@@ -262,15 +262,15 @@ export class SmtpProvider {
       fallbackFrom = sender.account.address;
     } else if (sender.account) {
       const account = sender.account;
+      let info: { messageId: string } | undefined;
       try {
         const transport = this.accountTransport(account);
-        const info = await transport.sendMail(
+        info = await transport.sendMail(
           this.mailOptions(options, sender, {
             name: sender.displayName ?? account.displayName,
             address: account.address,
           }),
         );
-        return this.succeeded(options, this.fromTextOf(sender), info);
       } catch (error) {
         const errorMessage = describeSmtpError(error);
         // Şifre çözülemedi (anahtar yok/değişti) ya da kutunun oturumu/bağlantısı
@@ -296,6 +296,16 @@ export class SmtpProvider {
         );
         fallbackFrom = account.address;
       }
+      // Gönderim sonrası işler try DIŞINDA: buradaki bir hata, gitmiş bir
+      // e-postayı "kutu hatası" sanıp varsayılan kimlikle ikinci kez yollatmasın.
+      if (info) {
+        // Kutu "hatalı" işaretliyken başarılı gönderim işareti kaldırır —
+        // yalnız o geçişte yazılır, her gönderimde değil.
+        if (account.lastTestOk === false) {
+          await this.routing?.clearAccountFailure(account.id);
+        }
+        return this.succeeded(options, this.fromTextOf(sender), info);
+      }
     }
 
     const metadata = fallbackFrom
@@ -315,7 +325,12 @@ export class SmtpProvider {
   /**
    * Admin "Test gönder": tek bir kutunun KENDİ oturumuyla gerçek bir e-posta
    * gönderir. Varsayılan kimliğe düşmez — amaç kutunun çalıştığını görmek.
-   * Sonuç kutuya yazılır (son test alanları).
+   *
+   * Kutunun sağlığı (son test alanları) yalnız KUTUYA ait sonuçla yazılır:
+   * başarı ya da kutu hatası (oturum, bağlantı, TLS, DNS, MAIL FROM, şifre
+   * çözülemedi — `isSenderAccountFailure`). Alıcı/içerik reddi (RCPT TO,
+   * DATA) kutunun değil adresin sorunudur: çağırana `ok:false` + hata metni
+   * döner, kutunun sağlık kaydına dokunulmaz.
    */
   async sendThroughAccount(
     account: MailSenderAccountRecord,
@@ -331,35 +346,38 @@ export class SmtpProvider {
       displayName: account.displayName,
       replyTo: undefined,
     };
-    let result: SmtpResponse;
     if (!(account.host || this.defaultTarget.host)) {
-      result = { success: false, error: "SMTP is not configured" };
-    } else {
-      try {
-        const info = await this.accountTransport(account).sendMail(
-          this.mailOptions(options, sender, {
-            name: account.displayName,
-            address: account.address,
-          }),
-        );
-        result = await this.succeeded(options, this.fromTextOf(sender), info);
-      } catch (error) {
+      // Sunucu yapılandırması eksik: kutunun kendisi hakkında bir şey söylemez.
+      return { ok: false, error: "SMTP is not configured" };
+    }
+    try {
+      const info = await this.accountTransport(account).sendMail(
+        this.mailOptions(options, sender, {
+          name: account.displayName,
+          address: account.address,
+        }),
+      );
+      await this.succeeded(options, this.fromTextOf(sender), info);
+      // Başarılı test kutuyu hemen yeniden devreye alır (soğuma beklenmez).
+      this.accountCooldowns.delete(account.id);
+      await this.routing?.recordAccountResult(account.id, true, null);
+      return { ok: true, error: null };
+    } catch (error) {
+      const errorMessage = describeSmtpError(error);
+      await this.failed(options, this.fromTextOf(sender), errorMessage);
+      if (
+        isSenderAccountFailure(error) ||
+        error instanceof SenderAccountUnusableError
+      ) {
         this.dropAccountTransport(account.id);
-        result = await this.failed(
-          options,
-          this.fromTextOf(sender),
-          describeSmtpError(error),
+        await this.routing?.recordAccountResult(
+          account.id,
+          false,
+          errorMessage,
         );
       }
+      return { ok: false, error: errorMessage };
     }
-    // Başarılı test kutuyu hemen yeniden devreye alır (soğuma beklenmez).
-    if (result.success) this.accountCooldowns.delete(account.id);
-    await this.routing?.recordAccountResult(
-      account.id,
-      result.success,
-      result.error ?? null,
-    );
-    return { ok: result.success, error: result.error ?? null };
   }
 
   private isCoolingDown(account: MailSenderAccountRecord): boolean {

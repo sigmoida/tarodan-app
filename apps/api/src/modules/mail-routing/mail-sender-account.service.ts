@@ -6,11 +6,12 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { Prisma, type MailSenderAccount } from "@prisma/client";
-import type {
-  MailAccountTestResult,
-  MailAreaId,
-  MailSenderAccountInput,
-  MailSenderAccountView,
+import {
+  isValidMailDisplayName,
+  type MailAccountTestResult,
+  type MailAreaId,
+  type MailSenderAccountInput,
+  type MailSenderAccountView,
 } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
@@ -20,7 +21,6 @@ import { MailAccountCipher } from "../mail/mail-account-cipher";
 import {
   isMailAreaId,
   isValidMailAddress,
-  isValidMailDisplayName,
   normalizeMailAddress,
 } from "../mail/helpers/mail-area-settings";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
@@ -95,8 +95,17 @@ export class MailSenderAccountService {
         host: patch.host !== undefined ? patch.host : current.host,
         port: patch.port !== undefined ? patch.port : current.port,
         secure: patch.secure !== undefined ? patch.secure : current.secure,
+        // Kullanıcı adı adresi izliyorsa (boş bırakılıp adresle doldurulmuş)
+        // ve istek kullanıcı adı taşımıyorsa yeniden türetilir (null → yeni
+        // adres). Yoksa adres değişince kutu ESKİ kullanıcıyla oturum açıp YENİ
+        // adresten gönderir; sunucu MAIL FROM'u reddeder ve her e-posta sessizce
+        // varsayılan kimliğe düşerdi.
         username:
-          patch.username !== undefined ? patch.username : current.username,
+          patch.username !== undefined
+            ? patch.username
+            : current.username === current.address
+              ? null
+              : current.username,
       });
       if (fields.address !== current.address) {
         await this.assertAddressFree(tx, fields.address);

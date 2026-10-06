@@ -1,5 +1,10 @@
 import type { MailAreaId } from "@tarodan/types";
-import { MailInternalDeliveryService } from "./mail-internal-delivery.service";
+import {
+  MAIL_DIGEST_BATCH_LIMIT,
+  MAIL_DIGEST_MAX_MAILS_PER_AREA,
+  MAIL_INSTANT_GRACE_MS,
+  MailInternalDeliveryService,
+} from "./mail-internal-delivery.service";
 import {
   defaultAreaRouting,
   type MailAreaRouting,
@@ -73,20 +78,25 @@ function build(areaRouting: MailAreaRouting, rows: NoticeRow[] = []) {
           return row;
         },
       ),
-      update: jest.fn(
+      // Tek satır hedefli (`where.id` metin) yazımlar depoya uygulanır;
+      // özet işinin toplu yazımları yalnız kaydedilir.
+      updateMany: jest.fn(
         async ({
           where,
           data,
         }: {
-          where: { id: string };
+          where: { id?: unknown; sentAt?: unknown };
           data: Partial<NoticeRow>;
         }) => {
-          const row = store.find((r) => r.id === where.id)!;
+          if (typeof where.id !== "string") return { count: 0 };
+          const row = store.find(
+            (r) => r.id === where.id && (where.sentAt !== null || !r.sentAt),
+          );
+          if (!row) return { count: 0 };
           Object.assign(row, data);
-          return row;
+          return { count: 1 };
         },
       ),
-      updateMany: jest.fn(async () => ({ count: 0 })),
       findMany: jest.fn(async () => []),
       deleteMany: jest.fn(async () => ({ count: 0 })),
     },
@@ -239,7 +249,9 @@ describe("MailInternalDeliveryService.runDigest — özet işi", () => {
       // 2) alanın adayları
       .mockResolvedValueOnce([{ id: "n1" }, { id: "n2" }])
       // 3) sahiplenilen satırlar
-      .mockResolvedValueOnce(claimed) as never;
+      .mockResolvedValueOnce(claimed)
+      // 4) aynı alan için yeni turda aday kalmadı → döngü biter
+      .mockResolvedValue([]) as never;
     return t;
   }
 
@@ -267,7 +279,7 @@ describe("MailInternalDeliveryService.runDigest — özet işi", () => {
       ([args]) =>
         args.data.claimId === null &&
         "claimedAt" in args.data &&
-        args.where.claimId !== undefined,
+        typeof args.where.claimId === "string",
     );
     expect(release).toBeDefined();
   });
@@ -281,7 +293,7 @@ describe("MailInternalDeliveryService.runDigest — özet işi", () => {
     expect(summary.stats).toMatchObject({ dropped: 2 });
   });
 
-  it("günlük koşu eski gönderilmiş kayıtları temizler", async () => {
+  it("günlük koşu eski kayıtları temizler — gönderilememiş eskiler dahil", async () => {
     const t = build(orderArea("daily"));
     t.prisma.mailInternalNotice.findMany = jest
       .fn()
@@ -290,7 +302,129 @@ describe("MailInternalDeliveryService.runDigest — özet işi", () => {
     await t.service.runDigest("daily");
 
     expect(t.prisma.mailInternalNotice.deleteMany).toHaveBeenCalledWith({
-      where: { sentAt: { lt: expect.any(Date) } },
+      where: {
+        OR: [
+          { sentAt: { lt: expect.any(Date) } },
+          { sentAt: null, createdAt: { lt: expect.any(Date) } },
+        ],
+      },
     });
+  });
+
+  it("saatlik koşu yalnız saklama yapmaz", async () => {
+    const t = build(orderArea("hourly"));
+    t.prisma.mailInternalNotice.findMany = jest
+      .fn()
+      .mockResolvedValue([]) as never;
+
+    await t.service.runDigest("hourly");
+
+    expect(t.prisma.mailInternalNotice.deleteMany).not.toHaveBeenCalled();
+  });
+
+  /** Alan kuyruğu: her tur `batch` aday + o kadar sahiplenilmiş satır döner. */
+  function backlogHarness(batches: number, perBatch = 2) {
+    const t = build(orderArea("daily"));
+    const findMany = jest.fn().mockResolvedValueOnce([{ areaId: "order" }]);
+    for (let b = 0; b < batches; b++) {
+      const ids = Array.from({ length: perBatch }, (_, i) => `b${b}-${i}`);
+      findMany
+        .mockResolvedValueOnce(ids.map((id) => ({ id })))
+        .mockResolvedValueOnce(ids.map((id) => pendingRow(id, "order")));
+    }
+    findMany.mockResolvedValue([]);
+    t.prisma.mailInternalNotice.findMany = findMany as never;
+    return t;
+  }
+
+  it("birikmiş kuyruğu aynı koşuda boşaltır: tur başına bir özet e-postası", async () => {
+    const t = backlogHarness(3);
+
+    const summary = await t.service.runDigest("daily");
+
+    expect(t.smtp.sendEmail).toHaveBeenCalledTimes(3);
+    expect(summary.stats).toMatchObject({ mails: 3, events: 6, capped: 0 });
+  });
+
+  it("alan başına koşu sınırında durur ve bunu bildirir", async () => {
+    const t = backlogHarness(MAIL_DIGEST_MAX_MAILS_PER_AREA + 2);
+
+    const summary = await t.service.runDigest("daily");
+
+    expect(t.smtp.sendEmail).toHaveBeenCalledTimes(
+      MAIL_DIGEST_MAX_MAILS_PER_AREA,
+    );
+    expect(summary.stats).toMatchObject({ capped: 1 });
+  });
+
+  it("aday sorgusu en eski önce ve parti sınırıyla", async () => {
+    const t = backlogHarness(1);
+
+    await t.service.runDigest("daily");
+
+    const candidateQuery = (
+      t.prisma.mailInternalNotice.findMany as unknown as jest.Mock
+    ).mock.calls[1][0];
+    expect(candidateQuery).toMatchObject({
+      orderBy: { createdAt: "asc" },
+      take: MAIL_DIGEST_BATCH_LIMIT,
+    });
+  });
+
+  it("saatlik koşu ölü anlık kayıtları (süresi geçmiş, gönderilmemiş) da toplar", async () => {
+    const t = build(orderArea("hourly"));
+    const findMany = jest.fn().mockResolvedValue([]);
+    t.prisma.mailInternalNotice.findMany = findMany as never;
+    const now = Date.now();
+
+    await t.service.runDigest("hourly");
+
+    const where = findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ sentAt: null, claimId: null });
+    expect(where.OR).toEqual([
+      { delivery: "hourly" },
+      { delivery: "instant", createdAt: { lt: expect.any(Date) } },
+    ]);
+    const graceCutoff = where.OR[1].createdAt.lt.getTime();
+    expect(now - graceCutoff).toBeGreaterThanOrEqual(
+      MAIL_INSTANT_GRACE_MS - 1000,
+    );
+  });
+
+  it("günlük koşu anlık kayıtlara dokunmaz", async () => {
+    const t = build(orderArea("daily"));
+    const findMany = jest.fn().mockResolvedValue([]);
+    t.prisma.mailInternalNotice.findMany = findMany as never;
+
+    await t.service.runDigest("daily");
+
+    expect(findMany.mock.calls[0][0].where).toEqual({
+      delivery: "daily",
+      sentAt: null,
+      claimId: null,
+    });
+  });
+});
+
+describe("anlık kayıt — özet işiyle yarış", () => {
+  it("özet işi ölü sayıp sahiplendiyse outbox yeniden denemesi göndermez", async () => {
+    const t = build(orderArea("instant"));
+    t.prisma.mailInternalNotice.upsert.mockResolvedValueOnce({
+      id: "n-1",
+      sourceKey: "evt-1",
+      areaId: "order",
+      eventId: "order.paid",
+      delivery: "instant",
+      payload: payload.notice,
+      occurredAt: new Date(),
+      claimId: "digest-claim",
+      claimedAt: new Date(),
+      sentAt: null,
+      createdAt: new Date(),
+    });
+
+    await t.service.handleEvent(payload, { id: "evt-1" });
+
+    expect(t.smtp.sendEmail).not.toHaveBeenCalled();
   });
 });

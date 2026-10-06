@@ -335,6 +335,11 @@ export class AdminOrderCancelService {
         tx,
       );
     });
+    // Personel bildirimi commit SONRASI (işlem içinde ek okuma yok).
+    void this.orderService.notifyStaffUnpaidCancelled(
+      order.id,
+      "admin_cancelled",
+    );
     return {
       result: { orderId: order.id, kind: "unpaid" },
       // İptal bu işlemde kesinleşti: duyuru bu çağrınındır.

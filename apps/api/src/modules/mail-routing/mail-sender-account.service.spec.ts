@@ -154,6 +154,62 @@ describe("MailSenderAccountService.create", () => {
 });
 
 describe("MailSenderAccountService.update", () => {
+  describe("kullanıcı adı adres değişimini izler", () => {
+    it("kullanıcı adı eski adresse ve istek kullanıcı adı taşımıyorsa yeni adrese geçer", async () => {
+      const { service, tx } = build({ existing: row() });
+
+      await service.update(
+        "acc-1",
+        { address: "Iptal@Tarodan.com.tr" },
+        "admin-1",
+      );
+
+      const data = tx.mailSenderAccount.update.mock.calls[0][0].data;
+      expect(data.address).toBe("iptal@tarodan.com.tr");
+      expect(data.username).toBe("iptal@tarodan.com.tr");
+    });
+
+    it("ayrı bir kullanıcı adı girilmişse adres değişse de korunur", async () => {
+      const { service, tx } = build({
+        existing: row({ username: "smtp-login-42" }),
+      });
+
+      await service.update(
+        "acc-1",
+        { address: "iptal@tarodan.com.tr" },
+        "admin-1",
+      );
+
+      expect(tx.mailSenderAccount.update.mock.calls[0][0].data.username).toBe(
+        "smtp-login-42",
+      );
+    });
+
+    it("istek kullanıcı adı taşıyorsa o kazanır", async () => {
+      const { service, tx } = build({ existing: row() });
+
+      await service.update(
+        "acc-1",
+        { address: "iptal@tarodan.com.tr", username: "custom-user" },
+        "admin-1",
+      );
+
+      expect(tx.mailSenderAccount.update.mock.calls[0][0].data.username).toBe(
+        "custom-user",
+      );
+    });
+
+    it("adres değişmeden yapılan düzenleme kullanıcı adını değiştirmez", async () => {
+      const { service, tx } = build({ existing: row() });
+
+      await service.update("acc-1", { displayName: "Sipariş" }, "admin-1");
+
+      expect(tx.mailSenderAccount.update.mock.calls[0][0].data.username).toBe(
+        "siparis@tarodan.com.tr",
+      );
+    });
+  });
+
   it("şifre verilmezse kayıtlıdakini korur ve oturumu düşürür", async () => {
     const { service, tx, cipher, smtp } = build({ existing: row() });
 

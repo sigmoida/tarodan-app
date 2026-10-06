@@ -3,6 +3,7 @@ import {
   MAIL_AREAS,
   MAIL_DELIVERY_MODES,
   MAIL_INTERNAL_EVENTS,
+  MAIL_INTERNAL_RECIPIENTS_MAX,
   type MailAreaId,
   type MailDeliveryMode,
   type MailInternalEventId,
@@ -16,18 +17,37 @@ import {
  * satır gönderimi düşürmez, varsayılana çekilir.
  */
 
-/** Alan başına en çok iç bildirim alıcısı (sözleşme). */
-export const MAX_INTERNAL_RECIPIENTS = 20;
-
-/** Görünen ad / alan adı için üst sınır (From başlığı kısa kalsın). */
-export const MAX_MAIL_DISPLAY_NAME_LENGTH = 100;
-
-/** Olay ayarı olmayan (ya da bozuk) kaydın varsayılanı: kapalı + anlık. */
+/** Olay ayarı olmayan (ya da bozuk) kaydın teslim modu. */
 export const DEFAULT_MAIL_EVENT_DELIVERY: MailDeliveryMode = "instant";
 
 export const MAIL_INTERNAL_EVENT_IDS = Object.keys(
   MAIL_INTERNAL_EVENTS,
 ) as MailInternalEventId[];
+
+/**
+ * Ayarı kaydedilmemiş olayın durumu — olay başına varsayılanların TEK yeri.
+ * Hepsi kapalıdır; tek istisna misafir iletişim mesajı: o e-posta Mail
+ * Yönlendirme'den önce de her zaman gidiyordu. Varsayılanı açık olduğu için
+ * alana alıcı eklemek bildirimi kapatmaz, yalnız yönünü değiştirir; admin
+ * isterse açıkça kapatır.
+ */
+const MAIL_EVENT_DEFAULTS: Partial<
+  Record<MailInternalEventId, Omit<MailInternalEventState, "id">>
+> = {
+  "support.guestMessage": { enabled: true, delivery: "instant" },
+};
+
+export function defaultMailEventState(
+  id: MailInternalEventId,
+): MailInternalEventState {
+  return {
+    id,
+    ...(MAIL_EVENT_DEFAULTS[id] ?? {
+      enabled: false,
+      delivery: DEFAULT_MAIL_EVENT_DELIVERY,
+    }),
+  };
+}
 
 export function isMailAreaId(value: unknown): value is MailAreaId {
   return (
@@ -75,16 +95,6 @@ export function isValidMailAddress(value: string): boolean {
   return !/[\r\n]/.test(value) && isEmail(value);
 }
 
-/** Görünen ad From başlığına girer: satır sonu ve tırnak kabul edilmez. */
-export function isValidMailDisplayName(value: string): boolean {
-  const trimmed = value.trim();
-  return (
-    trimmed.length > 0 &&
-    trimmed.length <= MAX_MAIL_DISPLAY_NAME_LENGTH &&
-    !/[\r\n"<>\\]/.test(trimmed)
-  );
-}
-
 /** `"Ad" <adres>` — EmailLog'un `from` kolonu ve admin ekranı için metin. */
 export function formatMailFrom(displayName: string, address: string): string {
   return `"${displayName}" <${address}>`;
@@ -99,13 +109,14 @@ export function parseInternalRecipients(raw: unknown): string[] {
     const address = normalizeMailAddress(entry);
     if (isValidMailAddress(address)) seen.add(address);
   }
-  return [...seen].slice(0, MAX_INTERNAL_RECIPIENTS);
+  return [...seen].slice(0, MAIL_INTERNAL_RECIPIENTS_MAX);
 }
 
 /**
  * `events` JSON kolonu → alanın olaylarının TAM listesi (kayıt sırasıyla).
- * Kayıtta olmayan ya da bozuk olay kapalı + anlık sayılır; başka alanın olayı
- * yok sayılır.
+ * Kayıtta olmayan olay `defaultMailEventState`; bozuk alan (enabled boolean
+ * değil, teslim modu bilinmiyor) o alanın varsayılanına düşer; başka alanın
+ * olayı yok sayılır.
  */
 export function parseMailEventStates(
   area: MailAreaId,
@@ -116,6 +127,7 @@ export function parseMailEventStates(
       ? (raw as Record<string, unknown>)
       : {};
   return mailEventsOfArea(area).map((id) => {
+    const fallback = defaultMailEventState(id);
     const entry = stored[id];
     const value =
       entry && typeof entry === "object"
@@ -123,10 +135,11 @@ export function parseMailEventStates(
         : {};
     return {
       id,
-      enabled: value.enabled === true,
+      enabled:
+        typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
       delivery: isMailDeliveryMode(value.delivery)
         ? value.delivery
-        : DEFAULT_MAIL_EVENT_DELIVERY,
+        : fallback.delivery,
     };
   });
 }

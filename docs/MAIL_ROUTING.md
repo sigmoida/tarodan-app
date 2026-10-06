@@ -166,8 +166,19 @@ Validation errors are 400 with the repo's usual i18n message shape. Email addres
   sunucu yapılandırma eksiği.
 - **`DELETE` 409** gövdesi `server.mailRouting.accountInUse` ve kullanan alan
   kimliklerini (`{areas}`) taşır.
-- **Okuma ucu dahil** bütün uçlar `@Roles(super_admin)`; izin matrisi segmenti
-  `mail-routing` → `settings`.
+- **Okuma / yazma ayrımı** (Süreler ve Kurallar ile aynı): `GET` her admin
+  rolüne açıktır ve asıl kapı izin matrisidir (segment `mail-routing` →
+  `settings`; super_admin her zaman geçer) — ekranın salt-okunur görünümü
+  buna dayanır. Bütün değişiklikler ve test gönderimi yalnız super_admin.
+  Okuma yanıtında sır yoktur: şifre ve şifreli hali dönmez (`hasPassword`).
+- **Ortak kurallar `@tarodan/types`te**: `MAIL_DISPLAY_NAME_MAX_LENGTH` (100),
+  `MAIL_INTERNAL_RECIPIENTS_MAX` (20), `isValidMailDisplayName` — kırpılmış
+  değer boş olmamalı, en çok 100 karakter, ve CR, LF, `"`, `<`, `>`, `\`
+  içermemeli. API ve admin formu aynı fonksiyonu çağırır.
+- **Kullanıcı adı adresi izler**: güncelleme adresi değiştirip kullanıcı adı
+  taşımıyorsa ve kayıtlı kullanıcı adı eski adresle aynıysa, kullanıcı adı yeni
+  adrese geçer (yoksa kutu eski kullanıcıyla oturum açıp yeni adresten
+  gönderir, sunucu MAIL FROM'u reddeder).
 - `POST …/test` ayrıca `@Throttle` 10/dk (gerçek SMTP oturumu açar).
 
 ## Nasıl çalışır
@@ -237,6 +248,14 @@ olunca soğuma biter. Alıcı reddi (`RCPT TO`) ve içerik reddi hesap hatası
 sayılmaz: yeniden gönderilmez, başarısız döner. Hesap oturumlarının bağlantı
 zaman aşımı 15 sn'dir.
 
+**Sağlık işareti.** "Hatalı" işaretli (`lastTestOk=false`) bir kutudan
+başarılı bir gerçek gönderim işareti kaldırır — yalnız o geçişte, koşullu
+yazımla (`lastTestOk = false` olan satır); sağlıklı kutunun gönderimleri hiçbir
+şey yazmaz. Admin test gönderiminde de yalnız kutuya ait sonuç (başarı ya da
+oturum/bağlantı/TLS/DNS/MAIL FROM/şifre hatası) sağlığı yazar; alıcı ya da
+içerik reddi çağırana `ok:false` + hata metni olarak döner, kutunun sağlık
+kaydına dokunulmaz.
+
 `List-Unsubscribe` başlıkları ve satır sonu (CRLF) savunmaları değişmedi:
 görünen ad tırnak / `<>` / satır sonu içeremez, adresler `class-validator`
 `isEmail` ile doğrulanır, From nodemailer'a adres nesnesi olarak verilir.
@@ -256,7 +275,7 @@ hesabın şifresi panelden yeniden girilmelidir.
 ### İç bildirimler (personel postası)
 
 ```
-iş olayı ─► MailInternalNotifier.emit(eventId, notice, {isTest, dedupeKey, tx?})
+iş olayı (commit SONRASI) ─► MailInternalNotifier.emit(eventId, notice, {isTest, dedupeKey})
               │  test şeridi → bırak; olay kapalı / alıcı yok → bırak (önbellekli ön eleme)
               ▼
          outbox_events (type mail.internal_event, dedupe: eventId + iş anahtarı)
@@ -266,24 +285,31 @@ iş olayı ─► MailInternalNotifier.emit(eventId, notice, {isTest, dedupeKey,
               ├─ instant  → alanın kutusundan alanın alıcılarına TEK e-posta → sentAt
               └─ hourly / daily → bekler
          mail-digest-hourly (her saat başı) / mail-digest-daily (09:00 Europe/Istanbul)
-              └─ alan başına TEK özet e-postası (en çok 200 olay), satırlar sahiplenilir
+              └─ alan başına özet e-postaları (her biri en çok 200 olay, kuyruk boşalana ya da
+                 koşu başına 20 e-postaya kadar), satırlar sahiplenilir; saatlik koşu
+                 15 dk'dan eski, gönderilmemiş anlık satırları (outbox denemeleri tükenmiş) da toplar
 ```
 
 - İş işlemi SMTP'yi **hiç beklemez**; e-posta hatası işlemi **hiç bozmaz**.
-  `emit` tx'siz çağrıldığında fırlatmaz; tx ile çağrıldığında (yalnız ödenmemiş
-  sipariş iptali) satır iptalle aynı işlemde yazılır — iptal geri alınırsa
-  bildirim de yoktur.
+  `emit` her yerde commit SONRASI çağrılır ve fırlatmaz; açık bir işlemin
+  içinde ek sorgu ya da ikinci bağlantıdan ayar okuması yapılmaz.
+- **Olay varsayılanları** (tek yer: `defaultMailEventState`): her olay
+  kapalı + anlık; tek istisna `support.guestMessage` — **açık + anlık**, çünkü
+  bu e-posta Mail Yönlendirme'den önce de her zaman gidiyordu. Admin açıkça
+  kapatabilir.
 - Alanın alıcısı yoksa olay sessizce bırakılır. **İstisna — misafir mesajı:**
   `guestMessage` alanına alıcı girilmediği sürece misafir iletişim mesajı eski
-  davranışla `SUPPORT_NOTIFICATION_EMAIL`'e (yoksa `destek@tarodan.com.tr`)
-  **olay anahtarından bağımsız, anında** gider. Alıcı girildiği anda alanın
-  açık/kapalı ve teslim ayarı geçerli olur.
+  adrese, `SUPPORT_NOTIFICATION_EMAIL`'e (yoksa `destek@tarodan.com.tr`)
+  gider. Alıcı eklemek e-postayı kesmez, yönünü alıcılara çevirir.
 - Özet işi, olay anında seçili teslim moduyla saklanan satırları gönderir
   (sonradan mod değişirse bekleyen satır taşınmaz). Gönderim anında alanın
   alıcısı kalmamışsa birikmiş satırlar bırakılır. Başarısız gönderimde
   sahiplenme bırakılır, iş "başarısız" görünür ve bir sonraki koşu yeniden
-  dener; 30 dk'dan eski yarım sahiplenmeler geri alınır. Günlük koşu 90
-  günden eski gönderilmiş satırları siler.
+  dener; 30 dk'dan eski yarım sahiplenmeler geri alınır. Birikmiş kuyruk aynı
+  koşuda boşaltılır (alan başına en çok 20 e-posta × 200 olay; sınır dolarsa
+  loglanır, kalan sonraki koşuya kalır). Outbox denemeleri tükenmiş anlık
+  satırlar (15 dk'dan eski, gönderilmemiş) saatlik özete katılır. Günlük koşu
+  90 günden eski satırları siler — gönderilmemiş olanlar dahil.
 - Her e-posta: iş numaralı kısa konu, birkaç olgu (kim, tutar — e-posta
   şablonlarıyla aynı `formatEmailPrice`, durum), admin panelinde ilgili
   sayfaya link (`ADMIN_URL`). **Kimlik no, IBAN, tam adres ve mesaj gövdesi
@@ -291,20 +317,20 @@ iş olayı ─► MailInternalNotifier.emit(eventId, notice, {isTest, dedupeKey,
   `server.mailRouting.internal.*` katalog anahtarlarındandır (Türkçe).
 - Test şeridi (`isTest` sipariş/takas, `isTestAccount` kullanıcı) bildirilmez.
 
-| Olay                       | Nerede (commit sonrası, aksi belirtilmedikçe)                                                                                                                                                                                                                                  | Tekilleştirme            | Panel linki                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | -------------------------- |
-| `order.paid`               | `PaymentFulfillmentService` — sepet ödemesi (`processSuccessfulGroupPayment`, sepet başına tek e-posta, siparişler listelenir) ve grupsuz fiziksel sipariş (teklif siparişi)                                                                                                   | sepet (yoksa sipariş) id | sipariş / sipariş listesi  |
-| `order.cancelled`          | Ödenmemiş: `OrderLifecycleService.cancelUnpaidOrderInTx` (alıcı, misafir, sepet, yönetici; **iptal tx'inde**). Ödenmiş: `PaymentRefundService.processRefund` siparişi kapattığında (alıcı kargo öncesi iptal, yönetici iptali, stok kaskadı, kargolamama cron'u, ödeme yarışı) | sipariş id               | sipariş                    |
-| `refund.requested`         | `RefundNotificationService.notifyRefundRequestOpened` — kalıcı iade talebinin tek açılış noktası (inceleme gerektiren iptal/iade + teslim sonrası iade)                                                                                                                        | iade numarası            | iade talebi                |
-| `trade.started`            | `TradeLifecycleService.acceptTrade`                                                                                                                                                                                                                                            | takas numarası           | takas                      |
-| `trade.disputed`           | `TradeLifecycleService.raiseDispute`                                                                                                                                                                                                                                           | takas numarası           | takas                      |
-| `offer.converted`          | `OfferService.accept` (teklif kabul → sipariş)                                                                                                                                                                                                                                 | sipariş numarası         | teklif                     |
-| `support.ticketOpened`     | `SupportService.createTicket`                                                                                                                                                                                                                                                  | talep numarası           | destek talebi              |
-| `support.guestMessage`     | `SupportService.createGuestContact` (eski `sendGuestContactAdminEmail` kaldırıldı)                                                                                                                                                                                             | referans numarası        | Destek → Misafir mesajları |
-| `report.productReported`   | `UserReportService.createReport` (yalnız `product` türü)                                                                                                                                                                                                                       | şikayet id               | şikayet                    |
-| `listing.pendingApproval`  | `emitListingPendingApproval` (product/helpers): oluşturma (AI görsel denetimi yoksa), AI moderasyon işinin kuyrukta bıraktığı ilan, düzenleme sonrası yeniden onay, yeniden açma, yenileme — ilan gönderimde hâlâ `pending` değilse (oto-onay) bildirilmez                     | ilan + giriş anı         | ilan                       |
-| `discount.createdBySeller` | `DiscountCrudService.create` (`isAdmin=false`; admin indirimleri bildirilmez)                                                                                                                                                                                                  | indirim id               | İndirimler                 |
-| `boost.purchased`          | `PaymentFulfillmentService` — öne çıkarma ödemesi tamamlanınca                                                                                                                                                                                                                 | sipariş numarası         | öne çıkarma satın alımı    |
+| Olay                       | Nerede (commit sonrası, aksi belirtilmedikçe)                                                                                                                                                                                                                                                                                                                   | Tekilleştirme            | Panel linki                |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------------------------- |
+| `order.paid`               | `PaymentFulfillmentService` — sepet ödemesi (`processSuccessfulGroupPayment`, sepet başına tek e-posta, siparişler listelenir) ve grupsuz fiziksel sipariş (teklif siparişi)                                                                                                                                                                                    | sepet (yoksa sipariş) id | sipariş / sipariş listesi  |
+| `order.cancelled`          | Ödenmemiş: `OrderLifecycleService.notifyStaffUnpaidCancelled`, iptal işlemi bittikten sonra çağıranlarda (`cancel` — alıcı, misafir, sepet; `AdminOrderCancelService.cancelUnpaid` — yönetici). Ödenmiş: `PaymentRefundService.processRefund` siparişi kapattığında (alıcı kargo öncesi iptal, yönetici iptali, stok kaskadı, kargolamama cron'u, ödeme yarışı) | sipariş id               | sipariş                    |
+| `refund.requested`         | `RefundNotificationService.notifyRefundRequestOpened` — kalıcı iade talebinin tek açılış noktası (inceleme gerektiren iptal/iade + teslim sonrası iade)                                                                                                                                                                                                         | iade numarası            | iade talebi                |
+| `trade.started`            | `TradeLifecycleService.acceptTrade`                                                                                                                                                                                                                                                                                                                             | takas numarası           | takas                      |
+| `trade.disputed`           | `TradeLifecycleService.raiseDispute`                                                                                                                                                                                                                                                                                                                            | takas numarası           | takas                      |
+| `offer.converted`          | `OfferService.accept` (teklif kabul → sipariş)                                                                                                                                                                                                                                                                                                                  | sipariş numarası         | teklif                     |
+| `support.ticketOpened`     | `SupportService.createTicket`                                                                                                                                                                                                                                                                                                                                   | talep numarası           | destek talebi              |
+| `support.guestMessage`     | `SupportService.createGuestContact` (eski `sendGuestContactAdminEmail` kaldırıldı)                                                                                                                                                                                                                                                                              | referans numarası        | Destek → Misafir mesajları |
+| `report.productReported`   | `UserReportService.createReport` (yalnız `product` türü)                                                                                                                                                                                                                                                                                                        | şikayet id               | şikayet                    |
+| `listing.pendingApproval`  | `emitListingPendingApproval` (product/helpers): oluşturma (AI görsel denetimi yoksa), AI moderasyon işinin kuyrukta bıraktığı ilan, düzenleme sonrası yeniden onay, yeniden açma, yenileme — ilan gönderimde hâlâ `pending` değilse (oto-onay) bildirilmez                                                                                                      | ilan + giriş anı         | ilan                       |
+| `discount.createdBySeller` | `DiscountCrudService.create` (`isAdmin=false`; admin indirimleri bildirilmez)                                                                                                                                                                                                                                                                                   | indirim id               | İndirimler                 |
+| `boost.purchased`          | `PaymentFulfillmentService` — öne çıkarma ödemesi tamamlanınca                                                                                                                                                                                                                                                                                                  | sipariş numarası         | öne çıkarma satın alımı    |
 
 Bilinçli kapsam dışı: ödeme süresi dolan (hiç ödenmemiş) siparişlerin sistem
 iptali `order.cancelled` olarak bildirilmez — terk edilmiş ödeme ekranıdır,

@@ -39,10 +39,13 @@ import { AdminMailRoutingService } from "./admin-mail-routing.service";
 
 /**
  * Mail Yönlendirme (Sistem → Mail Yönlendirme): gönderici kutuları, alan
- * atamaları, iç bildirim alıcıları ve olay ayarları. Okuma dahil TAMAMI
- * super_admin'e açık — ekran posta kutusu kimliklerini ve personel adreslerini
- * gösterir. İzin matrisi segmenti `mail-routing` → `settings`.
- * Ayrıntı: docs/MAIL_ROUTING.md.
+ * atamaları, iç bildirim alıcıları ve olay ayarları. Süreler ve Kurallar ile
+ * aynı ayrım: OKUMA `settings` iznini taşıyan her admin rolüne açık (izin
+ * matrisi segmenti `mail-routing` → `settings`; super_admin her zaman geçer),
+ * DEĞİŞTİRME ve gerçek test gönderimi yalnız super_admin. Okuma yanıtında sır
+ * yoktur: şifre ve şifreli hali dönmez (`hasPassword`), kalanlar posta kutusu
+ * adresleri, SMTP sunucu/port/kullanıcı adı, son test sonucu ve personel
+ * adresleridir. Ayrıntı: docs/MAIL_ROUTING.md.
  */
 @ApiTags("admin")
 @Controller("admin")
@@ -53,7 +56,9 @@ export class AdminMailRoutingController {
   constructor(private readonly service: AdminMailRoutingService) {}
 
   @Get("mail-routing")
-  @Roles(AdminRole.super_admin)
+  // Her admin rolü; asıl kapı izin matrisidir (`settings`). Ayar ekranının
+  // salt-okunur görünümü bu uca dayanır.
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
     summary:
       "Mail Yönlendirme durumu: varsayılan kimlik, gönderici kutuları (şifresiz) ve alanlar",

@@ -6,6 +6,7 @@ import {
   type MailAreaRouting,
 } from "../../mail/mail-routing-directory";
 import { OUTBOX_MAIL_INTERNAL_EVENT } from "../../outbox/outbox.types";
+import { parseMailEventStates } from "../../mail/helpers/mail-area-settings";
 import { guestMessageNotice } from "../helpers/mail-internal-notices";
 
 const routing = (
@@ -72,7 +73,7 @@ describe("internalNoticeRoute — gönderim kararı (notifier + handler ortak)",
       else process.env.SUPPORT_NOTIFICATION_EMAIL = original;
     });
 
-    it("alanın alıcısı yokken olay kapalı olsa bile SUPPORT_NOTIFICATION_EMAIL'e anında gider", () => {
+    it("hiç ayar yokken (olay varsayılanı açık) SUPPORT_NOTIFICATION_EMAIL'e anında gider", () => {
       process.env.SUPPORT_NOTIFICATION_EMAIL = "Destek@Tarodan.com.tr";
       expect(
         internalNoticeRoute("support.guestMessage", routing("guestMessage")),
@@ -87,11 +88,51 @@ describe("internalNoticeRoute — gönderim kararı (notifier + handler ortak)",
       ).toEqual(["destek@tarodan.com.tr"]);
     });
 
-    it("alıcı girildiğinde alanın ayarı geçerli olur (kapalıysa gitmez)", () => {
+    it("alıcı eklenip olay ayarı hiç kaydedilmemişse e-posta KESİLMEZ, alıcılara yönelir", () => {
+      // Satır `events: {}` ile yazılmış alan: parse varsayılanı uygular.
+      const added = routing("guestMessage", {
+        internalRecipients: ["x@tarodan.com.tr"],
+        events: parseMailEventStates("guestMessage", {}),
+      });
+      expect(internalNoticeRoute("support.guestMessage", added)).toEqual({
+        recipients: ["x@tarodan.com.tr"],
+        delivery: "instant",
+      });
+    });
+
+    it("olay listesinde kayıt yoksa da varsayılan (açık) geçerlidir", () => {
       expect(
         internalNoticeRoute(
           "support.guestMessage",
-          routing("guestMessage", { internalRecipients: ["x@tarodan.com.tr"] }),
+          routing("guestMessage", {
+            internalRecipients: ["x@tarodan.com.tr"],
+            events: [],
+          }),
+        ),
+      ).toEqual({ recipients: ["x@tarodan.com.tr"], delivery: "instant" });
+    });
+
+    it("admin açıkça kapattıysa gitmez (alıcı olsun olmasın)", () => {
+      const off = [
+        {
+          id: "support.guestMessage" as const,
+          enabled: false,
+          delivery: "instant" as const,
+        },
+      ];
+      expect(
+        internalNoticeRoute(
+          "support.guestMessage",
+          routing("guestMessage", { events: off }),
+        ),
+      ).toBeNull();
+      expect(
+        internalNoticeRoute(
+          "support.guestMessage",
+          routing("guestMessage", {
+            internalRecipients: ["x@tarodan.com.tr"],
+            events: off,
+          }),
         ),
       ).toBeNull();
     });
@@ -152,20 +193,11 @@ describe("MailInternalNotifier.emit", () => {
     expect(outbox.enqueue).toHaveBeenCalledTimes(1);
   });
 
-  it("tx yokken outbox hatası iş akışına YÜKSELMEZ", async () => {
+  it("outbox hatası iş akışına YÜKSELMEZ", async () => {
     const { notifier, outbox } = build(enabledOrderArea);
     outbox.enqueue.mockRejectedValue(new Error("db down"));
 
     await expect(notifier.emit("order.paid", notice)).resolves.toBeUndefined();
-  });
-
-  it("tx verilince satır o işlemin istemcisiyle yazılır", async () => {
-    const { notifier, outbox } = build(enabledOrderArea);
-    const tx = { tag: "tx" };
-
-    await notifier.emit("order.paid", notice, { tx: tx as never });
-
-    expect(outbox.enqueue.mock.calls[0][0]).toBe(tx);
   });
 
   it("misafir mesajı alıcısız alanda da kuyruğa girer (eski adres geri düşüşü)", async () => {

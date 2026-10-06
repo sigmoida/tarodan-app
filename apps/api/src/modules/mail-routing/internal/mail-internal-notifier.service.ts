@@ -21,12 +21,6 @@ export interface MailInternalEmitOptions {
    * iptal) hepsi aynı anahtarı kullanır → tek e-posta.
    */
   dedupeKey?: string;
-  /**
-   * Verilirse outbox satırı İŞ İŞLEMİNİN İÇİNDE yazılır: işlem geri alınırsa
-   * bildirim de yoktur. Bu modda satır yazımı işlemin bir parçasıdır (hata
-   * işlemle birlikte yükselir); SMTP yine işlemin dışında, commit sonrası.
-   */
-  tx?: Prisma.TransactionClient;
 }
 
 /** Outbox satırının deneme sınırı (personel postası; ölü satır panelde görünür). */
@@ -40,6 +34,10 @@ const MAIL_INTERNAL_MAX_ATTEMPTS = 5;
  *
  * Ön eleme: olay kapalıysa ya da alanın alıcısı yoksa satır hiç yazılmaz
  * (önbellekli ayardan; handler gönderim anında yeniden denetler).
+ *
+ * Yalnız COMMIT SONRASI çağrılır: kendi bağlantısından ayar okur ve satır
+ * yazar. Açık bir etkileşimli işlemin içinden çağırmak, o işlem sürerken
+ * havuzdan ikinci bir bağlantı tutardı — bu yüzden işlem istemcisi almaz.
  */
 @Injectable()
 export class MailInternalNotifier {
@@ -51,10 +49,7 @@ export class MailInternalNotifier {
     private readonly routing: MailRoutingDirectory,
   ) {}
 
-  /**
-   * `tx` yoksa ASLA fırlatmaz (çağıran `await` etse de etmese de iş akışı
-   * etkilenmez). `tx` varsa yalnız satır yazımının kendi hatası yükselir.
-   */
+  /** ASLA fırlatmaz: çağıran `await` etse de etmese de iş akışı etkilenmez. */
   async emit(
     eventId: MailInternalEventId,
     notice: MailInternalNoticePayload,
@@ -68,20 +63,13 @@ export class MailInternalNotifier {
       notice,
       occurredAt: new Date().toISOString(),
     };
-    const write = (db: Prisma.TransactionClient) =>
-      this.outbox.enqueue(db, {
+    try {
+      await this.outbox.enqueue(this.prisma, {
         type: OUTBOX_MAIL_INTERNAL_EVENT,
         payload: payload as unknown as Prisma.InputJsonValue,
         dedupeKey: `${OUTBOX_MAIL_INTERNAL_EVENT}:${eventId}:${options.dedupeKey ?? notice.ref}`,
         maxAttempts: MAIL_INTERNAL_MAX_ATTEMPTS,
       });
-
-    if (options.tx) {
-      await write(options.tx);
-      return;
-    }
-    try {
-      await write(this.prisma);
     } catch (error: unknown) {
       this.logger.error(
         `Personel bildirimi kuyruğa yazılamadı (${eventId} ${notice.ref}): ${error instanceof Error ? error.message : String(error)}`,

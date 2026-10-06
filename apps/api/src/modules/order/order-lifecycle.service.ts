@@ -511,6 +511,11 @@ export class OrderLifecycleService {
     if (productIdToInvalidate) {
       await this.orderCommon.invalidateProductCaches(productIdToInvalidate);
     }
+    void this.notifyStaffUnpaidCancelled(
+      orderId,
+      "buyer_cancelled",
+      dto?.reason?.trim() || undefined,
+    );
     return result;
   }
 
@@ -647,33 +652,56 @@ export class OrderLifecycleService {
       );
     }
 
-    // Personel bildirimi (Mail Yönlendirme, `order.cancelled`): outbox satırı
-    // İPTALLE AYNI işlemde — iptal geri alınırsa bildirim de yok. SMTP commit
-    // sonrası drainer'da. Ödenmiş iptaller processRefund'dan aynı anahtarla.
-    if (this.mailNotifier) {
-      const summary = await tx.order.findUnique({
-        where: { id: order.id },
-        select: { orderNumber: true, totalAmount: true, isTest: true },
-      });
-      if (summary) {
-        const actor = UNPAID_CANCEL_ACTOR[opts.ledgerReason];
-        await this.mailNotifier.emit(
-          "order.cancelled",
-          orderCancelledNotice({
-            orderId: order.id,
-            orderNumber: summary.orderNumber,
-            cancelledBy: actor,
-            amount: summary.totalAmount,
-            // Yönetici iptalinin serbest metni personel postasına girmez;
-            // nedeni panelde (katalog kodu) görünür.
-            reason: actor === CancellationActor.buyer ? opts.reason : undefined,
-          }),
-          { isTest: summary.isTest, dedupeKey: order.id, tx },
-        );
-      }
-    }
-
+    // Personel bildirimi bu fonksiyonda DEĞİL: işlem açıkken ek sorgu ya da
+    // ikinci bağlantıdan ayar okuması yapılmasın diye çağıranlar commit
+    // SONRASI `notifyStaffUnpaidCancelled` çağırır.
     return cancelledOrder;
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `order.cancelled`) — ödenmemiş
+   * iptalin COMMIT SONRASI adımı; `cancelUnpaidOrderInTx`'i çağıran her yol
+   * işlemi bitirdikten sonra çağırır (alıcı/misafir/sepet iptali `cancel`,
+   * yönetici iptali AdminOrderCancelService). Ödenmiş iptaller processRefund'dan
+   * aynı anahtarla (sipariş id) gelir. Fırlatmaz; olay kapalıysa notifier ön
+   * elemesi önbellekten karar verir, outbox satırı yazılmaz.
+   */
+  async notifyStaffUnpaidCancelled(
+    orderId: string,
+    ledgerReason: "buyer_cancelled" | "admin_cancelled",
+    reason?: string,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          orderNumber: true,
+          totalAmount: true,
+          isTest: true,
+          status: true,
+        },
+      });
+      if (!order || order.status !== OrderStatus.cancelled) return;
+      const actor = UNPAID_CANCEL_ACTOR[ledgerReason];
+      await this.mailNotifier.emit(
+        "order.cancelled",
+        orderCancelledNotice({
+          orderId,
+          orderNumber: order.orderNumber,
+          cancelledBy: actor,
+          amount: order.totalAmount,
+          // Yönetici iptalinin serbest metni personel postasına girmez;
+          // nedeni panelde (katalog kodu) görünür.
+          reason: actor === CancellationActor.buyer ? reason : undefined,
+        }),
+        { isTest: order.isTest, dedupeKey: orderId },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `order.cancelled personel bildirimi hazırlanamadı (${orderId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

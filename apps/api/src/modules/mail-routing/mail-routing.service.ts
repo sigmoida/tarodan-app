@@ -6,6 +6,8 @@ import {
 import { Prisma } from "@prisma/client";
 import {
   MAIL_AREAS,
+  MAIL_INTERNAL_RECIPIENTS_MAX,
+  isValidMailDisplayName,
   type MailAreaId,
   type MailAreaState,
   type MailAreaUpdate,
@@ -17,13 +19,11 @@ import { i18nMessage } from "../i18n";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { MailRoutingDirectory } from "../mail/mail-routing-directory";
 import {
-  MAX_INTERNAL_RECIPIENTS,
   areaOfMailEvent,
   isMailAreaId,
   isMailDeliveryMode,
   isMailInternalEventId,
   isValidMailAddress,
-  isValidMailDisplayName,
   normalizeMailAddress,
   serializeMailEventStates,
 } from "../mail/helpers/mail-area-settings";
@@ -209,10 +209,10 @@ export function normalizeRecipients(raw: readonly string[]): string[] {
     }
     if (!unique.includes(address)) unique.push(address);
   }
-  if (unique.length > MAX_INTERNAL_RECIPIENTS) {
+  if (unique.length > MAIL_INTERNAL_RECIPIENTS_MAX) {
     throw new BadRequestException(
       i18nMessage("server.mailRouting.tooManyRecipients", {
-        max: MAX_INTERNAL_RECIPIENTS,
+        max: MAIL_INTERNAL_RECIPIENTS_MAX,
       }),
     );
   }

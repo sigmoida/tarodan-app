@@ -5,8 +5,10 @@ import type {
 } from "@tarodan/types";
 import { supportNotificationEmail } from "../../../config/mail";
 import {
-  normalizeMailAddress,
+  areaOfMailEvent,
+  defaultMailEventState,
   isValidMailAddress,
+  normalizeMailAddress,
 } from "../../mail/helpers/mail-area-settings";
 import type { MailAreaRouting } from "../../mail/mail-routing-directory";
 
@@ -17,22 +19,12 @@ export interface InternalNoticeRoute {
 }
 
 /**
- * Eski davranışın geri düşüşü: misafir mesajı, Mail Yönlendirme'den ÖNCE
- * `SUPPORT_NOTIFICATION_EMAIL`e her zaman ve anında gidiyordu. "guestMessage"
- * alanına alıcı girilmediği sürece bu aynen sürer (olay anahtarından bağımsız);
- * alıcı girildiği anda alanın açık/kapalı ve teslim ayarı geçerli olur.
+ * Alanın iç bildirim alıcıları. Tek geri düşüş misafir mesajı alanıdır: Mail
+ * Yönlendirme'den önce misafir iletişim mesajı `SUPPORT_NOTIFICATION_EMAIL`e
+ * gidiyordu; alana alıcı girilmediği sürece oraya gitmeye devam eder (olayın
+ * varsayılanı açık, bkz. `defaultMailEventState`). Alıcı girildiği anda e-posta
+ * onlara yönelir.
  */
-function isLegacyGuestFallback(
-  eventId: MailInternalEventId,
-  routing: MailAreaRouting,
-): boolean {
-  return (
-    eventId === "support.guestMessage" &&
-    routing.internalRecipients.length === 0
-  );
-}
-
-/** Alanın özet alıcıları (özet işinin, olaydan bağımsız kararı). */
 export function areaRecipients(
   area: MailAreaId,
   routing: MailAreaRouting,
@@ -52,12 +44,11 @@ export function internalNoticeRoute(
   eventId: MailInternalEventId,
   routing: MailAreaRouting,
 ): InternalNoticeRoute | null {
-  if (isLegacyGuestFallback(eventId, routing)) {
-    const recipients = areaRecipients("guestMessage", routing);
-    return recipients.length > 0 ? { recipients, delivery: "instant" } : null;
-  }
-  const state = routing.events.find((event) => event.id === eventId);
-  if (!state?.enabled) return null;
-  if (routing.internalRecipients.length === 0) return null;
-  return { recipients: routing.internalRecipients, delivery: state.delivery };
+  const state =
+    routing.events.find((event) => event.id === eventId) ??
+    defaultMailEventState(eventId);
+  if (!state.enabled) return null;
+  const recipients = areaRecipients(areaOfMailEvent(eventId), routing);
+  if (recipients.length === 0) return null;
+  return { recipients, delivery: state.delivery };
 }
