@@ -54,6 +54,8 @@ import { ConsentModule } from "../consent/consent.module";
 import { TimingRulesModule } from "../timing-rules/timing-rules.module";
 import { AdminTimingRulesService } from "./ops/admin-timing-rules.service";
 import { AdminTimingRulesController } from "./ops/admin-timing-rules.controller";
+import { AdminMailRoutingService } from "./ops/admin-mail-routing.service";
+import { AdminMailRoutingController } from "./ops/admin-mail-routing.controller";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
@@ -232,6 +234,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminAdPackageController,
     AdminSiteAccessController,
     AdminTimingRulesController,
+    AdminMailRoutingController,
   ],
   providers: [
     AdminService,
@@ -241,6 +244,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminCommissionService,
     AdminSettingsService,
     AdminTimingRulesService,
+    // Mail Yönlendirme: domain servisleri MailRoutingModule'den (@Global).
+    AdminMailRoutingService,
     AdminSiteAccessService,
     AdminUserService,
     AdminUserAccountService,
