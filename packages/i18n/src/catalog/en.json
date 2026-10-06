@@ -9099,6 +9099,11 @@
           "name": "Durations & Rules",
           "description": "Business durations and what happens when they run out",
           "keywords": "duration, timeout, listing lifetime, offer validity, return window, trade, alert"
+        },
+        "mailRouting": {
+          "name": "Email Routing",
+          "description": "Sender mailbox per area and internal notification recipients",
+          "keywords": "email, mail, sender, smtp, notification, recipient, mailbox, digest"
         }
       }
     },
@@ -9693,6 +9698,184 @@
         "distanceSales": "Distance Sales Agreement",
         "refundPolicy": "Refund Policy",
         "sellerAgreement": "Seller Agreement"
+      }
+    },
+    "mailRouting": {
+      "page": {
+        "title": "Email Routing",
+        "description": "Which mailbox each area's customer email is sent from, and who on the team receives operational events by email and how often. Changes apply from the next send."
+      },
+      "readOnly": "Only a super admin can change these settings; you can view them.",
+      "saved": "Changes saved.",
+      "error": {
+        "title": "Couldn't load email settings",
+        "description": "Refresh the page or try again in a moment."
+      },
+      "tabs": {
+        "accounts": "Sender Accounts",
+        "areas": "Areas",
+        "notifications": "Internal Notifications"
+      },
+      "areas": {
+        "account": "Account",
+        "order": "Order",
+        "cancellation": "Cancellation",
+        "refund": "Refund",
+        "trade": "Trade",
+        "offer": "Offer",
+        "payment": "Payment",
+        "invoice": "Invoice",
+        "membership": "Membership",
+        "listing": "New Product / Listing",
+        "discount": "Discount",
+        "boost": "Boost",
+        "ad": "Advertising",
+        "support": "Support Ticket",
+        "guestMessage": "Guest Messages",
+        "report": "Product Reports",
+        "sellerApplication": "Business Application",
+        "marketing": "Marketing",
+        "social": "Social"
+      },
+      "events": {
+        "order_paid": "Order paid",
+        "order_cancelled": "Order cancelled",
+        "refund_requested": "Refund requested",
+        "trade_started": "Trade started",
+        "trade_disputed": "Trade disputed",
+        "offer_converted": "Offer converted to an order",
+        "support_ticketOpened": "Support ticket opened",
+        "support_guestMessage": "New message from a guest",
+        "report_productReported": "Product reported",
+        "listing_pendingApproval": "Listing awaiting approval",
+        "discount_createdBySeller": "Seller created a discount",
+        "boost_purchased": "Boost purchased"
+      },
+      "delivery": {
+        "instant": "Instant",
+        "hourly": "Hourly digest",
+        "daily": "Daily digest"
+      },
+      "validation": {
+        "required": "This field is required.",
+        "email": "Enter a valid email address.",
+        "maxChars": "Must be at most {max} characters.",
+        "port": "Port must be a number between 1 and 65535.",
+        "passwordRequired": "Enter a password for the new account.",
+        "recipient": {
+          "invalid": "Enter a valid email address.",
+          "duplicate": "This address is already in the list.",
+          "limit": "An area can have at most {max} recipients."
+        }
+      },
+      "accountsTab": {
+        "title": "Sender accounts",
+        "fallbackInfo": "An area with no account, or whose account fails, sends from the default identity ({defaultFrom}).",
+        "add": "Add account",
+        "addTitle": "Add sender account",
+        "editTitle": "Edit sender account",
+        "created": "Account added.",
+        "updated": "Account updated.",
+        "deleted": "Account deleted.",
+        "empty": "No sender accounts yet. Areas currently send from the default identity.",
+        "noAreas": "Not used by any area",
+        "notTested": "Not tested yet",
+        "passwordSet": "Password set",
+        "passwordMissing": "No password",
+        "testSend": "Send test",
+        "deleteTitle": "Delete this account?",
+        "deleteDescription": "The account {address} will be deleted. It can't be deleted while an area uses it; change that area's account first.",
+        "columns": {
+          "address": "Address",
+          "displayName": "Display name",
+          "areas": "Used by areas",
+          "lastTest": "Last test",
+          "password": "Password"
+        },
+        "test": {
+          "title": "Send test: {address}",
+          "to": "Recipient address",
+          "toHelper": "A test email is sent to this address from the selected account.",
+          "send": "Send",
+          "ok": "Test email sent.",
+          "failed": "Could not send: {error}",
+          "badge": {
+            "ok": "Passed",
+            "failed": "Failed"
+          }
+        },
+        "form": {
+          "address": "Mailbox address",
+          "displayName": "Display name",
+          "displayNameHelper": "The sender name recipients see, for example Tarodan Orders.",
+          "password": "Password",
+          "passwordKeep": "Type a new password to change it",
+          "passwordEditHelper": "Leave empty to keep the stored password. The stored password is never shown.",
+          "showAdvanced": "Show advanced settings",
+          "hideAdvanced": "Hide advanced settings",
+          "advancedNote": "Leave these empty to use the default mail server. Fill them in only if this account lives on a different server.",
+          "username": "Username",
+          "usernameHelper": "Uses the mailbox address when empty.",
+          "host": "Server (host)",
+          "port": "Port",
+          "secure": "Secure connection",
+          "secureDefault": "Default",
+          "secureOn": "On (SSL/TLS)",
+          "secureOff": "Off (STARTTLS)"
+        }
+      },
+      "areasTab": {
+        "title": "Areas",
+        "editTitle": "Sender settings for {area}",
+        "defaultSender": "Default identity",
+        "noTemplates": "No templates",
+        "templateCount": "{count, plural, one {# template} other {# templates}}",
+        "templateKeys": "Customer templates in this area",
+        "columns": {
+          "area": "Area",
+          "sender": "Sender account",
+          "displayName": "Display name",
+          "replyTo": "Reply-to",
+          "templates": "Customer templates"
+        },
+        "form": {
+          "sender": "Sender account",
+          "displayName": "Display name (optional)",
+          "displayNameHelper": "Uses the account's display name when empty.",
+          "replyTo": "Reply-to address (optional)",
+          "replyToHelper": "Where a customer's reply goes. Uses the sender address when empty."
+        }
+      },
+      "notificationsTab": {
+        "info": "Operational events also arrive by email to the recipients of the matching area. For each event choose whether it is on, and whether it arrives instantly or as an hourly / daily digest.",
+        "views": {
+          "byArea": "By area",
+          "byPerson": "By person"
+        },
+        "recipients": "Recipients",
+        "events": "Events",
+        "delivery": "Delivery",
+        "noRecipients": "This area has no recipients.",
+        "recipientPlaceholder": "name@tarodan.com.tr",
+        "remove": "Remove",
+        "removeRecipient": "Remove {address}"
+      },
+      "people": {
+        "title": "Recipients",
+        "add": "Add person",
+        "addTitle": "Add a person to areas",
+        "editTitle": "Edit a person's areas",
+        "address": "Email address",
+        "areasLabel": "Areas received",
+        "removeAll": "Remove from all",
+        "removeTitle": "Remove this person from all areas?",
+        "removeDescription": "{address} will be removed from every area's recipient list.",
+        "empty": "No recipients added yet.",
+        "overLimit": "These areas' recipient lists are full, so the person could not be added: {areas}",
+        "columns": {
+          "person": "Person",
+          "areas": "Areas received"
+        }
       }
     }
   },
