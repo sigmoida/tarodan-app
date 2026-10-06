@@ -121,9 +121,12 @@ export function accountSchema(t: T, isEdit: boolean) {
       .string()
       .trim()
       .min(1, t("admin.mailRouting.validation.required"))
-      .refine(isValidMailDisplayName, t("admin.mailRouting.validation.displayName", {
+      .refine(
+        isValidMailDisplayName,
+        t("admin.mailRouting.validation.displayName", {
           max: MAIL_DISPLAY_NAME_MAX_LENGTH,
-        })),
+        }),
+      ),
     username: z.string().trim().max(200),
     password: isEdit
       ? z.string().max(500)
@@ -307,7 +310,8 @@ export function addRecipient(
   const address = normalizeEmail(raw);
   if (!isValidEmail(address)) return { ok: false, error: "invalid" };
   if (list.includes(address)) return { ok: false, error: "duplicate" };
-  if (list.length >= MAIL_INTERNAL_RECIPIENTS_MAX) return { ok: false, error: "limit" };
+  if (list.length >= MAIL_INTERNAL_RECIPIENTS_MAX)
+    return { ok: false, error: "limit" };
   return { ok: true, list: [...list, address] };
 }
 
@@ -433,7 +437,10 @@ export function planPersonChange(
     const has = area.internalRecipients.includes(address);
     const wants = selected.includes(area.id);
     if (has === wants) continue;
-    if (wants && area.internalRecipients.length >= MAIL_INTERNAL_RECIPIENTS_MAX) {
+    if (
+      wants &&
+      area.internalRecipients.length >= MAIL_INTERNAL_RECIPIENTS_MAX
+    ) {
       plan.overLimit.push(area.id);
       continue;
     }

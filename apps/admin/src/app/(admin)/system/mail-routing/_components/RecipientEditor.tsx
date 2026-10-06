@@ -4,10 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Input } from "@tarodan/ui";
 import { MAIL_INTERNAL_RECIPIENTS_MAX } from "@tarodan/types";
-import {
-  addRecipient,
-  removeRecipient,
-} from "../_lib/mail-routing";
+import { addRecipient, removeRecipient } from "../_lib/mail-routing";
 
 /**
  * Bir alanın alıcı listesi: adres ekle / çıkar. Doğrulama `addRecipient`

@@ -215,7 +215,10 @@ describe("account payloads", () => {
     const form = accountToFormValues(original);
     expect(form.username).toBe("custom-login");
     expect(
-      accountPatchPayload({ ...form, address: "info@tarodan.com.tr" }, original),
+      accountPatchPayload(
+        { ...form, address: "info@tarodan.com.tr" },
+        original,
+      ),
     ).toEqual({ address: "info@tarodan.com.tr" });
     expect(
       accountPatchPayload({ ...form, username: "other" }, original),
@@ -307,7 +310,10 @@ describe("recipients", () => {
       ok: false,
       error: "duplicate",
     });
-    const full = Array.from({ length: MAIL_INTERNAL_RECIPIENTS_MAX }, (_, i) => `u${i}@b.co`);
+    const full = Array.from(
+      { length: MAIL_INTERNAL_RECIPIENTS_MAX },
+      (_, i) => `u${i}@b.co`,
+    );
     expect(addRecipient(full, "new@b.co")).toEqual({
       ok: false,
       error: "limit",
