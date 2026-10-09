@@ -74,8 +74,11 @@ export const positionLabels = (t: T): Record<string, string> =>
   );
 
 /** Formda pozisyon seçicinin altında gösterilen tek satırlık açıklama + önerilen boyutlar. */
+const isAdPosition = (value: string): value is AdPosition =>
+  (AD_POSITIONS as readonly string[]).includes(value);
+
 export const positionHint = (t: T, position: string): string | undefined =>
-  (AD_POSITIONS as readonly string[]).includes(position)
+  isAdPosition(position)
     ? t(`admin.marketing.ads.positionHint.${position}`)
     : undefined;
 

@@ -256,10 +256,10 @@ describe("AdvertisementService — admin yanıtında kampanya özeti", () => {
     expect((await service.findOne("ad-1")).discount).toEqual(campaign);
 
     await service.create({ title: "X" });
-    expect(advertisement.create.mock.calls[0][0].include).toBeDefined();
+    expect(advertisement.create.mock.calls[0][0]).toHaveProperty("include");
 
     await service.update("ad-1", { title: "Y" });
-    expect(advertisement.update.mock.calls[0][0].include).toBeDefined();
+    expect(advertisement.update.mock.calls[0][0]).toHaveProperty("include");
   });
 });
 
