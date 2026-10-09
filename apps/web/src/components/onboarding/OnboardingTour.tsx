@@ -19,6 +19,7 @@ import {
 } from "@/lib/userExperiencePolicy.mjs";
 import { useAuthStore } from "@/stores/authStore";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
+import { useOnboardingTourStore } from "@/stores/onboardingTourStore";
 import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 import { tourOptions, tourStyles } from "./tourTheme";
 
@@ -86,6 +87,13 @@ export default function OnboardingTour({
       completionPending.current = false;
     }
   }, [config.field, config.version, setUser, tour]);
+
+  // Tur ekrandayken reklam popup'ı açılmasın (aynı sırayı çerez bandı da bekler).
+  const setTourRunning = useOnboardingTourStore((s) => s.setRunning);
+  useEffect(() => {
+    setTourRunning(run);
+    return () => setTourRunning(false);
+  }, [run, setTourRunning]);
 
   const handleEvent = useCallback(
     (event: EventData) => {

@@ -4,6 +4,7 @@
 
 import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
+import BannerSlot from "@/components/marketing/BannerSlot";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ListingsProvider, useListings } from "./_context/ListingsContext";
 import ListingsControls, {
@@ -24,6 +25,7 @@ function ListingsLayout() {
 
   return (
     <PageShell>
+      <BannerSlot position="header" className="mb-4 space-y-3" />
       <PageHeader
         title={title}
         description={description}
@@ -41,6 +43,7 @@ function ListingsLayout() {
           <ListingsPagination />
         </div>
       </div>
+      <BannerSlot position="footer" className="mt-8 space-y-3" />
     </PageShell>
   );
 }
