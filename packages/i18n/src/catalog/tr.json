@@ -5490,10 +5490,10 @@
         "allDevices": "Tüm Cihazlar",
         "position": {
           "header": "Üst Banner",
-          "sidebar": "Yan Panel",
           "footer": "Alt Banner",
           "inline": "İçerik Arası",
-          "popup": "Popup"
+          "popup": "Popup",
+          "topbar": "Üst Şerit"
         },
         "device": {
           "desktop": "Masaüstü",
@@ -5510,7 +5510,36 @@
           "hint": "JPG, PNG, WebP • En fazla 2 MB"
         },
         "validation": {
-          "titleRequired": "Başlık gerekli"
+          "titleRequired": "Başlık gerekli",
+          "linkInvalid": "Geçerli bir adres girin: https://… ile başlayan tam adres ya da / ile başlayan site içi yol.",
+          "contentMax": "Metin en fazla 500 karakter olabilir.",
+          "sizeMax": "Görsel genişliği ve yüksekliği en fazla 4000 piksel olabilir.",
+          "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz."
+        },
+        "schedule": "Yayın Aralığı",
+        "liveStatusLabel": "Yayın Durumu",
+        "liveStatus": {
+          "scheduled": "Planlandı",
+          "live": "Yayında",
+          "expired": "Süresi doldu",
+          "inactive": "Kapalı",
+          "campaignEnded": "Kampanya bitti"
+        },
+        "linkUrl": "Bağlantı (URL)",
+        "linkUrlHelper": "https://… ile başlayan tam adres ya da /kategori/araba gibi site içi yol.",
+        "content": "Metin",
+        "contentPlaceholder": "Görselsiz duyuru için kısa metin",
+        "contentHelper": "Düz metin, en fazla 500 karakter. Yalnız metinli ya da duyuru bannerları için kullanılabilir.",
+        "campaign": "Kampanya (opsiyonel)",
+        "noCampaign": "Kampanya bağlama",
+        "campaignHelper": "Kampanyaya bağlı reklam, kampanya bitince otomatik olarak yayından kalkar.",
+        "displayOrderHelper": "Aynı yerde birden çok reklam varsa sırayla dönüşümlü gösterilir; küçük sayı önce.",
+        "positionHint": {
+          "topbar": "Her sayfanın en üstünde ince bir şerit. Önerilen: 728×90 (şerit yüksekliğinde gösterilir) ya da küçük logo benzeri görsel; metin de olur.",
+          "header": "Ana sayfa ve liste sayfalarında site başlığının altındaki büyük banner. Önerilen: masaüstü 970×250 veya 1200×300, mobil 320×100.",
+          "footer": "Site altbilgisinin üstündeki banner. Önerilen: 970×250, mobil 320×100.",
+          "inline": "Liste, arama ve kategori sayfalarında ürün satırlarının arasında. Önerilen: masaüstü 728×90 veya 970×90, mobil 300×250.",
+          "popup": "Ziyaretçiye günde en çok bir kez açılan pencere. Önerilen: 600×600, mobil 320×480."
         }
       },
       "discounts": {
@@ -11234,7 +11263,8 @@
     },
     "advertisement": {
       "notFound": "Reklam bulunamadı",
-      "campaignNotFound": "Bağlanacak kampanya bulunamadı"
+      "campaignNotFound": "Bağlanacak kampanya bulunamadı",
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz"
     },
     "brand": {
       "notFound": "Marka bulunamadı"
@@ -11415,7 +11445,8 @@
       "presignFailed": "Presigned URL oluşturulamadı",
       "downloadUnavailable": "Dosya indirme servisi şu anda kullanılamıyor.",
       "invalidBucketType": "Geçersiz bucket tipi: {bucket}",
-      "invalidBucket": "Geçersiz bucket: {bucket}"
+      "invalidBucket": "Geçersiz bucket: {bucket}",
+      "publicUrlNotConfigured": "Görsel yükleme şu anda yapılandırılmamış (genel dosya adresi tanımsız). Lütfen sistem yöneticisine bildirin."
     },
     "consent": {
       "distanceSalesRequired": "Ödemeye devam etmek için Mesafeli Satış Sözleşmesi'ni onaylamanız gerekiyor.",

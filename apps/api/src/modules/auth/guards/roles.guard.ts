@@ -52,6 +52,8 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   "attribute-groups": ["attributes"],
   attributes: ["attributes"],
   discounts: ["discounts"],
+  // `/admin/ads/upload` (banner görseli) da bu segmentte: yalnız reklam izni
+  // olan rol ürün yüklemesine (`media` → products) erişmeden banner yükler.
   ads: ["ads"],
   // Reklam paketleri + boost satın alımları: menüde /marketing/ad-packages ve
   // /marketing/boost-purchases sayfaları "ads" izniyle gösterilir.
@@ -96,6 +98,8 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   moderation: ["ai_moderation"],
   "membership-tiers": ["membership_tiers"],
   staff: ["staff"],
+  // Genel admin yükleme ucu (üretici logosu + geriye dönük banner). Reklam
+  // banner'ı için `ads` izniyle açılan uç `/admin/ads/upload`'dur.
   media: ["products"],
 };
 

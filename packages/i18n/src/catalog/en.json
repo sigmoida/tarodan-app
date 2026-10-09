@@ -5490,10 +5490,10 @@
         "allDevices": "All Devices",
         "position": {
           "header": "Top Banner",
-          "sidebar": "Sidebar",
           "footer": "Bottom Banner",
           "inline": "Inline",
-          "popup": "Popup"
+          "popup": "Popup",
+          "topbar": "Top Bar"
         },
         "device": {
           "desktop": "Desktop",
@@ -5510,7 +5510,36 @@
           "hint": "JPG, PNG, WebP • Max 2 MB"
         },
         "validation": {
-          "titleRequired": "Title is required"
+          "titleRequired": "Title is required",
+          "linkInvalid": "Enter a valid address: a full URL starting with https://… or a site path starting with /.",
+          "contentMax": "Text can be at most 500 characters.",
+          "sizeMax": "Image width and height can be at most 4000 pixels.",
+          "endBeforeStart": "The end date cannot be before the start date."
+        },
+        "schedule": "Schedule",
+        "liveStatusLabel": "Live Status",
+        "liveStatus": {
+          "scheduled": "Scheduled",
+          "live": "Live",
+          "expired": "Expired",
+          "inactive": "Off",
+          "campaignEnded": "Campaign ended"
+        },
+        "linkUrl": "Link URL",
+        "linkUrlHelper": "A full address starting with https://… or a site path such as /category/cars.",
+        "content": "Text",
+        "contentPlaceholder": "Short text for an image-free announcement",
+        "contentHelper": "Plain text, up to 500 characters. Use it for text-only or announcement banners.",
+        "campaign": "Campaign (optional)",
+        "noCampaign": "No campaign",
+        "campaignHelper": "An ad linked to a campaign stops running automatically when the campaign ends.",
+        "displayOrderHelper": "When several ads share a spot they rotate in turn; the smaller number comes first.",
+        "positionHint": {
+          "topbar": "A thin strip at the very top of every page. Suggested: 728×90 (shown at strip height) or a small logo-like image; text works too.",
+          "header": "Large banner under the site header on the home and listing pages. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
+          "footer": "Banner above the site footer. Suggested: 970×250, 320×100 on mobile.",
+          "inline": "Between product rows on listing, search and category pages. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
+          "popup": "A window shown to a visitor at most once a day. Suggested: 600×600, 320×480 on mobile."
         }
       },
       "discounts": {
@@ -11234,7 +11263,8 @@
     },
     "advertisement": {
       "notFound": "Advertisement not found",
-      "campaignNotFound": "The campaign to link was not found"
+      "campaignNotFound": "The campaign to link was not found",
+      "endBeforeStart": "The end date cannot be before the start date"
     },
     "brand": {
       "notFound": "Brand not found"
@@ -11415,7 +11445,8 @@
       "presignFailed": "The presigned URL could not be created",
       "downloadUnavailable": "The file download service is unavailable right now.",
       "invalidBucketType": "Invalid bucket type: {bucket}",
-      "invalidBucket": "Invalid bucket: {bucket}"
+      "invalidBucket": "Invalid bucket: {bucket}",
+      "publicUrlNotConfigured": "Image upload is not configured right now (the public file address is not set). Please notify the system administrator."
     },
     "consent": {
       "distanceSalesRequired": "You need to accept the Distance Sales Agreement to continue with the payment.",

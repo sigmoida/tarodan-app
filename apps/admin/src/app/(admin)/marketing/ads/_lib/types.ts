@@ -1,7 +1,21 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
+import {
+  endOfIstanbulDayIso,
+  istanbulDateOf,
+  startOfIstanbulDayIso,
+} from "./dates";
 
 type T = ReturnType<typeof useTranslations<never>>;
+
+/** Reklama bağlı kampanyanın yayın durumunu belirleyen alanlar. */
+export interface AdCampaign {
+  id: string;
+  name: string;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+}
 
 export interface Ad {
   id: string;
@@ -13,6 +27,9 @@ export interface Ad {
   width: number | null;
   height: number | null;
   position: string;
+  discountId: string | null;
+  /** Bağlı kampanya (API ilişkiyi döndürürse); "Kampanya bitti" durumunu besler. */
+  discount?: AdCampaign | null;
   deviceType: string;
   displayOrder: number;
   isActive: boolean;
@@ -41,13 +58,29 @@ export const IAB_SIZES = [
   { name: "Small Square", width: 200, height: 200, device: "all" },
 ];
 
-export const positionLabels = (t: T): Record<string, string> => ({
-  header: t("admin.marketing.ads.position.header"),
-  sidebar: t("admin.marketing.ads.position.sidebar"),
-  footer: t("admin.marketing.ads.position.footer"),
-  inline: t("admin.marketing.ads.position.inline"),
-  popup: t("admin.marketing.ads.position.popup"),
-});
+/** API ile birebir: yan panel (sidebar) kaldırıldı, topbar eklendi. */
+export const AD_POSITIONS = [
+  "topbar",
+  "header",
+  "footer",
+  "inline",
+  "popup",
+] as const;
+export type AdPosition = (typeof AD_POSITIONS)[number];
+
+export const positionLabels = (t: T): Record<string, string> =>
+  Object.fromEntries(
+    AD_POSITIONS.map((p) => [p, t(`admin.marketing.ads.position.${p}`)]),
+  );
+
+/** Formda pozisyon seçicinin altında gösterilen tek satırlık açıklama + önerilen boyutlar. */
+const isAdPosition = (value: string): value is AdPosition =>
+  (AD_POSITIONS as readonly string[]).includes(value);
+
+export const positionHint = (t: T, position: string): string | undefined =>
+  isAdPosition(position)
+    ? t(`admin.marketing.ads.positionHint.${position}`)
+    : undefined;
 
 export const deviceLabels = (t: T): Record<string, string> => ({
   desktop: t("admin.marketing.ads.device.desktop"),
@@ -99,23 +132,57 @@ export const isIabSize = (width?: number | null, height?: number | null) =>
   !!height &&
   IAB_SIZES.some((s) => s.width === width && s.height === height);
 
+/** Bağlantı: mutlak `http(s)://…` ya da site-içi `/yol` (`//` ve `/\` hariç). Boş geçerli. */
+export const isValidAdLink = (v?: string | null): boolean => {
+  const s = (v ?? "").trim();
+  if (!s) return true;
+  return /^https?:\/\/\S+$/i.test(s) || /^\/(?![/\\])\S*$/.test(s);
+};
+
+export const AD_CONTENT_MAX = 500;
+export const AD_DIMENSION_MAX = 4000;
+
 /** Form schema (validation-only; numbers/nulls shaped in the mutationFn). */
 export const adSchema = (t: T) =>
-  z.object({
-    title: z.string().min(1, t("admin.marketing.ads.validation.titleRequired")),
-    imageUrl: z.string().optional().default(""),
-    linkUrl: z.string().optional().default(""),
-    altText: z.string().optional().default(""),
-    content: z.string().optional().default(""),
-    width: z.number().optional().default(0),
-    height: z.number().optional().default(0),
-    position: z.string().default("header"),
-    deviceType: z.string().default("all"),
-    displayOrder: z.string().optional().default("0"),
-    isActive: z.boolean().default(true),
-    startDate: z.string().optional().default(""),
-    endDate: z.string().optional().default(""),
-  });
+  z
+    .object({
+      title: z
+        .string()
+        .min(1, t("admin.marketing.ads.validation.titleRequired")),
+      imageUrl: z.string().optional().default(""),
+      linkUrl: z
+        .string()
+        .optional()
+        .default("")
+        .refine(isValidAdLink, t("admin.marketing.ads.validation.linkInvalid")),
+      altText: z.string().optional().default(""),
+      content: z
+        .string()
+        .max(AD_CONTENT_MAX, t("admin.marketing.ads.validation.contentMax"))
+        .optional()
+        .default(""),
+      width: z
+        .number()
+        .max(AD_DIMENSION_MAX, t("admin.marketing.ads.validation.sizeMax"))
+        .optional()
+        .default(0),
+      height: z
+        .number()
+        .max(AD_DIMENSION_MAX, t("admin.marketing.ads.validation.sizeMax"))
+        .optional()
+        .default(0),
+      position: z.string().default("header"),
+      deviceType: z.string().default("all"),
+      displayOrder: z.string().optional().default("0"),
+      isActive: z.boolean().default(true),
+      startDate: z.string().optional().default(""),
+      endDate: z.string().optional().default(""),
+      discountId: z.string().optional().default(""),
+    })
+    .refine((v) => !v.startDate || !v.endDate || v.endDate >= v.startDate, {
+      path: ["endDate"],
+      message: t("admin.marketing.ads.validation.endBeforeStart"),
+    });
 
 export type AdFormValues = z.infer<ReturnType<typeof adSchema>>;
 
@@ -133,6 +200,7 @@ export const emptyAdForm: AdFormValues = {
   isActive: true,
   startDate: "",
   endDate: "",
+  discountId: "",
 };
 
 export function adToForm(ad: Ad): AdFormValues {
@@ -148,26 +216,38 @@ export function adToForm(ad: Ad): AdFormValues {
     deviceType: ad.deviceType ?? "all",
     displayOrder: String(ad.displayOrder ?? 0),
     isActive: ad.isActive,
-    startDate: ad.startDate ? ad.startDate.slice(0, 10) : "",
-    endDate: ad.endDate ? ad.endDate.slice(0, 10) : "",
+    startDate: istanbulDateOf(ad.startDate),
+    endDate: istanbulDateOf(ad.endDate),
+    discountId: ad.discountId ?? "",
   };
 }
 
-/** Shape form values into the create/update API payload. */
-export function adFormToPayload(v: AdFormValues) {
+export type AdPayloadMode = "create" | "update";
+
+/**
+ * Form değerlerini API gövdesine çevirir.
+ * - create: boş alanlar gövdeden çıkarılır.
+ * - update: boşaltılan alanlar `null` gider (API `null`'ı temizler, atlananı
+ *   değiştirmez) — "Görseli kaldır" ve tarih/kampanya temizleme böyle çalışır.
+ */
+export function adFormToPayload(v: AdFormValues, mode: AdPayloadMode) {
+  const empty = mode === "update" ? null : undefined;
+  const text = (s?: string) => s?.trim() || empty;
+  const num = (n?: number) => n || empty;
   return {
     title: v.title.trim(),
-    imageUrl: v.imageUrl?.trim() || undefined,
-    linkUrl: v.linkUrl?.trim() || undefined,
-    content: v.content?.trim() || undefined,
-    altText: v.altText?.trim() || undefined,
-    width: v.width || undefined,
-    height: v.height || undefined,
+    imageUrl: text(v.imageUrl),
+    linkUrl: text(v.linkUrl),
+    content: text(v.content),
+    altText: text(v.altText),
+    width: num(v.width),
+    height: num(v.height),
     position: v.position,
     deviceType: v.deviceType,
     displayOrder: Number(v.displayOrder) || 0,
     isActive: v.isActive,
-    startDate: v.startDate || undefined,
-    endDate: v.endDate || undefined,
+    startDate: v.startDate ? startOfIstanbulDayIso(v.startDate) : empty,
+    endDate: v.endDate ? endOfIstanbulDayIso(v.endDate) : empty,
+    discountId: v.discountId || empty,
   };
 }
