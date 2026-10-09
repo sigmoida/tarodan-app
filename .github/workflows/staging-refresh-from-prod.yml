@@ -1,0 +1,513 @@
+# Replaces the STAGING (UAT) database with a MASKED copy of production
+# (docs/UAT_REFRESH.md). Started by the "Refresh from production" button in the
+# staging admin panel (the API dispatches this workflow with run_id +
+# report_token) or by hand from GitHub (run_id empty: the workflow registers its
+# own run row).
+#
+# Everything happens on the Coolify host over SSH; the production dump never
+# leaves the server and is deleted on every exit path (trap):
+#
+#   discover  staging api + production api containers (Coolify UUIDs) and
+#             their postgres containers (DATABASE_URL host = container name)
+#   guards    target is staging (hostnames, APP_ENV=staging, S3_ENV_PREFIX set
+#             and not prod), source is production (APP_ENV=production), target
+#             != source, pg_restore >= pg_dump major, enough disk, production
+#             has no migration the staging image does not know, the UAT seed and
+#             the masking runner pre-flights pass (--check)
+#   dump      pg_dump -Fc production -> temp file on the host (mode 600)
+#   restore   CREATE DATABASE <staging>_uat_scratch on the STAGING postgres,
+#             pg_restore into it, delete the dump
+#   migrate   prisma migrate deploy on the scratch DB (staging image) — the
+#             migrations it applies are the "newer than production" ones
+#   mask      dist-seed/prisma/uat/mask-database.js on the scratch DB
+#             (UAT_MASK_TARGET=scratch, production name passed as forbidden)
+#   verify    the runner's --verify + an independent e-mail domain check
+#   accounts  seed-uat.js --accounts-only (fixed UAT people, UAT_SEED_PASSWORD)
+#   backup    pg_dump of the current staging DB (~/tarodan-staging-backups)
+#   carry     staging's own uat_refresh_runs + mail routing rows are copied
+#             into the scratch DB (run history survives the swap; staging keeps
+#             its own sender mailboxes)
+#   swap      stop api, rename staging -> <staging>_pre_refresh, scratch ->
+#             staging, start api; unhealthy -> automatic rollback
+#   finish    flush Redis (selected db), restart api (search reindexes on boot),
+#             drop <staging>_pre_refresh, report succeeded
+#
+# Dry run = discover + guards + size estimate + migration preview. Only
+# metadata is read from production; nothing is copied or written (a manual dry
+# run still records its own run row).
+#
+# Required secrets (all already exist for the reset workflows):
+#   SERVER_HOST, SERVER_USERNAME, SERVER_PASSWORD  (SSH into the Coolify VPS)
+#   COOLIFY_STAGING_UUIDS                          (api,web,admin; api = first)
+#   COOLIFY_PROD_UUIDS                             (api,web,admin; api = first)
+#   UAT_SEED_PASSWORD                              (fixed UAT accounts)
+# COOLIFY_PROD_UUIDS must be visible to the `staging` environment (repository
+# secret, or added to that environment). No production database credential is
+# stored anywhere new: it is read from the production api container's own
+# DATABASE_URL on the host, as production-reset.yml does.
+name: Staging Refresh From Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type STAGING (all caps): replaces the whole staging DB with masked production data"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run: discovery, guards and size estimate only"
+        required: false
+        type: boolean
+        default: false
+      run_id:
+        description: "Set by the admin panel (leave empty when starting by hand)"
+        required: false
+        type: string
+        default: ""
+      report_token:
+        description: "Set by the admin panel (leave empty when starting by hand)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# Same group as Staging Reset: the two never touch the staging DB at once.
+concurrency:
+  group: staging-reset
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh staging from masked production
+    runs-on: ubuntu-latest
+    environment: staging
+    # Shorter than the API's 90-minute timeout: a run the API shows as
+    # "timed out" can no longer be working.
+    timeout-minutes: 85
+    steps:
+      - name: Validate inputs
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          RUN_ID: ${{ inputs.run_id }}
+          REPORT_TOKEN: ${{ inputs.report_token }}
+        run: |
+          set -euo pipefail
+          # Never print the token; mask it in every later log line.
+          if [ -n "${REPORT_TOKEN:-}" ]; then echo "::add-mask::$REPORT_TOKEN"; fi
+          if [ "${CONFIRM:-}" != "STAGING" ]; then
+            echo "::error::confirm must be exactly STAGING. Nothing was touched."
+            exit 1
+          fi
+          if [ -n "${RUN_ID:-}" ] || [ -n "${REPORT_TOKEN:-}" ]; then
+            printf '%s' "$RUN_ID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' \
+              || { echo "::error::run_id must be a UUID (set by the admin panel)."; exit 1; }
+            printf '%s' "$REPORT_TOKEN" | grep -Eq '^[0-9a-f]{64}$' \
+              || { echo "::error::report_token must be the 64-hex token the admin panel sent."; exit 1; }
+          fi
+
+      - name: Resolve api UUIDs (first field of COOLIFY_*_UUIDS)
+        id: uuid
+        env:
+          STAGING_UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+          PROD_UUIDS: ${{ secrets.COOLIFY_PROD_UUIDS }}
+        run: |
+          set -euo pipefail
+          staging="$(printf '%s' "$STAGING_UUIDS" | cut -d, -f1 | xargs)"
+          prod="$(printf '%s' "$PROD_UUIDS" | cut -d, -f1 | xargs)"
+          [ -n "$staging" ] || { echo "::error::COOLIFY_STAGING_UUIDS is empty."; exit 1; }
+          [ -n "$prod" ] || { echo "::error::COOLIFY_PROD_UUIDS is empty (must be visible to the staging environment)."; exit 1; }
+          [ "$staging" != "$prod" ] || { echo "::error::staging and production api UUIDs are the same."; exit 1; }
+          echo "staging=$staging" >> "$GITHUB_OUTPUT"
+          echo "prod=$prod" >> "$GITHUB_OUTPUT"
+
+      # ssh-action reports a missing secret as a bare "missing server host" with
+      # no hint about which one. Name it here instead.
+      - name: Verify SSH secrets are configured
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USERNAME: ${{ secrets.SERVER_USERNAME }}
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          UAT_PASSWORD: ${{ secrets.UAT_SEED_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
+          [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          [ -n "${UAT_PASSWORD:-}" ] || missing="$missing UAT_SEED_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
+
+      - name: Dump, mask and swap over SSH (Coolify host)
+        uses: appleboy/ssh-action@v1
+        env:
+          REFRESH_CONFIRM: STAGING
+          STAGING_API_UUID: ${{ steps.uuid.outputs.staging }}
+          PROD_API_UUID: ${{ steps.uuid.outputs.prod }}
+          # Boolean from the UI, string from the API dispatch: compare as text.
+          DRY_RUN: ${{ format('{0}', inputs.dry_run) == 'true' && '1' || '0' }}
+          RUN_ID: ${{ inputs.run_id }}
+          UAT_REFRESH_TOKEN: ${{ inputs.report_token }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          UAT_SEED_PASSWORD: ${{ secrets.UAT_SEED_PASSWORD }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 80m
+          envs: REFRESH_CONFIRM,STAGING_API_UUID,PROD_API_UUID,DRY_RUN,RUN_ID,UAT_REFRESH_TOKEN,WORKFLOW_RUN_URL,UAT_SEED_PASSWORD
+          script: |
+            set -euo pipefail
+            log() { echo "[uat-refresh] $*"; }
+            LAST_ERROR=""
+            die() { LAST_ERROR="$*"; echo "[uat-refresh] REFUSED: $*" >&2; exit 1; }
+
+            [ "${REFRESH_CONFIRM:-}" = "STAGING" ] || die "REFRESH_CONFIRM=STAGING not set."
+            [ -n "${STAGING_API_UUID:-}" ] && [ -n "${PROD_API_UUID:-}" ] || die "api UUIDs missing."
+            [ -n "${UAT_SEED_PASSWORD:-}" ] || die "UAT_SEED_PASSWORD not set."
+            # `docker exec -e NAME` (no value) copies these from this shell, so
+            # they never appear on a docker command line.
+            export UAT_SEED_PASSWORD UAT_REFRESH_TOKEN RUN_ID
+
+            # ─── State used by the exit trap ────────────────────────────────
+            PHASE="discover"
+            STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            STG_API_CID=""
+            SCRATCH_CREATED=0   # scratch DB exists and is NOT yet the staging DB
+            SWAPPED=0           # 0 | old_renamed | 1
+            COMMITTED=0
+            API_STOPPED=0
+            WORK_DIR="$HOME/tarodan-uat-refresh"
+            mkdir -p "$WORK_DIR" && chmod 700 "$WORK_DIR"
+            TS="$(date -u +%Y%m%d-%H%M%S)"
+            DUMP_FILE="$WORK_DIR/production-$TS.dump"
+            CARRY_FILE="$WORK_DIR/carry-$TS.sql"
+            LIST_DIR="$WORK_DIR/lists-$TS"
+            SUMMARY=""
+            SNAPSHOT_AT=""
+            MIGRATIONS_APPLIED=""
+            BACKUP_NAME=""
+
+            find_app_container() {
+              cid="$(docker ps --filter "label=coolify.applicationId=$1" --format '{{.ID}}' | head -1)"
+              [ -n "$cid" ] || cid="$(docker ps --filter "name=$1" --format '{{.ID}}' | head -1)"
+              printf '%s' "$cid"
+            }
+            env_from() { docker exec "$1" printenv "$2" 2>/dev/null || true; }
+
+            # ─── Reporting to the staging API (via its own container) ───────
+            REPORT_JS='const e=process.env;const b={state:e.R_STATE};
+            if(e.R_STARTED)b.startedAt=e.R_STARTED;
+            if(e.R_FINISHED)b.finishedAt=e.R_FINISHED;
+            if(e.R_SNAPSHOT)b.sourceSnapshotAt=e.R_SNAPSHOT;
+            if(e.R_SUMMARY)b.masked=JSON.parse(e.R_SUMMARY).masked;
+            if(e.R_MIGRATIONS)b.migrationsApplied=e.R_MIGRATIONS.split("\n").filter(Boolean);
+            if(e.R_BACKUP)b.backupFile=e.R_BACKUP;
+            if(e.R_ERROR)b.error=e.R_ERROR.slice(0,4000);
+            if(e.R_URL)b.workflowRunUrl=e.R_URL;
+            fetch("http://127.0.0.1:"+(e.PORT||3000)+"/api/internal/uat-refresh/"+e.RUN_ID+"/report",{method:"POST",headers:{"content-type":"application/json","x-uat-refresh-token":e.UAT_REFRESH_TOKEN},body:JSON.stringify(b)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1));'
+            report() {
+              [ -n "$STG_API_CID" ] && [ -n "${RUN_ID:-}" ] && [ -n "${UAT_REFRESH_TOKEN:-}" ] || return 0
+              finished=""
+              [ "$1" = "running" ] || finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              docker exec -e RUN_ID -e UAT_REFRESH_TOKEN -e REPORT_JS="$REPORT_JS" \
+                -e R_STATE="$1" -e R_ERROR="${2:-}" -e R_STARTED="$STARTED_AT" -e R_FINISHED="$finished" \
+                -e R_SNAPSHOT="$SNAPSHOT_AT" -e R_SUMMARY="$SUMMARY" -e R_MIGRATIONS="$MIGRATIONS_APPLIED" \
+                -e R_BACKUP="$BACKUP_NAME" -e R_URL="${WORKFLOW_RUN_URL:-}" \
+                "$STG_API_CID" sh -c 'node -e "$REPORT_JS"' >/dev/null 2>&1 \
+                || log "report '$1' could not be delivered to the staging API (non-fatal)"
+            }
+
+            # ─── Postgres helpers (password copied via env, never on argv) ──
+            DB_PARTS_JS='const u=new URL(process.env.DATABASE_URL);for(const v of [u.hostname,decodeURIComponent(u.username),decodeURIComponent(u.password),decodeURIComponent(u.pathname.slice(1))])process.stdout.write(Buffer.from(v).toString("base64")+"\n")'
+            part() { printf '%s\n' "$1" | sed -n "${2}p" | base64 -d; }
+            pg_container() {
+              cid="$(docker ps --format '{{.ID}}\t{{.Names}}' | awk -v host="$1" '$2 == host { print $1; exit }')"
+              [ -n "$cid" ] || cid="$(docker ps --filter "name=$1" --format '{{.ID}}' | head -1)"
+              printf '%s' "$cid"
+            }
+            stg_psql() { db="$1"; shift; PGPASSWORD="$STG_PG_PASS" docker exec -e PGPASSWORD "$STG_PG_CID" psql -X -q -v ON_ERROR_STOP=1 -U "$STG_PG_USER" -d "$db" "$@"; }
+            stg_psql_in() { db="$1"; shift; PGPASSWORD="$STG_PG_PASS" docker exec -i -e PGPASSWORD "$STG_PG_CID" psql -X -q -v ON_ERROR_STOP=1 -U "$STG_PG_USER" -d "$db" "$@"; }
+            prod_psql() { db="$1"; shift; PGPASSWORD="$PROD_PG_PASS" docker exec -e PGPASSWORD "$PROD_PG_CID" psql -X -q -v ON_ERROR_STOP=1 -U "$PROD_PG_USER" -d "$db" "$@"; }
+            applied_migrations_sql="SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY 1"
+            terminate_sql() { printf "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN (%s) AND pid <> pg_backend_pid()" "$1"; }
+
+            # Runs a command in the staging api container against the SCRATCH
+            # database: DATABASE_URL is rebuilt inside the container from its own
+            # value with only the database name swapped (no credential crosses).
+            SCRATCH_URL_JS='const u=new URL(process.env.DATABASE_URL);u.pathname="/"+process.env.SCRATCH_DB;process.stdout.write(u.href)'
+            on_scratch() {
+              docker exec -e SCRATCH_DB="$SCRATCH_DB" -e SCRATCH_URL_JS="$SCRATCH_URL_JS" \
+                -e UAT_MASK_TARGET=scratch -e UAT_MASK_FORBIDDEN_DATABASE_URL="$FORBIDDEN_URL" \
+                -e UAT_SOURCE_SNAPSHOT_AT="$SNAPSHOT_AT" -e UAT_SEED_PASSWORD \
+                "$STG_API_CID" sh -c 'cd /app && DATABASE_URL="$(node -e "$SCRATCH_URL_JS")" && export DATABASE_URL && exec "$@"' sh "$@"
+            }
+
+            wait_healthy() {
+              i=0
+              while [ "$i" -lt 36 ]; do
+                i=$((i + 1))
+                sleep 5
+                [ "$(docker inspect -f '{{.State.Status}}' "$STG_API_CID" 2>/dev/null || echo gone)" = "running" ] || continue
+                if docker exec "$STG_API_CID" node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+                  return 0
+                fi
+              done
+              log "api did NOT come back healthy within 3 minutes — last 60 log lines:"
+              docker logs --tail 60 "$STG_API_CID" 2>&1 || true
+              return 1
+            }
+
+            rename_db() { # $1 from, $2 to — retries while stragglers reconnect
+              n=0
+              while :; do
+                n=$((n + 1))
+                stg_psql template1 -tAc "$(terminate_sql "'$1'")" >/dev/null || true
+                if stg_psql template1 -c "ALTER DATABASE \"$1\" RENAME TO \"$2\""; then return 0; fi
+                [ "$n" -lt 5 ] || return 1
+                sleep 2
+              done
+            }
+
+            # Called from the exit trap (errexit does not apply inside `||`), so
+            # every step checks its own result: the previous staging database
+            # is never dropped, and the refreshed one only once the previous
+            # one is back under the staging name.
+            rollback() {
+              log "ROLLING BACK: restoring the previous staging database..."
+              docker stop "$STG_API_CID" >/dev/null 2>&1 || true
+              API_STOPPED=1
+              if [ "$SWAPPED" = "1" ]; then
+                stg_psql template1 -c "DROP DATABASE IF EXISTS \"$FAILED_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
+                rename_db "$STG_PG_DB" "$FAILED_DB" || return 1
+              fi
+              rename_db "$OLD_DB" "$STG_PG_DB" || return 1
+              SWAPPED=0
+              stg_psql template1 -c "DROP DATABASE IF EXISTS \"$FAILED_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
+              docker start "$STG_API_CID" >/dev/null || return 1
+              API_STOPPED=0
+              wait_healthy || log "api unhealthy after rollback — inspect it now."
+              log "rollback done: staging runs on its previous database."
+            }
+
+            cleanup() {
+              rc=$?
+              rm -f "$DUMP_FILE" "$CARRY_FILE"
+              rm -rf "$LIST_DIR"
+              [ "$rc" = "0" ] && return 0
+              if [ "$COMMITTED" != "1" ] && [ "$SWAPPED" != "0" ]; then
+                rollback || log "ROLLBACK FAILED — databases: $STG_PG_DB / $OLD_DB / $FAILED_DB. Backup: ${BACKUP_NAME:-none}."
+              fi
+              if [ "$SCRATCH_CREATED" = "1" ]; then
+                stg_psql template1 -c "DROP DATABASE IF EXISTS \"$SCRATCH_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
+              fi
+              if [ "$API_STOPPED" = "1" ]; then docker start "$STG_API_CID" >/dev/null 2>&1 || true; fi
+              report failed "phase $PHASE: ${LAST_ERROR:-command failed (exit $rc)}"
+              log "FAILED in phase $PHASE."
+            }
+            trap cleanup EXIT
+
+            # ─── Discover ────────────────────────────────────────────────────
+            STG_API_CID="$(find_app_container "$STAGING_API_UUID")"
+            [ -n "$STG_API_CID" ] || die "no running staging api container for UUID '$STAGING_API_UUID'."
+            PROD_API_CID="$(find_app_container "$PROD_API_UUID")"
+            [ -n "$PROD_API_CID" ] || die "no running production api container for UUID '$PROD_API_UUID'."
+            [ "$STG_API_CID" != "$PROD_API_CID" ] || die "staging and production resolve to the same container."
+            log "staging api: $STG_API_CID | production api: $PROD_API_CID"
+
+            # ─── Guard: the TARGET is staging (same fingerprint as staging-reset)
+            PHASE="guards"
+            FRONTEND_URL="$(env_from "$STG_API_CID" FRONTEND_URL)"
+            API_URL="$(env_from "$STG_API_CID" API_URL)"
+            S3_ENV_PREFIX="$(env_from "$STG_API_CID" S3_ENV_PREFIX)"
+            log "target FRONTEND_URL=$FRONTEND_URL | API_URL=$API_URL | S3_ENV_PREFIX=${S3_ENV_PREFIX:-<unset>}"
+            case "$FRONTEND_URL $API_URL" in
+              *staging.tarodan.com.tr*|*staging.tarodan.shop*) : ;;
+              *) die "target api FRONTEND_URL/API_URL is not a staging host — refusing." ;;
+            esac
+            case "$FRONTEND_URL" in
+              https://tarodan.com.tr*|https://www.tarodan.com.tr*|https://tarodan.shop*|https://www.tarodan.shop*)
+                die "production domain fingerprint on the target api — refusing." ;;
+            esac
+            [ "$(env_from "$STG_API_CID" APP_ENV)" = "staging" ] || die "target api APP_ENV is not staging — refusing."
+            # Staging must keep writing uploads under its OWN prefix while it
+            # serves production rows. Unset falls back to "prod" under
+            # NODE_ENV=production (StorageService), so unset is refused too.
+            [ -n "$S3_ENV_PREFIX" ] && [ "$S3_ENV_PREFIX" != "prod" ] || die "target S3_ENV_PREFIX must be set and not 'prod' (uploads would land in production storage)."
+            # ─── Guard: the SOURCE is production ────────────────────────────
+            [ "$(env_from "$PROD_API_CID" APP_ENV)" = "production" ] || die "source api APP_ENV is not production — refusing."
+
+            STG_PARTS="$(docker exec "$STG_API_CID" node -e "$DB_PARTS_JS")"
+            PROD_PARTS="$(docker exec "$PROD_API_CID" node -e "$DB_PARTS_JS")"
+            STG_PG_HOST="$(part "$STG_PARTS" 1)"; STG_PG_USER="$(part "$STG_PARTS" 2)"
+            STG_PG_PASS="$(part "$STG_PARTS" 3)"; STG_PG_DB="$(part "$STG_PARTS" 4)"
+            PROD_PG_HOST="$(part "$PROD_PARTS" 1)"; PROD_PG_USER="$(part "$PROD_PARTS" 2)"
+            PROD_PG_PASS="$(part "$PROD_PARTS" 3)"; PROD_PG_DB="$(part "$PROD_PARTS" 4)"
+            [ -n "$STG_PG_HOST" ] && [ -n "$STG_PG_DB" ] && [ -n "$PROD_PG_HOST" ] && [ -n "$PROD_PG_DB" ] || die "DATABASE_URL could not be parsed."
+            STG_PG_CID="$(pg_container "$STG_PG_HOST")"
+            PROD_PG_CID="$(pg_container "$PROD_PG_HOST")"
+            [ -n "$STG_PG_CID" ] || die "staging postgres container '$STG_PG_HOST' not found."
+            [ -n "$PROD_PG_CID" ] || die "production postgres container '$PROD_PG_HOST' not found."
+            SCRATCH_DB="${STG_PG_DB}_uat_scratch"
+            OLD_DB="${STG_PG_DB}_pre_refresh"
+            FAILED_DB="${STG_PG_DB}_failed_refresh"
+            FORBIDDEN_URL="postgresql://$PROD_PG_HOST/$PROD_PG_DB"
+            if [ "$STG_PG_CID" = "$PROD_PG_CID" ]; then
+              # One postgres server for both: only the database names separate them.
+              for name in "$STG_PG_DB" "$SCRATCH_DB" "$OLD_DB" "$FAILED_DB"; do
+                [ "$name" != "$PROD_PG_DB" ] || die "target database '$name' is the production database — refusing."
+              done
+              log "WARNING: staging and production share one postgres server; only database names differ."
+            fi
+            [ "$STG_PG_HOST/$STG_PG_DB" != "$PROD_PG_HOST/$PROD_PG_DB" ] || die "target database == source database — refusing."
+            log "source: $PROD_PG_DB on $PROD_PG_HOST | target: $STG_PG_DB on $STG_PG_HOST (scratch: $SCRATCH_DB)"
+
+            # ─── Manual start (no run_id): register the run ourselves ───────
+            DRY_SQL="false"; [ "${DRY_RUN:-0}" = "1" ] && DRY_SQL="true"
+            [ "$(stg_psql "$STG_PG_DB" -tAc "SELECT to_regclass('public.uat_refresh_runs') IS NOT NULL")" = "t" ] \
+              || die "uat_refresh_runs is missing on staging: deploy staging from a commit that includes it first."
+            if [ -z "${RUN_ID:-}" ]; then
+              RUN_ID="$(cat /proc/sys/kernel/random/uuid)"
+              UAT_REFRESH_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+              export RUN_ID UAT_REFRESH_TOKEN
+              # Same digest the API stores (hashReportToken: SHA-256 hex).
+              TOKEN_HASH="$(printf '%s' "$UAT_REFRESH_TOKEN" | sha256sum | cut -d' ' -f1)"
+              stg_psql "$STG_PG_DB" -c "INSERT INTO uat_refresh_runs (id, state, dry_run, token_hash, workflow_run_url) VALUES ('$RUN_ID', 'queued', $DRY_SQL, '$TOKEN_HASH', '${WORKFLOW_RUN_URL:-}')" >/dev/null
+              log "manual start: registered run $RUN_ID"
+            fi
+            report running
+
+            # ─── Pre-flights (nothing written yet) ──────────────────────────
+            PROD_MAJOR="$(docker exec "$PROD_PG_CID" pg_dump --version | grep -oE '[0-9]+' | head -1)"
+            STG_MAJOR="$(docker exec "$STG_PG_CID" pg_restore --version | grep -oE '[0-9]+' | head -1)"
+            [ "$STG_MAJOR" -ge "$PROD_MAJOR" ] || die "staging pg_restore $STG_MAJOR is older than production pg_dump $PROD_MAJOR."
+            docker exec -e UAT_SEED_PASSWORD "$STG_API_CID" sh -c "cd /app && node dist-seed/prisma/seed-uat.js --check" \
+              || die "UAT seed pre-flight failed (is UAT_SEED_PASSWORD 16+ chars? is staging deployed with seed-uat?)."
+            on_scratch node dist-seed/prisma/uat/mask-database.js --check \
+              || die "masking runner pre-flight failed (is staging deployed from a commit with dist-seed/prisma/uat/mask-database.js?)."
+
+            # Production must not be AHEAD of the staging image: a column the
+            # staging code does not know is a column the masking catalogue does
+            # not cover.
+            mkdir -p "$LIST_DIR"
+            docker exec "$STG_API_CID" sh -c 'ls -1 /app/prisma/migrations' | grep -E '^[0-9]{14}_' | sort > "$LIST_DIR/image"
+            prod_psql "$PROD_PG_DB" -tAc "$applied_migrations_sql" | sed '/^$/d' | sort > "$LIST_DIR/prod"
+            if [ -n "$(comm -23 "$LIST_DIR/prod" "$LIST_DIR/image")" ]; then
+              comm -23 "$LIST_DIR/prod" "$LIST_DIR/image" | sed 's/^/  /'
+              die "production has migrations the staging image does not know (listed above): deploy staging from a branch that includes them, then refresh."
+            fi
+            log "migrations newer than production (will apply after import): $(comm -13 "$LIST_DIR/prod" "$LIST_DIR/image" | wc -l | xargs)"
+
+            PROD_DB_BYTES="$(prod_psql "$PROD_PG_DB" -tAc "SELECT pg_database_size(current_database())" | xargs)"
+            PROD_DB_PRETTY="$(prod_psql "$PROD_PG_DB" -tAc "SELECT pg_size_pretty(pg_database_size(current_database()))" | xargs)"
+            DOCKER_ROOT="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
+            FREE_WORK="$(df -Pk "$WORK_DIR" | awk 'NR==2 { print $4 * 1024 }')"
+            FREE_DOCKER="$(df -Pk "$DOCKER_ROOT" 2>/dev/null | awk 'NR==2 { print $4 * 1024 }' || echo "$FREE_WORK")"
+            log "production database size: $PROD_DB_PRETTY ($PROD_DB_BYTES bytes); free: work dir $((FREE_WORK / 1048576)) MiB, docker root $((FREE_DOCKER / 1048576)) MiB"
+            # Dump (≤ DB size) next to the scratch DB (≈ DB size) + staging backup.
+            [ "$FREE_DOCKER" -ge $((PROD_DB_BYTES * 3)) ] && [ "$FREE_WORK" -ge "$PROD_DB_BYTES" ] \
+              || die "not enough disk space for dump + scratch database + backup (need ~3x $PROD_DB_PRETTY)."
+
+            if [ "${DRY_RUN:-0}" = "1" ]; then
+              log "DRY_RUN=1 — discovery, guards and pre-flights passed. Nothing was copied or written."
+              report succeeded
+              exit 0
+            fi
+
+            # ─── Dump production (stays on this host) ───────────────────────
+            PHASE="dump"
+            SNAPSHOT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            log "pg_dump production -> $DUMP_FILE"
+            ( umask 077; PGPASSWORD="$PROD_PG_PASS" docker exec -e PGPASSWORD "$PROD_PG_CID" \
+                pg_dump -Fc --no-owner --no-acl -U "$PROD_PG_USER" "$PROD_PG_DB" > "$DUMP_FILE" )
+            [ -s "$DUMP_FILE" ] || die "production dump is empty."
+            log "dump size: $(du -h "$DUMP_FILE" | cut -f1)"
+
+            # ─── Restore into a scratch DB on the STAGING server ────────────
+            PHASE="restore"
+            stg_psql template1 -c "DROP DATABASE IF EXISTS \"$SCRATCH_DB\" WITH (FORCE)"
+            stg_psql template1 -c "CREATE DATABASE \"$SCRATCH_DB\""
+            SCRATCH_CREATED=1
+            PGPASSWORD="$STG_PG_PASS" docker exec -i -e PGPASSWORD "$STG_PG_CID" \
+              pg_restore --no-owner --no-acl --no-comments --exit-on-error -U "$STG_PG_USER" -d "$SCRATCH_DB" < "$DUMP_FILE"
+            rm -f "$DUMP_FILE"
+            log "restored into $SCRATCH_DB; production dump deleted."
+
+            # ─── Bring the copy to the staging schema (before masking: the
+            #     catalogue describes the staging schema) ──────────────────
+            PHASE="migrate"
+            stg_psql "$SCRATCH_DB" -tAc "$applied_migrations_sql" | sed '/^$/d' | sort > "$LIST_DIR/before"
+            on_scratch npx prisma migrate deploy --schema=prisma/schema.prisma
+            stg_psql "$SCRATCH_DB" -tAc "$applied_migrations_sql" | sed '/^$/d' | sort > "$LIST_DIR/after"
+            MIGRATIONS_APPLIED="$(comm -13 "$LIST_DIR/before" "$LIST_DIR/after")"
+            log "migrations applied after import: $(printf '%s\n' "$MIGRATIONS_APPLIED" | sed '/^$/d' | wc -l | xargs)"
+
+            # ─── Mask + verify ──────────────────────────────────────────────
+            PHASE="mask"
+            MASK_OUT="$(on_scratch node dist-seed/prisma/uat/mask-database.js)"
+            SUMMARY="$(printf '%s\n' "$MASK_OUT" | tail -n 1)"
+            printf '%s' "$SUMMARY" | grep -q '"masked"' || die "masking runner printed no summary."
+            PHASE="verify"
+            on_scratch node dist-seed/prisma/uat/mask-database.js --verify
+            # Independent sample: no address outside the masked/system domains.
+            LEAKS="$(stg_psql "$SCRATCH_DB" -tAc "SELECT count(*) FROM users WHERE email !~* '@uat\.invalid\$' AND split_part(lower(email), '@', 2) NOT IN ('tarodan.system', 'deleted.local', 'tarodan.com')" | xargs)"
+            [ "$LEAKS" = "0" ] || die "$LEAKS user e-mail(s) outside uat.invalid after masking — aborting."
+
+            # ─── Fixed UAT accounts on top ──────────────────────────────────
+            PHASE="accounts"
+            on_scratch node dist-seed/prisma/seed-uat.js --accounts-only
+
+            # ─── Back up current staging + carry its own rows over ──────────
+            PHASE="backup"
+            BACKUP_DIR="$HOME/tarodan-staging-backups"; mkdir -p "$BACKUP_DIR"
+            BACKUP_NAME="staging-pre-refresh-$TS.sql.gz"
+            log "pg_dump staging ($STG_PG_DB) -> $BACKUP_DIR/$BACKUP_NAME"
+            PGPASSWORD="$STG_PG_PASS" docker exec -e PGPASSWORD "$STG_PG_CID" pg_dump -U "$STG_PG_USER" "$STG_PG_DB" | gzip > "$BACKUP_DIR/$BACKUP_NAME"
+            [ -s "$BACKUP_DIR/$BACKUP_NAME" ] || die "staging backup is empty."
+            ls -1t "$BACKUP_DIR"/staging-pre-*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+
+            PHASE="carry"
+            # Staging's run history (this run included) and its own mail routing
+            # (sender mailboxes encrypted with the STAGING key) replace the
+            # production rows the masking already emptied.
+            PGPASSWORD="$STG_PG_PASS" docker exec -e PGPASSWORD "$STG_PG_CID" pg_dump --data-only --no-owner --no-acl \
+              --table=public.uat_refresh_runs --table=public.mail_sender_accounts --table=public.mail_area_settings \
+              -U "$STG_PG_USER" "$STG_PG_DB" > "$CARRY_FILE"
+            stg_psql "$SCRATCH_DB" -c "TRUNCATE uat_refresh_runs, mail_area_settings, mail_sender_accounts"
+            stg_psql_in "$SCRATCH_DB" < "$CARRY_FILE" >/dev/null
+            rm -f "$CARRY_FILE"
+
+            # ─── Swap ───────────────────────────────────────────────────────
+            PHASE="swap"
+            log "stopping the staging api and swapping databases..."
+            docker stop "$STG_API_CID" >/dev/null
+            API_STOPPED=1
+            stg_psql template1 -c "DROP DATABASE IF EXISTS \"$OLD_DB\" WITH (FORCE)"
+            rename_db "$STG_PG_DB" "$OLD_DB"
+            SWAPPED="old_renamed"
+            rename_db "$SCRATCH_DB" "$STG_PG_DB"
+            SWAPPED=1
+            SCRATCH_CREATED=0
+            docker start "$STG_API_CID" >/dev/null
+            API_STOPPED=0
+            wait_healthy || die "api unhealthy on the refreshed database."
+
+            # ─── Finish: Redis, search, cleanup ─────────────────────────────
+            PHASE="finish"
+            # flushdb, never flushall: staging and production share the Redis
+            # server on this host (see staging-reset.yml).
+            docker exec "$STG_API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushdb().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
+            # Restart so boot re-registers the (flushed) repeatable jobs and the
+            # search sync reindexes the production listings within ~5 minutes.
+            docker restart "$STG_API_CID" >/dev/null
+            wait_healthy || die "api unhealthy after the post-refresh restart."
+            COMMITTED=1
+            stg_psql template1 -c "DROP DATABASE IF EXISTS \"$OLD_DB\" WITH (FORCE)" || log "could not drop $OLD_DB (drop it by hand)."
+
+            PHASE="done"
+            report succeeded
+            log "staging now runs on masked production data (snapshot $SNAPSHOT_AT). Backup: $BACKUP_DIR/$BACKUP_NAME"
