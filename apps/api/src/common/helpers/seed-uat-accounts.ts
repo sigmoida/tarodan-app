@@ -17,7 +17,7 @@ export const UAT_PASSWORD_MIN_LENGTH = 16;
 export const UAT_PASSWORD_MAX_BYTES = 72;
 
 /** Platform servis hesabı hiçbir zaman üye/personel olarak açılamaz. */
-const PLATFORM_EMAIL = "platform@tarodan.com";
+export const PLATFORM_EMAIL = "platform@tarodan.com";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type UatAccountKind = "member" | "staff";

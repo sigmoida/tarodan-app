@@ -30,7 +30,7 @@ export function anonymizedEmailFor(userId: string): string {
   return `deleted_${userId}@deleted.local`;
 }
 
-const ANONYMIZED_EMAIL_PATTERN = /^deleted_.+@deleted\.local$/i;
+export const ANONYMIZED_EMAIL_PATTERN = /^deleted_.+@deleted\.local$/i;
 
 /**
  * Anonimleştirilmiş `users` satırı, kimlik alanları için kaynak DEĞİLDİR.
