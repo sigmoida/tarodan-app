@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import {
   FormModal,
   FormInput,
   FormDatePicker,
   FormSelect,
+  FormTextarea,
   FormCheckbox,
   useZodForm,
 } from "@tarodan/ui/form";
@@ -29,17 +31,28 @@ import {
   emptyAdForm,
   adFormToPayload,
   positionOptions,
+  positionHint,
+  AD_CONTENT_MAX,
   deviceOptions,
   IAB_SIZES,
   isIabSize,
 } from "../_lib/types";
+import {
+  campaignLabel,
+  selectableCampaigns,
+  unwrapCampaigns,
+} from "../_lib/campaigns";
 
 const AD_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 /** Drag-drop upload + dimension detection + IAB presets, bound to the RHF form. */
 function AdImageField() {
   const t = useTranslations();
-  const { watch, setValue } = useFormContext<AdFormValues>();
+  const {
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<AdFormValues>();
   const imageUrl = watch("imageUrl");
   const width = watch("width");
   const height = watch("height");
@@ -65,13 +78,15 @@ function AdImageField() {
   const upload = async (file: File) => {
     setUploading(true);
     try {
-      const res = await adminApi.uploadMedia(file);
-      const url = (res.data as { url?: string })?.url;
-      if (url) {
-        setValue("imageUrl", url, { shouldDirty: true });
-        loadDims(url);
-        toast.success(t("admin.marketing.ads.upload.success"));
+      const res = await adminApi.uploadAdImage(file);
+      const url = res.data?.url;
+      if (!url) {
+        toast.error(t("admin.marketing.ads.upload.failed"));
+        return;
       }
+      setValue("imageUrl", url, { shouldDirty: true });
+      loadDims(url);
+      toast.success(t("admin.marketing.ads.upload.success"));
     } catch (error) {
       toast.error(
         extractErrorMessage(error, t("admin.marketing.ads.upload.failed")),
@@ -187,12 +202,55 @@ function AdImageField() {
         ))}
       </div>
 
+      {(errors.width || errors.height) && (
+        <Alert variant="danger">
+          {t("admin.marketing.ads.validation.sizeMax")}
+        </Alert>
+      )}
+
       {!!width && !!height && !compliant && (
         <Alert variant="warning">
           {t("admin.marketing.ads.iabWarning", { width, height })}
         </Alert>
       )}
     </div>
+  );
+}
+
+/** Pozisyon seçici + seçilen yerin tek satırlık açıklaması ve önerilen boyutlar. */
+function PositionField() {
+  const t = useTranslations();
+  const position = useWatch({ name: "position" }) as string;
+  return (
+    <FormSelect
+      name="position"
+      label={t("admin.marketing.ads.positionLabel")}
+      options={positionOptions(t)}
+      helperText={positionHint(t, position)}
+    />
+  );
+}
+
+/** Opsiyonel kampanya bağlantısı: yalnız aktif/yaklaşan kampanyalar seçilebilir. */
+function CampaignField({ currentId }: { currentId?: string | null }) {
+  const t = useTranslations();
+  const { data } = useQuery({
+    queryKey: ["discounts", "ad-options"],
+    queryFn: async () =>
+      unwrapCampaigns((await adminApi.getDiscounts({ limit: 200 })).data),
+    staleTime: 60_000,
+  });
+  const campaigns = selectableCampaigns(data ?? [], new Date(), currentId);
+  return (
+    <FormSelect
+      name="discountId"
+      label={t("admin.marketing.ads.campaign")}
+      options={[
+        { value: "", label: t("admin.marketing.ads.noCampaign") },
+        ...campaigns.map((c) => ({ value: c.id, label: campaignLabel(c) })),
+      ]}
+      helperText={t("admin.marketing.ads.campaignHelper")}
+    />
   );
 }
 
@@ -215,8 +273,8 @@ export function AdFormModal({
   const save = useAdminMutation(
     (v: AdFormValues) =>
       isEdit
-        ? adminApi.updateAd(ad!.id, adFormToPayload(v))
-        : adminApi.createAd(adFormToPayload(v)),
+        ? adminApi.updateAd(ad!.id, adFormToPayload(v, "update"))
+        : adminApi.createAd(adFormToPayload(v, "create")),
     {
       invalidates: ["ads"],
       successMessage: isEdit
@@ -252,15 +310,20 @@ export function AdFormModal({
       />
       <FormInput
         name="linkUrl"
-        label="Link URL"
+        label={t("admin.marketing.ads.linkUrl")}
         placeholder={t("admin.marketing.ads.linkUrlPlaceholder")}
+        helperText={t("admin.marketing.ads.linkUrlHelper")}
+      />
+      <FormTextarea
+        name="content"
+        label={t("admin.marketing.ads.content")}
+        placeholder={t("admin.marketing.ads.contentPlaceholder")}
+        helperText={t("admin.marketing.ads.contentHelper")}
+        maxLength={AD_CONTENT_MAX}
+        rows={3}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormSelect
-          name="position"
-          label={t("admin.marketing.ads.positionLabel")}
-          options={positionOptions(t)}
-        />
+        <PositionField />
         <FormSelect
           name="deviceType"
           label={t("admin.marketing.ads.deviceType")}
@@ -272,7 +335,9 @@ export function AdFormModal({
         label={t("admin.marketing.ads.displayOrder")}
         type="number"
         placeholder="0"
+        helperText={t("admin.marketing.ads.displayOrderHelper")}
       />
+      <CampaignField currentId={ad?.discountId} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormDatePicker
           name="startDate"

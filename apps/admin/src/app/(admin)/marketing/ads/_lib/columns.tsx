@@ -8,8 +8,9 @@ import {
   DeviceTabletIcon,
 } from "@heroicons/react/24/outline";
 import { col, type RowActionItem } from "@/components/table";
-import { fmtPercent } from "@/lib/format";
+import { fmtDate, fmtPercent } from "@/lib/format";
 import { type Ad, positionLabels, deviceLabels } from "./types";
+import { AD_STATUS_VARIANT, adLiveStatus } from "./status";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -32,6 +33,7 @@ export function adColumns(
 ) {
   const positions = positionLabels(t);
   const devices = deviceLabels(t);
+  const now = new Date();
   return [
     col.custom<Ad>(
       t("admin.marketing.ads.preview"),
@@ -96,6 +98,26 @@ export function adColumns(
         </span>
       ),
       { sortKey: "deviceType", sortType: "text" },
+    ),
+    col.muted<Ad>(
+      t("admin.marketing.ads.schedule"),
+      (ad) =>
+        ad.startDate || ad.endDate
+          ? `${fmtDate(ad.startDate) ?? "—"} – ${fmtDate(ad.endDate) ?? "—"}`
+          : null,
+      { minWidth: 150, sortKey: "startDate", sortType: "date" },
+    ),
+    col.badge<Ad>(
+      t("admin.marketing.ads.liveStatusLabel"),
+      (ad) => {
+        const status = adLiveStatus(ad, now);
+        return (
+          <Badge variant={AD_STATUS_VARIANT[status]} size="sm">
+            {t(`admin.marketing.ads.liveStatus.${status}`)}
+          </Badge>
+        );
+      },
+      { sortable: false },
     ),
     col.custom<Ad>(
       t("common.status"),

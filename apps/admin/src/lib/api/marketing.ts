@@ -52,6 +52,19 @@ export const marketingApi = {
   updateAd: (id: string, data: any) => api.patch(`/admin/ads/${id}`, data),
   deleteAd: (id: string) => api.delete(`/admin/ads/${id}`),
   reorderAds: (ids: string[]) => api.patch("/admin/ads/reorder", { ids }),
+  /** Reklam görseli yükleme (multipart); yanıt `/admin/media/upload` ile aynı: `{ url, key }`. */
+  uploadAdImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string; key: string }>(
+      "/admin/ads/upload",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+  },
+  /** Kampanya (indirim) listesi; reklam formundaki kampanya seçimi için. */
+  getDiscounts: (params?: { isActive?: boolean; limit?: number }) =>
+    api.get("/admin/discounts", { params }),
 
   // Notifications
   getNotificationHistory: (params?: {
