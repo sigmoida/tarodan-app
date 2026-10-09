@@ -815,6 +815,53 @@ describe("validateEnv", () => {
     });
   });
 
+  // Staging yenileme düğmesinin GitHub tetikleyicisi (docs/UAT_REFRESH.md).
+  describe("GITHUB_DISPATCH_*", () => {
+    const dispatch = {
+      GITHUB_DISPATCH_TOKEN: "github_pat_example",
+      GITHUB_DISPATCH_REPO: "sigmoida/tarodan-app",
+    };
+
+    it("accepts the trigger on staging", () => {
+      expect(() => validateEnv({ ...stagingBase, ...dispatch })).not.toThrow();
+    });
+
+    it("is optional (the button then shows 'not configured')", () => {
+      expect(() => validateEnv(stagingBase)).not.toThrow();
+    });
+
+    it("refuses half a configuration", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          GITHUB_DISPATCH_TOKEN: dispatch.GITHUB_DISPATCH_TOKEN,
+        }),
+      ).toThrow(/GITHUB_DISPATCH_REPO/);
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          GITHUB_DISPATCH_REPO: dispatch.GITHUB_DISPATCH_REPO,
+        }),
+      ).toThrow(/GITHUB_DISPATCH_TOKEN/);
+    });
+
+    it("refuses a repo that is not owner/repo", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          ...dispatch,
+          GITHUB_DISPATCH_REPO: "https://github.com/sigmoida/tarodan-app",
+        }),
+      ).toThrow(/owner\/repo/);
+    });
+
+    it("refuses the token on the production deployment", () => {
+      expect(() => validateEnv({ ...prodBase, ...dispatch })).toThrow(
+        /GITHUB_DISPATCH_TOKEN.*production deployment/,
+      );
+    });
+  });
+
   it("still requires presence of every secret outside production", () => {
     expect(() =>
       validateEnv({

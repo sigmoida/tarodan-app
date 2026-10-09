@@ -11504,6 +11504,15 @@
           }
         }
       }
+    },
+    "uatRefresh": {
+      "productionRefused": "Refreshing from production is not available on the live deployment",
+      "notConfigured": "The staging refresh is not configured (GitHub trigger missing: GITHUB_DISPATCH_TOKEN / GITHUB_DISPATCH_REPO)",
+      "alreadyRunning": "A staging refresh is already queued or running; wait for it to finish",
+      "dispatchFailed": "The refresh workflow could not be started on GitHub; the run was marked as failed",
+      "runNotFound": "Refresh run not found",
+      "invalidToken": "The refresh run or its report token is not valid",
+      "alreadyFinished": "This refresh run has already finished"
     }
   },
   "status": {
