@@ -4419,3 +4419,48 @@ enum LedgerDirection {
   debit
   credit
 }
+
+/// Staging "production'dan maskeli yenile" koşuları (docs/UAT_REFRESH.md).
+/// Yalnız staging'de dolar: admin düğmesi satırı açar ve GitHub workflow'unu
+/// tetikler, workflow aşamaları `POST /internal/uat-refresh/:id/report` ile
+/// bildirir. Yenileme staging veritabanını DEĞİŞTİRDİĞİ için workflow bu
+/// tabloyu takastan önce döker ve yeni veritabanına geri yükler — geçmiş
+/// yenilemeleri atlatır. Bu yüzden kullanıcıya FK YOK: isteyen personelin
+/// satırı takastan sonra var olmayabilir; adı satırda anlık görüntü olarak durur.
+model UatRefreshRun {
+  id                String          @id @default(uuid())
+  state             UatRefreshState @default(queued)
+  /// User.id; null = GitHub'dan elle başlatılmış koşu (workflow satırı kendisi açar).
+  requestedById     String?         @map("requested_by_id")
+  /// İsteyen personelin o anki görünen adı (FK yok, bkz. model notu).
+  requestedByName   String?         @map("requested_by_name")
+  requestedAt       DateTime        @default(now()) @map("requested_at")
+  startedAt         DateTime?       @map("started_at")
+  finishedAt        DateTime?       @map("finished_at")
+  dryRun            Boolean         @default(false) @map("dry_run")
+  /// Koşuya özel rapor token'ının SHA-256'sı (hex). Token yalnız dispatch
+  /// girdisinde yaşar; düz hali hiçbir yerde saklanmaz.
+  tokenHash         String          @unique @map("token_hash")
+  workflowRunUrl    String?         @map("workflow_run_url")
+  /// Production dökümünün alındığı an.
+  sourceSnapshotAt  DateTime?       @map("source_snapshot_at")
+  /// `[{ table, rows }]` — maskelenen/silinen satır sayıları.
+  masked            Json            @default("[]")
+  /// Import sonrası uygulanan (production'dan yeni) migration adları.
+  migrationsApplied String[]        @default([]) @map("migrations_applied")
+  /// Yenileme öncesi staging yedeğinin sunucudaki dosya adı.
+  backupFile        String?         @map("backup_file")
+  error             String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  @@index([requestedAt])
+  @@map("uat_refresh_runs")
+}
+
+enum UatRefreshState {
+  queued
+  running
+  succeeded
+  failed
+}

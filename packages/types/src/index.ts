@@ -141,3 +141,5 @@ export * from "./admin-trade-cancellation";
 export * from "./paytr-merchant-oid";
 // Mail routing: areas, sender accounts, staff notification events + admin shapes
 export * from "./mail-routing";
+// Staging refresh from production (masked): run status shared by API + admin
+export * from "./uat-refresh";
