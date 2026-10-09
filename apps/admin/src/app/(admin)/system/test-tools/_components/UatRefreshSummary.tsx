@@ -110,7 +110,10 @@ export function UatRefreshSummary({
       {run.error && (
         <Alert variant="danger" title={t(`${base}.error`)}>
           <span className="whitespace-pre-wrap break-words">
-            {uatRefreshErrorText(run.error, t(`${base}.timedOut`))}
+            {uatRefreshErrorText(run.error, {
+              timedOut: t(`${base}.timedOut`),
+              dispatchUnconfirmed: t(`${base}.dispatchUnconfirmed`),
+            })}
           </span>
         </Alert>
       )}

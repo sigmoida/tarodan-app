@@ -242,10 +242,18 @@ describe("uatRefreshPollInterval", () => {
   });
 });
 
+const TEXTS = { timedOut: "Zaman aşımı", dispatchUnconfirmed: "Onaylanamadı" };
+
 describe("uatRefreshErrorText", () => {
+  it("onaylanamayan başlatma kodunu çevirir", () => {
+    expect(uatRefreshErrorText("dispatchUnconfirmed", TEXTS)).toBe(
+      "Onaylanamadı",
+    );
+  });
+
   it("translates the timed-out code and passes other messages through", () => {
-    expect(uatRefreshErrorText("timedOut", "Zaman aşımı")).toBe("Zaman aşımı");
-    expect(uatRefreshErrorText("pg_restore failed", "Zaman aşımı")).toBe(
+    expect(uatRefreshErrorText("timedOut", TEXTS)).toBe("Zaman aşımı");
+    expect(uatRefreshErrorText("pg_restore failed", TEXTS)).toBe(
       "pg_restore failed",
     );
   });

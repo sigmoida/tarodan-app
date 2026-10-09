@@ -1,6 +1,7 @@
 import {
   UAT_REFRESH_ACTIVE_STATES,
   UAT_REFRESH_TIMED_OUT_ERROR,
+  UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
 } from "@tarodan/types";
 import type {
   UatRefreshRun,
@@ -26,9 +27,13 @@ export function isUatRefreshActive(
  */
 export function uatRefreshErrorText(
   error: string,
-  timedOutText: string,
+  texts: { timedOut: string; dispatchUnconfirmed: string },
 ): string {
-  return error === UAT_REFRESH_TIMED_OUT_ERROR ? timedOutText : error;
+  if (error === UAT_REFRESH_TIMED_OUT_ERROR) return texts.timedOut;
+  if (error === UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR) {
+    return texts.dispatchUnconfirmed;
+  }
+  return error;
 }
 
 /** Durumun rozet rengi (tek kaynak; kart ve geçmiş tablosu aynı haritayı okur). */

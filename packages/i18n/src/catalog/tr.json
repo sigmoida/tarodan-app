@@ -4960,6 +4960,7 @@
             "maskedRows": "Satır",
             "error": "Hata",
             "timedOut": "Çalışma beklenen sürede bitmedi; zaman aşımına uğramış sayıldı. Ayrıntı için GitHub çalışmasını kontrol et.",
+            "dispatchUnconfirmed": "GitHub iş akışını başlatma isteği onaylanamadı; iş yine de başlamış olabilir. İlk durum bildirimi geldiğinde burada görünür.",
             "dryRun": "Deneme"
           },
           "duration": "{minutes} dk {seconds} sn",
