@@ -68,7 +68,7 @@ Gösterim: ✅ tam · 🟡 kısmi · ❌ yok · ⚠️ hatalı/bozuk
 | Sepet                                       | Bilinçli hibrit ("Faz A"): yerel yazma otoriter, üyede sunucu aynası + stok/uygunluk `useServerCart`; **misafir sepeti cihaz-yerel** — bilinçli karar |
 | Boost/vitrin                                | `GET /products/:id/boost/options` birincil, legacy `pricing` yalnız fallback; ölü `FeaturedListingsModal` silindi + regresyon testi                   |
 | Satıcı faturası                             | Yükleme/değiştirme/indirme tam (`sellerInvoiceApi`)                                                                                                   |
-| Reklam alanları                             | `GET /ads/active` + impression/click, anasayfada `AdBanner`                                                                                           |
+| Reklam alanları                             | `GET /ads/active` + impression/click, anasayfada `AdBanner` — 2026-10-09 yuva/sayım değişikliği için aşağıdaki "Uç yolu notları"na bakın                |
 | E-posta değişikliği, kullanıcı adı, telefon | Üçü de ekranlı ve bağlı                                                                                                                               |
 | Planlı üyelik değişikliği iptali            | `POST /membership/cancel-scheduled-change` bağlı                                                                                                      |
 | Tıklama + popüler ray                       | `recordClick` fire-and-forget, `products/popular` anasayfada                                                                                          |
@@ -92,6 +92,8 @@ Gösterim: ✅ tam · 🟡 kısmi · ❌ yok · ⚠️ hatalı/bozuk
 | Satıcı kargo         | `GET /shipping/order/:id` → yoksa `POST /shipping` → `PATCH /shipping/:id/tracking` | Doğru sıra; #20'deki serbest metin notu geçerli                                   |
 | Bekleyen sayaçlar    | `status-counts` (sekme) + `pending-count` (rozet)                                   | Doğru ayrım; `GET /orders/seller/pending-count` mobilde kullanılmıyor (opsiyonel) |
 | Kendi istatistikleri | `me/stats` (profil) + `me/business-stats` (yalnız kurumsal)                         | Doğru kapılama                                                                    |
+| Reklam yuvaları      | `GET /ads/active?position=&device=` (yanıt şekli değişmedi)                         | 2026-10-09: yuvalar `topbar` (sayfa üstü ince şerit) · `header` (site başlığı altındaki büyük banner) · `footer` · `inline` (ürün ızgarası satır arası) · `popup` (ziyaretçi başına günde en fazla bir). **`sidebar` kaldırıldı** — `?position=sidebar` artık `[]` döner; eski sidebar kayıtları `inline`'a taşınıp pasife alındı. Sıra `displayOrder ASC, createdAt DESC`; yuvadaki tüm canlı reklamlar döner, rotasyon istemcide |
+| Reklam tık/gösterim  | `POST /ads/:id/click`, `POST /ads/:id/impression`                                   | 2026-10-09: gövde okunmaz (`sendBeacon`/text-plain/boş gövde geçerli), **her zaman 204, gövdesiz** — bilinmeyen/yayında olmayan reklam da 204 (eskiden 404 + `{ success:true }`). IP+reklam başına tekilleştirme (tık 10 sn, gösterim 30 dk) ve IP başına 60/dk sınırı; mobil yanıt gövdesine ya da 404'e bakmamalı, 429'u sessizce yutmalı |
 
 ---
 

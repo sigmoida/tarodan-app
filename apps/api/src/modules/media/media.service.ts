@@ -4,6 +4,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { v4 as uuidv4 } from "uuid";
@@ -138,6 +139,16 @@ export class MediaService {
     if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
         `File type '${file.mimetype}' is not allowed`,
+      );
+    }
+
+    // Public kökün kalıcı URL'i `S3_PUBLIC_BASE_URL`'den kurulur. Tanımsızsa
+    // nesne yüklenip `url: ""` dönüyor, istemci boş URL'i kaydediyordu
+    // (reklam görseli kırık kalıyordu). Yüklemeden ÖNCE açık 503 ver; aşağıdaki
+    // try bloğu her hatayı 400'e çevirdiği için kontrol onun dışında.
+    if (isPublicBucket(bucket) && !this.storageService.hasPublicAssetBaseUrl()) {
+      throw new ServiceUnavailableException(
+        i18nMessage("server.storage.publicUrlNotConfigured"),
       );
     }
 

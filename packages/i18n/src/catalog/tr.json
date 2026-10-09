@@ -11263,7 +11263,8 @@
     },
     "advertisement": {
       "notFound": "Reklam bulunamadı",
-      "campaignNotFound": "Bağlanacak kampanya bulunamadı"
+      "campaignNotFound": "Bağlanacak kampanya bulunamadı",
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz"
     },
     "brand": {
       "notFound": "Marka bulunamadı"
@@ -11444,7 +11445,8 @@
       "presignFailed": "Presigned URL oluşturulamadı",
       "downloadUnavailable": "Dosya indirme servisi şu anda kullanılamıyor.",
       "invalidBucketType": "Geçersiz bucket tipi: {bucket}",
-      "invalidBucket": "Geçersiz bucket: {bucket}"
+      "invalidBucket": "Geçersiz bucket: {bucket}",
+      "publicUrlNotConfigured": "Görsel yükleme şu anda yapılandırılmamış (genel dosya adresi tanımsız). Lütfen sistem yöneticisine bildirin."
     },
     "consent": {
       "distanceSalesRequired": "Ödemeye devam etmek için Mesafeli Satış Sözleşmesi'ni onaylamanız gerekiyor.",

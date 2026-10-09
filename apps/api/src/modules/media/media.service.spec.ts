@@ -1,6 +1,7 @@
 // sharp CJS: servis de `require` ile yüklüyor, spec aynı yolu izler.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sharp = require("sharp");
+import { ServiceUnavailableException } from "@nestjs/common";
 import { MediaService } from "./media.service";
 
 /**
@@ -42,6 +43,7 @@ function createService(): {
       return { key: `key-${uploaded.length}` };
     }),
     getPublicAssetUrl: jest.fn((key: string) => `https://cdn.test/${key}`),
+    hasPublicAssetBaseUrl: jest.fn(() => true),
   };
   const service = new MediaService(
     {} as never, // ConfigService — bu yolda kullanılmıyor
@@ -97,5 +99,51 @@ describe("MediaService — EXIF yönlendirmesi", () => {
 
     const avatar = await sharp(uploaded[0]).metadata();
     expect(avatar.height).toBeGreaterThan(avatar.width);
+  });
+});
+
+describe("MediaService.upload — public kök URL'i tanımsız", () => {
+  function serviceWithoutPublicBaseUrl() {
+    const storageService = {
+      uploadFile: jest.fn(),
+      getPublicAssetUrl: jest.fn(() => ""),
+      hasPublicAssetBaseUrl: jest.fn(() => false),
+      getPresignedDownloadUrl: jest.fn(async () => "https://signed.test/k"),
+    };
+    const service = new MediaService(
+      {} as never,
+      {} as never,
+      storageService as never,
+      {} as never,
+    );
+    return { service, storageService };
+  }
+
+  const png = {
+    buffer: Buffer.from("x"),
+    size: 1,
+    mimetype: "image/png",
+    originalname: "banner.png",
+  } as Express.Multer.File;
+
+  it("public köke yüklemeden ÖNCE 503 verir (sessiz `url: \"\"` yerine)", async () => {
+    const { service, storageService } = serviceWithoutPublicBaseUrl();
+
+    const upload = service.upload(png, { bucket: "products", folder: "ads" });
+
+    await expect(upload).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(upload).rejects.toMatchObject({
+      response: { i18nKey: "server.storage.publicUrlNotConfigured" },
+    });
+    expect(storageService.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("private kök (presigned URL) bu ayara bağlı değildir", async () => {
+    const { service, storageService } = serviceWithoutPublicBaseUrl();
+    storageService.uploadFile.mockResolvedValue({ key: "k", bucket: "messages" });
+
+    await expect(
+      service.upload(png, { bucket: "messages" }),
+    ).resolves.toMatchObject({ url: "https://signed.test/k" });
   });
 });

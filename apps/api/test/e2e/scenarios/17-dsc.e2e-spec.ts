@@ -28,10 +28,11 @@
  *  - POST /api/admin/commission-rules (@Roles super_admin YALNIZ) — admin/moderator → 403.
  *  - GET /api/ads/active @Public → { id,title,imageUrl,linkUrl,content,altText,width,height,position,deviceType }
  *    (clickCount/impressionCount YOK). device=mobile → [mobile, all]; position filtrelenir; isActive=false hariç.
- *  - POST /api/ads/:id/click|impression @Public → varsayılan 201, { success:true }, sayaç +1; yok → 404 "Reklam bulunamadı".
+ *  - POST /api/ads/:id/click|impression @Public → 204 (gövdesiz, beacon dostu); yalnız yayındaki reklamda ve
+ *    IP+reklam başına pencerede bir kez sayılır (tık 10 sn, gösterim 30 dk); yok/yayında değil → 204, sayılmaz.
  *  - GET /api/ads/iab-sizes → 10 öğe (IAB_STANDARD_SIZES).
  *  - POST /api/admin/ads (@Roles) → varsayılan 201, toResponse iabCompliant/iabSize/ctr/clickCount/impressionCount.
- *    CreateAdvertisementDto width/height @Min(1)@Max(2000) → 2500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
+ *    CreateAdvertisementDto width/height @Min(1)@Max(4000) → 4500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
  *  - PATCH /api/admin/ads/:id → 200; PATCH /api/admin/ads/reorder @HttpCode(200); DELETE @HttpCode(204).
  *  - POST /api/newsletter/subscribe @HttpCode(200) → mesajlar; e-posta lowercase+trim; idempotent güncelle;
  *    reaktivasyon. GET /unsubscribe?token= (yok→404); POST /unsubscribe (bulunmayan→200 nötr, idempotent).
@@ -1436,17 +1437,17 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-053", async () => {
-    // position=header filtresi; sidebar dışlanır; displayOrder asc.
+    // position=header filtresi; diğer yuvalar (topbar) dışlanır; displayOrder asc.
     await seedAd({ title: "Header-A", position: "header", displayOrder: 1 });
     await seedAd({ title: "Header-B", position: "header", displayOrder: 0 });
-    await seedAd({ title: "Sidebar-X", position: "sidebar", displayOrder: 0 });
+    await seedAd({ title: "Topbar-X", position: "topbar", displayOrder: 0 });
     const res = await request(server())
       .get("/api/ads/active?position=header")
       .expect(200);
     const titles = res.body.map((a: any) => a.title);
     expect(titles).toContain("Header-A");
     expect(titles).toContain("Header-B");
-    expect(titles).not.toContain("Sidebar-X");
+    expect(titles).not.toContain("Topbar-X");
     // displayOrder asc → Header-B (0) önce Header-A (1).
     expect(titles.indexOf("Header-B")).toBeLessThan(titles.indexOf("Header-A"));
   });
@@ -1494,11 +1495,13 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-058", async () => {
-    // Tık kaydı sayacı artırır (public).
+    // Tık kaydı sayacı artırır (public, 204 — sendBeacon yanıt okumaz).
     const ad = await seedAd({ title: "Tık Reklam" });
-    const res = await request(server()).post(`/api/ads/${ad.id}/click`);
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.success).toBe(true);
+    await request(server())
+      .post(`/api/ads/${ad.id}/click`)
+      .set("Content-Type", "text/plain")
+      .send("")
+      .expect(204);
     const prisma = getPrisma();
     const refreshed = await (prisma as any).advertisement.findUnique({
       where: { id: ad.id },
@@ -1507,11 +1510,9 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-059", async () => {
-    // Gösterim kaydı sayacı artırır (public).
+    // Gösterim kaydı sayacı artırır (public, 204).
     const ad = await seedAd({ title: "Gösterim Reklam" });
-    const res = await request(server()).post(`/api/ads/${ad.id}/impression`);
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.success).toBe(true);
+    await request(server()).post(`/api/ads/${ad.id}/impression`).expect(204);
     const prisma = getPrisma();
     const refreshed = await (prisma as any).advertisement.findUnique({
       where: { id: ad.id },
@@ -1520,14 +1521,19 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-060", async () => {
-    // Olmayan reklam tık/gösterim → 404.
-    const click = await request(server())
-      .post(`/api/ads/${ABSENT_UUID}/click`)
-      .expect(404);
-    expect(String(click.body.message)).toContain("Reklam bulunamadı");
+    // Olmayan ya da yayında olmayan reklam tık/gösterim → 204, sayılmaz
+    // (beacon yanıtı okumaz; 404 yalnız id yoklamaya yarardı).
+    await request(server()).post(`/api/ads/${ABSENT_UUID}/click`).expect(204);
     await request(server())
       .post(`/api/ads/${ABSENT_UUID}/impression`)
-      .expect(404);
+      .expect(204);
+    const passive = await seedAd({ title: "Pasif Sayım", isActive: false });
+    await request(server()).post(`/api/ads/${passive.id}/click`).expect(204);
+    const prisma = getPrisma();
+    const refreshed = await (prisma as any).advertisement.findUnique({
+      where: { id: passive.id },
+    });
+    expect(refreshed.clickCount).toBe(0);
   });
 
   scenario("DSC-061", async () => {
@@ -1576,14 +1582,14 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-064", async () => {
-    // Boyut sınırı 1-2000 dışında → 400.
+    // Boyut sınırı 1-4000 dışında → 400.
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc64@test.com",
     });
     await request(server())
       .post("/api/admin/ads")
       .set(authHeader(admin))
-      .send(iabAd({ width: 2500 }))
+      .send(iabAd({ width: 4500 }))
       .expect(400);
   });
 
@@ -2312,17 +2318,17 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-104", async () => {
-    // Reklam tık şişirme: aynı reklama çok kez POST /click → sayaç her seferinde +1 (koruma yok, RİSK).
+    // Reklam tık şişirme: aynı IP'den aynı reklama art arda 5 POST /click →
+    // 10 sn'lik tekilleştirme penceresi yalnız ilkini sayar.
     const ad = await seedAd({ title: "Şişirme Reklam" });
     for (let i = 0; i < 5; i++) {
-      const r = await request(server()).post(`/api/ads/${ad.id}/click`);
-      expect([200, 201]).toContain(r.status);
+      await request(server()).post(`/api/ads/${ad.id}/click`).expect(204);
     }
     const prisma = getPrisma();
     const refreshed = await (prisma as any).advertisement.findUnique({
       where: { id: ad.id },
     });
-    expect(refreshed.clickCount).toBe(5);
+    expect(refreshed.clickCount).toBe(1);
   });
 
   scenario("DSC-106", async () => {
