@@ -15,6 +15,7 @@ export * from "./admin-staff.dto";
 export * from "./notifications-admin.dto";
 export * from "./admin-membership.dto";
 export * from "./expired-listings-maintenance.dto";
+export * from "./admin-renew-listings.dto";
 export {
   AnalyticsQueryDto,
   SalesAnalyticsResponseDto,

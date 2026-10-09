@@ -14,14 +14,17 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { TextLink } from "@/components/TextLink";
 import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { ProductDetail } from "../_lib/types";
+import { canRenewExpiredListing } from "../_lib/renewal";
 
 export interface ProductSidebarProps {
   product: ProductDetail;
   onApprove: () => void;
   onReject: () => void;
   onRestore: () => void;
+  onRenew: () => void;
   onDelete: () => void;
   busyRestore?: boolean;
+  busyRenew?: boolean;
   busyDelete?: boolean;
 }
 
@@ -30,14 +33,17 @@ export function ProductSidebar({
   onApprove,
   onReject,
   onRestore,
+  onRenew,
   onDelete,
   busyRestore,
+  busyRenew,
   busyDelete,
 }: ProductSidebarProps) {
   const t = useTranslations();
   const canApprove = product.status === "pending";
   const canReject = product.status === "pending";
   const canRestore = product.status === "deleted";
+  const canRenew = canRenewExpiredListing(product);
   const canDelete =
     product.status !== "sold" &&
     product.status !== "reserved" &&
@@ -86,6 +92,16 @@ export function ProductSidebar({
             className="w-full justify-center"
           >
             {t("admin.catalog.products.restore")}
+          </Button>
+        )}
+        {canRenew && (
+          <Button
+            variant="success"
+            onClick={onRenew}
+            isLoading={busyRenew}
+            className="w-full justify-center"
+          >
+            {t("admin.catalog.products.renewExpired")}
           </Button>
         )}
         {canDelete && (
