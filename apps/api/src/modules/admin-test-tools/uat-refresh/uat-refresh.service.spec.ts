@@ -87,7 +87,10 @@ describe("UatRefreshService", () => {
       dispatch: jest.fn(
         async (_config: unknown, _inputs: UatRefreshDispatchInputs) =>
           options.dispatchOk === false
-            ? { ok: false as const, error: "GitHub workflow dispatch failed: HTTP 404" }
+            ? {
+                ok: false as const,
+                error: "GitHub workflow dispatch failed: HTTP 404",
+              }
             : { ok: true as const },
       ),
     };
@@ -141,7 +144,12 @@ describe("UatRefreshService", () => {
 
     it("shows a run stuck for over 90 minutes as failed (timed out), not current", async () => {
       const { service } = build({
-        rows: [runRow({ state: "running", requestedAt: new Date("2026-10-09T10:00:00Z") })],
+        rows: [
+          runRow({
+            state: "running",
+            requestedAt: new Date("2026-10-09T10:00:00Z"),
+          }),
+        ],
       });
       const status = await service.getStatus(NOW);
       expect(status.current).toBeNull();
@@ -158,9 +166,9 @@ describe("UatRefreshService", () => {
     it("is refused on production", async () => {
       goLive();
       const { service, dispatcher } = build();
-      await expect(service.start("admin-user", dto, NOW)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(
+        service.start("admin-user", dto, NOW),
+      ).rejects.toBeInstanceOf(ForbiddenException);
       expect(dispatcher.dispatch).not.toHaveBeenCalled();
     });
 
@@ -175,10 +183,12 @@ describe("UatRefreshService", () => {
     });
 
     it("answers 409 while another run is queued or running", async () => {
-      const { service, tx, dispatcher } = build({ active: [runRow({ state: "running" })] });
-      await expect(service.start("admin-user", dto, NOW)).rejects.toBeInstanceOf(
-        ConflictException,
-      );
+      const { service, tx, dispatcher } = build({
+        active: [runRow({ state: "running" })],
+      });
+      await expect(
+        service.start("admin-user", dto, NOW),
+      ).rejects.toBeInstanceOf(ConflictException);
       expect(tx.$executeRaw).toHaveBeenCalled(); // advisory lock first
       expect(tx.uatRefreshRun.create).not.toHaveBeenCalled();
       expect(dispatcher.dispatch).not.toHaveBeenCalled();
@@ -186,9 +196,16 @@ describe("UatRefreshService", () => {
 
     it("does not let a timed-out run block a new one", async () => {
       const { service, tx } = build({
-        active: [runRow({ state: "running", requestedAt: new Date("2026-10-09T09:00:00Z") })],
+        active: [
+          runRow({
+            state: "running",
+            requestedAt: new Date("2026-10-09T09:00:00Z"),
+          }),
+        ],
       });
-      await expect(service.start("admin-user", dto, NOW)).resolves.toMatchObject({
+      await expect(
+        service.start("admin-user", dto, NOW),
+      ).resolves.toMatchObject({
         state: "queued",
       });
       expect(tx.uatRefreshRun.create).toHaveBeenCalled();
@@ -198,7 +215,9 @@ describe("UatRefreshService", () => {
       const { service, tx, dispatcher } = build();
       const run = await service.start("admin-user", dto, NOW);
 
-      const created = (tx.uatRefreshRun.create.mock.calls[0] as unknown as [{ data: Row }])[0].data;
+      const created = (
+        tx.uatRefreshRun.create.mock.calls[0] as unknown as [{ data: Row }]
+      )[0].data;
       expect(created).toMatchObject({
         state: "queued",
         requestedById: "admin-user",
@@ -221,9 +240,9 @@ describe("UatRefreshService", () => {
 
     it("marks the run failed and answers 502 when GitHub refuses the dispatch", async () => {
       const { service, prisma } = build({ dispatchOk: false });
-      await expect(service.start("admin-user", dto, NOW)).rejects.toBeInstanceOf(
-        BadGatewayException,
-      );
+      await expect(
+        service.start("admin-user", dto, NOW),
+      ).rejects.toBeInstanceOf(BadGatewayException);
       expect(prisma.uatRefreshRun.update).toHaveBeenCalledWith({
         where: { id: "22222222-2222-4222-8222-222222222222" },
         data: expect.objectContaining({
@@ -262,7 +281,12 @@ describe("UatRefreshService", () => {
     it("refuses to rewrite a finished run", async () => {
       const { service } = build({ found: runRow({ state: "succeeded" }) });
       await expect(
-        service.report(runId, "the-token", { state: "failed", error: "x" }, NOW),
+        service.report(
+          runId,
+          "the-token",
+          { state: "failed", error: "x" },
+          NOW,
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -274,7 +298,8 @@ describe("UatRefreshService", () => {
         {
           state: "running",
           startedAt: "2026-10-09T11:55:00Z",
-          workflowRunUrl: "https://github.com/sigmoida/tarodan-app/actions/runs/9",
+          workflowRunUrl:
+            "https://github.com/sigmoida/tarodan-app/actions/runs/9",
         },
         NOW,
       );
@@ -283,13 +308,16 @@ describe("UatRefreshService", () => {
         data: {
           state: "running",
           startedAt: new Date("2026-10-09T11:55:00Z"),
-          workflowRunUrl: "https://github.com/sigmoida/tarodan-app/actions/runs/9",
+          workflowRunUrl:
+            "https://github.com/sigmoida/tarodan-app/actions/runs/9",
         },
       });
     });
 
     it("stores the full summary on success and clears any error", async () => {
-      const { service, prisma } = build({ found: runRow({ state: "running" }) });
+      const { service, prisma } = build({
+        found: runRow({ state: "running" }),
+      });
       await service.report(
         runId,
         "the-token",
@@ -319,9 +347,17 @@ describe("UatRefreshService", () => {
 
     it("accepts a late report for a run that already looks timed out", async () => {
       const { service, prisma } = build({
-        found: runRow({ state: "running", requestedAt: new Date("2026-10-09T09:00:00Z") }),
+        found: runRow({
+          state: "running",
+          requestedAt: new Date("2026-10-09T09:00:00Z"),
+        }),
       });
-      await service.report(runId, "the-token", { state: "failed", error: "pg_restore failed" }, NOW);
+      await service.report(
+        runId,
+        "the-token",
+        { state: "failed", error: "pg_restore failed" },
+        NOW,
+      );
       expect(prisma.uatRefreshRun.update).toHaveBeenCalledWith({
         where: { id: runId },
         data: expect.objectContaining({

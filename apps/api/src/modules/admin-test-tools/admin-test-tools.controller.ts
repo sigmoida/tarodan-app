@@ -243,16 +243,26 @@ export class AdminTestToolsController {
   @ApiResponse({ status: 201, description: "Kuyruğa alınan koşu" })
   @ApiResponse({ status: 403, description: "Canlı dağıtımda reddedilir" })
   @ApiResponse({ status: 409, description: "Kuyrukta/koşan bir yenileme var" })
-  @ApiResponse({ status: 503, description: "GitHub tetikleyicisi yapılandırılmamış" })
+  @ApiResponse({
+    status: 503,
+    description: "GitHub tetikleyicisi yapılandırılmamış",
+  })
   async startUatRefresh(
     @CurrentUser("id") adminId: string,
     @Body() dto: StartUatRefreshDto,
   ) {
     const run = await this.uatRefresh.start(adminId, dto);
-    await this.writeAudit(adminId, "uat_refresh_start", "uat_refresh_run", run.id, null, {
-      dryRun: run.dryRun,
-      state: run.state,
-    });
+    await this.writeAudit(
+      adminId,
+      "uat_refresh_start",
+      "uat_refresh_run",
+      run.id,
+      null,
+      {
+        dryRun: run.dryRun,
+        state: run.state,
+      },
+    );
     return run;
   }
 

@@ -27,12 +27,12 @@ describe("resolveMaskTarget", () => {
   });
 
   it("refuses without UAT_MASK_TARGET=scratch", () => {
-    expect(() => resolveMaskTarget({ ...ok, UAT_MASK_TARGET: undefined })).toThrow(
-      /UAT_MASK_TARGET=scratch/,
-    );
-    expect(() => resolveMaskTarget({ ...ok, UAT_MASK_TARGET: "staging" })).toThrow(
-      /UAT_MASK_TARGET=scratch/,
-    );
+    expect(() =>
+      resolveMaskTarget({ ...ok, UAT_MASK_TARGET: undefined }),
+    ).toThrow(/UAT_MASK_TARGET=scratch/);
+    expect(() =>
+      resolveMaskTarget({ ...ok, UAT_MASK_TARGET: "staging" }),
+    ).toThrow(/UAT_MASK_TARGET=scratch/);
   });
 
   it("refuses a database that is not a scratch database (e.g. live staging)", () => {
@@ -59,7 +59,10 @@ describe("resolveMaskTarget", () => {
       resolveMaskTarget({ ...ok, UAT_MASK_FORBIDDEN_DATABASE_URL: "" }),
     ).toThrow(/UAT_MASK_FORBIDDEN_DATABASE_URL/);
     expect(() =>
-      resolveMaskTarget({ ...ok, UAT_MASK_FORBIDDEN_DATABASE_URL: "not a url" }),
+      resolveMaskTarget({
+        ...ok,
+        UAT_MASK_FORBIDDEN_DATABASE_URL: "not a url",
+      }),
     ).toThrow(/not a valid database URL/);
   });
 

@@ -120,9 +120,13 @@ export function classifyJsonKey(key: string): JsonKeyKind | null {
   if (/birthdate|dogumtarihi/.test(k) || k === "dob") return "birthDate";
   if (k === "username") return "username";
   if (
-    /fullname|firstname|lastname|surname|legalname|displayname|adsoyad/.test(k) ||
+    /fullname|firstname|lastname|surname|legalname|displayname|adsoyad/.test(
+      k,
+    ) ||
     /(^|account|card)holder(name)?$/.test(k) ||
-    /(guest|recipient|buyer|seller|receiver|transfer|customer|contact|sender)name$/.test(k)
+    /(guest|recipient|buyer|seller|receiver|transfer|customer|contact|sender)name$/.test(
+      k,
+    )
   ) {
     return "fullName";
   }
@@ -169,7 +173,9 @@ function fakeForKind(
  */
 export function scrubJson(value: unknown, key: string, path = "$"): unknown {
   if (Array.isArray(value)) {
-    return value.map((item, index) => scrubJson(item, key, `${path}[${index}]`));
+    return value.map((item, index) =>
+      scrubJson(item, key, `${path}[${index}]`),
+    );
   }
   if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};

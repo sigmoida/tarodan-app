@@ -60,7 +60,9 @@ describe("UAT masking fakes", () => {
   it("emails use the non-deliverable .invalid domain", () => {
     for (const key of KEYS) {
       expect(fakeEmail(key)).toMatch(
-        new RegExp(`^u[0-9a-f]{12}@${UAT_MASK_EMAIL_DOMAIN.replace(".", "\\.")}$`),
+        new RegExp(
+          `^u[0-9a-f]{12}@${UAT_MASK_EMAIL_DOMAIN.replace(".", "\\.")}$`,
+        ),
       );
     }
     expect(UAT_MASK_EMAIL_DOMAIN.endsWith(".invalid")).toBe(true);
@@ -94,7 +96,9 @@ describe("UAT masking fakes", () => {
     for (const key of KEYS.slice(0, 50)) {
       expect(isValidLegalName(fakeFirstName(key))).toBe(true);
       expect(isValidLegalName(fakeLastName(key))).toBe(true);
-      expect(fakeFullName(key)).toBe(`${fakeFirstName(key)} ${fakeLastName(key)}`);
+      expect(fakeFullName(key)).toBe(
+        `${fakeFirstName(key)} ${fakeLastName(key)}`,
+      );
     }
   });
 
@@ -119,7 +123,9 @@ describe("UAT masking fakes", () => {
     const masked = fakeFileName(KEYS[0], "ahmet_yilmaz_kimlik.PDF");
     expect(masked).toMatch(/^document-[0-9a-f]{8}\.pdf$/);
     expect(masked).not.toContain("ahmet");
-    expect(fakeFileName(KEYS[0], "no-extension")).toMatch(/^document-[0-9a-f]{8}$/);
+    expect(fakeFileName(KEYS[0], "no-extension")).toMatch(
+      /^document-[0-9a-f]{8}$/,
+    );
   });
 
   it("an attempt number yields a different value for collision handling", () => {

@@ -232,7 +232,9 @@ const envSchema = z
     if (Boolean(dispatchToken) !== Boolean(dispatchRepo)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: [dispatchToken ? "GITHUB_DISPATCH_REPO" : "GITHUB_DISPATCH_TOKEN"],
+        path: [
+          dispatchToken ? "GITHUB_DISPATCH_REPO" : "GITHUB_DISPATCH_TOKEN",
+        ],
         message:
           "GITHUB_DISPATCH_TOKEN and GITHUB_DISPATCH_REPO must be set together (staging refresh trigger)",
       });

@@ -90,7 +90,9 @@ export function resolveMaskTarget(
  * bunu aynen taşır; geçersizse `null` — yanlış bir zaman damgası göstermektense
  * hiç.
  */
-export function resolveSourceSnapshotAt(value: string | undefined): string | null {
+export function resolveSourceSnapshotAt(
+  value: string | undefined,
+): string | null {
   const raw = value?.trim();
   if (!raw) return null;
   const date = new Date(raw);

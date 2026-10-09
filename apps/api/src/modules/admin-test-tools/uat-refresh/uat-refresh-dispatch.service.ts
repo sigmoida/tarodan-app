@@ -14,8 +14,7 @@ export interface UatRefreshDispatchInputs {
 }
 
 export type UatRefreshDispatchResult =
-  | { ok: true }
-  | { ok: false; error: string };
+  { ok: true } | { ok: false; error: string };
 
 const GITHUB_API = "https://api.github.com";
 const DISPATCH_TIMEOUT_MS = 10_000;

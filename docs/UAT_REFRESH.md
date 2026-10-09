@@ -25,33 +25,41 @@ Owner decisions (2026-10-09):
 ### Status record (shared shape) — `packages/types/src/uat-refresh.ts`, exported from the package index
 
 ```ts
-export const UAT_REFRESH_STATES = ["queued", "running", "succeeded", "failed"] as const;
+export const UAT_REFRESH_STATES = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+] as const;
 export type UatRefreshState = (typeof UAT_REFRESH_STATES)[number];
 
-export interface UatRefreshMaskedCount { table: string; rows: number }
+export interface UatRefreshMaskedCount {
+  table: string;
+  rows: number;
+}
 
 export interface UatRefreshRun {
-  id: string;                    // our row id
+  id: string; // our row id
   state: UatRefreshState;
   requestedBy: { id: string; displayName: string } | null; // null = started from GitHub directly
-  requestedAt: string;           // ISO
+  requestedAt: string; // ISO
   startedAt: string | null;
   finishedAt: string | null;
   workflowRunUrl: string | null; // GitHub run html_url
   sourceSnapshotAt: string | null; // when the production dump was taken
   dryRun: boolean;
-  masked: UatRefreshMaskedCount[];  // per table, filled by the workflow at the end
-  migrationsApplied: string[];      // staging migrations newer than production that were applied after the import
-  backupFile: string | null;        // staging pre-refresh backup file name on the server
+  masked: UatRefreshMaskedCount[]; // per table, filled by the workflow at the end
+  migrationsApplied: string[]; // staging migrations newer than production that were applied after the import
+  backupFile: string | null; // staging pre-refresh backup file name on the server
   error: string | null;
 }
 
 export interface UatRefreshStatus {
-  available: boolean;            // false on production or when the GitHub trigger is not configured
+  available: boolean; // false on production or when the GitHub trigger is not configured
   unavailableReason: "production" | "notConfigured" | null;
   current: UatRefreshRun | null; // a queued/running run, if any
-  last: UatRefreshRun | null;    // latest finished run
-  history: UatRefreshRun[];      // last 10, newest first
+  last: UatRefreshRun | null; // latest finished run
+  history: UatRefreshRun[]; // last 10, newest first
 }
 ```
 
@@ -76,18 +84,18 @@ export interface UatRefreshStatus {
 
 ### Pieces
 
-| Piece | Where |
-| --- | --- |
-| Shared shapes (+ `UAT_REFRESH_CONFIRM_PHRASE`, `UAT_REFRESH_TIMEOUT_MINUTES`, `UAT_REFRESH_TIMED_OUT_ERROR`, `StartUatRefreshRequest`, `UatRefreshReport`) | `packages/types/src/uat-refresh.ts` |
-| Run table | `uat_refresh_runs` (`UatRefreshRun`), migration `20261009100000_uat_refresh_runs` |
-| Admin endpoints | `AdminTestToolsController` → `UatRefreshService` (`apps/api/src/modules/admin-test-tools/uat-refresh/`) |
-| Report endpoint | `UatRefreshReportController` (`POST /api/internal/uat-refresh/:runId/report`) |
-| GitHub trigger | `UatRefreshDispatchService` + `config/uat-refresh.ts` |
-| Masking catalogue (single source of truth) | `apps/api/src/common/helpers/uat-masking/masking-catalog.ts` |
-| Fakes / scrubbers / SQL planning / target guard | `masking-fakes.ts`, `masking-scrub.ts`, `masking-sql.ts`, `mask-target-guard.ts` (same folder) |
-| Masking runner | `apps/api/prisma/uat/mask-database.ts` → `dist-seed/prisma/uat/mask-database.js` (`pnpm --filter @tarodan/api uat:mask:prod`) |
-| Fixed UAT accounts | `seed-uat.js --accounts-only` |
-| Workflow | `.github/workflows/staging-refresh-from-prod.yml` |
+| Piece                                                                                                                                                      | Where                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Shared shapes (+ `UAT_REFRESH_CONFIRM_PHRASE`, `UAT_REFRESH_TIMEOUT_MINUTES`, `UAT_REFRESH_TIMED_OUT_ERROR`, `StartUatRefreshRequest`, `UatRefreshReport`) | `packages/types/src/uat-refresh.ts`                                                                                           |
+| Run table                                                                                                                                                  | `uat_refresh_runs` (`UatRefreshRun`), migration `20261009100000_uat_refresh_runs`                                             |
+| Admin endpoints                                                                                                                                            | `AdminTestToolsController` → `UatRefreshService` (`apps/api/src/modules/admin-test-tools/uat-refresh/`)                       |
+| Report endpoint                                                                                                                                            | `UatRefreshReportController` (`POST /api/internal/uat-refresh/:runId/report`)                                                 |
+| GitHub trigger                                                                                                                                             | `UatRefreshDispatchService` + `config/uat-refresh.ts`                                                                         |
+| Masking catalogue (single source of truth)                                                                                                                 | `apps/api/src/common/helpers/uat-masking/masking-catalog.ts`                                                                  |
+| Fakes / scrubbers / SQL planning / target guard                                                                                                            | `masking-fakes.ts`, `masking-scrub.ts`, `masking-sql.ts`, `mask-target-guard.ts` (same folder)                                |
+| Masking runner                                                                                                                                             | `apps/api/prisma/uat/mask-database.ts` → `dist-seed/prisma/uat/mask-database.js` (`pnpm --filter @tarodan/api uat:mask:prod`) |
+| Fixed UAT accounts                                                                                                                                         | `seed-uat.js --accounts-only`                                                                                                 |
+| Workflow                                                                                                                                                   | `.github/workflows/staging-refresh-from-prod.yml`                                                                             |
 
 ### Flow
 
@@ -207,49 +215,49 @@ street `UAT <name> Sokak No:n D:m` · company `UAT Firma <8 hex>` · username
 
 ### Deleted tables
 
-| Table | Why |
-| --- | --- |
-| `oauth_accounts` | Links to real Google/Apple identities |
-| `two_factor_secrets` | 2FA secrets (and `admin_users.two_factor_enabled` → false) |
-| `password_reset_tokens`, `email_verification_tokens`, `phone_verification_tokens`, `email_change_tokens` | One-time links/codes + real addresses |
-| `refresh_tokens`, `admin_sessions`, `csrf_tokens` | Live sessions (+ IPs) |
-| `push_tokens` | Real devices: staging must never push to a customer's phone |
-| `saved_cards` | Live-merchant PayTR card tokens + mandate IP |
-| `outbox_events`, `mail_internal_notices` | Pending side effects are not replayed on staging |
-| `email_logs`, `notification_logs`, `error_logs`, `cache_entries` | Logs with real recipients / request data |
-| `mail_sender_accounts` | Encrypted production mailbox passwords (staging's own are carried over) |
-| `uat_refresh_runs` | Production has none; staging's history is carried over |
+| Table                                                                                                    | Why                                                                     |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `oauth_accounts`                                                                                         | Links to real Google/Apple identities                                   |
+| `two_factor_secrets`                                                                                     | 2FA secrets (and `admin_users.two_factor_enabled` → false)              |
+| `password_reset_tokens`, `email_verification_tokens`, `phone_verification_tokens`, `email_change_tokens` | One-time links/codes + real addresses                                   |
+| `refresh_tokens`, `admin_sessions`, `csrf_tokens`                                                        | Live sessions (+ IPs)                                                   |
+| `push_tokens`                                                                                            | Real devices: staging must never push to a customer's phone             |
+| `saved_cards`                                                                                            | Live-merchant PayTR card tokens + mandate IP                            |
+| `outbox_events`, `mail_internal_notices`                                                                 | Pending side effects are not replayed on staging                        |
+| `email_logs`, `notification_logs`, `error_logs`, `cache_entries`                                         | Logs with real recipients / request data                                |
+| `mail_sender_accounts`                                                                                   | Encrypted production mailbox passwords (staging's own are carried over) |
+| `uat_refresh_runs`                                                                                       | Production has none; staging's history is carried over                  |
 
 ### Masked columns
 
-| Table | Columns → rule |
-| --- | --- |
-| `users` (except `platform@tarodan.com`, `guest@tarodan.system`, `deleted_…@deleted.local`) | `email` email (unique) · `phone` phone (unique) · `username` username (unique) · `display_name` full name · `legal_first_name` / `legal_last_name` · `national_id` TCKN (unique) · `birth_date` · `tax_id` TCKN/VKN by length · `company_name` company (unique) |
-| `users` (all rows) | `password_hash` NULL · `fcm_token` NULL |
-| `admin_users` | `last_login_ip` NULL · `two_factor_enabled` false |
-| `deleted_user_identities` (key `user_id`) | email, username, display name, legal names, phone, birth date, national id, tax id, company, `address_line` street, `iban`, `bank_account_holder`; `source_detail`/`source_refs` JSON scrub |
-| `consent_records` | `guest_email` email · `ip_address`/`user_agent` NULL · `details` JSON |
-| `corporate_applications` | authorized name, legal name/title (company), `company_address` street, `company_email`/`kep_address` email, `phone`/`contact_phone`, `tax_id`, `bank_account_holder`, `iban`, `invitation_token_hash` NULL, `review_note` free text |
-| `corporate_stakeholders` | `full_name` · `identity_number` TCKN |
-| `corporate_application_events` | `note` free text · `metadata` JSON |
-| `newsletter_subscribers` | `email` (unique) · `unsubscribe_token` (unique) |
-| `addresses` | `full_name` (key `user_id` → same as the user's fake name) · `phone` · `address` street · `zip_code` NULL (city/district kept: tariffs use them) |
-| `seller_bank_accounts` (key `user_id`) | `account_holder` · `iban` · `tc_kimlik_no` · `tax_id` (coherent with the user) |
-| `seller_documents` | `file_name` · `review_note` / `appeal_note` free text (files unreadable from staging) |
-| `payout_transfers` (key `seller_id`) | `transfer_iban` · `transfer_name` · `provider_response` JSON |
-| `payment_provider_events` | `utoken` NULL · `raw` JSON |
-| `payments.metadata`, `refund_attempts.provider_response`, `membership_payments.metadata`, `paytr_statement_lines.raw`, `paytr_settlements.raw`, `paytr_settlement_items.raw`, `seller_account_adjustments.metadata`, `refund_financial_components.metadata`, `carrier_cancellation_tasks.metadata`, `ledger_entries.metadata`, `scheduled_notifications.target_data` | JSON scrub |
-| `orders` | `shipping_address` JSON (guest name/e-mail/phone, billing address) · `financial_snapshot` JSON · `cancel_reason` free text |
-| `elogo_invoices` | `recipient_vkn_tckn` by length · `recipient_name` · `recipient_email` · `recipient_street` (invoice number/ETTN kept) |
-| `invoices` | `notes` free text |
-| `shipments` | `label_zpl` NULL · `label_url` NULL (labels print the recipient) · `received_by` full name |
-| `trade_shipments` | `label_zpl` NULL |
-| `messages`, `trade_messages`, `ticket_messages`, `support_tickets.subject`, `offers.message`, `trades.initiator_message/receiver_message`, `reports.description/admin_note`, `trade_disputes.description/resolution_notes`, `refund_requests.description` | free text |
-| `trade_disputes.evidence`, `refund_requests.metadata` | JSON scrub |
-| `audit_logs` | `ip_address`/`user_agent` NULL · `old_value`/`new_value` JSON |
-| `security_logs` | `email` · `ip_address`/`user_agent`/`location` NULL · `details` JSON |
-| `site_access_pins` | `email` |
-| `mail_area_settings` | `sender_account_id`/`reply_to` NULL · `internal_recipients` `[]` (then replaced by staging's own rows) |
+| Table                                                                                                                                                                                                                                                                                                                                                                | Columns → rule                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users` (except `platform@tarodan.com`, `guest@tarodan.system`, `deleted_…@deleted.local`)                                                                                                                                                                                                                                                                           | `email` email (unique) · `phone` phone (unique) · `username` username (unique) · `display_name` full name · `legal_first_name` / `legal_last_name` · `national_id` TCKN (unique) · `birth_date` · `tax_id` TCKN/VKN by length · `company_name` company (unique) |
+| `users` (all rows)                                                                                                                                                                                                                                                                                                                                                   | `password_hash` NULL · `fcm_token` NULL                                                                                                                                                                                                                         |
+| `admin_users`                                                                                                                                                                                                                                                                                                                                                        | `last_login_ip` NULL · `two_factor_enabled` false                                                                                                                                                                                                               |
+| `deleted_user_identities` (key `user_id`)                                                                                                                                                                                                                                                                                                                            | email, username, display name, legal names, phone, birth date, national id, tax id, company, `address_line` street, `iban`, `bank_account_holder`; `source_detail`/`source_refs` JSON scrub                                                                     |
+| `consent_records`                                                                                                                                                                                                                                                                                                                                                    | `guest_email` email · `ip_address`/`user_agent` NULL · `details` JSON                                                                                                                                                                                           |
+| `corporate_applications`                                                                                                                                                                                                                                                                                                                                             | authorized name, legal name/title (company), `company_address` street, `company_email`/`kep_address` email, `phone`/`contact_phone`, `tax_id`, `bank_account_holder`, `iban`, `invitation_token_hash` NULL, `review_note` free text                             |
+| `corporate_stakeholders`                                                                                                                                                                                                                                                                                                                                             | `full_name` · `identity_number` TCKN                                                                                                                                                                                                                            |
+| `corporate_application_events`                                                                                                                                                                                                                                                                                                                                       | `note` free text · `metadata` JSON                                                                                                                                                                                                                              |
+| `newsletter_subscribers`                                                                                                                                                                                                                                                                                                                                             | `email` (unique) · `unsubscribe_token` (unique)                                                                                                                                                                                                                 |
+| `addresses`                                                                                                                                                                                                                                                                                                                                                          | `full_name` (key `user_id` → same as the user's fake name) · `phone` · `address` street · `zip_code` NULL (city/district kept: tariffs use them)                                                                                                                |
+| `seller_bank_accounts` (key `user_id`)                                                                                                                                                                                                                                                                                                                               | `account_holder` · `iban` · `tc_kimlik_no` · `tax_id` (coherent with the user)                                                                                                                                                                                  |
+| `seller_documents`                                                                                                                                                                                                                                                                                                                                                   | `file_name` · `review_note` / `appeal_note` free text (files unreadable from staging)                                                                                                                                                                           |
+| `payout_transfers` (key `seller_id`)                                                                                                                                                                                                                                                                                                                                 | `transfer_iban` · `transfer_name` · `provider_response` JSON                                                                                                                                                                                                    |
+| `payment_provider_events`                                                                                                                                                                                                                                                                                                                                            | `utoken` NULL · `raw` JSON                                                                                                                                                                                                                                      |
+| `payments.metadata`, `refund_attempts.provider_response`, `membership_payments.metadata`, `paytr_statement_lines.raw`, `paytr_settlements.raw`, `paytr_settlement_items.raw`, `seller_account_adjustments.metadata`, `refund_financial_components.metadata`, `carrier_cancellation_tasks.metadata`, `ledger_entries.metadata`, `scheduled_notifications.target_data` | JSON scrub                                                                                                                                                                                                                                                      |
+| `orders`                                                                                                                                                                                                                                                                                                                                                             | `shipping_address` JSON (guest name/e-mail/phone, billing address) · `financial_snapshot` JSON · `cancel_reason` free text                                                                                                                                      |
+| `elogo_invoices`                                                                                                                                                                                                                                                                                                                                                     | `recipient_vkn_tckn` by length · `recipient_name` · `recipient_email` · `recipient_street` (invoice number/ETTN kept)                                                                                                                                           |
+| `invoices`                                                                                                                                                                                                                                                                                                                                                           | `notes` free text                                                                                                                                                                                                                                               |
+| `shipments`                                                                                                                                                                                                                                                                                                                                                          | `label_zpl` NULL · `label_url` NULL (labels print the recipient) · `received_by` full name                                                                                                                                                                      |
+| `trade_shipments`                                                                                                                                                                                                                                                                                                                                                    | `label_zpl` NULL                                                                                                                                                                                                                                                |
+| `messages`, `trade_messages`, `ticket_messages`, `support_tickets.subject`, `offers.message`, `trades.initiator_message/receiver_message`, `reports.description/admin_note`, `trade_disputes.description/resolution_notes`, `refund_requests.description`                                                                                                            | free text                                                                                                                                                                                                                                                       |
+| `trade_disputes.evidence`, `refund_requests.metadata`                                                                                                                                                                                                                                                                                                                | JSON scrub                                                                                                                                                                                                                                                      |
+| `audit_logs`                                                                                                                                                                                                                                                                                                                                                         | `ip_address`/`user_agent` NULL · `old_value`/`new_value` JSON                                                                                                                                                                                                   |
+| `security_logs`                                                                                                                                                                                                                                                                                                                                                      | `email` · `ip_address`/`user_agent`/`location` NULL · `details` JSON                                                                                                                                                                                            |
+| `site_access_pins`                                                                                                                                                                                                                                                                                                                                                   | `email`                                                                                                                                                                                                                                                         |
+| `mail_area_settings`                                                                                                                                                                                                                                                                                                                                                 | `sender_account_id`/`reply_to` NULL · `internal_recipients` `[]` (then replaced by staging's own rows)                                                                                                                                                          |
 
 **Messages (decision).** Marketplace/trade/support message text is kept so
 testers see realistic conversations; e-mail addresses, TR mobile numbers, TR
@@ -307,15 +315,15 @@ means adding a rule (or a reasoned allow-list line) in the same change.
 
 ## Secrets and environment
 
-| Name | Where | Notes |
-| --- | --- | --- |
-| `GITHUB_DISPATCH_TOKEN` | **staging** api env (Coolify) | Fine-grained PAT (or GitHub App token) for this repository only, permission **Actions: Read and write**. Optional: absent → button "not configured". Refused at boot on `APP_ENV=production`. |
-| `GITHUB_DISPATCH_REPO` | staging api env | `owner/repo`, e.g. `sigmoida/tarodan-app`. Must be set together with the token. |
-| `GITHUB_DISPATCH_REF` | staging api env (optional) | Branch the workflow runs from; default `development`. The workflow file must exist on that branch. |
-| `SERVER_HOST`, `SERVER_USERNAME`, `SERVER_PASSWORD` | GitHub secrets (existing) | SSH into the Coolify host. |
-| `COOLIFY_STAGING_UUIDS` | GitHub secret (existing) | First field = staging api app UUID. |
-| `COOLIFY_PROD_UUIDS` | GitHub secret (existing) | First field = production api app UUID. Must be visible to the `staging` environment (repository-level secret, or add it to that environment). |
-| `UAT_SEED_PASSWORD` | GitHub secret (existing) | Password of the re-applied fixed accounts. |
+| Name                                                | Where                         | Notes                                                                                                                                                                                         |
+| --------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GITHUB_DISPATCH_TOKEN`                             | **staging** api env (Coolify) | Fine-grained PAT (or GitHub App token) for this repository only, permission **Actions: Read and write**. Optional: absent → button "not configured". Refused at boot on `APP_ENV=production`. |
+| `GITHUB_DISPATCH_REPO`                              | staging api env               | `owner/repo`, e.g. `sigmoida/tarodan-app`. Must be set together with the token.                                                                                                               |
+| `GITHUB_DISPATCH_REF`                               | staging api env (optional)    | Branch the workflow runs from; default `development`. The workflow file must exist on that branch.                                                                                            |
+| `SERVER_HOST`, `SERVER_USERNAME`, `SERVER_PASSWORD` | GitHub secrets (existing)     | SSH into the Coolify host.                                                                                                                                                                    |
+| `COOLIFY_STAGING_UUIDS`                             | GitHub secret (existing)      | First field = staging api app UUID.                                                                                                                                                           |
+| `COOLIFY_PROD_UUIDS`                                | GitHub secret (existing)      | First field = production api app UUID. Must be visible to the `staging` environment (repository-level secret, or add it to that environment).                                                 |
+| `UAT_SEED_PASSWORD`                                 | GitHub secret (existing)      | Password of the re-applied fixed accounts.                                                                                                                                                    |
 
 No new production credential is stored anywhere: the workflow reads the
 production `DATABASE_URL` from the production api container on the host, as

@@ -102,7 +102,13 @@ async function maskComputedColumns(
         let value = computeMaskedValue(column, columnRule, key, original);
         while (seen?.has(value)) {
           attempt += 1;
-          value = computeMaskedValue(column, columnRule, key, original, attempt);
+          value = computeMaskedValue(
+            column,
+            columnRule,
+            key,
+            original,
+            attempt,
+          );
         }
         seen?.add(value);
         if (value === original) continue;
@@ -161,7 +167,9 @@ async function withTriggersDisabled<T>(
     { table: string; trigger: string }[]
   >(buildEnabledTriggersSql());
   for (const { table, trigger } of triggers) {
-    await prisma.$executeRawUnsafe(buildTriggerToggleSql(table, trigger, false));
+    await prisma.$executeRawUnsafe(
+      buildTriggerToggleSql(table, trigger, false),
+    );
   }
   log(`${triggers.length} user trigger(s) disabled for masking`);
   try {

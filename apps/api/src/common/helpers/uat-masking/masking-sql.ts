@@ -208,7 +208,9 @@ export function computeMaskedValue(
     case "fake":
       return FAKERS[columnRule.fake](key, original, attempt);
     case "json":
-      return JSON.stringify(scrubJson(JSON.parse(original), `${key}:${column}`));
+      return JSON.stringify(
+        scrubJson(JSON.parse(original), `${key}:${column}`),
+      );
     case "freeText":
       return scrubFreeText(original, `${key}:${column}`);
   }
@@ -253,12 +255,18 @@ export function buildVerificationQueries(
       const base = `SELECT count(*)::int AS n FROM ${table} WHERE ${col} IS NOT NULL${keepClause(rule)}`;
       if (columnRule.strategy === "null") {
         queries.push({ name: `${rule.table}.${column}: not null`, sql: base });
-      } else if (columnRule.strategy === "fake" && columnRule.fake === "email") {
+      } else if (
+        columnRule.strategy === "fake" &&
+        columnRule.fake === "email"
+      ) {
         queries.push({
           name: `${rule.table}.${column}: address outside ${UAT_MASK_EMAIL_DOMAIN}`,
           sql: `${base} AND ${col} !~* '@${escapeRegex(UAT_MASK_EMAIL_DOMAIN)}$'`,
         });
-      } else if (columnRule.strategy === "fake" && columnRule.fake === "phone") {
+      } else if (
+        columnRule.strategy === "fake" &&
+        columnRule.fake === "phone"
+      ) {
         queries.push({
           name: `${rule.table}.${column}: phone outside ${UAT_MASK_PHONE_PREFIX}`,
           sql: `${base} AND ${col} !~ '^${escapeRegex(UAT_MASK_PHONE_PREFIX)}[0-9]{7}$'`,

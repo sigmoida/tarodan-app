@@ -1,7 +1,4 @@
-import {
-  MaskColumnsRule,
-  UAT_MASKING_CATALOG,
-} from "./masking-catalog";
+import { MaskColumnsRule, UAT_MASKING_CATALOG } from "./masking-catalog";
 import {
   UAT_MASK_TEMP_PREFIX,
   buildBatchUpdateSql,
@@ -19,7 +16,10 @@ import {
 } from "./masking-sql";
 import { fakeFullName } from "./masking-fakes";
 
-const maskRule = (table: string, predicate?: (r: MaskColumnsRule) => boolean) => {
+const maskRule = (
+  table: string,
+  predicate?: (r: MaskColumnsRule) => boolean,
+) => {
   const rule = UAT_MASKING_CATALOG.find(
     (r): r is MaskColumnsRule =>
       r.action === "mask" && r.table === table && (!predicate || predicate(r)),
@@ -38,7 +38,9 @@ describe("UAT masking SQL", () => {
   });
 
   it("deletes whole tables", () => {
-    expect(buildDeleteSql("refresh_tokens")).toBe('DELETE FROM "refresh_tokens"');
+    expect(buildDeleteSql("refresh_tokens")).toBe(
+      'DELETE FROM "refresh_tokens"',
+    );
   });
 
   it("splits a rule into set-based, computed and unique columns", () => {
@@ -66,14 +68,18 @@ describe("UAT masking SQL", () => {
       buildSelectBatchSql(users),
       buildTempUniqueSql(users, "email"),
     ]) {
-      expect(sql).toContain("AND NOT (\"email\" IN ('platform@tarodan.com', 'guest@tarodan.system')");
+      expect(sql).toContain(
+        "AND NOT (\"email\" IN ('platform@tarodan.com', 'guest@tarodan.system')",
+      );
       expect(sql).toContain("deleted\\.local$");
     }
   });
 
   it("parks unique columns on a per-row temporary value first", () => {
     expect(buildTempUniqueSql(users, "email")).toMatch(
-      new RegExp(`^UPDATE "users" SET "email" = '${UAT_MASK_TEMP_PREFIX}' \\|\\| ctid::text WHERE "email" IS NOT NULL`),
+      new RegExp(
+        `^UPDATE "users" SET "email" = '${UAT_MASK_TEMP_PREFIX}' \\|\\| ctid::text WHERE "email" IS NOT NULL`,
+      ),
     );
   });
 
@@ -92,23 +98,33 @@ describe("UAT masking SQL", () => {
   });
 
   it("writes a page with one set-based UPDATE … FROM unnest per column", () => {
-    expect(buildBatchUpdateSql(users, "email", users.columns.email as never)).toBe(
+    expect(
+      buildBatchUpdateSql(users, "email", users.columns.email as never),
+    ).toBe(
       `UPDATE "users" AS t SET "email" = v.val FROM unnest($1::text[], $2::text[]) AS v(id, val) WHERE t."id" = v.id`,
     );
     expect(
-      buildBatchUpdateSql(users, "birth_date", users.columns.birth_date as never),
+      buildBatchUpdateSql(
+        users,
+        "birth_date",
+        users.columns.birth_date as never,
+      ),
     ).toContain('"birth_date" = v.val::timestamp(3)');
     const orders = maskRule("orders");
     expect(
-      buildBatchUpdateSql(orders, "shipping_address", orders.columns.shipping_address as never),
+      buildBatchUpdateSql(
+        orders,
+        "shipping_address",
+        orders.columns.shipping_address as never,
+      ),
     ).toContain('"shipping_address" = v.val::jsonb');
   });
 
   it("computes values from the key, not from the original", () => {
     const rule = users.columns.display_name as never;
-    expect(computeMaskedValue("display_name", rule, "user-1", "Gerçek Ad")).toBe(
-      fakeFullName("user-1"),
-    );
+    expect(
+      computeMaskedValue("display_name", rule, "user-1", "Gerçek Ad"),
+    ).toBe(fakeFullName("user-1"));
     const json = computeMaskedValue(
       "shipping_address",
       maskRule("orders").columns.shipping_address as never,
@@ -125,7 +141,9 @@ describe("UAT masking SQL", () => {
     const queries = buildVerificationQueries();
     const byName = (prefix: string) =>
       queries.find((q) => q.name.startsWith(prefix));
-    expect(byName("users.email")?.sql).toContain(`"email" !~* '@uat\\.invalid$'`);
+    expect(byName("users.email")?.sql).toContain(
+      `"email" !~* '@uat\\.invalid$'`,
+    );
     expect(byName("users.email")?.sql).toContain("AND NOT (");
     expect(byName("users.password_hash")?.sql).toBe(
       'SELECT count(*)::int AS n FROM "users" WHERE "password_hash" IS NOT NULL',
@@ -140,11 +158,21 @@ describe("UAT masking SQL", () => {
   it("toggles user triggers by name on the touched tables only", () => {
     expect(buildEnabledTriggersSql()).toContain("NOT t.tgisinternal");
     expect(buildEnabledTriggersSql()).toContain("'consent_records'");
-    expect(buildTriggerToggleSql("ledger_entries", "ledger_entries_append_only_guard", false)).toBe(
+    expect(
+      buildTriggerToggleSql(
+        "ledger_entries",
+        "ledger_entries_append_only_guard",
+        false,
+      ),
+    ).toBe(
       'ALTER TABLE "ledger_entries" DISABLE TRIGGER "ledger_entries_append_only_guard"',
     );
-    expect(buildTriggerToggleSql("ledger_entries", "ledger_entries_append_only_guard", true)).toMatch(
-      /ENABLE TRIGGER/,
-    );
+    expect(
+      buildTriggerToggleSql(
+        "ledger_entries",
+        "ledger_entries_append_only_guard",
+        true,
+      ),
+    ).toMatch(/ENABLE TRIGGER/);
   });
 });

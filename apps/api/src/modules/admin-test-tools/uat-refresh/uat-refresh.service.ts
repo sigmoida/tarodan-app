@@ -25,7 +25,10 @@ import {
   reportTokenMatches,
   toUatRefreshRun,
 } from "../helpers/uat-refresh.helper";
-import { StartUatRefreshDto, UatRefreshReportDto } from "../dto/uat-refresh.dto";
+import {
+  StartUatRefreshDto,
+  UatRefreshReportDto,
+} from "../dto/uat-refresh.dto";
 import { UatRefreshDispatchService } from "./uat-refresh-dispatch.service";
 
 /**
@@ -134,7 +137,11 @@ export class UatRefreshService {
     if (!dispatched.ok) {
       await this.prisma.uatRefreshRun.update({
         where: { id: run.id },
-        data: { state: "failed", finishedAt: new Date(), error: dispatched.error },
+        data: {
+          state: "failed",
+          finishedAt: new Date(),
+          error: dispatched.error,
+        },
       });
       throw new BadGatewayException(
         i18nMessage("server.uatRefresh.dispatchFailed"),
@@ -195,7 +202,9 @@ export class UatRefreshService {
         : {}),
       ...(dto.backupFile !== undefined ? { backupFile: dto.backupFile } : {}),
       ...(dto.workflowRunUrl ? { workflowRunUrl: dto.workflowRunUrl } : {}),
-      ...(terminal ? { error: dto.state === "failed" ? (dto.error ?? null) : null } : {}),
+      ...(terminal
+        ? { error: dto.state === "failed" ? (dto.error ?? null) : null }
+        : {}),
     };
     const updated = await this.prisma.uatRefreshRun.update({
       where: { id: runId },

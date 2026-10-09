@@ -26,7 +26,11 @@ export const UAT_MASK_EMAIL_DOMAIN = "uat.invalid";
 export const UAT_MASK_PHONE_PREFIX = "+90500";
 
 /** Tüm sahte değerlerin hash girdisi: tür ad alanı + anahtar (+ deneme). */
-export function maskDigest(namespace: string, key: string, attempt = 0): string {
+export function maskDigest(
+  namespace: string,
+  key: string,
+  attempt = 0,
+): string {
   const input =
     attempt > 0 ? `${namespace}:${key}#${attempt}` : `${namespace}:${key}`;
   return createHash("sha256").update(input).digest("hex");
@@ -47,23 +51,94 @@ function indexFrom(hex: string, length: number): number {
 
 // Sabit Türkçe ad listeleri — "rastgele" ama tekrarlanabilir kimlikler için.
 const FIRST_NAMES = [
-  "Ahmet", "Mehmet", "Mustafa", "Ali", "Hüseyin", "Hasan", "İbrahim", "Murat",
-  "Emre", "Burak", "Can", "Deniz", "Eren", "Kaan", "Onur", "Serkan", "Tolga",
-  "Volkan", "Yusuf", "Kerem", "Ayşe", "Fatma", "Emine", "Hatice", "Zeynep",
-  "Elif", "Merve", "Büşra", "Esra", "Gizem", "Selin", "Derya", "Ebru", "Seda",
-  "Özge", "Ceren", "Dilek", "Pınar", "Şule", "Nur",
+  "Ahmet",
+  "Mehmet",
+  "Mustafa",
+  "Ali",
+  "Hüseyin",
+  "Hasan",
+  "İbrahim",
+  "Murat",
+  "Emre",
+  "Burak",
+  "Can",
+  "Deniz",
+  "Eren",
+  "Kaan",
+  "Onur",
+  "Serkan",
+  "Tolga",
+  "Volkan",
+  "Yusuf",
+  "Kerem",
+  "Ayşe",
+  "Fatma",
+  "Emine",
+  "Hatice",
+  "Zeynep",
+  "Elif",
+  "Merve",
+  "Büşra",
+  "Esra",
+  "Gizem",
+  "Selin",
+  "Derya",
+  "Ebru",
+  "Seda",
+  "Özge",
+  "Ceren",
+  "Dilek",
+  "Pınar",
+  "Şule",
+  "Nur",
 ] as const;
 
 const LAST_NAMES = [
-  "Yılmaz", "Kaya", "Demir", "Şahin", "Çelik", "Yıldız", "Yıldırım", "Öztürk",
-  "Aydın", "Özdemir", "Arslan", "Doğan", "Kılıç", "Aslan", "Çetin", "Kara",
-  "Koç", "Kurt", "Özkan", "Şimşek", "Polat", "Korkmaz", "Erdoğan", "Güneş",
-  "Aksoy", "Tekin", "Bulut", "Akın", "Ünal", "Güler",
+  "Yılmaz",
+  "Kaya",
+  "Demir",
+  "Şahin",
+  "Çelik",
+  "Yıldız",
+  "Yıldırım",
+  "Öztürk",
+  "Aydın",
+  "Özdemir",
+  "Arslan",
+  "Doğan",
+  "Kılıç",
+  "Aslan",
+  "Çetin",
+  "Kara",
+  "Koç",
+  "Kurt",
+  "Özkan",
+  "Şimşek",
+  "Polat",
+  "Korkmaz",
+  "Erdoğan",
+  "Güneş",
+  "Aksoy",
+  "Tekin",
+  "Bulut",
+  "Akın",
+  "Ünal",
+  "Güler",
 ] as const;
 
 const STREET_NAMES = [
-  "Lale", "Gül", "Menekşe", "Papatya", "Çınar", "Ihlamur", "Akasya", "Zambak",
-  "Nergis", "Manolya", "Sedir", "Defne",
+  "Lale",
+  "Gül",
+  "Menekşe",
+  "Papatya",
+  "Çınar",
+  "Ihlamur",
+  "Akasya",
+  "Zambak",
+  "Nergis",
+  "Manolya",
+  "Sedir",
+  "Defne",
 ] as const;
 
 export function fakeEmail(key: string, attempt = 0): string {
@@ -111,7 +186,9 @@ export function fakeIban(key: string): string {
 }
 
 export function fakeFirstName(key: string): string {
-  return FIRST_NAMES[indexFrom(maskDigest("firstName", key), FIRST_NAMES.length)];
+  return FIRST_NAMES[
+    indexFrom(maskDigest("firstName", key), FIRST_NAMES.length)
+  ];
 }
 
 export function fakeLastName(key: string): string {
@@ -149,7 +226,8 @@ export function fakeUsername(key: string, attempt = 0): string {
 export function fakeBirthDate(key: string): string {
   const start = Date.UTC(1960, 0, 1);
   const span = Math.floor((Date.UTC(2000, 11, 31) - start) / 86_400_000);
-  const day = parseInt(maskDigest("birthDate", key).slice(0, 8), 16) % (span + 1);
+  const day =
+    parseInt(maskDigest("birthDate", key).slice(0, 8), 16) % (span + 1);
   return new Date(start + day * 86_400_000).toISOString().slice(0, 10);
 }
 

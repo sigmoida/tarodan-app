@@ -86,9 +86,9 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
     expect(isPersonalOrJson(find("users", "email")!)).toBe(true);
     expect(isPersonalOrJson(find("admin_users", "last_login_ip")!)).toBe(true);
     expect(isPersonalOrJson(find("products", "description")!)).toBe(false);
-    expect(isPersonalOrJson(find("trade_shipments", "recipient_user_id")!)).toBe(
-      false,
-    );
+    expect(
+      isPersonalOrJson(find("trade_shipments", "recipient_user_id")!),
+    ).toBe(false);
   });
 
   it("every personal-looking or JSON column is masked or explicitly allowed", () => {
@@ -143,7 +143,10 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
     for (const rule of UAT_MASKING_CATALOG) {
       if (rule.action !== "mask") continue;
       for (const [column, columnRule] of Object.entries(rule.columns)) {
-        if (columnRule.strategy === "null" && !find(rule.table, column)?.optional) {
+        if (
+          columnRule.strategy === "null" &&
+          !find(rule.table, column)?.optional
+        ) {
           notNullable.push(`${rule.table}.${column}`);
         }
       }
@@ -161,7 +164,10 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
             `${rule.table}.${column}:Json`,
           );
         }
-        if (columnRule.strategy === "fake" || columnRule.strategy === "freeText") {
+        if (
+          columnRule.strategy === "fake" ||
+          columnRule.strategy === "freeText"
+        ) {
           const expected =
             columnRule.strategy === "fake" && columnRule.fake === "birthDate"
               ? "DateTime"
@@ -179,9 +185,10 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
       if (rule.action !== "mask") continue;
       for (const [column, columnRule] of Object.entries(rule.columns)) {
         if (columnRule.strategy === "fake" && columnRule.unique) {
-          expect([column, ORIGINAL_DEPENDENT_FAKES.includes(columnRule.fake)]).toEqual(
-            [column, false],
-          );
+          expect([
+            column,
+            ORIGINAL_DEPENDENT_FAKES.includes(columnRule.fake),
+          ]).toEqual([column, false]);
         }
       }
     }
@@ -191,7 +198,10 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
     for (const [entry, reason] of Object.entries(UAT_MASK_ALLOW_LIST)) {
       const [table, column] = entry.split(".");
       expect([entry, Boolean(find(table, column))]).toEqual([entry, true]);
-      expect([entry, isCoveredByCatalog(table, column)]).toEqual([entry, false]);
+      expect([entry, isCoveredByCatalog(table, column)]).toEqual([
+        entry,
+        false,
+      ]);
       expect(reason.trim().length).toBeGreaterThan(5);
     }
   });
@@ -229,9 +239,13 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
         rule.table === "users" &&
         "password_hash" in rule.columns,
     );
-    expect(passwordRule).toMatchObject({ columns: { password_hash: { strategy: "null" } } });
+    expect(passwordRule).toMatchObject({
+      columns: { password_hash: { strategy: "null" } },
+    });
     // Sistem satırı istisnası şifreyi kapsamaz.
-    expect(passwordRule && "keepWhere" in passwordRule && passwordRule.keepWhere).toBeFalsy();
+    expect(
+      passwordRule && "keepWhere" in passwordRule && passwordRule.keepWhere,
+    ).toBeFalsy();
   });
 
   it("clears the sender-account link before deleting the sender accounts (FK RESTRICT)", () => {

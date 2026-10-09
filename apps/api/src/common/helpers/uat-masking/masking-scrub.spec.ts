@@ -134,7 +134,9 @@ describe("scrubJson", () => {
     expect(out.billingAddress.fullName).not.toBe("Yılmaz Ltd");
     expect(out.billingAddress.phone).toMatch(/^\+90500\d{7}$/);
     expect(out.billingAddress.city).toBe("İstanbul");
-    expect(out.note).toMatch(/^kapıya bırakın, mail: u[0-9a-f]{12}@uat\.invalid$/);
+    expect(out.note).toMatch(
+      /^kapıya bırakın, mail: u[0-9a-f]{12}@uat\.invalid$/,
+    );
     expect(out.attempts[0].email).toMatch(/@uat\.invalid$/);
   });
 
@@ -144,11 +146,13 @@ describe("scrubJson", () => {
   });
 
   it("nulls numbers under personal keys and keeps empty values", () => {
-    expect(scrubJson({ phone: 5321234567, iban: "", tckn: null }, "k")).toEqual({
-      phone: null,
-      iban: "",
-      tckn: null,
-    });
+    expect(scrubJson({ phone: 5321234567, iban: "", tckn: null }, "k")).toEqual(
+      {
+        phone: null,
+        iban: "",
+        tckn: null,
+      },
+    );
   });
 
   it("passes scalars and arrays of non-personal data through", () => {

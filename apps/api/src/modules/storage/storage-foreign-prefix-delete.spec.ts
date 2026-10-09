@@ -11,7 +11,9 @@ describe("StorageService.deleteFileByKey — environment prefix boundary", () =>
       get: (key: string, fallback?: unknown) =>
         key === "S3_ENV_PREFIX" ? envPrefix : fallback,
     };
-    const prisma = { mediaFile: { deleteMany: jest.fn(async () => ({ count: 1 })) } };
+    const prisma = {
+      mediaFile: { deleteMany: jest.fn(async () => ({ count: 1 })) },
+    };
     const svc = new StorageService(config as never, prisma as never);
     const send = jest.fn().mockResolvedValue({});
     Object.assign(svc as object, { isS3Available: true, s3Client: { send } });

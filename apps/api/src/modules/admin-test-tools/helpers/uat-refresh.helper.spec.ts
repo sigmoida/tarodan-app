@@ -61,10 +61,16 @@ describe("uat refresh timeout", () => {
 
   it(`treats a queued/running run older than ${UAT_REFRESH_TIMEOUT_MINUTES} minutes as timed out`, () => {
     expect(
-      isTimedOut(row(), minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES - 1)),
+      isTimedOut(
+        row(),
+        minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES - 1),
+      ),
     ).toBe(false);
     expect(
-      isTimedOut(row(), minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES + 1)),
+      isTimedOut(
+        row(),
+        minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES + 1),
+      ),
     ).toBe(true);
     expect(
       isTimedOut(
@@ -76,7 +82,10 @@ describe("uat refresh timeout", () => {
 
   it("never times out a finished run", () => {
     expect(
-      isTimedOut(row({ state: "succeeded" }), minutesAfter(requestedAt, 10_000)),
+      isTimedOut(
+        row({ state: "succeeded" }),
+        minutesAfter(requestedAt, 10_000),
+      ),
     ).toBe(false);
   });
 
@@ -129,8 +138,10 @@ describe("toUatRefreshRun", () => {
 
   it("a run started from GitHub directly has no requester", () => {
     expect(
-      toUatRefreshRun(row({ requestedById: null, requestedByName: null }), new Date())
-        .requestedBy,
+      toUatRefreshRun(
+        row({ requestedById: null, requestedByName: null }),
+        new Date(),
+      ).requestedBy,
     ).toBeNull();
   });
 });

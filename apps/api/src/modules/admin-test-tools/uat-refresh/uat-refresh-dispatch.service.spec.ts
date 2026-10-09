@@ -24,7 +24,10 @@ describe("UatRefreshDispatchService", () => {
 
   it("posts the dispatch for staging-refresh-from-prod.yml with string inputs", async () => {
     const fetchMock = mockFetch(async () => ({ ok: true, status: 204 }));
-    const result = await new UatRefreshDispatchService().dispatch(config, inputs);
+    const result = await new UatRefreshDispatchService().dispatch(
+      config,
+      inputs,
+    );
     expect(result).toEqual({ ok: true });
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [
@@ -66,7 +69,10 @@ describe("UatRefreshDispatchService", () => {
       error.name = "TimeoutError";
       throw error;
     });
-    const result = await new UatRefreshDispatchService().dispatch(config, inputs);
+    const result = await new UatRefreshDispatchService().dispatch(
+      config,
+      inputs,
+    );
     expect(result).toEqual({
       ok: false,
       error: "GitHub workflow dispatch failed: TimeoutError",
