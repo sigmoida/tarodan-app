@@ -4,28 +4,22 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
+import {
+  Advertisement,
+  AdDeviceType,
+  AdPosition,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   CreateAdvertisementDto,
-  AdPosition,
-  AdDeviceType,
   IAB_STANDARD_SIZES,
 } from "./dto/create-advertisement.dto";
 import { UpdateAdvertisementDto } from "./dto/update-advertisement.dto";
 import { i18nMessage } from "../i18n";
 
-/** Prisma client may not have Advertisement until after prisma generate + migration. */
-type PrismaWithAd = PrismaService & {
-  advertisement: {
-    findMany: (args: any) => Promise<any[]>;
-    findUnique: (args: any) => Promise<any | null>;
-    findFirst: (args: any) => Promise<any | null>;
-    create: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-    delete: (args: any) => Promise<any>;
-    count: (args: any) => Promise<number>;
-  };
-};
+/** Pozisyon / cihaz başına sayaç özeti (istatistik ekranı). */
+type AdCounterBucket = { count: number; clicks: number; impressions: number };
 
 @Injectable()
 export class AdvertisementService {
@@ -33,16 +27,16 @@ export class AdvertisementService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private get adRepo(): PrismaWithAd["advertisement"] {
-    return (this.prisma as PrismaWithAd).advertisement;
+  private get adRepo() {
+    return this.prisma.advertisement;
   }
 
   /**
    * Check if dimensions match IAB standard sizes
    */
   checkIABCompliance(
-    width?: number,
-    height?: number,
+    width?: number | null,
+    height?: number | null,
   ): { isCompliant: boolean; matchedSize?: string; suggestions: string[] } {
     if (!width || !height) {
       return {
@@ -87,18 +81,18 @@ export class AdvertisementService {
         { startDate: { lte: now }, endDate: { gte: now } },
       ];
 
-      const where: any = {
+      const where: Prisma.AdvertisementWhereInput = {
         isActive: true,
         OR: dateConditions,
       };
 
       if (position) {
-        where.position = position;
+        where.position = position as AdPosition;
       }
 
       // Filter by device type - include 'all' type as well
       if (deviceType && deviceType !== "all") {
-        where.deviceType = { in: [deviceType, "all"] };
+        where.deviceType = { in: [deviceType as AdDeviceType, "all"] };
       }
 
       const ads = await this.adRepo.findMany({
@@ -125,13 +119,13 @@ export class AdvertisementService {
         ads
           // Kampanya duyurusu, kampanya bitince/durunca kendiliğinden düşer:
           // yayından kaldırmayı admin'in hatırlamasına bırakmayız.
-          .filter((a: any) => {
+          .filter((a) => {
             const campaign = a.discount;
             if (!campaign) return true;
             if (!campaign.isActive || campaign.budgetStoppedAt) return false;
             return campaign.startDate <= now && campaign.endDate >= now;
           })
-          .map((a: any) => ({
+          .map((a) => ({
             id: a.id,
             title: a.title,
             imageUrl: a.imageUrl,
@@ -169,7 +163,7 @@ export class AdvertisementService {
     const ad = await this.adRepo.findUnique({ where: { id } });
     if (!ad)
       throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
-    await (this.prisma as PrismaWithAd).advertisement.update({
+    await this.adRepo.update({
       where: { id },
       data: { clickCount: { increment: 1 } },
     });
@@ -183,7 +177,7 @@ export class AdvertisementService {
     const ad = await this.adRepo.findUnique({ where: { id } });
     if (!ad)
       throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
-    await (this.prisma as PrismaWithAd).advertisement.update({
+    await this.adRepo.update({
       where: { id },
       data: { impressionCount: { increment: 1 } },
     });
@@ -201,9 +195,9 @@ export class AdvertisementService {
    * List all ads (admin).
    */
   async findAll(position?: string, deviceType?: string, isActive?: boolean) {
-    const where: any = {};
-    if (position) where.position = position;
-    if (deviceType) where.deviceType = deviceType;
+    const where: Prisma.AdvertisementWhereInput = {};
+    if (position) where.position = position as AdPosition;
+    if (deviceType) where.deviceType = deviceType as AdDeviceType;
     if (typeof isActive === "boolean") where.isActive = isActive;
 
     const ads = await this.adRepo.findMany({
@@ -211,7 +205,7 @@ export class AdvertisementService {
       orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
     });
 
-    return ads.map((a: any) => this.toResponse(a));
+    return ads.map((a) => this.toResponse(a));
   }
 
   /**
@@ -221,13 +215,10 @@ export class AdvertisementService {
     const ads = await this.adRepo.findMany({});
 
     const totalAds = ads.length;
-    const activeAds = ads.filter((a: any) => a.isActive).length;
-    const totalClicks = ads.reduce(
-      (sum: number, a: any) => sum + (a.clickCount || 0),
-      0,
-    );
+    const activeAds = ads.filter((a) => a.isActive).length;
+    const totalClicks = ads.reduce((sum, a) => sum + (a.clickCount || 0), 0);
     const totalImpressions = ads.reduce(
-      (sum: number, a: any) => sum + (a.impressionCount || 0),
+      (sum, a) => sum + (a.impressionCount || 0),
       0,
     );
     const avgCTR =
@@ -236,7 +227,7 @@ export class AdvertisementService {
         : "0.00";
 
     // Group by position
-    const byPosition = ads.reduce((acc: any, a: any) => {
+    const byPosition = ads.reduce<Record<string, AdCounterBucket>>((acc, a) => {
       const pos = a.position || "header";
       if (!acc[pos]) acc[pos] = { count: 0, clicks: 0, impressions: 0 };
       acc[pos].count++;
@@ -246,7 +237,7 @@ export class AdvertisementService {
     }, {});
 
     // Group by device type
-    const byDeviceType = ads.reduce((acc: any, a: any) => {
+    const byDeviceType = ads.reduce<Record<string, AdCounterBucket>>((acc, a) => {
       const device = a.deviceType || "all";
       if (!acc[device]) acc[device] = { count: 0, clicks: 0, impressions: 0 };
       acc[device].count++;
@@ -340,7 +331,7 @@ export class AdvertisementService {
       await this.assertDiscountExists(dto.discountId);
     }
 
-    const ad = await (this.prisma as PrismaWithAd).advertisement.update({
+    const ad = await this.adRepo.update({
       where: { id },
       data: {
         title: dto.title,
@@ -386,7 +377,7 @@ export class AdvertisementService {
     const existing = await this.adRepo.findUnique({ where: { id } });
     if (!existing)
       throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
-    await (this.prisma as PrismaWithAd).advertisement.delete({ where: { id } });
+    await this.adRepo.delete({ where: { id } });
     return { success: true };
   }
 
@@ -396,7 +387,7 @@ export class AdvertisementService {
   async reorder(ids: string[]) {
     await this.prisma.$transaction(
       ids.map((id: string, index: number) =>
-        (this.prisma as PrismaWithAd).advertisement.update({
+        this.adRepo.update({
           where: { id },
           data: { displayOrder: index },
         }),
@@ -405,7 +396,7 @@ export class AdvertisementService {
     return this.findAll();
   }
 
-  private toResponse(ad: any) {
+  private toResponse(ad: Advertisement) {
     const ctr =
       ad.impressionCount > 0
         ? ((ad.clickCount / ad.impressionCount) * 100).toFixed(2)
