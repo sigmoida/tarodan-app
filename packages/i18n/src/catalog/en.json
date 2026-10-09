@@ -4922,6 +4922,72 @@
           },
           "reviewHint": "Put the buyer account email and password in the App Store / Play review notes and add \"payments run in test mode, no charge is made\"."
         },
+        "uatRefresh": {
+          "title": "Staging data",
+          "description": "Replaces the staging database with a masked copy of production. Everything testers created is deleted on the next refresh.",
+          "notConfigured": "Refreshing from production is not configured in this environment. Set the GitHub trigger settings (repository, workflow and access token) on the API to enable this card.",
+          "loadFailed": "Could not load the refresh status.",
+          "retry": "Try again",
+          "action": "Refresh from production",
+          "state": {
+            "queued": "Queued",
+            "running": "Running",
+            "succeeded": "Succeeded",
+            "failed": "Failed"
+          },
+          "active": {
+            "title": "Staging is being refreshed",
+            "body": "The site is unavailable while the refresh runs; this page updates by itself. You can keep it open until the result arrives.",
+            "elapsed": "Elapsed: {duration}",
+            "swapping": "The API does not respond for a while when the database is swapped; this is expected and the refresh is still running."
+          },
+          "last": {
+            "title": "Last refresh",
+            "none": "No refresh has been run yet.",
+            "state": "Status",
+            "requestedAt": "Requested at",
+            "requestedBy": "Started by",
+            "requestedByGithub": "Directly from GitHub",
+            "duration": "Duration",
+            "sourceSnapshotAt": "Production snapshot taken",
+            "workflowRun": "GitHub run",
+            "openRun": "Open run",
+            "backupFile": "Backup file",
+            "migrations": "Migrations applied after the import",
+            "migrationsNone": "None",
+            "masked": "Masked rows ({count} tables)",
+            "maskedTable": "Table",
+            "maskedRows": "Rows",
+            "error": "Error",
+            "dryRun": "Dry run"
+          },
+          "duration": "{minutes} min {seconds} s",
+          "history": {
+            "title": "Recent refreshes",
+            "empty": "No refreshes recorded.",
+            "state": "Status",
+            "requestedAt": "Date",
+            "requestedBy": "Started by",
+            "duration": "Duration",
+            "mode": "Type",
+            "real": "Real",
+            "run": "Run"
+          },
+          "modal": {
+            "title": "Refresh staging from production",
+            "lead": "This cannot be undone. Before you start:",
+            "replace": "Staging data is replaced with a masked copy of production.",
+            "wipe": "Everything created on staging since the last refresh (records, orders, listings, uploads) is deleted.",
+            "accounts": "The four fixed UAT accounts are restored with the shared password.",
+            "downtime": "It takes several minutes and the site is unavailable meanwhile.",
+            "confirmLabel": "Type STAGING to confirm",
+            "confirmMismatch": "You must type exactly STAGING to continue.",
+            "dryRun": "Dry run (change nothing)",
+            "submit": "Start refresh"
+          },
+          "started": "Refresh started.",
+          "startFailed": "Could not start the refresh."
+        },
         "simulation": {
           "title": "Shipment Simulation",
           "description": "Advance parcels that never reach the carrier (staging stub cargo, test lane) as if the carrier had reported them. The reading goes through the real cargo tracking path: order status, delivery date, return window, escrow, notifications and emails happen exactly as in reality.",

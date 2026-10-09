@@ -46,3 +46,22 @@ export interface ShipmentSimulationResult {
   before: SimulatableParcel;
   after: SimulatableParcel;
 }
+
+/**
+ * Test Tools — staging refresh from production (UAT). The status shapes are the
+ * shared contract in `@tarodan/types` (`uat-refresh.ts`); re-exported so admin
+ * code imports them from one place.
+ */
+export type {
+  UatRefreshMaskedCount,
+  UatRefreshRun,
+  UatRefreshState,
+  UatRefreshStatus,
+} from "@tarodan/types";
+
+export interface StartUatRefreshPayload {
+  /** Literal onay ifadesi; API aynı değeri bekler. */
+  confirm: "STAGING";
+  /** true: hiçbir şey değiştirilmez, yalnız hat denenir. */
+  dryRun?: boolean;
+}
