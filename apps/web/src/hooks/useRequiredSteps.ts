@@ -1,6 +1,9 @@
 "use client";
 
-import { activeRequiredStep } from "@/lib/requiredSteps";
+import {
+  activeRequiredStep,
+  requiredStepsOutstanding,
+} from "@/lib/requiredSteps";
 import { useLegalIdentity } from "./useLegalIdentity";
 import { usePendingConsents } from "./usePendingConsents";
 
@@ -13,9 +16,12 @@ import { usePendingConsents } from "./usePendingConsents";
 export function useRequiredSteps() {
   const consents = usePendingConsents();
   const identity = useLegalIdentity();
-  const active = activeRequiredStep({
+  const states = {
     consents: consents.state,
     legalIdentity: identity.state,
-  });
-  return { active, consents, identity };
+  };
+  const active = activeRequiredStep(states);
+  /** Zorunlu bir adım açık ya da henüz bilinmiyor: başka katman açılmasın. */
+  const outstanding = requiredStepsOutstanding(states);
+  return { active, outstanding, consents, identity };
 }

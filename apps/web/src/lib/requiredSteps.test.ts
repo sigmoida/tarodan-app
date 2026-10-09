@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   REQUIRED_STEPS,
   activeRequiredStep,
+  requiredStepsOutstanding,
   isRequiredStepExemptPath,
   requiredStepState,
 } from "./requiredSteps";
@@ -64,5 +65,22 @@ describe("isRequiredStepExemptPath", () => {
     expect(isRequiredStepExemptPath("/terms")).toBe(true);
     expect(isRequiredStepExemptPath("/privacy")).toBe(true);
     expect(isRequiredStepExemptPath("/profile")).toBe(false);
+  });
+});
+
+describe("requiredStepsOutstanding — kapatılabilir katmanlar bekler", () => {
+  it("bir adım bekliyorsa ya da durum bilinmiyorsa doğru", () => {
+    expect(
+      requiredStepsOutstanding({ consents: "pending", legalIdentity: "done" }),
+    ).toBe(true);
+    expect(
+      requiredStepsOutstanding({ consents: "done", legalIdentity: "unknown" }),
+    ).toBe(true);
+  });
+
+  it("hepsi bitince yanlış", () => {
+    expect(
+      requiredStepsOutstanding({ consents: "done", legalIdentity: "done" }),
+    ).toBe(false);
   });
 });

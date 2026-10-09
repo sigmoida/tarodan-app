@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ALL_ACCEPTED,
+  CONSENT_CHANGED_EVENT,
   DEFAULT_PREFERENCES,
   getOrCreateVisitorId,
   hasConsent,
@@ -25,8 +26,15 @@ export function useCookieConsent() {
   useEffect(() => {
     // Kayıtlı tercihi rızadan bağımsız oku: kullanıcı banner'da onay verdikten
     // sonra /cookies sayfasında tercihlerini gerçek değerleriyle görmeli.
-    setPreferences(readPreferences());
-    setNeedsConsent(!hasConsent());
+    const sync = () => {
+      setPreferences(readPreferences());
+      setNeedsConsent(!hasConsent());
+    };
+    sync();
+    // Hook'un başka bir örneği (ör. banner) kaydettiğinde bu örnek de bilsin:
+    // tanıtım turu çerez bandının kapanmasını buradan bekler.
+    window.addEventListener(CONSENT_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(CONSENT_CHANGED_EVENT, sync);
   }, []);
 
   const toggle = useCallback((category: CookieCategory) => {

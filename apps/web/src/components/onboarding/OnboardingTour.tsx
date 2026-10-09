@@ -18,6 +18,8 @@ import {
   type OnboardingTourKey,
 } from "@/lib/userExperiencePolicy.mjs";
 import { useAuthStore } from "@/stores/authStore";
+import { useCookieConsent } from "@/hooks/useCookieConsent";
+import { useRequiredSteps } from "@/hooks/useRequiredSteps";
 import { tourOptions, tourStyles } from "./tourTheme";
 
 /**
@@ -40,9 +42,15 @@ export default function OnboardingTour({
   const [run, setRun] = useState(false);
   const completionPending = useRef(false);
   const config = ONBOARDING_TOURS[tour];
+  // Tur en son açılır: zorunlu pencereler ve çerez bandı kapanmadan başlarsa
+  // üçü üst üste binip hiçbiri tıklanamıyordu.
+  const { outstanding } = useRequiredSteps();
+  const { needsConsent: cookieBannerOpen } = useCookieConsent();
 
   const eligible =
     ready &&
+    !outstanding &&
+    !cookieBannerOpen &&
     steps.length > 0 &&
     shouldStartTour({
       isAuthenticated,

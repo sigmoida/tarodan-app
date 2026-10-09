@@ -36,6 +36,18 @@ export function requiredStepState(input: {
 }
 
 /**
+ * Zorunlu adımlar henüz bitmedi mi: biri bekliyor YA DA durumu bilinmiyor
+ * (sorgu yükleniyor). Kapatılabilir katmanlar (çerez bandı, tanıtım turu) bu
+ * doğruyken açılmaz; aksi hâlde yükleme anında açılıp zorunlu pencerenin
+ * altında kalırlar.
+ */
+export function requiredStepsOutstanding(
+  states: Record<RequiredStep, RequiredStepState>,
+): boolean {
+  return REQUIRED_STEPS.some((step) => states[step] !== "done");
+}
+
+/**
  * Gösterilecek adım: sıradaki İLK `pending`. Önceki bir adım hâlâ `unknown`
  * ise sonraki gösterilmez (beklenir) — aksi hâlde kimlik penceresi açılır,
  * onay sorgusu gelince onun yerini alır ve pencereler göz kırpar.
