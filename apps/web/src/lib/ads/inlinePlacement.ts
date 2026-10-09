@@ -5,7 +5,7 @@ export const INLINE_AD_FIRST_AFTER = 8;
 /** Sonrakiler her 16 kartta bir… */
 export const INLINE_AD_EVERY = 16;
 /** …ve ilkine ek olarak en çok bu kadar tekrar edilir. */
-export const INLINE_AD_MAX_REPEATS = 2;
+export const INLINE_AD_MAX_REPEATS = 1;
 
 /**
  * Bu kartın (0 tabanlı sıra) hemen ardına satır içi afiş girer mi? Döndürülen

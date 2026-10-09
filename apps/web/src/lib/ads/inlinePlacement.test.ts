@@ -13,7 +13,6 @@ describe("inlineAdSlotAfter", () => {
     expect(slots(60)).toEqual([
       { after: 8, slot: 0 },
       { after: 24, slot: 1 },
-      { after: 40, slot: 2 },
     ]);
   });
 
@@ -21,7 +20,7 @@ describe("inlineAdSlotAfter", () => {
     expect(slots(7)).toEqual([]);
   });
 
-  it("tekrar sayısı sınırlıdır (56. karttan sonra yok)", () => {
-    expect(inlineAdSlotAfter(55)).toBeNull();
+  it("tekrar sayısı sınırlıdır (sayfada en çok 2 afiş)", () => {
+    expect(inlineAdSlotAfter(39)).toBeNull();
   });
 });
