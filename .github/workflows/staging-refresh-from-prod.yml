@@ -24,13 +24,16 @@
 #   verify    the runner's --verify + an independent e-mail domain check
 #   accounts  seed-uat.js --accounts-only (fixed UAT people, UAT_SEED_PASSWORD)
 #   backup    pg_dump of the current staging DB (~/tarodan-staging-backups)
-#   carry     staging's own uat_refresh_runs + mail routing rows are copied
-#             into the scratch DB (run history survives the swap; staging keeps
-#             its own sender mailboxes)
-#   swap      stop api, rename staging -> <staging>_pre_refresh, scratch ->
-#             staging, start api; unhealthy -> automatic rollback
-#   finish    flush Redis (selected db), restart api (search reindexes on boot),
-#             drop <staging>_pre_refresh, report succeeded
+#   carry     staging's own uat_refresh_runs, mail routing and site access PIN
+#             rows are copied into the scratch DB (run history survives the
+#             swap; staging keeps its own sender mailboxes and PINs)
+#   swap      stop the api (and any other container on the staging DB, e.g. a
+#             separate worker), FLUSHDB staging's Redis db through the Redis
+#             container while nothing consumes it, rename staging ->
+#             <staging>_pre_refresh and scratch -> staging, start once (boot
+#             re-registers repeatable jobs; search reindexes); unhealthy ->
+#             automatic rollback
+#   finish    drop <staging>_pre_refresh, report succeeded
 #
 # Dry run = discover + guards + size estimate + migration preview. Only
 # metadata is read from production; nothing is copied or written (a manual dry
@@ -225,7 +228,7 @@ jobs:
             # ─── Postgres helpers (password copied via env, never on argv) ──
             DB_PARTS_JS='const u=new URL(process.env.DATABASE_URL);for(const v of [u.hostname,decodeURIComponent(u.username),decodeURIComponent(u.password),decodeURIComponent(u.pathname.slice(1))])process.stdout.write(Buffer.from(v).toString("base64")+"\n")'
             part() { printf '%s\n' "$1" | sed -n "${2}p" | base64 -d; }
-            pg_container() {
+            container_by_host() {
               cid="$(docker ps --format '{{.ID}}\t{{.Names}}' | awk -v host="$1" '$2 == host { print $1; exit }')"
               [ -n "$cid" ] || cid="$(docker ps --filter "name=$1" --format '{{.ID}}' | head -1)"
               printf '%s' "$cid"
@@ -235,6 +238,27 @@ jobs:
             prod_psql() { db="$1"; shift; PGPASSWORD="$PROD_PG_PASS" docker exec -e PGPASSWORD "$PROD_PG_CID" psql -X -q -v ON_ERROR_STOP=1 -U "$PROD_PG_USER" -d "$db" "$@"; }
             applied_migrations_sql="SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY 1"
             terminate_sql() { printf "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN (%s) AND pid <> pg_backend_pid()" "$1"; }
+
+            # ─── Redis helpers: staging's own db on the shared server ───────
+            # Flushed through the Redis CONTAINER (redis-cli), so it works while
+            # the api is stopped. FLUSHDB on the selected db, never FLUSHALL:
+            # staging and production share the Redis server on this host.
+            REDIS_PARTS_JS='const u=new URL(process.env.REDIS_URL);for(const v of [u.hostname,u.port||"6379",decodeURIComponent(u.username||""),decodeURIComponent(u.password||""),(u.pathname||"/").slice(1)||"0"])process.stdout.write(Buffer.from(v).toString("base64")+"\n")'
+            redis_cli() {
+              if [ -n "$STG_REDIS_PASS" ]; then
+                REDISCLI_AUTH="$STG_REDIS_PASS" docker exec -e REDISCLI_AUTH "$STG_REDIS_CID" \
+                  redis-cli -p "$STG_REDIS_PORT" ${STG_REDIS_USER:+--user "$STG_REDIS_USER"} -n "$STG_REDIS_DB" "$@"
+              else
+                docker exec "$STG_REDIS_CID" redis-cli -p "$STG_REDIS_PORT" -n "$STG_REDIS_DB" "$@"
+              fi
+            }
+            redis_flush() { [ "$(redis_cli FLUSHDB 2>/dev/null | tr -d '\r')" = "OK" ]; }
+
+            # The api plus every peer container on the staging database (found
+            # in the guards phase). Word splitting of $STG_PEERS is intended.
+            STG_PEERS=""
+            stop_staging_apps() { docker stop "$STG_API_CID" $STG_PEERS; }
+            start_staging_apps() { docker start "$STG_API_CID" $STG_PEERS; }
 
             # Runs a command in the staging api container against the SCRATCH
             # database: DATABASE_URL is rebuilt inside the container from its own
@@ -279,7 +303,7 @@ jobs:
             # one is back under the staging name.
             rollback() {
               log "ROLLING BACK: restoring the previous staging database..."
-              docker stop "$STG_API_CID" >/dev/null 2>&1 || true
+              stop_staging_apps >/dev/null 2>&1 || true
               API_STOPPED=1
               if [ "$SWAPPED" = "1" ]; then
                 stg_psql template1 -c "DROP DATABASE IF EXISTS \"$FAILED_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
@@ -288,7 +312,7 @@ jobs:
               rename_db "$OLD_DB" "$STG_PG_DB" || return 1
               SWAPPED=0
               stg_psql template1 -c "DROP DATABASE IF EXISTS \"$FAILED_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
-              docker start "$STG_API_CID" >/dev/null || return 1
+              start_staging_apps >/dev/null || return 1
               API_STOPPED=0
               wait_healthy || log "api unhealthy after rollback — inspect it now."
               log "rollback done: staging runs on its previous database."
@@ -305,7 +329,7 @@ jobs:
               if [ "$SCRATCH_CREATED" = "1" ]; then
                 stg_psql template1 -c "DROP DATABASE IF EXISTS \"$SCRATCH_DB\" WITH (FORCE)" >/dev/null 2>&1 || true
               fi
-              if [ "$API_STOPPED" = "1" ]; then docker start "$STG_API_CID" >/dev/null 2>&1 || true; fi
+              if [ "$API_STOPPED" = "1" ]; then start_staging_apps >/dev/null 2>&1 || true; fi
               report failed "phase $PHASE: ${LAST_ERROR:-command failed (exit $rc)}"
               log "FAILED in phase $PHASE."
             }
@@ -348,8 +372,8 @@ jobs:
             PROD_PG_HOST="$(part "$PROD_PARTS" 1)"; PROD_PG_USER="$(part "$PROD_PARTS" 2)"
             PROD_PG_PASS="$(part "$PROD_PARTS" 3)"; PROD_PG_DB="$(part "$PROD_PARTS" 4)"
             [ -n "$STG_PG_HOST" ] && [ -n "$STG_PG_DB" ] && [ -n "$PROD_PG_HOST" ] && [ -n "$PROD_PG_DB" ] || die "DATABASE_URL could not be parsed."
-            STG_PG_CID="$(pg_container "$STG_PG_HOST")"
-            PROD_PG_CID="$(pg_container "$PROD_PG_HOST")"
+            STG_PG_CID="$(container_by_host "$STG_PG_HOST")"
+            PROD_PG_CID="$(container_by_host "$PROD_PG_HOST")"
             [ -n "$STG_PG_CID" ] || die "staging postgres container '$STG_PG_HOST' not found."
             [ -n "$PROD_PG_CID" ] || die "production postgres container '$PROD_PG_HOST' not found."
             SCRATCH_DB="${STG_PG_DB}_uat_scratch"
@@ -365,6 +389,27 @@ jobs:
             fi
             [ "$STG_PG_HOST/$STG_PG_DB" != "$PROD_PG_HOST/$PROD_PG_DB" ] || die "target database == source database — refusing."
             log "source: $PROD_PG_DB on $PROD_PG_HOST | target: $STG_PG_DB on $STG_PG_HOST (scratch: $SCRATCH_DB)"
+
+            # Every container using the staging database is stopped for the
+            # swap — the api and, if staging runs one separately, the worker —
+            # so nothing consumes the (flushed) queues or holds connections.
+            STG_DB_URL="$(env_from "$STG_API_CID" DATABASE_URL)"
+            STG_PEERS=""
+            for cid in $(docker ps -q); do
+              [ "$cid" != "$STG_API_CID" ] || continue
+              if [ "$(env_from "$cid" DATABASE_URL)" = "$STG_DB_URL" ]; then STG_PEERS="$STG_PEERS $cid"; fi
+            done
+            STG_DB_URL=""
+            log "other containers on the staging database (stopped with the api):${STG_PEERS:- none}"
+            [ -n "$(env_from "$STG_API_CID" REDIS_URL)" ] || die "staging api has no REDIS_URL."
+            REDIS_PARTS="$(docker exec "$STG_API_CID" node -e "$REDIS_PARTS_JS")"
+            STG_REDIS_HOST="$(part "$REDIS_PARTS" 1)"; STG_REDIS_PORT="$(part "$REDIS_PARTS" 2)"
+            STG_REDIS_USER="$(part "$REDIS_PARTS" 3)"; STG_REDIS_PASS="$(part "$REDIS_PARTS" 4)"
+            STG_REDIS_DB="$(part "$REDIS_PARTS" 5)"
+            STG_REDIS_CID="$(container_by_host "$STG_REDIS_HOST")"
+            [ -n "$STG_REDIS_CID" ] || die "staging Redis container '$STG_REDIS_HOST' not found."
+            [ "$(redis_cli PING 2>/dev/null | tr -d '\r')" = "PONG" ] || die "staging Redis (db $STG_REDIS_DB) does not answer PING via redis-cli."
+            log "staging Redis: $STG_REDIS_HOST db $STG_REDIS_DB"
 
             # ─── Manual start (no run_id): register the run ourselves ───────
             DRY_SQL="false"; [ "${DRY_RUN:-0}" = "1" ] && DRY_SQL="true"
@@ -468,44 +513,45 @@ jobs:
             log "pg_dump staging ($STG_PG_DB) -> $BACKUP_DIR/$BACKUP_NAME"
             PGPASSWORD="$STG_PG_PASS" docker exec -e PGPASSWORD "$STG_PG_CID" pg_dump -U "$STG_PG_USER" "$STG_PG_DB" | gzip > "$BACKUP_DIR/$BACKUP_NAME"
             [ -s "$BACKUP_DIR/$BACKUP_NAME" ] || die "staging backup is empty."
-            ls -1t "$BACKUP_DIR"/staging-pre-*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+            # Own rotation only: staging-reset's staging-pre-reset-* backups
+            # live in the same directory and are not ours to prune.
+            ls -1t "$BACKUP_DIR"/staging-pre-refresh-*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
 
             PHASE="carry"
-            # Staging's run history (this run included) and its own mail routing
-            # (sender mailboxes encrypted with the STAGING key) replace the
-            # production rows the masking already emptied.
+            # Staging's run history (this run included), its own mail routing
+            # (sender mailboxes encrypted with the STAGING key) and its own site
+            # access PINs replace the production rows the masking emptied.
             PGPASSWORD="$STG_PG_PASS" docker exec -e PGPASSWORD "$STG_PG_CID" pg_dump --data-only --no-owner --no-acl \
               --table=public.uat_refresh_runs --table=public.mail_sender_accounts --table=public.mail_area_settings \
+              --table=public.site_access_pins \
               -U "$STG_PG_USER" "$STG_PG_DB" > "$CARRY_FILE"
-            stg_psql "$SCRATCH_DB" -c "TRUNCATE uat_refresh_runs, mail_area_settings, mail_sender_accounts"
+            stg_psql "$SCRATCH_DB" -c "TRUNCATE uat_refresh_runs, mail_area_settings, mail_sender_accounts, site_access_pins"
             stg_psql_in "$SCRATCH_DB" < "$CARRY_FILE" >/dev/null
             rm -f "$CARRY_FILE"
 
-            # ─── Swap ───────────────────────────────────────────────────────
+            # ─── Swap (api stopped: Redis is flushed BEFORE it boots once) ──
             PHASE="swap"
-            log "stopping the staging api and swapping databases..."
-            docker stop "$STG_API_CID" >/dev/null
+            log "stopping the staging api, flushing its Redis db and swapping databases..."
+            stop_staging_apps >/dev/null
             API_STOPPED=1
+            # Nothing consumes the queues now: stale Bull jobs from the old
+            # database cannot run against the new data, and the single boot
+            # below re-registers the repeatable jobs (search sync reindexes the
+            # production listings within ~5 minutes).
+            redis_flush || die "could not flush staging's Redis db $STG_REDIS_DB."
             stg_psql template1 -c "DROP DATABASE IF EXISTS \"$OLD_DB\" WITH (FORCE)"
             rename_db "$STG_PG_DB" "$OLD_DB"
             SWAPPED="old_renamed"
             rename_db "$SCRATCH_DB" "$STG_PG_DB"
             SWAPPED=1
             SCRATCH_CREATED=0
-            docker start "$STG_API_CID" >/dev/null
+            start_staging_apps >/dev/null
             API_STOPPED=0
             wait_healthy || die "api unhealthy on the refreshed database."
-
-            # ─── Finish: Redis, search, cleanup ─────────────────────────────
-            PHASE="finish"
-            # flushdb, never flushall: staging and production share the Redis
-            # server on this host (see staging-reset.yml).
-            docker exec "$STG_API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushdb().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
-            # Restart so boot re-registers the (flushed) repeatable jobs and the
-            # search sync reindexes the production listings within ~5 minutes.
-            docker restart "$STG_API_CID" >/dev/null
-            wait_healthy || die "api unhealthy after the post-refresh restart."
             COMMITTED=1
+
+            # ─── Finish ─────────────────────────────────────────────────────
+            PHASE="finish"
             stg_psql template1 -c "DROP DATABASE IF EXISTS \"$OLD_DB\" WITH (FORCE)" || log "could not drop $OLD_DB (drop it by hand)."
 
             PHASE="done"
