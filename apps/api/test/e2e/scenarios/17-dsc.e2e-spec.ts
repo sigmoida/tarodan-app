@@ -31,7 +31,7 @@
  *  - POST /api/ads/:id/click|impression @Public → varsayılan 201, { success:true }, sayaç +1; yok → 404 "Reklam bulunamadı".
  *  - GET /api/ads/iab-sizes → 10 öğe (IAB_STANDARD_SIZES).
  *  - POST /api/admin/ads (@Roles) → varsayılan 201, toResponse iabCompliant/iabSize/ctr/clickCount/impressionCount.
- *    CreateAdvertisementDto width/height @Min(1)@Max(2000) → 2500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
+ *    CreateAdvertisementDto width/height @Min(1)@Max(4000) → 4500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
  *  - PATCH /api/admin/ads/:id → 200; PATCH /api/admin/ads/reorder @HttpCode(200); DELETE @HttpCode(204).
  *  - POST /api/newsletter/subscribe @HttpCode(200) → mesajlar; e-posta lowercase+trim; idempotent güncelle;
  *    reaktivasyon. GET /unsubscribe?token= (yok→404); POST /unsubscribe (bulunmayan→200 nötr, idempotent).
@@ -1436,17 +1436,17 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-053", async () => {
-    // position=header filtresi; sidebar dışlanır; displayOrder asc.
+    // position=header filtresi; diğer yuvalar (topbar) dışlanır; displayOrder asc.
     await seedAd({ title: "Header-A", position: "header", displayOrder: 1 });
     await seedAd({ title: "Header-B", position: "header", displayOrder: 0 });
-    await seedAd({ title: "Sidebar-X", position: "sidebar", displayOrder: 0 });
+    await seedAd({ title: "Topbar-X", position: "topbar", displayOrder: 0 });
     const res = await request(server())
       .get("/api/ads/active?position=header")
       .expect(200);
     const titles = res.body.map((a: any) => a.title);
     expect(titles).toContain("Header-A");
     expect(titles).toContain("Header-B");
-    expect(titles).not.toContain("Sidebar-X");
+    expect(titles).not.toContain("Topbar-X");
     // displayOrder asc → Header-B (0) önce Header-A (1).
     expect(titles.indexOf("Header-B")).toBeLessThan(titles.indexOf("Header-A"));
   });
@@ -1576,14 +1576,14 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-064", async () => {
-    // Boyut sınırı 1-2000 dışında → 400.
+    // Boyut sınırı 1-4000 dışında → 400.
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc64@test.com",
     });
     await request(server())
       .post("/api/admin/ads")
       .set(authHeader(admin))
-      .send(iabAd({ width: 2500 }))
+      .send(iabAd({ width: 4500 }))
       .expect(400);
   });
 

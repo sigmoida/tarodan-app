@@ -11,7 +11,7 @@ export class AdvertisementController {
 
   @Get('active')
   @ApiOperation({ summary: 'Get active ads for display (public)' })
-  @ApiQuery({ name: 'position', required: false, description: 'Filter by position: header, sidebar, footer, inline, popup' })
+  @ApiQuery({ name: 'position', required: false, description: 'Filter by slot: topbar, header, footer, inline, popup' })
   @ApiQuery({ name: 'device', required: false, description: 'Filter by device: desktop, mobile, all' })
   getActive(
     @Query('position') position?: string,

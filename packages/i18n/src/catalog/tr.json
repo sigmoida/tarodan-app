@@ -11234,7 +11234,8 @@
     },
     "advertisement": {
       "notFound": "Reklam bulunamadı",
-      "campaignNotFound": "Bağlanacak kampanya bulunamadı"
+      "campaignNotFound": "Bağlanacak kampanya bulunamadı",
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz"
     },
     "brand": {
       "notFound": "Marka bulunamadı"

@@ -3551,12 +3551,20 @@ model Advertisement {
   altText         String?      @map("alt_text")
   width           Int?
   height          Int?
+  /// Render yuvası — yerleşim anlamları `AdPosition` enum'unda.
   position        AdPosition   @default(header)
   deviceType      AdDeviceType @default(all) @map("device_type")
+  /// Aynı yuvadaki canlı reklamların sırası (küçük önce); rotasyonu web yapar.
   displayOrder    Int          @default(0) @map("display_order")
+  /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresi ve bağlı
+  /// kampanya da canlı olmalı (`isAdLive`, advertisement/helpers).
   isActive        Boolean      @default(true) @map("is_active")
+  /// Yayın penceresi; null = sınırsız. Admin İstanbul gününün 00:00 /
+  /// 23:59:59.999 anını ofsetli ISO olarak gönderir, olduğu gibi saklanır.
   startDate       DateTime?    @map("start_date")
   endDate         DateTime?    @map("end_date")
+  /// Yalnız canlı reklamda, IP+reklam başına tekilleştirilerek artar (tık
+  /// 10 sn, gösterim 30 dk) — ham sayaç değil, istatistik ekranının kaynağı.
   clickCount      Int          @default(0) @map("click_count")
   impressionCount Int          @default(0) @map("impression_count")
   /// Banner bir KAMPANYAYI duyuruyorsa ona bağlanır: şerit, kampanyanın adını ve
@@ -4264,11 +4272,20 @@ enum AdDeviceType {
   all
 }
 
+/// Reklamın web'de render edildiği yuva. Web her yuvayı kendi bileşeniyle
+/// okur (`GET /ads/active?position=`); burada olmayan bir yuva hiçbir sayfada
+/// görünmez — `sidebar` tam bu yüzden kaldırıldı (20261009120000).
 enum AdPosition {
+  /// Her sayfanın en üstündeki ince şerit (kampanya/duyuru metni).
+  topbar
+  /// Site başlığının altındaki büyük banner: anasayfa, ilan ve kategori
+  /// listelerinin tepesi.
   header
-  sidebar
+  /// Site alt bilgisinin hemen üstündeki banner.
   footer
+  /// İlan/arama/kategori ızgarasında ürün satırları arasındaki banner.
   inline
+  /// Ziyaretçi başına günde en fazla bir kez açılan modal.
   popup
 }
 

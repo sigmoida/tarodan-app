@@ -20283,7 +20283,7 @@
       "tur": "Happy path / Hedefleme",
       "pri": "P1",
       "steps": "1. GET /api/ads/active?position=header.",
-      "exp": "Sadece position=header reklamlar döner; sidebar dışlanır. Sıralama displayOrder asc.",
+      "exp": "Sadece position=header reklamlar döner; topbar dışlanır. Sıralama displayOrder asc.",
       "gap": false,
       "gapRefs": []
     },
@@ -20422,10 +20422,10 @@
       "code": "17",
       "prefix": "DSC",
       "domTitle": "17 — İndirim & Pazarlama",
-      "title": "Boyut sınırı 1-2000 px dışında → 400",
+      "title": "Boyut sınırı 1-4000 px dışında → 400",
       "tur": "Sınır değer / Doğrulama",
       "pri": "P1",
-      "steps": "1. POST /api/admin/ads body width=2500.",
+      "steps": "1. POST /api/admin/ads body width=4500.",
       "exp": "HTTP 400 (class-validator).",
       "gap": false,
       "gapRefs": []
