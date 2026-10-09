@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
-import { UAT_REFRESH_CONFIRM_PHRASE } from "./uatRefresh";
+import { UAT_REFRESH_CONFIRM_PHRASE } from "@tarodan/types";
 
 type T = ReturnType<typeof useTranslations<never>>;
 

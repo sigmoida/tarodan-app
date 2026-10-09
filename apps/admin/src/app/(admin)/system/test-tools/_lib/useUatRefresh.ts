@@ -2,12 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type {
-  StartUatRefreshPayload,
+  StartUatRefreshRequest,
   UatRefreshStatus,
 } from "@/lib/api/system.types";
 import { uatRefreshPhase, uatRefreshPollInterval } from "./uatRefresh";
@@ -34,13 +33,12 @@ export function useUatRefresh() {
   });
 
   const start = useAdminMutation(
-    (payload: StartUatRefreshPayload) =>
+    (payload: StartUatRefreshRequest) =>
       adminApi.startUatRefresh(payload).then((r) => r.data),
     {
       invalidates: [RESOURCE],
       errorMessage: t("admin.system.testTools.uatRefresh.startFailed"),
-      onSuccess: () =>
-        toast.success(t("admin.system.testTools.uatRefresh.started")),
+      successMessage: t("admin.system.testTools.uatRefresh.started"),
     },
   );
 

@@ -14,6 +14,7 @@ import {
   runDurationText,
   uatRefreshMaskedColumns,
 } from "../_lib/uatRefreshColumns";
+import { uatRefreshErrorText } from "../_lib/uatRefresh";
 
 /**
  * Son bitmiş yenilemenin özeti: durum, zamanlar, kaynak kopya, GitHub bağlantısı,
@@ -108,7 +109,9 @@ export function UatRefreshSummary({
 
       {run.error && (
         <Alert variant="danger" title={t(`${base}.error`)}>
-          <span className="whitespace-pre-wrap break-words">{run.error}</span>
+          <span className="whitespace-pre-wrap break-words">
+            {uatRefreshErrorText(run.error, t(`${base}.timedOut`))}
+          </span>
         </Alert>
       )}
     </div>

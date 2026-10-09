@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { UAT_REFRESH_CONFIRM_PHRASE } from "@tarodan/types";
 import { Alert, Button, Spinner } from "@tarodan/ui";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { SectionTitle } from "@/components/detail/SectionTitle";
 import { TextLink } from "@/components/TextLink";
 import { usePermissions } from "@/context/PermissionsContext";
-import { UAT_REFRESH_CONFIRM_PHRASE } from "../_lib/uatRefresh";
 import {
   runDurationText,
   uatRefreshHistoryColumns,

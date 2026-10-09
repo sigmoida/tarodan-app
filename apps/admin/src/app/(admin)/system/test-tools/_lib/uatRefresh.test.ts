@@ -12,6 +12,7 @@ import {
   isUatRefreshHiddenError,
   isUatRefreshUnreachable,
   splitDuration,
+  uatRefreshErrorText,
   uatRefreshDurationMs,
   uatRefreshPhase,
   uatRefreshPollInterval,
@@ -238,5 +239,14 @@ describe("uatRefreshPollInterval", () => {
     ).toBe(false);
     expect(uatRefreshPollInterval(status(), httpError(500))).toBe(false);
     expect(uatRefreshPollInterval(undefined, null)).toBe(false);
+  });
+});
+
+describe("uatRefreshErrorText", () => {
+  it("translates the timed-out code and passes other messages through", () => {
+    expect(uatRefreshErrorText("timedOut", "Zaman aşımı")).toBe("Zaman aşımı");
+    expect(uatRefreshErrorText("pg_restore failed", "Zaman aşımı")).toBe(
+      "pg_restore failed",
+    );
   });
 });

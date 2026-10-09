@@ -4,7 +4,7 @@ import type {
   ShipmentSimulationResult,
   SimulatableParcel,
   SimulateShipmentPayload,
-  StartUatRefreshPayload,
+  StartUatRefreshRequest,
   UatRefreshRun,
   UatRefreshStatus,
 } from "./system.types";
@@ -168,6 +168,6 @@ export const systemApi = {
   // the API refuses on production). The run itself happens in GitHub Actions.
   getUatRefreshStatus: () =>
     api.get<UatRefreshStatus>("/admin/test-tools/uat-refresh"),
-  startUatRefresh: (payload: StartUatRefreshPayload) =>
+  startUatRefresh: (payload: StartUatRefreshRequest) =>
     api.post<UatRefreshRun>("/admin/test-tools/uat-refresh", payload),
 };

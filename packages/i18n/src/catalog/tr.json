@@ -4959,6 +4959,7 @@
             "maskedTable": "Tablo",
             "maskedRows": "Satır",
             "error": "Hata",
+            "timedOut": "Çalışma beklenen sürede bitmedi; zaman aşımına uğramış sayıldı. Ayrıntı için GitHub çalışmasını kontrol et.",
             "dryRun": "Deneme"
           },
           "duration": "{minutes} dk {seconds} sn",

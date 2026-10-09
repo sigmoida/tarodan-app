@@ -4959,6 +4959,7 @@
             "maskedTable": "Table",
             "maskedRows": "Rows",
             "error": "Error",
+            "timedOut": "The run did not finish in the expected time and was treated as timed out. Check the GitHub run for details.",
             "dryRun": "Dry run"
           },
           "duration": "{minutes} min {seconds} s",
