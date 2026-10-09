@@ -157,6 +157,8 @@ describe("UAT masking SQL", () => {
 
   it("toggles user triggers by name on the touched tables only", () => {
     expect(buildEnabledTriggersSql()).toContain("NOT t.tgisinternal");
+    // Prisma cannot deserialize Postgres `name` columns: read them as text.
+    expect(buildEnabledTriggersSql()).toContain('t.tgname::text AS "trigger"');
     expect(buildEnabledTriggersSql()).toContain("'consent_records'");
     expect(
       buildTriggerToggleSql(

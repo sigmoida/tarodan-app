@@ -287,7 +287,10 @@ export function buildVerificationQueries(
   return queries;
 }
 
-/** Dokunulan tablolardaki AÇIK kullanıcı tetikleyicileri (adıyla). */
+/**
+ * Dokunulan tablolardaki AÇIK kullanıcı tetikleyicileri (adıyla). Adlar
+ * `::text`'e çevrilir: Prisma ham sorgusu Postgres'in `name` tipini okuyamaz.
+ */
 export function buildEnabledTriggersSql(
   catalog: readonly MaskRule[] = UAT_MASKING_CATALOG,
 ): string {
@@ -295,7 +298,7 @@ export function buildEnabledTriggersSql(
     .map((name) => `'${name}'`)
     .join(", ");
   return (
-    `SELECT c.relname AS "table", t.tgname AS "trigger" FROM pg_trigger t` +
+    `SELECT c.relname::text AS "table", t.tgname::text AS "trigger" FROM pg_trigger t` +
     ` JOIN pg_class c ON c.oid = t.tgrelid` +
     ` WHERE NOT t.tgisinternal AND t.tgenabled <> 'D'` +
     ` AND c.relnamespace = 'public'::regnamespace AND c.relname IN (${tables})` +
