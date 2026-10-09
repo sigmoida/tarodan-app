@@ -17,7 +17,7 @@ export const UAT_PASSWORD_MIN_LENGTH = 16;
 export const UAT_PASSWORD_MAX_BYTES = 72;
 
 /** Platform servis hesabı hiçbir zaman üye/personel olarak açılamaz. */
-const PLATFORM_EMAIL = "platform@tarodan.com";
+export const PLATFORM_EMAIL = "platform@tarodan.com";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type UatAccountKind = "member" | "staff";
@@ -99,6 +99,48 @@ export function shouldResetPasswords(
   env: Record<string, string | undefined>,
 ): boolean {
   return isTruthyFlag(env[UAT_RESET_PASSWORDS_ENV]);
+}
+
+/**
+ * Seed'in koşu kipi (komut satırından):
+ *  - `--check`: DB'ye dokunmadan guard + şifre + veri dosyaları;
+ *  - `--accounts-only`: production'dan maskeli yenileme sonrası
+ *    (docs/UAT_REFRESH.md) — yalnız sabit hesaplar. Referans veri, depo adresi
+ *    ve başlangıç ilanları production'dan gelmiştir; yeniden yazılırsa canlının
+ *    ayarlarını/komisyon setini lansman verisiyle ezer, ilanları çoğaltırdı;
+ *  - bayraksız: staging reset'in tam UAT verisi.
+ * İkisi birden verilirse `--check` kazanır (hiçbir şey yazılmaz).
+ */
+export type UatSeedMode = "check" | "accountsOnly" | "full";
+
+export const UAT_SEED_CHECK_FLAG = "--check";
+export const UAT_SEED_ACCOUNTS_ONLY_FLAG = "--accounts-only";
+
+export function parseUatSeedMode(argv: readonly string[]): UatSeedMode {
+  if (argv.includes(UAT_SEED_CHECK_FLAG)) return "check";
+  if (argv.includes(UAT_SEED_ACCOUNTS_ONLY_FLAG)) return "accountsOnly";
+  return "full";
+}
+
+export interface UatSeedSteps {
+  /** Üyelik katmanı, vergi, kargo, ayarlar, katalog, komisyon kural seti. */
+  referenceData: boolean;
+  /** `accounts.json` üyeleri ve personeli. */
+  accounts: boolean;
+  /** Depo adresi (ilk süper adminin adresi). */
+  warehouseAddress: boolean;
+  /** `listings.json` başlangıç ilanları. */
+  starterListings: boolean;
+}
+
+export function planUatSeedSteps(mode: UatSeedMode): UatSeedSteps {
+  const full = mode === "full";
+  return {
+    referenceData: full,
+    accounts: mode !== "check",
+    warehouseAddress: full,
+    starterListings: full,
+  };
 }
 
 export interface UatSyncPlan {

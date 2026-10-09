@@ -11,6 +11,7 @@
     "seed:prod": "node dist-seed/prisma/seed-production.js",
     "seed:launch:prod": "node dist-seed/prisma/seed-launch.js",
     "seed:uat:prod": "node dist-seed/prisma/seed-uat.js",
+    "uat:mask:prod": "node dist-seed/prisma/uat/mask-database.js",
     "seed:media:prod": "node dist-seed/prisma/seed-media.js",
     "media:migrate-folders:prod": "node dist-seed/scripts/migrate-media-folders.js",
     "bootstrap:prod:admin": "node dist-seed/prisma/bootstrap-production-admin.js",

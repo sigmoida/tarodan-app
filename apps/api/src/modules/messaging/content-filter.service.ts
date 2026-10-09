@@ -1,6 +1,10 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { ModerationAiClient } from '../moderation/moderation-ai.client';
+import {
+  EMAIL_PATTERN_SOURCE,
+  TR_MOBILE_PHONE_PATTERN_SOURCE,
+} from '../../common/helpers/contact-patterns';
 
 export interface FilterResult {
   isClean: boolean;
@@ -175,10 +179,10 @@ export class ContentFilterService implements OnModuleInit {
    */
   getBuiltinPatterns(): Array<{type: string; pattern: string; name: string}> {
     return [
-      // Turkish phone numbers
+      // Turkish phone numbers — shared with UAT masking (common/helpers/contact-patterns)
       {
         type: 'phone',
-        pattern: '(\\+90|0)?\\s*5\\d{2}\\s*\\d{3}\\s*\\d{2}\\s*\\d{2}',
+        pattern: TR_MOBILE_PHONE_PATTERN_SOURCE,
         name: 'Türk Telefon Numarası',
       },
       // International phone
@@ -190,7 +194,7 @@ export class ContentFilterService implements OnModuleInit {
       // Email
       {
         type: 'email',
-        pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
+        pattern: EMAIL_PATTERN_SOURCE,
         name: 'E-posta Adresi',
       },
       // WhatsApp

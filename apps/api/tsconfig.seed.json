@@ -1,7 +1,7 @@
 {
   // Üretimde çalıştırılabilir derlenmiş seed'ler. Çıktı yolları `seed:prod`,
   // `seed:launch:prod`, `seed:uat:prod`, `bootstrap:prod:admin`, `reset:prod:runtime` ve
-  // `verify:prod:launch` script'lerinin BEKLEDİĞİ yollardır — bozulursa
+  // `verify:prod:launch`, `uat:mask:prod` script'lerinin BEKLEDİĞİ yollardır — bozulursa
   // konteyner boot'ta MODULE_NOT_FOUND ile crash-loop'a girer.
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -35,6 +35,7 @@
     "prisma/seed-launch.ts",
     "prisma/seed-launch-core.ts",
     "prisma/seed-uat.ts",
+    "prisma/uat/*.ts",
     "prisma/bootstrap-production-admin.ts",
     "scripts/migrate-media-folders.ts",
     "maintenance/**/*.ts"
