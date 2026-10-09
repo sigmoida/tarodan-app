@@ -5,7 +5,9 @@ import {
   assertUatSeedAllowed,
   parseUatAccounts,
   parseUatListings,
+  parseUatSeedMode,
   planUatAccountSync,
+  planUatSeedSteps,
   resolveUatPassword,
   shouldResetPasswords,
   UAT_PASSWORD_ENV,
@@ -299,5 +301,63 @@ describe("shipped UAT data files", () => {
         expect(attributes.has(slug)).toBe(true);
       }
     }
+  });
+});
+
+describe("UAT seed modes", () => {
+  it("parses the run mode; --check wins over --accounts-only", () => {
+    expect(parseUatSeedMode(["node", "seed-uat.js"])).toBe("full");
+    expect(parseUatSeedMode(["node", "seed-uat.js", "--check"])).toBe("check");
+    expect(parseUatSeedMode(["node", "seed-uat.js", "--accounts-only"])).toBe(
+      "accountsOnly",
+    );
+    expect(
+      parseUatSeedMode(["node", "seed-uat.js", "--accounts-only", "--check"]),
+    ).toBe("check");
+  });
+
+  it("--check writes nothing", () => {
+    expect(planUatSeedSteps("check")).toEqual({
+      referenceData: false,
+      accounts: false,
+      warehouseAddress: false,
+      starterListings: false,
+    });
+  });
+
+  it("--accounts-only re-applies only the fixed accounts (production data stays)", () => {
+    expect(planUatSeedSteps("accountsOnly")).toEqual({
+      referenceData: false,
+      accounts: true,
+      warehouseAddress: false,
+      starterListings: false,
+    });
+  });
+
+  it("a full run (staging reset) writes everything", () => {
+    expect(planUatSeedSteps("full")).toEqual({
+      referenceData: true,
+      accounts: true,
+      warehouseAddress: true,
+      starterListings: true,
+    });
+  });
+
+  it("seed-uat.ts gates every non-account write behind its step", () => {
+    const source = readFileSync(
+      join(apiAppRoot(), "prisma", "seed-uat.ts"),
+      "utf8",
+    );
+    const main = source.slice(source.indexOf("async function main"));
+    const gate = (step: string, write: string) => {
+      const at = main.indexOf(`if (steps.${step})`);
+      expect(at).toBeGreaterThan(-1);
+      expect(at).toBeLessThan(main.indexOf(write));
+    };
+    gate("referenceData", "seedBusinessConfig(");
+    gate("referenceData", "seedCommissionRuleSet(");
+    gate("warehouseAddress", "seedWarehouseAddress(");
+    gate("starterListings", "upsertSeedProduct(");
+    expect(main).toContain("parseUatSeedMode(process.argv)");
   });
 });

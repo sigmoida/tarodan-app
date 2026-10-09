@@ -22,6 +22,9 @@
  * koşulabilir; var olan bir hesabın şifresi `UAT_SEED_RESET_PASSWORDS=1`
  * verilmedikçe DEĞİŞMEZ. `--check` DB'ye dokunmadan guard'ı, şifreyi ve veri
  * dosyalarını doğrular (workflow bunu veritabanı silinmeden ÖNCE koşar).
+ * `--accounts-only` production'dan maskeli yenilemeden sonra koşar: yalnız
+ * sabit hesaplar — referans veri, depo adresi ve ilanlar production'dan gelir
+ * (kipler: `planUatSeedSteps`).
  *
  * Demo seed'ine bağlı değildir — `seed-independence.spec.ts` doğrular.
  */
@@ -31,7 +34,9 @@ import {
   assertUatSeedAllowed,
   parseUatAccounts,
   parseUatListings,
+  parseUatSeedMode,
   planUatAccountSync,
+  planUatSeedSteps,
   resolveUatPassword,
   shouldResetPasswords,
   UatAccountKind,
@@ -187,8 +192,10 @@ async function main(): Promise<void> {
   const context: SyncContext = {
     resetPasswords: shouldResetPasswords(process.env),
   };
+  const mode = parseUatSeedMode(process.argv);
+  const steps = planUatSeedSteps(mode);
 
-  if (process.argv.includes("--check")) {
+  if (!steps.accounts) {
     log(
       `check OK: ${accounts.members.length} members, ${accounts.staff.length} staff, ${listings.length} listings; password accepted.`,
     );
@@ -196,12 +203,13 @@ async function main(): Promise<void> {
   }
 
   // Referans veri — lansman seed'iyle aynı fonksiyonlar, aynı veri dosyaları.
-  const launchAccounts = load<Accounts>("accounts.json");
-  const businessConfig = load<BusinessConfig>("business-config.json");
-  const commission = load<CommissionConfig>("commission.json");
-  await seedBusinessConfig(prisma, businessConfig);
-  await seedCatalog(prisma);
-  await seedCommissionRuleSet(prisma, commission);
+  if (steps.referenceData) {
+    const businessConfig = load<BusinessConfig>("business-config.json");
+    const commission = load<CommissionConfig>("commission.json");
+    await seedBusinessConfig(prisma, businessConfig);
+    await seedCatalog(prisma);
+    await seedCommissionRuleSet(prisma, commission);
+  }
 
   const hash = makeHasher(password);
   const userIds = new Map<string, string>();
@@ -217,33 +225,42 @@ async function main(): Promise<void> {
 
   // Depo adresi (readiness ister): ilk süper adminin adresi. Adminler gerçek
   // kişiler olduğu için görünen adlarına dokunulmaz.
-  await seedWarehouseAddress(prisma, launchAccounts, { renameAdmin: false });
+  if (steps.warehouseAddress) {
+    const launchAccounts = load<Accounts>("accounts.json");
+    await seedWarehouseAddress(prisma, launchAccounts, { renameAdmin: false });
+  }
 
   // Başlangıç ilanları yalnız YOKSA yazılır: yeniden koşu, testin sattığı/
   // düzenlediği bir ilanı eski haline döndürmesin.
-  const lookups = await loadProductLookups(prisma);
-  let created = 0;
-  for (const listing of listings) {
-    const item = listing as unknown as ProductData;
-    const slug = productSlug(item);
-    const present = await prisma.product.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
-    if (present) continue;
-    await upsertSeedProduct(
-      prisma,
-      lookups,
-      userIds.get(listing.ownerEmail)!,
-      item,
+  if (steps.starterListings) {
+    const lookups = await loadProductLookups(prisma);
+    let created = 0;
+    for (const listing of listings) {
+      const item = listing as unknown as ProductData;
+      const slug = productSlug(item);
+      const present = await prisma.product.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+      if (present) continue;
+      await upsertSeedProduct(
+        prisma,
+        lookups,
+        userIds.get(listing.ownerEmail)!,
+        item,
+      );
+      created += 1;
+    }
+    log(
+      `starter listings: ${created} created, ${listings.length - created} already present`,
     );
-    created += 1;
   }
-  log(
-    `starter listings: ${created} created, ${listings.length - created} already present`,
-  );
 
-  log("UAT data is ready.");
+  log(
+    mode === "accountsOnly"
+      ? "UAT accounts are ready (accounts-only: no reference data, no listings)."
+      : "UAT data is ready.",
+  );
 }
 
 main()
