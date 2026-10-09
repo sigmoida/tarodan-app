@@ -4922,6 +4922,72 @@
           },
           "reviewHint": "Apple/Google inceleme notuna alıcı hesabın e-posta ve şifresini yaz; \"ödemeler test modunda, tahsilat yapılmaz\" ibaresini ekle."
         },
+        "uatRefresh": {
+          "title": "Staging verisi",
+          "description": "Staging veritabanını canlının maskelenmiş bir kopyasıyla yeniler. Tester'ların oluşturduğu her şey bir sonraki yenilemede silinir.",
+          "notConfigured": "Canlıdan yenileme bu ortamda yapılandırılmamış. API'ye GitHub tetikleyici ayarlarını (depo, workflow ve erişim anahtarı) tanımlayınca bu kart çalışır.",
+          "loadFailed": "Yenileme durumu alınamadı.",
+          "retry": "Tekrar dene",
+          "action": "Canlıdan yenile",
+          "state": {
+            "queued": "Sırada",
+            "running": "Çalışıyor",
+            "succeeded": "Başarılı",
+            "failed": "Başarısız"
+          },
+          "active": {
+            "title": "Staging yenileniyor",
+            "body": "Yenileme sürerken site kullanılamaz; bu sayfa kendiliğinden güncellenir. Sonuç gelene kadar bu sayfayı açık tutabilirsin.",
+            "elapsed": "Geçen süre: {duration}",
+            "swapping": "Veritabanı değiştirilirken API bir süre yanıt vermez; bu beklenen bir durumdur, yenileme sürüyor."
+          },
+          "last": {
+            "title": "Son yenileme",
+            "none": "Henüz bir yenileme yapılmadı.",
+            "state": "Durum",
+            "requestedAt": "İstek zamanı",
+            "requestedBy": "Başlatan",
+            "requestedByGithub": "GitHub'dan doğrudan",
+            "duration": "Süre",
+            "sourceSnapshotAt": "Canlı kopya zamanı",
+            "workflowRun": "GitHub çalışması",
+            "openRun": "Çalışmayı aç",
+            "backupFile": "Yedek dosyası",
+            "migrations": "İçe aktarmadan sonra uygulanan migration'lar",
+            "migrationsNone": "Yok",
+            "masked": "Maskelenen satırlar ({count} tablo)",
+            "maskedTable": "Tablo",
+            "maskedRows": "Satır",
+            "error": "Hata",
+            "dryRun": "Deneme"
+          },
+          "duration": "{minutes} dk {seconds} sn",
+          "history": {
+            "title": "Son yenilemeler",
+            "empty": "Kayıtlı yenileme yok.",
+            "state": "Durum",
+            "requestedAt": "Tarih",
+            "requestedBy": "Başlatan",
+            "duration": "Süre",
+            "mode": "Tür",
+            "real": "Gerçek",
+            "run": "Çalışma"
+          },
+          "modal": {
+            "title": "Staging'i canlıdan yenile",
+            "lead": "Bu işlem geri alınamaz. Başlamadan önce şunları bil:",
+            "replace": "Staging verisi, canlının maskelenmiş bir kopyasıyla değiştirilir.",
+            "wipe": "Staging'de son yenilemeden beri oluşturulan her şey (kayıtlar, siparişler, ilanlar, yüklemeler) silinir.",
+            "accounts": "Dört sabit UAT hesabı ortak şifreyle yeniden kurulur.",
+            "downtime": "İşlem birkaç dakika sürer; bu sürede site kullanılamaz.",
+            "confirmLabel": "Onaylamak için STAGING yaz",
+            "confirmMismatch": "Devam etmek için tam olarak STAGING yazmalısın.",
+            "dryRun": "Deneme modu (hiçbir şeyi değiştirme)",
+            "submit": "Yenilemeyi başlat"
+          },
+          "started": "Yenileme başlatıldı.",
+          "startFailed": "Yenileme başlatılamadı."
+        },
         "simulation": {
           "title": "Kargo Simülasyonu",
           "description": "Taşıyıcıya hiç gitmeyen kolileri (staging sahte kargo, test şeridi) taşıyıcı haber vermiş gibi ilerlet. Okuma gerçek kargo takip hattından geçer: sipariş durumu, teslim tarihi, iade penceresi, escrow, bildirim ve e-postalar gerçekteki gibi oluşur.",
