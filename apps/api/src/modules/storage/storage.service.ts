@@ -523,10 +523,23 @@ export class StorageService implements OnModuleInit {
     return { folders, files };
   }
 
-  /** Tam key ile S3 nesnesi + varsa MediaFile kaydını siler (temizlik cron'u için). */
+  /**
+   * Tam key ile S3 nesnesi + varsa MediaFile kaydını siler (temizlik cron'u için).
+   *
+   * Yalnız KENDİ env önekindeki nesneyi siler. Staging production'ın maskeli
+   * kopyasıyla çalışırken (docs/UAT_REFRESH.md) satırlar `prod/…` key'leri
+   * taşır; bu ortamın başka bir ortamın nesnesini silmesi asla doğru değildir.
+   * Satır yine silinir (kendi veritabanımız), nesneye dokunulmaz.
+   */
   async deleteFileByKey(key: string): Promise<void> {
     await this.prisma.mediaFile.deleteMany({ where: { key } });
     if (!this.isS3Available) return;
+    if (!hasEnvPrefix(this.envPrefix, key)) {
+      this.logger.warn(
+        `Refusing to delete ${key}: outside this environment's prefix (${this.envPrefix})`,
+      );
+      return;
+    }
     await this.client().send(
       new DeleteObjectCommand({ Bucket: this.baseBucket, Key: key }),
     );
