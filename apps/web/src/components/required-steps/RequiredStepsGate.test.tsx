@@ -27,9 +27,10 @@ vi.mock("@/i18n/navigation", () => ({ usePathname: () => state.pathname }));
 
 // Sıra kuralı GERÇEK `activeRequiredStep`ten gelir; yalnız sorgular sahte.
 vi.mock("@/hooks/useRequiredSteps", async () => {
-  const { activeRequiredStep } = await vi.importActual<
-    typeof import("@/lib/requiredSteps")
-  >("@/lib/requiredSteps");
+  const { activeRequiredStep, requiredStepsOutstanding } =
+    await vi.importActual<typeof import("@/lib/requiredSteps")>(
+      "@/lib/requiredSteps",
+    );
   const identityStatus: LegalIdentityStatus = {
     required: true,
     missing: ["nationalId"],
@@ -40,6 +41,10 @@ vi.mock("@/hooks/useRequiredSteps", async () => {
   };
   return {
     useRequiredSteps: () => ({
+      outstanding: requiredStepsOutstanding({
+        consents: state.consents,
+        legalIdentity: state.identity,
+      }),
       active: activeRequiredStep({
         consents: state.consents,
         legalIdentity: state.identity,
@@ -63,6 +68,7 @@ vi.mock("@/components/identity/LegalIdentityGate", () => ({
 }));
 
 import RequiredStepsGate from "./RequiredStepsGate";
+import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -110,5 +116,18 @@ describe("RequiredStepsGate", () => {
     state.identity = "pending";
     state.pathname = "/privacy";
     expect(renderedGates()).toEqual([]);
+  });
+});
+
+describe("RequiredStepsGate — kök düzendeki katmanlara bildirim", () => {
+  it("bekleyen adım varken mağazaya yazar, bitince temizler", () => {
+    state.consents = "pending";
+    state.identity = "done";
+    renderedGates();
+    expect(useRequiredStepsStore.getState().outstanding).toBe(true);
+
+    state.consents = "done";
+    renderedGates();
+    expect(useRequiredStepsStore.getState().outstanding).toBe(false);
   });
 });

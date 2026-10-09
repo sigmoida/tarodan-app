@@ -32,11 +32,16 @@ export interface Advertisement {
   } | null;
 }
 
+/** API'deki reklam denetleyicisinin kökü (`@Controller('ads')`). */
+const ADS_BASE = "/ads";
+
 export const advertisementsApi = {
   getActive: (params?: { position?: AdPosition; deviceType?: string }) =>
-    api.get("/advertisements/active", { params }),
+    api.get(`${ADS_BASE}/active`, {
+      // API sorgu adı `device`; istemci tarafındaki ad değişmesin.
+      params: { position: params?.position, device: params?.deviceType },
+    }),
   /** Görüntülenme ve tıklama sayaçları — reklam performansının tek ölçüsü. */
-  recordImpression: (id: string) =>
-    api.post(`/advertisements/${id}/impression`),
-  recordClick: (id: string) => api.post(`/advertisements/${id}/click`),
+  recordImpression: (id: string) => api.post(`${ADS_BASE}/${id}/impression`),
+  recordClick: (id: string) => api.post(`${ADS_BASE}/${id}/click`),
 };

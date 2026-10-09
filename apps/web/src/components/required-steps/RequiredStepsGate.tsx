@@ -2,11 +2,12 @@
 
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { usePathname } from "@/i18n/navigation";
 import ConsentGate from "@/components/legal/ConsentGate";
 import LegalIdentityGate from "@/components/identity/LegalIdentityGate";
 import { useRequiredSteps } from "@/hooks/useRequiredSteps";
+import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 import {
   isRequiredStepExemptPath,
   type RequiredStep,
@@ -24,7 +25,15 @@ import {
  */
 export default function RequiredStepsGate() {
   const pathname = usePathname();
-  const { active, consents, identity } = useRequiredSteps();
+  const { active, outstanding, consents, identity } = useRequiredSteps();
+  const setOutstanding = useRequiredStepsStore((s) => s.setOutstanding);
+
+  // Kök düzendeki çerez bandı (sorgu sağlayıcısının dışında) bu bilgiyi
+  // mağazadan okur; kapı sayfadan kalkınca bekleyen bir şey kalmaz.
+  useEffect(() => {
+    setOutstanding(outstanding);
+  }, [outstanding, setOutstanding]);
+  useEffect(() => () => setOutstanding(false), [setOutstanding]);
 
   if (!active || isRequiredStepExemptPath(pathname)) return null;
 

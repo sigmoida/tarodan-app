@@ -19,7 +19,7 @@ import {
 } from "@/lib/userExperiencePolicy.mjs";
 import { useAuthStore } from "@/stores/authStore";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
-import { useRequiredSteps } from "@/hooks/useRequiredSteps";
+import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 import { tourOptions, tourStyles } from "./tourTheme";
 
 /**
@@ -44,7 +44,7 @@ export default function OnboardingTour({
   const config = ONBOARDING_TOURS[tour];
   // Tur en son açılır: zorunlu pencereler ve çerez bandı kapanmadan başlarsa
   // üçü üst üste binip hiçbiri tıklanamıyordu.
-  const { outstanding } = useRequiredSteps();
+  const outstanding = useRequiredStepsStore((s) => s.outstanding);
   const { needsConsent: cookieBannerOpen } = useCookieConsent();
 
   const eligible =
