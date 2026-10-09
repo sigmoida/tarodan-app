@@ -12,7 +12,9 @@
  *   (bayraksız)  maskele + doğrula; son stdout satırı JSON özet:
  *                {"masked":[{"table":"users","rows":123},…],"sourceSnapshotAt":"…"}
  *   --check      yalnız hedef guard'ı (DB'ye bağlanmaz) — workflow ön kontrolü
- *   --verify     yalnız doğrulama sorguları; ihlal varsa çıkış kodu 1
+ *   --verify     yalnız doğrulama: katalogdan türeyen sorgular + serbest metin/JSON
+ *                kolonlarının rastgele örnekleminde kalmış e-posta/telefon/IBAN/
+ *                TCKN taraması; ihlal varsa çıkış kodu 1 (değerler yazdırılmaz)
  *
  * Guard'lar `mask-target-guard.ts`'te (scratch bayrağı + `_uat_scratch` adı +
  * production adıyla eşleşmeme). İdempotent: sahte değerler satır anahtarından
@@ -37,9 +39,13 @@ import {
   buildTempUniqueSql,
   buildTriggerToggleSql,
   buildVerificationQueries,
-  computeMaskedValue,
+  UAT_MASK_SAMPLE_SIZE,
+  buildSampleSql,
+  computeMaskedCell,
+  keyAlias,
   keyColumnOf,
   planMaskRule,
+  scrubbedColumns,
 } from "../../src/common/helpers/uat-masking/masking-sql";
 import {
   resolveMaskTarget,
@@ -97,23 +103,18 @@ async function maskComputedColumns(
         const original = row[column];
         if (original === null || original === undefined) continue;
         const id = String(row.id);
-        const key = row[`__key_${keyColumn}`] ?? id;
+        const key = row[keyAlias(keyColumn)] ?? id;
         let attempt = 0;
-        let value = computeMaskedValue(column, columnRule, key, original);
-        while (seen?.has(value)) {
+        let cell = computeMaskedCell(column, columnRule, key, original);
+        while (seen?.has(cell.value)) {
           attempt += 1;
-          value = computeMaskedValue(
-            column,
-            columnRule,
-            key,
-            original,
-            attempt,
-          );
+          cell = computeMaskedCell(column, columnRule, key, original, attempt);
         }
-        seen?.add(value);
-        if (value === original) continue;
+        seen?.add(cell.value);
+        // Zaten maskeli hücre yazılmaz (JSON dahil: karşılaştırma normalize).
+        if (!cell.changed) continue;
         ids.push(id);
-        values.push(value);
+        values.push(cell.value);
       }
       if (ids.length > 0) {
         await prisma.$executeRawUnsafe(
@@ -155,6 +156,28 @@ async function verify(prisma: PrismaClient): Promise<string[]> {
     const [row] = await prisma.$queryRawUnsafe<{ n: number }[]>(query.sql);
     const n = Number(row?.n ?? 0);
     if (n !== 0) failures.push(`${query.name}: ${n}`);
+  }
+  // Serbest metin / JSON örneklemi: aynı temizleyici kendi çıktısında sabit
+  // noktadır; değiştirdiği her hücre maskelenmemiş iletişim/kimlik verisidir.
+  // Değer ASLA yazdırılmaz, yalnız sayı.
+  for (const target of scrubbedColumns()) {
+    const keyColumn = keyColumnOf(target.rule, target.columnRule);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      buildSampleSql(target),
+      UAT_MASK_SAMPLE_SIZE,
+    );
+    const leaks = rows.filter((row) => {
+      const original = row[target.column];
+      if (original === null || original === undefined) return false;
+      const key = row[keyAlias(keyColumn)] ?? String(row.id);
+      return computeMaskedCell(target.column, target.columnRule, key, original)
+        .changed;
+    }).length;
+    if (leaks > 0) {
+      failures.push(
+        `${target.rule.table}.${target.column}: ${leaks} sampled cell(s) still hold e-mail/phone/IBAN/TCKN`,
+      );
+    }
   }
   return failures;
 }

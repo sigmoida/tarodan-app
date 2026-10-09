@@ -1,6 +1,11 @@
 import { isValidTckn } from "@tarodan/types";
 import { isValidTrIban } from "../../validators/tr-iban";
-import { classifyJsonKey, scrubFreeText, scrubJson } from "./masking-scrub";
+import {
+  classifyJsonKey,
+  scrubFreeText,
+  scrubJson,
+  scrubJsonText,
+} from "./masking-scrub";
 
 /**
  * Serbest metin ve JSON temizliği: iletişim/kimlik kalıpları sahteye döner,
@@ -161,5 +166,77 @@ describe("scrubJson", () => {
     expect(scrubJson([{ amount: 10, rate: "0.05" }], "k")).toEqual([
       { amount: 10, rate: "0.05" },
     ]);
+  });
+});
+
+describe("scrubFreeText — Turkish phone spellings", () => {
+  it.each([
+    "05321234567",
+    "5321234567",
+    "+905321234567",
+    "0532 123 45 67",
+    "0 532 123 45 67",
+    "0532.123.45.67",
+    "0532-123-45-67",
+    "(0532) 123 45 67",
+    "0(532) 123 4567",
+    "+90 (532) 123 45 67",
+    "90 532 123 45 67",
+  ])("replaces %s", (phone) => {
+    const out = scrubFreeText(`Ara: ${phone} lütfen`, "k");
+    expect(out).toMatch(/^Ara: \+90500\d{7} lütfen$/);
+    expect(scrubFreeText(out, "k")).toBe(out);
+  });
+
+  it.each(["Sipariş 1053212345678 tamam", "fiyat 532 TL", "ORD-10023"])(
+    "leaves %s alone",
+    (text) => {
+      expect(scrubFreeText(text, "k")).toBe(text);
+    },
+  );
+});
+
+describe("scrubJsonText", () => {
+  it("reports unchanged for a cell without personal data, regardless of jsonb spacing", () => {
+    expect(
+      scrubJsonText('{"city": "Ankara", "total": 10.50, "n": 3}', "k"),
+    ).toEqual({
+      value: '{"city":"Ankara","total":10.50,"n":3}',
+      changed: false,
+    });
+  });
+
+  it("rewrites only personal values and keeps big integers and decimal scale exact", () => {
+    const out = scrubJsonText(
+      '{"phone": "0532 123 45 67", "providerId": 12345678901234567890, "amount": 99.90, "rate": 1e-7}',
+      "k",
+    );
+    expect(out.changed).toBe(true);
+    expect(out.value).toMatch(/"phone":"\+90500\d{7}"/);
+    expect(out.value).toContain('"providerId":12345678901234567890');
+    expect(out.value).toContain('"amount":99.90');
+    expect(out.value).toContain('"rate":1e-7');
+  });
+
+  it("nulls a big number under a personal key and leaves preserved numbers out of text scrubbing", () => {
+    const out = scrubJsonText(
+      '{"tckn": 12345678901234567890, "ref": 10000000146000000000}',
+      "k",
+    );
+    expect(JSON.parse(out.value.replace(/:(\d{17,})/g, ':"$1"'))).toEqual({
+      tckn: null,
+      ref: "10000000146000000000",
+    });
+  });
+
+  it("is a fixed point on its own output", () => {
+    const first = scrubJsonText(
+      '{"guestEmail": "a@b.com", "x": [1, 2.50]}',
+      "k",
+    );
+    expect(scrubJsonText(first.value, "k")).toEqual({
+      value: first.value,
+      changed: false,
+    });
   });
 });

@@ -5,7 +5,10 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { UAT_REFRESH_TIMED_OUT_ERROR } from "@tarodan/types";
+import {
+  UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
+  UAT_REFRESH_TIMED_OUT_ERROR,
+} from "@tarodan/types";
 import { UatRefreshService } from "./uat-refresh.service";
 import { hashReportToken } from "../helpers/uat-refresh.helper";
 import { UatRefreshDispatchInputs } from "./uat-refresh-dispatch.service";
@@ -36,6 +39,7 @@ const runRow = (overrides: Row = {}): Row => ({
   backupFile: null,
   error: null,
   tokenHash: hashReportToken("the-token"),
+  updatedAt: new Date("2026-10-09T11:50:00Z"),
   ...overrides,
 });
 
@@ -56,7 +60,8 @@ describe("UatRefreshService", () => {
       configured?: boolean;
       rows?: Row[];
       active?: Row[];
-      dispatchOk?: boolean;
+      dispatchResult?:
+        { ok: true } | { ok: false; definite: boolean; error: string };
       found?: Row | null;
     } = {},
   ) => {
@@ -86,12 +91,7 @@ describe("UatRefreshService", () => {
       config: jest.fn(() => (options.configured === false ? null : CONFIG)),
       dispatch: jest.fn(
         async (_config: unknown, _inputs: UatRefreshDispatchInputs) =>
-          options.dispatchOk === false
-            ? {
-                ok: false as const,
-                error: "GitHub workflow dispatch failed: HTTP 404",
-              }
-            : { ok: true as const },
+          options.dispatchResult ?? { ok: true as const },
       ),
     };
     const service = new UatRefreshService(prisma as never, dispatcher as never);
@@ -142,7 +142,7 @@ describe("UatRefreshService", () => {
       });
     });
 
-    it("shows a run stuck for over 90 minutes as failed (timed out), not current", async () => {
+    it("shows a run running for over 90 minutes as failed (timed out), not current", async () => {
       const { service } = build({
         rows: [
           runRow({
@@ -194,20 +194,37 @@ describe("UatRefreshService", () => {
       expect(dispatcher.dispatch).not.toHaveBeenCalled();
     });
 
-    it("does not let a timed-out run block a new one", async () => {
+    it("keeps refusing while a run that only LOOKS timed out is still reporting", async () => {
       const { service, tx } = build({
         active: [
           runRow({
             state: "running",
-            requestedAt: new Date("2026-10-09T09:00:00Z"),
+            requestedAt: new Date("2026-10-09T10:00:00Z"),
+            startedAt: new Date("2026-10-09T10:00:00Z"),
+            updatedAt: new Date("2026-10-09T11:30:00Z"),
           }),
         ],
       });
       await expect(
         service.start("admin-user", dto, NOW),
-      ).resolves.toMatchObject({
-        state: "queued",
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(tx.uatRefreshRun.create).not.toHaveBeenCalled();
+    });
+
+    it("lets a run silent for more than 3 hours stop blocking", async () => {
+      const { service, tx } = build({
+        active: [
+          runRow({
+            state: "running",
+            requestedAt: new Date("2026-10-09T08:00:00Z"),
+            startedAt: new Date("2026-10-09T08:00:00Z"),
+            updatedAt: new Date("2026-10-09T08:30:00Z"),
+          }),
+        ],
       });
+      await expect(
+        service.start("admin-user", dto, NOW),
+      ).resolves.toMatchObject({ state: "queued" });
       expect(tx.uatRefreshRun.create).toHaveBeenCalled();
     });
 
@@ -238,8 +255,14 @@ describe("UatRefreshService", () => {
       expect(JSON.stringify(run)).not.toContain(inputs.reportToken);
     });
 
-    it("marks the run failed and answers 502 when GitHub refuses the dispatch", async () => {
-      const { service, prisma } = build({ dispatchOk: false });
+    it("marks the run failed and answers 502 when GitHub definitely refuses the dispatch (4xx)", async () => {
+      const { service, prisma } = build({
+        dispatchResult: {
+          ok: false,
+          definite: true,
+          error: "GitHub workflow dispatch failed: HTTP 404",
+        },
+      });
       await expect(
         service.start("admin-user", dto, NOW),
       ).rejects.toBeInstanceOf(BadGatewayException);
@@ -249,6 +272,31 @@ describe("UatRefreshService", () => {
           state: "failed",
           error: "GitHub workflow dispatch failed: HTTP 404",
         }),
+      });
+    });
+  });
+
+  describe("start — ambiguous dispatch", () => {
+    it("leaves the run queued with the unconfirmed note on a timeout / network error / 5xx", async () => {
+      const { service, prisma } = build({
+        dispatchResult: {
+          ok: false,
+          definite: false,
+          error: "GitHub workflow dispatch failed: TimeoutError",
+        },
+      });
+      const run = await service.start(
+        "admin-user",
+        { confirm: "STAGING", dryRun: false },
+        NOW,
+      );
+      expect(run).toMatchObject({
+        state: "queued",
+        error: UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
+      });
+      expect(prisma.uatRefreshRun.update).toHaveBeenCalledWith({
+        where: { id: "22222222-2222-4222-8222-222222222222" },
+        data: { error: UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR },
       });
     });
   });
@@ -276,6 +324,43 @@ describe("UatRefreshService", () => {
         unknown.service.report(runId, "the-token", { state: "running" }, NOW),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.uatRefreshRun.update).not.toHaveBeenCalled();
+    });
+
+    it("lets the workflow's first running report claim an unconfirmed dispatch", async () => {
+      const { service, prisma } = build({
+        found: runRow({ error: UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR }),
+      });
+      await service.report(runId, "the-token", { state: "running" }, NOW);
+      expect(prisma.uatRefreshRun.update).toHaveBeenCalledWith({
+        where: { id: runId },
+        data: expect.objectContaining({
+          state: "running",
+          error: null,
+          finishedAt: null,
+        }),
+      });
+    });
+
+    it("accepts a running report for a run marked failed with the unconfirmed note, nothing else", async () => {
+      const failed = runRow({
+        state: "failed",
+        finishedAt: NOW,
+        error: UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
+      });
+      const { service, prisma } = build({ found: failed });
+      await service.report(runId, "the-token", { state: "running" }, NOW);
+      expect(prisma.uatRefreshRun.update).toHaveBeenCalledWith({
+        where: { id: runId },
+        data: expect.objectContaining({ state: "running", finishedAt: null }),
+      });
+      await expect(
+        build({ found: failed }).service.report(
+          runId,
+          "the-token",
+          { state: "succeeded" },
+          NOW,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it("refuses to rewrite a finished run", async () => {

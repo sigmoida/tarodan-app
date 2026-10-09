@@ -1,5 +1,16 @@
 import { isValidTckn } from "@tarodan/types";
 import {
+  EMAIL_PATTERN_SOURCE,
+  TCKN_CANDIDATE_PATTERN_SOURCE,
+  TR_IBAN_PATTERN_SOURCE,
+  TR_MOBILE_PHONE_PATTERN_SOURCE,
+} from "../contact-patterns";
+import {
+  isPreservedNumber,
+  parseJsonPreservingNumbers,
+  stringifyJsonPreservingNumbers,
+} from "./masking-json";
+import {
   UAT_MASK_EMAIL_DOMAIN,
   fakeBirthDate,
   fakeEmail,
@@ -31,15 +42,17 @@ import {
  */
 
 /**
- * Tek geçişte taranan birleşik kalıp. Sıra önemli: e-posta önce yakalanır ki
- * yerel kısmındaki rakam dizisi telefon/TCKN sanılmasın; IBAN telefondan önce.
+ * Tek geçişte taranan birleşik kalıp — kalıpların kendisi mesajlaşma içerik
+ * filtresiyle ORTAK (`common/helpers/contact-patterns.ts`). Sıra önemli:
+ * e-posta önce yakalanır ki yerel kısmındaki rakam dizisi telefon/TCKN
+ * sanılmasın; IBAN telefondan önce.
  */
 const FREE_TEXT_PATTERN = new RegExp(
   [
-    "(?<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})",
-    "(?<iban>\\bTR\\s?\\d{2}(?:\\s?\\d{4}){5}\\s?\\d{2}\\b)",
-    "(?<phone>(?<!\\d)(?:\\+?90[\\s-]?|0)?5\\d{2}[\\s-]?\\d{3}[\\s-]?\\d{2}[\\s-]?\\d{2}(?!\\d))",
-    "(?<tckn>(?<!\\d)\\d{11}(?!\\d))",
+    `(?<email>${EMAIL_PATTERN_SOURCE})`,
+    `(?<iban>${TR_IBAN_PATTERN_SOURCE})`,
+    `(?<phone>${TR_MOBILE_PHONE_PATTERN_SOURCE})`,
+    `(?<tckn>${TCKN_CANDIDATE_PATTERN_SOURCE})`,
   ].join("|"),
   "gi",
 );
@@ -169,7 +182,9 @@ function fakeForKind(
  * JSON değerini derinlemesine temizler. Şekil korunur: nesne/dizi yapısı ve
  * anahtarlar aynen kalır; kişisel anahtarın altındaki nesne (ör.
  * `billingAddress: {…}`) özyinelemeyle gezilir, metin değeri sahte değere,
- * `drop` türü ve kişisel anahtardaki sayı `null`'a döner.
+ * `drop` türü ve kişisel anahtardaki sayı `null`'a döner. Sayılara (ve
+ * `masking-json.ts`'in kayıpsız sakladığı büyük sayılara) başka hiçbir yerde
+ * dokunulmaz.
  */
 export function scrubJson(value: unknown, key: string, path = "$"): unknown {
   if (Array.isArray(value)) {
@@ -186,7 +201,11 @@ export function scrubJson(value: unknown, key: string, path = "$"): unknown {
         out[field] = scrubJson(inner, key, innerPath);
       } else if (inner === null || inner === "" || typeof inner === "boolean") {
         out[field] = inner;
-      } else if (kind === "drop" || typeof inner !== "string") {
+      } else if (
+        kind === "drop" ||
+        typeof inner !== "string" ||
+        isPreservedNumber(inner)
+      ) {
         out[field] = null;
       } else {
         out[field] = fakeForKind(kind, `${key}:${innerPath}`, inner);
@@ -194,6 +213,25 @@ export function scrubJson(value: unknown, key: string, path = "$"): unknown {
     }
     return out;
   }
-  if (typeof value === "string") return scrubFreeText(value, `${key}:${path}`);
+  if (typeof value === "string" && !isPreservedNumber(value)) {
+    return scrubFreeText(value, `${key}:${path}`);
+  }
   return value;
+}
+
+/**
+ * Bir JSON hücresinin (veritabanından gelen metni) maskelenmiş hali.
+ * `changed=false` ise hücre YAZILMAZ: `jsonb::text` biçimi ile
+ * `JSON.stringify` biçimi farklı olduğundan metin karşılaştırması her hücreyi
+ * "değişmiş" sayardı. Karşılaştırma iki tarafın da aynı serileştiriciden
+ * geçmiş halidir; sayılar kayıpsız taşınır (2^53 üstü tam sayılar dahil).
+ */
+export function scrubJsonText(
+  text: string,
+  key: string,
+): { value: string; changed: boolean } {
+  const parsed = parseJsonPreservingNumbers(text);
+  const before = stringifyJsonPreservingNumbers(parsed);
+  const value = stringifyJsonPreservingNumbers(scrubJson(parsed, key));
+  return { value, changed: value !== before };
 }
