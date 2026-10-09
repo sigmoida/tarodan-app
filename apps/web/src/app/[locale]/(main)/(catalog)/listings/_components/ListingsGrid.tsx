@@ -5,7 +5,10 @@
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { Fragment } from "react";
+import InlineAdSlot from "@/components/marketing/InlineAdSlot";
 import { ProductCard } from "@/components/ui";
+import { inlineAdSlotAfter } from "@/lib/ads/inlinePlacement";
 import { useListings } from "../_context/ListingsContext";
 
 // Two views only: a responsive grid (up to 4 columns) or a stacked list. The
@@ -82,13 +85,15 @@ export default function ListingsGrid() {
     return (
       <div className="space-y-4">
         {listings.map((listing, index) => (
-          <ProductCard
-            key={listing.id}
-            product={listing}
-            layout="list"
-            index={index}
-            priority={index === 0}
-          />
+          <Fragment key={listing.id}>
+            <ProductCard
+              product={listing}
+              layout="list"
+              index={index}
+              priority={index === 0}
+            />
+            <AdAfterCard index={index} />
+          </Fragment>
         ))}
       </div>
     );
@@ -97,14 +102,22 @@ export default function ListingsGrid() {
   return (
     <div className={getGridClass(productLayout)}>
       {listings.map((listing, index) => (
-        <ProductCard
-          key={listing.id}
-          product={listing}
-          layout="grid"
-          index={index}
-          priority={index < 4}
-        />
+        <Fragment key={listing.id}>
+          <ProductCard
+            product={listing}
+            layout="grid"
+            index={index}
+            priority={index < 4}
+          />
+          <AdAfterCard index={index} />
+        </Fragment>
       ))}
     </div>
   );
+}
+
+/** Admin'in "inline" afişi: 8. karttan sonra, sonra her 16 kartta (en çok 2 tekrar). */
+function AdAfterCard({ index }: { index: number }) {
+  const slot = inlineAdSlotAfter(index);
+  return slot === null ? null : <InlineAdSlot slot={slot} />;
 }
