@@ -53,15 +53,9 @@ export interface ShipmentSimulationResult {
  * code imports them from one place.
  */
 export type {
+  StartUatRefreshRequest,
   UatRefreshMaskedCount,
   UatRefreshRun,
   UatRefreshState,
   UatRefreshStatus,
 } from "@tarodan/types";
-
-export interface StartUatRefreshPayload {
-  /** Literal onay ifadesi; API aynı değeri bekler. */
-  confirm: "STAGING";
-  /** true: hiçbir şey değiştirilmez, yalnız hat denenir. */
-  dryRun?: boolean;
-}

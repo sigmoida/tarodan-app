@@ -1,3 +1,7 @@
+import {
+  UAT_REFRESH_ACTIVE_STATES,
+  UAT_REFRESH_TIMED_OUT_ERROR,
+} from "@tarodan/types";
 import type {
   UatRefreshRun,
   UatRefreshState,
@@ -7,16 +11,24 @@ import type {
 /** Çalışma sürerken durum ucu bu aralıkla yoklanır. */
 export const UAT_REFRESH_POLL_MS = 10_000;
 
-/** Onay penceresinde yazılması gereken ifade (API aynı değeri bekler). */
-export const UAT_REFRESH_CONFIRM_PHRASE = "STAGING" as const;
-
 type BadgeVariant = "default" | "success" | "warning" | "danger" | "outline";
 
 /** Kuyrukta ya da çalışıyor: yeni yenileme başlatılamaz, durum yoklanır. */
 export function isUatRefreshActive(
   state: UatRefreshState | null | undefined,
 ): boolean {
-  return state === "queued" || state === "running";
+  return !!state && UAT_REFRESH_ACTIVE_STATES.includes(state);
+}
+
+/**
+ * Çalışmanın hata metni: API zaman aşımını sabit bir kodla bildirir (düz yazı
+ * değil), katalogdan çevrilir; diğer değerler iş akışının teknik mesajıdır.
+ */
+export function uatRefreshErrorText(
+  error: string,
+  timedOutText: string,
+): string {
+  return error === UAT_REFRESH_TIMED_OUT_ERROR ? timedOutText : error;
 }
 
 /** Durumun rozet rengi (tek kaynak; kart ve geçmiş tablosu aynı haritayı okur). */
