@@ -566,6 +566,18 @@ başlatır; açılışta api indeksleri garantiler ve 5 dakikada bir
 başlatmadan yaklaşık 5 dk içinde aranabilir olur. Bu işler worker rolünde
 koşar; staging'de worker (veya `PROCESS_ROLE=all`) ayakta olmalı.
 
+### Staging'i production'dan yenile (maskeli)
+
+Staging Reset'in tamamlayıcısı: staging veritabanını UAT seed'i yerine
+**production'ın maskeli kopyasıyla** değiştirir. Staging admin panelinde
+Sistem → Test Araçları düğmesi (ya da GitHub → Actions → **Staging Refresh From
+Production**, `confirm=STAGING`). Kişisel veri `masking-catalog.ts`'teki tek
+katalogla maskelenir (e-posta `@uat.invalid`, şifre/oturum/OAuth/2FA/kart/push
+token'ı silinir); sabit UAT hesapları `seed-uat.js --accounts-only` ile yeniden
+yazılır; başlangıç ilanları yazılmaz. Production dökümü sunucudan çıkmaz.
+Staging Reset ile aynı `concurrency` grubundadır. Önce **dry run**. Tasarım,
+maskeleme tablosu, secret'lar ve runbook: [UAT_REFRESH.md](./UAT_REFRESH.md).
+
 ### seed-assets
 
 Demo görseller repoda değil S3'te yaşar: `s3://amzn-tarodan/seed-assets/`.
