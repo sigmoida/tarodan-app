@@ -23,7 +23,7 @@ import {
   fakeToken,
   fakeUsername,
 } from "./masking-fakes";
-import { scrubFreeText, scrubJson } from "./masking-scrub";
+import { scrubFreeText, scrubJsonText } from "./masking-scrub";
 
 /**
  * Katalog → SQL. Saf: veritabanına dokunmaz, yalnız çalıştırılacak ifadeleri ve
@@ -41,6 +41,8 @@ import { scrubFreeText, scrubJson } from "./masking-scrub";
  */
 
 export const UAT_MASK_BATCH_SIZE = 1000;
+/** Maskeleme sonrası serbest metin/JSON örneklemi: kolon başına satır. */
+export const UAT_MASK_SAMPLE_SIZE = 500;
 export const UAT_MASK_TEMP_PREFIX = "__uat_tmp__";
 
 /** Katalogdaki adlar sabit metindir; yine de SQL'e girmeden doğrulanır. */
@@ -121,7 +123,8 @@ export function keyColumnOf(
   return columnRule.key ?? rule.keyColumn ?? "id";
 }
 
-const keyAlias = (column: string) => `__key_${column}`;
+/** Seçilen satırda anahtar kolonunun takma adı (çalıştırıcı bununla okur). */
+export const keyAlias = (column: string) => `__key_${column}`;
 
 /**
  * Bir sayfa: `id`, gereken anahtar kolonları ve hesaplanan kolonların metin
@@ -147,6 +150,49 @@ export function buildSelectBatchSql(rule: MaskColumnsRule): string {
     `SELECT ${selected} FROM ${quoteIdent(rule.table)}` +
     ` WHERE ${quoteIdent("id")} > $1${keepClause(rule)}` +
     ` ORDER BY ${quoteIdent("id")} LIMIT $2`
+  );
+}
+
+/** İçeriği korunan (serbest metin / JSON) bir kolon — örneklem denetimi için. */
+export interface ScrubbedColumn {
+  rule: MaskColumnsRule;
+  column: string;
+  columnRule: Extract<ColumnRule, { strategy: "freeText" | "json" }>;
+}
+
+export function scrubbedColumns(
+  catalog: readonly MaskRule[] = UAT_MASKING_CATALOG,
+): ScrubbedColumn[] {
+  return catalog.flatMap((rule) =>
+    rule.action !== "mask"
+      ? []
+      : Object.entries(rule.columns).flatMap(([column, columnRule]) =>
+          columnRule.strategy === "freeText" || columnRule.strategy === "json"
+            ? [{ rule, column, columnRule }]
+            : [],
+        ),
+  );
+}
+
+/**
+ * Maskeleme sonrası örneklem: kolonun dolu satırlarından rastgele `$1` tanesi
+ * (id, anahtar, değer). Çalıştırıcı her birine aynı temizleyiciyi yeniden
+ * uygular; temizleyici kendi çıktısında sabit nokta olduğundan, değişen tek
+ * bir hücre maskelenmemiş e-posta/telefon/IBAN/TCKN kaldığı anlamına gelir.
+ */
+export function buildSampleSql({
+  rule,
+  column,
+  columnRule,
+}: ScrubbedColumn): string {
+  const key = keyColumnOf(rule, columnRule);
+  return (
+    `SELECT ${quoteIdent("id")}::text AS ${quoteIdent("id")},` +
+    ` ${quoteIdent(key)}::text AS ${quoteIdent(keyAlias(key))},` +
+    ` ${quoteIdent(column)}::text AS ${quoteIdent(column)}` +
+    ` FROM ${quoteIdent(rule.table)}` +
+    ` WHERE ${quoteIdent(column)} IS NOT NULL${keepClause(rule)}` +
+    ` ORDER BY random() LIMIT $1`
   );
 }
 
@@ -192,27 +238,37 @@ const FAKERS: Record<
   fileName: (key, original) => fakeFileName(key, original),
 };
 
+export interface MaskedCell {
+  value: string;
+  /** `false` = hücre zaten maskeli; YAZILMAZ (idempotent koşu, JSON dahil). */
+  changed: boolean;
+}
+
 /**
  * Bir hücrenin yeni değeri. `key` satırın anahtar kolonunun değeri; JSON ve
  * serbest metin için kolon adı da eklenir ki aynı satırın iki kolonu aynı
- * sahte değerleri üretmesin.
+ * sahte değerleri üretmesin. JSON karşılaştırması iki tarafın da aynı kayıpsız
+ * serileştiriciden geçmiş halidir (`scrubJsonText`): `jsonb::text` biçimi
+ * yüzünden her hücre değişmiş görünmez, büyük sayılar yuvarlanmaz.
  */
-export function computeMaskedValue(
+export function computeMaskedCell(
   column: string,
   columnRule: ComputedColumnRule,
   key: string,
   original: string,
   attempt = 0,
-): string {
+): MaskedCell {
   switch (columnRule.strategy) {
-    case "fake":
-      return FAKERS[columnRule.fake](key, original, attempt);
+    case "fake": {
+      const value = FAKERS[columnRule.fake](key, original, attempt);
+      return { value, changed: value !== original };
+    }
     case "json":
-      return JSON.stringify(
-        scrubJson(JSON.parse(original), `${key}:${column}`),
-      );
-    case "freeText":
-      return scrubFreeText(original, `${key}:${column}`);
+      return scrubJsonText(original, `${key}:${column}`);
+    case "freeText": {
+      const value = scrubFreeText(original, `${key}:${column}`);
+      return { value, changed: value !== original };
+    }
   }
 }
 

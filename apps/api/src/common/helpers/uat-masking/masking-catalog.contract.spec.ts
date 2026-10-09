@@ -4,6 +4,7 @@ import { apiAppRoot } from "../app-root";
 import {
   ORIGINAL_DEPENDENT_FAKES,
   UAT_MASKING_CATALOG,
+  UAT_MASK_ALLOW_GROUPS,
   UAT_MASK_ALLOW_LIST,
   isCoveredByCatalog,
 } from "./masking-catalog";
@@ -11,10 +12,13 @@ import {
 /**
  * Maskeleme kataloğu ↔ schema.prisma sözleşmesi.
  *
- * Asıl guard: adı kişisel veri söyleyen ya da tipi JSON olan HER kolonun ya
- * katalogda bir kuralı ya da gerekçeli izin listesinde bir satırı olmalı. Yeni
- * bir `secondaryPhone` / `metadata Json` kolonu eklenip katalog unutulursa bu
- * spec kırmızıdır — staging'e production'dan maskelenmemiş veri taşınamaz.
+ * Asıl guard ŞEMANIN TAMAMINI kapsar: her `String` / `String[]` / `Json` kolonu
+ * ya katalogda bir kurala ya da gerekçeli izin listesinde bir gruba girer.
+ * Yalnız birincil anahtar ve bir `@relation`'ın `fields` listesindeki yabancı
+ * anahtar YAPISAL olarak muaftır (rastgele UUID, veri değil) — ad kalıbıyla
+ * muafiyet yok: `ratings.comment` gibi adı "kişisel" demeyen kullanıcı metni de
+ * karar ister. Ek olarak adı kişisel veri söyleyen her tipteki kolon (ör.
+ * `birthDate DateTime`, `isEmailVerified Boolean`) da karar ister.
  *
  * Ters yön de denetlenir: katalogdaki her tablo/kolon şemada vardır (yeniden
  * adlandırma kuralı sessizce boşa düşürmesin), izin listesi bayatlamaz.
@@ -27,6 +31,9 @@ interface SchemaColumn {
   column: string;
   type: string;
   optional: boolean;
+  list: boolean;
+  /** Birincil anahtar ya da bir `@relation`'ın yabancı anahtarı. */
+  structuralKey: boolean;
 }
 
 /** schema.prisma → tablo/kolon listesi (ilişki alanları hariç). */
@@ -36,10 +43,16 @@ function parseSchemaColumns(source: string): SchemaColumn[] {
   const columns: SchemaColumn[] = [];
   for (const [, model, body] of modelBlocks) {
     const table = /@@map\("([^"]+)"\)/.exec(body)?.[1] ?? model;
+    const keyFields = new Set(
+      [
+        ...body.matchAll(/fields:\s*\[([^\]]*)\]/g),
+        ...body.matchAll(/@@id\(\[([^\]]*)\]/g),
+      ].flatMap((m) => m[1].split(",").map((f) => f.trim())),
+    );
     for (const line of body.split("\n")) {
       const match = /^\s+(\w+)\s+(\w+)(\[\])?(\?)?(.*)$/.exec(line);
       if (!match) continue;
-      const [, field, type, , optional, rest] = match;
+      const [, field, type, list, optional, rest] = match;
       if (modelNames.has(type)) continue; // ilişki alanı, kolon değil
       columns.push({
         model,
@@ -48,6 +61,8 @@ function parseSchemaColumns(source: string): SchemaColumn[] {
         column: /@map\("([^"]+)"\)/.exec(rest)?.[1] ?? field,
         type,
         optional: Boolean(optional),
+        list: Boolean(list),
+        structuralKey: /@id\b/.test(rest) || keyFields.has(field),
       });
     }
   }
@@ -63,10 +78,17 @@ const PERSONAL_FIELD_PATTERN =
   /email|phone|iban|nationalId|tckn|address|fullName|firstName|lastName|birthDate|password|secret|token/i;
 const IP_WORD_PATTERN = /(^ip|Ip)(?=[A-Z]|$)/;
 
-const isPersonalOrJson = (column: SchemaColumn): boolean =>
-  column.type === "Json" ||
+const isPersonalName = (column: SchemaColumn): boolean =>
   PERSONAL_FIELD_PATTERN.test(column.field) ||
   IP_WORD_PATTERN.test(column.field);
+
+/** Metin ya da JSON taşıyabilen her kolon. */
+const isTextOrJson = (column: SchemaColumn): boolean =>
+  column.type === "String" || column.type === "Json";
+
+const decided = (column: SchemaColumn): boolean =>
+  isCoveredByCatalog(column.table, column.column) ||
+  `${column.table}.${column.column}` in UAT_MASK_ALLOW_LIST;
 
 describe("UAT masking catalogue ↔ schema.prisma", () => {
   const columns = parseSchemaColumns(
@@ -83,24 +105,74 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
     expect(byTable.size).toBeGreaterThan(100);
     expect(find("users", "email")?.type).toBe("String");
     expect(find("orders", "shipping_address")?.type).toBe("Json");
-    expect(isPersonalOrJson(find("users", "email")!)).toBe(true);
-    expect(isPersonalOrJson(find("admin_users", "last_login_ip")!)).toBe(true);
-    expect(isPersonalOrJson(find("products", "description")!)).toBe(false);
-    expect(
-      isPersonalOrJson(find("trade_shipments", "recipient_user_id")!),
-    ).toBe(false);
+    expect(find("ratings", "comment")?.type).toBe("String");
+    expect(find("users", "id")?.structuralKey).toBe(true);
+    expect(find("orders", "buyer_id")?.structuralKey).toBe(true);
+    expect(find("ratings", "comment")?.structuralKey).toBe(false);
+    expect(find("reports", "target_id")?.structuralKey).toBe(false);
+    expect(find("ticket_messages", "attachments")?.list).toBe(true);
+    expect(isPersonalName(find("users", "email")!)).toBe(true);
+    expect(isPersonalName(find("admin_users", "last_login_ip")!)).toBe(true);
+    expect(isPersonalName(find("products", "description")!)).toBe(false);
+    expect(columns.filter(isTextOrJson).length).toBeGreaterThan(500);
   });
 
-  it("every personal-looking or JSON column is masked or explicitly allowed", () => {
-    const uncovered = columns
-      .filter(isPersonalOrJson)
-      .filter(
-        (c) =>
-          !isCoveredByCatalog(c.table, c.column) &&
-          !(`${c.table}.${c.column}` in UAT_MASK_ALLOW_LIST),
-      )
+  it("every text or JSON column is masked, allow-listed, or a structural key", () => {
+    const undecided = columns
+      .filter(isTextOrJson)
+      .filter((c) => !c.structuralKey && !decided(c))
       .map((c) => `${c.table}.${c.column} (${c.model}.${c.field})`);
-    expect(uncovered).toEqual([]);
+    expect(undecided).toEqual([]);
+  });
+
+  it("every personal-looking column of any type is masked or allow-listed", () => {
+    const undecided = columns
+      .filter(isPersonalName)
+      .filter((c) => !c.structuralKey && !decided(c))
+      .map((c) => `${c.table}.${c.column} (${c.model}.${c.field})`);
+    expect(undecided).toEqual([]);
+  });
+
+  it("covers the user-written text and file names a name pattern would miss", () => {
+    for (const [table, column] of [
+      ["ratings", "comment"],
+      ["users", "bio"],
+      ["trades", "cancel_reason"],
+      ["offers", "cancel_reason"],
+      ["user_blocks", "reason"],
+      ["reports", "reason"],
+      ["trade_disputes", "reason"],
+      ["product_ratings", "review"],
+      ["products", "description"],
+      ["seller_uploaded_invoices", "file_name"],
+      ["media_files", "filename"],
+    ]) {
+      expect([`${table}.${column}`, isCoveredByCatalog(table, column)]).toEqual(
+        [`${table}.${column}`, true],
+      );
+    }
+  });
+
+  it("computed rules never target list (array) columns", () => {
+    for (const rule of UAT_MASKING_CATALOG) {
+      if (rule.action !== "mask") continue;
+      for (const [column, columnRule] of Object.entries(rule.columns)) {
+        if (columnRule.strategy === "null") continue;
+        expect([
+          `${rule.table}.${column}`,
+          find(rule.table, column)?.list,
+        ]).toEqual([`${rule.table}.${column}`, false]);
+      }
+    }
+  });
+
+  it("allow-list groups have reasons and never list a column twice", () => {
+    const all = UAT_MASK_ALLOW_GROUPS.flatMap((group) => {
+      expect(group.reason.trim().length).toBeGreaterThan(5);
+      return group.columns;
+    });
+    expect(new Set(all).size).toBe(all.length);
+    expect(Object.keys(UAT_MASK_ALLOW_LIST)).toHaveLength(all.length);
   });
 
   it("every catalogued table and column exists in the schema", () => {
@@ -231,6 +303,7 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
         "mail_sender_accounts",
         "push_tokens",
         "saved_cards",
+        "site_access_pins",
       ]),
     );
     const passwordRule = UAT_MASKING_CATALOG.find(
@@ -246,6 +319,27 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
     expect(
       passwordRule && "keepWhere" in passwordRule && passwordRule.keepWhere,
     ).toBeFalsy();
+  });
+
+  it("masks deleted accounts too: only their anonymized e-mail/name sentinel survives", () => {
+    const usersRules = UAT_MASKING_CATALOG.filter(
+      (rule): rule is Extract<typeof rule, { action: "mask" }> =>
+        rule.action === "mask" && rule.table === "users",
+    );
+    const ruleFor = (column: string) =>
+      usersRules.find((rule) => column in rule.columns);
+    // Kullanıcı adı / doğum tarihi deleteAccount'ta temizlenmez: silinmiş
+    // satırlarda da maskelenmeli — kuralları yalnız gerçek sistem hesaplarını korur.
+    for (const column of ["username", "birth_date", "phone", "bio"]) {
+      expect([column, ruleFor(column)?.keepWhere]).toEqual([
+        column,
+        expect.not.stringContaining("deleted"),
+      ]);
+    }
+    // E-posta + görünen ad: sentinel İKİSİ birden taşınıyorsa korunur.
+    expect(ruleFor("email")?.keepWhere).toContain("deleted");
+    expect(ruleFor("email")?.keepWhere).toContain("Silinmiş Kullanıcı");
+    expect(ruleFor("display_name")).toBe(ruleFor("email"));
   });
 
   it("clears the sender-account link before deleting the sender accounts (FK RESTRICT)", () => {
