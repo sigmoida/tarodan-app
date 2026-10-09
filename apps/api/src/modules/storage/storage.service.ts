@@ -584,12 +584,26 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  private publicBaseUrl(): string {
+    return this.configService.get<string>("S3_PUBLIC_BASE_URL", "") ?? "";
+  }
+
+  /**
+   * Public kök URL'i tanımlı mı. Okuma yolları tanımsızken boş URL'e düşüp
+   * yedek görsele geçer; YÜKLEME yolu ise bunu önceden sormalı — aksi halde
+   * nesne yüklenir ve istemciye `url: ""` döner, kaydedilen alan sessizce
+   * kırık kalır.
+   */
+  hasPublicAssetBaseUrl(): boolean {
+    return this.publicBaseUrl().trim() !== "";
+  }
+
   /**
    * Build direct public URL for public-read S3 assets (product/collection images).
    * Key must include env prefix (e.g. dev/products/product-images/...).
    */
   getPublicAssetUrl(key: string): string {
-    const baseUrl = this.configService.get("S3_PUBLIC_BASE_URL", "");
+    const baseUrl = this.publicBaseUrl();
     if (!baseUrl) {
       this.logger.warn(
         "S3_PUBLIC_BASE_URL not configured; returning empty URL",

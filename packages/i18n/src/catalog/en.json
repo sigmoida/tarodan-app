@@ -11416,7 +11416,8 @@
       "presignFailed": "The presigned URL could not be created",
       "downloadUnavailable": "The file download service is unavailable right now.",
       "invalidBucketType": "Invalid bucket type: {bucket}",
-      "invalidBucket": "Invalid bucket: {bucket}"
+      "invalidBucket": "Invalid bucket: {bucket}",
+      "publicUrlNotConfigured": "Image upload is not configured right now (the public file address is not set). Please notify the system administrator."
     },
     "consent": {
       "distanceSalesRequired": "You need to accept the Distance Sales Agreement to continue with the payment.",

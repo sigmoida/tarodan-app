@@ -2,6 +2,8 @@ import { BadRequestException } from "@nestjs/common";
 import { AdvertisementService } from "./advertisement.service";
 import type { PrismaService } from "../../prisma";
 import type { UpdateAdvertisementDto } from "./dto/update-advertisement.dto";
+import type { MediaService } from "../media/media.service";
+import { AD_IMAGE_UPLOAD } from "./helpers/ad-image-upload.constants";
 
 /**
  * Reklam CRUD sözleşmesi: güncellemede `null` = temizle, alan yok = dokunma;
@@ -52,10 +54,14 @@ function makeService(existing: Record<string, unknown> | null = row()) {
     findUnique: jest.fn().mockResolvedValue({ id: "disc-1" }),
   };
   const prisma = { advertisement, discount } as unknown as PrismaService;
+  const media = {
+    upload: jest.fn().mockResolvedValue({ url: "https://cdn.test/ads/a.webp" }),
+  };
   return {
-    service: new AdvertisementService(prisma),
+    service: new AdvertisementService(prisma, media as unknown as MediaService),
     advertisement,
     discount,
+    media,
   };
 }
 
@@ -309,5 +315,26 @@ describe("AdvertisementService.getActive — vitrin seçimi", () => {
       isFlashSale: true,
       endsAt: liveCampaign.endDate,
     });
+  });
+});
+
+describe("AdvertisementService.uploadImage", () => {
+  it("dosyayı reklam hedefine (products/ads, 5MB, jpeg/png/webp) yükler", async () => {
+    const { service, media } = makeService();
+    const file = { originalname: "a.png" } as Express.Multer.File;
+
+    await expect(service.uploadImage(file)).resolves.toEqual({
+      url: "https://cdn.test/ads/a.webp",
+    });
+    expect(media.upload).toHaveBeenCalledWith(file, AD_IMAGE_UPLOAD);
+    expect(AD_IMAGE_UPLOAD).toMatchObject({ bucket: "products", folder: "ads" });
+  });
+
+  it("dosya yoksa 400", async () => {
+    const { service, media } = makeService();
+    await expect(service.uploadImage(undefined)).rejects.toMatchObject({
+      response: { i18nKey: "server.admin.fileMissing" },
+    });
+    expect(media.upload).not.toHaveBeenCalled();
   });
 });

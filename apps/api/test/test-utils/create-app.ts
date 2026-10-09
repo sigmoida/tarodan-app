@@ -166,6 +166,9 @@ function createStorageStub(): Partial<StorageService> {
     getPublicAssetUrl(key: string) {
       return `https://test-cdn.invalid/${key}`;
     },
+    hasPublicAssetBaseUrl() {
+      return true;
+    },
     async getPresignedUploadUrl(_args: any) {
       return {
         uploadUrl: "https://test-presigned.invalid",

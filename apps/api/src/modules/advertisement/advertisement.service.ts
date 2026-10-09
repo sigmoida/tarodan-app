@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { AdDeviceType, AdPosition, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { MediaService, type UploadResult } from "../media/media.service";
 import {
   CreateAdvertisementDto,
   IAB_STANDARD_SIZES,
@@ -16,6 +17,7 @@ import {
   adLiveWhere,
   isAdLive,
 } from "./helpers/ad-live.helper";
+import { AD_IMAGE_UPLOAD } from "./helpers/ad-image-upload.constants";
 import { i18nMessage } from "../i18n";
 
 /** Pozisyon / cihaz başına sayaç özeti (istatistik ekranı). */
@@ -54,7 +56,10 @@ function toDateField(value: string | null | undefined): Date | null | undefined 
 export class AdvertisementService {
   private readonly logger = new Logger(AdvertisementService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly media: MediaService,
+  ) {}
 
   private get adRepo() {
     return this.prisma.advertisement;
@@ -168,6 +173,17 @@ export class AdvertisementService {
       this.logger.warn(`getActive failed: ${err}`);
       return [];
     }
+  }
+
+  /**
+   * Reklam görseli yükle (admin). `products/ads` public köküne gider; dönen
+   * `url` doğrudan `imageUrl` olarak kaydedilir.
+   */
+  async uploadImage(file: Express.Multer.File | undefined): Promise<UploadResult> {
+    if (!file) {
+      throw new BadRequestException(i18nMessage("server.admin.fileMissing"));
+    }
+    return this.media.upload(file, AD_IMAGE_UPLOAD);
   }
 
   /**
