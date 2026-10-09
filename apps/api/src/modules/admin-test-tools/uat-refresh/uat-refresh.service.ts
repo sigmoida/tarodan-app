@@ -10,6 +10,7 @@ import {
 import { Prisma } from "@prisma/client";
 import {
   UAT_REFRESH_ACTIVE_STATES,
+  UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
   UAT_REFRESH_HISTORY_LIMIT,
   UatRefreshRun,
   UatRefreshStatus,
@@ -18,10 +19,11 @@ import { PrismaService } from "../../../prisma";
 import { isLiveProduction } from "../../../config/environment";
 import { i18nMessage } from "../../i18n";
 import {
+  acceptsReport,
+  blocksNewRun,
   generateReportToken,
   hashReportToken,
   isActiveState,
-  isTimedOut,
   reportTokenMatches,
   toUatRefreshRun,
 } from "../helpers/uat-refresh.helper";
@@ -43,7 +45,15 @@ import { UatRefreshDispatchService } from "./uat-refresh-dispatch.service";
  * production veritabanı kimliği yalnız GitHub secret'larında durur.
  *
  * Aynı anda tek koşu: `start` kontrolü ve satır açılışı bir advisory lock
- * altında; zaman aşımına uğramış (bkz. `isTimedOut`) koşu engel sayılmaz.
+ * altında. Engel kuralı görünür zaman aşımından AYRI (`blocksNewRun`): bitmemiş
+ * bir koşu, son yazımından bu yana uzun süre sessiz kalmadıkça yeni koşuyu
+ * engeller — "zaman aşımına uğramış görünen" yavaş bir koşu takas ortasında
+ * ezilemez.
+ *
+ * Dispatch belirsiz biterse (zaman aşımı, ağ, 5xx) GitHub isteği almış
+ * olabilir: koşu `queued` kalır, `error` = `dispatchUnconfirmed`; workflow'un
+ * ilk raporu onu sahiplenir ve kodu temizler. Yalnız kesin red (4xx) koşuyu
+ * başarısız yapar.
  */
 @Injectable()
 export class UatRefreshService {
@@ -111,7 +121,7 @@ export class UatRefreshService {
         where: { state: { in: [...UAT_REFRESH_ACTIVE_STATES] } },
         orderBy: { requestedAt: "desc" },
       });
-      if (active.some((row) => !isTimedOut(row, now))) {
+      if (active.some((row) => blocksNewRun(row, now))) {
         throw new ConflictException(
           i18nMessage("server.uatRefresh.alreadyRunning"),
         );
@@ -134,7 +144,7 @@ export class UatRefreshService {
       reportToken: token,
       dryRun: run.dryRun,
     });
-    if (!dispatched.ok) {
+    if (!dispatched.ok && dispatched.definite) {
       await this.prisma.uatRefreshRun.update({
         where: { id: run.id },
         data: {
@@ -147,6 +157,18 @@ export class UatRefreshService {
         i18nMessage("server.uatRefresh.dispatchFailed"),
       );
     }
+    if (!dispatched.ok) {
+      // Belirsiz: workflow koşuyor olabilir. Kuyrukta kalır (yeni koşuyu da
+      // engeller); ilk rapor sahiplenir, gelmezse sessizlik süresi sonunda düşer.
+      const unconfirmed = await this.prisma.uatRefreshRun.update({
+        where: { id: run.id },
+        data: { error: UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR },
+      });
+      this.logger.warn(
+        `UAT refresh ${run.id}: dispatch unconfirmed (${dispatched.error}); left queued for the workflow to claim`,
+      );
+      return toUatRefreshRun(unconfirmed, now);
+    }
     this.logger.log(
       `UAT refresh ${run.id} dispatched (dryRun=${run.dryRun}) by ${requestedById}`,
     );
@@ -156,8 +178,9 @@ export class UatRefreshService {
   /**
    * Workflow raporu. Satır yoksa ya da token tutmuyorsa AYNI yanıt (403):
    * koşu kimliklerini yoklamak bir şey söylemesin. Bitmiş koşu yeniden
-   * yazılamaz (409); zaman aşımına uğramış görünen koşu ise yazılabilir —
-   * workflow geç de olsa gerçeği söyler.
+   * yazılamaz (409) — tek istisna dispatch'i belirsiz kalıp başarısız
+   * işaretlenmiş koşunun `running` raporu (`acceptsReport`). Zaman aşımına
+   * uğramış GÖRÜNEN koşu yazılabilir: workflow geç de olsa gerçeği söyler.
    */
   async report(
     runId: string,
@@ -176,7 +199,7 @@ export class UatRefreshService {
         i18nMessage("server.uatRefresh.invalidToken"),
       );
     }
-    if (!isActiveState(row.state)) {
+    if (!acceptsReport(row, dto.state)) {
       throw new ConflictException(
         i18nMessage("server.uatRefresh.alreadyFinished"),
       );
@@ -185,6 +208,9 @@ export class UatRefreshService {
     const date = (value: string | undefined) =>
       value ? new Date(value) : undefined;
     const terminal = dto.state !== "running";
+    // Workflow belirsiz dispatch'i sahipleniyor: not ve (varsa) bitiş silinir.
+    const claimsUnconfirmed =
+      !terminal && row.error === UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR;
     const data: Prisma.UatRefreshRunUpdateInput = {
       state: dto.state,
       startedAt: date(dto.startedAt) ?? row.startedAt ?? now,
@@ -205,6 +231,7 @@ export class UatRefreshService {
       ...(terminal
         ? { error: dto.state === "failed" ? (dto.error ?? null) : null }
         : {}),
+      ...(claimsUnconfirmed ? { error: null, finishedAt: null } : {}),
     };
     const updated = await this.prisma.uatRefreshRun.update({
       where: { id: runId },

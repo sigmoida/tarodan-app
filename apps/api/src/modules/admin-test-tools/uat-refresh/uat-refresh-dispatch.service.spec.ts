@@ -50,7 +50,7 @@ describe("UatRefreshDispatchService", () => {
     });
   });
 
-  it("reports an HTTP refusal without leaking the token", async () => {
+  it("reports a 4xx as a DEFINITE refusal without leaking the token", async () => {
     mockFetch(async () => ({ ok: false, status: 404 }));
     const result = await new UatRefreshDispatchService().dispatch(config, {
       ...inputs,
@@ -58,12 +58,26 @@ describe("UatRefreshDispatchService", () => {
     });
     expect(result).toEqual({
       ok: false,
+      definite: true,
       error: "GitHub workflow dispatch failed: HTTP 404",
     });
     expect(JSON.stringify(result)).not.toContain("SECRET");
   });
 
-  it("reports a network failure / timeout by error name only", async () => {
+  it("reports a 5xx as ambiguous (GitHub may still have accepted it)", async () => {
+    mockFetch(async () => ({ ok: false, status: 502 }));
+    const result = await new UatRefreshDispatchService().dispatch(
+      config,
+      inputs,
+    );
+    expect(result).toEqual({
+      ok: false,
+      definite: false,
+      error: "GitHub workflow dispatch failed: HTTP 502",
+    });
+  });
+
+  it("reports a network failure / timeout as ambiguous, by error name only", async () => {
     mockFetch(async () => {
       const error = new Error("connect ECONNREFUSED github_pat_SECRET");
       error.name = "TimeoutError";
@@ -75,6 +89,7 @@ describe("UatRefreshDispatchService", () => {
     );
     expect(result).toEqual({
       ok: false,
+      definite: false,
       error: "GitHub workflow dispatch failed: TimeoutError",
     });
   });

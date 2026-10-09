@@ -13,8 +13,13 @@ export interface UatRefreshDispatchInputs {
   dryRun: boolean;
 }
 
+/**
+ * `definite`: GitHub isteği KESİN reddetti (4xx — kimlik, izin, ref, girdi);
+ * workflow başlamadı. `definite=false`: zaman aşımı, ağ hatası ya da 5xx —
+ * GitHub isteği almış olabilir, workflow koşabilir.
+ */
 export type UatRefreshDispatchResult =
-  { ok: true } | { ok: false; error: string };
+  { ok: true } | { ok: false; definite: boolean; error: string };
 
 const GITHUB_API = "https://api.github.com";
 const DISPATCH_TIMEOUT_MS = 10_000;
@@ -68,13 +73,17 @@ export class UatRefreshDispatchService {
       if (response.ok) return { ok: true };
       const error = `GitHub workflow dispatch failed: HTTP ${response.status}`;
       this.logger.warn(`${error} (${config.repo}@${config.ref})`);
-      return { ok: false, error };
+      return {
+        ok: false,
+        definite: response.status >= 400 && response.status < 500,
+        error,
+      };
     } catch (cause) {
       const error = `GitHub workflow dispatch failed: ${
         cause instanceof Error ? cause.name : "unknown error"
       }`;
       this.logger.warn(error);
-      return { ok: false, error };
+      return { ok: false, definite: false, error };
     }
   }
 }

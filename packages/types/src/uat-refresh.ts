@@ -60,11 +60,25 @@ export const UAT_REFRESH_CONFIRM_PHRASE = "STAGING";
 export const UAT_REFRESH_HISTORY_LIMIT = 10;
 
 /**
- * A run still queued/running this long after it was requested is shown as
- * failed: the workflow's own job timeout is shorter, so it cannot still be
+ * A RUNNING run this long after the workflow started it (`startedAt`) is shown
+ * as failed: the workflow's own job timeout is shorter, so it cannot still be
  * working.
  */
 export const UAT_REFRESH_TIMEOUT_MINUTES = 90;
+
+/**
+ * A QUEUED run (dispatched, workflow not started yet) gets a longer allowance,
+ * counted from `requestedAt`: the job can wait behind Staging Reset in the
+ * shared concurrency group and in the GitHub runner queue.
+ */
+export const UAT_REFRESH_QUEUED_TIMEOUT_MINUTES = 180;
+
+/**
+ * A queued/running run blocks a new one until it has been silent (no report,
+ * no state change) this long — independently of the display timeout above, so
+ * a slow run that only LOOKS timed out can never be overtaken mid-swap.
+ */
+export const UAT_REFRESH_SILENT_AFTER_MINUTES = 180;
 
 /**
  * `error` of a run that timed out (see above). A stable code, not prose: the
@@ -72,6 +86,14 @@ export const UAT_REFRESH_TIMEOUT_MINUTES = 90;
  * is the workflow's technical message and is shown as is.
  */
 export const UAT_REFRESH_TIMED_OUT_ERROR = "timedOut";
+
+/**
+ * `error` of a QUEUED run whose GitHub dispatch call ended ambiguously
+ * (timeout, network error, 5xx): GitHub may still have accepted it, so the run
+ * stays queued (and blocks a new one) until the workflow's first report claims
+ * it, which clears this code. A stable code like the one above.
+ */
+export const UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR = "dispatchUnconfirmed";
 
 /** States in which a run still blocks a new one. */
 export const UAT_REFRESH_ACTIVE_STATES: readonly UatRefreshState[] = [

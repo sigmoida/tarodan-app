@@ -1,10 +1,15 @@
 import { createHash } from "crypto";
 import {
+  UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
+  UAT_REFRESH_QUEUED_TIMEOUT_MINUTES,
+  UAT_REFRESH_SILENT_AFTER_MINUTES,
   UAT_REFRESH_TIMED_OUT_ERROR,
   UAT_REFRESH_TIMEOUT_MINUTES,
 } from "@tarodan/types";
 import {
   UatRefreshRunRow,
+  acceptsReport,
+  blocksNewRun,
   generateReportToken,
   hashReportToken,
   isTimedOut,
@@ -27,6 +32,7 @@ const row = (overrides: Partial<UatRefreshRunRow> = {}): UatRefreshRunRow => ({
   migrationsApplied: [],
   backupFile: null,
   error: null,
+  updatedAt: new Date("2026-10-09T10:01:00Z"),
   ...overrides,
 });
 
@@ -56,26 +62,40 @@ describe("uat refresh report token", () => {
   });
 });
 
-describe("uat refresh timeout", () => {
+describe("uat refresh timeout (display)", () => {
   const requestedAt = row().requestedAt;
+  const startedAt = row().startedAt!;
 
-  it(`treats a queued/running run older than ${UAT_REFRESH_TIMEOUT_MINUTES} minutes as timed out`, () => {
+  it(`times a running run out ${UAT_REFRESH_TIMEOUT_MINUTES} minutes after the workflow STARTED it`, () => {
+    // Waited 60 minutes in the queue, then ran for 80: not timed out.
+    const late = row({ startedAt: minutesAfter(requestedAt, 60) });
+    expect(isTimedOut(late, minutesAfter(requestedAt, 140))).toBe(false);
     expect(
       isTimedOut(
         row(),
-        minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES - 1),
+        minutesAfter(startedAt, UAT_REFRESH_TIMEOUT_MINUTES - 1),
       ),
     ).toBe(false);
     expect(
       isTimedOut(
         row(),
-        minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES + 1),
+        minutesAfter(startedAt, UAT_REFRESH_TIMEOUT_MINUTES + 1),
       ),
     ).toBe(true);
+  });
+
+  it(`gives a queued run a longer allowance (${UAT_REFRESH_QUEUED_TIMEOUT_MINUTES} min from the request)`, () => {
+    const queued = row({ state: "queued", startedAt: null });
     expect(
       isTimedOut(
-        row({ state: "queued" }),
+        queued,
         minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES + 1),
+      ),
+    ).toBe(false);
+    expect(
+      isTimedOut(
+        queued,
+        minutesAfter(requestedAt, UAT_REFRESH_QUEUED_TIMEOUT_MINUTES + 1),
       ),
     ).toBe(true);
   });
@@ -92,13 +112,63 @@ describe("uat refresh timeout", () => {
   it("shows a timed-out run as failed with the timedOut code", () => {
     const run = toUatRefreshRun(
       row(),
-      minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES + 5),
+      minutesAfter(startedAt, UAT_REFRESH_TIMEOUT_MINUTES + 5),
     );
     expect(run.state).toBe("failed");
     expect(run.error).toBe(UAT_REFRESH_TIMED_OUT_ERROR);
     expect(run.finishedAt).toBe(
-      minutesAfter(requestedAt, UAT_REFRESH_TIMEOUT_MINUTES).toISOString(),
+      minutesAfter(startedAt, UAT_REFRESH_TIMEOUT_MINUTES).toISOString(),
     );
+  });
+});
+
+describe("blocksNewRun", () => {
+  const updatedAt = row().updatedAt;
+
+  it("keeps blocking a running run that only LOOKS timed out while it is not silent", () => {
+    const slow = row({ updatedAt });
+    const now = minutesAfter(updatedAt, UAT_REFRESH_TIMEOUT_MINUTES + 30);
+    expect(isTimedOut(slow, now)).toBe(true);
+    expect(blocksNewRun(slow, now)).toBe(true);
+  });
+
+  it(`releases a run silent for more than ${UAT_REFRESH_SILENT_AFTER_MINUTES} minutes`, () => {
+    expect(
+      blocksNewRun(
+        row(),
+        minutesAfter(updatedAt, UAT_REFRESH_SILENT_AFTER_MINUTES + 1),
+      ),
+    ).toBe(false);
+    expect(
+      blocksNewRun(
+        row({ state: "queued" }),
+        minutesAfter(updatedAt, UAT_REFRESH_SILENT_AFTER_MINUTES - 1),
+      ),
+    ).toBe(true);
+  });
+
+  it("never blocks on a finished run", () => {
+    expect(blocksNewRun(row({ state: "failed" }), updatedAt)).toBe(false);
+  });
+});
+
+describe("acceptsReport", () => {
+  it("accepts any report for a queued or running run", () => {
+    expect(acceptsReport(row({ state: "queued" }), "running")).toBe(true);
+    expect(acceptsReport(row(), "succeeded")).toBe(true);
+  });
+
+  it("refuses a finished run, except a running report claiming an unconfirmed dispatch", () => {
+    expect(acceptsReport(row({ state: "succeeded" }), "running")).toBe(false);
+    expect(
+      acceptsReport(row({ state: "failed", error: "boom" }), "running"),
+    ).toBe(false);
+    const unconfirmed = row({
+      state: "failed",
+      error: UAT_REFRESH_DISPATCH_UNCONFIRMED_ERROR,
+    });
+    expect(acceptsReport(unconfirmed, "running")).toBe(true);
+    expect(acceptsReport(unconfirmed, "succeeded")).toBe(false);
   });
 });
 
