@@ -171,34 +171,6 @@ export class AdvertisementService {
   }
 
   /**
-   * Record a click (public).
-   */
-  async recordClick(id: string) {
-    const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad)
-      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
-    await this.adRepo.update({
-      where: { id },
-      data: { clickCount: { increment: 1 } },
-    });
-    return { success: true };
-  }
-
-  /**
-   * Record an impression (public).
-   */
-  async recordImpression(id: string) {
-    const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad)
-      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
-    await this.adRepo.update({
-      where: { id },
-      data: { impressionCount: { increment: 1 } },
-    });
-    return { success: true };
-  }
-
-  /**
    * Get IAB standard sizes
    */
   getIABSizes() {
