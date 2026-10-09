@@ -1,5 +1,5 @@
 import { validate } from "class-validator";
-import { isValidTrIban } from "./tr-iban";
+import { isValidTrIban, trIbanCheckDigits } from "./tr-iban";
 import { UpsertBankAccountDto } from "../../modules/user/dto/bank-account.dto";
 
 /**
@@ -26,6 +26,27 @@ describe("isValidTrIban", () => {
     expect(isValidTrIban("TR33000610051978645784132")).toBe(false);
     expect(isValidTrIban("DE89370400440532013000")).toBe(false);
     expect(isValidTrIban("")).toBe(false);
+  });
+});
+
+describe("trIbanCheckDigits", () => {
+  it("reproduces the check digits of a known valid IBAN", () => {
+    expect(trIbanCheckDigits(VALID_IBAN.slice(4))).toBe("33");
+  });
+
+  it("always yields an IBAN the validator accepts (same mod-97)", () => {
+    for (const bban of [
+      "0000000000000000000000",
+      "9999999999999999999999",
+      "0001200000000000000001",
+    ]) {
+      expect(isValidTrIban(`TR${trIbanCheckDigits(bban)}${bban}`)).toBe(true);
+    }
+  });
+
+  it("refuses a BBAN that is not 22 digits", () => {
+    expect(() => trIbanCheckDigits("123")).toThrow(/22 digits/);
+    expect(() => trIbanCheckDigits("000610051978645784132A")).toThrow();
   });
 });
 

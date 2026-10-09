@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SMS_VERIFICATION_CODE_PATTERN } from "./sms";
+import { GITHUB_REPO_PATTERN } from "./uat-refresh";
 
 /**
  * Startup environment validation (issues #62 + #68).
@@ -193,6 +194,12 @@ const envSchema = z
     S3_ENV_PREFIX: z.string().optional(),
     ELASTICSEARCH_INDEX_PREFIX: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
+    // Staging "production'dan maskeli yenile" düğmesinin GitHub tetikleyicisi
+    // (config/uat-refresh.ts, docs/UAT_REFRESH.md). Yoksa düğme
+    // "yapılandırılmamış" görünür; canlı dağıtımda verilirse açılış durur.
+    GITHUB_DISPATCH_TOKEN: z.string().optional(),
+    GITHUB_DISPATCH_REPO: z.string().optional(),
+    GITHUB_DISPATCH_REF: z.string().optional(),
   })
   .strip()
   .superRefine((env, ctx) => {
@@ -213,6 +220,38 @@ const envSchema = z
         path: ["SMS_FIXED_VERIFICATION_CODE"],
         message:
           "SMS_FIXED_VERIFICATION_CODE must not be set on the production deployment (every phone would verify with one known code)",
+      });
+    }
+
+    // Yenileme tetikleyicisi: ya ikisi birden ya hiçbiri (yarısı sessizce
+    // "yapılandırılmamış" görünürdü); depo "owner/repo" biçiminde. Canlıda
+    // token YOK: düğme orada reddedilir, production veritabanını okuyan bir
+    // workflow'u tetikleyebilen bir kimliğin canlı konteynerde durması gereksiz.
+    const dispatchToken = env.GITHUB_DISPATCH_TOKEN?.trim() ?? "";
+    const dispatchRepo = env.GITHUB_DISPATCH_REPO?.trim() ?? "";
+    if (Boolean(dispatchToken) !== Boolean(dispatchRepo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [
+          dispatchToken ? "GITHUB_DISPATCH_REPO" : "GITHUB_DISPATCH_TOKEN",
+        ],
+        message:
+          "GITHUB_DISPATCH_TOKEN and GITHUB_DISPATCH_REPO must be set together (staging refresh trigger)",
+      });
+    }
+    if (dispatchRepo && !GITHUB_REPO_PATTERN.test(dispatchRepo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["GITHUB_DISPATCH_REPO"],
+        message: "GITHUB_DISPATCH_REPO must be 'owner/repo'",
+      });
+    }
+    if (dispatchToken && env.APP_ENV === "production") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["GITHUB_DISPATCH_TOKEN"],
+        message:
+          "GITHUB_DISPATCH_TOKEN must not be set on the production deployment (the staging refresh is refused there)",
       });
     }
 

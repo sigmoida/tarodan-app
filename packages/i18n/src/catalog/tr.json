@@ -11504,6 +11504,15 @@
           }
         }
       }
+    },
+    "uatRefresh": {
+      "productionRefused": "Production'dan yenileme canlı dağıtımda kullanılamaz",
+      "notConfigured": "Staging yenileme yapılandırılmamış (GitHub tetikleyicisi eksik: GITHUB_DISPATCH_TOKEN / GITHUB_DISPATCH_REPO)",
+      "alreadyRunning": "Kuyrukta ya da çalışan bir staging yenilemesi var; bitmesini bekleyin",
+      "dispatchFailed": "Yenileme iş akışı GitHub'da başlatılamadı; koşu başarısız olarak işaretlendi",
+      "runNotFound": "Yenileme koşusu bulunamadı",
+      "invalidToken": "Yenileme koşusu ya da rapor anahtarı geçersiz",
+      "alreadyFinished": "Bu yenileme koşusu zaten tamamlandı"
     }
   },
   "status": {

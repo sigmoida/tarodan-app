@@ -21,12 +21,15 @@ import { TestLaneService } from "./test-lane.service";
 import { ShipmentSimulationService } from "./shipment-simulation.service";
 import { CreateTestAccountDto } from "./dto/create-test-account.dto";
 import { SimulateShipmentDto } from "./dto/simulate-shipment.dto";
+import { StartUatRefreshDto } from "./dto/uat-refresh.dto";
+import { UatRefreshService } from "./uat-refresh/uat-refresh.service";
 
 /**
  * Admin "Test Araçları / Zaman Makinesi" — yalnız SÜPER-ADMIN.
  * Süre-bazlı akışları (boost/üyelik/iade/sipariş/teklif/takas/hold/token) manuel test eder:
  * cron tetikleme + tek kaydın tarih alanını geri/ileri alma + taşıyıcı olayı
- * simülasyonu (UAT; canlıda yalnız test şeridi). Her değişiklik audit'lenir.
+ * simülasyonu (UAT; canlıda yalnız test şeridi) + staging'i production'ın maskeli
+ * kopyasıyla yenileme (yalnız staging). Her değişiklik audit'lenir.
  */
 @ApiTags("admin-test-tools")
 @ApiBearerAuth()
@@ -39,6 +42,7 @@ export class AdminTestToolsController {
     private readonly service: AdminTestToolsService,
     private readonly testLane: TestLaneService,
     private readonly simulation: ShipmentSimulationService,
+    private readonly uatRefresh: UatRefreshService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -214,6 +218,52 @@ export class AdminTestToolsController {
       },
     );
     return res;
+  }
+
+  // ───────────── Staging'i production'dan maskeli yenile (docs/UAT_REFRESH.md) ─────────────
+
+  @Get("uat-refresh")
+  @ApiOperation({
+    summary: "Staging yenileme düğmesinin durumu + son 10 koşu",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "UatRefreshStatus. Canlıda available=false, unavailableReason=production ve geçmiş boş.",
+  })
+  getUatRefreshStatus() {
+    return this.uatRefresh.getStatus();
+  }
+
+  @Post("uat-refresh")
+  @ApiOperation({
+    summary:
+      "Staging veritabanını production'ın maskeli kopyasıyla değiştir (GitHub workflow'u tetikler)",
+  })
+  @ApiResponse({ status: 201, description: "Kuyruğa alınan koşu" })
+  @ApiResponse({ status: 403, description: "Canlı dağıtımda reddedilir" })
+  @ApiResponse({ status: 409, description: "Kuyrukta/koşan bir yenileme var" })
+  @ApiResponse({
+    status: 503,
+    description: "GitHub tetikleyicisi yapılandırılmamış",
+  })
+  async startUatRefresh(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: StartUatRefreshDto,
+  ) {
+    const run = await this.uatRefresh.start(adminId, dto);
+    await this.writeAudit(
+      adminId,
+      "uat_refresh_start",
+      "uat_refresh_run",
+      run.id,
+      null,
+      {
+        dryRun: run.dryRun,
+        state: run.state,
+      },
+    );
+    return run;
   }
 
   /** AuditLog.adminUserId = AdminUser.id (User.id değil); çöz ve yaz. Hata ana akışı bozmaz. */
