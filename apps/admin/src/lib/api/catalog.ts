@@ -43,6 +43,11 @@ export const catalogApi = {
   deleteProduct: (id: string, payload: RemoveProductPayload) =>
     api.delete(`/admin/products/${id}`, { data: payload }),
   restoreProduct: (id: string) => api.post(`/admin/products/${id}/restore`),
+  /** Süresi dolan ilanı yeniden yayına al (yönetici kararı onay sayılır). */
+  renewExpiredProduct: (id: string) =>
+    api.post(`/admin/products/${id}/renew`),
+  bulkRenewExpiredProducts: (productIds: string[]) =>
+    api.post("/admin/products/bulk-renew", { productIds }),
   exportProducts: (params?: ProductExportParams) =>
     api.get("/admin/products-export", { params, responseType: "blob" }),
   getProductImportSellers: (search?: string) =>

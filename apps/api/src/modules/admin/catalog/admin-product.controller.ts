@@ -76,6 +76,7 @@ import {
 } from "./admin-product-bulk-import.constants";
 import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
 import { AdminExpiredListingsService } from "./admin-expired-listings.service";
+import { AdminProductRenewalService } from "./admin-product-renewal.service";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -126,6 +127,7 @@ import {
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
   ExpiredListingsMaintenanceDto,
+  BulkRenewListingsDto,
 } from "../dto";
 
 @ApiTags("admin")
@@ -139,6 +141,7 @@ export class AdminProductController {
     private readonly discountService: DiscountService,
     private readonly productBulkImport: AdminProductBulkImportService,
     private readonly expiredListings: AdminExpiredListingsService,
+    private readonly productRenewal: AdminProductRenewalService,
   ) {}
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -459,6 +462,46 @@ export class AdminProductController {
     @Body() dto: ExpiredListingsMaintenanceDto,
   ) {
     return this.expiredListings.run(adminId, dto);
+  }
+
+  /**
+   * Süresi dolmuş ilanları toplu yeniden yayına alır. Literal rota
+   * (`products/:id/…` rotalarından önce). Sıralı; her ilan kendi sonucuyla döner.
+   */
+  @Post("products/bulk-renew")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Bulk re-publish expired listings",
+    description:
+      "Yalnız 'süresi doldu' nedeniyle kapanmış ilanlar; stok, üyelik limiti ve komisyon kapıları geçerli. Başarısız ilanlar errorKey ile raporlanır.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Per-item results with renewed/failed counts",
+  })
+  async bulkRenewExpiredListings(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: BulkRenewListingsDto,
+  ) {
+    return this.productRenewal.renewMany(adminId, dto.productIds);
+  }
+
+  @Post("products/:id/renew")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Re-publish an expired listing (admin)",
+    description:
+      "Yalnız 'süresi doldu' nedeniyle kapanmış ilan; ömrü bugünden yeniden başlar, yönetici kararı onay sayılır.",
+  })
+  @ApiParam({ name: "id", description: "Product ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Listing is active" })
+  async renewExpiredListing(
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.productRenewal.renew(adminId, id);
   }
 
   @Post("products/bulk-reject")

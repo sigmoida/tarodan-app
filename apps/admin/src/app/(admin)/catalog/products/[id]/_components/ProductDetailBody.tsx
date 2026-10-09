@@ -54,6 +54,24 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
     });
   };
 
+  // Hata mesajı sunucunun yerelleştirilmiş metnidir (ortak hata toast'ı).
+  const renew = useAdminMutation(
+    () => adminApi.renewExpiredProduct(product.id),
+    {
+      invalidates: ["products"],
+      successMessage: t("admin.catalog.products.renewedExpired"),
+    },
+  );
+
+  const onRenew = async () => {
+    await confirm({
+      title: t("admin.catalog.products.renewExpiredTitle"),
+      description: t("admin.catalog.products.renewExpiredDescription"),
+      confirmLabel: t("admin.catalog.products.renewExpired"),
+      onConfirm: () => renew.mutateAsync(),
+    });
+  };
+
   return (
     <>
       <AdminTabs
@@ -89,8 +107,10 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
               onApprove={() => setApproveOpen(true)}
               onReject={() => setRejectOpen(true)}
               onRestore={onRestore}
+              onRenew={onRenew}
               onDelete={() => setRemoveOpen(true)}
               busyRestore={restore.isPending}
+              busyRenew={renew.isPending}
             />
           }
         />

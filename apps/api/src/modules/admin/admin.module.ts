@@ -60,6 +60,7 @@ import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
 import { AdminExpiredListingsService } from "./catalog/admin-expired-listings.service";
+import { AdminProductRenewalService } from "./catalog/admin-product-renewal.service";
 import {
   ProductImportBatchProcessor,
   ProductImportBatchScheduler,
@@ -257,6 +258,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductService,
     AdminProductBulkImportService,
     AdminExpiredListingsService,
+    AdminProductRenewalService,
     AdminOrderService,
     AdminCancellationService,
     AdminAnalyticsService,

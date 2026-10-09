@@ -42,6 +42,8 @@ export interface ProductDetail {
   carModel?: { id: string; name: string } | null;
   manufacturer?: { id: string; name: string } | null;
   status: string;
+  /** Pasif ilanın kapanış nedeni (`expired` = süresi doldu); aksi hâlde null. */
+  inactiveReason?: string | null;
   category: { id: string; name: string };
   seller: { id: string; displayName: string; email: string };
   images: Array<{ id: string; url: string; sortOrder: number }>;
