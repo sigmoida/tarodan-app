@@ -23,6 +23,7 @@ import {
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/helpers/shipping-package-tier";
+import { NETSIS_INVOICE_SETTING_DEFINITIONS } from "../src/modules/invoicing/provider/netsis-invoice-settings";
 import { PRODUCTION_REFERENCE_IDS } from "./seed-ids";
 
 const prisma = new PrismaClient();
@@ -241,11 +242,34 @@ async function seedShippingTariff(): Promise<void> {
   });
 }
 
+/**
+ * Netsis faturalama ayar SATIRLARI (cari/seri/kart kodları). Satır var olsun
+ * ki admin genel ayar ekranı anahtarları göstersin ve doldurulabilsin; değerler
+ * muhasebenin Netsis'te açtığı kayıtlara bağlı bir iş kararıdır, bu yüzden
+ * varsayılanlar boştur ve `update: {}` adminin girdiğini asla ezmez.
+ * Anahtar listesinin tek kaynağı `netsis-invoice-settings.ts`.
+ */
+async function seedNetsisInvoiceSettings(): Promise<void> {
+  for (const setting of NETSIS_INVOICE_SETTING_DEFINITIONS) {
+    await prisma.platformSetting.upsert({
+      where: { settingKey: setting.key },
+      create: {
+        settingKey: setting.key,
+        settingValue: setting.value,
+        settingType: setting.type,
+        description: setting.description,
+      },
+      update: {},
+    });
+  }
+}
+
 async function main(): Promise<void> {
   await seedMembershipTiers();
   await seedTaxReferences();
   await seedPlatformSeller();
   await seedShippingTariff();
+  await seedNetsisInvoiceSettings();
   console.log("Production reference data is ready.");
 }
 
