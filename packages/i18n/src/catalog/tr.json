@@ -5669,7 +5669,10 @@
           "generated": "{count} kod üretildi (toplam {total})",
           "generateFailed": "Kod üretilemedi",
           "rowGenerate": "Kod Üret",
-          "rowExport": "Kodları İndir (Excel)"
+          "rowExport": "Kodları İndir (Excel)",
+          "redeemed": "Kullanıldı",
+          "redeemedAt": "Kullanım Tarihi",
+          "exportTitle": "Voucher Kodları"
         },
         "targetLabel": "İndirilecek Kalem",
         "targetHelper": "Ürün fiyatı satıcıya aittir; platform yalnız kendi bedellerinden indirim yapabilir.",
@@ -6703,7 +6706,9 @@
         "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder.",
         "transferQueuedInfo": "Transfer kuyruğa alındı — birkaç saniye içinde işlenir; Transferler sekmesinden izleyin",
         "transferQueueFallback": "Anında transfer kuyruğa alınamadı — saatlik ödeme taraması devreye girecek",
-        "transferDeferred": "Transfer satırı şu an oluşmadı (engel ya da zaten mevcut olabilir) — bekleyen transfer hemen, engelli olan saatlik taramada işlenir"
+        "transferDeferred": "Transfer satırı şu an oluşmadı (engel ya da zaten mevcut olabilir) — bekleyen transfer hemen, engelli olan saatlik taramada işlenir",
+        "refundedAmount": "İade Edilen",
+        "earlyReleaseDays": "Erken Bırakma (gün)"
       },
       "tax": {
         "title": "Vergi Ayarları",
@@ -8754,7 +8759,18 @@
       "exportHint": "Dönem seçin; dosya o ay silinen hesapları içerir.",
       "exportYear": "Yıl",
       "exportMonth": "Ay",
-      "retentionNotice": "Kayıtlar hukuki yükümlülük gereği saklanır ve silinemez; saklama süresi dolanlar filtreyle listelenir."
+      "retentionNotice": "Kayıtlar hukuki yükümlülük gereği saklanır ve silinemez; saklama süresi dolanlar filtreyle listelenir.",
+      "export": {
+        "adminCode": "Kullanıcı Kodu",
+        "username": "Kullanıcı Adı",
+        "legalName": "Ad Soyad / Unvan",
+        "deletedAt": "Silinme Tarihi",
+        "title": "Silinen Hesap Kimlik Bildirimi {period}",
+        "sheetName": "Bildirim {period}",
+        "infoSheet": "Bilgi",
+        "period": "Dönem",
+        "formatVersion": "Biçim sürümü"
+      }
     },
     "roles": {
       "title": "Roller ve İzinler",
@@ -11650,6 +11666,27 @@
         "conflict": "Netsis kaydın zaten var olduğunu bildiriyor",
         "configuration": "Netsis entegrasyonu yanlış yapılandırılmış",
         "unknown": "Netsis beklenmeyen bir hata döndürdü"
+      }
+    },
+    "export": {
+      "summary": {
+        "sheetName": "Özet",
+        "report": "Rapor",
+        "generatedAt": "Oluşturulma (İstanbul saati)",
+        "filters": "Uygulanan filtreler",
+        "noFilters": "Filtre yok — tüm kayıtlar",
+        "search": "Arama",
+        "searchApplied": "Uygulandı ({length} karakter)",
+        "sort": "Sıralama",
+        "rowCount": "Kayıt sayısı",
+        "lineCount": "Satır sayısı (kalem)",
+        "totals": "Toplamlar",
+        "parentTotal": "Kayıt tutarları toplamı",
+        "notes": "Notlar",
+        "truncated": "Dosya yalnız ilk {count} kaydı içeriyor; tamamı için filtreyi daraltın.",
+        "longFormat": "Veri sayfasında her satır bir kalemdir; üst kaydın kolonları her kalemde tekrarlanır. Üst kayıt tutarlarını veri sayfasında toplamayın — toplamlar bu sayfadadır.",
+        "tab": "Sekme",
+        "subTab": "Alt sekme"
       }
     }
   },

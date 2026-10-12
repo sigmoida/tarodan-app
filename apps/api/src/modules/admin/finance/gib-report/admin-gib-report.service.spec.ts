@@ -1,10 +1,7 @@
 import * as ExcelJS from "exceljs";
 import { BusinessStatus } from "@prisma/client";
-import {
-  AdminGibReportService,
-  GIB_REPORT_EXPORT_ROW_CAP,
-  toGibRow,
-} from "./admin-gib-report.service";
+import { ExportListService } from "../../../../common/export";
+import { AdminGibReportService, toGibRow } from "./admin-gib-report.service";
 
 const product = (over: Record<string, unknown> = {}) => ({
   id: "p1",
@@ -35,16 +32,35 @@ const product = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+interface FindManyArgs {
+  where: Record<string, unknown>;
+  orderBy: unknown[];
+  skip?: number;
+  take?: number;
+}
+
 function makeService(rows: Record<string, unknown>[] = [product()]) {
   const prisma = {
     product: {
-      findMany: jest.fn().mockResolvedValue(rows),
+      // Gerçek tablo gibi skip/take ile dilimler — döküm sayfa döngüsü sonlanır.
+      findMany: jest.fn(async (args: FindManyArgs) =>
+        args.take === undefined
+          ? rows
+          : rows.slice(args.skip ?? 0, (args.skip ?? 0) + args.take),
+      ),
       count: jest.fn().mockResolvedValue(rows.length),
     },
   };
+  const audit = {
+    createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+  };
   return {
-    service: new AdminGibReportService(prisma as never),
+    service: new AdminGibReportService(
+      prisma as never,
+      new ExportListService(audit as never),
+    ),
     prisma,
+    audit,
   };
 }
 
@@ -150,36 +166,38 @@ describe("AdminGibReportService.list", () => {
   });
 });
 
-describe("AdminGibReportService.exportXlsx", () => {
-  async function sheetOf(body: Buffer) {
+describe("AdminGibReportService.export", () => {
+  async function dataSheetOf(body: Buffer) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(body as never);
-    const sheet = workbook.worksheets[0];
+    expect(workbook.worksheets[0].name).toBe("Özet");
+    const sheet = workbook.worksheets[1];
     const header = (sheet.getRow(1).values as unknown[]).slice(1);
     const first = (sheet.getRow(2).values as unknown[]).slice(1);
     return { sheet, header, first };
   }
 
-  it("listeyle aynı filtre ve sırayla çeker, tavan + 1 okur", async () => {
+  it("listeyle aynı filtre ve sırayla sayfa sayfa okur", async () => {
     const { service, prisma } = makeService();
-    await service.exportXlsx({ status: "sold" }, "tr");
-    expect(prisma.product.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ kind: "listing", status: "sold" }),
-        take: GIB_REPORT_EXPORT_ROW_CAP + 1,
-      }),
-    );
+    await service.export({ status: "sold" }, "admin-1", "tr");
+    const args = prisma.product.findMany.mock.calls[0][0];
+    expect(args.where).toMatchObject({ kind: "listing", status: "sold" });
+    expect(args.orderBy).toEqual([
+      { publishedAt: { sort: "desc", nulls: "last" } },
+      { id: "asc" },
+    ]);
+    expect(args).toMatchObject({ skip: 0, take: 500 });
   });
 
   it("dosya TAM kimlik numarasını ve yasal ad kaynağını taşır; formül hücreleri nötrlenir", async () => {
     const { service } = makeService();
-    const file = await service.exportXlsx({}, "tr");
-    expect(file).toMatchObject({ rowCount: 1, truncated: false });
+    const file = await service.export({}, "admin-1", "tr");
+    expect(file).toMatchObject({ rowCount: 1, truncatedAt: null });
     expect(file.filename).toMatch(
       /^gib-ilan-satici-raporu-\d{4}-\d{2}-\d{2}\.xlsx$/,
     );
 
-    const { header, first } = await sheetOf(file.body);
+    const { header, first } = await dataSheetOf(file.body);
     expect(header).toHaveLength(17);
     expect(first).toContain("12345678901"); // maskesiz
     expect(first).toContain("Ahmet Kaya");
@@ -189,13 +207,54 @@ describe("AdminGibReportService.exportXlsx", () => {
     );
   });
 
-  it("tavan aşılırsa kırpar ve truncated bildirir", async () => {
-    const rows = Array.from({ length: GIB_REPORT_EXPORT_ROW_CAP + 1 }, (_, i) =>
-      product({ id: `p${i}` }),
+  it("tarihler İstanbul duvar saatiyle gerçek tarih hücresidir", async () => {
+    const { service } = makeService();
+    const file = await service.export({}, "admin-1", "tr");
+    const { sheet } = await dataSheetOf(file.body);
+    // Üyelik tarihi (1. kolon) 2025-03-01T10:00Z → 13:00 İstanbul.
+    expect(sheet.getRow(2).getCell(1).value).toEqual(
+      new Date("2025-03-01T13:00:00.000Z"),
     );
-    const { service } = makeService(rows);
-    const file = await service.exportXlsx({}, "tr");
-    expect(file.truncated).toBe(true);
-    expect(file.rowCount).toBe(GIB_REPORT_EXPORT_ROW_CAP);
+  });
+
+  it("her indirmede zorunlu denetim kaydı yazar: filtre + satır sayısı, arama TERİMİ yok", async () => {
+    const { service, audit } = makeService();
+
+    await service.export(
+      {
+        search: "12345678901",
+        status: "active",
+        sellerKind: "individual",
+        identityIncomplete: true,
+        startDate: "2026-01-01",
+      },
+      "admin-1",
+      "tr",
+    );
+
+    const [actor, action, entityType, entityId, oldValue, payload] =
+      audit.createRequiredAuditLog.mock.calls[0];
+    expect([actor, action, entityType, entityId, oldValue]).toEqual([
+      "admin-1",
+      "gib_report_export",
+      "GibReport",
+      "export",
+      null,
+    ]);
+    expect(JSON.stringify(payload)).not.toContain("12345678901");
+    expect(payload).toEqual({
+      resource: "gibReport",
+      filters: {
+        status: "active",
+        sellerKind: "individual",
+        identityIncomplete: true,
+        startDate: "2026-01-01",
+        searchApplied: true,
+        searchLength: 11,
+      },
+      rowCount: 1,
+      truncated: false,
+      truncatedAt: null,
+    });
   });
 });

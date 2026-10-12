@@ -5669,7 +5669,10 @@
           "generated": "{count} codes generated (total {total})",
           "generateFailed": "Failed to generate codes",
           "rowGenerate": "Generate Codes",
-          "rowExport": "Export Codes (Excel)"
+          "rowExport": "Export Codes (Excel)",
+          "redeemed": "Redeemed",
+          "redeemedAt": "Redeemed at",
+          "exportTitle": "Voucher codes"
         },
         "targetLabel": "Discounted item",
         "targetHelper": "The product price belongs to the seller; the platform may only discount its own fees.",
@@ -6703,7 +6706,9 @@
         "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected.",
         "transferQueuedInfo": "Transfer queued — it will be processed within seconds; follow it on the Transfers tab",
         "transferQueueFallback": "Immediate transfer could not be queued — the hourly payout sweep will pick it up",
-        "transferDeferred": "No transfer row was created right now (blocked or already existing) — a pending transfer is processed immediately, a blocked one by the hourly sweep"
+        "transferDeferred": "No transfer row was created right now (blocked or already existing) — a pending transfer is processed immediately, a blocked one by the hourly sweep",
+        "refundedAmount": "Refunded",
+        "earlyReleaseDays": "Released early (days)"
       },
       "tax": {
         "title": "Tax Settings",
@@ -8754,7 +8759,18 @@
       "exportHint": "Pick a period; the file covers accounts deleted that month.",
       "exportYear": "Year",
       "exportMonth": "Month",
-      "retentionNotice": "Records are retained under a legal obligation and cannot be deleted; expired ones can be filtered."
+      "retentionNotice": "Records are retained under a legal obligation and cannot be deleted; expired ones can be filtered.",
+      "export": {
+        "adminCode": "User code",
+        "username": "Username",
+        "legalName": "Full name / company title",
+        "deletedAt": "Deleted on",
+        "title": "Deleted account identity report {period}",
+        "sheetName": "Report {period}",
+        "infoSheet": "Info",
+        "period": "Period",
+        "formatVersion": "Format version"
+      }
     },
     "roles": {
       "title": "Roles & Permissions",
@@ -11650,6 +11666,27 @@
         "conflict": "Netsis reports the record already exists",
         "configuration": "The Netsis integration is misconfigured",
         "unknown": "Netsis returned an unexpected error"
+      }
+    },
+    "export": {
+      "summary": {
+        "sheetName": "Summary",
+        "report": "Report",
+        "generatedAt": "Generated at (Istanbul time)",
+        "filters": "Applied filters",
+        "noFilters": "No filters — all records",
+        "search": "Search",
+        "searchApplied": "Applied ({length} characters)",
+        "sort": "Sort",
+        "rowCount": "Record count",
+        "lineCount": "Row count (line items)",
+        "totals": "Totals",
+        "parentTotal": "Sum of record amounts",
+        "notes": "Notes",
+        "truncated": "The file holds only the first {count} records; narrow the filter to get them all.",
+        "longFormat": "Each data row is a line item; the parent record's columns repeat on every line. Do not sum parent amounts on the data sheet — the totals are on this sheet.",
+        "tab": "Tab",
+        "subTab": "Sub-tab"
       }
     }
   },

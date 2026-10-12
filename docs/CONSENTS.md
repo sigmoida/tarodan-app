@@ -133,9 +133,10 @@ hizalanır. Bülten çıkış bağlantısı ve hesap silme de `withdrawn` yazar.
   ziyaretçi kimliği, IP, sepet/sipariş no; filtre: `document`, `action`,
   `source`, `subjectType` = `user|guest|visitor`, `userId`, tarih aralığı;
   DMMF tabanlı sıralama; `{ data, meta }` zarfı).
-- `GET /admin/consents/export` — aynı filtrenin Excel dökümü (5000 satır
-  tavanı, aşılırsa `X-Export-Truncated-At`), her indirme zorunlu denetim kaydı
-  (`consent_records_export`).
+- `GET /admin/consents/export` — aynı filtrenin Excel dökümü (ortak hat:
+  20.000 kayıt tavanı, aşılırsa `X-Export-Truncated-At`), her indirme zorunlu
+  denetim kaydı (`consent_records_export`; arama terimi yazılmaz, yalnız
+  uygulandığı ve uzunluğu). Bkz. `docs/ADMIN_EXPORTS.md`.
 - `GET /admin/consents/status/:userId` — belge başına en son kayıt + yeniden
   onay bekliyor mu.
 - İzin: `users` (`PERMISSION_MAP.consents`), roller super_admin / admin /

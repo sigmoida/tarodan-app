@@ -89,6 +89,59 @@ export function istanbulDayEnd(day: string): Date {
   return new Date(istanbulDayStart(day).getTime() + DAY_MS - 1);
 }
 
+/**
+ * Takvim ayının (1–12) Türkiye'deki aralığı: ayın ilk anı dahil, sonraki
+ * ayın ilk anı HARİÇ. `Date.UTC(y, m - 1, 1)` ay sınırını üç saat kaydırırdı:
+ * ayın son gecesi 21:00'den sonra silinen kayıt yanlış aya düşerdi.
+ */
+export function istanbulMonthRange(
+  year: number,
+  month: number,
+): { gte: Date; lt: Date } {
+  const monthStart = (y: number, m: number) =>
+    new Date(`${y}-${String(m).padStart(2, "0")}-01T00:00:00+03:00`);
+  return {
+    gte: monthStart(year, month),
+    lt: month === 12 ? monthStart(year + 1, 1) : monthStart(year, month + 1),
+  };
+}
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Liste filtresindeki bir tarih ucunu ana çevirir. Yalnız tarih ("yyyy-mm-dd",
+ * panelin tarih seçicisi) Türkiye gününün başı ya da SONU olur: bitiş
+ * `new Date("2026-10-12")` olsaydı UTC gece yarısı olurdu ve seçilen günün
+ * tamamı dışarıda kalırdı. Saat taşıyan bir ISO değeri olduğu gibi kullanılır.
+ */
+export function istanbulRangeEdge(value: string, edge: "start" | "end"): Date {
+  if (DATE_ONLY.test(value)) {
+    return edge === "start" ? istanbulDayStart(value) : istanbulDayEnd(value);
+  }
+  return new Date(value);
+}
+
+/**
+ * Bir anın Türkiye'deki DUVAR SAATİNİ UTC alanlarında taşıyan `Date`.
+ * Elektronik tablo tarihleri saat dilimsizdir ve yazıcı (ExcelJS) `Date`'i UTC
+ * alanlarından yazar: 21:30Z'de oluşan sipariş, dosyada ertesi günün 00:30'u
+ * olarak görünmeli — ekranla aynı gün.
+ */
+export function istanbulWallClock(at: Date): Date {
+  const p = trCalendarParts(at);
+  return new Date(
+    Date.UTC(
+      Number(p.year),
+      Number(p.month) - 1,
+      Number(p.day),
+      Number(p.hour),
+      Number(p.minute),
+      Number(p.second),
+      at.getUTCMilliseconds(),
+    ),
+  );
+}
+
 /** `at`'in düştüğü Türkiye GÜNÜNÜN BAŞLANGIÇ anı ("bugün, gece yarısı"). */
 export function istanbulDayStartOf(at: Date): Date {
   return istanbulDayStart(trCalendarDate(at));

@@ -184,8 +184,8 @@ Satıcının serbest metni yalnız olay tablosundadır ve yalnız admin uçları
 (`GET /admin/products/:id` → `removalHistory`). Vitrin ve satıcı yanıtları
 (`formatProductResponse`) neden alanı taşımaz; bir kontrat spec'i
 (`listing-removal-privacy.contract.spec.ts`) olay tablosunu okuyan kodun yalnız
-admin/yazıcı olmasını şart koşar. Dışa aktarım (CSV) neden kodunu, kaldıranı,
-platformu, ihlal kodunu ve tarihi içerir; serbest metni içermez.
+admin/yazıcı olmasını şart koşar. Ürün dışa aktarımı kaldırıldı (bkz.
+`docs/ADMIN_EXPORTS.md`); serbest metin hiçbir dökümde yer almaz.
 
 ## Admin
 
@@ -196,7 +196,6 @@ platformu, ihlal kodunu ve tarihi içerir; serbest metni içermez.
 - Ürün detayı: kaldırma geçmişi (serbest metin dahil; sayılmayan olaylar
   notla işaretli).
 - Red ve kaldırma pencereleri: ihlal türü seçimi (zorunlu) + açıklama.
-- Dışa aktarım (`GET /admin/products-export`): aynı filtreler + neden kolonları.
 
 ## Dashboard — nasıl sayılır
 

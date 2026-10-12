@@ -3,6 +3,9 @@ import {
   istanbulDayEnd,
   istanbulDayStart,
   istanbulDayStartOf,
+  istanbulMonthRange,
+  istanbulRangeEdge,
+  istanbulWallClock,
   istanbulYesterdayWindow,
   trCalendarDate,
   trCalendarTime,
@@ -74,6 +77,41 @@ describe("Türkiye takvimi", () => {
     // 2026-07-20T22:30Z = 21 Temmuz 01:30 İstanbul → 21 Temmuz günü.
     const at = new Date("2026-07-20T22:30:00.000Z");
     expect(istanbulDayStartOf(at)).toEqual(istanbulDayStart("2026-07-21"));
+  });
+
+  it("ay aralığı Türkiye gece yarısından Türkiye gece yarısınadır", () => {
+    const { gte, lt } = istanbulMonthRange(2026, 9);
+    expect(gte.toISOString()).toBe("2026-08-31T21:00:00.000Z");
+    expect(lt.toISOString()).toBe("2026-09-30T21:00:00.000Z");
+  });
+
+  it("aralık aralığında yıl devrilir", () => {
+    const { gte, lt } = istanbulMonthRange(2026, 12);
+    expect(gte.toISOString()).toBe("2026-11-30T21:00:00.000Z");
+    expect(lt.toISOString()).toBe("2026-12-31T21:00:00.000Z");
+  });
+
+  it("yalnız tarih olan filtre ucu Türkiye gününün başı/sonudur", () => {
+    expect(istanbulRangeEdge("2026-10-12", "start")).toEqual(
+      istanbulDayStart("2026-10-12"),
+    );
+    // Bitiş seçilen günün TAMAMINI kapsar (UTC gece yarısı değil).
+    expect(istanbulRangeEdge("2026-10-12", "end").toISOString()).toBe(
+      "2026-10-12T20:59:59.999Z",
+    );
+  });
+
+  it("saat taşıyan filtre ucu olduğu gibi kullanılır", () => {
+    expect(
+      istanbulRangeEdge("2026-10-12T10:00:00.000Z", "end").toISOString(),
+    ).toBe("2026-10-12T10:00:00.000Z");
+  });
+
+  it("duvar saati UTC alanlarında İstanbul saatini taşır", () => {
+    // 21:30Z = ertesi gün 00:30 İstanbul.
+    expect(
+      istanbulWallClock(new Date("2026-08-04T21:30:15.250Z")).toISOString(),
+    ).toBe("2026-08-05T00:30:15.250Z");
   });
 
   it("dünün tam gününü verir — sunucu UTC koşarken bile", () => {

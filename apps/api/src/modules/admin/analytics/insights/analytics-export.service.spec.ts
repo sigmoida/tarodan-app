@@ -1,4 +1,6 @@
+import * as ExcelJS from "exceljs";
 import type { AnalyticsSalesResponse } from "@tarodan/types";
+import { ExportListService } from "../../../../common/export";
 import { AnalyticsExportService } from "./analytics-export.service";
 
 /** Yalnız çağrılan sekmenin servisi konuşur; diğerleri sessiz kalmalı. */
@@ -10,7 +12,8 @@ const silent = () => ({
 
 const response = {
   range: {
-    from: "2026-06-01T00:00:00.000Z",
+    // İstanbul gece yarısı: 1 Haziran 00:00 = 31 Mayıs 21:00Z.
+    from: "2026-05-31T21:00:00.000Z",
     to: "2026-06-30T20:59:59.999Z",
     groupBy: "day",
     compared: false,
@@ -19,7 +22,7 @@ const response = {
     timeZone: "Europe/Istanbul",
   },
   metrics: {
-    gmv: { current: 1250.5, previous: null, changePercent: null },
+    gmv: { current: 1250.5, previous: null, changePercent: -12.5 },
     orderCount: { current: 3, previous: null, changePercent: null },
   },
   series: [
@@ -39,7 +42,7 @@ const response = {
     },
   ],
   byCategory: [
-    { key: "c1", label: "Yılmaz, Ltd.", count: 3, amount: 1250.5, share: 100 },
+    { key: "c1", label: "Yılmaz, Ltd.", count: 3, amount: -1250.5, share: 100 },
   ],
   byBrand: [],
   topSellers: [{ id: "u1", label: "=cmd", orderCount: 3, gmv: 1250.5 }],
@@ -47,17 +50,31 @@ const response = {
 
 function serviceWithSales() {
   const sales = { get: jest.fn().mockResolvedValue(response) };
+  const audit = {
+    createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+  };
   return {
     sales,
+    audit,
     service: new AnalyticsExportService(
       sales as never,
       silent() as never,
       silent() as never,
       silent() as never,
       silent() as never,
+      new ExportListService(audit as never),
     ),
   };
 }
+
+async function workbookOf(body: Buffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(body as never);
+  return workbook;
+}
+
+const rowValues = (sheet: ExcelJS.Worksheet | undefined, n: number) =>
+  ((sheet?.getRow(n).values as unknown[]) ?? []).slice(1);
 
 describe("AnalyticsExportService", () => {
   /**
@@ -69,61 +86,99 @@ describe("AnalyticsExportService", () => {
     const { sales, service } = serviceWithSales();
     const query = { from: "2026-06-01", to: "2026-06-30" };
 
-    await service.export("sales", "csv", query);
+    await service.export("sales", query, "admin-1", "tr");
 
     expect(sales.get).toHaveBeenCalledWith(query);
   });
 
-  it("metrikleri, serileri ve kırılımları ayrı sayfalara yazar", async () => {
+  it("Özet'in ardından metrikleri, serileri ve kırılımları ayrı sayfalara yazar", async () => {
     const { service } = serviceWithSales();
-    const csv = (await service.export("sales", "csv", undefined)).body.toString(
-      "utf8",
-    );
+    const file = await service.export("sales", undefined, "admin-1", "tr");
+    const workbook = await workbookOf(file.body);
 
-    expect(csv).toContain("metrics");
-    expect(csv).toContain("metric,current,previous,changePercent");
-    expect(csv).toContain("gmv,1250.5,,");
+    expect(workbook.worksheets.map((s) => s.name)).toEqual([
+      "Özet",
+      "metrics",
+      "series",
+      "byCategory",
+      "topSellers",
+    ]);
+    const metrics = workbook.getWorksheet("metrics");
+    expect(rowValues(metrics, 1)).toEqual([
+      "metric",
+      "current",
+      "previous",
+      "changePercent",
+    ]);
     // Seriler tek sayfada yan yana: kova başına bir satır.
-    expect(csv).toContain("bucket,gmv,orderCount");
-    expect(csv).toContain("2026-06-02,1250.5,3");
-    expect(csv).toContain("byCategory");
+    const series = workbook.getWorksheet("series");
+    expect(rowValues(series, 1)).toEqual(["bucket", "gmv", "orderCount"]);
+    expect(rowValues(series, 3)).toEqual(["2026-06-02", 1250.5, 3]);
   });
 
   it("boş kırılım için sayfa açmaz", async () => {
     const { service } = serviceWithSales();
-    const csv = (await service.export("sales", "csv", undefined)).body.toString(
-      "utf8",
-    );
+    const file = await service.export("sales", undefined, "admin-1", "tr");
+    const workbook = await workbookOf(file.body);
 
-    expect(csv).not.toContain("byBrand");
+    expect(workbook.getWorksheet("byBrand")).toBeUndefined();
   });
 
-  it("aralığı dosya adına taşır", async () => {
+  /** Eski CSV negatif değerleri `'-12.5` metnine çeviriyordu — toplanamıyordu. */
+  it("sayılar — negatifler dahil — SAYI hücresidir", async () => {
     const { service } = serviceWithSales();
+    const file = await service.export("sales", undefined, "admin-1", "tr");
+    const workbook = await workbookOf(file.body);
 
-    expect((await service.export("sales", "csv", undefined)).filename).toBe(
-      "analitik-sales-2026-06-01-2026-06-30.csv",
-    );
-    expect((await service.export("sales", "xlsx", undefined)).filename).toBe(
-      "analitik-sales-2026-06-01-2026-06-30.xlsx",
+    const gmv = workbook.getWorksheet("metrics")?.getRow(2);
+    expect(gmv?.getCell(1).value).toBe("gmv");
+    expect(gmv?.getCell(2).value).toBe(1250.5);
+    expect(gmv?.getCell(4).value).toBe(-12.5);
+    expect(rowValues(workbook.getWorksheet("byCategory"), 2)).toContain(
+      -1250.5,
     );
   });
 
-  it("paylaşılan yazıcıdan geçtiği için kaçış ve formül korumasını devralır", async () => {
+  it("metinler formüle karşı nötrlenir, virgül olduğu gibi kalır", async () => {
     const { service } = serviceWithSales();
-    const csv = (await service.export("sales", "csv", undefined)).body.toString(
-      "utf8",
-    );
+    const file = await service.export("sales", undefined, "admin-1", "tr");
+    const workbook = await workbookOf(file.body);
 
-    expect(csv).toContain('"Yılmaz, Ltd."');
-    expect(csv).toContain("'=cmd");
+    expect(rowValues(workbook.getWorksheet("topSellers"), 2)).toContain("'=cmd");
+    expect(rowValues(workbook.getWorksheet("byCategory"), 2)).toContain(
+      "Yılmaz, Ltd.",
+    );
   });
 
-  it("XLSX'i elektronik tablo içerik tipiyle döner", async () => {
+  it("aralığı İstanbul takvimiyle dosya adına taşır", async () => {
     const { service } = serviceWithSales();
-    const file = await service.export("sales", "xlsx", undefined);
+    const file = await service.export("sales", undefined, "admin-1", "tr");
 
-    expect(file.contentType).toContain("spreadsheetml.sheet");
-    expect(file.body.length).toBeGreaterThan(0);
+    expect(file.filename).toMatch(
+      /^analitik-sales-2026-06-01-2026-06-30-\d{4}-\d{2}-\d{2}\.xlsx$/,
+    );
+  });
+
+  it("her indirme denetim kaydı bırakır", async () => {
+    const { service, audit } = serviceWithSales();
+    await service.export(
+      "sales",
+      { from: "2026-06-01", to: "2026-06-30" },
+      "admin-1",
+      "tr",
+    );
+
+    const [actor, action, entityType, entityId, , payload] =
+      audit.createRequiredAuditLog.mock.calls[0];
+    expect([actor, action, entityType, entityId]).toEqual([
+      "admin-1",
+      "analytics_export",
+      "Analytics",
+      "sales",
+    ]);
+    expect(payload.filters).toMatchObject({
+      from: "2026-06-01",
+      to: "2026-06-30",
+    });
   });
 });

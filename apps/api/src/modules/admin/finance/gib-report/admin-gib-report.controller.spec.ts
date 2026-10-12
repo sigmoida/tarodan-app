@@ -1,30 +1,29 @@
 import "reflect-metadata";
+import { StreamableFile } from "@nestjs/common";
 import { ROLES_KEY } from "../../../auth/decorators/roles.decorator";
 import { PERMISSION_MAP } from "../../../auth/guards/roles.guard";
 import { DEFAULT_ROLE_PERMISSIONS } from "../../dto/role-permissions.dto";
 import { AdminGibReportController } from "./admin-gib-report.controller";
-import { GIB_REPORT_EXPORT_ROW_CAP } from "./admin-gib-report.service";
 
-function setup(over: { rowCount?: number; truncated?: boolean } = {}) {
+function setup(over: { truncatedAt?: number | null } = {}) {
   const file = {
     filename: "gib-ilan-satici-raporu-2026-10-05.xlsx",
     body: Buffer.from("xlsx"),
-    rowCount: over.rowCount ?? 42,
-    truncated: over.truncated ?? false,
+    rowCount: 42,
+    truncatedAt: over.truncatedAt ?? null,
   };
   const service = {
-    exportXlsx: jest.fn().mockResolvedValue(file),
+    export: jest.fn().mockResolvedValue(file),
     list: jest.fn(),
   };
-  const audit = {
-    createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+  const headers = new Map<string, string>();
+  const res = {
+    setHeader: jest.fn((name: string, value: string) => {
+      headers.set(name, value);
+    }),
   };
-  const res = { setHeader: jest.fn(), send: jest.fn() };
-  const controller = new AdminGibReportController(
-    service as never,
-    audit as never,
-  );
-  return { controller, service, audit, res, file };
+  const controller = new AdminGibReportController(service as never);
+  return { controller, service, res, headers, file };
 }
 
 describe("AdminGibReportController — erişim", () => {
@@ -47,96 +46,42 @@ describe("AdminGibReportController — erişim", () => {
 });
 
 describe("AdminGibReportController.export", () => {
-  it("her indirmede zorunlu denetim kaydı yazar: filtre + satır sayısı, kimlik DEĞERİ yok", async () => {
-    const { controller, audit, res } = setup();
+  it("dökümü çağıranın kimliği ve isteğin diliyle üretir", async () => {
+    const { controller, service, res } = setup();
+    const query = { search: "ahmet", status: "active" as const };
 
-    await controller.export(
-      "admin-1",
-      {
-        search: "ahmet",
-        status: "active",
-        sellerKind: "individual",
-        identityIncomplete: true,
-        startDate: "2026-01-01",
-      },
-      "tr",
-      res as never,
-    );
+    await controller.export("admin-1", query, "tr", res as never);
 
-    expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
-      "admin-1",
-      "gib_report_export",
-      "GibReport",
-      "export",
-      null,
-      {
-        filters: {
-          searchApplied: true,
-          searchLength: 5,
-          status: "active",
-          sellerKind: "individual",
-          identityIncomplete: true,
-          startDate: "2026-01-01",
-          endDate: null,
-        },
-        rowCount: 42,
-        truncated: false,
-      },
-    );
+    expect(service.export).toHaveBeenCalledWith(query, "admin-1", "tr");
   });
 
-  it("arama terimi (vergi no / TCKN olabilir) denetim kaydına yazılmaz", async () => {
-    const { controller, audit, res } = setup();
-    await controller.export(
-      "admin-1",
-      { search: "12345678901" },
-      "tr",
-      res as never,
+  it("dosyayı ortak yanıtla, önbelleğe alınmayan ek olarak döner", async () => {
+    const { controller, res, headers, file } = setup();
+
+    const result = await controller.export("admin-1", {}, "tr", res as never);
+
+    expect(result).toBeInstanceOf(StreamableFile);
+    expect(headers.get("Cache-Control")).toBe("no-store");
+    expect(headers.get("Content-Disposition")).toBe(
+      `attachment; filename="${file.filename}"`,
     );
-    const payload = audit.createRequiredAuditLog.mock.calls[0][5];
-    expect(JSON.stringify(payload)).not.toContain("12345678901");
-    expect(payload.filters).toMatchObject({
-      searchApplied: true,
-      searchLength: 11,
-    });
+    expect(headers.get("X-Export-Row-Count")).toBe("42");
+    expect(headers.has("X-Export-Truncated-At")).toBe(false);
   });
 
-  it("denetim kaydı yazılamazsa dosya GÖNDERİLMEZ (fail-closed)", async () => {
-    const { controller, audit, res } = setup();
-    audit.createRequiredAuditLog.mockRejectedValue(new Error("audit down"));
+  it("tavan aşıldıysa kırpılma başlığını yazar", async () => {
+    const { controller, res, headers } = setup({ truncatedAt: 20000 });
+    await controller.export("admin-1", {}, "tr", res as never);
+    expect(headers.get("X-Export-Truncated-At")).toBe("20000");
+  });
+
+  it("döküm (ve denetimi) başarısızsa dosya dönmez", async () => {
+    const { controller, service, res } = setup();
+    service.export.mockRejectedValue(new Error("audit down"));
 
     await expect(
       controller.export("admin-1", {}, "tr", res as never),
     ).rejects.toThrow("audit down");
-    expect(res.send).not.toHaveBeenCalled();
-  });
-
-  it("dosyayı önbelleğe alınmayan ek olarak gönderir", async () => {
-    const { controller, res, file } = setup();
-    await controller.export("admin-1", {}, "tr", res as never);
-
-    expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
-    expect(res.setHeader).toHaveBeenCalledWith(
-      "Content-Disposition",
-      `attachment; filename="${file.filename}"`,
-    );
-    expect(res.send).toHaveBeenCalledWith(file.body);
-    expect(res.setHeader).not.toHaveBeenCalledWith(
-      "X-Export-Truncated-At",
-      expect.anything(),
-    );
-  });
-
-  it("tavan aşıldıysa kırpılma başlığını ve denetim kaydında truncated'ı yazar", async () => {
-    const { controller, audit, res } = setup({ truncated: true });
-    await controller.export("admin-1", {}, "tr", res as never);
-
-    expect(res.setHeader).toHaveBeenCalledWith(
-      "X-Export-Truncated-At",
-      String(GIB_REPORT_EXPORT_ROW_CAP),
-    );
-    expect(audit.createRequiredAuditLog.mock.calls[0][5]).toMatchObject({
-      truncated: true,
-    });
+    expect(res.setHeader).not.toHaveBeenCalled();
   });
 });
