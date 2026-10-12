@@ -117,8 +117,15 @@ iletir. Açıklık: `NETSIS_ENABLED`.
 
 ### Gönderim (`send`)
 
+0. `existingProviderRef` yoksa önce fiş BİZİM ETTN'imizle aranır
+   (`itemSlips.findByTrackingKey`, fiş başlığında `EKACK1`; canlıda salt
+   okunur `Queries` sorgusu `NETSIS_SLIP_BY_TRACKING_KEY_SQL`). Önceki deneme
+   commit edip yanıtı kaybettiyse fiş bulunur ve aşağıdaki "Yeniden gönderim"
+   yoluyla devam edilir — ikinci satış faturası açılmaz. Arama ağ hatasıyla
+   düşerse fırlatılır (kayıt `pending`); sonucu okunamazsa fiş açılmaz, ret
+   döner.
 1. Ayarlar okunur (aşağıda). Belgenin ihtiyaç duyduğu bir kod eksikse Netsis'e
-   hiç gidilmez → `configuration` reddi, eksik anahtarlar mesajda.
+   yazılmaz → `configuration` reddi, eksik anahtarlar mesajda.
 2. **Tek NetOpenX transaction'ı** (`transactions.withTransaction`):
    - Cari: TCKN'li bireysel alıcı ve misafir → ORTAK perakende cari
      (`netsis.cari.retailCode`, muhasebece açılır; biz yalnız varlığını
@@ -146,7 +153,8 @@ tüketilmez); iş kuralı reddi sınıflanıp döner.
 
 ### Yeniden gönderim (idempotent)
 
-`existingProviderRef` doluysa fiş yeniden oluşturulmaz: `itemSlips.details`
+`existingProviderRef` doluysa (ya da fiş ETTN ile bulunduysa) fiş yeniden
+oluşturulmaz: `itemSlips.details`
 ile bulunur; tutarları kayıttakiyle hâlâ tutuyor mu diye `calculate` ile
 bakılır (gönderilmemiş belge iadede yeniden fiyatlanmış olabilir —
 tutmuyorsa `configuration`, fiş silinmez çünkü seri numarasında boşluk

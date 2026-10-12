@@ -9,6 +9,7 @@
  * sabitlendiğinde değişen yalnız bu dosya olur; eşleyici
  * (`netsis-slip.mapper.ts`) adları buradan okur. Ayrıntı: docs/NETSIS.md.
  */
+import { NETSIS_SLIP_TRACKING_KEY_FIELD } from "../../netsis";
 
 /** VERIFY: `FatUst.TIPI` — kapalı (peşin) satış faturası / iade faturası. */
 export const NETSIS_SLIP_TIPI = {
@@ -35,8 +36,12 @@ export const NETSIS_HEADER_FIELDS = {
    * ETTN'ini atar; gönderim sonucundaki ETTN kayda yazılır.
    */
   ettn: "ETTN",
-  /** Fişi yeniden bulmak için: bizim ETTN (ek açıklama 1). */
-  ourEttnReference: "EKACK1",
+  /**
+   * Fişi yeniden bulmak için: bizim ETTN (ek açıklama 1). Alan adı Netsis
+   * modülünün izleme anahtarıdır — `itemSlips.findByTrackingKey` aynı alanı
+   * arar (kayıp yanıttan sonra ikinci fiş açılmasın).
+   */
+  ourEttnReference: NETSIS_SLIP_TRACKING_KEY_FIELD,
   /** Fişi yeniden bulmak için: Kayıt No KYT-… (ek açıklama 2). */
   sourceReference: "EKACK2",
   /** İade faturasında orijinal belgenin numarası ve tarihi. */
