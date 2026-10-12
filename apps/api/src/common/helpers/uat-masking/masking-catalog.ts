@@ -942,6 +942,10 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "advertisements.link_url",
       "advertisements.content",
       "advertisements.alt_text",
+      // Reklam tıklanabilir alanları: admin'in yazdığı hedef bağlantı ve
+      // alan adı; kişisel veri taşımaz (reklamla aynı sınıf).
+      "advertisement_hotspots.link_url",
+      "advertisement_hotspots.label",
       "discounts.name",
       "discounts.description",
       "scheduled_notifications.title",
