@@ -91,6 +91,10 @@ export enum NotificationType {
   // Admin uyarısı: bir e-Arşiv/e-Fatura belgesi deneme bütçesini tüketti — cron
   // artık denemez, yasal süre işliyor; admin "Yeniden Dene" ile kurtarır.
   ELOGO_INVOICE_EXHAUSTED = "elogo_invoice_exhausted",
+  // Admin uyarısı: bir para hareketinin Netsis muhasebe kaydı deneme bütçesini
+  // tüketti ya da sonucu bilinmiyor (çift kayıt riski) — cron artık denemez.
+  // Para akışı etkilenmez; muhasebe tarafı elle eşleştirir ya da yeniden dener.
+  NETSIS_SYNC_EXHAUSTED = "netsis_sync_exhausted",
   // Admin uyarısı: kurumsal satıcı teslimden N gün sonra ürün faturasını
   // hâlâ yüklemedi; satıcı hatırlatıldı, takip operasyonda.
   SELLER_INVOICE_MISSING = "seller_invoice_missing",

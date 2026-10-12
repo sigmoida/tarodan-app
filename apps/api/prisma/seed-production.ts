@@ -24,6 +24,7 @@ import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/helpers/shipping-package-tier";
 import { NETSIS_INVOICE_SETTING_DEFINITIONS } from "../src/modules/invoicing/provider/netsis-invoice-settings";
+import { NETSIS_ACCOUNTING_SETTING_DEFINITIONS } from "../src/modules/invoicing/accounting/netsis-accounting-settings";
 import { PRODUCTION_REFERENCE_IDS } from "./seed-ids";
 
 const prisma = new PrismaClient();
@@ -247,10 +248,14 @@ async function seedShippingTariff(): Promise<void> {
  * ki admin genel ayar ekranı anahtarları göstersin ve doldurulabilsin; değerler
  * muhasebenin Netsis'te açtığı kayıtlara bağlı bir iş kararıdır, bu yüzden
  * varsayılanlar boştur ve `update: {}` adminin girdiğini asla ezmez.
- * Anahtar listesinin tek kaynağı `netsis-invoice-settings.ts`.
+ * Anahtar listelerinin tek kaynağı `netsis-invoice-settings.ts` ve muhasebe
+ * senkronu için `netsis-accounting-settings.ts` (senkron varsayılan KAPALI).
  */
 async function seedNetsisInvoiceSettings(): Promise<void> {
-  for (const setting of NETSIS_INVOICE_SETTING_DEFINITIONS) {
+  for (const setting of [
+    ...NETSIS_INVOICE_SETTING_DEFINITIONS,
+    ...NETSIS_ACCOUNTING_SETTING_DEFINITIONS,
+  ]) {
     await prisma.platformSetting.upsert({
       where: { settingKey: setting.key },
       create: {

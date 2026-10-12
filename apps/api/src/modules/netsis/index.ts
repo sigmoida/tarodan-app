@@ -11,11 +11,15 @@ export * from "./helpers/netsis.types";
 export { NETSIS_DOC_TYPES } from "./helpers/netsis.constants";
 export {
   netsisArpCode,
+  netsisSlipKey,
   readNetsisArpEInvoiceProfile,
+  readNetsisRecordRef,
 } from "./helpers/netsis-model.helper";
 export type { NetsisArpEInvoiceProfile } from "./helpers/netsis-model.helper";
 export {
   classifyNetsisError,
+  describeNetsisError,
+  isNetsisPreSendFailure,
   NetsisRequestException,
 } from "./http/netsis-error";
 export type { NetsisErrorKind } from "./http/netsis-error";

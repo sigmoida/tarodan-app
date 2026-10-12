@@ -80,6 +80,8 @@ describe("notification-preferences", () => {
       expect(
         categoryForType(NotificationType.REFUND_REVIEW_REQUIRED_ADMIN),
       ).toBeNull();
+      // Muhasebe aktarımı tıkandı: kimse tercihle susturamaz.
+      expect(categoryForType(NotificationType.NETSIS_SYNC_EXHAUSTED)).toBeNull();
     });
   });
 

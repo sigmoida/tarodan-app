@@ -316,9 +316,21 @@ class StubEDocuments implements NetsisEDocumentApi {
 class StubReceipts implements NetsisReceiptsApi {
   constructor(private readonly store: NetsisStubStore) {}
 
+  /**
+   * Muhasebe senkronu kayıtları bir cariye yazılır: canlıdaki gibi cari önce
+   * var olmalı (cari kodu verilmemiş kayıt — ör. hesaplar arası virman —
+   * serbesttir). Numaralar (`STUB-TAH-n` / `STUB-HVL-n`) deterministiktir.
+   */
+  private requireArp(code: string | undefined): void {
+    if (code && !this.store.arps.has(code)) {
+      throw invalid(`ARP ${code} does not exist`);
+    }
+  }
+
   async createCollection(
     receipt: NetsisMixedReceipt,
   ): Promise<NetsisMixedReceipt> {
+    this.requireArp(receipt.CARI_KOD);
     const id = `STUB-TAH-${this.store.next()}`;
     const stored = { ...clone(receipt), ID: id };
     this.store.collections.set(id, stored);
@@ -333,6 +345,7 @@ class StubReceipts implements NetsisReceiptsApi {
   async createBankTransfer(
     transfer: NetsisBankTransfer,
   ): Promise<NetsisBankTransfer> {
+    this.requireArp(transfer.CARI_KOD);
     const stored = { ...clone(transfer), ID: `STUB-HVL-${this.store.next()}` };
     this.store.bankTransfers.push(stored);
     return clone(stored);

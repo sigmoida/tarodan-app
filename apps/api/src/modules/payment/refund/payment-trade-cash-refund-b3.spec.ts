@@ -338,6 +338,23 @@ describe("PaymentService trade cash refund idempotency", () => {
     );
   });
 
+  it("queues the Netsis accounting mirror with the finalize transaction", async () => {
+    // Muhasebe aynası: PSP iadesi kesinleşti → tek olay, finalize tx'iyle
+    // atomik. Olay yalnız iş kaydı açar; Netsis'e tx içinden gidilmez.
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
+    mockTx.refundAttempt.findUnique.mockResolvedValue(
+      refundAttempt(RefundAttemptStatus.succeeded),
+    );
+
+    await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(mockOutbox.enqueue).toHaveBeenCalledWith(mockTx, {
+      type: "netsis_accounting.sync",
+      payload: { kind: "refund_reversal", sourceId: ATTEMPT_ID },
+      dedupeKey: `netsis_accounting.sync:refund_reversal:${ATTEMPT_ID}`,
+    });
+  });
+
   it("treats an already-finalized attempt as an idempotent success", async () => {
     mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockTx.refundAttempt.findUnique.mockResolvedValue(

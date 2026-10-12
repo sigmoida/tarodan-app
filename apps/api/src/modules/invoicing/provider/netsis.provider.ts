@@ -3,8 +3,8 @@ import type { FiscalInvoiceType } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import {
   NetsisClientFacade,
-  NetsisRequestException,
   classifyNetsisError,
+  describeNetsisError,
   readNetsisArpEInvoiceProfile,
   type NetsisCallOptions,
   type NetsisEDocumentRequest,
@@ -29,6 +29,7 @@ import type {
   FiscalParty,
   RecipientKindResult,
 } from "./e-invoice-provider";
+import { isNetsisCorporateTaxId } from "./netsis-cari";
 import {
   NETSIS_CARI_CODE_MAX_LENGTH,
   NETSIS_INVOICE_SETTING_KEYS,
@@ -50,9 +51,6 @@ import {
 } from "./netsis-slip.mapper";
 
 type EInvoiceSendRejection = Extract<EInvoiceSendResult, { accepted: false }>;
-
-/** VKN 10 hanedir (tüzel kişi); TCKN 11. */
-const VKN_LENGTH = 10;
 
 const SERIAL_SETTING_KEY: Record<EInvoiceScenario, string> = {
   EARCHIVE: NETSIS_INVOICE_SETTING_KEYS.earchiveSerial,
@@ -106,12 +104,7 @@ const digitsOf = (value: string | null | undefined): string =>
 /** Kayda/loga güvenli kısa hata metni (Netsis gövde parçası, istek değil). */
 function errorText(error: unknown): string {
   if (error instanceof NetsisInvoiceRejection) return error.resultMsg;
-  if (error instanceof NetsisRequestException) {
-    return `${error.kind}: ${error.detail}`.slice(0, 500);
-  }
-  const payload = localizedPayloadOf(error);
-  if (payload) return translateMessage(payload.i18nKey);
-  return String((error as Error)?.message ?? error).slice(0, 500);
+  return describeNetsisError(error);
 }
 
 interface CorporateRecipient {
@@ -166,7 +159,7 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
     taxId: string,
   ): Promise<RecipientKindResult | null> {
     const vkn = digitsOf(taxId);
-    if (vkn.length !== VKN_LENGTH) return { kind: "EARCHIVE" };
+    if (!isNetsisCorporateTaxId(vkn)) return { kind: "EARCHIVE" };
     try {
       const recipient = await this.corporateRecipient(vkn);
       if (!recipient) {
@@ -300,7 +293,7 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
         message("itemTypeUnresolved", { type: context.invoiceType ?? "-" }),
       );
     }
-    const pooled = document.customer.vknTckn.length !== VKN_LENGTH;
+    const pooled = !isNetsisCorporateTaxId(document.customer.vknTckn);
     const missing = [
       ...(pooled && !settings.retailCariCode
         ? [NETSIS_INVOICE_SETTING_KEYS.retailCariCode]

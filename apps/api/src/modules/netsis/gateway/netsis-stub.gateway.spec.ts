@@ -258,6 +258,30 @@ describe("NetsisStubGateway", () => {
     expect(stub.snapshot().bankTransfers).toHaveLength(1);
   });
 
+  it("writes receipts only to an existing cari, with deterministic keys", async () => {
+    await expect(
+      stub.receipts.createCollection({ CARI_KOD: "YOK", TUTAR: "10.00" }),
+    ).rejects.toMatchObject({ kind: "validation" });
+    await expect(
+      stub.receipts.createBankTransfer({ CARI_KOD: "YOK", TUTAR: "10.00" }),
+    ).rejects.toMatchObject({ kind: "validation" });
+    expect(stub.snapshot().collections).toHaveLength(0);
+    expect(stub.snapshot().bankTransfers).toHaveLength(0);
+
+    await stub.arps.create(arp);
+    const collection = await stub.receipts.createCollection({
+      CARI_KOD: "U10001",
+      TUTAR: "-25.00",
+    });
+    const transfer = await stub.receipts.createBankTransfer({
+      CARI_KOD: "U10001",
+      TUTAR: "75.00",
+    });
+    expect(collection.ID).toMatch(/^STUB-TAH-\d+$/);
+    expect(transfer.ID).toMatch(/^STUB-HVL-\d+$/);
+    expect(stub.snapshot().collections[0]).toMatchObject({ TUTAR: "-25.00" });
+  });
+
   it("guards queries exactly like the live client", async () => {
     await expect(stub.queries.select("SELECT 1 AS x")).resolves.toEqual([]);
     await expect(stub.queries.select("DROP TABLE x")).rejects.toBeInstanceOf(

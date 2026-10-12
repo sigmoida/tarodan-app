@@ -5,12 +5,18 @@ import {
   netsisItemSettingKey,
 } from "./netsis-invoice-settings";
 import {
+  NETSIS_ACCOUNTING_SETTING_DEFINITIONS,
+  NETSIS_ACCOUNTING_SETTING_KEYS,
+} from "../accounting/netsis-accounting-settings";
+import {
+  NETSIS_SETTING_DEFINITIONS,
   checkNetsisSettingValue,
   describeNetsisSettings,
   netsisSettingGroup,
 } from "./netsis-invoice-settings.validation";
 
 const K = NETSIS_INVOICE_SETTING_KEYS;
+const A = NETSIS_ACCOUNTING_SETTING_KEYS;
 
 function completeStored(): Map<string, string> {
   const stored = new Map<string, string>([
@@ -112,13 +118,25 @@ describe("netsisSettingGroup", () => {
     expect(netsisSettingGroup(K.productSaleItem)).toBe("item");
     expect(netsisSettingGroup(netsisItemSettingKey("boost"))).toBe("item");
   });
+
+  it("muhasebe senkronu anahtarları kendi kartında (account)", () => {
+    expect(netsisSettingGroup(A.enabled)).toBe("account");
+    expect(netsisSettingGroup(A.paytrClearing)).toBe("account");
+    expect(netsisSettingGroup(A.mainBank)).toBe("account");
+    expect(netsisSettingGroup(A.pspFeeExpense)).toBe("account");
+  });
 });
 
 describe("describeNetsisSettings", () => {
   it("her tanımlı ayar için bir satır döner; boş harita her zorunluyu eksik sayar", () => {
     const { settings, readiness } = describeNetsisSettings(new Map());
-    expect(settings.map((row) => row.key)).toEqual(
-      NETSIS_INVOICE_SETTING_DEFINITIONS.map((row) => row.key),
+    // Önce fatura ayarları, sonra muhasebe senkronu ayarları — tek liste.
+    expect(settings.map((row) => row.key)).toEqual([
+      ...NETSIS_INVOICE_SETTING_DEFINITIONS.map((row) => row.key),
+      ...NETSIS_ACCOUNTING_SETTING_DEFINITIONS.map((row) => row.key),
+    ]);
+    expect(NETSIS_SETTING_DEFINITIONS.map((row) => row.key)).toEqual(
+      settings.map((row) => row.key),
     );
     expect(readiness.ready).toBe(false);
     expect(readiness.invalid).toEqual([]);
@@ -161,5 +179,103 @@ describe("describeNetsisSettings", () => {
     expect(readiness.invalid).toEqual([K.earchiveSerial]);
     expect(readiness.missing).toEqual([]);
     expect(settings.find((r) => r.key === K.earchiveSerial)?.valid).toBe(false);
+  });
+});
+
+describe("muhasebe senkronu ayarları (account kartı)", () => {
+  it("PUT: hesap kodu kırpılır, 30 karakteri aşan reddedilir, boş temizler", () => {
+    expect(checkNetsisSettingValue(A.mainBank, "  102.01.001 ")).toEqual({
+      ok: true,
+      value: "102.01.001",
+    });
+    expect(checkNetsisSettingValue(A.mainBank, "x".repeat(31))).toEqual({
+      ok: false,
+      reason: "invalid",
+    });
+    expect(checkNetsisSettingValue(A.pspFeeExpense, " ")).toEqual({
+      ok: true,
+      value: "",
+    });
+  });
+
+  it("PUT: ana anahtar mantıksaldır", () => {
+    expect(checkNetsisSettingValue(A.enabled, true)).toEqual({
+      ok: true,
+      value: "true",
+    });
+    expect(checkNetsisSettingValue(A.enabled, "evet")).toEqual({
+      ok: false,
+      reason: "type",
+    });
+  });
+
+  it("kapalıyken muhasebe hazırdır ve hiçbir hesap zorunlu değildir", () => {
+    const { settings, accountingReadiness } = describeNetsisSettings(new Map());
+    expect(accountingReadiness).toEqual({
+      ready: true,
+      missing: [],
+      invalid: [],
+    });
+    const accountRows = settings.filter((row) => row.group === "account");
+    expect(accountRows.map((row) => row.key)).toEqual(
+      NETSIS_ACCOUNTING_SETTING_DEFINITIONS.map((row) => row.key),
+    );
+    expect(accountRows.every((row) => !row.required)).toBe(true);
+    expect(accountRows.find((row) => row.key === A.enabled)).toMatchObject({
+      value: "false",
+      type: "boolean",
+    });
+  });
+
+  it("açıkken ara hesap ve banka zorunlu; gider hesabı opsiyonel", () => {
+    const { settings, accountingReadiness } = describeNetsisSettings(
+      new Map([[A.enabled, "true"]]),
+    );
+    expect(accountingReadiness.ready).toBe(false);
+    expect(accountingReadiness.missing).toEqual([
+      A.paytrClearing,
+      A.mainBank,
+    ]);
+    expect(settings.find((r) => r.key === A.pspFeeExpense)?.required).toBe(
+      false,
+    );
+  });
+
+  it("muhasebe eksiği belge kesim hazırlığını BOZMAZ", () => {
+    const stored = completeStored();
+    stored.set(A.enabled, "true");
+    const { readiness, accountingReadiness } = describeNetsisSettings(stored);
+    expect(readiness).toEqual({ ready: true, missing: [], invalid: [] });
+    expect(accountingReadiness.ready).toBe(false);
+  });
+
+  it("geçersiz kayıtlı hesap kodu 'invalid' görünür", () => {
+    const { accountingReadiness } = describeNetsisSettings(
+      new Map([
+        [A.enabled, "true"],
+        [A.paytrClearing, "P".repeat(31)],
+        [A.mainBank, "102.01"],
+      ]),
+    );
+    expect(accountingReadiness).toEqual({
+      ready: false,
+      missing: [],
+      invalid: [A.paytrClearing],
+    });
+  });
+
+  it("hepsi doluysa muhasebe hazır", () => {
+    const { accountingReadiness } = describeNetsisSettings(
+      new Map([
+        [A.enabled, "true"],
+        [A.paytrClearing, "102.99"],
+        [A.mainBank, "102.01"],
+      ]),
+    );
+    expect(accountingReadiness).toEqual({
+      ready: true,
+      missing: [],
+      invalid: [],
+    });
   });
 });

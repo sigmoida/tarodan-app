@@ -2,8 +2,8 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n/localized-message";
-import { NETSIS_INVOICE_SETTING_DEFINITIONS } from "./netsis-invoice-settings";
 import {
+  NETSIS_SETTING_DEFINITIONS,
   checkNetsisSettingValue,
   describeNetsisSettings,
   type NetsisSettingState,
@@ -12,7 +12,10 @@ import {
 
 export interface NetsisInvoiceSettingsState {
   settings: NetsisSettingState[];
+  /** Netsis ile belge kesilebilir mi. */
   readiness: NetsisSettingsReadiness;
+  /** Muhasebe senkronu (tahsilat/ödeme aktarımı) yazabilir mi; kapalıyken hazır. */
+  accountingReadiness: NetsisSettingsReadiness;
 }
 
 /** Değişen ayarların önce/sonra değerleri (yalnız gerçekten değişenler). */
@@ -26,8 +29,9 @@ export type NetsisInvoiceSettingsAfterWrite = (
   change: NetsisInvoiceSettingsChange,
 ) => Promise<void>;
 
+/** Faturalama + muhasebe senkronu ayarları: aynı ekran, aynı yazım kapısı. */
 const SETTING_BY_KEY = new Map(
-  NETSIS_INVOICE_SETTING_DEFINITIONS.map((row) => [row.key, row]),
+  NETSIS_SETTING_DEFINITIONS.map((row) => [row.key, row]),
 );
 
 /**

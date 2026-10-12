@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
 import type { MessageKey } from "@tarodan/i18n";
-import { i18nMessage } from "../../i18n/localized-message";
+import { i18nMessage, localizedPayloadOf } from "../../i18n/localized-message";
+import { translateMessage } from "../../i18n/translate";
 
 /**
  * Netsis hatalarının TEK sınıflandırması.
@@ -157,6 +158,47 @@ export function classifyNetsisError(error: unknown): NetsisErrorKind {
     return "network";
   }
   return "unknown";
+}
+
+/**
+ * Bağlantı HİÇ kurulamadı: istek Netsis'e ulaşmadı. (Zaman aşımı ve bağlantı
+ * kopması burada YOK — istek gitmiş, yanıt kaybolmuş olabilir.)
+ */
+const PRE_SEND_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * Yazma çağrısı Netsis'e hiç ULAŞMADAN mı düştü? `true` ise kayıt Netsis'te
+ * oluşmuş olamaz ve güvenle yeniden denenir. `false` "yazıldı" demek değildir,
+ * "bilinmiyor" demektir: zaman aşımında istek gitmiş, yanıt kaybolmuş
+ * olabilir — idempotency anahtarı olmayan bir yazmayı körlemesine yeniden
+ * denemek çift kayıt üretir (muhasebe senkronu bunu insana bırakır).
+ */
+export function isNetsisPreSendFailure(error: unknown): boolean {
+  const code = errorCode(error);
+  return code !== null && PRE_SEND_CODES.has(code);
+}
+
+/**
+ * Kayda/loga güvenli kısa hata metni: Netsis yanıtından bir parça ya da
+ * yerelleştirilmiş mesaj — ASLA istek gövdesi. Fatura sağlayıcısı ve muhasebe
+ * senkronu hata kolonlarını bununla doldurur.
+ */
+export function describeNetsisError(error: unknown): string {
+  if (error instanceof NetsisRequestException) {
+    return `${error.kind}: ${error.detail}`.slice(0, 500);
+  }
+  const payload = localizedPayloadOf(error);
+  if (payload) {
+    return translateMessage(payload.i18nKey, undefined, payload.i18nParams);
+  }
+  return String((error as Error)?.message ?? error).slice(0, 500);
 }
 
 /** Log'a güvenli kısa parça: satır sonları düzleşir, 300 karakterde kesilir. */

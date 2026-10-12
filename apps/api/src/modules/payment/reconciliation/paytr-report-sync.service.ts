@@ -1,6 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
+import { OutboxService } from "../../outbox/outbox.service";
+import { netsisAccountingSyncEvent } from "../../outbox/outbox.types";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaytrMerchant, Prisma } from "@prisma/client";
 import {
@@ -45,6 +47,9 @@ export class PaytrReportSyncService {
     private readonly prisma: PrismaService,
     private readonly paymentProviders: PaymentProviderRegistry,
     private readonly configService: ConfigService,
+    // Gerçekleşen hakedişin Netsis muhasebe olayı (yalnız olay yayar).
+    // @Optional — dar birim test kurulumları için.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /** Bayrak kapalıyken hiçbir istek atılmaz; scheduler bunu "disabled" izi olarak yazar. */
@@ -300,9 +305,18 @@ export class PaytrReportSyncService {
           })),
         });
       }
-      await this.prisma.paytrSettlement.update({
-        where: { id: settlement.id },
-        data: { itemsSyncedAt: new Date() },
+      // Hakediş burada KESİNLEŞİR (gerçekleşmiş + kalemleri çekildi, bir kez).
+      // Netsis muhasebe aynası olayı damgayla ATOMİK yazılır: ara hesaptan
+      // şirket bankasına aktarım kaydı. Olay yalnız iş kaydı açar.
+      await this.prisma.$transaction(async (tx) => {
+        await tx.paytrSettlement.update({
+          where: { id: settlement.id },
+          data: { itemsSyncedAt: new Date() },
+        });
+        await this.outbox?.enqueue(
+          tx,
+          netsisAccountingSyncEvent("settlement_transfer", settlement.id),
+        );
       });
       itemsFetchedFor++;
     }

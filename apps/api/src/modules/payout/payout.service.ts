@@ -22,6 +22,8 @@ import {
 } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { LedgerService } from "../ledger/ledger.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { netsisAccountingSyncEvent } from "../outbox/outbox.types";
 import {
   isValidTrIban,
   normalizeTrIban,
@@ -127,6 +129,10 @@ export class PayoutService {
     // @Optional + best-effort — defter hatası payout'u BOZMAZ; reconciliation yakalar.
     @Optional()
     private readonly ledger?: LedgerService,
+    // Netsis muhasebe aynası: "para satıcıya ulaştı" olayını yayar (yalnız
+    // olay; senkronu bilmez). @Optional — dar birim test kurulumları için.
+    @Optional()
+    private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -1094,6 +1100,23 @@ export class PayoutService {
       this.logger.warn(
         `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${e?.message}`,
       );
+    }
+    // Netsis muhasebe aynası (docs/NETSIS.md → "Muhasebe senkronu"). Bu yolda
+    // statü yazımı bir işlemin içinde değil, bu yüzden olay commit'ten SONRA
+    // yazılır; süreç tam burada ölürse senkron cron'unun süpürmesi tamamlanmış
+    // payout'u yine bulur. Olay yalnız iş kaydı açar: Netsis'e burada gidilmez
+    // ve hatası payout'u bozmaz.
+    if (params.netAmount > 0) {
+      await this.outbox
+        ?.enqueue(
+          this.prisma,
+          netsisAccountingSyncEvent("payout_transfer", params.payoutId),
+        )
+        .catch((e: unknown) =>
+          this.logger.warn(
+            `Netsis muhasebe olayı yazılamadı (payout ${params.payoutId}): ${(e as Error)?.message}`,
+          ),
+        );
     }
   }
 

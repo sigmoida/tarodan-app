@@ -175,6 +175,8 @@ export interface NetsisMixedReceipt extends NetsisPassthrough {
   TARIH?: string;
   ACIKLAMA?: string;
   TUTAR?: NetsisNumeric;
+  /** Belge/dekont numarası — bizim referansımız (fatura no, sipariş no). VERIFY. */
+  BELGE_NO?: string;
 }
 
 // VERIFY against GET definitions/BankRemittanceTransfer
@@ -182,6 +184,9 @@ export interface NetsisBankTransfer extends NetsisPassthrough {
   TARIH?: string;
   TUTAR?: NetsisNumeric;
   ACIKLAMA?: string;
+  /** Havale bir cariye gidiyorsa (satıcı ödemesi) carinin kodu. VERIFY. */
+  CARI_KOD?: string;
+  BELGE_NO?: string;
 }
 
 // ---------------------------------------------------------------------------

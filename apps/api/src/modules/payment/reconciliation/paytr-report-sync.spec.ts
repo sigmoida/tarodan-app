@@ -62,6 +62,8 @@ function makeService(opts: {
   detail?: any[];
   /** Kimliği tanımlı mağazaların env'i (varsayılan: yalnız pazaryeri). */
   env?: Record<string, string>;
+  /** Netsis muhasebe olayı için OutboxService taklidi (@Optional). */
+  outbox?: { enqueue: jest.Mock };
 }) {
   const prisma = opts.prisma ?? makePrisma();
   const getTransactionStatement = jest
@@ -87,6 +89,7 @@ function makeService(opts: {
           : env[key],
       ),
     } as any,
+    opts.outbox as any,
   );
   return {
     service,
@@ -319,6 +322,42 @@ describe("PaytrReportSyncService.syncSettlements", () => {
         data: { itemsSyncedAt: expect.any(Date) },
       }),
     );
+  });
+
+  it("a newly finalized settlement queues the Netsis accounting event with its stamp", async () => {
+    const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    const { service, prisma } = makeService({
+      summary: [REALIZED],
+      detail: [],
+      outbox,
+    });
+
+    await service.syncSettlements();
+
+    // Damga ve olay aynı işlemde (tx istemcisi bu mock'ta prisma'nın kendisi).
+    expect(outbox.enqueue).toHaveBeenCalledTimes(1);
+    expect(outbox.enqueue).toHaveBeenCalledWith(prisma, {
+      type: "netsis_accounting.sync",
+      payload: { kind: "settlement_transfer", sourceId: "stl-2026-07-30" },
+      dedupeKey: "netsis_accounting.sync:settlement_transfer:stl-2026-07-30",
+    });
+    const stampOrder = prisma.paytrSettlement.update.mock.invocationCallOrder[0];
+    expect(stampOrder).toBeLessThan(
+      outbox.enqueue.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("an already finalized settlement does not queue the event again", async () => {
+    const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    const { service } = makeService({
+      prisma: makePrisma({ itemsSyncedAt: new Date("2026-07-31T02:00:00Z") }),
+      summary: [REALIZED],
+      outbox,
+    });
+
+    await service.syncSettlements();
+
+    expect(outbox.enqueue).not.toHaveBeenCalled();
   });
 
   it("replaces projections wholesale on every sync", async () => {

@@ -57,6 +57,7 @@ const ALWAYS_SEND = new Set<string>([
 const ADMIN_ALARM_TYPES = new Set<string>([
   NotificationType.ORDER_STUCK_IN_TRANSIT,
   NotificationType.ELOGO_INVOICE_EXHAUSTED,
+  NotificationType.NETSIS_SYNC_EXHAUSTED,
   NotificationType.SELLER_INVOICE_MISSING,
   NotificationType.TRADE_STUCK_AT_WAREHOUSE,
   NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING,

@@ -151,6 +151,8 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.ORDER_STUCK_IN_TRANSIT]: free("adminLink"),
   // Fatura alarmları admin Faturalar ekranına gider (üretici tam linki verir).
   [NotificationType.ELOGO_INVOICE_EXHAUSTED]: free("adminLink"),
+  // Muhasebe aktarımı alarmı Faturalama Ayarları ekranına gider (üretici verir).
+  [NotificationType.NETSIS_SYNC_EXHAUSTED]: free("adminLink"),
   [NotificationType.SELLER_INVOICE_MISSING]: free("adminLink"),
   // Satıcının ürünü satışa kapandı: alıcı tarafındaki "artık satışta değil"
   // sayfası, kaldırılmış ürünün 404'üne gitmesin.

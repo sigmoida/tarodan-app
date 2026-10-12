@@ -10043,7 +10043,8 @@
         "serial": "Seriler",
         "item": "Hizmet Kartları",
         "document": "Belge",
-        "readiness": "Hazırlık durumu"
+        "readiness": "Hazırlık durumu",
+        "account": "Muhasebe Aktarımı"
       },
       "provider": {
         "active": "Etkin sağlayıcı",
@@ -10084,6 +10085,22 @@
         "einvoice": {
           "label": "e-Fatura serisi",
           "helper": "3 karakter, harf ve rakam (ör. TRE)."
+        },
+        "enabled": {
+          "label": "Tahsilat ve ödemeleri Netsis'e aktar",
+          "helper": "Fatura tahsilatları, PayTR hakedişleri, satıcı ödemeleri ve alıcı iadeleri Netsis'e kayıt olarak yazılır. Yalnız fatura sağlayıcısı Netsis iken çalışır."
+        },
+        "paytrClearing": {
+          "label": "PayTR ara hesabı",
+          "helper": "Fatura tahsilatlarının girdiği ve hakedişin bankaya aktarıldığı ara hesabın Netsis kodu."
+        },
+        "mainBank": {
+          "label": "Şirket banka hesabı",
+          "helper": "Hakedişin geldiği ve satıcı ödemelerinin çıktığı banka hesabının Netsis kodu."
+        },
+        "pspFeeExpense": {
+          "label": "PayTR kesintisi gider hesabı",
+          "helper": "Opsiyonel. PayTR'nin hakedişten düştüğü kesintinin yazılacağı gider hesabı."
         }
       },
       "validation": {
@@ -10539,6 +10556,10 @@
       "tradeCancelledByPlatform": {
         "title": "Takasınız Tarodan tarafından iptal edildi",
         "message": "{tradeNumber} numaralı takas Tarodan tarafından iptal edildi. Neden: {reason}.{hasRefund, select, yes { Ödediğiniz {refundAmount} TL'nin tamamı iade edilecek.} other {}} Takastaki ürünleriniz yeniden serbest."
+      },
+      "netsisSyncExhausted": {
+        "title": "Netsis Muhasebe Aktarımı Tıkandı",
+        "message": "{kindLabel} kaydı ({sourceId}) Netsis'e yazılamadı ve deneme hakkı tükendi: {reason}. Nedeni giderip kaydı yeniden deneyin; para akışı bundan etkilenmez."
       }
     },
     "auth": {
@@ -11749,6 +11770,42 @@
         "conflict": "Netsis kaydın zaten var olduğunu bildiriyor",
         "configuration": "Netsis entegrasyonu yanlış yapılandırılmış",
         "unknown": "Netsis beklenmeyen bir hata döndürdü"
+      },
+      "accounting": {
+        "description": {
+          "invoiceCollection": "Tahsilat {invoiceNumber}",
+          "settlementTransfer": "PayTR hakediş {date} kesinti {fee}",
+          "payoutTransfer": "Satıcı ödemesi {reference}",
+          "payoutTransferPooled": "Satıcı ödemesi {name} ****{last4} {reference}",
+          "refundReversal": "İade {reference}",
+          "refundReversalPooled": "İade {reference} {name}"
+        },
+        "error": {
+          "accountMissing": "Netsis muhasebe hesabı tanımlı değil: {account}",
+          "corporateCariCodeInvalid": "Kurumsal cari kodu Netsis'e yazılamıyor: {code}",
+          "retailCariMissing": "Ortak perakende cari kodu (netsis.cari.retailCode) tanımlı değil",
+          "invalidProviderRef": "Faturanın Netsis referansı okunamadı: {ref}",
+          "slipNotFound": "Faturanın Netsis fişi bulunamadı: {number}",
+          "slipCariMissing": "Faturanın Netsis fişinde cari kodu yok: {number}",
+          "refLost": "Kayıt Netsis'te oluştu ({ref}) ama yerelde saklanamadı; çift kayıt olmasın diye yeniden denenmez, Netsis'te kontrol edin",
+          "outcomeUnknown": "Netsis'e gönderildi ama sonucu bilinmiyor; çift kayıt olmasın diye otomatik denenmez. Netsis'te {tracking} izleme anahtarlı kaydı arayın: varsa kayıt numarasıyla eşleştirin, yoksa yeniden deneyin"
+        },
+        "skip": {
+          "disabled": "Muhasebe senkronu kapalı ya da fatura sağlayıcısı Netsis değil",
+          "sourceMissing": "Kaynak kayıt bulunamadı",
+          "notFinal": "Kaynak henüz kesinleşmemiş ({status})",
+          "zeroAmount": "Aktarılacak tutar yok",
+          "testLane": "Test şeridi işlemi; muhasebeye aktarılmaz",
+          "partyMissing": "İşlemin tarafı bulunamadı"
+        },
+        "recordNotFound": "Netsis senkron kaydı bulunamadı",
+        "notRetryable": "Bu kayıt yeniden denenemez (durum: {status})",
+        "kind": {
+          "invoice_collection": "Fatura tahsilatı",
+          "settlement_transfer": "PayTR hakediş aktarımı",
+          "payout_transfer": "Satıcı ödemesi",
+          "refund_reversal": "Alıcı iadesi"
+        }
       }
     },
     "invoicing": {

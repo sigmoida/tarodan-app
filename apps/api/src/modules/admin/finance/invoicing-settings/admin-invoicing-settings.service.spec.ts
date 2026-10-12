@@ -75,6 +75,20 @@ describe("AdminInvoicingSettingsService", () => {
       type: "platform_sale",
       labelKey: "admin.finance.invoices.types.platformSale",
     });
+    // Muhasebe senkronu aynı yanıtta, kendi kartı ve kendi hazırlığıyla.
+    expect(
+      result.settings.filter((r) => r.group === "account").map((r) => r.key),
+    ).toEqual([
+      "netsis.accounting.enabled",
+      "netsis.account.paytrClearing",
+      "netsis.account.mainBank",
+      "netsis.account.pspFeeExpense",
+    ]);
+    expect(result.accountingReadiness).toEqual({
+      ready: true,
+      missing: [],
+      invalid: [],
+    });
   });
 
   it("update: ZORUNLU denetimi ayar işleminin içinde, önce/sonra ile yazar", async () => {

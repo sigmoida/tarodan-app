@@ -59,6 +59,9 @@ describe("critical admin audit durability", () => {
     // membership.service) bu tek dosyaya delege eder; zorunlu denetim yazımı
     // artık burada yaşar.
     "membership-tier-update.service.ts",
+    // Netsis muhasebe kaydını yeniden kuyruğa alma / elle eşleştirme: yanlış
+    // bir eşleştirme muhasebede bir para hareketini görünmez kılar.
+    "admin-netsis-sync.service.ts",
   ])("uses required audit writes in %s", (filename) => {
     const source = readFileSync(findByName(filename), "utf8");
     expect(source).toContain("createRequiredAuditLog");

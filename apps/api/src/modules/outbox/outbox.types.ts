@@ -1,3 +1,6 @@
+import type { NetsisSyncKind } from "@prisma/client";
+import type { OutboxEnqueueInput } from "./outbox.service";
+
 /**
  * Outbox olay tipleri (dispatch anahtarları) — magic string yerine tek kaynak.
  * Her tip için idempotent bir handler kayıtlıdır (OutboxHandlerRegistry).
@@ -157,3 +160,32 @@ export const tradeCancelledPaymentRefundDedupeKey = (
  * beklenmez. Yük: `MailInternalOutboxPayload` (mail-routing modülü).
  */
 export const OUTBOX_MAIL_INTERNAL_EVENT = "mail.internal_event";
+
+/**
+ * Netsis muhasebe senkronu: bir para hareketi KESİNLEŞTİ (satıcı ödemesi
+ * tamamlandı, PSP iadesi sonuçlandı, PayTR hakedişi gerçekleşti). Handler
+ * (`invoicing/accounting/netsis-accounting-sync.service.ts`) yalnız iş
+ * kaydını (`NetsisSyncRecord`) açar; Netsis'e HİÇBİR ZAMAN burada, bir
+ * isteğin ya da para transaction'ının içinde gidilmez — yazımı cron yapar.
+ * Senkron kapalıysa kayıt `skipped` açılır. Para akışları yalnız bu olayı
+ * yayar; senkronun kendisini bilmez. İdempotent: kaynak başına tek satır.
+ */
+export const OUTBOX_NETSIS_ACCOUNTING_SYNC = "netsis_accounting.sync";
+
+export type NetsisAccountingSyncPayload = {
+  kind: NetsisSyncKind;
+  sourceId: string;
+};
+
+/** Para akışlarının yaydığı olay — tip, yük ve tekilleştirme anahtarı tek yerde. */
+export function netsisAccountingSyncEvent(
+  kind: NetsisSyncKind,
+  sourceId: string,
+): OutboxEnqueueInput {
+  const payload: NetsisAccountingSyncPayload = { kind, sourceId };
+  return {
+    type: OUTBOX_NETSIS_ACCOUNTING_SYNC,
+    payload,
+    dedupeKey: `${OUTBOX_NETSIS_ACCOUNTING_SYNC}:${kind}:${sourceId}`,
+  };
+}

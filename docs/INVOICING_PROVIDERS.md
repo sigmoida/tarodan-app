@@ -186,6 +186,13 @@ döndürür (admin ekranı için).
 | `netsis.item.productSale`           | boş        | `platform_sale` kartı (≤ 35 karakter, VERIFY)       |
 | `netsis.item.<tür>`                 | boş        | `FiscalInvoiceType`'tan türeyen her ücret türü için |
 
+Aynı ekranda (grup `account`) muhasebe senkronunun anahtarları durur:
+`netsis.accounting.enabled` (varsayılan kapalı), `netsis.account.paytrClearing`,
+`netsis.account.mainBank`, `netsis.account.pspFeeExpense`. Tanımları
+`accounting/netsis-accounting-settings.ts`'tedir; hazırlıkları ayrı döner
+(`accountingReadiness`) ve belge kesim hazırlığını etkilemez. Akışlar:
+`docs/NETSIS.md` → "Muhasebe senkronu".
+
 **Admin ekranı:** Sistem → Faturalama Ayarları (`/system/invoicing-settings`,
 `settings` izni). `GET`/`PUT /admin/invoicing/settings` ayarları okur/yazar
 (PUT: bilinmeyen anahtar 400, hepsi tek işlemde, zorunlu denetim kaydı

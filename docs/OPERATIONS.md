@@ -257,6 +257,51 @@ Bilinçli olarak eski adıyla kalanlar (ayrı bir ops adımı isterler, bkz.
 cron kimliği, `ELOGO_*` ortam anahtarları, S3 klasörü `elogo-invoices/`, e-posta
 şablonu `elogo-invoice`, bildirim türü `ELOGO_INVOICE_EXHAUSTED`.
 
+### Netsis muhasebe senkronu (tahsilat ve ödeme aktarımı)
+
+`20261012150000_netsis_sync_records` migration'ı yalnız ekler (iki enum +
+`netsis_sync_records` tablosu); deploy'da kendiliğinden koşar, backfill yoktur.
+Akışlar ve doğrulanacaklar: `NETSIS.md` → "Muhasebe senkronu".
+
+**Varsayılan KAPALI.** Kapalıyken (ya da `INVOICE_PROVIDER` `netsis` değilken)
+para akışları yine olay yayar ve her hareket için `skipped` bir satır açılır;
+Netsis'e hiçbir şey yazılmaz. Para akışları senkrondan hiçbir zaman etkilenmez.
+
+Açma sırası:
+
+1. `INVOICE_PROVIDER=netsis` ve `NETSIS_ENABLED=true` (deploy ayarı).
+2. Muhasebecinin verdiği kodlar Sistem → Faturalama Ayarları'na (ya da
+   `PUT /admin/invoicing/settings`): `netsis.account.paytrClearing` (PayTR ara
+   hesabı), `netsis.account.mainBank` (şirket bankası), opsiyonel
+   `netsis.account.pspFeeExpense`; ortak perakende cari
+   (`netsis.cari.retailCode`) bireysel satıcı ödemeleri ve iadeler için de
+   gerekir.
+3. `netsis.accounting.enabled` = `true`. Zorunlu hesap eksikken cron hiçbir
+   kaydı denemez (bütçe yakmaz); `GET /admin/invoicing/settings` yanıtındaki
+   `accountingReadiness` eksikleri listeler.
+4. Açılmadan önce biriken `skipped` kayıtlar KENDİLİĞİNDEN yazılmaz. Muhasebenin
+   seçtiği günden itibaren aktarmak için:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/requeue-netsis-sync.js --since 2026-11-01 --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/requeue-netsis-sync.js --since 2026-11-01'
+```
+
+`--since` zorunludur (tarihsiz koşu tüm geçmişi yazardı); `--kind
+payout_transfer` gibi türe daraltılabilir. Yerelde:
+`pnpm --filter @tarodan/api netsis:requeue-sync:prod -- --since …` (önce
+`build:seed`). Idempotenttir: yalnız `skipped` satırlara dokunur.
+
+İzleme: cron `netsis-accounting-retry` (15 dk, Sentry check-in). Bütçesi biten
+ya da **sonucu bilinmeyen** (zaman aşımı → Netsis'e yazılmış olabilir) kayıtlar
+`NETSIS_SYNC_EXHAUSTED` admin bildirimi ve `NETSIS_SYNC_EXHAUSTED` /
+`NETSIS_SYNC_OUTCOME_UNKNOWN` log satırı üretir. Kurtarma:
+`GET /admin/invoicing/netsis-sync?status=failed` ile kaydı bulun; Netsis'te
+izleme anahtarıyla (`<tür>:<kaynak id>`, kaydın `EKACK1` alanında) arayın —
+varsa `POST /admin/invoicing/netsis-sync/:id/retry` gövdesine
+`{ "netsisRef": "<Netsis kayıt no>" }` ile eşleştirin, yoksa boş gövdeyle
+yeniden deneyin. İkisi de zorunlu denetim kaydı yazar.
+
 ### Bir kerelik: onay kayıtları (consent_records) geçişi
 
 `20261005100000_consent_records` migration'ı hukuki onay kayıtları tablosunu
