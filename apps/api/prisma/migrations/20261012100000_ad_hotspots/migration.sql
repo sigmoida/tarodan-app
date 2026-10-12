@@ -39,7 +39,8 @@ ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Veri adımı: bugün tıklanabilir olan her görselli reklam (görsel + bağlantı)
 -- görselin TAMAMINI kaplayan tek bir alan alır (x 0, y 0, en 1, boy 1; hedef =
--- eski link_url, ad = başlığın ilk 80 karakteri) ve link_url'i boşaltılır.
+-- eski link_url, ad = başlığın ilk 80 karakteri; başlık boşsa 'Reklam' — boş ad
+-- kuralı ihlal eder ve sonraki kaydı engellerdi) ve link_url'i boşaltılır.
 -- Böylece mevcut reklamlar göç sonrası tam eskisi gibi tıklanır; admin alanı
 -- dilediğinde daraltır/böler. Boş dize de "yok" sayılır (BlankToNull öncesi
 -- kayıtlar). Reklamın tık geçmişi reklamda kalır; yeni alanın sayacı 0'dan
@@ -49,7 +50,8 @@ INSERT INTO "advertisement_hotspots" (
     "link_url", "label", "sort_order", "click_count", "created_at", "updated_at"
 )
 SELECT gen_random_uuid()::text, "id", 0, 0, 1, 1,
-       "link_url", left(btrim("title"), 80), 0, 0, NOW(), NOW()
+       "link_url", COALESCE(NULLIF(left(btrim("title"), 80), ''), 'Reklam'),
+       0, 0, NOW(), NOW()
   FROM "advertisements"
  WHERE COALESCE("image_url", '') <> ''
    AND COALESCE("link_url", '') <> '';

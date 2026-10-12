@@ -22,11 +22,10 @@ describe("adAspectRatio", () => {
     );
   });
 
-  it("ölçü yoksa yüklenen görselin gerçek oranı varsayılanın önüne geçer", () => {
+  it("yüklenen görselin gerçek oranı kayıtlı ölçünün ve varsayılanın önüne geçer", () => {
     expect(adAspectRatio({ width: null, height: null }, "header", 2)).toBe(2);
-    expect(adAspectRatio({ width: 728, height: 90 }, "header", 2)).toBeCloseTo(
-      728 / 90,
-    );
+    // IAB ön ayarı görselle uyuşmasa da kutu = görsel (alanlar kaymasın).
+    expect(adAspectRatio({ width: 728, height: 90 }, "header", 2)).toBe(2);
     expect(adAspectRatio({ width: null, height: null }, "header", 0)).toBe(
       FALLBACK_AD_RATIO.header,
     );

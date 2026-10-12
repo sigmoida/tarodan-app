@@ -35,7 +35,9 @@ function TopAdItem({ ad }: { ad: Advertisement }) {
           alt={ad.altText || ad.title}
           loading="lazy"
           decoding="async"
-          className="h-6 w-auto max-w-[200px] object-contain"
+          // Kutu = görsel: `max-h`/`max-w` ile kendi oranında sığar (sabit
+          // yükseklik + object-contain harf kutusu bırakır, alanlar kayardı).
+          className="h-auto max-h-6 w-auto max-w-[200px]"
           onError={() => setImageFailed(true)}
         />
         <AdHotspots ad={ad} />

@@ -41,8 +41,9 @@ export default function AdCreative({
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   useAdImpression(boxRef, ad.id);
-  // Kayıtlı ölçüsü olmayan afişte kutu, görsel yüklenince onun gerçek oranını
-  // alır: alanlar kutunun yüzdesiyle yerleştiği için kutu = görsel olmalı.
+  // Görsel yüklenince kutu onun gerçek oranını alır (kayıtlı ölçü IAB ön
+  // ayarıyla görselden sapabilir): alanlar kutunun yüzdesiyle yerleştiği için
+  // kutu = görsel olmalı.
   const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
 
   const body = (

@@ -1,5 +1,6 @@
 /** @format */
 
+import type { AdHotspotInput } from "@tarodan/types";
 import { api, GATEWAY_BASE } from "./client";
 
 /**
@@ -16,14 +17,8 @@ export type AdPosition = "topbar" | "header" | "footer" | "inline" | "popup";
  * Görsel afişin tıklanabilir bölgesi. Koordinatlar görselin 0–1 oranlarıdır
  * (sol-üst köşe + en/boy); bölgeler çakışmaz ve `sortOrder` ile sıralıdır.
  */
-export interface AdHotspot {
+export interface AdHotspot extends AdHotspotInput {
   id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-  linkUrl: string;
   sortOrder: number;
 }
 

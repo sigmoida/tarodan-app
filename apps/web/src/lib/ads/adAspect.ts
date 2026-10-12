@@ -12,18 +12,28 @@ export const FALLBACK_AD_RATIO: Record<AdPosition, number> = {
 };
 
 /**
- * Yuvanın en/boy oranı: afişin kendi `width/height` değeri varsa o (kırpma
- * olmasın), yoksa yüklenen görselin gerçek oranı (`naturalRatio`, tarayıcıdan
- * okunur), o da yoksa konum varsayılanı. Geçersiz/sıfır ölçü yok sayılır.
+ * Yuvanın en/boy oranı: görsel yüklendiyse onun gerçek oranı (`naturalRatio`,
+ * tarayıcıdan okunur); yüklenene kadar afişin kayıtlı `width/height` değeri
+ * (yer ayırma, kayma olmasın); o da yoksa konum varsayılanı. Geçersiz/sıfır
+ * ölçü yok sayılır.
  *
  * Kutu ile görselin oranı AYNI olmalı: tıklanabilir alanlar kutunun
  * yüzdesiyle yerleşir; görsel kutuya harf kutusuyla sığarsa alanlar kayar.
+ * Kayıtlı ölçü admin'de IAB ön ayarıyla görselden bağımsız seçilebildiği için
+ * yetkili olan görselin kendisidir.
  */
 export function adAspectRatio(
   ad: { width: number | null; height: number | null },
   position: AdPosition,
   naturalRatio?: number | null,
 ): number {
+  if (
+    typeof naturalRatio === "number" &&
+    Number.isFinite(naturalRatio) &&
+    naturalRatio > 0
+  ) {
+    return naturalRatio;
+  }
   const { width, height } = ad;
   if (
     typeof width === "number" &&
@@ -32,13 +42,6 @@ export function adAspectRatio(
     height > 0
   ) {
     return width / height;
-  }
-  if (
-    typeof naturalRatio === "number" &&
-    Number.isFinite(naturalRatio) &&
-    naturalRatio > 0
-  ) {
-    return naturalRatio;
   }
   return FALLBACK_AD_RATIO[position];
 }

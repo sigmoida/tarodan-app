@@ -53,6 +53,7 @@ export function HotspotEditor({ imageUrl, value, onChange, issues }: Props) {
   const full = value.length >= AD_HOTSPOT_MAX;
   const issuesAt = (index: number, field: string) =>
     issues.find((i) => i.path[1] === index && i.path[2] === field)?.message;
+  const listIssue = issues.find((i) => i.path.length === 1)?.message;
 
   const remove = (index: number) => {
     onChange(value.filter((_, i) => i !== index));
@@ -98,11 +99,7 @@ export function HotspotEditor({ imageUrl, value, onChange, issues }: Props) {
           {t("admin.marketing.ads.hotspots.emptyWarning")}
         </Alert>
       )}
-      {issues.find((i) => i.path.length === 1) && (
-        <Alert variant="danger">
-          {issues.find((i) => i.path.length === 1)?.message}
-        </Alert>
-      )}
+      {listIssue && <Alert variant="danger">{listIssue}</Alert>}
 
       <div
         ref={surfaceRef}

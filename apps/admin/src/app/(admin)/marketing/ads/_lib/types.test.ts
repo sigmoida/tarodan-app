@@ -145,7 +145,7 @@ describe("adSchema", () => {
   });
 
   it("rejects bad links, long content, oversize dimensions", () => {
-    expect(msgs({ ...filled, linkUrl: "//x.com" })).toContain(
+    expect(msgs({ ...filled, imageUrl: "", linkUrl: "//x.com" })).toContain(
       "admin.marketing.ads.validation.linkInvalid",
     );
     expect(msgs({ ...filled, content: "a".repeat(501) })).toContain(
@@ -155,6 +155,10 @@ describe("adSchema", () => {
       "admin.marketing.ads.validation.sizeMax",
     );
     expect(schema.safeParse({ ...filled, width: 4000, height: 4000 }).success).toBe(true);
+  });
+
+  it("image ad: the hidden ad-level link is not validated (stale value must not block submit)", () => {
+    expect(schema.safeParse({ ...filled, linkUrl: "//x.com" }).success).toBe(true);
   });
 });
 

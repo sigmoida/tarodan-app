@@ -59,7 +59,9 @@ describe("ad hotspots migration", () => {
 
     const insertSql = sql.slice(insert, clear);
     expect(insertSql).toMatch(/gen_random_uuid\(\)::text, "id", 0, 0, 1, 1,/);
-    expect(insertSql).toMatch(/"link_url", left\(btrim\("title"\), 80\), 0, 0/);
+    expect(insertSql).toMatch(
+      /"link_url", COALESCE\(NULLIF\(left\(btrim\("title"\), 80\), ''\), 'Reklam'\),\s+0, 0/,
+    );
     expect(insertSql).toMatch(/COALESCE\("image_url", ''\) <> ''/);
     expect(insertSql).toMatch(/COALESCE\("link_url", ''\) <> ''/);
   });

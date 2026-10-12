@@ -1,6 +1,10 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
-import { validateAdHotspots, type AdHotspotError } from "@tarodan/types";
+import {
+  validateAdHotspots,
+  type AdHotspotError,
+  type AdHotspotInput,
+} from "@tarodan/types";
 import {
   endOfIstanbulDayIso,
   istanbulDateOf,
@@ -19,27 +23,15 @@ export interface AdCampaign {
 }
 
 /** API'nin döndürdüğü tıklanabilir alan (konum görselin kesri, 0–1). */
-export interface AdHotspot {
+export interface AdHotspot extends AdHotspotInput {
   id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-  linkUrl: string;
   sortOrder: number;
   clickCount: number;
 }
 
 /** Formdaki alan: kayıtlıysa `id` + `clickCount` taşır (güncellemede tıklama sayısı korunur). */
-export interface AdHotspotFormRow {
+export interface AdHotspotFormRow extends AdHotspotInput {
   id?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-  linkUrl: string;
   clickCount?: number;
 }
 
@@ -240,11 +232,7 @@ export const adSchema = (t: T) =>
         .string()
         .min(1, t("admin.marketing.ads.validation.titleRequired")),
       imageUrl: z.string().optional().default(""),
-      linkUrl: z
-        .string()
-        .optional()
-        .default("")
-        .refine(isValidAdLink, t("admin.marketing.ads.validation.linkInvalid")),
+      linkUrl: z.string().optional().default(""),
       altText: z.string().optional().default(""),
       content: z
         .string()
@@ -271,6 +259,15 @@ export const adSchema = (t: T) =>
       hotspots: z.array(hotspotRowSchema).optional().default([]),
     })
     .superRefine((v, ctx) => {
+      // Reklam bağlantısı yalnız görselsiz reklamda görünür ve gider; görselli
+      // reklamda gizli alanın eski değeri gönderimi engellemesin.
+      if (!v.imageUrl?.trim() && !isValidAdLink(v.linkUrl)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["linkUrl"],
+          message: t("admin.marketing.ads.validation.linkInvalid"),
+        });
+      }
       for (const issue of hotspotIssues(t, v.hotspots)) {
         ctx.addIssue({ code: "custom", ...issue });
       }
