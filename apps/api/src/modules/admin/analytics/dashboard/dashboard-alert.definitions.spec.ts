@@ -6,7 +6,10 @@ import {
 import {
   ALERT_DEFINITIONS,
   DIAGNOSTIC_ALERT_KEYS,
+  stuckShippedCutoff,
 } from "./dashboard-alert.definitions";
+import { shippedBeforeWhere } from "../../orders/helpers/shipped-before-where";
+import { LIVE_ORDER } from "../../../account-lane/live-lane.where";
 import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
 import { defaultTimingValues } from "../../../../common/timing-rules";
 import { preparingDeadlineApproachingWhere } from "../../../../common/helpers/preparing-deadline";
@@ -79,6 +82,19 @@ describe("dashboard alert definitions", () => {
       const where = captureWhere("stuckShippedOrders", ctx);
       const cutoff = where.shipment.is.shippedAt.lt as Date;
       expect(NOW.getTime() - cutoff.getTime()).toBe(3 * 24 * 60 * 60 * 1000);
+    });
+
+    it("counts with the order list's shippedBefore predicate and links to it at the same cutoff", () => {
+      const ctx = ctxWith({ shippedStaleAlertDays: 3 });
+      const cutoff = stuckShippedCutoff(NOW, ctx);
+
+      expect(captureWhere("stuckShippedOrders", ctx)).toEqual({
+        ...LIVE_ORDER,
+        ...shippedBeforeWhere(cutoff),
+      });
+      expect(ALERT_DEFINITIONS.stuckShippedOrders.href?.(NOW, ctx)).toBe(
+        `/operations/orders?bucket=all&shippedBefore=${encodeURIComponent(cutoff.toISOString())}`,
+      );
     });
 
     it("reads the carrier-task threshold from carrierCancellationAlertHours", () => {

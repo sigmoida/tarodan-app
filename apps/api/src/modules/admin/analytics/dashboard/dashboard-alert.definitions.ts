@@ -1,7 +1,6 @@
 import {
   CommissionRuleSetStatus,
   CouponReservationStatus,
-  OrderStatus,
   OutboxStatus,
   PaymentHoldStatus,
   PayoutStatus,
@@ -10,10 +9,11 @@ import {
   ShippingTariffStatus,
   TradeStatus,
 } from "@prisma/client";
-import type {
-  DashboardAlertKey,
-  DashboardAlertSeverity,
-  DashboardAlertThreshold,
+import {
+  adminOrdersShippedBeforeHref,
+  type DashboardAlertKey,
+  type DashboardAlertSeverity,
+  type DashboardAlertThreshold,
 } from "@tarodan/types";
 import type { PrismaService } from "../../../../prisma";
 import {
@@ -27,6 +27,10 @@ import {
   liveRowSql,
 } from "../../../account-lane/live-lane.where";
 import { preparingDeadlineApproachingWhere } from "../../../../common/helpers/preparing-deadline";
+import {
+  shippedBeforeWhere,
+  shippedStaleCutoff,
+} from "../../orders/helpers/shipped-before-where";
 
 /**
  * Zone B — "Uyarılar". Normalde OLMAMASI gereken durumlar; sıfırsa satır hiç
@@ -56,6 +60,11 @@ export interface AlertDefinition {
     ctx: AlertThresholdContext,
   ) => Prisma.PrismaPromise<unknown>;
   read: (raw: unknown) => AlertReading;
+  /**
+   * Bağlantı eşiğe bağlıysa (liste süzgecine eşik anı yazılır) onu üretir;
+   * yoksa `DASHBOARD_ALERT_LINKS`'teki sabit adres kullanılır.
+   */
+  href?: (now: Date, ctx: AlertThresholdContext) => string;
 }
 
 const count = (raw: unknown): AlertReading => ({ count: Number(raw ?? 0) });
@@ -67,6 +76,14 @@ const missingConfig = (raw: unknown): AlertReading => ({
 
 const daysAgo = (now: Date, days: number) =>
   new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+/** "Uzun süredir kargoda" uyarısının kesim anı — sayım ve bağlantı paylaşır. */
+export function stuckShippedCutoff(
+  now: Date,
+  ctx: AlertThresholdContext,
+): Date {
+  return shippedStaleCutoff(now, ctx.timing.shippedStaleAlertDays);
+}
 
 /**
  * Bu üç uyarı PayTR/defter mutabakatının `diagnostics` çıktısından gelir
@@ -84,7 +101,11 @@ export type QueryableAlertKey = Exclude<
 >;
 
 export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
-  /** Kargo poll'u teslimatı hiç raporlamazsa sipariş asla faturalanamaz. */
+  /**
+   * Kargo poll'u teslimatı hiç raporlamazsa sipariş asla faturalanamaz.
+   * Küme ve bağlantı aynı kesim anından (`stuckShippedCutoff`) ve aynı
+   * yüklemden (`shippedBeforeWhere`) gelir: liste uyarının saydığını açar.
+   */
   stuckShippedOrders: {
     severity: "critical",
     threshold: (ctx) => ({
@@ -95,17 +116,12 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
       prisma.order.count({
         where: {
           ...LIVE_ORDER,
-          status: OrderStatus.shipped,
-          shipment: {
-            is: {
-              shippedAt: {
-                lt: daysAgo(now, ctx.timing.shippedStaleAlertDays),
-              },
-            },
-          },
+          ...shippedBeforeWhere(stuckShippedCutoff(now, ctx)),
         },
       }),
     read: count,
+    href: (now, ctx) =>
+      adminOrdersShippedBeforeHref(stuckShippedCutoff(now, ctx).toISOString()),
   },
 
   /** Kargoya verilmiş ama depoya HİÇ varmamış takas girişi (kayıp koli adayı). */

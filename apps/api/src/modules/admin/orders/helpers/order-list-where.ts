@@ -18,6 +18,7 @@ import {
   type PaytrOidMatch,
 } from "../../../payment/helpers/paytr-oid-search";
 import { cartBucketWhere, groupLines, singleLine } from "./order-bucket-where";
+import { shippedBeforeWhere } from "./shipped-before-where";
 
 /** Liste + sayaç uçlarının ortak filtre alanları (DTO'nun alt kümesi). */
 export interface OrderListFilters {
@@ -34,6 +35,12 @@ export interface OrderListFilters {
   productId?: string;
   /** Eski deep-link'ler (`?status=delivered`): tek sipariş durumu. */
   status?: OrderStatus;
+  /**
+   * ISO an: bu andan ÖNCE kargoya verilmiş, hâlâ `shipped` satırlar —
+   * dashboard'un "uzun süredir kargoda" uyarısının bağlantısı
+   * (`shippedBeforeWhere`, uyarıyla aynı yüklem).
+   */
+  shippedBefore?: string;
   /**
    * `search` bir PayTR "sipariş no"suysa isteğin başında BİR KEZ çözülmüş
    * kayıtlar (`resolvePaytrOidMatch`); `where`'ler yalnız `id IN (...)` taşır.
@@ -110,6 +117,9 @@ function filterParts(filters: OrderListFilters): Record<string, unknown>[] {
     if (where) parts.push(where);
   }
   if (filters.status) parts.push({ status: filters.status });
+  if (filters.shippedBefore) {
+    parts.push(shippedBeforeWhere(new Date(filters.shippedBefore)));
+  }
   const dates = dateRangeWhere(filters);
   if (Object.keys(dates).length > 0) parts.push(dates);
   parts.push(...scopeParts(filters));
@@ -218,6 +228,7 @@ export function orderListScopeOf(query: OrderListQuery): {
     userRole: query.userRole,
     productId: query.productId,
     status: query.status,
+    shippedBefore: query.shippedBefore,
   };
   return { tab, bucket, filters };
 }

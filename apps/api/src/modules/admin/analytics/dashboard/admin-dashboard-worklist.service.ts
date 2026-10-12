@@ -174,7 +174,9 @@ export class AdminDashboardWorklistService {
           ? { threshold: definition.threshold(ctx) }
           : {}),
         severity: definition.severity,
-        href: DASHBOARD_ALERT_LINKS[key],
+        // Eşiğe bağlı bağlantı (ör. `shippedBefore=<kesim anı>`) sayımla aynı
+        // `now` + `ctx`'ten üretilir: liste uyarının saydığı kümeyi açar.
+        href: definition.href?.(now, ctx) ?? DASHBOARD_ALERT_LINKS[key],
       });
     });
 

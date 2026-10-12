@@ -195,6 +195,39 @@ describe("AdminDashboardWorklistService", () => {
     ).toEqual({ value: 3, unit: "days" });
   });
 
+  it("links the stuck-shipment alert to the order list cut at the SAME threshold", async () => {
+    prisma.platformSetting.findMany.mockResolvedValue([
+      {
+        settingKey: "shipped_stale_alert_days",
+        settingValue: "3",
+        updatedAt: new Date(),
+      },
+    ]);
+    alertCounts.stuckShippedOrders = 4;
+
+    const { generatedAt, alerts } = await service.getWorklist();
+    const alert = alerts.find((row) => row.key === "stuckShippedOrders");
+    const url = new URL(alert?.href ?? "", "https://admin.test");
+
+    expect(url.pathname).toBe("/operations/orders");
+    expect(url.searchParams.get("bucket")).toBe("all");
+    const cutoff = new Date(url.searchParams.get("shippedBefore") ?? "");
+    const DAY = 24 * 60 * 60 * 1000;
+    // The href's cutoff is generatedAt − threshold, the threshold the row shows.
+    expect((new Date(generatedAt).getTime() - cutoff.getTime()) / DAY).toBe(
+      alert?.threshold?.value,
+    );
+    expect(alert?.threshold).toEqual({ value: 3, unit: "days" });
+  });
+
+  it("keeps the static catalogue link for alerts with no threshold-bound list", async () => {
+    alertCounts.outboxDead = 1;
+
+    const { alerts } = await service.getWorklist();
+
+    expect(alerts[0]?.href).toBe("/system/logs");
+  });
+
   it("keeps today's default threshold when no admin value is set", async () => {
     alertCounts.stuckShippedOrders = 1;
 

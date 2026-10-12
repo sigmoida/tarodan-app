@@ -229,6 +229,15 @@ export class AdminOrderCountsQueryDto extends AdminListQueryDto {
   status?: OrderStatus;
 
   @ApiPropertyOptional({
+    example: "2026-10-02T09:00:00.000Z",
+    description:
+      "Bu andan önce kargoya verilmiş, hâlâ kargodaki siparişler (dashboard 'uzun süredir kargoda' uyarısı)",
+  })
+  @IsOptional()
+  @IsDateString()
+  shippedBefore?: string;
+
+  @ApiPropertyOptional({
     example: "2024-01-01",
     description: "Eski ad; startDate tercih edilir",
   })
