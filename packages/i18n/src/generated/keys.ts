@@ -5513,6 +5513,7 @@ export type MessageKey =
   | "home.slider.allBrands"
   | "home.slider.browseMarketplace"
   | "home.slider.exploreHotWheels"
+  | "home.slider.goToSlide"
   | "home.slider.hotWheelsSubtitle"
   | "home.slider.hotWheelsTitle"
   | "home.slider.howItWorks"
