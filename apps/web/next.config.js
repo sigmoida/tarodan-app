@@ -159,6 +159,18 @@ const nextConfig = {
     return {
       beforeFiles: [
         {
+          // Staging iOS'ta hiçbir uygulamayı sahiplenmez. Prod uygulaması
+          // (`com.tarodan.app`) `applinks:staging.tarodan.com.tr` taşıyor;
+          // staging de aynı AASA'yı yayınlayınca staging maillerindeki
+          // doğrulama/şifre sıfırlama linkleri PROD uygulamasında açılıyor ve
+          // staging token'ı prod API'ye gidip düşüyordu. Boş `details` ile bu
+          // linkler Safari'de, staging web'inde açılır. Host'a bağlı: aynı build
+          // iki ortamda da koşuyor, env'e değil isteğe bakmak en az sürprizli.
+          source: '/.well-known/apple-app-site-association',
+          has: [{ type: 'host', value: 'staging.tarodan.com.tr' }],
+          destination: '/.well-known/apple-app-site-association-staging.json',
+        },
+        {
           // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
           source: '/favicon.ico',
           destination: '/tarodan-favicon.png',
