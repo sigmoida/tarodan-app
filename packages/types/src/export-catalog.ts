@@ -60,7 +60,8 @@ export function defineExportCatalog<const T extends readonly ExportColumn[]>(
   resource: string,
   columns: T,
 ): ExportCatalog<T> {
-  const keys = columns.map((column) => column.key);
+  // İndeksle erişim anahtarın literal tipini korur (`map` kısıta düşerdi).
+  const keys = Array.from({ length: columns.length }, (_, i) => columns[i].key);
   // Aynı anahtar iki kez tanımlanırsa ikinci kolon birincinin değerini yazardı.
   if (new Set(keys).size !== keys.length) {
     throw new Error(`Export catalog "${resource}" has duplicate column keys`);
