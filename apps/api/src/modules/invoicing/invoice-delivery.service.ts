@@ -8,7 +8,11 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import { Prisma, type FiscalInvoice } from "@prisma/client";
+import {
+  Prisma,
+  type EInvoiceProviderName,
+  type FiscalInvoice,
+} from "@prisma/client";
 import { AccountLaneService } from "../account-lane/account-lane.service";
 import { PrismaService } from "../../prisma";
 import { INVOICE_MAX_SEND_ATTEMPTS } from "./helpers/invoice-retry-policy";
@@ -41,6 +45,10 @@ import {
   type FiscalDocumentLine,
   type RecipientKindResult,
 } from "./provider/e-invoice-provider";
+import {
+  InvoiceProviderRegistry,
+  providerForRecord,
+} from "./provider/provider-registry";
 import type { CutOptions, RevenueType } from "./invoicing.service";
 import { i18nMessage } from "../i18n";
 import { InvoiceDocumentService } from "./invoice-document.service";
@@ -77,7 +85,17 @@ export class InvoiceDeliveryService {
     // Test şeridi kapısı. AccountLaneModule @Global olduğu için runtime'da her
     // zaman gelir; @Optional yalnız üç-argümanlı birim testleri için.
     @Optional() private readonly lanes?: AccountLaneService,
+    // Kesilmiş kaydın KENDİ sağlayıcısı (eLogo belgesi Netsis'e geçildikten
+    // sonra da eLogo'dan sorulur). Yoksa bağlı sağlayıcı — birim testleri.
+    @Optional() private readonly registry?: InvoiceProviderRegistry,
   ) {}
+
+  /** Kaydı kesen sağlayıcı — durum, gönderim ve PDF ona sorulur. */
+  private providerOf(record: {
+    provider?: EInvoiceProviderName | null;
+  }): EInvoiceProvider {
+    return providerForRecord(this.registry, this.provider, record.provider);
+  }
 
   // ───────────────────────── core ─────────────────────────
 
@@ -157,6 +175,8 @@ export class InvoiceDeliveryService {
                 where: { type_sourceId: { type, sourceId } },
               });
               if (raced) return raced;
+              // Numarayı sağlayıcı veriyorsa `null`: kayıt numarasız açılır,
+              // sayaç ilerlemez; numara gönderim sonucundan yazılır.
               const invoiceNumber =
                 await this.documents.allocateDocumentNumberInTransaction(
                   tx,
@@ -166,8 +186,8 @@ export class InvoiceDeliveryService {
                 data: {
                   type,
                   sourceId,
-                  // Belgeyi kesecek sağlayıcı. İptal/iade/PDF ileride bu kayda
-                  // bakar; bugün tek bağlama eLogo olduğundan kolon varsayılanıyla aynı.
+                  // Belgeyi kesecek sağlayıcı (`INVOICE_PROVIDER`). Gönderim,
+                  // durum, iptal ve PDF bundan sonra hep bu kayda bakar.
                   provider: this.provider.name,
                   sellerUserId: parties.sellerUserId,
                   buyerUserId: parties.buyerUserId,
@@ -294,8 +314,16 @@ export class InvoiceDeliveryService {
     const now = new Date();
     const issueMoment = inv.issuedAt ?? inv.createdAt;
     let currentNumber = inv.invoiceNumber ?? "";
+    // Belgeyi kesen sağlayıcı. Numarayı o veriyorsa (Netsis) kayıt gönderime
+    // kadar NUMARASIZDIR; numara ve referans gönderim sonucundan yazılır.
+    const provider = this.providerOf(inv);
+    const providerNumbered = provider.numbering === "provider";
 
-    if (!inv.invoiceNumber || !inv.ettn || !inv.recipientVknTckn) {
+    if (
+      (!inv.invoiceNumber && !providerNumbered) ||
+      !inv.ettn ||
+      !inv.recipientVknTckn
+    ) {
       await this.prisma.fiscalInvoice.update({
         where: { id: inv.id },
         data: {
@@ -324,15 +352,18 @@ export class InvoiceDeliveryService {
       inv.recipientVknTckn !== "11111111111" &&
       (inv.recipientVknTckn.length === 10 ||
         inv.recipientVknTckn.length === 11);
-    if (!isReturn && isRealIdentifier) {
+    // Belge sağlayıcıda zaten oluşturulduysa (Netsis fişi var, yalnız gönderimi
+    // kaldı) senaryo o belgeyle donmuştur: yeniden çözülmez.
+    const createdAtProvider = providerNumbered && !!inv.providerRef;
+    if (!isReturn && isRealIdentifier && !createdAtProvider) {
       let chk: RecipientKindResult | null = null;
       try {
-        chk = await this.provider.resolveRecipientKind(inv.recipientVknTckn);
+        chk = await provider.resolveRecipientKind(inv.recipientVknTckn);
       } catch (err: unknown) {
         // Mükellef sorgusu ağ/sağlayıcı arızasıyla düşerse belge KALICI
         // `failed` olmamalı: bu, gönderimdeki geçici arızayla aynı durumdur —
         // sayaç geri alınır, kayıt `pending` kalır ve cron yeniden dener.
-        const transient = this.provider.classifyError(err) === "network";
+        const transient = provider.classifyError(err) === "network";
         const reason = String((err as Error)?.message ?? err).slice(0, 400);
         await this.prisma.fiscalInvoice
           .update({
@@ -369,13 +400,16 @@ export class InvoiceDeliveryService {
         });
       }
     } else if (documentType === "EINVOICE") {
-      const chk = await this.provider
+      const chk = await provider
         .resolveRecipientKind(inv.recipientVknTckn)
         .catch(() => null);
       alias = chk?.alias;
     }
     const isEInvoice = documentType === "EINVOICE";
-    if (isEInvoice) {
+    // PK etiketi yalnız belgeyi DOĞRUDAN entegratöre veren sağlayıcıda
+    // gerekir. ERP (Netsis) e-Faturayı kendi carisinin etiketine yollar;
+    // etiketi bizden beklemez.
+    if (isEInvoice && !providerNumbered) {
       if (!alias) {
         await this.prisma.fiscalInvoice.update({
           where: { id: inv.id },
@@ -471,7 +505,8 @@ export class InvoiceDeliveryService {
     const fiscalDocument = (documentNumber: string): FiscalDocumentInput => ({
       scenario: documentType,
       kind: isReturn ? "RETURN" : "SALE",
-      documentNumber,
+      // Sağlayıcı numaralandırmasında numara henüz yoktur — boş gider.
+      documentNumber: documentNumber || undefined,
       ettn,
       issueDate: this.documents.ymd(issueMoment),
       issueTime: this.documents.hms(issueMoment),
@@ -485,11 +520,16 @@ export class InvoiceDeliveryService {
       ...(billingRef ? { billingReference: billingRef } : {}),
     });
 
-    const deliver = (invoiceNumber: string, total: number) => {
+    const deliver = (
+      invoiceNumber: string,
+      total: number,
+      issuedEttn: string = ettn,
+    ) => {
       void this.deliverPdf(
+        provider,
         {
           id: inv.id,
-          ettn,
+          ettn: issuedEttn,
           invoiceNumber,
           type: inv.type,
           total,
@@ -508,7 +548,7 @@ export class InvoiceDeliveryService {
     // Önceki deneme sırasında provider başarı verip DB güncellenememiş olabilir.
     // Aynı ETTN'i yeniden yollamadan önce durum sorgusuyla mutabakat yap.
     if (claimed.reconcileFirst) {
-      const providerStatus = await this.provider
+      const providerStatus = await provider
         .getStatus(
           { ettn: inv.ettn, providerRef: inv.providerRef },
           documentType,
@@ -537,7 +577,9 @@ export class InvoiceDeliveryService {
             sentAt: now,
           },
         });
-        deliver(inv.invoiceNumber, Number(inv.total));
+        // Sağlayıcı numaralandırmasında numara, fiş oluştuğu denemede kayda
+        // yazılmıştır; yine de yoksa PDF/e-posta adı olmadan teslim edilmez.
+        if (inv.invoiceNumber) deliver(inv.invoiceNumber, Number(inv.total));
         return;
       }
       if (providerStatus?.state === "processing") {
@@ -562,15 +604,34 @@ export class InvoiceDeliveryService {
       // Kayda yazılan tutarlar, sağlayıcıya giden belgeyle AYNI hesaptan gelir.
       const { totals } = computeFiscalDocumentTotals(lines);
       for (let attempt = 0; attempt < 12; attempt++) {
-        const res = await this.provider.send(fiscalDocument(currentNumber), {
+        const res = await provider.send(fiscalDocument(currentNumber), {
           ...(alias ? { recipientAlias: alias } : {}),
+          // Belge sağlayıcıda zaten oluştuysa (önceki denemede fiş açıldı,
+          // gönderim düştü) yeniden oluşturulmaz, yalnız gönderilir.
+          ...(inv.providerRef ? { existingProviderRef: inv.providerRef } : {}),
+          invoiceType: inv.type,
+          ...(inv.recipientUserId
+            ? { recipientUserId: inv.recipientUserId }
+            : {}),
+          ...(inv.sourceReference?.trim()
+            ? { sourceReference: inv.sourceReference.trim() }
+            : {}),
         });
 
         if (res.accepted) {
+          // Numarayı sağlayıcı verdiyse kayda ŞİMDİ yazılır. ERP kendi ETTN'ini
+          // atadıysa (Netsis) GİB'deki belgenin kimliği odur — bizim ürettiğimiz
+          // ETTN onunla değiştirilir; eLogo bizimkini geri döndürür.
+          const issuedNumber = providerNumbered
+            ? (res.documentNumber ?? inv.invoiceNumber)
+            : currentNumber;
+          const issuedEttn =
+            providerNumbered && res.ettn && res.ettn !== ettn ? res.ettn : ettn;
           await this.prisma.fiscalInvoice.update({
             where: { id: inv.id },
             data: {
-              invoiceNumber: currentNumber,
+              invoiceNumber: issuedNumber,
+              ...(issuedEttn !== ettn ? { ettn: issuedEttn } : {}),
               netAmount: totals.taxExclusive,
               taxAmount: totals.tax,
               total: totals.payable,
@@ -587,15 +648,27 @@ export class InvoiceDeliveryService {
             },
           });
           this.logger.log(
-            `eLogo ${inv.type} faturası gönderildi (${currentNumber}, ref=${res.providerRef})`,
+            `eLogo ${inv.type} faturası gönderildi (${issuedNumber ?? "-"}, ref=${res.providerRef})`,
           );
-          deliver(currentNumber, totals.payable);
+          if (issuedNumber) {
+            deliver(issuedNumber, totals.payable, issuedEttn);
+          } else {
+            this.logger.error(
+              `${provider.name} ${inv.type} belgesini kabul etti ama numara döndürmedi (id=${inv.id}) — PDF/e-posta atlandı`,
+            );
+          }
           return;
         }
 
         // Numara çakışması → ARTAN adımla ileri atla (ardışık dolu numara bloğunu az
         // denemede geç: 1,2,3,... büyüyen sıçrama; 12 denemede ~78 numaralık blok aşılır).
-        if (attempt < 11 && res.category === "duplicate-number") {
+        // Yalnız YEREL numaralandırmada: numarayı sağlayıcı veriyorsa bizim
+        // sayacımızdan yeni numara almak anlamsızdır.
+        if (
+          !providerNumbered &&
+          attempt < 11 &&
+          res.category === "duplicate-number"
+        ) {
           const skip = attempt + 1;
           for (let s = 0; s < skip; s++) {
             currentNumber = await this.documents.allocateInvoiceNumber(
@@ -613,18 +686,27 @@ export class InvoiceDeliveryService {
         // özgüdür: yeniden denemek sonucu değiştirmez, bu yüzden bütçe hemen
         // tüketilmiş sayılır ve alarm bir sonraki cron turunda görünür.
         const configurationFailure = res.category === "configuration";
+        // Belge sağlayıcıda OLUŞUP yalnız gönderimi ağ yüzünden düştüyse
+        // (Netsis) bu, fırlatılan geçici arızayla aynıdır: bütçe tüketilmez.
+        const transientRejection = res.category === "network";
         await this.prisma.fiscalInvoice.update({
           where: { id: inv.id },
           data: {
-            invoiceNumber: currentNumber,
+            invoiceNumber: providerNumbered
+              ? (res.documentNumber ?? inv.invoiceNumber)
+              : currentNumber,
+            // Oluşmuş belgenin referansı: sonraki deneme yalnız gönderir.
+            ...(res.providerRef ? { providerRef: res.providerRef } : {}),
             netAmount: totals.taxExclusive,
             taxAmount: totals.tax,
             total: totals.payable,
             discountTotal: totals.allowance,
-            status: "failed",
+            status: transientRejection ? "pending" : "failed",
             ...(configurationFailure
               ? { attemptCount: INVOICE_MAX_SEND_ATTEMPTS }
-              : {}),
+              : transientRejection
+                ? { attemptCount: { decrement: 1 } }
+                : {}),
             providerResultCode: res.resultCode ?? null,
             providerResultMsg: res.resultMsg ?? null,
           },
@@ -641,12 +723,14 @@ export class InvoiceDeliveryService {
       // 8 deneme × 30 dk cron ≈ 4 saat; sağlayıcı bir gün kapalı kalırsa fatura
       // kalıcı `failed`'e düşüp 7 günlük e-Arşiv süresini sessizce kaçırıyordu.
       // Sayaç geri alınır ve kayıt `pending`'de bırakılır → cron denemeye devam eder.
-      const transient = this.provider.classifyError(err) === "network";
+      const transient = provider.classifyError(err) === "network";
       await this.prisma.fiscalInvoice
         .update({
           where: { id: inv.id },
           data: {
-            invoiceNumber: currentNumber,
+            // Sağlayıcı numaralandırmasında numaraya dokunulmaz (boş numara
+            // yazmak tekil kolonda ikinci numarasız kayıtla çakışırdı).
+            ...(providerNumbered ? {} : { invoiceNumber: currentNumber }),
             status: transient ? "pending" : "failed",
             ...(transient ? { attemptCount: { decrement: 1 } } : {}),
             providerResultMsg: String((err as Error)?.message || err).slice(
@@ -668,6 +752,8 @@ export class InvoiceDeliveryService {
    * Tamamen best-effort: hata kesimi etkilemez.
    */
   private async deliverPdf(
+    /** Belgeyi kesen sağlayıcı — PDF ondan istenir. */
+    provider: EInvoiceProvider,
     inv: {
       id: string;
       ettn: string;
@@ -692,9 +778,7 @@ export class InvoiceDeliveryService {
       );
       return;
     }
-    const pdf = await this.provider
-      .fetchPdf({ ettn: inv.ettn })
-      .catch(() => null);
+    const pdf = await provider.fetchPdf({ ettn: inv.ettn }).catch(() => null);
     if (!pdf || pdf.length < 200) {
       this.logger.warn(
         `eLogo PDF alınamadı (${inv.invoiceNumber}) — S3/mail atlandı`,
@@ -900,6 +984,8 @@ export class InvoiceDeliveryService {
         recipientEmail: true,
         recipientName: true,
         lineDescription: true,
+        provider: true,
+        providerRef: true,
       },
     });
     if (!invoice)
@@ -930,7 +1016,9 @@ export class InvoiceDeliveryService {
         : null;
     const pdf =
       stored ??
-      (await this.provider.fetchPdf({ ettn: invoice.ettn }).catch(() => null));
+      (await this.providerOf(invoice)
+        .fetchPdf({ ettn: invoice.ettn, providerRef: invoice.providerRef })
+        .catch(() => null));
     if (!pdf || pdf.length < 200)
       throw new ServiceUnavailableException(
         i18nMessage("server.elogo.invoicePdfUnavailable"),
