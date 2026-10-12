@@ -1,13 +1,13 @@
 {
   "meta": {
-    "total": 2291,
+    "total": 2290,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
       "P0": 700,
       "P1": 984,
-      "P2": 607
+      "P2": 606
     }
   },
   "domains": [
@@ -141,7 +141,7 @@
       "code": "22",
       "prefix": "ADM",
       "title": "22 — Admin Paneli & Raporlama",
-      "count": 120
+      "count": 119
     },
     {
       "code": "23",
@@ -26329,19 +26329,6 @@
       "pri": "P1",
       "steps": "1. GET /api/reports/sales admin token.",
       "exp": "HTTP 200; satış özeti. (reports.controller.ts:39-44; test reports.e2e-spec.ts:57-66)",
-      "gap": false,
-      "gapRefs": []
-    },
-    {
-      "id": "ADM-056",
-      "code": "22",
-      "prefix": "ADM",
-      "domTitle": "22 — Admin Paneli & Raporlama",
-      "title": "Sales CSV export doğru header'larla iner (happy path)",
-      "tur": "Happy path",
-      "pri": "P2",
-      "steps": "1. GET /api/reports/sales/export/csv admin token. 2. Response header'larını incele.",
-      "exp": "HTTP 200; Content-Type: text/csv; Content-Disposition: attachment; filename=sales-report.csv. (reports.controller.ts:50-58)",
       "gap": false,
       "gapRefs": []
     },

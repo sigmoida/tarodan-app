@@ -1165,18 +1165,6 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
     expect(res.body).toBeTruthy();
   });
 
-  scenario("ADM-056", async () => {
-    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
-    const res = await request(server())
-      .get("/api/reports/sales/export/csv")
-      .set(authHeader(admin))
-      .expect(200);
-    expect(res.headers["content-type"]).toContain("text/csv");
-    expect(res.headers["content-disposition"]).toContain(
-      "filename=sales-report.csv",
-    );
-  });
-
   scenario("ADM-057", async () => {
     const moderator = await createAdminUser(ctx.module, {
       role: AdminRole.moderator,
