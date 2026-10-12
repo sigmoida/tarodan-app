@@ -471,19 +471,6 @@ export interface AnalyticsMembershipResponse {
 // Exports
 // ===========================================================================
 
-export const ANALYTICS_EXPORT_FORMATS = ["csv", "xlsx"] as const;
-
-export type AnalyticsExportFormat = (typeof ANALYTICS_EXPORT_FORMATS)[number];
-
-export function isAnalyticsExportFormat(
-  value: unknown,
-): value is AnalyticsExportFormat {
-  return (
-    typeof value === "string" &&
-    (ANALYTICS_EXPORT_FORMATS as readonly string[]).includes(value)
-  );
-}
-
 /** The tab's response, keyed by tab — one definition for screen and export. */
 export interface AnalyticsTabResponse {
   sales: AnalyticsSalesResponse;

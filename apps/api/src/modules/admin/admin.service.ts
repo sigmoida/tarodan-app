@@ -6,10 +6,7 @@ import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminUserService } from "./users/admin-user.service";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminStaffService } from "./users/admin-staff.service";
-import {
-  AdminProductService,
-  type AdminProductExportQuery,
-} from "./catalog/admin-product.service";
+import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminOrderService } from "./orders/admin-order.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
@@ -70,7 +67,6 @@ import {
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -381,10 +377,6 @@ export class AdminService {
 
   async getProducts(query: AdminProductQueryDto) {
     return this.productService.getProducts(query);
-  }
-
-  async exportProducts(query: AdminProductExportQuery) {
-    return this.productService.exportProducts(query);
   }
 
   async uploadProductImages(productId: string, files: Express.Multer.File[]) {
@@ -734,10 +726,6 @@ export class AdminService {
     sortType?: "text" | "number" | "date";
   }) {
     return this.payoutService.getPayoutsSchedule(query);
-  }
-
-  async getPayoutsExport(query: PayoutExportQueryDto) {
-    return this.payoutService.getPayoutsExport(query);
   }
 
   async releasePayout(

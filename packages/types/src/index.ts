@@ -146,3 +146,6 @@ export * from "./uat-refresh";
 
 // Reklam tıklanabilir alanları — admin formu + API aynı kuralla denetler
 export * from "./ad-hotspot";
+
+// Admin Excel dökümleri: kaynak başına kolon kataloğu (API yazıcısı + admin)
+export * from "./export-catalog";

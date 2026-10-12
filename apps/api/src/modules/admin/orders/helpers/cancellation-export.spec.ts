@@ -1,8 +1,9 @@
 import type { AdminCancellationRow } from "@tarodan/types";
 import {
-  cancellationExportSheet,
+  cancellationExportFilters,
+  cancellationExportRecords,
+  cancellationExportTotals,
   cancellationReasonText,
-  flattenCancellationRows,
 } from "./cancellation-export";
 
 /** Anahtarı olduğu gibi döndüren çevirmen: testte etiketin kaynağı görünür. */
@@ -88,8 +89,25 @@ function row(
 }
 
 describe("cancellation export", () => {
-  it("writes one sheet row per cancelled LINE", () => {
-    expect(flattenCancellationRows([row(), row({ id: "g2" })])).toHaveLength(4);
+  it("writes one row per cancelled LINE (long format)", () => {
+    expect(cancellationExportRecords(row(), t)).toHaveLength(2);
+  });
+
+  it("repeats the parent record's columns on every line", () => {
+    const [first, second] = cancellationExportRecords(row(), t);
+    for (const line of [first, second]) {
+      expect(line).toMatchObject({
+        rowNumber: "GRP-1",
+        testLane: false,
+        origin:
+          "[admin.operations.cancellations.export.originValue.direct_sale]",
+        orderDate: "2026-09-20T09:00:00.000Z",
+        buyer: "name-b1",
+        buyerCode: "K-b1",
+      });
+    }
+    expect(first.orderNumber).toBe("ORD-1");
+    expect(second.orderNumber).toBe("ORD-2");
   });
 
   it("reason text uses the same catalog keys as the screen", () => {
@@ -124,61 +142,80 @@ describe("cancellation export", () => {
     ).toBe("—");
   });
 
-  it("renders translated headers, numbers as numbers and the unknown actor label", () => {
-    const sheet = cancellationExportSheet([row()], t);
-    expect(sheet.name).toBe(
-      "[admin.operations.cancellations.export.sheetName]",
-    );
-    expect(sheet.headers[0]).toBe(
-      "[admin.operations.cancellations.export.rowNumber]",
-    );
-    expect(sheet.rows).toHaveLength(2);
-
-    const col = (name: string) =>
-      sheet.headers.indexOf(`[admin.operations.cancellations.export.${name}]`);
-    const [first, second] = sheet.rows;
-    expect(first[col("rowNumber")]).toBe("GRP-1");
-    expect(first[col("origin")]).toBe(
-      "[admin.operations.cancellations.export.originValue.direct_sale]",
-    );
-    expect(first[col("orderNumber")]).toBe("ORD-1");
-    expect(first[col("unitPrice")]).toBe(100);
-    expect(first[col("cancelledBy")]).toBe(
-      "[admin.operations.cancellations.actor.buyer]",
-    );
-    expect(first[col("refundState")]).toBe(
-      "[admin.operations.cancellations.refundState.refunded]",
-    );
-    expect(second[col("cancelledBy")]).toBe(
+  it("keeps amounts numeric and labels actors / refund states from the catalog", () => {
+    const [first, second] = cancellationExportRecords(row(), t);
+    expect(first).toMatchObject({
+      quantity: 1,
+      unitPrice: 100,
+      subtotal: 100,
+      cancelledAt: "2026-09-21T10:00:00.000Z",
+      cancelledBy: "[admin.operations.cancellations.actor.buyer]",
+      refundState: "[admin.operations.cancellations.refundState.refunded]",
+    });
+    expect(second.cancelledBy).toBe(
       "[admin.operations.cancellations.actor.unknown]",
     );
-    expect(second[col("cancelledAt")]).toBe("");
+    expect(second.cancelledAt).toBeNull();
   });
 
   /** Test şeridi kaydı dökümden çıkarılmaz — işaretlenir (liste gibi). */
-  it("marks test-lane rows in their own column and leaves live rows blank", () => {
-    const sheet = cancellationExportSheet(
-      [row(), row({ id: "g2", number: "GRP-2", isTest: true })],
+  it("marks test-lane records instead of dropping them", () => {
+    const lines = cancellationExportRecords(
+      row({ id: "g2", number: "GRP-2", isTest: true }),
       t,
     );
-    const col = sheet.headers.indexOf(
-      "[admin.operations.cancellations.export.testLane]",
-    );
-    expect(col).toBeGreaterThan(-1);
-    const byNumber = (n: string) =>
-      sheet.rows.filter(
-        (r) =>
-          r[
-            sheet.headers.indexOf(
-              "[admin.operations.cancellations.export.rowNumber]",
-            )
-          ] === n,
-      );
-    expect(byNumber("GRP-1").every((r) => r[col] === "")).toBe(true);
+    expect(lines.every((line) => line.testLane === true)).toBe(true);
+  });
+
+  it("still writes a record that has no lines (the count must hold)", () => {
+    expect(cancellationExportRecords(row({ packages: [] }), t)).toEqual([
+      expect.objectContaining({ rowNumber: "GRP-1" }),
+    ]);
+  });
+
+  it("puts the parent totals in the summary, never in the data rows", () => {
     expect(
-      byNumber("GRP-2").every(
-        (r) => r[col] === "[admin.shared.testLane.badge]",
-      ),
-    ).toBe(true);
+      cancellationExportTotals([row(), row({ id: "g2", totalAmount: 60.1 })]),
+    ).toEqual([
+      {
+        labelKey: "server.export.summary.parentTotal",
+        value: 300.1,
+        type: "money",
+      },
+    ]);
+  });
+
+  it("summarises tab, sub-tab and filters; the party term is redacted", () => {
+    const entries = cancellationExportFilters({
+      tab: "offer",
+      bucket: "buyer",
+      party: "ahmet@ornek.com",
+      adminReason: "any",
+    });
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          labelKey: "server.export.summary.tab",
+          valueKey: "admin.operations.cancellations.tabs.offers",
+        }),
+        expect.objectContaining({
+          labelKey: "server.export.summary.subTab",
+          valueKey: "admin.operations.cancellations.buckets.buyer",
+        }),
+        expect.objectContaining({
+          labelKey: "admin.operations.cancellations.filters.party",
+          redacted: true,
+        }),
+        expect.objectContaining({
+          labelKey: "admin.operations.cancellations.filters.adminReason",
+          valueKey: "admin.operations.cancellations.filters.adminReasonAny",
+        }),
+      ]),
+    );
+  });
+
+  it("falls back to the default tab for an unknown one", () => {
+    const [tab] = cancellationExportFilters({ tab: "nope" });
+    expect(tab).toMatchObject({ value: "all" });
   });
 });

@@ -116,7 +116,6 @@ export function productColumns(t: T) {
       },
       {
         minWidth: 220,
-        exportValue: (p) => removalCell(p.removal, t)?.label ?? "",
       },
     ),
     col.date<Product>(t("common.date"), "createdAt"),

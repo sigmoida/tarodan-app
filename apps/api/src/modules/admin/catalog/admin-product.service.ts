@@ -20,11 +20,6 @@ import {
   toAdminRemovalEvent,
   toAdminRemovalSummary,
 } from "./admin-product-removal.helper";
-import {
-  isListingRemovalActor,
-  isListingRemovalReasonFilter,
-  listingRemovalActorOf,
-} from "@tarodan/types";
 import { stampApprovedContentFingerprint } from "../../product/helpers/product-content-fingerprint";
 import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 import {
@@ -57,15 +52,6 @@ import {
   SCALE_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
 } from "../../../common/helpers/attribute-groups";
-
-/** `GET /admin/products-export` filtreleri (liste filtreleriyle aynı adlar). */
-export interface AdminProductExportQuery {
-  status?: string;
-  categoryId?: string;
-  sellerId?: string;
-  removalReason?: string;
-  removalActor?: string;
-}
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -324,95 +310,6 @@ export class AdminProductService {
     return {
       ...result,
       data: productsWithCampaignPrices,
-    };
-  }
-
-  /**
-   * Export products to CSV format
-   */
-  async exportProducts(query: AdminProductExportQuery) {
-    const where: Prisma.ProductWhereInput = catalogProductWhere();
-
-    if (query.status) {
-      where.status = query.status as ProductStatus;
-    }
-    if (query.categoryId) {
-      where.categoryId = query.categoryId;
-    }
-    if (query.sellerId) {
-      where.sellerId = query.sellerId;
-    }
-    // Liste ile AYNI kaldırma filtreleri; tanınmayan değer filtre sayılmaz.
-    const removalParts = listingRemovalFilterWhere({
-      removalReason: isListingRemovalReasonFilter(query.removalReason)
-        ? query.removalReason
-        : undefined,
-      removalActor: isListingRemovalActor(query.removalActor)
-        ? query.removalActor
-        : undefined,
-    });
-    if (removalParts.length > 0) where.AND = removalParts;
-
-    const products = await this.prisma.product.findMany({
-      where,
-      include: {
-        seller: { select: { displayName: true, email: true } },
-        category: { select: { name: true } },
-        removalEvents: LATEST_REMOVAL_INCLUDE,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Create CSV header
-    const headers = [
-      "ID",
-      "İlan No",
-      "Başlık",
-      "Fiyat",
-      "Durum",
-      "Kondisyon",
-      "Kategori",
-      "Satıcı",
-      "Satıcı Email",
-      "Oluşturulma Tarihi",
-      // Kaldırma nedeni: kod (dışa aktarım makine okunur kalsın; etiket
-      // katalogdan). Satıcının serbest metni dışa aktarılmaz.
-      "Kaldırma Nedeni",
-      "Kaldıran",
-      "Satış Platformu",
-      "İhlal Kodu",
-      "Kaldırma Tarihi",
-    ];
-
-    // Create CSV rows
-    const rows = products.map((p) => {
-      const removal = toAdminRemovalSummary(p);
-      return [
-        p.id,
-        p.productCode,
-        `"${(p.title || "").replace(/"/g, '""')}"`,
-        Number(p.price).toFixed(2),
-        p.status,
-        p.condition,
-        p.category?.name || "",
-        p.seller?.displayName || "",
-        p.seller?.email || "",
-        new Date(p.createdAt).toISOString(),
-        // Vitrindeki ilan: boş; kaldırılmış ama nedeni kayıtsız: "unknown".
-        removal ? (removal.reason ?? "unknown") : "",
-        removal?.reason ? listingRemovalActorOf(removal.reason) : "",
-        removal?.platform ?? "",
-        removal?.violationCode ?? "",
-        removal?.removedAt ?? "",
-      ];
-    });
-
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-
-    return {
-      filename: `products_${new Date().toISOString().split("T")[0]}.csv`,
-      content: csv,
-      mimeType: "text/csv",
     };
   }
 

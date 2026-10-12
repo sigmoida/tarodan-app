@@ -27,7 +27,6 @@ export {
   DashboardStatsQueryDto,
   DashboardRangeConstraint,
   AnalyticsRangeQueryDto,
-  AnalyticsExportQueryDto,
   AnalyticsRangeConstraint,
 } from "./analytics.dto";
 export {
@@ -47,7 +46,7 @@ export {
 export {
   PayoutTransactionsQueryDto,
   PayoutScheduleQueryDto,
-  PayoutExportQueryDto,
+  PayoutTransfersQueryDto,
   ReleasePayoutDto,
 } from "./payout.dto";
 export { CreateStaticPageDto, UpdateStaticPageDto } from "./page.dto";

@@ -18,7 +18,10 @@ import {
   ParseUUIDPipe,
   Headers,
   Res,
+  StreamableFile,
 } from "@nestjs/common";
+import type { Response } from "express";
+import type { Locale } from "@tarodan/i18n";
 
 import {
   FileFieldsInterceptor,
@@ -77,6 +80,9 @@ import {
 import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
 import { AdminExpiredListingsService } from "./admin-expired-listings.service";
 import { AdminProductRenewalService } from "./admin-product-renewal.service";
+import { AdminVoucherCodeExportService } from "./admin-voucher-code-export.service";
+import { sendExport } from "../../../common/export";
+import { ReqLocale } from "../../i18n";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -104,7 +110,6 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -142,6 +147,7 @@ export class AdminProductController {
     private readonly productBulkImport: AdminProductBulkImportService,
     private readonly expiredListings: AdminExpiredListingsService,
     private readonly productRenewal: AdminProductRenewalService,
+    private readonly voucherCodeExports: AdminVoucherCodeExportService,
   ) {}
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -272,32 +278,6 @@ export class AdminProductController {
     return this.adminService.updateProduct(adminId, id, dto);
   }
 
-  @Get("products-export")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Export products to CSV" })
-  async exportProducts(
-    @Query("status") status?: string,
-    @Query("categoryId") categoryId?: string,
-    @Query("sellerId") sellerId?: string,
-    @Query("removalReason") removalReason?: string,
-    @Query("removalActor") removalActor?: string,
-    @Res() res?: any,
-  ) {
-    const result = await this.adminService.exportProducts({
-      status,
-      categoryId,
-      sellerId,
-      removalReason,
-      removalActor,
-    });
-    res.setHeader("Content-Type", result.mimeType);
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${result.filename}"`,
-    );
-    res.send(result.content);
-  }
-
   // ==================== DISCOUNT MANAGEMENT (admin token) ====================
 
   @Get("discounts")
@@ -378,31 +358,21 @@ export class AdminProductController {
   }
 
   @Get("discounts/:id/codes/export")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Export a discount's voucher codes as CSV (admin)" })
+  // Kodlar paraya denk: dökümü, kodu ÜRETEBİLEN rollerle aynı kapı.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({ summary: "Export a discount's voucher codes as XLSX (admin)" })
   @ApiParam({ name: "id", description: "Discount (template) ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "XLSX file" })
   async exportVoucherCodes(
     @Param("id") id: string,
-    @Res() res: import("express").Response,
-  ) {
-    const { data } = await this.discountService.listCodes(id);
-    const rows = [
-      "code,isRedeemed,redeemedAt,orderId",
-      ...data.map((c) =>
-        [
-          c.code,
-          c.isRedeemed ? "1" : "0",
-          c.redeemedAt ? new Date(c.redeemedAt).toISOString() : "",
-          c.orderId ?? "",
-        ].join(","),
-      ),
-    ].join("\n");
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="voucher-codes-${id}.csv"`,
+    @CurrentUser("id") adminId: string,
+    @ReqLocale() locale: Locale,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return sendExport(
+      res,
+      await this.voucherCodeExports.exportCodes(id, adminId, locale),
     );
-    res.send(rows);
   }
 
   @Post("products/:id/approve")

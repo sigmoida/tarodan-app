@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { AxiosResponse } from "axios";
 import { Spinner } from "@tarodan/ui";
 import { useAdminResource } from "@/hooks/useAdminResource";
@@ -125,8 +125,6 @@ function ResourceListInner<T>({
     selectable,
     `${data.page}|${data.pageSize}|${data.search}|${JSON.stringify(data.filters)}`,
   );
-  const exportRef = useRef<any[]>([]);
-  const exportRowsRef = useRef<any[]>([]);
 
   return (
     <ResourceListContext.Provider
@@ -135,9 +133,6 @@ function ResourceListInner<T>({
         getRowId,
         filterFields: filters,
         selection,
-        exportRef,
-        exportRowsRef,
-        exportName: resource,
       }}
     >
       <AdminPage>{children}</AdminPage>

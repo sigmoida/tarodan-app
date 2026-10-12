@@ -1,5 +1,4 @@
 import type {
-  AnalyticsExportFormat,
   AnalyticsRangeQuery,
   AnalyticsTab,
   DashboardPeriodQuery,
@@ -36,17 +35,10 @@ export const dashboardApi = {
   getAnalyticsTab: (tab: AnalyticsTab, params: AnalyticsRangeQuery) =>
     api.get(`/admin/analytics/${tab}`, { params }),
   /**
-   * The same tab, same window, as a file. The API renders it FROM the response
+   * The same tab, same window, as an Excel file. The API renders it FROM the response
    * the screen is showing, so the two cannot disagree — and it arrives as a
    * blob, not as JSON to be re-assembled in the browser.
    */
-  exportAnalyticsTab: (
-    tab: AnalyticsTab,
-    format: AnalyticsExportFormat,
-    params: AnalyticsRangeQuery,
-  ) =>
-    api.get(`/admin/analytics/${tab}/export`, {
-      params: { ...params, format },
-      responseType: "blob",
-    }),
+  exportAnalyticsTab: (tab: AnalyticsTab, params: AnalyticsRangeQuery) =>
+    api.get(`/admin/analytics/${tab}/export`, { params, responseType: "blob" }),
 };

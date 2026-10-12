@@ -8,8 +8,8 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 /**
  * Kimlik numaraları ve IBAN varsayılan olarak MASKELİ (admin/CLAUDE.md §9):
- * bu ekran yüksek trafikli değil ama içeriği ham TCKN. CSV dışa aktarımı
- * bilinçli bir eylem olduğu için `exportValue` ham değeri verir.
+ * bu ekran yüksek trafikli değil ama içeriği ham TCKN. Ham değer yalnız
+ * denetim kaydı bırakan sunucu dökümündedir.
  */
 function maskedColumn(
   header: string,
@@ -26,7 +26,6 @@ function maskedColumn(
       minWidth: 190,
       sortKey,
       sortType: "text",
-      exportValue: (r) => get(r as DeletedIdentity) ?? "",
     },
   );
 }

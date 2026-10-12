@@ -111,17 +111,6 @@ export function sellerSlots(
   );
 }
 
-/** Dışa aktarım: yuva başına "satıcı PKG", kalem sırasıyla. */
-export function sellerSlotsExport(
-  row: Pick<AdminOrderListRow, "packages" | "offer">,
-): string {
-  return sellerSlots(row)
-    .map((slot) =>
-      [slot.seller.displayName, slot.packageNumber].filter(Boolean).join(" "),
-    )
-    .join(" | ");
-}
-
 /**
  * Paketin faturalarını fatura listesinde açan bağlantı. Belgenin kayıt no'su
  * koli referansının gövdesini taşır (önek KYT-), liste araması `sourceReference`

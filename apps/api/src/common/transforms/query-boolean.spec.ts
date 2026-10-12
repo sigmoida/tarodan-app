@@ -10,10 +10,7 @@ import { OrderQueryDto } from "../../modules/order/dto/order-query.dto";
 import { SecurityLogQueryDto } from "../../modules/admin/dto/logs-admin.dto";
 import { AdminCollectionQueryDto } from "../../modules/admin/dto/collection-admin.dto";
 import { AnalyticsRangeQueryDto } from "../../modules/admin/dto/analytics.dto";
-import {
-  PayoutExportQueryDto,
-  PayoutTransactionsQueryDto,
-} from "../../modules/admin/dto/payout.dto";
+import { PayoutTransactionsQueryDto } from "../../modules/admin/dto/payout.dto";
 import { GibReportQueryDto } from "../../modules/admin/dto/gib-report.dto";
 import {
   AdminAttributeGroupQueryDto,
@@ -95,7 +92,6 @@ const DTOS: Record<
   AdminCollectionQueryDto: { metatype: AdminCollectionQueryDto },
   AnalyticsRangeQueryDto: { metatype: AnalyticsRangeQueryDto },
   PayoutTransactionsQueryDto: { metatype: PayoutTransactionsQueryDto },
-  PayoutExportQueryDto: { metatype: PayoutExportQueryDto },
   GibReportQueryDto: { metatype: GibReportQueryDto },
   AdminAttributeGroupQueryDto: { metatype: AdminAttributeGroupQueryDto },
   AdminAttributeQueryDto: { metatype: AdminAttributeQueryDto },
@@ -145,8 +141,10 @@ function queryBooleanFields(): Array<{
 describe("her @QueryBoolean() alanı: false false kalır, true true olur, yoksa yoktur", () => {
   const fields = queryBooleanFields();
 
-  it("tarama alanları buluyor (bu dalda 30 alan)", () => {
-    expect(fields.length).toBeGreaterThanOrEqual(30);
+  // Hold dökümü listenin DTO'sunu alınca `PayoutExportQueryDto.earlyReleased`
+  // (ayrı bir sınıftaki kopya) kalktı: 30 → 29.
+  it("tarama alanları buluyor (bu dalda 29 alan)", () => {
+    expect(fields.length).toBeGreaterThanOrEqual(29);
   });
 
   it("her alanın sınıfı tabloda (yeni sınıf → DTOS'a ekleyin)", () => {

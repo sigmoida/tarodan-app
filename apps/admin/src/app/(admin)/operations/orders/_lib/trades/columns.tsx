@@ -36,7 +36,6 @@ export function tradeColumns(t: T) {
         minWidth: 240,
         sortKey: "tradeNumber",
         sortType: "text",
-        exportValue: (trade) => trade.tradeNumber,
       },
     ),
     col.custom<Trade>(
@@ -105,10 +104,6 @@ export function tradeColumns(t: T) {
         minWidth: 240,
         sortKey: "cashAmount",
         sortType: "number",
-        exportValue: (r) =>
-          r.cashAmount
-            ? `${r.cashAmount} / ${cashPayer(r)?.displayName ?? ""}`
-            : "",
       },
     ),
     col.date<Trade>(t("common.date"), "createdAt"),

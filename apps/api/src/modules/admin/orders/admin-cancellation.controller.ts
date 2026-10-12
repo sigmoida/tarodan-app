@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Res, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -12,15 +19,14 @@ import { AdminJwtAuthGuard } from "../../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
+import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { ReqLocale } from "../../i18n";
+import { sendExport } from "../../../common/export";
 import {
   AdminCancellationCountsQueryDto,
   AdminCancellationQueryDto,
 } from "../dto";
-import {
-  AdminCancellationService,
-  CANCELLATION_EXPORT_ROW_CAP,
-} from "./admin-cancellation.service";
+import { AdminCancellationService } from "./admin-cancellation.service";
 
 /**
  * "İptal & İade" ekranının İptaller sekmesi. Roller ve izin anahtarı iade
@@ -66,26 +72,15 @@ export class AdminCancellationController {
   })
   @ApiResponse({ status: 200, description: "XLSX file" })
   async export(
+    @CurrentUser("id") adminId: string,
     @Query() query: AdminCancellationQueryDto,
     @ReqLocale() locale: Locale,
-    @Res() res: Response,
-  ): Promise<void> {
-    const file = await this.cancellations.exportXlsx(query, locale);
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // Dosya alıcı/satıcı kimliği taşır: her indirme zorunlu denetim bırakır.
+    return sendExport(
+      res,
+      await this.cancellations.export(query, adminId, locale),
     );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${file.filename}"`,
-    );
-    // Tavan aşıldıysa panel uyarır: dosya yalnız ilk N satırı taşır.
-    if (file.truncated) {
-      res.setHeader(
-        "X-Export-Truncated-At",
-        String(CANCELLATION_EXPORT_ROW_CAP),
-      );
-    }
-    res.send(file.body);
   }
 }

@@ -5,6 +5,7 @@ import {
   ParseUUIDPipe,
   Query,
   Res,
+  StreamableFile,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -23,15 +24,9 @@ import { Roles } from "../../auth/decorators/roles.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { ReqLocale } from "../../i18n";
-import { AdminAuditService } from "../ops/admin-audit.service";
 import { ConsentRecordQueryDto } from "../dto/consent-record.dto";
-import {
-  AdminConsentService,
-  CONSENT_EXPORT_ROW_CAP,
-} from "./admin-consent.service";
-
-const XLSX_MIME =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+import { sendExport } from "../../../common/export";
+import { AdminConsentService } from "./admin-consent.service";
 
 /**
  * Onay Kayıtları — kullanıcıların verdiği hukuki onayların ispat ekranı.
@@ -51,10 +46,7 @@ const XLSX_MIME =
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminConsentController {
-  constructor(
-    private readonly service: AdminConsentService,
-    private readonly audit: AdminAuditService,
-  ) {}
+  constructor(private readonly service: AdminConsentService) {}
 
   @Get("consents")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
@@ -75,45 +67,11 @@ export class AdminConsentController {
     @CurrentUser("id") adminId: string,
     @Query() query: ConsentRecordQueryDto,
     @ReqLocale() locale: Locale,
-    @Res() res: Response,
-  ): Promise<void> {
-    const file = await this.service.exportXlsx(query, locale);
-
-    // Zorunlu denetim kaydı: uç toplu kişisel veri dışarı taşıyor. Değerler
-    // değil, filtre ve satır sayısı yazılır.
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "consent_records_export",
-      "ConsentRecord",
-      "export",
-      null,
-      {
-        filters: {
-          search: query.search ?? null,
-          document: query.document ?? null,
-          action: query.action ?? null,
-          source: query.source ?? null,
-          subjectType: query.subjectType ?? null,
-          userId: query.userId ?? null,
-          startDate: query.startDate ?? null,
-          endDate: query.endDate ?? null,
-        },
-        rowCount: file.rowCount,
-        truncated: file.truncated,
-      },
-    );
-
-    res.setHeader("Content-Type", XLSX_MIME);
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${file.filename}"`,
-    );
-    // Tavan aşıldıysa panel uyarır: dosya yalnız ilk N satırı taşır.
-    if (file.truncated) {
-      res.setHeader("X-Export-Truncated-At", String(CONSENT_EXPORT_ROW_CAP));
-    }
-    res.send(file.body);
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // Zorunlu denetim kaydı hatta: uç toplu kişisel veri dışarı taşıyor.
+    // Değerler ve arama TERİMİ değil, filtreler ve satır sayısı yazılır.
+    return sendExport(res, await this.service.export(query, adminId, locale));
   }
 
   @Get("consents/status/:userId")

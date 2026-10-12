@@ -472,9 +472,15 @@ yapılır — ek iş gerekmez.
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel
 indirilir (`GET /api/admin/deleted-identities/export`). Dosya, o ay **silinen**
 hesapları içerir (arşiv satırının oluşturulma tarihini değil, `deleted_at`'i
-esas alır — backfill satırlarının hepsi aynı güne düşer). Her indirme
-`deleted_identity_export` adıyla denetim kaydına yazılır; kayda kimlik
-DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
+esas alır — backfill satırlarının hepsi aynı güne düşer). Ay sınırları
+**Türkiye takvimindedir** (ayın son gecesi 21:00'den sonra silinen hesap o
+aydadır). Her indirme `deleted_identity_export` adıyla denetim kaydına yazılır;
+kayda kimlik DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
+
+Dosya düzeni (biçim sürümü 2): 1. sayfa **Özet**, 2. sayfa **Bildirim
+YYYY-AA** (portala yüklenecek veri; kolon sırası değişmedi), son sayfa
+**Bilgi**. Portal ilk sayfayı okuyorsa yüklemeden önce Bildirim sayfasını
+ayrı kaydedin. Bkz. `docs/ADMIN_EXPORTS.md`.
 
 ---
 

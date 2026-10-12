@@ -1,29 +1,27 @@
 import { Injectable } from "@nestjs/common";
+import type { Locale } from "@tarodan/i18n";
 import type {
-  AnalyticsExportFormat,
   AnalyticsMetric,
+  AnalyticsRange,
   AnalyticsRangeQuery,
   AnalyticsSeries,
   AnalyticsTab,
+  ExportColumnType,
 } from "@tarodan/types";
 import {
-  renderSheet,
-  toCsv,
-  toXlsx,
-  type Cell,
-  type RenderedSheet,
-} from "../../../../common/helpers/tabular-export";
+  ExportListService,
+  type ExportCellValue,
+  type ExportFile,
+  type ExportRecord,
+  type WorkbookColumn,
+  type WorkbookDataSheet,
+} from "../../../../common/export";
+import { trCalendarDate } from "../../../../common/helpers/tr-calendar";
 import { AnalyticsCatalogService } from "./analytics-catalog.service";
 import { AnalyticsMembershipService } from "./analytics-membership.service";
 import { AnalyticsQualityService } from "./analytics-quality.service";
 import { AnalyticsSalesService } from "./analytics-sales.service";
 import { AnalyticsTradeService } from "./analytics-trade.service";
-
-export interface AnalyticsExportFile {
-  filename: string;
-  contentType: string;
-  body: Buffer;
-}
 
 /** A metric map is an object whose values all carry `current`. */
 function isMetricMap(value: unknown): value is Record<string, AnalyticsMetric> {
@@ -57,11 +55,51 @@ function isSeriesList(value: unknown): value is AnalyticsSeries[] {
   );
 }
 
-function isRowList(value: unknown): value is Array<Record<string, Cell>> {
+function isRowList(value: unknown): value is Array<Record<string, unknown>> {
   return (
     Array.isArray(value) &&
     value.every((entry) => typeof entry === "object" && entry !== null)
   );
+}
+
+/** Yanıttaki bir hücre değeri — iç içe nesne dosyaya JSON metni olarak gider. */
+function cellOf(value: unknown): ExportCellValue {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Kolon tipi değerlerden: dolu her hücre sayıysa SAYI kolonu. Eski CSV
+ * yazıcısı her değeri metne çevirip nötrlüyordu; negatif bir değişim yüzdesi
+ * `'-12.5` metnine dönüşüp toplanamıyordu.
+ */
+function inferType(values: readonly ExportCellValue[]): ExportColumnType {
+  const filled = values.filter((v) => v !== null && v !== undefined);
+  return filled.length > 0 && filled.every((v) => typeof v === "number")
+    ? "number"
+    : "text";
+}
+
+/** Başlıklar ALAN ADLARIDIR — bkz. sınıf açıklaması. */
+function fieldSheet(
+  name: string,
+  headers: readonly string[],
+  records: readonly ExportRecord[],
+): WorkbookDataSheet {
+  const columns: WorkbookColumn[] = headers.map((header) => ({
+    key: header,
+    header,
+    type: inferType(records.map((record) => record[header])),
+  }));
+  return { name, columns, records };
 }
 
 /**
@@ -78,7 +116,9 @@ function isRowList(value: unknown): value is Array<Record<string, Cell>> {
  *
  * Başlıklar ALAN ADLARIDIR, çeviri değil: dosya çoğunlukla başka bir tabloya
  * ya da muhasebeye aktarılıyor ve orada sabit, makine-okunur bir anahtar
- * lazım. Etiketleme ekranın işi.
+ * lazım. Etiketleme ekranın işi. Bu yüzden analitik, kolon kataloğu
+ * (`EXPORT_CATALOGS`) OLMAYAN tek dökümdür; yazıcı, Özet sayfası, yanıt
+ * başlıkları ve denetim diğer dökümlerle ortaktır. Yalnız XLSX.
  */
 @Injectable()
 export class AnalyticsExportService {
@@ -88,32 +128,46 @@ export class AnalyticsExportService {
     private readonly catalog: AnalyticsCatalogService,
     private readonly quality: AnalyticsQualityService,
     private readonly membership: AnalyticsMembershipService,
+    private readonly exports: ExportListService,
   ) {}
 
   async export(
     tab: AnalyticsTab,
-    format: AnalyticsExportFormat,
     query: AnalyticsRangeQuery | undefined,
-  ): Promise<AnalyticsExportFile> {
+    actorId: string,
+    locale: Locale,
+  ): Promise<ExportFile> {
     const response = await this.load(tab, query);
+    const range = (response as { range: AnalyticsRange }).range;
     const sheets = this.toSheets(response);
-    const range = (response as { range: { from: string; to: string } }).range;
-    const stem = `analitik-${tab}-${range.from.slice(0, 10)}-${range.to.slice(0, 10)}`;
+    const from = trCalendarDate(new Date(range.from));
+    const to = trCalendarDate(new Date(range.to));
 
-    if (format === "xlsx") {
-      return {
-        filename: `${stem}.xlsx`,
-        contentType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        body: await toXlsx(sheets),
-      };
-    }
-
-    return {
-      filename: `${stem}.csv`,
-      contentType: "text/csv; charset=utf-8",
-      body: Buffer.from(toCsv(sheets), "utf8"),
-    };
+    return this.exports.exportSheets({
+      locale,
+      resource: "analytics",
+      slug: `analitik-${tab}-${from}-${to}`,
+      titleKey: `admin.analytics.tabs.${tab}`,
+      filters: [
+        { labelKey: "admin.analytics.filters.from", value: from },
+        { labelKey: "admin.analytics.filters.to", value: to },
+        {
+          labelKey: "admin.analytics.filters.groupBy",
+          value: range.groupBy,
+          valueKey: `admin.analytics.filters.${range.groupBy}`,
+        },
+        { labelKey: "admin.analytics.filters.compare", value: range.compared },
+      ],
+      rowCount: sheets.reduce((sum, sheet) => sum + sheet.records.length, 0),
+      sheets: () => sheets,
+      audit: {
+        actorId,
+        action: "analytics_export",
+        entityType: "Analytics",
+        entityId: tab,
+        query: query ?? {},
+      },
+    });
   }
 
   private load(tab: AnalyticsTab, query: AnalyticsRangeQuery | undefined) {
@@ -132,16 +186,15 @@ export class AnalyticsExportService {
     }
   }
 
-  private toSheets(response: object): RenderedSheet[] {
-    const sheets: RenderedSheet[] = [];
+  private toSheets(response: object): WorkbookDataSheet[] {
+    const sheets: WorkbookDataSheet[] = [];
 
     // Sekme yanıtları birbirinden farklı arayüzler; sayfalar ALANLARIN
     // ŞEKLİNDEN türetildiği için burada tek ortak okuma biçimine indirilir.
     const entries = Object.entries(response) as Array<[string, unknown]>;
 
     for (const [field, value] of entries) {
-      // `range` dosya adında zaten var ve tek satırlık bir sayfa açmaya
-      // değmez.
+      // `range` Özet'te ve dosya adında zaten var.
       if (field === "range") continue;
 
       if (isMetricMap(value)) {
@@ -159,26 +212,25 @@ export class AnalyticsExportService {
   private metricsSheet(
     name: string,
     metrics: Record<string, AnalyticsMetric>,
-  ): RenderedSheet {
-    const rows = Object.entries(metrics).map(([key, value]) => ({
-      key,
-      ...value,
+  ): WorkbookDataSheet {
+    const records = Object.entries(metrics).map(([key, value]) => ({
+      metric: key,
+      current: value.current,
+      previous: value.previous,
+      changePercent: value.changePercent,
     }));
-
-    return renderSheet(
+    return fieldSheet(
       name,
-      [
-        { header: "metric", value: (row) => row.key },
-        { header: "current", value: (row) => row.current },
-        { header: "previous", value: (row) => row.previous },
-        { header: "changePercent", value: (row) => row.changePercent },
-      ],
-      rows,
+      ["metric", "current", "previous", "changePercent"],
+      records,
     );
   }
 
   /** Seriler tek sayfada yan yana: kova başına bir satır, seri başına kolon. */
-  private seriesSheet(name: string, series: AnalyticsSeries[]): RenderedSheet {
+  private seriesSheet(
+    name: string,
+    series: AnalyticsSeries[],
+  ): WorkbookDataSheet {
     const buckets = series[0]?.points.map((point) => point.bucket) ?? [];
     const byKey = new Map(
       series.map((entry) => [
@@ -187,31 +239,32 @@ export class AnalyticsExportService {
       ]),
     );
 
-    return renderSheet(
+    const records = buckets.map((bucket) => {
+      const record: Record<string, ExportCellValue> = { bucket };
+      for (const entry of series) {
+        record[entry.key] = byKey.get(entry.key)?.get(bucket) ?? 0;
+      }
+      return record;
+    });
+    return fieldSheet(
       name,
-      [
-        { header: "bucket", value: (bucket: string) => bucket },
-        ...series.map((entry) => ({
-          header: entry.key,
-          value: (bucket: string) => byKey.get(entry.key)?.get(bucket) ?? 0,
-        })),
-      ],
-      buckets,
+      ["bucket", ...series.map((entry) => entry.key)],
+      records,
     );
   }
 
   private rowsSheet(
     name: string,
-    rows: Array<Record<string, Cell>>,
-  ): RenderedSheet {
+    rows: Array<Record<string, unknown>>,
+  ): WorkbookDataSheet {
     // Kolonlar satırların BİRLEŞİMİNDEN alınır: ilk satırda olmayan bir alan
     // (yalnız bazı satırlarda dolan `averageViewUplift` gibi) düşmesin.
     const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
-
-    return renderSheet<Record<string, Cell>>(
-      name,
-      headers.map((header) => ({ header, value: (row) => row[header] })),
-      rows,
+    const records = rows.map((row) =>
+      Object.fromEntries(
+        headers.map((header) => [header, cellOf(row[header])]),
+      ),
     );
+    return fieldSheet(name, headers, records);
   }
 }

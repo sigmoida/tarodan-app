@@ -65,6 +65,11 @@ export const marketingApi = {
   /** Kampanya (indirim) listesi; reklam formundaki kampanya seçimi için. */
   getDiscounts: (params?: { isActive?: boolean; limit?: number }) =>
     api.get("/admin/discounts", { params }),
+  /** Bir kampanyanın kupon kodları, Excel dosyası olarak. */
+  exportDiscountCodes: (discountId: string) =>
+    api.get(`/admin/discounts/${discountId}/codes/export`, {
+      responseType: "blob",
+    }),
 
   // Notifications
   getNotificationHistory: (params?: {

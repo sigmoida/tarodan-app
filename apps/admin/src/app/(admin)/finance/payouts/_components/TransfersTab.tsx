@@ -3,7 +3,7 @@
 "use client";
 
 import { adminApi } from "@/lib/api";
-import { ResourceList } from "@/components/list";
+import { ExportButton, ResourceList } from "@/components/list";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { transferColumns } from "../_lib/columns";
 import { type PayoutTransferRow } from "../_lib/types";
@@ -52,7 +52,9 @@ export function TransfersTab() {
       syncUrl
       filters={payoutTransferFilterFields(t)}
     >
-      <ResourceList.Toolbar />
+      <ResourceList.Toolbar>
+        <ExportButton fetcher={(p) => adminApi.exportPayoutTransfers(p)} />
+      </ResourceList.Toolbar>
       <ResourceList.Table
         columns={transferColumns(
           (r) => retry.mutate(r.id),

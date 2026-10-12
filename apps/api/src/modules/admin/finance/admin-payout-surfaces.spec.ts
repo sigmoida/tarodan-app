@@ -43,6 +43,25 @@ describe("AdminPayoutService — transfer ve borç listeleri", () => {
     );
   });
 
+  it("transfer listesi: tarih uçları Türkiye günüdür, bitiş günü TAMAMIYLA dahil", async () => {
+    const { service, prisma } = makeService();
+
+    await service.getPayoutTransfers({
+      dateFrom: "2026-10-01",
+      dateTo: "2026-10-12",
+      page: 1,
+      limit: 20,
+    });
+
+    // Eskiden `new Date("2026-10-12")` = UTC gece yarısı: seçilen gün dışarıda.
+    expect(prisma.payoutTransfer.findMany.mock.calls[0][0].where.createdAt).toEqual(
+      {
+        gte: new Date("2026-09-30T21:00:00.000Z"),
+        lte: new Date("2026-10-12T20:59:59.999Z"),
+      },
+    );
+  });
+
   it("borç listesi: status=open yalnız açık borçları getirir", async () => {
     const { service, prisma } = makeService();
 

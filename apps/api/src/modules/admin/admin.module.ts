@@ -34,6 +34,7 @@ import { AdminPspReconciliationService } from "./finance/admin-psp-reconciliatio
 import { AdminMediaService } from "./catalog/admin-media.service";
 import { AdminMediaController } from "./catalog/admin-media.controller";
 import { AdminAuditService } from "./ops/admin-audit.service";
+import { ExportListService } from "../../common/export/export-list.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminSiteAccessService } from "./users/admin-site-access.service";
@@ -61,6 +62,7 @@ import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
 import { AdminExpiredListingsService } from "./catalog/admin-expired-listings.service";
 import { AdminProductRenewalService } from "./catalog/admin-product-renewal.service";
+import { AdminVoucherCodeExportService } from "./catalog/admin-voucher-code-export.service";
 import {
   ProductImportBatchProcessor,
   ProductImportBatchScheduler,
@@ -83,6 +85,7 @@ import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.se
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
 import { AdminPayoutService } from "./finance/admin-payout.service";
+import { AdminPayoutExportService } from "./finance/admin-payout-export.service";
 import { AdminFinanceService } from "./finance/admin-finance.service";
 import { AdminTradeService } from "./trade/admin-trade.service";
 import { AdminTradeCommonService } from "./trade/admin-trade-common.service";
@@ -242,6 +245,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminPspReconciliationService,
     AdminMediaService,
     AdminAuditService,
+    // Admin Excel dökümlerinin tek hattı (common/export) — denetimi AdminAuditService ile yazar.
+    ExportListService,
     AdminCommissionService,
     AdminSettingsService,
     AdminTimingRulesService,
@@ -259,6 +264,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductBulkImportService,
     AdminExpiredListingsService,
     AdminProductRenewalService,
+    AdminVoucherCodeExportService,
     AdminOrderService,
     AdminCancellationService,
     AdminAnalyticsService,
@@ -277,6 +283,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,
+    AdminPayoutExportService,
     AdminFinanceService,
     AdminTradeService,
     AdminTradeCommonService,

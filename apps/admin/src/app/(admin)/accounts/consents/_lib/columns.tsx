@@ -44,7 +44,6 @@ export function consentColumns(t: TranslateFn) {
       {
         sortKey: "version",
         sortType: "text",
-        exportValue: (r) => (r as AdminConsentRecordRow).version,
       },
     ),
     col.badge<AdminConsentRecordRow>(
@@ -57,8 +56,6 @@ export function consentColumns(t: TranslateFn) {
       {
         sortKey: "action",
         sortType: "text",
-        exportValue: (r) =>
-          t(CONSENT_ACTION_I18N_KEYS[(r as AdminConsentRecordRow).action]),
       },
     ),
     col.user<AdminConsentRecordRow>(

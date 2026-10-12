@@ -17,14 +17,12 @@ import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
 import { QueryBoolean } from "../../../common/transforms";
 import { OrderStatus } from "@prisma/client";
 import {
-  ANALYTICS_EXPORT_FORMATS,
   ANALYTICS_GROUP_BYS,
   DASHBOARD_PERIODS,
   DEFAULT_ANALYTICS_GROUP_BY,
   DEFAULT_DASHBOARD_PERIOD,
   analyticsRangeIssue,
   dashboardRangeIssue,
-  type AnalyticsExportFormat,
   type AnalyticsGroupBy,
   type AnalyticsRangeQuery,
   type DashboardPeriod,
@@ -242,15 +240,4 @@ export class AnalyticsRangeQueryDto implements AnalyticsRangeQuery {
   @QueryBoolean()
   @IsBoolean()
   compare?: boolean;
-}
-
-/** Dışa aktarım sorgusu — ekranla AYNI aralık, artı dosya biçimi. */
-export class AnalyticsExportQueryDto extends AnalyticsRangeQueryDto {
-  @ApiPropertyOptional({
-    enum: ANALYTICS_EXPORT_FORMATS,
-    default: "csv",
-  })
-  @IsOptional()
-  @IsIn(ANALYTICS_EXPORT_FORMATS)
-  format?: AnalyticsExportFormat = "csv";
 }
