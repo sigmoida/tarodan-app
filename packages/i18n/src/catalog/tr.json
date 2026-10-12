@@ -7149,6 +7149,8 @@
           "shipped": "Kargoya Verilen",
           "inTransit": "Taşıma Durumunda",
           "delivered": "Teslim Edilen",
+          "cancelled": "İptaller",
+          "refunds": "İadeler",
           "other": "Diğer"
         },
         "filters": {

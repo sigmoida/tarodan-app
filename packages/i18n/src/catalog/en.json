@@ -7149,6 +7149,8 @@
           "shipped": "Handed to Carrier",
           "inTransit": "In Transit",
           "delivered": "Delivered",
+          "cancelled": "Cancelled",
+          "refunds": "Refunds",
           "other": "Other"
         },
         "filters": {
