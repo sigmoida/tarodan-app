@@ -23,6 +23,13 @@ import {
   LINE_DESCRIPTION,
 } from "./invoice/invoice-line-description";
 import { resolveInvoiceParties } from "./invoice/invoice-parties";
+import {
+  buildInvoiceBillingReference,
+  buildInvoiceDocumentInput,
+  buildInvoiceDocumentLines,
+  invoiceDocumentDescription,
+  invoiceOrderNote,
+} from "./invoice/fiscal-document-input";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import {
