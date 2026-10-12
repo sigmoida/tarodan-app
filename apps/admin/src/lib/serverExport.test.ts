@@ -75,7 +75,10 @@ describe("readExportResponse / exportNotice", () => {
     const file = readExportResponse(
       {
         data,
-        headers: { "x-export-truncated-at": "5000", "x-export-row-count": "5000" },
+        headers: {
+          "x-export-truncated-at": "5000",
+          "x-export-row-count": "5000",
+        },
       },
       "x.xlsx",
     );
@@ -107,9 +110,9 @@ describe("exportErrorMessage", () => {
     await expect(
       exportErrorMessage({ response: { data: { message: "Yetkisiz" } } }, "x"),
     ).resolves.toBe("Yetkisiz");
-    await expect(exportErrorMessage(new Error("net"), "fallback")).resolves.toBe(
-      "fallback",
-    );
+    await expect(
+      exportErrorMessage(new Error("net"), "fallback"),
+    ).resolves.toBe("fallback");
   });
 });
 
