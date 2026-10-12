@@ -3546,6 +3546,8 @@ model Advertisement {
   id              String       @id @default(uuid())
   title           String
   imageUrl        String?      @map("image_url")
+  /// Yalnız GÖRSELSİZ (metin) reklamın tek hedefi. Görselli reklamda daima
+  /// null: tıklama yalnız `hotspots` alanlarında olur, alan dışı bir yere gitmez.
   linkUrl         String?      @map("link_url")
   content         String?
   altText         String?      @map("alt_text")
@@ -3572,6 +3574,9 @@ model Advertisement {
   /// kendiliğinden düşer).
   discountId      String?      @map("discount_id")
   discount        Discount?    @relation(fields: [discountId], references: [id], onDelete: SetNull)
+  /// Görsel üzerindeki tıklanabilir alanlar (sortOrder sırasıyla). Görselsiz
+  /// reklamda boş; görsel değişince (yeni oran) ya da kalkınca silinir.
+  hotspots        AdHotspot[]
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
@@ -3579,6 +3584,40 @@ model Advertisement {
   @@index([position, deviceType, isActive])
   @@index([startDate, endDate])
   @@map("advertisements")
+}
+
+/// Görselli reklamın tıklanabilir dikdörtgeni. Kurallar (en çok 10 alan, en
+/// küçük boyut, çakışmazlık, taşmazlık) tek kaynaktan: `validateAdHotspots`
+/// (@tarodan/types) — admin formu ve API aynı fonksiyonu çalıştırır.
+model AdHotspot {
+  id              String        @id @default(uuid())
+  /// Reklam silinince alanları da gider: yalnız görsel düzeni + tık sayacı,
+  /// finansal/denetim izi değil (Cascade bilinçli).
+  advertisementId String        @map("advertisement_id")
+  advertisement   Advertisement @relation(fields: [advertisementId], references: [id], onDelete: Cascade)
+  /// Sol üst köşe + en/boy, görselin KESRİ (0–1): görsel hangi boyutta
+  /// çizilirse çizilsin (web, mobil, admin önizleme) alan aynı yere düşer.
+  x               Float
+  y               Float
+  width           Float
+  height          Float
+  /// Alanın hedefi; reklamın eski `linkUrl` kuralıyla aynı (`@IsAdLinkUrl`).
+  linkUrl         String        @map("link_url")
+  /// Admin'in alana verdiği ad: istatistikte alanı tanıtır, web'de
+  /// ekran okuyucu etiketi (aria-label) olur.
+  label           String
+  /// Admin'in çizim/liste sırası (0 tabanlı). Kayıtta payload dizisinin
+  /// sırasıyla yeniden yazılır; yanıtlar bu sırayla döner.
+  sortOrder       Int           @default(0) @map("sort_order")
+  /// Bu alana düşen tık; reklamın `clickCount`'u ile AYNI işlemde artar.
+  /// Reklam toplamı alanların toplamından büyük olabilir: alanlardan önceki ve
+  /// silinmiş alanlara düşen tıklar yalnız reklamda kalır.
+  clickCount      Int           @default(0) @map("click_count")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([advertisementId])
+  @@map("advertisement_hotspots")
 }
 
 model Discount {
