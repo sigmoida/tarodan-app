@@ -46,6 +46,27 @@ import { toDiscountResponse } from "./helpers/discount-response.mapper";
 import { i18nMessage } from "../i18n";
 
 /**
+ * Bir batch'in kodları — listeleme ve Excel dökümü AYNI alanları ve sırayı
+ * okur. Toplu üretim `createMany` ile yazdığı için kodların `createdAt`'i
+ * çoğunlukla eşittir; `id` ikinci anahtar olmadan sıra belirsiz kalır ve
+ * sayfalı döküm sayfa sınırında kod atlayıp tekrarlayabilirdi.
+ */
+const VOUCHER_CODE_SELECT = {
+  id: true,
+  code: true,
+  isRedeemed: true,
+  redeemedById: true,
+  redeemedAt: true,
+  orderId: true,
+  createdAt: true,
+} satisfies Prisma.DiscountCodeSelect;
+
+const VOUCHER_CODE_ORDER: Prisma.DiscountCodeOrderByWithRelationInput[] = [
+  { createdAt: "asc" },
+  { id: "asc" },
+];
+
+/**
  * Adet koşullu türlerin (bogo / bulk_quantity) şekil doğrulaması. İkisi de
  * SATICI ürün-fiyatı kampanyasıdır (cep kuralı: assertTargetAllowedForActor
  * admin'i zaten engeller), kodsuz-otomatik çalışır ve sepette SATIR bazında
@@ -861,20 +882,12 @@ export class DiscountCrudService {
     return generateReferenceCode(prefix || REFERENCE_PREFIX.voucher);
   }
 
-  /** Bir batch'in kodları (admin listeleme + CSV export). */
+  /** Bir batch'in kodları (admin listeleme). */
   async listCodes(discountId: string) {
     const codes = await this.prisma.discountCode.findMany({
       where: { discountId },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        code: true,
-        isRedeemed: true,
-        redeemedById: true,
-        redeemedAt: true,
-        orderId: true,
-        createdAt: true,
-      },
+      orderBy: VOUCHER_CODE_ORDER,
+      select: VOUCHER_CODE_SELECT,
     });
     return {
       data: codes,
@@ -883,5 +896,16 @@ export class DiscountCrudService {
         redeemed: codes.filter((c) => c.isRedeemed).length,
       },
     };
+  }
+
+  /** Kodların bir sayfası — admin Excel dökümü, listeyle aynı sıra. */
+  listCodesPage(discountId: string, page: { skip: number; take: number }) {
+    return this.prisma.discountCode.findMany({
+      where: { discountId },
+      orderBy: VOUCHER_CODE_ORDER,
+      select: VOUCHER_CODE_SELECT,
+      skip: page.skip,
+      take: page.take,
+    });
   }
 }

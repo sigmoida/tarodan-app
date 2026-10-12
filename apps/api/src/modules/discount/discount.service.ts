@@ -69,6 +69,10 @@ export class DiscountService {
     return this.crud.listCodes(discountId);
   }
 
+  listCodesPage(...args: Parameters<DiscountCrudService["listCodesPage"]>) {
+    return this.crud.listCodesPage(...args);
+  }
+
   // ────────────────────────── kupon doğrulama ──────────────────────────
   // Sepet önizlemesi ve checkout bu servisi adresliyor; gövde
   // DiscountCouponService'te.

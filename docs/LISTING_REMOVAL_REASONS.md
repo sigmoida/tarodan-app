@@ -196,7 +196,6 @@ platformu, ihlal kodunu ve tarihi içerir; serbest metni içermez.
 - Ürün detayı: kaldırma geçmişi (serbest metin dahil; sayılmayan olaylar
   notla işaretli).
 - Red ve kaldırma pencereleri: ihlal türü seçimi (zorunlu) + açıklama.
-- Dışa aktarım (`GET /admin/products-export`): aynı filtreler + neden kolonları.
 
 ## Dashboard — nasıl sayılır
 

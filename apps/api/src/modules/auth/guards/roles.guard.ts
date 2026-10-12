@@ -43,7 +43,6 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   finance: ["payments"],
   "refund-attempts": ["payments"],
   products: ["products"],
-  "products-export": ["products"],
   categories: ["categories"],
   brands: ["brands"],
   manufacturers: ["manufacturers"],

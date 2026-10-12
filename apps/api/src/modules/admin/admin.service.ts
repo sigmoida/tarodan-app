@@ -6,10 +6,7 @@ import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminUserService } from "./users/admin-user.service";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminStaffService } from "./users/admin-staff.service";
-import {
-  AdminProductService,
-  type AdminProductExportQuery,
-} from "./catalog/admin-product.service";
+import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminOrderService } from "./orders/admin-order.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
@@ -380,10 +377,6 @@ export class AdminService {
 
   async getProducts(query: AdminProductQueryDto) {
     return this.productService.getProducts(query);
-  }
-
-  async exportProducts(query: AdminProductExportQuery) {
-    return this.productService.exportProducts(query);
   }
 
   async uploadProductImages(productId: string, files: Express.Multer.File[]) {

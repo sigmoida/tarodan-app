@@ -62,6 +62,7 @@ import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
 import { AdminExpiredListingsService } from "./catalog/admin-expired-listings.service";
 import { AdminProductRenewalService } from "./catalog/admin-product-renewal.service";
+import { AdminVoucherCodeExportService } from "./catalog/admin-voucher-code-export.service";
 import {
   ProductImportBatchProcessor,
   ProductImportBatchScheduler,
@@ -263,6 +264,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductBulkImportService,
     AdminExpiredListingsService,
     AdminProductRenewalService,
+    AdminVoucherCodeExportService,
     AdminOrderService,
     AdminCancellationService,
     AdminAnalyticsService,
