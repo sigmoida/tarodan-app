@@ -23,6 +23,7 @@ import { paginate, resolveOrderBy } from "../../../common/list";
 import { primaryCashPayment } from "../../trade/helpers/trade.constants";
 import { i18nMessage } from "../../i18n";
 import { refundRequestKindWhere } from "./helpers/refund-request-kind-where";
+import { refundComponentTotals } from "../../refund/helpers/refund-component-totals";
 
 /**
  * İade talepleri admin operasyonları (liste/detay, force-finalize) +
@@ -204,7 +205,12 @@ export class AdminRefundService {
         .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
         .filter((img: any) => img.url);
     }
-    return rr;
+    // Taraf başına özet (alıcı / satıcı / platform) — bileşen satırlarından,
+    // tek yardımcıyla; panel kendi toplamını yapmaz.
+    return {
+      ...rr,
+      financialTotals: refundComponentTotals(rr.financialComponents),
+    };
   }
 
   async approveRefundRequest(
