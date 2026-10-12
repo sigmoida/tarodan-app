@@ -11666,6 +11666,63 @@
         "configuration": "The Netsis integration is misconfigured",
         "unknown": "Netsis returned an unexpected error"
       }
+    },
+    "invoicing": {
+      "pdf": {
+        "title": {
+          "EARCHIVE": "e-Archive Invoice",
+          "EINVOICE": "e-Invoice"
+        },
+        "returnMarker": "RETURN",
+        "scenario": {
+          "EARCHIVE": "e-Archive",
+          "EINVOICE": "e-Invoice"
+        },
+        "section": {
+          "issuer": "Issued by",
+          "recipient": "Recipient",
+          "billingReference": "Returned Document",
+          "note": "Note",
+          "verification": "Document Lookup",
+          "qr": "QR Data"
+        },
+        "field": {
+          "documentNumber": "Invoice No",
+          "ettn": "ETTN",
+          "issueDate": "Issue Date",
+          "issueTime": "Time",
+          "scenario": "Scenario",
+          "reference": "Reference",
+          "status": "Status",
+          "vkn": "Tax ID (VKN)",
+          "tckn": "National ID (TCKN)",
+          "taxOffice": "Tax Office",
+          "address": "Address",
+          "email": "E-mail",
+          "phone": "Phone",
+          "pendingNumber": "Assigned by the integrator"
+        },
+        "column": {
+          "description": "Description",
+          "quantity": "Qty",
+          "unitPrice": "Unit Price",
+          "discount": "Discount",
+          "vatRate": "VAT %",
+          "vatAmount": "VAT Amount",
+          "lineTotal": "Amount"
+        },
+        "totals": {
+          "lineExtension": "Goods/Services Amount (excl. VAT)",
+          "discount": "Total Discount",
+          "vat": "VAT ({rate}%)",
+          "vatTotal": "Total VAT",
+          "gross": "Amount Due"
+        },
+        "billingReferenceText": "Return invoice for document {documentNumber} ({issueDate}).",
+        "generatedAt": "Generated: {date}",
+        "page": "Page {page} / {total}",
+        "legal": "This document is the visual copy of the e-document submitted to the Revenue Administration (GİB); its fiscal validity lies in the e-document."
+      }
     }
   },
   "status": {

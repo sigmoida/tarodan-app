@@ -11666,6 +11666,63 @@
         "configuration": "Netsis entegrasyonu yanlış yapılandırılmış",
         "unknown": "Netsis beklenmeyen bir hata döndürdü"
       }
+    },
+    "invoicing": {
+      "pdf": {
+        "title": {
+          "EARCHIVE": "e-Arşiv Fatura",
+          "EINVOICE": "e-Fatura"
+        },
+        "returnMarker": "İADE",
+        "scenario": {
+          "EARCHIVE": "e-Arşiv",
+          "EINVOICE": "e-Fatura"
+        },
+        "section": {
+          "issuer": "Düzenleyen",
+          "recipient": "Alıcı",
+          "billingReference": "İade Edilen Belge",
+          "note": "Not",
+          "verification": "Belge Sorgulama",
+          "qr": "QR Verisi"
+        },
+        "field": {
+          "documentNumber": "Fatura No",
+          "ettn": "ETTN",
+          "issueDate": "Düzenlenme Tarihi",
+          "issueTime": "Saat",
+          "scenario": "Senaryo",
+          "reference": "Referans",
+          "status": "Durum",
+          "vkn": "VKN",
+          "tckn": "TCKN",
+          "taxOffice": "Vergi Dairesi",
+          "address": "Adres",
+          "email": "E-posta",
+          "phone": "Telefon",
+          "pendingNumber": "Entegratör tarafından atanacak"
+        },
+        "column": {
+          "description": "Açıklama",
+          "quantity": "Miktar",
+          "unitPrice": "Birim Fiyat",
+          "discount": "İskonto",
+          "vatRate": "KDV %",
+          "vatAmount": "KDV Tutarı",
+          "lineTotal": "Tutar"
+        },
+        "totals": {
+          "lineExtension": "Mal/Hizmet Tutarı (KDV Hariç)",
+          "discount": "Toplam İskonto",
+          "vat": "KDV (%{rate})",
+          "vatTotal": "Toplam KDV",
+          "gross": "Ödenecek Tutar"
+        },
+        "billingReferenceText": "{documentNumber} numaralı belge ({issueDate}) için iade faturasıdır.",
+        "generatedAt": "Oluşturulma: {date}",
+        "page": "Sayfa {page} / {total}",
+        "legal": "Bu belge, GİB'e iletilen e-belgenin görsel kopyasıdır; mali geçerliliği e-belgededir."
+      }
     }
   },
   "status": {
