@@ -166,6 +166,9 @@ export class InvoiceDeliveryService {
                 data: {
                   type,
                   sourceId,
+                  // Belgeyi kesecek sağlayıcı. İptal/iade/PDF ileride bu kayda
+                  // bakar; bugün tek bağlama eLogo olduğundan kolon varsayılanıyla aynı.
+                  provider: this.provider.name,
                   sellerUserId: parties.sellerUserId,
                   buyerUserId: parties.buyerUserId,
                   context: parties.context,

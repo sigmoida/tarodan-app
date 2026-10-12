@@ -681,6 +681,8 @@ export class InvoiceReversalService {
             data: {
               type: "return_invoice",
               sourceId: reversalSourceId,
+              // İade faturasını gönderecek sağlayıcı — kayıt kimin kestiğini taşır.
+              provider: this.provider.name,
               recipientUserId: inv.recipientUserId,
               recipientVknTckn: inv.recipientVknTckn,
               recipientName: inv.recipientName,

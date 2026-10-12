@@ -281,6 +281,8 @@ describe("InvoicingService", () => {
     expect(Number(rec.netAmount)).toBeCloseTo(120, 2);
     expect(Number(rec.taxAmount)).toBeCloseTo(24, 2);
     expect(Number(rec.total)).toBeCloseTo(144, 2);
+    // Kayıt belgeyi kesen sağlayıcıyı taşır (portun adı).
+    expect(rec.provider).toBe("elogo");
   });
 
   it("alıcı adresi UBL PostalAddress'e yazılır (Country-only şema hatası önlenir)", async () => {
@@ -1274,6 +1276,8 @@ describe("InvoicingService", () => {
     );
     expect(returns).toHaveLength(2); // çakışma yok: sourceId = orijinal fatura id
     expect(returns.map((r: any) => r.sourceId).sort()).toEqual(["c1", "s1"]);
+    // İade faturası da onu gönderen sağlayıcıyı kaydeder.
+    expect(returns.map((r: any) => r.provider)).toEqual(["elogo", "elogo"]);
   });
 
   it("platform satışı: komisyon ATLANIR, alıcıya platform_sale e-Arşivi kesilir", async () => {

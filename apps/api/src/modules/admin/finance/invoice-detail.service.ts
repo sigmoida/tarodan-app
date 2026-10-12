@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  EInvoiceProviderName,
   FiscalInvoiceContext,
   FiscalInvoiceType,
   Prisma,
@@ -43,6 +44,8 @@ export interface InvoiceDetailData {
   description: string;
   documentType: string;
   status: string;
+  /** Belgeyi kesen e-belge sağlayıcısı. */
+  provider: EInvoiceProviderName;
   context: FiscalInvoiceContext | null;
   ettn: string | null;
   sourceReference: string | null;
@@ -101,6 +104,7 @@ export class InvoiceDetailService {
         lineItems: true,
         documentType: true,
         status: true,
+        provider: true,
         context: true,
         ettn: true,
         invoiceNumber: true,
@@ -136,6 +140,7 @@ export class InvoiceDetailService {
       description,
       documentType: invoice.documentType,
       status: invoice.status,
+      provider: invoice.provider,
       context: invoice.context,
       ettn: invoice.ettn,
       sourceReference: invoice.sourceReference,

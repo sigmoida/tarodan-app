@@ -12,6 +12,7 @@ describe("AdminTaxService.getFiscalInvoices — işlem referansı", () => {
     type: "trade_service_fee",
     sourceId: "tcp-1",
     status: "sent",
+    provider: "netsis",
     documentType: "EARCHIVE",
     invoiceNumber: "TRD2026000000001",
     ettn: null,
@@ -32,7 +33,7 @@ describe("AdminTaxService.getFiscalInvoices — işlem referansı", () => {
     billingReference: null,
     pdfUrl: null,
     emailSentAt: null,
-    providerResultMsg: null,
+    providerResultMsg: "Kabul edildi",
     issuedAt: null,
     cancelledAt: null,
     cancelReason: null,
@@ -91,6 +92,24 @@ describe("AdminTaxService.getFiscalInvoices — işlem referansı", () => {
       refs: [{ kind: "trade", label: "TKS-AAA", targetId: "trade-1" }],
     });
     expect(prisma.tradeCashPayment.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("satır belgeyi kesen sağlayıcıyı ve sağlayıcının sonuç metnini taşır", async () => {
+    const { service, prisma } = makeService([invoiceRow]);
+
+    const result = await service.getFiscalInvoices({});
+
+    expect(result.data[0]).toMatchObject({
+      provider: "netsis",
+      resultMsg: "Kabul edildi",
+    });
+    const pageSelect = prisma.fiscalInvoice.findMany.mock.calls.find(
+      ([args]) => Object.keys(args.select).length > 1,
+    )?.[0].select;
+    expect(pageSelect).toMatchObject({
+      provider: true,
+      providerResultMsg: true,
+    });
   });
 
   it("İşlem No filtresi numarayı kaynak anahtarına çevirir", async () => {

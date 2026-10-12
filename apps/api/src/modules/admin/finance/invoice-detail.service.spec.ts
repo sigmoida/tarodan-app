@@ -16,6 +16,7 @@ describe("InvoiceDetailService.build — kaynak işlem tablosu", () => {
     lineItems: null,
     documentType: "e-Arşiv",
     status: "sent",
+    provider: "netsis",
     context: "direct_sale",
     ettn: "ettn-1",
     invoiceNumber: "TRD2026000000001",
@@ -76,6 +77,14 @@ describe("InvoiceDetailService.build — kaynak işlem tablosu", () => {
         occurredAt: new Date("2026-09-02T08:00:00Z"),
       },
     ]);
+  });
+
+  it("belgeyi kesen sağlayıcıyı döner", async () => {
+    const { service } = makeService(order);
+
+    const detail = await service.build("inv-1");
+
+    expect(detail.provider).toBe("netsis");
   });
 
   it("ödeme yoksa siparişin oluşturulma tarihine düşer", async () => {
