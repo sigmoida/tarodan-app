@@ -4,10 +4,13 @@ The customer is moving from eLogo to the Logo Netsis ERP. The API talks to
 Netsis through **NetOpenX REST** (JSON over HTTPS, token auth) running on the
 customer's Netsis server. Code: `apps/api/src/modules/netsis/`.
 
-**Status (2026-10-12):** standalone client only. Nothing imports
-`NetsisModule`; invoicing still runs through eLogo. We have **no access to a
-Netsis instance yet** — every request/response shape is a documented guess,
-marked `VERIFY` in code and listed at the end of this page.
+**Status (2026-10-12):** `InvoicingModule` imports `NetsisModule` and
+registers `NetsisInvoiceProvider` (`modules/invoicing/provider/netsis.provider.ts`).
+New invoices go through Netsis only with `INVOICE_PROVIDER=netsis`; the
+default is still eLogo. We have **no access to a Netsis instance yet** —
+every request/response shape is a documented guess, marked `VERIFY` in code
+and listed at the end of this page. The invoicing flow itself is described in
+`docs/INVOICING_PROVIDERS.md` → "Netsis adaptörü".
 
 ## What the customer must provide
 
@@ -105,7 +108,66 @@ resources and `services/describe` into `apps/api/scripts/netsis-definitions/`
 (gitignored), then revokes the token. Secrets are redacted. Run it on the test
 company first; use the dumps to pin `netsis.types.ts`.
 
+## How the invoicing provider uses Netsis (assumptions)
+
+Field names the provider writes live in
+`modules/invoicing/provider/netsis-invoice.constants.ts`; the pure mapper is
+`netsis-slip.mapper.ts`. Our field → Netsis field:
+
+| Ours (`FiscalDocumentInput`) | Netsis | VERIFY |
+| --- | --- | --- |
+| `kind` SALE / RETURN | `FaturaTip` = `ftSFat` / `ftAFat` (`NETSIS_DOC_TYPES`) | yes |
+| `kind` SALE / RETURN | `FatUst.TIPI` = `ftKapali` / `ftIade` | yes |
+| cari (pooled retail or user `adminCode`) | `FatUst.CARI_KODU` | key name |
+| Netsis serial number | `FatUst.FATIRS_NO` (absent for `Calculate`) | yes |
+| `issueDate` (TR calendar) | `FatUst.TARIH` | format |
+| `issueTime` | `FatUst.FATURA_SAATI` | yes |
+| `note` (≤ 50) | `FatUst.ACIKLAMA` | length |
+| `scenario` | `FatUst.EBELGE_TIPI` = `EFATURA` / `EARSIV` | yes |
+| `sendType` (e-Arşiv only) | `FatUst.EARSIV_GONDERIM_SEKLI` | yes |
+| `ettn` | `FatUst.ETTN` (Netsis may assign its own; the send result's ETTN wins) | yes |
+| `ettn` (our reference) | `FatUst.EKACK1` | yes |
+| `sourceReference` (KYT-…) | `FatUst.EKACK2` | yes |
+| `billingReference` | `FatUst.IADE_FATIRS_NO` / `IADE_FATIRS_TARIH` | yes |
+| pooled cari: customer title / first / last name, TCKN, address, city, district, e-mail | `FatUst.EBELGE_ALICI_UNVAN` / `_AD` / `_SOYAD` / `_VKNTCKN` / `_ADRES` / `_IL` / `_ILCE` / `_EPOSTA` | yes |
+| item card code (per invoice type, from settings) | `Kalems[].STOK_KODU` | — |
+| `quantity` | `Kalems[].STHAR_GCMIK` | — |
+| line net ÷ quantity (6 dp) | `Kalems[].STHAR_NF` | precision |
+| `unitPrice` (gross unit, 6 dp) | `Kalems[].STHAR_BF` | precision |
+| `vatRate` | `Kalems[].STHAR_KDV` | — |
+| `name` (≤ 50) | `Kalems[].STHAR_ACIKLAMA` | length |
+| `discount` as % of gross line (4 dp) | `Kalems[].STHAR_SATISK` | yes |
+
+Other assumptions:
+
+- `providerRef` stored on our record = `<FaturaTip>:<FATIRS_NO>`; the
+  e-document request is `{ FaturaTip, FATIRS_NO, ETTN? }`.
+- The cari's e-invoice flag and PK label are read from `CariEkBilgi` (then
+  `CariTemelBilgi`) fields `EFATURA_KULLANICISI` (`E`/`H`) and
+  `EFATURA_ETIKET` (plus a few spellings) —
+  `helpers/netsis-model.helper.ts` → `readNetsisArpEInvoiceProfile`. An
+  unreadable flag means e-Arşiv, never e-invoice.
+- Corporate cari code = the user's B/K code (`K010042`); `CARI_KOD` assumed
+  ≤ 15 characters, `STOK_KODU` ≤ 35.
+- `Calculate` is run on the number-less slip; a number obtained inside a
+  transaction that is then rolled back is assumed to be returned to the
+  serial (if not, a failed create leaves a gap — ask).
+- Re-sending an existing slip runs `Calculate` on the stored slip (from
+  `Details`) to detect amounts that changed since it was created.
+
 ## To verify with the Netsis consultant
+
+- [ ] **Invoice slip fields** used by the invoicing provider (table above):
+      `TIPI` values, e-document kind flag, e-Arşiv send type, time field,
+      whether an externally supplied `ETTN` is accepted, the extra
+      description fields (`EKACK1/2`), the return reference fields, and how
+      the real recipient of a pooled retail cari is written on an e-Arşiv
+      invoice. Does `STHAR_NF` stand on its own or is it derived from
+      `STHAR_BF` − `STHAR_SATISK`?
+- [ ] **Cari e-invoice flag**: which field `EDocCurrentUpdate` fills and
+      where the PK label lives.
+- [ ] **Serial numbers in a rolled-back transaction**: are they returned?
+- [ ] **Calculate on a stored slip** (with `FATIRS_NO`): allowed?
 
 - [ ] **Token request**: `POST api/v2/token`, form-encoded, fields
       `grant_type=password, username, password, dbname, dbuser, dbpassword,
