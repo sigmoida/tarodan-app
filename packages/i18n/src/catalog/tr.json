@@ -11666,6 +11666,26 @@
         "configuration": "Netsis entegrasyonu yanlış yapılandırılmış",
         "unknown": "Netsis beklenmeyen bir hata döndürdü"
       }
+    },
+    "invoicing": {
+      "netsis": {
+        "settingsMissing": "Netsis faturalama ayarları eksik ya da geçersiz: {keys}",
+        "totalsMismatch": "Netsis'in hesapladığı tutarlar kayıttakinden farklı ({details}); belge gönderilmedi",
+        "totalsField": {
+          "netAmount": "matrah",
+          "vatAmount": "KDV",
+          "grossAmount": "toplam"
+        },
+        "retailCariNotFound": "Perakende cari {code} Netsis'te bulunamadı",
+        "corporateCariMissing": "Kurumsal alıcının carisi ({code}) Netsis'te yok ve otomatik cari açma kapalı",
+        "corporateCariCodeInvalid": "Kurumsal cari kodu geçersiz ({code}); Netsis cari kodu en fazla 15 karakter olabilir",
+        "corporateUserMissing": "VKN {vkn} hiçbir kullanıcıya bağlı değil; kurumsal cari kodu belirlenemedi",
+        "itemTypeUnresolved": "Belgenin Netsis hizmet kartı belirlenemedi (tür: {type})",
+        "invalidProviderRef": "Geçersiz Netsis belge referansı: {ref}",
+        "slipNotFound": "{number} numaralı fatura Netsis'te bulunamadı",
+        "staleSlip": "Netsis'teki {number} numaralı fatura kayıttaki tutarlarla uyuşmuyor; Netsis'te elle düzeltilmeli",
+        "documentCancelled": "{number} numaralı Netsis e-belgesi iptal edilmiş; yeniden gönderilmedi"
+      }
     }
   },
   "status": {

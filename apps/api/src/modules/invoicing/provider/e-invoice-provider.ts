@@ -4,10 +4,12 @@
  * "hangi entegratörle" sorusunu ayırır.
  *
  * Alan servisleri (delivery / reversal / query / document) yalnız bu arayüzü
- * bilir ve `E_INVOICE_PROVIDER` token'ıyla enjekte eder. eLogo (doğrudan
- * özel entegratör, UBL-TR SOAP) bugünkü TEK uygulamadır —
- * `elogo.provider.ts`. Logo Netsis (NetOpenX REST) aynı arayüzün ikinci
- * uygulaması olacak; bkz. docs/INVOICING_PROVIDERS.md.
+ * bilir ve `E_INVOICE_PROVIDER` token'ıyla enjekte eder. İki uygulama var:
+ * eLogo (doğrudan özel entegratör, UBL-TR SOAP) — `elogo.provider.ts` — ve
+ * Logo Netsis (ERP, NetOpenX REST) — `netsis.provider.ts`. Yeni kesimler
+ * `INVOICE_PROVIDER` ile bağlanan sağlayıcıdan geçer; kesilmiş bir kaydın
+ * durum/iptal/PDF işlemleri kaydın KENDİ sağlayıcısında yapılır
+ * (`provider-registry.ts`). Bkz. docs/INVOICING_PROVIDERS.md.
  *
  * Buradaki tipler entegratör sözlüğü (SOAP sonuç kodu, UBL profil adı, XSLT,
  * ZIP/base64) taşımaz. GİB'in kendi kavramları (e-Fatura / e-Arşiv senaryosu,
@@ -19,9 +21,9 @@
  * hesaplamaz, beyan edilen tutar kayda yazılanla aynı kalır.
  */
 
-import type { EInvoiceProviderName } from "@prisma/client";
+import type { EInvoiceProviderName, FiscalInvoiceType } from "@prisma/client";
 
-/** DI token — modülde `ElogoInvoiceProvider`'a bağlanır. */
+/** DI token — modülde `INVOICE_PROVIDER` ayarının seçtiği sağlayıcıya bağlanır. */
 export const E_INVOICE_PROVIDER = "E_INVOICE_PROVIDER";
 
 /**
@@ -40,9 +42,11 @@ export type { EInvoiceProviderName };
  *    yeniden denenir. eLogo böyledir.
  *  - `provider`: numarayı ERP/entegratör gönderim anında atar (Netsis).
  *    Bu akışta kayıt NUMARASIZ açılır, sayaç hiç ilerlemez, numara
- *    `send` sonucundaki `documentNumber`'dan kayda yazılır; numara çakışması
- *    diye bir hata sınıfı yoktur. Faz 1a bu akışı UYGULAMAZ — yalnız bayrak
- *    ve `InvoiceDocumentService.allocateDocumentNumberInTransaction` kapısı var.
+ *    `send` sonucundaki `documentNumber`'dan kayda yazılır; yerel numara
+ *    çakışması yeniden denemesi bu akışta çalışmaz. Belge sağlayıcıda
+ *    oluşup gönderimi düşerse (`accepted: false` + `providerRef`) teslim
+ *    katmanı referansı saklar ve sonraki deneme yalnız GÖNDERİR
+ *    (`EInvoiceSendContext.existingProviderRef`).
  */
 export type DocumentNumbering = "local" | "provider";
 
@@ -140,10 +144,30 @@ export interface FiscalDocumentInput {
   billingReference?: { documentNumber: string; issueDate: string };
 }
 
-/** Gönderimin bağlamı — belgenin kendisine ait olmayan teslim bilgisi. */
+/**
+ * Gönderimin bağlamı — belgenin kendisine ait olmayan teslim bilgisi.
+ * Alanların hepsi isteğe bağlıdır; bir sağlayıcının ihtiyaç duymadığı alanı
+ * yok sayması beklenir (eLogo yalnız `recipientAlias`'ı okur).
+ */
 export interface EInvoiceSendContext {
   /** e-Fatura alıcısının GİB posta kutusu etiketi (PK alias). */
   recipientAlias?: string;
+  /**
+   * Kaydın daha önce sağlayıcıdan aldığı referans (`FiscalInvoice.providerRef`).
+   * Doluysa belge sağlayıcıda ZATEN oluşturulmuştur: `provider`
+   * numaralandırmalı sağlayıcı (Netsis) yeniden oluşturmaz, yalnız gönderir
+   * ya da durumunu sorar — aynı satış iki kez ERP'ye yazılmaz. eLogo yok sayar.
+   */
+  existingProviderRef?: string;
+  /**
+   * Kaydın türü. Netsis hizmet/ürün kartını buradan seçer; iade faturasında
+   * kart orijinal belgenin türünden gelir.
+   */
+  invoiceType?: FiscalInvoiceType;
+  /** Belgenin alıcısı olan kullanıcı — kurumsal cari kodu (B/K kodu) için. */
+  recipientUserId?: string;
+  /** Kayıt No (KYT-…) — belgeyi sağlayıcıda yeniden bulabilmek için. */
+  sourceReference?: string;
 }
 
 /**
@@ -151,6 +175,8 @@ export interface EInvoiceSendContext {
  * bağımsız kılar:
  *
  *  - `network`: ağ/zaman aşımı/sağlayıcı 5xx — bütçe TÜKETMEZ, kayıt `pending`.
+ *    Normalde fırlatılır; belge sağlayıcıda oluşup yalnız gönderimi düştüyse
+ *    (`providerRef` dolu) dönüş değeri olarak da gelebilir — sonuç aynıdır.
  *  - `duplicate-number`: numara sağlayıcıda zaten kullanılmış — yalnız `local`
  *    numaralandırmada anlamlı; yeni numarayla yeniden denenir.
  *  - `configuration`: hesabın/ortamın reddi (görsel tasarım yok vb.) — belgeye
@@ -165,6 +191,10 @@ export type EInvoiceSendResult =
       accepted: true;
       /** Sağlayıcının belge referansı (eLogo refId) — iptalde geri verilir. */
       providerRef?: string;
+      /**
+       * Sağlayıcının belgeye yazdığı ETTN. eLogo bizimkini geri döndürür;
+       * ERP (Netsis) kendi ETTN'ini atayabilir — o durumda kayda bu yazılır.
+       */
       ettn?: string;
       /** `provider` numaralandırmada atanan numara. */
       documentNumber?: string;
@@ -176,6 +206,13 @@ export type EInvoiceSendResult =
       category: EInvoiceErrorCategory;
       resultCode?: number;
       resultMsg?: string;
+      /**
+       * Belge sağlayıcıda OLUŞTU ama gönderilemedi (`provider`
+       * numaralandırma). Teslim katmanı referansı ve numarayı kayda yazar,
+       * sonraki deneme `existingProviderRef` ile yalnız gönderimi tekrarlar.
+       */
+      providerRef?: string;
+      documentNumber?: string;
     };
 
 /** Sağlayıcıdaki bir belgeyi tanımlar. */
