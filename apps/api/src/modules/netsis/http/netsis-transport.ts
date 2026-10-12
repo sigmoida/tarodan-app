@@ -120,7 +120,11 @@ export class NetsisTransport {
    * olsa bile hatadır, başarılı zarftan yalnız `Data` döner. Zarfsız JSON
    * (token ucu, tanımlar) olduğu gibi döner; JSON olmayan gövde (HTML) metin.
    */
-  private unwrap(request: NetsisRequest, status: number, text: string): unknown {
+  private unwrap(
+    request: NetsisRequest,
+    status: number,
+    text: string,
+  ): unknown {
     if (!text.trim()) return null;
     let parsed: unknown;
     try {

@@ -152,12 +152,7 @@ export interface NetsisEDocumentRequest extends NetsisPassthrough {
 }
 
 export type NetsisEDocumentState =
-  | "draft"
-  | "sent"
-  | "accepted"
-  | "rejected"
-  | "cancelled"
-  | "unknown";
+  "draft" | "sent" | "accepted" | "rejected" | "cancelled" | "unknown";
 
 export interface NetsisEDocumentSendResult {
   ettn: string | null;

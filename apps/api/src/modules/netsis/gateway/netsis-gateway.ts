@@ -30,7 +30,10 @@ import type {
 /** Cari (ARPs). */
 export interface NetsisArpsApi {
   /** `CARI_KOD` ile; kayıt yoksa `null`. */
-  findByCode(code: string, options?: NetsisCallOptions): Promise<NetsisArp | null>;
+  findByCode(
+    code: string,
+    options?: NetsisCallOptions,
+  ): Promise<NetsisArp | null>;
   create(arp: NetsisArp, options?: NetsisCallOptions): Promise<NetsisArp>;
   update(
     code: string,

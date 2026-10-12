@@ -55,9 +55,13 @@ describe("NetsisTransactionsClient", () => {
     });
 
     expect(result).toBe("done");
-    expect(http.post).toHaveBeenCalledWith("ItemSlips", {}, {
-      transactionId: "TX-9",
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "ItemSlips",
+      {},
+      {
+        transactionId: "TX-9",
+      },
+    );
     expect(http.get.mock.calls.map(([path]) => path)).toEqual([
       "OpenTransaction",
       "CommitTransaction",

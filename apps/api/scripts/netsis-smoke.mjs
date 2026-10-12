@@ -56,9 +56,10 @@ const config = {
   dbPassword: process.env.NETSIS_DB_PASSWORD ?? "",
   dbType: process.env.NETSIS_DB_TYPE?.trim() || "vtMSSQL",
   branchCode: process.env.NETSIS_BRANCH_CODE?.trim() || "0",
-  timeoutMs: Number(process.env.NETSIS_TIMEOUT_MS) > 0
-    ? Number(process.env.NETSIS_TIMEOUT_MS)
-    : 15000,
+  timeoutMs:
+    Number(process.env.NETSIS_TIMEOUT_MS) > 0
+      ? Number(process.env.NETSIS_TIMEOUT_MS)
+      : 15000,
 };
 
 const secrets = new Set([config.password, config.dbPassword].filter(Boolean));
@@ -116,9 +117,7 @@ function preview(result) {
 function save(name, result) {
   const file = join(outDir, name);
   const content =
-    result.json !== null
-      ? JSON.stringify(result.json, null, 2)
-      : result.text;
+    result.json !== null ? JSON.stringify(result.json, null, 2) : result.text;
   writeFileSync(file, redact(content), { mode: 0o600 });
   return file;
 }
@@ -132,7 +131,9 @@ async function step(label, fn, { showBody = true } = {}) {
     console.log(`${ok ? "OK  " : "FAIL"} ${label} [${result.status}] ${body}`);
     return result;
   } catch (error) {
-    console.log(`FAIL ${label} [network] ${redact(error?.cause?.code ?? error?.name ?? error)}`);
+    console.log(
+      `FAIL ${label} [network] ${redact(error?.cause?.code ?? error?.name ?? error)}`,
+    );
     return null;
   }
 }
@@ -151,7 +152,9 @@ async function main() {
   console.log("=== CONFIG ===");
   console.log(`Base URL:  ${config.baseUrl}`);
   console.log(`User:      ${mask(config.username)}`);
-  console.log(`Database:  ${config.dbName || "not-configured"} (${config.dbType}, branch ${config.branchCode})`);
+  console.log(
+    `Database:  ${config.dbName || "not-configured"} (${config.dbType}, branch ${config.branchCode})`,
+  );
   console.log(`DB user:   ${mask(config.dbUser)}`);
   console.log(`Output:    ${outDir}`);
   mkdirSync(outDir, { recursive: true });
@@ -184,24 +187,28 @@ async function main() {
   }
 
   console.log("\n=== TOKEN (one licence seat while this runs) ===");
-  const tokenResult = await step("POST token", () =>
-    call("POST", "token", {
-      form: {
-        grant_type: "password",
-        username: config.username,
-        password: config.password,
-        dbname: config.dbName,
-        dbuser: config.dbUser,
-        dbpassword: config.dbPassword,
-        dbtype: config.dbType,
-        branchcode: config.branchCode,
-      },
-    }),
+  const tokenResult = await step(
+    "POST token",
+    () =>
+      call("POST", "token", {
+        form: {
+          grant_type: "password",
+          username: config.username,
+          password: config.password,
+          dbname: config.dbName,
+          dbuser: config.dbUser,
+          dbpassword: config.dbPassword,
+          dbtype: config.dbType,
+          branchcode: config.branchCode,
+        },
+      }),
     { showBody: false },
   );
   const token = tokenResult?.json?.access_token;
   if (!token) {
-    console.log("No access_token in the response — check the token body (see docs/NETSIS.md).");
+    console.log(
+      "No access_token in the response — check the token body (see docs/NETSIS.md).",
+    );
     return;
   }
   secrets.add(token);
@@ -210,7 +217,9 @@ async function main() {
   );
 
   try {
-    await step("GET ping (authenticated)", () => call("GET", "ping", { token }));
+    await step("GET ping (authenticated)", () =>
+      call("GET", "ping", { token }),
+    );
 
     console.log("\n=== MODEL DEFINITIONS ===");
     for (const resource of RESOURCES) {

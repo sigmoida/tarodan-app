@@ -32,7 +32,10 @@ export class NetsisArpsClient implements NetsisArpsApi {
     return record as NetsisArp | null;
   }
 
-  async create(arp: NetsisArp, options?: NetsisCallOptions): Promise<NetsisArp> {
+  async create(
+    arp: NetsisArp,
+    options?: NetsisCallOptions,
+  ): Promise<NetsisArp> {
     const data = await this.http.post(NETSIS_PATHS.arps, arp, options);
     return writtenNetsisRecord(data, arp);
   }

@@ -1,4 +1,8 @@
-import { Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import type { NetsisConfig, NetsisMode } from "../../config/netsis";
 import { i18nMessage } from "../i18n/localized-message";
 import type {
@@ -77,7 +81,9 @@ export class NetsisClientFacade implements NetsisGateway {
 
   private ready(): NetsisGateway {
     if (!this.config.enabled) {
-      throw new ServiceUnavailableException(i18nMessage("server.netsis.disabled"));
+      throw new ServiceUnavailableException(
+        i18nMessage("server.netsis.disabled"),
+      );
     }
     return this.gateway;
   }

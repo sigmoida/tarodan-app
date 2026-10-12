@@ -118,7 +118,9 @@ export class NetsisSessionService {
     } catch (error: unknown) {
       const retry = options.retryOnUnauthorized ?? true;
       if (!retry || !isUnauthorized(error)) throw error;
-      this.logger.warn("Netsis rejected the shared token (401); re-authenticating once");
+      this.logger.warn(
+        "Netsis rejected the shared token (401); re-authenticating once",
+      );
       await this.invalidate(token);
       return call(await this.getAccessToken());
     }

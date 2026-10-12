@@ -16,12 +16,7 @@ import { i18nMessage } from "../../i18n/localized-message";
  *  - `unknown`       sınıflanamayan 5xx ya da beklenmeyen yanıt şekli
  */
 export type NetsisErrorKind =
-  | "network"
-  | "auth"
-  | "validation"
-  | "conflict"
-  | "configuration"
-  | "unknown";
+  "network" | "auth" | "validation" | "conflict" | "configuration" | "unknown";
 
 const MESSAGE_KEYS: Record<NetsisErrorKind, MessageKey> = {
   network: "server.netsis.error.network",
@@ -48,7 +43,9 @@ export class NetsisRequestException extends HttpException {
   ) {
     super(
       i18nMessage(messageKey),
-      kind === "network" ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY,
+      kind === "network"
+        ? HttpStatus.SERVICE_UNAVAILABLE
+        : HttpStatus.BAD_GATEWAY,
       cause === undefined ? undefined : { cause },
     );
   }
@@ -125,7 +122,11 @@ function isUpstreamFailure(value: unknown): value is NetsisUpstreamFailure {
 /** `err.code` ya da undici'nin sardığı `err.cause.code`. */
 function errorCode(error: unknown): string | null {
   let current: unknown = error;
-  for (let depth = 0; depth < 3 && typeof current === "object" && current; depth++) {
+  for (
+    let depth = 0;
+    depth < 3 && typeof current === "object" && current;
+    depth++
+  ) {
     const code = (current as { code?: unknown }).code;
     if (typeof code === "string") return code;
     current = (current as { cause?: unknown }).cause;

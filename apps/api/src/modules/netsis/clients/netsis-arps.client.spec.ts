@@ -65,9 +65,9 @@ describe("NetsisArpsClient", () => {
   it("creates with POST ARPs and passes the transaction through", async () => {
     http.post.mockResolvedValue(arp);
 
-    await expect(
-      client.create(arp, { transactionId: "T-1" }),
-    ).resolves.toEqual(arp);
+    await expect(client.create(arp, { transactionId: "T-1" })).resolves.toEqual(
+      arp,
+    );
     expect(http.post).toHaveBeenCalledWith("ARPs", arp, {
       transactionId: "T-1",
     });

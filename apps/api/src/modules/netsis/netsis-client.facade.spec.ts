@@ -37,7 +37,10 @@ describe("NetsisClientFacade", () => {
   });
 
   it("refuses every call with a localized 503 while disabled", () => {
-    const facade = new NetsisClientFacade(new NetsisStubGateway(), config(false));
+    const facade = new NetsisClientFacade(
+      new NetsisStubGateway(),
+      config(false),
+    );
 
     expect(facade.enabled).toBe(false);
     // Mod okunabilir kalır (teşhis için); iş yapan her yüzey kapalı.

@@ -53,9 +53,9 @@ import type {
  * için `snapshot()`, `setEDocumentState()` ve `reset()` açıktır.
  */
 
-type StubTransactionState = "open" | "committed" | "rolledBack";
+export type NetsisStubTransactionState = "open" | "committed" | "rolledBack";
 
-interface StubEDocument {
+export interface NetsisStubEDocument {
   ettn: string;
   state: NetsisEDocumentState;
   slip: Pick<NetsisItemSlipKey, "FaturaTip" | "FATIRS_NO">;
@@ -65,10 +65,10 @@ export interface NetsisStubSnapshot {
   arps: NetsisArp[];
   items: NetsisItem[];
   slips: NetsisItemSlip[];
-  eDocuments: StubEDocument[];
+  eDocuments: NetsisStubEDocument[];
   collections: NetsisMixedReceipt[];
   bankTransfers: NetsisBankTransfer[];
-  transactions: { id: string; state: StubTransactionState }[];
+  transactions: { id: string; state: NetsisStubTransactionState }[];
 }
 
 /** Numara verilmemiş faturaya stub'ın verdiği seri. */
@@ -98,10 +98,10 @@ class NetsisStubStore {
   readonly items = new Map<string, NetsisItem>();
   readonly slips = new Map<string, NetsisItemSlip>();
   /** Fatura anahtarına göre (`slipId`). */
-  readonly eDocuments = new Map<string, StubEDocument>();
+  readonly eDocuments = new Map<string, NetsisStubEDocument>();
   readonly collections = new Map<string, NetsisMixedReceipt>();
   readonly bankTransfers: NetsisBankTransfer[] = [];
-  readonly transactions = new Map<string, StubTransactionState>();
+  readonly transactions = new Map<string, NetsisStubTransactionState>();
   readonly numberCounters = new Map<string, number>();
   private sequence = 0;
 
@@ -199,17 +199,15 @@ class StubItemSlips implements NetsisItemSlipsApi {
         throw invalid(`item ${line.STOK_KODU} does not exist`);
       }
     }
-    const stored = clone(slip);
-    stored.FatUst.FATIRS_NO =
+    const number =
       header.FATIRS_NO?.trim() ||
       this.store.nextDocumentNumber(STUB_DEFAULT_SERIAL);
-    const id = slipId({
-      FaturaTip: stored.FaturaTip,
-      FATIRS_NO: stored.FatUst.FATIRS_NO,
-    });
+    const id = slipId({ FaturaTip: slip.FaturaTip, FATIRS_NO: number });
     if (this.store.slips.has(id)) {
-      throw conflict(`duplicate number ${stored.FatUst.FATIRS_NO}`);
+      throw conflict(`duplicate number ${number}`);
     }
+    const stored = clone(slip);
+    stored.FatUst.FATIRS_NO = number;
     this.store.slips.set(id, stored);
     return clone(stored);
   }
@@ -239,7 +237,10 @@ class StubItemSlips implements NetsisItemSlipsApi {
   async delete(key: NetsisItemSlipKey): Promise<void> {
     this.require(key);
     const document = this.store.eDocuments.get(slipId(key));
-    if (document && (document.state === "sent" || document.state === "accepted")) {
+    if (
+      document &&
+      (document.state === "sent" || document.state === "accepted")
+    ) {
       throw invalid(`${key.FATIRS_NO} has a sent e-document`);
     }
     this.store.slips.delete(slipId(key));
@@ -256,10 +257,16 @@ class StubItemSlips implements NetsisItemSlipsApi {
 class StubEDocuments implements NetsisEDocumentApi {
   constructor(private readonly store: NetsisStubStore) {}
 
-  async send(request: NetsisEDocumentRequest): Promise<NetsisEDocumentSendResult> {
+  async send(
+    request: NetsisEDocumentRequest,
+  ): Promise<NetsisEDocumentSendResult> {
     const id = this.requireSlip(request);
     const existing = this.store.eDocuments.get(id);
-    if (existing && existing.state !== "rejected" && existing.state !== "cancelled") {
+    if (
+      existing &&
+      existing.state !== "rejected" &&
+      existing.state !== "cancelled"
+    ) {
       throw conflict(`e-document for ${request.FATIRS_NO}`);
     }
     const ettn = this.store.nextEttn();
@@ -284,7 +291,10 @@ class StubEDocuments implements NetsisEDocumentApi {
 
   async cancelEArchive(request: NetsisEDocumentRequest): Promise<void> {
     const document = this.store.eDocuments.get(this.requireSlip(request));
-    if (!document || (document.state !== "sent" && document.state !== "accepted")) {
+    if (
+      !document ||
+      (document.state !== "sent" && document.state !== "accepted")
+    ) {
       throw invalid(`${request.FATIRS_NO} has no sent e-archive document`);
     }
     document.state = "cancelled";
@@ -306,7 +316,9 @@ class StubEDocuments implements NetsisEDocumentApi {
 class StubReceipts implements NetsisReceiptsApi {
   constructor(private readonly store: NetsisStubStore) {}
 
-  async createCollection(receipt: NetsisMixedReceipt): Promise<NetsisMixedReceipt> {
+  async createCollection(
+    receipt: NetsisMixedReceipt,
+  ): Promise<NetsisMixedReceipt> {
     const id = `STUB-TAH-${this.store.next()}`;
     const stored = { ...clone(receipt), ID: id };
     this.store.collections.set(id, stored);
@@ -318,7 +330,9 @@ class StubReceipts implements NetsisReceiptsApi {
     return receipt ? clone(receipt) : null;
   }
 
-  async createBankTransfer(transfer: NetsisBankTransfer): Promise<NetsisBankTransfer> {
+  async createBankTransfer(
+    transfer: NetsisBankTransfer,
+  ): Promise<NetsisBankTransfer> {
     const stored = { ...clone(transfer), ID: `STUB-HVL-${this.store.next()}` };
     this.store.bankTransfers.push(stored);
     return clone(stored);
@@ -342,11 +356,16 @@ class StubTransactions implements NetsisTransactionsApi {
     this.close(transactionId, "rolledBack");
   }
 
-  withTransaction<T>(fn: (tx: NetsisTransactionContext) => Promise<T>): Promise<T> {
+  withTransaction<T>(
+    fn: (tx: NetsisTransactionContext) => Promise<T>,
+  ): Promise<T> {
     return runInNetsisTransaction(this, fn);
   }
 
-  private close(transactionId: string, state: StubTransactionState): void {
+  private close(
+    transactionId: string,
+    state: NetsisStubTransactionState,
+  ): void {
     if (this.store.transactions.get(transactionId) !== "open") {
       throw invalid(`transaction ${transactionId} is not open`);
     }

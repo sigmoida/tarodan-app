@@ -1,6 +1,9 @@
 import { NetsisRequestException } from "../http/netsis-error";
 import type { NetsisHttpClient } from "../http/netsis-http.client";
-import type { NetsisItemSlip, NetsisItemSlipKey } from "../helpers/netsis.types";
+import type {
+  NetsisItemSlip,
+  NetsisItemSlipKey,
+} from "../helpers/netsis.types";
 import { NetsisItemSlipsClient } from "./netsis-item-slips.client";
 
 describe("NetsisItemSlipsClient", () => {

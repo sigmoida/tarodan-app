@@ -58,7 +58,11 @@ export class NetsisEDocumentClient implements NetsisEDocumentApi {
     request: NetsisEDocumentRequest,
     options?: NetsisCallOptions,
   ): Promise<void> {
-    await this.http.post(NETSIS_PATHS.eDocumentCancelEArchive, request, options);
+    await this.http.post(
+      NETSIS_PATHS.eDocumentCancelEArchive,
+      request,
+      options,
+    );
   }
 
   async show(

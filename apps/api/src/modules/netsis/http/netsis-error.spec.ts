@@ -59,13 +59,16 @@ describe("classifyNetsisError", () => {
         : inner;
     };
 
-    it.each(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"])(
-      "%s → network",
-      (code) => {
-        expect(classifyNetsisError(withCode(code))).toBe("network");
-        expect(classifyNetsisError(withCode(code, true))).toBe("network");
-      },
-    );
+    it.each([
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+    ])("%s → network", (code) => {
+      expect(classifyNetsisError(withCode(code))).toBe("network");
+      expect(classifyNetsisError(withCode(code, true))).toBe("network");
+    });
 
     it("classifies an aborted (timed-out) fetch as network", () => {
       const abort = new Error("This operation was aborted");

@@ -1,7 +1,4 @@
-import {
-  NetsisRequestException,
-  netsisSnippet,
-} from "../http/netsis-error";
+import { NetsisRequestException, netsisSnippet } from "../http/netsis-error";
 import type { NetsisPassthrough, NetsisRawRecord } from "./netsis.types";
 
 /**

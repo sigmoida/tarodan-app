@@ -3,8 +3,6 @@ import type { NetsisCallOptions } from "../helpers/netsis.types";
 import { NetsisSessionService } from "../session/netsis-session.service";
 import { NetsisTransport, type NetsisRequest } from "./netsis-transport";
 
-type NetsisQuery = NetsisRequest["query"];
-
 /**
  * Kimlikli NetOpenX çağrıları: her istek ortak oturumun token'ını taşır,
  * 401'de oturum bir kez yenilenir (`NetsisSessionService.withSession`).
@@ -20,7 +18,7 @@ export class NetsisHttpClient {
 
   get(
     path: string,
-    query?: NetsisQuery,
+    query?: NetsisRequest["query"],
     options?: NetsisCallOptions,
   ): Promise<unknown> {
     return this.request({ method: "GET", path, query, ...options });

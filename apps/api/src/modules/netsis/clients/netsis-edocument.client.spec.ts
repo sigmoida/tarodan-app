@@ -25,11 +25,9 @@ describe("NetsisEDocumentClient", () => {
     await expect(
       client.send(request, { transactionId: "T-1" }),
     ).resolves.toEqual({ ettn, raw: { ETTN: ettn } });
-    expect(http.post).toHaveBeenCalledWith(
-      "EDocument/SendEDocument",
-      request,
-      { transactionId: "T-1" },
-    );
+    expect(http.post).toHaveBeenCalledWith("EDocument/SendEDocument", request, {
+      transactionId: "T-1",
+    });
   });
 
   it("keeps a scalar send response in raw and reports no ETTN", async () => {
@@ -44,9 +42,7 @@ describe("NetsisEDocumentClient", () => {
   it("checks with POST EDocument/CheckEDocument and normalises the state", async () => {
     http.post.mockResolvedValue({ Durum: "Kabul edildi" });
 
-    await expect(
-      client.check({ ...request, ETTN: ettn }),
-    ).resolves.toEqual({
+    await expect(client.check({ ...request, ETTN: ettn })).resolves.toEqual({
       state: "accepted",
       ettn,
       raw: { Durum: "Kabul edildi" },

@@ -60,9 +60,9 @@ describe("NetsisQueriesClient", () => {
   });
 
   it("never reaches Netsis with a writing statement", async () => {
-    await expect(client.select("DELETE FROM TBLCASABIT")).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      client.select("DELETE FROM TBLCASABIT"),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(http.post).not.toHaveBeenCalled();
   });
 });

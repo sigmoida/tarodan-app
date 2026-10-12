@@ -29,7 +29,10 @@ describe("NetsisStubGateway", () => {
       },
     ],
   });
-  const keyOf = (number: string) => ({ FaturaTip: "ftSFat", FATIRS_NO: number });
+  const keyOf = (number: string) => ({
+    FaturaTip: "ftSFat",
+    FATIRS_NO: number,
+  });
 
   const seed = async () => {
     await stub.arps.create(arp);
@@ -54,9 +57,9 @@ describe("NetsisStubGateway", () => {
   });
 
   it("rejects a serial that is not 3 upper-case characters", async () => {
-    await expect(stub.itemSlips.newEArchiveNumber("tr")).rejects.toMatchObject(
-      { kind: "validation" },
-    );
+    await expect(stub.itemSlips.newEArchiveNumber("tr")).rejects.toMatchObject({
+      kind: "validation",
+    });
   });
 
   it("calculates totals from the lines with Decimal, rounding per line", async () => {
@@ -162,9 +165,7 @@ describe("NetsisStubGateway", () => {
     it("send assigns a deterministic ETTN and marks the document sent", async () => {
       const result = await stub.eDocuments.send(keyOf("TRD1"));
 
-      expect(result.ettn).toMatch(
-        /^00000000-0000-4000-8000-[0-9a-f]{12}$/,
-      );
+      expect(result.ettn).toMatch(/^00000000-0000-4000-8000-[0-9a-f]{12}$/);
       await expect(stub.eDocuments.check(keyOf("TRD1"))).resolves.toEqual({
         state: "sent",
         ettn: result.ettn,
@@ -182,9 +183,9 @@ describe("NetsisStubGateway", () => {
 
     it("refuses a second send while the first stands, allows it after a rejection", async () => {
       const first = await stub.eDocuments.send(keyOf("TRD1"));
-      await expect(stub.eDocuments.send(keyOf("TRD1"))).rejects.toMatchObject(
-        { kind: "conflict" },
-      );
+      await expect(stub.eDocuments.send(keyOf("TRD1"))).rejects.toMatchObject({
+        kind: "conflict",
+      });
 
       if (!first.ettn) throw new Error("expected an ETTN");
       stub.setEDocumentState(first.ettn, "rejected");
