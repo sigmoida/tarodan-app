@@ -5484,6 +5484,34 @@
         "linkUrlPlaceholder": "https://tarodan.com.tr/kampanya",
         "image": "Reklam Görseli",
         "removeImage": "Görseli Kaldır",
+        "hotspots": {
+          "column": "Alanlar",
+          "title": "Tıklanabilir alanlar",
+          "disabled": "Önce görsel yükleyin",
+          "help": "Görsel üzerinde sürükleyerek alan çizin; alanı sürükleyerek taşıyın, köşelerinden boyutlandırın, Delete tuşuyla silin. Alanlar birbiriyle çakışamaz. Görselli reklamda yalnız bu alanlar tıklanır, dışına tıklamak bir şey yapmaz.",
+          "mobileNote": "Mobil uygulama alan desteği gelene kadar görselli reklamlar mobilde tıklanmaz.",
+          "count": "{count} / {max}",
+          "maxReached": "En fazla {max} alan eklenebilir.",
+          "emptyWarning": "Bu görselde tıklanabilir alan yok; reklam tıklanamaz.",
+          "rowName": "{index}. alan",
+          "areaLabel": "{index}. alan: {label}",
+          "label": "Alan adı",
+          "labelPlaceholder": "Örn. Sepete git",
+          "link": "Bağlantı",
+          "clicks": "Tıklama",
+          "delete": "Alanı sil",
+          "replaceTitle": "Görsel değişince alanlar silinir",
+          "replaceBody": "Bu reklamdaki tıklanabilir alanlar yeni görsele uymaz; devam ederseniz tümü silinir.",
+          "error": {
+            "tooMany": "En fazla 10 alan eklenebilir.",
+            "outOfBounds": "{index}. alan görselin dışına taşıyor.",
+            "tooSmall": "{index}. alan çok küçük.",
+            "overlap": "{index}. alan {other}. alanla çakışıyor.",
+            "labelRequired": "Alan adı gerekli.",
+            "labelTooLong": "Alan adı en fazla 80 karakter olabilir.",
+            "linkRequired": "Bağlantı gerekli."
+          }
+        },
         "iabCompliant": "IAB Uyumlu",
         "iabWarning": "Boyut ({width}x{height}) IAB standardı değil — önerilen boyutlardan birini seçin.",
         "allPositions": "Tüm Pozisyonlar",
@@ -11264,7 +11292,9 @@
     "advertisement": {
       "notFound": "Reklam bulunamadı",
       "campaignNotFound": "Bağlanacak kampanya bulunamadı",
-      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz"
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
+      "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
+      "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
     },
     "brand": {
       "notFound": "Marka bulunamadı"

@@ -77,12 +77,28 @@ export class AdvertisementController {
   @Throttle(TRACKING_THROTTLE)
   @ApiOperation({
     summary:
-      "Record ad click (public, beacon-friendly; deduped per IP for 10 s, live ads only)",
+      "Record ad click (public, beacon-friendly; deduped per IP + ad + hotspot for 10 s, live ads only). Image ads count only with ?hotspot=; text ads only without it.",
   })
   @ApiParam({ name: "id", description: "Ad ID" })
+  @ApiQuery({
+    name: "hotspot",
+    required: false,
+    description:
+      "Clicked hotspot id (image ads). Must belong to the ad; an invalid or foreign id is ignored (still 204)",
+  })
   @ApiResponse({ status: 204, description: "Accepted (counted or ignored)" })
-  async recordClick(@Param("id") id: string, @Req() req: Request) {
-    await this.tracking.recordClick(id, resolveClientIp(req) ?? "unknown");
+  // `hotspot` ham bırakılır: geçersiz değer 400 değil, sessiz yok sayma —
+  // kararı servis verir.
+  async recordClick(
+    @Param("id") id: string,
+    @Req() req: Request,
+    @Query("hotspot") hotspot?: unknown,
+  ) {
+    await this.tracking.recordClick(
+      id,
+      resolveClientIp(req) ?? "unknown",
+      hotspot,
+    );
   }
 
   @Post(":id/impression")

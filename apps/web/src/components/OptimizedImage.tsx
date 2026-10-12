@@ -171,15 +171,21 @@ export default function OptimizedImage({
     }
   }, [src, imgSrc, fallbackSrc, alt, retryCount, hasError, logContext]);
 
-  const handleLoad = useCallback(() => {
-    // Log successful loads in development for monitoring
-    if (process.env.NODE_ENV === "development" && hasError) {
-      console.log("🖼️ OptimizedImage: Fallback loaded successfully", {
-        fallbackSrc,
-        originalSrc: src,
-      });
-    }
-  }, [hasError, fallbackSrc, src]);
+  const callerOnLoad = props.onLoad;
+  const handleLoad = useCallback(
+    (event: React.SyntheticEvent<HTMLImageElement>) => {
+      // Log successful loads in development for monitoring
+      if (process.env.NODE_ENV === "development" && hasError) {
+        console.log("🖼️ OptimizedImage: Fallback loaded successfully", {
+          fallbackSrc,
+          originalSrc: src,
+        });
+      }
+      // Çağıranın onLoad'u yutulmasın (afiş görselin gerçek oranını buradan okur).
+      callerOnLoad?.(event);
+    },
+    [hasError, fallbackSrc, src, callerOnLoad],
+  );
 
   return (
     <Image

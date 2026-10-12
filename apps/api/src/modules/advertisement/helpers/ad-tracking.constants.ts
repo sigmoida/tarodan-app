@@ -17,11 +17,17 @@ export type AdTrackingKind = keyof typeof AD_TRACKING_DEDUPE_SECONDS;
 /** İstemci IP'si başına dakikalık istek tavanı (iki uç ayrı ayrı). */
 export const AD_TRACKING_THROTTLE = { limit: 60, ttl: 60_000 } as const;
 
-/** Tekilleştirme anahtarı — reklam ve IP ayrı segmentlerde. */
+/**
+ * Tekilleştirme anahtarı — reklam ve IP ayrı segmentlerde. Alan tıkında alan
+ * da anahtardadır: aynı ziyaretçinin aynı reklamdaki İKİ farklı alana art
+ * arda tıkı iki tıktır.
+ */
 export function adTrackingDedupeKey(
   kind: AdTrackingKind,
   adId: string,
   clientIp: string,
+  hotspotId?: string,
 ): string {
-  return `ads:dedupe:${kind}:${adId}:${clientIp}`;
+  const target = hotspotId ? `${adId}:hotspot:${hotspotId}` : adId;
+  return `ads:dedupe:${kind}:${target}:${clientIp}`;
 }

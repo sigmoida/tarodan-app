@@ -26,10 +26,11 @@
  *    DELETE @HttpCode(204). Sahibin GET /:id → başkası → 403 "Bu indirimi görüntüleme yetkiniz yok".
  *  - POST /api/admin/discounts (@Roles super_admin,admin,moderator) — varsayılan 201; isAdmin=true → sellerId=null.
  *  - POST /api/admin/commission-rules (@Roles super_admin YALNIZ) — admin/moderator → 403.
- *  - GET /api/ads/active @Public → { id,title,imageUrl,linkUrl,content,altText,width,height,position,deviceType }
+ *  - GET /api/ads/active @Public → { id,title,imageUrl,linkUrl,content,altText,width,height,position,deviceType,hotspots }
  *    (clickCount/impressionCount YOK). device=mobile → [mobile, all]; position filtrelenir; isActive=false hariç.
  *  - POST /api/ads/:id/click|impression @Public → 204 (gövdesiz, beacon dostu); yalnız yayındaki reklamda ve
  *    IP+reklam başına pencerede bir kez sayılır (tık 10 sn, gösterim 30 dk); yok/yayında değil → 204, sayılmaz.
+ *    Görselli reklamda tık yalnız `?hotspot=<alanId>` ile (reklam + alan sayacı birlikte); görselsizde alansız.
  *  - GET /api/ads/iab-sizes → 10 öğe (IAB_STANDARD_SIZES).
  *  - POST /api/admin/ads (@Roles) → varsayılan 201, toResponse iabCompliant/iabSize/ctr/clickCount/impressionCount.
  *    CreateAdvertisementDto width/height @Min(1)@Max(4000) → 4500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
@@ -256,7 +257,8 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       data: {
         title: "Seed Ad",
         imageUrl: "https://cdn.test/a.png",
-        linkUrl: "https://test.example/x",
+        // Görselli reklamın linkUrl'i kural gereği null; tıklama alanlardadır.
+        linkUrl: null,
         position: "header" as any,
         deviceType: "all" as any,
         isActive: true,
@@ -1496,17 +1498,49 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
 
   scenario("DSC-058", async () => {
     // Tık kaydı sayacı artırır (public, 204 — sendBeacon yanıt okumaz).
-    const ad = await seedAd({ title: "Tık Reklam" });
+    // Metin reklam: alansız tık sayılır. Görselli reklam: yalnız alanına
+    // (`?hotspot=`) düşen tık sayılır; reklam ve alan sayacı birlikte artar.
+    const prisma = getPrisma() as any;
+    const clicks = async (id: string) =>
+      (await prisma.advertisement.findUnique({ where: { id } })).clickCount;
+
+    const text = await seedAd({
+      title: "Tık Metin",
+      imageUrl: null,
+      linkUrl: "https://test.example/x",
+    });
     await request(server())
-      .post(`/api/ads/${ad.id}/click`)
+      .post(`/api/ads/${text.id}/click`)
       .set("Content-Type", "text/plain")
       .send("")
       .expect(204);
-    const prisma = getPrisma();
-    const refreshed = await (prisma as any).advertisement.findUnique({
-      where: { id: ad.id },
+    expect(await clicks(text.id)).toBe(1);
+
+    const image = await seedAd({ title: "Tık Görsel" });
+    const hotspot = await prisma.adHotspot.create({
+      data: {
+        advertisementId: image.id,
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        label: "Tümü",
+        linkUrl: "/kategori/x",
+      },
     });
-    expect(refreshed.clickCount).toBe(1);
+    await request(server()).post(`/api/ads/${image.id}/click`).expect(204);
+    expect(await clicks(image.id)).toBe(0);
+
+    await request(server())
+      .post(`/api/ads/${image.id}/click?hotspot=${hotspot.id}`)
+      .set("Content-Type", "text/plain")
+      .send("")
+      .expect(204);
+    expect(await clicks(image.id)).toBe(1);
+    const refreshedHotspot = await prisma.adHotspot.findUnique({
+      where: { id: hotspot.id },
+    });
+    expect(refreshedHotspot.clickCount).toBe(1);
   });
 
   scenario("DSC-059", async () => {

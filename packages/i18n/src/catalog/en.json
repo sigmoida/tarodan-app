@@ -5484,6 +5484,34 @@
         "linkUrlPlaceholder": "https://tarodan.com.tr/campaign",
         "image": "Ad Image",
         "removeImage": "Remove Image",
+        "hotspots": {
+          "column": "Areas",
+          "title": "Clickable areas",
+          "disabled": "Upload an image first",
+          "help": "Drag on the image to draw an area; drag an area to move it, use its corners to resize it, press Delete to remove it. Areas cannot overlap. On an image ad only these areas are clickable; clicking elsewhere does nothing.",
+          "mobileNote": "Image ads are not clickable on mobile until the mobile app supports areas.",
+          "count": "{count} / {max}",
+          "maxReached": "You can add at most {max} areas.",
+          "emptyWarning": "This image has no clickable area; the ad cannot be clicked.",
+          "rowName": "Area {index}",
+          "areaLabel": "Area {index}: {label}",
+          "label": "Area name",
+          "labelPlaceholder": "E.g. Go to cart",
+          "link": "Link",
+          "clicks": "Clicks",
+          "delete": "Delete area",
+          "replaceTitle": "Changing the image deletes the areas",
+          "replaceBody": "The clickable areas will not fit the new image; if you continue, all of them are deleted.",
+          "error": {
+            "tooMany": "You can add at most 10 areas.",
+            "outOfBounds": "Area {index} extends outside the image.",
+            "tooSmall": "Area {index} is too small.",
+            "overlap": "Area {index} overlaps area {other}.",
+            "labelRequired": "Area name is required.",
+            "labelTooLong": "Area name can be at most 80 characters.",
+            "linkRequired": "Link is required."
+          }
+        },
         "iabCompliant": "IAB Compliant",
         "iabWarning": "Size ({width}x{height}) is not an IAB standard — select one of the recommended sizes.",
         "allPositions": "All Positions",
@@ -11264,7 +11292,9 @@
     "advertisement": {
       "notFound": "Advertisement not found",
       "campaignNotFound": "The campaign to link was not found",
-      "endBeforeStart": "The end date cannot be before the start date"
+      "endBeforeStart": "The end date cannot be before the start date",
+      "hotspotInvalid": "{code, select, tooMany {An ad can have at most {max} clickable areas.} outOfBounds {Clickable area {position} extends outside the image.} tooSmall {Clickable area {position} is too small; its width and height must be at least {minPercent}% of the image.} overlap {Clickable area {position} overlaps area {other}.} labelRequired {Clickable area {position} needs a name.} labelTooLong {The name of clickable area {position} can be at most {labelMax} characters.} linkRequired {Clickable area {position} needs a link.} other {Clickable area {position} is invalid.}}",
+      "hotspotsNeedImage": "Clickable areas can only be set on an ad with an image"
     },
     "brand": {
       "notFound": "Brand not found"

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import {
+  validateAdHotspots,
+  type AdHotspotError,
+  type AdHotspotInput,
+} from "@tarodan/types";
+import {
   endOfIstanbulDayIso,
   istanbulDateOf,
   startOfIstanbulDayIso,
@@ -15,6 +20,19 @@ export interface AdCampaign {
   isActive: boolean;
   startDate: string;
   endDate: string;
+}
+
+/** API'nin döndürdüğü tıklanabilir alan (konum görselin kesri, 0–1). */
+export interface AdHotspot extends AdHotspotInput {
+  id: string;
+  sortOrder: number;
+  clickCount: number;
+}
+
+/** Formdaki alan: kayıtlıysa `id` + `clickCount` taşır (güncellemede tıklama sayısı korunur). */
+export interface AdHotspotFormRow extends AdHotspotInput {
+  id?: string;
+  clickCount?: number;
 }
 
 export interface Ad {
@@ -38,6 +56,8 @@ export interface Ad {
   clickCount: number;
   impressionCount: number;
   ctr: number;
+  /** Görselli reklamda tıklanabilir tek yer; yoksa/boşsa reklam tıklanamaz. */
+  hotspots?: AdHotspot[];
   iabCompliant: boolean;
   iabSize: string | null;
   createdAt: string;
@@ -139,8 +159,70 @@ export const isValidAdLink = (v?: string | null): boolean => {
   return /^https?:\/\/\S+$/i.test(s) || /^\/(?![/\\])\S*$/.test(s);
 };
 
+/** Paylaşılan alan kuralı hatası → form hata yolu + çevrilmiş mesaj. */
+export interface HotspotIssue {
+  path: (string | number)[];
+  message: string;
+}
+
+/** Hata kodunun satırdaki hangi alana yazılacağı ("" = satıra değil, listeye). */
+const HOTSPOT_ERROR_FIELD: Record<AdHotspotError["code"], string> = {
+  tooMany: "",
+  outOfBounds: "x",
+  tooSmall: "x",
+  overlap: "x",
+  labelRequired: "label",
+  labelTooLong: "label",
+  linkRequired: "linkUrl",
+};
+
+/**
+ * Alan listesinin TÜM hataları: paylaşılan `validateAdHotspots` + bağlantı
+ * biçimi (`isValidAdLink`). Şema ve satır içi hata gösterimi aynı çıktıyı kullanır.
+ */
+export function hotspotIssues(
+  t: T,
+  hotspots: readonly AdHotspotFormRow[],
+): HotspotIssue[] {
+  const issues: HotspotIssue[] = validateAdHotspots(hotspots).map((e) => ({
+    path:
+      e.index === undefined
+        ? ["hotspots"]
+        : ["hotspots", e.index, HOTSPOT_ERROR_FIELD[e.code]],
+    message: t(`admin.marketing.ads.hotspots.error.${e.code}`, {
+      index: (e.index ?? 0) + 1,
+      other: (e.otherIndex ?? 0) + 1,
+    }),
+  }));
+  hotspots.forEach((h, index) => {
+    if (h.linkUrl.trim() && !isValidAdLink(h.linkUrl)) {
+      issues.push({
+        path: ["hotspots", index, "linkUrl"],
+        message: t("admin.marketing.ads.validation.linkInvalid"),
+      });
+    }
+  });
+  return issues;
+}
+
 export const AD_CONTENT_MAX = 500;
 export const AD_DIMENSION_MAX = 4000;
+
+/**
+ * Alan satırı şeması. Admin tsconfig'inde `strictNullChecks` kapalı olduğu için
+ * zod çıkarımı her alanı opsiyonel gösterir; şema zorunlu kıldığından çıkış tipi
+ * `AdHotspotFormRow` olarak sabitlenir (paylaşılan kurallar zorunlu alan ister).
+ */
+const hotspotRowSchema = z.object({
+  id: z.string().optional(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  label: z.string(),
+  linkUrl: z.string(),
+  clickCount: z.number().optional(),
+}) as unknown as z.ZodType<AdHotspotFormRow>;
 
 /** Form schema (validation-only; numbers/nulls shaped in the mutationFn). */
 export const adSchema = (t: T) =>
@@ -150,11 +232,7 @@ export const adSchema = (t: T) =>
         .string()
         .min(1, t("admin.marketing.ads.validation.titleRequired")),
       imageUrl: z.string().optional().default(""),
-      linkUrl: z
-        .string()
-        .optional()
-        .default("")
-        .refine(isValidAdLink, t("admin.marketing.ads.validation.linkInvalid")),
+      linkUrl: z.string().optional().default(""),
       altText: z.string().optional().default(""),
       content: z
         .string()
@@ -178,6 +256,21 @@ export const adSchema = (t: T) =>
       startDate: z.string().optional().default(""),
       endDate: z.string().optional().default(""),
       discountId: z.string().optional().default(""),
+      hotspots: z.array(hotspotRowSchema).optional().default([]),
+    })
+    .superRefine((v, ctx) => {
+      // Reklam bağlantısı yalnız görselsiz reklamda görünür ve gider; görselli
+      // reklamda gizli alanın eski değeri gönderimi engellemesin.
+      if (!v.imageUrl?.trim() && !isValidAdLink(v.linkUrl)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["linkUrl"],
+          message: t("admin.marketing.ads.validation.linkInvalid"),
+        });
+      }
+      for (const issue of hotspotIssues(t, v.hotspots)) {
+        ctx.addIssue({ code: "custom", ...issue });
+      }
     })
     .refine((v) => !v.startDate || !v.endDate || v.endDate >= v.startDate, {
       path: ["endDate"],
@@ -201,6 +294,7 @@ export const emptyAdForm: AdFormValues = {
   startDate: "",
   endDate: "",
   discountId: "",
+  hotspots: [],
 };
 
 export function adToForm(ad: Ad): AdFormValues {
@@ -219,6 +313,18 @@ export function adToForm(ad: Ad): AdFormValues {
     startDate: istanbulDateOf(ad.startDate),
     endDate: istanbulDateOf(ad.endDate),
     discountId: ad.discountId ?? "",
+    hotspots: [...(ad.hotspots ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((h) => ({
+        id: h.id,
+        x: h.x,
+        y: h.y,
+        width: h.width,
+        height: h.height,
+        label: h.label,
+        linkUrl: h.linkUrl,
+        clickCount: h.clickCount,
+      })),
   };
 }
 
@@ -234,10 +340,26 @@ export function adFormToPayload(v: AdFormValues, mode: AdPayloadMode) {
   const empty = mode === "update" ? null : undefined;
   const text = (s?: string) => s?.trim() || empty;
   const num = (n?: number) => n || empty;
+  // Görselli reklamda tıklama yalnız alanlardadır: reklam düzeyi bağlantı gitmez
+  // (API de null'a zorlar). Güncellemede açık null → eski bağlantı temizlenir.
+  const hasImage = Boolean(v.imageUrl?.trim());
+  const linkUrl = hasImage ? empty : text(v.linkUrl);
+  // Güncellemede dizi HER ZAMAN gider (tam küme değişimi; `id` tıklama sayısını
+  // korur). Oluşturmada yalnız alan varsa.
+  const hotspots = v.hotspots.map((h) => ({
+    ...(h.id ? { id: h.id } : {}),
+    x: h.x,
+    y: h.y,
+    width: h.width,
+    height: h.height,
+    label: h.label.trim(),
+    linkUrl: h.linkUrl.trim(),
+  }));
   return {
     title: v.title.trim(),
     imageUrl: text(v.imageUrl),
-    linkUrl: text(v.linkUrl),
+    linkUrl,
+    ...(mode === "update" || hotspots.length ? { hotspots } : {}),
     content: text(v.content),
     altText: text(v.altText),
     width: num(v.width),
