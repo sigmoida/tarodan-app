@@ -446,7 +446,7 @@ kargolanmamış iptalde iade edilir.
 
 **Belgelerin ters kaydı** iade tx'iyle atomik olarak kuyruğa alınır
 (`invoice.trade_cash_refund_reverse`) ve hangi belgenin terslendiğine
-`ElogoReversalService.tradeReversalKeys` karar verir; kural yine
+`InvoiceReversalService.tradeReversalKeys` karar verir; kural yine
 `trade-refund-policy.ts`'tir: hizmet bedeli yalnız KUSURSUZ tarafın tam
 iadesinde (`fullRefundEntitled`), kargo ise koli yola çıkmadıysa terslenir.
 Eskiden ters kayıt hiç kuyruğa alınmıyordu ("iade edilen kısım faturalanan
@@ -585,7 +585,12 @@ Kapsamsız çağrı takasın tüm borcunu ele aldığı için bugünkü gibi tem
 
 ---
 
-## 8b. Gelir e-belgeleri (eLogo)
+## 8b. Gelir e-belgeleri
+
+Belgeler sağlayıcıdan bağımsız tek hattan geçer (`modules/invoicing`, tablo
+`fiscal_invoices`); entegratör (bugün eLogo, sonra Logo Netsis) bir portun
+arkasındadır ve her kayıt kendisini kesen sağlayıcıyı `provider` kolonunda
+taşır — bkz. [INVOICING_PROVIDERS.md](INVOICING_PROVIDERS.md).
 
 Düzenleyen **hep platform firmasıdır**, satıcı adına değil; ürün bedelinin
 beyanı satıcıya aittir (platform satışı hariç — orada satıcı zaten Tarodan'dır).
@@ -605,7 +610,7 @@ beyanı satıcıya aittir (platform satışı hariç — orada satıcı zaten Ta
 Altısı da §2'deki hizmet KDV'sine tabidir ve matrahları
 `order-service-tax.helper.ts`'in KDV tabanlarının BİREBİR karşılığıdır — iki
 liste ayrışırsa tahsil edilen KDV ile beyan edilen KDV ayrışır. Tanım tek
-yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
+yerdedir: `modules/invoicing/invoice/package-fee-components.ts`.
 
 - **Anahtar pakettir** (`sourceId = orderPackage.id`), sipariş değil: sepette
   aynı satıcıdan iki ürün alındığında `Order` iki tanedir ama gönderi, kargo
@@ -622,8 +627,8 @@ yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
   yazar ve indirimi `cac:AllowanceCharge` + `cbc:AllowanceTotalAmount` ile ayrı
   gösterir; KDV matrahı yine indirimli tutardır. Kaynak `Order.feeDiscountBreakdown`
   snapshot'ıdır (hedef adları belge tipleriyle birebir aynı), belge toplamı
-  `ElogoInvoice.discountTotal`. Kısmi iadede iskonto matrahla aynı oranda küçülür.
-- **Fatura kayıt no** (`ElogoInvoice.sourceReference`) kesim anında
+  `FiscalInvoice.discountTotal`. Kısmi iadede iskonto matrahla aynı oranda küçülür.
+- **Fatura kayıt no** (`FiscalInvoice.sourceReference`) kesim anında
   snapshot'lanır: koli kodunun gövdesinden türetilen `KYT-…`
   (`invoiceRecordReference`, bkz. CODE_SCHEME.md §2); ürün faturası sipariş
   anahtarlı olduğu için sipariş numarasının gövdesinden türer. Faturaya hem

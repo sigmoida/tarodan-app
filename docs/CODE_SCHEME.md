@@ -135,10 +135,10 @@ Notlar:
 
 ## 3. Belge numaraları — sıralı, atomik
 
-| Belge              | Format              | Sayaç                                           |
-| ------------------ | ------------------- | ----------------------------------------------- |
-| İç fatura (PDF)    | `SPR-202607-000001` | `document_sequences` (`upsert + increment`)     |
-| e-Arşiv / e-Fatura | `TRD2026000000001`  | `elogo_doc_sequences` (GİB zorunlu 16 karakter) |
+| Belge              | Format              | Sayaç                                            |
+| ------------------ | ------------------- | ------------------------------------------------ |
+| İç fatura (PDF)    | `SPR-202607-000001` | `document_sequences` (`upsert + increment`)      |
+| e-Arşiv / e-Fatura | `TRD2026000000001`  | `fiscal_doc_sequences` (GİB zorunlu 16 karakter) |
 
 İkisi de **atomik** artırılır. "En büyüğü oku +1 yaz" yaklaşımı eşzamanlı iki
 belgede aynı numarayı üretir; bu yüzden kullanılmaz.

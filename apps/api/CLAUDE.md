@@ -96,7 +96,7 @@ The `order` module is the canonical shape: `order-pricing`,
 - `payment` went the same way: hold release, the refund-attempt ledger and
   trade cash refunds are their own services, so `payment-refund.service.ts`
   (2331 → 1126) now does one job — refunding an order.
-- `elogo-invoicing` (2316 → 156), `discount` (2086 → 181) and `auth`
+- `invoicing` (then `elogo-invoicing`, 2316 → 156), `discount` (2086 → 181) and `auth`
   (1835 → 162) followed, each landing on the same shape: a facade that only
   delegates, behind it services named after the responsibility
   (`discount-crud` / `-coupon` / `-pricing` / `-usage` / `-trade-fee`;

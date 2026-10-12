@@ -1,7 +1,7 @@
 # e-Belge Sağlayıcıları
 
 Tarodan'ın kestiği her gelir/iade belgesi tek bir alan hattından geçer
-(`apps/api/src/modules/elogo/`): kesim, gönderim kirası (lease), deneme bütçesi,
+(`apps/api/src/modules/invoicing/`): kesim, gönderim kirası (lease), deneme bütçesi,
 iptal-mi-iade-mi kararı, PDF'in S3'e ve müşteriye teslimi. Bu hat
 **entegratörü bilmez**; belgeyi bir sağlayıcı portuna verir. Bugün tek
 sağlayıcı eLogo'dur, Logo Netsis (NetOpenX REST) ikincisi olacak.
@@ -9,7 +9,7 @@ sağlayıcı eLogo'dur, Logo Netsis (NetOpenX REST) ikincisi olacak.
 ## Port — `provider/e-invoice-provider.ts`
 
 `EInvoiceProvider`, `E_INVOICE_PROVIDER` token'ıyla enjekte edilir
-(`elogo.module.ts` → `ElogoInvoiceProvider`). Delivery, reversal, query ve
+(`invoicing.module.ts` → `ElogoInvoiceProvider`). Delivery, reversal, query ve
 document servisleri yalnız bu arayüzü görür.
 
 | Üye                          | Ne yapar                                                                  |
@@ -51,14 +51,15 @@ Yalnız çeviri yapar, iş kuralı taşımaz:
   doğrulaması `elogo.service.ts` + `elogo-soap.client.ts`'te kalır).
 - SOAP sonucunu port durumuna çevirir: `isCancel` → `cancelled`;
   `status 2` ya da GİB `1300` → `completed`; `status 1` → `processing`.
-- Red metnini sınıflar (`helpers/elogo-retry-policy.ts`): numara çakışması
+- Red metnini sınıflar (`provider/elogo-error-patterns.ts`; ağ kalıpları ortak
+  `helpers/invoice-retry-policy.ts`'tedir): numara çakışması
   önce, sonra yapılandırma; fırlatılan hatada ağ sınıfı önce bakılır.
 - Numaralandırma `local`'dir.
 
 ## Numaralandırma: `local` ve `provider`
 
-- **local (eLogo):** Kayıt kesim anında `ElogoDocSequence`'ten boşluksuz TRD
-  numarasıyla açılır (`ElogoDocumentService.allocateDocumentNumberInTransaction`).
+- **local (eLogo):** Kayıt kesim anında `FiscalDocSequence`'ten boşluksuz TRD
+  numarasıyla açılır (`InvoiceDocumentService.allocateDocumentNumberInTransaction`).
   Paylaşımlı hesapta numara çakışırsa yeni numara alınıp yeniden gönderilir.
 - **provider (Netsis):** Numarayı ERP gönderimde atar. Kayıt **numarasız**
   açılır, sayaç ilerlemez (kapı `null` döner); numara `send` sonucundaki
@@ -84,19 +85,77 @@ orijinal numaranın sağlayıcıdan okunması) Netsis adaptörüyle birlikte gel
 `ElogoService.refundStrategy`'de durur. Netsis adaptörü yazılırken bu kural
 paylaşılan bir yardımcıya taşınmalı, kopyalanmamalı.
 
-## Faz 1b — yeniden adlandırma
+## Kayıt — `FiscalInvoice` (`fiscal_invoices`)
 
-Faz 1a'da dosya taşınmadı, şema değişmedi. Faz 1b:
+Belge kaydı sağlayıcıdan bağımsızdır. `provider` kolonu
+(`EInvoiceProviderName`: `elogo` / `netsis`) belgeyi KESEN sağlayıcıyı tutar;
+kesim (`InvoiceDeliveryService.cut`) ve iade faturası
+(`InvoiceReversalService`) kaydı portun `name`'iyle açar. Port tipi
+`EInvoiceProviderName` bu enum'dan türer, yeni bir sağlayıcı önce şemaya
+eklenir. Kolon eklenmeden önceki kayıtların hepsi eLogo'yla kesildiği için
+varsayılan `elogo`'dur.
 
-- Modül `elogo/` → `invoicing/`; servisler `Invoicing*` adını alır, eLogo'ya
-  özgü dosyalar (`elogo.service.ts`, `elogo-soap.client.ts`, UBL üreteci,
-  adaptör) `invoicing/providers/elogo/` altına iner.
-- Tablo `elogo_invoices` → `fiscal_invoices`; `provider` kolonu eklenir (kayıt
-  hangi sağlayıcıyla kesildi). `elogoRefId` / `elogoResultCode` /
-  `elogoResultMsg` → `providerRef` / `providerResultCode` / `providerResultMsg`.
-- `E_INVOICE_PROVIDER` bağlaması ayarla seçilir; kesilmiş belgenin iptal/iade
-  ve PDF işlemleri kaydın kendi `provider`'ıyla yapılır.
+Sağlayıcının belgeye verdiği referans ve son sonucu `providerRef` /
+`providerResultCode` / `providerResultMsg` kolonlarındadır. Admin fatura
+listesi sonucu `resultMsg` adıyla, sağlayıcıyı `provider` olarak döner ve
+"Sağlayıcı" kolonunda rozet olarak gösterir; detay dökümü (Excel) künyeye
+"e-Belge Sağlayıcısı" satırını yazar.
 
-Bugün port dışında kalan eLogo adları (bilinçli, Faz 1b işi): tablo/kolon
-adları, `ELOGO_*` ortam anahtarları (düzenleyen bilgisi, KDV, önek), S3 klasörü
-`elogo-invoices`, e-posta şablonu `elogo-invoice`, log etiketleri.
+## Faz 1b — yeniden adlandırma (yapıldı)
+
+Davranış değişmedi; yalnız sağlayıcıdan bağımsız olan her şey eLogo adını
+bıraktı. eLogo adını yalnız adaptör taşır: `provider/elogo.provider.ts`,
+`provider/elogo.types.ts`, `provider/elogo-error-patterns.ts`,
+`elogo.service.ts`, `elogo-soap.client.ts`, `ubl/*` ve `config/elogo.ts`.
+
+| Eski                                                                 | Yeni                                                                    |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `modules/elogo/`, `ElogoModule`                                      | `modules/invoicing/`, `InvoicingModule`                                 |
+| `elogo-invoicing.service.ts` / `ElogoInvoicingService`               | `invoicing.service.ts` / `InvoicingService` (metot adları aynı)         |
+| `elogo-issuing` / `-delivery` / `-reversal` / `-document` / `-query` | `invoice-issuing` / `-delivery` / `-reversal` / `-document` / `-query`  |
+| `elogo-invoice.controller.ts` / `ElogoInvoiceController`             | `invoicing.controller.ts` / `InvoicingController` (yol aynı)            |
+| `jobs/elogo-scheduler.service.ts`, `jobs/elogo-scheduled.processor`  | `jobs/invoice-scheduler.service.ts`, `jobs/invoice-scheduled.processor` |
+| `helpers/elogo-retry-policy.ts`                                      | `helpers/invoice-retry-policy.ts` + `provider/elogo-error-patterns.ts`  |
+| `helpers/elogo-write-conflict.ts`, `helpers/elogo-pdf.ts`            | `helpers/invoice-write-conflict.ts`, `helpers/invoice-pdf.ts`           |
+| `helpers/elogo.types.ts`                                             | `provider/elogo.types.ts`                                               |
+| `invoice/elogo-document-number.ts`, `invoice/elogo-guest-recipient`  | `invoice/document-number.ts`, `invoice/guest-recipient.ts`              |
+| `ELOGO_MAX_SEND_ATTEMPTS`, `isTransientElogoFailure`                 | `INVOICE_MAX_SEND_ATTEMPTS`, `isTransientInvoiceFailure`                |
+| `formatElogoInvoiceNumber`, `ELOGO_NUMBER_LENGTH`                    | `formatInvoiceNumber`, `INVOICE_NUMBER_LENGTH`                          |
+| `ElogoInvoice` / `elogo_invoices`                                    | `FiscalInvoice` / `fiscal_invoices`                                     |
+| `ElogoInvoiceType` / `Context` / `Status`                            | `FiscalInvoiceType` / `Context` / `Status`                              |
+| `ElogoDocSequence` / `elogo_doc_sequences`                           | `FiscalDocSequence` / `fiscal_doc_sequences`                            |
+| `elogoRefId` / `elogoResultCode` / `elogoResultMsg`                  | `providerRef` / `providerResultCode` / `providerResultMsg`              |
+| —                                                                    | `provider` (`EInvoiceProviderName`, varsayılan `elogo`)                 |
+
+Migration: `20261012120000_fiscal_invoices_rename` — tablo, enum, kolon, kısıt
+ve indeks adlarını Prisma'nın varsayılan adlarına çevirir, `provider`'ı ekler;
+her eski adın karşılığı `helpers/fiscal-invoices-migration.spec.ts`'te
+sabitlenmiştir. Dağıtım notu: `OPERATIONS.md`.
+
+### Faz 5 — bilinçli olarak eski adıyla kalanlar
+
+Bunlar saklanan veriye, yayındaki istemcilere ya da dış sistemlere bağlıdır;
+adlarını değiştirmek bir taşıma ya da ops adımı ister, kozmetik olduğu için
+ayrı bir fazda yapılır:
+
+- Yollar `/elogo/invoices*` — mobil sözleşme; Swagger etiketi `elogo-invoices`.
+- Cron kimliği `elogo-retry-pending` — Bull repeatable anahtarı ve Sentry
+  check-in'i.
+- `ELOGO_*` ortam anahtarları — eLogo sağlayıcısını yapılandırırlar.
+- i18n anahtarları `server.elogo.*`, `server.notification.elogoInvoiceExhausted`.
+- S3 klasörü `elogo-invoices/` ve dosya kaydı türü `elogo_invoice`
+  (`helpers/invoice-pdf.ts` → `INVOICE_PDF_STORAGE`).
+- E-posta şablonu `elogo-invoice` (admin'den düzenlenen DB kaydının anahtarı).
+- Bildirim türü `ELOGO_INVOICE_EXHAUSTED` (`elogo_invoice_exhausted`) ve
+  tekilleştirme anahtarı `elogo-exhausted:<id>`.
+- Silinen hesap kimlik arşivindeki kaynak `elogo_invoice` ve ref anahtarı
+  `elogoInvoiceId` (`deleted_user_identities` satırlarında saklı).
+- Log metinleri (`eLogo …`) ve cron kataloğundaki etiket/açıklama.
+- Bakım script'lerinin adları (`backfill-elogo-invoice-parties`,
+  `reissue-demo-elogo-invoices`, `elogo-smoke`) ve paket script'leri.
+
+### Sonraki adım (Netsis adaptörüyle)
+
+- `E_INVOICE_PROVIDER` bağlaması ayarla seçilir.
+- Kesilmiş belgenin iptal/iade ve PDF işlemleri kaydın kendi `provider`'ıyla
+  yapılır (bugün tek bağlama olduğu için port doğrudan kullanılıyor).

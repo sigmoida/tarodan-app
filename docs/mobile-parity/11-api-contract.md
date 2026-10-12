@@ -20,7 +20,7 @@ En değerli alan: **`coverage`**
 Dokümanda ayrıca 9 iş akışı, **22 Socket.IO realtime olayı** ve 11 durum sözlüğü
 (`OrderStatus`, `RefundRequestStatus`, `TradeStatus`, `ShipmentStatus`, `PaymentStatus`,
 `OfferStatus`, `ProductStatus`, `SubscriptionStatus`, `MessageStatus`,
-`ElogoInvoiceStatus`, `SellerDocumentStatus`) bulunur.
+`FiscalInvoiceStatus`, `SellerDocumentStatus`) bulunur.
 
 > Domain dokümanları (01–10) her işlev için **hangi ucun kullanılacağını** küratörlü olarak
 > listeler. Tam katalog için üretilen dokümana bak.
