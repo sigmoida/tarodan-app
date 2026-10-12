@@ -10,4 +10,8 @@ export const invoicingSettingsApi = {
   updateInvoicingSettings: (data: InvoicingSettingsPayload) =>
     api.put("/admin/invoicing/settings", data),
   pingNetsis: () => api.post("/admin/invoicing/netsis/ping"),
+  getNetsisSyncRecords: (params: Record<string, unknown>) =>
+    api.get("/admin/invoicing/netsis-sync", { params }),
+  retryNetsisSync: (id: string) =>
+    api.post(`/admin/invoicing/netsis-sync/${id}/retry`, {}),
 };

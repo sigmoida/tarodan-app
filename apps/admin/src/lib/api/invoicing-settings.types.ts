@@ -5,7 +5,12 @@
 
 export type InvoicingProvider = "elogo" | "netsis";
 export type NetsisMode = "stub" | "live";
-export type InvoicingSettingGroup = "cari" | "serial" | "item" | "document";
+export type InvoicingSettingGroup =
+  | "cari"
+  | "serial"
+  | "item"
+  | "document"
+  | "account";
 
 export interface InvoicingSettingRow {
   key: string;
@@ -39,6 +44,8 @@ export interface InvoicingSettingsState {
   netsisMode: NetsisMode;
   settings: InvoicingSettingRow[];
   readiness: InvoicingReadiness;
+  /** Muhasebe senkronu hazırlığı (senkron kapalıyken hazır sayılır). */
+  accountingReadiness: InvoicingReadiness;
   feeTypes: InvoicingFeeType[];
 }
 
@@ -54,4 +61,28 @@ export interface NetsisPingResult {
 /** `PUT /admin/invoicing/settings` gövdesi. */
 export interface InvoicingSettingsPayload {
   values: Record<string, string | boolean>;
+}
+
+export type NetsisSyncKind =
+  | "invoice_collection"
+  | "settlement_transfer"
+  | "payout_transfer"
+  | "refund_reversal";
+export type NetsisSyncStatus =
+  | "pending"
+  | "processing"
+  | "synced"
+  | "failed"
+  | "skipped";
+
+/** `GET /admin/invoicing/netsis-sync` satırı (API: `AdminNetsisSyncRow` alt kümesi). */
+export interface NetsisSyncRecordRow {
+  id: string;
+  kind: NetsisSyncKind;
+  status: NetsisSyncStatus;
+  /** Cron artık denemez; yeniden deneme gerekir. */
+  exhausted: boolean;
+  lastError: string | null;
+  amount: number | null;
+  createdAt: string;
 }

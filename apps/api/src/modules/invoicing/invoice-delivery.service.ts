@@ -15,6 +15,8 @@ import {
 } from "@prisma/client";
 import { AccountLaneService } from "../account-lane/account-lane.service";
 import { PrismaService } from "../../prisma";
+import { OutboxService } from "../outbox/outbox.service";
+import { netsisAccountingSyncEvent } from "../outbox/outbox.types";
 import { INVOICE_MAX_SEND_ATTEMPTS } from "./helpers/invoice-retry-policy";
 import { retryOnWriteConflict } from "./helpers/invoice-write-conflict";
 import { INVOICE_PDF_STORAGE } from "./helpers/invoice-pdf";
@@ -97,6 +99,9 @@ export class InvoiceDeliveryService {
     // Sağlayıcının PDF vermediği (Netsis) kayıtlar için kendi görsel kopyamız.
     // Yoksa fallback yok — yalnız birim testleri.
     @Optional() private readonly pdfRenderer?: FiscalInvoicePdfService,
+    // Netsis muhasebe senkronu olayı için. OutboxModule @Global olduğu için
+    // runtime'da her zaman gelir; @Optional yalnız birim testleri için.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /** Kaydı kesen sağlayıcı — durum, gönderim ve PDF ona sorulur. */
@@ -313,6 +318,35 @@ export class InvoiceDeliveryService {
       reconcileFirst:
         current.status === "processing" || current.attemptCount > 0,
     };
+  }
+
+  /**
+   * Kaydı `sent` yapar. Netsis'in kestiği belge için muhasebe senkronunun
+   * tahsilat olayı (`netsis_accounting.sync`) durum yazımıyla AYNI işlemde
+   * sıraya alınır: yazım geri alınırsa olay da gitmez, işlenirse olay kesindir.
+   * eLogo kayıtları muhasebe aynasına girmez — olay yok, işlem de yok.
+   */
+  private async markSent(
+    row: Pick<FiscalInvoice, "id" | "provider">,
+    data: Prisma.FiscalInvoiceUpdateInput,
+  ): Promise<void> {
+    const write = (db: Prisma.TransactionClient) =>
+      db.fiscalInvoice.update({
+        where: { id: row.id },
+        data: { ...data, status: "sent" },
+      });
+    if (row.provider !== "netsis" || !this.outbox) {
+      await write(this.prisma);
+      return;
+    }
+    const outbox = this.outbox;
+    await this.prisma.$transaction(async (tx) => {
+      await write(tx);
+      await outbox.enqueue(
+        tx,
+        netsisAccountingSyncEvent("invoice_collection", row.id),
+      );
+    });
   }
 
   /** Kayıttaki snapshot'tan belgeyi kurup sağlayıcıya gönderir, durumu günceller. */
@@ -555,15 +589,11 @@ export class InvoiceDeliveryService {
         return;
       }
       if (providerStatus?.state === "completed") {
-        await this.prisma.fiscalInvoice.update({
-          where: { id: inv.id },
-          data: {
-            status: "sent",
-            providerResultCode: providerStatus.resultCode ?? null,
-            providerResultMsg: providerStatus.resultMsg ?? null,
-            issuedAt: issueMoment,
-            sentAt: now,
-          },
+        await this.markSent(inv, {
+          providerResultCode: providerStatus.resultCode ?? null,
+          providerResultMsg: providerStatus.resultMsg ?? null,
+          issuedAt: issueMoment,
+          sentAt: now,
         });
         // Sağlayıcı numaralandırmasında numara, fiş oluştuğu denemede kayda
         // yazılmıştır; yine de yoksa PDF/e-posta adı olmadan teslim edilmez.
@@ -615,25 +645,21 @@ export class InvoiceDeliveryService {
             : currentNumber;
           const issuedEttn =
             providerNumbered && res.ettn && res.ettn !== ettn ? res.ettn : ettn;
-          await this.prisma.fiscalInvoice.update({
-            where: { id: inv.id },
-            data: {
-              invoiceNumber: issuedNumber,
-              ...(issuedEttn !== ettn ? { ettn: issuedEttn } : {}),
-              netAmount: totals.taxExclusive,
-              taxAmount: totals.tax,
-              total: totals.payable,
-              // İskonto da belgeden okunur: kayıt, gerçekten basılan XML ile
-              // aynı iskontoyu taşımalı (rapor bu kolonu okur).
-              discountTotal: totals.allowance,
-              sendType,
-              status: "sent",
-              providerRef: res.providerRef ?? null,
-              providerResultCode: res.resultCode ?? null,
-              providerResultMsg: res.resultMsg ?? null,
-              issuedAt: issueMoment,
-              sentAt: now,
-            },
+          await this.markSent(inv, {
+            invoiceNumber: issuedNumber,
+            ...(issuedEttn !== ettn ? { ettn: issuedEttn } : {}),
+            netAmount: totals.taxExclusive,
+            taxAmount: totals.tax,
+            total: totals.payable,
+            // İskonto da belgeden okunur: kayıt, gerçekten basılan XML ile
+            // aynı iskontoyu taşımalı (rapor bu kolonu okur).
+            discountTotal: totals.allowance,
+            sendType,
+            providerRef: res.providerRef ?? null,
+            providerResultCode: res.resultCode ?? null,
+            providerResultMsg: res.resultMsg ?? null,
+            issuedAt: issueMoment,
+            sentAt: now,
           });
           this.logger.log(
             `eLogo ${inv.type} faturası gönderildi (${issuedNumber ?? "-"}, ref=${res.providerRef})`,

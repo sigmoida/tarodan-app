@@ -10106,7 +10106,8 @@
       "validation": {
         "serial": "The series must be exactly 3 characters (A-Z and 0-9 only).",
         "cariMax": "The customer code can be at most {max} characters.",
-        "itemMax": "The service-card code can be at most {max} characters."
+        "itemMax": "The service-card code can be at most {max} characters.",
+        "accountMax": "Account code can be at most {max} characters."
       },
       "readiness": {
         "ready": "Ready",
@@ -10114,10 +10115,43 @@
         "allSet": "Every setting needed to issue a Netsis invoice is filled in and valid.",
         "blocking": "Netsis documents cannot be issued until the settings below are completed.",
         "missing": "missing",
-        "invalid": "invalid"
+        "invalid": "invalid",
+        "sections": {
+          "invoicing": "Invoicing",
+          "accounting": "Accounting sync"
+        },
+        "allSetAccounting": "All settings the accounting sync needs are filled in and valid (or the sync is off).",
+        "blockingAccounting": "The accounting sync will not run until the settings below are completed."
       },
       "saveButton": "Save",
-      "saved": "Invoicing settings saved"
+      "saved": "Invoicing settings saved",
+      "sync": {
+        "title": "Sync records",
+        "description": "The last 20 collection, settlement, payout and refund records sent to Netsis.",
+        "empty": "No sync records yet.",
+        "retry": "Retry",
+        "retried": "Record queued again",
+        "columns": {
+          "kind": "Kind",
+          "status": "Status",
+          "amount": "Amount",
+          "createdAt": "Created",
+          "error": "Last error"
+        },
+        "kind": {
+          "invoice_collection": "Invoice collection",
+          "settlement_transfer": "Settlement transfer",
+          "payout_transfer": "Seller payout",
+          "refund_reversal": "Refund reversal"
+        },
+        "status": {
+          "pending": "Pending",
+          "processing": "Processing",
+          "synced": "Synced",
+          "failed": "Failed",
+          "skipped": "Skipped"
+        }
+      }
     }
   },
   "server": {

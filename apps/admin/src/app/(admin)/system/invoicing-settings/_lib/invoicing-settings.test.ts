@@ -6,6 +6,10 @@ import type {
   InvoicingSettingsState,
 } from "@/lib/api/invoicing-settings.types";
 import {
+  SETTING_GROUPS,
+  SYNC_STATUS_VARIANT,
+  canRetrySync,
+  truncateSyncError,
   changedSettings,
   fieldName,
   invoicingSettingsSchema,
@@ -49,7 +53,16 @@ const AUTO = row({
 });
 const EARCHIVE = row({ key: "netsis.serial.earchive", group: "serial" });
 const MEMBERSHIP = row({ key: "netsis.item.membership" });
-const ROWS = [RETAIL, AUTO, EARCHIVE, MEMBERSHIP];
+const ACC_ENABLED = row({
+  key: "netsis.accounting.enabled",
+  group: "account",
+  type: "boolean",
+  required: false,
+  value: "false",
+  default: "false",
+});
+const CLEARING = row({ key: "netsis.account.paytrClearing", group: "account" });
+const ROWS = [RETAIL, AUTO, EARCHIVE, MEMBERSHIP, ACC_ENABLED, CLEARING];
 
 const FEES: InvoicingFeeType[] = [
   {
@@ -82,6 +95,8 @@ describe("toFormValues", () => {
       netsis__cari__autoCreateCorporate: true,
       netsis__serial__earchive: "",
       netsis__item__membership: "",
+      netsis__accounting__enabled: false,
+      netsis__account__paytrClearing: "",
     });
   });
 });
@@ -108,9 +123,15 @@ describe("normalizeValue / violationOf", () => {
     expect(violationOf(MEMBERSHIP, "x".repeat(36))).toBe("itemMax");
   });
 
+  it("muhasebe hesap kodu en çok 30 karakter", () => {
+    expect(violationOf(CLEARING, "x".repeat(30))).toBeNull();
+    expect(violationOf(CLEARING, "x".repeat(31))).toBe("accountMax");
+  });
+
   it("boş değer ve mantıksal ayar ihlal sayılmaz", () => {
     expect(violationOf(EARCHIVE, "")).toBeNull();
     expect(violationOf(AUTO, true)).toBeNull();
+    expect(violationOf(ACC_ENABLED, true)).toBeNull();
   });
 });
 
@@ -141,8 +162,11 @@ describe("invoicingSettingsSchema", () => {
         [fieldName(EARCHIVE.key)]: "TOOLONG",
         [fieldName(RETAIL.key)]: "x".repeat(16),
         [fieldName(MEMBERSHIP.key)]: "y".repeat(36),
+        [fieldName(CLEARING.key)]: "z".repeat(31),
       }),
     ).toEqual({
+      netsis__account__paytrClearing:
+        'admin.invoicingSettings.validation.accountMax:{"max":30}',
       netsis__serial__earchive: "admin.invoicingSettings.validation.serial",
       netsis__cari__retailCode:
         'admin.invoicingSettings.validation.cariMax:{"max":15}',
@@ -182,6 +206,45 @@ describe("kart yardımcıları", () => {
     expect(rowsInGroup(ROWS, "cari")).toEqual([RETAIL, AUTO]);
     expect(rowsInGroup(ROWS, "serial")).toEqual([EARCHIVE]);
     expect(rowsInGroup(ROWS, "item")).toEqual([MEMBERSHIP]);
+    expect(rowsInGroup(ROWS, "account")).toEqual([ACC_ENABLED, CLEARING]);
+  });
+
+  it("SETTING_GROUPS hesap grubunu belge grubundan sonra çizer", () => {
+    expect(SETTING_GROUPS).toEqual(["cari", "serial", "item", "document", "account"]);
+  });
+
+  it("muhasebe ayarının etiketi kendi son segmentinden gelir", () => {
+    expect(settingLabelKey(CLEARING, FEES)).toBe(
+      "admin.invoicingSettings.fields.paytrClearing.label",
+    );
+    expect(settingLabelKey(ACC_ENABLED, FEES)).toBe(
+      "admin.invoicingSettings.fields.enabled.label",
+    );
+  });
+
+  it("senkron durum rozetleri: synced başarılı, failed tehlike, kalanı çerçeveli", () => {
+    expect(SYNC_STATUS_VARIANT).toEqual({
+      synced: "success",
+      pending: "outline",
+      processing: "outline",
+      failed: "danger",
+      skipped: "outline",
+    });
+  });
+
+  it("son hata uzunsa kısaltılır, boşsa null", () => {
+    expect(truncateSyncError(null)).toBeNull();
+    expect(truncateSyncError("kısa")).toBe("kısa");
+    const long = "x".repeat(200);
+    const out = truncateSyncError(long) as string;
+    expect(out).toHaveLength(80);
+    expect(out.endsWith("…")).toBe(true);
+  });
+
+  it("yalnız başarısız kayıt yeniden denenir", () => {
+    expect(canRetrySync({ status: "failed" })).toBe(true);
+    expect(canRetrySync({ status: "synced" })).toBe(false);
+    expect(canRetrySync({ status: "skipped" })).toBe(false);
   });
 
   it("hizmet kartı etiketi fatura türü anahtarından, cari/seri kendi anahtarından gelir", () => {
@@ -197,7 +260,7 @@ describe("kart yardımcıları", () => {
   });
 
   it("readinessItems önce geçersizleri sonra eksikleri etiketleriyle listeler", () => {
-    const items = readinessItems({
+    const state = {
       settings: ROWS,
       feeTypes: FEES,
       readiness: {
@@ -205,7 +268,13 @@ describe("kart yardımcıları", () => {
         missing: ["netsis.item.membership"],
         invalid: ["netsis.serial.earchive"],
       },
-    });
+      accountingReadiness: {
+        ready: false,
+        missing: ["netsis.account.paytrClearing"],
+        invalid: [],
+      },
+    };
+    const items = readinessItems(state);
     expect(items).toEqual([
       {
         key: "netsis.serial.earchive",
@@ -216,6 +285,30 @@ describe("kart yardımcıları", () => {
         key: "netsis.item.membership",
         status: "missing",
         labelKey: "admin.finance.invoices.types.membership",
+      },
+    ]);
+  });
+
+  it("readinessItems muhasebe bloğunu kendi listesinden okur", () => {
+    expect(
+      readinessItems(
+        {
+          settings: ROWS,
+          feeTypes: FEES,
+          readiness: { ready: true, missing: [], invalid: [] },
+          accountingReadiness: {
+            ready: false,
+            missing: ["netsis.account.paytrClearing"],
+            invalid: [],
+          },
+        },
+        "accounting",
+      ),
+    ).toEqual([
+      {
+        key: "netsis.account.paytrClearing",
+        status: "missing",
+        labelKey: "admin.invoicingSettings.fields.paytrClearing.label",
       },
     ]);
   });
