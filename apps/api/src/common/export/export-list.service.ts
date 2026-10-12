@@ -80,7 +80,7 @@ interface ExportBase {
   /** Veri sayfalarından sonra gelen sözleşmeli sayfalar. */
   appendix?: (
     t: Translate,
-    result: { rowCount: number; truncatedAt: number | null },
+    result: { rowCount: number; truncatedAt: number | null; generatedAt: Date },
   ) => readonly WorkbookAppendixSheet[];
   audit: ExportAudit;
 }
@@ -209,6 +209,7 @@ export class ExportListService {
       appendix: base.appendix?.(t, {
         rowCount: content.rowCount,
         truncatedAt: content.truncatedAt,
+        generatedAt,
       }),
       t,
       unmask: base.unmask ?? false,

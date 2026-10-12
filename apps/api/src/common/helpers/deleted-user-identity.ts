@@ -567,33 +567,3 @@ export function archivedNationalIdIsDeclared(sourceDetail: unknown): boolean {
   const source: IdentitySourceKey = "user";
   return (sourceDetail as Record<string, unknown>).nationalId === source;
 }
-
-/**
- * Aylık bildirim dosyasının kolon sözleşmesi. Müşteri bu dosyayı resmî bir
- * portala yüklüyor: kolon kümesi ve SIRASI tek yerde tanımlı, XLSX ve CSV aynı
- * listeyi kullanır. Değişiklik `EXPORT_FORMAT_VERSION` ile görünür olur.
- */
-export const EXPORT_FORMAT_VERSION = "1";
-
-export const ARCHIVE_EXPORT_COLUMNS = [
-  { key: "adminCode", header: "Kullanıcı Kodu" },
-  { key: "username", header: "Kullanıcı Adı" },
-  { key: "displayName", header: "Ad Soyad / Unvan" },
-  { key: "email", header: "E-posta" },
-  { key: "phone", header: "Telefon" },
-  { key: "nationalId", header: "TC Kimlik No" },
-  { key: "taxId", header: "Vergi No" },
-  { key: "taxOffice", header: "Vergi Dairesi" },
-  { key: "companyName", header: "Firma Adı" },
-  { key: "addressCity", header: "İl" },
-  { key: "addressDistrict", header: "İlçe" },
-  { key: "addressLine", header: "Adres" },
-  { key: "iban", header: "IBAN" },
-  { key: "wasSeller", header: "Satıcı" },
-  { key: "registeredAt", header: "Kayıt Tarihi" },
-  { key: "deletedAt", header: "Silinme Tarihi" },
-  { key: "retainUntil", header: "Saklama Bitişi" },
-] as const;
-
-export type ArchiveExportColumnKey =
-  (typeof ARCHIVE_EXPORT_COLUMNS)[number]["key"];
