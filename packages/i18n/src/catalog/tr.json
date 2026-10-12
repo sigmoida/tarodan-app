@@ -7461,7 +7461,7 @@
           "reasonRequired": "İptal nedeni seçin"
         }
       },
-"refunds": {
+      "refunds": {
         "tabs": {
           "all": "Tüm İadeler",
           "direct": "Direkt Satış İadeleri",
@@ -7476,10 +7476,7 @@
           "refunding": "İade Ediliyor",
           "completed": "Tamamlanan",
           "rejected": "Reddedilen",
-          "disputed": "İtirazlı",
-          "pending_review": "Onay bekleyen",
-          "awaiting_return": "İade kargosu bekleniyor",
-          "at_warehouse": "Depoda"
+          "disputed": "İtirazlı"
         },
         "origin": {
           "direct": "Direkt Satış",

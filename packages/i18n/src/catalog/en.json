@@ -7461,7 +7461,7 @@
           "reasonRequired": "Select a cancellation reason"
         }
       },
-"refunds": {
+      "refunds": {
         "tabs": {
           "all": "All Refunds",
           "direct": "Direct Sale Refunds",
@@ -7476,10 +7476,7 @@
           "refunding": "Refunding",
           "completed": "Completed",
           "rejected": "Rejected",
-          "disputed": "Disputed",
-          "pending_review": "Pending review",
-          "awaiting_return": "Awaiting return shipment",
-          "at_warehouse": "At warehouse"
+          "disputed": "Disputed"
         },
         "origin": {
           "direct": "Direct Sale",
