@@ -53,6 +53,8 @@ describe("isSellerFaultRefund — the fault source", () => {
       true,
     ],
     ["v1 buyer remorse", { faultParty: null, policyCode: "buyer_remorse_return" }, false],
+    // Politikasız ve tarafsız talep: kusur belirlenemez → şüphede ödenmez.
+    ["legacy, no fault party", { faultParty: null, policyCode: "legacy" }, true],
     ["v1 platform", { faultParty: null, policyCode: "platform_cancellation" }, false],
     // faultParty is authoritative even if a legacy code says otherwise
     ["column wins", { faultParty: "buyer", policyCode: "seller_fault_return" }, false],

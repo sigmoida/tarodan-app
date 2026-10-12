@@ -56,6 +56,9 @@ export const OPEN_REFUND_STATUSES: readonly RefundRequestStatus[] = [
 /** Bu tutarın altındaki kalıntı "sıfır" sayılır (kuruş artıkları). */
 export const HOLD_RESIDUAL_MIN = new Prisma.Decimal("0.01");
 
+/** `RefundRequest.policyCode` şema varsayılanı: politika hiç yazılmamış talep. */
+const LEGACY_POLICY_CODE = "legacy";
+
 /**
  * Siparişten yüklemin ihtiyaç duyduğu her şey — TEK okumada. Açık talepler
  * "frozen" kararını, sonuçlanmış (`refunded`) talepler kusur kararını besler.
@@ -124,9 +127,12 @@ export function holdReleaseOrderFacts(order: {
  * `faultParty` admin'in/politikanın kesinleştirdiği finansal gerçektir (v2
  * her talepte yazar). Yalnız v1 (eski) talepte boştur; orada kusur
  * `policyCode`'dadır (`seller_fault_return`, `seller_fault_cancellation`).
+ * Politikasız (`legacy`) ve tarafsız talepte kusur BELİRLENEMEZ — şüphede
+ * ödenmez, satıcı kusuru sayılır (PAYMENTS.md §5 kalıntı kuralı).
  */
 export function isSellerFaultRefund(refund: RefundFaultFacts): boolean {
   if (refund.faultParty) return refund.faultParty === RefundFaultParty.seller;
+  if (refund.policyCode === LEGACY_POLICY_CODE) return true;
   return refund.policyCode.startsWith("seller_fault");
 }
 

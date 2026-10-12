@@ -1,19 +1,15 @@
 import type { MessageKey } from "@tarodan/i18n";
+import type { HoldReleaseBlockedReason } from "@tarodan/types";
 /**
  * Hold satırının "serbest bırakılabilir mi / neden değil" rozeti.
  *
  * Karar SUNUCUDADIR (`releasable` + `releaseBlockedReason`): iade donması, vade,
  * sipariş durumu ve satıcı kusuru orada hesaplanır. Bu modül yalnız sunumdur —
  * sebep → etiket / ton eşlemesi; hiçbir tarih ya da durum burada yeniden
- * değerlendirilmez.
+ * değerlendirilmez. Sebep sözlüğü `@tarodan/types` (`HoldReleaseBlockedReason`).
  */
 
-export type HoldReleaseBlockedReason =
-  | "frozen"
-  | "not_due"
-  | "order_not_terminal"
-  | "seller_at_fault"
-  | "already_released";
+export type { HoldReleaseBlockedReason };
 
 /** Hold satırının sunucudan gelen serbest bırakma alanları. */
 export interface HoldReleaseFlags {

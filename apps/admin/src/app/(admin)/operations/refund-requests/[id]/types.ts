@@ -1,3 +1,5 @@
+import type { RefundFinancialTotals } from "@tarodan/types";
+
 export interface HistoryEntry {
   action: string;
   by: string;
@@ -96,23 +98,8 @@ export interface RefundRequestDetail {
   };
 }
 
-/**
- * Tarafa göre toplamlar (sunucu hesaplar). Taraflar arası TOPLANMAZ: alıcı iadesi
- * ile satıcı kesintisi aynı paranın iki yüzüdür; kalem tablosunun bileşenleri de
- * bu rakamlara eklenmez.
- */
-export interface RefundFinancialTotals {
-  buyerRefund: number;
-  buyerCharge: number;
-  buyerNet: number;
-  sellerRefund: number;
-  sellerCharge: number;
-  sellerNet: number;
-  platformRetain: number;
-  platformRefund: number;
-  platformNet: number;
-  shippingRefund: number;
-}
+/** Tarafa göre toplamlar — API ile ortak şekil (`@tarodan/types`). */
+export type { RefundFinancialTotals };
 
 export interface RefundFinancialComponent {
   id?: string;

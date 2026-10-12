@@ -1,43 +1,25 @@
 import { Prisma } from "@prisma/client";
-import type {
-  RefundComponentCodeV2,
-  RefundTreatmentV2,
-} from "./refund-financial-policy-v2";
+import type { RefundFinancialTotals } from "@tarodan/types";
+import type { RefundTreatmentV2 } from "./refund-financial-policy-v2";
+
+export type { RefundFinancialTotals };
 
 /**
- * İade kararının TARAF BAŞINA toplamları — admin iade detayının özet satırı.
+ * İade kararının TARAF BAŞINA toplamları — admin iade detayının özet satırı
+ * (şekil: `@tarodan/types` `RefundFinancialTotals`).
  *
  * Kaynak, kesinleşmiş `RefundFinancialComponent` satırlarıdır (iade, ledger ve
  * fatura da onları okur); toplam burada yeniden hesaplanmaz, yalnız satırların
- * BRÜT tutarları (net + KDV) muamelelerine göre toplanır:
- *
- * - alıcı: `buyer_refund` (geri ödenen) − `buyer_charge` (iadeden düşülen) =
- *   alıcının hesabına dönen tutar (`RefundRequest.amount` ile aynı invaryant).
- * - satıcı: `seller_refund` (satıcıya iade edilen kesinti / kargo payı) −
- *   `seller_charge` (satıcıya yazılan borç).
- * - platform: `platform_retain` (platformda kalan) − `platform_absorb`
- *   (platformun üstlendiği maliyet; `platformRefund`).
- * - shippingRefund: alıcıya geri ödenen gidiş kargosu (`outbound_shipping`
- *   × `buyer_refund`) — dönüş kargosu hiçbir zaman alıcıya iade edilmez.
+ * BRÜT tutarları (net + KDV) muamelelerine göre toplanır. `shippingRefund` =
+ * `outbound_shipping` × `buyer_refund` — dönüş kargosu hiçbir zaman alıcıya
+ * iade edilmez.
  *
  * Decimal ile toplanır; sayı yalnız sınırda (`.toNumber()`) üretilir.
  */
-export interface RefundFinancialTotals {
-  buyerRefund: number;
-  buyerCharge: number;
-  buyerNet: number;
-  sellerRefund: number;
-  sellerCharge: number;
-  sellerNet: number;
-  platformRetain: number;
-  platformRefund: number;
-  platformNet: number;
-  shippingRefund: number;
-}
-
 export interface RefundComponentAmountRow {
-  componentCode: RefundComponentCodeV2 | string;
-  treatment: RefundTreatmentV2 | string;
+  /** DB satırı düz string taşır (`RefundComponentCodeV2` ya da eski kod). */
+  componentCode: string;
+  treatment: string;
   grossAmount: Prisma.Decimal.Value;
 }
 

@@ -650,42 +650,14 @@ export class AdminPayoutService {
     );
     const result = await paginate(
       this.prisma.paymentHold,
-      {
-        where,
-        include: {
-          seller: { select: { id: true, displayName: true, email: true } },
-        },
-        orderBy,
-      },
+      { where, include: HOLD_ROW_INCLUDE, orderBy },
       query,
     );
 
-    // Grup ödemesinde payment.order NULL'dur — sipariş numarası hold.orderId
-    // üzerinden çözülür (eskiden her sepet hold'u "-" görünüyordu).
-    const scheduleOrders = await this.prisma.order.findMany({
-      where: { id: { in: result.data.map((h) => h.orderId) } },
-      select: { id: true, orderNumber: true },
-    });
-    const scheduleOrderMap = new Map(
-      scheduleOrders.map((o) => [o.id, o.orderNumber]),
-    );
-
-    return {
-      ...result,
-      data: result.data.map((h) => ({
-        id: h.id,
-        orderId: h.orderId,
-        orderNumber: scheduleOrderMap.get(h.orderId) ?? "-",
-        sellerId: h.sellerId,
-        sellerName: h.seller.displayName ?? h.seller.email,
-        sellerEmail: h.seller.email,
-        amount: Number(h.amount),
-        refundedAmount: Number(h.refundedAmount ?? 0),
-        frozenByRefundId: h.frozenByRefundId ?? null,
-        releaseAt: h.releaseAt,
-        createdAt: h.createdAt,
-      })),
-    };
+    // Escrow listesiyle AYNI satır: sipariş numarası hold.orderId üzerinden
+    // çözülür (grup ödemesinde payment.order NULL) ve `releasable` /
+    // `releaseBlockedReason` rozeti bırakma yükleminden gelir.
+    return { ...result, data: await this.toHoldRows(result.data) };
   }
 
   /**
