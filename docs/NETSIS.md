@@ -188,10 +188,10 @@ offset payouts are recorded as `skipped` with a reason, never sent.
   cash: `payment-trade-refund.service.ts`) and the PayTR settlement items stamp
   (`paytr-report-sync.service.ts`) inside their own transaction; payout
   completion (`payout.service.ts` → `applyPayoutCompletionEffects`) right after
-  its status write (that path has no transaction). Invoices emit no event —
-  the invoice delivery service was out of scope — so the cron sweep is their
-  only path (≤ 15 min delay). The sweep (last 30 days, sources without a row,
-  ordered, 200 per kind) also backstops every lost event.
+  its status write (that path has no transaction). Netsis-issued invoices:
+  `InvoiceDeliveryService.markSent` writes the `sent` status and the event in
+  one transaction (eLogo rows: no event). The sweep (last 30 days, sources
+  without a row, ordered, 200 per kind) backstops every lost event.
 - **Off switch:** with `netsis.accounting.enabled=false` or
   `INVOICE_PROVIDER≠netsis` rows are opened as `skipped`; after switching on,
   `maintenance/requeue-netsis-sync.ts --since <day>` re-queues them
