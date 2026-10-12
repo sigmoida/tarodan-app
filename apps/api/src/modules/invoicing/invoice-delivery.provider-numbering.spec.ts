@@ -135,7 +135,10 @@ type SendMock = jest.Mock<
 function fakeProvider(
   over: Partial<Record<keyof EInvoiceProvider, unknown>> = {},
 ) {
-  const send: SendMock = jest.fn(async () => ({
+  const send: SendMock = jest.fn<
+    Promise<EInvoiceSendResult>,
+    [FiscalDocumentInput, EInvoiceSendContext]
+  >(async () => ({
     accepted: true as const,
     providerRef: "ftSFat:EAR2026000000001",
     documentNumber: "EAR2026000000001",
