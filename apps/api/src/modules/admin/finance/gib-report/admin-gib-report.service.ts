@@ -6,31 +6,27 @@ import {
   GIB_LISTING_STATUS_I18N_KEYS,
   GIB_NAME_SOURCE_I18N_KEYS,
   GIB_SELLER_KIND_I18N_KEYS,
+  EXPORT_CATALOGS,
   type AdminGibReportRow,
+  type ExportCatalogKey,
   type GibListingStatus,
 } from "@tarodan/types";
 
 import { PrismaService } from "../../../../prisma";
 import { paginate, resolveOrderBy } from "../../../../common/list";
 import {
-  renderSheet,
-  toXlsx,
-  type ExportColumn,
-} from "../../../../common/helpers/tabular-export";
+  ExportListService,
+  type ExportFile,
+  type ExportRecord,
+  type Translate,
+} from "../../../../common/export";
 import { frontendUrl } from "../../../../config/app-urls";
-import { translateMessage } from "../../../i18n/translate";
 import type { GibReportQueryDto } from "../../dto/gib-report.dto";
 import {
   GIB_SELLER_SELECT,
   resolveGibSellerIdentity,
 } from "./gib-seller-identity";
 import { buildGibReportWhere } from "./gib-report.where";
-
-/**
- * Tek istekte üretilecek döküm tavanı. Devlet dökümü eksik olmamalı, bu yüzden
- * onay kayıtlarının tavanından yüksektir; aşılırsa başlıkla bildirilir.
- */
-export const GIB_REPORT_EXPORT_ROW_CAP = 20000;
 
 const ROW_SELECT = {
   id: true,
@@ -55,7 +51,10 @@ type GibProduct = Prisma.ProductGetPayload<{ select: typeof ROW_SELECT }>;
  */
 @Injectable()
 export class AdminGibReportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly exports: ExportListService,
+  ) {}
 
   async list(query: GibReportQueryDto) {
     const result = await paginate(
@@ -71,43 +70,65 @@ export class AdminGibReportService {
   }
 
   /**
-   * Geçerli filtrenin Excel dökümü — listeyle AYNI filtre ve sıra. Tavan + 1
-   * okunur: sessizce kırpılan bir döküm, devlet dosyasında fark edilmeyen
-   * eksik kayıttır; aşım `truncated` ile bildirilir.
+   * Geçerli filtrenin Excel dökümü — listeyle AYNI filtre ve sıra; tavan,
+   * kırpılma, Özet ve zorunlu denetim ortak hatta. Kimlik numarası TAM yazılır:
+   * uç `@Roles(super_admin, admin)` + `tax` izniyle kapalı, maskesiz görme
+   * hakkı ucun kendisidir. Arama terimi (vergi no / TCKN olabilir) denetime de
+   * Özet'e de yazılmaz.
    */
-  async exportXlsx(
+  async export(
     query: GibReportQueryDto,
+    actorId: string,
     locale: Locale,
-  ): Promise<{
-    filename: string;
-    body: Buffer;
-    rowCount: number;
-    truncated: boolean;
-  }> {
-    const found = await this.prisma.product.findMany({
-      where: buildGibReportWhere(query),
-      orderBy: this.orderBy(query),
-      select: ROW_SELECT,
-      take: GIB_REPORT_EXPORT_ROW_CAP + 1,
+  ): Promise<ExportFile> {
+    const where = buildGibReportWhere(query);
+    const orderBy = this.orderBy(query);
+    return this.exports.exportList({
+      catalog: EXPORT_CATALOGS.gibReport,
+      locale,
+      slug: "gib-ilan-satici-raporu",
+      titleKey: "admin.gibReport.title",
+      sheetNameKey: "admin.gibReport.export.sheetName",
+      unmask: true,
+      filters: [
+        {
+          labelKey: "admin.gibReport.filters.status",
+          value: query.status,
+          valueKey: query.status && GIB_LISTING_STATUS_I18N_KEYS[query.status],
+        },
+        {
+          labelKey: "admin.gibReport.filters.sellerKind",
+          value: query.sellerKind,
+          valueKey:
+            query.sellerKind && GIB_SELLER_KIND_I18N_KEYS[query.sellerKind],
+        },
+        {
+          labelKey: "admin.gibReport.filters.identityIncomplete",
+          value: query.identityIncomplete ? true : undefined,
+          valueKey: "admin.gibReport.filters.identityIncompleteOnly",
+        },
+        { labelKey: "admin.finance.common.startDate", value: query.startDate },
+        { labelKey: "admin.finance.common.endDate", value: query.endDate },
+      ],
+      sort: query,
+      fetchPage: async ({ skip, take }) =>
+        (
+          await this.prisma.product.findMany({
+            where,
+            orderBy,
+            select: ROW_SELECT,
+            skip,
+            take,
+          })
+        ).map(toGibRow),
+      map: gibExportRecord,
+      audit: {
+        actorId,
+        action: "gib_report_export",
+        entityType: "GibReport",
+        query,
+      },
     });
-    const truncated = found.length > GIB_REPORT_EXPORT_ROW_CAP;
-    const rows = (
-      truncated ? found.slice(0, GIB_REPORT_EXPORT_ROW_CAP) : found
-    ).map(toGibRow);
-    const t = (key: string) => translateMessage(key, locale);
-    const day = new Date().toISOString().slice(0, 10);
-    return {
-      filename: `gib-ilan-satici-raporu-${day}.xlsx`,
-      body: await toXlsx([
-        renderSheet(
-          t("admin.gibReport.export.sheetName"),
-          exportColumns(t),
-          rows,
-        ),
-      ]),
-      rowCount: rows.length,
-      truncated,
-    };
   }
 
   /**
@@ -157,45 +178,30 @@ export function toGibRow(product: GibProduct): AdminGibReportRow {
   };
 }
 
-const HEADER = "admin.gibReport.export";
-
-/** Döküm kolonları — başlıklar panelin katalog anahtarlarından. TAM kimlik no. */
-export function exportColumns(
-  t: (key: string) => string,
-): ExportColumn<AdminGibReportRow>[] {
-  return [
-    { header: t(`${HEADER}.membershipDate`), value: (r) => r.membershipDate },
-    { header: t(`${HEADER}.identityNumber`), value: (r) => r.identityNumber },
-    {
-      header: t(`${HEADER}.identityKind`),
-      value: (r) =>
-        r.identityKind ? t(GIB_IDENTITY_KIND_I18N_KEYS[r.identityKind]) : "",
-    },
-    { header: t(`${HEADER}.legalName`), value: (r) => r.legalName },
-    {
-      header: t(`${HEADER}.legalNameSource`),
-      value: (r) => t(GIB_NAME_SOURCE_I18N_KEYS[r.legalNameSource]),
-    },
-    {
-      header: t(`${HEADER}.sellerKind`),
-      value: (r) => t(GIB_SELLER_KIND_I18N_KEYS[r.sellerKind]),
-    },
-    {
-      header: t(`${HEADER}.sellerDeleted`),
-      value: (r) => t(r.sellerDeleted ? "common.yes" : "common.no"),
-    },
-    { header: t(`${HEADER}.productCode`), value: (r) => r.productCode },
-    { header: t(`${HEADER}.title`), value: (r) => r.title },
-    { header: t(`${HEADER}.description`), value: (r) => r.description },
-    { header: t(`${HEADER}.price`), value: (r) => r.price },
-    {
-      header: t(`${HEADER}.status`),
-      value: (r) => t(GIB_LISTING_STATUS_I18N_KEYS[r.status]),
-    },
-    { header: t(`${HEADER}.publishedAt`), value: (r) => r.publishedAt },
-    { header: t(`${HEADER}.createdAt`), value: (r) => r.createdAt },
-    { header: t(`${HEADER}.listingUrl`), value: (r) => r.listingUrl },
-    { header: t(`${HEADER}.storeName`), value: (r) => r.storeName },
-    { header: t(`${HEADER}.profileUrl`), value: (r) => r.profileUrl },
-  ];
+/** Döküm satırı — kolonlar `EXPORT_CATALOGS.gibReport`. TAM kimlik no. */
+export function gibExportRecord(
+  r: AdminGibReportRow,
+  t: Translate,
+): ExportRecord<ExportCatalogKey<typeof EXPORT_CATALOGS.gibReport>> {
+  return {
+    membershipDate: r.membershipDate,
+    identityNumber: r.identityNumber,
+    identityKind: r.identityKind
+      ? t(GIB_IDENTITY_KIND_I18N_KEYS[r.identityKind])
+      : null,
+    legalName: r.legalName,
+    legalNameSource: t(GIB_NAME_SOURCE_I18N_KEYS[r.legalNameSource]),
+    sellerKind: t(GIB_SELLER_KIND_I18N_KEYS[r.sellerKind]),
+    sellerDeleted: r.sellerDeleted,
+    productCode: r.productCode,
+    title: r.title,
+    description: r.description,
+    price: r.price,
+    status: t(GIB_LISTING_STATUS_I18N_KEYS[r.status]),
+    publishedAt: r.publishedAt,
+    createdAt: r.createdAt,
+    listingUrl: r.listingUrl,
+    storeName: r.storeName,
+    profileUrl: r.profileUrl,
+  };
 }
