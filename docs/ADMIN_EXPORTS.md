@@ -21,8 +21,8 @@ açıyor, negatif tutarları metne çeviriyordu).
 - Gateway (`packages/auth/src/proxy.ts`) `content-disposition`,
   `cache-control`, `x-export-row-count`, `x-export-truncated-at` başlıklarını
   tarayıcıya taşır.
-- Tavan: 20.000 kayıt (`EXPORT_ROW_CAP`). İptaller 5.000 (birleşik sayfalama
-  maliyeti karesel büyür). Tavan aşılırsa sessiz kırpma yok: başlık + Özet notu.
+- Tavan: 20.000 kayıt (`EXPORT_ROW_CAP`). İptaller ve İadeler 5.000 (birleşik
+  sayfalama maliyeti karesel büyür). Tavan aşılırsa sessiz kırpma yok: başlık + Özet notu.
 - Denetim: her indirme `createRequiredAuditLog` ile **fail-closed** kayıt
   bırakır; kayıt yazılamazsa dosya dönmez. Arama terimi (ve kişisel arama
   alanları, ör. iptallerde `party`) **asla** yazılmaz: yalnız
@@ -66,6 +66,7 @@ toplanmaz — Özet'teki "Toplamlar"dadır ve Özet bunu not olarak söyler.
 | `GET /admin/consents/export`            | `consents`                   | `consent_records_export`  |
 | `GET /admin/gib-report/export`          | `gibReport`                  | `gib_report_export`       |
 | `GET /admin/cancellations/export`       | `cancellations` (uzun biçim) | `cancellations_export`    |
+| `GET /admin/refund-requests/export`     | `refundRequests`             | `refund_requests_export`  |
 | `GET /admin/deleted-identities/export`  | `deletedIdentities`          | `deleted_identity_export` |
 | `GET /admin/analytics/:tab/export`      | — (istisna)                  | `analytics_export`        |
 
