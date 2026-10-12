@@ -20,6 +20,7 @@ import {
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { Panel } from "@/components/detail/Panel";
 import { extractErrorMessage } from "@/lib/error";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -305,7 +306,7 @@ function PositionField() {
 function CampaignField({ currentId }: { currentId?: string | null }) {
   const t = useTranslations();
   const { data } = useQuery({
-    queryKey: ["discounts", "ad-options"],
+    queryKey: adminKeys.options("discounts"),
     queryFn: async () =>
       unwrapCampaigns((await adminApi.getDiscounts({ limit: 200 })).data),
     staleTime: 60_000,
