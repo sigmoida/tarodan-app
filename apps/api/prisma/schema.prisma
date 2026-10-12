@@ -3655,6 +3655,77 @@ model AdHotspot {
   @@map("advertisement_hotspots")
 }
 
+/// Vitrin hero slaytı (ana sayfa slider'ı, giriş/kayıt ekranı görseli). Kodda
+/// yedek slayt YOK: web ve mobil yalnız bu tablodan okur. Referans seed bir
+/// ana sayfa slaytı kurar; API yayındaki son ana sayfa slaytının silinmesini /
+/// kapatılmasını reddeder. Kurallar ve sözleşme: docs/HERO_CMS.md.
+model HeroSlide {
+  id              String        @id @default(uuid())
+  placement       HeroPlacement
+  /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresinin de içinde
+  /// olmalı (`isHeroSlideLive`, hero/helpers).
+  isActive        Boolean       @default(true) @map("is_active")
+  /// Aynı yerleşimdeki slaytların sırası (küçük önce).
+  displayOrder    Int           @default(0) @map("display_order")
+  /// Yayın penceresi; null = sınırsız. Reklamla aynı kural
+  /// (`withinScheduleWindow`): sınırlar dahil.
+  startDate       DateTime?     @map("start_date")
+  endDate         DateTime?     @map("end_date")
+  /// Geniş ekran görseli (public S3 URL, `hero/` klasörü).
+  imageUrl        String        @map("image_url")
+  /// Dar ekran/mobil uygulama görseli; null = `imageUrl` kullanılır.
+  mobileImageUrl  String?       @map("mobile_image_url")
+  imageSide       HeroImageSide @default(right) @map("image_side")
+  /// Metinler `LocalizedText` JSON'u: `{ tr, en? }` — tr zorunlu, en boşsa
+  /// istemci tr'ye düşer (`pickLocalized`, @tarodan/types). Ayrı dil kolonları
+  /// yerine JSON: üçüncü dil şema değişikliği istemesin.
+  title           Json
+  subtitle        Json?
+  imageAlt        Json?         @map("image_alt")
+  /// Buton etiketi + hedefi çift olarak var ya da yok; hedef reklam
+  /// bağlantısıyla aynı kural (`@IsAdLinkUrl`: http(s) ya da `/yol`).
+  cta1Label       Json?         @map("cta1_label")
+  cta1Href        String?       @map("cta1_href")
+  cta2Label       Json?         @map("cta2_label")
+  cta2Href        String?       @map("cta2_href")
+  /// Mobil uygulama iOS'ta bu slaytı göstermez (mağaza incelemesine takılacak
+  /// içerik — ör. ödeme/üyelik çağrısı). Web yok sayar.
+  hideOnIos       Boolean       @default(false) @map("hide_on_ios")
+  /// Yalnız yayındaki slaytta, IP+slayt(+buton) başına tekilleştirilerek artar
+  /// (gösterim 30 dk, tık 10 sn) — reklam sayaçlarıyla aynı pencere.
+  impressionCount Int           @default(0) @map("impression_count")
+  /// Slayta yapılan TÜM tıklar (görsel + butonlar); buton sayaçları bunun
+  /// alt kırılımıdır ve aynı işlemde artar.
+  clickCount      Int           @default(0) @map("click_count")
+  cta1ClickCount  Int           @default(0) @map("cta1_click_count")
+  cta2ClickCount  Int           @default(0) @map("cta2_click_count")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([placement, isActive, displayOrder])
+  @@map("hero_slides")
+}
+
+/// Ana sayfa güven rozeti (güvenli alışveriş, iade, takas …). Kodda yedek
+/// liste yok; referans seed bugünkü altı rozeti kurar.
+model TrustBadge {
+  id           String   @id @default(uuid())
+  isActive     Boolean  @default(true) @map("is_active")
+  displayOrder Int      @default(0) @map("display_order")
+  /// Sabit ikon anahtarı (`TRUST_BADGE_ICONS`, @tarodan/types); istemci kendi
+  /// ikon setine eşler. Enum değil: ikon eklemek göç gerektirmesin.
+  icon         String
+  /// `LocalizedText` JSON'u. Metin herkese açık süre belirteci taşıyabilir
+  /// (`{returnWindowDays}`); public uç güncel değerle doldurur.
+  title        Json
+  description  Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, displayOrder])
+  @@map("trust_badges")
+}
+
 model Discount {
   id                  String               @id @default(uuid())
   code                String?              @unique
@@ -4361,6 +4432,22 @@ enum AdPosition {
   inline
   /// Ziyaretçi başına günde en fazla bir kez açılan modal.
   popup
+}
+
+/// Hero slaytının gösterildiği yer (`HERO_PLACEMENTS`, @tarodan/types).
+enum HeroPlacement {
+  /// Ana sayfa slider'ı — en az bir yayında slayt zorunlu (API guard'ı).
+  home
+  /// Giriş, şifre sıfırlama vb. auth ekranlarının görsel paneli.
+  auth_default
+  /// Kayıt ekranlarının (bireysel + kurumsal) görsel paneli.
+  auth_register
+}
+
+/// Görselin geniş ekranda durduğu taraf; metin öbür tarafa yerleşir.
+enum HeroImageSide {
+  left
+  right
 }
 
 enum CommissionLedgerStatus {
