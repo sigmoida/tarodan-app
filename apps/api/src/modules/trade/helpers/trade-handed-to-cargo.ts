@@ -1,5 +1,22 @@
 import { PrismaService } from "../../../prisma";
 
+/** Eşiğin okuduğu iki sinyal: ilk depo varışı ve kargoya verilmiş bacak. */
+export interface TradeCargoHandoverSignals {
+  firstWarehouseArrivalAt: Date | string | null | undefined;
+  /** Takasın `shippedAt`'i dolu en az bir bacağı var mı (bacak türü fark etmez). */
+  anyLegShipped: boolean;
+}
+
+/**
+ * Eşiğin saf hâli — yüklenmiş takas üzerinden karar veren okuyucular (admin
+ * İadeler listesi) aynı kuralı sorgusuz çalıştırır.
+ */
+export function isTradeHandedToCargo(
+  signals: TradeCargoHandoverSignals,
+): boolean {
+  return !!signals.firstWarehouseArrivalAt || signals.anyLegShipped;
+}
+
 /**
  * Takasın herhangi bir bacağı KARGOYA VERİLDİ Mİ — iade politikasının kargo
  * eşiği (`TradeRefundContext.handedToCargo`) tek kaynaktan okunur.
@@ -25,5 +42,8 @@ export async function tradeHandedToCargo(
       where: { tradeId, shippedAt: { not: null } },
     }),
   ]);
-  return !!trade?.firstWarehouseArrivalAt || shippedCount > 0;
+  return isTradeHandedToCargo({
+    firstWarehouseArrivalAt: trade?.firstWarehouseArrivalAt,
+    anyLegShipped: shippedCount > 0,
+  });
 }
