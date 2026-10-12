@@ -69,12 +69,13 @@ function makePrisma(row: Row) {
     },
     user: { findUnique: jest.fn(async () => null) },
     address: { findFirst: jest.fn(async () => null) },
+  };
+  return Object.assign(prisma, {
     $transaction: jest.fn(
       async (fn: (tx: unknown) => Promise<unknown>): Promise<unknown> =>
         fn(prisma),
     ),
-  };
-  return prisma;
+  });
 }
 
 function fakeConfig(): ConfigService {
