@@ -20,8 +20,9 @@ import { NetsisSessionService } from "./session/netsis-session.service";
 /**
  * Logo Netsis (NetOpenX REST) entegrasyonu — eLogo'nun yerini alacak.
  *
- * Şimdilik BAĞIMSIZ: hiçbir modül bunu import etmiyor, faturalama hâlâ
- * eLogo'dan. Dışarıya yalnız `NetsisClientFacade` açılır; arkasındaki gateway
+ * `InvoicingModule` bunu import eder (Netsis fatura sağlayıcısı
+ * `NetsisClientFacade`'i kullanır); yeni belgeyi hangi sağlayıcının keseceğini
+ * `INVOICE_PROVIDER` seçer. Dışarıya yalnız `NetsisClientFacade` açılır; arkasındaki gateway
  * `NETSIS_MODE`'a göre (Sürat/eLogo'daki gibi factory ile) canlı ya da stub'dır.
  * Oturum Redis'te paylaşıldığı için `CacheService` gerekir (CacheModule global).
  * Ayrıntı: docs/NETSIS.md.

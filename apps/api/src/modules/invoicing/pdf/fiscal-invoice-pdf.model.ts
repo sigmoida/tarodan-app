@@ -1,4 +1,7 @@
-import { trCalendarDateTime } from "../../../common/helpers/tr-calendar";
+import {
+  trCalendarDate,
+  trCalendarParts,
+} from "../../../common/helpers/tr-calendar";
 import { translateMessage } from "../../i18n/translate";
 import { computeFiscalDocumentTotals } from "../invoice/fiscal-document-totals";
 import type { FiscalParty } from "../provider/e-invoice-provider";
@@ -76,6 +79,22 @@ export function formatFiscalDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-");
   return y && m && d ? `${d}.${m}.${y}` : isoDate;
 }
+
+/** Bir an -> "dd.mm.yyyy HH:mm", Türkiye takvimi (belge tarihleriyle aynı biçim). */
+export function formatFiscalDateTime(at: Date): string {
+  const { hour, minute } = trCalendarParts(at);
+  return `${formatFiscalDate(trCalendarDate(at))} ${hour}:${minute}`;
+}
+
+/** Katalogda etiketi olan kayıt durumları (`FiscalInvoiceStatus`). */
+const FISCAL_STATUS_LABELS = [
+  "pending",
+  "processing",
+  "sent",
+  "signed",
+  "failed",
+  "cancelled",
+] as const;
 
 function partyName(party: FiscalParty): string {
   return (
@@ -185,7 +204,13 @@ export function buildFiscalInvoicePdfModel(
     { label: t("field.issueDate"), value: issueDateValue },
     { label: t("field.scenario"), value: t(`scenario.${document.scenario}`) },
     { label: t("field.reference"), value: input.sourceReference },
-    { label: t("field.status"), value: input.status },
+    {
+      label: t("field.status"),
+      // Bilinmeyen durum ham basılır: yanlış etiket uydurmaktan iyidir.
+      value: (FISCAL_STATUS_LABELS as readonly string[]).includes(input.status)
+        ? t(`status.${input.status}`)
+        : input.status,
+    },
   ];
 
   const ref = document.billingReference;
@@ -229,7 +254,7 @@ export function buildFiscalInvoicePdfModel(
       : undefined,
     footer: {
       legal: t("legal"),
-      generatedAt: t("generatedAt", { date: trCalendarDateTime(input.issuedAt) }),
+      generatedAt: t("generatedAt", { date: formatFiscalDateTime(input.issuedAt) }),
     },
     pageLabel: (page, total) => t("page", { page, total }),
   };

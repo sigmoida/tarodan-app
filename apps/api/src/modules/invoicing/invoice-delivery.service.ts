@@ -35,14 +35,12 @@ import { computeFiscalDocumentTotals } from "./invoice/fiscal-document-totals";
 import {
   invoiceDiscountFromLines,
   invoiceTotalsFromLines,
-  readInvoiceLineItems,
 } from "./invoice/invoice-lines";
 import {
   E_INVOICE_PROVIDER,
   type EInvoiceProvider,
   type EInvoiceScenario,
   type FiscalDocumentInput,
-  type FiscalDocumentLine,
   type RecipientKindResult,
 } from "./provider/e-invoice-provider";
 import {
@@ -54,6 +52,7 @@ import { i18nMessage } from "../i18n";
 import { InvoiceDocumentService } from "./invoice-document.service";
 import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../mail/smtp.provider";
+import { FiscalInvoicePdfService } from "./pdf/fiscal-invoice-pdf.service";
 
 /**
  * Faturanın e-Logo'ya GİDİŞİ — InvoicingService'ten birebir taşındı.
@@ -88,6 +87,9 @@ export class InvoiceDeliveryService {
     // Kesilmiş kaydın KENDİ sağlayıcısı (eLogo belgesi Netsis'e geçildikten
     // sonra da eLogo'dan sorulur). Yoksa bağlı sağlayıcı — birim testleri.
     @Optional() private readonly registry?: InvoiceProviderRegistry,
+    // Sağlayıcının PDF vermediği (Netsis) kayıtlar için kendi görsel kopyamız.
+    // Yoksa fallback yok — yalnız birim testleri.
+    @Optional() private readonly pdfRenderer?: FiscalInvoicePdfService,
   ) {}
 
   /** Kaydı kesen sağlayıcı — durum, gönderim ve PDF ona sorulur. */
@@ -458,67 +460,46 @@ export class InvoiceDeliveryService {
     const sendType: "ELEKTRONIK" | "KAGIT" = recipientEmail
       ? "ELEKTRONIK"
       : "KAGIT";
-    const desc =
-      inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
+    const desc = invoiceDocumentDescription(inv.type, inv.lineDescription);
     // "Kayıt No" — belgenin hangi alışverişten doğduğunu taşımak zorunda; aynı
     // kod hakediş dökümünün "Kayıt No" kolonunda da durur. Hem belge notuna hem
     // kalemin açıklamasına yazılır: sağlayıcının görsel tasarımı hangisini bastığına
     // göre değişir, ikisinde de durması belgeyi bozmaz.
-    const orderNote = inv.sourceReference?.trim()
-      ? `Kayıt No: ${inv.sourceReference.trim()}`
-      : null;
-
-    let billingRef: FiscalDocumentInput["billingReference"];
-    if (isReturn && inv.billingReference) {
-      billingRef = {
-        documentNumber: inv.billingReference,
-        issueDate: this.documents.ymd(
-          inv.billingReferenceIssueDate ?? issueMoment,
-        ),
-      };
-    }
-
+    const orderNote = invoiceOrderNote(inv.sourceReference);
+    const billingRef = buildInvoiceBillingReference({
+      isReturn,
+      billingReference: inv.billingReference,
+      billingReferenceIssueDate: inv.billingReferenceIssueDate,
+      fallbackIssueMoment: issueMoment,
+    });
     // Kalem snapshot'ı varsa (ürün faturası) belge kalem kalem üretilir; yoksa
     // tek satırlı hizmet faturası. Snapshot kesim anında donduğu için retry
     // aynı belgeyi yeniden üretir.
-    const snapshotLines = readInvoiceLineItems(inv.lineItems);
-    const lines: FiscalDocumentLine[] = snapshotLines.length
-      ? snapshotLines.map((l) => ({
-          name: l.name,
-          description: orderNote ?? undefined,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          lineExtension: l.net,
-          discount: l.discount,
-          vatRate: l.vatRate,
-          taxAmount: l.taxAmount,
-        }))
-      : [
-          {
-            name: desc,
-            description: orderNote ?? undefined,
-            quantity: 1,
-            unitPrice: net,
-            vatRate: rate,
-          },
-        ];
-    const fiscalDocument = (documentNumber: string): FiscalDocumentInput => ({
-      scenario: documentType,
-      kind: isReturn ? "RETURN" : "SALE",
-      // Sağlayıcı numaralandırmasında numara henüz yoktur — boş gider.
-      documentNumber: documentNumber || undefined,
-      ettn,
-      issueDate: this.documents.ymd(issueMoment),
-      issueTime: this.documents.hms(issueMoment),
-      currency: "TRY",
-      // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da bu alan yok).
-      sendType: isEInvoice ? undefined : sendType,
-      note: orderNote ? `${desc} — ${orderNote}` : desc,
-      supplier: this.documents.supplierParty(),
-      customer: party,
-      lines,
-      ...(billingRef ? { billingReference: billingRef } : {}),
+    const lines = buildInvoiceDocumentLines({
+      lineItems: inv.lineItems,
+      description: desc,
+      orderNote,
+      net,
+      vatRate: rate,
     });
+    const supplier = this.documents.supplierParty();
+    const fiscalDocument = (documentNumber: string): FiscalDocumentInput =>
+      buildInvoiceDocumentInput({
+        scenario: documentType,
+        isReturn,
+        // Sağlayıcı numaralandırmasında numara henüz yoktur — boş gider.
+        documentNumber,
+        ettn,
+        issueMoment,
+        // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da bu alan yok).
+        sendType: isEInvoice ? undefined : sendType,
+        description: desc,
+        orderNote,
+        supplier,
+        customer: party,
+        lines,
+        billingReference: billingRef,
+      });
 
     const deliver = (
       invoiceNumber: string,
@@ -778,7 +759,11 @@ export class InvoiceDeliveryService {
       );
       return;
     }
-    const pdf = await provider.fetchPdf({ ettn: inv.ettn }).catch(() => null);
+    // Sağlayıcı PDF veremiyorsa (Netsis) görsel kopyayı biz basarız; bundan
+    // sonrası (S3, pdfUrl, e-posta) sağlayıcı PDF'iyle birebir aynı yoldur.
+    const pdf =
+      (await provider.fetchPdf({ ettn: inv.ettn }).catch(() => null)) ??
+      (await this.renderVisualCopy(inv.id, recipientEmail));
     if (!pdf || pdf.length < 200) {
       this.logger.warn(
         `eLogo PDF alınamadı (${inv.invoiceNumber}) — S3/mail atlandı`,
@@ -810,8 +795,7 @@ export class InvoiceDeliveryService {
     let emailedAt: Date | null = null;
     try {
       if (recipientEmail && this.smtp) {
-        const desc =
-          inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
+        const desc = invoiceDocumentDescription(inv.type, inv.lineDescription);
         const tplKey = "elogo-invoice";
         const tplData = {
           recipientName: inv.recipientName || "Değerli Müşterimiz",
@@ -855,6 +839,22 @@ export class InvoiceDeliveryService {
     this.logger.log(
       `eLogo PDF teslim (${inv.invoiceNumber}): S3=${pdfKey ? "OK" : "-"} mail=${emailedAt ? recipientEmail : "-"}`,
     );
+  }
+
+  /**
+   * Görsel kopya: kayıt yeniden okunur (numara/ETTN gönderimden SONRA yazılmış
+   * olabilir) ve ortak servise verilir. Basılamazsa `null` — çağıran "PDF
+   * alınamadı" yolunu izler.
+   */
+  private async renderVisualCopy(
+    invoiceId: string,
+    recipientEmail: string | null,
+  ): Promise<Buffer | null> {
+    if (!this.pdfRenderer) return null;
+    const row = await this.prisma.fiscalInvoice
+      .findUnique({ where: { id: invoiceId } })
+      .catch(() => null);
+    return row ? this.pdfRenderer.renderForRecord(row, recipientEmail) : null;
   }
 
   /** Cron: pending/failed ve lease'i düşmüş processing kayıtları yeniden dener. */
@@ -1018,7 +1018,8 @@ export class InvoiceDeliveryService {
       stored ??
       (await this.providerOf(invoice)
         .fetchPdf({ ettn: invoice.ettn, providerRef: invoice.providerRef })
-        .catch(() => null));
+        .catch(() => null)) ??
+      (await this.renderVisualCopy(invoice.id, to));
     if (!pdf || pdf.length < 200)
       throw new ServiceUnavailableException(
         i18nMessage("server.elogo.invoicePdfUnavailable"),

@@ -263,9 +263,9 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
   }
 
   /**
-   * PDF'i Netsis'ten değil kendi şablonumuzdan üretiyoruz.
-   * TODO(netsis-pdf): `pdf/fiscal-invoice-pdf.renderer.ts` bağlanınca belge
-   * buradan değil oradan üretilecek; o zamana kadar PDF teslimi atlanır.
+   * Netsis PDF vermez: `null` döner. Çağıranlar (`InvoiceDeliveryService`,
+   * `InvoiceQueryService`) bunu görünce kendi görsel kopyamızı basar
+   * (`pdf/fiscal-invoice-pdf.service.ts`).
    */
   async fetchPdf(): Promise<Buffer | null> {
     return null;

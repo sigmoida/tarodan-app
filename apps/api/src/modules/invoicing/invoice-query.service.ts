@@ -17,6 +17,7 @@ import {
 import { i18nMessage } from "../i18n";
 import { invoiceDescriptionOf } from "./invoice/invoice-line-description";
 import { INVOICE_PDF_STORAGE } from "./helpers/invoice-pdf";
+import { FiscalInvoicePdfService } from "./pdf/fiscal-invoice-pdf.service";
 
 /**
  * Kullanıcıya gösterim sırası: önce ürün/üyelik gibi ALIŞVERİŞİN kendi belgesi,
@@ -62,6 +63,8 @@ export class InvoiceQueryService {
     @Optional() private readonly storage?: StorageService,
     // Kesilmiş belgenin kendi sağlayıcısı; yoksa bağlı olan (birim testleri).
     @Optional() private readonly registry?: InvoiceProviderRegistry,
+    // Sağlayıcının PDF vermediği (Netsis) kayıtların görsel kopyası.
+    @Optional() private readonly pdfRenderer?: FiscalInvoicePdfService,
   ) {}
 
   // ───────────────────────── app: görüntüleme/indirme ─────────────────────────
@@ -166,7 +169,9 @@ export class InvoiceQueryService {
 
   /**
    * Kullanıcının bir e-Arşiv faturasının indirme URL'i (S3 presigned, public → app açabilir).
-   * PDF S3'te yoksa sağlayıcıdan canlı çekilip yüklenir + pdfUrl kaydedilir. Sahiplik kontrollü.
+   * PDF S3'te yoksa sağlayıcıdan canlı çekilip yüklenir + pdfUrl kaydedilir. Sağlayıcı
+   * PDF veremiyorsa (Netsis) görsel kopyamız basılır ve AYNI yoldan kalıcılaşır:
+   * bir sonraki indirme `pdfUrl`den gelir, kopya yeniden basılmaz. Sahiplik kontrollü.
    * Storage yoksa son çare: buffer döner (controller stream eder).
    */
   async getInvoiceDownload(
@@ -178,14 +183,6 @@ export class InvoiceQueryService {
       where: userId
         ? { id: invoiceId, recipientUserId: userId }
         : { id: invoiceId },
-      select: {
-        id: true,
-        ettn: true,
-        invoiceNumber: true,
-        pdfUrl: true,
-        provider: true,
-        providerRef: true,
-      },
     });
     if (!inv?.ettn || !inv.invoiceNumber)
       throw new NotFoundException(
@@ -198,9 +195,18 @@ export class InvoiceQueryService {
     let key = inv.pdfUrl;
     const storageOk = !!this.storage?.isStorageAvailable?.();
 
+    // Canlı PDF: önce sağlayıcıdan, o vermezse görsel kopya. Bu çağrı içinde
+    // bir kez çözülür (yükleme düşüp son çareye inilirse yeniden basılmaz).
+    let live: Buffer | null | undefined;
+    const loadPdf = async (): Promise<Buffer | null> =>
+      (live ??=
+        (await issuer.fetchPdf(ref).catch(() => null)) ??
+        (await this.pdfRenderer?.renderForRecord(inv)) ??
+        null);
+
     // S3'te yoksa canlı çek → yükle → kaydet.
     if (!key && storageOk) {
-      const pdf = await issuer.fetchPdf(ref).catch(() => null);
+      const pdf = await loadPdf();
       if (pdf && pdf.length > 200) {
         try {
           const up = await this.storage!.uploadFile(pdf, {
@@ -231,7 +237,7 @@ export class InvoiceQueryService {
       if (url) return { url, invoiceNumber: inv.invoiceNumber };
     }
     // Son çare: canlı buffer (storage yok).
-    const buffer = await issuer.fetchPdf(ref).catch(() => null);
+    const buffer = await loadPdf();
     if (!buffer)
       throw new NotFoundException(
         i18nMessage("server.elogo.invoicePdfUnavailable"),

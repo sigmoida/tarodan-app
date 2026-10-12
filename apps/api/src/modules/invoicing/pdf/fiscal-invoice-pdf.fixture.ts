@@ -75,7 +75,7 @@ export function buildFiscalInvoicePdfInputFixture(
   return {
     document: buildFiscalDocumentFixture(),
     provider: "netsis",
-    status: "SENT",
+    status: "sent",
     sourceReference: "KYT-10001",
     issuedAt: new Date("2026-10-12T11:35:20Z"),
     verification: {

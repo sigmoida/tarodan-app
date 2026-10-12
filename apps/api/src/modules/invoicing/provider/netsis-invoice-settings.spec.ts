@@ -112,6 +112,22 @@ describe("netsis-invoice-settings", () => {
     ).toBe(expected);
   });
 
+  it("doğrulama bağlantısı opsiyonel: boş varsayılan, yalnız http(s) kabul edilir", () => {
+    expect(parseNetsisInvoiceSettings(new Map()).earchiveVerificationUrl).toBe(
+      "",
+    );
+    expect(
+      parseNetsisInvoiceSettings(
+        new Map([[K.earchiveVerificationUrl, "  https://sorgu.example.com/x  "]]),
+      ).earchiveVerificationUrl,
+    ).toBe("https://sorgu.example.com/x");
+    expect(
+      parseNetsisInvoiceSettings(
+        new Map([[K.earchiveVerificationUrl, "javascript:alert(1)"]]),
+      ).earchiveVerificationUrl,
+    ).toBe("");
+  });
+
   describe("netsisInvoiceSettingsReadiness", () => {
     it("hepsi doluysa eksik yok", () => {
       expect(
@@ -140,9 +156,11 @@ describe("netsis-invoice-settings", () => {
         parseNetsisInvoiceSettings(new Map()),
       );
       expect(missing).toHaveLength(
-        NETSIS_INVOICE_SETTING_DEFINITIONS.length - 1,
+        NETSIS_INVOICE_SETTING_DEFINITIONS.length - 2,
       );
       expect(missing).not.toContain(K.autoCreateCorporateCari);
+      // Opsiyonel/bilgilendirici: eksikliği faturayı engellemez.
+      expect(missing).not.toContain(K.earchiveVerificationUrl);
     });
   });
 

@@ -21,7 +21,7 @@ export interface FiscalInvoicePdfVerification {
 export interface FiscalInvoicePdfInput {
   document: FiscalDocumentInput;
   provider: FiscalInvoicePdfProvider;
-  /** FiscalInvoice.status (ham değer; etiketlenmez). */
+  /** FiscalInvoice.status (ham enum değeri; model katalogdan etiketler). */
   status: string;
   /** Bizim KYT- kaynak kodu. */
   sourceReference: string;

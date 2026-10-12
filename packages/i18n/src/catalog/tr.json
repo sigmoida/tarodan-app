@@ -11721,7 +11721,16 @@
         "billingReferenceText": "{documentNumber} numaralı belge ({issueDate}) için iade faturasıdır.",
         "generatedAt": "Oluşturulma: {date}",
         "page": "Sayfa {page} / {total}",
-        "legal": "Bu belge, GİB'e iletilen e-belgenin görsel kopyasıdır; mali geçerliliği e-belgededir."
+        "legal": "Bu belge, GİB'e iletilen e-belgenin görsel kopyasıdır; mali geçerliliği e-belgededir.",
+        "status": {
+          "pending": "Beklemede",
+          "processing": "Gönderiliyor",
+          "sent": "Gönderildi",
+          "signed": "İmzalandı",
+          "failed": "Başarısız",
+          "cancelled": "İptal edildi"
+        },
+        "verificationLabel": "e-Arşiv belge sorgulama"
       },
       "netsis": {
         "settingsMissing": "Netsis faturalama ayarları eksik ya da geçersiz: {keys}",
