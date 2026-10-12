@@ -47,7 +47,6 @@ export {
   PayoutTransactionsQueryDto,
   PayoutScheduleQueryDto,
   PayoutTransfersQueryDto,
-  PayoutExportQueryDto,
   ReleasePayoutDto,
 } from "./payout.dto";
 export { CreateStaticPageDto, UpdateStaticPageDto } from "./page.dto";

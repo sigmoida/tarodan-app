@@ -145,6 +145,7 @@ export class AnalyticsExportService {
 
     return this.exports.exportSheets({
       locale,
+      resource: "analytics",
       slug: `analitik-${tab}-${from}-${to}`,
       titleKey: `admin.analytics.tabs.${tab}`,
       filters: [
@@ -260,7 +261,9 @@ export class AnalyticsExportService {
     // (yalnız bazı satırlarda dolan `averageViewUplift` gibi) düşmesin.
     const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
     const records = rows.map((row) =>
-      Object.fromEntries(headers.map((header) => [header, cellOf(row[header])])),
+      Object.fromEntries(
+        headers.map((header) => [header, cellOf(row[header])]),
+      ),
     );
     return fieldSheet(name, headers, records);
   }

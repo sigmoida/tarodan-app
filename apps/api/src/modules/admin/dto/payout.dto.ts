@@ -7,9 +7,13 @@ import {
   IsNotEmpty,
   MaxLength,
 } from "class-validator";
+import { PayoutStatus } from "@prisma/client";
 import { QueryBoolean } from "../../../common/transforms";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
+
+/** Transferler sekmesinin durum süzgeci: "all" ya da bir `PayoutStatus`. */
+const TRANSFER_STATUS_FILTERS = ["all", ...Object.values(PayoutStatus)];
 
 export class PayoutTransactionsQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({
@@ -79,9 +83,10 @@ export class PayoutTransfersQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({
     description: '"all" or a PayoutStatus (failed, returned, completed, …)',
+    enum: TRANSFER_STATUS_FILTERS,
   })
   @IsOptional()
-  @IsString()
+  @IsIn(TRANSFER_STATUS_FILTERS)
   status?: string;
 
   @ApiPropertyOptional({ example: "2024-01-01" })
@@ -94,13 +99,6 @@ export class PayoutTransfersQueryDto extends AdminListQueryDto {
   @IsDateString()
   dateTo?: string;
 }
-
-/**
- * @deprecated Hold dökümü artık listenin DTO'sunu (`PayoutTransactionsQueryDto`)
- * alır — arama ve sıralama dahil. Ad, controller'lardaki kopya import
- * listeleri temizlenene kadar takma ad olarak duruyor.
- */
-export { PayoutTransactionsQueryDto as PayoutExportQueryDto };
 
 export class ReleasePayoutDto {
   @ApiProperty({ description: "Manual release reason", maxLength: 500 })

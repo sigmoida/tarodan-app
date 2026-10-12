@@ -58,16 +58,16 @@ toplanmaz — Özet'teki "Toplamlar"dadır ve Özet bunu not olarak söyler.
 
 ## Uçlar
 
-| Uç | Katalog | Denetim eylemi |
-| --- | --- | --- |
-| `GET /admin/payouts/export` | `payoutHolds` | `payout_holds_export` |
-| `GET /admin/payouts/transfers/export` | `payoutTransfers` | `payout_transfers_export` |
-| `GET /admin/discounts/:id/codes/export` | `voucherCodes` | `voucher_codes_export` |
-| `GET /admin/consents/export` | `consents` | `consent_records_export` |
-| `GET /admin/gib-report/export` | `gibReport` | `gib_report_export` |
-| `GET /admin/cancellations/export` | `cancellations` (uzun biçim) | `cancellations_export` |
-| `GET /admin/deleted-identities/export` | `deletedIdentities` | `deleted_identity_export` |
-| `GET /admin/analytics/:tab/export` | — (istisna) | `analytics_export` |
+| Uç                                      | Katalog                      | Denetim eylemi            |
+| --------------------------------------- | ---------------------------- | ------------------------- |
+| `GET /admin/payouts/export`             | `payoutHolds`                | `payout_holds_export`     |
+| `GET /admin/payouts/transfers/export`   | `payoutTransfers`            | `payout_transfers_export` |
+| `GET /admin/discounts/:id/codes/export` | `voucherCodes`               | `voucher_codes_export`    |
+| `GET /admin/consents/export`            | `consents`                   | `consent_records_export`  |
+| `GET /admin/gib-report/export`          | `gibReport`                  | `gib_report_export`       |
+| `GET /admin/cancellations/export`       | `cancellations` (uzun biçim) | `cancellations_export`    |
+| `GET /admin/deleted-identities/export`  | `deletedIdentities`          | `deleted_identity_export` |
+| `GET /admin/analytics/:tab/export`      | — (istisna)                  | `analytics_export`        |
 
 **Analitik tek istisnadır:** liste değil; ekranın çizdiği yanıt nesnesini alan
 adlarıyla (makine-okunur başlık) yazar, kolon kataloğu yoktur. Yazıcı, Özet,
@@ -88,7 +88,7 @@ taşır.
    fonksiyona çıkar; liste ve döküm onu çağırsın. Sayfa sınırı kaymasın diye
    döküm sırasına `{ id: "asc" }` ekle.
 3. **Servis:** `ExportListService.exportList({ catalog, locale, slug,
-   titleKey, filters, sort, fetchPage, map, audit })`. `fetchPage` liste
+titleKey, filters, sort, fetchPage, map, audit })`. `fetchPage` liste
    satırını döner, `map` satırı katalog anahtarlı kayda çevirir (durum
    etiketlerini `t` ile).
 4. **Controller:** liste DTO'su + `@CurrentUser("id")` + `@ReqLocale()` +
@@ -104,5 +104,8 @@ taşır.
   ayrıntısı) — Netsis yeniden adlandırmasından sonra ayrı pakette taşınacak;
   sözleşme spec'inde "bekleyen" listesinde durur ve liste yalnız küçülür.
 - `GET /admin/products-export` silindi: tavansızdı ve hiçbir düğme çağırmıyordu.
-- Toolbar'ın istemci tarafı "yüklü sayfayı indir" düğmesi bu hattın parçası
-  değildir (admin tarafı).
+- Toolbar'ın istemci tarafı "yüklü sayfayı CSV indir" düğmesi (`lib/csv.ts`,
+  kolonların `exportValue`'su) kaldırıldı: yalnız ekrandaki sayfayı, sunucu
+  sıralaması/filtresi olmadan ve denetimsiz aktarıyordu. Döküm isteyen her
+  liste bu hatta bir `ExportButton` + `/export` ucu ekler; henüz ucu olmayan
+  listelerde (siparişler, ürünler, ödemeler, kargo …) indirme yoktur.

@@ -213,13 +213,6 @@ export const financeApi = {
     sortOrder?: "asc" | "desc";
     sortType?: "text" | "number" | "date";
   }) => api.get("/admin/payouts/schedule", { params }),
-  getPayoutsExport: (params?: {
-    sellerId?: string;
-    status?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    earlyReleased?: string;
-  }) => api.get("/admin/payouts/export", { params }),
   // force = erken bırakma: yalnız tarih şartını esnetir (teslim/iade/frozen
   // guard'ları backend'de aynen geçerli).
   releasePayout: (orderId: string, reason: string, force?: boolean) =>

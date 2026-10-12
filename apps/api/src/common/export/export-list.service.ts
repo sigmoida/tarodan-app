@@ -114,6 +114,12 @@ export interface ExportListOptions<
 export interface ExportSheetsOptions extends ExportBase {
   sheets: (t: Translate) => readonly WorkbookDataSheet[];
   rowCount: number;
+  /**
+   * Denetim kaydındaki kaynak adı (`analytics` gibi) — katalogsuz dökümün
+   * karşılığı. Verilmezse `slug`; tarih taşıyan bir slug her indirmede farklı
+   * bir "kaynak" yazar ve denetim kayıtları kaynağa göre gruplanamaz.
+   */
+  resource?: string;
 }
 
 /**
@@ -149,7 +155,10 @@ export class ExportListService {
     return this.finish(options, t, {
       sheets: [
         {
-          name: t(options.sheetNameKey ?? options.titleKey, options.titleValues),
+          name: t(
+            options.sheetNameKey ?? options.titleKey,
+            options.titleValues,
+          ),
           columns: catalogColumns(options.catalog.columns, t),
           records,
         },
@@ -169,7 +178,7 @@ export class ExportListService {
       rowCount: options.rowCount,
       totals: [],
       truncatedAt: null,
-      resource: options.slug,
+      resource: options.resource ?? options.slug,
     });
   }
 
