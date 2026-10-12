@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseInvoiceProviderName } from "./invoice-provider";
 import { parseNetsisMode } from "./netsis";
 import { SMS_VERIFICATION_CODE_PATTERN } from "./sms";
 import { GITHUB_REPO_PATTERN } from "./uat-refresh";
@@ -177,6 +178,9 @@ const envSchema = z
     NETSIS_BRANCH_CODE: z.string().optional(),
     NETSIS_TIMEOUT_MS: z.string().optional(),
     NETSIS_TOKEN_SAFETY_SECONDS: z.string().optional(),
+    // Yeni e-belgeleri kesen sağlayıcı (config/invoice-provider.ts):
+    // `elogo` (varsayılan) | `netsis`.
+    INVOICE_PROVIDER: z.string().optional(),
 
     // Production delivery/telemetry dependencies.
     SENDGRID_API_KEY: z.string().optional(),
@@ -703,13 +707,40 @@ const envSchema = z
       }
     }
 
+    // Yeni belgeleri kesen sağlayıcı. Canlı pazaryeri e-belge olmadan
+    // çalışamaz: SEÇİLEN sağlayıcı canlıda açık olmak zorunda. Seçilmeyen
+    // sağlayıcı açık kalabilir (eski belgelerinin durum/iptal işlemleri için);
+    // açıksa kendi korumaları aynen geçerlidir.
+    const invoiceProvider = parseInvoiceProviderName(env.INVOICE_PROVIDER);
+    if (invoiceProvider === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["INVOICE_PROVIDER"],
+        message: "INVOICE_PROVIDER must be 'elogo' or 'netsis'",
+      });
+    }
+    const netsisSelected = invoiceProvider === "netsis";
+    if (
+      netsisSelected &&
+      isProductionDeployment &&
+      !["true", "1"].includes((env.NETSIS_ENABLED ?? "").trim().toLowerCase())
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["NETSIS_ENABLED"],
+        message:
+          "NETSIS_ENABLED must be 'true' in production when INVOICE_PROVIDER is 'netsis'",
+      });
+    }
+
     const elogoEnabled = ["true", "1"].includes(
       (env.ELOGO_ENABLED ?? "").trim().toLowerCase(),
     );
     // Canlı pazaryeri e-belge olmadan çalışamaz; staging ise eLogo'suz
     // koşabilir (aksi halde staging ya demo hesabına ya da — daha kötüsü —
-    // canlı hesaba bağlanmak ZORUNDA kalır).
-    if (!elogoEnabled && isProductionDeployment) {
+    // canlı hesaba bağlanmak ZORUNDA kalır). Netsis seçiliyse eLogo kapalı
+    // olabilir.
+    if (!elogoEnabled && isProductionDeployment && !netsisSelected) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["ELOGO_ENABLED"],
