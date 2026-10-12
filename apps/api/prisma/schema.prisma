@@ -2781,6 +2781,84 @@ enum EInvoiceProviderName {
   netsis
 }
 
+/// Platformun para hareketlerinin Netsis'e (ERP muhasebesi) AYNALANMASI — kaynak
+/// olay başına TEK satır. Muhasebe tahsilatları ve ödemeleri faturaların yanında
+/// görsün diye kesilen Netsis faturasının tahsilatı, PayTR hakedişinin bankaya
+/// aktarımı, satıcı ödemesi ve alıcı iadesi Netsis'e kayıt olarak yazılır.
+/// Para akışının KENDİSİ bu tabloya hiç bakmaz: senkron düşerse para yine akar,
+/// satır yalnız muhasebe tarafının yeniden denenebilir iş kaydıdır
+/// (docs/NETSIS.md → "Muhasebe senkronu").
+///
+/// Kaynak polimorfiktir (fatura / hakediş / payout / iade denemesi) ve FK
+/// bilerek YOK: denetim izi kaynak tablolardan bağımsız kalıcıdır, tıpkı
+/// LedgerEntry gibi.
+model NetsisSyncRecord {
+  id             String           @id @default(uuid())
+  kind           NetsisSyncKind
+  /// Kaynak tablonun mantıksal adı (`fiscal_invoice`, `paytr_settlement`,
+  /// `payout_transfer`, `refund_attempt`) — destek ekranı kaynağı buradan bulur.
+  sourceType     String           @map("source_type")
+  sourceId       String           @map("source_id")
+  /// `<kind>:<sourceId>`. Outbox en-az-bir-kez teslim eder ve cron'un süpürmesi
+  /// aynı olayı yeniden bulabilir; UNIQUE anahtar aynı para hareketinin ikinci
+  /// bir satır (dolayısıyla ikinci bir Netsis kaydı) açmasını DB'de durdurur.
+  idempotencyKey String           @unique @map("idempotency_key")
+  status         NetsisSyncStatus @default(pending)
+  /// Bütçe tüketen deneme sayısı. Ağ arızası bütçe tüketmez; yapılandırma
+  /// hatası bütçeyi hemen bitirir (alarm görünür olsun) — fatura teslimatıyla
+  /// aynı politika.
+  attemptCount   Int              @default(0) @map("attempt_count")
+  /// Gönderim kirası (lease): `processing` satırı bu andan itibaren belli bir
+  /// süre o işçinindir; süre dolarsa (süreç çöktü) cron satırı geri alır.
+  lastAttemptAt  DateTime?        @map("last_attempt_at")
+  lastError      String?          @map("last_error")
+  /// Netsis'te OLUŞAN kaydın anahtarı. Gönderimden hemen sonra, durumdan ÖNCE
+  /// ayrı bir yazımla saklanır: dolu bir `netsisRef` "kayıt Netsis'te var"
+  /// demektir ve sonraki deneme ikinci kez göndermez.
+  netsisRef      String?          @map("netsis_ref")
+  /// Netsis'e GÖNDERİLEN gövde (destek ve mutabakat için) — çağrıdan önce yazılır.
+  payload        Json?
+  /// Gönderilen işaretli tutar (iade ters kaydında negatif). Liste/filtre JSON'a
+  /// inmeden okusun diye kolon; kaynak gerçeği kaynak tablodadır.
+  amount         Decimal?         @db.Decimal(12, 2)
+  syncedAt       DateTime?        @map("synced_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  // Süpürme sorgusu "bu kaynağın satırı var mı"yı (kind, source_id) ile sorar;
+  // aynı zamanda idempotencyKey'in ikinci bir DB güvencesi.
+  @@unique([kind, sourceId])
+  // Retry adayları: pending/failed + bayat processing kirası.
+  @@index([status, lastAttemptAt])
+  // Admin listesinin varsayılan sırası ve tarih filtresi.
+  @@index([createdAt])
+  @@map("netsis_sync_records")
+}
+
+/// Netsis'e aynalanan para hareketinin türü.
+enum NetsisSyncKind {
+  /// Netsis'in kestiği gelir faturasının tahsilatı (MixedReceiptsMain) — PayTR
+  /// ara hesabına, faturanın carisinde, faturayı kapatacak şekilde.
+  invoice_collection
+  /// Gerçekleşen PayTR hakedişi: ara hesaptan şirket bankasına aktarım
+  /// (BankRemittanceTransfer).
+  settlement_transfer
+  /// Satıcıya tamamlanan ödeme: şirket bankasından satıcının carisine havale.
+  payout_transfer
+  /// Alıcıya tamamlanan PSP iadesi: alıcının carisinde tahsilat ters kaydı.
+  refund_reversal
+}
+
+enum NetsisSyncStatus {
+  pending
+  processing
+  synced
+  failed
+  /// Yazılmadı: senkron kapalıydı (sonra yeniden kuyruğa alınabilir) ya da
+  /// kaynak aynalanacak bir para hareketi değil (sıfır tutar, test şeridi…).
+  skipped
+}
+
 model Shipment {
   id                  String          @id @default(uuid())
   orderId             String          @unique @map("order_id")
