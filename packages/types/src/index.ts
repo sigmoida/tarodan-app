@@ -143,3 +143,6 @@ export * from "./paytr-merchant-oid";
 export * from "./mail-routing";
 // Staging refresh from production (masked): run status shared by API + admin
 export * from "./uat-refresh";
+
+// Reklam tıklanabilir alanları — admin formu + API aynı kuralla denetler
+export * from "./ad-hotspot";
