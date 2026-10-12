@@ -4,6 +4,7 @@ import { ElogoDocumentService } from "../elogo-document.service";
 import { ElogoDeliveryService } from "../elogo-delivery.service";
 import { ElogoIssuingService } from "../elogo-issuing.service";
 import { ElogoService } from "../elogo.service";
+import { ElogoInvoiceProvider } from "../provider/elogo.provider";
 import { VAT_SOURCE_BY_TYPE } from "./invoice-vat-rate";
 
 /**
@@ -123,6 +124,14 @@ function makeElogo(): ElogoService {
   } as unknown as ElogoService;
 }
 
+/**
+ * Servisler entegratörü `E_INVOICE_PROVIDER` portu üzerinden görür. Casuslar
+ * ElogoService seviyesinde kalır: gerçek eLogo uygulaması araya girer.
+ */
+function asProvider(elogo: ElogoService): ElogoInvoiceProvider {
+  return new ElogoInvoiceProvider(elogo, fakeConfig());
+}
+
 /** Checkout'un kullandığı hizmet KDV'si politikası. */
 function makeTaxPolicy(
   over: Partial<{ serviceVatEnabled: boolean; serviceVatRate: number }> = {},
@@ -197,14 +206,14 @@ describe("fatura KDV oranının kaynağı", () => {
     // olmayan bir kopyadan okuyup env oranına düşer.
     const documents = new ElogoDocumentService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       fakeConfig({ ELOGO_VAT_RATE: "20" }),
       makeTaxService({}, 20),
       makeTaxPolicy({ serviceVatRate: 18 }),
     );
     const delivery = new ElogoDeliveryService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       documents,
     );
     const svc = new ElogoInvoicingService(
@@ -242,14 +251,14 @@ describe("fatura KDV oranının kaynağı", () => {
     // olmayan bir kopyadan okuyup env oranına düşer.
     const documents = new ElogoDocumentService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       fakeConfig(),
       makeTaxService({}, 20),
       makeTaxPolicy({ serviceVatEnabled: false }),
     );
     const delivery = new ElogoDeliveryService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       documents,
     );
     const svc = new ElogoInvoicingService(
@@ -297,14 +306,14 @@ describe("fatura KDV oranının kaynağı", () => {
     // olmayan bir kopyadan okuyup env oranına düşer.
     const documents = new ElogoDocumentService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       fakeConfig(),
       makeTaxService({ "cat-kitap": 10 }, 20),
       makeTaxPolicy(),
     );
     const delivery = new ElogoDeliveryService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       documents,
     );
     const svc = new ElogoInvoicingService(
@@ -342,12 +351,12 @@ describe("fatura KDV oranının kaynağı", () => {
     // olmayan bir kopyadan okuyup env oranına düşer.
     const documents = new ElogoDocumentService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       fakeConfig({ ELOGO_VAT_RATE: "20" }),
     );
     const delivery = new ElogoDeliveryService(
       prisma as any,
-      makeElogo(),
+      asProvider(makeElogo()),
       documents,
     );
     const svc = new ElogoInvoicingService(

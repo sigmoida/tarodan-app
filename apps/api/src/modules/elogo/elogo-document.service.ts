@@ -1,13 +1,16 @@
-import { Injectable, Optional } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma, type ElogoInvoiceType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
-import { ElogoService } from "./elogo.service";
 import { type GuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
 import type { ElogoDocumentType } from "./helpers/elogo.types";
 import { TaxService } from "../tax/tax.service";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
-import { type UblParty } from "./ubl/ubl-invoice.builder";
+import {
+  E_INVOICE_PROVIDER,
+  type EInvoiceProvider,
+  type FiscalParty,
+} from "./provider/e-invoice-provider";
 import { invoiceAmountsFor } from "./invoice/invoice-amounts";
 import {
   buildPackageFeeDocuments,
@@ -35,7 +38,7 @@ import { DEFAULT_ELOGO_INVOICE_PREFIX } from "../../config/elogo";
 export class ElogoDocumentService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly elogo: ElogoService,
+    @Inject(E_INVOICE_PROVIDER) private readonly provider: EInvoiceProvider,
     private readonly config: ConfigService,
     @Optional() private readonly taxService?: TaxService,
     /**
@@ -94,10 +97,7 @@ export class ElogoDocumentService {
   private get prefix(): string {
     return this.cfg("ELOGO_INVOICE_PREFIX", DEFAULT_ELOGO_INVOICE_PREFIX);
   }
-  get xsltUuid(): string | undefined {
-    return this.cfg("ELOGO_INVOICE_XSLT_UUID") || undefined;
-  }
-  supplierParty(): UblParty {
+  supplierParty(): FiscalParty {
     return {
       vknTckn: this.cfg("ELOGO_COMPANY_VKN", this.cfg("ELOGO_WS_USERNAME", "")),
       title: this.cfg("ELOGO_COMPANY_TITLE", "TARODAN"),
@@ -136,6 +136,20 @@ export class ElogoDocumentService {
     return invoiceIssueTime(d);
   }
 
+  /**
+   * Kesim anındaki numara kapısı. Numarayı sağlayıcı veriyorsa
+   * (`numbering === "provider"`) kayıt numarasız açılır ve sayaç İLERLEMEZ —
+   * aksi halde boşluksuz seride hiç kullanılmayan numaralar kalırdı. Yerel
+   * numaralandırmada aynı transaction'da boşluksuz TRD numarası tahsis edilir.
+   */
+  async allocateDocumentNumberInTransaction(
+    tx: Prisma.TransactionClient,
+    year: number,
+  ): Promise<string | null> {
+    if (this.provider.numbering !== "local") return null;
+    return this.allocateInvoiceNumberInTransaction(tx, year);
+  }
+
   /** Gap-free belge numarası: PREFIX + yıl + 9 hane (ElogoDocSequence atomik artırım). */
   async allocateInvoiceNumber(year: number): Promise<string> {
     return this.prisma.$transaction((tx) =>
@@ -156,7 +170,7 @@ export class ElogoDocumentService {
     return formatElogoInvoiceNumber(prefix, year, row.lastValue);
   }
 
-  /** Alıcı (User) → UBL party + belge tipi (e-Fatura mükellefse EINVOICE). */
+  /** Alıcı (User) → belge tarafı + belge tipi (e-Fatura mükellefse EINVOICE). */
   async resolveRecipient(
     userId: string,
     /**
@@ -171,7 +185,7 @@ export class ElogoDocumentService {
     name: string;
     email?: string | null;
     address?: GuestInvoiceRecipient["address"];
-    party: UblParty;
+    party: FiscalParty;
     documentType: ElogoDocumentType;
     alias?: string;
   }> {
@@ -197,10 +211,12 @@ export class ElogoDocumentService {
     let documentType: ElogoDocumentType = "EARCHIVE";
     let alias: string | undefined;
     if (hasRealTaxId) {
-      const chk = await this.elogo.checkUser(vknTckn).catch(() => null);
-      if (chk?.isEInvoiceUser) {
+      const chk = await this.provider
+        .resolveRecipientKind(vknTckn)
+        .catch(() => null);
+      if (chk?.kind === "EINVOICE") {
         documentType = "EINVOICE";
-        alias = chk.eInvoicePkAlias;
+        alias = chk.alias;
       }
     }
     return {
@@ -234,7 +250,7 @@ export class ElogoDocumentService {
       district?: string | null;
       address?: string | null;
     } | null,
-  ): UblParty {
+  ): FiscalParty {
     // GİB UBL-TR: PostalAddress'te CitySubdivisionName + CityName gerekli (yalnız Country → şema hatası).
     const common = {
       vknTckn,
@@ -259,7 +275,7 @@ export class ElogoDocumentService {
       : { ...common, firstName: "Nihai", lastName: "Tüketici" };
   }
 
-  /** Alıcının varsayılan adresini çek (UBL PostalAddress için). */
+  /** Alıcının varsayılan adresini çek (belgedeki alıcı adresi için). */
   async fetchAddress(userId?: string | null): Promise<{
     city: string | null;
     district: string | null;

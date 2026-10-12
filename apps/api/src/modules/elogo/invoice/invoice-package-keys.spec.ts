@@ -6,6 +6,7 @@ import { ElogoIssuingService } from "../elogo-issuing.service";
 import { ElogoReversalService } from "../elogo-reversal.service";
 import { ElogoQueryService } from "../elogo-query.service";
 import { ElogoService } from "../elogo.service";
+import { ElogoInvoiceProvider } from "../provider/elogo.provider";
 
 /**
  * Komisyon ve hizmet bedeli faturaları SATICI PAKETİ başına kesilir
@@ -200,6 +201,14 @@ function makeElogo(over: Record<string, any> = {}): ElogoService {
   } as unknown as ElogoService;
 }
 
+/**
+ * Servisler entegratörü `E_INVOICE_PROVIDER` portu üzerinden görür. Casuslar
+ * ElogoService seviyesinde kalır: gerçek eLogo uygulaması araya girer.
+ */
+function asProvider(elogo: ElogoService): ElogoInvoiceProvider {
+  return new ElogoInvoiceProvider(elogo, fakeConfig());
+}
+
 /** Gönderilmiş (sent) paket faturası kaydı. */
 function sentPackageInvoice(type: "commission" | "service_fee", total: number) {
   return {
@@ -239,7 +248,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = elogo;
+    const elogoClient = asProvider(elogo);
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -278,7 +287,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = elogo;
+    const elogoClient = asProvider(elogo);
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -314,7 +323,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = elogo;
+    const elogoClient = asProvider(elogo);
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -353,7 +362,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = elogo;
+    const elogoClient = asProvider(elogo);
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -406,7 +415,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     prisma.invoices.push(pending);
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = makeElogo();
+    const elogoClient = asProvider(makeElogo());
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -440,7 +449,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     prisma.invoices.push(sentPackageInvoice("service_fee", 60));
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = makeElogo();
+    const elogoClient = asProvider(makeElogo());
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -469,7 +478,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     prisma.invoices.push(sentPackageInvoice("commission", 144));
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = makeElogo();
+    const elogoClient = asProvider(makeElogo());
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -496,7 +505,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     prisma.invoices.push(sentPackageInvoice("commission", 144));
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = makeElogo();
+    const elogoClient = asProvider(makeElogo());
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -541,7 +550,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
     prisma.invoices.push(guestInvoice());
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = makeElogo();
+    const elogoClient = asProvider(makeElogo());
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -577,7 +586,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = elogo;
+    const elogoClient = asProvider(elogo);
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,
@@ -610,7 +619,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
     prisma.invoices.push(sentPackageInvoice("service_fee", 60));
     // Tek zincir, PAYLAŞILAN örnekler — kesim ve ters kayıt aynı belge/
     // gönderim nesnelerini kullanır.
-    const elogoClient = makeElogo();
+    const elogoClient = asProvider(makeElogo());
     const documents = new ElogoDocumentService(
       prisma as any,
       elogoClient,

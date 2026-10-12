@@ -223,13 +223,13 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
 
     const documents = new ElogoDocumentService(
       prisma,
-      {} as any, // elogo client
+      {} as any, // e-belge sağlayıcısı (E_INVOICE_PROVIDER) — kesim casuslandığı için çağrılmaz
       { get: () => "" } as any, // config
     );
     // Kesim GÖNDERIM servisinde yaşıyor; casus da orada olmalı.
     const delivery = new ElogoDeliveryService(
       prisma,
-      {} as any, // elogo client
+      {} as any, // e-belge sağlayıcısı (E_INVOICE_PROVIDER) — kesim casuslandığı için çağrılmaz
       documents,
     );
     const elogo = new ElogoInvoicingService(

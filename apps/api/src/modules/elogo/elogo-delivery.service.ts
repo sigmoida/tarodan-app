@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,11 +11,7 @@ import { randomUUID } from "crypto";
 import { Prisma, type ElogoInvoice } from "@prisma/client";
 import { AccountLaneService } from "../account-lane/account-lane.service";
 import { PrismaService } from "../../prisma";
-import {
-  ELOGO_MAX_SEND_ATTEMPTS,
-  isConfigurationElogoFailure,
-  isTransientElogoFailure,
-} from "./helpers/elogo-retry-policy";
+import { ELOGO_MAX_SEND_ATTEMPTS } from "./helpers/elogo-retry-policy";
 import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
 import {
   invoiceDescriptionOf,
@@ -29,19 +26,22 @@ import {
 } from "../../config/app-urls";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
-import { buildInvoiceXml } from "./ubl/ubl-invoice.builder";
+import { computeFiscalDocumentTotals } from "./invoice/fiscal-document-totals";
 import {
   invoiceDiscountFromLines,
   invoiceTotalsFromLines,
   readInvoiceLineItems,
 } from "./invoice/invoice-lines";
-import type {
-  ElogoDocumentType,
-  ElogoUserCheckResult,
-} from "./helpers/elogo.types";
+import {
+  E_INVOICE_PROVIDER,
+  type EInvoiceProvider,
+  type EInvoiceScenario,
+  type FiscalDocumentInput,
+  type FiscalDocumentLine,
+  type RecipientKindResult,
+} from "./provider/e-invoice-provider";
 import type { CutOptions, RevenueType } from "./elogo-invoicing.service";
 import { i18nMessage } from "../i18n";
-import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../mail/smtp.provider";
@@ -68,7 +68,7 @@ export class ElogoDeliveryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly elogo: ElogoService,
+    @Inject(E_INVOICE_PROVIDER) private readonly provider: EInvoiceProvider,
     private readonly documents: ElogoDocumentService,
     @Optional() private readonly storage?: StorageService,
     @Optional() private readonly smtp?: SmtpProvider,
@@ -104,7 +104,7 @@ export class ElogoDeliveryService {
       sourceReference,
     } = opts;
     try {
-      const providerEnabled = this.elogo.isEnabled();
+      const providerEnabled = this.provider.isEnabled();
       if (!providerEnabled) {
         this.logger.debug(
           `eLogo kapalı — ${type} faturası pending kaydedilecek (source=${sourceId})`,
@@ -157,7 +157,7 @@ export class ElogoDeliveryService {
               });
               if (raced) return raced;
               const invoiceNumber =
-                await this.documents.allocateInvoiceNumberInTransaction(
+                await this.documents.allocateDocumentNumberInTransaction(
                   tx,
                   invoiceIssueYear(now),
                 );
@@ -211,10 +211,10 @@ export class ElogoDeliveryService {
       if (providerEnabled) {
         await this.sendRecord(record.id);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Idempotency yarışı (aynı anda iki create) veya beklenmedik hata — yut, cron toparlar.
       this.logger.error(
-        `eLogo ${type} faturası kesimi hata (source=${sourceId}): ${err?.message}`,
+        `eLogo ${type} faturası kesimi hata (source=${sourceId}): ${(err as Error)?.message}`,
       );
     }
   }
@@ -282,7 +282,7 @@ export class ElogoDeliveryService {
     };
   }
 
-  /** Kayıttaki snapshot'tan UBL üretip gönderir, durumu günceller. */
+  /** Kayıttaki snapshot'tan belgeyi kurup sağlayıcıya gönderir, durumu günceller. */
   async sendRecord(invoiceId: string): Promise<void> {
     const claimed = await this.claimInvoiceForSend(invoiceId);
     if (!claimed) return;
@@ -314,21 +314,21 @@ export class ElogoDeliveryService {
 
     // Provider geçici olarak kapalıyken kayıt EARCHIVE açılmış olabilir. İlk gerçek
     // gönderimde alıcı mükellefiyetini tekrar çöz; return belgesi orijinal tipini korur.
-    let documentType = inv.documentType as ElogoDocumentType;
+    let documentType = inv.documentType as EInvoiceScenario;
     let alias: string | undefined;
     const isRealIdentifier =
       inv.recipientVknTckn !== "11111111111" &&
       (inv.recipientVknTckn.length === 10 ||
         inv.recipientVknTckn.length === 11);
     if (!isReturn && isRealIdentifier) {
-      let chk: ElogoUserCheckResult | null = null;
+      let chk: RecipientKindResult | null = null;
       try {
-        chk = await this.elogo.checkUser(inv.recipientVknTckn);
+        chk = await this.provider.resolveRecipientKind(inv.recipientVknTckn);
       } catch (err: unknown) {
         // Mükellef sorgusu ağ/sağlayıcı arızasıyla düşerse belge KALICI
         // `failed` olmamalı: bu, gönderimdeki geçici arızayla aynı durumdur —
         // sayaç geri alınır, kayıt `pending` kalır ve cron yeniden dener.
-        const transient = isTransientElogoFailure(err);
+        const transient = this.provider.classifyError(err) === "network";
         const reason = String((err as Error)?.message ?? err).slice(0, 400);
         await this.prisma.elogoInvoice
           .update({
@@ -355,8 +355,8 @@ export class ElogoDeliveryService {
         });
         return;
       }
-      documentType = chk?.isEInvoiceUser ? "EINVOICE" : "EARCHIVE";
-      alias = chk?.isEInvoiceUser ? chk.eInvoicePkAlias : undefined;
+      documentType = chk.kind;
+      alias = chk.kind === "EINVOICE" ? chk.alias : undefined;
       if (documentType !== inv.documentType) {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
@@ -364,10 +364,10 @@ export class ElogoDeliveryService {
         });
       }
     } else if (documentType === "EINVOICE") {
-      const chk = await this.elogo
-        .checkUser(inv.recipientVknTckn)
+      const chk = await this.provider
+        .resolveRecipientKind(inv.recipientVknTckn)
         .catch(() => null);
-      alias = chk?.eInvoicePkAlias;
+      alias = chk?.alias;
     }
     const isEInvoice = documentType === "EINVOICE";
     if (isEInvoice) {
@@ -383,7 +383,7 @@ export class ElogoDeliveryService {
       }
     }
 
-    // Alıcı e-postası + adresi UBL'e konur — eLogo e-Arşiv'i (ELEKTRONIK) bu e-postaya gönderir.
+    // Alıcı e-postası + adresi belgeye konur — e-Arşiv'i (ELEKTRONIK) sağlayıcı bu e-postaya gönderir.
     const [recipientUser, addr] = await Promise.all([
       inv.recipientUserId
         ? this.prisma.user
@@ -412,7 +412,7 @@ export class ElogoDeliveryService {
       recipientEmail,
       snapshotAddress ?? addr,
     );
-    // e-Arşiv gönderim şekli: eLogo ELEKTRONIK belgeyi alıcının e-postasına
+    // e-Arşiv gönderim şekli: sağlayıcı ELEKTRONIK belgeyi alıcının e-postasına
     // yollar; e-posta yoksa GİB KAGIT bekler — ELEKTRONIK göndermek ya
     // reddedilir ya da belge alıcıya hiç ulaşmaz. e-Fatura'da bu alan yoktur.
     const sendType: "ELEKTRONIK" | "KAGIT" = recipientEmail
@@ -422,16 +422,16 @@ export class ElogoDeliveryService {
       inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
     // "Kayıt No" — belgenin hangi alışverişten doğduğunu taşımak zorunda; aynı
     // kod hakediş dökümünün "Kayıt No" kolonunda da durur. Hem belge notuna hem
-    // kalemin açıklamasına yazılır: eLogo'nun XSLT tasarımı hangisini bastığına
+    // kalemin açıklamasına yazılır: sağlayıcının görsel tasarımı hangisini bastığına
     // göre değişir, ikisinde de durması belgeyi bozmaz.
     const orderNote = inv.sourceReference?.trim()
       ? `Kayıt No: ${inv.sourceReference.trim()}`
       : null;
 
-    let billingRef: { invoiceId: string; issueDate: string } | undefined;
+    let billingRef: FiscalDocumentInput["billingReference"];
     if (isReturn && inv.billingReference) {
       billingRef = {
-        invoiceId: inv.billingReference,
+        documentNumber: inv.billingReference,
         issueDate: this.documents.ymd(
           inv.billingReferenceIssueDate ?? issueMoment,
         ),
@@ -442,42 +442,42 @@ export class ElogoDeliveryService {
     // tek satırlı hizmet faturası. Snapshot kesim anında donduğu için retry
     // aynı belgeyi yeniden üretir.
     const snapshotLines = readInvoiceLineItems(inv.lineItems);
-    const buildXml = (invoiceNumber: string) =>
-      buildInvoiceXml({
-        profileId: isEInvoice ? "TEMELFATURA" : "EARSIVFATURA",
-        invoiceTypeCode: isReturn ? "IADE" : "SATIS",
-        id: invoiceNumber,
-        uuid: ettn,
-        issueDate: this.documents.ymd(issueMoment),
-        issueTime: this.documents.hms(issueMoment),
-        currency: "TRY",
-        // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
-        sendType: isEInvoice ? undefined : sendType,
-        note: orderNote ? `${desc} — ${orderNote}` : desc,
-        supplier: this.documents.supplierParty(),
-        customer: party,
-        lines: snapshotLines.length
-          ? snapshotLines.map((l) => ({
-              name: l.name,
-              description: orderNote ?? undefined,
-              quantity: l.quantity,
-              unitPrice: l.unitPrice,
-              lineExtension: l.net,
-              discount: l.discount,
-              vatRate: l.vatRate,
-              taxAmount: l.taxAmount,
-            }))
-          : [
-              {
-                name: desc,
-                description: orderNote ?? undefined,
-                quantity: 1,
-                unitPrice: net,
-                vatRate: rate,
-              },
-            ],
-        ...(billingRef ? { billingReference: billingRef } : {}),
-      });
+    const lines: FiscalDocumentLine[] = snapshotLines.length
+      ? snapshotLines.map((l) => ({
+          name: l.name,
+          description: orderNote ?? undefined,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          lineExtension: l.net,
+          discount: l.discount,
+          vatRate: l.vatRate,
+          taxAmount: l.taxAmount,
+        }))
+      : [
+          {
+            name: desc,
+            description: orderNote ?? undefined,
+            quantity: 1,
+            unitPrice: net,
+            vatRate: rate,
+          },
+        ];
+    const fiscalDocument = (documentNumber: string): FiscalDocumentInput => ({
+      scenario: documentType,
+      kind: isReturn ? "RETURN" : "SALE",
+      documentNumber,
+      ettn,
+      issueDate: this.documents.ymd(issueMoment),
+      issueTime: this.documents.hms(issueMoment),
+      currency: "TRY",
+      // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da bu alan yok).
+      sendType: isEInvoice ? undefined : sendType,
+      note: orderNote ? `${desc} — ${orderNote}` : desc,
+      supplier: this.documents.supplierParty(),
+      customer: party,
+      lines,
+      ...(billingRef ? { billingReference: billingRef } : {}),
+    });
 
     const deliver = (invoiceNumber: string, total: number) => {
       void this.deliverPdf(
@@ -502,31 +502,31 @@ export class ElogoDeliveryService {
     // Önceki deneme sırasında provider başarı verip DB güncellenememiş olabilir.
     // Aynı ETTN'i yeniden yollamadan önce durum sorgusuyla mutabakat yap.
     if (claimed.reconcileFirst) {
-      const providerStatus = await this.elogo
-        .getDocumentStatus(inv.ettn, documentType)
+      const providerStatus = await this.provider
+        .getStatus(
+          { ettn: inv.ettn, providerRef: inv.elogoRefId },
+          documentType,
+        )
         .catch(() => null);
-      if (providerStatus?.isCancel) {
+      if (providerStatus?.state === "cancelled") {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
           data: {
             status: "cancelled",
             cancelledAt: now,
-            elogoResultCode: providerStatus.code ?? null,
-            elogoResultMsg: providerStatus.description ?? null,
+            elogoResultCode: providerStatus.resultCode ?? null,
+            elogoResultMsg: providerStatus.resultMsg ?? null,
           },
         });
         return;
       }
-      if (
-        providerStatus &&
-        (providerStatus.status === 2 || providerStatus.code === 1300)
-      ) {
+      if (providerStatus?.state === "completed") {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
           data: {
             status: "sent",
-            elogoResultCode: providerStatus.code ?? null,
-            elogoResultMsg: providerStatus.description ?? null,
+            elogoResultCode: providerStatus.resultCode ?? null,
+            elogoResultMsg: providerStatus.resultMsg ?? null,
             issuedAt: issueMoment,
             sentAt: now,
           },
@@ -534,14 +534,14 @@ export class ElogoDeliveryService {
         deliver(inv.invoiceNumber, Number(inv.total));
         return;
       }
-      if (providerStatus?.status === 1) {
+      if (providerStatus?.state === "processing") {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
           data: {
             status: "processing",
-            elogoResultCode: providerStatus.code ?? null,
+            elogoResultCode: providerStatus.resultCode ?? null,
             elogoResultMsg:
-              providerStatus.description ?? "Provider is still processing",
+              providerStatus.resultMsg ?? "Provider is still processing",
           },
         });
         return;
@@ -551,22 +551,16 @@ export class ElogoDeliveryService {
     // Paylaşımlı eLogo hesabında (özellikle demo) fatura numarası çakışırsa yeni numara
     // alıp boşluğa kadar atlayarak yeniden dener. Böylece taze bir DB'nin sequence'i,
     // hesapta zaten kullanılmış numaralarla otomatik hizalanır (elle müdahale gerekmez).
+    // Çakışma yalnız yerel numaralandırmada doğar (`numbering === "local"`).
     try {
+      // Kayda yazılan tutarlar, sağlayıcıya giden belgeyle AYNI hesaptan gelir.
+      const { totals } = computeFiscalDocumentTotals(lines);
       for (let attempt = 0; attempt < 12; attempt++) {
-        const { xml, totals } = buildXml(currentNumber);
-        const res = await this.elogo.sendDocument({
-          documentType,
-          documentUuid: inv.ettn,
-          documentNumber: currentNumber,
-          ublXml: xml,
-          signed: false,
-          ...(alias ? { alias } : {}),
-          ...(this.documents.xsltUuid
-            ? { xsltUuid: this.documents.xsltUuid }
-            : {}),
+        const res = await this.provider.send(fiscalDocument(currentNumber), {
+          ...(alias ? { recipientAlias: alias } : {}),
         });
 
-        if (res.success) {
+        if (res.accepted) {
           await this.prisma.elogoInvoice.update({
             where: { id: inv.id },
             data: {
@@ -579,15 +573,15 @@ export class ElogoDeliveryService {
               discountTotal: totals.allowance,
               sendType,
               status: "sent",
-              elogoRefId: res.refId != null ? String(res.refId) : null,
-              elogoResultCode: res.code ?? null,
-              elogoResultMsg: res.description ?? null,
+              elogoRefId: res.providerRef ?? null,
+              elogoResultCode: res.resultCode ?? null,
+              elogoResultMsg: res.resultMsg ?? null,
               issuedAt: issueMoment,
               sentAt: now,
             },
           });
           this.logger.log(
-            `eLogo ${inv.type} faturası gönderildi (${currentNumber}, ref=${res.refId})`,
+            `eLogo ${inv.type} faturası gönderildi (${currentNumber}, ref=${res.providerRef})`,
           );
           deliver(currentNumber, totals.payable);
           return;
@@ -595,7 +589,7 @@ export class ElogoDeliveryService {
 
         // Numara çakışması → ARTAN adımla ileri atla (ardışık dolu numara bloğunu az
         // denemede geç: 1,2,3,... büyüyen sıçrama; 12 denemede ~78 numaralık blok aşılır).
-        if (attempt < 11 && this.isDuplicateNumberError(res.description)) {
+        if (attempt < 11 && res.category === "duplicate-number") {
           const skip = attempt + 1;
           for (let s = 0; s < skip; s++) {
             currentNumber = await this.documents.allocateInvoiceNumber(
@@ -612,9 +606,7 @@ export class ElogoDeliveryService {
         // YAPILANDIRMA reddi (XSLT tasarımı yok vb.) belgeye değil hesaba
         // özgüdür: yeniden denemek sonucu değiştirmez, bu yüzden bütçe hemen
         // tüketilmiş sayılır ve alarm bir sonraki cron turunda görünür.
-        const configurationFailure = isConfigurationElogoFailure(
-          res.description,
-        );
+        const configurationFailure = res.category === "configuration";
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
           data: {
@@ -627,23 +619,23 @@ export class ElogoDeliveryService {
             ...(configurationFailure
               ? { attemptCount: ELOGO_MAX_SEND_ATTEMPTS }
               : {}),
-            elogoResultCode: res.code ?? null,
-            elogoResultMsg: res.description ?? null,
+            elogoResultCode: res.resultCode ?? null,
+            elogoResultMsg: res.resultMsg ?? null,
           },
         });
         this.logger.error(
           configurationFailure
-            ? `ELOGO_CONFIG_ERROR ${inv.type} faturası sağlayıcı yapılandırma reddi (${currentNumber}): ${res.description} — XSLT/hesap ayarı düzeltilmeden yeniden denenmeyecek`
-            : `eLogo ${inv.type} faturası reddedildi (${currentNumber}): ${res.description}`,
+            ? `ELOGO_CONFIG_ERROR ${inv.type} faturası sağlayıcı yapılandırma reddi (${currentNumber}): ${res.resultMsg} — XSLT/hesap ayarı düzeltilmeden yeniden denenmeyecek`
+            : `eLogo ${inv.type} faturası reddedildi (${currentNumber}): ${res.resultMsg}`,
         );
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // GEÇİCİ arıza (ağ/zaman aşımı/sağlayıcı 5xx) deneme bütçesini TÜKETMEMELİ:
       // 8 deneme × 30 dk cron ≈ 4 saat; sağlayıcı bir gün kapalı kalırsa fatura
       // kalıcı `failed`'e düşüp 7 günlük e-Arşiv süresini sessizce kaçırıyordu.
       // Sayaç geri alınır ve kayıt `pending`'de bırakılır → cron denemeye devam eder.
-      const transient = isTransientElogoFailure(err);
+      const transient = this.provider.classifyError(err) === "network";
       await this.prisma.elogoInvoice
         .update({
           where: { id: inv.id },
@@ -651,29 +643,21 @@ export class ElogoDeliveryService {
             invoiceNumber: currentNumber,
             status: transient ? "pending" : "failed",
             ...(transient ? { attemptCount: { decrement: 1 } } : {}),
-            elogoResultMsg: String(err?.message || err).slice(0, 500),
+            elogoResultMsg: String((err as Error)?.message || err).slice(
+              0,
+              500,
+            ),
           },
         })
         .catch(() => undefined);
       this.logger[transient ? "warn" : "error"](
-        `eLogo ${inv.type} faturası gönderim hatası (${currentNumber}, ${transient ? "geçici" : "kalıcı"}): ${err?.message}`,
+        `eLogo ${inv.type} faturası gönderim hatası (${currentNumber}, ${transient ? "geçici" : "kalıcı"}): ${(err as Error)?.message}`,
       );
     }
   }
 
-  /** eLogo "aynı fatura numarası tekrar kullanılamaz" reddini tanı (paylaşımlı hesapta numara çakışması). */
-  private isDuplicateNumberError(msg?: string | null): boolean {
-    if (!msg) return false;
-    const m = msg.toLocaleLowerCase("tr");
-    return (
-      m.includes("tekrar kullanılamaz") ||
-      m.includes("aynı fatura numarası") ||
-      (m.includes("daha önce") && m.includes("fatura"))
-    );
-  }
-
   /**
-   * Kesilen e-Arşiv PDF'ini eLogo'dan çek → S3'e kaydet → alıcıya KENDİ SMTP'mizden e-postala.
+   * Kesilen e-Arşiv PDF'ini sağlayıcıdan çek → S3'e kaydet → alıcıya KENDİ SMTP'mizden e-postala.
    * Demo eLogo mail atmadığı için maili biz atıyoruz; PDF de uygulamada gösterilebilsin diye S3'te.
    * Tamamen best-effort: hata kesimi etkilemez.
    */
@@ -683,7 +667,7 @@ export class ElogoDeliveryService {
       ettn: string;
       invoiceNumber: string;
       type: string;
-      total: any;
+      total: number;
       currentPdfUrl: string | null;
       recipientName?: string | null;
       lineDescription?: string | null;
@@ -702,8 +686,8 @@ export class ElogoDeliveryService {
       );
       return;
     }
-    const pdf = await this.elogo
-      .getEArchiveInvoicePdf(inv.ettn)
+    const pdf = await this.provider
+      .fetchPdf({ ettn: inv.ettn })
       .catch(() => null);
     if (!pdf || pdf.length < 200) {
       this.logger.warn(
@@ -723,12 +707,12 @@ export class ElogoDeliveryService {
           isPublic: false,
           entityType: "elogo_invoice",
           entityId: inv.id,
-        } as any);
+        });
         pdfKey = up.key;
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `eLogo PDF S3 yükleme hatası (${inv.invoiceNumber}): ${e?.message}`,
+        `eLogo PDF S3 yükleme hatası (${inv.invoiceNumber}): ${(e as Error)?.message}`,
       );
     }
     // 2) Alıcıya kendi SMTP'mizden e-postala (PDF ekli). Şablon = admin'den düzenlenebilir
@@ -763,12 +747,12 @@ export class ElogoDeliveryService {
           // EmailLog + Mail Yönlendirme alanı (fatura) şablondan.
           template: tplKey,
           attachments: [{ filename: `${inv.invoiceNumber}.pdf`, content: pdf }],
-        } as any);
+        });
         emailedAt = new Date();
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `eLogo PDF e-posta hatası (${inv.invoiceNumber}): ${e?.message}`,
+        `eLogo PDF e-posta hatası (${inv.invoiceNumber}): ${(e as Error)?.message}`,
       );
     }
     // 3) Kaydı güncelle (pdfUrl + emailSentAt).
@@ -785,7 +769,7 @@ export class ElogoDeliveryService {
 
   /** Cron: pending/failed ve lease'i düşmüş processing kayıtları yeniden dener. */
   async retryPendingInvoices(maxAttempts = 8, batch = 50): Promise<void> {
-    if (!this.elogo.isEnabled()) return;
+    if (!this.provider.isEnabled()) return;
     const staleBefore = new Date(Date.now() - SEND_LEASE_MS);
     const pend = await this.prisma.elogoInvoice.findMany({
       where: {
@@ -894,7 +878,7 @@ export class ElogoDeliveryService {
    * gönder" kararını değil. Bu yüzden `cut` yolundan ayrı bir metottur.
    *
    * PDF önce S3'ten okunur: kesilmiş belgenin kopyası zaten oradadır ve
-   * sağlayıcıya bağımlı olmayan yol daha hızlıdır; yoksa eLogo'dan canlı çekilir.
+   * sağlayıcıya bağımlı olmayan yol daha hızlıdır; yoksa sağlayıcıdan canlı çekilir.
    */
   async emailInvoice(invoiceId: string): Promise<{ sentTo: string }> {
     const invoice = await this.prisma.elogoInvoice.findUnique({
@@ -940,7 +924,7 @@ export class ElogoDeliveryService {
         : null;
     const pdf =
       stored ??
-      (await this.elogo.getEArchiveInvoicePdf(invoice.ettn).catch(() => null));
+      (await this.provider.fetchPdf({ ettn: invoice.ettn }).catch(() => null));
     if (!pdf || pdf.length < 200)
       throw new ServiceUnavailableException(
         i18nMessage("server.elogo.invoicePdfUnavailable"),
@@ -971,7 +955,7 @@ export class ElogoDeliveryService {
       html: email.html,
       template: "elogo-invoice",
       attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
-    } as any);
+    });
     await this.prisma.elogoInvoice.update({
       where: { id: invoice.id },
       data: { emailSentAt: new Date() },

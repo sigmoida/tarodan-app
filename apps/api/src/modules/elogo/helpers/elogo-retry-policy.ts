@@ -55,6 +55,23 @@ export function isConfigurationElogoFailure(message?: string | null): boolean {
 }
 
 /**
+ * eLogo "aynı fatura numarası tekrar kullanılamaz" reddi — paylaşımlı hesapta
+ * numara çakışması. Yalnız yerel numaralandırmada anlamlıdır: teslim katmanı
+ * yeni numara alıp yeniden dener.
+ */
+export function isDuplicateNumberElogoFailure(
+  message?: string | null,
+): boolean {
+  if (!message) return false;
+  const lower = message.toLocaleLowerCase("tr");
+  return (
+    lower.includes("tekrar kullanılamaz") ||
+    lower.includes("aynı fatura numarası") ||
+    (lower.includes("daha önce") && lower.includes("fatura"))
+  );
+}
+
+/**
  * Hata GEÇİCİ mi (ağ/sağlayıcı erişilebilirliği) yoksa KALICI mı (iş kuralı,
  * doğrulama, mükellef bulunamadı)? Geçici hatalar deneme sayacını artırmaz.
  */

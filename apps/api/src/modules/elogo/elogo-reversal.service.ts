@@ -1,6 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import { Prisma, type ElogoInvoice } from "@prisma/client";
+import {
+  Prisma,
+  type ElogoInvoice,
+  type ElogoInvoiceType,
+} from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   invoiceDiscountFromLines,
@@ -20,7 +24,11 @@ import { refundRequestIdOf } from "./helpers/refund-request-key";
 import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
 import { tradeHandedToCargo } from "../trade/helpers/trade-handed-to-cargo";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
-import { ElogoService } from "./elogo.service";
+import {
+  E_INVOICE_PROVIDER,
+  type EInvoiceCancelResult,
+  type EInvoiceProvider,
+} from "./provider/e-invoice-provider";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 
@@ -50,7 +58,7 @@ export class ElogoReversalService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly elogo: ElogoService,
+    @Inject(E_INVOICE_PROVIDER) private readonly provider: EInvoiceProvider,
     private readonly documents: ElogoDocumentService,
     private readonly delivery: ElogoDeliveryService,
   ) {}
@@ -219,7 +227,12 @@ export class ElogoReversalService {
     const failures: string[] = [];
     for (const k of keys) {
       const inv = await this.prisma.elogoInvoice.findUnique({
-        where: { type_sourceId: { type: k.type as any, sourceId: k.sourceId } },
+        where: {
+          type_sourceId: {
+            type: k.type as ElogoInvoiceType,
+            sourceId: k.sourceId,
+          },
+        },
       });
       if (!inv || inv.status === "cancelled") continue;
       try {
@@ -244,8 +257,8 @@ export class ElogoReversalService {
           }
           await this.reverseInvoice(inv, adjustment);
         }
-      } catch (error: any) {
-        const message = `${inv.invoiceNumber ?? inv.id}: ${error?.message ?? error}`;
+      } catch (error: unknown) {
+        const message = `${inv.invoiceNumber ?? inv.id}: ${(error as Error)?.message ?? error}`;
         failures.push(message);
         this.logger.error(`eLogo iade/iptal hata (${message})`);
       }
@@ -509,18 +522,18 @@ export class ElogoReversalService {
       (!adjustment || invoiceAdjustment.fullyRefunded) &&
       alreadyReversed <= 0.009 &&
       inv.documentType === "EARCHIVE" &&
-      this.elogo.refundStrategy(inv.issuedAt) === "CANCEL";
+      this.provider.eArchiveReversalStrategy(inv.issuedAt) === "CANCEL";
 
     if (canCancel) {
       let cancellationOutcomeUnknown = false;
-      const res = await this.elogo
-        .cancelEArchiveInvoice(inv.ettn, inv.elogoRefId ?? undefined)
-        .catch((e: any) => {
+      const res: EInvoiceCancelResult = await this.provider
+        .cancelEArchive({ ettn: inv.ettn, providerRef: inv.elogoRefId })
+        .catch((e: unknown): EInvoiceCancelResult => {
           cancellationOutcomeUnknown = true;
           return {
             success: false,
-            description: String(e?.message),
-          } as any;
+            resultMsg: String((e as Error)?.message),
+          };
         });
       if (res.success) {
         await this.prisma.elogoInvoice.update({
@@ -529,7 +542,7 @@ export class ElogoReversalService {
             status: "cancelled",
             cancelledAt: new Date(),
             cancelReason: "refund",
-            elogoResultMsg: res.description ?? null,
+            elogoResultMsg: res.resultMsg ?? null,
           },
         });
         this.logger.log(`eLogo iptal ${inv.invoiceNumber}: OK`);
@@ -537,19 +550,18 @@ export class ElogoReversalService {
       }
       // Timeout/transport hatasında provider iptali uygulamış olabilir. IADE
       // faturasına düşmeden önce ETTN durumunu sorgula; aksi halde çift ters kayıt olur.
-      const providerStatus = await this.elogo
-        .getDocumentStatus(inv.ettn, "EARCHIVE")
+      const providerStatus = await this.provider
+        .getStatus({ ettn: inv.ettn, providerRef: inv.elogoRefId }, "EARCHIVE")
         .catch(() => null);
-      if (providerStatus?.isCancel) {
+      if (providerStatus?.state === "cancelled") {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
           data: {
             status: "cancelled",
             cancelledAt: new Date(),
             cancelReason: "refund",
-            elogoResultCode: providerStatus.code ?? null,
-            elogoResultMsg:
-              providerStatus.description ?? res.description ?? null,
+            elogoResultCode: providerStatus.resultCode ?? null,
+            elogoResultMsg: providerStatus.resultMsg ?? res.resultMsg ?? null,
           },
         });
         return;
@@ -561,13 +573,13 @@ export class ElogoReversalService {
       }
       // İptal BAŞARISIZ → İADE FATURASINA düş (her durumda reversal garanti; orijinali 'sent' bırak).
       this.logger.warn(
-        `eLogo iptal başarısız (${inv.invoiceNumber}): ${res.description} → iade faturasına düşülüyor`,
+        `eLogo iptal başarısız (${inv.invoiceNumber}): ${res.resultMsg} → iade faturasına düşülüyor`,
       );
       await this.prisma.elogoInvoice.update({
         where: { id: inv.id },
         data: {
           cancelReason: "refund",
-          elogoResultMsg: res.description ?? null,
+          elogoResultMsg: res.resultMsg ?? null,
         },
       });
       // aşağıdaki İADE FATURASI yoluna devam (return yok)
@@ -658,7 +670,7 @@ export class ElogoReversalService {
           });
           if (raced) return raced;
           const number =
-            await this.documents.allocateInvoiceNumberInTransaction(
+            await this.documents.allocateDocumentNumberInTransaction(
               tx,
               invoiceIssueYear(now),
             );
