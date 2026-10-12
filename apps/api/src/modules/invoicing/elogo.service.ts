@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ElogoSoapClient } from "./elogo-soap.client";
+import { eArchiveReversalStrategy } from "./helpers/earchive-reversal-strategy";
 import type {
   ElogoDocumentStatus,
   ElogoDocumentType,
@@ -194,18 +195,12 @@ export class ElogoService {
    * İade durumunda izlenecek yol (mevzuat): fatura tarihinden **≤8 gün** ise e-Arşiv İPTAL,
    * **>8 gün** ise iptal yapılamaz → İADE FATURASI (InvoiceTypeCode=IADE, orijinali referans).
    * Çağıran taraf 'CANCEL' → cancelEArchiveInvoice(), 'RETURN_INVOICE' → sendDocument(IADE UBL) yapar.
+   * Kural sağlayıcıdan bağımsızdır; tek kaynağı `helpers/earchive-reversal-strategy.ts`.
    */
   refundStrategy(
     invoiceIssueDate: Date | string,
     now: Date = new Date(),
   ): "CANCEL" | "RETURN_INVOICE" {
-    const issued =
-      typeof invoiceIssueDate === "string"
-        ? new Date(invoiceIssueDate)
-        : invoiceIssueDate;
-    const daysElapsed = Math.floor(
-      (now.getTime() - issued.getTime()) / (24 * 60 * 60 * 1000),
-    );
-    return daysElapsed <= 8 ? "CANCEL" : "RETURN_INVOICE";
+    return eArchiveReversalStrategy(invoiceIssueDate, now);
   }
 }
