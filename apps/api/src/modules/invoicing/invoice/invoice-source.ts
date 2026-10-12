@@ -68,3 +68,13 @@ export function invoiceTypesOfSourceKind(
 export function reversedInvoiceIdOf(sourceId: string): string {
   return sourceId.split(":")[0];
 }
+
+/**
+ * İade faturası anahtarının iade DENEMESİ kısmı (`<faturaId>:<refundAttemptId>`);
+ * tam iade anahtarında (`<faturaId>`) deneme yoktur → null. Deneme, iade
+ * talebine `refund-request:<id>` idempotency anahtarıyla bağlıdır.
+ */
+export function reversalRefundAttemptIdOf(sourceId: string): string | null {
+  const separator = sourceId.indexOf(":");
+  return separator === -1 ? null : sourceId.slice(separator + 1) || null;
+}

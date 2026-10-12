@@ -1624,18 +1624,33 @@ describe("12 — İade & İptal (REF)", () => {
         201,
       );
 
-      // status[]=wait_for_delivery (dizi param) — DTO @IsArray + @IsEnum each.
+      // İadeler ekranı: kargolanmış ama teslim edilmemiş siparişin ürün iadesi
+      // (wait_for_delivery, deneme yok) "Ürün Bekleniyor" kovasındadır.
       const res = await request(server())
         .get(
-          "/api/admin/refund-requests?status[]=wait_for_delivery&page=1&limit=20",
+          "/api/admin/refund-requests?tab=direct&bucket=awaiting_return&page=1&limit=20",
         )
         .set(authHeader(admin))
         .expect(200);
-      expect(Array.isArray(res.body.items)).toBe(true);
-      expect(res.body.items.length).toBeGreaterThanOrEqual(1);
-      expect(res.body.page).toBe(1);
-      expect(res.body.limit).toBe(20);
-      expect(typeof res.body.total).toBe("number");
+      expect(Array.isArray(res.body.data)).toBe(true);
+      const seeded = res.body.data.find(
+        (row: { order: { id: string } }) => row.order.id === orderId,
+      );
+      expect(seeded).toMatchObject({
+        origin: "direct",
+        kind: "return",
+        status: "wait_for_delivery",
+      });
+      expect(res.body.meta.page).toBe(1);
+      expect(res.body.meta.limit).toBe(20);
+      expect(typeof res.body.meta.total).toBe("number");
+
+      // Sayaçlar listeyle aynı kümeyi sayar.
+      const counts = await request(server())
+        .get("/api/admin/refund-requests/counts?tab=direct")
+        .set(authHeader(admin))
+        .expect(200);
+      expect(counts.body.awaiting_return).toBe(res.body.meta.total);
     });
 
     scenario("REF-101", async () => {

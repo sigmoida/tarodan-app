@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import type { RefundFinancialTotals } from "@tarodan/types";
-import type { RefundTreatmentV2 } from "./refund-financial-policy-v2";
+import type {
+  RefundComponentCodeV2,
+  RefundTreatmentV2,
+} from "./refund-financial-policy-v2";
 
 export type { RefundFinancialTotals };
 
@@ -62,4 +65,46 @@ export function refundComponentTotals(
     platformNet: money(platformRetain.minus(platformRefund)),
     shippingRefund: money(shippingRefund),
   };
+}
+
+/** Satış komisyonu bileşenleri: alıcı + satıcı komisyonu (hizmet bedeli değil). */
+export const SALES_COMMISSION_COMPONENT_CODES = [
+  "buyer_commission",
+  "seller_commission",
+] as const satisfies readonly RefundComponentCodeV2[];
+
+/** Bedelin sahibine geri döndüğü muameleler (alıcıya / satıcıya iade). */
+const RETURNED_TREATMENTS: readonly RefundTreatmentV2[] = [
+  "buyer_refund",
+  "seller_refund",
+];
+
+export interface RefundComponentNetRow {
+  componentCode: string;
+  treatment: string;
+  netAmount: Prisma.Decimal.Value;
+}
+
+/**
+ * İadede GERİ VERİLEN satış komisyonu — KDV HARİÇ (sipariş komisyon kolonları
+ * da KDV hariçtir; oran aynı tabanda okunur). Alıcı komisyonu alıcıya,
+ * satıcı komisyonu satıcıya iade edilen satırların toplamı; politika burada
+ * yeniden çalıştırılmaz, kesinleşmiş bileşen satırları okunur.
+ */
+export function refundedSalesCommissionNet(
+  components: readonly RefundComponentNetRow[],
+): number {
+  return components
+    .filter(
+      (row) =>
+        (SALES_COMMISSION_COMPONENT_CODES as readonly string[]).includes(
+          row.componentCode,
+        ) && (RETURNED_TREATMENTS as readonly string[]).includes(row.treatment),
+    )
+    .reduce(
+      (total, row) => total.plus(new Prisma.Decimal(row.netAmount)),
+      new Prisma.Decimal(0),
+    )
+    .toDecimalPlaces(2)
+    .toNumber();
 }

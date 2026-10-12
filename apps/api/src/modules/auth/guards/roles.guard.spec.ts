@@ -119,6 +119,9 @@ describe("RolesGuard — admin iade yüzeyi URL-segment izin kapısı", () => {
   // [açıklama, method, url]
   const refundSurfaces: Array<[string, string, string]> = [
     ["iade listesi", "GET", "/api/admin/refund-requests"],
+    // İadeler ekranının sayaçları ve Excel'i liste ile aynı izni ister.
+    ["iade sayaçları", "GET", "/api/admin/refund-requests/counts?tab=trade"],
+    ["iade Excel", "GET", "/api/admin/refund-requests/export"],
     ["iade detayı", "GET", "/api/admin/refund-requests/abc"],
     ["force-finalize", "POST", "/api/admin/refund-requests/abc/force-finalize"],
     [

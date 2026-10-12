@@ -85,6 +85,16 @@ export function tradeServiceFeeOf(payment: RefundablePayment): number {
 }
 
 /**
+ * Satırın iadesinde GERİ VERİLEN hizmet bedeli: yalnız kusursuz tarafın tam
+ * iadesinde bedelin tamamı, aksi halde 0 (bedel hiçbir kusurlu iptalde iade
+ * edilmez). `refundableAmountFor` ile aynı karar — admin İadeler ekranı
+ * "iade edilecek komisyon"u buradan okur.
+ */
+export function refundedServiceFeeOf(payment: RefundablePayment): number {
+  return payment.fullRefundEntitled ? tradeServiceFeeOf(payment) : 0;
+}
+
+/**
  * Kargo bedeli iade dışı mı? (yalnız kargoya verildikten sonra, kusurlu tarafta)
  *
  * Karar YALNIZ kusursuzluk bayrağına ve kargo eşiğine bakar; tutarlara değil.
