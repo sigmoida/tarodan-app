@@ -5251,7 +5251,6 @@
         "totalCount": "<value>{count}</value> products total",
         "filteredBySeller": "— Filtering by seller",
         "removeFilter": "Remove filter",
-        "exportCsv": "Download CSV",
         "condition": "Condition",
         "seller": "Seller",
         "sellerId": "Seller ID",
@@ -5670,7 +5669,7 @@
           "generated": "{count} codes generated (total {total})",
           "generateFailed": "Failed to generate codes",
           "rowGenerate": "Generate Codes",
-          "rowExport": "Export Codes (CSV)"
+          "rowExport": "Export Codes (Excel)"
         },
         "targetLabel": "Discounted item",
         "targetHelper": "The product price belongs to the seller; the platform may only discount its own fees.",
@@ -6667,9 +6666,6 @@
         "noUpcomingPayments": "No upcoming payments",
         "historyLoadError": "Transaction history could not be loaded",
         "empty": "No records",
-        "exported": "Exported",
-        "exportFailed": "Export failed",
-        "exportCsv": "Export (CSV)",
         "status": {
           "held": "Held",
           "released": "Released",
@@ -7804,8 +7800,6 @@
         "empty": "No cancellations yet",
         "emptyFiltered": "No cancellations match the filter",
         "export": {
-          "button": "Export to Excel",
-          "truncated": "The file only contains the first {count} rows — narrow the filter",
           "sheetName": "Cancellations",
           "rowNumber": "Row No",
           "origin": "Type",
@@ -8032,10 +8026,6 @@
         "rangeUnparseable": "The dates must be valid",
         "rangeReversed": "The start cannot be after the end",
         "rangeTooLong": "The range can cover at most 366 days"
-      },
-      "export": {
-        "csv": "Download CSV",
-        "xlsx": "Download Excel"
       },
       "notes": {
         "stockElsewhere": "Current-state counts live on the Dashboard.",
@@ -8762,11 +8752,8 @@
       "filterRetentionExpired": "Retention expired",
       "exportTitle": "Monthly filing",
       "exportHint": "Pick a period; the file covers accounts deleted that month.",
-      "exportButton": "Download Excel",
       "exportYear": "Year",
       "exportMonth": "Month",
-      "exported": "Filing file downloaded",
-      "exportFailed": "Could not generate the filing file",
       "retentionNotice": "Records are retained under a legal obligation and cannot be deleted; expired ones can be filtered."
     },
     "roles": {
@@ -9380,8 +9367,7 @@
       "table": {
         "noRecords": "No records found",
         "selectAll": "Select all",
-        "selectRow": "Select row",
-        "exportCsv": "Download CSV"
+        "selectRow": "Select row"
       },
       "timeline": {
         "title": "Timeline"
@@ -9476,6 +9462,13 @@
       "testLane": {
         "badge": "TEST",
         "hint": "Test lane record — paid in PayTR test mode; no charge, shipment or e-invoice, excluded from reports"
+      },
+      "export": {
+        "button": "Export to Excel",
+        "success": "{count} rows downloaded",
+        "successNoCount": "Export downloaded",
+        "truncated": "The first {count} rows were downloaded; narrow the filter",
+        "failed": "Could not download the export"
       }
     },
     "auth": {
@@ -9525,10 +9518,6 @@
       "search": "Search member, email, IP, visitor ID or order no…",
       "empty": "No consent records",
       "outdatedVersion": "outdated",
-      "exportButton": "Download Excel",
-      "exported": "Export downloaded",
-      "exportFailed": "Could not create the export",
-      "exportTruncated": "The file contains the first {count} records; narrow the filter to get the rest.",
       "columns": {
         "createdAt": "Date",
         "document": "Document",
@@ -9601,10 +9590,6 @@
       "totalCount": "{count} listings",
       "search": "Search listing, seller, company, tax number or bank account holder…",
       "empty": "No matching listings",
-      "exportButton": "Download Excel",
-      "exported": "Export downloaded (with full identity numbers)",
-      "exportFailed": "Could not generate the export",
-      "exportTruncated": "The file contains the first {count} listings; narrow the filter for the rest.",
       "noIdentity": "Missing",
       "columns": {
         "publishedAt": "Published",

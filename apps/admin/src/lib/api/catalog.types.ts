@@ -1,8 +1,3 @@
-import type {
-  ListingRemovalActor,
-  ListingRemovalReasonFilter,
-} from "@tarodan/types";
-
 /**
  * `POST /admin/products/:id/reject` gövdesi. `reason` satıcıya giden
  * gerekçedir (kalıcı yazılır); `violationCode` kaldırma kaydının ihlal kodu —
@@ -20,13 +15,4 @@ export interface RejectProductPayload {
 export interface RemoveProductPayload {
   violationCode?: string;
   note?: string;
-}
-
-/** `GET /admin/products-export` filtreleri — listeyle aynı adlar. */
-export interface ProductExportParams {
-  status?: string;
-  categoryId?: string;
-  sellerId?: string;
-  removalReason?: ListingRemovalReasonFilter;
-  removalActor?: ListingRemovalActor;
 }

@@ -130,7 +130,6 @@ export const refundRequestColumns = (t: T) => [
       minWidth: 150,
       sortKey: "amount",
       sortType: "number",
-      exportValue: (r) => `${r.amount} / ${r.refundedSellerFeeAmount ?? 0}`,
     },
   ),
   col.text<RefundRequestRow>(

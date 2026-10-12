@@ -48,7 +48,6 @@ export function reportColumns({ t }: { t: T }) {
         minWidth: 320,
         sortKey: "description",
         sortType: "text",
-        exportValue: (r) => r.description ?? "",
       },
     ),
     col.user<Report>(

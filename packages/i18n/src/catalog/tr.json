@@ -5251,7 +5251,6 @@
         "totalCount": "Toplam <value>{count}</value> ürün",
         "filteredBySeller": "— Satıcıya göre filtreleniyor",
         "removeFilter": "Filtreyi kaldır",
-        "exportCsv": "CSV İndir",
         "condition": "Kondisyon",
         "seller": "Satıcı",
         "sellerId": "Satıcı ID",
@@ -5670,7 +5669,7 @@
           "generated": "{count} kod üretildi (toplam {total})",
           "generateFailed": "Kod üretilemedi",
           "rowGenerate": "Kod Üret",
-          "rowExport": "Kodları İndir (CSV)"
+          "rowExport": "Kodları İndir (Excel)"
         },
         "targetLabel": "İndirilecek Kalem",
         "targetHelper": "Ürün fiyatı satıcıya aittir; platform yalnız kendi bedellerinden indirim yapabilir.",
@@ -6667,9 +6666,6 @@
         "noUpcomingPayments": "Yaklaşan ödeme yok",
         "historyLoadError": "İşlem geçmişi yüklenemedi",
         "empty": "Kayıt yok",
-        "exported": "Dışa aktarıldı",
-        "exportFailed": "Dışa aktarma başarısız",
-        "exportCsv": "Dışa Aktar (CSV)",
         "status": {
           "held": "Tutuluyor",
           "released": "Serbest Bırakıldı",
@@ -7804,8 +7800,6 @@
         "empty": "Henüz iptal yok",
         "emptyFiltered": "Filtreye uygun iptal bulunamadı",
         "export": {
-          "button": "Excel'e aktar",
-          "truncated": "Dosya yalnız ilk {count} satırı içeriyor — filtreyi daraltın",
           "sheetName": "İptaller",
           "rowNumber": "Satır No",
           "origin": "Tür",
@@ -8032,10 +8026,6 @@
         "rangeUnparseable": "Tarihler geçerli olmalı",
         "rangeReversed": "Başlangıç, bitişten sonra olamaz",
         "rangeTooLong": "Aralık en fazla 366 gün olabilir"
-      },
-      "export": {
-        "csv": "CSV İndir",
-        "xlsx": "Excel İndir"
       },
       "notes": {
         "stockElsewhere": "Anlık durum sayıları Kontrol Paneli'nde.",
@@ -8762,11 +8752,8 @@
       "filterRetentionExpired": "Saklama süresi dolmuş",
       "exportTitle": "Aylık bildirim",
       "exportHint": "Dönem seçin; dosya o ay silinen hesapları içerir.",
-      "exportButton": "Excel İndir",
       "exportYear": "Yıl",
       "exportMonth": "Ay",
-      "exported": "Bildirim dosyası indirildi",
-      "exportFailed": "Bildirim dosyası oluşturulamadı",
       "retentionNotice": "Kayıtlar hukuki yükümlülük gereği saklanır ve silinemez; saklama süresi dolanlar filtreyle listelenir."
     },
     "roles": {
@@ -9380,8 +9367,7 @@
       "table": {
         "noRecords": "Kayıt bulunamadı",
         "selectAll": "Tümünü seç",
-        "selectRow": "Satırı seç",
-        "exportCsv": "CSV İndir"
+        "selectRow": "Satırı seç"
       },
       "timeline": {
         "title": "Zaman Çizelgesi"
@@ -9476,6 +9462,13 @@
       "testLane": {
         "badge": "TEST",
         "hint": "Test şeridi kaydı — PayTR test modunda ödendi; tahsilat, kargo ve e-fatura yok, raporlara girmez"
+      },
+      "export": {
+        "button": "Excel'e aktar",
+        "success": "{count} satır indirildi",
+        "successNoCount": "Döküm indirildi",
+        "truncated": "İlk {count} satır indirildi; filtreyi daraltın",
+        "failed": "Döküm indirilemedi"
       }
     },
     "auth": {
@@ -9525,10 +9518,6 @@
       "search": "Üye, e-posta, IP, ziyaretçi kimliği veya sipariş no ara…",
       "empty": "Onay kaydı yok",
       "outdatedVersion": "eski sürüm",
-      "exportButton": "Excel İndir",
-      "exported": "Döküm indirildi",
-      "exportFailed": "Döküm oluşturulamadı",
-      "exportTruncated": "Dosya ilk {count} kaydı içeriyor; tamamı için filtreyi daraltın.",
       "columns": {
         "createdAt": "Tarih",
         "document": "Belge",
@@ -9601,10 +9590,6 @@
       "totalCount": "{count} ilan",
       "search": "İlan, satıcı, firma, vergi no veya banka hesabı sahibi ara…",
       "empty": "Eşleşen ilan yok",
-      "exportButton": "Excel İndir",
-      "exported": "Döküm indirildi (tam kimlik numaralarıyla)",
-      "exportFailed": "Döküm oluşturulamadı",
-      "exportTruncated": "Dosya ilk {count} ilanı içeriyor; tamamı için filtreyi daraltın.",
       "noIdentity": "Yok",
       "columns": {
         "publishedAt": "Yayın tarihi",

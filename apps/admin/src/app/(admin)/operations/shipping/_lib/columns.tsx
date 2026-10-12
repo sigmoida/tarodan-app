@@ -66,7 +66,6 @@ export const physicalShipmentColumns = (t: T) => [
       minWidth: 230,
       sortKey: "order.orderNumber",
       sortType: "text",
-      exportValue: (row) => parcelLabel(row),
     },
   ),
   col.user<PhysicalShipmentRow>(

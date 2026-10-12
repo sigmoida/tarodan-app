@@ -18,7 +18,6 @@ import {
   rowDetailHref,
   rowSingleLine,
   sellerSlots,
-  sellerSlotsExport,
 } from "./rowView";
 
 const line = (orderId: string) => ({ orderId }) as AdminOrderLine;
@@ -199,18 +198,6 @@ describe("sellerSlots (Satıcı column)", () => {
       { key: "of1", seller: party("s9"), packageNumber: null },
     ]);
     expect(sellerSlots({ packages: [], offer: null })).toEqual([]);
-  });
-
-  it("exports one 'seller PKG' entry per line", () => {
-    expect(
-      sellerSlotsExport({
-        offer: null,
-        packages: [
-          sellerPkg("p1", "s1", "PKG-1", [line("o1"), line("o2")]),
-          sellerPkg("p2", "s2", null, [line("o3")]),
-        ],
-      }),
-    ).toBe("name-s1 PKG-1 | name-s1 PKG-1 | name-s2");
   });
 });
 
