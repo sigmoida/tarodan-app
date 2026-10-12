@@ -213,6 +213,11 @@ offset payouts are recorded as `skipped` with a reason, never sent.
   re-queued. Connection failures that never reached Netsis (refused, DNS,
   unreachable, connect timeout, session lock, integration off) do not consume
   the budget (`netsis-sync-failure-policy.ts`).
+- **Stub mode caveat:** `NETSIS_MODE=stub` keeps an in-memory store per
+  process. The worker that posts accounting records does not see slips or
+  caris created by the web process, so collections fail with "slip not found"
+  and payouts to a cari fail validation. Keep `netsis.accounting.enabled` off
+  on stub environments unless you are testing exactly this.
 - **Budget:** 8 attempts; configuration problems (missing account, invalid
   corporate code, auth) exhaust it at once. Missing required accounts stop the
   whole run instead (nothing is attempted, no budget burnt).
