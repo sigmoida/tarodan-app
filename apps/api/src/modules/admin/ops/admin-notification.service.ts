@@ -36,6 +36,8 @@ import {
   newsletterUnsubscribeUrl,
 } from "../../../common/helpers/broadcast-email";
 import { DEFAULT_MAILING_TYPE, type MailingType } from "@tarodan/types";
+import { MediaService, type UploadResult } from "../../media/media.service";
+import { NOTIFICATION_IMAGE_UPLOAD } from "./notification-image-upload.constants";
 
 /** Yayının hedef + e-posta alanları; anında ve zamanlanmış gönderim ortak kullanır. */
 export interface AdminBroadcastInput {
@@ -88,7 +90,21 @@ export class AdminNotificationService {
     private readonly eventService: EventService,
     private readonly audit: AdminAuditService,
     private readonly newsletter: NewsletterService,
+    private readonly media: MediaService,
   ) {}
+
+  /**
+   * Bildirim görseli yükler (`file` multipart alanı). Yalnız jpeg/png/webp,
+   * en çok 5 MB; public URL döner — gönderim formu onu bildirime yazar.
+   */
+  async uploadImage(
+    file: Express.Multer.File | undefined,
+  ): Promise<UploadResult> {
+    if (!file) {
+      throw new BadRequestException(i18nMessage("server.admin.fileMissing"));
+    }
+    return this.media.upload(file, NOTIFICATION_IMAGE_UPLOAD);
+  }
 
   /**
    * E-posta alanlarını normalleştirir. HTML SUNUCUDA süzülür (istemciye

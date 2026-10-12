@@ -24,6 +24,7 @@ import {
 } from "../dto/admin-notification.dto";
 
 import { FileInterceptor } from "@nestjs/platform-express";
+import { UPLOAD_MULTER_OPTIONS } from "../../../common/upload/multer-options";
 import {
   ApiTags,
   ApiOperation,
@@ -169,6 +170,28 @@ export class AdminNotificationController {
   @ApiResponse({ status: HttpStatus.OK, description: "Rendered email" })
   previewBroadcastEmail(@Body() body: PreviewBroadcastEmailDto) {
     return this.adminService.previewBroadcastEmail(body);
+  }
+
+  @Post("notifications/upload")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @UseInterceptors(FileInterceptor("file", UPLOAD_MULTER_OPTIONS))
+  @ApiOperation({
+    summary:
+      "Upload a notification image (multipart field `file`, jpeg/png/webp, 5 MB; needs only the `notifications` permission)",
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Returns { url, key, … } — put `url` into the notification",
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description: "S3_PUBLIC_BASE_URL is not configured",
+  })
+  // URL segmenti `notifications` → izin matrisinde `notifications`: bildirim
+  // izni olan rol görsel yükler, ürün (`media` → `products`) yüklemesine
+  // erişmeden.
+  async uploadNotificationImage(@UploadedFile() file?: Express.Multer.File) {
+    return this.adminService.uploadNotificationImage(file);
   }
 
   @Post("notifications/audience-count")

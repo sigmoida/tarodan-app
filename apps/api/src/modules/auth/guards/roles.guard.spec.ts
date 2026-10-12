@@ -363,3 +363,66 @@ describe("RolesGuard — reklam görseli yükleme izni", () => {
     expect(PERMISSION_MAP.media).toEqual(["products"]);
   });
 });
+
+/**
+ * Bildirim görseli `POST /admin/notifications/upload` ile `notifications`
+ * izniyle yüklenir — reklam yüklemesiyle aynı desen: ürün (`media` →
+ * `products`) yüklemesine erişim gerekmez, verilmez de.
+ */
+describe("RolesGuard — bildirim görseli yükleme izni", () => {
+  const makeGuard = (permissions: string[]) => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn().mockResolvedValue({
+          settingValue: JSON.stringify({ moderator: permissions }),
+        }),
+      },
+    } as any;
+    const guard = new RolesGuard(new Reflector(), prisma);
+    jest
+      .spyOn((guard as any).reflector as Reflector, "getAllAndOverride")
+      .mockImplementation((key: any, targets: any[]) =>
+        key === ROLES_KEY ? targets[0]?.[ROLES_KEY] : undefined,
+      );
+    return guard;
+  };
+
+  const ctx = (originalUrl: string): ExecutionContext => {
+    const req = {
+      user: { isAdmin: true, role: "moderator" },
+      method: "POST",
+      originalUrl,
+    };
+    const handler = () => undefined;
+    (handler as any)[ROLES_KEY] = ["super_admin", "admin", "moderator"];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  it("izin haritası: notifications → notifications", () => {
+    expect(PERMISSION_MAP.notifications).toEqual(["notifications"]);
+  });
+
+  it("yalnız notifications izni → POST /api/admin/notifications/upload izinli", async () => {
+    await expect(
+      makeGuard(["notifications"]).canActivate(
+        ctx("/api/admin/notifications/upload"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("yalnız notifications izni → POST /api/admin/media/upload 403", async () => {
+    await expect(
+      makeGuard(["notifications"]).canActivate(ctx("/api/admin/media/upload")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("notifications izni yoksa (yalnız ads) → bildirim yüklemesi 403", async () => {
+    await expect(
+      makeGuard(["ads"]).canActivate(ctx("/api/admin/notifications/upload")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
