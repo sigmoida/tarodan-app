@@ -4,6 +4,7 @@ import {
   upcomingHoldsWhere,
 } from "./finance-health.where";
 import { LIVE_PAYMENT } from "../../account-lane/live-lane.where";
+import { HOLD_RELEASE_ORDER_SELECT } from "../../payout/helpers/hold-release-eligibility";
 
 /**
  * Hold listelerinin dashboard ile paylaştığı kümeler: "süresi geçmiş" süzgeci
@@ -91,6 +92,94 @@ describe("AdminPayoutService — hold sets shared with the dashboard", () => {
     expect(paymentHold.findMany.mock.calls[0][0].where).toMatchObject({
       payment: LIVE_PAYMENT,
       status: "held",
+    });
+  });
+});
+
+describe("AdminPayoutService.getPayoutsTransactions — releasability flags", () => {
+  const PAST = new Date("2026-10-01T09:00:00.000Z");
+  const holdRow = (id: string, orderId: string, extra = {}) => ({
+    id,
+    orderId,
+    sellerId: "s1",
+    seller: { displayName: "Satıcı", email: "s@x.test" },
+    payment: { paidAt: PAST },
+    amount: 420,
+    refundedAmount: 395,
+    frozenByRefundId: null,
+    status: "held",
+    releaseAt: PAST,
+    releasedAt: null,
+    createdAt: PAST,
+    ...extra,
+  });
+
+  it("flags each row with the SAME predicate the release uses, plus the order status", async () => {
+    const paymentHold = {
+      findMany: jest.fn().mockResolvedValue([
+        holdRow("h-buyer", "o-buyer"),
+        holdRow("h-seller", "o-seller"),
+        holdRow("h-frozen", "o-delivered", {
+          refundedAmount: 0,
+          frozenByRefundId: "rr-1",
+        }),
+        holdRow("h-orphan", "o-missing"),
+      ]),
+      count: jest.fn().mockResolvedValue(4),
+    };
+    const order = {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "o-buyer",
+          orderNumber: "ORD-1",
+          status: "cancelled",
+          refundRequests: [
+            { status: "refunded", faultParty: "buyer", policyCode: "v2" },
+          ],
+        },
+        {
+          id: "o-seller",
+          orderNumber: "ORD-2",
+          status: "refunded",
+          refundRequests: [
+            { status: "refunded", faultParty: "seller", policyCode: "v2" },
+          ],
+        },
+        {
+          id: "o-delivered",
+          orderNumber: "ORD-3",
+          status: "delivered",
+          refundRequests: [],
+        },
+      ]),
+    };
+    const service = new AdminPayoutService(
+      { paymentHold, order } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    const { data } = await service.getPayoutsTransactions({} as any);
+    const flags = Object.fromEntries(
+      data.map((row) => [
+        row.id,
+        [row.releasable, row.releaseBlockedReason, row.orderStatus],
+      ]),
+    );
+
+    expect(flags).toEqual({
+      "h-buyer": [true, null, "cancelled"],
+      "h-seller": [false, "seller_at_fault", "refunded"],
+      "h-frozen": [false, "frozen", "delivered"],
+      "h-orphan": [false, "order_not_terminal", null],
+    });
+    // the order is read with the predicate's own select
+    expect(order.findMany.mock.calls[0][0].select).toMatchObject({
+      id: true,
+      orderNumber: true,
+      ...HOLD_RELEASE_ORDER_SELECT,
     });
   });
 });

@@ -10709,6 +10709,13 @@
       "groupOrderItemNotAwaitingPayment": "The \"{item}\" order in the group is not awaiting payment. Please recreate the cart.",
       "groupOrderNotAwaitingPayment": "An order in the group is not awaiting payment. Please recreate the cart.",
       "holdNotReleasable": "No releasable payment was found (it may be frozen due to an open refund)",
+      "holdReleaseBlocked": {
+        "alreadyReleased": "Nothing is left to release on this payment (already released or consumed by a refund)",
+        "frozen": "The payment is frozen by an open refund and cannot be released until the refund settles",
+        "notDue": "The payment's release date has not come yet",
+        "orderNotTerminal": "The order is not in a state that allows releasing the payment",
+        "sellerAtFault": "The seller was at fault in the refund/cancellation, so the remaining amount is not paid to the seller"
+      },
       "installmentInfoFetchFailed": "Installment information could not be fetched",
       "installmentInfoUnavailable": "Installment information could not be retrieved",
       "installmentResponseInvalid": "The PayTR installment response is invalid or empty",

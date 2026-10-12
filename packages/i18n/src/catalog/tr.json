@@ -10709,6 +10709,13 @@
       "groupOrderItemNotAwaitingPayment": "Gruptaki \"{item}\" siparişi ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.",
       "groupOrderNotAwaitingPayment": "Gruptaki bir sipariş ödeme beklemiyor. Lütfen sepeti yeniden oluşturun.",
       "holdNotReleasable": "Serbest bırakılabilir ödeme bulunamadı (açık iade nedeniyle dondurulmuş olabilir)",
+      "holdReleaseBlocked": {
+        "alreadyReleased": "Bu ödemede serbest bırakılacak tutar kalmadı (bırakıldı ya da iadeyle tükendi)",
+        "frozen": "Ödeme açık bir iade nedeniyle dondurulmuş; iade sonuçlanmadan serbest bırakılamaz",
+        "notDue": "Ödemenin serbest bırakma tarihi henüz gelmedi",
+        "orderNotTerminal": "Sipariş, ödemenin serbest bırakılabileceği bir durumda değil",
+        "sellerAtFault": "İade/iptalde kusur satıcıda olduğu için kalan tutar satıcıya ödenmez"
+      },
       "installmentInfoFetchFailed": "Taksit bilgisi alınamadı",
       "installmentInfoUnavailable": "Taksit bilgileri alınamadı",
       "installmentResponseInvalid": "PayTR taksit yanıtı geçersiz/boş",

@@ -32,6 +32,10 @@ import { paginate, resolveOrderBy } from "../../../common/list";
 import { generatePayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { i18nMessage } from "../../i18n";
 import { earlyReleaseDays } from "@tarodan/types";
+import {
+  HOLD_RELEASE_ORDER_SELECT,
+  holdReleasabilityOf,
+} from "../../payout/helpers/hold-release-eligibility";
 
 /**
  * Satıcı ödemeleri (escrow özet/işlem/plan/CSV, manuel release, transfer retry) —
@@ -500,32 +504,39 @@ export class AdminPayoutService {
     );
     const holds = result.data;
 
+    // Sipariş, bırakma yüklemiyle AYNI seçimle okunur: liste rozeti ile
+    // gerçek bırakma kararı aynı gerçekten türer.
     const orders = await this.prisma.order.findMany({
       where: { id: { in: holds.map((h) => h.orderId) } },
-      select: { id: true, orderNumber: true },
+      select: { id: true, orderNumber: true, ...HOLD_RELEASE_ORDER_SELECT },
     });
     const orderMap = new Map(orders.map((o) => [o.id, o]));
+    const now = new Date();
 
     return {
       ...result,
-      data: holds.map((h) => ({
-        id: h.id,
-        orderId: h.orderId,
-        orderNumber: orderMap.get(h.orderId)?.orderNumber ?? "-",
-        sellerId: h.sellerId,
-        sellerName: h.seller.displayName ?? h.seller.email,
-        sellerEmail: h.seller.email,
-        amount: Number(h.amount),
-        // Kısmi iadede tüketilen pay — net ödenecek = amount - refundedAmount.
-        refundedAmount: Number(h.refundedAmount ?? 0),
-        // GERÇEK iade kilidi — UI neden rozetini bununla üretir (uydurma yok).
-        frozenByRefundId: h.frozenByRefundId ?? null,
-        status: h.status,
-        releaseAt: h.releaseAt,
-        releasedAt: h.releasedAt,
-        paidAt: h.payment?.paidAt,
-        createdAt: h.createdAt,
-      })),
+      data: holds.map((h) => {
+        const order = orderMap.get(h.orderId);
+        return {
+          id: h.id,
+          orderId: h.orderId,
+          orderNumber: order?.orderNumber ?? "-",
+          sellerId: h.sellerId,
+          sellerName: h.seller.displayName ?? h.seller.email,
+          sellerEmail: h.seller.email,
+          amount: Number(h.amount),
+          // Kısmi iadede tüketilen pay — net ödenecek = amount - refundedAmount.
+          refundedAmount: Number(h.refundedAmount ?? 0),
+          // GERÇEK iade kilidi — UI neden rozetini bununla üretir (uydurma yok).
+          frozenByRefundId: h.frozenByRefundId ?? null,
+          status: h.status,
+          releaseAt: h.releaseAt,
+          releasedAt: h.releasedAt,
+          paidAt: h.payment?.paidAt,
+          createdAt: h.createdAt,
+          ...holdReleasabilityOf(h, order ?? null, now),
+        };
+      }),
     };
   }
 
