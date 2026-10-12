@@ -162,13 +162,13 @@ describe("resolveIdentityFields", () => {
       recipientStreet: null,
     };
 
-    const vkn = resolveIdentityFields({ user: baseUser, elogoInvoice: elogo });
+    const vkn = resolveIdentityFields({ user: baseUser, fiscalInvoice: elogo });
     expect(vkn.values.taxId).toBe("1234567890");
     expect(vkn.values.nationalId).toBeNull();
 
     const tckn = resolveIdentityFields({
       user: baseUser,
-      elogoInvoice: { ...elogo, recipientVknTckn: "12345678901" },
+      fiscalInvoice: { ...elogo, recipientVknTckn: "12345678901" },
     });
     expect(tckn.values.nationalId).toBe("12345678901");
     expect(tckn.values.taxId).toBeNull();

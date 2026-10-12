@@ -477,7 +477,7 @@ export class PaymentTradeRefundService {
             // dolayısıyla gerekçe geçersiz. Ayrıca kusursuz tarafın tam iadesi
             // (fullRefundEntitled) hizmet bedelini de geri veriyor; o belge de
             // ayakta bırakılamaz. Hangi belgenin ne kadar terslendiğine
-            // ElogoReversalService karar verir (iade politikasını okur); burası
+            // InvoiceReversalService karar verir (iade politikasını okur); burası
             // yalnız "para geri döndü" sinyalini dayanıklı biçimde iletir.
             if (this.outbox) {
               await this.outbox.enqueue(tx, {

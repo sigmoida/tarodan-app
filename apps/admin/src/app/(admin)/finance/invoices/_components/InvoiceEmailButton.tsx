@@ -6,7 +6,7 @@ import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { fmtDate } from "@/lib/format";
-import { ELOGO_INVOICE_LIST_RESOURCES, type Invoice } from "../_lib/types";
+import { FISCAL_INVOICE_LIST_RESOURCES, type Invoice } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
 /**
@@ -22,7 +22,7 @@ export function InvoiceEmailButton({ invoice }: { invoice: Invoice }) {
   const confirm = useConfirm();
   const send = useAdminMutation((id: string) => adminApi.emailInvoice(id), {
     // Gönderim tarihi satırda yazıyor; her sekmenin listesi tazelenmeli.
-    invalidates: ELOGO_INVOICE_LIST_RESOURCES,
+    invalidates: FISCAL_INVOICE_LIST_RESOURCES,
     successMessage: t("admin.finance.invoices.emailSent", {
       email: invoice.recipientEmail ?? invoice.recipientName ?? "",
     }),

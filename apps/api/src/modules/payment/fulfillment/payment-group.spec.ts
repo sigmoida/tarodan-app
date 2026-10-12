@@ -31,7 +31,7 @@ import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { EventService } from "../../events";
 import { InvoiceService } from "../../invoice/invoice.service";
-import { ElogoInvoicingService } from "../../elogo";
+import { InvoicingService } from "../../invoicing";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { NotificationService } from "../../notification/notification.service";
 import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
@@ -235,7 +235,7 @@ describe("PaymentService group payment (checkout group)", () => {
           },
         },
         {
-          provide: ElogoInvoicingService,
+          provide: InvoicingService,
           useValue: {
             issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
             issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),

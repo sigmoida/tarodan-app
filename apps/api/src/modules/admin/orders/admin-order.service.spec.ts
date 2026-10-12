@@ -72,7 +72,7 @@ function makePrisma() {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
+    fiscalInvoice: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((queries: unknown[]) =>
       Promise.all(queries as Promise<number>[]),
     ),
@@ -270,7 +270,7 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
         lineRow({ id: "o2", packageId: "p1" }),
         lineRow({ id: "o3", packageId: "p2" }),
       ]);
-    prisma.elogoInvoice.findMany.mockResolvedValue([
+    prisma.fiscalInvoice.findMany.mockResolvedValue([
       {
         id: "i1",
         type: "seller_commission",
@@ -285,8 +285,8 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
 
     const result = await service.getOrders({});
 
-    expect(prisma.elogoInvoice.findMany).toHaveBeenCalledTimes(1);
-    const where = prisma.elogoInvoice.findMany.mock.calls[0][0].where;
+    expect(prisma.fiscalInvoice.findMany).toHaveBeenCalledTimes(1);
+    const where = prisma.fiscalInvoice.findMany.mock.calls[0][0].where;
     expect([...where.sourceId.in].sort()).toEqual(
       ["o1", "o2", "o3", "p1", "p2"].sort(),
     );
@@ -300,7 +300,7 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
     const result = await service.getOrders({ tab: "all", bucket: "other" });
     expect(result.data).toEqual([]);
     expect(prisma.order.findMany).toHaveBeenCalledTimes(1);
-    expect(prisma.elogoInvoice.findMany).not.toHaveBeenCalled();
+    expect(prisma.fiscalInvoice.findMany).not.toHaveBeenCalled();
   });
 });
 

@@ -120,7 +120,7 @@ export function invoiceRecordReference(
  */
 export const EXTERNAL_CODE_FORMATS = {
   /** e-Arşiv/e-Fatura numarası: GİB zorunlu 16 karakter, önek ELOGO_INVOICE_PREFIX (varsayılan "TRD") */
-  elogoInvoice: "TRD2026000000001",
+  fiscalInvoice: "TRD2026000000001",
   /** Tarodan iç fatura (PDF) numarası: aylık sıralı belge numarası */
   internalInvoice: "SPR-202607-000001",
 } as const;

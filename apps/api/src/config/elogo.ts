@@ -1,7 +1,7 @@
 /**
  * eLogo belge numarası öneki — TEK kaynak.
  *
- * Önek `ElogoDocumentService` tarafından `ConfigService` üzerinden okunur
+ * Önek `InvoiceDocumentService` tarafından `ConfigService` üzerinden okunur
  * (testler sahte config verir); DI dışındaki bakım script'leri ise buradaki
  * düz accessor'ı kullanır. İkisi de aynı varsayılana düşer, böylece bir
  * script'in saydığı sayaç ile runtime'ın ilerlettiği sayaç hiç ayrışmaz.

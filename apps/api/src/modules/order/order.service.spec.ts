@@ -23,7 +23,7 @@ import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { ProductLockService } from "../product/lock/product-lock.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { TaxService } from "../tax/tax.service";
-import { ElogoInvoicingService } from "../elogo";
+import { InvoicingService } from "../invoicing";
 import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
@@ -168,7 +168,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
         OrderQueryService,
         OrderLifecycleService,
         {
-          provide: ElogoInvoicingService,
+          provide: InvoicingService,
           useValue: {
             issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
             issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
@@ -361,7 +361,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
         OrderCommonService,
         OrderQueryService,
         OrderLifecycleService,
-        { provide: ElogoInvoicingService, useValue: {} },
+        { provide: InvoicingService, useValue: {} },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventService, useValue: {} },
         { provide: CacheService, useValue: {} },

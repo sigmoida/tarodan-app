@@ -8,16 +8,16 @@ import {
   OrderStatus,
   TradeStatus,
   PaymentStatus,
-  type ElogoInvoiceType,
+  type FiscalInvoiceType,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { LIVE_ORDER } from "../../account-lane/live-lane.where";
 import { OrderService } from "../order.service";
-import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
+import { InvoicingService } from "../../invoicing/invoicing.service";
 import {
   LEGACY_PACKAGE_FEE_INVOICE_TYPES,
   PACKAGE_FEE_INVOICE_TYPES,
-} from "../../elogo/invoice/package-fee-components";
+} from "../../invoicing/invoice/package-fee-components";
 import { resolveTimingValue } from "../../../common/timing-rules";
 import { SellerInvoiceService } from "../invoice/seller-invoice.service";
 import { NotificationService } from "../../notification/notification.service";
@@ -44,7 +44,7 @@ export class OrderSchedulerService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly orderService: OrderService,
     private readonly configService: ConfigService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly invoicing: InvoicingService,
     private readonly sellerInvoice: SellerInvoiceService,
     private readonly notificationService: NotificationService,
     private readonly cache: CacheService,
@@ -417,7 +417,7 @@ export class OrderSchedulerService implements OnModuleInit {
     // her turda boşa yeniden işlenip yanıltıcı "yeniFatura" sayacı üretiyorlardı; onları eleriz.
     const delivered = await this.prisma.order.findMany({
       where: {
-        // Test şeridi siparişine eLogo belgesi hiç kesilmez (ElogoDeliveryService
+        // Test şeridi siparişine eLogo belgesi hiç kesilmez (InvoiceDeliveryService
         // kapısı); aday kümesinde kalsaydı her tur boşa denenir ve take:500
         // penceresinde canlı teslimatların yerini tutardı.
         ...LIVE_ORDER,
@@ -456,7 +456,7 @@ export class OrderSchedulerService implements OnModuleInit {
       // Ücret belgeleri PAKET anahtarlı, platform satışı SİPARİŞ anahtarlıdır.
       // İki anahtar da sorulmazsa "zaten faturalanmış" testi hiç tutmaz ve her
       // tur boşa fatura denemesi yapılır.
-      const invSources = await this.prisma.elogoInvoice.findMany({
+      const invSources = await this.prisma.fiscalInvoice.findMany({
         where: {
           sourceId: {
             in: [
@@ -471,7 +471,7 @@ export class OrderSchedulerService implements OnModuleInit {
               ...PACKAGE_FEE_INVOICE_TYPES,
               ...LEGACY_PACKAGE_FEE_INVOICE_TYPES,
               "platform_sale",
-            ] as ElogoInvoiceType[],
+            ] as FiscalInvoiceType[],
           },
         },
         select: { sourceId: true, type: true },
@@ -485,7 +485,7 @@ export class OrderSchedulerService implements OnModuleInit {
         const feeSourceId = o.packageId ?? o.id;
         const ledger = o.commissionLedger;
         // Ücret belgeleri İKİ NESİLDEN biriyle kesilir ve nesil seçimi
-        // ElogoIssuingService.issuePackageFeeInvoices'taki kuralın AYNISIDIR:
+        // InvoiceIssuingService.issuePackageFeeInvoices'taki kuralın AYNISIDIR:
         // birleşik belge zaten varsa ya da defterde kalem kırılımı yoksa eski
         // nesil, aksi halde hizmet başına. İki nesli "biri tamsa tamam" diye
         // OR'lamak sessiz bir kayıp üretiyordu: kırılımı olmayan defterde altı
@@ -628,7 +628,7 @@ export class OrderSchedulerService implements OnModuleInit {
       // bakmak satırı sonsuza dek faturalanmış sayar ve kargo belgesi hiç
       // doğmazdı.
       const invoicedTypes = new Map<string, Set<string>>();
-      for (const inv of await this.prisma.elogoInvoice.findMany({
+      for (const inv of await this.prisma.fiscalInvoice.findMany({
         where: {
           sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
           // v1 komisyon / v2 hizmet bedeli + ayrı kesilen kargo belgesi.
@@ -656,7 +656,7 @@ export class OrderSchedulerService implements OnModuleInit {
           !!types?.has("trade_shipping");
         if (feeInvoiced && shippingInvoiced) continue;
         try {
-          await this.elogoInvoicing.issueTradeCashFeeInvoice(c.id);
+          await this.invoicing.issueTradeCashFeeInvoice(c.id);
           tradeInvoiced++;
         } catch (e: any) {
           this.logger.warn(

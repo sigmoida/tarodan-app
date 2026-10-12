@@ -1,17 +1,18 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type {
-  ElogoInvoiceContext,
-  ElogoInvoiceType,
+  EInvoiceProviderName,
+  FiscalInvoiceContext,
+  FiscalInvoiceType,
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
-import { invoiceDescriptionOf } from "../../elogo/invoice/invoice-line-description";
-import { readInvoiceLineItems } from "../../elogo/invoice/invoice-lines";
+import { invoiceDescriptionOf } from "../../invoicing/invoice/invoice-line-description";
+import { readInvoiceLineItems } from "../../invoicing/invoice/invoice-lines";
 import {
   invoiceSourceKindOf,
   reversedInvoiceIdOf,
-} from "../../elogo/invoice/invoice-source";
+} from "../../invoicing/invoice/invoice-source";
 
 /** Belgenin üzerindeki tek kalem (çok kalemli belgede birden fazla). */
 export interface InvoiceDetailLine {
@@ -39,11 +40,13 @@ export interface InvoiceSourceRow {
 
 export interface InvoiceDetailData {
   invoiceNumber: string;
-  type: ElogoInvoiceType;
+  type: FiscalInvoiceType;
   description: string;
   documentType: string;
   status: string;
-  context: ElogoInvoiceContext | null;
+  /** Belgeyi kesen e-belge sağlayıcısı. */
+  provider: EInvoiceProviderName;
+  context: FiscalInvoiceContext | null;
   ettn: string | null;
   sourceReference: string | null;
   billingReference: string | null;
@@ -90,7 +93,7 @@ export class InvoiceDetailService {
   constructor(private readonly prisma: PrismaService) {}
 
   async build(invoiceId: string): Promise<InvoiceDetailData> {
-    const invoice = await this.prisma.elogoInvoice.findUnique({
+    const invoice = await this.prisma.fiscalInvoice.findUnique({
       where: { id: invoiceId },
       select: {
         id: true,
@@ -101,6 +104,7 @@ export class InvoiceDetailService {
         lineItems: true,
         documentType: true,
         status: true,
+        provider: true,
         context: true,
         ettn: true,
         invoiceNumber: true,
@@ -136,6 +140,7 @@ export class InvoiceDetailService {
       description,
       documentType: invoice.documentType,
       status: invoice.status,
+      provider: invoice.provider,
       context: invoice.context,
       ettn: invoice.ettn,
       sourceReference: invoice.sourceReference,
@@ -221,7 +226,7 @@ export class InvoiceDetailService {
    * eşlemedir — taraf çözümü "kim", burası "ne" sorusunu cevaplar.
    */
   private async buildSource(
-    type: ElogoInvoiceType,
+    type: FiscalInvoiceType,
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
     switch (invoiceSourceKindOf(type)) {
@@ -244,7 +249,7 @@ export class InvoiceDetailService {
   private async sourceOfReversedInvoice(
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
-    const original = await this.prisma.elogoInvoice.findUnique({
+    const original = await this.prisma.fiscalInvoice.findUnique({
       where: { id: reversedInvoiceIdOf(sourceId) },
       select: { type: true, sourceId: true },
     });

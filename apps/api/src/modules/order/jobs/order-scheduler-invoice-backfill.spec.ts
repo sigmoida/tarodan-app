@@ -32,7 +32,7 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
         update: jest.fn().mockResolvedValue({}),
         count: jest.fn().mockResolvedValue(0),
       },
-      elogoInvoice: {
+      fiscalInvoice: {
         // Beklenen her iki fatura türü de mevcut → sipariş tam faturalı.
         findMany: jest.fn().mockResolvedValue(invoices),
       },

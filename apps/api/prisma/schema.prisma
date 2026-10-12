@@ -89,8 +89,8 @@ model User {
   sellerOffers            Offer[]                  @relation("SellerOffers")
   buyerOrders             Order[]                  @relation("BuyerOrders")
   sellerOrders            Order[]                  @relation("SellerOrders")
-  elogoInvoicesAsSeller   ElogoInvoice[]           @relation("ElogoInvoiceSeller")
-  elogoInvoicesAsBuyer    ElogoInvoice[]           @relation("ElogoInvoiceBuyer")
+  fiscalInvoicesAsSeller  FiscalInvoice[]          @relation("FiscalInvoiceSeller")
+  fiscalInvoicesAsBuyer   FiscalInvoice[]          @relation("FiscalInvoiceBuyer")
   buyerCheckoutGroups     CheckoutGroup[]          @relation("BuyerCheckoutGroups")
   passwordResetTokens     PasswordResetToken[]
   paymentHolds            PaymentHold[]
@@ -2554,87 +2554,102 @@ model Invoice {
 
 /// Tarodan'ın KENDİ gelir e-belgeleri (komisyon / hizmet bedeli / üyelik / boost / iade).
 /// Düzenleyen = platform firması (Serhatlar). Mevcut Invoice (sipariş makbuzu) ile
-/// KARIŞTIRILMAMALI — bu model yalnızca eLogo'ya gönderilen GİB e-Arşiv/e-Fatura'yı izler.
+/// KARIŞTIRILMAMALI — bu model yalnızca e-belge sağlayıcısına (eLogo / Netsis) gönderilen
+/// GİB e-Arşiv/e-Fatura'yı izler. Tablo eskiden `elogo_invoices` adını taşıyordu; tek
+/// sağlayıcı varken konmuş bir addı, kayıt sağlayıcıdan bağımsız olduğu için yeniden
+/// adlandırıldı (bkz. docs/INVOICING_PROVIDERS.md).
 /// İlişki (User/Order) bilerek eklenmedi (daha az invaziv); kimlikler düz alan olarak tutulur.
 /// Tutarlar olay anındaki KAYITLI snapshot'tan gelir (oran/fiyat sonradan değişse de etkilenmez).
-model ElogoInvoice {
-  id                        String             @id @default(uuid())
-  type                      ElogoInvoiceType
+model FiscalInvoice {
+  id                        String                @id @default(uuid())
+  type                      FiscalInvoiceType
   /// Kaynak kaydın id'si (orderId / membershipPaymentId / boostId). type+sourceId tekil → idempotency.
-  sourceId                  String             @map("source_id")
+  sourceId                  String                @map("source_id")
   /// FATURA KAYIT NO (ör. KYT-K7X9M2QF3N) — kesim anında snapshot'lanır. Koli/sipariş
   /// referansından türetilir (gövde aynı, önek KYT); faturaya "Kayıt No" olarak basılır
   /// ve hakediş dökümünün aynı adlı kolonunda durur. sourceId bir UUID, belgede yeri yok.
-  sourceReference           String?            @map("source_reference")
+  sourceReference           String?               @map("source_reference")
   /// İşlemin SATICI tarafı — belgenin MUHATABI değil (o `recipientUserId`),
   /// dayandığı işlemin satan tarafıdır. Üyelik/öne çıkarma gibi Tarodan'ın
   /// kendi satışlarında PLATFORM SATICISI kullanıcısıdır; takasta bedeli
   /// ödemeyen taraftır. Kaynak çözülemezse NULL kalır.
-  sellerUserId              String?            @map("seller_user_id")
+  sellerUserId              String?               @map("seller_user_id")
   /// İşlemin ALICI tarafı = bedeli ödeyen taraf. Takasta ödeyen taraftır.
-  buyerUserId               String?            @map("buyer_user_id")
+  buyerUserId               String?               @map("buyer_user_id")
   /// İşlemin GERÇEKLEŞME ŞEKLİ — belgenin hangi işlemden doğduğu (doğrudan
   /// satış / teklif / takas / platform hizmeti). Kaynak kayıttan kesim anında
   /// çözülür; çözülemeyen eski kayıtlarda NULL kalır.
-  context                   ElogoInvoiceContext? @map("context")
-  recipientUserId           String?            @map("recipient_user_id")
-  recipientVknTckn          String?            @map("recipient_vkn_tckn")
-  recipientName             String?            @map("recipient_name")
+  context                   FiscalInvoiceContext? @map("context")
+  recipientUserId           String?               @map("recipient_user_id")
+  recipientVknTckn          String?               @map("recipient_vkn_tckn")
+  recipientName             String?               @map("recipient_name")
   // Misafir siparişleri tek sistem kullanıcısını paylaşır; gönderim anında alıcıyı
   // kullanıcı kaydından çözmek faturayı sistem e-postasına/boş adrese yazıyordu.
   // Kesim anındaki GERÇEK iletişim bilgisi burada snapshot'lanır.
-  recipientEmail            String?            @map("recipient_email")
-  recipientCity             String?            @map("recipient_city")
-  recipientDistrict         String?            @map("recipient_district")
-  recipientStreet           String?            @map("recipient_street")
-  documentType              String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
-  sendType                  String             @default("ELEKTRONIK") @map("send_type")
-  invoiceNumber             String?            @unique @map("invoice_number")
-  ettn                      String?            @unique
-  netAmount                 Decimal            @map("net_amount") @db.Decimal(10, 2)
+  recipientEmail            String?               @map("recipient_email")
+  recipientCity             String?               @map("recipient_city")
+  recipientDistrict         String?               @map("recipient_district")
+  recipientStreet           String?               @map("recipient_street")
+  documentType              String                @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
+  sendType                  String                @default("ELEKTRONIK") @map("send_type")
+  invoiceNumber             String?               @unique @map("invoice_number")
+  ettn                      String?               @unique
+  netAmount                 Decimal               @map("net_amount") @db.Decimal(10, 2)
   /// Belgede gösterilen İSKONTO toplamı (KDV hariç). Kesinti kolonları indirim
   /// SONRASI tutarı taşır; brüt bedel = netAmount + discountTotal. Raporlama için
   /// kolon, kalem kırılımı lineItems'ta.
-  discountTotal             Decimal            @default(0) @map("discount_total") @db.Decimal(10, 2)
-  taxAmount                 Decimal            @map("tax_amount") @db.Decimal(10, 2)
-  total                     Decimal            @db.Decimal(10, 2)
+  discountTotal             Decimal               @default(0) @map("discount_total") @db.Decimal(10, 2)
+  taxAmount                 Decimal               @map("tax_amount") @db.Decimal(10, 2)
+  total                     Decimal               @db.Decimal(10, 2)
   /// İlk oluşturma anındaki brüt tutar. Pending belge iadede netleştirilse bile
   /// tekrarlı kısmi iadeler bu immutable baz üzerinden hesaplanır.
-  originalTotal             Decimal            @map("original_total") @db.Decimal(10, 2)
-  vatRate                   Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
-  status                    ElogoInvoiceStatus @default(pending)
-  elogoRefId                String?            @map("elogo_ref_id")
-  elogoResultCode           Int?               @map("elogo_result_code")
-  elogoResultMsg            String?            @map("elogo_result_msg")
+  originalTotal             Decimal               @map("original_total") @db.Decimal(10, 2)
+  vatRate                   Decimal               @default(20) @map("vat_rate") @db.Decimal(5, 2)
+  status                    FiscalInvoiceStatus   @default(pending)
+  /// Belgeyi KESEN e-belge sağlayıcısı. İptal / iade / PDF işlemleri belgeyi kesen
+  /// sağlayıcıda yapılmak zorunda: sağlayıcı değişse de eski belge eski
+  /// sağlayıcıda yaşar. Bu kolon eklenmeden önceki her kayıt eLogo'yla
+  /// kesildiği için varsayılan `elogo`dur — geriye doldurma gerekmez.
+  provider                  EInvoiceProviderName  @default(elogo)
+  /// Sağlayıcının belgeye verdiği referans (eLogo: SendDocument `refId`).
+  /// Durum sorgusu ve iptal bununla yapılır. Eski adı `elogo_ref_id`.
+  providerRef               String?               @map("provider_ref")
+  /// Sağlayıcının son işlem sonuç kodu (eLogo: `resultCode` / GİB durum kodu).
+  /// Yalnız teşhis içindir; karar sınıflandırılmış port sonucundan verilir.
+  /// Eski adı `elogo_result_code`.
+  providerResultCode        Int?                  @map("provider_result_code")
+  /// Sağlayıcının son sonuç / hata metni — admin listesinde "Sonuç" olarak
+  /// gösterilir. Eski adı `elogo_result_msg`.
+  providerResultMsg         String?               @map("provider_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
-  billingReference          String?            @map("billing_reference")
+  billingReference          String?               @map("billing_reference")
   /// İADE faturasında referans verilen orijinal faturanın düzenlenme tarihi.
   /// Retry sırasında "bugünün tarihi" kullanılmaması için immutable snapshot.
-  billingReferenceIssueDate DateTime?          @map("billing_reference_issue_date")
+  billingReferenceIssueDate DateTime?             @map("billing_reference_issue_date")
   /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
   /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
-  lineDescription           String?            @map("line_description")
+  lineDescription           String?               @map("line_description")
   /// ÇOK KALEMLİ belgenin satırları (ürün + kargo + hizmet bedeli), kesim anında
   /// snapshot'lanır: `[{ name, quantity, net, unitPrice, vatRate }]`. Yalnız ürün
   /// faturasında (platform satışı) dolar; hizmet faturaları tek kalemdir ve burası
   /// NULL kalır. Fiyat/oran/ürün adı sonradan değişse bile retry aynı belgeyi üretir.
-  lineItems                 Json?              @map("line_items")
-  /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
-  pdfUrl                    String?            @map("pdf_url")
+  lineItems                 Json?                 @map("line_items")
+  /// Sağlayıcıdan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
+  pdfUrl                    String?               @map("pdf_url")
   /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.
-  emailSentAt               DateTime?          @map("email_sent_at")
-  attemptCount              Int                @default(0) @map("attempt_count")
-  lastAttemptAt             DateTime?          @map("last_attempt_at")
+  emailSentAt               DateTime?             @map("email_sent_at")
+  attemptCount              Int                   @default(0) @map("attempt_count")
+  lastAttemptAt             DateTime?             @map("last_attempt_at")
   /// Pending/failed belgenin hangi refund finalize anına kadar netleştirildiği.
-  refundAdjustedAt          DateTime?          @map("refund_adjusted_at")
-  issuedAt                  DateTime?          @map("issued_at")
-  sentAt                    DateTime?          @map("sent_at")
-  cancelledAt               DateTime?          @map("cancelled_at")
-  cancelReason              String?            @map("cancel_reason")
-  createdAt                 DateTime           @default(now()) @map("created_at")
-  updatedAt                 DateTime           @updatedAt @map("updated_at")
-  seller                    User?              @relation("ElogoInvoiceSeller", fields: [sellerUserId], references: [id])
-  buyer                     User?              @relation("ElogoInvoiceBuyer", fields: [buyerUserId], references: [id])
+  refundAdjustedAt          DateTime?             @map("refund_adjusted_at")
+  issuedAt                  DateTime?             @map("issued_at")
+  sentAt                    DateTime?             @map("sent_at")
+  cancelledAt               DateTime?             @map("cancelled_at")
+  cancelReason              String?               @map("cancel_reason")
+  createdAt                 DateTime              @default(now()) @map("created_at")
+  updatedAt                 DateTime              @updatedAt @map("updated_at")
+  seller                    User?                 @relation("FiscalInvoiceSeller", fields: [sellerUserId], references: [id])
+  buyer                     User?                 @relation("FiscalInvoiceBuyer", fields: [buyerUserId], references: [id])
 
   @@unique([type, sourceId])
   @@index([status])
@@ -2642,18 +2657,20 @@ model ElogoInvoice {
   @@index([sellerUserId])
   @@index([buyerUserId])
   @@index([context])
-  @@map("elogo_invoices")
+  @@map("fiscal_invoices")
 }
 
 /// Gap-free belge numarası sırası (prefix + yıl bazında). GİB zorunluluğu.
-model ElogoDocSequence {
+/// Yalnız numarayı BİZİM verdiğimiz (`local`) sağlayıcıda ilerler; eski adı
+/// `elogo_doc_sequences`.
+model FiscalDocSequence {
   id        String @id @default(uuid())
   prefix    String
   year      Int
   lastValue Int    @default(0) @map("last_value")
 
   @@unique([prefix, year])
-  @@map("elogo_doc_sequences")
+  @@map("fiscal_doc_sequences")
 }
 
 /// Tarodan iç belge sayaçları (ör. PDF fatura no: scope = "SPR-202607").
@@ -2670,7 +2687,7 @@ model DocumentSequence {
 }
 
 /// Kurumsal (şirket) satıcının siparişe elle yüklediği ÜRÜN faturası PDF'i.
-/// Tarodan'ın eLogo gelir e-Arşivlerinden (komisyon/hizmet) AYRI; satıcının kendi
+/// Tarodan'ın kendi gelir e-belgelerinden (`FiscalInvoice` — komisyon/hizmet) AYRI; satıcının kendi
 /// sisteminden kestiği fatura. Sipariş başına TEK (orderId @unique); değiştirilebilir.
 model SellerUploadedInvoice {
   id          String    @id @default(uuid())
@@ -2692,7 +2709,7 @@ model SellerUploadedInvoice {
   @@map("seller_uploaded_invoices")
 }
 
-enum ElogoInvoiceType {
+enum FiscalInvoiceType {
   /// LEGACY birleşik satıcı belgesi (komisyon + platform hizmet bedeli). Yeni
   /// teslimatlarda kesilmez; kesinti kırılımı olmayan eski ledger'lar ve daha
   /// önce bu türle faturalanmış paketler için korunur.
@@ -2727,20 +2744,27 @@ enum ElogoInvoiceType {
 /// Faturanın dayandığı işlemin GERÇEKLEŞME ŞEKLİ. `OrderOrigin` ile aynı
 /// değerleri taşır, artı `trade`: takasın siparişi yoktur, dolayısıyla origin'i
 /// de yoktur — fatura ekranı ikisini tek kolonda gösterir.
-enum ElogoInvoiceContext {
+enum FiscalInvoiceContext {
   direct_sale
   offer
   trade
   platform_service
 }
 
-enum ElogoInvoiceStatus {
+enum FiscalInvoiceStatus {
   pending
   processing
   sent
   signed
   failed
   cancelled
+}
+
+/// e-Belge sağlayıcısı (entegratör). Değerler `EInvoiceProvider.name` ile
+/// birebir aynıdır — port tipi bu enum'dan türer (tek kaynak).
+enum EInvoiceProviderName {
+  elogo
+  netsis
 }
 
 model Shipment {

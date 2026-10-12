@@ -259,7 +259,7 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
       get: (k: string) =>
         k === "FEATURE_48H_CONFIRMATION_WINDOW" ? flag : undefined,
     };
-    // Constructor: (prisma, orderService, configService, elogoInvoicing,
+    // Constructor: (prisma, orderService, configService, invoicing,
     // sellerInvoice, notificationService, cache, scheduledQueue). Bunlardan
     // yalnız prisma/orderService/config runAutoCompleteConfirmedOrders'ta
     // kullanılır; kalanı onModuleInit / diğer cron'ların işi → stub yeterli.

@@ -55,6 +55,9 @@ export type IdentitySourceKey =
   | "seller_bank_account"
   | "corporate_application"
   | "corporate_stakeholder"
+  // `fiscal_invoices` satırı. Değer tablo adı değişmeden önce arşive yazıldı ve
+  // `deleted_user_identities.source_detail`'te saklanıyor; okuyucular bu
+  // değeri arıyor, o yüzden yeniden adlandırılmaz.
   | "elogo_invoice"
   | "order_shipping_address"
   | "payout_transfer"
@@ -130,7 +133,7 @@ export interface IdentityCorporateSource {
   stakeholders?: IdentityStakeholderSource[];
 }
 
-export interface IdentityElogoSource {
+export interface IdentityFiscalInvoiceSource {
   id: string;
   recipientVknTckn: string | null;
   recipientName: string | null;
@@ -167,7 +170,7 @@ export interface IdentitySources {
   address?: IdentityAddressSource | null;
   bankAccount?: IdentityBankAccountSource | null;
   corporateApplication?: IdentityCorporateSource | null;
-  elogoInvoice?: IdentityElogoSource | null;
+  fiscalInvoice?: IdentityFiscalInvoiceSource | null;
   order?: IdentityOrderSource | null;
   payoutTransfer?: IdentityPayoutSource | null;
   auditLog?: IdentityAuditSource | null;
@@ -286,7 +289,7 @@ export function resolveIdentityFields(
     address,
     bankAccount,
     corporateApplication: corp,
-    elogoInvoice: elogo,
+    fiscalInvoice: elogo,
     order,
     payoutTransfer: payout,
     auditLog: audit,
@@ -299,6 +302,8 @@ export function resolveIdentityFields(
   const corpRef: [string, string] | undefined = corp
     ? ["corporateApplicationId", corp.id]
     : undefined;
+  // Ref anahtarı `deleted_user_identities.source_refs`'e yazılıyor; tablo adı
+  // değişse de saklanan veriyle uyum için sabit kalır.
   const elogoRef: [string, string] | undefined = elogo
     ? ["elogoInvoiceId", elogo.id]
     : undefined;

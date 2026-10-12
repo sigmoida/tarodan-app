@@ -35,7 +35,7 @@ describe("OrderLifecycleService.cancelAsGuest", () => {
       {} as any, // commissionLedger
       {} as any, // orderCommon
       orderQuery as any,
-      {} as any, // elogoInvoicing
+      {} as any, // invoicing
     );
     const cancel = jest.fn().mockResolvedValue({ id: "order-1" });
     (service as any).cancel = cancel;

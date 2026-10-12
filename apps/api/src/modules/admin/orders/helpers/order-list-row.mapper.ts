@@ -29,7 +29,7 @@ import type {
 export interface RowMapContext {
   now: Date;
   imageUrl: (keyOrUrl: string | null | undefined) => string | null;
-  /** `ElogoInvoice.sourceId` → belgeler (paket id'si ya da eski sipariş id'si). */
+  /** `FiscalInvoice.sourceId` → belgeler (paket id'si ya da eski sipariş id'si). */
   invoicesBySource: ReadonlyMap<string, readonly ListInvoice[]>;
 }
 

@@ -51,6 +51,12 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Fatura iptal edildi",
 };
 
+/** Belgeyi kesen entegratör — müşavir belgeyi o portalda arar. */
+const PROVIDER_LABELS: Record<string, string> = {
+  elogo: "eLogo",
+  netsis: "Logo Netsis",
+};
+
 const CONTEXT_LABELS: Record<string, string> = {
   direct_sale: "Doğrudan satış",
   offer: "Teklif",
@@ -98,6 +104,10 @@ export class InvoiceDetailWorkbookService {
       ["Fatura Türü", TYPE_LABELS[detail.type] ?? detail.type],
       ["Açıklama", detail.description],
       ["Durum", STATUS_LABELS[detail.status] ?? detail.status],
+      [
+        "e-Belge Sağlayıcısı",
+        PROVIDER_LABELS[detail.provider] ?? detail.provider,
+      ],
       [
         "Sipariş Gerçekleşme Şekli",
         detail.context

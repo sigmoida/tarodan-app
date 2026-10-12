@@ -27,7 +27,7 @@ import { i18nMessage } from "../i18n";
 /**
  * NOT: Bu modülün ürettiği belge "Sipariş Özeti"dir (SPR- numarası) — mali
  * belge (fatura) DEĞİLDİR; şablonun altında bu açıkça yazar. Tarodan'ın resmî
- * gelir belgeleri `ElogoInvoice` (eLogo e-Arşiv/e-Fatura), satıcının ürün
+ * gelir belgeleri `FiscalInvoice` (eLogo e-Arşiv/e-Fatura), satıcının ürün
  * faturası ise `SellerUploadedInvoice`'tır. Uçlar (`/invoices/*`) mobil
  * uygulama sözleşmesinde olduğu için korunur; eski "alıcı+satıcıya fatura
  * maili" yolu kaldırıldı (hiçbir yerden çağrılmıyordu).
@@ -560,7 +560,7 @@ export class InvoiceService {
   /**
    * Legacy receipt-table credit note entry point.
    *
-   * Real return documents are issued by ElogoInvoicingService as a
+   * Real return documents are issued by InvoicingService as a
    * `return_invoice` with a billing reference. The local Invoice model is one
    * immutable receipt per order; writing a second negative receipt would break
    * that invariant and bypass the eLogo retry/idempotency flow.
