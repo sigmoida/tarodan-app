@@ -13,6 +13,7 @@ import {
   type InvoiceParty,
   type SellerInvoice,
   documentTypeLabel,
+  invoiceProviderLabels,
   invoiceStatusConfig,
   invoiceTypeLabels,
 } from "./types";
@@ -34,13 +35,14 @@ const partyCell = (party: InvoiceParty | null) =>
       }
     : { name: "—" };
 
-export const elogoColumns = (
+export const fiscalInvoiceColumns = (
   t: T,
   // failed belgeler için retry aksiyonu (deneme sayacı sıfırlanır, cron alır).
   onRetry?: (invoice: Invoice) => void,
   retryingId?: string,
 ) => {
   const types = invoiceTypeLabels(t);
+  const providers = invoiceProviderLabels(t);
   return [
     col.user<Invoice>(
       t("admin.finance.common.seller"),
@@ -89,6 +91,17 @@ export const elogoColumns = (
         sortKey: "invoiceNumber",
         sortType: "text",
       },
+    ),
+    // Belgeyi kesen entegratör: iptal/iade ve PDF o sağlayıcıda yapılır,
+    // operatör belgeyi o portalda arar.
+    col.badge<Invoice>(
+      t("admin.finance.invoices.provider"),
+      (i) => (
+        <Badge variant="outline" size="sm">
+          {providers[i.provider]}
+        </Badge>
+      ),
+      { sortKey: "provider", sortType: "text", minWidth: 110 },
     ),
     // Açıklama = belgenin ÜSTÜNDE yazan metin; türün etiketi onun altında ikinci
     // satırdır. İkisi aynı şey değil: biri kayıt, öteki arayüz sözlüğü.

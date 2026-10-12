@@ -6309,6 +6309,11 @@
         "type": "Type",
         "description": "Description",
         "context": "Transaction Type",
+        "provider": "Provider",
+        "providerName": {
+          "elogo": "eLogo",
+          "netsis": "Netsis"
+        },
         "totalWithVat": "TOTAL INCL. VAT",
         "detail": "Detail",
         "detailExport": "Detail Export",

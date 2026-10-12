@@ -3,14 +3,14 @@
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { elogoColumns } from "../_lib/columns";
+import { fiscalInvoiceColumns } from "../_lib/columns";
 import {
-  ELOGO_INVOICE_LIST_RESOURCES,
+  FISCAL_INVOICE_LIST_RESOURCES,
   type Invoice,
   invoiceListResource,
   mapInvoices,
 } from "../_lib/types";
-import { elogoInvoiceFilterFields } from "../_lib/filters";
+import { fiscalInvoiceFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
 /**
@@ -21,14 +21,14 @@ import { useTranslations } from "next-intl";
  * `key={scope}` sayfa/filtre durumunu sekme değişince sıfırlar: 3. sayfadayken
  * başka sekmeye geçen operatör boş liste görüyordu.
  */
-export function ElogoInvoicesTab({ scope }: { scope: string }) {
+export function FiscalInvoicesTab({ scope }: { scope: string }) {
   const t = useTranslations();
   const retry = useAdminMutation(
-    (id: string) => adminApi.retryElogoInvoice(id),
+    (id: string) => adminApi.retryFiscalInvoice(id),
     {
       // Sekmeler çakışır: yeniden denenen belge birden fazla listenin
       // önbelleğinde durur, hepsi birden tazelenmeli.
-      invalidates: [...ELOGO_INVOICE_LIST_RESOURCES, "invoices-summary"],
+      invalidates: [...FISCAL_INVOICE_LIST_RESOURCES, "invoices-summary"],
       successMessage: t("admin.finance.invoices.retried"),
     },
   );
@@ -46,14 +46,14 @@ export function ElogoInvoicesTab({ scope }: { scope: string }) {
       }
       getRowId={(i) => i.id}
       syncUrl
-      filters={elogoInvoiceFilterFields(t)}
+      filters={fiscalInvoiceFilterFields(t)}
     >
       <ResourceList.Toolbar
         searchPlaceholder={t("admin.finance.invoices.searchPlaceholder")}
       />
       <ResourceList.Total unit={t("admin.finance.invoices.invoiceUnit")} />
       <ResourceList.Table
-        columns={elogoColumns(
+        columns={fiscalInvoiceColumns(
           t,
           (i) => retry.mutate(i.id),
           retry.isPending ? (retry.variables as string) : undefined,

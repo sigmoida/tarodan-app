@@ -6309,6 +6309,11 @@
         "type": "Tür",
         "description": "Açıklama",
         "context": "Sipariş Gerçekleşme Şekli",
+        "provider": "Sağlayıcı",
+        "providerName": {
+          "elogo": "eLogo",
+          "netsis": "Netsis"
+        },
         "totalWithVat": "KDV DAHİL TUTAR",
         "detail": "Detay",
         "detailExport": "Detay Dökümü",

@@ -143,7 +143,7 @@ export const financeApi = {
   getFinanceOverview: () => api.get("/admin/finance/overview"),
   // eLogo invoice summary strip + exhausted-retry recovery
   getInvoicesSummary: () => api.get("/admin/invoices/summary"),
-  retryElogoInvoice: (id: string) => api.post(`/admin/invoices/${id}/retry`),
+  retryFiscalInvoice: (id: string) => api.post(`/admin/invoices/${id}/retry`),
 
   // Seller Payouts
   getPayoutsSummary: () => api.get("/admin/payouts/summary"),
