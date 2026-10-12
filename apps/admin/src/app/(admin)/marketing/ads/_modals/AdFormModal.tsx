@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -12,7 +12,7 @@ import {
   FormCheckbox,
   useZodForm,
 } from "@tarodan/ui/form";
-import { Alert, Button, FileDropzone, Input } from "@tarodan/ui";
+import { Alert, Button, ConfirmDialog, FileDropzone, Input } from "@tarodan/ui";
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -36,7 +36,9 @@ import {
   deviceOptions,
   IAB_SIZES,
   isIabSize,
+  hotspotIssues,
 } from "../_lib/types";
+import { HotspotEditor } from "../_components/HotspotEditor";
 import {
   campaignLabel,
   selectableCampaigns,
@@ -56,7 +58,13 @@ function AdImageField() {
   const imageUrl = watch("imageUrl");
   const width = watch("width");
   const height = watch("height");
+  const hotspotCount = (watch("hotspots") ?? []).length;
   const [uploading, setUploading] = useState(false);
+  // Yazılan adres odak çıkınca uygulanır: her tuşta "alanlar silinsin mi?" sorulmasın.
+  const [urlDraft, setUrlDraft] = useState(imageUrl);
+  // Alanlar varken görsel değişirse/kalkarsa onay beklenir (alanlar silinir).
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  useEffect(() => setUrlDraft(imageUrl), [imageUrl]);
 
   const setDims = useCallback(
     (w: number, h: number) => {
@@ -75,6 +83,33 @@ function AdImageField() {
     [setDims],
   );
 
+  const applyImage = (url: string) => {
+    setValue("imageUrl", url, { shouldDirty: true });
+    if (url) loadDims(url);
+    else setDims(0, 0);
+  };
+
+  const requestImage = (url: string) => {
+    if (url === imageUrl) return;
+    if (imageUrl && hotspotCount > 0) {
+      setPendingUrl(url);
+      return;
+    }
+    applyImage(url);
+  };
+
+  const confirmImage = () => {
+    if (pendingUrl === null) return;
+    setValue("hotspots", [], { shouldDirty: true });
+    applyImage(pendingUrl);
+    setPendingUrl(null);
+  };
+
+  const cancelImage = () => {
+    setPendingUrl(null);
+    setUrlDraft(imageUrl);
+  };
+
   const upload = async (file: File) => {
     setUploading(true);
     try {
@@ -84,8 +119,7 @@ function AdImageField() {
         toast.error(t("admin.marketing.ads.upload.failed"));
         return;
       }
-      setValue("imageUrl", url, { shouldDirty: true });
-      loadDims(url);
+      requestImage(url);
       toast.success(t("admin.marketing.ads.upload.success"));
     } catch (error) {
       toast.error(
@@ -134,10 +168,7 @@ function AdImageField() {
             variant="danger"
             size="sm"
             type="button"
-            onClick={() => {
-              setValue("imageUrl", "", { shouldDirty: true });
-              setDims(0, 0);
-            }}
+            onClick={() => requestImage("")}
           >
             {t("admin.marketing.ads.removeImage")}
           </Button>
@@ -176,13 +207,9 @@ function AdImageField() {
 
       <Input
         type="url"
-        value={imageUrl}
-        onChange={(e) => {
-          const url = e.target.value;
-          setValue("imageUrl", url, { shouldDirty: true });
-          if (url) loadDims(url);
-          else setDims(0, 0);
-        }}
+        value={urlDraft}
+        onChange={(e) => setUrlDraft(e.target.value)}
+        onBlur={() => requestImage(urlDraft.trim())}
         placeholder={t("admin.marketing.ads.upload.urlPlaceholder")}
       />
 
@@ -213,7 +240,49 @@ function AdImageField() {
           {t("admin.marketing.ads.iabWarning", { width, height })}
         </Alert>
       )}
+
+      <ConfirmDialog
+        isOpen={pendingUrl !== null}
+        onClose={cancelImage}
+        onConfirm={confirmImage}
+        title={t("admin.marketing.ads.hotspots.replaceTitle")}
+        description={t("admin.marketing.ads.hotspots.replaceBody")}
+        confirmLabel={t("common.confirm")}
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        destructive
+      />
     </div>
+  );
+}
+
+/**
+ * Görselli reklamda tıklama yalnız alanlardadır: reklam bağlantısı gizlenir,
+ * alan editörü gösterilir. Görselsiz (yalnız metin) reklamda bağlantı alanı.
+ */
+function LinkOrHotspotsField() {
+  const t = useTranslations();
+  const { setValue, formState } = useFormContext<AdFormValues>();
+  const imageUrl = useWatch({ name: "imageUrl" }) as string;
+  const hotspots = (useWatch({ name: "hotspots" }) ?? []) as AdFormValues["hotspots"];
+
+  if (!imageUrl) {
+    return (
+      <FormInput
+        name="linkUrl"
+        label={t("admin.marketing.ads.linkUrl")}
+        placeholder={t("admin.marketing.ads.linkUrlPlaceholder")}
+        helperText={t("admin.marketing.ads.linkUrlHelper")}
+      />
+    );
+  }
+  return (
+    <HotspotEditor
+      imageUrl={imageUrl}
+      value={hotspots}
+      onChange={(next) => setValue("hotspots", next, { shouldDirty: true })}
+      issues={formState.isSubmitted ? hotspotIssues(t, hotspots) : []}
+    />
   );
 }
 
@@ -308,12 +377,7 @@ export function AdFormModal({
         label={t("admin.marketing.ads.altText")}
         placeholder={t("admin.marketing.ads.altTextPlaceholder")}
       />
-      <FormInput
-        name="linkUrl"
-        label={t("admin.marketing.ads.linkUrl")}
-        placeholder={t("admin.marketing.ads.linkUrlPlaceholder")}
-        helperText={t("admin.marketing.ads.linkUrlHelper")}
-      />
+      <LinkOrHotspotsField />
       <FormTextarea
         name="content"
         label={t("admin.marketing.ads.content")}
