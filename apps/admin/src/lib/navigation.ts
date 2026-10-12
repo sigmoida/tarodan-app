@@ -499,6 +499,17 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "settings",
         },
         {
+          // API: PERMISSION_MAP.invoicing = ["settings"]; Netsis cari/seri/hizmet
+          // kartı kodları + bağlantı testi (super_admin ve admin düzenler).
+          name: t("admin.nav.items.invoicingSettings.name"),
+          href: "/system/invoicing-settings",
+          description: t("admin.nav.items.invoicingSettings.description"),
+          keywords: t("admin.nav.items.invoicingSettings.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "settings",
+        },
+        {
           // API: PERMISSION_MAP["mail-routing"] = ["settings"]; değiştirme
           // ayrıca super_admin'e sınırlı (sayfa diğer rollere salt okunur).
           name: t("admin.nav.items.mailRouting.name"),

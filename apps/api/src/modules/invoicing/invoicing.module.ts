@@ -20,6 +20,7 @@ import {
 import { ElogoInvoiceProvider } from "./provider/elogo.provider";
 import { NetsisInvoiceProvider } from "./provider/netsis.provider";
 import { InvoiceProviderRegistry } from "./provider/provider-registry";
+import { NetsisInvoiceSettingsService } from "./provider/netsis-invoice-settings.service";
 import { invoiceProviderName } from "../../config/invoice-provider";
 import { NetsisModule } from "../netsis/netsis.module";
 import { StorageModule } from "../storage/storage.module";
@@ -77,6 +78,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ElogoInvoiceProvider,
     NetsisInvoiceProvider,
     InvoiceProviderRegistry,
+    // Netsis ayarlarının admin okuma/yazma kapısı (Faturalama Ayarları ekranı).
+    NetsisInvoiceSettingsService,
     {
       provide: E_INVOICE_PROVIDER,
       useFactory: (registry: InvoiceProviderRegistry): EInvoiceProvider =>
@@ -99,6 +102,6 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ...scheduledProcessors(InvoiceScheduledProcessor),
   ],
   controllers: [InvoicingController],
-  exports: [ElogoService, InvoicingService],
+  exports: [ElogoService, InvoicingService, NetsisInvoiceSettingsService],
 })
 export class InvoicingModule {}

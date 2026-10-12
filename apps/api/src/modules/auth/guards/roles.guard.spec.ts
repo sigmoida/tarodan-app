@@ -362,4 +362,8 @@ describe("RolesGuard — reklam görseli yükleme izni", () => {
     expect(PERMISSION_MAP.ads).toEqual(["ads"]);
     expect(PERMISSION_MAP.media).toEqual(["products"]);
   });
+
+  it("izin haritası: invoicing (Faturalama Ayarları) → settings", () => {
+    expect(PERMISSION_MAP.invoicing).toEqual(["settings"]);
+  });
 });

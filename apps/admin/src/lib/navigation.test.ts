@@ -63,6 +63,11 @@ describe("routePermission", () => {
     expect(routePermission("/system/timing-rules")).toBe("settings");
   });
 
+  it("guards the invoicing settings screen with the settings permission", () => {
+    // API: PERMISSION_MAP.invoicing = ["settings"] — menü ve uç aynı izni ister.
+    expect(routePermission("/system/invoicing-settings")).toBe("settings");
+  });
+
   it("guards the consent records screen with the users permission", () => {
     // API: PERMISSION_MAP.consents = ["users"] — menü ve uç aynı izni ister.
     expect(routePermission("/accounts/consents")).toBe("users");

@@ -84,6 +84,10 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   // super_admin). `finance` segmenti `payments`e bağlı olduğu için kardeş
   // literal segment kullanılır; `@Roles` moderator'ü ayrıca dışarıda tutar.
   "gib-report": ["tax"],
+  // Faturalama Ayarları (Netsis cari/seri/hizmet kartı kodları + bağlantı testi):
+  // platform yapılandırması → `settings` izni. `finance` segmenti `payments`e
+  // bağlı olduğu için kardeş literal segment kullanılır.
+  invoicing: ["settings"],
   shipping: ["shipping"],
   settings: ["settings", "payment_settings"],
   // Süreler ve Kurallar ayar ekranının parçası: aynı izinle görünür; yazma

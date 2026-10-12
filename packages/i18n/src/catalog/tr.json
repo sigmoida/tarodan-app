@@ -9164,7 +9164,7 @@
         "invoices": {
           "name": "Faturalar",
           "description": "Fatura ve e-fatura işlemlerini yönetin",
-          "keywords": "fatura,invoice,e-arşiv,e-fatura,elogo,iade faturası"
+          "keywords": "fatura,invoice,e-arşiv,e-fatura,e-belge,elogo,netsis,iade faturası"
         },
         "settlement": {
           "name": "Hakediş Dökümü",
@@ -9241,6 +9241,11 @@
           "name": "E-posta Yönlendirme",
           "description": "Alan bazında gönderen posta kutusu ve iç bildirim alıcıları",
           "keywords": "e-posta, mail, gönderen, smtp, bildirim, alıcı, posta kutusu, özet"
+        },
+        "invoicingSettings": {
+          "name": "Faturalama Ayarları",
+          "description": "Netsis cari, seri ve hizmet kartı kodları; sağlayıcı ve bağlantı durumu",
+          "keywords": "faturalama, netsis, cari kodu, seri, hizmet kartı, e-fatura, e-arşiv, e-belge, bağlantı testi"
         }
       }
     },
@@ -10022,6 +10027,75 @@
           "areas": "Aldığı alanlar"
         }
       }
+    },
+    "invoicingSettings": {
+      "page": {
+        "title": "Faturalama Ayarları",
+        "description": "Netsis'te muhasebenin açtığı kayıtlara bağlı kodlar. Değişiklikler deploy gerektirmeden bir sonraki belgeden itibaren geçerli olur."
+      },
+      "error": {
+        "title": "Faturalama ayarları yüklenemedi",
+        "description": "Ayarlar okunamadı. Bağlantınızı kontrol edip tekrar deneyin."
+      },
+      "groups": {
+        "provider": "Sağlayıcı",
+        "cari": "Cari",
+        "serial": "Seriler",
+        "item": "Hizmet Kartları",
+        "readiness": "Hazırlık durumu"
+      },
+      "provider": {
+        "active": "Etkin sağlayıcı",
+        "netsisEnabled": "Netsis entegrasyonu",
+        "netsisMode": "Netsis modu",
+        "on": "Açık",
+        "off": "Kapalı",
+        "envNote": "Sağlayıcı ve Netsis modu dağıtım ayarıdır; bu ekrandan değiştirilmez."
+      },
+      "mode": {
+        "stub": "Test (stub)",
+        "live": "Canlı"
+      },
+      "ping": {
+        "button": "Bağlantıyı test et",
+        "ok": "Netsis bağlantısı çalışıyor. Mod: {mode} · Sürüm: {version} · Kimlik: {auth}",
+        "failed": "Netsis bağlantısı kurulamadı: {error}",
+        "authenticated": "doğrulandı",
+        "notAuthenticated": "doğrulanmadı"
+      },
+      "fields": {
+        "retailCode": {
+          "label": "Perakende cari kodu",
+          "helper": "Bireysel ve misafir alıcıların ortak carisi."
+        },
+        "autoCreateCorporate": {
+          "label": "Kurumsal cariyi otomatik aç",
+          "helper": "VKN'li alıcının carisi ilk faturada açılır."
+        },
+        "earchive": {
+          "label": "e-Arşiv serisi",
+          "helper": "3 karakter, harf ve rakam (ör. TRD)."
+        },
+        "einvoice": {
+          "label": "e-Fatura serisi",
+          "helper": "3 karakter, harf ve rakam (ör. TRE)."
+        }
+      },
+      "validation": {
+        "serial": "Seri tam 3 karakter olmalı (yalnız A-Z ve 0-9).",
+        "cariMax": "Cari kodu en fazla {max} karakter olabilir.",
+        "itemMax": "Hizmet kartı kodu en fazla {max} karakter olabilir."
+      },
+      "readiness": {
+        "ready": "Hazır",
+        "notReady": "Hazır değil",
+        "allSet": "Netsis faturası kesmek için gereken tüm ayarlar dolu ve geçerli.",
+        "blocking": "Aşağıdaki ayarlar tamamlanmadan Netsis ile belge kesilemez.",
+        "missing": "eksik",
+        "invalid": "geçersiz"
+      },
+      "saveButton": "Kaydet",
+      "saved": "Faturalama ayarları kaydedildi"
     }
   },
   "server": {
@@ -10327,7 +10401,7 @@
       },
       "elogoInvoiceExhausted": {
         "title": "e-Fatura Gönderimi Tıkandı — Yönetim Gerekli",
-        "message": "{invoiceNumber} numaralı {typeLabel} belgesi eLogo'ya gönderilemedi ve deneme hakkı tükendi: {reason}. Yasal süre işliyor; nedeni giderip Faturalar ekranından \"Yeniden Dene\" ile gönderin."
+        "message": "{invoiceNumber} numaralı {typeLabel} belgesi e-belge sağlayıcısına gönderilemedi ve deneme hakkı tükendi: {reason}. Yasal süre işliyor; nedeni giderip Faturalar ekranından \"Yeniden Dene\" ile gönderin."
       },
       "sellerInvoiceMissing": {
         "title": "Satıcı Faturası Yüklenmedi",
@@ -11292,6 +11366,11 @@
           "preparingWarningBeforeDeadline": "Satıcı hazırlık uyarısı (saat), satıcı hazırlık süresinden (gün × 24 saat) kısa olmalıdır."
         },
         "conflict": "Süreler aynı anda başka bir yönetici tarafından değiştirildi. Sayfayı yenileyip tekrar deneyin."
+      },
+      "invoicingSettings": {
+        "empty": "Kaydedilecek bir ayar gönderilmedi.",
+        "unknownKey": "Bilinmeyen faturalama ayarı: {key}",
+        "invalidValue": "{key} ayarı için geçersiz değer."
       }
     },
     "advertisement": {
@@ -11458,7 +11537,7 @@
       "issueForbidden": "Bu siparişin faturasını oluşturma yetkiniz yok",
       "notFound": "Fatura bulunamadı",
       "orderUnpaidOrCancelled": "Ödenmemiş veya iptal edilmiş siparişler için fatura oluşturulamaz.",
-      "returnViaElogoOnly": "İade faturaları yalnız eLogo iade belgesi akışından oluşturulabilir."
+      "returnViaElogoOnly": "İade faturaları yalnız e-belge iade akışından oluşturulabilir."
     },
     "security": {
       "passwordRequiredFor2fa": "İki faktörlü doğrulama için önce bir hesap şifresi belirlemelisiniz",
