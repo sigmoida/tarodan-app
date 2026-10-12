@@ -42,7 +42,7 @@ function ImageSideField() {
       name="imageSide"
       label={t("admin.marketing.hero.imageSideLabel")}
       options={imageSideOptions(t)}
-      helperText={t(`admin.marketing.hero.imageSideHint.${side}`)}
+      helperText={t(`admin.marketing.hero.imageSideHint.${side as "left" | "right"}`)}
     />
   );
 }

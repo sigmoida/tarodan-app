@@ -41,10 +41,12 @@ const isBlank = (value: unknown): boolean =>
  */
 export function pickLocalized(
   text: LocalizedText | null | undefined,
-  locale: LocalizedTextLocale,
+  locale: LocalizedTextLocale | string,
 ): string {
   if (!text) return "";
-  if (locale === "en" && !isBlank(text.en)) return (text.en as string).trim();
+  // İstemciler ham locale verir (`en-US`, `tr-TR`); yalnız iki dilimiz var.
+  const wantsEn = String(locale).toLowerCase().startsWith("en");
+  if (wantsEn && !isBlank(text.en)) return (text.en as string).trim();
   return typeof text.tr === "string" ? text.tr.trim() : "";
 }
 
