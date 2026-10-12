@@ -51,6 +51,8 @@ import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
 import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
 import { AdminInvoicingSettingsService } from "./finance/invoicing-settings/admin-invoicing-settings.service";
 import { AdminInvoicingSettingsController } from "./finance/invoicing-settings/admin-invoicing-settings.controller";
+import { AdminNetsisSyncService } from "./finance/netsis-sync/admin-netsis-sync.service";
+import { AdminNetsisSyncController } from "./finance/netsis-sync/admin-netsis-sync.controller";
 import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
 import { ConsentModule } from "../consent/consent.module";
 import { TimingRulesModule } from "../timing-rules/timing-rules.module";
@@ -242,6 +244,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTimingRulesController,
     AdminMailRoutingController,
     AdminInvoicingSettingsController,
+    AdminNetsisSyncController,
   ],
   providers: [
     AdminService,
@@ -252,6 +255,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminSettingsService,
     AdminTimingRulesService,
     AdminInvoicingSettingsService,
+    AdminNetsisSyncService,
     // Mail Yönlendirme: domain servisleri MailRoutingModule'den (@Global).
     AdminMailRoutingService,
     AdminSiteAccessService,
