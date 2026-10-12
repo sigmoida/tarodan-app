@@ -72,7 +72,7 @@ export class RevenueSplitService {
     }
     if (standardVatRate === null) {
       const env = Number(this.config.get<string>("ELOGO_VAT_RATE"));
-      // ElogoDocumentService.resolveVatRate ile aynı son basamak: 20.
+      // InvoiceDocumentService.resolveVatRate ile aynı son basamak: 20.
       standardVatRate =
         Number.isFinite(env) && env > 0 ? env : ELOGO_DEFAULT_VAT_RATE;
     }

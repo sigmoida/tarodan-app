@@ -35,7 +35,7 @@ import {
 } from "../../payment-providers/refund-errors";
 import { EventService } from "../../events";
 import { InvoiceService } from "../../invoice/invoice.service";
-import { ElogoInvoicingService } from "../../elogo";
+import { InvoicingService } from "../../invoicing";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { NotificationService } from "../../notification/notification.service";
 import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
@@ -165,7 +165,7 @@ describe("PaymentService trade cash refund idempotency", () => {
           },
         },
         {
-          provide: ElogoInvoicingService,
+          provide: InvoicingService,
           useValue: {
             issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
             issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
@@ -321,7 +321,7 @@ describe("PaymentService trade cash refund idempotency", () => {
     // Takas kargosu artık faturalanıyor; kargolanmadan iptalde bedeli iade
     // edilen belgenin ayakta bırakılması yanlış beyan olurdu. Ters kaydın
     // KUYRUĞA ALINMASI iade tx'iyle atomiktir — hangi belgenin terslendiğine
-    // ElogoReversalService iade politikasını okuyarak karar verir.
+    // InvoiceReversalService iade politikasını okuyarak karar verir.
     mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockTx.refundAttempt.findUnique.mockResolvedValue(
       refundAttempt(RefundAttemptStatus.succeeded),

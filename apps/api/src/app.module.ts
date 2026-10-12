@@ -59,7 +59,7 @@ import { PaymentProvidersModule } from "./modules/payment-providers";
 import { InvoiceModule } from "./modules/invoice";
 
 // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
-import { ElogoModule } from "./modules/elogo";
+import { InvoicingModule } from "./modules/invoicing";
 
 // Marketing Email System
 import { MarketingModule } from "./modules/marketing/marketing.module";
@@ -216,7 +216,7 @@ import { isTest } from "./config/environment";
 
     // PHASE 5 - Operations Modules
     InvoiceModule, // Invoice Generation & Delivery
-    ElogoModule, // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
+    InvoicingModule, // Gelir e-belgeleri (e-Arşiv / e-Fatura) — sağlayıcı portu + eLogo adaptörü
     MarketingModule, // Marketing Email Scheduler (weekly newsletter, monthly promotions)
 
     I18nModule, // GAP-L03: Multi-language Support

@@ -121,7 +121,7 @@ describe("RefundService policy integration", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
       },
-      elogoInvoice: {
+      fiscalInvoice: {
         findUnique: jest.fn().mockResolvedValue(platformSaleInvoice),
       },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },

@@ -25,7 +25,7 @@ import { getAvailableQuantity } from "../product/helpers/product-availability.he
 import { ProductLockService } from "../product/lock/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
-import { ElogoInvoicingService } from "../elogo";
+import { InvoicingService } from "../invoicing";
 import {
   OrderCommonService,
   isReactivatablePayment,
@@ -77,7 +77,7 @@ export class OrderLifecycleService {
     private readonly commissionLedger: CommissionLedgerService,
     private readonly orderCommon: OrderCommonService,
     private readonly orderQuery: OrderQueryService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly invoicing: InvoicingService,
     @Optional() private readonly discountService?: DiscountService,
     private readonly refundService?: RefundService,
     // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
@@ -251,7 +251,7 @@ export class OrderLifecycleService {
       // `revenueInvoicedAt` işaretini KOYMUYORDU ve tam faturalı sipariş backfill
       // aday penceresinde yer tutmaya devam ediyordu. Fire-and-forget: sipariş
       // tamamlamayı BLOKLAMAZ; servis idempotent + retry cron'lu.
-      void this.elogoInvoicing
+      void this.invoicing
         .issueOrderRevenueInvoices(orderId)
         .catch((e) =>
           this.logger.warn(
@@ -1012,7 +1012,7 @@ export class OrderLifecycleService {
     this.logger.log(
       `confirmDelivery: ${orderId} tamamlandı → e-Arşiv tetikleniyor (komisyon+hizmet+platform)`,
     );
-    void this.elogoInvoicing
+    void this.invoicing
       .issueOrderRevenueInvoices(orderId)
       .catch((e) =>
         this.logger.warn(
@@ -1035,10 +1035,10 @@ export class OrderLifecycleService {
       .catch((e: any) =>
         this.logger.warn(`teslim markEarned hatası ${orderId}: ${e?.message}`),
       );
-    // Faturalama + `revenueInvoicedAt` işareti TEK kaynakta (ElogoInvoicingService):
+    // Faturalama + `revenueInvoicedAt` işareti TEK kaynakta (InvoicingService):
     // teslim yaşam-döngüsü, teslim tx'inin outbox görevi ve backfill cron'u aynı
     // metodu çağırır.
-    await this.elogoInvoicing.issueOrderRevenueInvoices(orderId);
+    await this.invoicing.issueOrderRevenueInvoices(orderId);
   }
 
   /**

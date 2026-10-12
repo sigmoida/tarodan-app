@@ -27,8 +27,8 @@ import {
   CommissionLedgerStatus,
   BoostStatus,
   OrderCancellationType,
-  ElogoInvoiceType,
-  ElogoInvoiceStatus,
+  FiscalInvoiceType,
+  FiscalInvoiceStatus,
   ShippingTariffStatus,
   CouponReservationStatus,
   Prisma,
@@ -55,9 +55,9 @@ import { generateReferenceCode } from "../src/common/helpers/generate-reference"
 import { generatePayoutTransIdCode } from "../src/common/helpers/payout-trans-id";
 import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
-  formatElogoInvoiceNumber,
+  formatInvoiceNumber,
   highestSequenceValue,
-} from "../src/modules/elogo/invoice/elogo-document-number";
+} from "../src/modules/invoicing/invoice/document-number";
 import {
   billableDesiForTier,
   tierCodeForDesi,
@@ -7747,13 +7747,13 @@ async function main() {
 
   // SupportTicket waiting_customer: ticketScenarios içinde zaten mevcut (2 örnek) → eklenmedi.
 
-  // --- 29g. eLogo geçmiş faturaları: Invoice + ElogoInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
+  // --- 29g. eLogo geçmiş faturaları: Invoice + FiscalInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
   const elogoYear = new Date().getFullYear();
   // GİB zorunlu 16 karakter — format runtime ile TEK kaynaktan gelir.
   const elogoPrefix = process.env.ELOGO_INVOICE_PREFIX?.trim() || "TRD";
   const seededElogoNumbers: string[] = [];
   const genElogoNumber = () => {
-    const number = formatElogoInvoiceNumber(
+    const number = formatInvoiceNumber(
       elogoPrefix,
       elogoYear,
       seededElogoNumbers.length + 1,
@@ -7770,9 +7770,9 @@ async function main() {
 
   const invoiceSaleOrders = corpSales.map((s) => s.order);
   const elogoStatuses = [
-    ElogoInvoiceStatus.sent,
-    ElogoInvoiceStatus.signed,
-    ElogoInvoiceStatus.sent,
+    FiscalInvoiceStatus.sent,
+    FiscalInvoiceStatus.signed,
+    FiscalInvoiceStatus.sent,
   ];
   for (let i = 0; i < invoiceSaleOrders.length; i++) {
     const o = invoiceSaleOrders[i];
@@ -7799,9 +7799,9 @@ async function main() {
     // Tarodan'ın KENDİ komisyon gelir e-Arşiv faturası (recipient = satıcı).
     const commissionGross = Number(o.commissionAmount);
     const net = round2(commissionGross / 1.2);
-    await prisma.elogoInvoice.create({
+    await prisma.fiscalInvoice.create({
       data: {
-        type: ElogoInvoiceType.commission,
+        type: FiscalInvoiceType.commission,
         sourceId: o.id,
         recipientUserId: o.sellerId,
         recipientVknTckn: "1234567890",
@@ -7815,10 +7815,10 @@ async function main() {
         total: round2(net * 1.2),
         originalTotal: round2(net * 1.2),
         vatRate: 20,
-        status: elogoStatuses[i] ?? ElogoInvoiceStatus.sent,
-        elogoRefId: `${Math.floor(Math.random() * 1e6)}`,
-        elogoResultCode: 0,
-        elogoResultMsg: "İşlem başarılı",
+        status: elogoStatuses[i] ?? FiscalInvoiceStatus.sent,
+        providerRef: `${Math.floor(Math.random() * 1e6)}`,
+        providerResultCode: 0,
+        providerResultMsg: "İşlem başarılı",
         issuedAt,
         sentAt: issuedAt,
       },
@@ -7836,7 +7836,7 @@ async function main() {
     elogoYear,
   );
   if (seededLastValue > 0) {
-    await prisma.elogoDocSequence.upsert({
+    await prisma.fiscalDocSequence.upsert({
       where: { prefix_year: { prefix: elogoPrefix, year: elogoYear } },
       update: { lastValue: seededLastValue },
       create: {

@@ -9,7 +9,7 @@ import {
 } from "@prisma/client";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
-import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
+import { InvoicingService } from "../../invoicing/invoicing.service";
 import type { SuratTakipGonderi } from "../helpers/surat-cargo.types";
 import { interpretSuratTracking } from "../mappers/surat-status.mapper";
 import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
@@ -614,11 +614,11 @@ export class TradeTrackingSyncService {
         select: { id: true },
       });
       if (tcps.length > 0) {
-        const elogo = this.moduleRef.get(ElogoInvoicingService, {
+        const invoicing = this.moduleRef.get(InvoicingService, {
           strict: false,
         });
         for (const tcp of tcps) {
-          await elogo
+          await invoicing
             .issueTradeCashFeeInvoice(tcp.id)
             .catch((e: any) =>
               this.logger.warn(

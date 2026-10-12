@@ -349,7 +349,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
   invoicesExhausted: {
     where: () => exhaustedInvoicesWhere,
     query: (prisma) =>
-      prisma.elogoInvoice.aggregate({
+      prisma.fiscalInvoice.aggregate({
         where: exhaustedInvoicesWhere,
         _count: { _all: true },
         _min: { createdAt: true },

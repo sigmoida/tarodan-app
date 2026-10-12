@@ -17,7 +17,7 @@ import {
   computeRelevanceScore,
   RELEVANCE_PREMIUM_BONUS,
 } from "../../product/helpers/relevance-score";
-import { ElogoInvoicingService } from "../../elogo";
+import { InvoicingService } from "../../invoicing";
 import {
   hasUsableRecurringCard,
   isPremiumEntitled,
@@ -41,7 +41,7 @@ export class VirtualOrderFulfillmentService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly invoicing: InvoicingService,
     private readonly outbox?: OutboxService,
     // Aktivasyon takas yetkisini değiştirir; arama dokümanı (sellerCanTrade)
     // ancak reindex'le tazelenir. @Optional — spec harness'ları konumsal kurar.
@@ -556,8 +556,8 @@ export class VirtualOrderFulfillmentService {
         orderBy: { createdAt: "desc" },
         select: { id: true },
       });
-      if (mp) await this.elogoInvoicing.issueMembershipInvoice(mp.id);
-      else await this.elogoInvoicing.issueMembershipInvoiceForOrder(orderId);
+      if (mp) await this.invoicing.issueMembershipInvoice(mp.id);
+      else await this.invoicing.issueMembershipInvoiceForOrder(orderId);
     })().catch((e) =>
       this.logger.warn(`eLogo üyelik faturası tetik hatası: ${e?.message}`),
     );
@@ -570,7 +570,7 @@ export class VirtualOrderFulfillmentService {
         where: { orderId },
         select: { id: true },
       });
-      if (boost) await this.elogoInvoicing.issueBoostInvoice(boost.id);
+      if (boost) await this.invoicing.issueBoostInvoice(boost.id);
     })().catch((e) =>
       this.logger.warn(`eLogo boost faturası tetik hatası: ${e?.message}`),
     );

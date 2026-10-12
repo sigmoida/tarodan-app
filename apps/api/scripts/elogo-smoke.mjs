@@ -197,7 +197,7 @@ async function diagnoseDatabase() {
       Boolean(process.env.AWS_S3_BUCKET ?? process.env.S3_BUCKET),
     );
 
-    const invoices = await prisma.elogoInvoice.findMany({
+    const invoices = await prisma.fiscalInvoice.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
       select: {
@@ -206,7 +206,7 @@ async function diagnoseDatabase() {
         invoiceNumber: true,
         emailSentAt: true,
         pdfUrl: true,
-        elogoResultMsg: true,
+        providerResultMsg: true,
         attemptCount: true,
         createdAt: true,
       },
@@ -226,8 +226,8 @@ async function diagnoseDatabase() {
           `attempts=${invoice.attemptCount}`,
         ].join(" "),
       );
-      if (invoice.elogoResultMsg) {
-        console.log(`  result: ${invoice.elogoResultMsg}`);
+      if (invoice.providerResultMsg) {
+        console.log(`  result: ${invoice.providerResultMsg}`);
       }
     }
 
@@ -241,7 +241,7 @@ async function diagnoseDatabase() {
         seller: { select: { sellerType: true } },
       },
     });
-    const orderInvoices = await prisma.elogoInvoice.findMany({
+    const orderInvoices = await prisma.fiscalInvoice.findMany({
       where: { sourceId: { in: orders.map((order) => order.id) } },
       select: {
         sourceId: true,

@@ -20,7 +20,7 @@ describe("OrderSchedulerService.runProcessDeliveredOrders — invoice candidate 
         // Faturalama sağlığı alarmları (reportInvoiceStaleness) sayaç sorgular.
         count: jest.fn().mockResolvedValue(0),
       },
-      elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
+      fiscalInvoice: { findMany: jest.fn().mockResolvedValue([]) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
       // Süreler Süreler ve Kurallar'dan; satır yok → varsayılan.
       platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },

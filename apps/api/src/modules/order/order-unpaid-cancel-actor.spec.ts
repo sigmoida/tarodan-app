@@ -75,7 +75,7 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
       commissionLedger as any,
       {} as any, // orderCommon
       {} as any, // orderQuery
-      {} as any, // elogoInvoicing
+      {} as any, // invoicing
       discountService as any,
     );
     return { service, tx };

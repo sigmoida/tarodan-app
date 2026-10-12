@@ -66,7 +66,7 @@ import {
   AddOrderTrackingDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
-  ElogoInvoiceQueryDto,
+  FiscalInvoiceQueryDto,
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
@@ -1266,8 +1266,8 @@ export class AdminService {
   // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
   // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getElogoInvoices(query: ElogoInvoiceQueryDto) {
-    return this.taxService.getElogoInvoices(query);
+  async getFiscalInvoices(query: FiscalInvoiceQueryDto) {
+    return this.taxService.getFiscalInvoices(query);
   }
 
   async getSellerUploadedInvoices(query: SellerUploadedInvoiceQueryDto) {

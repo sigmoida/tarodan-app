@@ -862,6 +862,155 @@ describe("validateEnv", () => {
     });
   });
 
+  describe("NETSIS_*", () => {
+    const netsisLive = {
+      NETSIS_ENABLED: "true",
+      NETSIS_MODE: "live",
+      NETSIS_BASE_URL: "https://netsis.customer.test:7070",
+      NETSIS_USERNAME: "NETSIS",
+      NETSIS_PASSWORD: "netsis-password",
+      NETSIS_DB_NAME: "TARODAN2026",
+      NETSIS_DB_USER: "TEMELSET",
+      NETSIS_DB_PASSWORD: "db-password",
+    };
+
+    it("is optional: production boots with Netsis disabled (the default)", () => {
+      expect(() => validateEnv({ ...prodBase })).not.toThrow();
+      expect(() =>
+        validateEnv({ ...prodBase, NETSIS_ENABLED: "false" }),
+      ).not.toThrow();
+    });
+
+    it("does not touch any eLogo guard", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, ELOGO_ENABLED: "false" }),
+      ).toThrow(/ELOGO_ENABLED/);
+    });
+
+    it("passes with a complete live configuration in production", () => {
+      expect(() => validateEnv({ ...prodBase, ...netsisLive })).not.toThrow();
+    });
+
+    it("refuses the stub (explicit or defaulted) on a production deployment", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, NETSIS_MODE: "stub" }),
+      ).toThrow(/NETSIS_MODE.*'live' in production/);
+      expect(() =>
+        validateEnv({ ...prodBase, NETSIS_ENABLED: "true" }),
+      ).toThrow(/NETSIS_MODE.*'live' in production/);
+    });
+
+    it("refuses an unknown mode instead of silently stubbing", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, ...netsisLive, NETSIS_MODE: "rest" }),
+      ).toThrow(/NETSIS_MODE must be 'stub' or 'live'/);
+    });
+
+    it("lets staging run the stub without any credentials", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          NETSIS_ENABLED: "true",
+          NETSIS_MODE: "stub",
+        }),
+      ).not.toThrow();
+    });
+
+    it("lets staging run live with a complete configuration", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, ...netsisLive }),
+      ).not.toThrow();
+    });
+
+    it("requires an HTTPS base URL whenever live", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          NETSIS_BASE_URL: "http://netsis.customer.test:7070",
+        }),
+      ).toThrow(/NETSIS_BASE_URL/);
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          ...without(netsisLive, "NETSIS_BASE_URL"),
+        }),
+      ).toThrow(/NETSIS_BASE_URL/);
+    });
+
+    it.each([
+      "NETSIS_USERNAME",
+      "NETSIS_PASSWORD",
+      "NETSIS_DB_NAME",
+      "NETSIS_DB_USER",
+      "NETSIS_DB_PASSWORD",
+    ])("requires %s when live", (key) => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...without(netsisLive, key) }),
+      ).toThrow(new RegExp(`${key} is required`));
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, [key]: "   " }),
+      ).toThrow(new RegExp(`${key} is required`));
+    });
+
+    it("rejects malformed numeric tuning values", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, NETSIS_TIMEOUT_MS: "0" }),
+      ).toThrow(/NETSIS_TIMEOUT_MS/);
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, NETSIS_TIMEOUT_MS: "15s" }),
+      ).toThrow(/NETSIS_TIMEOUT_MS/);
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          NETSIS_TOKEN_SAFETY_SECONDS: "-1",
+        }),
+      ).toThrow(/NETSIS_TOKEN_SAFETY_SECONDS/);
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          NETSIS_TIMEOUT_MS: "20000",
+          NETSIS_TOKEN_SAFETY_SECONDS: "0",
+        }),
+      ).not.toThrow();
+    });
+
+    it("keeps the declared keys (so .env-file values reach ConfigService)", () => {
+      const result = validateEnv({
+        ...prodBase,
+        ...netsisLive,
+        NETSIS_DB_TYPE: "vtMSSQL",
+        NETSIS_BRANCH_CODE: "0",
+        NETSIS_TIMEOUT_MS: "15000",
+        NETSIS_TOKEN_SAFETY_SECONDS: "60",
+      });
+      expect(result).toMatchObject({
+        ...netsisLive,
+        NETSIS_DB_TYPE: "vtMSSQL",
+        NETSIS_BRANCH_CODE: "0",
+        NETSIS_TIMEOUT_MS: "15000",
+        NETSIS_TOKEN_SAFETY_SECONDS: "60",
+      });
+    });
+
+    it("does not guard anything outside production builds", () => {
+      expect(() =>
+        validateEnv({
+          NODE_ENV: "development",
+          DATABASE_URL: "postgresql://u:p@db:5432/app",
+          JWT_SECRET: "dev",
+          JWT_REFRESH_SECRET: "dev",
+          ADMIN_JWT_SECRET: "dev",
+          GUEST_CHECKOUT_OTP_SECRET: "dev",
+          NETSIS_ENABLED: "true",
+          NETSIS_MODE: "stub",
+        }),
+      ).not.toThrow();
+    });
+  });
+
   it("still requires presence of every secret outside production", () => {
     expect(() =>
       validateEnv({

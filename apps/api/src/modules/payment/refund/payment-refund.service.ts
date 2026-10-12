@@ -33,7 +33,7 @@ import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { DiscountService } from "../../discount/discount.service";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
-import { ElogoInvoicingService } from "../../elogo";
+import { InvoicingService } from "../../invoicing";
 import { PaymentCommonService } from "../payment-common.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -164,7 +164,7 @@ export class PaymentRefundService {
     private readonly eventService: EventService,
     private readonly notificationService: NotificationService,
     private readonly commissionLedger: CommissionLedgerService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly invoicing: InvoicingService,
     private readonly paymentCommon: PaymentCommonService,
     private readonly providerEvents: PaymentProviderEventService,
     private readonly holdRelease: PaymentHoldReleaseService,
@@ -1324,7 +1324,7 @@ export class PaymentRefundService {
       // Post-commit hızlı yol. Aynı olay outbox'ta kalıcıdır; servis attempt-bazında
       // idempotent olduğu için iki tetik güvenlidir.
       if (invoiceAdjustment) {
-        void this.elogoInvoicing
+        void this.invoicing
           .handleOrderRefund(orderId, invoiceAdjustment)
           .catch((e) =>
             this.logger.warn(

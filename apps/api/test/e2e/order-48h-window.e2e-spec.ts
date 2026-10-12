@@ -39,7 +39,7 @@ describe("48h window core + auto-complete cron (E2E)", () => {
         issueCommissionInvoice: async () => {},
         issueServiceFeeInvoice: async () => {},
         issuePlatformSaleInvoice: async () => {},
-      } as any, // elogoInvoicing (no-op stub)
+      } as any, // invoicing (no-op stub)
     );
     return new OrderService(
       {} as any, // orderPricing
@@ -63,7 +63,7 @@ describe("48h window core + auto-complete cron (E2E)", () => {
         issueCommissionInvoice: async () => {},
         issueServiceFeeInvoice: async () => {},
         issuePlatformSaleInvoice: async () => {},
-      } as any /* elogoInvoicing (no-op stub) */,
+      } as any /* invoicing (no-op stub) */,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
       { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
       { createNotification: async () => {} } as any /* notificationService */,

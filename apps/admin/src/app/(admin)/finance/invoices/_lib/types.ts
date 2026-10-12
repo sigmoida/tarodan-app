@@ -17,11 +17,15 @@ export interface InvoiceParty {
   name: string;
 }
 
+/** Belgeyi kesen e-belge sağlayıcısı — API'nin `EInvoiceProviderName` değerleri. */
+export type InvoiceProvider = "elogo" | "netsis";
+
 export interface Invoice {
   id: string;
   type: string;
   isReturn: boolean;
   status: string;
+  provider: InvoiceProvider;
   documentType: string;
   invoiceNumber: string | null;
   ettn: string | null;
@@ -108,7 +112,7 @@ export const invoiceListResource = (scope: string): string =>
  * tazelemesi gereken listeler: sekmeler ÇAKIŞTIĞI için aynı belge birden fazla
  * sekmenin önbelleğinde durur, hepsi birden geçersizleşmeli.
  */
-export const ELOGO_INVOICE_LIST_RESOURCES = INVOICE_TAB_KEYS.filter(
+export const FISCAL_INVOICE_LIST_RESOURCES = INVOICE_TAB_KEYS.filter(
   (key) => key !== CORPORATE_TAB,
 ).map(invoiceListResource);
 
@@ -133,7 +137,7 @@ export const normalizeInvoiceTab = (tab: string): InvoiceTabKey =>
     ? (tab as InvoiceTabKey)
     : "all";
 
-/** İşlemin gerçekleşme şekli — API'nin `ElogoInvoiceContext` değerleriyle birebir. */
+/** İşlemin gerçekleşme şekli — API'nin `FiscalInvoiceContext` değerleriyle birebir. */
 export const invoiceContextLabels = (t: T): Record<string, string> => ({
   direct_sale: t("admin.finance.invoices.contexts.directSale"),
   offer: t("admin.finance.invoices.contexts.offer"),
@@ -176,6 +180,14 @@ export const invoiceTypeLabels = (t: T): Record<string, string> =>
       .filter((option) => option.value !== "all")
       .map((option) => [option.value, option.label]),
   );
+
+/** Sağlayıcı rozeti — belgeyi hangi entegratör kesti (iptal/iade orada yapılır). */
+export const invoiceProviderLabels = (
+  t: T,
+): Record<InvoiceProvider, string> => ({
+  elogo: t("admin.finance.invoices.providerName.elogo"),
+  netsis: t("admin.finance.invoices.providerName.netsis"),
+});
 
 /** Belge tipi rozeti — mükellefe kesilen e-Fatura mı, e-Arşiv mi. */
 export const documentTypeLabel = (t: T, documentType: string): string =>
@@ -293,6 +305,8 @@ export function mapInvoices(raw: any[]): Invoice[] {
     type: r.type,
     isReturn: !!r.isReturn,
     status: r.status,
+    // Alanı henüz döndürmeyen bir API sürümünde her belge eLogo'yla kesilmişti.
+    provider: r.provider === "netsis" ? "netsis" : "elogo",
     documentType: r.documentType,
     invoiceNumber: r.invoiceNumber,
     ettn: r.ettn,

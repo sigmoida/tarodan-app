@@ -449,7 +449,7 @@ const statusContractDefinitions = {
     "PayTR ödeme sonucu; kesin durum sunucu/callback otoritesindedir",
   ShipmentStatus: "Sürat durum kodlarından normalize edilen kargo durumu",
   RefundRequestStatus: "İade talebi, iade kargosu ve para iadesi yaşam döngüsü",
-  ElogoInvoiceStatus: "eLogo resmi belge üretim durumu",
+  FiscalInvoiceStatus: "Resmi e-belge (e-Arşiv / e-Fatura) üretim durumu",
   TradeStatus: "Takas, depo, kargo ve teslim yaşam döngüsü",
   SubscriptionStatus: "Üyelik yenileme/iptal durumu",
   MessageStatus: "Mesaj moderasyon ve okundu durumu",

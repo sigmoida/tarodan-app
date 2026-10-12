@@ -34,7 +34,7 @@ describe("AdminFinanceService.getFinanceOverview", () => {
       paymentHold: { count: jest.fn().mockResolvedValue(2) }, // süresi geçmiş held
       payoutTransfer: { count: jest.fn().mockResolvedValue(3) }, // failed/returned
       order: { count: jest.fn().mockResolvedValue(4) }, // faturasız teslimat
-      elogoInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
+      fiscalInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
       sellerAccountAdjustment: {
         aggregate: jest.fn().mockResolvedValue({
           _sum: { remainingAmount: 340 },
@@ -103,7 +103,7 @@ describe("AdminFinanceService.getFinanceOverview", () => {
 describe("AdminFinanceService.getInvoicesSummary", () => {
   it("durum kırılımını ve tükenenleri döndürür", async () => {
     const prisma = {
-      elogoInvoice: {
+      fiscalInvoice: {
         aggregate: jest
           .fn()
           .mockResolvedValue({ _sum: { total: 900 }, _count: { id: 6 } }),

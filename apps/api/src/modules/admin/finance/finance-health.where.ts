@@ -5,7 +5,7 @@ import {
   Prisma,
   SellerAdjustmentStatus,
 } from "@prisma/client";
-import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/helpers/elogo-retry-policy";
+import { INVOICE_MAX_SEND_ATTEMPTS } from "../../invoicing/helpers/invoice-retry-policy";
 import {
   LIVE_ORDER,
   LIVE_PAYMENT,
@@ -46,15 +46,15 @@ export function overdueHoldsWhere(now: Date): Prisma.PaymentHoldWhereInput {
 }
 
 /** Deneme bütçesi tükenmiş e-belgeler — yasal süre işliyor, elle müdahale şart. */
-export const exhaustedInvoicesWhere: Prisma.ElogoInvoiceWhereInput = {
+export const exhaustedInvoicesWhere: Prisma.FiscalInvoiceWhereInput = {
   status: "failed",
-  attemptCount: { gte: ELOGO_MAX_SEND_ATTEMPTS },
+  attemptCount: { gte: INVOICE_MAX_SEND_ATTEMPTS },
 };
 
 /** Denemesi süren başarısız belgeler (tükenmişlerden ayrı sayılır). */
-export const retryableFailedInvoicesWhere: Prisma.ElogoInvoiceWhereInput = {
+export const retryableFailedInvoicesWhere: Prisma.FiscalInvoiceWhereInput = {
   status: "failed",
-  attemptCount: { lt: ELOGO_MAX_SEND_ATTEMPTS },
+  attemptCount: { lt: INVOICE_MAX_SEND_ATTEMPTS },
 };
 
 /** Açık satıcı borcu (payout mahsubu bekleyen). */

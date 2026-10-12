@@ -15,7 +15,7 @@ import {
  * birden eşleştiren bir arama dar sorguyu imkânsız kılar (bir fatura numarası
  * bir kullanıcı kodu değildir).
  */
-export const elogoInvoiceFilterFields = (t: TranslateFn): FilterField[] => [
+export const fiscalInvoiceFilterFields = (t: TranslateFn): FilterField[] => [
   {
     type: "text",
     name: "invoiceNumber",

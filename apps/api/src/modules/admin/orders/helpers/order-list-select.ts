@@ -1,6 +1,6 @@
 import {
   RefundRequestStatus,
-  type ElogoInvoiceType,
+  type FiscalInvoiceType,
   type Prisma,
 } from "@prisma/client";
 
@@ -115,9 +115,9 @@ export const LIST_INVOICE_SELECT = {
   invoiceNumber: true,
   ettn: true,
   pdfUrl: true,
-} as const satisfies Prisma.ElogoInvoiceSelect;
+} as const satisfies Prisma.FiscalInvoiceSelect;
 
-export type ListInvoice = Prisma.ElogoInvoiceGetPayload<{
+export type ListInvoice = Prisma.FiscalInvoiceGetPayload<{
   select: typeof LIST_INVOICE_SELECT;
 }>;
 
@@ -126,7 +126,7 @@ export type ListInvoice = Prisma.ElogoInvoiceGetPayload<{
  * tabloyu gösterir (fatura / iade talebi), takas ve platform hizmeti belgeleri
  * sipariş ekranına ait değildir.
  */
-export const ORDER_INVOICE_TYPES: ElogoInvoiceType[] = [
+export const ORDER_INVOICE_TYPES: FiscalInvoiceType[] = [
   "commission",
   "service_fee",
   "buyer_commission",

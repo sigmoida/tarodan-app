@@ -8,7 +8,7 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import {
-  ElogoInvoiceType,
+  FiscalInvoiceType,
   OrderStatus,
   PaymentHoldStatus,
   Prisma,
@@ -33,7 +33,7 @@ import {
   shippingAmountForDesi,
 } from "../shipping/helpers/shipping-tariff.helper";
 import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
-import { readInvoiceLineItems } from "../elogo/invoice/invoice-lines";
+import { readInvoiceLineItems } from "../invoicing/invoice/invoice-lines";
 import {
   calculateRefundFinancials,
   RefundFinancialResult,
@@ -156,10 +156,10 @@ export class RefundFinancialService {
       return Number(order.taxAmount ?? 0);
     }
 
-    const invoice = await this.prisma.elogoInvoice.findUnique({
+    const invoice = await this.prisma.fiscalInvoice.findUnique({
       where: {
         type_sourceId: {
-          type: ElogoInvoiceType.platform_sale,
+          type: FiscalInvoiceType.platform_sale,
           sourceId: order.id,
         },
       },

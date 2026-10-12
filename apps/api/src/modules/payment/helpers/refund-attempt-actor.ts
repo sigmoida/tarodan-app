@@ -3,7 +3,7 @@ import {
   isAdminCancelReasonCode,
   type AdminCancelReasonCode,
 } from "@tarodan/types";
-import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
+import { refundRequestIdOf } from "../../invoicing/helpers/refund-request-key";
 
 /**
  * Bir iade talebini (RefundRequest) başlatabilen taraflar: alıcı (kendi iptal /
