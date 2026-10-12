@@ -11,7 +11,7 @@ import {
   type Advertisement,
   type AdPosition,
 } from "@/lib/api/advertisements";
-import { adAspectRatio } from "@/lib/ads/adAspect";
+import { adAspectRatio, naturalRatioOf } from "@/lib/ads/adAspect";
 import { isExternalAdHref, safeAdHref } from "@/lib/ads/safeAdHref";
 import AdHotspots from "./AdHotspots";
 
@@ -41,6 +41,9 @@ export default function AdCreative({
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   useAdImpression(boxRef, ad.id);
+  // Kayıtlı ölçüsü olmayan afişte kutu, görsel yüklenince onun gerçek oranını
+  // alır: alanlar kutunun yüzdesiyle yerleştiği için kutu = görsel olmalı.
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
 
   const body = (
     <div
@@ -53,7 +56,7 @@ export default function AdCreative({
       {ad.imageUrl ? (
         <div
           className="relative w-full bg-surface-alt"
-          style={{ aspectRatio: adAspectRatio(ad, position) }}
+          style={{ aspectRatio: adAspectRatio(ad, position, naturalRatio) }}
         >
           <OptimizedImage
             src={ad.imageUrl}
@@ -62,6 +65,7 @@ export default function AdCreative({
             sizes={sizes}
             className="object-contain"
             logContext={{ page: "banner", adId: ad.id }}
+            onLoad={(e) => setNaturalRatio(naturalRatioOf(e.currentTarget))}
           />
           <AdHotspots ad={ad} onNavigate={onNavigate} />
         </div>

@@ -216,6 +216,22 @@ export function hotspotIssues(
 export const AD_CONTENT_MAX = 500;
 export const AD_DIMENSION_MAX = 4000;
 
+/**
+ * Alan satırı şeması. Admin tsconfig'inde `strictNullChecks` kapalı olduğu için
+ * zod çıkarımı her alanı opsiyonel gösterir; şema zorunlu kıldığından çıkış tipi
+ * `AdHotspotFormRow` olarak sabitlenir (paylaşılan kurallar zorunlu alan ister).
+ */
+const hotspotRowSchema = z.object({
+  id: z.string().optional(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  label: z.string(),
+  linkUrl: z.string(),
+  clickCount: z.number().optional(),
+}) as unknown as z.ZodType<AdHotspotFormRow>;
+
 /** Form schema (validation-only; numbers/nulls shaped in the mutationFn). */
 export const adSchema = (t: T) =>
   z
@@ -252,21 +268,7 @@ export const adSchema = (t: T) =>
       startDate: z.string().optional().default(""),
       endDate: z.string().optional().default(""),
       discountId: z.string().optional().default(""),
-      hotspots: z
-        .array(
-          z.object({
-            id: z.string().optional(),
-            x: z.number(),
-            y: z.number(),
-            width: z.number(),
-            height: z.number(),
-            label: z.string(),
-            linkUrl: z.string(),
-            clickCount: z.number().optional(),
-          }),
-        )
-        .optional()
-        .default([]),
+      hotspots: z.array(hotspotRowSchema).optional().default([]),
     })
     .superRefine((v, ctx) => {
       for (const issue of hotspotIssues(t, v.hotspots)) {
