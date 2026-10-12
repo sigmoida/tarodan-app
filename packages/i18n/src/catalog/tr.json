@@ -2512,7 +2512,8 @@
       "secureTradingSubtitle": "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Her iki taraf için korumalı sistem.",
       "startTrading": "Takasa Başla",
       "howItWorks": "Nasıl Çalışır?",
-      "imageAlt": "Diecast model araç koleksiyonu"
+      "imageAlt": "Diecast model araç koleksiyonu",
+      "goToSlide": "Slayta git: {index}"
     }
   },
   "search": {

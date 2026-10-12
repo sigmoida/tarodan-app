@@ -2512,7 +2512,8 @@
       "secureTradingSubtitle": "Trade your collections with other collectors safely. Protected system for both parties.",
       "startTrading": "Start Trading",
       "howItWorks": "How It Works?",
-      "imageAlt": "Diecast model car collection"
+      "imageAlt": "Diecast model car collection",
+      "goToSlide": "Go to slide {index}"
     }
   },
   "search": {

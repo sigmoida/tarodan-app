@@ -2,7 +2,6 @@
 
 import QueryProvider from "@/components/QueryProvider";
 import { RealtimeProvider } from "@/components/realtime/RealtimeProvider";
-import { PlatformFeeAnnouncementBanner } from "@/components/banners/PlatformFeeAnnouncementBanner";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
 import SellerAddressPrompt from "@/components/SellerAddressPrompt";
@@ -16,8 +15,7 @@ import PreferredLanguageSync from "@/components/PreferredLanguageSync";
 /**
  * Layout for the public marketplace. Owns the storefront chrome (Navbar +
  * category bar + Footer) and the client providers those routes need
- * (query / realtime / confirm / business-membership gating + the platform-fee
- * banner). Auth pages and standalone status pages live outside this group and
+ * (query / realtime / confirm / business-membership gating). Auth pages and standalone status pages live outside this group and
  * so render without any of it. Replaces the old runtime `LayoutShell` path check.
  */
 export default function MainLayout({
@@ -29,7 +27,6 @@ export default function MainLayout({
     <QueryProvider>
       <PreferredLanguageSync />
       <RealtimeProvider />
-      <PlatformFeeAnnouncementBanner />
       <ConfirmProvider>
         {/* Zorunlu adımlar (önce sözleşme onayları, sonra yasal kimlik) —
             tek montaj noktası, aynı anda tek pencere. Üyelik kapısından

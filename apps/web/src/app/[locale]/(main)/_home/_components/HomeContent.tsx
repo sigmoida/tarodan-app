@@ -31,7 +31,7 @@ export default function HomeContent({
   return (
     <PageShell>
       <HomeOnboardingTour hasProducts={hasProducts} />
-      <HeroSlider />
+      <HeroSlider slides={data.heroSlides} />
       {/* Admin'in tanımladığı afişler ve platform kampanya duyuruları. Yuva
           boşsa hiçbir şey çizilmez. */}
       <BannerSlot position="header" className="mt-4 space-y-3" />
@@ -46,7 +46,7 @@ export default function HomeContent({
         featuredBusiness={data.featuredBusiness}
       />
       <BannerSlot position="footer" className="mt-8 space-y-3" />
-      <TrustBadges locale={locale} />
+      <TrustBadges badges={data.trustBadges} locale={locale} />
     </PageShell>
   );
 }
