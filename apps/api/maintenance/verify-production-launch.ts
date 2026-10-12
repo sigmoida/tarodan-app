@@ -137,6 +137,18 @@ async function main(): Promise<void> {
   await assertEmpty(baseUrl, "/search/products?page=1&pageSize=1");
   await assertEmpty(baseUrl, "/ads/active?position=header&device=desktop");
 
+  // Ana sayfa slider'ının kodda yedeği yok: referans seed'in slaytı (ya da
+  // admin'in yerine koyduğu) yayında olmalı, yoksa vitrin hero'suz açılır.
+  const heroSlides = asList(
+    await getJson(baseUrl, "/hero-slides?placement=home"),
+  );
+  if (heroSlides.length === 0) {
+    throw new Error(
+      "/hero-slides?placement=home returned no live slide; the storefront hero would be empty",
+    );
+  }
+  console.log(`home hero slides: ${heroSlides.length} live`);
+
   console.log(
     `Production API is ready. Catalog seeded; ${loadCount("products.json")} launch listings are inactive and invisible to buyers.`,
   );
