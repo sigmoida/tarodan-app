@@ -21,6 +21,8 @@ import { AdminCatalogController } from "./catalog/admin-catalog.controller";
 import { AdminTaxController } from "./finance/admin-tax.controller";
 import { AdminCollectionController } from "./catalog/admin-collection.controller";
 import { AdminAdvertisementController } from "./catalog/admin-advertisement.controller";
+import { AdminHeroController } from "./catalog/admin-hero.controller";
+import { AdminHeroService } from "./catalog/admin-hero.service";
 import { AdminShippingController } from "./orders/admin-shipping.controller";
 import { AdminLogsController } from "./analytics/admin-logs.controller";
 import { AdminReviewController } from "./ops/admin-review.controller";
@@ -135,6 +137,7 @@ import { SupportModule } from "../support";
 import { SearchModule } from "../search/search.module";
 import { CacheModule } from "../cache";
 import { AdvertisementModule } from "../advertisement/advertisement.module";
+import { HeroModule } from "../hero/hero.module";
 import { MediaModule } from "../media/media.module";
 import { DiscountModule } from "../discount/discount.module";
 import { EventModule } from "../events/event.module";
@@ -167,6 +170,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     SearchModule,
     CacheModule,
     AdvertisementModule,
+    // Vitrin hero'su + güven rozetleri: yazma domain servisinden, denetim burada.
+    HeroModule,
     MediaModule,
     DiscountModule,
     EventModule,
@@ -231,6 +236,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTaxController,
     AdminCollectionController,
     AdminAdvertisementController,
+    AdminHeroController,
     AdminShippingController,
     AdminLogsController,
     AdminReviewController,
@@ -315,6 +321,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminReviewService,
     AdminSellerApplicationService,
     AdminAdPackageService,
+    AdminHeroService,
     ScheduledNotificationScheduler,
     ...scheduledProcessors(ScheduledNotificationProcessor),
     LogRetentionService,
