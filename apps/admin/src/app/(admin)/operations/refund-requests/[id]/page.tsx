@@ -14,6 +14,7 @@ import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { RefundStatusStepper } from "./_components/RefundStatusStepper";
 import { FinancialComponentsTable } from "./_components/FinancialComponentsTable";
+import { FinancialTotalsBlock } from "./_components/FinancialTotalsBlock";
 import { RefundNextActionPanel } from "./_components/RefundNextActionPanel";
 import type {
   HistoryEntry,
@@ -214,6 +215,9 @@ export default function RefundRequestDetailPage() {
                 title={t("admin.operations.refundRequests.decisionV2.title")}
               >
                 <FinancialComponentsTable components={rr.financialComponents} />
+                {rr.financialTotals && (
+                  <FinancialTotalsBlock totals={rr.financialTotals} />
+                )}
               </SectionCard>
             )}
 

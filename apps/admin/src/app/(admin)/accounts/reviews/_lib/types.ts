@@ -13,6 +13,10 @@ export interface Review {
   status: ReviewStatus;
   adminReply?: string;
   adminReplyAt?: string;
+  /** Yorum görselleri — API düz URL ya da `{ url }` dönebilir. */
+  images?: Array<string | { url: string }>;
+  orderId?: string;
+  sellerId?: string;
   createdAt: string;
   isVerifiedPurchase: boolean;
   user: {
@@ -29,6 +33,9 @@ export interface UserRating {
   score: number;
   comment?: string;
   status?: ReviewStatus;
+  images?: Array<string | { url: string }>;
+  adminReply?: string;
+  adminReplyAt?: string;
   createdAt: string;
   orderId?: string;
   tradeId?: string;

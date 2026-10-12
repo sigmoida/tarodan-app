@@ -1,5 +1,6 @@
 import { payoutStatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
+import type { HoldReleaseFlags } from "./holdReason";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -56,7 +57,12 @@ export interface PayoutAdjustmentRow {
   createdAt: string;
 }
 
-export interface PayoutTransaction {
+/** Sunucunun hold satırına eklediği serbest bırakma kararı + sipariş durumu. */
+export interface HoldRowServerFlags extends HoldReleaseFlags {
+  orderStatus?: string;
+}
+
+export interface PayoutTransaction extends HoldRowServerFlags {
   id: string;
   orderId: string;
   orderNumber: string;
@@ -73,7 +79,7 @@ export interface PayoutTransaction {
   frozenByRefundId: string | null;
 }
 
-export interface ScheduleItem {
+export interface ScheduleItem extends HoldRowServerFlags {
   id: string;
   orderId: string;
   orderNumber: string;
@@ -106,6 +112,12 @@ export const payoutTabs = (t: T) => [
     key: "schedule",
     label: t("admin.finance.payouts.schedule"),
   },
+];
+
+/** "Vadesi geçmiş" süzgeci — değer API'ye `overdue=true` gider (dashboard uyarısı). */
+export const overdueFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.payouts.filterAllDue") },
+  { value: "true", label: t("admin.finance.payouts.filterOverdueOnly") },
 ];
 
 export const payoutStatusFilterOptions = (t: T) => [

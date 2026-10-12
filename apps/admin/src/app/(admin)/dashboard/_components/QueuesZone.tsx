@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Card, EmptyState, Skeleton } from "@tarodan/ui";
+import { Card, cn, EmptyState, Skeleton } from "@tarodan/ui";
 import type { DashboardQueueTile } from "@tarodan/types";
 import type { MessageKey } from "@tarodan/i18n";
 import { TextLink } from "@/components/TextLink";
@@ -49,7 +49,17 @@ function QueueTile({ tile }: { tile: DashboardQueueTile }) {
             <li key={part.key}>
               <Link
                 href={part.href}
-                className="flex items-baseline justify-between gap-2 py-0.5 text-xs text-body hover:underline"
+                className={cn(
+                  "flex items-baseline justify-between gap-2 py-0.5 text-xs hover:underline",
+                  // Bilgi satırı (ör. yaklaşan serbest bırakmalar) bekleyen iş
+                  // değildir: toplama girmez, soluk çizilir.
+                  part.informational ? "text-muted" : "text-body",
+                )}
+                title={
+                  part.informational
+                    ? t("admin.dashboard.queueParts.informationalHint")
+                    : undefined
+                }
               >
                 <span className="truncate">
                   {t(`admin.dashboard.queueParts.${part.key}` as MessageKey)}

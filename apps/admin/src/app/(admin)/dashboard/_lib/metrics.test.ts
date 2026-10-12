@@ -32,6 +32,25 @@ describe("toDashboardMetrics", () => {
     expect(metrics.signedInUsers.allTime).toBe(0);
   });
 
+  it("carries the server's hover description, dropping empty ones", () => {
+    const metrics = toDashboardMetrics({
+      paidOrders: {
+        period: 1,
+        yesterday: 0,
+        thisMonth: 1,
+        allTime: 1,
+        description: "Orders with a completed payment",
+      },
+      sellerPayoutCount: { period: 1, description: "" },
+    });
+
+    expect(metrics.paidOrders.description).toBe(
+      "Orders with a completed payment",
+    );
+    expect(metrics.sellerPayoutCount.description).toBeUndefined();
+    expect(metrics.paidAmount.description).toBeUndefined();
+  });
+
   it("coerces string figures (Decimal columns serialize as strings)", () => {
     const metrics = toDashboardMetrics({
       paidAmount: {

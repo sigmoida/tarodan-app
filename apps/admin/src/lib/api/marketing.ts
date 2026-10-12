@@ -85,6 +85,14 @@ export const marketingApi = {
   scheduleNotification: (
     data: NotificationBroadcastPayload & { scheduledFor: string },
   ) => api.post("/admin/notifications/schedule", data),
+  /** E-posta gövdesine eklenecek görseli yükler (multipart `file`); yanıt `{ url }`. */
+  uploadNotificationImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string }>("/admin/notifications/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   /** Gerçekte gidecek (sunucuda süzülmüş + iskeletli) e-postayı döner. */
   previewBroadcastEmail: (data: BroadcastEmailPreviewPayload) =>
     api.post("/admin/notifications/email-preview", data),

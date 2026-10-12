@@ -199,6 +199,8 @@ export const financeApi = {
     dateTo?: string;
     /** "true" = yalnız ERKEN bırakılanlar (releasedAt < releaseAt). */
     earlyReleased?: string;
+    /** "true" = yalnız vadesi geçmiş (releaseAt < şimdi) bekleyen hold'lar. */
+    overdue?: string;
     page?: number;
     limit?: number;
     sortBy?: string;

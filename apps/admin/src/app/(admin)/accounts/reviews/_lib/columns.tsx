@@ -14,7 +14,12 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 type Act = (id: string, s: ReviewStatus) => void;
 
-export function productReviewColumns(act: Act, t: T, busyId?: string) {
+export function productReviewColumns(
+  act: Act,
+  t: T,
+  busyId?: string,
+  onOpen?: (id: string) => void,
+) {
   return [
     col.product<Review>(
       t("admin.accounts.reviews.product"),
@@ -62,12 +67,23 @@ export function productReviewColumns(act: Act, t: T, busyId?: string) {
     ),
     col.date<Review>(t("common.date"), "createdAt"),
     col.rowMenu<Review>((r) =>
-      reviewRowMenu(r.status, (s) => act(r.id, s), t, busyId === r.id),
+      reviewRowMenu(
+        r.status,
+        (s) => act(r.id, s),
+        t,
+        busyId === r.id,
+        onOpen && (() => onOpen(r.id)),
+      ),
     ),
   ];
 }
 
-export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
+export function sellerReviewColumns(
+  act: Act,
+  t: T,
+  busyId?: string,
+  onOpen?: (id: string) => void,
+) {
   return [
     col.user<UserRating>(
       t("admin.accounts.reviews.sender"),
@@ -135,7 +151,13 @@ export function sellerReviewColumns(act: Act, t: T, busyId?: string) {
     ),
     col.date<UserRating>(t("common.date"), "createdAt"),
     col.rowMenu<UserRating>((r) =>
-      reviewRowMenu(r.status, (s) => act(r.id, s), t, busyId === r.id),
+      reviewRowMenu(
+        r.status,
+        (s) => act(r.id, s),
+        t,
+        busyId === r.id,
+        onOpen && (() => onOpen(r.id)),
+      ),
     ),
   ];
 }

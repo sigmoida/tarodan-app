@@ -19,6 +19,7 @@ export function MetricCard({
   label,
   value,
   title,
+  description,
   change,
   changeLabel,
   footer,
@@ -29,6 +30,8 @@ export function MetricCard({
   value: ReactNode;
   /** Tooltip for the (truncated) value — e.g. a long name. */
   title?: string;
+  /** Hover açıklaması (native tooltip) — kartın ne saydığını söyler. */
+  description?: string;
   /** Signed percentage delta — renders a colored up/down trend row when set. */
   change?: number;
   /** Suffix next to the trend value (default "vs yesterday"). */
@@ -56,13 +59,13 @@ export function MetricCard({
           hover) rather than wrapping, so every card's value lines up. */}
       <p
         className="mb-2 truncate text-sm text-muted"
-        title={typeof label === "string" ? label : undefined}
+        title={description ?? (typeof label === "string" ? label : undefined)}
       >
         {label}
       </p>
       <div
         className="min-w-0 truncate text-2xl font-bold text-heading"
-        title={title}
+        title={title ?? description}
       >
         {loading ? <Skeleton className="h-8 w-20" /> : value}
       </div>

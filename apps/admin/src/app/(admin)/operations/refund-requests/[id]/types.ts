@@ -56,6 +56,7 @@ export interface RefundRequestDetail {
   retainedBuyerServiceTaxAmount?: number | string;
   retainedSellerServiceTaxAmount?: number | string;
   financialComponents?: RefundFinancialComponent[];
+  financialTotals?: RefundFinancialTotals | null;
   metadata?: { history?: HistoryEntry[] } | null;
   refundProductAmount?: boolean;
   refundShippingFee?: boolean;
@@ -93,6 +94,24 @@ export interface RefundRequestDetail {
     payment?: { id: string; status: string; amount: number | string } | null;
     shipment?: { status: string; deliveredAt?: string | null } | null;
   };
+}
+
+/**
+ * Tarafa göre toplamlar (sunucu hesaplar). Taraflar arası TOPLANMAZ: alıcı iadesi
+ * ile satıcı kesintisi aynı paranın iki yüzüdür; kalem tablosunun bileşenleri de
+ * bu rakamlara eklenmez.
+ */
+export interface RefundFinancialTotals {
+  buyerRefund: number;
+  buyerCharge: number;
+  buyerNet: number;
+  sellerRefund: number;
+  sellerCharge: number;
+  sellerNet: number;
+  platformRetain: number;
+  platformRefund: number;
+  platformNet: number;
+  shippingRefund: number;
 }
 
 export interface RefundFinancialComponent {
