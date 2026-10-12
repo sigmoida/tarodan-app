@@ -1,7 +1,15 @@
-import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
-import { ElogoService } from "./elogo.service";
+import {
+  E_INVOICE_PROVIDER,
+  type EInvoiceProvider,
+} from "./provider/e-invoice-provider";
 import { i18nMessage } from "../i18n";
 import { invoiceDescriptionOf } from "./invoice/invoice-line-description";
 
@@ -45,7 +53,7 @@ const invoiceDisplayRank = (type: string): number => {
 export class ElogoQueryService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly elogo: ElogoService,
+    @Inject(E_INVOICE_PROVIDER) private readonly provider: EInvoiceProvider,
     @Optional() private readonly storage?: StorageService,
   ) {}
 
@@ -175,8 +183,8 @@ export class ElogoQueryService {
 
     // S3'te yoksa canlı çek → yükle → kaydet.
     if (!key && storageOk) {
-      const pdf = await this.elogo
-        .getEArchiveInvoicePdf(inv.ettn)
+      const pdf = await this.provider
+        .fetchPdf({ ettn: inv.ettn })
         .catch(() => null);
       if (pdf && pdf.length > 200) {
         try {
@@ -208,8 +216,8 @@ export class ElogoQueryService {
       if (url) return { url, invoiceNumber: inv.invoiceNumber };
     }
     // Son çare: canlı buffer (storage yok).
-    const buffer = await this.elogo
-      .getEArchiveInvoicePdf(inv.ettn)
+    const buffer = await this.provider
+      .fetchPdf({ ettn: inv.ettn })
       .catch(() => null);
     if (!buffer)
       throw new NotFoundException(
