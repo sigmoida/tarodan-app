@@ -7461,28 +7461,99 @@
           "reasonRequired": "İptal nedeni seçin"
         }
       },
-      "refunds": {
-        "title": "İadeler",
-        "description": "Direk satış, teklif ve takas iade talepleri; durumuna göre ayrılmış",
-        "searchPlaceholder": "İade no, sipariş no, takip no, alıcı / satıcı adı",
-        "empty": "Henüz iade talebi yok",
-        "emptyFiltered": "Filtreye uygun iade talebi bulunamadı",
+"refunds": {
         "tabs": {
           "all": "Tüm İadeler",
-          "direct": "Direk Satış İadeleri",
+          "direct": "Direkt Satış İadeleri",
           "offer": "Teklif İadeleri",
           "trade": "Takas İadeleri"
         },
         "buckets": {
           "all": "Tümü",
-          "pending_review": "Onay bekleyen",
-          "awaiting_return": "İade kargosu bekleniyor",
-          "at_warehouse": "Depoda",
-          "refunding": "İade ediliyor",
+          "pendingReview": "İnceleme Bekleyen",
+          "awaitingReturn": "Ürün Bekleniyor",
+          "atWarehouse": "Depoda / İncelemede",
+          "refunding": "İade Ediliyor",
           "completed": "Tamamlanan",
           "rejected": "Reddedilen",
-          "disputed": "İhtilaflı"
+          "disputed": "İtirazlı",
+          "pending_review": "Onay bekleyen",
+          "awaiting_return": "İade kargosu bekleniyor",
+          "at_warehouse": "Depoda"
         },
+        "origin": {
+          "direct": "Direkt Satış",
+          "offer": "Teklif",
+          "trade": "Takas"
+        },
+        "moneyStatus": {
+          "none": "İade yok",
+          "pending": "Bekliyor",
+          "refunding": "İade ediliyor",
+          "refunded": "Ödendi",
+          "failed": "Başarısız"
+        },
+        "tradeRole": {
+          "initiator": "Takas başlatan",
+          "responder": "Takas devam ettiren"
+        },
+        "warehouseDecision": {
+          "pending": "Kontrol sürüyor",
+          "approved": "Onaylandı",
+          "rejected": "Reddedildi"
+        },
+        "export": {
+          "sheetName": "İadeler",
+          "refundNo": "İade No",
+          "refundDate": "İade Tarihi",
+          "testLane": "Test şeridi",
+          "origin": "Tür",
+          "kind": "İade Türü",
+          "tradeRole": "Takas Tarafı",
+          "orderNumber": "Sipariş No",
+          "orderDate": "Sipariş Tarihi",
+          "groupNumber": "Grup No",
+          "buyer": "Alıcı",
+          "buyerCode": "Alıcı Kodu",
+          "seller": "Satıcı",
+          "sellerCode": "Satıcı Kodu",
+          "product": "Ürün",
+          "productCode": "Ürün Kodu",
+          "quantity": "Adet",
+          "refundQuantity": "İade Adedi",
+          "unitPrice": "Birim Fiyat",
+          "commissionRate": "Komisyon Oranı (%)",
+          "commissionAmount": "Komisyon Tutarı",
+          "refundableCommissionRate": "İade Edilecek Komisyon Oranı (%)",
+          "refundableCommissionAmount": "İade Edilecek Komisyon Tutarı",
+          "listingCommissionAmount": "İlan Fiyatı Komisyonu",
+          "offerCommissionAmount": "Teklif Fiyatı Komisyonu",
+          "priceDifference": "Fiyat Farkı",
+          "buyerDeduction": "Alıcı Kesintisi",
+          "sellerDeduction": "Satıcı Kesintisi",
+          "refundAmount": "İade Tutarı",
+          "moneyStatus": "İade Tutar Durumu",
+          "refundedAt": "İade Ödeme Tarihi",
+          "packageTrackingNo": "Sipariş Paket Takip No",
+          "returnTrackingNo": "İade Paket Takip No",
+          "returnShipmentStatus": "İade Kargo Durumu",
+          "warehouseArrival": "Depoya Ulaşma Durumu",
+          "warehouseDecision": "Depo Kararı",
+          "warehouseOutboundAt": "Depodan Çıkış",
+          "returnToCustomersStatus": "Müşteriye Dönüş Kargo Durumu",
+          "reason": "İade Nedeni",
+          "note": "Açıklama",
+          "status": "İade Son Durum",
+          "completedAt": "Sonuçlanma Tarihi",
+          "returnInvoiceNumber": "İade Faturası No",
+          "returnInvoiceStatus": "İade Faturası Durumu",
+          "refundTotal": "İade tutarları toplamı"
+        },
+        "title": "İadeler",
+        "description": "Direk satış, teklif ve takas iade talepleri; durumuna göre ayrılmış",
+        "searchPlaceholder": "İade no, sipariş no, takip no, alıcı / satıcı adı",
+        "empty": "Henüz iade talebi yok",
+        "emptyFiltered": "Filtreye uygun iade talebi bulunamadı",
         "columns": {
           "refundNo": "İade No",
           "order": "Sipariş",
@@ -7517,13 +7588,6 @@
           "listingCommission": "İlan komisyonu",
           "offerCommission": "Teklif komisyonu",
           "priceDifference": "Fiyat farkı"
-        },
-        "moneyStatus": {
-          "none": "İade yok",
-          "pending": "Bekliyor",
-          "refunding": "İade ediliyor",
-          "refunded": "Ödendi",
-          "failed": "Başarısız"
         },
         "warehouse": {
           "arrival": "Varış",
@@ -7965,92 +8029,6 @@
           "reason": "İptal Nedeni",
           "refundState": "İade Durumu",
           "testLane": "Test şeridi"
-        }
-      },
-      "refunds": {
-        "tabs": {
-          "all": "Tüm İadeler",
-          "direct": "Direkt Satış İadeleri",
-          "offer": "Teklif İadeleri",
-          "trade": "Takas İadeleri"
-        },
-        "buckets": {
-          "all": "Tümü",
-          "pendingReview": "İnceleme Bekleyen",
-          "awaitingReturn": "Ürün Bekleniyor",
-          "atWarehouse": "Depoda / İncelemede",
-          "refunding": "İade Ediliyor",
-          "completed": "Tamamlanan",
-          "rejected": "Reddedilen",
-          "disputed": "İtirazlı"
-        },
-        "origin": {
-          "direct": "Direkt Satış",
-          "offer": "Teklif",
-          "trade": "Takas"
-        },
-        "moneyStatus": {
-          "none": "İade yok",
-          "pending": "Bekliyor",
-          "refunding": "İade ediliyor",
-          "refunded": "Ödendi",
-          "failed": "Başarısız"
-        },
-        "tradeRole": {
-          "initiator": "Takas başlatan",
-          "responder": "Takas devam ettiren"
-        },
-        "warehouseDecision": {
-          "pending": "Kontrol sürüyor",
-          "approved": "Onaylandı",
-          "rejected": "Reddedildi"
-        },
-        "export": {
-          "sheetName": "İadeler",
-          "refundNo": "İade No",
-          "refundDate": "İade Tarihi",
-          "testLane": "Test şeridi",
-          "origin": "Tür",
-          "kind": "İade Türü",
-          "tradeRole": "Takas Tarafı",
-          "orderNumber": "Sipariş No",
-          "orderDate": "Sipariş Tarihi",
-          "groupNumber": "Grup No",
-          "buyer": "Alıcı",
-          "buyerCode": "Alıcı Kodu",
-          "seller": "Satıcı",
-          "sellerCode": "Satıcı Kodu",
-          "product": "Ürün",
-          "productCode": "Ürün Kodu",
-          "quantity": "Adet",
-          "refundQuantity": "İade Adedi",
-          "unitPrice": "Birim Fiyat",
-          "commissionRate": "Komisyon Oranı (%)",
-          "commissionAmount": "Komisyon Tutarı",
-          "refundableCommissionRate": "İade Edilecek Komisyon Oranı (%)",
-          "refundableCommissionAmount": "İade Edilecek Komisyon Tutarı",
-          "listingCommissionAmount": "İlan Fiyatı Komisyonu",
-          "offerCommissionAmount": "Teklif Fiyatı Komisyonu",
-          "priceDifference": "Fiyat Farkı",
-          "buyerDeduction": "Alıcı Kesintisi",
-          "sellerDeduction": "Satıcı Kesintisi",
-          "refundAmount": "İade Tutarı",
-          "moneyStatus": "İade Tutar Durumu",
-          "refundedAt": "İade Ödeme Tarihi",
-          "packageTrackingNo": "Sipariş Paket Takip No",
-          "returnTrackingNo": "İade Paket Takip No",
-          "returnShipmentStatus": "İade Kargo Durumu",
-          "warehouseArrival": "Depoya Ulaşma Durumu",
-          "warehouseDecision": "Depo Kararı",
-          "warehouseOutboundAt": "Depodan Çıkış",
-          "returnToCustomersStatus": "Müşteriye Dönüş Kargo Durumu",
-          "reason": "İade Nedeni",
-          "note": "Açıklama",
-          "status": "İade Son Durum",
-          "completedAt": "Sonuçlanma Tarihi",
-          "returnInvoiceNumber": "İade Faturası No",
-          "returnInvoiceStatus": "İade Faturası Durumu",
-          "refundTotal": "İade tutarları toplamı"
         }
       }
     },

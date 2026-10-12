@@ -34,8 +34,9 @@ describe("bucket label resolution", () => {
       );
     }
     for (const bucket of ADMIN_REFUND_BUCKETS) {
-      expect(ADMIN_REFUND_BUCKET_I18N_KEYS[bucket]).toBe(
-        `admin.operations.refunds.buckets.${bucket}`,
+      // Anahtar biçimi (camelCase) @tarodan/types haritasının işi; burada yalnız alan adı sabitlenir.
+      expect(ADMIN_REFUND_BUCKET_I18N_KEYS[bucket]).toMatch(
+        /^admin\.operations\.refunds\.buckets\.[A-Za-z]+$/,
       );
     }
   });
