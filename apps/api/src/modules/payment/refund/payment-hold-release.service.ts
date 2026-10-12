@@ -20,6 +20,7 @@ import {
   holdReleaseBlockedReason,
   holdReleaseOrderFacts,
   holdResidual,
+  RESIDUAL_ORDER_STATUSES,
 } from "../../payout/helpers/hold-release-eligibility";
 import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
@@ -40,6 +41,9 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+
+/** Bir cron turunda okunan damgasız kalıntı adayı üst sınırı. */
+const RESIDUAL_CANDIDATE_BATCH = 500;
 
 /**
  * Escrow'un SERBEST BIRAKMA tarafı — PaymentRefundService'ten birebir taşındı.
@@ -409,22 +413,22 @@ export class PaymentHoldReleaseService {
     // dondurulmamış (frozenByRefundId null) olanları release et. releaseAt artık
     // teslim + return + grace olduğu için süre dolduğunda iade penceresi zaten
     // kapanmıştır; açık iade varsa frozen + status guard'ları release'i engeller.
-    // Adaylar: tarihi gelmiş hold'lar + KALINTI adayları. Kalıntı (iade/iptal
-    // sonrası satıcıya bırakılan kargo payı) kargoya verilmeden iptal edilen
-    // siparişte damgasızdır (`releaseAt` yalnız teslimde yazılır) — tarih
-    // filtresi tek başına onu hiç görmezdi. `refundedAmount > 0` kalıntı
-    // adayını daraltır; asıl karar aşağıdaki yüklemdedir.
-    const dueHolds = await this.prisma.paymentHold.findMany({
+    // Adaylar: tarihi gelmiş hold'lar + KALINTI adayları (`residualHoldCandidates`).
+    // Asıl karar aşağıdaki yüklemdedir.
+    const datedHolds = await this.prisma.paymentHold.findMany({
       where: {
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
-        OR: [
-          { releaseAt: { lte: now } },
-          { releaseAt: null, refundedAmount: { gt: 0 } },
-        ],
+        releaseAt: { lte: now },
       },
       orderBy: { createdAt: "asc" },
     });
+    const residualHolds = await this.residualHoldCandidates();
+    const dueHolds = [
+      ...new Map(
+        [...datedHolds, ...residualHolds].map((hold) => [hold.id, hold]),
+      ).values(),
+    ];
 
     // Y1: Escrow yalnızca ürün en az sevk edildiyse VE açık bir iade/itiraz yoksa
     // serbest bırakılmalı. releaseAt ödeme anında NULL'dır; yalnız teslimde
@@ -492,6 +496,42 @@ export class PaymentHoldReleaseService {
     }
 
     return { count: holdCount, tradeCashReleased };
+  }
+
+  /**
+   * Damgasız KALINTI adayları: iade/iptalle KAPANMIŞ siparişin hâlâ tutulan,
+   * kilitsiz, `releaseAt`'siz hold'ları. Kargoya verilmeden iptal edilen
+   * siparişte `releaseAt` hiç yazılmaz (yalnız teslimde yazılır), bu yüzden
+   * tarih filtresi bu hold'ları hiç görmez.
+   *
+   * Eskiden aday `refundedAmount > 0` ile daraltılıyordu; ama bırakılacak pay
+   * hold'u aşarsa iade HİÇ tüketmez (`refundedAmount` 0 kalır) ve kalıntı hold'un
+   * tamamı olur — cron o hold'u hiç seçmiyordu. Sipariş durumunu okumak şart;
+   * `PaymentHold`'un `order` ilişkisi olmadığı için parametreli bir JOIN ile.
+   * Sınırlı ve sıralı (§11): kapanmış siparişte tutulan hold yalnız kalıntı
+   * taşır, küme doğası gereği küçüktür.
+   */
+  private async residualHoldCandidates() {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT h.id
+      FROM payment_holds h
+      JOIN orders o ON o.id = h.order_id
+      WHERE h.status::text = ${PaymentHoldStatus.held}
+        AND h.frozen_by_refund_id IS NULL
+        AND h.release_at IS NULL
+        AND o.status::text IN (${Prisma.join([...RESIDUAL_ORDER_STATUSES])})
+      ORDER BY h.created_at ASC
+      LIMIT ${RESIDUAL_CANDIDATE_BATCH}
+    `;
+    if (rows.length === 0) return [];
+    return this.prisma.paymentHold.findMany({
+      where: {
+        id: { in: rows.map((row) => row.id) },
+        status: PaymentHoldStatus.held,
+        frozenByRefundId: null,
+      },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
   /**
