@@ -3,8 +3,8 @@ import type { FiscalInvoiceType } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import {
   NetsisClientFacade,
-  NetsisRequestException,
   classifyNetsisError,
+  describeNetsisError,
   readNetsisArpEInvoiceProfile,
   type NetsisCallOptions,
   type NetsisEDocumentRequest,
@@ -104,12 +104,7 @@ const digitsOf = (value: string | null | undefined): string =>
 /** Kayda/loga güvenli kısa hata metni (Netsis gövde parçası, istek değil). */
 function errorText(error: unknown): string {
   if (error instanceof NetsisInvoiceRejection) return error.resultMsg;
-  if (error instanceof NetsisRequestException) {
-    return `${error.kind}: ${error.detail}`.slice(0, 500);
-  }
-  const payload = localizedPayloadOf(error);
-  if (payload) return translateMessage(payload.i18nKey);
-  return String((error as Error)?.message ?? error).slice(0, 500);
+  return describeNetsisError(error);
 }
 
 interface CorporateRecipient {

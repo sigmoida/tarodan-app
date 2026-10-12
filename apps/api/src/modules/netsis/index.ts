@@ -18,6 +18,8 @@ export {
 export type { NetsisArpEInvoiceProfile } from "./helpers/netsis-model.helper";
 export {
   classifyNetsisError,
+  describeNetsisError,
+  isNetsisPreSendFailure,
   NetsisRequestException,
 } from "./http/netsis-error";
 export type { NetsisErrorKind } from "./http/netsis-error";

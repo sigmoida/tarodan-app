@@ -1,10 +1,63 @@
-import { HttpStatus } from "@nestjs/common";
+import { HttpStatus, ServiceUnavailableException } from "@nestjs/common";
+import { i18nMessage } from "../../i18n/localized-message";
 import {
   classifyNetsisError,
   classifyNetsisResponse,
+  describeNetsisError,
+  isNetsisPreSendFailure,
   NetsisRequestException,
   netsisSnippet,
 } from "./netsis-error";
+
+describe("describeNetsisError", () => {
+  it("Netsis hatası: sınıf + yanıt parçası", () => {
+    expect(
+      describeNetsisError(
+        new NetsisRequestException("validation", 400, "CARI_KOD yok"),
+      ),
+    ).toBe("validation: CARI_KOD yok");
+  });
+
+  it("yerelleştirilmiş hata: katalog metni (tr)", () => {
+    expect(
+      describeNetsisError(
+        new ServiceUnavailableException(i18nMessage("server.netsis.disabled")),
+      ),
+    ).toBe("Netsis entegrasyonu kapalı");
+  });
+
+  it("diğerleri: mesaj, 500 karakterde kesilir", () => {
+    expect(describeNetsisError(new Error("x".repeat(600)))).toHaveLength(500);
+  });
+});
+
+describe("isNetsisPreSendFailure", () => {
+  const wrapped = (code: string) =>
+    new NetsisRequestException(
+      "network",
+      null,
+      "POST MixedReceiptsMain: TypeError",
+      undefined,
+      Object.assign(new TypeError("fetch failed"), { cause: { code } }),
+    );
+
+  it("bağlantı hiç kurulamadıysa istek Netsis'e ulaşmamıştır", () => {
+    expect(isNetsisPreSendFailure(wrapped("ECONNREFUSED"))).toBe(true);
+    expect(isNetsisPreSendFailure(wrapped("ENOTFOUND"))).toBe(true);
+    expect(isNetsisPreSendFailure(wrapped("UND_ERR_CONNECT_TIMEOUT"))).toBe(
+      true,
+    );
+  });
+
+  it("zaman aşımı, kopma ve sunucu yanıtı belirsizdir (false)", () => {
+    expect(isNetsisPreSendFailure(wrapped("ETIMEDOUT"))).toBe(false);
+    expect(isNetsisPreSendFailure(wrapped("ECONNRESET"))).toBe(false);
+    expect(
+      isNetsisPreSendFailure(new NetsisRequestException("network", 504, "x")),
+    ).toBe(false);
+    expect(isNetsisPreSendFailure(new Error("boom"))).toBe(false);
+  });
+});
 
 describe("classifyNetsisError", () => {
   const upstream = (status: number, body = "") => ({ status, body });
