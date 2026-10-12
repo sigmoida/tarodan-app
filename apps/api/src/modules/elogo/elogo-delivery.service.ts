@@ -211,10 +211,10 @@ export class ElogoDeliveryService {
       if (providerEnabled) {
         await this.sendRecord(record.id);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Idempotency yarışı (aynı anda iki create) veya beklenmedik hata — yut, cron toparlar.
       this.logger.error(
-        `eLogo ${type} faturası kesimi hata (source=${sourceId}): ${err?.message}`,
+        `eLogo ${type} faturası kesimi hata (source=${sourceId}): ${(err as Error)?.message}`,
       );
     }
   }
@@ -630,7 +630,7 @@ export class ElogoDeliveryService {
         );
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // GEÇİCİ arıza (ağ/zaman aşımı/sağlayıcı 5xx) deneme bütçesini TÜKETMEMELİ:
       // 8 deneme × 30 dk cron ≈ 4 saat; sağlayıcı bir gün kapalı kalırsa fatura
       // kalıcı `failed`'e düşüp 7 günlük e-Arşiv süresini sessizce kaçırıyordu.
@@ -643,12 +643,15 @@ export class ElogoDeliveryService {
             invoiceNumber: currentNumber,
             status: transient ? "pending" : "failed",
             ...(transient ? { attemptCount: { decrement: 1 } } : {}),
-            elogoResultMsg: String(err?.message || err).slice(0, 500),
+            elogoResultMsg: String((err as Error)?.message || err).slice(
+              0,
+              500,
+            ),
           },
         })
         .catch(() => undefined);
       this.logger[transient ? "warn" : "error"](
-        `eLogo ${inv.type} faturası gönderim hatası (${currentNumber}, ${transient ? "geçici" : "kalıcı"}): ${err?.message}`,
+        `eLogo ${inv.type} faturası gönderim hatası (${currentNumber}, ${transient ? "geçici" : "kalıcı"}): ${(err as Error)?.message}`,
       );
     }
   }
@@ -664,7 +667,7 @@ export class ElogoDeliveryService {
       ettn: string;
       invoiceNumber: string;
       type: string;
-      total: any;
+      total: number;
       currentPdfUrl: string | null;
       recipientName?: string | null;
       lineDescription?: string | null;
@@ -704,12 +707,12 @@ export class ElogoDeliveryService {
           isPublic: false,
           entityType: "elogo_invoice",
           entityId: inv.id,
-        } as any);
+        });
         pdfKey = up.key;
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `eLogo PDF S3 yükleme hatası (${inv.invoiceNumber}): ${e?.message}`,
+        `eLogo PDF S3 yükleme hatası (${inv.invoiceNumber}): ${(e as Error)?.message}`,
       );
     }
     // 2) Alıcıya kendi SMTP'mizden e-postala (PDF ekli). Şablon = admin'den düzenlenebilir
@@ -744,12 +747,12 @@ export class ElogoDeliveryService {
           // EmailLog + Mail Yönlendirme alanı (fatura) şablondan.
           template: tplKey,
           attachments: [{ filename: `${inv.invoiceNumber}.pdf`, content: pdf }],
-        } as any);
+        });
         emailedAt = new Date();
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.logger.warn(
-        `eLogo PDF e-posta hatası (${inv.invoiceNumber}): ${e?.message}`,
+        `eLogo PDF e-posta hatası (${inv.invoiceNumber}): ${(e as Error)?.message}`,
       );
     }
     // 3) Kaydı güncelle (pdfUrl + emailSentAt).
@@ -952,7 +955,7 @@ export class ElogoDeliveryService {
       html: email.html,
       template: "elogo-invoice",
       attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
-    } as any);
+    });
     await this.prisma.elogoInvoice.update({
       where: { id: invoice.id },
       data: { emailSentAt: new Date() },

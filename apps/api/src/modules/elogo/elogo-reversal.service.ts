@@ -1,6 +1,10 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import { Prisma, type ElogoInvoice } from "@prisma/client";
+import {
+  Prisma,
+  type ElogoInvoice,
+  type ElogoInvoiceType,
+} from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   invoiceDiscountFromLines,
@@ -223,7 +227,12 @@ export class ElogoReversalService {
     const failures: string[] = [];
     for (const k of keys) {
       const inv = await this.prisma.elogoInvoice.findUnique({
-        where: { type_sourceId: { type: k.type as any, sourceId: k.sourceId } },
+        where: {
+          type_sourceId: {
+            type: k.type as ElogoInvoiceType,
+            sourceId: k.sourceId,
+          },
+        },
       });
       if (!inv || inv.status === "cancelled") continue;
       try {
@@ -248,8 +257,8 @@ export class ElogoReversalService {
           }
           await this.reverseInvoice(inv, adjustment);
         }
-      } catch (error: any) {
-        const message = `${inv.invoiceNumber ?? inv.id}: ${error?.message ?? error}`;
+      } catch (error: unknown) {
+        const message = `${inv.invoiceNumber ?? inv.id}: ${(error as Error)?.message ?? error}`;
         failures.push(message);
         this.logger.error(`eLogo iade/iptal hata (${message})`);
       }
@@ -519,12 +528,12 @@ export class ElogoReversalService {
       let cancellationOutcomeUnknown = false;
       const res: EInvoiceCancelResult = await this.provider
         .cancelEArchive({ ettn: inv.ettn, providerRef: inv.elogoRefId })
-        .catch((e: any) => {
+        .catch((e: unknown): EInvoiceCancelResult => {
           cancellationOutcomeUnknown = true;
           return {
             success: false,
-            resultMsg: String(e?.message),
-          } as any;
+            resultMsg: String((e as Error)?.message),
+          };
         });
       if (res.success) {
         await this.prisma.elogoInvoice.update({

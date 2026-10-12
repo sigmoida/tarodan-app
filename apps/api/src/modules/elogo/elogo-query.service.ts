@@ -196,7 +196,7 @@ export class ElogoQueryService {
             isPublic: false,
             entityType: "elogo_invoice",
             entityId: inv.id,
-          } as any);
+          });
           key = up.key;
           await this.prisma.elogoInvoice
             .update({ where: { id: inv.id }, data: { pdfUrl: key } })
