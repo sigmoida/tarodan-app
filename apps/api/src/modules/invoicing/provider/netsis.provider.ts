@@ -506,10 +506,13 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
    * B/K kodudur (docs/CODE_SCHEME.md).
    */
   private async corporateRecipient(
-    vkn: string,
+    rawVkn: string,
     userId?: string,
     snapshot?: FiscalParty,
   ): Promise<CorporateRecipient | null> {
+    // `isNetsisCorporateTaxId` rakam sayar; arama da aynı normalize değerle
+    // yapılır — biçimli bir VKN ("123 456 7890") kullanıcıyı kaçırmasın.
+    const vkn = digitsOf(rawVkn);
     const select = {
       adminCode: true,
       companyName: true,

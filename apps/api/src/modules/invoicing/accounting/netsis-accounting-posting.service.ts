@@ -57,6 +57,13 @@ export interface NetsisAccountingRunResult {
   blockers?: string[];
 }
 
+/** Bir turun kayıtlarının paylaştığı ayarlar (tur başına bir kez okunur). */
+export interface NetsisPostingContext {
+  settings: NetsisAccountingSettings;
+  /** Fatura ayarlarındaki ortak perakende cari (`netsis.cari.retailCode`). */
+  retailCariCode: string;
+}
+
 /** Kayıt Netsis'te OLUŞTU ama `netsisRef` yerelde saklanamadı. */
 class NetsisSyncRefLostError extends Error {
   constructor(readonly ref: string) {
@@ -136,10 +143,16 @@ export class NetsisAccountingPostingService {
       select: { id: true },
     });
 
+    // Ayarlar tur başına BİR kez okunur; kayıt başına yeniden sorulmaz.
+    const context: NetsisPostingContext = {
+      settings,
+      retailCariCode: (await loadNetsisInvoiceSettings(this.prisma))
+        .retailCariCode,
+    };
     let synced = 0;
     let failed = 0;
     for (const { id } of candidates) {
-      const status = await this.post(id, settings).catch((error: unknown) => {
+      const status = await this.post(id, context).catch((error: unknown) => {
         this.logger.error(
           `Netsis muhasebe kaydı işlenemedi (${id}): ${describeNetsisError(error)}`,
         );
@@ -154,7 +167,7 @@ export class NetsisAccountingPostingService {
   /** Tek kaydı yazar; sahiplenemezse (başkası işliyor / bitmiş) `null`. */
   async post(
     recordId: string,
-    preloaded?: NetsisAccountingSettings,
+    preloaded?: NetsisPostingContext,
   ): Promise<NetsisSyncStatus | null> {
     const claimed = await this.claim(recordId);
     if (!claimed) return null;
@@ -166,14 +179,16 @@ export class NetsisAccountingPostingService {
       return this.fail(record, "unknown", this.outcomeUnknownText(record));
     }
 
-    let phase: "prepare" | "send" = "prepare";
+    // `finalize`: Netsis'te kayıt oluştu VE anahtarı yerelde saklandı; kalan
+    // tek iş durumu yazmaktır. Burada düşen bir DB hatası "sonucu bilinmiyor"
+    // değildir — sonraki deneme dolu `netsisRef`i görüp göndermeden kapatır.
+    let phase: "prepare" | "send" | "finalize" = "prepare";
     try {
       const load = await this.sources.load(record.kind, record.sourceId);
       if (load.state !== "ready") return this.skip(record, load.reason);
 
-      const settings =
-        preloaded ?? (await loadNetsisAccountingSettings(this.prisma));
-      const { retailCariCode } = await loadNetsisInvoiceSettings(this.prisma);
+      const { settings, retailCariCode } =
+        preloaded ?? (await this.loadContext());
       const posting = buildNetsisAccountingPosting(
         await this.resolveSource(load.source),
         { accounts: settings.accounts, retailCariCode },
@@ -200,7 +215,8 @@ export class NetsisAccountingPostingService {
         `${NETSIS_SYNC_LOCAL_REF_PREFIX}${record.idempotencyKey}`;
 
       await this.persistRef(record.id, ref);
-      return this.markSynced(record.id, ref);
+      phase = "finalize";
+      return await this.markSynced(record.id, ref);
     } catch (error: unknown) {
       if (error instanceof NetsisSyncRefLostError) {
         return this.fail(
@@ -208,6 +224,9 @@ export class NetsisAccountingPostingService {
           "unknown",
           message("error.refLost", { ref: error.ref }),
         );
+      }
+      if (phase === "finalize") {
+        return this.fail(record, "retry", describeNetsisError(error));
       }
       const outcome = netsisSyncFailureOutcome(error, phase);
       return this.fail(
@@ -275,6 +294,15 @@ export class NetsisAccountingPostingService {
   }
 
   // ───────────────────────── iç adımlar ─────────────────────────
+
+  /** Tek kayıt çağrısı (cron dışı) için ayarlar. */
+  private async loadContext(): Promise<NetsisPostingContext> {
+    const [settings, invoice] = await Promise.all([
+      loadNetsisAccountingSettings(this.prisma),
+      loadNetsisInvoiceSettings(this.prisma),
+    ]);
+    return { settings, retailCariCode: invoice.retailCariCode };
+  }
 
   /**
    * DB kirası: yalnız bir işçi aynı kaydı yazar. Durum + deneme sayısı (+ bayat

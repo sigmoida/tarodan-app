@@ -277,6 +277,29 @@ describe("NetsisAccountingPostingService", () => {
     expect(row).toMatchObject({ status: "pending", attemptCount: 0 });
   });
 
+  it("netsisRef saklandıktan sonra durum yazımı düşerse: pending, bütçe tüketmez, alarm yok", async () => {
+    const { service, stub, row, prisma } = build();
+    await stub.arps.create({ CariTemelBilgi: { CARI_KOD: RETAIL } });
+    const update = prisma.netsisSyncRecord.update.getMockImplementation()!;
+    let failedOnce = false;
+    prisma.netsisSyncRecord.update.mockImplementation(async (args) => {
+      if (args.data.status === "synced" && !failedOnce) {
+        failedOnce = true;
+        throw new Error("db down");
+      }
+      return update(args);
+    });
+
+    await expect(service.post("rec-1")).resolves.toBe("pending");
+    // Netsis'teki kayıt anahtarı duruyor: sonraki deneme göndermeden kapatır.
+    expect(row).toMatchObject({ status: "pending", attemptCount: 0 });
+    expect(row.netsisRef).toMatch(/^STUB-HVL-/);
+    expect(stub.snapshot().bankTransfers).toHaveLength(1);
+
+    await expect(service.post("rec-1")).resolves.toBe("synced");
+    expect(stub.snapshot().bankTransfers).toHaveLength(1);
+  });
+
   it("Netsis reddetti (400): bir deneme tüketir", async () => {
     const { service, stub, row } = build();
     jest

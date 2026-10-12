@@ -240,6 +240,17 @@ describe("InvoiceDeliveryService — sağlayıcı numaralandırması (Netsis)", 
     expect(prisma.fiscalDocSequence.upsert).not.toHaveBeenCalled();
   });
 
+  it("kaydı kesen sağlayıcı kapalıysa gönderilmez: pending kalır, bütçe tüketilmez", async () => {
+    const rows = [pendingInvoice()];
+    const provider = fakeProvider({ isEnabled: jest.fn(() => false) });
+    const { delivery } = build(rows, provider);
+
+    await delivery.sendRecord("inv-1");
+
+    expect(provider.send).not.toHaveBeenCalled();
+    expect(rows[0]).toMatchObject({ status: "pending", attemptCount: 0 });
+  });
+
   it("kabul: belge numarasız gider; sağlayıcının numarası, referansı ve ETTN'i kayda yazılır", async () => {
     const rows = [pendingInvoice()];
     const provider = fakeProvider();

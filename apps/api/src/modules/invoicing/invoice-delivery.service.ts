@@ -263,7 +263,12 @@ export class InvoiceDeliveryService {
    */
   private async claimInvoiceForSend(
     invoiceId: string,
-  ): Promise<{ invoice: FiscalInvoice; reconcileFirst: boolean } | null> {
+  ): Promise<{
+    invoice: FiscalInvoice;
+    reconcileFirst: boolean;
+    /** Sahiplenme bir deneme saydı (bayat kira devralmada saymaz). */
+    attemptCounted: boolean;
+  } | null> {
     const current = await this.prisma.fiscalInvoice.findUnique({
       where: { id: invoiceId },
     });
@@ -317,6 +322,7 @@ export class InvoiceDeliveryService {
       invoice,
       reconcileFirst:
         current.status === "processing" || current.attemptCount > 0,
+      attemptCounted: current.status !== "processing",
     };
   }
 
@@ -361,6 +367,22 @@ export class InvoiceDeliveryService {
     // kadar NUMARASIZDIR; numara ve referans gönderim sonucundan yazılır.
     const provider = this.providerOf(inv);
     const providerNumbered = provider.numbering === "provider";
+
+    // Kaydı kesen sağlayıcı kapalıysa (ör. Netsis'e geçildi, ELOGO_ENABLED=false
+    // ve eski bir eLogo kaydı bekliyor) deneme yapılmaz ve bütçe tüketilmez:
+    // cron'un `isEnabled` kapısı yalnız BAĞLI sağlayıcıya bakar.
+    if (!provider.isEnabled()) {
+      await this.prisma.fiscalInvoice.update({
+        where: { id: inv.id },
+        data: {
+          status: "pending",
+          ...(claimed.attemptCounted
+            ? { attemptCount: { decrement: 1 } }
+            : {}),
+        },
+      });
+      return;
+    }
 
     if (
       (!inv.invoiceNumber && !providerNumbered) ||
