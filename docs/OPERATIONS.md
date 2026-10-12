@@ -219,7 +219,7 @@ imha gerekirse `SET LOCAL "tarodan.allow_identity_purge" = 'on'` gerekir.
 ### Bir kerelik: fatura taraf/işlem kolonları backfill'i
 
 `20260910100000_elogo_invoice_parties_and_context` migration'ı
-`elogo_invoices` (bugün `fiscal_invoices`) tablosuna `seller_user_id`, `buyer_user_id` ve `context`
+`elogo_invoices` (model: `FiscalInvoice`) tablosuna `seller_user_id`, `buyer_user_id` ve `context`
 (sipariş gerçekleşme şekli) kolonlarını ekler. Yeni kesilen belgeler bunları
 kesim anında yazar; **migration'dan önce kesilmiş belgelerde boştur**.
 
@@ -242,20 +242,15 @@ Idempotenttir: yalnız üç kolonu da boş olan satırlara dokunur. `--dry-run`
 iade faturalarını "çözülemeyen" sayar — tarafları ters çevirdikleri belgeden
 devraldıkları için kaynakları henüz yazılmamıştır; gerçek koşuda dolarlar.
 
-### Bir kerelik: e-belge tablosunun sağlayıcıdan bağımsız adı (Faz 1b)
+### Faz 1b (Netsis geçişi): e-belge kaydı sağlayıcıdan bağımsız
 
-`20261012120000_fiscal_invoices_rename` migration'ı yalnız YENİDEN ADLANDIRIR:
-`elogo_invoices` → `fiscal_invoices`, `elogo_doc_sequences` →
-`fiscal_doc_sequences`, `ElogoInvoice*` enum'ları → `FiscalInvoice*`,
-`elogo_ref_id` / `elogo_result_code` / `elogo_result_msg` →
-`provider_ref` / `provider_result_code` / `provider_result_msg`; ayrıca
-`provider` kolonunu (`elogo` varsayılanlı) ekler. Veri taşınmaz, backfill
-yoktur. Deploy'da kendiliğinden koşar.
-
-Eski imaj eski adları okur. **Web ve worker aynı sürümle birlikte yeniden
-başlatılmalı**; aradaki kısa pencerede eski worker'ın `elogo-retry-pending`
-cron'u hata verebilir — kayıtlar `pending`/`failed` kalır ve yeni sürümün cron'u
-toparlar, belge kaybolmaz.
+`20261012120000_fiscal_invoice_provider` migration'ı YALNIZ `provider`
+kolonunu (`elogo` varsayılanlı) ekler. Kod adları sağlayıcıdan bağımsızdır
+(`FiscalInvoice`, `providerRef`…) ama **veritabanı adları bilerek değişmez**:
+`elogo_invoices`, `elogo_doc_sequences`, `elogo_ref_id` / `elogo_result_code` /
+`elogo_result_msg` ve `ElogoInvoice*` enum tipleri Prisma `@map` ile eşlenir.
+Ek geriye dönük uyumludur: eski imaj kolonu yok sayar, deploy penceresi ve
+geri dönüş adımı gerektirmez.
 
 Bilinçli olarak eski adıyla kalanlar (ayrı bir ops adımı isterler, bkz.
 `INVOICING_PROVIDERS.md` "Faz 5"): `/elogo/invoices*` yolları, `elogo-retry-pending`

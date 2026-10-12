@@ -588,7 +588,7 @@ Kapsamsız çağrı takasın tüm borcunu ele aldığı için bugünkü gibi tem
 ## 8b. Gelir e-belgeleri
 
 Belgeler sağlayıcıdan bağımsız tek hattan geçer (`modules/invoicing`, tablo
-`fiscal_invoices`); entegratör (bugün eLogo, sonra Logo Netsis) bir portun
+`elogo_invoices`, model `FiscalInvoice`); entegratör (bugün eLogo, sonra Logo Netsis) bir portun
 arkasındadır ve her kayıt kendisini kesen sağlayıcıyı `provider` kolonunda
 taşır — bkz. [INVOICING_PROVIDERS.md](INVOICING_PROVIDERS.md).
 

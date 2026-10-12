@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
  *
  * Belge kaydı ve numara tahsisi SERIALIZABLE bir transaction'da yapılır; aynı
  * anda iki belge (komisyon + hizmet bedeli, ya da teslim tetiği + outbox) aynı
- * `fiscal_doc_sequences` satırını artırınca Postgres kaybedeni serialization
+ * `elogo_doc_sequences` (FiscalDocSequence) satırını artırınca Postgres kaybedeni serialization
  * hatasıyla düşürür ve Prisma bunu P2034 ("write conflict or deadlock") olarak
  * yükseltir. Kaybeden transaction geri alınır — numara tüketilmez, kayıt
  * oluşmaz — dolayısıyla tek doğru tepki AYNI işi kısa bir bekleme sonrası

@@ -85,7 +85,7 @@ orijinal numaranın sağlayıcıdan okunması) Netsis adaptörüyle birlikte gel
 `ElogoService.refundStrategy`'de durur. Netsis adaptörü yazılırken bu kural
 paylaşılan bir yardımcıya taşınmalı, kopyalanmamalı.
 
-## Kayıt — `FiscalInvoice` (`fiscal_invoices`)
+## Kayıt — `FiscalInvoice` (DB tablosu bilerek `elogo_invoices`)
 
 Belge kaydı sağlayıcıdan bağımsızdır. `provider` kolonu
 (`EInvoiceProviderName`: `elogo` / `netsis`) belgeyi KESEN sağlayıcıyı tutar;
@@ -121,16 +121,13 @@ bıraktı. eLogo adını yalnız adaptör taşır: `provider/elogo.provider.ts`,
 | `invoice/elogo-document-number.ts`, `invoice/elogo-guest-recipient`  | `invoice/document-number.ts`, `invoice/guest-recipient.ts`              |
 | `ELOGO_MAX_SEND_ATTEMPTS`, `isTransientElogoFailure`                 | `INVOICE_MAX_SEND_ATTEMPTS`, `isTransientInvoiceFailure`                |
 | `formatElogoInvoiceNumber`, `ELOGO_NUMBER_LENGTH`                    | `formatInvoiceNumber`, `INVOICE_NUMBER_LENGTH`                          |
-| `ElogoInvoice` / `elogo_invoices`                                    | `FiscalInvoice` / `fiscal_invoices`                                     |
+| `ElogoInvoice` / `elogo_invoices`                                    | `FiscalInvoice` / DB adı değişmedi: `elogo_invoices`                                     |
 | `ElogoInvoiceType` / `Context` / `Status`                            | `FiscalInvoiceType` / `Context` / `Status`                              |
-| `ElogoDocSequence` / `elogo_doc_sequences`                           | `FiscalDocSequence` / `fiscal_doc_sequences`                            |
+| `ElogoDocSequence` / `elogo_doc_sequences`                           | `FiscalDocSequence` / DB adı değişmedi: `elogo_doc_sequences`                            |
 | `elogoRefId` / `elogoResultCode` / `elogoResultMsg`                  | `providerRef` / `providerResultCode` / `providerResultMsg`              |
 | —                                                                    | `provider` (`EInvoiceProviderName`, varsayılan `elogo`)                 |
 
-Migration: `20261012120000_fiscal_invoices_rename` — tablo, enum, kolon, kısıt
-ve indeks adlarını Prisma'nın varsayılan adlarına çevirir, `provider`'ı ekler;
-her eski adın karşılığı `helpers/fiscal-invoices-migration.spec.ts`'te
-sabitlenmiştir. Dağıtım notu: `OPERATIONS.md`.
+Migration: `20261012120000_fiscal_invoice_provider` — yalnız `provider` kolonunu ekler. Veritabanı adları BİLEREK tarihsel kalır (`elogo_invoices`, `elogo_ref_id`…; Prisma `@map`): fiziksel yeniden adlandırma deploy penceresi ve geri dönüş riski taşır, görünür faydası yoktur.
 
 ### Faz 5 — bilinçli olarak eski adıyla kalanlar
 
