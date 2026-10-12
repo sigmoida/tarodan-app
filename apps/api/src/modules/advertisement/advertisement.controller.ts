@@ -19,20 +19,10 @@ import {
 import type { Request } from "express";
 import { AdvertisementService } from "./advertisement.service";
 import { AdvertisementTrackingService } from "./advertisement-tracking.service";
-import { AD_TRACKING_THROTTLE } from "./helpers/ad-tracking.constants";
 import { Public } from "../auth/decorators/public.decorator";
-import {
-  clientIpThrottleTracker,
-  resolveClientIp,
-} from "../../common/helpers/client-ip";
-
-/**
- * Tık/gösterim kovası istemci IP'sidir: web gateway trafiği tek web sunucusu
- * IP'sinden gelir, `req.ip` kovası bütün ziyaretçileri tek kovaya kilitlerdi.
- */
-const TRACKING_THROTTLE = {
-  default: { ...AD_TRACKING_THROTTLE, getTracker: clientIpThrottleTracker },
-};
+import { resolveClientIp } from "../../common/helpers/client-ip";
+// Tık/gösterim kovası istemci IP'sidir (hero slaytlarıyla ortak tanım).
+import { BEACON_TRACKING_THROTTLE } from "../../common/helpers/beacon-tracking";
 
 @ApiTags("ads")
 @Controller("ads")
@@ -74,7 +64,7 @@ export class AdvertisementController {
   // gönderir, ikisi de geçerli istektir.
   @Post(":id/click")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Throttle(TRACKING_THROTTLE)
+  @Throttle(BEACON_TRACKING_THROTTLE)
   @ApiOperation({
     summary:
       "Record ad click (public, beacon-friendly; deduped per IP + ad + hotspot for 10 s, live ads only). Image ads count only with ?hotspot=; text ads only without it.",
@@ -103,7 +93,7 @@ export class AdvertisementController {
 
   @Post(":id/impression")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Throttle(TRACKING_THROTTLE)
+  @Throttle(BEACON_TRACKING_THROTTLE)
   @ApiOperation({
     summary:
       "Record ad impression (public, beacon-friendly; deduped per IP for 30 min, live ads only)",

@@ -1,21 +1,16 @@
+import {
+  BEACON_DEDUPE_SECONDS,
+  type BeaconTrackingKind,
+} from "../../../common/helpers/beacon-tracking";
+
 /**
- * Reklam tık/gösterim sayımı — tekilleştirme pencereleri ve hız sınırı.
- *
- * Uçlar herkese açık ve `navigator.sendBeacon` ile çağrılır; koruma olmadan
- * aynı sekmede yenileme ya da elle döngü sayaçları istediği kadar şişirirdi
- * (DSC-104). Pencere boyunca aynı IP + aynı reklam bir kez sayılır.
+ * Reklam tık/gösterim sayımı — tekilleştirme anahtarı. Pencereler ve hız
+ * sınırı vitrin içeriğiyle ortaktır (`common/helpers/beacon-tracking`): aynı
+ * IP + aynı reklam pencere boyunca bir kez sayılır (DSC-104).
  */
-export const AD_TRACKING_DEDUPE_SECONDS = {
-  /** Aynı ziyaretçi aynı reklamı yarım saat içinde tekrar görürse sayılmaz. */
-  impression: 30 * 60,
-  /** Çift tık / hızlı tekrar tık tek tık sayılır. */
-  click: 10,
-} as const;
+export const AD_TRACKING_DEDUPE_SECONDS = BEACON_DEDUPE_SECONDS;
 
-export type AdTrackingKind = keyof typeof AD_TRACKING_DEDUPE_SECONDS;
-
-/** İstemci IP'si başına dakikalık istek tavanı (iki uç ayrı ayrı). */
-export const AD_TRACKING_THROTTLE = { limit: 60, ttl: 60_000 } as const;
+export type AdTrackingKind = BeaconTrackingKind;
 
 /**
  * Tekilleştirme anahtarı — reklam ve IP ayrı segmentlerde. Alan tıkında alan
