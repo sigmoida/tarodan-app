@@ -34,6 +34,7 @@ import { AdminPspReconciliationService } from "./finance/admin-psp-reconciliatio
 import { AdminMediaService } from "./catalog/admin-media.service";
 import { AdminMediaController } from "./catalog/admin-media.controller";
 import { AdminAuditService } from "./ops/admin-audit.service";
+import { ExportListService } from "../../common/export/export-list.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminSiteAccessService } from "./users/admin-site-access.service";
@@ -242,6 +243,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminPspReconciliationService,
     AdminMediaService,
     AdminAuditService,
+    // Admin Excel dökümlerinin tek hattı (common/export) — denetimi AdminAuditService ile yazar.
+    ExportListService,
     AdminCommissionService,
     AdminSettingsService,
     AdminTimingRulesService,
