@@ -7849,6 +7849,10 @@
         "stock": "Right now",
         "loadFailed": "This section could not be loaded."
       },
+      "metricDescriptions": {
+        "paidOrders": "Order lines paid in this period; every product line in a cart counts separately.",
+        "sellerPayoutCount": "Bank transfers completed in this period — sent about 15 days after delivery, trade cash payouts included."
+      },
       "queues": {
         "refundRequests": "Refund requests",
         "tradeOperations": "Trade operations",

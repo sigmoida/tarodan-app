@@ -89,6 +89,12 @@ export interface DashboardMetric {
   thisMonth: number;
   /** Fixed. */
   allTime: number;
+  /**
+   * i18n katalog ANAHTARI: metriğin neyi saydığını söyleyen tek cümle (panel
+   * ipucu olarak çevirir). Yalnız `DASHBOARD_METRIC_DESCRIPTION_KEYS`'teki
+   * metriklerde bulunur.
+   */
+  description?: string;
 }
 
 /**
@@ -143,6 +149,17 @@ export const DASHBOARD_METRIC_KEYS = [
 ] as const;
 
 export type DashboardMetricKey = (typeof DASHBOARD_METRIC_KEYS)[number];
+
+/**
+ * Adı tek başına yanlış okunan metriklerin açıklaması (i18n anahtarı). Test
+ * kullanıcıları iki kartı karıştırdı: "ödenen sipariş" dönemde ÖDENEN sipariş
+ * satırlarıdır; "satıcı ödemesi" dönemde TAMAMLANAN banka transferleridir
+ * (teslimden ~15 gün sonra, takas nakit hak edişi dahil).
+ */
+export const DASHBOARD_METRIC_DESCRIPTION_KEYS = {
+  paidOrders: "admin.dashboard.metricDescriptions.paidOrders",
+  sellerPayoutCount: "admin.dashboard.metricDescriptions.sellerPayoutCount",
+} as const satisfies Partial<Record<DashboardMetricKey, string>>;
 
 export interface DashboardStatsResponse {
   range: DashboardPeriodRange;

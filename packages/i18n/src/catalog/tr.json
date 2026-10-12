@@ -7849,6 +7849,10 @@
         "stock": "Şu anki durum",
         "loadFailed": "Bu bölüm yüklenemedi."
       },
+      "metricDescriptions": {
+        "paidOrders": "Ödemesi bu dönemde alınan sipariş satırları; sepetteki her ürün satırı ayrı sayılır.",
+        "sellerPayoutCount": "Bu dönemde tamamlanan banka transferleri — teslimden yaklaşık 15 gün sonra gider, takas nakit hak edişi dahil."
+      },
       "queues": {
         "refundRequests": "İade talepleri",
         "tradeOperations": "Takas operasyonu",
