@@ -1,6 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import {
+  NETSIS_ACCOUNT_CODE_MAX,
+  NETSIS_CARI_CODE_MAX,
+  NETSIS_ITEM_CODE_MAX,
+  NETSIS_SERIAL_LENGTH,
+} from "@tarodan/types";
 import { FormCheckbox, FormInput } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type {
@@ -8,9 +14,6 @@ import type {
   InvoicingSettingsState,
 } from "@/lib/api/invoicing-settings.types";
 import {
-  ACCOUNT_CODE_MAX_LENGTH,
-  CARI_CODE_MAX_LENGTH,
-  ITEM_CODE_MAX_LENGTH,
   fieldName,
   rowsInGroup,
   settingHelperKey,
@@ -18,13 +21,13 @@ import {
 } from "../_lib/invoicing-settings";
 
 const MAX_LENGTH: Record<InvoicingSettingGroup, number> = {
-  cari: CARI_CODE_MAX_LENGTH,
-  serial: 3,
-  item: ITEM_CODE_MAX_LENGTH,
+  cari: NETSIS_CARI_CODE_MAX,
+  serial: NETSIS_SERIAL_LENGTH,
+  item: NETSIS_ITEM_CODE_MAX,
   // Belge grubu: adres alanları (biçim sunucuda doğrulanır).
   document: 2048,
   // Muhasebe hesap kodları (`netsis.account.*`).
-  account: ACCOUNT_CODE_MAX_LENGTH,
+  account: NETSIS_ACCOUNT_CODE_MAX,
 };
 
 /**

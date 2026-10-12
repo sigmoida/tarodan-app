@@ -7,10 +7,12 @@ import {
   readNetsisEttn,
   readNetsisRecordRef,
   readNetsisSlipTotals,
+  readNetsisTrackedSlipKey,
   sameNetsisSlip,
   sumNetsisSlipLines,
 } from "./netsis-model.helper";
 import type { NetsisItemSlip } from "./netsis.types";
+import { NetsisRequestException } from "../http/netsis-error";
 
 describe("netsis-model.helper", () => {
   const slip: NetsisItemSlip = {
@@ -158,5 +160,35 @@ describe("netsis-model.helper", () => {
     expect(readNetsisRecordRef({ KAYITNO: "  K-9 " })).toBe("K-9");
     expect(readNetsisRecordRef({ ID: "" })).toBeNull();
     expect(readNetsisRecordRef({})).toBeNull();
+  });
+
+  describe("readNetsisTrackedSlipKey", () => {
+    it("maps FTIRSIP to FaturaTip and trims the number", () => {
+      expect(
+        readNetsisTrackedSlipKey({
+          FATIRS_NO: " EAR2026000000001",
+          FTIRSIP: "1",
+        }),
+      ).toEqual({ FaturaTip: "ftSFat", FATIRS_NO: "EAR2026000000001" });
+      expect(
+        readNetsisTrackedSlipKey({ FATIRS_NO: "EAR2026000000002", FTIRSIP: 2 }),
+      ).toEqual({ FaturaTip: "ftAFat", FATIRS_NO: "EAR2026000000002" });
+    });
+
+    it.each([
+      [{ FATIRS_NO: "EAR1", FTIRSIP: "6" }],
+      [{ FATIRS_NO: "", FTIRSIP: "1" }],
+      [{ FTIRSIP: "1" }],
+      [{ FATIRS_NO: "EAR1" }],
+    ])("an unreadable row %p is an error, not 'not found'", (row) => {
+      let error: unknown;
+      try {
+        readNetsisTrackedSlipKey(row);
+      } catch (e: unknown) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(NetsisRequestException);
+      expect(error).toMatchObject({ kind: "unknown" });
+    });
   });
 });

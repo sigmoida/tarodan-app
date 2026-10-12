@@ -1,4 +1,5 @@
 import type { EInvoiceProviderName, PrismaClient } from "@prisma/client";
+import { NETSIS_ACCOUNT_CODE_MAX } from "@tarodan/types";
 import { invoiceProviderName } from "../../../config/invoice-provider";
 import {
   netsisSettingBoolean,
@@ -34,12 +35,6 @@ export const NETSIS_ACCOUNTING_SETTING_KEYS = {
    */
   pspFeeExpense: "netsis.account.pspFeeExpense",
 } as const;
-
-/**
- * VERIFY: Netsis banka hesap kodu (TBLBANKAHESAP) / muhasebe hesap kodu
- * (TBLMUPLAN, ör. `102.01.001`) uzunluğu. 30 karakter varsayıldı.
- */
-export const NETSIS_ACCOUNT_CODE_MAX_LENGTH = 30;
 
 export type NetsisAccountingAccount = Exclude<
   keyof typeof NETSIS_ACCOUNTING_SETTING_KEYS,
@@ -94,9 +89,12 @@ export const NETSIS_ACCOUNTING_SETTING_DEFINITIONS: readonly NetsisInvoiceSettin
     },
   ];
 
-/** Hesap kodunun TEK kuralı — ayrıştırıcı da admin doğrulaması da bunu kullanır. */
+/**
+ * Hesap kodunun TEK kuralı — ayrıştırıcı da admin doğrulaması da bunu kullanır.
+ * Uzunluk sınırı (VERIFY) `@tarodan/types`'tan: admin ekranıyla ortak.
+ */
 export function normalizeNetsisAccountCode(raw: string | undefined): string {
-  return netsisSettingCode(raw, NETSIS_ACCOUNT_CODE_MAX_LENGTH);
+  return netsisSettingCode(raw, NETSIS_ACCOUNT_CODE_MAX);
 }
 
 /** Ham `settingKey → settingValue` haritasından tipli ayarlar. */

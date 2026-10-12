@@ -74,3 +74,39 @@ export const NETSIS_DOC_TYPES = {
   salesInvoice: "ftSFat",
   salesReturnInvoice: "ftAFat",
 } as const;
+
+/**
+ * VERIFY: fiş başlığında (`FatUst`) BİZİM izleme anahtarımızın (faturanın
+ * ETTN'i) yazıldığı ek açıklama alanı. Netsis ETTN'i kendisi atayabildiği
+ * için fişi yeniden bulmanın tek güvenilir yolu budur.
+ */
+export const NETSIS_SLIP_TRACKING_KEY_FIELD = "EKACK1";
+
+/**
+ * VERIFY: izleme anahtarıyla fiş arayan salt okunur sorgu — `Queries` ucuna
+ * gider, `assertNetsisReadOnlySelect` bekçisinden geçer. Kayıp yanıt (Netsis
+ * transaction'ı commit etti, HTTP yanıtı bize ulaşmadı) sonrası yeniden
+ * denemenin İKİNCİ bir fiş açmasını önler.
+ *
+ * Tablo/kolon adları tahmin: satış faturası başlığı `TBLFATUIRS`, belge
+ * numarası `FATIRS_NO`, belge tipi `FTIRSIP` (`NETSIS_DOC_TYPE_BY_FTIRSIP`),
+ * ek açıklama `EKACK1` (Netsis'te ek açıklamalar `TBLFATUEK`'te de
+ * tutulabilir — danışmana sorulacak). `@trackingKey` değeri
+ * `bindNetsisQueryParams` ile bağlanır, asla elle birleştirilmez.
+ *
+ * `scripts/netsis-smoke.mjs` aynı sorguyu `--ettn` ile koşar (Node TS
+ * okuyamaz): oradaki kopyayı `netsis-smoke-script.contract.spec.ts` kilitler.
+ */
+export const NETSIS_SLIP_BY_TRACKING_KEY_SQL =
+  "SELECT FATIRS_NO, FTIRSIP FROM TBLFATUIRS WHERE EKACK1 = @trackingKey ORDER BY FATIRS_NO";
+
+/**
+ * VERIFY: `TBLFATUIRS.FTIRSIP` (veritabanı belge tipi kodu) → NetOpenX
+ * `FaturaTip`. "1" satış faturası, "2" alış faturası — satış iadesi alış
+ * faturası + iade tipi olarak girilir (`NETSIS_DOC_TYPES`). Tanınmayan kod
+ * okuyucuda hatadır, "bulunamadı" sayılmaz.
+ */
+export const NETSIS_DOC_TYPE_BY_FTIRSIP: Readonly<Record<string, string>> = {
+  "1": NETSIS_DOC_TYPES.salesInvoice,
+  "2": NETSIS_DOC_TYPES.salesReturnInvoice,
+};

@@ -1,7 +1,7 @@
+import { NETSIS_ACCOUNT_CODE_MAX } from "@tarodan/types";
 import {
   NETSIS_ACCOUNTING_SETTING_DEFINITIONS,
   NETSIS_ACCOUNTING_SETTING_KEYS,
-  NETSIS_ACCOUNT_CODE_MAX_LENGTH,
   isValidNetsisAccountingValue,
   loadNetsisAccountingSettings,
   netsisAccountingActive,
@@ -44,7 +44,7 @@ describe("netsis-accounting-settings", () => {
       new Map([
         [A.enabled, " TRUE "],
         [A.paytrClearing, "  102.99.001  "],
-        [A.mainBank, "B".repeat(NETSIS_ACCOUNT_CODE_MAX_LENGTH + 1)],
+        [A.mainBank, "B".repeat(NETSIS_ACCOUNT_CODE_MAX + 1)],
       ]),
     );
     expect(settings.enabled).toBe(true);
@@ -101,7 +101,7 @@ describe("netsis-accounting-settings", () => {
     expect(
       isValidNetsisAccountingValue(
         A.mainBank,
-        "x".repeat(NETSIS_ACCOUNT_CODE_MAX_LENGTH + 1),
+        "x".repeat(NETSIS_ACCOUNT_CODE_MAX + 1),
       ),
     ).toBe(false);
     expect(isValidNetsisAccountingValue(A.enabled, "true")).toBe(true);

@@ -32,7 +32,8 @@ export type LoadedNetsisAccountingSource =
 /**
  * - `ready`: aynalanacak kesinleşmiş para hareketi.
  * - `not_applicable`: kaynak kesin ama aynalanacak bir şey yok (sıfır tutar,
- *   test şeridi, taraf yok) — `skipped` satır açılır ki süpürme tekrar bakmasın.
+ *   test şeridi, taraf yok, gönderilmiş faturanın numarası/referansı yok) —
+ *   `skipped` satır açılır ki süpürme tekrar bakmasın.
  * - `absent`: kaynak yok, bize ait değil (eLogo faturası, iade faturası) ya da
  *   HENÜZ kesinleşmedi — satır AÇILMAZ; kesinleşince olay ya da süpürme getirir.
  */
@@ -116,20 +117,23 @@ export class NetsisAccountingSourceService {
     if (row.provider !== "netsis" || row.type === "return_invoice") {
       return absent("sourceMissing");
     }
-    if (
-      (row.status !== "sent" && row.status !== "signed") ||
-      !row.invoiceNumber ||
-      !row.providerRef
-    ) {
+    if (row.status !== "sent" && row.status !== "signed") {
       return absent("notFinal", { status: row.status });
     }
+    // Gönderilmiş ama numarası ya da Netsis referansı boş: tahsilat hangi
+    // fişe yazılacağını bilemez ve bu kendiliğinden düzelmez (`markSent`
+    // ikisini durumla birlikte yazar). `absent` satır açmazdı; süpürme aynı
+    // faturayı 30 gün boyunca her turda yeniden yüklerdi. `skipped` + neden:
+    // kayıt düzeltilirse bakım script'i yeniden kuyruğa alır.
+    const { invoiceNumber, providerRef } = row;
+    if (!invoiceNumber || !providerRef) return notApplicable("noNumber");
     if (!isPositive(row.total)) return notApplicable("zeroAmount");
     return {
       state: "ready",
       source: {
         kind: "invoice_collection",
-        invoiceNumber: row.invoiceNumber,
-        providerRef: row.providerRef,
+        invoiceNumber,
+        providerRef,
         issuedAt: row.issuedAt ?? row.sentAt ?? row.createdAt,
         gross: row.total,
       },

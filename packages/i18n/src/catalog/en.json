@@ -11796,6 +11796,7 @@
       "notConfigured": "The Netsis connection is not configured (base URL or credentials missing)",
       "sessionBusy": "Another process is opening the shared Netsis session; try again shortly",
       "queryNotReadOnly": "A Netsis query must be a single SELECT statement without comments",
+      "queryParamInvalid": "Netsis query parameter is missing, unused or invalid: {name}",
       "recordNotFound": "Netsis record not found",
       "error": {
         "network": "The Netsis server could not be reached",
@@ -11830,7 +11831,8 @@
           "notFinal": "The source is not final yet ({status})",
           "zeroAmount": "There is no amount to transfer",
           "testLane": "Test lane transaction; not sent to accounting",
-          "partyMissing": "The transaction's party was not found"
+          "partyMissing": "The transaction's party was not found",
+          "noNumber": "The Netsis invoice looks sent but its invoice number or Netsis reference is empty; the collection cannot be tied to a document"
         },
         "recordNotFound": "Netsis sync record not found",
         "notRetryable": "This record cannot be retried (status: {status})",

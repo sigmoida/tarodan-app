@@ -69,7 +69,11 @@ and all five credentials set. Unknown modes and malformed numbers fail boot.
 
 The stub mimics the server's rules, numbers deterministically
 (`TRD2026000000001`) and offers `snapshot()` / `setEDocumentState()` /
-`reset()` for the future invoicing provider's specs.
+`loseNextCommitResponse()` / `reset()` for the invoicing provider's specs.
+`loseNextCommitResponse()` applies the next commit and then throws a
+`network` error (a committed transaction whose response was lost); the
+stub's `findByTrackingKey` ignores slips written in an open or rolled-back
+transaction, like a read outside it.
 
 ## The shared session — and why
 
@@ -101,7 +105,14 @@ snippet, never the request body.
 
 ```bash
 cd apps/api && pnpm smoke:netsis   # read-only (the only mode); --out <dir> to redirect
+cd apps/api && pnpm smoke:netsis -- --ettn <invoice ETTN>   # also run the slip lookup
 ```
+
+It always prints the slip lookup SELECT (`NETSIS_SLIP_BY_TRACKING_KEY_SQL`;
+the script carries a copy pinned by `netsis-smoke-script.contract.spec.ts`)
+and, with `--ettn`, runs it through `Queries` and saves the rows to
+`slip-by-tracking-key.json` — use an ETTN of a slip created on the test
+company to check `TBLFATUIRS` / `FATIRS_NO` / `FTIRSIP` / `EKACK1`.
 
 It calls the `public/*` endpoints, takes a token, calls the authenticated
 `ping`, saves `definitions/<R>` + `services/<R>` for the six modelled
@@ -155,6 +166,17 @@ Other assumptions:
   serial (if not, a failed create leaves a gap — ask).
 - Re-sending an existing slip runs `Calculate` on the stored slip (from
   `Details`) to detect amounts that changed since it was created.
+- **Lost response:** without a `providerRef` the provider first looks the
+  slip up by our ETTN (`itemSlips.findByTrackingKey`). Live runs
+  `NETSIS_SLIP_BY_TRACKING_KEY_SQL` — `SELECT FATIRS_NO, FTIRSIP FROM
+  TBLFATUIRS WHERE EKACK1 = @trackingKey ORDER BY FATIRS_NO` — through
+  `Queries`; `@trackingKey` is bound by `bindNetsisQueryParams` as an `N'…'`
+  literal (we assume `Queries` has no native parameters). `FTIRSIP` `1`/`2`
+  map back to `ftSFat`/`ftAFat` (`NETSIS_DOC_TYPE_BY_FTIRSIP`); any other code
+  is an error, never "not found". A found slip continues like the
+  `providerRef` path, so a retry after a committed-but-unanswered
+  transaction never opens a second invoice. The stub's
+  `loseNextCommitResponse()` reproduces that case.
 
 ## Muhasebe senkronu (accounting sync)
 
@@ -174,8 +196,10 @@ money flows never wait for it or fail because of it.
 | `RefundAttempt` finalized after PSP success → `refund_reversal` | `MixedReceiptsMain` with a **negative** amount (collection reversal), `BELGE_NO` = ORD-/takas number | buyer's cari by the same rule (order buyer, or the trade cash payer); `paytrClearing` | `−amount` |
 
 The pooled-vs-corporate rule is shared with the invoice provider
-(`provider/netsis-cari.ts`). Test-lane payments, zero amounts and fully
-offset payouts are recorded as `skipped` with a reason, never sent.
+(`provider/netsis-cari.ts`). Test-lane payments, zero amounts, fully
+offset payouts and a `sent` Netsis invoice whose number or `providerRef` is
+empty (`skip.noNumber` — otherwise the sweep would reload it every run for 30
+days) are recorded as `skipped` with a reason, never sent.
 
 ### Mechanics
 
@@ -289,6 +313,10 @@ returns them with `group: "account"` and a separate `accountingReadiness`
 - [ ] **Cari e-invoice flag**: which field `EDocCurrentUpdate` fills and
       where the PK label lives.
 - [ ] **Serial numbers in a rolled-back transaction**: are they returned?
+- [ ] **Slip lookup by our ETTN**: is `EKACK1` a `TBLFATUIRS` column (or
+      `TBLFATUEK`)? `FTIRSIP` codes for a sales invoice and a sales return?
+      Does `Queries` accept parameters natively? Is `EKACK1` indexed (the
+      lookup runs before every new invoice)?
 - [ ] **Calculate on a stored slip** (with `FATIRS_NO`): allowed?
 
 - [ ] **Token request**: `POST api/v2/token`, form-encoded, fields

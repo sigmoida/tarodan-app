@@ -4,6 +4,7 @@ import type {
   NetsisItem,
   NetsisItemSlip,
 } from "../helpers/netsis.types";
+import { NETSIS_SLIP_TRACKING_KEY_FIELD } from "../helpers/netsis.constants";
 import { NetsisRequestException } from "../http/netsis-error";
 import { NetsisStubGateway } from "./netsis-stub.gateway";
 
@@ -156,6 +157,86 @@ describe("NetsisStubGateway", () => {
     });
   });
 
+  describe("findByTrackingKey", () => {
+    const tracked = (number: string, trackingKey: string): NetsisItemSlip => {
+      const value = slip(number);
+      value.FatUst[NETSIS_SLIP_TRACKING_KEY_FIELD] = trackingKey;
+      return value;
+    };
+
+    it("finds a slip by our tracking key; unknown or blank keys find nothing", async () => {
+      await seed();
+      await stub.itemSlips.create(tracked("TRD1", "ettn-1"));
+      await stub.itemSlips.create(slip("TRD2"));
+
+      await expect(stub.itemSlips.findByTrackingKey("ettn-1")).resolves.toEqual(
+        keyOf("TRD1"),
+      );
+      await expect(stub.itemSlips.findByTrackingKey(" ettn-1 ")).resolves.toEqual(
+        keyOf("TRD1"),
+      );
+      await expect(
+        stub.itemSlips.findByTrackingKey("ettn-2"),
+      ).resolves.toBeNull();
+      await expect(stub.itemSlips.findByTrackingKey("  ")).resolves.toBeNull();
+    });
+
+    it("sees only committed slips, like a read outside the transaction", async () => {
+      await seed();
+      await expect(
+        stub.transactions.withTransaction(async (tx) => {
+          await stub.itemSlips.create(tracked("TRD1", "ettn-rolled-back"), tx);
+          await expect(
+            stub.itemSlips.findByTrackingKey("ettn-rolled-back"),
+          ).resolves.toBeNull();
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+      await expect(
+        stub.itemSlips.findByTrackingKey("ettn-rolled-back"),
+      ).resolves.toBeNull();
+
+      await stub.transactions.withTransaction((tx) =>
+        stub.itemSlips.create(tracked("TRD2", "ettn-committed"), tx),
+      );
+      await expect(
+        stub.itemSlips.findByTrackingKey("ettn-committed"),
+      ).resolves.toEqual(keyOf("TRD2"));
+    });
+  });
+
+  describe("loseNextCommitResponse", () => {
+    it("applies the next commit, then throws a network error once", async () => {
+      await seed();
+      stub.loseNextCommitResponse();
+
+      const error = await stub.transactions
+        .withTransaction((tx) => stub.itemSlips.create(slip("TRD1"), tx))
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(NetsisRequestException);
+      expect(error).toMatchObject({ kind: "network" });
+      // Netsis yazdı: transaction kalıcı, fiş duruyor (rollback denemesi düştü).
+      expect(stub.snapshot().transactions).toEqual([
+        expect.objectContaining({ state: "committed" }),
+      ]);
+      expect(stub.snapshot().slips).toHaveLength(1);
+
+      // Tek seferlik: sonraki commit normal döner.
+      await expect(
+        stub.transactions.withTransaction(async () => "ok"),
+      ).resolves.toBe("ok");
+    });
+
+    it("is cleared by reset", async () => {
+      stub.loseNextCommitResponse();
+      stub.reset();
+      await expect(
+        stub.transactions.withTransaction(async () => "ok"),
+      ).resolves.toBe("ok");
+    });
+  });
+
   describe("e-documents", () => {
     beforeEach(async () => {
       await seed();
@@ -287,6 +368,15 @@ describe("NetsisStubGateway", () => {
     await expect(stub.queries.select("DROP TABLE x")).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it("binds query parameters exactly like the live client", async () => {
+    await expect(
+      stub.queries.select("SELECT 1 AS x WHERE @a = @a", { a: "v" }),
+    ).resolves.toEqual([]);
+    await expect(
+      stub.queries.select("SELECT 1 AS x WHERE EKACK1 = @missing"),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("pings as an authenticated stub and resets cleanly", async () => {

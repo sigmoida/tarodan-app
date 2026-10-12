@@ -11796,6 +11796,7 @@
       "notConfigured": "Netsis bağlantısı yapılandırılmamış (adres ya da kimlik bilgileri eksik)",
       "sessionBusy": "Ortak Netsis oturumu başka bir süreç tarafından açılıyor; kısa süre sonra tekrar deneyin",
       "queryNotReadOnly": "Netsis sorgusu yorum içermeyen tek bir SELECT ifadesi olmalı",
+      "queryParamInvalid": "Netsis sorgu parametresi eksik, fazla ya da geçersiz: {name}",
       "recordNotFound": "Netsis kaydı bulunamadı",
       "error": {
         "network": "Netsis sunucusuna ulaşılamadı",
@@ -11830,7 +11831,8 @@
           "notFinal": "Kaynak henüz kesinleşmemiş ({status})",
           "zeroAmount": "Aktarılacak tutar yok",
           "testLane": "Test şeridi işlemi; muhasebeye aktarılmaz",
-          "partyMissing": "İşlemin tarafı bulunamadı"
+          "partyMissing": "İşlemin tarafı bulunamadı",
+          "noNumber": "Netsis faturası gönderilmiş görünüyor ama fatura numarası ya da Netsis referansı boş; tahsilat bir belgeye bağlanamaz"
         },
         "recordNotFound": "Netsis senkron kaydı bulunamadı",
         "notRetryable": "Bu kayıt yeniden denenemez (durum: {status})",

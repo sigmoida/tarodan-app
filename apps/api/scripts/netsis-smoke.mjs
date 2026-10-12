@@ -7,6 +7,7 @@
  *   pnpm smoke:netsis
  *   pnpm smoke:netsis -- --read-only          (the default; the only mode)
  *   pnpm smoke:netsis -- --out /some/dir      (default: scripts/netsis-definitions/)
+ *   pnpm smoke:netsis -- --ettn <invoice ETTN> (also run the slip lookup)
  *
  * Steps: public Ping + Version + CompanyList, token, authenticated ping, then
  * GET definitions/<R> and services/<R> for every resource the client models,
@@ -14,6 +15,12 @@
  * (gitignored) so the guessed models in src/modules/netsis/helpers/
  * netsis.types.ts can be pinned. The token is revoked at the end so the
  * licence seat is released.
+ *
+ * Slip lookup: the invoicing provider finds a slip it created by our ETTN
+ * (written to EKACK1) before creating one, so a retry after a lost response
+ * never opens a second sales invoice. The script prints that read-only SELECT
+ * and, with --ettn, runs it through Queries — the way to check the guessed
+ * table/column names (TBLFATUIRS, FATIRS_NO, FTIRSIP, EKACK1).
  *
  * Never creates, updates or deletes anything in Netsis. Reads the same
  * NETSIS_* variables (and defaults) as src/config/netsis.ts — keep the two in
@@ -32,8 +39,19 @@ const RESOURCES = [
   "BankRemittanceTransfer",
 ];
 
+/**
+ * Mirror of NETSIS_SLIP_BY_TRACKING_KEY_SQL (src/modules/netsis/helpers/
+ * netsis.constants.ts) — Node cannot import the TypeScript constant, so
+ * netsis-smoke-script.contract.spec.ts pins this copy to it.
+ */
+const SLIP_BY_TRACKING_KEY_SQL =
+  "SELECT FATIRS_NO, FTIRSIP FROM TBLFATUIRS WHERE EKACK1 = @trackingKey ORDER BY FATIRS_NO";
+/** ETTN shape only (UUID characters), so the literal needs no escaping. */
+const ETTN_PATTERN = /^[0-9A-Za-z-]{1,64}$/;
+
 const args = process.argv.slice(2).filter((argument) => argument !== "--");
 let outDir = fileURLToPath(new URL("./netsis-definitions/", import.meta.url));
+let ettn = null;
 for (let index = 0; index < args.length; index++) {
   const argument = args[index];
   if (argument === "--read-only") continue;
@@ -41,8 +59,16 @@ for (let index = 0; index < args.length; index++) {
     outDir = args[++index];
     continue;
   }
+  if (argument === "--ettn" && args[index + 1]) {
+    ettn = args[++index].trim();
+    if (!ETTN_PATTERN.test(ettn)) {
+      console.error("--ettn must be an ETTN (letters, digits and dashes).");
+      process.exit(2);
+    }
+    continue;
+  }
   console.error(
-    `Unknown argument '${argument}'. This script is read-only and accepts only --read-only and --out <dir>.`,
+    `Unknown argument '${argument}'. This script is read-only and accepts only --read-only, --out <dir> and --ettn <ettn>.`,
   );
   process.exit(2);
 }
@@ -78,13 +104,16 @@ function mask(value) {
   return `${value.slice(0, 2)}***${value.slice(-2)}`;
 }
 
-async function call(method, path, { token, form } = {}) {
+async function call(method, path, { token, form, json } = {}) {
   const url = `${config.baseUrl}/api/v2/${path}`;
   const headers = { Accept: "application/json" };
   let body;
   if (form) {
     headers["Content-Type"] = "application/x-www-form-urlencoded";
     body = new URLSearchParams(form).toString();
+  } else if (json) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(json);
   }
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -236,6 +265,30 @@ async function main() {
       call("GET", "services/describe", { token }),
     );
     if (describe) save("services-describe.json", describe);
+
+    console.log("\n=== SLIP LOOKUP BY TRACKING KEY (read-only) ===");
+    console.log(`SQL: ${SLIP_BY_TRACKING_KEY_SQL}`);
+    if (!ettn) {
+      console.log("Pass --ettn <invoice ETTN> to run it against Netsis.");
+    } else {
+      // VERIFY: Queries body `{ Query }`. Same binding as the API: N'…'.
+      const query = SLIP_BY_TRACKING_KEY_SQL.replace(
+        "@trackingKey",
+        `N'${ettn}'`,
+      );
+      const lookup = await step(`POST Queries (EKACK1 = ${ettn})`, () =>
+        call("POST", "Queries", { token, json: { Query: query } }),
+      );
+      if (lookup) {
+        save("slip-by-tracking-key.json", lookup);
+        const rows = lookup.json?.Data ?? lookup.json;
+        console.log(
+          Array.isArray(rows)
+            ? `Rows: ${rows.length}${rows.length > 1 ? " — more than one slip carries this ETTN (duplicate)" : ""}`
+            : "Rows: unexpected response shape (see the saved file)",
+        );
+      }
+    }
   } finally {
     await step("GET revoke", () => call("GET", "revoke", { token }));
     console.log("\nDone. Nothing was written to Netsis.");

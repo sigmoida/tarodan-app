@@ -1,4 +1,6 @@
 import { Prisma } from "@prisma/client";
+import { NetsisRequestException, netsisSnippet } from "../http/netsis-error";
+import { NETSIS_DOC_TYPE_BY_FTIRSIP } from "./netsis.constants";
 import { isNetsisRecord } from "./netsis-response.helper";
 import type {
   NetsisArp,
@@ -222,4 +224,32 @@ export function readNetsisRecordRef(record: NetsisRawRecord): string | null {
     }
   }
   return null;
+}
+
+/** Sorgu satırındaki metin ya da sayı alanı, kırpılmış; yoksa boş. */
+function scalarText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+/**
+ * İzleme anahtarı sorgusunun (`NETSIS_SLIP_BY_TRACKING_KEY_SQL`) bir
+ * satırından fiş anahtarı. Boş numara ya da tanınmayan belge tipi `unknown`
+ * hatasıdır, ASLA "bulunamadı" değil: öyle sayılsa çağıran var olan fişin
+ * yanına ikincisini açardı.
+ */
+export function readNetsisTrackedSlipKey(
+  row: NetsisRawRecord,
+): NetsisItemSlipKey {
+  const number = scalarText(row.FATIRS_NO);
+  const docType = NETSIS_DOC_TYPE_BY_FTIRSIP[scalarText(row.FTIRSIP)];
+  if (!number || !docType) {
+    throw new NetsisRequestException(
+      "unknown",
+      null,
+      `unexpected tracked slip row: ${netsisSnippet(JSON.stringify(row))}`,
+    );
+  }
+  return { FaturaTip: docType, FATIRS_NO: number };
 }

@@ -11,6 +11,7 @@ import type {
   NetsisItemSlipKey,
   NetsisMixedReceipt,
   NetsisPingResult,
+  NetsisQueryParams,
   NetsisRawRecord,
   NetsisSlipTotals,
   NetsisTransactionContext,
@@ -90,6 +91,13 @@ export interface NetsisItemSlipsApi {
     options?: NetsisCallOptions,
   ): Promise<string>;
   delete(key: NetsisItemSlipKey, options?: NetsisCallOptions): Promise<void>;
+  /**
+   * Fişi BİZİM izleme anahtarımızla (faturanın ETTN'i, başlıkta
+   * `NETSIS_SLIP_TRACKING_KEY_FIELD`) bulur; yoksa `null`. Yalnız
+   * commit edilmiş fişleri görür (transaction dışı okuma). Boş anahtar
+   * hiçbir fişle eşleşmez. Kayıp yanıttan sonra ikinci fişi önlemek için.
+   */
+  findByTrackingKey(trackingKey: string): Promise<NetsisItemSlipKey | null>;
 }
 
 /** e-Belge (EDocument). */
@@ -154,8 +162,11 @@ export interface NetsisPublicApi {
 
 /** NetRS sorguları — YALNIZ okuma. */
 export interface NetsisQueriesApi {
-  /** Tek bir SELECT; başka her şey Netsis'e gitmeden reddedilir. */
-  select(sql: string): Promise<NetsisRawRecord[]>;
+  /**
+   * Tek bir SELECT; başka her şey Netsis'e gitmeden reddedilir. `@ad` yer
+   * tutucuları `params`'tan bağlanır (`bindNetsisQueryParams`).
+   */
+  select(sql: string, params?: NetsisQueryParams): Promise<NetsisRawRecord[]>;
 }
 
 export interface NetsisGateway {

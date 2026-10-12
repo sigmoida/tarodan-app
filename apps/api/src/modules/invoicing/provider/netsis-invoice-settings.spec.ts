@@ -1,3 +1,4 @@
+import { NETSIS_CARI_CODE_MAX, NETSIS_ITEM_CODE_MAX } from "@tarodan/types";
 import { FiscalInvoiceType } from "@prisma/client";
 import {
   NETSIS_FEE_INVOICE_TYPES,
@@ -77,7 +78,7 @@ describe("netsis-invoice-settings", () => {
     const settings = parseNetsisInvoiceSettings(
       new Map([
         [K.retailCariCode, "  120.01.001  "],
-        [K.productSaleItem, "X".repeat(36)],
+        [K.productSaleItem, "X".repeat(NETSIS_ITEM_CODE_MAX + 1)],
         [netsisItemSettingKey("boost"), " BOOST "],
       ]),
     );
@@ -85,8 +86,9 @@ describe("netsis-invoice-settings", () => {
     expect(settings.itemCodes.platform_sale).toBe("");
     expect(settings.itemCodes.boost).toBe("BOOST");
     expect(
-      parseNetsisInvoiceSettings(new Map([[K.retailCariCode, "C".repeat(16)]]))
-        .retailCariCode,
+      parseNetsisInvoiceSettings(
+        new Map([[K.retailCariCode, "C".repeat(NETSIS_CARI_CODE_MAX + 1)]]),
+      ).retailCariCode,
     ).toBe("");
   });
 

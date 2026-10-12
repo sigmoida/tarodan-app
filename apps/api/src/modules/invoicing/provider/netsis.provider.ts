@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { FiscalInvoiceType } from "@prisma/client";
+import { NETSIS_CARI_CODE_MAX } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import {
   NetsisClientFacade,
@@ -10,6 +11,7 @@ import {
   type NetsisEDocumentRequest,
   type NetsisEDocumentState,
   type NetsisErrorKind,
+  type NetsisItemSlipKey,
 } from "../../netsis";
 import { localizedPayloadOf } from "../../i18n/localized-message";
 import { translateMessage } from "../../i18n/translate";
@@ -31,7 +33,6 @@ import type {
 } from "./e-invoice-provider";
 import { isNetsisCorporateTaxId } from "./netsis-cari";
 import {
-  NETSIS_CARI_CODE_MAX_LENGTH,
   NETSIS_INVOICE_SETTING_KEYS,
   loadNetsisInvoiceSettings,
   netsisItemSettingKey,
@@ -127,6 +128,10 @@ interface CorporateRecipient {
  *     kalır; sonuç `providerRef` taşır ve sonraki deneme yalnız gönderir
  *     (`EInvoiceSendContext.existingProviderRef`).
  *
+ * Referans yoksa önce fiş ETTN'imizle aranır (`findByTrackingKey`): commit
+ * olup yanıtı kaybolan bir denemenin fişi bulunur ve yalnız gönderilir —
+ * yeniden deneme ikinci bir satış faturası açmaz.
+ *
  * Tutar kontrolü defteri korur: Netsis'in hesapladığı matrah/KDV/toplam
  * kaydınkiyle 0,01 TL'den fazla ayrışırsa belge hiç gönderilmez.
  */
@@ -213,6 +218,28 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
         );
       }
       return this.resend(document, existing);
+    }
+    // Kayıp yanıt: önceki denemede Netsis transaction'ı commit etti ama yanıt
+    // bize ulaşmadı — teslim katmanının elinde referans yok. Fiş BİZİM
+    // ETTN'imizle (`EKACK1`) aranır; varsa yeniden OLUŞTURULMAZ, referanslı
+    // yolla aynı devam eder (tutar kontrolü, durum, yalnız gönderim). Arama
+    // sonuçsuz kalırsa fiş açılmaz: ikinci fiş, gecikmiş faturadan pahalıdır.
+    let tracked: NetsisItemSlipKey | null;
+    try {
+      tracked = await this.netsis.itemSlips.findByTrackingKey(document.ettn);
+    } catch (error: unknown) {
+      const category = this.classifyError(error);
+      if (category === "network") throw error;
+      return { accepted: false, category, resultMsg: errorText(error) };
+    }
+    if (tracked) {
+      this.logger.warn(
+        `Netsis fişi ${tracked.FATIRS_NO} ETTN ${document.ettn} ile zaten var (önceki yanıt kaybolmuş) — yeniden oluşturulmaz, yalnız gönderilir`,
+      );
+      return this.resend(document, {
+        docType: tracked.FaturaTip,
+        documentNumber: tracked.FATIRS_NO,
+      });
     }
     return this.createAndSend(document, context);
   }
@@ -562,7 +589,7 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
     options?: NetsisCallOptions,
   ): Promise<string | null> {
     const { code } = recipient;
-    if (!code || code.length > NETSIS_CARI_CODE_MAX_LENGTH) {
+    if (!code || code.length > NETSIS_CARI_CODE_MAX) {
       throw new NetsisInvoiceRejection(
         message("corporateCariCodeInvalid", { code: code || "-" }),
       );

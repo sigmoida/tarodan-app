@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { translateMessage } from "../../i18n/translate";
 import { NetsisAccountingSourceService } from "./netsis-accounting-source.service";
 
 const D = (value: string | number) => new Prisma.Decimal(value);
@@ -57,12 +58,33 @@ describe("NetsisAccountingSourceService", () => {
       ["eLogo faturası", { provider: "elogo" }],
       ["iade faturası", { type: "return_invoice" }],
       ["henüz gönderilmemiş", { status: "pending" }],
-      ["numarasız", { invoiceNumber: null }],
+      ["numarasız ve gönderilmemiş", { status: "pending", invoiceNumber: null }],
     ])("%s: satır açılmaz (absent)", async (_label, override) => {
       const { service } = build({ invoice: { ...sent, ...override } });
       const load = await service.load("invoice_collection", "inv-1");
       expect(load.state).toBe("absent");
     });
+
+    it.each([
+      ["numarasız", { invoiceNumber: null }],
+      ["boş numaralı", { invoiceNumber: "" }],
+      ["Netsis referanssız", { providerRef: null }],
+      ["imzalı ama referanssız", { status: "signed", providerRef: "" }],
+    ])(
+      "gönderilmiş ama %s: skipped + neden (süpürme her turda yeniden yüklemesin)",
+      async (_label, override) => {
+        const { service } = build({ invoice: { ...sent, ...override } });
+        await expect(
+          service.load("invoice_collection", "inv-1"),
+        ).resolves.toEqual({
+          state: "not_applicable",
+          reason: translateMessage(
+            "server.netsis.accounting.skip.noNumber",
+            "tr",
+          ),
+        });
+      },
+    );
   });
 
   describe("settlement_transfer", () => {

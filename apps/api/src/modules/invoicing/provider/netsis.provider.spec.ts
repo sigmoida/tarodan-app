@@ -330,13 +330,16 @@ describe("NetsisInvoiceProvider", () => {
       );
     });
 
-    it("eksik ayarlar: hiçbir Netsis çağrısı yapılmaz, eksik anahtarlar mesajda", async () => {
+    it("eksik ayarlar: ETTN aramasından başka Netsis çağrısı yapılmaz, eksik anahtarlar mesajda", async () => {
       const settings = completeSettings();
       delete settings[K.retailCariCode];
       delete settings[netsisItemSettingKey("seller_commission")];
       const { gateway, provider } = await build({ settings });
+      const lookup = jest.spyOn(gateway.itemSlips, "findByTrackingKey");
 
       const res = await provider.send(document(), SALE_CONTEXT);
+
+      expect(lookup).toHaveBeenCalledTimes(1);
 
       expect(res.accepted).toBe(false);
       if (res.accepted) return;
@@ -448,6 +451,115 @@ describe("NetsisInvoiceProvider", () => {
           documentNumber: expect.stringMatching(NUMBER),
         }),
       );
+    });
+  });
+
+  describe("send — kayıp yanıt (referans yok, fiş ETTN ile aranır)", () => {
+    it("normal yol: arama boş döner, fiş bir kez açılır", async () => {
+      const { gateway, provider } = await build();
+      const lookup = jest.spyOn(gateway.itemSlips, "findByTrackingKey");
+      const create = jest.spyOn(gateway.itemSlips, "create");
+
+      const res = await provider.send(document(), SALE_CONTEXT);
+
+      expect(res.accepted).toBe(true);
+      expect(lookup).toHaveBeenCalledWith(document().ettn);
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(gateway.snapshot().slips).toHaveLength(1);
+    });
+
+    it("commit oldu ama yanıt kayboldu: yeniden deneme İKİNCİ fiş açmaz, tutarı kontrol edip yalnız gönderir", async () => {
+      const { gateway, provider } = await build();
+      gateway.loseNextCommitResponse();
+
+      // 1. deneme: Netsis fişi yazdı, yanıt gelmedi → ulaşım hatası fırlar,
+      // teslim katmanının elinde referans yok.
+      await expect(provider.send(document(), SALE_CONTEXT)).rejects.toThrow(
+        NetsisRequestException,
+      );
+      expect(gateway.snapshot().slips).toHaveLength(1);
+      expect(gateway.snapshot().eDocuments).toHaveLength(0);
+      expect(gateway.snapshot().transactions).toEqual([
+        expect.objectContaining({ state: "committed" }),
+      ]);
+
+      const create = jest.spyOn(gateway.itemSlips, "create");
+      const newNumber = jest.spyOn(gateway.itemSlips, "newEArchiveNumber");
+      const calculate = jest.spyOn(gateway.itemSlips, "calculate");
+      const check = jest.spyOn(gateway.eDocuments, "check");
+
+      // 2. deneme: existingProviderRef YOK (teslim katmanı bilmiyor).
+      const res = await provider.send(document(), SALE_CONTEXT);
+
+      expect(res).toEqual({
+        accepted: true,
+        providerRef: expect.stringMatching(/^ftSFat:EAR\d{4}000000001$/),
+        documentNumber: expect.stringMatching(NUMBER),
+        ettn: expect.stringMatching(/^00000000-0000-4000-8000-/),
+      });
+      expect(create).not.toHaveBeenCalled();
+      expect(newNumber).not.toHaveBeenCalled();
+      expect(calculate).toHaveBeenCalledTimes(1);
+      expect(check).toHaveBeenCalledTimes(1);
+      const snap = gateway.snapshot();
+      expect(snap.slips).toHaveLength(1);
+      expect(snap.eDocuments).toEqual([
+        expect.objectContaining({ state: "sent" }),
+      ]);
+      // Yeni transaction açılmadı: yazım yok.
+      expect(snap.transactions).toHaveLength(1);
+    });
+
+    it("bulunan fişin e-belgesi zaten yoldaysa ikinci kez gönderilmez, kabul sayılır", async () => {
+      const { gateway, provider } = await build();
+      const first = await provider.send(document(), SALE_CONTEXT);
+      if (!first.accepted) throw new Error("fixture");
+      const sendEDocument = jest.spyOn(gateway.eDocuments, "send");
+
+      const res = await provider.send(document(), SALE_CONTEXT);
+
+      expect(res).toEqual(
+        expect.objectContaining({
+          accepted: true,
+          providerRef: first.providerRef,
+          documentNumber: first.documentNumber,
+        }),
+      );
+      expect(sendEDocument).not.toHaveBeenCalled();
+      expect(gateway.snapshot().slips).toHaveLength(1);
+    });
+
+    it("arama ağ hatasıyla düşerse fırlatılır, fiş açılmaz", async () => {
+      const { gateway, provider } = await build();
+      jest
+        .spyOn(gateway.itemSlips, "findByTrackingKey")
+        .mockRejectedValue(
+          new NetsisRequestException("network", null, "ETIMEDOUT"),
+        );
+      const create = jest.spyOn(gateway.itemSlips, "create");
+
+      await expect(provider.send(document(), SALE_CONTEXT)).rejects.toThrow(
+        NetsisRequestException,
+      );
+      expect(create).not.toHaveBeenCalled();
+      expect(gateway.snapshot().transactions).toHaveLength(0);
+    });
+
+    it("arama sonucu okunamazsa fiş açılmaz (ikinci fiş riski), reddedilir", async () => {
+      const { gateway, provider } = await build();
+      jest
+        .spyOn(gateway.itemSlips, "findByTrackingKey")
+        .mockRejectedValue(
+          new NetsisRequestException("unknown", null, "unexpected row"),
+        );
+
+      const res = await provider.send(document(), SALE_CONTEXT);
+
+      expect(res).toEqual(
+        expect.objectContaining({ accepted: false, category: "unknown" }),
+      );
+      expect(gateway.snapshot().slips).toHaveLength(0);
+      expect(gateway.snapshot().transactions).toHaveLength(0);
     });
   });
 

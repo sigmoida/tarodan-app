@@ -1,4 +1,9 @@
 import { FiscalInvoiceType, type PrismaClient } from "@prisma/client";
+import {
+  NETSIS_CARI_CODE_MAX,
+  NETSIS_ITEM_CODE_MAX,
+  isValidNetsisSerial,
+} from "@tarodan/types";
 import type { EInvoiceScenario } from "./e-invoice-provider";
 
 /**
@@ -54,15 +59,6 @@ export function netsisItemSettingKey(type: NetsisItemInvoiceType): string {
     ? NETSIS_INVOICE_SETTING_KEYS.productSaleItem
     : `netsis.item.${type}`;
 }
-
-/**
- * Alan uzunlukları. VERIFY: Netsis tablolarında `TBLCASABIT.CARI_KOD`
- * varchar(15), `TBLSTSABIT.STOK_KODU` varchar(35) varsayıldı; GİB seri
- * öneki 3 karakterdir (ör. `TRD`).
- */
-export const NETSIS_CARI_CODE_MAX_LENGTH = 15;
-export const NETSIS_ITEM_CODE_MAX_LENGTH = 35;
-const SERIAL_PATTERN = /^[A-Z0-9]{3}$/;
 
 export interface NetsisInvoiceSettings {
   /** Boş = yapılandırılmamış. */
@@ -138,7 +134,9 @@ export const NETSIS_INVOICE_SETTING_DEFINITIONS: readonly NetsisInvoiceSettingDe
 
 /**
  * Kod: kırpılır; boş ya da azami uzunluğu aşan değer YOK sayılır. Muhasebe
- * senkronunun hesap kodları da bu kuralı kullanır (`accounting/`).
+ * senkronunun hesap kodları da bu kuralı kullanır (`accounting/`). Sınırlar
+ * ve seri deseni `@tarodan/types` (`netsis-settings.ts`) içindedir — admin
+ * ekranı aynılarıyla doğrular.
  */
 export function netsisSettingCode(
   raw: string | undefined,
@@ -150,7 +148,7 @@ export function netsisSettingCode(
 
 function serial(raw: string | undefined): string {
   const value = (raw ?? "").trim().toUpperCase();
-  return SERIAL_PATTERN.test(value) ? value : "";
+  return isValidNetsisSerial(value) ? value : "";
 }
 
 function httpUrl(raw: string | undefined): string {
@@ -180,14 +178,14 @@ export function parseNetsisInvoiceSettings(
       type,
       netsisSettingCode(
         values.get(netsisItemSettingKey(type)),
-        NETSIS_ITEM_CODE_MAX_LENGTH,
+        NETSIS_ITEM_CODE_MAX,
       ),
     ]),
   ) as Record<NetsisItemInvoiceType, string>;
   return {
     retailCariCode: netsisSettingCode(
       values.get(keys.retailCariCode),
-      NETSIS_CARI_CODE_MAX_LENGTH,
+      NETSIS_CARI_CODE_MAX,
     ),
     autoCreateCorporateCari: netsisSettingBoolean(
       values.get(keys.autoCreateCorporateCari),
