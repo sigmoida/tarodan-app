@@ -146,3 +146,6 @@ export * from "./uat-refresh";
 
 // Reklam tıklanabilir alanları — admin formu + API aynı kuralla denetler
 export * from "./ad-hotspot";
+
+// Netsis ayar kodları: seri deseni + cari/kart/hesap kodu sınırları (API + admin)
+export * from "./netsis-settings";
