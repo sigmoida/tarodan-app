@@ -9,6 +9,7 @@ import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./refund/payment-refund.service";
 import { PaymentHoldReleaseService } from "./refund/payment-hold-release.service";
+import { PaymentHoldResidualService } from "./refund/payment-hold-residual.service";
 import { PaymentRefundAttemptService } from "./refund/payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./refund/payment-trade-refund.service";
 import { PaymentReconciliationService } from "./reconciliation/payment-reconciliation.service";
@@ -89,6 +90,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentCommonService,
     PaymentRefundService,
     PaymentHoldReleaseService,
+    PaymentHoldResidualService,
     PaymentRefundAttemptService,
     PaymentTradeRefundService,
     PaymentReconciliationService,
@@ -118,6 +120,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   ],
   exports: [
     PaymentService,
+    // Satıcı kusurlu kalıntıyı platforma kapatma (admin ucu + bakım script'i).
+    PaymentHoldResidualService,
     PaymentProviderEventService,
     VirtualOrderFulfillmentService,
     // Admin PSP mutabakat ekranı: tek satır yeniden eşleme + senkron durumu.

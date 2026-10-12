@@ -2,6 +2,7 @@ import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import {
   OrderStatus,
   PaymentHoldStatus,
+  Prisma,
   RefundRequestStatus,
 } from "@prisma/client";
 import { BadRequestException } from "@nestjs/common";
@@ -45,6 +46,8 @@ describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", 
       },
       order: { findUnique: jest.fn().mockResolvedValue(order) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      // Damgasız kalıntı adayları (kapanmış sipariş JOIN'i) — varsayılan yok.
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     const configService = { get: jest.fn().mockReturnValue(undefined) };
     const service = new PaymentHoldReleaseService(
@@ -115,20 +118,47 @@ describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", 
     expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
   });
 
-  it("adaylar: tarihi gelmişler + damgasız KALINTI adayları (iade sonrası kalan)", async () => {
+  it("adaylar: tarihi gelmişler + kapanmış siparişin damgasız hold'ları (sipariş durumundan)", async () => {
     const { service, prisma } = makeService(null);
 
     await service.releaseHoldsDue();
 
     const { where } = prisma.paymentHold.findMany.mock.calls[0][0];
-    expect(where).toMatchObject({
+    expect(where).toEqual({
       status: PaymentHoldStatus.held,
       frozenByRefundId: null,
+      releaseAt: { lte: expect.any(Date) },
     });
-    expect(where.OR).toEqual([
-      { releaseAt: { lte: expect.any(Date) } },
-      { releaseAt: null, refundedAmount: { gt: 0 } },
-    ]);
+    // Kalıntı adayı `refundedAmount`'a göre DEĞİL, siparişin kapanmış
+    // olmasına göre seçilir — sınırlı ve sıralı JOIN.
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const query = prisma.$queryRaw.mock.calls[0][0] as Prisma.Sql;
+    expect(query).toBeInstanceOf(Prisma.Sql);
+    expect(query.sql).toContain("JOIN orders o ON o.id = h.order_id");
+    expect(query.sql).toContain("h.release_at IS NULL");
+    expect(query.sql).toContain("h.frozen_by_refund_id IS NULL");
+    expect(query.sql).toContain("ORDER BY h.created_at ASC");
+    expect(query.sql).toContain("LIMIT");
+    expect(query.sql).not.toContain("refunded_amount");
+    expect(query.values).toEqual(
+      expect.arrayContaining([
+        PaymentHoldStatus.held,
+        OrderStatus.cancelled,
+        OrderStatus.refunded,
+      ]),
+    );
+  });
+
+  it("aynı hold iki aday kümesinde de çıksa bir kez bırakılır", async () => {
+    const hold = heldHold({ amount: 420, refundedAmount: 395 });
+    const { service, prisma } = makeService(
+      { status: OrderStatus.cancelled, refundRequests: [finalized("buyer")] },
+      hold,
+    );
+    prisma.$queryRaw.mockResolvedValue([{ id: hold.id }]);
+
+    expect((await service.releaseHoldsDue()).count).toBe(1);
+    expect(prisma.paymentHold.updateMany).toHaveBeenCalledTimes(1);
   });
 
   describe("kapanmış siparişin kalıntısı", () => {
@@ -160,6 +190,63 @@ describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", 
       );
 
       expect((await service.releaseHoldsDue()).count).toBe(1);
+    });
+
+    describe("iade hiç tüketmediyse (refundedAmount 0, kalıntı = hold'un tamamı)", () => {
+      // Bırakılacak pay hold'u aşınca iade hold'dan hiçbir şey tüketmez:
+      // refundedAmount 0 ve releaseAt null kalır. Eski aday süzgeci
+      // (`refundedAmount > 0`) bu hold'u hiç görmüyordu.
+      const untouched = heldHold({
+        amount: 30,
+        refundedAmount: 0,
+        releaseAt: null,
+      });
+      const withClosedOrderCandidate = (refundRequests: unknown[]) => {
+        const ctx = makeService(
+          { status: OrderStatus.cancelled, refundRequests },
+          untouched,
+        );
+        // Tarih süzgeci bu hold'u görmez; yalnız kapanmış-sipariş JOIN'i bulur.
+        ctx.prisma.paymentHold.findMany
+          .mockReset()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([untouched]);
+        ctx.prisma.$queryRaw.mockResolvedValue([{ id: untouched.id }]);
+        return ctx;
+      };
+
+      it("kusur satıcıda değil → cron kalıntıyı serbest bırakır", async () => {
+        const { service, prisma } = withClosedOrderCandidate([
+          finalized("buyer"),
+        ]);
+
+        expect((await service.releaseHoldsDue()).count).toBe(1);
+        expect(prisma.paymentHold.findMany).toHaveBeenLastCalledWith({
+          where: {
+            id: { in: ["hold-1"] },
+            status: PaymentHoldStatus.held,
+            frozenByRefundId: null,
+          },
+          orderBy: { createdAt: "asc" },
+        });
+        expect(prisma.paymentHold.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ id: "hold-1" }),
+            data: expect.objectContaining({
+              status: PaymentHoldStatus.released,
+            }),
+          }),
+        );
+      });
+
+      it("kusur satıcıda → bırakılmaz (settle-residual ile kapatılır)", async () => {
+        const { service, prisma } = withClosedOrderCandidate([
+          finalized("seller"),
+        ]);
+
+        expect((await service.releaseHoldsDue()).count).toBe(0);
+        expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
+      });
     });
 
     it("tam iadeden sonra planlanan tarih henüz gelmediyse bekler", async () => {
@@ -241,7 +328,10 @@ describe("PaymentHoldReleaseService.releasePayment — admin manual release", ()
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
       },
-      data: { status: PaymentHoldStatus.released, releasedAt: expect.any(Date) },
+      data: {
+        status: PaymentHoldStatus.released,
+        releasedAt: expect.any(Date),
+      },
     });
   });
 
@@ -254,9 +344,9 @@ describe("PaymentHoldReleaseService.releasePayment — admin manual release", ()
     const error = await service.releasePayment("o1").catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(BadRequestException);
-    expect(JSON.stringify((error as BadRequestException).getResponse())).toContain(
-      "server.payment.holdReleaseBlocked.sellerAtFault",
-    );
+    expect(
+      JSON.stringify((error as BadRequestException).getResponse()),
+    ).toContain("server.payment.holdReleaseBlocked.sellerAtFault");
     expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
   });
 

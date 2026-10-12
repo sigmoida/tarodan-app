@@ -171,7 +171,10 @@ tazmin edilir mi, (c) dönüş bacağını kim öder.
 - **Cayma / alıcı kusuru:** gidiş iade edilmez, dönüş alıcının iadesinden
   düşülür, satıcının payı tazmin edilir (yalnız tam iadede).
 - **İptal `hasShipped`'e bağlı:** kargoya verilmeden maliyet yoktur → iki taraf
-  bütünlenir; verildiyse maliyet kusurlu tarafa gider.
+  bütünlenir; verildiyse maliyet kusurlu tarafa gider. İstisna: satıcı
+  kusurunda satıcının payı kargo öncesinde de tazmin edilmez (alıcı ödediğinin
+  tamamını alır; tazmin hold'da ödenemeyen bir kalıntı bırakıyordu — PAYMENTS
+  §5).
 - **Kargo asla oranlanmaz** (kısmi iadede tek koli tüm adetlere hizmet eder);
   satıcıya yansıtılan gidiş, fiilen iade edilen tutarı izlediği için oranlanır.
 - **İade kolisi** `RefundService.openReturnShipment` ile yine

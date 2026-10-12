@@ -27,6 +27,15 @@ import type {
  *    kararı: kusur satıcıda DEĞİLSE bu tutar satıcıya ödenir; satıcıdaysa asla.
  *    Eskiden her bırakma yolu yalnız teslim edilmiş siparişi kabul ettiği için
  *    bu para escrow'da süresiz kalıyordu.
+ *
+ * Satıcı kusurlu kalıntı (`seller_at_fault`) GEÇİCİ bir durumdur: o para
+ * PLATFORMUNDUR, alıcının değil — alıcı ödediğinin tamamını (T) zaten geri
+ * almıştır; satıcının kargo payı T'de değil, satıcının hak edişinden
+ * düşülmüştür. Alıcıya ikinci kez iade edilemez (PSP tavanı T'dir). Bu yüzden
+ * PSP'ye gitmeden platforma KAPATILIR (`holdResidualSettleable` →
+ * `PaymentHoldResidualService`: admin ucu + bakım script'i). Kaynağı da
+ * kapandı: satıcı kusurlu kargo öncesi iptal artık satıcı payını tazmin
+ * etmez, hold tamamen tüketilir.
  */
 
 /** Normal bırakmanın sipariş durumları. */
@@ -233,23 +242,62 @@ export function holdResidualPayable(
 }
 
 /**
- * Admin hold listesinin satır alanları — bırakma ile AYNI yüklemden. `order`,
- * `HOLD_RELEASE_ORDER_SELECT` ile okunmuş sipariştir (`null`: bulunamadı).
+ * Kapanmış (iade/iptal) siparişin hold'unda KALAN tutar — kalıntı yollarının
+ * (satıcıya bırakma ya da platforma kapatma) üzerinde çalıştığı para. Hold
+ * tutulmuyorsa ya da sipariş kapanmamışsa 0: açık siparişte `amount −
+ * refundedAmount` kalıntı değil, henüz hak edilmemiş satıcı payıdır.
+ */
+export function closedOrderHoldResidual(
+  hold: Pick<HoldReleaseHoldFacts, "status" | "amount" | "refundedAmount">,
+  order: Pick<HoldReleaseOrderFacts, "status"> | null,
+): Prisma.Decimal {
+  if (
+    hold.status !== PaymentHoldStatus.held ||
+    !order ||
+    !RESIDUAL_ORDER_STATUSES.includes(order.status)
+  ) {
+    return new Prisma.Decimal(0);
+  }
+  return holdResidual(hold);
+}
+
+/**
+ * Satıcı kusurlu kalıntı platforma KAPATILABİLİR mi: hold tutuluyor, kilitsiz,
+ * açık iade yok, sipariş kapanmış, kalıntı > eşik ve bırakmayı engelleyen TEK
+ * neden `seller_at_fault` (kusur satıcıda ya da belirlenemiyor — şüphede
+ * satıcıya ödenmez kuralının diğer yüzü). Tarih şartı aranmaz: kapatma
+ * satıcıya ödeme değildir, beklenecek bir iade penceresi yoktur.
+ */
+export function holdResidualSettleable(
+  hold: HoldReleaseHoldFacts,
+  order: HoldReleaseOrderFacts | null,
+  now: Date,
+): boolean {
+  return (
+    holdReleaseBlockedReason({ hold, order, now, ignoreReleaseDate: true }) ===
+      "seller_at_fault" &&
+    closedOrderHoldResidual(hold, order).greaterThan(HOLD_RESIDUAL_MIN)
+  );
+}
+
+/**
+ * Admin hold listesinin satır alanları — bırakma ve kapatma ile AYNI
+ * yüklemlerden. `order`, `HOLD_RELEASE_ORDER_SELECT` ile okunmuş sipariştir
+ * (`null`: bulunamadı).
  */
 export function holdReleasabilityOf(
   hold: HoldReleaseHoldFacts,
   order: Parameters<typeof holdReleaseOrderFacts>[0] | null,
   now: Date,
 ): HoldReleasability {
-  const reason = holdReleaseBlockedReason({
-    hold,
-    order: order ? holdReleaseOrderFacts(order) : null,
-    now,
-  });
+  const facts = order ? holdReleaseOrderFacts(order) : null;
+  const reason = holdReleaseBlockedReason({ hold, order: facts, now });
   return {
     releasable: reason === null,
     releaseBlockedReason: reason,
     orderStatus: order?.status ?? null,
+    residualAmount: closedOrderHoldResidual(hold, facts).toNumber(),
+    residualSettleable: holdResidualSettleable(hold, facts, now),
   };
 }
 

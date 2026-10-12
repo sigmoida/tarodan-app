@@ -89,6 +89,7 @@ import {
   PayoutScheduleQueryDto,
   PayoutTransfersQueryDto,
   ReleasePayoutDto,
+  SettleHoldResidualDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -445,6 +446,29 @@ export class AdminPaymentController {
       dto.reason,
       dto.force ?? false,
     );
+  }
+
+  @Post("payouts/holds/:id/settle-residual")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Settle a seller-fault residual to the platform (no PSP call; the buyer already got everything they paid)",
+  })
+  @ApiParam({ name: "id", description: "PaymentHold ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Residual settled" })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: "Hold not found" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Not a seller-fault residual (not held, frozen, order not closed, seller not at fault or nothing left)",
+  })
+  async settleHoldResidual(
+    @Param("id") holdId: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: SettleHoldResidualDto,
+  ) {
+    return this.adminService.settleHoldResidual(adminId, holdId, dto.reason);
   }
 
   @Post("payouts/release-trade/:tradeId")

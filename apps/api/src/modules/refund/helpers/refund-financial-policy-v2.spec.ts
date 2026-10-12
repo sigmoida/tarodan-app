@@ -236,6 +236,102 @@ describe("refund financial policy v2", () => {
     });
   });
 
+  describe("satıcı kusurunda satıcının kargo payı hold'da kalmaz", () => {
+    // Alıcı ödediğinin TAMAMINI (T = ürün + alıcı kargo payı + alıcı ücretleri)
+    // geri alır; satıcının kargo payı T'de değil, satıcının hak edişinden
+    // düşülmüştür. Bu pay `seller_refund` olarak tazmin edilirse hold'da
+    // `amount − refundedAmount` kalıntısı doğar; satıcı kusurlu olduğu için o
+    // para kimseye ödenemez ve escrow'da süresiz kilitli kalırdı.
+    const sellerShippingRetention = (
+      result: ReturnType<typeof calculateRefundFinancialsV2>,
+    ) =>
+      result.components.filter(
+        (c) =>
+          c.componentCode === "outbound_shipping" &&
+          c.treatment === "seller_refund",
+      );
+    const buyerPaid =
+      base.productGrossAmount +
+      base.buyerShippingAmount * 1.2 +
+      base.buyerCommissionAmount * 1.2 +
+      base.buyerPlatformFeeAmount * 1.2;
+
+    it("kargo öncesi satıcı kusurlu iptal: alıcıya T, satıcı payı tazmin edilmez", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "seller",
+        hasShipped: false,
+        returnShippingAmount: 0,
+      });
+
+      expect(sellerShippingRetention(result)).toHaveLength(0);
+      expect(result.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "buyer_refund",
+            netAmount: 60,
+            taxAmount: 12,
+          }),
+        ]),
+      );
+      // Taşıma doğmadı: satıcıya gidiş kargosu borcu da yazılmaz.
+      expect(
+        result.components.some((c) => c.treatment === "seller_charge"),
+      ).toBe(false);
+      // Alıcı ödediği her kuruşu geri alır, fazlasını değil.
+      expect(result.buyerRefundAmount).toBeCloseTo(buyerPaid, 2);
+      // Koli mutabakatı yine tek seferlik yazılır.
+      expect(result.outboundSettlementRequired).toBe(true);
+    });
+
+    it("satıcı kusurlu iade (kargolanmış): satıcı payı tazmin edilmez, tam kargo satıcıya borç", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "seller",
+        hasShipped: true,
+      });
+
+      expect(sellerShippingRetention(result)).toHaveLength(0);
+      expect(result.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "buyer_refund",
+            netAmount: 60,
+          }),
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "seller_charge",
+            netAmount: 100,
+          }),
+        ]),
+      );
+      expect(result.buyerRefundAmount).toBeCloseTo(buyerPaid, 2);
+    });
+
+    it.each(["buyer", "carrier", "platform"] as const)(
+      "kargo öncesi %s kusurunda satıcı payı AYNEN tazmin edilir (davranış değişmez)",
+      (faultParty) => {
+        const result = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped: false,
+          returnShippingAmount: 0,
+        });
+
+        expect(sellerShippingRetention(result)).toEqual([
+          expect.objectContaining({
+            netAmount: 40,
+            taxAmount: 8,
+            grossAmount: 48,
+            quantityPortion: 1,
+          }),
+        ]);
+      },
+    );
+  });
+
   it.each([0, 10, 20])(
     "keeps net + tax = gross at %s service VAT",
     (serviceVatRate) => {

@@ -467,6 +467,37 @@ _c) Manuel çözüm (her satır için):_
 Geçiş öncesi alınmış üyelik ödemelerinin iadeleri eski (pazaryeri) mağazadan
 yapılır — ek iş gerekmez.
 
+### Bir kerelik: satıcı kusurlu escrow kalıntılarını kapatma
+
+Satıcı kusurlu kargo öncesi iptal eskiden satıcının kargo payını hold'da
+bırakıyordu; sipariş kapanıyor ama hold `amount − refundedAmount > 0` ile
+`held` kalıyor ve kusur satıcıda olduğu için **hiç ödenmiyordu** (admin
+listesinde "Satıcı kusurlu — ödenmez"). Kaynak düzeltildi; birikmiş olanlar bu
+script'le kapatılır. Para alıcıya gitmez — alıcı ödediğinin tamamını zaten geri
+almıştı; kalıntı platformun parasıdır (`PAYMENTS.md` §5 Kalıntı). PSP çağrısı
+yoktur: hold `cancelled` + `refundedAmount = amount` olur, defterde
+`seller_escrow → platform_commission` `adjustment` grubu yazılır
+(`hold-residual-settle:<holdId>`).
+
+Deploy sonrası, önce kuru koşu (varsayılan — yalnız raporlar):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/settle-seller-fault-residuals.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/settle-seller-fault-residuals.js --apply'
+```
+
+Yerelde: `pnpm --filter @tarodan/api settle:prod:seller-fault-residuals` (önce
+`build` + `build:seed`; script derlenmiş uygulama bağlamını `dist/`'ten yükler).
+
+Rapor hold başına: hold, sipariş, satıcı, kalıntı, kusur dayanağı (`seller` =
+sonuçlanmış talepte satıcı kusuru; `unknown` = kapanmış siparişte sonuçlanmış
+talep yok — şüphede satıcıya ödenmez kuralıyla aynı küme) ve sonuç. `unknown`
+satırlarını `--apply`'dan önce gözle kontrol edin. Idempotenttir: kapatılan
+hold aday kümesinden düşer, ikinci koşu hiçbir şey kapatmaz; `failed` satır
+varsa yeniden çalıştırmak güvenlidir. Tek hold için panel ucu:
+`POST /admin/payouts/holds/:id/settle-residual` (sebep zorunlu, denetim
+kaydı yazılır).
+
 ### Her ay: silinen hesap bildirimi
 
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel

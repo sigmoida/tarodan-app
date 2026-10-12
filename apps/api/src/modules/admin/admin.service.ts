@@ -737,6 +737,10 @@ export class AdminService {
     return this.payoutService.releasePayout(adminId, orderId, reason, force);
   }
 
+  async settleHoldResidual(adminId: string, holdId: string, reason: string) {
+    return this.payoutService.settleHoldResidual(adminId, holdId, reason);
+  }
+
   async releaseTradePaymentHold(
     adminId: string,
     tradeId: string,

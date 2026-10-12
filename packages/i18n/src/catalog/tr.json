@@ -10767,6 +10767,7 @@
         "orderNotTerminal": "Sipariş, ödemenin serbest bırakılabileceği bir durumda değil",
         "sellerAtFault": "İade/iptalde kusur satıcıda olduğu için kalan tutar satıcıya ödenmez"
       },
+      "holdResidualNotSettleable": "Bu ödemede kapatılacak satıcı kusurlu kalan tutar yok (tutulmuyor, iadeyle dondurulmuş, sipariş kapanmamış, kusur satıcıda değil ya da kalan tutar yok)",
       "installmentInfoFetchFailed": "Taksit bilgisi alınamadı",
       "installmentInfoUnavailable": "Taksit bilgileri alınamadı",
       "installmentResponseInvalid": "PayTR taksit yanıtı geçersiz/boş",
