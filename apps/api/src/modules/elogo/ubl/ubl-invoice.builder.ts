@@ -9,67 +9,24 @@
  * eLogo TEST ortamına gönderildiğinde yapılır. Tutar matematiği burada test edilir.
  */
 
+import type {
+  FiscalDocumentLine,
+  FiscalParty,
+} from "../provider/e-invoice-provider";
+import {
+  computeFiscalDocumentTotals,
+  type FiscalDocumentTotals,
+} from "../invoice/fiscal-document-totals";
+
 export type UblProfileId = "EARSIVFATURA" | "TEMELFATURA" | "TICARIFATURA";
 export type UblInvoiceTypeCode = "SATIS" | "IADE";
 
-export interface UblParty {
-  /** 10 haneli VKN (tüzel) veya 11 haneli TCKN (gerçek kişi). */
-  vknTckn: string;
-  /** Tüzel kişi unvanı (şirket). Gerçek kişide boş bırakılıp firstName/lastName kullanılır. */
-  title?: string;
-  firstName?: string;
-  lastName?: string;
-  /** Vergi dairesi (VKN için). */
-  taxOffice?: string;
-  country?: string;
-  city?: string;
-  district?: string;
-  streetAddress?: string;
-  email?: string;
-  phone?: string;
-  websiteUri?: string;
-}
-
-export interface UblInvoiceLine {
-  name: string;
-  /**
-   * Kalemin AÇIKLAMASI (`cac:Item/cbc:Description`) — hizmet faturalarında
-   * "Sipariş No: PKG-…". Belgenin hangi koliden doğduğu kalemin üstünde
-   * durmalı; belge notu tek başına yeterli değil, çoğu XSLT tasarımı satırın
-   * açıklamasını basar.
-   */
-  description?: string;
-  quantity: number;
-  /** Birim kodu (UBL). Adet=C62, ay=MON. Varsayılan C62. */
-  unitCode?: string;
-  /** Birim fiyat (KDV hariç). */
-  unitPrice: number;
-  /**
-   * Satıra uygulanan İSKONTO (KDV hariç). Verildiğinde satırda
-   * `cac:AllowanceCharge` (ChargeIndicator=false) basılır ve belge toplamına
-   * `cbc:AllowanceTotalAmount` eklenir. `lineExtension` (matrah) indirim
-   * SONRASI tutardır — UBL-TR kuralı budur; `unitPrice` ise brüt birim fiyat.
-   */
-  discount?: number;
-  /**
-   * Satırın KDV hariç toplamı. Verilmezse `quantity × unitPrice` hesaplanır.
-   *
-   * Birden fazla adette birim fiyat kuruşa yuvarlandığında (100/3 = 33,33)
-   * `quantity × unitPrice` tahsil edilen tutardan sapıyor. Toplam AÇIKÇA
-   * verildiğinde fatura, müşteriden tahsil edilen tutarla kuruşu kuruşuna eşleşir.
-   */
-  lineExtension?: number;
-  /** KDV oranı (%). Örn. 20. */
-  vatRate: number;
-  /**
-   * Satırın KDV'si, AÇIKÇA verildiğinde. Verilmezse `lineExtension × vatRate`.
-   *
-   * Paket hizmet belgeleri tek satırdır ama KDV'leri sipariş bazında yuvarlanıp
-   * toplanır (checkout tahsil ederken böyle yuvarlar). Birleşik matrahtan yeniden
-   * hesaplamak beyanı tahsilattan bir kuruş ayırabilirdi.
-   */
-  taxAmount?: number;
-}
+/**
+ * Taraf ve satır tipleri sağlayıcı portunun nötr tipleridir; UBL adları
+ * geriye uyumluluk için takma ad olarak kalır.
+ */
+export type UblParty = FiscalParty;
+export type UblInvoiceLine = FiscalDocumentLine;
 
 export interface UblInvoiceInput {
   profileId?: UblProfileId; // e-Arşiv → EARSIVFATURA
@@ -99,15 +56,7 @@ export interface UblInvoiceInput {
 export interface UblInvoiceResult {
   xml: string;
   /** Hesaplanan toplamlar (kayıt/denetim için). */
-  totals: {
-    lineExtension: number;
-    taxExclusive: number;
-    tax: number;
-    taxInclusive: number;
-    payable: number;
-    /** Belgede gösterilen toplam iskonto (matraha DAHİL DEĞİL, ondan düşülmüştür). */
-    allowance: number;
-  };
+  totals: FiscalDocumentTotals;
 }
 
 // ── yardımcılar ────────────────────────────────────────────────────────────────
@@ -208,38 +157,18 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
   if (!input.lines.length)
     throw new Error("UBL: en az bir fatura satırı gerekli");
 
-  // Satır hesapları. Matrah ve KDV oran BAZINDA toplanır: bir belgede farklı
-  // oranlar bulunabilir (ör. %10 ürün + %20 kargo/hizmet bedeli) ve GİB her oran
-  // için ayrı TaxSubtotal bekler.
-  let lineExtensionSum = 0;
-  let taxSum = 0;
-  let allowanceSum = 0;
-  const byRate = new Map<number, { base: number; tax: number }>();
+  // Satır ve dip toplamları TEK yerden gelir (`fiscal-document-totals.ts`):
+  // kayıt da aynı hesabı yazar, belge ile beyan ayrışmaz.
+  const computed = computeFiscalDocumentTotals(input.lines);
   const lineXmls: string[] = [];
   input.lines.forEach((line, i) => {
-    const lineExt = round2(
-      line.lineExtension ?? line.quantity * line.unitPrice,
-    );
-    const lineTax = round2(
-      typeof line.taxAmount === "number" && Number.isFinite(line.taxAmount)
-        ? line.taxAmount
-        : (lineExt * line.vatRate) / 100,
-    );
-    lineExtensionSum = round2(lineExtensionSum + lineExt);
-    taxSum = round2(taxSum + lineTax);
-    const group = byRate.get(line.vatRate) ?? { base: 0, tax: 0 };
-    byRate.set(line.vatRate, {
-      base: round2(group.base + lineExt),
-      tax: round2(group.tax + lineTax),
-    });
+    const {
+      lineExtension: lineExt,
+      tax: lineTax,
+      allowance,
+    } = computed.lines[i];
     // İskonto: brüt bedel (matrah + indirim) satırın BaseAmount'ı, indirim
     // Amount. Matrah zaten indirim düşülmüş tutardır, dolayısıyla KDV değişmez.
-    const allowance = round2(
-      Number.isFinite(line.discount as number) && (line.discount as number) > 0
-        ? (line.discount as number)
-        : 0,
-    );
-    allowanceSum = round2(allowanceSum + allowance);
     const allowanceXml = allowance
       ? `<cac:AllowanceCharge>${el("cbc:ChargeIndicator", "false")}${el(
           "cbc:Amount",
@@ -274,17 +203,19 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
     );
   });
 
-  // UBL-TR: LineExtensionAmount satır matrahlarının toplamıdır (indirim düşülmüş);
-  // AllowanceTotalAmount belgede gösterilen toplam iskontodur ve
-  // TaxExclusiveAmount'ı DEĞİŞTİRMEZ — indirim zaten matrahın içinden düşülmüştür.
-  const taxExclusive = lineExtensionSum;
-  const taxInclusive = round2(taxExclusive + taxSum);
-  const payable = taxInclusive;
+  const {
+    lineExtension: lineExtensionSum,
+    taxExclusive,
+    tax: taxSum,
+    taxInclusive,
+    payable,
+    allowance: allowanceSum,
+  } = computed.totals;
 
   const taxTotalXml =
     `<cac:TaxTotal>` +
     el("cbc:TaxAmount", money(taxSum), `currencyID="${currency}"`) +
-    [...byRate.entries()]
+    [...computed.byRate.entries()]
       .sort(([a], [b]) => a - b)
       .map(([rate, g]) => buildTaxSubtotal(g.base, rate, g.tax, currency))
       .join("") +
@@ -361,15 +292,5 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
     lineXmls.join("") +
     `</Invoice>`;
 
-  return {
-    xml,
-    totals: {
-      lineExtension: lineExtensionSum,
-      taxExclusive,
-      tax: taxSum,
-      taxInclusive,
-      payable,
-      allowance: allowanceSum,
-    },
-  };
+  return { xml, totals: computed.totals };
 }
