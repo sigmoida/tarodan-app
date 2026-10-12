@@ -12,6 +12,8 @@ import { ElogoReversalService } from "./elogo-reversal.service";
 import { ElogoSchedulerService } from "./jobs/elogo-scheduler.service";
 import { ElogoScheduledProcessor } from "./jobs/elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
+import { E_INVOICE_PROVIDER } from "./provider/e-invoice-provider";
+import { ElogoInvoiceProvider } from "./provider/elogo.provider";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
@@ -28,6 +30,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
  * eLogo e-Belge entegrasyon modülü.
  * Sürat Kargo modülüyle aynı desen: SOAP client factory ile (ELOGO_SOAP_MODE)
  * stub/live arasında seçilir; ElogoService dışarı export edilir.
+ *
+ * Teslim/ters kayıt/sorgu servisleri entegratörü `E_INVOICE_PROVIDER` portu
+ * üzerinden görür; bugün tek bağlama eLogo'dur (docs/INVOICING_PROVIDERS.md).
  */
 @Module({
   imports: [
@@ -54,6 +59,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
       inject: [ConfigService],
     },
     ElogoService,
+    ElogoInvoiceProvider,
+    { provide: E_INVOICE_PROVIDER, useExisting: ElogoInvoiceProvider },
     ElogoInvoicingService,
     ElogoQueryService,
     ElogoDocumentService,
