@@ -29,6 +29,7 @@ import type {
   FiscalParty,
   RecipientKindResult,
 } from "./e-invoice-provider";
+import { isNetsisCorporateTaxId } from "./netsis-cari";
 import {
   NETSIS_CARI_CODE_MAX_LENGTH,
   NETSIS_INVOICE_SETTING_KEYS,
@@ -50,9 +51,6 @@ import {
 } from "./netsis-slip.mapper";
 
 type EInvoiceSendRejection = Extract<EInvoiceSendResult, { accepted: false }>;
-
-/** VKN 10 hanedir (tüzel kişi); TCKN 11. */
-const VKN_LENGTH = 10;
 
 const SERIAL_SETTING_KEY: Record<EInvoiceScenario, string> = {
   EARCHIVE: NETSIS_INVOICE_SETTING_KEYS.earchiveSerial,
@@ -166,7 +164,7 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
     taxId: string,
   ): Promise<RecipientKindResult | null> {
     const vkn = digitsOf(taxId);
-    if (vkn.length !== VKN_LENGTH) return { kind: "EARCHIVE" };
+    if (!isNetsisCorporateTaxId(vkn)) return { kind: "EARCHIVE" };
     try {
       const recipient = await this.corporateRecipient(vkn);
       if (!recipient) {
@@ -300,7 +298,7 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
         message("itemTypeUnresolved", { type: context.invoiceType ?? "-" }),
       );
     }
-    const pooled = document.customer.vknTckn.length !== VKN_LENGTH;
+    const pooled = !isNetsisCorporateTaxId(document.customer.vknTckn);
     const missing = [
       ...(pooled && !settings.retailCariCode
         ? [NETSIS_INVOICE_SETTING_KEYS.retailCariCode]

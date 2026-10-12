@@ -10556,6 +10556,10 @@
       "tradeCancelledByPlatform": {
         "title": "Your trade was cancelled by Tarodan",
         "message": "Trade {tradeNumber} was cancelled by Tarodan. Reason: {reason}.{hasRefund, select, yes { The full {refundAmount} TL you paid will be refunded.} other {}} Your items in the trade are free again."
+      },
+      "netsisSyncExhausted": {
+        "title": "Netsis Accounting Sync Blocked",
+        "message": "The {kindLabel} record ({sourceId}) could not be written to Netsis and has run out of attempts: {reason}. Fix the cause and retry the record; money flows are not affected."
       }
     },
     "auth": {
@@ -11766,6 +11770,41 @@
         "conflict": "Netsis reports the record already exists",
         "configuration": "The Netsis integration is misconfigured",
         "unknown": "Netsis returned an unexpected error"
+      },
+      "accounting": {
+        "description": {
+          "invoiceCollection": "Collection {invoiceNumber}",
+          "settlementTransfer": "PayTR settlement {date} fee {fee}",
+          "payoutTransfer": "Seller payout {reference}",
+          "payoutTransferPooled": "Seller payout {name} ****{last4} {reference}",
+          "refundReversal": "Refund {reference}",
+          "refundReversalPooled": "Refund {reference} {name}"
+        },
+        "error": {
+          "accountMissing": "Netsis accounting account is not configured: {account}",
+          "corporateCariCodeInvalid": "The corporate account code cannot be written to Netsis: {code}",
+          "retailCariMissing": "The shared retail account code (netsis.cari.retailCode) is not configured",
+          "invalidProviderRef": "The invoice's Netsis reference could not be read: {ref}",
+          "slipNotFound": "The invoice's Netsis slip was not found: {number}",
+          "slipCariMissing": "The invoice's Netsis slip has no account code: {number}",
+          "refLost": "The record was created in Netsis ({ref}) but could not be saved locally; it is not retried to avoid a duplicate, check it in Netsis"
+        },
+        "skip": {
+          "disabled": "Accounting sync is off or Netsis is not the invoicing provider",
+          "sourceMissing": "Source record not found",
+          "notFinal": "The source is not final yet ({status})",
+          "zeroAmount": "There is no amount to transfer",
+          "testLane": "Test lane transaction; not sent to accounting",
+          "partyMissing": "The transaction's party was not found"
+        },
+        "recordNotFound": "Netsis sync record not found",
+        "notRetryable": "This record cannot be retried (status: {status})",
+        "kind": {
+          "invoice_collection": "Invoice collection",
+          "settlement_transfer": "PayTR settlement transfer",
+          "payout_transfer": "Seller payout",
+          "refund_reversal": "Buyer refund"
+        }
       }
     },
     "invoicing": {

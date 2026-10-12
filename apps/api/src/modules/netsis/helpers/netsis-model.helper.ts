@@ -205,3 +205,21 @@ export function readNetsisArpEInvoiceProfile(
   }
   return { isEInvoiceUser, alias };
 }
+
+/**
+ * Yazılan tahsilat/havale kaydının Netsis'teki anahtarı. VERIFY: yanıtın
+ * hangi alanda döndüğü (`ID` stub'ın verdiği; `INCKEYNO`, `KAYITNO` tablo
+ * kolonu tahmini). Bulunamazsa `null` — çağıran kendi referansını saklar.
+ */
+const RECORD_REF_FIELDS = ["ID", "Id", "INCKEYNO", "KAYITNO", "KayitNo"] as const;
+
+export function readNetsisRecordRef(record: NetsisRawRecord): string | null {
+  for (const field of RECORD_REF_FIELDS) {
+    const value = record[field];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+  return null;
+}

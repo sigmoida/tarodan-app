@@ -11,7 +11,9 @@ export * from "./helpers/netsis.types";
 export { NETSIS_DOC_TYPES } from "./helpers/netsis.constants";
 export {
   netsisArpCode,
+  netsisSlipKey,
   readNetsisArpEInvoiceProfile,
+  readNetsisRecordRef,
 } from "./helpers/netsis-model.helper";
 export type { NetsisArpEInvoiceProfile } from "./helpers/netsis-model.helper";
 export {

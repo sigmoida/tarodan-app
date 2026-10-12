@@ -5,6 +5,7 @@ import {
   readNetsisArpEInvoiceProfile,
   readNetsisEDocumentState,
   readNetsisEttn,
+  readNetsisRecordRef,
   readNetsisSlipTotals,
   sameNetsisSlip,
   sumNetsisSlipLines,
@@ -149,5 +150,13 @@ describe("netsis-model.helper", () => {
     expect(readNetsisEttn({ UUID: "def" })).toBe("def");
     expect(readNetsisEttn({ ETTN: "" })).toBeNull();
     expect(readNetsisEttn({})).toBeNull();
+  });
+
+  it("readNetsisRecordRef: yazılan kaydın anahtarını bilinen alanlardan okur", () => {
+    expect(readNetsisRecordRef({ ID: "STUB-TAH-3" })).toBe("STUB-TAH-3");
+    expect(readNetsisRecordRef({ INCKEYNO: 4711 })).toBe("4711");
+    expect(readNetsisRecordRef({ KAYITNO: "  K-9 " })).toBe("K-9");
+    expect(readNetsisRecordRef({ ID: "" })).toBeNull();
+    expect(readNetsisRecordRef({})).toBeNull();
   });
 });
