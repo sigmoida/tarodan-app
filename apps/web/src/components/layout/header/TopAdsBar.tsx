@@ -10,6 +10,7 @@ import { useActiveAds } from "@/hooks/useActiveAds";
 import { useAdImpression } from "@/hooks/useAdImpression";
 import { trackAdEvent, type Advertisement } from "@/lib/api/advertisements";
 import { isExternalAdHref, safeAdHref } from "@/lib/ads/safeAdHref";
+import AdHotspots from "@/components/marketing/AdHotspots";
 import { Container } from "../Container";
 
 /**
@@ -23,6 +24,24 @@ function TopAdItem({ ad }: { ad: Advertisement }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [imageFailed, setImageFailed] = useState(false);
   useAdImpression(ref, ad.id);
+
+  // Görselli afişte tıklama yalnız bölgelerden gelir; öğenin tamamı tıklanmaz.
+  if (ad.imageUrl && !imageFailed) {
+    return (
+      <span ref={ref} className="relative flex h-6 flex-shrink-0 items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={ad.imageUrl}
+          alt={ad.altText || ad.title}
+          loading="lazy"
+          decoding="async"
+          className="h-6 w-auto max-w-[200px] object-contain"
+          onError={() => setImageFailed(true)}
+        />
+        <AdHotspots ad={ad} />
+      </span>
+    );
+  }
 
   const handleClick = () => {
     trackAdEvent(ad.id, "click");
@@ -44,21 +63,9 @@ function TopAdItem({ ad }: { ad: Advertisement }) {
       className="flex h-6 flex-shrink-0 items-center border-0 bg-transparent p-0 hover:bg-transparent hover:opacity-80"
     >
       <span ref={ref} className="flex items-center">
-        {ad.imageUrl && !imageFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={ad.imageUrl}
-            alt={ad.altText || ad.title}
-            loading="lazy"
-            decoding="async"
-            className="h-6 w-auto max-w-[200px] object-contain"
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <span className="whitespace-nowrap text-xs font-medium text-body">
-            {ad.title}
-          </span>
-        )}
+        <span className="whitespace-nowrap text-xs font-medium text-body">
+          {ad.title}
+        </span>
       </span>
     </Button>
   );

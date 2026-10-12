@@ -13,11 +13,14 @@ import {
 } from "@/lib/api/advertisements";
 import { adAspectRatio } from "@/lib/ads/adAspect";
 import { isExternalAdHref, safeAdHref } from "@/lib/ads/safeAdHref";
+import AdHotspots from "./AdHotspots";
 
 /**
  * Tek afişin çizimi — header/footer/inline/popup yuvalarının ortak gövdesi.
  * Üç iş yapar: görseli kırpmadan (`object-contain`) kendi oranında çizer,
  * görünür olunca gösterimi sayar, tıklamayı `sendBeacon` ile sayar.
+ * Görselli afişte YALNIZ tanımlı bölgeler (hotspot) tıklanır; görselsiz
+ * (metin) afişte tek `linkUrl` bağlantısı geçerlidir.
  *
  * Görsel kutusu veri geldikten SONRA çizilir (yuva boşken yer ayrılmaz);
  * oran afişin kendi ölçüsünden gelir, böylece görsel yüklenirken kayma olmaz.
@@ -60,12 +63,16 @@ export default function AdCreative({
             className="object-contain"
             logContext={{ page: "banner", adId: ad.id }}
           />
+          <AdHotspots ad={ad} onNavigate={onNavigate} />
         </div>
       ) : (
         <AdTextBody ad={ad} />
       )}
     </div>
   );
+
+  // Görselli afiş sarmalanmaz: tıklama bölgelerden gelir.
+  if (ad.imageUrl) return body;
 
   return (
     <AdLink ad={ad} onNavigate={onNavigate}>
