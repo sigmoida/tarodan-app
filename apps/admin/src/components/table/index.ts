@@ -8,6 +8,7 @@ export {
   type RowAction,
   type RowActionItem,
 } from "./RowActionMenu";
+export { moveActions } from "./reorderActions";
 export { TruncatedText } from "./TruncatedText";
 export {
   Empty,

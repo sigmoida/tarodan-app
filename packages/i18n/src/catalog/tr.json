@@ -5467,6 +5467,101 @@
       }
     },
     "marketing": {
+      "hero": {
+        "title": "Hero slaytları",
+        "subtitle": "Ana sayfa ve giriş/kayıt ekranlarındaki hero alanını yönetin",
+        "new": "Yeni slayt",
+        "edit": "Slaytı düzenle",
+        "created": "Slayt oluşturuldu",
+        "updated": "Slayt güncellendi",
+        "deleted": "Slayt silindi",
+        "deleteConfirm": "\"{title}\" slaytı silinsin mi?",
+        "empty": "Bu yerleşimde henüz slayt yok",
+        "maxLiveNote": "Yayında en fazla {max} slayt",
+        "placementLabel": "Yerleşim",
+        "placement": {
+          "home": "Ana sayfa",
+          "auth_default": "Giriş (varsayılan)",
+          "auth_register": "Giriş (kayıt)"
+        },
+        "columns": {
+          "image": "Görsel",
+          "cta": "Düğmeler",
+          "impressions": "Gösterim",
+          "clicks": "Tık",
+          "cta1Clicks": "Düğme 1",
+          "cta2Clicks": "Düğme 2",
+          "ios": "iOS"
+        },
+        "hiddenOnIos": "iOS'ta gizli",
+        "hideOnIos": "iOS uygulamasında gösterme",
+        "hideOnIosHint": "iOS uygulamasında gösterilmez (örn. koleksiyon oluşturma)",
+        "desktopImage": "Masaüstü görseli",
+        "mobileImage": "Mobil görsel (isteğe bağlı)",
+        "mobileImageHint": "Boşsa her cihazda masaüstü görseli kullanılır.",
+        "imageSideLabel": "Görsel tarafı",
+        "imageSide": {
+          "left": "Sol",
+          "right": "Sağ"
+        },
+        "imageSideHint": {
+          "left": "Görsel solda, metin sağda görünür.",
+          "right": "Görsel sağda, metin solda görünür."
+        },
+        "fields": {
+          "title": "Başlık",
+          "subtitle": "Alt başlık",
+          "imageAlt": "Görsel alternatif metni",
+          "cta1Label": "1. düğme etiketi",
+          "cta2Label": "2. düğme etiketi",
+          "cta1Href": "1. düğme adresi",
+          "cta2Href": "2. düğme adresi"
+        },
+        "preview": {
+          "title": "Önizleme",
+          "titlePlaceholder": "Başlık",
+          "noImage": "Görsel yok"
+        },
+        "moveUp": "Yukarı taşı",
+        "moveDown": "Aşağı taşı",
+        "validation": {
+          "trRequired": "Türkçe metin zorunlu",
+          "trRequiredForEn": "İngilizce metin için önce Türkçe metni girin",
+          "maxLength": "En fazla {max} karakter olabilir.",
+          "imageRequired": "Masaüstü görseli gerekli",
+          "ctaHrefRequired": "Düğme etiketi için bir adres girin",
+          "ctaLabelRequired": "Adres için bir düğme etiketi girin",
+          "linkInvalid": "Geçerli bir adres girin: https://… ile başlayan tam adres ya da / ile başlayan site içi yol.",
+          "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz."
+        }
+      },
+      "trustBadges": {
+        "title": "Güven rozetleri",
+        "subtitle": "Sitede gösterilen güven rozetlerini yönetin",
+        "new": "Yeni rozet",
+        "edit": "Rozeti düzenle",
+        "created": "Rozet oluşturuldu",
+        "updated": "Rozet güncellendi",
+        "deleted": "Rozet silindi",
+        "deleteConfirm": "\"{title}\" rozeti silinsin mi?",
+        "empty": "Henüz rozet yok",
+        "maxActiveNote": "Yayında en fazla {max} rozet önerilir",
+        "tokensHint": "Süre değişkeni kullanılabilir: '{returnWindowDays}'",
+        "columns": {
+          "order": "Sıra",
+          "icon": "Simge"
+        },
+        "validation": {
+          "trRequired": "Türkçe metin zorunlu",
+          "trRequiredForEn": "İngilizce metin için önce Türkçe metni girin",
+          "maxLength": "En fazla {max} karakter olabilir.",
+          "iconRequired": "Bir simge seçin"
+        }
+      },
+      "localeTabs": {
+        "tr": "Türkçe",
+        "en": "İngilizce"
+      },
       "ads": {
         "title": "Reklam Yönetimi",
         "subtitle": "IAB standartlarına uygun reklam yönetimi",
@@ -9411,6 +9506,16 @@
           "description": "Geliştirici test ve simülasyon araçları",
           "keywords": "test,zaman,cron,süre,boost,üyelik,iade,time"
         },
+        "hero": {
+          "name": "Hero slaytları",
+          "description": "Ana sayfa ve giriş ekranı hero alanını yönetin",
+          "keywords": "hero,slayt,banner,ana sayfa,giriş"
+        },
+        "trustBadges": {
+          "name": "Güven rozetleri",
+          "description": "Sitedeki güven rozetlerini yönetin",
+          "keywords": "güven,rozet,badge"
+        },
         "adPackages": {
           "name": "Öne Çıkarma",
           "description": "Vitrin ve ekonomik öne çıkarma paketlerini yönetin",
@@ -9657,6 +9762,8 @@
       },
       "rateRange": "Oran {min} ile {max} arasında olmalı",
       "rowActions": {
+        "moveUp": "Yukarı taşı",
+        "moveDown": "Aşağı taşı",
         "deactivate": "Pasifleştir",
         "activate": "Aktifleştir"
       },

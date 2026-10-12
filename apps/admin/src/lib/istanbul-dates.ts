@@ -1,4 +1,4 @@
-import { ADMIN_TIME_ZONE } from "@/lib/format";
+import { ADMIN_TIME_ZONE } from "./format";
 
 /**
  * Reklam tarihleri İstanbul takvim günüdür. Form `YYYY-MM-DD` tutar; API'ye
