@@ -1,21 +1,14 @@
+import { LIVE_STATUS_VARIANT, scheduleLiveStatus, type LiveStatus } from "@/lib/live-status";
 import type { Ad } from "./types";
 
-export type AdLiveStatus =
-  | "scheduled"
-  | "live"
-  | "expired"
-  | "inactive"
-  | "campaignEnded";
+export type AdLiveStatus = LiveStatus | "campaignEnded";
 
 /** Rozet varyantları (yalnız Badge'in mevcut beş varyantı). */
 export const AD_STATUS_VARIANT: Record<
   AdLiveStatus,
   "outline" | "success" | "warning"
 > = {
-  scheduled: "outline",
-  live: "success",
-  expired: "warning",
-  inactive: "outline",
+  ...LIVE_STATUS_VARIANT,
   campaignEnded: "warning",
 };
 
@@ -29,12 +22,10 @@ export function adLiveStatus(
   now: Date,
 ): AdLiveStatus {
   if (!ad.isActive) return "inactive";
-  const t = now.getTime();
   if (ad.discount) {
     const campaignEnd = new Date(ad.discount.endDate).getTime();
-    if (!ad.discount.isActive || campaignEnd < t) return "campaignEnded";
+    if (!ad.discount.isActive || campaignEnd < now.getTime())
+      return "campaignEnded";
   }
-  if (ad.endDate && new Date(ad.endDate).getTime() < t) return "expired";
-  if (ad.startDate && new Date(ad.startDate).getTime() > t) return "scheduled";
-  return "live";
+  return scheduleLiveStatus(ad, now);
 }

@@ -316,6 +316,24 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "ads",
         },
         {
+          name: t("admin.nav.items.hero.name"),
+          href: "/marketing/hero",
+          description: t("admin.nav.items.hero.description"),
+          keywords: t("admin.nav.items.hero.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "ads",
+        },
+        {
+          name: t("admin.nav.items.trustBadges.name"),
+          href: "/marketing/trust-badges",
+          description: t("admin.nav.items.trustBadges.description"),
+          keywords: t("admin.nav.items.trustBadges.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "ads",
+        },
+        {
           name: t("admin.nav.items.discounts.name"),
           href: "/marketing/discounts",
           description: t("admin.nav.items.discounts.description"),

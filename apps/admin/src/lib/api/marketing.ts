@@ -71,6 +71,33 @@ export const marketingApi = {
       responseType: "blob",
     }),
 
+  // Hero slaytları (ana sayfa + giriş/kayıt ekranları)
+  getHeroSlides: (params?: { placement?: string }) =>
+    api.get("/admin/hero-slides", { params }),
+  createHeroSlide: (data: any) => api.post("/admin/hero-slides", data),
+  updateHeroSlide: (id: string, data: any) =>
+    api.patch(`/admin/hero-slides/${id}`, data),
+  deleteHeroSlide: (id: string) => api.delete(`/admin/hero-slides/${id}`),
+  reorderHeroSlides: (ids: string[]) =>
+    api.patch("/admin/hero-slides/reorder", { ids }),
+  /** Hero görseli yükleme (multipart `file`); yanıt `{ url }`. */
+  uploadHeroImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string }>("/admin/hero-slides/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  // Güven rozetleri
+  getTrustBadges: () => api.get("/admin/trust-badges"),
+  createTrustBadge: (data: any) => api.post("/admin/trust-badges", data),
+  updateTrustBadge: (id: string, data: any) =>
+    api.patch(`/admin/trust-badges/${id}`, data),
+  deleteTrustBadge: (id: string) => api.delete(`/admin/trust-badges/${id}`),
+  reorderTrustBadges: (ids: string[]) =>
+    api.patch("/admin/trust-badges/reorder", { ids }),
+
   // Notifications
   getNotificationHistory: (params?: {
     page?: number;

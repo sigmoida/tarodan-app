@@ -9,7 +9,8 @@ import {
   endOfIstanbulDayIso,
   istanbulDateOf,
   startOfIstanbulDayIso,
-} from "./dates";
+} from "@/lib/istanbul-dates";
+import { isValidLink } from "@/lib/links";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -152,12 +153,8 @@ export const isIabSize = (width?: number | null, height?: number | null) =>
   !!height &&
   IAB_SIZES.some((s) => s.width === width && s.height === height);
 
-/** Bağlantı: mutlak `http(s)://…` ya da site-içi `/yol` (`//` ve `/\` hariç). Boş geçerli. */
-export const isValidAdLink = (v?: string | null): boolean => {
-  const s = (v ?? "").trim();
-  if (!s) return true;
-  return /^https?:\/\/\S+$/i.test(s) || /^\/(?![/\\])\S*$/.test(s);
-};
+/** Reklam bağlantısı kuralı (`@/lib/links` ile tek kaynak). */
+export const isValidAdLink = isValidLink;
 
 /** Paylaşılan alan kuralı hatası → form hata yolu + çevrilmiş mesaj. */
 export interface HotspotIssue {
