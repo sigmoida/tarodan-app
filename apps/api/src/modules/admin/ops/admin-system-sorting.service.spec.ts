@@ -262,6 +262,7 @@ describe("admin system and user list sorting", () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     await service.getNotificationHistory({
@@ -290,6 +291,7 @@ describe("admin system and user list sorting", () => {
     });
     const service = new AdminNotificationService(
       { scheduledNotification } as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -324,6 +326,7 @@ describe("admin system and user list sorting", () => {
     };
     const service = new AdminNotificationService(
       { notificationLog, user } as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

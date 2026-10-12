@@ -40,6 +40,7 @@ describe("AdminNotificationService — HTML e-posta", () => {
       eventService as never,
       audit as never,
       newsletter as never,
+      {} as never, // media — yükleme bu spec'in konusu değil
     );
     return { service, prisma, eventService, newsletter, audit };
   };

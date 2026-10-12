@@ -12,6 +12,7 @@ import {
   RefundAttemptStatus,
 } from "@prisma/client";
 import {
+  DASHBOARD_METRIC_DESCRIPTION_KEYS,
   DASHBOARD_METRIC_KEYS,
   type DashboardMetric,
   type DashboardMetricKey,
@@ -247,13 +248,18 @@ export class AdminAnalyticsDashboardService {
       this.getThisMonthMetrics(now),
     ]);
 
+    const descriptions: Partial<Record<DashboardMetricKey, string>> =
+      DASHBOARD_METRIC_DESCRIPTION_KEYS;
     const metrics = {} as Record<DashboardMetricKey, DashboardMetric>;
     DASHBOARD_METRIC_KEYS.forEach((key) => {
+      const description = descriptions[key];
       metrics[key] = {
         period: period[key],
         yesterday: closed[key].yesterday,
         thisMonth: thisMonth[key],
         allTime: closed[key].allTime,
+        // Panel ipucu olarak çevirir; servis dil seçmez.
+        ...(description ? { description } : {}),
       };
     });
 

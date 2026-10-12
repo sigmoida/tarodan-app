@@ -31,6 +31,8 @@ export const ADMIN_ORDER_BUCKETS = [
   "shipped",
   "in_transit",
   "delivered",
+  "cancelled",
+  "refunds",
   "other",
 ] as const;
 
@@ -64,8 +66,9 @@ export function adminOrderBucketFilter(
 /**
  * Bir sipariş satırının (Order) ilerleme aşamaları, İLERLEME SIRASIYLA.
  * Sıra anlamlıdır: çok satıcılı sepet en GERİDEKİ paketinin aşamasına düşer.
- * Hiçbir aşamaya uymayan satır "other"dır (ödeme bekleyen, iptal, iade, kargo
- * hatası…) — yani aşamalar + other her siparişi tam olarak bir kez kapsar.
+ * Hiçbir aşamaya uymayan satır KAPANMIŞ satırdır (iptal, iade, ödeme bekleyen,
+ * kargo hatası…); hiçbir satırı aşamada olmayan sepet `ORDER_CLOSED_BUCKETS`
+ * kurallarıyla İptaller / İadeler / Diğer'den TAM OLARAK birine düşer.
  */
 export const ORDER_LINE_STAGES = [
   "new",
@@ -97,7 +100,7 @@ export interface OrderLineStageRule {
  * - in_transit (Taşıma Durumunda): yolda / dağıtımda. Kargo `delivered` ama
  *   sipariş henüz geçmemişse de burada durur (teslim handler'ı birazdan çevirir).
  * - delivered (Teslim Edilen): teslim + onay penceresi + tamamlanmış.
- * Kargosu hata/iade/iptal olmuş `shipped` sipariş "other"a düşer.
+ * Kargosu hata/iade/iptal olmuş `shipped` sipariş hiçbir aşamada değildir.
  */
 export const ORDER_LINE_STAGE_RULES: Record<
   OrderLineStage,
@@ -129,6 +132,43 @@ export const ORDER_LINE_STAGE_RULES: Record<
 };
 
 /**
+ * KAPANMIŞ sepetlerin kovaları — hiçbir satırı bir ilerleme aşamasında olmayan
+ * sepetler, ekrandaki sırayla. Öncelik sırası bu sıra DEĞİLDİR; karar
+ * `orderCartBucketOf`'ta: önce iade, sonra iptal, kalan "Diğer".
+ *
+ * - refunds (İadeler): en az bir satırda iade izi var — iade talebi açılmış /
+ *   iade edilmiş sipariş ya da geri dönen (dönmekte olan) koli.
+ * - cancelled (İptaller): iade izi yok ve satırların TAMAMI iptal. İptal
+ *   satırının yanında ödenmemiş ya da kargosu hata vermiş bir satır varsa o
+ *   satır hâlâ bakılacak iştir; sepet "Diğer"de kalır.
+ * - other (Diğer): kalan her şey — ödeme bekleyen/terk edilmiş sepet, kargosu
+ *   hata vermiş ya da iptal edilmiş `shipped` sipariş…
+ *
+ * Üç kova birbirini dışlar ve kapanmış sepetlerin tamamını kapsar: sayaçların
+ * toplamı yine sepet sayısına eşittir.
+ */
+export const ORDER_CLOSED_BUCKETS = ["cancelled", "refunds", "other"] as const;
+
+export type OrderClosedBucket = (typeof ORDER_CLOSED_BUCKETS)[number];
+
+/** Bir sepetin kovası: ilerleme aşaması ya da kapanmış kovalardan biri. */
+export type OrderCartBucket = OrderLineStage | OrderClosedBucket;
+
+/** İade izi taşıyan satır: sipariş durumu ya da kolinin durumu yeter. */
+export const ORDER_REFUND_LINE_RULE = {
+  orderStatuses: ["refund_requested", "refunded"],
+  shipmentStatuses: ["return_in_progress", "returned"],
+} as const satisfies {
+  orderStatuses: readonly OrderStatusValue[];
+  shipmentStatuses: readonly ShipmentStatusValue[];
+};
+
+/** İptal satırı. */
+export const ORDER_CANCELLED_LINE_STATUSES = [
+  "cancelled",
+] as const satisfies readonly OrderStatusValue[];
+
+/**
  * Sekmenin kapsadığı sipariş kökenleri — listenin ve sayaçların kaynağı.
  * Teklif siparişi grupsuz tekil siparişidir; CheckoutGroup kaynağı yalnız
  * doğrudan satışı taşır (bkz. API `orderListSourceWheres`).
@@ -151,9 +191,9 @@ export const ADMIN_ORDER_TAB_BUCKETS: Record<
   AdminOrderTab,
   readonly AdminOrderBucket[]
 > = {
-  all: ["all", "new", "shipped", "in_transit", "delivered", "other"],
-  direct_sale: ["all", "new", "shipped", "in_transit", "delivered", "other"],
-  offer_order: ["all", "new", "shipped", "in_transit", "delivered", "other"],
+  all: ADMIN_ORDER_BUCKETS,
+  direct_sale: ADMIN_ORDER_BUCKETS,
+  offer_order: ADMIN_ORDER_BUCKETS,
 };
 
 export const ADMIN_ORDER_BUCKET_I18N_KEYS = {
@@ -162,6 +202,8 @@ export const ADMIN_ORDER_BUCKET_I18N_KEYS = {
   shipped: "admin.operations.orders.buckets.shipped",
   in_transit: "admin.operations.orders.buckets.inTransit",
   delivered: "admin.operations.orders.buckets.delivered",
+  cancelled: "admin.operations.orders.buckets.cancelled",
+  refunds: "admin.operations.orders.buckets.refunds",
   other: "admin.operations.orders.buckets.other",
 } as const satisfies Record<AdminOrderBucket, string>;
 
@@ -211,6 +253,51 @@ export function orderLineStageOf(
       continue;
     }
     if (rule.shipment.statuses.includes(shipmentStatus)) return stage;
+  }
+  return "other";
+}
+
+/** Kovayı belirleyen satır bilgisi: siparişin ve (varsa) kolinin durumu. */
+export interface OrderLineState {
+  status: OrderStatusValue;
+  shipmentStatus: ShipmentStatusValue | null;
+}
+
+/** Satırda iade izi var mı (`ORDER_REFUND_LINE_RULE`). */
+export function isRefundOrderLine(line: OrderLineState): boolean {
+  const rule = ORDER_REFUND_LINE_RULE;
+  return (
+    (rule.orderStatuses as readonly OrderStatusValue[]).includes(line.status) ||
+    (line.shipmentStatus !== null &&
+      (rule.shipmentStatuses as readonly ShipmentStatusValue[]).includes(
+        line.shipmentStatus,
+      ))
+  );
+}
+
+/**
+ * Bir sepetin kovası — API'nin Prisma `where`'lerinin düz okuması (contract
+ * spec ikisini her durum kombinasyonunda karşılaştırır). Satırsız sepet hiçbir
+ * kovada değildir (`null`).
+ *
+ * 1. En geride kalan satırın aşaması (en geride paket kuralı).
+ * 2. Hiçbir satır aşamada değilse: iade izi → İadeler; tamamı iptal →
+ *    İptaller; kalan → Diğer.
+ */
+export function orderCartBucketOf(
+  lines: readonly OrderLineState[],
+): OrderCartBucket | null {
+  if (lines.length === 0) return null;
+  const stages = lines.map((line) =>
+    orderLineStageOf(line.status, line.shipmentStatus),
+  );
+  for (const stage of ORDER_LINE_STAGES) {
+    if (stages.includes(stage)) return stage;
+  }
+  if (lines.some(isRefundOrderLine)) return "refunds";
+  const cancelled = ORDER_CANCELLED_LINE_STATUSES as readonly OrderStatusValue[];
+  if (lines.every((line) => cancelled.includes(line.status))) {
+    return "cancelled";
   }
   return "other";
 }

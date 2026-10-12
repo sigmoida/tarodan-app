@@ -1,9 +1,18 @@
 "use client";
 
-import type { KeyboardEvent, ReactNode } from "react";
+import {
+  useRef,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { useFormContext, useWatch } from "react-hook-form";
+import { Button } from "@tarodan/ui";
 import { FormTextarea } from "@tarodan/ui/form";
 import { useTranslations } from "next-intl";
+import toast from "react-hot-toast";
+import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { emailImageTag, insertAtCursor } from "./imageSnippet";
 
 /**
  * HTML e-posta gövdesi editörü (RHF alanı). E-posta şablonu düzenleyicisi ve
@@ -16,6 +25,7 @@ export function EmailHtmlEditor({
   placeholder,
   emptyHint,
   className = "min-h-[280px]",
+  onUploadImage,
 }: {
   name: string;
   id?: string;
@@ -24,11 +34,60 @@ export function EmailHtmlEditor({
   emptyHint?: ReactNode;
   /** Yükseklik sınıfları; varsayılan şablon düzenleyicisindeki gibi esnek. */
   className?: string;
+  /**
+   * Verilirse "Görsel ekle" düğmesi çıkar: dosyayı yükler, dönen http(s) adresini
+   * `<img>` olarak imlecin olduğu yere ekler. Verilmezse düğme yoktur.
+   */
+  onUploadImage?: (file: File) => Promise<string>;
 }) {
   const t = useTranslations();
-  const { setValue, control, formState } = useFormContext();
+  const { setValue, getValues, control, formState } = useFormContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const error = formState.errors[name]?.message as string | undefined;
   const value = (useWatch({ control, name }) as string | undefined) ?? "";
+
+  const insertImage = useAdminMutation(
+    async (file: File) => {
+      const url = await onUploadImage!(file);
+      const tag = emailImageTag(url);
+      if (!tag)
+        throw new Error("upload returned a non-http(s) url");
+      return tag;
+    },
+    {
+      errorMessage: t("admin.marketing.emailTemplates.imageUploadFailed"),
+      onSuccess: (tag) => {
+        const textarea = document.getElementById(
+          id,
+        ) as HTMLTextAreaElement | null;
+        const next = insertAtCursor(
+          (getValues(name) as string | undefined) ?? "",
+          tag,
+          textarea?.selectionStart,
+          textarea?.selectionEnd,
+        );
+        setValue(name, next.value, { shouldDirty: true });
+        if (textarea) {
+          requestAnimationFrame(() => {
+            textarea.focus();
+            textarea.selectionStart = textarea.selectionEnd = next.caret;
+          });
+        }
+      },
+    },
+  );
+
+  const onPickImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Aynı dosya art arda seçilebilsin diye alan sıfırlanır.
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("admin.marketing.emailTemplates.imageNotAnImage"));
+      return;
+    }
+    insertImage.mutate(file);
+  };
 
   const onTabKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Tab") return;
@@ -55,6 +114,26 @@ export function EmailHtmlEditor({
         <span className="text-xs font-medium text-muted">
           {t("admin.marketing.emailTemplates.htmlBody")}
         </span>
+        {onUploadImage && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPickImage}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              isLoading={insertImage.isPending}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {t("admin.marketing.emailTemplates.insertImage")}
+            </Button>
+          </>
+        )}
         <span className="text-xs text-subtle">
           {value.length > 0
             ? t("admin.marketing.emailTemplates.characterCount", {

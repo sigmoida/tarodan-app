@@ -10,6 +10,7 @@ import { useOrderBucket } from "../_hooks/useOrderBucket";
 import { OrdersScreenTabBar } from "./OrdersScreenTabBar";
 import { OrderBucketBar } from "./OrderBucketBar";
 import { OrdersTable } from "./OrdersTable";
+import { ShippedBeforeNotice } from "./ShippedBeforeNotice";
 
 /**
  * Sipariş sekmeleri (Tüm / Direkt Satış / Siparişe Dönen Teklifler) × alt
@@ -41,6 +42,7 @@ export function OrdersView({ tab }: { tab: AdminOrderTab }) {
       />
       <p className="text-sm text-muted empty:hidden">
         <DeepLinkFilterSummary />
+        <ShippedBeforeNotice />
       </p>
       <OrdersTable />
       <ResourceList.Pagination />

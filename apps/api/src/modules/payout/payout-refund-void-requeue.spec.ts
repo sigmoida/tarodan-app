@@ -105,9 +105,56 @@ describe("PayoutService — requeue refund-voided payouts", () => {
       order: {
         findUnique: jest
           .fn()
-          .mockResolvedValue({ id: "o1", status: OrderStatus.cancelled }),
+          .mockResolvedValue({ id: "o1", status: OrderStatus.preparing }),
       },
     });
+
+    const requeued = await service.requeueRefundVoidedPayouts();
+
+    expect(requeued).toBe(0);
+    expect(updates).toHaveLength(0);
+  });
+
+  // Kapanmış (iade/iptal) siparişin kalıntısı: kusur satıcıda değilse ödenir,
+  // satıcıdaysa (ya da kusur belirlenemiyorsa) asla.
+  const cancelledOrderWith = (finalized: unknown[]) => ({
+    order: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: "o1", status: OrderStatus.cancelled }),
+    },
+    refundRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue(finalized),
+    },
+  });
+
+  it("kapanmış siparişte kusur satıcıda DEĞİLSE kalıntı için yeniden kuyruğa alınır", async () => {
+    const overrides = cancelledOrderWith([
+      { faultParty: "buyer", policyCode: "v2_buyer_return" },
+    ]);
+    const { service, updates } = makeService([voidedPayout()], overrides);
+
+    const requeued = await service.requeueRefundVoidedPayouts();
+
+    expect(requeued).toBe(1);
+    expect(updates[0].data.status).toBe(PayoutStatus.pending);
+    // kusur yalnız SONUÇLANMIŞ taleplerden okunur
+    expect(overrides.refundRequest.findMany).toHaveBeenCalledWith({
+      where: { orderId: "o1", status: "refunded" },
+      select: { faultParty: true, policyCode: true },
+    });
+  });
+
+  it.each([
+    ["kusur satıcıda", [{ faultParty: "seller", policyCode: "v2_seller_x" }]],
+    ["v1 satıcı kusuru", [{ faultParty: null, policyCode: "seller_fault_return" }]],
+    ["kusur belirlenemiyor (sonuçlanmış talep yok)", []],
+  ])("kapanmış siparişte %s → yeniden kuyruğa ALINMAZ", async (_n, finalized) => {
+    const { service, updates } = makeService(
+      [voidedPayout()],
+      cancelledOrderWith(finalized),
+    );
 
     const requeued = await service.requeueRefundVoidedPayouts();
 

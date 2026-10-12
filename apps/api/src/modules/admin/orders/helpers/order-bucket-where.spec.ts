@@ -6,19 +6,26 @@ import {
   ShipmentStatus,
 } from "@prisma/client";
 import {
+  ADMIN_ORDER_BUCKETS,
   CANCELLATION_ACTORS,
   OFFER_STATUSES,
+  ORDER_CLOSED_BUCKETS,
   ORDER_ORIGINS,
   ORDER_LINE_STAGES,
   ORDER_LINE_STAGE_RULES,
   ORDER_STATUSES,
   SHIPMENT_STATUSES,
+  orderCartBucketOf,
   orderLineStageOf,
+  type OrderCartBucket,
+  type OrderLineState,
 } from "@tarodan/types";
 import {
   cartBucketWhere,
   groupLines,
+  notCancelledOrderLineWhere,
   orderLineStageWhere,
+  refundOrderLineWhere,
   singleLine,
 } from "./order-bucket-where";
 
@@ -155,22 +162,59 @@ describe("cartBucketWhere — the least-advanced-package rule", () => {
     });
   });
 
-  it("other = a cart with lines, none of them in any progress stage", () => {
+  // Eskiden tek "other" kovası vardı; artık kapanmış sepet üçe ayrılıyor
+  // (İptaller / İadeler / Diğer) ve üçü de aynı "kapanmış" tabanı paylaşıyor.
+  const closedBase = [
+    { orders: { some: {} } },
+    {
+      NOT: {
+        orders: {
+          some: {
+            OR: [
+              stage("new"),
+              stage("shipped"),
+              stage("in_transit"),
+              stage("delivered"),
+            ],
+          },
+        },
+      },
+    },
+  ];
+
+  it("refunds = a closed cart with at least one refund-marked line", () => {
+    expect(cartBucketWhere("refunds", groupLines)).toEqual({
+      AND: [...closedBase, { orders: { some: refundOrderLineWhere() } }],
+    });
+  });
+
+  it("cancelled = a closed cart with no refund mark and no line that is not cancelled", () => {
+    expect(cartBucketWhere("cancelled", groupLines)).toEqual({
+      AND: [
+        ...closedBase,
+        { NOT: { orders: { some: refundOrderLineWhere() } } },
+        { NOT: { orders: { some: notCancelledOrderLineWhere() } } },
+      ],
+    });
+  });
+
+  it("other = a closed cart with no refund mark and a line that is not cancelled", () => {
     expect(cartBucketWhere("other", groupLines)).toEqual({
       AND: [
-        { orders: { some: {} } },
+        ...closedBase,
+        { NOT: { orders: { some: refundOrderLineWhere() } } },
+        { orders: { some: notCancelledOrderLineWhere() } },
+      ],
+    });
+  });
+
+  it("a refund mark is the order status or a parcel coming back", () => {
+    expect(refundOrderLineWhere()).toEqual({
+      OR: [
+        { status: { in: ["refund_requested", "refunded"] } },
         {
-          NOT: {
-            orders: {
-              some: {
-                OR: [
-                  stage("new"),
-                  stage("shipped"),
-                  stage("in_transit"),
-                  stage("delivered"),
-                ],
-              },
-            },
+          shipment: {
+            is: { status: { in: ["return_in_progress", "returned"] } },
           },
         },
       ],
@@ -186,5 +230,187 @@ describe("cartBucketWhere — the least-advanced-package rule", () => {
         },
       ],
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Contract: kovalar birbirini dışlar ve her sepeti kapsar.
+//
+// Üretilen Prisma `where`'leri burada küçük bir bellek-içi yorumlayıcıyla
+// değerlendirilir (yalnız builder'ın kullandığı operatörler: AND/OR/NOT,
+// `in`/`notIn`, `shipment.is`, `orders.some`). Her sipariş durumu × kargo
+// durumu (kargo yok dahil) kombinasyonu için: tam olarak BİR kova eşleşir ve
+// o kova `orderCartBucketOf`'un (panelin okuduğu düz kural) söylediğidir.
+// ---------------------------------------------------------------------------
+
+type Where = Record<string, unknown>;
+
+function matchesScalar(filter: unknown, value: string): boolean {
+  const f = filter as { in?: string[]; notIn?: string[] };
+  if (f.in) return f.in.includes(value);
+  if (f.notIn) return !f.notIn.includes(value);
+  throw new Error(`unsupported scalar filter ${JSON.stringify(filter)}`);
+}
+
+function matchesLine(where: unknown, line: OrderLineState): boolean {
+  return Object.entries(where as Where).every(([key, value]) => {
+    switch (key) {
+      case "AND":
+        return (value as unknown[]).every((part) => matchesLine(part, line));
+      case "OR":
+        return (value as unknown[]).some((part) => matchesLine(part, line));
+      case "NOT":
+        return !matchesLine(value, line);
+      case "status":
+        return matchesScalar(value, line.status);
+      case "shipment": {
+        const is = (value as { is: Where | null }).is;
+        if (is === null) return line.shipmentStatus === null;
+        if (line.shipmentStatus === null) return false;
+        return matchesScalar(is.status, line.shipmentStatus);
+      }
+      default:
+        throw new Error(`unsupported line key ${key}`);
+    }
+  });
+}
+
+function matchesGroup(where: unknown, lines: OrderLineState[]): boolean {
+  return Object.entries(where as Where).every(([key, value]) => {
+    switch (key) {
+      case "AND":
+        return (value as unknown[]).every((part) => matchesGroup(part, lines));
+      case "OR":
+        return (value as unknown[]).some((part) => matchesGroup(part, lines));
+      case "NOT":
+        return !matchesGroup(value, lines);
+      case "orders": {
+        const some = (value as { some: unknown }).some;
+        return lines.some((line) => matchesLine(some, line));
+      }
+      default:
+        throw new Error(`unsupported group key ${key}`);
+    }
+  });
+}
+
+const CART_BUCKETS = [
+  ...ORDER_LINE_STAGES,
+  ...ORDER_CLOSED_BUCKETS,
+] as const satisfies readonly OrderCartBucket[];
+
+const EVERY_LINE: OrderLineState[] = ORDER_STATUSES.flatMap((status) =>
+  [null, ...SHIPMENT_STATUSES].map((shipmentStatus) => ({
+    status,
+    shipmentStatus,
+  })),
+);
+
+describe("cart buckets — mutually exclusive and exhaustive (contract)", () => {
+  it("the screen's bucket list is 'all', the stages, then the closed buckets", () => {
+    expect([...ADMIN_ORDER_BUCKETS]).toEqual(["all", ...CART_BUCKETS]);
+    expect([...ORDER_CLOSED_BUCKETS]).toEqual([
+      "cancelled",
+      "refunds",
+      "other",
+    ]);
+  });
+
+  it("a one-line cart (offer order): every order × shipment status lands in exactly one bucket", () => {
+    for (const line of EVERY_LINE) {
+      const hits = CART_BUCKETS.filter((bucket) =>
+        matchesLine(cartBucketWhere(bucket, singleLine), line),
+      );
+      expect({ line, hits }).toEqual({
+        line,
+        hits: [orderCartBucketOf([line])],
+      });
+    }
+  });
+
+  it("a two-line cart (CheckoutGroup): every pair of lines lands in exactly one bucket", () => {
+    const wheres = CART_BUCKETS.map(
+      (bucket) => [bucket, cartBucketWhere(bucket, groupLines)] as const,
+    );
+    for (const a of EVERY_LINE) {
+      for (const b of EVERY_LINE) {
+        const cart = [a, b];
+        const hits = wheres
+          .filter(([, where]) => matchesGroup(where, cart))
+          .map(([bucket]) => bucket);
+        if (hits.length !== 1 || hits[0] !== orderCartBucketOf(cart)) {
+          throw new Error(
+            `cart ${JSON.stringify(cart)} → ${JSON.stringify(hits)}, expected ${orderCartBucketOf(cart)}`,
+          );
+        }
+      }
+    }
+  });
+
+  it("an empty cart is in no bucket", () => {
+    expect(orderCartBucketOf([])).toBeNull();
+    for (const bucket of CART_BUCKETS) {
+      expect(matchesGroup(cartBucketWhere(bucket, groupLines), [])).toBe(false);
+    }
+  });
+
+  it.each<[string, OrderLineState[], OrderCartBucket]>([
+    [
+      "unpaid / abandoned",
+      [{ status: "pending_payment", shipmentStatus: null }],
+      "other",
+    ],
+    [
+      "fully cancelled",
+      [{ status: "cancelled", shipmentStatus: null }],
+      "cancelled",
+    ],
+    [
+      "cancelled after the label was voided",
+      [{ status: "cancelled", shipmentStatus: "cancelled" }],
+      "cancelled",
+    ],
+    [
+      "refund requested",
+      [{ status: "refund_requested", shipmentStatus: "delivered" }],
+      "refunds",
+    ],
+    ["refunded", [{ status: "refunded", shipmentStatus: null }], "refunds"],
+    [
+      "parcel returned to sender",
+      [{ status: "shipped", shipmentStatus: "returned" }],
+      "refunds",
+    ],
+    [
+      "failed shipment",
+      [{ status: "shipped", shipmentStatus: "failed" }],
+      "other",
+    ],
+    [
+      "one cancelled + one refunded package → refunds wins",
+      [
+        { status: "cancelled", shipmentStatus: null },
+        { status: "refunded", shipmentStatus: "returned" },
+      ],
+      "refunds",
+    ],
+    [
+      "one cancelled + one unpaid line is still open work → other",
+      [
+        { status: "cancelled", shipmentStatus: null },
+        { status: "pending_payment", shipmentStatus: null },
+      ],
+      "other",
+    ],
+    [
+      "a live package keeps the cart in its stage",
+      [
+        { status: "cancelled", shipmentStatus: null },
+        { status: "delivered", shipmentStatus: "delivered" },
+      ],
+      "delivered",
+    ],
+  ])("%s", (_name, cart, expected) => {
+    expect(orderCartBucketOf(cart)).toBe(expected);
   });
 });

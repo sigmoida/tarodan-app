@@ -19,7 +19,9 @@ import {
   failedTransfersWhere,
   openAdjustmentsWhere,
   overdueHoldsWhere,
+  UPCOMING_RELEASE_WINDOW_DAYS,
   uninvoicedDeliveredWhere,
+  upcomingHoldsWhere,
 } from "../../finance/finance-health.where";
 import {
   LIVE_ORDER,
@@ -72,6 +74,12 @@ export interface QueuePartDefinition {
    * açık destek talebinin içindedir) — kutu toplamına eklenmez.
    */
   subsetOf?: DashboardQueuePartKey;
+  /**
+   * Bilgi satırı (yaklaşan serbest bırakmalar): bekleyen iş değil. Kutu
+   * toplamına ve yaşına girmez. Tanım `DASHBOARD_INFORMATIONAL_QUEUE_PARTS`
+   * ile birebir — spec ikisini eşler.
+   */
+  informational?: true;
 }
 
 /** `aggregate` sonucunu okuyan standart çevirici. */
@@ -92,6 +100,10 @@ function reader(
     return reading;
   };
 }
+
+/** Yaklaşan serbest bırakma penceresinin sonu. */
+const upcomingWindowEnd = (now: Date) =>
+  new Date(now.getTime() + UPCOMING_RELEASE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
 /** Yalnız SATIŞ ilanları — sanal ürünler (üyelik/boost) moderasyona girmez. */
 const LISTING = { kind: ProductKind.listing } as const;
@@ -343,6 +355,31 @@ export const QUEUE_PART_DEFINITIONS: Record<
         _min: { createdAt: true },
       }),
     read: reader("createdAt", "remainingAmount"),
+  },
+  holdsUpcoming: {
+    // Önümüzdeki 7 gün içinde tarihinde kendiliğinden açılacak escrow:
+    // tutar = Σ(amount − refundedAmount), satıcıya gerçekten gidecek kısım.
+    where: (now) => upcomingHoldsWhere(now, upcomingWindowEnd(now)),
+    query: (prisma, now) =>
+      prisma.paymentHold.aggregate({
+        where: upcomingHoldsWhere(now, upcomingWindowEnd(now)),
+        _count: { _all: true },
+        _sum: { amount: true, refundedAmount: true },
+      }),
+    read: (raw) => {
+      const row = raw as AggregateRaw;
+      const gross = new Prisma.Decimal(String(row?._sum?.amount ?? 0));
+      const refunded = new Prisma.Decimal(
+        String(row?._sum?.refundedAmount ?? 0),
+      );
+      return {
+        count: Number(row?._count?._all ?? 0),
+        // Takvim satırı yaşlanmaz: "en eski" bir bekleyen iş yok.
+        oldestAt: null,
+        amount: gross.minus(refunded).toDecimalPlaces(2).toNumber(),
+      };
+    },
+    informational: true,
   },
 
   // ── Belgeler ──────────────────────────────────────────────────────────────

@@ -71,7 +71,10 @@ function makeService(
     },
     payoutTransfer: { findMany: pager(data.transfers ?? [transfer()]) },
     order: {
-      findMany: jest.fn().mockResolvedValue([{ id: "o1", orderNumber: "ORD-1" }]),
+      findMany: jest.fn().mockResolvedValue([
+        // Liste satırı bırakılabilirlik bayrağını da türetir (HOLD_RELEASE_ORDER_SELECT).
+        { id: "o1", orderNumber: "ORD-1", status: "completed", refundRequests: [] },
+      ]),
     },
   };
   const audit = {

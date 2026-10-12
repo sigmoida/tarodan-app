@@ -45,6 +45,27 @@ export function overdueHoldsWhere(now: Date): Prisma.PaymentHoldWhereInput {
   };
 }
 
+/** "Yaklaşan serbest bırakmalar" penceresi: dashboard bilgi satırı. */
+export const UPCOMING_RELEASE_WINDOW_DAYS = 7;
+
+/**
+ * Serbest kalma tarihi HENÜZ gelmemiş, tarihinde kendiliğinden açılacak
+ * hold'lar: tutuluyor, iade kilidi yok, `releaseAt` şimdi ya da sonrası
+ * (`until` verilirse en geç o an). Süresi geçmişler `overdueHoldsWhere`'dedir —
+ * iki küme kesişmez.
+ */
+export function upcomingHoldsWhere(
+  now: Date,
+  until?: Date,
+): Prisma.PaymentHoldWhereInput {
+  return {
+    payment: LIVE_PAYMENT,
+    status: PaymentHoldStatus.held,
+    frozenByRefundId: null,
+    releaseAt: until ? { gt: now, lte: until } : { gt: now },
+  };
+}
+
 /** Deneme bütçesi tükenmiş e-belgeler — yasal süre işliyor, elle müdahale şart. */
 export const exhaustedInvoicesWhere: Prisma.FiscalInvoiceWhereInput = {
   status: "failed",

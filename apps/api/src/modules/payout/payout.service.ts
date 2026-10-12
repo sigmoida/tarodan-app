@@ -35,28 +35,18 @@ import {
   trCalendarDateTime,
 } from "../../common/helpers/tr-calendar";
 import type { PaytrReturnedTransfer } from "../payment-providers/paytr/paytr-transfer.service";
+import type { HoldReleaseBlockedReason } from "@tarodan/types";
+import {
+  OPEN_REFUND_STATUSES,
+  RESIDUAL_ORDER_STATUSES,
+  holdPayoutOrderBlock,
+} from "./helpers/hold-release-eligibility";
 
 /** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
 function maskIban(iban: string | null | undefined): string {
   const clean = (iban || "").replace(/\s/g, "");
   return clean ? `***${clean.slice(-4)}` : "(yok)";
 }
-
-const PAYOUT_ELIGIBLE_ORDER_STATUSES: OrderStatus[] = [
-  OrderStatus.delivered,
-  OrderStatus.awaiting_buyer_confirmation,
-  OrderStatus.completed,
-];
-
-const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
-  RefundRequestStatus.pending_review,
-  RefundRequestStatus.approved,
-  RefundRequestStatus.wait_for_delivery,
-  RefundRequestStatus.return_shipment_open,
-  RefundRequestStatus.return_in_transit,
-  RefundRequestStatus.return_delivered,
-  RefundRequestStatus.disputed,
-];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const IBAN_COOLDOWN_MS = 3 * DAY_MS;
@@ -205,6 +195,26 @@ export class PayoutService {
   }
 
   /**
+   * Siparişin durumu hold parasının satıcıya gitmesine izin veriyor mu — hold
+   * bırakma yollarıyla AYNI yüklem (`holdPayoutOrderBlock`). Teslim edilmiş
+   * sipariş doğrudan geçer; iade/iptalle kapanmış siparişin KALINTISI yalnız
+   * kusur satıcıda değilse geçer (kusur, sonuçlanmış iade taleplerinden okunur
+   * — bu sorgu yalnız kapanmış siparişte koşar).
+   */
+  private async orderPayoutBlock(order: {
+    id: string;
+    status: OrderStatus;
+  }): Promise<HoldReleaseBlockedReason | null> {
+    const finalizedRefunds = RESIDUAL_ORDER_STATUSES.includes(order.status)
+      ? await this.prisma.refundRequest.findMany({
+          where: { orderId: order.id, status: RefundRequestStatus.refunded },
+          select: { faultParty: true, policyCode: true },
+        })
+      : [];
+    return holdPayoutOrderBlock({ status: order.status, finalizedRefunds });
+  }
+
+  /**
    * Bu ödeme/sipariş için parayı bağlayan bir iade var mı? Payout OLUŞTURMA,
    * transfer ETME ve iade-void'lu payout'u yeniden kuyruğa alma yollarının
    * tamamı aynı guard'ı kullanır (tek kaynak).
@@ -220,7 +230,7 @@ export class PayoutService {
       const openRefund = await this.prisma.refundRequest.findFirst({
         where: {
           orderId: target.orderId,
-          status: { in: OPEN_REFUND_STATUSES },
+          status: { in: [...OPEN_REFUND_STATUSES] },
         },
         select: { id: true },
       });
@@ -299,9 +309,12 @@ export class PayoutService {
       // Test şeridi: PayTR test modunda tahsil edilen para yoktur → satıcıya
       // gerçek transfer ÜRETME. Hold released kalır, payout satırı hiç oluşmaz.
       if (payment.isTest || order.isTest) continue;
-      if (!PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)) {
+      // Teslim edilmiş sipariş ya da kusur satıcıda olmayan kapanmış siparişin
+      // kalıntısı (hold bırakma yollarıyla aynı yüklem).
+      const orderBlock = await this.orderPayoutBlock(order);
+      if (orderBlock) {
         this.logger.warn(
-          `Payout skipped: order ${hold.orderId} is not payout eligible (status=${order.status})`,
+          `Payout skipped: order ${hold.orderId} is not payout eligible (status=${order.status}, reason=${orderBlock})`,
         );
         continue;
       }
@@ -706,13 +719,14 @@ export class PayoutService {
           : null;
       if (refundTarget) {
         if (refundTarget.orderId) {
+          const orderId = refundTarget.orderId;
           const order = await this.prisma.order.findUnique({
-            where: { id: refundTarget.orderId },
+            where: { id: orderId },
             select: { status: true },
           });
           if (
             !order ||
-            !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)
+            (await this.orderPayoutBlock({ id: orderId, status: order.status }))
           ) {
             await this.prisma.payoutTransfer.updateMany({
               where: { id: payout.id, status: PayoutStatus.pending },
@@ -1226,7 +1240,11 @@ export class PayoutService {
         where: { id: hold.orderId },
         select: { status: true },
       });
-      if (!order || !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)) {
+      // Kapanmış siparişin kalıntısı da (kusur satıcıda değilse) ödenir.
+      if (
+        !order ||
+        (await this.orderPayoutBlock({ id: hold.orderId, status: order.status }))
+      ) {
         continue;
       }
 
