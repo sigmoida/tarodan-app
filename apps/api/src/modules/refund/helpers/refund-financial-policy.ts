@@ -200,14 +200,16 @@ export function resolveCancellationPolicy(
 
   if (reason === "delivery_delayed") {
     // Kusur satıcıda: alıcı kargoyu geri alır, maliyet satıcıya yazılır.
-    // Satıcının kendi payı da tazmin EDİLMEZ — gecikme onun kusuru.
+    // Satıcının kendi payı da tazmin EDİLMEZ — gecikme onun kusuru. Kargo
+    // öncesinde de: tazmin hold'da satıcıya ödenemeyen bir kalıntı bırakıyordu
+    // (alıcı zaten ödediğinin tamamını alır; v2 ile aynı kural).
     return {
       policyCode: "seller_fault_cancellation",
       returnShippingPayer: null,
       refundOutboundShipping: true,
       refundBuyerProtectionFee: true,
       refundSellerPlatformFee: false,
-      compensateSellerShipping: !hasShipped,
+      compensateSellerShipping: false,
       chargeSellerOutboundShipping: hasShipped,
       requiresEvidence: false,
       requiresAdminReview: false,

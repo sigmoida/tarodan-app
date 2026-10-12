@@ -300,14 +300,22 @@ export function calculateRefundFinancialsV2(
       input.buyerShippingAmount,
       1,
     );
-    add(
-      "outbound_shipping",
-      "seller_refund",
-      input.sellerShippingAmount,
-      outboundTax(input.sellerShippingAmount),
-      input.sellerShippingAmount,
-      1,
-    );
+    // Satıcı kusurunda satıcının kargo payı TAZMİN EDİLMEZ. Alıcı ödediğinin
+    // tamamını (T) zaten geri alır; satıcı payı T'de değil, satıcının hak
+    // edişinden düşülmüştür. Tazmin hold'da `amount − refundedAmount` kalıntısı
+    // bırakıyordu — o para platformun kendi parasıdır ve satıcı kusurlu olduğu
+    // için kimseye ödenemiyordu (escrow'da süresiz kilit). Bileşen hiç
+    // üretilmeyince hold tamamen tüketilir.
+    if (input.faultParty !== "seller") {
+      add(
+        "outbound_shipping",
+        "seller_refund",
+        input.sellerShippingAmount,
+        outboundTax(input.sellerShippingAmount),
+        input.sellerShippingAmount,
+        1,
+      );
+    }
   }
 
   const returnNet = money(input.returnShippingAmount);

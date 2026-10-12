@@ -310,6 +310,44 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       );
     });
 
+    it.each([
+      ["v2", undefined],
+      ["v1", "false"],
+    ])(
+      "%s: satıcı kusurlu iptalde satıcının kargo payı hold'da BIRAKILMAZ (kalıntı doğmaz)",
+      async (_label, v2Flag) => {
+        if (v2Flag !== undefined) process.env.REFUND_POLICY_V2_ENABLED = v2Flag;
+        const { creation, payment, createdRows } = makeService();
+
+        await creation.createCancellationRefund(
+          "order-1",
+          "buyer-1",
+          OrderCancellationReason.delivery_delayed,
+        );
+
+        // Alıcı ödediğinin TAMAMINI (T = 1180) alır; satıcı payı (40) T'de
+        // değildir. Tazmin edilseydi hold'da satıcı kusurlu olduğu için hiç
+        // ödenemeyecek 40 TL'lik bir kalıntı kalırdı.
+        expect(createdRows[0]).toMatchObject({
+          amount: 1180,
+          sellerShippingCompensationAmount: 0,
+        });
+        expect(
+          componentNet(createdRows[0], "outbound_shipping", "seller_refund"),
+        ).toBeUndefined();
+        expect(payment.processRefund).toHaveBeenCalledWith(
+          "order-1",
+          1180,
+          expect.objectContaining({
+            settlement: expect.objectContaining({
+              holdPortion: 1,
+              holdRetainedAmount: 0,
+            }),
+          }),
+        );
+      },
+    );
+
     it("siparişe iptal nedenini ve açıklamayı yazar, sonra İPTAL tipini", async () => {
       const { creation, prisma } = makeService();
 
