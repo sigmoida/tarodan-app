@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseNetsisMode } from "./netsis";
 import { SMS_VERIFICATION_CODE_PATTERN } from "./sms";
 import { GITHUB_REPO_PATTERN } from "./uat-refresh";
 
@@ -160,6 +161,22 @@ const envSchema = z
     ELOGO_COMPANY_VKN: z.string().optional(),
     ELOGO_COMPANY_TITLE: z.string().optional(),
     ELOGO_ALLOW_NON_LIVE_HOST: z.string().optional(),
+
+    // Logo Netsis (NetOpenX REST) — eLogo'nun yerine geçecek ERP entegrasyonu
+    // (config/netsis.ts, docs/NETSIS.md). Varsayılan kapalı; açıkken canlıda
+    // yalnız gerçek istemci ve tam kimlik kabul edilir — aşağıda.
+    NETSIS_ENABLED: z.string().optional(),
+    NETSIS_MODE: z.string().optional(),
+    NETSIS_BASE_URL: z.string().optional(),
+    NETSIS_USERNAME: z.string().optional(),
+    NETSIS_PASSWORD: z.string().optional(),
+    NETSIS_DB_NAME: z.string().optional(),
+    NETSIS_DB_USER: z.string().optional(),
+    NETSIS_DB_PASSWORD: z.string().optional(),
+    NETSIS_DB_TYPE: z.string().optional(),
+    NETSIS_BRANCH_CODE: z.string().optional(),
+    NETSIS_TIMEOUT_MS: z.string().optional(),
+    NETSIS_TOKEN_SAFETY_SECONDS: z.string().optional(),
 
     // Production delivery/telemetry dependencies.
     SENDGRID_API_KEY: z.string().optional(),
@@ -763,6 +780,80 @@ const envSchema = z
             message: `${key} is required in production when ELOGO_ENABLED is set`,
           });
         }
+      }
+    }
+
+    // Netsis: kapalıyken hiçbir şey istenmez (eLogo'dan geçiş sürerken
+    // varsayılan budur). Açıkken canlı dağıtım YALNIZ gerçek istemciyle koşar —
+    // stub, faturayı kesilmiş gösterip ERP'ye hiçbir şey yazmaz. Staging stub
+    // ya da live seçebilir; live seçildiği her yerde HTTPS ve tam kimlik şart,
+    // yoksa ilk faturada değil açılışta durulur.
+    const netsisEnabled = ["true", "1"].includes(
+      (env.NETSIS_ENABLED ?? "").trim().toLowerCase(),
+    );
+    if (netsisEnabled) {
+      const netsisMode = parseNetsisMode(env.NETSIS_MODE);
+      if (netsisMode === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_MODE"],
+          message: "NETSIS_MODE must be 'stub' or 'live'",
+        });
+      } else if (isProductionDeployment && netsisMode !== "live") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_MODE"],
+          message:
+            "NETSIS_MODE must be 'live' in production when NETSIS_ENABLED is set (the stub records invoices that never reach Netsis)",
+        });
+      }
+      if (netsisMode === "live") {
+        if (!(env.NETSIS_BASE_URL ?? "").trim().startsWith("https://")) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["NETSIS_BASE_URL"],
+            message:
+              "NETSIS_BASE_URL must be an HTTPS URL when NETSIS_MODE is 'live' (credentials travel in the token request)",
+          });
+        }
+        for (const key of [
+          "NETSIS_USERNAME",
+          "NETSIS_PASSWORD",
+          "NETSIS_DB_NAME",
+          "NETSIS_DB_USER",
+          "NETSIS_DB_PASSWORD",
+        ] as const) {
+          if (!env[key]?.trim()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [key],
+              message: `${key} is required when NETSIS_ENABLED is set with NETSIS_MODE 'live'`,
+            });
+          }
+        }
+      }
+      // Geçersiz sayı accessor'da sessizce varsayılana düşerdi; açılışta söyle.
+      const netsisTimeout = (env.NETSIS_TIMEOUT_MS ?? "").trim();
+      if (
+        netsisTimeout &&
+        !(Number.isInteger(Number(netsisTimeout)) && Number(netsisTimeout) > 0)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_TIMEOUT_MS"],
+          message: "NETSIS_TIMEOUT_MS must be a positive integer",
+        });
+      }
+      const netsisSafety = (env.NETSIS_TOKEN_SAFETY_SECONDS ?? "").trim();
+      if (
+        netsisSafety &&
+        !(Number.isInteger(Number(netsisSafety)) && Number(netsisSafety) >= 0)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_TOKEN_SAFETY_SECONDS"],
+          message: "NETSIS_TOKEN_SAFETY_SECONDS must be a non-negative integer",
+        });
       }
     }
 
