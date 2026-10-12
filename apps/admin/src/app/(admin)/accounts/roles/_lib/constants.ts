@@ -320,7 +320,11 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "settings",
         label: t("admin.roles.permissions.settings.label"),
         description: t("admin.roles.permissions.settings.description"),
-        pages: ["/system/settings", "/system/timing-rules"],
+        pages: [
+          "/system/settings",
+          "/system/timing-rules",
+          "/system/invoicing-settings",
+        ],
       },
       {
         key: "logs",
