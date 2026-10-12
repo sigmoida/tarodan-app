@@ -11264,7 +11264,9 @@
     "advertisement": {
       "notFound": "Reklam bulunamadı",
       "campaignNotFound": "Bağlanacak kampanya bulunamadı",
-      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz"
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
+      "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
+      "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
     },
     "brand": {
       "notFound": "Marka bulunamadı"

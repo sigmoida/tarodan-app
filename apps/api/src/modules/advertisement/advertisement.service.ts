@@ -18,6 +18,15 @@ import {
   isAdLive,
 } from "./helpers/ad-live.helper";
 import { AD_IMAGE_UPLOAD } from "./helpers/ad-image-upload.constants";
+import {
+  AD_HOTSPOT_ADMIN_SELECT,
+  AD_HOTSPOT_ORDER_BY,
+  AD_HOTSPOT_PUBLIC_SELECT,
+  adHotspotRowData,
+  planAdHotspotReplace,
+  resolveAdClickTargets,
+  type AdHotspotChange,
+} from "./helpers/ad-hotspot.helper";
 import { i18nMessage } from "../i18n";
 
 /** Pozisyon / cihaz başına sayaç özeti (istatistik ekranı). */
@@ -37,6 +46,8 @@ const ADMIN_CAMPAIGN_SELECT = {
 
 const ADMIN_AD_INCLUDE = {
   discount: { select: ADMIN_CAMPAIGN_SELECT },
+  // Admin alan başına tık sayısını da görür (istatistik).
+  hotspots: { select: AD_HOTSPOT_ADMIN_SELECT, orderBy: AD_HOTSPOT_ORDER_BY },
 } as const satisfies Prisma.AdvertisementInclude;
 
 type AdminAdRow = Prisma.AdvertisementGetPayload<{
@@ -140,6 +151,10 @@ export class AdvertisementService {
               isFlashSale: true,
             },
           },
+          hotspots: {
+            select: AD_HOTSPOT_PUBLIC_SELECT,
+            orderBy: AD_HOTSPOT_ORDER_BY,
+          },
         },
       });
 
@@ -156,6 +171,9 @@ export class AdvertisementService {
           height: a.height,
           position: a.position,
           deviceType: a.deviceType,
+          // Görselli reklamda tıklama YALNIZ bu alanlarda olur (`linkUrl` null);
+          // istemci tıkı `POST /ads/:id/click?hotspot=<id>` ile bildirir.
+          hotspots: a.hotspots,
           campaign: a.discount
             ? {
                 id: a.discount.id,
@@ -288,13 +306,17 @@ export class AdvertisementService {
     const startDate = toDateField(dto.startDate) ?? null;
     const endDate = toDateField(dto.endDate) ?? null;
     this.assertWindowOrder(startDate, endDate);
+    // Yeni reklamın "kayıtlı hali" görselsizdir; kurallar güncellemeyle aynı.
+    const targets = resolveAdClickTargets({ imageUrl: null }, dto);
     await this.assertDiscountExists(dto.discountId);
 
+    const hotspots =
+      targets.hotspots.kind === "replace" ? targets.hotspots.hotspots : [];
     const ad = await this.adRepo.create({
       data: {
         title: dto.title,
         imageUrl: dto.imageUrl ?? null,
-        linkUrl: dto.linkUrl ?? null,
+        linkUrl: targets.linkUrl ?? null,
         content: dto.content ?? null,
         altText: dto.altText ?? null,
         width: dto.width ?? null,
@@ -311,6 +333,14 @@ export class AdvertisementService {
         // bitince afiş düşer" süzmesi bu kolondan okunur. Alan DTO'da vardı
         // ama persist edilmiyordu — bağ hiç kurulamıyordu.
         discountId: dto.discountId || null,
+        // İç içe oluşturma reklamla tek işlemdedir.
+        hotspots: hotspots.length
+          ? {
+              create: hotspots.map((hotspot, index) =>
+                adHotspotRowData(hotspot, index),
+              ),
+            }
+          : undefined,
       },
       include: ADMIN_AD_INCLUDE,
     });
@@ -322,7 +352,10 @@ export class AdvertisementService {
    * Zorunlu alanlara `null` DTO'da reddedilir (UpdateAdvertisementDto).
    */
   async update(id: string, dto: UpdateAdvertisementDto) {
-    const existing = await this.adRepo.findUnique({ where: { id } });
+    const existing = await this.adRepo.findUnique({
+      where: { id },
+      include: { hotspots: { select: { id: true } } },
+    });
     if (!existing)
       throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
 
@@ -348,35 +381,79 @@ export class AdvertisementService {
       endDate === undefined ? existing.endDate : endDate,
     );
 
+    // Görsel/bağlantı/alan kuralları SONUÇ reklam üzerinde (saklı + yama).
+    const targets = resolveAdClickTargets(existing, dto);
+
     if (dto.discountId) {
       await this.assertDiscountExists(dto.discountId);
     }
 
-    const ad = await this.adRepo.update({
-      where: { id },
-      // Prisma'da `undefined` alanı yazmaz, `null` temizler — DTO'nun
-      // anlamı birebir taşınır.
-      data: {
-        title: dto.title,
-        imageUrl: dto.imageUrl,
-        linkUrl: dto.linkUrl,
-        content: dto.content,
-        altText: dto.altText,
-        width: dto.width,
-        height: dto.height,
-        position: dto.position,
-        deviceType: dto.deviceType,
-        displayOrder: dto.displayOrder,
-        isActive: dto.isActive,
-        startDate,
-        endDate,
-        // undefined = dokunma; null ya da boş dize = bağı kaldır (SetNull).
-        discountId:
-          dto.discountId === undefined ? undefined : dto.discountId || null,
-      },
-      include: ADMIN_AD_INCLUDE,
+    // Alan kümesi ile reklam satırı tek işlemde: yarım kalan değişim görselle
+    // uyuşmayan alanlar bırakmasın.
+    const ad = await this.prisma.$transaction(async (tx) => {
+      await this.applyHotspotChange(
+        tx,
+        id,
+        existing.hotspots.map((h) => h.id),
+        targets.hotspots,
+      );
+      return tx.advertisement.update({
+        where: { id },
+        // Prisma'da `undefined` alanı yazmaz, `null` temizler — DTO'nun
+        // anlamı birebir taşınır.
+        data: {
+          title: dto.title,
+          imageUrl: dto.imageUrl,
+          // Görselli reklamda daima null; görselsizde DTO'nun anlamı.
+          linkUrl: targets.linkUrl,
+          content: dto.content,
+          altText: dto.altText,
+          width: dto.width,
+          height: dto.height,
+          position: dto.position,
+          deviceType: dto.deviceType,
+          displayOrder: dto.displayOrder,
+          isActive: dto.isActive,
+          startDate,
+          endDate,
+          // undefined = dokunma; null ya da boş dize = bağı kaldır (SetNull).
+          discountId:
+            dto.discountId === undefined ? undefined : dto.discountId || null,
+        },
+        include: ADMIN_AD_INCLUDE,
+      });
     });
     return this.toResponse(ad);
+  }
+
+  /**
+   * Alan değişimini işlem içinde uygular. Kalan alanlar yerinde güncellenir
+   * (tık sayacı korunur), listede olmayanlar silinir, yeniler eklenir; sıra
+   * payload dizisinin sırasıdır.
+   */
+  private async applyHotspotChange(
+    tx: Prisma.TransactionClient,
+    advertisementId: string,
+    persistedIds: string[],
+    change: AdHotspotChange,
+  ): Promise<void> {
+    if (change.kind === "keep") return;
+    if (change.kind === "clear") {
+      await tx.adHotspot.deleteMany({ where: { advertisementId } });
+      return;
+    }
+    const plan = planAdHotspotReplace(persistedIds, change.hotspots);
+    await tx.adHotspot.deleteMany({
+      where: { advertisementId, id: { notIn: plan.keepIds } },
+    });
+    for (const { id, data } of plan.update) {
+      await tx.adHotspot.update({ where: { id }, data });
+    }
+    if (plan.create.length) {
+      await tx.adHotspot.createMany({
+        data: plan.create.map((row) => ({ ...row, advertisementId })),
+      });
+    }
   }
 
   /** Yayın penceresi ters olamaz: böyle bir reklam hiçbir an yayında olmaz. */
@@ -463,6 +540,8 @@ export class AdvertisementService {
             endDate: ad.discount.endDate,
           }
         : null,
+      // Alan başına `clickCount` dahil, sortOrder sırasıyla.
+      hotspots: ad.hotspots,
       clickCount: ad.clickCount,
       impressionCount: ad.impressionCount,
       ctr: parseFloat(ctr),

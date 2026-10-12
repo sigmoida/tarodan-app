@@ -20347,8 +20347,8 @@
       "title": "Tık kaydı sayacı artırır (public)",
       "tur": "Happy path / Idempotency-gözlem",
       "pri": "P1",
-      "steps": "1. POST /api/ads/ /click (kimliksiz).",
-      "exp": "HTTP 204 (gövdesiz; text/plain gövde de kabul); DB'de clickCount=1. Aynı IP 10 sn içinde tekrar tıklarsa sayılmaz.",
+      "steps": "1. POST /api/ads/ /click (kimliksiz) — görselsiz reklam. 2. Görselli reklamda alansız POST /click. 3. Görselli reklamda POST /click?hotspot=<alanId>.",
+      "exp": "HTTP 204 (gövdesiz; text/plain gövde de kabul). Görselsiz reklamda clickCount=1. Görselli reklamda alansız tık sayılmaz (0); alan tıkı reklam ve alan clickCount'unu birlikte 1 yapar. Aynı IP 10 sn içinde aynı hedefe tekrar tıklarsa sayılmaz.",
       "gap": false,
       "gapRefs": []
     },
