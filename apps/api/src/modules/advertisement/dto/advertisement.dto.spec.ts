@@ -125,6 +125,61 @@ describe("CreateAdvertisementDto — alan kuralları", () => {
     );
   });
 
+  describe("hotspots", () => {
+    const spot = (over: Record<string, unknown> = {}) => ({
+      x: 0,
+      y: 0,
+      width: 0.5,
+      height: 1,
+      label: "Sol",
+      linkUrl: "/sol",
+      ...over,
+    });
+
+    it("geçerli alan listesi nesne olarak dönüşür", async () => {
+      const id = "11111111-1111-4111-8111-111111111111";
+      const dto = await create({
+        imageUrl: "https://cdn.example.com/a.png",
+        hotspots: [spot({ id }), spot({ x: 0.5, linkUrl: "https://x.com" })],
+      });
+      expect(dto.hotspots).toHaveLength(2);
+      expect(dto.hotspots?.[0]).toMatchObject({ id, x: 0, label: "Sol" });
+    });
+
+    it.each([
+      ["javascript: bağlantı", { linkUrl: "javascript:alert(1)" }],
+      ["boş bağlantı", { linkUrl: "" }],
+      ["protokol-göreli bağlantı", { linkUrl: "//evil.com" }],
+      ["80 karakteri aşan ad", { label: "x".repeat(81) }],
+      ["sayı olmayan x", { x: "sol" }],
+      ["sonsuz en", { width: Infinity }],
+      ["uuid olmayan id", { id: "abc" }],
+    ])("%s → 400", async (_d, over) => {
+      await expect(
+        create({ hotspots: [spot(over)] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("dizi değilse 400", async () => {
+      await expect(create({ hotspots: spot() })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it("güncellemede null 400 (temizlemek için [])", async () => {
+      await expect(update({ hotspots: null })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(update({ hotspots: [] })).resolves.toEqual({ hotspots: [] });
+    });
+
+    it("güncellemede gönderilmezse alan taşınmaz (dokunma)", async () => {
+      await expect(update({ title: "X" })).resolves.not.toHaveProperty(
+        "hotspots",
+      );
+    });
+  });
+
   it("ofsetli ISO tarihleri kabul eder", async () => {
     await expect(
       create({

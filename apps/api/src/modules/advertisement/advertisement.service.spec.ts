@@ -33,6 +33,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   impressionCount: 0,
   discountId: null,
   discount: null,
+  hotspots: [],
   createdAt: NOW,
   updatedAt: NOW,
   ...over,
@@ -43,7 +44,7 @@ function makeService(existing: Record<string, unknown> | null = row()) {
     findUnique: jest.fn().mockResolvedValue(existing),
     findMany: jest.fn().mockResolvedValue([]),
     create: jest.fn(async ({ data }: { data: Record<string, unknown> }) =>
-      row(data),
+      row({ ...data, hotspots: [] }),
     ),
     update: jest.fn(async ({ data }: { data: Record<string, unknown> }) =>
       row({ ...existing, ...data }),
@@ -53,7 +54,19 @@ function makeService(existing: Record<string, unknown> | null = row()) {
   const discount = {
     findUnique: jest.fn().mockResolvedValue({ id: "disc-1" }),
   };
-  const prisma = { advertisement, discount } as unknown as PrismaService;
+  const adHotspot = {
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    update: jest.fn().mockResolvedValue({}),
+    createMany: jest.fn().mockResolvedValue({ count: 0 }),
+  };
+  const mock: Record<string, unknown> = { advertisement, discount, adHotspot };
+  // İnteraktif işlem aynı istemciyle çalışır: tx üzerindeki çağrılar aynı
+  // mock'lara düşer.
+  const $transaction = jest.fn(
+    async (fn: (tx: unknown) => Promise<unknown>) => fn(mock),
+  );
+  mock.$transaction = $transaction;
+  const prisma = mock as unknown as PrismaService;
   const media = {
     upload: jest.fn().mockResolvedValue({ url: "https://cdn.test/ads/a.webp" }),
   };
@@ -61,6 +74,8 @@ function makeService(existing: Record<string, unknown> | null = row()) {
     service: new AdvertisementService(prisma, media as unknown as MediaService),
     advertisement,
     discount,
+    adHotspot,
+    $transaction,
     media,
   };
 }
@@ -90,7 +105,11 @@ describe("AdvertisementService.update — null temizler, yokluk dokunmaz", () =>
   });
 
   it("gönderilmeyen alanların hiçbiri yazılmaz (undefined = dokunma)", async () => {
-    const { service, advertisement } = makeService();
+    // Görselsiz reklam: görselli reklamda linkUrl kural gereği daima null
+    // yazılır (aşağıdaki "tıklanabilir alanlar" bölümü).
+    const { service, advertisement } = makeService(
+      row({ imageUrl: null, linkUrl: "/kategori/x" }),
+    );
     await service.update("ad-1", { isActive: false });
     const data = updateData(advertisement);
     expect(data.isActive).toBe(false);
@@ -242,6 +261,20 @@ describe("AdvertisementService — admin yanıtında kampanya özeti", () => {
           endDate: true,
         },
       },
+      hotspots: {
+        select: {
+          id: true,
+          x: true,
+          y: true,
+          width: true,
+          height: true,
+          label: true,
+          linkUrl: true,
+          sortOrder: true,
+          clickCount: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     });
     expect(linked.discountId).toBe("disc-1");
     expect(linked.discount).toEqual(campaign);
@@ -336,5 +369,281 @@ describe("AdvertisementService.uploadImage", () => {
       response: { i18nKey: "server.admin.fileMissing" },
     });
     expect(media.upload).not.toHaveBeenCalled();
+  });
+});
+
+describe("AdvertisementService — tıklanabilir alanlar (hotspot)", () => {
+  const H1 = "11111111-1111-4111-8111-111111111111";
+  const H2 = "22222222-2222-4222-8222-222222222222";
+  const FOREIGN = "99999999-9999-4999-8999-999999999999";
+
+  const left = { x: 0, y: 0, width: 0.5, height: 1, label: "Sol", linkUrl: "/sol" };
+  const right = {
+    x: 0.5,
+    y: 0,
+    width: 0.5,
+    height: 1,
+    label: "Sağ",
+    linkUrl: "https://x.com",
+  };
+
+  const textAd = () => row({ imageUrl: null, linkUrl: "/kategori/x" });
+  const imageAd = (ids: string[] = []) =>
+    row({ linkUrl: null, hotspots: ids.map((id) => ({ id })) });
+
+  const expectI18n = async (promise: Promise<unknown>, i18nKey: string) => {
+    await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+    await expect(promise).rejects.toMatchObject({ response: { i18nKey } });
+  };
+
+  describe("create", () => {
+    it("görselli reklam: alanlar (sıra = sortOrder) reklamla birlikte oluşur, linkUrl null", async () => {
+      const { service, advertisement } = makeService();
+      await service.create({
+        title: "X",
+        imageUrl: "https://cdn.test/a.png",
+        linkUrl: "/yok-sayilir",
+        hotspots: [left, right],
+      });
+      const data = advertisement.create.mock.calls[0][0].data;
+      expect(data.linkUrl).toBeNull();
+      expect(data.hotspots).toEqual({
+        create: [
+          { ...left, sortOrder: 0 },
+          { ...right, sortOrder: 1 },
+        ],
+      });
+    });
+
+    it("görselli reklam alansız oluşturulabilir (tıklanamaz görsel)", async () => {
+      const { service, advertisement } = makeService();
+      await service.create({ title: "X", imageUrl: "https://cdn.test/a.png" });
+      const data = advertisement.create.mock.calls[0][0].data;
+      expect(data.hotspots).toBeUndefined();
+      expect(data.linkUrl).toBeNull();
+    });
+
+    it("görselsiz reklam tek linkUrl'ini korur", async () => {
+      const { service, advertisement } = makeService();
+      await service.create({ title: "X", linkUrl: "/kategori/x" });
+      expect(advertisement.create.mock.calls[0][0].data.linkUrl).toBe(
+        "/kategori/x",
+      );
+    });
+
+    it("görselsiz reklama alan 400 (hotspotsNeedImage)", async () => {
+      const { service, advertisement } = makeService();
+      await expectI18n(
+        service.create({ title: "X", hotspots: [left] }),
+        "server.advertisement.hotspotsNeedImage",
+      );
+      expect(advertisement.create).not.toHaveBeenCalled();
+    });
+
+    it("geçersiz alan listesi ilk hatayla 400 (hotspotInvalid + kod/sıra)", async () => {
+      const { service, advertisement } = makeService();
+      const promise = service.create({
+        title: "X",
+        imageUrl: "https://cdn.test/a.png",
+        hotspots: [left, { ...right, x: 0.4 }],
+      });
+      await expectI18n(promise, "server.advertisement.hotspotInvalid");
+      await expect(promise).rejects.toMatchObject({
+        response: {
+          i18nParams: { code: "overlap", index: 1, position: 2, other: 1 },
+        },
+      });
+      expect(advertisement.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("update — küme değişimi", () => {
+    it("kalan id güncellenir (tık sayacına dokunulmaz), eksik silinir, yeni eklenir; tek işlemde", async () => {
+      const { service, advertisement, adHotspot, $transaction } = makeService(
+        imageAd([H1, H2]),
+      );
+      await service.update("ad-1", {
+        hotspots: [{ ...right, id: H2 }, left],
+      });
+
+      expect($transaction).toHaveBeenCalledTimes(1);
+      expect(adHotspot.deleteMany).toHaveBeenCalledWith({
+        where: { advertisementId: "ad-1", id: { notIn: [H2] } },
+      });
+      expect(adHotspot.update).toHaveBeenCalledTimes(1);
+      expect(adHotspot.update).toHaveBeenCalledWith({
+        where: { id: H2 },
+        data: { ...right, sortOrder: 0 },
+      });
+      expect(adHotspot.update.mock.calls[0][0].data).not.toHaveProperty(
+        "clickCount",
+      );
+      expect(adHotspot.createMany).toHaveBeenCalledWith({
+        data: [{ ...left, sortOrder: 1, advertisementId: "ad-1" }],
+      });
+      // Reklam satırı alanlardan SONRA, aynı işlemde yazılır.
+      expect(advertisement.update).toHaveBeenCalledTimes(1);
+      expect(adHotspot.createMany.mock.invocationCallOrder[0]).toBeLessThan(
+        advertisement.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("başka reklamın ya da bilinmeyen id yeni alan sayılır, asla güncellenmez", async () => {
+      const { service, adHotspot } = makeService(imageAd([H1]));
+      await service.update("ad-1", { hotspots: [{ ...left, id: FOREIGN }] });
+
+      expect(adHotspot.update).not.toHaveBeenCalled();
+      expect(adHotspot.deleteMany).toHaveBeenCalledWith({
+        where: { advertisementId: "ad-1", id: { notIn: [] } },
+      });
+      const created = adHotspot.createMany.mock.calls[0][0].data;
+      expect(created).toHaveLength(1);
+      expect(created[0]).not.toHaveProperty("id");
+    });
+
+    it("boş liste tüm alanları siler", async () => {
+      const { service, adHotspot } = makeService(imageAd([H1, H2]));
+      await service.update("ad-1", { hotspots: [] });
+      expect(adHotspot.deleteMany).toHaveBeenCalledWith({
+        where: { advertisementId: "ad-1", id: { notIn: [] } },
+      });
+      expect(adHotspot.createMany).not.toHaveBeenCalled();
+    });
+
+    it("alan gönderilmez ve görsel aynı kalırsa alanlara dokunulmaz", async () => {
+      const { service, adHotspot } = makeService(imageAd([H1]));
+      await service.update("ad-1", {
+        title: "Y",
+        imageUrl: "https://cdn.test/a.png",
+      });
+      expect(adHotspot.deleteMany).not.toHaveBeenCalled();
+      expect(adHotspot.update).not.toHaveBeenCalled();
+      expect(adHotspot.createMany).not.toHaveBeenCalled();
+    });
+
+    it("geçersiz liste 400; hiçbir şey yazılmaz", async () => {
+      const { service, advertisement, adHotspot } = makeService(imageAd([H1]));
+      await expectI18n(
+        service.update("ad-1", { hotspots: [{ ...left, width: 0.01 }] }),
+        "server.advertisement.hotspotInvalid",
+      );
+      expect(adHotspot.deleteMany).not.toHaveBeenCalled();
+      expect(advertisement.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("update — görsel/bağlantı kuralları (sonuç reklam üzerinde)", () => {
+    it("görselli reklamda gönderilen linkUrl yok sayılır, null yazılır", async () => {
+      const { service, advertisement } = makeService(imageAd());
+      await service.update("ad-1", { linkUrl: "/kategori/y" });
+      expect(updateData(advertisement).linkUrl).toBeNull();
+    });
+
+    it("görselsiz reklamda linkUrl gönderildiği gibi yazılır, alanlara dokunulmaz", async () => {
+      const { service, advertisement, adHotspot } = makeService(textAd());
+      await service.update("ad-1", { linkUrl: "/kategori/y" });
+      expect(updateData(advertisement).linkUrl).toBe("/kategori/y");
+      expect(adHotspot.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("görselsiz reklama alan 400 (hotspotsNeedImage)", async () => {
+      const { service, advertisement } = makeService(textAd());
+      await expectI18n(
+        service.update("ad-1", { hotspots: [left] }),
+        "server.advertisement.hotspotsNeedImage",
+      );
+      expect(advertisement.update).not.toHaveBeenCalled();
+    });
+
+    it("görsel kaldırılırsa alanları aynı işlemde silinir", async () => {
+      const { service, advertisement, adHotspot, $transaction } = makeService(
+        imageAd([H1, H2]),
+      );
+      await service.update("ad-1", { imageUrl: null, linkUrl: "/kategori/x" });
+      expect($transaction).toHaveBeenCalledTimes(1);
+      expect(adHotspot.deleteMany).toHaveBeenCalledWith({
+        where: { advertisementId: "ad-1" },
+      });
+      const data = updateData(advertisement);
+      expect(data.imageUrl).toBeNull();
+      expect(data.linkUrl).toBe("/kategori/x");
+    });
+
+    it("görsel kaldırılırken alan gönderilirse 400", async () => {
+      const { service, advertisement } = makeService(imageAd([H1]));
+      await expectI18n(
+        service.update("ad-1", { imageUrl: null, hotspots: [left] }),
+        "server.advertisement.hotspotsNeedImage",
+      );
+      expect(advertisement.update).not.toHaveBeenCalled();
+    });
+
+    it("görsel değişti, alan gönderilmedi → eski alanlar silinir (oran farklı olabilir)", async () => {
+      const { service, adHotspot } = makeService(imageAd([H1]));
+      await service.update("ad-1", { imageUrl: "https://cdn.test/yeni.png" });
+      expect(adHotspot.deleteMany).toHaveBeenCalledWith({
+        where: { advertisementId: "ad-1" },
+      });
+      expect(adHotspot.createMany).not.toHaveBeenCalled();
+    });
+
+    it("görsel değişti ve alanlar da gönderildi → gönderilen küme geçerli", async () => {
+      const { service, adHotspot } = makeService(imageAd([H1]));
+      await service.update("ad-1", {
+        imageUrl: "https://cdn.test/yeni.png",
+        hotspots: [{ ...left, id: H1 }],
+      });
+      expect(adHotspot.deleteMany).toHaveBeenCalledTimes(1);
+      expect(adHotspot.deleteMany).toHaveBeenCalledWith({
+        where: { advertisementId: "ad-1", id: { notIn: [H1] } },
+      });
+      expect(adHotspot.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("görselsiz reklama görsel eklenince eski linkUrl temizlenir", async () => {
+      const { service, advertisement } = makeService(textAd());
+      await service.update("ad-1", {
+        imageUrl: "https://cdn.test/a.png",
+        hotspots: [left],
+      });
+      expect(updateData(advertisement).linkUrl).toBeNull();
+    });
+  });
+
+  describe("yanıtlar", () => {
+    beforeEach(() => jest.useFakeTimers().setSystemTime(NOW));
+    afterEach(() => jest.useRealTimers());
+
+    it("admin yanıtı alanları tık sayısıyla taşır", async () => {
+      const hotspot = { id: H1, ...left, sortOrder: 0, clickCount: 7 };
+      const { service } = makeService(row({ hotspots: [hotspot] }));
+      expect((await service.findOne("ad-1")).hotspots).toEqual([hotspot]);
+    });
+
+    it("vitrin alanları tık sayısı OLMADAN, sortOrder sırasıyla seçer ve döner", async () => {
+      const { service, advertisement } = makeService();
+      const hotspot = { id: H1, ...left, sortOrder: 0 };
+      advertisement.findMany.mockResolvedValue([
+        row({ linkUrl: null, hotspots: [hotspot] }),
+      ]);
+
+      const [ad] = await service.getActive("header");
+
+      expect(advertisement.findMany.mock.calls[0][0].include.hotspots).toEqual({
+        select: {
+          id: true,
+          x: true,
+          y: true,
+          width: true,
+          height: true,
+          label: true,
+          linkUrl: true,
+          sortOrder: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      });
+      expect(ad.hotspots).toEqual([hotspot]);
+      expect(ad.linkUrl).toBeNull();
+    });
   });
 });

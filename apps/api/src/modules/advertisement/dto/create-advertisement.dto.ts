@@ -10,7 +10,10 @@ import {
   Max,
   MaxLength,
   ValidateIf,
+  IsArray,
+  ValidateNested,
 } from "class-validator";
+import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdDeviceType, AdPosition } from "@prisma/client";
 import { BlankToNull } from "../../../common/transforms";
@@ -18,6 +21,7 @@ import {
   AD_LINK_URL_MAX_LENGTH,
   IsAdLinkUrl,
 } from "../helpers/ad-link-url.validator";
+import { AdHotspotDto } from "./ad-hotspot.dto";
 
 // Pozisyon/cihaz enum'larının tek kaynağı Prisma şemasıdır; DTO'lar ve
 // servis aynı değerleri buradan okur.
@@ -87,7 +91,7 @@ export class CreateAdvertisementDto {
 
   @ApiPropertyOptional({
     description:
-      'Click destination: absolute http(s) URL or a site path starting with a single "/"',
+      'Click destination of a TEXT ad (no image): absolute http(s) URL or a site path starting with a single "/". Ignored on an image ad — stored as null; image ads are clickable only through `hotspots`.',
     maxLength: AD_LINK_URL_MAX_LENGTH,
     nullable: true,
   })
@@ -95,6 +99,22 @@ export class CreateAdvertisementDto {
   @BlankToNull()
   @IsAdLinkUrl()
   linkUrl?: string | null;
+
+  /**
+   * Görselli reklamın tıklanabilir alanları. Gönderilirse kümenin TAMAMINI
+   * değiştirir (sıra = `sortOrder`); gönderilmezse dokunulmaz. `null` kabul
+   * edilmez — temizlemek için `[]`.
+   */
+  @ApiPropertyOptional({
+    description:
+      "Clickable areas on the image (image ads only). When present, replaces the full set: items with a persisted `id` are kept (with their click count), missing ones are deleted, new ones created; array order = sortOrder. Absent = unchanged; `[]` clears.",
+    type: [AdHotspotDto],
+  })
+  @IsOptionalNotNull()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AdHotspotDto)
+  hotspots?: AdHotspotDto[];
 
   @ApiPropertyOptional({
     description: "Plain text content",
