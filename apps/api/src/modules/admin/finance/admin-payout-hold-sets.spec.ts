@@ -1,8 +1,5 @@
 import { AdminPayoutService } from "./admin-payout.service";
-import {
-  overdueHoldsWhere,
-  upcomingHoldsWhere,
-} from "./finance-health.where";
+import { overdueHoldsWhere, upcomingHoldsWhere } from "./finance-health.where";
 import { LIVE_PAYMENT } from "../../account-lane/live-lane.where";
 import { HOLD_RELEASE_ORDER_SELECT } from "../../payout/helpers/hold-release-eligibility";
 
@@ -164,6 +161,17 @@ describe("AdminPayoutService.getPayoutsTransactions — releasability flags", ()
       "h-seller": [false, "seller_at_fault", "refunded"],
       "h-frozen": [false, "frozen", "delivered"],
       "h-orphan": [false, "order_not_terminal", null],
+    });
+    // residual: only a closed order's hold carries one; the seller-fault
+    // residual is what finance settles to the platform
+    const residuals = Object.fromEntries(
+      data.map((row) => [row.id, [row.residualAmount, row.residualSettleable]]),
+    );
+    expect(residuals).toEqual({
+      "h-buyer": [25, false],
+      "h-seller": [25, true],
+      "h-frozen": [0, false],
+      "h-orphan": [0, false],
     });
     // the order is read with the predicate's own select
     expect(order.findMany.mock.calls[0][0].select).toMatchObject({

@@ -6,7 +6,9 @@ import {
 import { HOLD_RELEASE_BLOCKED_REASONS } from "@tarodan/types";
 import {
   HOLD_RELEASE_BLOCKED_MESSAGE_KEYS,
+  closedOrderHoldResidual,
   holdPayoutOrderBlock,
+  holdResidualSettleable,
   holdReleaseBlockedReason,
   holdReleaseOrderFacts,
   holdResidual,
@@ -154,6 +156,59 @@ describe("holdResidualPayable", () => {
         NOW,
       ),
     ).toBe(false);
+  });
+});
+
+describe("closedOrderHoldResidual", () => {
+  it("is the leftover of a held hold on a closed order, zero otherwise", () => {
+    expect(closedOrderHoldResidual(hold(), order()).toNumber()).toBe(25);
+    // the retained share swallowed the whole hold: nothing was consumed
+    expect(
+      closedOrderHoldResidual(hold({ amount: 30, refundedAmount: 0 }), order()).toNumber(),
+    ).toBe(30);
+    expect(
+      closedOrderHoldResidual(hold(), order({ status: OrderStatus.delivered })).toNumber(),
+    ).toBe(0);
+    expect(
+      closedOrderHoldResidual(hold({ status: PaymentHoldStatus.cancelled }), order()).toNumber(),
+    ).toBe(0);
+    expect(closedOrderHoldResidual(hold(), null).toNumber()).toBe(0);
+  });
+});
+
+describe("holdResidualSettleable — the seller-fault residual goes to the platform", () => {
+  const sellerFault = order({
+    status: OrderStatus.refunded,
+    finalizedRefunds: [{ faultParty: "seller", policyCode: "v2_seller_cancellation" }],
+  });
+
+  it("settles a seller-fault residual, whatever the release date", () => {
+    expect(holdResidualSettleable(hold(), sellerFault, NOW)).toBe(true);
+    expect(holdResidualSettleable(hold({ releaseAt: FUTURE }), sellerFault, NOW)).toBe(true);
+    expect(holdResidualSettleable(hold({ releaseAt: null }), sellerFault, NOW)).toBe(true);
+    // v1 row: the fault is in the policy code
+    expect(
+      holdResidualSettleable(
+        hold(),
+        order({ finalizedRefunds: [{ faultParty: null, policyCode: "seller_fault_cancellation" }] }),
+        NOW,
+      ),
+    ).toBe(true);
+    // unknown fault is treated like seller fault (never paid to the seller)
+    expect(holdResidualSettleable(hold(), order({ finalizedRefunds: [] }), NOW)).toBe(true);
+  });
+
+  it.each<[string, HoldReleaseHoldFacts, HoldReleaseOrderFacts | null]>([
+    ["seller not at fault (it is released instead)", hold(), order()],
+    ["hold frozen by an open refund", hold({ frozenByRefundId: "rr" }), sellerFault],
+    ["open refund on the order", hold(), { ...sellerFault, hasOpenRefund: true }],
+    ["hold already settled / released", hold({ status: PaymentHoldStatus.cancelled }), sellerFault],
+    ["nothing left in the hold", hold({ refundedAmount: 420 }), sellerFault],
+    ["only a kuruş left", hold({ refundedAmount: 419.99 }), sellerFault],
+    ["order not closed", hold(), { ...sellerFault, status: OrderStatus.delivered }],
+    ["order missing", hold(), null],
+  ])("not settleable: %s", (_name, h, o) => {
+    expect(holdResidualSettleable(h, o, NOW)).toBe(false);
   });
 });
 
