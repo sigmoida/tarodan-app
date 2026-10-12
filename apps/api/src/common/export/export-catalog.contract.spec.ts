@@ -1,7 +1,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { getMessages, locales } from "@tarodan/i18n";
-import { EXPORT_CATALOGS, EXPORT_COLUMN_TYPES } from "@tarodan/types";
+import {
+  EXPORT_CATALOGS,
+  EXPORT_COLUMN_TYPES,
+  type ExportCatalog,
+} from "@tarodan/types";
 
 import { lookupNode } from "../../modules/i18n/translate";
 import { apiAppRoot } from "../helpers/app-root";
@@ -43,7 +47,8 @@ const hasMessage = (locale: (typeof locales)[number], key: string) =>
   ) === "string";
 
 describe("export catalogs", () => {
-  const catalogs = Object.entries(EXPORT_CATALOGS);
+  const catalogs: Array<[string, ExportCatalog]> =
+    Object.entries(EXPORT_CATALOGS);
 
   it("tarama kendini doğrular: kapsamdaki kaynakların hepsi tanımlı", () => {
     expect(Object.keys(EXPORT_CATALOGS).sort()).toEqual(
