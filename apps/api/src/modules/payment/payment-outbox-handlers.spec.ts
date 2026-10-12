@@ -17,7 +17,7 @@ const makeDeps = (over?: {
   const paymentCommon = {
     cancelSuratShipmentIfExists: jest.fn().mockResolvedValue({ ok: true }),
   } as any;
-  const elogoInvoicing = {
+  const invoicing = {
     handleOrderRefund: jest.fn().mockResolvedValue(undefined),
     handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
     issueVirtualOrderInvoice: jest.fn().mockResolvedValue(undefined),
@@ -48,14 +48,14 @@ const makeDeps = (over?: {
   const svc = new PaymentOutboxHandlers(
     registry,
     paymentCommon,
-    elogoInvoicing,
+    invoicing,
     prisma,
     fulfillmentFinalizer,
   );
   return {
     registry,
     paymentCommon,
-    elogoInvoicing,
+    invoicing,
     prisma,
     fulfillmentFinalizer,
     svc,
@@ -108,7 +108,7 @@ describe("PaymentOutboxHandlers", () => {
   });
 
   it("invoice.refund_reverse handler'ını kaydeder ve eLogo ters kaydına yönlendirir", async () => {
-    const { registry, elogoInvoicing, svc } = makeDeps();
+    const { registry, invoicing, svc } = makeDeps();
     svc.onModuleInit();
     expect(registry.types()).toContain(OUTBOX_INVOICE_REFUND_REVERSE);
 
@@ -119,16 +119,13 @@ describe("PaymentOutboxHandlers", () => {
       fullyRefunded: false,
     };
     await registry.get(OUTBOX_INVOICE_REFUND_REVERSE)!(payload, {} as any);
-    expect(elogoInvoicing.handleOrderRefund).toHaveBeenCalledWith(
-      "o3",
-      payload,
-    );
+    expect(invoicing.handleOrderRefund).toHaveBeenCalledWith("o3", payload);
     // Talebe bağlanamayan deneme ceza faturası doğurmaz.
-    expect(elogoInvoicing.issuePenaltyInvoice).not.toHaveBeenCalled();
+    expect(invoicing.issuePenaltyInvoice).not.toHaveBeenCalled();
   });
 
   it("ters kayıttan sonra kusurlu tarafın ceza faturasını keser", async () => {
-    const { registry, elogoInvoicing, svc } = makeDeps({
+    const { registry, invoicing, svc } = makeDeps({
       refundAttempt: { idempotencyKey: "refund-request:rr9" },
     });
     svc.onModuleInit();
@@ -143,12 +140,12 @@ describe("PaymentOutboxHandlers", () => {
       {} as any,
     );
 
-    expect(elogoInvoicing.handleOrderRefund).toHaveBeenCalled();
-    expect(elogoInvoicing.issuePenaltyInvoice).toHaveBeenCalledWith("rr9");
+    expect(invoicing.handleOrderRefund).toHaveBeenCalled();
+    expect(invoicing.issuePenaltyInvoice).toHaveBeenCalledWith("rr9");
   });
 
   it("invoice.trade_cash_refund_reverse handler'ını kaydeder ve eLogo takas ters kaydına yönlendirir", async () => {
-    const { registry, elogoInvoicing, svc } = makeDeps();
+    const { registry, invoicing, svc } = makeDeps();
     svc.onModuleInit();
     expect(registry.types()).toContain(
       OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
@@ -158,11 +155,11 @@ describe("PaymentOutboxHandlers", () => {
       { tradeCashPaymentId: "tcp-9" },
       {} as any,
     );
-    expect(elogoInvoicing.handleTradeCashRefund).toHaveBeenCalledWith("tcp-9");
+    expect(invoicing.handleTradeCashRefund).toHaveBeenCalledWith("tcp-9");
   });
 
   it("invoice.revenue_issue handler'ını sanal sipariş faturalandırmasına yönlendirir", async () => {
-    const { registry, elogoInvoicing, svc } = makeDeps();
+    const { registry, invoicing, svc } = makeDeps();
     svc.onModuleInit();
     expect(registry.types()).toContain(OUTBOX_REVENUE_INVOICE_ISSUE);
 
@@ -170,7 +167,7 @@ describe("PaymentOutboxHandlers", () => {
       { orderId: "mem-order", kind: "membership" },
       {} as any,
     );
-    expect(elogoInvoicing.issueVirtualOrderInvoice).toHaveBeenCalledWith(
+    expect(invoicing.issueVirtualOrderInvoice).toHaveBeenCalledWith(
       "mem-order",
       "membership",
     );

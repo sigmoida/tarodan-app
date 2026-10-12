@@ -363,7 +363,7 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       get: (k: string) =>
         k === "FEATURE_48H_CONFIRMATION_WINDOW" ? "true" : undefined,
     };
-    // Constructor: (prisma, orderService, configService, elogoInvoicing,
+    // Constructor: (prisma, orderService, configService, invoicing,
     // sellerInvoice, notificationService, cache, scheduledQueue).
     // runAutoCompleteConfirmedOrders yalnız config flag + prisma + orderService
     // kullanır; kalanı stub geçilir.

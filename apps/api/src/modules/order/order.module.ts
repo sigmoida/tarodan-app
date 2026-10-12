@@ -28,7 +28,7 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { ProductModule } from "../product/product.module";
 import { CommissionModule } from "../commission/commission.module";
 import { TaxModule } from "../tax/tax.module";
-import { ElogoModule } from "../elogo";
+import { InvoicingModule } from "../invoicing";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { RefundModule } from "../refund/refund.module";
 import { UserBlockModule } from "../user-block/user-block.module";
@@ -47,7 +47,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ProductModule,
     CommissionModule,
     TaxModule,
-    ElogoModule,
+    InvoicingModule,
     ShippingTariffModule,
     UserBlockModule,
     RefundModule,

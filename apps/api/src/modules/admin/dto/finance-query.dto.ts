@@ -3,20 +3,20 @@ import { IsDateString, IsIn, IsOptional, IsString } from "class-validator";
 
 import { AdminListQueryDto } from "../../../common/list";
 import {
-  ELOGO_INVOICE_SCOPES,
-  type ElogoInvoiceScope,
+  FISCAL_INVOICE_SCOPES,
+  type FiscalInvoiceScope,
 } from "../finance/invoice-scope";
 
-export class ElogoInvoiceQueryDto extends AdminListQueryDto {
+export class FiscalInvoiceQueryDto extends AdminListQueryDto {
   /**
    * Fatura ekranının sekmesi. Sekmeler ÇAKIŞIR (ceza faturası hem kendi
    * sekmesinde hem tarafın sekmesinde görünür) — bunlar birer görünüm, ayrık
    * kümeler değil.
    */
-  @ApiPropertyOptional({ enum: ELOGO_INVOICE_SCOPES })
+  @ApiPropertyOptional({ enum: FISCAL_INVOICE_SCOPES })
   @IsOptional()
-  @IsIn(ELOGO_INVOICE_SCOPES)
-  scope?: ElogoInvoiceScope;
+  @IsIn(FISCAL_INVOICE_SCOPES)
+  scope?: FiscalInvoiceScope;
 
   /** İşlemin gerçekleşme şekli (doğrudan satış / teklif / takas / platform hizmeti). */
   @ApiPropertyOptional()

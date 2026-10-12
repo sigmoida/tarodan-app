@@ -25,7 +25,7 @@
  *   node dist-seed/maintenance/backfill-elogo-invoice-parties.js
  */
 import { PrismaClient } from "@prisma/client";
-import { resolveInvoiceParties } from "../src/modules/elogo/invoice/invoice-parties";
+import { resolveInvoiceParties } from "../src/modules/invoicing/invoice/invoice-parties";
 
 const prisma = new PrismaClient();
 const BATCH_SIZE = 200;
@@ -45,7 +45,7 @@ async function backfillPass(
 ): Promise<void> {
   let cursor: string | undefined;
   for (;;) {
-    const invoices = await prisma.elogoInvoice.findMany({
+    const invoices = await prisma.fiscalInvoice.findMany({
       where: {
         // Tarafı ÇÖZÜLMEMİŞ belgeler: üçü de boşsa dokunulmamış demektir.
         // Kesim anında yazılanlar (biri bile doluysa) yeniden çözülmez.
@@ -76,7 +76,7 @@ async function backfillPass(
       summary.byContext[parties.context ?? "—"] =
         (summary.byContext[parties.context ?? "—"] ?? 0) + 1;
       if (dryRun) continue;
-      await prisma.elogoInvoice.update({
+      await prisma.fiscalInvoice.update({
         where: { id: invoice.id },
         data: parties,
       });

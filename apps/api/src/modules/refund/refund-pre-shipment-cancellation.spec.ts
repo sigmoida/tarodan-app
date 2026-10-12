@@ -151,7 +151,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
       },
-      elogoInvoice: { findUnique: jest.fn().mockResolvedValue(null) },
+      fiscalInvoice: { findUnique: jest.fn().mockResolvedValue(null) },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       adminUser: { findMany: jest.fn().mockResolvedValue([]) },
       $queryRaw: jest.fn().mockResolvedValue([{ id: order.id }]),

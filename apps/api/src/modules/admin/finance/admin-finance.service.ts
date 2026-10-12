@@ -64,7 +64,7 @@ export class AdminFinanceService {
           timing: { invoiceDeadlineDays },
         }),
       }),
-      this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
+      this.prisma.fiscalInvoice.count({ where: exhaustedInvoicesWhere }),
       this.prisma.sellerAccountAdjustment.aggregate({
         where: openAdjustmentsWhere,
         _sum: { remainingAmount: true },
@@ -98,7 +98,7 @@ export class AdminFinanceService {
 
     const [issued, pendingCount, failedCount, exhaustedCount] =
       await Promise.all([
-        this.prisma.elogoInvoice.aggregate({
+        this.prisma.fiscalInvoice.aggregate({
           where: {
             status: { in: ["sent", "signed"] },
             createdAt: { gte: monthStart, lte: now },
@@ -106,11 +106,13 @@ export class AdminFinanceService {
           _sum: { total: true },
           _count: { id: true },
         }),
-        this.prisma.elogoInvoice.count({
+        this.prisma.fiscalInvoice.count({
           where: { status: { in: ["pending", "processing"] } },
         }),
-        this.prisma.elogoInvoice.count({ where: retryableFailedInvoicesWhere }),
-        this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
+        this.prisma.fiscalInvoice.count({
+          where: retryableFailedInvoicesWhere,
+        }),
+        this.prisma.fiscalInvoice.count({ where: exhaustedInvoicesWhere }),
       ]);
 
     return {

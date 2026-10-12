@@ -296,7 +296,7 @@ export class AdminOrderService {
       ),
     ];
     const invoices = sourceIds.length
-      ? await this.prisma.elogoInvoice.findMany({
+      ? await this.prisma.fiscalInvoice.findMany({
           where: {
             sourceId: { in: sourceIds },
             type: { in: ORDER_INVOICE_TYPES },

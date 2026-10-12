@@ -17,8 +17,8 @@ import {
   OrderRevenueInvoicePayload,
 } from "../outbox/outbox.types";
 import { PaymentCommonService } from "./payment-common.service";
-import { ElogoInvoicingService } from "../elogo";
-import { refundRequestIdOf } from "../elogo/helpers/refund-request-key";
+import { InvoicingService } from "../invoicing";
+import { refundRequestIdOf } from "../invoicing/helpers/refund-request-key";
 import { PrismaService } from "../../prisma";
 import { FulfillmentFinalizer } from "./fulfillment/fulfillment-finalizer.service";
 import { PaymentRefundService } from "./refund/payment-refund.service";
@@ -39,7 +39,7 @@ export class PaymentOutboxHandlers implements OnModuleInit {
   constructor(
     private readonly registry: OutboxHandlerRegistry,
     private readonly paymentCommon: PaymentCommonService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly invoicing: InvoicingService,
     private readonly prisma: PrismaService,
     private readonly fulfillmentFinalizer: FulfillmentFinalizer,
     // İptal edilmiş takasa sonradan gelen ödemenin iadesi (aynı modülün
@@ -97,13 +97,10 @@ export class PaymentOutboxHandlers implements OnModuleInit {
       // Deploy öncesinden kuyrukta kalmış `{orderId}` payload'ları tam-iade
       // davranışıyla işlemeye devam et; yeni olaylar refundAttemptId taşır.
       if (!adjustment.refundAttemptId) {
-        await this.elogoInvoicing.handleOrderRefund(adjustment.orderId);
+        await this.invoicing.handleOrderRefund(adjustment.orderId);
         return;
       }
-      await this.elogoInvoicing.handleOrderRefund(
-        adjustment.orderId,
-        adjustment,
-      );
+      await this.invoicing.handleOrderRefund(adjustment.orderId, adjustment);
       // Ters kayıttan SONRA: kusurluya yüklenen kargo bedelinin belgesi. Ters
       // kayıt önce çalışmalı ki iade faturaları ile ceza aynı sıraya girsin.
       // İdempotent (type+sourceId) ve `cut` hatayı yutar — iadeyi bloklamaz.
@@ -111,7 +108,7 @@ export class PaymentOutboxHandlers implements OnModuleInit {
         adjustment.refundAttemptId,
       );
       if (refundRequestId) {
-        await this.elogoInvoicing.issuePenaltyInvoice(refundRequestId);
+        await this.invoicing.issuePenaltyInvoice(refundRequestId);
       }
     });
 
@@ -120,7 +117,7 @@ export class PaymentOutboxHandlers implements OnModuleInit {
       async (payload) => {
         const { tradeCashPaymentId } =
           payload as InvoiceTradeCashRefundReversePayload;
-        await this.elogoInvoicing.handleTradeCashRefund(tradeCashPaymentId);
+        await this.invoicing.handleTradeCashRefund(tradeCashPaymentId);
       },
     );
 
@@ -128,11 +125,11 @@ export class PaymentOutboxHandlers implements OnModuleInit {
       const { orderId, membershipPaymentId, kind } =
         payload as RevenueInvoiceIssuePayload;
       if (kind === "membership" && membershipPaymentId) {
-        await this.elogoInvoicing.issueMembershipInvoice(membershipPaymentId);
+        await this.invoicing.issueMembershipInvoice(membershipPaymentId);
         return;
       }
       if (!orderId) throw new Error("Revenue invoice source is missing");
-      await this.elogoInvoicing.issueVirtualOrderInvoice(orderId, kind);
+      await this.invoicing.issueVirtualOrderInvoice(orderId, kind);
     });
 
     // Teslim edilen fiziksel siparişin gelir faturaları. Teslim tx'iyle atomik
@@ -142,7 +139,7 @@ export class PaymentOutboxHandlers implements OnModuleInit {
     this.registry.register(OUTBOX_ORDER_REVENUE_INVOICE, async (payload) => {
       const { orderId } = payload as OrderRevenueInvoicePayload;
       if (!orderId) throw new Error("Order revenue invoice source is missing");
-      await this.elogoInvoicing.issueOrderRevenueInvoices(orderId);
+      await this.invoicing.issueOrderRevenueInvoices(orderId);
     });
 
     // #8: fulfillment DAYANIKLILIK backstop'u. Anlık event yolu (OrderFulfillmentListener)

@@ -65,7 +65,7 @@ describe("OrderLifecycleService.cancel — ödenmemiş siparişte canlı çekim"
       {} as any, // commissionLedger
       {} as any, // orderCommon
       orderQuery as any,
-      {} as any, // elogoInvoicing
+      {} as any, // invoicing
     );
     return { service, tx, calls };
   };

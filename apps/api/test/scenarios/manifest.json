@@ -19581,7 +19581,7 @@
       "tur": "Güvenlik / i18n",
       "pri": "P1",
       "steps": "Uygulanamaz: InvoiceService.generateAndSendInvoice ve e-posta yolu kaldırıldı.",
-      "exp": "Senaryo skip. Misafir e-Arşiv belgesi eLogo tarafında kesim anındaki iletişim bilgisiyle (shippingAddress.guestEmail) gönderilir — elogo-delivery.service.ts.",
+      "exp": "Senaryo skip. Misafir e-Arşiv belgesi eLogo tarafında kesim anındaki iletişim bilgisiyle (shippingAddress.guestEmail) gönderilir — invoice-delivery.service.ts.",
       "gap": false,
       "gapRefs": []
     },

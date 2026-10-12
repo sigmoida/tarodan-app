@@ -6,7 +6,7 @@ import { AdminTaxService } from "./admin-tax.service";
  * `invoice-process*.spec.ts`'te kilitli; burada listenin onu doğru yere
  * bağladığı sabitlenir.
  */
-describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
+describe("AdminTaxService.getFiscalInvoices — işlem referansı", () => {
   const invoiceRow = {
     id: "inv-1",
     type: "trade_service_fee",
@@ -32,7 +32,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
     billingReference: null,
     pdfUrl: null,
     emailSentAt: null,
-    elogoResultMsg: null,
+    providerResultMsg: null,
     issuedAt: null,
     cancelledAt: null,
     cancelReason: null,
@@ -41,7 +41,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
 
   const makeService = (rows: unknown[] = []) => {
     const prisma = {
-      elogoInvoice: {
+      fiscalInvoice: {
         count: jest.fn().mockResolvedValue(rows.length),
         // `select: { id }` yalnız iade faturası araması için atılır.
         findMany: jest
@@ -75,7 +75,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
       {} as never,
     );
     const pageWhere = () =>
-      prisma.elogoInvoice.findMany.mock.calls.find(
+      prisma.fiscalInvoice.findMany.mock.calls.find(
         ([args]) => Object.keys(args.select).length > 1,
       )?.[0].where;
     return { service, prisma, pageWhere };
@@ -84,7 +84,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
   it("her satıra işlemin referanslarını ekler", async () => {
     const { service, prisma } = makeService([invoiceRow]);
 
-    const result = await service.getElogoInvoices({});
+    const result = await service.getFiscalInvoices({});
 
     expect(result.data[0].process).toEqual({
       kind: "trade",
@@ -96,7 +96,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
   it("İşlem No filtresi numarayı kaynak anahtarına çevirir", async () => {
     const { service, prisma, pageWhere } = makeService();
 
-    await service.getElogoInvoices({ processRef: "rfd-aaa" });
+    await service.getFiscalInvoices({ processRef: "rfd-aaa" });
 
     expect(prisma.refundRequest.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { refundNumber: "RFD-AAA" } }),
@@ -109,7 +109,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
   it("İşlem No filtresine numara olmayan metin girilirse sonuç boştur", async () => {
     const { service, pageWhere } = makeService();
 
-    await service.getElogoInvoices({ processRef: "komisyon" });
+    await service.getFiscalInvoices({ processRef: "komisyon" });
 
     expect(pageWhere().AND).toContainEqual({ id: { in: [] } });
   });
@@ -117,7 +117,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
   it("genel arama işlem numarasını da eşleştirir, metin aramasını korur", async () => {
     const { service, pageWhere } = makeService();
 
-    await service.getElogoInvoices({ search: "TKS-AAA" });
+    await service.getFiscalInvoices({ search: "TKS-AAA" });
 
     const search = pageWhere().AND.at(-1);
     expect(search.OR).toHaveLength(2);
@@ -137,7 +137,7 @@ describe("AdminTaxService.getElogoInvoices — işlem referansı", () => {
   it("işlem numarası olmayan genel arama kaynak tablolarına gitmez", async () => {
     const { service, prisma, pageWhere } = makeService();
 
-    await service.getElogoInvoices({ search: "komisyon" });
+    await service.getFiscalInvoices({ search: "komisyon" });
 
     expect(prisma.trade.findUnique).not.toHaveBeenCalled();
     expect(pageWhere().AND.at(-1).OR).toContainEqual({

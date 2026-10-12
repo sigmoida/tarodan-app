@@ -43,7 +43,7 @@ describe("InvoiceDetailService.build — kaynak işlem tablosu", () => {
         .mockResolvedValue(orderRow ? { orders: [orderRow] } : null),
     };
     const prisma = {
-      elogoInvoice: { findUnique: jest.fn().mockResolvedValue(invoice) },
+      fiscalInvoice: { findUnique: jest.fn().mockResolvedValue(invoice) },
       orderPackage,
       order: { findUnique: jest.fn().mockResolvedValue(null) },
     };
@@ -155,7 +155,7 @@ describe("InvoiceDetailService.build — tür başına kaynak dalı", () => {
     tables: Record<string, { findUnique: jest.Mock }> = {},
   ) => {
     const prisma = {
-      elogoInvoice: found({ ...baseInvoice, ...invoice }),
+      fiscalInvoice: found({ ...baseInvoice, ...invoice }),
       orderPackage: none(),
       order: none(),
       tradeCashPayment: none(),
@@ -289,7 +289,7 @@ describe("InvoiceDetailService.build — tür başına kaynak dalı", () => {
   });
 
   it("iade faturası ters çevirdiği belgenin kaynağını gösterir (kısmi anahtar dahil)", async () => {
-    const elogoInvoice = {
+    const fiscalInvoice = {
       findUnique: jest
         .fn()
         .mockResolvedValueOnce({
@@ -302,7 +302,7 @@ describe("InvoiceDetailService.build — tür başına kaynak dalı", () => {
     const detail = await build(
       { type: "return_invoice", sourceId: "inv-0:attempt-1" },
       {
-        elogoInvoice,
+        fiscalInvoice,
         order: found({
           orderNumber: "ORD-PPP",
           quantity: 1,
@@ -315,13 +315,13 @@ describe("InvoiceDetailService.build — tür başına kaynak dalı", () => {
     );
 
     expect(detail.source.map((row) => row.reference)).toEqual(["ORD-PPP"]);
-    expect(elogoInvoice.findUnique).toHaveBeenLastCalledWith(
+    expect(fiscalInvoice.findUnique).toHaveBeenLastCalledWith(
       expect.objectContaining({ where: { id: "inv-0" } }),
     );
   });
 
   it("iade faturasının kaynağı yine iade faturasıysa döngüye girmez", async () => {
-    const elogoInvoice = {
+    const fiscalInvoice = {
       findUnique: jest
         .fn()
         .mockResolvedValueOnce({
@@ -333,7 +333,7 @@ describe("InvoiceDetailService.build — tür başına kaynak dalı", () => {
     };
     const detail = await build(
       { type: "return_invoice", sourceId: "inv-0" },
-      { elogoInvoice },
+      { fiscalInvoice },
     );
 
     expect(detail.source).toEqual([]);

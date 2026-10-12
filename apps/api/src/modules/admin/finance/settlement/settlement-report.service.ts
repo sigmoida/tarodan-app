@@ -9,7 +9,7 @@ import {
   resolveOrderBy,
 } from "../../../../common/list";
 import { storedProductBaseOf } from "../../../order/helpers/order-charged-base.helper";
-import { resolveGuestInvoiceRecipient } from "../../../elogo/invoice/elogo-guest-recipient";
+import { resolveGuestInvoiceRecipient } from "../../../invoicing/invoice/guest-recipient";
 import type { SettlementReportQueryDto } from "../../dto";
 import {
   buildSettlementRow,

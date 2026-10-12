@@ -25,7 +25,7 @@ import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
 import { TaxService } from "../../tax/tax.service";
-import { ElogoInvoicingService } from "../../elogo";
+import { InvoicingService } from "../../invoicing";
 import { RefundService } from "../../refund/refund.service";
 import {
   CancellationActor,
@@ -274,7 +274,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         OrderQueryService,
         OrderLifecycleService,
         {
-          provide: ElogoInvoicingService,
+          provide: InvoicingService,
           useValue: {
             issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
             issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
@@ -1088,7 +1088,7 @@ describe("OrderService checkout group (batch checkout)", () => {
 
     it("satıcı başına TEK fatura kaynağı üretir (3 sipariş → 2 paket)", async () => {
       // Komisyon ve hizmet bedeli faturaları artık `packageId` anahtarlı
-      // kesiliyor (ElogoInvoicingService.resolvePackageInvoiceBasis), sipariş
+      // kesiliyor (InvoicingService.resolvePackageInvoiceBasis), sipariş
       // değil. Paket satıcı başına tek olduğu için 2 satıcı → 2 fatura seti:
       // biri iki kalemli, diğeri tek kalemli.
       splitTwoAndOne();

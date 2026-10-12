@@ -14,7 +14,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { errorMessage } from "../../../common/helpers/error-message";
-import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
+import { refundRequestIdOf } from "../../invoicing/helpers/refund-request-key";
 import {
   refundAttemptCancelActor,
   refundRequestAdminReasonCode,

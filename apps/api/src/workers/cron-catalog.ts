@@ -134,6 +134,9 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
   {
+    // Kimlik eLogo adını taşısa da iş sağlayıcıdan bağımsızdır (InvoiceSchedulerService).
+    // Bull repeatable anahtarı, Sentry check-in'i ve geçmiş koşu kayıtları bu
+    // değere bağlı; değiştirmek bir ops adımı ister (docs/INVOICING_PROVIDERS.md).
     key: "elogo-retry-pending",
     label: "e-Fatura gönderimlerini yeniden dene",
     description: "Bekleyen/başarısız e-Logo faturalarını yeniden dener",

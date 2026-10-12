@@ -1,4 +1,4 @@
-import { SYSTEM_GUEST_EMAIL } from "../../elogo/invoice/elogo-guest-recipient";
+import { SYSTEM_GUEST_EMAIL } from "../../invoicing/invoice/guest-recipient";
 
 const SYSTEM_GUEST_NAME = "GUEST_SYSTEM";
 

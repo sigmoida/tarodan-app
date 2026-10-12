@@ -17,7 +17,7 @@
  * mapper gönderi referansına (SatisKodu) düşüyor: koli başına ayrık, telefonsuz.
  */
 
-import { SYSTEM_GUEST_EMAIL } from "../../elogo/invoice/elogo-guest-recipient";
+import { SYSTEM_GUEST_EMAIL } from "../../invoicing/invoice/guest-recipient";
 
 /**
  * Depo tarafının sabit müşteri anahtarı. Depo bir kullanıcı kaydı değil ama

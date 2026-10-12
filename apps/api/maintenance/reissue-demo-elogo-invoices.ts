@@ -31,10 +31,10 @@
  *     satırı kendisi yakalar; kuyruk gerekmez.
  *   - iade faturaları → yeniden kesilmez (kaynağı zaten geçersiz).
  */
-import { PrismaClient, type ElogoInvoiceType } from "@prisma/client";
+import { PrismaClient, type FiscalInvoiceType } from "@prisma/client";
 import { randomUUID } from "node:crypto";
-import { highestSequenceValue } from "../src/modules/elogo/invoice/elogo-document-number";
-import { invoiceIssueYear } from "../src/modules/elogo/invoice/invoice-datetime";
+import { highestSequenceValue } from "../src/modules/invoicing/invoice/document-number";
+import { invoiceIssueYear } from "../src/modules/invoicing/invoice/invoice-datetime";
 import { elogoInvoicePrefix } from "../src/config/elogo";
 import {
   OUTBOX_ORDER_REVENUE_INVOICE,
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient();
   try {
-    const demoRows = await prisma.elogoInvoice.findMany({
+    const demoRows = await prisma.fiscalInvoice.findMany({
       where: {
         createdAt: { lt: before },
         OR: [{ cancelReason: null }, { cancelReason: { not: DEMO_REASON } }],
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
     const membershipSources: string[] = [];
     const boostSources: string[] = [];
     const tradeSources: string[] = [];
-    const reissuable = new Set<ElogoInvoiceType>([
+    const reissuable = new Set<FiscalInvoiceType>([
       "commission",
       "service_fee",
       "platform_sale",
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     );
 
     // Sayaç durumu: aktif (iptal olmayan, demo olmayan) en yüksek canlı numara.
-    const activeAfter = await prisma.elogoInvoice.findMany({
+    const activeAfter = await prisma.fiscalInvoice.findMany({
       where: {
         status: { not: "cancelled" },
         invoiceNumber: { startsWith: `${prefix}${year}` },
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
       prefix,
       year,
     );
-    const seq = await prisma.elogoDocSequence.findUnique({
+    const seq = await prisma.fiscalDocSequence.findUnique({
       where: { prefix_year: { prefix, year } },
     });
     console.log(
@@ -195,7 +195,7 @@ async function main(): Promise<void> {
     const now = new Date();
     await prisma.$transaction(async (tx) => {
       for (const r of demoRows) {
-        await tx.elogoInvoice.update({
+        await tx.fiscalInvoice.update({
           where: { id: r.id },
           data: {
             status: "cancelled",
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
             cancelReason: DEMO_REASON,
             invoiceNumber: r.invoiceNumber ? `DEMO-${r.invoiceNumber}` : null,
             sourceId: `demo:${r.sourceId}`,
-            elogoResultMsg:
+            providerResultMsg:
               `Demo ortamında üretildi (GİB'e ulaşmadı); orijinal no=${r.invoiceNumber ?? "-"} source=${r.sourceId} durum=${r.status}`.slice(
                 0,
                 500,
@@ -250,7 +250,7 @@ async function main(): Promise<void> {
       }
 
       if (resetSequence) {
-        await tx.elogoDocSequence.upsert({
+        await tx.fiscalDocSequence.upsert({
           where: { prefix_year: { prefix, year } },
           create: { prefix, year, lastValue: highestLive },
           update: { lastValue: highestLive },

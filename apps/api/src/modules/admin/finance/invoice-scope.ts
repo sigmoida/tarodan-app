@@ -1,4 +1,4 @@
-import { Prisma, type ElogoInvoiceType } from "@prisma/client";
+import { Prisma, type FiscalInvoiceType } from "@prisma/client";
 
 /**
  * Admin fatura ekranının sekmeleri. Ayrık kümeler DEĞİL, birer görünümdür: bir
@@ -9,7 +9,7 @@ import { Prisma, type ElogoInvoiceType } from "@prisma/client";
  * yüklediği ÜRÜN faturalarını (`SellerUploadedInvoice`) listeler ve kendi
  * ucundan beslenir.
  */
-export const ELOGO_INVOICE_SCOPES = [
+export const FISCAL_INVOICE_SCOPES = [
   "all",
   "buyer",
   "seller",
@@ -17,17 +17,17 @@ export const ELOGO_INVOICE_SCOPES = [
   "platform",
 ] as const;
 
-export type ElogoInvoiceScope = (typeof ELOGO_INVOICE_SCOPES)[number];
+export type FiscalInvoiceScope = (typeof FISCAL_INVOICE_SCOPES)[number];
 
 /**
  * Tarodan'ın KENDİ satışları: muhatabı işlemin alıcısıdır ama bunlar bir
  * alışverişin tarafına kesilmiş belgeler değildir, kendi sekmelerinde dururlar.
  */
-const PLATFORM_SALE_TYPES: ElogoInvoiceType[] = ["membership", "boost"];
+const PLATFORM_SALE_TYPES: FiscalInvoiceType[] = ["membership", "boost"];
 
-/** Taraf sekmelerinin ihtiyaç duyduğu alan referansları (`prisma.elogoInvoice.fields`). */
+/** Taraf sekmelerinin ihtiyaç duyduğu alan referansları (`prisma.fiscalInvoice.fields`). */
 export type InvoicePartyFieldRefs = Pick<
-  Prisma.ElogoInvoiceFieldRefs,
+  Prisma.FiscalInvoiceFieldRefs,
   "sellerUserId" | "buyerUserId"
 >;
 
@@ -40,10 +40,10 @@ export type InvoicePartyFieldRefs = Pick<
  * çevirdiği belgenin tarafına. Tarafları çözülememiş eski kayıtlar taraf
  * sekmelerine düşmez ama "Tüm Faturalar"da durur.
  */
-export function elogoInvoiceScopeWhere(
-  scope: ElogoInvoiceScope | undefined,
+export function fiscalInvoiceScopeWhere(
+  scope: FiscalInvoiceScope | undefined,
   fields: InvoicePartyFieldRefs,
-): Prisma.ElogoInvoiceWhereInput {
+): Prisma.FiscalInvoiceWhereInput {
   switch (scope) {
     case "seller":
       return { recipientUserId: { equals: fields.sellerUserId } };

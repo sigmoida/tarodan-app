@@ -4,16 +4,16 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import {
-  type ElogoInvoiceContext,
-  ElogoInvoiceStatus,
-  ElogoInvoiceType,
+  type FiscalInvoiceContext,
+  FiscalInvoiceStatus,
+  FiscalInvoiceType,
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { AdminDeletedIdentityService } from "../users/admin-deleted-identity.service";
 import { StorageService } from "../../storage/storage.service";
-import { ElogoInvoiceQueryDto, SellerUploadedInvoiceQueryDto } from "../dto";
+import { FiscalInvoiceQueryDto, SellerUploadedInvoiceQueryDto } from "../dto";
 import {
   paginate,
   paginateComputedRows,
@@ -22,13 +22,13 @@ import {
 import {
   invoiceDescriptionOf,
   invoiceTypesMatchingDescription,
-} from "../../elogo/invoice/invoice-line-description";
-import { resolveInvoiceProcesses } from "../../elogo/invoice/invoice-process";
+} from "../../invoicing/invoice/invoice-line-description";
+import { resolveInvoiceProcesses } from "../../invoicing/invoice/invoice-process";
 import {
   NO_INVOICE_MATCH,
   invoiceProcessWhere,
-} from "../../elogo/invoice/invoice-process-search";
-import { elogoInvoiceScopeWhere } from "./invoice-scope";
+} from "../../invoicing/invoice/invoice-process-search";
+import { fiscalInvoiceScopeWhere } from "./invoice-scope";
 import { isInvoiceDownloadable } from "./invoice-downloadable";
 import { i18nMessage } from "../../i18n";
 
@@ -1037,8 +1037,10 @@ export class AdminTaxService {
    */
   private invoiceDescriptionWhere(
     search: string,
-  ): Prisma.ElogoInvoiceWhereInput {
-    const types = invoiceTypesMatchingDescription(search) as ElogoInvoiceType[];
+  ): Prisma.FiscalInvoiceWhereInput {
+    const types = invoiceTypesMatchingDescription(
+      search,
+    ) as FiscalInvoiceType[];
     return {
       OR: [
         { lineDescription: { contains: search, mode: "insensitive" } },
@@ -1064,7 +1066,7 @@ export class AdminTaxService {
    */
   private async invoicePartyWhere(
     code: string,
-  ): Promise<Prisma.ElogoInvoiceWhereInput> {
+  ): Promise<Prisma.FiscalInvoiceWhereInput> {
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [
@@ -1087,11 +1089,11 @@ export class AdminTaxService {
   }
 
   /** Toolbar'ın tek arama kutusu — numara, taraf, VKN, ETTN ve tutar birlikte. */
-  private invoiceSearchWhere(search: string): Prisma.ElogoInvoiceWhereInput {
+  private invoiceSearchWhere(search: string): Prisma.FiscalInvoiceWhereInput {
     const normalized = search.toLowerCase();
     const numeric = Number(search.replace(",", "."));
     const like = { contains: search, mode: "insensitive" } as const;
-    const or: Prisma.ElogoInvoiceWhereInput[] = [
+    const or: Prisma.FiscalInvoiceWhereInput[] = [
       { invoiceNumber: like },
       { recipientName: like },
       { recipientVknTckn: like },
@@ -1107,15 +1109,15 @@ export class AdminTaxService {
       { buyer: { is: { OR: [{ displayName: like }, { companyName: like }] } } },
     ];
     if (
-      Object.values(ElogoInvoiceType).includes(normalized as ElogoInvoiceType)
+      Object.values(FiscalInvoiceType).includes(normalized as FiscalInvoiceType)
     )
-      or.push({ type: normalized as ElogoInvoiceType });
+      or.push({ type: normalized as FiscalInvoiceType });
     if (
-      Object.values(ElogoInvoiceStatus).includes(
-        normalized as ElogoInvoiceStatus,
+      Object.values(FiscalInvoiceStatus).includes(
+        normalized as FiscalInvoiceStatus,
       )
     )
-      or.push({ status: normalized as ElogoInvoiceStatus });
+      or.push({ status: normalized as FiscalInvoiceStatus });
     if (Number.isFinite(numeric))
       or.push(
         { netAmount: numeric },
@@ -1134,16 +1136,16 @@ export class AdminTaxService {
    * admin kataloğunun işidir. Tek istisna `description` — o, belgenin ÜSTÜNDE
    * yazan metnin ta kendisidir, çeviri değil kayıttır.
    */
-  async getElogoInvoices(query: ElogoInvoiceQueryDto) {
-    const filters: Prisma.ElogoInvoiceWhereInput[] = [
-      elogoInvoiceScopeWhere(query.scope, this.prisma.elogoInvoice.fields),
+  async getFiscalInvoices(query: FiscalInvoiceQueryDto) {
+    const filters: Prisma.FiscalInvoiceWhereInput[] = [
+      fiscalInvoiceScopeWhere(query.scope, this.prisma.fiscalInvoice.fields),
     ];
-    if (query.type) filters.push({ type: query.type as ElogoInvoiceType });
+    if (query.type) filters.push({ type: query.type as FiscalInvoiceType });
     if (query.status)
-      filters.push({ status: query.status as ElogoInvoiceStatus });
+      filters.push({ status: query.status as FiscalInvoiceStatus });
     if (query.documentType) filters.push({ documentType: query.documentType });
     if (query.context)
-      filters.push({ context: query.context as ElogoInvoiceContext });
+      filters.push({ context: query.context as FiscalInvoiceContext });
     if (query.invoiceNumber?.trim())
       filters.push({
         invoiceNumber: {
@@ -1176,7 +1178,7 @@ export class AdminTaxService {
         processWhere ? { OR: [textWhere, processWhere] } : textWhere,
       );
     }
-    const where: Prisma.ElogoInvoiceWhereInput = { AND: filters };
+    const where: Prisma.FiscalInvoiceWhereInput = { AND: filters };
 
     const partySelect = {
       id: true,
@@ -1209,15 +1211,15 @@ export class AdminTaxService {
       billingReference: true,
       pdfUrl: true,
       emailSentAt: true,
-      elogoResultMsg: true,
+      providerResultMsg: true,
       issuedAt: true,
       cancelledAt: true,
       cancelReason: true,
       createdAt: true,
-    } satisfies Prisma.ElogoInvoiceSelect;
+    } satisfies Prisma.FiscalInvoiceSelect;
     let result;
     if (query.sortBy === "hasPdf") {
-      const invoices = await this.prisma.elogoInvoice.findMany({
+      const invoices = await this.prisma.fiscalInvoice.findMany({
         where,
         select,
       });
@@ -1228,9 +1230,9 @@ export class AdminTaxService {
       );
     } else {
       const orderBy = resolveOrderBy<
-        | Prisma.ElogoInvoiceOrderByWithRelationInput
-        | Prisma.ElogoInvoiceOrderByWithRelationInput[]
-      >("ElogoInvoice", query, {
+        | Prisma.FiscalInvoiceOrderByWithRelationInput
+        | Prisma.FiscalInvoiceOrderByWithRelationInput[]
+      >("FiscalInvoice", query, {
         defaultSort: { createdAt: "desc" },
         // Taraf kolonları önce ünvanı, yoksa görünen adı basar; sıralama da
         // aynı sırayı izlemeli, yoksa başlık tıklaması hücreyle uyuşmaz.
@@ -1252,12 +1254,12 @@ export class AdminTaxService {
         },
       });
       result = await paginate(
-        this.prisma.elogoInvoice,
+        this.prisma.fiscalInvoice,
         { where, orderBy, select },
         query,
       );
     }
-    const rows = result.data as Prisma.ElogoInvoiceGetPayload<{
+    const rows = result.data as Prisma.FiscalInvoiceGetPayload<{
       select: typeof select;
     }>[];
     // Sayfanın işlem referansları TOPLU çözülür: kaynak tablosu başına tek sorgu.
@@ -1291,7 +1293,7 @@ export class AdminTaxService {
         billingReference: r.billingReference,
         hasPdf: isInvoiceDownloadable(r),
         emailSentAt: r.emailSentAt,
-        resultMsg: r.elogoResultMsg,
+        resultMsg: r.providerResultMsg,
         issuedAt: r.issuedAt,
         cancelledAt: r.cancelledAt,
         cancelReason: r.cancelReason,

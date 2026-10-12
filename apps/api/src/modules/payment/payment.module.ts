@@ -47,7 +47,7 @@ import { PayoutModule } from "../payout/payout.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { CommissionModule } from "../commission/commission.module";
 import { StorageModule } from "../storage/storage.module";
-import { ElogoModule } from "../elogo";
+import { InvoicingModule } from "../invoicing";
 import { DiscountModule } from "../discount";
 import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
@@ -66,7 +66,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     CommissionModule,
     StorageModule,
     ProductLockModule,
-    ElogoModule,
+    InvoicingModule,
     DiscountModule,
     // Ödeme formu kapısı: mesafeli satış onayı (consent_records).
     ConsentModule,
