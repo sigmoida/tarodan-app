@@ -10042,6 +10042,7 @@
         "cari": "Customer account",
         "serial": "Series",
         "item": "Service cards",
+        "document": "Document",
         "readiness": "Readiness"
       },
       "provider": {
@@ -10064,6 +10065,10 @@
         "notAuthenticated": "not verified"
       },
       "fields": {
+        "verificationUrl": {
+          "label": "e-Archive lookup URL",
+          "helper": "Integrator lookup link printed on the invoice PDF (must start with https); hidden when empty."
+        },
         "retailCode": {
           "label": "Retail customer code",
           "helper": "The shared account for individual and guest buyers."

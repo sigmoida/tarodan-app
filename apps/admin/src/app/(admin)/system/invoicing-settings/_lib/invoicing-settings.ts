@@ -28,6 +28,7 @@ export const SETTING_GROUPS: readonly InvoicingSettingGroup[] = [
   "cari",
   "serial",
   "item",
+  "document",
 ];
 
 /**
@@ -87,7 +88,11 @@ export function violationOf(
   if (row.group === "cari") {
     return normalized.length > CARI_CODE_MAX_LENGTH ? "cariMax" : null;
   }
-  return normalized.length > ITEM_CODE_MAX_LENGTH ? "itemMax" : null;
+  if (row.group === "item") {
+    return normalized.length > ITEM_CODE_MAX_LENGTH ? "itemMax" : null;
+  }
+  // Belge grubu (ör. sorgulama adresi): biçim kuralı sunucuda.
+  return null;
 }
 
 const VIOLATION_PARAMS: Record<InvoicingViolation, Record<string, number>> = {

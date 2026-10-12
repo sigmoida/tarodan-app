@@ -10042,6 +10042,7 @@
         "cari": "Cari",
         "serial": "Seriler",
         "item": "Hizmet Kartları",
+        "document": "Belge",
         "readiness": "Hazırlık durumu"
       },
       "provider": {
@@ -10064,6 +10065,10 @@
         "notAuthenticated": "doğrulanmadı"
       },
       "fields": {
+        "verificationUrl": {
+          "label": "e-Arşiv belge sorgulama adresi",
+          "helper": "Fatura PDF'inde gösterilen entegratör sorgulama bağlantısı (https ile başlamalı); boşsa gösterilmez."
+        },
         "retailCode": {
           "label": "Perakende cari kodu",
           "helper": "Bireysel ve misafir alıcıların ortak carisi."

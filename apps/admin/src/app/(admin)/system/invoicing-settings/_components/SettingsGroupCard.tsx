@@ -20,6 +20,8 @@ const MAX_LENGTH: Record<InvoicingSettingGroup, number> = {
   cari: CARI_CODE_MAX_LENGTH,
   serial: 3,
   item: ITEM_CODE_MAX_LENGTH,
+  // Belge grubu: adres alanları (biçim sunucuda doğrulanır).
+  document: 2048,
 };
 
 /**

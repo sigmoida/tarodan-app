@@ -15,7 +15,7 @@ import {
  * kalıyorsa değer ayrıştırıcıda elenmiş, yani geçersizdir.
  */
 
-export type NetsisSettingGroup = "cari" | "serial" | "item";
+export type NetsisSettingGroup = "cari" | "serial" | "item" | "document";
 
 export interface NetsisSettingState {
   key: string;
@@ -49,7 +49,9 @@ const DEFINITIONS = new Map<string, NetsisInvoiceSettingDefinition>(
 export function netsisSettingGroup(key: string): NetsisSettingGroup {
   if (key.startsWith("netsis.cari.")) return "cari";
   if (key.startsWith("netsis.serial.")) return "serial";
-  return "item";
+  if (key.startsWith("netsis.item.")) return "item";
+  // Belge görünümü ayarları (ör. e-Arşiv sorgulama adresi): kart kodu değil.
+  return "document";
 }
 
 /** Boş haritada eksik görünen anahtarlar = zorunlu olanlar. */

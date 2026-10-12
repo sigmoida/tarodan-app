@@ -5,7 +5,7 @@
 
 export type InvoicingProvider = "elogo" | "netsis";
 export type NetsisMode = "stub" | "live";
-export type InvoicingSettingGroup = "cari" | "serial" | "item";
+export type InvoicingSettingGroup = "cari" | "serial" | "item" | "document";
 
 export interface InvoicingSettingRow {
   key: string;
