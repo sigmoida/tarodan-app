@@ -133,6 +133,12 @@ export function adColumns(
       ),
       { sortKey: "isActive", sortType: "number" },
     ),
+    // Yalnız görselli reklamın tıklanabilir alanı olur; metin reklamda "—".
+    col.number<Ad>(
+      t("admin.marketing.ads.hotspots.column"),
+      (ad) => (ad.imageUrl ? (ad.hotspots?.length ?? 0) : null),
+      { minWidth: 80, sortable: false },
+    ),
     col.custom<Ad>(
       t("admin.marketing.ads.statistics"),
       (ad) => (

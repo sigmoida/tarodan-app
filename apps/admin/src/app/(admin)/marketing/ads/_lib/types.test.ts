@@ -6,6 +6,7 @@ import {
   adSchema,
   adToForm,
   emptyAdForm,
+  hotspotIssues,
   isValidAdLink,
   positionLabels,
   type Ad,
@@ -80,7 +81,6 @@ describe("adFormToPayload", () => {
       expect(adFormToPayload(filled, mode)).toMatchObject({
         title: "Yaz",
         imageUrl: "https://cdn/x.png",
-        linkUrl: "/kampanya",
         content: "Merhaba",
         width: 970,
         height: 250,
@@ -155,5 +155,125 @@ describe("adSchema", () => {
       "admin.marketing.ads.validation.sizeMax",
     );
     expect(schema.safeParse({ ...filled, width: 4000, height: 4000 }).success).toBe(true);
+  });
+});
+
+describe("hotspots in the payload", () => {
+  const spot = (over = {}) => ({
+    x: 0.1,
+    y: 0.1,
+    width: 0.2,
+    height: 0.2,
+    label: " Sepet ",
+    linkUrl: " /sepet ",
+    ...over,
+  });
+  const imageForm = {
+    ...filled,
+    linkUrl: "/stale",
+    hotspots: [spot({ id: "h1", clickCount: 7 }), spot({ x: 0.5 })],
+  };
+
+  it("update: sends the full set, id only for persisted rows, trimmed, no clickCount", () => {
+    const p = adFormToPayload(imageForm, "update");
+    expect(p.hotspots).toEqual([
+      { id: "h1", x: 0.1, y: 0.1, width: 0.2, height: 0.2, label: "Sepet", linkUrl: "/sepet" },
+      { x: 0.5, y: 0.1, width: 0.2, height: 0.2, label: "Sepet", linkUrl: "/sepet" },
+    ]);
+  });
+
+  it("image ad: ad-level link is null on update and omitted on create", () => {
+    expect(adFormToPayload(imageForm, "update").linkUrl).toBeNull();
+    expect(adFormToPayload(imageForm, "create").linkUrl).toBeUndefined();
+  });
+
+  it("update always sends the array (empty clears), create only when non-empty", () => {
+    const none = { ...filled, hotspots: [] };
+    expect(adFormToPayload(none, "update").hotspots).toEqual([]);
+    expect("hotspots" in adFormToPayload(none, "create")).toBe(false);
+    expect(adFormToPayload(imageForm, "create").hotspots).toHaveLength(2);
+  });
+
+  it("text-only ad keeps its ad-level link", () => {
+    const text = { ...emptyAdForm, title: "x", linkUrl: "/kampanya" };
+    expect(adFormToPayload(text, "update").linkUrl).toBe("/kampanya");
+    expect(adFormToPayload(text, "create").linkUrl).toBe("/kampanya");
+  });
+
+  it("adToForm sorts by sortOrder and carries id + clickCount", () => {
+    const row = (id: string, sortOrder: number) => ({
+      id,
+      x: 0,
+      y: 0,
+      width: 0.1,
+      height: 0.1,
+      label: id,
+      linkUrl: "/a",
+      sortOrder,
+      clickCount: sortOrder * 10,
+    });
+    const ad = {
+      title: "a",
+      position: "topbar",
+      isActive: true,
+      hotspots: [row("b", 1), row("a", 0)],
+    } as Ad;
+    expect(adToForm(ad).hotspots.map((h) => [h.id, h.clickCount])).toEqual([
+      ["a", 0],
+      ["b", 10],
+    ]);
+    expect(adToForm({ ...ad, hotspots: undefined }).hotspots).toEqual([]);
+  });
+});
+
+describe("hotspotIssues / adSchema hotspot rules", () => {
+  const ok = { x: 0.1, y: 0.1, width: 0.2, height: 0.2, label: "A", linkUrl: "/a" };
+  const paths = (list: Parameters<typeof hotspotIssues>[1]) =>
+    hotspotIssues(t, list).map((i) => i.path.join("."));
+
+  it("accepts an empty list and valid rows", () => {
+    expect(hotspotIssues(t, [])).toEqual([]);
+    expect(hotspotIssues(t, [ok, { ...ok, x: 0.5 }])).toEqual([]);
+  });
+
+  it("maps each shared error code to its row field and message key", () => {
+    expect(hotspotIssues(t, [{ ...ok, label: " " }])).toEqual([
+      { path: ["hotspots", 0, "label"], message: "admin.marketing.ads.hotspots.error.labelRequired" },
+    ]);
+    expect(paths([{ ...ok, label: "x".repeat(81) }])).toEqual(["hotspots.0.label"]);
+    expect(paths([{ ...ok, linkUrl: "" }])).toEqual(["hotspots.0.linkUrl"]);
+    expect(paths([{ ...ok, width: 0.01 }])).toEqual(["hotspots.0.x"]);
+    expect(paths([{ ...ok, x: 0.95 }])).toEqual(["hotspots.0.x"]);
+    expect(paths([ok, { ...ok, x: 0.2 }])).toEqual(["hotspots.1.x"]);
+  });
+
+  it("flags too many rows on the list itself", () => {
+    const many = Array.from({ length: 11 }, (_, i) => ({
+      ...ok,
+      x: (i % 5) * 0.2,
+      y: Math.floor(i / 5) * 0.3,
+    }));
+    expect(hotspotIssues(t, many)[0]).toEqual({
+      path: ["hotspots"],
+      message: "admin.marketing.ads.hotspots.error.tooMany",
+    });
+  });
+
+  it("rejects a malformed row link with the link message", () => {
+    expect(hotspotIssues(t, [{ ...ok, linkUrl: "//evil.com" }])).toEqual([
+      { path: ["hotspots", 0, "linkUrl"], message: "admin.marketing.ads.validation.linkInvalid" },
+    ]);
+  });
+
+  it("surfaces the issues through the form schema", () => {
+    const r = adSchema(t).safeParse({
+      ...filled,
+      hotspots: [{ ...ok, label: "" }],
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.map((i) => i.path.join("."))).toContain("hotspots.0.label");
+    }
+    expect(adSchema(t).safeParse({ ...filled, hotspots: [ok] }).success).toBe(true);
   });
 });
