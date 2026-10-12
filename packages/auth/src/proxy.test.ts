@@ -45,6 +45,19 @@ describe("gateway forwarded headers", () => {
     // Taşınmazsa panel kırpılmış Excel'i tam sanır — uyarı hiç çıkmaz.
     expect(FORWARDED_RESPONSE_HEADERS).toContain("x-export-truncated-at");
   });
+
+  it("dışa aktarımın kayıt sayısını ve no-store önbellek kuralını taşır", () => {
+    // Kişisel veri taşıyan döküm tarayıcı önbelleğinde kalmamalı; kayıt
+    // sayısı panelin "N kayıt indirildi" bildirimini besler.
+    expect(FORWARDED_RESPONSE_HEADERS).toContain("x-export-row-count");
+    expect(FORWARDED_RESPONSE_HEADERS).toContain("cache-control");
+  });
+
+  it("yanıt safelist'i de küçük harfle tutulur", () => {
+    for (const header of FORWARDED_RESPONSE_HEADERS) {
+      expect(header).toBe(header.toLowerCase());
+    }
+  });
 });
 
 describe("gateway client IP (onay kaydı kanıtı)", () => {

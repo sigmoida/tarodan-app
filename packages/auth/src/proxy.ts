@@ -140,8 +140,12 @@ export function gatewayClientIp(headers: Headers): string | null {
  */
 export const FORWARDED_RESPONSE_HEADERS = [
   "x-admin-session-expires-at",
-  // Admin Excel dışa aktarımları: dosya tavanda kırpıldıysa satır tavanı.
+  // Admin Excel dışa aktarımları (apps/api common/export/export-response.ts):
+  // dosya tavanda kırpıldıysa tavan, dosyadaki kayıt sayısı ve kişisel veri
+  // taşıyan dosyanın tarayıcı önbelleğinde kalmaması için `no-store`.
   "x-export-truncated-at",
+  "x-export-row-count",
+  "cache-control",
 ] as const;
 
 /**
