@@ -6,6 +6,8 @@ import type {
   InvoicingSettingGroup,
   InvoicingSettingRow,
   InvoicingSettingsState,
+  NetsisSyncRecordRow,
+  NetsisSyncStatus,
 } from "@/lib/api/invoicing-settings.types";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -19,6 +21,8 @@ type T = ReturnType<typeof useTranslations<never>>;
 export const SERIAL_PATTERN = /^[A-Z0-9]{3}$/;
 export const CARI_CODE_MAX_LENGTH = 15;
 export const ITEM_CODE_MAX_LENGTH = 35;
+/** Muhasebe hesap kodu (`netsis.account.*`); sunucuda `NETSIS_ACCOUNT_CODE_MAX_LENGTH`. */
+export const ACCOUNT_CODE_MAX_LENGTH = 30;
 
 export type InvoicingFormValues = Record<string, string | boolean>;
 export type InvoicingSettingsPayloadValues = Record<string, string | boolean>;
@@ -29,6 +33,7 @@ export const SETTING_GROUPS: readonly InvoicingSettingGroup[] = [
   "serial",
   "item",
   "document",
+  "account",
 ];
 
 /**
@@ -74,7 +79,11 @@ export function normalizeValue(
   return row.group === "serial" ? text.toUpperCase() : text;
 }
 
-export type InvoicingViolation = "serial" | "cariMax" | "itemMax";
+export type InvoicingViolation =
+  | "serial"
+  | "cariMax"
+  | "itemMax"
+  | "accountMax";
 
 /** Normalize edilmiş bir değerin ihlali; boş değer geçerlidir (ayarı temizler). */
 export function violationOf(
@@ -91,6 +100,9 @@ export function violationOf(
   if (row.group === "item") {
     return normalized.length > ITEM_CODE_MAX_LENGTH ? "itemMax" : null;
   }
+  if (row.group === "account") {
+    return normalized.length > ACCOUNT_CODE_MAX_LENGTH ? "accountMax" : null;
+  }
   // Belge grubu (ör. sorgulama adresi): biçim kuralı sunucuda.
   return null;
 }
@@ -99,6 +111,7 @@ const VIOLATION_PARAMS: Record<InvoicingViolation, Record<string, number>> = {
   serial: {},
   cariMax: { max: CARI_CODE_MAX_LENGTH },
   itemMax: { max: ITEM_CODE_MAX_LENGTH },
+  accountMax: { max: ACCOUNT_CODE_MAX_LENGTH },
 };
 
 /** Formun zod şeması: her ayarın kuralı kendi alan adı altında raporlanır. */
@@ -184,10 +197,22 @@ export interface ReadinessItem {
   labelKey: MessageKey;
 }
 
-/** Hazırlık rozetleri: önce geçersizler, sonra eksikler; her biri kendi etiketiyle. */
+/** Hazırlık bloğu: belge kesimi ya da muhasebe senkronu. */
+export type ReadinessSection = "invoicing" | "accounting";
+
+/**
+ * Hazırlık rozetleri: önce geçersizler, sonra eksikler; her biri kendi
+ * etiketiyle. `section` hangi bloğun (belge kesimi / muhasebe) listesini seçer.
+ */
 export function readinessItems(
-  state: Pick<InvoicingSettingsState, "settings" | "readiness" | "feeTypes">,
+  state: Pick<
+    InvoicingSettingsState,
+    "settings" | "readiness" | "accountingReadiness" | "feeTypes"
+  >,
+  section: ReadinessSection = "invoicing",
 ): ReadinessItem[] {
+  const readiness =
+    section === "accounting" ? state.accountingReadiness : state.readiness;
   const labelOf = (key: string): MessageKey => {
     const row = state.settings.find((item) => item.key === key);
     return row
@@ -195,15 +220,42 @@ export function readinessItems(
       : (key as MessageKey);
   };
   return [
-    ...state.readiness.invalid.map((key) => ({
+    ...readiness.invalid.map((key) => ({
       key,
       status: "invalid" as const,
       labelKey: labelOf(key),
     })),
-    ...state.readiness.missing.map((key) => ({
+    ...readiness.missing.map((key) => ({
       key,
       status: "missing" as const,
       labelKey: labelOf(key),
     })),
   ];
 }
+
+/** Senkron kaydı durumu → rozet varyantı (tek kaynak). */
+export const SYNC_STATUS_VARIANT: Record<
+  NetsisSyncStatus,
+  "success" | "outline" | "danger"
+> = {
+  synced: "success",
+  pending: "outline",
+  processing: "outline",
+  failed: "danger",
+  skipped: "outline",
+};
+
+export const SYNC_ERROR_MAX_LENGTH = 80;
+
+/** Uzun son hata metnini tabloda tek satıra sığacak şekilde kısaltır. */
+export function truncateSyncError(
+  error: string | null,
+  max: number = SYNC_ERROR_MAX_LENGTH,
+): string | null {
+  if (!error) return null;
+  return error.length > max ? `${error.slice(0, max - 1).trimEnd()}…` : error;
+}
+
+/** Yalnız başarısız kayıt elle yeniden kuyruğa alınır. */
+export const canRetrySync = (record: Pick<NetsisSyncRecordRow, "status">) =>
+  record.status === "failed";

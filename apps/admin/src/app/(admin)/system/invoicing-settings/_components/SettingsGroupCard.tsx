@@ -8,6 +8,7 @@ import type {
   InvoicingSettingsState,
 } from "@/lib/api/invoicing-settings.types";
 import {
+  ACCOUNT_CODE_MAX_LENGTH,
   CARI_CODE_MAX_LENGTH,
   ITEM_CODE_MAX_LENGTH,
   fieldName,
@@ -22,6 +23,8 @@ const MAX_LENGTH: Record<InvoicingSettingGroup, number> = {
   item: ITEM_CODE_MAX_LENGTH,
   // Belge grubu: adres alanları (biçim sunucuda doğrulanır).
   document: 2048,
+  // Muhasebe hesap kodları (`netsis.account.*`).
+  account: ACCOUNT_CODE_MAX_LENGTH,
 };
 
 /**

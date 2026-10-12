@@ -9,6 +9,7 @@ import { PageLoading } from "@/components/PageLoading";
 import { ProviderCard } from "./_components/ProviderCard";
 import { ReadinessCard } from "./_components/ReadinessCard";
 import { SettingsGroupCard } from "./_components/SettingsGroupCard";
+import { SyncRecordsCard } from "./_components/SyncRecordsCard";
 import { SETTING_GROUPS } from "./_lib/invoicing-settings";
 import { useInvoicingSettingsPage } from "./_lib/useInvoicingSettingsPage";
 
@@ -61,6 +62,8 @@ export default function InvoicingSettingsPage() {
       </Form>
 
       <ReadinessCard state={state} />
+
+      <SyncRecordsCard />
     </AdminPage>
   );
 }

@@ -10106,7 +10106,8 @@
       "validation": {
         "serial": "Seri tam 3 karakter olmalı (yalnız A-Z ve 0-9).",
         "cariMax": "Cari kodu en fazla {max} karakter olabilir.",
-        "itemMax": "Hizmet kartı kodu en fazla {max} karakter olabilir."
+        "itemMax": "Hizmet kartı kodu en fazla {max} karakter olabilir.",
+        "accountMax": "Hesap kodu en fazla {max} karakter olabilir."
       },
       "readiness": {
         "ready": "Hazır",
@@ -10114,10 +10115,43 @@
         "allSet": "Netsis faturası kesmek için gereken tüm ayarlar dolu ve geçerli.",
         "blocking": "Aşağıdaki ayarlar tamamlanmadan Netsis ile belge kesilemez.",
         "missing": "eksik",
-        "invalid": "geçersiz"
+        "invalid": "geçersiz",
+        "sections": {
+          "invoicing": "Faturalama",
+          "accounting": "Muhasebe senkronu"
+        },
+        "allSetAccounting": "Muhasebe senkronu için gereken tüm ayarlar dolu ve geçerli (ya da senkron kapalı).",
+        "blockingAccounting": "Aşağıdaki ayarlar tamamlanmadan muhasebe senkronu çalışmaz."
       },
       "saveButton": "Kaydet",
-      "saved": "Faturalama ayarları kaydedildi"
+      "saved": "Faturalama ayarları kaydedildi",
+      "sync": {
+        "title": "Senkron kayıtları",
+        "description": "Netsis'e aktarılan tahsilat, hakediş, ödeme ve iade kayıtlarının son 20'si.",
+        "empty": "Henüz senkron kaydı yok.",
+        "retry": "Yeniden dene",
+        "retried": "Kayıt yeniden kuyruğa alındı",
+        "columns": {
+          "kind": "Tür",
+          "status": "Durum",
+          "amount": "Tutar",
+          "createdAt": "Oluşturulma",
+          "error": "Son hata"
+        },
+        "kind": {
+          "invoice_collection": "Fatura tahsilatı",
+          "settlement_transfer": "Hakediş aktarımı",
+          "payout_transfer": "Satıcı ödemesi",
+          "refund_reversal": "İade ters kaydı"
+        },
+        "status": {
+          "pending": "Bekliyor",
+          "processing": "İşleniyor",
+          "synced": "Aktarıldı",
+          "failed": "Başarısız",
+          "skipped": "Atlandı"
+        }
+      }
     }
   },
   "server": {
