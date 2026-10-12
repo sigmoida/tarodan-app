@@ -136,8 +136,14 @@ export const NETSIS_INVOICE_SETTING_DEFINITIONS: readonly NetsisInvoiceSettingDe
     ),
   ];
 
-/** Kod: kırpılır; boş ya da azami uzunluğu aşan değer YOK sayılır. */
-function code(raw: string | undefined, maxLength: number): string {
+/**
+ * Kod: kırpılır; boş ya da azami uzunluğu aşan değer YOK sayılır. Muhasebe
+ * senkronunun hesap kodları da bu kuralı kullanır (`accounting/`).
+ */
+export function netsisSettingCode(
+  raw: string | undefined,
+  maxLength: number,
+): string {
   const value = (raw ?? "").trim();
   return value.length > 0 && value.length <= maxLength ? value : "";
 }
@@ -153,7 +159,10 @@ function httpUrl(raw: string | undefined): string {
 }
 
 /** "true"/"1"/"yes"/"on" → true; bozuk ya da yok → varsayılan. */
-function bool(raw: string | undefined, fallback: boolean): boolean {
+export function netsisSettingBoolean(
+  raw: string | undefined,
+  fallback: boolean,
+): boolean {
   if (raw == null) return fallback;
   const value = raw.trim().toLowerCase();
   if (["true", "1", "yes", "on"].includes(value)) return true;
@@ -169,15 +178,18 @@ export function parseNetsisInvoiceSettings(
   const itemCodes = Object.fromEntries(
     ITEM_TYPES.map((type) => [
       type,
-      code(values.get(netsisItemSettingKey(type)), NETSIS_ITEM_CODE_MAX_LENGTH),
+      netsisSettingCode(
+        values.get(netsisItemSettingKey(type)),
+        NETSIS_ITEM_CODE_MAX_LENGTH,
+      ),
     ]),
   ) as Record<NetsisItemInvoiceType, string>;
   return {
-    retailCariCode: code(
+    retailCariCode: netsisSettingCode(
       values.get(keys.retailCariCode),
       NETSIS_CARI_CODE_MAX_LENGTH,
     ),
-    autoCreateCorporateCari: bool(
+    autoCreateCorporateCari: netsisSettingBoolean(
       values.get(keys.autoCreateCorporateCari),
       true,
     ),

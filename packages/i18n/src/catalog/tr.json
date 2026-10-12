@@ -10043,7 +10043,8 @@
         "serial": "Seriler",
         "item": "Hizmet Kartları",
         "document": "Belge",
-        "readiness": "Hazırlık durumu"
+        "readiness": "Hazırlık durumu",
+        "account": "Muhasebe Aktarımı"
       },
       "provider": {
         "active": "Etkin sağlayıcı",
@@ -10084,6 +10085,22 @@
         "einvoice": {
           "label": "e-Fatura serisi",
           "helper": "3 karakter, harf ve rakam (ör. TRE)."
+        },
+        "enabled": {
+          "label": "Tahsilat ve ödemeleri Netsis'e aktar",
+          "helper": "Fatura tahsilatları, PayTR hakedişleri, satıcı ödemeleri ve alıcı iadeleri Netsis'e kayıt olarak yazılır. Yalnız fatura sağlayıcısı Netsis iken çalışır."
+        },
+        "paytrClearing": {
+          "label": "PayTR ara hesabı",
+          "helper": "Fatura tahsilatlarının girdiği ve hakedişin bankaya aktarıldığı ara hesabın Netsis kodu."
+        },
+        "mainBank": {
+          "label": "Şirket banka hesabı",
+          "helper": "Hakedişin geldiği ve satıcı ödemelerinin çıktığı banka hesabının Netsis kodu."
+        },
+        "pspFeeExpense": {
+          "label": "PayTR kesintisi gider hesabı",
+          "helper": "Opsiyonel. PayTR'nin hakedişten düştüğü kesintinin yazılacağı gider hesabı."
         }
       },
       "validation": {

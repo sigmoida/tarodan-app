@@ -10043,7 +10043,8 @@
         "serial": "Series",
         "item": "Service cards",
         "document": "Document",
-        "readiness": "Readiness"
+        "readiness": "Readiness",
+        "account": "Accounting Sync"
       },
       "provider": {
         "active": "Active provider",
@@ -10084,6 +10085,22 @@
         "einvoice": {
           "label": "e-Invoice series",
           "helper": "3 characters, letters and digits (e.g. TRE)."
+        },
+        "enabled": {
+          "label": "Send collections and payouts to Netsis",
+          "helper": "Invoice collections, PayTR settlements, seller payouts and buyer refunds are written to Netsis as records. Only runs while Netsis is the invoicing provider."
+        },
+        "paytrClearing": {
+          "label": "PayTR clearing account",
+          "helper": "Netsis code of the clearing account that invoice collections enter and settlements leave to the bank."
+        },
+        "mainBank": {
+          "label": "Company bank account",
+          "helper": "Netsis code of the bank account that receives settlements and pays sellers."
+        },
+        "pspFeeExpense": {
+          "label": "PayTR fee expense account",
+          "helper": "Optional. Expense account for the fee PayTR deducts from the settlement."
         }
       },
       "validation": {

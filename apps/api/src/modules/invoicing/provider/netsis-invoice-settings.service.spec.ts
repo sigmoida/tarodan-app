@@ -1,8 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
+import { NETSIS_ACCOUNTING_SETTING_KEYS } from "../accounting/netsis-accounting-settings";
 import { NETSIS_INVOICE_SETTING_KEYS } from "./netsis-invoice-settings";
 import { NetsisInvoiceSettingsService } from "./netsis-invoice-settings.service";
 
 const K = NETSIS_INVOICE_SETTING_KEYS;
+const A = NETSIS_ACCOUNTING_SETTING_KEYS;
 
 describe("NetsisInvoiceSettingsService", () => {
   const makeService = (
@@ -132,5 +134,40 @@ describe("NetsisInvoiceSettingsService", () => {
     await expect(service.apply({}, "admin-1")).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it("state: muhasebe senkronu hazırlığını ayrı döner", async () => {
+    const { service } = makeService([
+      { settingKey: A.enabled, settingValue: "true" },
+    ]);
+    const state = await service.state();
+    expect(state.accountingReadiness).toEqual({
+      ready: false,
+      missing: [A.paytrClearing, A.mainBank],
+      invalid: [],
+    });
+    expect(state.settings.some((row) => row.key === A.mainBank)).toBe(true);
+  });
+
+  it("apply: muhasebe anahtarlarını da aynı işlemde yazar", async () => {
+    const { service, tx } = makeService();
+    const change = await service.apply(
+      { [A.enabled]: true, [A.mainBank]: " 102.01 " },
+      "admin-1",
+    );
+    expect(tx.platformSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { settingKey: A.enabled },
+        create: expect.objectContaining({
+          settingValue: "true",
+          settingType: "boolean",
+        }),
+      }),
+    );
+    expect(change.after).toEqual({
+      [A.enabled]: "true",
+      [A.mainBank]: "102.01",
+    });
+    expect(change.before).toEqual({ [A.enabled]: "false", [A.mainBank]: "" });
   });
 });

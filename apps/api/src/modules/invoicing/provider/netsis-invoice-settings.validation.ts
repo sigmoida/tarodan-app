@@ -1,4 +1,10 @@
 import {
+  NETSIS_ACCOUNTING_SETTING_DEFINITIONS,
+  isValidNetsisAccountingValue,
+  netsisAccountingSettingsReadiness,
+  parseNetsisAccountingSettings,
+} from "../accounting/netsis-accounting-settings";
+import {
   NETSIS_INVOICE_SETTING_DEFINITIONS,
   netsisInvoiceSettingsReadiness,
   parseNetsisInvoiceSettings,
@@ -6,16 +12,28 @@ import {
 } from "./netsis-invoice-settings";
 
 /**
- * Netsis faturalama ayarlarının admin yüzü için SAF doğrulama/özet mantığı.
+ * Netsis ayarlarının (faturalama + muhasebe senkronu) admin yüzü için SAF
+ * doğrulama/özet mantığı.
  *
- * Kural tek kaynaktan gelir: bir değerin geçerli olup olmadığına
- * `parseNetsisInvoiceSettings` (sağlayıcının belge keserken okuduğu ayrıştırıcı)
- * karar verir — burada ikinci bir uzunluk/seri kuralı YAZILMAZ. Tek anahtarlı
- * bir harita ayrıştırılır; anahtar `netsisInvoiceSettingsReadiness` çıktısında
- * kalıyorsa değer ayrıştırıcıda elenmiş, yani geçersizdir.
+ * Kural tek kaynaktan gelir: bir değerin geçerli olup olmadığına ayarın kendi
+ * ayrıştırıcısı (`parseNetsisInvoiceSettings`, `normalizeNetsisAccountCode`)
+ * karar verir — burada ikinci bir uzunluk/seri kuralı YAZILMAZ. Fatura
+ * tarafında tek anahtarlı bir harita ayrıştırılır; anahtar
+ * `netsisInvoiceSettingsReadiness` çıktısında kalıyorsa değer ayrıştırıcıda
+ * elenmiş, yani geçersizdir.
+ *
+ * İki BÖLÜM vardır ve hazırlıkları ayrıdır: fatura hazırlığı "Netsis ile belge
+ * kesilebilir mi", muhasebe hazırlığı "tahsilat/ödeme kayıtları yazılabilir mi"
+ * sorusunu cevaplar. Muhasebe ayarı eksik diye fatura "hazır değil"
+ * görünmemeli.
  */
 
-export type NetsisSettingGroup = "cari" | "serial" | "item" | "document";
+export type NetsisSettingGroup =
+  | "cari"
+  | "serial"
+  | "item"
+  | "document"
+  | "account";
 
 export interface NetsisSettingState {
   key: string;
@@ -24,7 +42,7 @@ export interface NetsisSettingState {
   default: string;
   /** Dolu bir değer ayrıştırıcıda elenmediyse (boş değer geçersiz SAYILMAZ — eksiktir). */
   valid: boolean;
-  /** Belge kesmek için dolu olması gerekir. */
+  /** Bölümün işi (belge kesmek / muhasebe kaydı yazmak) için dolu olması gerekir. */
   required: boolean;
   /** Ekran girdiyi buna göre çizer (kutucuk / metin). */
   type: NetsisInvoiceSettingDefinition["type"];
@@ -41,30 +59,81 @@ export type NetsisSettingValueCheck =
   | { ok: true; value: string }
   | { ok: false; reason: "unknown" | "type" | "invalid" };
 
-const DEFINITIONS = new Map<string, NetsisInvoiceSettingDefinition>(
-  NETSIS_INVOICE_SETTING_DEFINITIONS.map((row) => [row.key, row]),
-);
-
-/** Ekrandaki kart: anahtar önekinden (`netsis.cari.*`, `netsis.serial.*`, kalan = hizmet kartı). */
-export function netsisSettingGroup(key: string): NetsisSettingGroup {
-  if (key.startsWith("netsis.cari.")) return "cari";
-  if (key.startsWith("netsis.serial.")) return "serial";
-  if (key.startsWith("netsis.item.")) return "item";
-  // Belge görünümü ayarları (ör. e-Arşiv sorgulama adresi): kart kodu değil.
-  return "document";
+interface NetsisSettingsSection {
+  definitions: readonly NetsisInvoiceSettingDefinition[];
+  /** Dolu bir değer ayrıştırıcıda elenmiyor mu. Boş değer için çağrılmaz. */
+  survives(key: string, value: string): boolean;
+  /** Kayıtlı haritayla bölümün işini durduran (eksik/geçersiz) anahtarlar. */
+  blockers(stored: ReadonlyMap<string, string>): string[];
 }
 
-/** Boş haritada eksik görünen anahtarlar = zorunlu olanlar. */
-const REQUIRED_KEYS: ReadonlySet<string> = new Set(
-  netsisInvoiceSettingsReadiness(parseNetsisInvoiceSettings(new Map())),
-);
-
-/** Dolu bir değer ayrıştırıcıdan geçiyor mu. Boş değer için çağrılmaz. */
-function survivesParsing(key: string, value: string): boolean {
+/** Dolu bir fatura değeri ayrıştırıcıdan geçiyor mu. */
+function survivesInvoiceParsing(key: string, value: string): boolean {
   const readiness = netsisInvoiceSettingsReadiness(
     parseNetsisInvoiceSettings(new Map([[key, value]])),
   );
   return !readiness.includes(key);
+}
+
+const INVOICE_SECTION: NetsisSettingsSection = {
+  definitions: NETSIS_INVOICE_SETTING_DEFINITIONS,
+  survives: survivesInvoiceParsing,
+  blockers: (stored) =>
+    netsisInvoiceSettingsReadiness(parseNetsisInvoiceSettings(stored)),
+};
+
+const ACCOUNTING_SECTION: NetsisSettingsSection = {
+  definitions: NETSIS_ACCOUNTING_SETTING_DEFINITIONS,
+  survives: isValidNetsisAccountingValue,
+  blockers: (stored) =>
+    netsisAccountingSettingsReadiness(parseNetsisAccountingSettings(stored)),
+};
+
+const SECTIONS: readonly NetsisSettingsSection[] = [
+  INVOICE_SECTION,
+  ACCOUNTING_SECTION,
+];
+
+/** Ekranın ve PUT'un tanıdığı TÜM ayarlar (önce fatura, sonra muhasebe). */
+export const NETSIS_SETTING_DEFINITIONS: readonly NetsisInvoiceSettingDefinition[] =
+  SECTIONS.flatMap((section) => section.definitions);
+
+const DEFINITIONS = new Map<string, NetsisInvoiceSettingDefinition>(
+  NETSIS_SETTING_DEFINITIONS.map((row) => [row.key, row]),
+);
+
+const SECTION_OF = new Map<string, NetsisSettingsSection>(
+  SECTIONS.flatMap((section) =>
+    section.definitions.map((row) => [row.key, section] as const),
+  ),
+);
+
+/** Ekrandaki kart: anahtar önekinden (`netsis.cari.*`, `netsis.serial.*`, …). */
+export function netsisSettingGroup(key: string): NetsisSettingGroup {
+  if (key.startsWith("netsis.cari.")) return "cari";
+  if (key.startsWith("netsis.serial.")) return "serial";
+  if (key.startsWith("netsis.item.")) return "item";
+  // Muhasebe senkronu: ana anahtar ve hesap kodları aynı kartta.
+  if (key.startsWith("netsis.account.") || key.startsWith("netsis.accounting.")) {
+    return "account";
+  }
+  // Belge görünümü ayarları (ör. e-Arşiv sorgulama adresi): kart kodu değil.
+  return "document";
+}
+
+/**
+ * Bölümün zorunlu anahtarları = metin değerleri boşken işi durduranlar.
+ * Mantıksal anahtarlar (ör. senkronun açık olması) korunur: muhasebe hesapları
+ * yalnız senkron açıkken zorunludur.
+ */
+function requiredKeys(
+  section: NetsisSettingsSection,
+  stored: ReadonlyMap<string, string>,
+): ReadonlySet<string> {
+  const togglesOnly = new Map(
+    [...stored].filter(([key]) => DEFINITIONS.get(key)?.type === "boolean"),
+  );
+  return new Set(section.blockers(togglesOnly));
 }
 
 /**
@@ -77,7 +146,8 @@ export function checkNetsisSettingValue(
   raw: unknown,
 ): NetsisSettingValueCheck {
   const definition = DEFINITIONS.get(key);
-  if (!definition) return { ok: false, reason: "unknown" };
+  const section = SECTION_OF.get(key);
+  if (!definition || !section) return { ok: false, reason: "unknown" };
 
   if (definition.type === "boolean") {
     if (typeof raw === "boolean") return { ok: true, value: String(raw) };
@@ -91,7 +161,7 @@ export function checkNetsisSettingValue(
   if (typeof raw !== "string") return { ok: false, reason: "type" };
   const trimmed = raw.trim();
   if (trimmed === "") return { ok: true, value: "" };
-  if (!survivesParsing(key, trimmed)) return { ok: false, reason: "invalid" };
+  if (!section.survives(key, trimmed)) return { ok: false, reason: "invalid" };
   return {
     ok: true,
     value:
@@ -99,45 +169,57 @@ export function checkNetsisSettingValue(
   };
 }
 
-/** Kayıtlı ham değerlerden (anahtar → değer) ekranın satırları ve hazırlık durumu. */
-export function describeNetsisSettings(stored: ReadonlyMap<string, string>): {
-  settings: NetsisSettingState[];
-  readiness: NetsisSettingsReadiness;
-} {
-  const settings = NETSIS_INVOICE_SETTING_DEFINITIONS.map(
+function describeSection(
+  section: NetsisSettingsSection,
+  stored: ReadonlyMap<string, string>,
+): { settings: NetsisSettingState[]; readiness: NetsisSettingsReadiness } {
+  const required = requiredKeys(section, stored);
+  const settings = section.definitions.map(
     (definition): NetsisSettingState => {
       const value = stored.get(definition.key) ?? definition.value;
       const filled = value.trim() !== "";
       const valid =
         definition.type === "boolean" ||
         !filled ||
-        survivesParsing(definition.key, value);
+        section.survives(definition.key, value.trim());
       return {
         key: definition.key,
         value,
         default: definition.value,
         valid,
-        required: REQUIRED_KEYS.has(definition.key),
+        required: required.has(definition.key),
         type: definition.type,
         group: netsisSettingGroup(definition.key),
       };
     },
   );
-
-  const missing = settings
-    .filter((row) => row.required && row.value.trim() === "")
-    .map((row) => row.key);
-  const invalid = settings.filter((row) => !row.valid).map((row) => row.key);
-  const blockers = netsisInvoiceSettingsReadiness(
-    parseNetsisInvoiceSettings(stored),
-  );
-
   return {
     settings,
     readiness: {
-      ready: blockers.length === 0,
-      missing,
-      invalid,
+      ready: section.blockers(stored).length === 0,
+      missing: settings
+        .filter((row) => row.required && row.value.trim() === "")
+        .map((row) => row.key),
+      invalid: settings.filter((row) => !row.valid).map((row) => row.key),
     },
+  };
+}
+
+/**
+ * Kayıtlı ham değerlerden (anahtar → değer) ekranın satırları ve iki bölümün
+ * hazırlık durumu: `readiness` belge kesimi, `accountingReadiness` muhasebe
+ * senkronu içindir (senkron kapalıyken hazır sayılır).
+ */
+export function describeNetsisSettings(stored: ReadonlyMap<string, string>): {
+  settings: NetsisSettingState[];
+  readiness: NetsisSettingsReadiness;
+  accountingReadiness: NetsisSettingsReadiness;
+} {
+  const invoice = describeSection(INVOICE_SECTION, stored);
+  const accounting = describeSection(ACCOUNTING_SECTION, stored);
+  return {
+    settings: [...invoice.settings, ...accounting.settings],
+    readiness: invoice.readiness,
+    accountingReadiness: accounting.readiness,
   };
 }
