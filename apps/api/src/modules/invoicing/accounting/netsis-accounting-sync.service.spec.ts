@@ -1,12 +1,16 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { translateMessage } from "../../i18n/translate";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import {
   OUTBOX_NETSIS_ACCOUNTING_SYNC,
   netsisAccountingSyncEvent,
 } from "../../outbox/outbox.types";
 import { NETSIS_ACCOUNTING_SETTING_KEYS } from "./netsis-accounting-settings";
-import type { NetsisAccountingSourceLoad } from "./netsis-accounting-source.service";
+import {
+  NetsisAccountingSourceService,
+  type NetsisAccountingSourceLoad,
+} from "./netsis-accounting-source.service";
 import {
   NETSIS_SYNC_SWEEP_BATCH,
   NetsisAccountingSyncService,
@@ -199,6 +203,55 @@ describe("NetsisAccountingSyncService", () => {
         new Date("2026-09-12T00:00:00Z"),
         NETSIS_SYNC_SWEEP_BATCH,
       ]);
+    });
+
+    it("gönderilmiş ama numarasız Netsis faturası: skipped satır açılır, NOT EXISTS sonraki turlarda dışlar", async () => {
+      const ctx = build();
+      const prisma = {
+        ...ctx.prisma,
+        fiscalInvoice: {
+          findUnique: jest.fn().mockResolvedValue({
+            provider: "netsis",
+            type: "seller_commission",
+            status: "sent",
+            invoiceNumber: null,
+            providerRef: null,
+            issuedAt: null,
+            sentAt: new Date("2026-10-05T10:01:00Z"),
+            createdAt: new Date("2026-10-05T09:00:00Z"),
+            total: new Prisma.Decimal("120.00"),
+          }),
+        },
+      };
+      // Gerçek kaynak okuyucusu: uygunluk kararı oradadır.
+      const service = new NetsisAccountingSyncService(
+        prisma as never,
+        new NetsisAccountingSourceService(prisma as never),
+        new OutboxHandlerRegistry(),
+      );
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ id: "inv-1" }])
+        .mockResolvedValue([]);
+
+      await expect(service.sweep()).resolves.toBe(1);
+
+      expect(ctx.created).toEqual([
+        {
+          kind: "invoice_collection",
+          sourceType: "fiscal_invoice",
+          sourceId: "inv-1",
+          idempotencyKey: "invoice_collection:inv-1",
+          status: "skipped",
+          lastError: translateMessage(
+            "server.netsis.accounting.skip.noNumber",
+            "tr",
+          ),
+        },
+      ]);
+      // Aday sorgusu "satırı olmayan" kaynakları seçer: skipped satır da
+      // satırdır, bu fatura bir sonraki turda yeniden yüklenmez.
+      const sql = prisma.$queryRaw.mock.calls[0][0] as Prisma.Sql;
+      expect(sql.sql).toContain("NOT EXISTS");
     });
 
     it("bir türün sorgu hatası diğerlerini durdurmaz", async () => {

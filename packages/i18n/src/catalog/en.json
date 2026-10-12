@@ -11830,7 +11830,8 @@
           "notFinal": "The source is not final yet ({status})",
           "zeroAmount": "There is no amount to transfer",
           "testLane": "Test lane transaction; not sent to accounting",
-          "partyMissing": "The transaction's party was not found"
+          "partyMissing": "The transaction's party was not found",
+          "noNumber": "The Netsis invoice looks sent but its invoice number or Netsis reference is empty; the collection cannot be tied to a document"
         },
         "recordNotFound": "Netsis sync record not found",
         "notRetryable": "This record cannot be retried (status: {status})",

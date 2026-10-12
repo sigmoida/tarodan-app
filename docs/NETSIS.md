@@ -174,8 +174,10 @@ money flows never wait for it or fail because of it.
 | `RefundAttempt` finalized after PSP success → `refund_reversal` | `MixedReceiptsMain` with a **negative** amount (collection reversal), `BELGE_NO` = ORD-/takas number | buyer's cari by the same rule (order buyer, or the trade cash payer); `paytrClearing` | `−amount` |
 
 The pooled-vs-corporate rule is shared with the invoice provider
-(`provider/netsis-cari.ts`). Test-lane payments, zero amounts and fully
-offset payouts are recorded as `skipped` with a reason, never sent.
+(`provider/netsis-cari.ts`). Test-lane payments, zero amounts, fully
+offset payouts and a `sent` Netsis invoice whose number or `providerRef` is
+empty (`skip.noNumber` — otherwise the sweep would reload it every run for 30
+days) are recorded as `skipped` with a reason, never sent.
 
 ### Mechanics
 
