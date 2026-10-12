@@ -426,6 +426,16 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
     },
   },
   {
+    table: "netsis_sync_records",
+    action: "mask",
+    reason:
+      "Netsis'e gönderilen tahsilat/transfer gövdesi (satıcı adı, IBAN son 4 hanesi, açıklama) ve Netsis hata metni; kaynak/ref anahtarları aynen kalır.",
+    columns: {
+      payload: JSON_SCRUB,
+      last_error: FREE_TEXT,
+    },
+  },
+  {
     table: "elogo_invoices",
     action: "mask",
     reason:
@@ -687,6 +697,11 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "seller_account_adjustments.order_id",
       "seller_account_adjustments.refund_request_id",
       "elogo_invoices.source_id",
+      // Netsis muhasebe senkronu: polimorfik kaynak anahtarı, mükerrerlik anahtarı ve Netsis kayıt referansı.
+      "netsis_sync_records.source_type",
+      "netsis_sync_records.source_id",
+      "netsis_sync_records.idempotency_key",
+      "netsis_sync_records.netsis_ref",
       "elogo_invoices.recipient_user_id",
       "seller_uploaded_invoices.seller_id",
       "seller_uploaded_invoices.buyer_id",
