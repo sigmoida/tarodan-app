@@ -175,7 +175,10 @@ sayar, iptal edilmişse göndermez, değilse yalnız `eDocuments.send` yapar.
 `provider/netsis-invoice-settings.ts` tek kaynaktır; satırlar referans
 seed'inde (`prisma/seed-production.ts`) boş varsayılanla açılır ve asla
 ezilmez. `netsisInvoiceSettingsReadiness()` eksik/geçersiz anahtarları
-döndürür (admin ekranı için).
+döndürür (admin ekranı için). Uzunluk sınırları ve seri deseni
+(`NETSIS_CARI_CODE_MAX`, `NETSIS_ITEM_CODE_MAX`, `NETSIS_ACCOUNT_CODE_MAX`,
+`isValidNetsisSerial`) `@tarodan/types` → `netsis-settings.ts`'tedir; API
+ayrıştırıcıları ve admin ekranının erken doğrulaması aynı sabitleri okur.
 
 | Anahtar                             | Varsayılan | Not                                                 |
 | ----------------------------------- | ---------- | --------------------------------------------------- |

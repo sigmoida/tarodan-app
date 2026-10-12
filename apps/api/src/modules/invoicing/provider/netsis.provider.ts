@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { FiscalInvoiceType } from "@prisma/client";
+import { NETSIS_CARI_CODE_MAX } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import {
   NetsisClientFacade,
@@ -31,7 +32,6 @@ import type {
 } from "./e-invoice-provider";
 import { isNetsisCorporateTaxId } from "./netsis-cari";
 import {
-  NETSIS_CARI_CODE_MAX_LENGTH,
   NETSIS_INVOICE_SETTING_KEYS,
   loadNetsisInvoiceSettings,
   netsisItemSettingKey,
@@ -562,7 +562,7 @@ export class NetsisInvoiceProvider implements EInvoiceProvider {
     options?: NetsisCallOptions,
   ): Promise<string | null> {
     const { code } = recipient;
-    if (!code || code.length > NETSIS_CARI_CODE_MAX_LENGTH) {
+    if (!code || code.length > NETSIS_CARI_CODE_MAX) {
       throw new NetsisInvoiceRejection(
         message("corporateCariCodeInvalid", { code: code || "-" }),
       );

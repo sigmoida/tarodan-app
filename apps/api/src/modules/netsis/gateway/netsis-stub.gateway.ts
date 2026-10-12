@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { isValidNetsisSerial } from "@tarodan/types";
 import { assertNetsisReadOnlySelect } from "../clients/netsis-queries.client";
 import { ensureNetsisItem } from "../helpers/netsis-ensure-item.helper";
 import {
@@ -73,8 +74,6 @@ export interface NetsisStubSnapshot {
 
 /** Numara verilmemiş faturaya stub'ın verdiği seri. */
 const STUB_DEFAULT_SERIAL = "TRD";
-/** GİB belge numarası: 3 karakter seri + 4 hane yıl + 9 hane sıra. */
-const SERIAL_PATTERN = /^[A-Z0-9]{3}$/;
 
 const clone = <T>(value: T): T => structuredClone(value);
 
@@ -110,8 +109,9 @@ class NetsisStubStore {
     return this.sequence;
   }
 
+  /** GİB belge numarası: 3 karakter seri + 4 hane yıl + 9 hane sıra. */
   nextDocumentNumber(serial: string): string {
-    if (!SERIAL_PATTERN.test(serial)) {
+    if (!isValidNetsisSerial(serial)) {
       throw invalid(`serial '${serial}' must be 3 upper-case characters`);
     }
     const prefix = `${serial}${new Date().getFullYear()}`;

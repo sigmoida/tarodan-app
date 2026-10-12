@@ -1,9 +1,9 @@
 import { Prisma, type NetsisSyncKind } from "@prisma/client";
+import { NETSIS_CARI_CODE_MAX } from "@tarodan/types";
 import { trCalendarDate } from "../../../common/helpers/tr-calendar";
 import { translateMessage } from "../../i18n/translate";
 import type { NetsisBankTransfer, NetsisMixedReceipt } from "../../netsis";
 import { isNetsisCorporateTaxId } from "../provider/netsis-cari";
-import { NETSIS_CARI_CODE_MAX_LENGTH } from "../provider/netsis-invoice-settings";
 import { NETSIS_TEXT_MAX_LENGTH } from "../provider/netsis-invoice.constants";
 import type { NetsisAccountingSettings } from "./netsis-accounting-settings";
 
@@ -193,7 +193,7 @@ export function netsisPartyCari(
 ): { code: string; pooled: boolean } {
   if (isNetsisCorporateTaxId(party.taxId)) {
     const code = party.adminCode.trim();
-    if (!code || code.length > NETSIS_CARI_CODE_MAX_LENGTH) {
+    if (!code || code.length > NETSIS_CARI_CODE_MAX) {
       throw new NetsisAccountingMappingError(
         "server.netsis.accounting.error.corporateCariCodeInvalid",
         { code: code || "-" },
