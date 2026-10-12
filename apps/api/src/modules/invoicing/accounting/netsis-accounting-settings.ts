@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
+import type { EInvoiceProviderName, PrismaClient } from "@prisma/client";
+import { invoiceProviderName } from "../../../config/invoice-provider";
 import {
   netsisSettingBoolean,
   netsisSettingCode,
@@ -144,6 +145,18 @@ export function netsisAccountingSettingsReadiness(
   return REQUIRED_ACCOUNTS.filter(
     (account) => !settings.accounts[account],
   ).map((account) => NETSIS_ACCOUNTING_SETTING_KEYS[account]);
+}
+
+/**
+ * Senkron şu an YAZIYOR mu: ana anahtar açık VE yeni belgeleri Netsis kesiyor
+ * (`INVOICE_PROVIDER=netsis`). eLogo döneminde Netsis'te faturanın carisi
+ * yoktur; tahsilatı kapatacak belge de yoktur.
+ */
+export function netsisAccountingActive(
+  settings: Pick<NetsisAccountingSettings, "enabled">,
+  provider: EInvoiceProviderName = invoiceProviderName(),
+): boolean {
+  return settings.enabled && provider === "netsis";
 }
 
 /** Dolu bir hesap kodu ayrıştırıcıdan geçiyor mu (admin doğrulaması). */

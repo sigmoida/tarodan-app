@@ -11787,7 +11787,8 @@
           "invalidProviderRef": "The invoice's Netsis reference could not be read: {ref}",
           "slipNotFound": "The invoice's Netsis slip was not found: {number}",
           "slipCariMissing": "The invoice's Netsis slip has no account code: {number}",
-          "refLost": "The record was created in Netsis ({ref}) but could not be saved locally; it is not retried to avoid a duplicate, check it in Netsis"
+          "refLost": "The record was created in Netsis ({ref}) but could not be saved locally; it is not retried to avoid a duplicate, check it in Netsis",
+          "outcomeUnknown": "Sent to Netsis but the outcome is unknown; not retried automatically to avoid a duplicate. Look up the record with tracking key {tracking} in Netsis: match it with its record number if it exists, otherwise retry"
         },
         "skip": {
           "disabled": "Accounting sync is off or Netsis is not the invoicing provider",

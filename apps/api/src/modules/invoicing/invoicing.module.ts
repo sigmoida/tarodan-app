@@ -12,6 +12,11 @@ import { InvoiceIssuingService } from "./invoice-issuing.service";
 import { InvoiceReversalService } from "./invoice-reversal.service";
 import { InvoiceSchedulerService } from "./jobs/invoice-scheduler.service";
 import { InvoiceScheduledProcessor } from "./jobs/invoice-scheduled.processor";
+import { NetsisAccountingSchedulerService } from "./jobs/netsis-accounting-scheduler.service";
+import { NetsisAccountingScheduledProcessor } from "./jobs/netsis-accounting-scheduled.processor";
+import { NetsisAccountingSourceService } from "./accounting/netsis-accounting-source.service";
+import { NetsisAccountingSyncService } from "./accounting/netsis-accounting-sync.service";
+import { NetsisAccountingPostingService } from "./accounting/netsis-accounting-posting.service";
 import { InvoicingController } from "./invoicing.controller";
 import {
   E_INVOICE_PROVIDER,
@@ -99,9 +104,25 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     // aynı servisi okur. OrderModule'ü import etmek döngü yaratacağı için
     // (order → invoicing) yalnızca Prisma'ya bağlı olan bu servis burada sağlanır.
     OrderTaxPolicyService,
-    ...scheduledProcessors(InvoiceScheduledProcessor),
+    // Muhasebe senkronu (docs/NETSIS.md → "Muhasebe senkronu"): para
+    // hareketlerini Netsis'e aynalar. Olay işleyicisi her rolde kayıtlıdır
+    // (yalnız iş kaydı açar); Netsis'e yazan cron yalnız worker rolünde.
+    NetsisAccountingSourceService,
+    NetsisAccountingSyncService,
+    NetsisAccountingPostingService,
+    NetsisAccountingSchedulerService,
+    ...scheduledProcessors(
+      InvoiceScheduledProcessor,
+      NetsisAccountingScheduledProcessor,
+    ),
   ],
   controllers: [InvoicingController],
-  exports: [ElogoService, InvoicingService, NetsisInvoiceSettingsService],
+  exports: [
+    ElogoService,
+    InvoicingService,
+    NetsisInvoiceSettingsService,
+    // Admin: senkron kayıtlarını yeniden deneme / elle eşleştirme.
+    NetsisAccountingSyncService,
+  ],
 })
 export class InvoicingModule {}

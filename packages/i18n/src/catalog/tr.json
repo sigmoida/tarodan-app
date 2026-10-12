@@ -11787,7 +11787,8 @@
           "invalidProviderRef": "Faturanın Netsis referansı okunamadı: {ref}",
           "slipNotFound": "Faturanın Netsis fişi bulunamadı: {number}",
           "slipCariMissing": "Faturanın Netsis fişinde cari kodu yok: {number}",
-          "refLost": "Kayıt Netsis'te oluştu ({ref}) ama yerelde saklanamadı; çift kayıt olmasın diye yeniden denenmez, Netsis'te kontrol edin"
+          "refLost": "Kayıt Netsis'te oluştu ({ref}) ama yerelde saklanamadı; çift kayıt olmasın diye yeniden denenmez, Netsis'te kontrol edin",
+          "outcomeUnknown": "Netsis'e gönderildi ama sonucu bilinmiyor; çift kayıt olmasın diye otomatik denenmez. Netsis'te {tracking} izleme anahtarlı kaydı arayın: varsa kayıt numarasıyla eşleştirin, yoksa yeniden deneyin"
         },
         "skip": {
           "disabled": "Muhasebe senkronu kapalı ya da fatura sağlayıcısı Netsis değil",

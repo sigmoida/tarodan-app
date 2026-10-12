@@ -4,6 +4,7 @@ import {
   NETSIS_ACCOUNT_CODE_MAX_LENGTH,
   isValidNetsisAccountingValue,
   loadNetsisAccountingSettings,
+  netsisAccountingActive,
   netsisAccountingSettingsReadiness,
   parseNetsisAccountingSettings,
 } from "./netsis-accounting-settings";
@@ -87,6 +88,12 @@ describe("netsis-accounting-settings", () => {
         ),
       ).toEqual([]);
     });
+  });
+
+  it("senkron yalnız açık VE fatura sağlayıcısı Netsis iken yazar", () => {
+    expect(netsisAccountingActive({ enabled: true }, "netsis")).toBe(true);
+    expect(netsisAccountingActive({ enabled: true }, "elogo")).toBe(false);
+    expect(netsisAccountingActive({ enabled: false }, "netsis")).toBe(false);
   });
 
   it("isValidNetsisAccountingValue ayrıştırıcının kuralını kullanır", () => {

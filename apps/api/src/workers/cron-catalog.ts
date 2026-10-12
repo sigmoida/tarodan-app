@@ -142,6 +142,15 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     description: "Bekleyen/başarısız e-Logo faturalarını yeniden dener",
     triggerable: true,
   },
+  {
+    // Para taşımaz: yalnız ERP'ye muhasebe kaydı yazar ve kayıt başına
+    // idempotenttir; senkron kapalıyken yazma adımı no-op'tur.
+    key: "netsis-accounting-retry",
+    label: "Netsis muhasebe aktarımı",
+    description:
+      "Fatura tahsilatlarını, PayTR hakedişlerini, satıcı ödemelerini ve alıcı iadelerini Netsis'e yazar; bekleyenleri yeniden dener",
+    triggerable: true,
+  },
 
   // ── Bakım ──────────────────────────────────────────────────────────────────
   {

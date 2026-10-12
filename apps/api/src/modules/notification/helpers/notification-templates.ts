@@ -426,6 +426,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.elogoInvoiceExhausted.message",
     icon: "🧾",
   },
+  [NotificationType.NETSIS_SYNC_EXHAUSTED]: {
+    titleKey: "server.notification.netsisSyncExhausted.title",
+    messageKey: "server.notification.netsisSyncExhausted.message",
+    icon: "🧾",
+  },
   [NotificationType.SELLER_INVOICE_MISSING]: {
     titleKey: "server.notification.sellerInvoiceMissing.title",
     messageKey: "server.notification.sellerInvoiceMissing.message",
