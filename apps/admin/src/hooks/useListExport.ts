@@ -1,70 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import type { AxiosResponse } from "axios";
 import { downloadBlob } from "@/lib/download";
-import { useResourceList } from "@/components/list";
+import { ResourceListContext } from "@/context/ResourceListContext";
 import { listFilterParams } from "@/hooks/useAdminResource";
 import {
-  exportFilename,
+  EXPORT_XLSX_MIME,
+  exportErrorMessage,
+  exportNotice,
   exportSortParams,
-  exportTruncatedAt,
+  readExportResponse,
 } from "@/lib/serverExport";
 
-const XLSX_TYPE =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+type ExportParams = Record<string, unknown>;
 
-interface ListExportOptions {
-  /** Sunucunun Excel ucu — liste filtresi + sıralama parametreleriyle çağrılır. */
-  request: (params: Record<string, string>) => Promise<AxiosResponse>;
+export interface ListExportOptions {
+  /** Sunucunun Excel ucu (`responseType: "blob"`); birleşik parametrelerle çağrılır. */
+  fetcher: (params: ExportParams) => Promise<AxiosResponse>;
+  /** Listenin üstüne eklenen ek parametreler (sekme, dönem …). */
+  params?: ExportParams;
   /** Sunucu `Content-Disposition` göndermezse kullanılan dosya adı. */
-  fallbackFilename: string;
-  /** Çevrilmiş toast metinleri (çağıran `t` ile çözer). */
-  messages: {
-    success: string;
-    failed: string;
-    truncated: (count: number) => string;
-  };
+  fallbackFilename?: string;
+  /**
+   * Listenin filtre + arama + sıralaması dökümle gider (varsayılan). Liste
+   * bağlamı olmayan ya da dökümü kendi parametreleriyle (dönem, sekme) süren
+   * yerlerde `false`.
+   */
+  listState?: boolean;
 }
 
+const FALLBACK_FILENAME = "export.xlsx";
+
 /**
- * Sunucu tarafı Excel dökümü: geçerli filtre + arama + sıralamanın TAMAMI
- * (yalnız ekrandaki sayfa değil). Sunucu dökümü listeyle aynı sorgudan üretir
- * ve indirmeyi denetim kaydına yazar; tavan aşıldıysa kullanıcı uyarılır.
- * Onay Kayıtları ve GİB raporu aynı akışı paylaşır.
+ * Tek döküm akışı: sunucu, ekrandaki listenin TAMAMINI (aynı filtre, arama,
+ * sıralama) Excel olarak üretir; burada yalnız indirilir ve bildirilir. Dosya
+ * adı `Content-Disposition`dan gelir, tavan aşıldıysa kullanıcı uyarılır,
+ * hata sunucunun mesajıyla gösterilir. İstemci tarafı dosya üretimi YOKTUR.
+ *
+ * `download(override)` aynı akışı çağrı başına farklı uçla çalıştırır (satır
+ * menüsündeki "kodları indir" gibi).
  */
-export function useListExport({
-  request,
-  fallbackFilename,
-  messages,
-}: ListExportOptions): {
-  download: () => Promise<void>;
+export function useListExport(options?: Partial<ListExportOptions>): {
+  download: (override?: Partial<ListExportOptions>) => Promise<void>;
   isExporting: boolean;
 } {
-  const { search, filters, sort } = useResourceList();
+  const t = useTranslations();
+  const list = useContext(ResourceListContext);
   const [isExporting, setExporting] = useState(false);
 
-  const download = async () => {
+  const download = async (override?: Partial<ListExportOptions>) => {
+    const { fetcher, params, fallbackFilename, listState } = {
+      listState: true,
+      ...options,
+      ...override,
+    };
+    if (!fetcher) return;
+    const listParams =
+      listState && list
+        ? {
+            ...listFilterParams(list.search, list.filters),
+            ...exportSortParams(list.sort),
+          }
+        : {};
+
     setExporting(true);
     try {
-      const response = await request({
-        ...listFilterParams(search, filters),
-        ...exportSortParams(sort),
-      });
-      downloadBlob(
-        exportFilename(response.headers, fallbackFilename),
-        response.data as BlobPart,
-        XLSX_TYPE,
+      const response = await fetcher({ ...listParams, ...params });
+      const file = readExportResponse(
+        response,
+        fallbackFilename ?? FALLBACK_FILENAME,
       );
-      const truncated = exportTruncatedAt(response.headers);
-      if (truncated) {
-        toast(messages.truncated(truncated));
+      downloadBlob(file.filename, file.data, EXPORT_XLSX_MIME);
+      const notice = exportNotice(file);
+      if (notice.kind === "truncated") {
+        toast(t("admin.shared.export.truncated", { count: notice.count }));
+      } else if (notice.count != null) {
+        toast.success(
+          t("admin.shared.export.success", { count: notice.count }),
+        );
       } else {
-        toast.success(messages.success);
+        toast.success(t("admin.shared.export.successNoCount"));
       }
-    } catch {
-      toast.error(messages.failed);
+    } catch (error) {
+      toast.error(
+        await exportErrorMessage(error, t("admin.shared.export.failed")),
+      );
     } finally {
       setExporting(false);
     }

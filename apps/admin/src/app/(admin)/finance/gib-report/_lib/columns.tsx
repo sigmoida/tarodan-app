@@ -16,8 +16,7 @@ import { gibSeller } from "./rows";
  * Satır salt okunurdur.
  *
  * Kimlik numarası tabloda MASKELİ (`MaskedValue`: tıkla-göster) gelir ve
- * bilinçli olarak `exportValue` taşımaz — toolbar'ın istemci CSV'si onu
- * dışarı almaz; tam değer yalnız denetim kaydı bırakan sunucu dökümündedir.
+ * tam değer yalnız denetim kaydı bırakan sunucu dökümündedir.
  * Kimlik numarası satıcının banka hesabında / arşivde de yaşadığı için bu
  * kolon sunucuda sıralanamaz.
  */
@@ -48,8 +47,6 @@ export function gibReportColumns(t: TranslateFn) {
       {
         sortKey: "status",
         sortType: "text",
-        exportValue: (r) =>
-          t(GIB_LISTING_STATUS_I18N_KEYS[(r as AdminGibReportRow).status]),
       },
     ),
     col.muted<AdminGibReportRow>(

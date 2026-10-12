@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { adminApi } from "@/lib/api";
-import { ResourceList } from "@/components/list";
+import { ExportButton, ResourceList } from "@/components/list";
 import { transactionColumns } from "../_lib/columns";
 import { type PayoutTransaction } from "../_lib/types";
 import { payoutTransactionFilterFields } from "../_lib/filters";
@@ -56,7 +56,9 @@ export function TransactionsTab() {
       syncUrl
       filters={payoutTransactionFilterFields(t)}
     >
-      <ResourceList.Toolbar />
+      <ResourceList.Toolbar>
+        <ExportButton fetcher={(p) => adminApi.exportPayoutHolds(p)} />
+      </ResourceList.Toolbar>
       <ResourceList.Table
         columns={columns}
         emptyText={t("admin.finance.payouts.empty")}

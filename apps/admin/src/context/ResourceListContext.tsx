@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useRef,
-  useState,
-  type MutableRefObject,
-} from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import type { UseAdminResourceResult } from "@/hooks/useAdminResource";
 import type { FilterField } from "@/components/list/filters/types";
 
@@ -62,14 +56,6 @@ export interface ResourceListContextValue<T> extends UseAdminResourceResult<T> {
   selection: SelectionState;
   /** The list's filter schema — the toolbar builds its dialog from this. */
   filterFields: readonly FilterField[];
-  /** The rendered table registers its columns here so the toolbar can offer a
-   * CSV export without every page wiring one. */
-  exportRef: MutableRefObject<any[]>;
-  /** CSV, tabloya gerçekten basılan (map'lenmiş) satırları dışa aktarır —
-   * ham API satırları değil (grup satırlı listelerde kolonlar map'li şekli bekler). */
-  exportRowsRef: MutableRefObject<any[]>;
-  /** Resource name — used as the CSV filename stem. */
-  exportName: string;
 }
 
 export const ResourceListContext =

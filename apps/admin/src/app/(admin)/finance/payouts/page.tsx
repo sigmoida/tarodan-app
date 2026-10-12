@@ -6,7 +6,6 @@ import { AdminTabs } from "@/components/AdminTabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import { payoutTabs } from "./_lib/types";
 import { PayoutsSummary } from "./_components/PayoutsSummary";
-import { PayoutsExport } from "./_components/PayoutsExport";
 import { TransactionsTab } from "./_components/TransactionsTab";
 import { TransfersTab } from "./_components/TransfersTab";
 import { AdjustmentsTab } from "./_components/AdjustmentsTab";
@@ -22,9 +21,7 @@ export default function PayoutsPage() {
       <PageHeader
         title={t("admin.finance.payouts.title")}
         description={t("admin.finance.payouts.subtitle")}
-      >
-        <PayoutsExport />
-      </PageHeader>
+      />
 
       <PayoutsSummary />
 

@@ -41,7 +41,6 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
         grow: 1,
         minWidth: 180,
         sortable: false,
-        exportValue: (p) => p.reference?.number ?? "",
       },
     ),
     col.user<Payment>(

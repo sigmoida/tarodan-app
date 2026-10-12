@@ -5,7 +5,6 @@ import type {
   CatalogImportSchema,
 } from "./catalog-import.types";
 import type {
-  ProductExportParams,
   RejectProductPayload,
   RemoveProductPayload,
 } from "./catalog.types";
@@ -48,8 +47,6 @@ export const catalogApi = {
     api.post(`/admin/products/${id}/renew`),
   bulkRenewExpiredProducts: (productIds: string[]) =>
     api.post("/admin/products/bulk-renew", { productIds }),
-  exportProducts: (params?: ProductExportParams) =>
-    api.get("/admin/products-export", { params, responseType: "blob" }),
   getProductImportSellers: (search?: string) =>
     api.get("/admin/products/bulk-import/sellers", {
       params: search ? { search } : undefined,

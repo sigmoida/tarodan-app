@@ -1,16 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Select } from "@tarodan/ui";
-import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
+import { Select } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
-import { downloadBlob } from "@/lib/download";
+import { ExportButton } from "@/components/list/ExportButton";
 import { SectionCard } from "@/components/detail/SectionCard";
-
-const XLSX_MIME =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 const now = new Date();
 
@@ -23,33 +18,12 @@ export function DeletedIdentitiesExport() {
   const t = useTranslations();
   const [year, setYear] = useState(String(now.getFullYear()));
   const [month, setMonth] = useState(String(now.getMonth() + 1));
-  const [busy, setBusy] = useState(false);
 
   const monthNames = Array.from({ length: 12 }, (_, index) =>
     new Date(2024, index, 1).toLocaleDateString(t("common.dateLocale"), {
       month: "long",
     }),
   );
-
-  const onExport = async () => {
-    setBusy(true);
-    try {
-      const response = await adminApi.getDeletedIdentitiesExport({
-        year: Number(year),
-        month: Number(month),
-      });
-      downloadBlob(
-        `tarodan-silinen-hesap-bildirimi-${year}-${month.padStart(2, "0")}.xlsx`,
-        response.data as BlobPart,
-        XLSX_MIME,
-      );
-      toast.success(t("admin.deletedIdentities.exported"));
-    } catch {
-      toast.error(t("admin.deletedIdentities.exportFailed"));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <SectionCard title={t("admin.deletedIdentities.exportTitle")}>
@@ -72,15 +46,16 @@ export function DeletedIdentitiesExport() {
             label: name,
           }))}
         />
-        <Button
-          variant="outline"
+        <ExportButton
+          listState={false}
           className="shrink-0"
-          leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
-          isLoading={busy}
-          onClick={onExport}
-        >
-          {t("admin.deletedIdentities.exportButton")}
-        </Button>
+          fetcher={() =>
+            adminApi.getDeletedIdentitiesExport({
+              year: Number(year),
+              month: Number(month),
+            })
+          }
+        />
       </div>
       <p className="text-muted mt-3 text-sm">
         {t("admin.deletedIdentities.exportHint")}
