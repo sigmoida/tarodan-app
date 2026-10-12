@@ -59,6 +59,7 @@ describe("export catalogs", () => {
         "gibReport",
         "payoutHolds",
         "payoutTransfers",
+        "refundRequests",
         "voucherCodes",
       ].sort(),
     );

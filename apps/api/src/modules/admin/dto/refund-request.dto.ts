@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
-  IsArray,
   IsEnum,
   IsIn,
   IsOptional,
@@ -8,39 +7,54 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
+import { RefundFaultParty, RefundReason } from "@prisma/client";
 import {
-  RefundFaultParty,
-  RefundReason,
-  RefundRequestStatus,
-} from "@prisma/client";
-import { REFUND_REQUEST_KINDS, type RefundRequestKind } from "@tarodan/types";
+  ADMIN_REFUND_BUCKETS,
+  ADMIN_REFUND_TABS,
+  REFUND_REQUEST_KINDS,
+  type AdminRefundBucket,
+  type AdminRefundTab,
+  type RefundRequestKind,
+} from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
 
-export class RefundRequestQueryDto extends AdminListQueryDto {
+/**
+ * İadeler listesi, sayaçları ve Excel'inin ortak filtreleri (bkz.
+ * `orders/helpers/refund-list-where.ts`). `search` talep / sipariş / takas
+ * numarası, taraf (ad, e-posta, kullanıcı kodu), ürün ve kargo kodlarını
+ * tarar; `dateFrom` / `dateTo` İADE tarihine İstanbul günü sınırlarıyla
+ * uygulanır. Sıralama yalnız iade anına göredir (`sortOrder`).
+ */
+export class RefundRequestCountsQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({
-    isArray: true,
-    enum: RefundRequestStatus,
-    example: ["approved", "return_in_transit"],
+    enum: ADMIN_REFUND_TABS,
+    description:
+      "Sekme: tüm iadeler / direkt satış / teklif / takas (varsayılan tümü)",
   })
   @IsOptional()
-  @IsArray()
-  @IsEnum(RefundRequestStatus, { each: true })
-  status?: RefundRequestStatus[];
+  @IsIn(ADMIN_REFUND_TABS)
+  tab?: AdminRefundTab;
 
-  @ApiPropertyOptional({ example: "ahmet@example.com" })
+  @ApiPropertyOptional({ example: "RFD-K7X9M2QF3N" })
   @IsOptional()
   @IsString()
-  userSearch?: string;
+  search?: string;
 
-  @ApiPropertyOptional({ example: "2026-01-01" })
+  @ApiPropertyOptional({
+    example: "2026-10-01",
+    description: "İade tarihi başlangıcı (YYYY-MM-DD, İstanbul günü)",
+  })
   @IsOptional()
   @IsString()
-  from?: string;
+  dateFrom?: string;
 
-  @ApiPropertyOptional({ example: "2026-12-31" })
+  @ApiPropertyOptional({
+    example: "2026-10-12",
+    description: "İade tarihi bitişi (YYYY-MM-DD, İstanbul günü, dahil)",
+  })
   @IsOptional()
   @IsString()
-  to?: string;
+  dateTo?: string;
 
   @ApiPropertyOptional({
     enum: REFUND_REQUEST_KINDS,
@@ -50,6 +64,17 @@ export class RefundRequestQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsIn(REFUND_REQUEST_KINDS)
   kind?: RefundRequestKind;
+}
+
+export class RefundRequestQueryDto extends RefundRequestCountsQueryDto {
+  @ApiPropertyOptional({
+    enum: ADMIN_REFUND_BUCKETS,
+    description:
+      "Alt sekme (kova): tümü / inceleme / ürün bekleniyor / depoda / iade ediliyor / tamamlanan / reddedilen / itirazlı",
+  })
+  @IsOptional()
+  @IsIn(ADMIN_REFUND_BUCKETS)
+  bucket?: AdminRefundBucket;
 }
 
 export class ApproveRefundRequestDto {

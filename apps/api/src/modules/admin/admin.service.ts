@@ -48,7 +48,6 @@ import {
   AdminMessageQueryDto,
   AdminShipmentQueryDto,
   TradeShipmentQueryDto,
-  RefundRequestQueryDto,
   ApproveRefundRequestDto,
   AuditLogQueryDto,
   ApproveProductDto,
@@ -854,10 +853,6 @@ export class AdminService {
 
   // ==================== REFUND REQUEST ADMIN ====================
   // Taşındı: admin-refund.service.ts — imzalar aynen korunuyor (facade delege).
-
-  async listRefundRequests(query: RefundRequestQueryDto) {
-    return this.adminRefundService.listRefundRequests(query);
-  }
 
   async getRefundRequestDetail(refundRequestId: string) {
     return this.adminRefundService.getRefundRequestDetail(refundRequestId);
