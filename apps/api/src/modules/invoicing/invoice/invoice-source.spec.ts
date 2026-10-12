@@ -2,6 +2,7 @@ import { FiscalInvoiceType } from "@prisma/client";
 import {
   invoiceSourceKindOf,
   invoiceTypesOfSourceKind,
+  reversalRefundAttemptIdOf,
   reversedInvoiceIdOf,
 } from "./invoice-source";
 
@@ -69,5 +70,19 @@ describe("reversedInvoiceIdOf", () => {
 
   it("kısmi iade anahtarından fatura id'sini ayırır", () => {
     expect(reversedInvoiceIdOf("inv-1:attempt-7")).toBe("inv-1");
+  });
+});
+
+describe("reversalRefundAttemptIdOf", () => {
+  it("tam iade anahtarında deneme yoktur", () => {
+    expect(reversalRefundAttemptIdOf("inv-1")).toBeNull();
+  });
+
+  it("kısmi iade anahtarından deneme id'sini ayırır", () => {
+    expect(reversalRefundAttemptIdOf("inv-1:attempt-7")).toBe("attempt-7");
+  });
+
+  it("boş deneme kısmı null'dır", () => {
+    expect(reversalRefundAttemptIdOf("inv-1:")).toBeNull();
   });
 });

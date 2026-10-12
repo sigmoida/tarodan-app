@@ -15,3 +15,8 @@ export function refundRequestIdOf(
     ? idempotencyKey.slice(REFUND_REQUEST_KEY_PREFIX.length)
     : undefined;
 }
+
+/** Talebin iade denemesinin anahtarı — `refundRequestIdOf`'un tersi. */
+export function refundRequestAttemptKey(refundRequestId: string): string {
+  return `${REFUND_REQUEST_KEY_PREFIX}${refundRequestId}`;
+}
