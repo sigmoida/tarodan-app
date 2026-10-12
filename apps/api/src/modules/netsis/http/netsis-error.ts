@@ -161,8 +161,5 @@ export function classifyNetsisError(error: unknown): NetsisErrorKind {
 
 /** Log'a güvenli kısa parça: satır sonları düzleşir, 300 karakterde kesilir. */
 export function netsisSnippet(text: string): string {
-  return text
-    .replace(/[\r\n\t]+/g, " ")
-    .trim()
-    .slice(0, 300);
+  return text.replace(/\s+/g, " ").trim().slice(0, 300);
 }
