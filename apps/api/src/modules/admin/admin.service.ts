@@ -70,7 +70,6 @@ import {
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -734,10 +733,6 @@ export class AdminService {
     sortType?: "text" | "number" | "date";
   }) {
     return this.payoutService.getPayoutsSchedule(query);
-  }
-
-  async getPayoutsExport(query: PayoutExportQueryDto) {
-    return this.payoutService.getPayoutsExport(query);
   }
 
   async releasePayout(

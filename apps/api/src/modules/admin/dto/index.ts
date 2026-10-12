@@ -46,6 +46,7 @@ export {
 export {
   PayoutTransactionsQueryDto,
   PayoutScheduleQueryDto,
+  PayoutTransfersQueryDto,
   PayoutExportQueryDto,
   ReleasePayoutDto,
 } from "./payout.dto";

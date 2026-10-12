@@ -15,7 +15,10 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
+  StreamableFile,
 } from "@nestjs/common";
+import type { Response } from "express";
+import type { Locale } from "@tarodan/i18n";
 
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -28,6 +31,9 @@ import {
 } from "@nestjs/swagger";
 import { AdminService } from "../admin.service";
 import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
+import { AdminPayoutExportService } from "./admin-payout-export.service";
+import { sendExport } from "../../../common/export";
+import { ReqLocale } from "../../i18n";
 import {
   PspMissingPaymentsQueryDto,
   PspReconciliationQueryDto,
@@ -81,7 +87,7 @@ import {
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
   PayoutScheduleQueryDto,
-  PayoutExportQueryDto,
+  PayoutTransfersQueryDto,
   ReleasePayoutDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
@@ -119,6 +125,7 @@ export class AdminPaymentController {
   constructor(
     private readonly adminService: AdminService,
     private readonly pspReconciliation: AdminPspReconciliationService,
+    private readonly payoutExports: AdminPayoutExportService,
   ) {}
 
   // ==================== PAYMENT MANAGEMENT ====================
@@ -329,22 +336,26 @@ export class AdminPaymentController {
     summary: "List real bank payout transfers (PayoutTransfer rows)",
   })
   @ApiResponse({ status: HttpStatus.OK, description: "Payout transfers" })
-  async getPayoutTransfers(
-    @Query("status") status?: string,
-    @Query("search") search?: string,
-    @Query("dateFrom") dateFrom?: string,
-    @Query("dateTo") dateTo?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-  ) {
-    return this.adminService.getPayoutTransfers({
-      status,
-      search,
-      dateFrom,
-      dateTo,
-      page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
-    });
+  async getPayoutTransfers(@Query() query: PayoutTransfersQueryDto) {
+    return this.adminService.getPayoutTransfers(query);
+  }
+
+  @Get("payouts/transfers/export")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Transfers tab as an Excel file (same filters as the list)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "XLSX file" })
+  async exportPayoutTransfers(
+    @CurrentUser("id") adminId: string,
+    @Query() query: PayoutTransfersQueryDto,
+    @ReqLocale() locale: Locale,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return sendExport(
+      res,
+      await this.payoutExports.exportTransfers(query, adminId, locale),
+    );
   }
 
   @Get("payouts/adjustments")
@@ -400,13 +411,21 @@ export class AdminPaymentController {
 
   @Get("payouts/export")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Export payout transactions as CSV" })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "CSV content and filename",
+  @ApiOperation({
+    summary:
+      "Escrow (hold) tab as an Excel file — same filters, search and sort as the list",
   })
-  async getPayoutsExport(@Query() query: PayoutExportQueryDto) {
-    return this.adminService.getPayoutsExport(query);
+  @ApiResponse({ status: HttpStatus.OK, description: "XLSX file" })
+  async getPayoutsExport(
+    @CurrentUser("id") adminId: string,
+    @Query() query: PayoutTransactionsQueryDto,
+    @ReqLocale() locale: Locale,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return sendExport(
+      res,
+      await this.payoutExports.exportHolds(query, adminId, locale),
+    );
   }
 
   @Post("payouts/release/:orderId")

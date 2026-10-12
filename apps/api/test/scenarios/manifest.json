@@ -13727,11 +13727,11 @@
       "code": "11",
       "prefix": "COM",
       "domTitle": "11 — Komisyon & Payout (Satıcı Ödemesi)",
-      "title": "Payout CSV export",
+      "title": "Payout Excel export",
       "tur": "Happy path",
       "pri": "P2",
       "steps": "1. GET /api/admin/payouts/export?status=released.",
-      "exp": "{ csv, filename:'payouts-YYYY-MM-DD.csv' }; başlıklar id,orderId,orderNumber,sellerId,sellerName,sellerEmail,amount,status,releaseAt,releasedAt,createdAt (admin.service.ts:5045-5062). Virgül içeren alanlar tırnaklanır.",
+      "exp": "XLSX eki (Content-Type spreadsheetml, filename='satici-odemeleri-escrow-YYYY-MM-DD.xlsx', Cache-Control no-store, X-Export-Row-Count); 1. sayfa Özet, 2. sayfa Escrow: katalog başlıkları (EXPORT_CATALOGS.payoutHolds) — listeyle aynı süzgeç, arama ve sıralama (docs/ADMIN_EXPORTS.md).",
       "gap": false,
       "gapRefs": []
     },

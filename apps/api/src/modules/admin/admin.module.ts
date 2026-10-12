@@ -84,6 +84,7 @@ import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.se
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
 import { AdminPayoutService } from "./finance/admin-payout.service";
+import { AdminPayoutExportService } from "./finance/admin-payout-export.service";
 import { AdminFinanceService } from "./finance/admin-finance.service";
 import { AdminTradeService } from "./trade/admin-trade.service";
 import { AdminTradeCommonService } from "./trade/admin-trade-common.service";
@@ -280,6 +281,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,
+    AdminPayoutExportService,
     AdminFinanceService,
     AdminTradeService,
     AdminTradeCommonService,
