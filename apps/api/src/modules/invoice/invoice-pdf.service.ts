@@ -10,8 +10,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as fs from "fs";
-import * as path from "path";
+import { registerPdfFonts } from "../../common/pdf";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import * as PDFDocument from "pdfkit";
@@ -83,81 +82,6 @@ export class InvoicePdfService {
     private readonly configService: ConfigService,
     private readonly storageService: StorageService,
   ) {}
-
-  /**
-   * Resolve a Turkish-capable Unicode TrueType font for the invoice PDF.
-   *
-   * The standard PDF font (Helvetica) only covers Latin-1 and mangles İ/ı/ş/ğ — which is why
-   * invoices looked like garbled "dummy" PDFs. We bundle DejaVu Sans (full Turkish coverage,
-   * freely redistributable) so rendering is correct on EVERY platform, including the
-   * node:alpine container which ships no system fonts at all.
-   *
-   * Priority: bundled DejaVu → INVOICE_FONT_PATH env → platform system fonts → null (Helvetica).
-   * @param weight 'regular' | 'bold'
-   */
-  private getInvoiceFontPath(
-    weight: "regular" | "bold" = "regular",
-  ): string | null {
-    const bundledName =
-      weight === "bold" ? "DejaVuSans-Bold.ttf" : "DejaVuSans.ttf";
-    // Cover both dev and built layouts (code runs from dist/src/..., assets land under dist/...).
-    const bundledCandidates = [
-      path.join(__dirname, "../assets/fonts", bundledName),
-      path.join(__dirname, "../../assets/fonts", bundledName),
-      path.join(__dirname, "../../../assets/fonts", bundledName),
-      path.join(__dirname, "../../../../assets/fonts", bundledName),
-      path.join(process.cwd(), "dist/src/assets/fonts", bundledName),
-      path.join(process.cwd(), "dist/assets/fonts", bundledName),
-      path.join(process.cwd(), "src/assets/fonts", bundledName),
-      path.join(process.cwd(), "assets/fonts", bundledName),
-    ];
-    for (const p of bundledCandidates) {
-      if (fs.existsSync(p)) return p;
-    }
-
-    // Optional explicit override (regular weight).
-    const envPath = this.configService.get("INVOICE_FONT_PATH");
-    if (
-      weight === "regular" &&
-      envPath &&
-      typeof envPath === "string" &&
-      fs.existsSync(envPath)
-    )
-      return envPath;
-
-    // System font fallbacks (Arial & DejaVu both support Turkish).
-    const platform = process.platform;
-    const candidates: string[] = [];
-    if (platform === "win32") {
-      candidates.push(
-        weight === "bold"
-          ? "C:\\Windows\\Fonts\\arialbd.ttf"
-          : "C:\\Windows\\Fonts\\arial.ttf",
-        "C:\\Windows\\Fonts\\arial.ttf",
-      );
-    } else if (platform === "darwin") {
-      candidates.push(
-        weight === "bold"
-          ? "/Library/Fonts/Arial Bold.ttf"
-          : "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/Library/Fonts/Arial.ttf",
-      );
-    } else {
-      candidates.push(
-        weight === "bold"
-          ? "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-          : "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/msttcorefonts/arial.ttf",
-        "/usr/share/fonts/TTF/Arial.ttf",
-      );
-    }
-    for (const p of candidates) {
-      if (fs.existsSync(p)) return p;
-    }
-    return null;
-  }
 
   /**
    * Resolve invoice pdfUrl - if it's an S3 key, generate presigned URL
@@ -390,29 +314,11 @@ export class InvoicePdfService {
         doc.on("end", () => resolve(Buffer.concat(buffers)));
         doc.on("error", (err) => reject(err));
 
-        // Register a Unicode TrueType font so Turkish characters (İ, ı, ş, ğ, ç, ö, ü) render correctly.
-        // Without this, PDFKit's default Helvetica (Latin-1 only) mangles İ/ı/ş/ğ — the cause of the
-        // garbled, "dummy"-looking invoices. Bundled DejaVu Sans works on every platform.
-        const regularPath = this.getInvoiceFontPath("regular");
-        const boldPath = this.getInvoiceFontPath("bold");
-        let fontRegular = "Helvetica";
-        let fontBold = "Helvetica-Bold";
-        if (regularPath) {
-          try {
-            doc.registerFont("body", regularPath);
-            doc.registerFont("body-bold", boldPath || regularPath);
-            fontRegular = "body";
-            fontBold = "body-bold";
-          } catch (e: any) {
-            this.logger.warn(
-              `Failed to register invoice font (${regularPath}): ${e?.message}. Falling back to Helvetica.`,
-            );
-          }
-        } else {
-          this.logger.warn(
-            "No Unicode invoice font found — Turkish characters may not render. Bundle DejaVu Sans or set INVOICE_FONT_PATH.",
-          );
-        }
+        // Türkçe karakterler (İ, ı, ş, ğ, ç, ö, ü) için Unicode TrueType font; çözüm common/pdf içinde.
+        const { regular: fontRegular, bold: fontBold } = registerPdfFonts(doc, {
+          envFontPath: this.configService.get("INVOICE_FONT_PATH"),
+          logger: this.logger,
+        });
         doc.font(fontRegular);
 
         // Header
