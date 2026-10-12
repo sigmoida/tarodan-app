@@ -2612,15 +2612,17 @@ model FiscalInvoice {
   /// kesildiği için varsayılan `elogo`dur — geriye doldurma gerekmez.
   provider                  EInvoiceProviderName  @default(elogo)
   /// Sağlayıcının belgeye verdiği referans (eLogo: SendDocument `refId`).
-  /// Durum sorgusu ve iptal bununla yapılır. Eski adı `elogo_ref_id`.
-  providerRef               String?               @map("provider_ref")
+  /// Durum sorgusu ve iptal bununla yapılır. DB kolonu bilerek eski adında
+  /// (`elogo_ref_id`): fiziksel ad değişikliği deploy penceresi ve geri dönüş
+  /// riski taşır; Prisma adı sağlayıcıdan bağımsızdır, kolon adı tarihseldir.
+  providerRef               String?               @map("elogo_ref_id")
   /// Sağlayıcının son işlem sonuç kodu (eLogo: `resultCode` / GİB durum kodu).
   /// Yalnız teşhis içindir; karar sınıflandırılmış port sonucundan verilir.
-  /// Eski adı `elogo_result_code`.
-  providerResultCode        Int?                  @map("provider_result_code")
+  /// DB kolonu bilerek eski adında (`elogo_result_code`), bkz. providerRef.
+  providerResultCode        Int?                  @map("elogo_result_code")
   /// Sağlayıcının son sonuç / hata metni — admin listesinde "Sonuç" olarak
-  /// gösterilir. Eski adı `elogo_result_msg`.
-  providerResultMsg         String?               @map("provider_result_msg")
+  /// gösterilir. DB kolonu bilerek eski adında (`elogo_result_msg`).
+  providerResultMsg         String?               @map("elogo_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
   billingReference          String?               @map("billing_reference")
   /// İADE faturasında referans verilen orijinal faturanın düzenlenme tarihi.
@@ -2657,12 +2659,14 @@ model FiscalInvoice {
   @@index([sellerUserId])
   @@index([buyerUserId])
   @@index([context])
-  @@map("fiscal_invoices")
+  // Tablo adı bilerek tarihsel (`elogo_invoices`): fiziksel yeniden adlandırma
+  // deploy penceresi + geri dönüş riski taşır; model adı sağlayıcıdan bağımsız.
+  @@map("elogo_invoices")
 }
 
 /// Gap-free belge numarası sırası (prefix + yıl bazında). GİB zorunluluğu.
-/// Yalnız numarayı BİZİM verdiğimiz (`local`) sağlayıcıda ilerler; eski adı
-/// `elogo_doc_sequences`.
+/// Yalnız numarayı BİZİM verdiğimiz (`local`) sağlayıcıda ilerler; tablo adı
+/// bilerek tarihsel (`elogo_doc_sequences`, bkz. FiscalInvoice).
 model FiscalDocSequence {
   id        String @id @default(uuid())
   prefix    String
@@ -2670,7 +2674,7 @@ model FiscalDocSequence {
   lastValue Int    @default(0) @map("last_value")
 
   @@unique([prefix, year])
-  @@map("fiscal_doc_sequences")
+  @@map("elogo_doc_sequences")
 }
 
 /// Tarodan iç belge sayaçları (ör. PDF fatura no: scope = "SPR-202607").
@@ -2739,6 +2743,9 @@ enum FiscalInvoiceType {
   /// faturalanır. Hizmet bedeli platformda kalır (mevcut belgesi durur), komisyon
   /// ise iade faturasıyla geri verilir. Kaynak = RefundRequest.id.
   penalty
+
+  // DB tipi bilerek tarihsel adında (bkz. FiscalInvoice).
+  @@map("ElogoInvoiceType")
 }
 
 /// Faturanın dayandığı işlemin GERÇEKLEŞME ŞEKLİ. `OrderOrigin` ile aynı
@@ -2749,6 +2756,8 @@ enum FiscalInvoiceContext {
   offer
   trade
   platform_service
+
+  @@map("ElogoInvoiceContext")
 }
 
 enum FiscalInvoiceStatus {
@@ -2758,6 +2767,8 @@ enum FiscalInvoiceStatus {
   signed
   failed
   cancelled
+
+  @@map("ElogoInvoiceStatus")
 }
 
 /// e-Belge sağlayıcısı (entegratör). Değerler `EInvoiceProvider.name` ile

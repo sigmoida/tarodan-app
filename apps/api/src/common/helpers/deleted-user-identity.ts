@@ -55,7 +55,7 @@ export type IdentitySourceKey =
   | "seller_bank_account"
   | "corporate_application"
   | "corporate_stakeholder"
-  // `fiscal_invoices` satırı. Değer tablo adı değişmeden önce arşive yazıldı ve
+  // `elogo_invoices` (model: FiscalInvoice) satırı. Değer arşive yazıldı ve
   // `deleted_user_identities.source_detail`'te saklanıyor; okuyucular bu
   // değeri arıyor, o yüzden yeniden adlandırılmaz.
   | "elogo_invoice"
