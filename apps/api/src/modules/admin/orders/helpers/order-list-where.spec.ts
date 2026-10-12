@@ -6,6 +6,7 @@ import {
   orderListScopeOf,
   orderListSourceWheres,
 } from "./order-list-where";
+import { shippedBeforeWhere } from "./shipped-before-where";
 
 const contains = (term: string) => ({ contains: term, mode: "insensitive" });
 
@@ -62,6 +63,24 @@ describe("orderLineFilterWhere", () => {
     }) as { AND: Array<{ createdAt: { gte: Date; lte: Date } }> };
     expect(where.AND[0].createdAt.gte).toEqual(new Date("2026-09-01"));
     expect(where.AND[0].createdAt.lte.getHours()).toBe(23);
+  });
+
+  it("shippedBefore keeps still-shipped lines handed over before the instant — the alert's own predicate", () => {
+    const iso = "2026-10-02T09:00:00.000Z";
+    expect(orderLineFilterWhere({ shippedBefore: iso })).toEqual({
+      AND: [shippedBeforeWhere(new Date(iso))],
+    });
+    expect(shippedBeforeWhere(new Date(iso))).toEqual({
+      status: "shipped",
+      shipment: { is: { shippedAt: { lt: new Date(iso) } } },
+    });
+  });
+
+  it("the request's shippedBefore reaches the filters", () => {
+    const iso = "2026-10-02T09:00:00.000Z";
+    expect(orderListScopeOf({ shippedBefore: iso }).filters.shippedBefore).toBe(
+      iso,
+    );
   });
 
   it("the deep-link user filter narrows by role", () => {

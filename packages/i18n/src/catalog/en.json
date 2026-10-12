@@ -7199,7 +7199,10 @@
           "delivered": "Delivered",
           "other": "Other",
           "cancelled": "Cancellations",
-          "refunds": "Refunds"
+          "refunds": "Refunds",
+          "cancelled": "Cancelled",
+          "refunds": "Refunds",
+          "other": "Other"
         },
         "filters": {
           "party": "Buyer / Seller",
@@ -7911,6 +7914,10 @@
         "stock": "Right now",
         "loadFailed": "This section could not be loaded."
       },
+      "metricDescriptions": {
+        "paidOrders": "Order lines paid in this period; every product line in a cart counts separately.",
+        "sellerPayoutCount": "Bank transfers completed in this period — sent about 15 days after delivery, trade cash payouts included."
+      },
       "queues": {
         "refundRequests": "Refund requests",
         "tradeOperations": "Trade operations",
@@ -7938,6 +7945,7 @@
         "payoutsFailed": "Failed transfers",
         "holdsOverdue": "Overdue escrow",
         "adjustmentsOpen": "Open seller debt",
+        "holdsUpcoming": "Releasing within 7 days",
         "invoicesExhausted": "Documents out of retries",
         "ordersUninvoiced": "Uninvoiced deliveries",
         "carrierCancellations": "Carrier cancellation tasks",
@@ -10752,6 +10760,13 @@
       "groupOrderItemNotAwaitingPayment": "The \"{item}\" order in the group is not awaiting payment. Please recreate the cart.",
       "groupOrderNotAwaitingPayment": "An order in the group is not awaiting payment. Please recreate the cart.",
       "holdNotReleasable": "No releasable payment was found (it may be frozen due to an open refund)",
+      "holdReleaseBlocked": {
+        "alreadyReleased": "Nothing is left to release on this payment (already released or consumed by a refund)",
+        "frozen": "The payment is frozen by an open refund and cannot be released until the refund settles",
+        "notDue": "The payment's release date has not come yet",
+        "orderNotTerminal": "The order is not in a state that allows releasing the payment",
+        "sellerAtFault": "The seller was at fault in the refund/cancellation, so the remaining amount is not paid to the seller"
+      },
       "installmentInfoFetchFailed": "Installment information could not be fetched",
       "installmentInfoUnavailable": "Installment information could not be retrieved",
       "installmentResponseInvalid": "The PayTR installment response is invalid or empty",

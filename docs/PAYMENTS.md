@@ -209,6 +209,16 @@ yalnız `held`, vadesi gelmiş, iade ile dondurulmamış hold'lar — ayrıca si
 yoksa. Şüphede para **tutulur**, yanlış ödenmez. Takas nakit escrow'u aynı
 geçişte açılır.
 
+**Kalıntı (iade/iptal sonrası)**: iade satıcının kargo payını hold'da bırakırsa
+(`holdRetainedAmount`) sipariş `cancelled`/`refunded` olur ama hold
+`amount − refundedAmount > 0` ile `held` kalır. Bu kalıntı, sonuçlanmış iade
+talebinde kusur satıcıda **değilse** (`RefundRequest.faultParty`; v1'de
+`seller_fault_*` politika kodu) bırakılır ve ödenir; satıcıdaysa ya da kusur
+belirlenemiyorsa asla. Damgasız kalıntı (kargoya verilmeden iptal) hemen
+vadelidir. Karar tek yüklemde: `payout/helpers/hold-release-eligibility.ts` —
+manuel bırakma, cron, payout yolları ve admin hold listesinin `releasable`
+rozeti aynı fonksiyonu okur.
+
 ---
 
 ## 6. Payout

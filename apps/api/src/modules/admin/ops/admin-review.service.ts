@@ -140,14 +140,32 @@ export class AdminReviewService {
               avatarUrl: true,
             },
           },
-          product: { select: { id: true, title: true, images: { take: 1 } } },
+          product: {
+            select: {
+              id: true,
+              title: true,
+              sellerId: true,
+              images: { take: 1 },
+            },
+          },
         },
       },
       { page, limit },
     );
 
+    // Detay çekmecesi yeni uç istemeden çizilsin: tam yorum metni (`review`,
+    // `title`), admin yanıtı (`adminReply`), yorum görselleri (çözülmüş URL),
+    // ve sipariş / ürün / satıcı bağlantı kimlikleri satırda.
+    const orderNumbers = await this.orderNumbersOf(
+      result.data.map((review: { orderId: string }) => review.orderId),
+    );
     const resolvedReviews = result.data.map((review: any) => ({
       ...review,
+      images: (review.images ?? []).map(
+        (image: string) => this.resolveProductImageUrl(image) ?? image,
+      ),
+      orderNumber: orderNumbers.get(review.orderId) ?? null,
+      sellerId: review.product?.sellerId ?? null,
       product: review.product
         ? {
             ...review.product,
@@ -163,6 +181,19 @@ export class AdminReviewService {
     }));
 
     return { ...result, data: resolvedReviews };
+  }
+
+  /** Sayfadaki siparişlerin numaraları — tek sorgu (N+1 yok). */
+  private async orderNumbersOf(
+    orderIds: ReadonlyArray<string | null>,
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(orderIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return new Map();
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, orderNumber: true },
+    });
+    return new Map(orders.map((order) => [order.id, order.orderNumber]));
   }
 
   /**
@@ -240,7 +271,7 @@ export class AdminReviewService {
       { defaultSort: { createdAt: "desc" } },
     );
 
-    return paginate(
+    const result = await paginate(
       this.prisma.rating,
       {
         where,
@@ -266,5 +297,37 @@ export class AdminReviewService {
       },
       query,
     );
+
+    // Satıcı puanının görseli ve admin yanıtı yoktur; tam yorum (`comment`)
+    // satırda. Detay çekmecesi siparişe / takasa numarasıyla bağlanabilsin.
+    const [orderNumbers, tradeNumbers] = await Promise.all([
+      this.orderNumbersOf(result.data.map((rating) => rating.orderId)),
+      this.tradeNumbersOf(result.data.map((rating) => rating.tradeId)),
+    ]);
+    return {
+      ...result,
+      data: result.data.map((rating) => ({
+        ...rating,
+        orderNumber: rating.orderId
+          ? (orderNumbers.get(rating.orderId) ?? null)
+          : null,
+        tradeNumber: rating.tradeId
+          ? (tradeNumbers.get(rating.tradeId) ?? null)
+          : null,
+      })),
+    };
+  }
+
+  /** Sayfadaki takasların numaraları — tek sorgu (N+1 yok). */
+  private async tradeNumbersOf(
+    tradeIds: ReadonlyArray<string | null>,
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(tradeIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return new Map();
+    const trades = await this.prisma.trade.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, tradeNumber: true },
+    });
+    return new Map(trades.map((trade) => [trade.id, trade.tradeNumber]));
   }
 }

@@ -1489,6 +1489,10 @@ export class AdminService {
     return this.adminNotificationService.countAudience(dto);
   }
 
+  async uploadNotificationImage(file: Express.Multer.File | undefined) {
+    return this.adminNotificationService.uploadImage(file);
+  }
+
   async getScheduledNotifications(query?: ScheduledNotificationQueryDto) {
     return this.adminNotificationService.getScheduledNotifications(query);
   }

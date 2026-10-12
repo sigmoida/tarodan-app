@@ -23,6 +23,7 @@ import {
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
+import { buyAndPay } from "../factories/flows";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { PayoutService } from "../../src/modules/payout/payout.service";
 
@@ -540,6 +541,147 @@ describe("Payout Flow (E2E)", () => {
       });
       expect(payoutFinal?.status).toBe(PayoutStatus.completed);
       expect(ctx.paytr.transferCalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  /**
+   * İade/iptalle kapanmış siparişte satıcıya BIRAKILAN kargo payı (hold
+   * kalıntısı): kusur satıcıda değilse cron bırakır, payout kalıntıyı öder ve
+   * defter tam o tutarla kapanır; kusur satıcıdaysa para tutulur.
+   */
+  describe("Residual hold on a closed order", () => {
+    const RETAINED = 25;
+
+    /** Ödenmiş siparişi "iade/iptal sonrası" durumuna çeker: kalıntı = 25. */
+    async function closedOrderWithResidual(fault: "buyer" | "seller") {
+      const buyer = await createUser(ctx.module);
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const product = await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        price: 500,
+        quantity: 1,
+      });
+      const addr = await createAddress({ userId: buyer.id });
+      const prisma = getPrisma();
+      await prisma.sellerBankAccount.create({
+        data: {
+          userId: seller.id,
+          accountHolder: "Mehmet Yılmaz",
+          iban: "TR330006100519786457841326",
+        },
+      });
+      const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
+
+      const hold = await prisma.paymentHold.findFirstOrThrow({
+        where: { orderId },
+      });
+      // PayTR ödeme günü transfer kabul etmez — ödemeyi dünden say.
+      await prisma.payment.update({
+        where: { id: hold.paymentId },
+        data: { paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+      });
+      // Kargoya verilmeden iptal: hold damgasız, iade kalıntı dışını tüketti.
+      await prisma.paymentHold.update({
+        where: { id: hold.id },
+        data: {
+          refundedAmount: Number(hold.amount) - RETAINED,
+          releaseAt: null,
+          frozenByRefundId: null,
+        },
+      });
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.cancelled },
+      });
+      await prisma.refundRequest.create({
+        data: {
+          refundNumber: `RF-RESIDUAL-${fault}-${orderId.slice(0, 8)}`,
+          orderId,
+          requesterId: buyer.id,
+          reason: fault === "seller" ? "delivery_delayed" : "changed_mind",
+          amount: Number(hold.amount) - RETAINED,
+          status: "refunded",
+          faultParty: fault,
+          policyVersion: 2,
+          policyCode: `v2_${fault}_cancellation`,
+          sellerShippingCompensationAmount: RETAINED,
+          refundedAt: new Date(),
+        },
+      });
+      return { orderId, holdId: hold.id };
+    }
+
+    it("buyer fault: the cron releases the residual, the payout pays exactly it, and a re-run is a no-op", async () => {
+      const prisma = getPrisma();
+      const { holdId, orderId } = await closedOrderWithResidual("buyer");
+      const paymentService = ctx.app.get(PaymentService);
+      const payoutService = ctx.app.get(PayoutService);
+
+      await paymentService.releaseHoldsDue();
+      const released = await prisma.paymentHold.findUniqueOrThrow({
+        where: { id: holdId },
+      });
+      expect(released.status).toBe(PaymentHoldStatus.released);
+
+      expect(await payoutService.createPayoutsForReleasedHolds()).toBe(1);
+      const payout = await prisma.payoutTransfer.findFirstOrThrow({
+        where: { paymentHoldId: holdId },
+      });
+      expect(Number(payout.netAmount)).toBe(RETAINED);
+
+      // Idempotent: a second sweep neither re-releases nor creates a payout.
+      await paymentService.releaseHoldsDue();
+      expect(await payoutService.createPayoutsForReleasedHolds()).toBe(0);
+      expect(
+        await prisma.payoutTransfer.count({ where: { paymentHoldId: holdId } }),
+      ).toBe(1);
+
+      // Transfer → the ledger settles exactly the residual from seller escrow.
+      await payoutService.processPendingPayouts();
+      const settled = await prisma.payoutTransfer.findUniqueOrThrow({
+        where: { id: payout.id },
+      });
+      expect(settled.status).toBe(PayoutStatus.completed);
+      const ledger = await prisma.ledgerEntry.findMany({
+        where: { idempotencyKey: `payout-completed:${payout.id}` },
+      });
+      expect(
+        ledger.map((row) => [row.account, row.direction, Number(row.amount)]),
+      ).toEqual(
+        expect.arrayContaining([
+          ["seller_escrow", "credit", RETAINED],
+          ["payout", "debit", RETAINED],
+        ]),
+      );
+      expect(ledger.every((row) => row.orderId === orderId)).toBe(true);
+    });
+
+    it("seller fault: the residual stays held and the manual release says why", async () => {
+      const prisma = getPrisma();
+      const { holdId, orderId } = await closedOrderWithResidual("seller");
+
+      await ctx.app.get(PaymentService).releaseHoldsDue();
+      const kept = await prisma.paymentHold.findUniqueOrThrow({
+        where: { id: holdId },
+      });
+      expect(kept.status).toBe(PaymentHoldStatus.held);
+
+      const admin = await createAdminUser(ctx.module);
+      const res = await request(ctx.app.getHttpServer())
+        .post(`/api/admin/payouts/release/${orderId}`)
+        .set(authHeader(admin))
+        .send({ reason: "Kalan kargo payı" })
+        .expect(400);
+      expect(res.body.i18nKey).toBe(
+        "server.payment.holdReleaseBlocked.sellerAtFault",
+      );
+      expect(
+        await prisma.payoutTransfer.count({ where: { paymentHoldId: holdId } }),
+      ).toBe(0);
     });
   });
 });

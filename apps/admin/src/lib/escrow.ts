@@ -28,6 +28,3 @@ export function cancellationTypeLabel(
   }
   return { label: type, detail: "" };
 }
-import type { useTranslations } from "next-intl";
-
-type T = ReturnType<typeof useTranslations<never>>;

@@ -370,18 +370,21 @@ describe("AdminOrderService.getOrderCounts", () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     // group source is identical for "all" and "direct_sale" → counted once;
     // the offer-order tab has no group source
-    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(6);
-    // the groupless source differs per tab (its origins) → 3 tabs × 6 buckets
-    expect(prisma.order.count).toHaveBeenCalledTimes(18);
+    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(8);
+    // the groupless source differs per tab (its origins) → 3 tabs × 8 buckets
+    expect(prisma.order.count).toHaveBeenCalledTimes(24);
     expect(prisma.offer.count).not.toHaveBeenCalled();
     // the same where-builder as the list, filters included
     expect(prisma.order.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("offer_order", "new", { party: "ali" })
         .loose,
     });
-    expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
-      where: orderListSourceWheres("all", "other", { party: "ali" }).group,
-    });
+    // the closed carts are split three ways — each its own count
+    for (const bucket of ["cancelled", "refunds", "other"] as const) {
+      expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
+        where: orderListSourceWheres("all", bucket, { party: "ali" }).group,
+      });
+    }
     // "Tümü" counts the tab with the list's own unbucketed where
     expect(prisma.order.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("direct_sale", undefined, { party: "ali" })
@@ -396,6 +399,8 @@ describe("AdminOrderService.getOrderCounts", () => {
         shipped: n,
         in_transit: n,
         delivered: n,
+        cancelled: n,
+        refunds: n,
         other: n,
       },
     });

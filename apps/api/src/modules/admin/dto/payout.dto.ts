@@ -53,6 +53,16 @@ export class PayoutTransactionsQueryDto extends AdminListQueryDto {
   @QueryBoolean()
   @IsBoolean()
   earlyReleased?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Only OVERDUE holds: still held although their release date has passed (the dashboard's holdsOverdue set)",
+    example: true,
+  })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  overdue?: boolean;
 }
 
 export class PayoutScheduleQueryDto extends AdminListQueryDto {

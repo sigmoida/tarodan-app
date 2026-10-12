@@ -112,6 +112,16 @@ export function adminOrdersTabHref(tab: AdminOrdersScreenTab): string {
     : `${ADMIN_ORDERS_PATH}?${ADMIN_ORDERS_TAB_PARAM}=${tab}`;
 }
 
+/**
+ * "Uzun süredir kargoda" listesi: `cutoffIso`'dan önce kargoya verilmiş, hâlâ
+ * kargodaki siparişler (`GET /admin/orders?shippedBefore=`). Kova "Tümü"dür —
+ * böyle bir sepet Kargoya Verilen ya da Taşıma Durumunda olabilir; kapsamsız
+ * açılışın varsayılanı "Yeni" onu gizlerdi.
+ */
+export function adminOrdersShippedBeforeHref(cutoffIso: string): string {
+  return `${ADMIN_ORDERS_PATH}?bucket=all&shippedBefore=${encodeURIComponent(cutoffIso)}`;
+}
+
 /** Teklifler sekmesi — eski `/operations/offers` listesinin yeni yeri. */
 export const ADMIN_OFFERS_TAB_HREF = adminOrdersTabHref("offers");
 

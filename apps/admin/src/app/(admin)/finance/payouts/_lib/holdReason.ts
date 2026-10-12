@@ -1,3 +1,4 @@
+import type { MessageKey } from "@tarodan/i18n";
 /**
  * Hold satırının "serbest bırakılabilir mi / neden değil" rozeti.
  *
@@ -26,8 +27,8 @@ export interface HoldReasonView {
   code: "releasable" | HoldReleaseBlockedReason;
   tone: HoldReasonTone;
   /** `admin.finance.payouts.holdReasons.<code>.label|detail` */
-  labelKey: string;
-  detailKey: string;
+  labelKey: MessageKey;
+  detailKey: MessageKey;
 }
 
 const PREFIX = "admin.finance.payouts.holdReasons";
@@ -44,8 +45,8 @@ const TONE: Record<HoldReasonView["code"], HoldReasonTone> = {
 const view = (code: HoldReasonView["code"]): HoldReasonView => ({
   code,
   tone: TONE[code],
-  labelKey: `${PREFIX}.${code}.label`,
-  detailKey: `${PREFIX}.${code}.detail`,
+  labelKey: `${PREFIX}.${code}.label` as MessageKey,
+  detailKey: `${PREFIX}.${code}.detail` as MessageKey,
 });
 
 /**
