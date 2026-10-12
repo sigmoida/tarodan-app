@@ -1,4 +1,5 @@
 import {
+  DASHBOARD_INFORMATIONAL_QUEUE_PARTS,
   DASHBOARD_QUEUE_KEYS,
   DASHBOARD_QUEUE_PARTS,
   DASHBOARD_QUEUE_PART_KEYS,
@@ -14,6 +15,7 @@ import {
   openAdjustmentsWhere,
   overdueHoldsWhere,
   uninvoicedDeliveredWhere,
+  upcomingHoldsWhere,
 } from "../../finance/finance-health.where";
 import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
 import { defaultTimingValues } from "../../../../common/timing-rules";
@@ -115,6 +117,28 @@ describe("dashboard queue definitions", () => {
       expect(subsets).toEqual(["ticketsUrgent"]);
     });
 
+    it("counts the next 7 days of live, unfrozen releases — never an overdue hold", () => {
+      const weekLater = new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000);
+      expect(whereOf("holdsUpcoming")).toEqual(
+        upcomingHoldsWhere(NOW, weekLater),
+      );
+      expect(whereOf("holdsUpcoming")).toMatchObject({
+        payment: { isTest: false },
+        status: "held",
+        frozenByRefundId: null,
+        releaseAt: { gt: NOW, lte: weekLater },
+      });
+    });
+
+    it("flags only the upcoming-release line as informational, matching the shared list", () => {
+      const informational = DASHBOARD_QUEUE_PART_KEYS.filter(
+        (key) => QUEUE_PART_DEFINITIONS[key].informational,
+      );
+      expect(informational).toEqual([...DASHBOARD_INFORMATIONAL_QUEUE_PARTS]);
+      expect(informational).toEqual(["holdsUpcoming"]);
+      expect(DASHBOARD_QUEUE_PARTS.moneyOperations).toContain("holdsUpcoming");
+    });
+
     it("reuses the finance health definitions instead of restating them", () => {
       expect(whereOf("payoutsFailed")).toEqual(failedTransfersWhere);
       expect(whereOf("holdsOverdue")).toEqual(overdueHoldsWhere(NOW));
@@ -183,6 +207,7 @@ describe("dashboard queue definitions", () => {
       "tradeCompensationPending",
       "payoutsFailed",
       "holdsOverdue",
+      "holdsUpcoming",
       "ordersUninvoiced",
       "shipmentsWithoutTracking",
     ] as const)("%s excludes the test lane", (key) => {
@@ -229,6 +254,15 @@ describe("dashboard queue definitions", () => {
         _sum: { remainingAmount: "125.456" },
       });
       expect(reading).toEqual({ count: 2, oldestAt: null, amount: 125.46 });
+    });
+
+    it("sums what will actually reach sellers for upcoming releases: amount − refundedAmount", () => {
+      const reading = QUEUE_PART_DEFINITIONS.holdsUpcoming.read({
+        _count: { _all: 3 },
+        _sum: { amount: "1000.10", refundedAmount: "150.05" },
+      });
+      // A calendar line has no waiting item to age.
+      expect(reading).toEqual({ count: 3, oldestAt: null, amount: 850.05 });
     });
 
     it("survives an empty aggregate without inventing a zero-age item", () => {

@@ -191,6 +191,8 @@ export const DASHBOARD_QUEUE_PART_KEYS = [
   "payoutsFailed",
   "holdsOverdue",
   "adjustmentsOpen",
+  // Bilgi satırı: 7 gün içinde serbest kalacak hold'lar (iş değil, takvim).
+  "holdsUpcoming",
   // documents
   "invoicesExhausted",
   "ordersUninvoiced",
@@ -216,15 +218,50 @@ export const DASHBOARD_QUEUE_PARTS: Record<
   listingModeration: ["productsPending", "messagesPendingApproval"],
   sellerApplications: ["corporateApplications", "sellerDocuments"],
   supportAndReports: ["ticketsOpen", "ticketsUrgent", "reportsPending"],
-  moneyOperations: ["payoutsFailed", "holdsOverdue", "adjustmentsOpen"],
+  moneyOperations: [
+    "payoutsFailed",
+    "holdsOverdue",
+    "adjustmentsOpen",
+    "holdsUpcoming",
+  ],
   documents: ["invoicesExhausted", "ordersUninvoiced"],
   shipping: ["carrierCancellations", "shipmentsWithoutTracking"],
 };
 
 /**
+ * BİLGİ satırları: bekleyen iş değil, yaklaşan takvim. Kutunun "bekleyen iş"
+ * toplamına ve yaşına (oldestAt) girmez; satır kendi adedini ve tutarını
+ * gösterir.
+ */
+export const DASHBOARD_INFORMATIONAL_QUEUE_PARTS: readonly DashboardQueuePartKey[] =
+  ["holdsUpcoming"];
+
+/**
+ * Finans listelerinin süzülmüş adresleri — dashboard satırları ve Finans
+ * Özeti'nin sağlık şeridi AYNI adresi açsın diye tek yerde.
+ */
+export const ADMIN_FINANCE_LIST_HREFS = {
+  /** Transferler sekmesi, `failed` durumu (`returned` ayrı seçilir). */
+  failedTransfers: "/finance/payouts?tab=transfers&status=failed",
+  /** Transferler sekmesi, `retry_pending` durumu. */
+  retryPendingTransfers: "/finance/payouts?tab=transfers&status=retry_pending",
+  /** Escrow sekmesi, süresi geçmiş hâlâ tutulan hold'lar (`overdue=true`). */
+  overdueHolds: "/finance/payouts?tab=escrow&status=held&overdue=true",
+  /** Borç mahsupları sekmesi, açık borçlar. */
+  openAdjustments: "/finance/payouts?tab=adjustments&status=open",
+  /** Ödeme planı sekmesi: serbest kalma tarihine göre sıralı tutulan hold'lar. */
+  releaseSchedule: "/finance/payouts?tab=schedule",
+} as const;
+
+/** Taşıyıcı iptal görevleri sekmesi — liste `pending` ile açılır. */
+export const ADMIN_CARRIER_CANCELLATIONS_HREF =
+  "/operations/shipping?tab=iptaller";
+
+/**
  * The admin screen each line owns. A queue tile is useless without the screen
  * that clears it, so the link lives with the definition instead of being
- * re-guessed in JSX.
+ * re-guessed in JSX. Satırın listeyle birebir mi, daha geniş mi eşleştiği
+ * `docs/DASHBOARD_LINKS.md`'de.
  */
 export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
   {
@@ -235,19 +272,20 @@ export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
     tradeDisputesOpen: ADMIN_TRADES_TAB_HREF,
     tradeRefundFailures: ADMIN_TRADES_TAB_HREF,
     tradeCompensationPending: ADMIN_TRADES_TAB_HREF,
-    productsPending: "/catalog/products",
+    productsPending: "/catalog/products?tab=pending",
     messagesPendingApproval: "/messaging/messages",
     corporateApplications: "/accounts/seller-applications",
     sellerDocuments: "/accounts/seller-applications",
     ticketsOpen: "/messaging/support",
     ticketsUrgent: "/messaging/support",
     reportsPending: "/accounts/reports",
-    payoutsFailed: "/finance/payouts",
-    holdsOverdue: "/finance/overview",
-    adjustmentsOpen: "/finance/overview",
+    payoutsFailed: ADMIN_FINANCE_LIST_HREFS.failedTransfers,
+    holdsOverdue: ADMIN_FINANCE_LIST_HREFS.overdueHolds,
+    adjustmentsOpen: ADMIN_FINANCE_LIST_HREFS.openAdjustments,
+    holdsUpcoming: ADMIN_FINANCE_LIST_HREFS.releaseSchedule,
     invoicesExhausted: "/finance/invoices",
     ordersUninvoiced: "/finance/invoices",
-    carrierCancellations: "/operations/shipping",
+    carrierCancellations: ADMIN_CARRIER_CANCELLATIONS_HREF,
     shipmentsWithoutTracking: "/operations/shipping",
   };
 
@@ -268,14 +306,25 @@ export interface DashboardQueuePart {
   count: number;
   /** Age driver: when the oldest waiting item entered the queue. */
   oldestAt: string | null;
-  /** Only where money is the unit of work (open seller debt). */
+  /**
+   * Only where money is the unit of work (open seller debt) or the line is a
+   * money calendar (upcoming releases: Σ amount − refundedAmount).
+   */
   amount?: number;
+  /**
+   * Bilgi satırı (`DASHBOARD_INFORMATIONAL_QUEUE_PARTS`): bekleyen iş değil;
+   * kutu toplamına ve yaşına girmez, `oldestAt` her zaman null'dır.
+   */
+  informational?: true;
   href: string;
 }
 
 export interface DashboardQueueTile {
   key: DashboardQueueKey;
-  /** Sum of the tile's lines, minus lines flagged as a subset of another. */
+  /**
+   * Sum of the tile's lines, minus lines flagged as a subset of another and
+   * minus informational lines.
+   */
   total: number;
   oldestAt: string | null;
   parts: DashboardQueuePart[];
@@ -331,7 +380,9 @@ export interface DashboardAlert {
 }
 
 export const DASHBOARD_ALERT_LINKS: Record<DashboardAlertKey, string> = {
-  stuckShippedOrders: "/operations/shipping",
+  // API eşik anını ekler: `adminOrdersShippedBeforeHref(<kesim>)`. Bu sabit
+  // yalnız eşiksiz geri dönüştür.
+  stuckShippedOrders: ADMIN_ORDERS_PATH,
   stuckWarehouseTrades: ADMIN_TRADES_TAB_HREF,
   stuckOutboundTrades: ADMIN_TRADES_TAB_HREF,
   paymentsMissingFromStatement: "/finance/psp",
@@ -339,14 +390,15 @@ export const DASHBOARD_ALERT_LINKS: Record<DashboardAlertKey, string> = {
   commissionLedgerDrift: "/finance/overview",
   paymentsWithoutOrders: "/finance/overview",
   ordersWithoutHold: "/finance/overview",
+  // Panelde outbox ekranı yok; en yakın yüzey sistem logları (hata sekmesi).
   outboxDead: "/system/logs",
   outboxStuckProcessing: "/system/logs",
   noActiveCommissionRuleSet: "/finance/commission",
   noActiveShippingTariff: "/system/shipping-tariffs",
   staleCouponReservations: "/marketing/discounts",
   deliveredHoldsWithoutRelease: "/finance/payouts",
-  agedCarrierCancellations: "/operations/shipping",
-  exhaustedPayoutRetries: "/finance/payouts",
+  agedCarrierCancellations: ADMIN_CARRIER_CANCELLATIONS_HREF,
+  exhaustedPayoutRetries: ADMIN_FINANCE_LIST_HREFS.retryPendingTransfers,
   preparingDeadlineApproaching: ADMIN_ORDERS_PATH,
 };
 

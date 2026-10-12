@@ -17,7 +17,10 @@ describe("AdminDashboardWorklistService", () => {
   let revenueSplit: any;
   let service: AdminDashboardWorklistService;
   /** Per-part reading the stubbed aggregate should answer with. */
-  let partReadings: Record<string, { count: number; oldestAt: Date | null }>;
+  let partReadings: Record<
+    string,
+    { count: number; oldestAt: Date | null; amount?: number }
+  >;
   /** Per-alert count the stubbed query should answer with. */
   let alertCounts: Record<string, number>;
 
@@ -108,6 +111,26 @@ describe("AdminDashboardWorklistService", () => {
 
     // 7 open (3 of them urgent) + 2 reports — not 12.
     expect(support?.total).toBe(9);
+  });
+
+  it("shows upcoming releases in the money tile without counting them as waiting work", async () => {
+    partReadings.payoutsFailed = { count: 2, oldestAt: RECENT };
+    partReadings.holdsUpcoming = { count: 5, oldestAt: null, amount: 1234.5 };
+
+    const { queues } = await service.getWorklist();
+    const money = queues.find((tile) => tile.key === "moneyOperations");
+    const upcoming = money?.parts.find((part) => part.key === "holdsUpcoming");
+
+    expect(money?.total).toBe(2);
+    expect(money?.oldestAt).toBe(RECENT.toISOString());
+    expect(upcoming).toEqual({
+      key: "holdsUpcoming",
+      count: 5,
+      oldestAt: null,
+      amount: 1234.5,
+      informational: true,
+      href: "/finance/payouts?tab=schedule",
+    });
   });
 
   it("ages a tile by its OLDEST waiting item, ignoring empty lines", async () => {

@@ -7876,6 +7876,7 @@
         "payoutsFailed": "Başarısız transfer",
         "holdsOverdue": "Süresi geçmiş escrow",
         "adjustmentsOpen": "Açık satıcı borcu",
+        "holdsUpcoming": "7 gün içinde serbest kalacak",
         "invoicesExhausted": "Denemesi tükenmiş belge",
         "ordersUninvoiced": "Faturasız teslimat",
         "carrierCancellations": "Taşıyıcı iptal görevi",

@@ -108,15 +108,20 @@ export class AdminDashboardWorklistService {
       for (const partKey of DASHBOARD_QUEUE_PARTS[queueKey]) {
         const reading = readings.get(partKey);
         if (!reading) continue;
+        const definition = QUEUE_PART_DEFINITIONS[partKey];
         parts.push({
           key: partKey,
           count: reading.count,
           oldestAt: reading.oldestAt ? reading.oldestAt.toISOString() : null,
           ...(reading.amount === undefined ? {} : { amount: reading.amount }),
+          ...(definition.informational ? { informational: true as const } : {}),
           href: DASHBOARD_QUEUE_PART_LINKS[partKey],
         });
+        // Bilgi satırı (yaklaşan serbest bırakmalar) bekleyen iş değildir:
+        // ne toplama ne de kutunun yaşına girer.
+        if (definition.informational) continue;
         // Alt küme satırı (acil destek talebi) toplamı ikinci kez şişirmez.
-        if (!QUEUE_PART_DEFINITIONS[partKey].subsetOf) total += reading.count;
+        if (!definition.subsetOf) total += reading.count;
         if (
           reading.count > 0 &&
           reading.oldestAt &&

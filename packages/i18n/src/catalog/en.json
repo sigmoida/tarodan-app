@@ -7876,6 +7876,7 @@
         "payoutsFailed": "Failed transfers",
         "holdsOverdue": "Overdue escrow",
         "adjustmentsOpen": "Open seller debt",
+        "holdsUpcoming": "Releasing within 7 days",
         "invoicesExhausted": "Documents out of retries",
         "ordersUninvoiced": "Uninvoiced deliveries",
         "carrierCancellations": "Carrier cancellation tasks",

@@ -11,7 +11,11 @@ import {
   LIVE_PAYMENT,
   LIVE_PAYOUT_TRANSFER,
 } from "../../account-lane/live-lane.where";
-import { failedTransfersWhere } from "./finance-health.where";
+import {
+  failedTransfersWhere,
+  overdueHoldsWhere,
+  upcomingHoldsWhere,
+} from "./finance-health.where";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PayoutService } from "../../payout/payout.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
@@ -145,12 +149,11 @@ export class AdminPayoutService {
         _count: { id: true },
       }),
       this.prisma.payoutTransfer.count({ where: failedTransfersWhere }),
+      // "Yaklaşan" = tarihi HENÜZ gelmemiş ve tarihinde açılacak olan. Süresi
+      // geçmiş hold'lar artı tarihe göre en başa dizildiği için kartı
+      // dolduruyordu; onların yeri "süresi geçmiş hold" kuyruğudur.
       this.prisma.paymentHold.findMany({
-        where: {
-          ...liveHold,
-          status: PaymentHoldStatus.held,
-          releaseAt: { not: null },
-        },
+        where: upcomingHoldsWhere(new Date()),
         orderBy: { releaseAt: "asc" },
         take: 5,
         select: {
@@ -409,16 +412,26 @@ export class AdminPayoutService {
    * — sunucu tarafında kaldığından sayfalama ve toplam doğru kalır. NULL
    * karşılaştırması SQL'de elenir: bırakılmamış ya da planlanmamış satır girmez.
    * Kural `earlyReleaseDays` (@tarodan/types) ile aynıdır.
+   *
+   * `overdue`: dashboard'un "süresi geçmiş hold" kuyruğu ve Finans Özeti
+   * sağlık şeridiyle AYNI küme (`overdueHoldsWhere`) — bağlantı sayılanı açar.
    */
-  private holdListWhere(filter: {
-    sellerId?: string;
-    status?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    earlyReleased?: boolean;
-  }): Prisma.PaymentHoldWhereInput {
-    const { sellerId, status, dateFrom, dateTo, earlyReleased } = filter;
-    const where: Prisma.PaymentHoldWhereInput = {};
+  private holdListWhere(
+    filter: {
+      sellerId?: string;
+      status?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      earlyReleased?: boolean;
+      overdue?: boolean;
+    },
+    now = new Date(),
+  ): Prisma.PaymentHoldWhereInput {
+    const { sellerId, status, dateFrom, dateTo, earlyReleased, overdue } =
+      filter;
+    const where: Prisma.PaymentHoldWhereInput = overdue
+      ? { AND: [overdueHoldsWhere(now)] }
+      : {};
     if (sellerId) where.sellerId = sellerId;
     if (status) where.status = status as PaymentHoldStatus;
     if (dateFrom || dateTo) {
@@ -529,7 +542,10 @@ export class AdminPayoutService {
     sortType?: "text" | "number" | "date";
   }) {
     const { sellerId, search } = query;
+    // Test şeridi hold'u payout'ta bilinçli atlanır — planda görünürse hiç
+    // gerçekleşmeyecek bir ödeme gibi durur.
     const where: Prisma.PaymentHoldWhereInput = {
+      payment: LIVE_PAYMENT,
       status: PaymentHoldStatus.held,
     };
     if (sellerId) where.sellerId = sellerId;
