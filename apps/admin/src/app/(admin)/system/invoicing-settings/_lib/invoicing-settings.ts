@@ -1,6 +1,12 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
+import {
+  NETSIS_ACCOUNT_CODE_MAX,
+  NETSIS_CARI_CODE_MAX,
+  NETSIS_ITEM_CODE_MAX,
+  isValidNetsisSerial,
+} from "@tarodan/types";
 import type {
   InvoicingFeeType,
   InvoicingSettingGroup,
@@ -13,16 +19,11 @@ import type {
 type T = ReturnType<typeof useTranslations<never>>;
 
 /**
- * Faturalama Ayarları ekranının saf mantığı. Kurallar sunucudakinin aynasıdır
- * (`netsis-invoice-settings.ts`): seri 3 karakter A-Z0-9, cari kodu en çok 15,
- * hizmet kartı kodu en çok 35 karakter; metinler kırpılır. Sunucu aynı
- * kuralları yine uygular — buradaki doğrulama yalnız erken geri bildirimdir.
+ * Faturalama Ayarları ekranının saf mantığı. Seri deseni ve cari / hizmet
+ * kartı / muhasebe hesap kodu sınırları sunucuyla ORTAKTIR (`@tarodan/types`
+ * → `netsis-settings.ts`); metinler kırpılır. Sunucu aynı kuralları yine
+ * uygular — buradaki doğrulama yalnız erken geri bildirimdir.
  */
-export const SERIAL_PATTERN = /^[A-Z0-9]{3}$/;
-export const CARI_CODE_MAX_LENGTH = 15;
-export const ITEM_CODE_MAX_LENGTH = 35;
-/** Muhasebe hesap kodu (`netsis.account.*`); sunucuda `NETSIS_ACCOUNT_CODE_MAX_LENGTH`. */
-export const ACCOUNT_CODE_MAX_LENGTH = 30;
 
 export type InvoicingFormValues = Record<string, string | boolean>;
 export type InvoicingSettingsPayloadValues = Record<string, string | boolean>;
@@ -92,16 +93,16 @@ export function violationOf(
 ): InvoicingViolation | null {
   if (typeof normalized !== "string" || normalized === "") return null;
   if (row.group === "serial") {
-    return SERIAL_PATTERN.test(normalized) ? null : "serial";
+    return isValidNetsisSerial(normalized) ? null : "serial";
   }
   if (row.group === "cari") {
-    return normalized.length > CARI_CODE_MAX_LENGTH ? "cariMax" : null;
+    return normalized.length > NETSIS_CARI_CODE_MAX ? "cariMax" : null;
   }
   if (row.group === "item") {
-    return normalized.length > ITEM_CODE_MAX_LENGTH ? "itemMax" : null;
+    return normalized.length > NETSIS_ITEM_CODE_MAX ? "itemMax" : null;
   }
   if (row.group === "account") {
-    return normalized.length > ACCOUNT_CODE_MAX_LENGTH ? "accountMax" : null;
+    return normalized.length > NETSIS_ACCOUNT_CODE_MAX ? "accountMax" : null;
   }
   // Belge grubu (ör. sorgulama adresi): biçim kuralı sunucuda.
   return null;
@@ -109,9 +110,9 @@ export function violationOf(
 
 const VIOLATION_PARAMS: Record<InvoicingViolation, Record<string, number>> = {
   serial: {},
-  cariMax: { max: CARI_CODE_MAX_LENGTH },
-  itemMax: { max: ITEM_CODE_MAX_LENGTH },
-  accountMax: { max: ACCOUNT_CODE_MAX_LENGTH },
+  cariMax: { max: NETSIS_CARI_CODE_MAX },
+  itemMax: { max: NETSIS_ITEM_CODE_MAX },
+  accountMax: { max: NETSIS_ACCOUNT_CODE_MAX },
 };
 
 /** Formun zod şeması: her ayarın kuralı kendi alan adı altında raporlanır. */

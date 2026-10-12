@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { useTranslations } from "next-intl";
+import {
+  NETSIS_ACCOUNT_CODE_MAX,
+  NETSIS_CARI_CODE_MAX,
+  NETSIS_ITEM_CODE_MAX,
+} from "@tarodan/types";
 import type {
   InvoicingFeeType,
   InvoicingSettingRow,
@@ -116,16 +121,26 @@ describe("normalizeValue / violationOf", () => {
     expect(violationOf(EARCHIVE, "E-R")).toBe("serial");
   });
 
-  it("cari en çok 15, hizmet kartı en çok 35 karakter", () => {
-    expect(violationOf(RETAIL, "x".repeat(15))).toBeNull();
-    expect(violationOf(RETAIL, "x".repeat(16))).toBe("cariMax");
-    expect(violationOf(MEMBERSHIP, "x".repeat(35))).toBeNull();
-    expect(violationOf(MEMBERSHIP, "x".repeat(36))).toBe("itemMax");
+  it("cari ve hizmet kartı kodu ortak sınırlarla (@tarodan/types)", () => {
+    expect(violationOf(RETAIL, "x".repeat(NETSIS_CARI_CODE_MAX))).toBeNull();
+    expect(violationOf(RETAIL, "x".repeat(NETSIS_CARI_CODE_MAX + 1))).toBe(
+      "cariMax",
+    );
+    expect(
+      violationOf(MEMBERSHIP, "x".repeat(NETSIS_ITEM_CODE_MAX)),
+    ).toBeNull();
+    expect(
+      violationOf(MEMBERSHIP, "x".repeat(NETSIS_ITEM_CODE_MAX + 1)),
+    ).toBe("itemMax");
   });
 
-  it("muhasebe hesap kodu en çok 30 karakter", () => {
-    expect(violationOf(CLEARING, "x".repeat(30))).toBeNull();
-    expect(violationOf(CLEARING, "x".repeat(31))).toBe("accountMax");
+  it("muhasebe hesap kodu ortak sınırla (@tarodan/types)", () => {
+    expect(
+      violationOf(CLEARING, "x".repeat(NETSIS_ACCOUNT_CODE_MAX)),
+    ).toBeNull();
+    expect(
+      violationOf(CLEARING, "x".repeat(NETSIS_ACCOUNT_CODE_MAX + 1)),
+    ).toBe("accountMax");
   });
 
   it("boş değer ve mantıksal ayar ihlal sayılmaz", () => {
@@ -160,18 +175,18 @@ describe("invoicingSettingsSchema", () => {
       issues({
         ...toFormValues(ROWS),
         [fieldName(EARCHIVE.key)]: "TOOLONG",
-        [fieldName(RETAIL.key)]: "x".repeat(16),
-        [fieldName(MEMBERSHIP.key)]: "y".repeat(36),
-        [fieldName(CLEARING.key)]: "z".repeat(31),
+        [fieldName(RETAIL.key)]: "x".repeat(NETSIS_CARI_CODE_MAX + 1),
+        [fieldName(MEMBERSHIP.key)]: "y".repeat(NETSIS_ITEM_CODE_MAX + 1),
+        [fieldName(CLEARING.key)]: "z".repeat(NETSIS_ACCOUNT_CODE_MAX + 1),
       }),
     ).toEqual({
       netsis__account__paytrClearing:
-        'admin.invoicingSettings.validation.accountMax:{"max":30}',
+        `admin.invoicingSettings.validation.accountMax:{"max":${NETSIS_ACCOUNT_CODE_MAX}}`,
       netsis__serial__earchive: "admin.invoicingSettings.validation.serial",
       netsis__cari__retailCode:
-        'admin.invoicingSettings.validation.cariMax:{"max":15}',
+        `admin.invoicingSettings.validation.cariMax:{"max":${NETSIS_CARI_CODE_MAX}}`,
       netsis__item__membership:
-        'admin.invoicingSettings.validation.itemMax:{"max":35}',
+        `admin.invoicingSettings.validation.itemMax:{"max":${NETSIS_ITEM_CODE_MAX}}`,
     });
   });
 });
