@@ -1,14 +1,17 @@
 "use client";
 
-import type { AdminRefundBucket, AdminRefundTab } from "@tarodan/types";
+import {
+  resolveAdminRefundBucket,
+  resolveAdminRefundTab,
+  type AdminRefundBucket,
+  type AdminRefundTab,
+} from "@tarodan/types";
 import { useTabParam } from "@/hooks/useTabParam";
 import {
   DEFAULT_REFUND_BUCKET,
   DEFAULT_REFUND_TAB,
   REFUND_BUCKET_PARAM,
   REFUND_TAB_SCOPED_PARAMS,
-  resolveRefundBucket,
-  resolveRefundTab,
 } from "../_lib/screenTabs";
 
 // Module-level so the setters keep their identity across renders.
@@ -32,8 +35,8 @@ export function useRefundTabs(): {
     BUCKET_OPTIONS,
   );
   return {
-    tab: resolveRefundTab(rawTab),
-    bucket: resolveRefundBucket(rawBucket),
+    tab: resolveAdminRefundTab(rawTab),
+    bucket: resolveAdminRefundBucket(rawBucket),
     setTab,
     setBucket,
   };

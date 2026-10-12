@@ -91,13 +91,15 @@ const BUILDERS: Record<RefundColumnKey, RefundColumnBuilder> = {
     col.custom<AdminRefundRow>(
       t("admin.operations.refunds.columns.amount"),
       (row) => <RefundAmountCell row={row} />,
-      { minWidth: 170, sortKey: "amount", sortType: "number" },
+      // API yalnız iade anına göre sıralar (`sortOrder`); başka başlık
+      // sıralanabilir görünürse tıklama sessizce tarihe göre sıralardı.
+      { minWidth: 170 },
     ),
   status: (t) =>
     col.custom<AdminRefundRow>(
       t("admin.operations.refunds.columns.status"),
       (row) => <RefundStatusCell row={row} />,
-      { minWidth: 170, sortKey: "status", sortType: "text" },
+      { minWidth: 170 },
     ),
   invoice: (t) =>
     col.custom<AdminRefundRow>(

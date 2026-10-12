@@ -1,4 +1,4 @@
-import { ADMIN_REFUNDS_VIEW_HREF } from "./admin-cancellations";
+import { ADMIN_REFUNDS_PATH } from "./admin-refund-list";
 import {
   ADMIN_ORDERS_PATH,
   ADMIN_TRADES_TAB_HREF,
@@ -282,9 +282,9 @@ export const ADMIN_CARRIER_CANCELLATIONS_HREF =
  */
 export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
   {
-    // İadeler sekmesi, kuyruğun kendi durumuyla süzülmüş.
-    refundsPendingReview: `${ADMIN_REFUNDS_VIEW_HREF}&status=pending_review`,
-    refundsDisputed: `${ADMIN_REFUNDS_VIEW_HREF}&status=disputed`,
+    // İadeler ekranı, kuyruğun kendi alt sekmesine açılmış.
+    refundsPendingReview: `${ADMIN_REFUNDS_PATH}?bucket=pending_review`,
+    refundsDisputed: `${ADMIN_REFUNDS_PATH}?bucket=disputed`,
     tradesAtWarehouse: ADMIN_TRADES_TAB_HREF,
     tradeDisputesOpen: ADMIN_TRADES_TAB_HREF,
     tradeRefundFailures: ADMIN_TRADES_TAB_HREF,
@@ -308,7 +308,7 @@ export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
 
 /** The tile's own link — the screen that clears most of it. */
 export const DASHBOARD_QUEUE_LINKS: Record<DashboardQueueKey, string> = {
-  refundRequests: ADMIN_REFUNDS_VIEW_HREF,
+  refundRequests: ADMIN_REFUNDS_PATH,
   tradeOperations: ADMIN_TRADES_TAB_HREF,
   listingModeration: "/catalog/products",
   sellerApplications: "/accounts/seller-applications",

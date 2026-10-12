@@ -1,11 +1,15 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ADMIN_REFUND_BUCKETS, ADMIN_REFUND_BUCKET_I18N_KEYS, ADMIN_REFUND_TABS } from "@tarodan/types";
+import {
+  ADMIN_REFUND_BUCKETS,
+  ADMIN_REFUND_BUCKET_I18N_KEYS,
+  ADMIN_REFUND_TABS,
+  ADMIN_REFUND_TAB_I18N_KEYS,
+} from "@tarodan/types";
 import { AdminTabs } from "@/components/AdminTabs";
 import { useRefundTabs } from "../_hooks/useRefundTabs";
 import { useRefundCounts } from "../_hooks/useRefundCounts";
-import { REFUND_TAB_I18N_KEYS } from "../_lib/screenTabs";
 
 const PENDING = "…";
 
@@ -25,7 +29,7 @@ export function RefundsTabBar() {
       <AdminTabs
         tabs={ADMIN_REFUND_TABS.map((key) => ({
           key,
-          label: t(REFUND_TAB_I18N_KEYS[key]),
+          label: t(ADMIN_REFUND_TAB_I18N_KEYS[key]),
         }))}
         value={tab}
         onChange={setTab}

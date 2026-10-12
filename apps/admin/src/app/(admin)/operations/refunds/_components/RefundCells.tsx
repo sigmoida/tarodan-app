@@ -2,16 +2,19 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   Badge,
-  enumLabel,
-  refundReasonConfig,
   refundRequestStatusConfig,
   shipmentStatusConfig,
+  tradeStatusConfig,
 } from "@tarodan/ui";
-import type { AdminRefundRow } from "@tarodan/types";
+import {
+  ADMIN_REFUND_WAREHOUSE_DECISION_I18N_KEYS,
+  adminRefundReasonI18nKey,
+  type AdminRefundRow,
+} from "@tarodan/types";
 import { CellUser, TruncatedText } from "@/components/table";
 import { TextLink } from "@/components/TextLink";
 import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
-import { statusConfig } from "@/lib/statusLabels";
+import { statusConfig, statusLabel } from "@/lib/statusLabels";
 import { InvoicePdfButton } from "@/app/(admin)/finance/invoices/_components/InvoicePdfButton";
 import { MONEY_STATUS_BADGES } from "../_lib/moneyView";
 import {
@@ -22,13 +25,20 @@ import {
 
 const DASH = <span className="text-subtle">—</span>;
 
-/** İade no (kalın, iade dosyasına bağlı) + oluşturulma anı; takasta rol rozeti. */
+/** Satırın dosyası: talep dosyası; takas satırının dosyası takasın kendisidir. */
+export function refundRowHref(row: AdminRefundRow): string {
+  return row.trade
+    ? `/operations/trades/${row.trade.tradeId}`
+    : `/operations/refund-requests/${row.id}`;
+}
+
+/** İade no (kalın, dosyasına bağlı) + oluşturulma anı; takasta rol rozeti. */
 export function RefundNoCell({ row }: { row: AdminRefundRow }) {
   const t = useTranslations();
   return (
     <div className="flex flex-col items-start gap-0.5 leading-tight">
       <Link
-        href={`/operations/refund-requests/${row.id}`}
+        href={refundRowHref(row)}
         className="whitespace-nowrap font-semibold text-primary-600 underline underline-offset-2 hover:text-primary-700"
       >
         {row.refundNo}
@@ -37,7 +47,9 @@ export function RefundNoCell({ row }: { row: AdminRefundRow }) {
         {fmtDateTime(row.createdAt)}
       </span>
       {row.trade && (
-        <Badge variant="outline">{t(TRADE_ROLE_I18N_KEYS[row.trade.role])}</Badge>
+        <Badge variant="outline">
+          {t(TRADE_ROLE_I18N_KEYS[row.trade.role])}
+        </Badge>
       )}
     </div>
   );
@@ -49,7 +61,10 @@ export function RefundOrderCell({ row }: { row: AdminRefundRow }) {
   const ref = refundGroupRef(row);
   return (
     <div className="flex flex-col items-start gap-0.5 leading-tight">
-      <TextLink href={`/operations/orders/${row.order.id}`} className="whitespace-nowrap">
+      <TextLink
+        href={`/operations/orders/${row.order.id}`}
+        className="whitespace-nowrap"
+      >
         {row.order.orderNumber}
       </TextLink>
       <span className="whitespace-nowrap text-xs text-muted">
@@ -75,10 +90,7 @@ export function RefundOrderCell({ row }: { row: AdminRefundRow }) {
 /** Alıcı ve satıcı alt alta; kullanıcı kodu ikincil satırda. */
 export function RefundPartiesCell({ row }: { row: AdminRefundRow }) {
   const t = useTranslations();
-  const party = (
-    role: string,
-    p: AdminRefundRow["buyer"],
-  ) => (
+  const party = (role: string, p: AdminRefundRow["buyer"]) => (
     <CellUser
       name={p.name}
       secondary={[role, p.code].filter(Boolean).join(" · ")}
@@ -136,10 +148,21 @@ export function RefundWarehouseCell({ row }: { row: AdminRefundRow }) {
       {t(labelKey)} <span className="text-body">{value ?? "—"}</span>
     </span>
   );
+  // Kargo durumları ve depo kararı ham enum değil, dökümle aynı etiketlerdir.
+  const shipment = (status: string | null) =>
+    status ? statusLabel(shipmentStatusConfig, status, t) : null;
   return (
     <div className="flex flex-col items-start gap-0.5 leading-tight">
-      {line("admin.operations.refunds.warehouse.arrival", w.arrivalStatus)}
-      {line("admin.operations.refunds.warehouse.decision", w.decision)}
+      {line(
+        "admin.operations.refunds.warehouse.arrival",
+        shipment(w.arrivalStatus),
+      )}
+      {line(
+        "admin.operations.refunds.warehouse.decision",
+        w.decision
+          ? t(ADMIN_REFUND_WAREHOUSE_DECISION_I18N_KEYS[w.decision])
+          : null,
+      )}
       <span className="whitespace-nowrap text-xs text-muted">
         {t("admin.operations.refunds.warehouse.outbound")}{" "}
         <span className="text-body">{fmtDate(w.outboundAt) ?? "—"}</span>
@@ -154,22 +177,23 @@ export function RefundWarehouseCell({ row }: { row: AdminRefundRow }) {
       </span>
       {line(
         "admin.operations.refunds.warehouse.returnToCustomers",
-        w.returnToCustomersStatus,
+        shipment(w.returnToCustomersStatus),
       )}
     </div>
   );
 }
 
-/** İade nedeni etiketi + kısaltılmış not (tamamı ipucunda). */
+/**
+ * İade nedeni etiketi + kısaltılmış not (tamamı ipucunda). Neden anahtarı
+ * kökene göredir (talepte `RefundReason`, takasta yönetici iptal kodu) —
+ * dökümle aynı çözüm (`adminRefundReasonI18nKey`).
+ */
 export function RefundReasonCell({ row }: { row: AdminRefundRow }) {
   const t = useTranslations();
+  const key = adminRefundReasonI18nKey(row.origin, row.reason.code);
   const label =
     row.reason.label ??
-    enumLabel(
-      statusConfig(refundReasonConfig, t),
-      row.reason.code,
-      row.reason.code ?? "—",
-    );
+    (key ? t(key as Parameters<typeof t>[0]) : (row.reason.code ?? "—"));
   const note = truncateNote(row.reason.note);
   return (
     <div className="flex min-w-0 flex-col leading-tight">
@@ -205,15 +229,14 @@ export function RefundAmountCell({ row }: { row: AdminRefundRow }) {
   );
 }
 
-/** İade talebi durumu + tamamlanma anı. */
+/** Satır durumu (talep durumu; takasta takas durumu) + tamamlanma anı. */
 export function RefundStatusCell({ row }: { row: AdminRefundRow }) {
   const t = useTranslations();
+  const config =
+    row.origin === "trade" ? tradeStatusConfig : refundRequestStatusConfig;
   return (
     <div className="flex flex-col items-start gap-0.5 leading-tight">
-      <Badge
-        status={row.status}
-        config={statusConfig(refundRequestStatusConfig, t)}
-      />
+      <Badge status={row.status} config={statusConfig(config, t)} />
       {row.completedAt && (
         <span className="whitespace-nowrap text-xs text-muted">
           {fmtDateTime(row.completedAt)}

@@ -1,17 +1,19 @@
 import {
-  ADMIN_REFUND_BUCKETS,
-  ADMIN_REFUND_TABS,
+  ADMIN_REFUNDS_PATH,
+  resolveAdminRefundBucket,
+  resolveAdminRefundTab,
   type AdminRefundBucket,
   type AdminRefundTab,
 } from "@tarodan/types";
 import { toSearchParams, type QueryInput } from "@/lib/redirect-query";
 
 /**
- * İadeler ekranının adresi ve sekme davranışı. Üst sekme (`?tab=`) ve alt
- * sekme (`?bucket=`) URL'de yaşar; sözlükleri `@tarodan/types`'tan gelir.
+ * İadeler ekranının sekme davranışı. Üst sekme (`?tab=`) ve alt sekme
+ * (`?bucket=`) URL'de yaşar; adres, sözlükler, etiket anahtarları ve
+ * çözücüler `@tarodan/types`'tadır (`admin-refund-list.ts`).
  */
 
-export const REFUNDS_PATH = "/operations/refunds";
+export const REFUNDS_PATH = ADMIN_REFUNDS_PATH;
 
 export const REFUND_TAB_PARAM = "tab";
 export const REFUND_BUCKET_PARAM = "bucket";
@@ -19,30 +21,11 @@ export const REFUND_BUCKET_PARAM = "bucket";
 export const DEFAULT_REFUND_TAB = "all" satisfies AdminRefundTab;
 export const DEFAULT_REFUND_BUCKET = "all" satisfies AdminRefundBucket;
 
-export const REFUND_TAB_I18N_KEYS = {
-  all: "admin.operations.refunds.tabs.all",
-  direct: "admin.operations.refunds.tabs.direct",
-  offer: "admin.operations.refunds.tabs.offer",
-  trade: "admin.operations.refunds.tabs.trade",
-} as const satisfies Record<AdminRefundTab, string>;
-
 /**
  * Üst sekme değişince silinen parametre: alt sekme. Arama / tarih / tür
  * filtreleri dört sekmede de aynıdır, sekmeler arasında KALIR.
  */
 export const REFUND_TAB_SCOPED_PARAMS = [REFUND_BUCKET_PARAM] as const;
-
-export function resolveRefundTab(value: unknown): AdminRefundTab {
-  return (ADMIN_REFUND_TABS as readonly unknown[]).includes(value)
-    ? (value as AdminRefundTab)
-    : DEFAULT_REFUND_TAB;
-}
-
-export function resolveRefundBucket(value: unknown): AdminRefundBucket {
-  return (ADMIN_REFUND_BUCKETS as readonly unknown[]).includes(value)
-    ? (value as AdminRefundBucket)
-    : DEFAULT_REFUND_BUCKET;
-}
 
 /** Eski iade talebi durumu → yeni alt sekme (panonun kuyruk linkleri dahil). */
 const LEGACY_STATUS_BUCKET: Record<string, AdminRefundBucket> = {
@@ -74,10 +57,10 @@ const LEGACY_DROPPED_PARAMS: readonly string[] = [
  */
 export function refundsHref(query?: QueryInput): string {
   const source = toSearchParams(query);
-  const tab = resolveRefundTab(source.get(REFUND_TAB_PARAM));
+  const tab = resolveAdminRefundTab(source.get(REFUND_TAB_PARAM));
   const bucket =
     LEGACY_STATUS_BUCKET[source.get("status") ?? ""] ??
-    resolveRefundBucket(source.get(REFUND_BUCKET_PARAM));
+    resolveAdminRefundBucket(source.get(REFUND_BUCKET_PARAM));
 
   const params = new URLSearchParams();
   if (tab !== DEFAULT_REFUND_TAB) params.set(REFUND_TAB_PARAM, tab);

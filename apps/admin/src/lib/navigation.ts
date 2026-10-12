@@ -16,9 +16,9 @@ import {
   ADMIN_ORDERS_PATH,
   ADMIN_ORDERS_SCREEN_PERMISSIONS,
   ADMIN_ORDERS_SCREEN_TAB_PERMISSIONS,
+  ADMIN_REFUNDS_PATH,
   ADMIN_TRADES_TAB_HREF,
 } from "@tarodan/types";
-import { REFUNDS_PATH as ADMIN_REFUNDS_PATH } from "@/app/(admin)/operations/refunds/_lib/screenTabs";
 
 /**
  * The single source for the admin left menu. The nav data lives here

@@ -21,6 +21,9 @@ import type {
  *   talebi yoktur; para tarafın `TradeCashPayment` satırından iade edilir.
  */
 
+/** Ekranın adresi; üst sekme (`?tab=`) ve alt sekme (`?bucket=`) sorguda yaşar. */
+export const ADMIN_REFUNDS_PATH = "/operations/refunds";
+
 /** Üst sekmeler: satırın kökeni (sipariş kökeni ya da takas). */
 export const ADMIN_REFUND_TABS = ["all", "direct", "offer", "trade"] as const;
 

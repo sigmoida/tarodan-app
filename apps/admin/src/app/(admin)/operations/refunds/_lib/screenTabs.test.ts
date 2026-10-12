@@ -5,31 +5,27 @@ import {
   ADMIN_REFUND_BUCKETS,
   ADMIN_REFUND_BUCKET_I18N_KEYS,
   ADMIN_REFUND_TABS,
+  ADMIN_REFUND_TAB_I18N_KEYS,
+  resolveAdminRefundBucket,
+  resolveAdminRefundTab,
 } from "@tarodan/types";
-import {
-  REFUNDS_PATH,
-  REFUND_TAB_I18N_KEYS,
-  isLegacyRefundsView,
-  refundsHref,
-  resolveRefundBucket,
-  resolveRefundTab,
-} from "./screenTabs";
+import { REFUNDS_PATH, isLegacyRefundsView, refundsHref } from "./screenTabs";
 
-describe("resolveRefundTab / resolveRefundBucket", () => {
+describe("resolveAdminRefundTab / resolveAdminRefundBucket (shared resolvers)", () => {
   it("keeps known values and falls back to Tümü", () => {
-    expect(resolveRefundTab("trade")).toBe("trade");
-    expect(resolveRefundTab("direct_sale")).toBe("all");
-    expect(resolveRefundTab(undefined)).toBe("all");
-    expect(resolveRefundBucket("at_warehouse")).toBe("at_warehouse");
-    expect(resolveRefundBucket("new")).toBe("all");
-    expect(resolveRefundBucket(null)).toBe("all");
+    expect(resolveAdminRefundTab("trade")).toBe("trade");
+    expect(resolveAdminRefundTab("direct_sale")).toBe("all");
+    expect(resolveAdminRefundTab(undefined)).toBe("all");
+    expect(resolveAdminRefundBucket("at_warehouse")).toBe("at_warehouse");
+    expect(resolveAdminRefundBucket("new")).toBe("all");
+    expect(resolveAdminRefundBucket(null)).toBe("all");
   });
 });
 
 describe("bucket label resolution", () => {
   it("every tab and bucket has a label key under admin.operations.refunds", () => {
     for (const tab of ADMIN_REFUND_TABS) {
-      expect(REFUND_TAB_I18N_KEYS[tab]).toBe(
+      expect(ADMIN_REFUND_TAB_I18N_KEYS[tab]).toBe(
         `admin.operations.refunds.tabs.${tab}`,
       );
     }
@@ -80,19 +76,25 @@ describe("refundsHref (old refund list / İadeler view → new screen)", () => {
 
   it("renames the date range and keeps the other filters", () => {
     expect(
-      refundsHref({ view: "refunds", from: "2026-09-01", to: "2026-09-30", q: "RF", kind: "return" }),
+      refundsHref({
+        view: "refunds",
+        from: "2026-09-01",
+        to: "2026-09-30",
+        q: "RF",
+        kind: "return",
+      }),
     ).toBe(
       "/operations/refunds?dateFrom=2026-09-01&dateTo=2026-09-30&q=RF&kind=return",
     );
   });
 
   it("keeps a valid tab and ignores the cancellations screen's own sub-tabs", () => {
-    expect(refundsHref({ view: "refunds", tab: "trade", bucket: "buyer" })).toBe(
-      "/operations/refunds?tab=trade",
-    );
     expect(
-      refundsHref(new URLSearchParams("view=refunds&status=a&q=x")),
-    ).toBe("/operations/refunds?q=x");
+      refundsHref({ view: "refunds", tab: "trade", bucket: "buyer" }),
+    ).toBe("/operations/refunds?tab=trade");
+    expect(refundsHref(new URLSearchParams("view=refunds&status=a&q=x"))).toBe(
+      "/operations/refunds?q=x",
+    );
   });
 });
 
@@ -105,19 +107,22 @@ describe("isLegacyRefundsView", () => {
   });
 });
 
-describe("dashboard refund queue links (still ?view=refunds&status=…)", () => {
-  const redirected = (href: string) =>
-    refundsHref(new URL(href, "http://admin.local").searchParams);
-
-  it("land on the matching sub-tab of the new screen", () => {
-    expect(redirected(DASHBOARD_QUEUE_LINKS.refundRequests)).toBe(
-      REFUNDS_PATH,
-    );
-    expect(redirected(DASHBOARD_QUEUE_PART_LINKS.refundsPendingReview)).toBe(
+describe("dashboard refund queue links", () => {
+  it("open the matching sub-tab of the refunds screen directly", () => {
+    expect(DASHBOARD_QUEUE_LINKS.refundRequests).toBe(REFUNDS_PATH);
+    expect(DASHBOARD_QUEUE_PART_LINKS.refundsPendingReview).toBe(
       "/operations/refunds?bucket=pending_review",
     );
-    expect(redirected(DASHBOARD_QUEUE_PART_LINKS.refundsDisputed)).toBe(
+    expect(DASHBOARD_QUEUE_PART_LINKS.refundsDisputed).toBe(
       "/operations/refunds?bucket=disputed",
+    );
+  });
+
+  it("still resolve through the legacy redirect unchanged", () => {
+    const redirected = (href: string) =>
+      refundsHref(new URL(href, "http://admin.local").searchParams);
+    expect(redirected(DASHBOARD_QUEUE_PART_LINKS.refundsPendingReview)).toBe(
+      DASHBOARD_QUEUE_PART_LINKS.refundsPendingReview,
     );
   });
 });
