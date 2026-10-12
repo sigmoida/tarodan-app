@@ -5466,6 +5466,101 @@
       }
     },
     "marketing": {
+      "hero": {
+        "title": "Hero slides",
+        "subtitle": "Manage the hero area on the home page and the sign-in/sign-up screens",
+        "new": "New slide",
+        "edit": "Edit slide",
+        "created": "Slide created",
+        "updated": "Slide updated",
+        "deleted": "Slide deleted",
+        "deleteConfirm": "Delete the slide \"{title}\"?",
+        "empty": "No slides in this placement yet",
+        "maxLiveNote": "At most {max} slides live",
+        "placementLabel": "Placement",
+        "placement": {
+          "home": "Home page",
+          "auth_default": "Sign-in (default)",
+          "auth_register": "Sign-in (register)"
+        },
+        "columns": {
+          "image": "Image",
+          "cta": "Buttons",
+          "impressions": "Impressions",
+          "clicks": "Clicks",
+          "cta1Clicks": "Button 1",
+          "cta2Clicks": "Button 2",
+          "ios": "iOS"
+        },
+        "hiddenOnIos": "Hidden on iOS",
+        "hideOnIos": "Hide in the iOS app",
+        "hideOnIosHint": "Not shown in the iOS app (e.g. collection creation)",
+        "desktopImage": "Desktop image",
+        "mobileImage": "Mobile image (optional)",
+        "mobileImageHint": "When empty, the desktop image is used on every device.",
+        "imageSideLabel": "Image side",
+        "imageSide": {
+          "left": "Left",
+          "right": "Right"
+        },
+        "imageSideHint": {
+          "left": "The image is on the left, the text on the right.",
+          "right": "The image is on the right, the text on the left."
+        },
+        "fields": {
+          "title": "Title",
+          "subtitle": "Subtitle",
+          "imageAlt": "Image alt text",
+          "cta1Label": "Button 1 label",
+          "cta2Label": "Button 2 label",
+          "cta1Href": "Button 1 link",
+          "cta2Href": "Button 2 link"
+        },
+        "preview": {
+          "title": "Preview",
+          "titlePlaceholder": "Title",
+          "noImage": "No image"
+        },
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "validation": {
+          "trRequired": "Turkish text is required",
+          "trRequiredForEn": "Enter the Turkish text before the English one",
+          "maxLength": "At most {max} characters.",
+          "imageRequired": "The desktop image is required",
+          "ctaHrefRequired": "Enter a link for the button label",
+          "ctaLabelRequired": "Enter a button label for the link",
+          "linkInvalid": "Enter a valid link: a full address starting with https://… or a site path starting with /.",
+          "endBeforeStart": "The end date cannot be before the start date."
+        }
+      },
+      "trustBadges": {
+        "title": "Trust badges",
+        "subtitle": "Manage the trust badges shown on the site",
+        "new": "New badge",
+        "edit": "Edit badge",
+        "created": "Badge created",
+        "updated": "Badge updated",
+        "deleted": "Badge deleted",
+        "deleteConfirm": "Delete the badge \"{title}\"?",
+        "empty": "No badges yet",
+        "maxActiveNote": "At most {max} live badges recommended",
+        "tokensHint": "A timing variable can be used: '{returnWindowDays}'",
+        "columns": {
+          "order": "Order",
+          "icon": "Icon"
+        },
+        "validation": {
+          "trRequired": "Turkish text is required",
+          "trRequiredForEn": "Enter the Turkish text before the English one",
+          "maxLength": "At most {max} characters.",
+          "iconRequired": "Choose an icon"
+        }
+      },
+      "localeTabs": {
+        "tr": "Turkish",
+        "en": "English"
+      },
       "ads": {
         "title": "Ad Management",
         "subtitle": "Manage ads that comply with IAB standards",
@@ -9281,6 +9376,16 @@
           "description": "Developer test and simulation tools",
           "keywords": "test,time,cron,duration,boost,membership,refund"
         },
+        "hero": {
+          "name": "Hero slides",
+          "description": "Manage the home and sign-in hero area",
+          "keywords": "hero,slide,banner,home,sign-in"
+        },
+        "trustBadges": {
+          "name": "Trust badges",
+          "description": "Manage the site's trust badges",
+          "keywords": "trust,badge"
+        },
         "adPackages": {
           "name": "Ad Packages",
           "description": "Manage showcase and economy boost packages",
@@ -9522,6 +9627,8 @@
       },
       "rateRange": "The rate must be between {min} and {max}",
       "rowActions": {
+        "moveUp": "Move up",
+        "moveDown": "Move down",
         "deactivate": "Deactivate",
         "activate": "Activate"
       },
