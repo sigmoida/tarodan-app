@@ -20,8 +20,8 @@ import {
   holdReleaseBlockedReason,
   holdReleaseOrderFacts,
   holdResidual,
-  RESIDUAL_ORDER_STATUSES,
 } from "../../payout/helpers/hold-release-eligibility";
+import { findClosedOrderHeldHolds } from "../../payout/helpers/closed-order-hold-candidates";
 import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { CacheService } from "../../cache/cache.service";
@@ -506,23 +506,16 @@ export class PaymentHoldReleaseService {
    *
    * Eskiden aday `refundedAmount > 0` ile daraltılıyordu; ama bırakılacak pay
    * hold'u aşarsa iade HİÇ tüketmez (`refundedAmount` 0 kalır) ve kalıntı hold'un
-   * tamamı olur — cron o hold'u hiç seçmiyordu. Sipariş durumunu okumak şart;
-   * `PaymentHold`'un `order` ilişkisi olmadığı için parametreli bir JOIN ile.
-   * Sınırlı ve sıralı (§11): kapanmış siparişte tutulan hold yalnız kalıntı
-   * taşır, küme doğası gereği küçüktür.
+   * tamamı olur — cron o hold'u hiç seçmiyordu. Aday artık siparişin kapanmış
+   * olmasından seçilir (`findClosedOrderHeldHolds`). Sınırlı ve sıralı (§11):
+   * kapanmış siparişte tutulan hold yalnız kalıntı taşır, küme doğası gereği
+   * küçüktür; satıcı kusurlu kalıntılar da kalıntı kapatmayla tükenir.
    */
   private async residualHoldCandidates() {
-    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT h.id
-      FROM payment_holds h
-      JOIN orders o ON o.id = h.order_id
-      WHERE h.status::text = ${PaymentHoldStatus.held}
-        AND h.frozen_by_refund_id IS NULL
-        AND h.release_at IS NULL
-        AND o.status::text IN (${Prisma.join([...RESIDUAL_ORDER_STATUSES])})
-      ORDER BY h.created_at ASC
-      LIMIT ${RESIDUAL_CANDIDATE_BATCH}
-    `;
+    const rows = await findClosedOrderHeldHolds(this.prisma, {
+      undatedOnly: true,
+      limit: RESIDUAL_CANDIDATE_BATCH,
+    });
     if (rows.length === 0) return [];
     return this.prisma.paymentHold.findMany({
       where: {

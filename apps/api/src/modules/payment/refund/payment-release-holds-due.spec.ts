@@ -132,22 +132,15 @@ describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", 
     // Kalıntı adayı `refundedAmount`'a göre DEĞİL, siparişin kapanmış
     // olmasına göre seçilir — sınırlı ve sıralı JOIN.
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-    // Etiketli şablon çağrısı: (strings, ...values); IN listesi Prisma.join.
-    const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
-      readonly string[],
-      ...unknown[],
-    ];
-    const text = strings.join("?");
-    const flatValues = values.flatMap((value) =>
-      value instanceof Prisma.Sql ? value.values : [value],
-    );
-    expect(text).toContain("JOIN orders o ON o.id = h.order_id");
-    expect(text).toContain("h.release_at IS NULL");
-    expect(text).toContain("h.frozen_by_refund_id IS NULL");
-    expect(text).toContain("ORDER BY h.created_at ASC");
-    expect(text).toContain("LIMIT");
-    expect(text).not.toContain("refunded_amount");
-    expect(flatValues).toEqual(
+    const query = prisma.$queryRaw.mock.calls[0][0] as Prisma.Sql;
+    expect(query).toBeInstanceOf(Prisma.Sql);
+    expect(query.sql).toContain("JOIN orders o ON o.id = h.order_id");
+    expect(query.sql).toContain("h.release_at IS NULL");
+    expect(query.sql).toContain("h.frozen_by_refund_id IS NULL");
+    expect(query.sql).toContain("ORDER BY h.created_at ASC");
+    expect(query.sql).toContain("LIMIT");
+    expect(query.sql).not.toContain("refunded_amount");
+    expect(query.values).toEqual(
       expect.arrayContaining([
         PaymentHoldStatus.held,
         OrderStatus.cancelled,
@@ -335,7 +328,10 @@ describe("PaymentHoldReleaseService.releasePayment — admin manual release", ()
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
       },
-      data: { status: PaymentHoldStatus.released, releasedAt: expect.any(Date) },
+      data: {
+        status: PaymentHoldStatus.released,
+        releasedAt: expect.any(Date),
+      },
     });
   });
 
@@ -348,9 +344,9 @@ describe("PaymentHoldReleaseService.releasePayment — admin manual release", ()
     const error = await service.releasePayment("o1").catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(BadRequestException);
-    expect(JSON.stringify((error as BadRequestException).getResponse())).toContain(
-      "server.payment.holdReleaseBlocked.sellerAtFault",
-    );
+    expect(
+      JSON.stringify((error as BadRequestException).getResponse()),
+    ).toContain("server.payment.holdReleaseBlocked.sellerAtFault");
     expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
   });
 

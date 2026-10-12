@@ -125,3 +125,15 @@ export class ReleasePayoutDto {
   @IsBoolean()
   force?: boolean;
 }
+
+/** Satıcı kusurlu kalıntıyı platforma kapatma — geri dönülemez, sebep zorunlu. */
+export class SettleHoldResidualDto {
+  @ApiProperty({
+    description: "Why the seller-fault residual is settled to the platform",
+    maxLength: 500,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
+}

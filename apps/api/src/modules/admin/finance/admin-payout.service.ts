@@ -28,6 +28,7 @@ import {
   TradeStatus,
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
+import { PaymentHoldResidualService } from "../../payment/refund/payment-hold-residual.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
 import { generatePayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { istanbulRangeEdge } from "../../../common/helpers/tr-calendar";
@@ -105,7 +106,43 @@ export class AdminPayoutService {
     private readonly paymentService: PaymentService,
     private readonly payoutCore: PayoutService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
+    private readonly holdResidual: PaymentHoldResidualService,
   ) {}
+
+  /**
+   * Satıcı kusurlu kalıntıyı platforma kapatır (PSP'ye gidilmez). Kalan tutar
+   * alıcının değil platformun parasıdır — alıcı ödediğinin tamamını zaten geri
+   * almıştır. Geri dönülemez bir para hareketi olduğu için sebep zorunlu ve
+   * denetim kaydı kapatmayla AYNI işlemde yazılır (yazılamazsa kapatma da
+   * geri alınır). Uygun değilse 409.
+   */
+  async settleHoldResidual(adminId: string, holdId: string, reason: string) {
+    if (!reason?.trim()) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.payment.escrowReasonRequired"),
+      );
+    }
+    const settled = await this.holdResidual.settleResidual(holdId, {
+      actor: adminId,
+      reason: reason.trim(),
+      afterWrite: (tx, result) =>
+        this.audit.createRequiredAuditLog(
+          adminId,
+          "payout_hold_residual_settle",
+          "PaymentHold",
+          holdId,
+          { action: "settle_residual", reason: reason.trim() },
+          {
+            settledAmount: result.settledAmount,
+            orderId: result.orderId,
+            sellerId: result.sellerId,
+            faultBasis: result.faultBasis,
+          },
+          tx,
+        ),
+    });
+    return { success: true, ...settled };
+  }
 
   /**
    * Release SONRASI hızlı yol: transfer satırını KAPSAMLI oluştur (DB-only,
@@ -573,7 +610,11 @@ export class AdminPayoutService {
         ? []
         : await this.prisma.order.findMany({
             where: { id: { in: orderIds } },
-            select: { id: true, orderNumber: true, ...HOLD_RELEASE_ORDER_SELECT },
+            select: {
+              id: true,
+              orderNumber: true,
+              ...HOLD_RELEASE_ORDER_SELECT,
+            },
           });
     const orderById = new Map(orders.map((o) => [o.id, o]));
     const now = new Date();

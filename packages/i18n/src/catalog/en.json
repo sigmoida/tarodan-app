@@ -10767,6 +10767,7 @@
         "orderNotTerminal": "The order is not in a state that allows releasing the payment",
         "sellerAtFault": "The seller was at fault in the refund/cancellation, so the remaining amount is not paid to the seller"
       },
+      "holdResidualNotSettleable": "This payment has no seller-fault remainder to settle (it is not held, is frozen by a refund, its order is not closed, the seller was not at fault or nothing is left)",
       "installmentInfoFetchFailed": "Installment information could not be fetched",
       "installmentInfoUnavailable": "Installment information could not be retrieved",
       "installmentResponseInvalid": "The PayTR installment response is invalid or empty",

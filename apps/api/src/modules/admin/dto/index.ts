@@ -48,6 +48,7 @@ export {
   PayoutScheduleQueryDto,
   PayoutTransfersQueryDto,
   ReleasePayoutDto,
+  SettleHoldResidualDto,
 } from "./payout.dto";
 export { CreateStaticPageDto, UpdateStaticPageDto } from "./page.dto";
 export {
