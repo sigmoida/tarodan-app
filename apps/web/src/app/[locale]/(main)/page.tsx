@@ -3,6 +3,7 @@ import { hasRealDiscount } from "@/lib/productPrice";
 import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
+import { fetchHeroSlides, fetchTrustBadges } from "@/lib/api/hero";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
 import type {
@@ -127,6 +128,8 @@ export default async function HomePage({
     featuredCollector,
     featuredBusiness,
     topCollections,
+    heroSlides,
+    trustBadges,
   ] = await Promise.allSettled([
     // Vitrin (home showcase): yalnızca "ana sayfada vitrinlensin" paketini alan
     // ürünler, en son satın alınan en başta olacak şekilde (LIFO — boostedAt DESC).
@@ -143,6 +146,9 @@ export default async function HomePage({
     fetchNullable<FeaturedCollector>("/api/users/featured-collector"),
     fetchNullable<FeaturedBusiness>("/api/users/featured-business"),
     fetchTopCollections(),
+    // Panelden yönetilen hero + güven rozetleri; hata/boşta bölüm çizilmez.
+    fetchHeroSlides("home"),
+    fetchTrustBadges(),
   ]);
 
   // Faz 1: marka şeridi tamamen API'den — logolar S3'ten mutlak URL olarak
@@ -164,6 +170,8 @@ export default async function HomePage({
     featuredCollector: settledValue(featuredCollector, null),
     featuredBusiness: settledValue(featuredBusiness, null),
     marqueeItems,
+    heroSlides: settledValue(heroSlides, []),
+    trustBadges: settledValue(trustBadges, []),
   };
 
   return <HomeContent data={data} locale={locale} />;

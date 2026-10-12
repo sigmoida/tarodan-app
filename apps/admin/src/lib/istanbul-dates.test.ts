@@ -3,7 +3,7 @@ import {
   endOfIstanbulDayIso,
   istanbulDateOf,
   startOfIstanbulDayIso,
-} from "./dates";
+} from "./istanbul-dates";
 
 describe("ad dates — Istanbul calendar", () => {
   it("builds offset-aware ISO bounds for a day", () => {

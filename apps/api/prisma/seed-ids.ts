@@ -22,6 +22,25 @@ export const SEED_COMMISSION_RULE_SET_IDS = {
  * ikinci bir `isDefault` vergi bölgesi doğurur ve hangisinin geçerli olduğu
  * belirsizleşir.
  */
+/**
+ * Referans seed'in kurduğu vitrin içeriği (`seed-hero-content.ts`): sabit
+ * kimlik, yeniden çalıştırmanın ikinci bir slayt/rozet doğurmasını engeller.
+ */
+export const HERO_SEED_IDS = {
+  homeMarketplace: "6f1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e01",
+  authDefault: "6f1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e02",
+  authRegister: "6f1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e03",
+} as const;
+
+export const TRUST_BADGE_SEED_IDS = {
+  secureShopping: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c01",
+  secureShipping: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02",
+  returns: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c03",
+  installments: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c04",
+  collection: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c05",
+  trading: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c06",
+} as const;
+
 export const PRODUCTION_REFERENCE_IDS = {
   taxRegion: "production-tax-region-tr",
   taxRateDefault: "production-tax-rate-kdv-20",

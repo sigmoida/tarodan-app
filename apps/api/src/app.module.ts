@@ -97,6 +97,9 @@ import { EventModule } from "./modules/events";
 // Advertisement banners (public + admin)
 import { AdvertisementModule } from "./modules/advertisement/advertisement.module";
 
+// Storefront hero slides + trust badges (public + admin)
+import { HeroModule } from "./modules/hero/hero.module";
+
 // Discount & Promotion Engine
 import { DiscountModule } from "./modules/discount";
 import { CartModule } from "./modules/cart";
@@ -257,6 +260,9 @@ import { isTest } from "./config/environment";
 
     // Advertisement banners (public /api/ads + admin /api/admin/ads)
     AdvertisementModule,
+
+    // Storefront hero (public /api/hero-slides, /api/trust-badges + admin)
+    HeroModule,
 
     // Discount & Promotion Engine
     DiscountModule,

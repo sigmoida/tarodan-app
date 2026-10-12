@@ -341,10 +341,6 @@
     "passwordResetFailed": "Şifre sıfırlama başarısız",
     "heroBusinessTitle": "İşini Vitrine Taşı",
     "heroBusinessSubtitle": "Şirket hesabıyla binlerce koleksiyonere ulaş, ilanlarını tek yerden yönet.",
-    "heroRegisterTitle": "Koleksiyonun Başlasın",
-    "heroRegisterSubtitle": "Ücretsiz katıl, ilk modelini bugün keşfet.",
-    "heroDefaultTitle": "Koleksiyonun Kalbi Burada",
-    "heroDefaultSubtitle": "Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt.",
     "businessPendingEmailNotice": "Başvurunuz <b>{email}</b> adresi ile incelemede. Sonuç e-posta ile bildirilecek.",
     "businessRejectedEmailNotice": "<b>{email}</b> adresiyle yapılan kurumsal başvurunuz reddedildi.",
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
@@ -2501,18 +2497,7 @@
     "companyBioFallback": "Premium Diecast araçların alım ve satımı",
     "viewStore": "Mağazayı İncele",
     "slider": {
-      "marketplaceTitle": "Türkiye'nin En Büyük\nDiecast Pazaryeri",
-      "marketplaceSubtitle": "Diecast modelleri satın alın, satın ve takas edin. Dijital Garajınızı oluşturun ve koleksiyonunuzu sergileyin.",
-      "browseMarketplace": "Pazaryerini İncele",
-      "hotWheelsTitle": "Premium Hot Wheels\nKoleksiyonları",
-      "hotWheelsSubtitle": "Fast & Furious, Formula 1 ve daha fazlası. Nadir bulunan modelleri keşfedin.",
-      "exploreHotWheels": "Hot Wheels Keşfet",
-      "allBrands": "Tüm Markalar",
-      "secureTradingTitle": "Güvenli Takas\nSistemi",
-      "secureTradingSubtitle": "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Her iki taraf için korumalı sistem.",
-      "startTrading": "Takasa Başla",
-      "howItWorks": "Nasıl Çalışır?",
-      "imageAlt": "Diecast model araç koleksiyonu"
+      "goToSlide": "Slayta git: {index}"
     }
   },
   "search": {
@@ -4256,11 +4241,6 @@
       "unsubscribedToast": "Abonelikten çıkıldı",
       "subscriptionFailed": "Abonelik başarısız",
       "preferenceRequired": "En az bir e-posta tercihi seçin."
-    },
-    "platformFee": {
-      "ariaLabel": "Platform Hizmet Bedeli duyurusu",
-      "notice": "<b>Bilgi:</b> 2 Haziran 2026 itibarıyla TARODAN'da yapılan satın almalardan ürün bedelinin <b>%3'ü oranında</b> Platform Hizmet Bedeli alınmaya başlanmıştır. <link>Detaylı bilgi</link>.",
-      "dismiss": "Banner'ı kapat"
     }
   },
   "stockout": {
@@ -5466,6 +5446,101 @@
       }
     },
     "marketing": {
+      "hero": {
+        "title": "Hero slaytları",
+        "subtitle": "Ana sayfa ve giriş/kayıt ekranlarındaki hero alanını yönetin",
+        "new": "Yeni slayt",
+        "edit": "Slaytı düzenle",
+        "created": "Slayt oluşturuldu",
+        "updated": "Slayt güncellendi",
+        "deleted": "Slayt silindi",
+        "deleteConfirm": "\"{title}\" slaytı silinsin mi?",
+        "empty": "Bu yerleşimde henüz slayt yok",
+        "maxLiveNote": "Yayında en fazla {max} slayt",
+        "placementLabel": "Yerleşim",
+        "placement": {
+          "home": "Ana sayfa",
+          "auth_default": "Giriş (varsayılan)",
+          "auth_register": "Giriş (kayıt)"
+        },
+        "columns": {
+          "image": "Görsel",
+          "cta": "Düğmeler",
+          "impressions": "Gösterim",
+          "clicks": "Tık",
+          "cta1Clicks": "Düğme 1",
+          "cta2Clicks": "Düğme 2",
+          "ios": "iOS"
+        },
+        "hiddenOnIos": "iOS'ta gizli",
+        "hideOnIos": "iOS uygulamasında gösterme",
+        "hideOnIosHint": "iOS uygulamasında gösterilmez (örn. koleksiyon oluşturma)",
+        "desktopImage": "Masaüstü görseli",
+        "mobileImage": "Mobil görsel (isteğe bağlı)",
+        "mobileImageHint": "Boşsa her cihazda masaüstü görseli kullanılır.",
+        "imageSideLabel": "Görsel tarafı",
+        "imageSide": {
+          "left": "Sol",
+          "right": "Sağ"
+        },
+        "imageSideHint": {
+          "left": "Görsel solda, metin sağda görünür.",
+          "right": "Görsel sağda, metin solda görünür."
+        },
+        "fields": {
+          "title": "Başlık",
+          "subtitle": "Alt başlık",
+          "imageAlt": "Görsel alternatif metni",
+          "cta1Label": "1. düğme etiketi",
+          "cta2Label": "2. düğme etiketi",
+          "cta1Href": "1. düğme adresi",
+          "cta2Href": "2. düğme adresi"
+        },
+        "preview": {
+          "title": "Önizleme",
+          "titlePlaceholder": "Başlık",
+          "noImage": "Görsel yok"
+        },
+        "moveUp": "Yukarı taşı",
+        "moveDown": "Aşağı taşı",
+        "validation": {
+          "trRequired": "Türkçe metin zorunlu",
+          "trRequiredForEn": "İngilizce metin için önce Türkçe metni girin",
+          "maxLength": "En fazla {max} karakter olabilir.",
+          "imageRequired": "Masaüstü görseli gerekli",
+          "ctaHrefRequired": "Düğme etiketi için bir adres girin",
+          "ctaLabelRequired": "Adres için bir düğme etiketi girin",
+          "linkInvalid": "Geçerli bir adres girin: https://… ile başlayan tam adres ya da / ile başlayan site içi yol.",
+          "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz."
+        }
+      },
+      "trustBadges": {
+        "title": "Güven rozetleri",
+        "subtitle": "Sitede gösterilen güven rozetlerini yönetin",
+        "new": "Yeni rozet",
+        "edit": "Rozeti düzenle",
+        "created": "Rozet oluşturuldu",
+        "updated": "Rozet güncellendi",
+        "deleted": "Rozet silindi",
+        "deleteConfirm": "\"{title}\" rozeti silinsin mi?",
+        "empty": "Henüz rozet yok",
+        "maxActiveNote": "Yayında en fazla {max} rozet önerilir",
+        "tokensHint": "Süre değişkeni kullanılabilir: '{returnWindowDays}'",
+        "columns": {
+          "order": "Sıra",
+          "icon": "Simge"
+        },
+        "validation": {
+          "trRequired": "Türkçe metin zorunlu",
+          "trRequiredForEn": "İngilizce metin için önce Türkçe metni girin",
+          "maxLength": "En fazla {max} karakter olabilir.",
+          "iconRequired": "Bir simge seçin"
+        }
+      },
+      "localeTabs": {
+        "tr": "Türkçe",
+        "en": "İngilizce"
+      },
       "ads": {
         "title": "Reklam Yönetimi",
         "subtitle": "IAB standartlarına uygun reklam yönetimi",
@@ -5543,7 +5618,7 @@
         },
         "upload": {
           "formats": "Sadece JPG, PNG ve WebP desteklenir",
-          "maxSize": "Dosya en fazla 2MB olmalı",
+          "maxSize": "Dosya en fazla 5 MB olmalı",
           "success": "Görsel yüklendi",
           "failed": "Yükleme başarısız",
           "dropHint": "Görseli sürükleyip bırakın veya",
@@ -7199,10 +7274,7 @@
           "delivered": "Teslim Edilen",
           "other": "Diğer",
           "cancelled": "İptaller",
-          "refunds": "İadeler",
-          "cancelled": "İptaller",
-          "refunds": "İadeler",
-          "other": "Diğer"
+          "refunds": "İadeler"
         },
         "filters": {
           "party": "Alıcı / Satıcı",
@@ -8074,12 +8146,11 @@
         "payoutsFailed": "Başarısız transfer",
         "holdsOverdue": "Süresi geçmiş escrow",
         "adjustmentsOpen": "Açık satıcı borcu",
-        "holdsUpcoming": "7 gün içinde serbest kalacak",
+        "holdsUpcoming": "Yaklaşan serbest bırakma",
         "invoicesExhausted": "Denemesi tükenmiş belge",
         "ordersUninvoiced": "Faturasız teslimat",
         "carrierCancellations": "Taşıyıcı iptal görevi",
         "shipmentsWithoutTracking": "Takip kodu oluşmamış gönderi",
-        "holdsUpcoming": "Yaklaşan serbest bırakma",
         "informationalHint": "Bilgi satırı — bekleyen iş toplamına dahil değildir"
       },
       "alerts": {
@@ -9410,6 +9481,16 @@
           "description": "Geliştirici test ve simülasyon araçları",
           "keywords": "test,zaman,cron,süre,boost,üyelik,iade,time"
         },
+        "hero": {
+          "name": "Hero slaytları",
+          "description": "Ana sayfa ve giriş ekranı hero alanını yönetin",
+          "keywords": "hero,slayt,banner,ana sayfa,giriş"
+        },
+        "trustBadges": {
+          "name": "Güven rozetleri",
+          "description": "Sitedeki güven rozetlerini yönetin",
+          "keywords": "güven,rozet,badge"
+        },
         "adPackages": {
           "name": "Öne Çıkarma",
           "description": "Vitrin ve ekonomik öne çıkarma paketlerini yönetin",
@@ -9656,6 +9737,8 @@
       },
       "rateRange": "Oran {min} ile {max} arasında olmalı",
       "rowActions": {
+        "moveUp": "Yukarı taşı",
+        "moveDown": "Aşağı taşı",
         "deactivate": "Pasifleştir",
         "activate": "Aktifleştir"
       },
@@ -11497,6 +11580,16 @@
       "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
       "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
     },
+    "hero": {
+      "notFound": "Slayt bulunamadı",
+      "trustBadgeNotFound": "Güven rozeti bulunamadı",
+      "titleRequired": "Türkçe başlık zorunludur",
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
+      "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
+      "maxLiveSlides": "Bir yerleşimde aynı anda en fazla {max} slayt yayında olabilir",
+      "lastLiveHomeSlide": "Ana sayfada yayındaki son slayt silinemez veya yayından kaldırılamaz; önce başka bir slaytı yayına alın",
+      "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir"
+    },
     "brand": {
       "notFound": "Marka bulunamadı"
     },
@@ -12572,32 +12665,6 @@
     "sections": {
       "homesection": {
         "tumunuGor": "Tümünü gör"
-      },
-      "trustbadges": {
-        "guvenliAlisveris": "Güvenli Alışveriş",
-        "sslSertifikaliGuvenliOdeme": "SSL sertifikalı güvenli ödeme",
-        "guvenliKargo": "Güvenli Kargo",
-        "hizliTakipImkaniyla": "Hızlı takip imkanıyla",
-        "iadeImkani": "İade İmkanı",
-        "14GunKosulsuzIade": "{returnWindowDays} gün koşulsuz iade",
-        "taksitImkani": "Taksit İmkanı",
-        "12AyaVaranTaksit": "12 aya varan taksit",
-        "koleksiyonSergile": "Koleksiyon Sergile",
-        "dijitalGarajiniOlustur": "Dijital garajını oluştur",
-        "guvenliTakas": "Güvenli Takas",
-        "guvenliTakasSistemi": "Güvenli takas sistemi",
-        "secureShopping": "Secure Shopping",
-        "sslCertifiedSecurePayment": "SSL certified secure payment",
-        "secureShipping": "Secure Shipping",
-        "withFastTracking": "With fast tracking",
-        "easyReturns": "Easy Returns",
-        "14DaysUnconditionalReturn": "{returnWindowDays} gün koşulsuz iade",
-        "installments": "Installments",
-        "upTo12MonthInstallments": "Up to 12 month installments",
-        "displayCollection": "Display Collection",
-        "createYourDigitalGarage": "Create your digital garage",
-        "safeTrading": "Safe Trading",
-        "secureTradingSystem": "Secure trading system"
       }
     },
     "membership": {

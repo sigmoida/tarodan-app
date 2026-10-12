@@ -368,6 +368,73 @@ describe("RolesGuard — reklam görseli yükleme izni", () => {
 });
 
 /**
+ * Vitrin hero'su ve güven rozetleri pazarlama içeriğidir: reklamla aynı `ads`
+ * izniyle yönetilir (görsel yükleme dahil); ürün ya da ayar izni gerekmez,
+ * verilmez de.
+ */
+describe("RolesGuard — hero slaytları ve güven rozetleri izni", () => {
+  const makeGuard = (permissions: string[]) => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn().mockResolvedValue({
+          settingValue: JSON.stringify({ moderator: permissions }),
+        }),
+      },
+    } as any;
+    const guard = new RolesGuard(new Reflector(), prisma);
+    jest
+      .spyOn((guard as any).reflector as Reflector, "getAllAndOverride")
+      .mockImplementation((key: any, targets: any[]) =>
+        key === ROLES_KEY ? targets[0]?.[ROLES_KEY] : undefined,
+      );
+    return guard;
+  };
+
+  const ctx = (method: string, originalUrl: string): ExecutionContext => {
+    const req = {
+      user: { isAdmin: true, role: "moderator" },
+      method,
+      originalUrl,
+    };
+    const handler = () => undefined;
+    (handler as any)[ROLES_KEY] = ["super_admin", "admin", "moderator"];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  it("izin haritası: hero-slides → ads, trust-badges → ads", () => {
+    expect(PERMISSION_MAP["hero-slides"]).toEqual(["ads"]);
+    expect(PERMISSION_MAP["trust-badges"]).toEqual(["ads"]);
+  });
+
+  it.each([
+    ["GET", "/api/admin/hero-slides?placement=home"],
+    ["POST", "/api/admin/hero-slides/upload"],
+    ["PATCH", "/api/admin/hero-slides/reorder"],
+    ["DELETE", "/api/admin/hero-slides/abc"],
+    ["GET", "/api/admin/trust-badges"],
+    ["PATCH", "/api/admin/trust-badges/abc"],
+  ])("yalnız ads izni → %s %s izinli", async (method, url) => {
+    await expect(makeGuard(["ads"]).canActivate(ctx(method, url))).resolves.toBe(
+      true,
+    );
+  });
+
+  it.each([
+    "/api/admin/hero-slides",
+    "/api/admin/hero-slides/upload",
+    "/api/admin/trust-badges",
+  ])("ads izni yoksa (yalnız products) → %s 403", async (url) => {
+    await expect(
+      makeGuard(["products"]).canActivate(ctx("POST", url)),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+/**
  * Bildirim görseli `POST /admin/notifications/upload` ile `notifications`
  * izniyle yüklenir — reklam yüklemesiyle aynı desen: ürün (`media` →
  * `products`) yüklemesine erişim gerekmez, verilmez de.

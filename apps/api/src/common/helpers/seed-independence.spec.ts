@@ -35,6 +35,8 @@ const PRODUCTION_SEEDS = [
   "seed-launch.ts",
   "seed-launch-core.ts",
   "seed-uat.ts",
+  // Vitrin hero'su + güven rozetleri: referans katmanı, her açılışta koşar.
+  "seed-hero-content.ts",
 ];
 
 describe("production seeds are independent of the demo seed", () => {
@@ -73,6 +75,23 @@ describe("production seeds are independent of the demo seed", () => {
     for (const chunk of businessValueWrites) {
       expect(chunk).toContain("update: {}");
     }
+  });
+
+  it("never overwrites or resurrects admin-managed storefront content", () => {
+    // Her açılışta koşar: admin'in düzenlediği slayt/rozet ezilmemeli, sildiği
+    // seed slaytı geri gelmemeli — yazım yalnız boş yerleşimde, boş update ile.
+    const source = read("seed-hero-content.ts");
+    const upserts = source.split("prisma.").slice(1);
+    const contentWrites = upserts.filter((chunk) =>
+      /^(heroSlide|trustBadge)\.upsert/.test(chunk),
+    );
+    expect(contentWrites).toHaveLength(2);
+    for (const chunk of contentWrites) {
+      expect(chunk).toContain("update: {}");
+    }
+    expect(source).toContain("prisma.heroSlide.count({");
+    expect(source).toContain("prisma.trustBadge.count()");
+    expect(source).not.toMatch(/prisma\.(heroSlide|trustBadge)\.(update|delete)/);
   });
 
   it("sources every launch business value from the data files", () => {

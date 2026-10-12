@@ -45,7 +45,8 @@ import {
   unwrapCampaigns,
 } from "../_lib/campaigns";
 
-const AD_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+// Sunucu sınırıyla aynı (`POST /admin/ads/upload` 5 MB kabul eder).
+const AD_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Drag-drop upload + dimension detection + IAB presets, bound to the RHF form. */
 function AdImageField() {

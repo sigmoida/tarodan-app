@@ -69,6 +69,7 @@ import {
   SEED_SHIPPING_TIERS,
 } from "./seed-demo-config";
 import { SEED_COMMISSION_RULE_SET_IDS } from "./seed-ids";
+import { seedHeroContent } from "./seed-hero-content";
 import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
 const prisma = new PrismaClient();
 
@@ -8091,6 +8092,11 @@ async function main() {
   } else {
     console.log("⏭️  SEED_SKIP_IMAGES set — skipping user avatars");
   }
+
+  // Vitrin hero'su + güven rozetleri: canlıyla AYNI referans içerik (kodda
+  // yedek slayt yok, yerelde de slider boş kalmasın).
+  await seedHeroContent(prisma);
+  console.log("✅ Hero slides + trust badges ready");
 
   // ==========================================================================
   // Summary

@@ -341,10 +341,6 @@
     "passwordResetFailed": "Password reset failed",
     "heroBusinessTitle": "Put Your Business Center Stage",
     "heroBusinessSubtitle": "Reach thousands of collectors and manage every listing from one business account.",
-    "heroRegisterTitle": "Let the Collection Begin",
-    "heroRegisterSubtitle": "Join free and discover your first model today.",
-    "heroDefaultTitle": "Where Collections Come Alive",
-    "heroDefaultSubtitle": "Thousands of diecast models, one place. Find it, own it, grow it.",
     "businessPendingEmailNotice": "Başvurunuz <b>{email}</b> adresi ile incelemede. Sonuç e-posta ile bildirilecek.",
     "businessRejectedEmailNotice": "<b>{email}</b> adresiyle yapılan kurumsal başvurunuz reddedildi.",
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
@@ -2501,18 +2497,7 @@
     "companyBioFallback": "Buying and selling premium diecast vehicles",
     "viewStore": "View Store",
     "slider": {
-      "marketplaceTitle": "Turkey's Largest\nDiecast Marketplace",
-      "marketplaceSubtitle": "Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.",
-      "browseMarketplace": "Browse Marketplace",
-      "hotWheelsTitle": "Premium Hot Wheels\nCollections",
-      "hotWheelsSubtitle": "Fast & Furious, Formula 1 and more. Discover rare models.",
-      "exploreHotWheels": "Explore Hot Wheels",
-      "allBrands": "All Brands",
-      "secureTradingTitle": "Secure Trading\nSystem",
-      "secureTradingSubtitle": "Trade your collections with other collectors safely. Protected system for both parties.",
-      "startTrading": "Start Trading",
-      "howItWorks": "How It Works?",
-      "imageAlt": "Diecast model car collection"
+      "goToSlide": "Go to slide {index}"
     }
   },
   "search": {
@@ -4256,11 +4241,6 @@
       "unsubscribedToast": "Unsubscribed",
       "subscriptionFailed": "Subscription failed",
       "preferenceRequired": "Select at least one email preference."
-    },
-    "platformFee": {
-      "ariaLabel": "Platform service fee announcement",
-      "notice": "<b>Notice:</b> As of 2 June 2026, a Platform Service Fee of <b>3% of the item price</b> applies to purchases made on TARODAN. <link>Learn more</link>.",
-      "dismiss": "Dismiss banner"
     }
   },
   "stockout": {
@@ -5466,6 +5446,101 @@
       }
     },
     "marketing": {
+      "hero": {
+        "title": "Hero slides",
+        "subtitle": "Manage the hero area on the home page and the sign-in/sign-up screens",
+        "new": "New slide",
+        "edit": "Edit slide",
+        "created": "Slide created",
+        "updated": "Slide updated",
+        "deleted": "Slide deleted",
+        "deleteConfirm": "Delete the slide \"{title}\"?",
+        "empty": "No slides in this placement yet",
+        "maxLiveNote": "At most {max} slides live",
+        "placementLabel": "Placement",
+        "placement": {
+          "home": "Home page",
+          "auth_default": "Sign-in (default)",
+          "auth_register": "Sign-in (register)"
+        },
+        "columns": {
+          "image": "Image",
+          "cta": "Buttons",
+          "impressions": "Impressions",
+          "clicks": "Clicks",
+          "cta1Clicks": "Button 1",
+          "cta2Clicks": "Button 2",
+          "ios": "iOS"
+        },
+        "hiddenOnIos": "Hidden on iOS",
+        "hideOnIos": "Hide in the iOS app",
+        "hideOnIosHint": "Not shown in the iOS app (e.g. collection creation)",
+        "desktopImage": "Desktop image",
+        "mobileImage": "Mobile image (optional)",
+        "mobileImageHint": "When empty, the desktop image is used on every device.",
+        "imageSideLabel": "Image side",
+        "imageSide": {
+          "left": "Left",
+          "right": "Right"
+        },
+        "imageSideHint": {
+          "left": "The image is on the left, the text on the right.",
+          "right": "The image is on the right, the text on the left."
+        },
+        "fields": {
+          "title": "Title",
+          "subtitle": "Subtitle",
+          "imageAlt": "Image alt text",
+          "cta1Label": "Button 1 label",
+          "cta2Label": "Button 2 label",
+          "cta1Href": "Button 1 link",
+          "cta2Href": "Button 2 link"
+        },
+        "preview": {
+          "title": "Preview",
+          "titlePlaceholder": "Title",
+          "noImage": "No image"
+        },
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "validation": {
+          "trRequired": "Turkish text is required",
+          "trRequiredForEn": "Enter the Turkish text before the English one",
+          "maxLength": "At most {max} characters.",
+          "imageRequired": "The desktop image is required",
+          "ctaHrefRequired": "Enter a link for the button label",
+          "ctaLabelRequired": "Enter a button label for the link",
+          "linkInvalid": "Enter a valid link: a full address starting with https://… or a site path starting with /.",
+          "endBeforeStart": "The end date cannot be before the start date."
+        }
+      },
+      "trustBadges": {
+        "title": "Trust badges",
+        "subtitle": "Manage the trust badges shown on the site",
+        "new": "New badge",
+        "edit": "Edit badge",
+        "created": "Badge created",
+        "updated": "Badge updated",
+        "deleted": "Badge deleted",
+        "deleteConfirm": "Delete the badge \"{title}\"?",
+        "empty": "No badges yet",
+        "maxActiveNote": "At most {max} live badges recommended",
+        "tokensHint": "A timing variable can be used: '{returnWindowDays}'",
+        "columns": {
+          "order": "Order",
+          "icon": "Icon"
+        },
+        "validation": {
+          "trRequired": "Turkish text is required",
+          "trRequiredForEn": "Enter the Turkish text before the English one",
+          "maxLength": "At most {max} characters.",
+          "iconRequired": "Choose an icon"
+        }
+      },
+      "localeTabs": {
+        "tr": "Turkish",
+        "en": "English"
+      },
       "ads": {
         "title": "Ad Management",
         "subtitle": "Manage ads that comply with IAB standards",
@@ -5543,7 +5618,7 @@
         },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
-          "maxSize": "File size must not exceed 2MB",
+          "maxSize": "File must be at most 5 MB",
           "success": "Image uploaded",
           "failed": "Upload failed",
           "dropHint": "Drag and drop the image or",
@@ -7198,11 +7273,8 @@
           "inTransit": "In Transit",
           "delivered": "Delivered",
           "other": "Other",
-          "cancelled": "Cancellations",
-          "refunds": "Refunds",
           "cancelled": "Cancelled",
-          "refunds": "Refunds",
-          "other": "Other"
+          "refunds": "Refunds"
         },
         "filters": {
           "party": "Buyer / Seller",
@@ -8074,12 +8146,11 @@
         "payoutsFailed": "Failed transfers",
         "holdsOverdue": "Overdue escrow",
         "adjustmentsOpen": "Open seller debt",
-        "holdsUpcoming": "Releasing within 7 days",
+        "holdsUpcoming": "Upcoming releases",
         "invoicesExhausted": "Documents out of retries",
         "ordersUninvoiced": "Uninvoiced deliveries",
         "carrierCancellations": "Carrier cancellation tasks",
         "shipmentsWithoutTracking": "Shipments without a tracking id",
-        "holdsUpcoming": "Upcoming releases",
         "informationalHint": "Informational line — not included in the waiting-work total"
       },
       "alerts": {
@@ -9410,6 +9481,16 @@
           "description": "Developer test and simulation tools",
           "keywords": "test,time,cron,duration,boost,membership,refund"
         },
+        "hero": {
+          "name": "Hero slides",
+          "description": "Manage the home and sign-in hero area",
+          "keywords": "hero,slide,banner,home,sign-in"
+        },
+        "trustBadges": {
+          "name": "Trust badges",
+          "description": "Manage the site's trust badges",
+          "keywords": "trust,badge"
+        },
         "adPackages": {
           "name": "Ad Packages",
           "description": "Manage showcase and economy boost packages",
@@ -9656,6 +9737,8 @@
       },
       "rateRange": "The rate must be between {min} and {max}",
       "rowActions": {
+        "moveUp": "Move up",
+        "moveDown": "Move down",
         "deactivate": "Deactivate",
         "activate": "Activate"
       },
@@ -11497,6 +11580,16 @@
       "hotspotInvalid": "{code, select, tooMany {An ad can have at most {max} clickable areas.} outOfBounds {Clickable area {position} extends outside the image.} tooSmall {Clickable area {position} is too small; its width and height must be at least {minPercent}% of the image.} overlap {Clickable area {position} overlaps area {other}.} labelRequired {Clickable area {position} needs a name.} labelTooLong {The name of clickable area {position} can be at most {labelMax} characters.} linkRequired {Clickable area {position} needs a link.} other {Clickable area {position} is invalid.}}",
       "hotspotsNeedImage": "Clickable areas can only be set on an ad with an image"
     },
+    "hero": {
+      "notFound": "Slide not found",
+      "trustBadgeNotFound": "Trust badge not found",
+      "titleRequired": "A Turkish title is required",
+      "endBeforeStart": "The end date cannot be before the start date",
+      "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
+      "maxLiveSlides": "At most {max} slides can be live at the same time in one placement",
+      "lastLiveHomeSlide": "The last live home page slide cannot be deleted or taken offline; put another slide live first",
+      "reorderMixedPlacement": "Only slides of the same placement can be reordered together"
+    },
     "brand": {
       "notFound": "Brand not found"
     },
@@ -12572,32 +12665,6 @@
     "sections": {
       "homesection": {
         "tumunuGor": "Tümünü gör"
-      },
-      "trustbadges": {
-        "guvenliAlisveris": "Güvenli Alışveriş",
-        "sslSertifikaliGuvenliOdeme": "SSL sertifikalı güvenli ödeme",
-        "guvenliKargo": "Güvenli Kargo",
-        "hizliTakipImkaniyla": "Hızlı takip imkanıyla",
-        "iadeImkani": "İade İmkanı",
-        "14GunKosulsuzIade": "{returnWindowDays} gün koşulsuz iade",
-        "taksitImkani": "Taksit İmkanı",
-        "12AyaVaranTaksit": "12 aya varan taksit",
-        "koleksiyonSergile": "Koleksiyon Sergile",
-        "dijitalGarajiniOlustur": "Dijital garajını oluştur",
-        "guvenliTakas": "Güvenli Takas",
-        "guvenliTakasSistemi": "Güvenli takas sistemi",
-        "secureShopping": "Secure Shopping",
-        "sslCertifiedSecurePayment": "SSL certified secure payment",
-        "secureShipping": "Secure Shipping",
-        "withFastTracking": "With fast tracking",
-        "easyReturns": "Easy Returns",
-        "14DaysUnconditionalReturn": "{returnWindowDays, plural, one {# day} other {# days}} unconditional return",
-        "installments": "Installments",
-        "upTo12MonthInstallments": "Up to 12 month installments",
-        "displayCollection": "Display Collection",
-        "createYourDigitalGarage": "Create your digital garage",
-        "safeTrading": "Safe Trading",
-        "secureTradingSystem": "Secure trading system"
       }
     },
     "membership": {

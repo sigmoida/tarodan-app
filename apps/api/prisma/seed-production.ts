@@ -24,6 +24,7 @@ import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/helpers/shipping-package-tier";
 import { PRODUCTION_REFERENCE_IDS } from "./seed-ids";
+import { seedHeroContent } from "./seed-hero-content";
 
 const prisma = new PrismaClient();
 
@@ -246,6 +247,9 @@ async function main(): Promise<void> {
   await seedTaxReferences();
   await seedPlatformSeller();
   await seedShippingTariff();
+  // Vitrin hero'sunun kodda yedeği yok: ana sayfa slaytı, auth görselleri ve
+  // güven rozetleri yerleşim boşken bir kez kurulur (admin'inkini ezmez).
+  await seedHeroContent(prisma);
   console.log("Production reference data is ready.");
 }
 

@@ -1,6 +1,7 @@
 /** @format */
 
 import type { AdHotspotInput } from "@tarodan/types";
+import { sendTrackingBeacon } from "./beacon";
 import { api, GATEWAY_BASE } from "./client";
 
 /**
@@ -66,34 +67,13 @@ export function adEventUrl(
   return hotspotId ? `${base}?hotspot=${encodeURIComponent(hotspotId)}` : base;
 }
 
-/**
- * Sayaç gönderimi: sayfadan ayrılırken de (dış bağlantı tıklaması) kesilmez.
- * `sendBeacon` yoksa/reddederse `keepalive` fetch'e düşer. Hata yutulur —
- * ölçüm, ziyaretçi akışını asla bozmamalı.
- */
+/** Sayaç gönderimi — beacon/keepalive ayrıntısı `beacon.ts`te. */
 export function trackAdEvent(
   id: string,
   event: AdEvent,
   hotspotId?: string,
 ): void {
-  if (typeof window === "undefined") return;
-  const url = adEventUrl(id, event, hotspotId);
-  try {
-    if (
-      typeof navigator !== "undefined" &&
-      typeof navigator.sendBeacon === "function" &&
-      navigator.sendBeacon(url)
-    ) {
-      return;
-    }
-  } catch {
-    // beacon kullanılamadı → fetch yedeği
-  }
-  void fetch(url, {
-    method: "POST",
-    keepalive: true,
-    credentials: "include",
-  }).catch(() => undefined);
+  sendTrackingBeacon(adEventUrl(id, event, hotspotId));
 }
 
 export const advertisementsApi = {

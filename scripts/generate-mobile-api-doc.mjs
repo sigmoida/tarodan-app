@@ -181,6 +181,8 @@ const workflows = [
       "GET /categories",
       "GET /collections/browse",
       "GET /ads/active",
+      "GET /hero-slides",
+      "GET /trust-badges",
     ],
   },
   {

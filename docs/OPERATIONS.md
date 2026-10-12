@@ -639,8 +639,9 @@ kopyalarına sahiptir, uygulamadaki silme akışları paylaşılan kaynaklara do
 
 Anahtar düzeni: ürün `seed-assets/products/<slugBase>-card.webp` + `-detail.webp`
 · koleksiyon `seed-assets/collections/<slug>.webp` · hero
-`seed-assets/hero/<dosya>.png` (web CDN'den doğrudan çeker —
-`apps/web/src/lib/assetCdn.ts`, `NEXT_PUBLIC_ASSET_CDN_URL`) · avatar
+`seed-assets/hero/<dosya>.png` (referans seed'in `hero_slides` satırlarına
+mutlak URL olarak yazılır — `apps/api/prisma/seed-hero-content.ts`; web/mobil
+yalnız API'den okur) · avatar
 `seed-assets/avatars/avatar-XX.webp`.
 
 Bucket policy: [`docs/s3-bucket-policy-public-read.json`](./s3-bucket-policy-public-read.json) —

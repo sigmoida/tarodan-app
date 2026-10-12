@@ -235,7 +235,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "ads",
         label: t("admin.roles.permissions.ads.label"),
         description: t("admin.roles.permissions.ads.description"),
-        pages: ["/marketing/ads"],
+        pages: ["/marketing/ads", "/marketing/hero", "/marketing/trust-badges"],
       },
       {
         key: "notifications",

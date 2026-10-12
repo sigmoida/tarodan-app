@@ -158,3 +158,9 @@ export * from "./ad-hotspot";
 
 // Admin Excel dökümleri: kaynak başına kolon kataloğu (API yazıcısı + admin)
 export * from "./export-catalog";
+
+// Admin'in iki dilde yazdığı içerik metni (tr zorunlu, en → tr düşer)
+export * from "./localized-text";
+
+// Vitrin hero'su + güven rozetleri: yerleşimler, sınırlar, public/admin şekiller
+export * from "./hero";

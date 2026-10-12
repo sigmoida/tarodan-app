@@ -57,6 +57,10 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   // Reklam paketleri + boost satın alımları: menüde /marketing/ad-packages ve
   // /marketing/boost-purchases sayfaları "ads" izniyle gösterilir.
   "ad-packages": ["ads"],
+  // Vitrin hero'su (slider + auth görseli, `/admin/hero-slides/upload` dahil)
+  // ve ana sayfa güven rozetleri: pazarlama içeriği, reklamla aynı izin.
+  "hero-slides": ["ads"],
+  "trust-badges": ["ads"],
   notifications: ["notifications"],
   "email-templates": ["email_templates"],
   pages: ["pages"],
