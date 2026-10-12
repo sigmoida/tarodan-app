@@ -187,6 +187,16 @@ döndürür (admin ekranı için).
 | `netsis.item.productSale`           | boş        | `platform_sale` kartı (≤ 35 karakter, VERIFY)       |
 | `netsis.item.<tür>`                 | boş        | `FiscalInvoiceType`'tan türeyen her ücret türü için |
 
+**Admin ekranı:** Sistem → Faturalama Ayarları (`/system/invoicing-settings`,
+`settings` izni). `GET`/`PUT /admin/invoicing/settings` ayarları okur/yazar
+(PUT: bilinmeyen anahtar 400, hepsi tek işlemde, zorunlu denetim kaydı
+`netsis_invoice_settings_update` önce/sonra değerleriyle), `POST
+/admin/invoicing/netsis/ping` bağlantıyı sınar (hata `ok:false` + yerelleştirilmiş
+mesaj). Doğrulama `provider/netsis-invoice-settings.validation.ts`'tedir ve kuralı
+sağlayıcının ayrıştırıcısından alır — ikinci bir kural kopyası yoktur.
+Etkin sağlayıcı ve Netsis modu (`INVOICE_PROVIDER`, `NETSIS_*`) ekranda
+salt okunurdur.
+
 Ücret türleri enum'dan türetilir (`platform_sale` ve `return_invoice`
 hariç hepsi): `commission`, `service_fee`, `buyer_commission`,
 `buyer_service_fee`, `buyer_shipping`, `seller_commission`,

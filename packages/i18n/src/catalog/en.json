@@ -9164,7 +9164,7 @@
         "invoices": {
           "name": "Invoices",
           "description": "Manage invoice and e-invoice operations",
-          "keywords": "invoice,e-archive,e-invoice,elogo,refund invoice"
+          "keywords": "invoice,e-archive,e-invoice,e-document,elogo,netsis,refund invoice"
         },
         "settlement": {
           "name": "Settlement Report",
@@ -9241,6 +9241,11 @@
           "name": "Email Routing",
           "description": "Sender mailbox per area and internal notification recipients",
           "keywords": "email, mail, sender, smtp, notification, recipient, mailbox, digest"
+        },
+        "invoicingSettings": {
+          "name": "Invoicing Settings",
+          "description": "Netsis customer, series and service-card codes; provider and connection status",
+          "keywords": "invoicing, netsis, customer code, series, service card, e-invoice, e-archive, e-document, connection test"
         }
       }
     },
@@ -10022,6 +10027,75 @@
           "areas": "Areas received"
         }
       }
+    },
+    "invoicingSettings": {
+      "page": {
+        "title": "Invoicing Settings",
+        "description": "Codes tied to the records accounting opened in Netsis. Changes apply from the next document, no deploy needed."
+      },
+      "error": {
+        "title": "Could not load invoicing settings",
+        "description": "The settings could not be read. Check your connection and try again."
+      },
+      "groups": {
+        "provider": "Provider",
+        "cari": "Customer account",
+        "serial": "Series",
+        "item": "Service cards",
+        "readiness": "Readiness"
+      },
+      "provider": {
+        "active": "Active provider",
+        "netsisEnabled": "Netsis integration",
+        "netsisMode": "Netsis mode",
+        "on": "On",
+        "off": "Off",
+        "envNote": "The provider and Netsis mode are deployment settings; they cannot be changed here."
+      },
+      "mode": {
+        "stub": "Test (stub)",
+        "live": "Live"
+      },
+      "ping": {
+        "button": "Test connection",
+        "ok": "Netsis connection works. Mode: {mode} · Version: {version} · Credentials: {auth}",
+        "failed": "Could not reach Netsis: {error}",
+        "authenticated": "verified",
+        "notAuthenticated": "not verified"
+      },
+      "fields": {
+        "retailCode": {
+          "label": "Retail customer code",
+          "helper": "The shared account for individual and guest buyers."
+        },
+        "autoCreateCorporate": {
+          "label": "Create corporate accounts automatically",
+          "helper": "A buyer with a tax number gets an account on the first invoice."
+        },
+        "earchive": {
+          "label": "e-Archive series",
+          "helper": "3 characters, letters and digits (e.g. TRD)."
+        },
+        "einvoice": {
+          "label": "e-Invoice series",
+          "helper": "3 characters, letters and digits (e.g. TRE)."
+        }
+      },
+      "validation": {
+        "serial": "The series must be exactly 3 characters (A-Z and 0-9 only).",
+        "cariMax": "The customer code can be at most {max} characters.",
+        "itemMax": "The service-card code can be at most {max} characters."
+      },
+      "readiness": {
+        "ready": "Ready",
+        "notReady": "Not ready",
+        "allSet": "Every setting needed to issue a Netsis invoice is filled in and valid.",
+        "blocking": "Netsis documents cannot be issued until the settings below are completed.",
+        "missing": "missing",
+        "invalid": "invalid"
+      },
+      "saveButton": "Save",
+      "saved": "Invoicing settings saved"
     }
   },
   "server": {
@@ -10327,7 +10401,7 @@
       },
       "elogoInvoiceExhausted": {
         "title": "e-Invoice Delivery Blocked — Admin Action Required",
-        "message": "Document {invoiceNumber} ({typeLabel}) could not be sent to eLogo and has run out of attempts: {reason}. The legal deadline is running; fix the cause and use \"Retry\" on the Invoices screen."
+        "message": "Document {invoiceNumber} ({typeLabel}) could not be sent to the e-document provider and has run out of attempts: {reason}. The legal deadline is running; fix the cause and use \"Retry\" on the Invoices screen."
       },
       "sellerInvoiceMissing": {
         "title": "Seller Invoice Not Uploaded",
@@ -11292,6 +11366,11 @@
           "preparingWarningBeforeDeadline": "The seller preparation warning (hours) must be shorter than the seller preparation time (days × 24 hours)."
         },
         "conflict": "Another admin changed the durations at the same time. Reload the page and try again."
+      },
+      "invoicingSettings": {
+        "empty": "No setting was submitted to save.",
+        "unknownKey": "Unknown invoicing setting: {key}",
+        "invalidValue": "Invalid value for the {key} setting."
       }
     },
     "advertisement": {
@@ -11458,7 +11537,7 @@
       "issueForbidden": "You are not allowed to issue an invoice for this order",
       "notFound": "Invoice not found",
       "orderUnpaidOrCancelled": "An invoice cannot be issued for an unpaid or cancelled order.",
-      "returnViaElogoOnly": "Return invoices can only be issued through the eLogo return-document flow."
+      "returnViaElogoOnly": "Return invoices can only be issued through the e-document return flow."
     },
     "security": {
       "passwordRequiredFor2fa": "Set an account password before enabling two-factor authentication",

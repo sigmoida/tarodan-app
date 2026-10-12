@@ -49,6 +49,8 @@ import { AdminLegalIdentityService } from "./users/admin-legal-identity.service"
 import { AdminLegalIdentityController } from "./users/admin-legal-identity.controller";
 import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
 import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
+import { AdminInvoicingSettingsService } from "./finance/invoicing-settings/admin-invoicing-settings.service";
+import { AdminInvoicingSettingsController } from "./finance/invoicing-settings/admin-invoicing-settings.controller";
 import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
 import { ConsentModule } from "../consent/consent.module";
 import { TimingRulesModule } from "../timing-rules/timing-rules.module";
@@ -145,6 +147,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { OrderModule } from "../order/order.module";
 import { OfferModule } from "../offer/offer.module";
 import { InvoicingModule } from "../invoicing/invoicing.module";
+import { NetsisModule } from "../netsis/netsis.module";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { TradeModule } from "../trade/trade.module";
 import { CommissionModule } from "../commission/commission.module";
@@ -180,6 +183,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     UserModule,
     ModerationModule,
     InvoicingModule,
+    // Faturalama Ayarları ekranı: Netsis bağlantı testi (ping).
+    NetsisModule,
     ShippingTariffModule,
     // Depo adresi tek kaynağı — AdminTradeCommonService buna delege eder.
     WarehouseAddressModule,
@@ -236,6 +241,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminSiteAccessController,
     AdminTimingRulesController,
     AdminMailRoutingController,
+    AdminInvoicingSettingsController,
   ],
   providers: [
     AdminService,
@@ -245,6 +251,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminCommissionService,
     AdminSettingsService,
     AdminTimingRulesService,
+    AdminInvoicingSettingsService,
     // Mail Yönlendirme: domain servisleri MailRoutingModule'den (@Global).
     AdminMailRoutingService,
     AdminSiteAccessService,
