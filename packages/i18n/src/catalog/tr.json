@@ -11683,7 +11683,7 @@
         "totals": "Toplamlar",
         "parentTotal": "Kayıt tutarları toplamı",
         "notes": "Notlar",
-        "truncated": "Dosya yalnız ilk {count} kaydı içeriyor; tamamı için filtreyi daraltın.",
+        "truncated": "Dosya yalnız ilk {count, number} kaydı içeriyor; tamamı için filtreyi daraltın.",
         "longFormat": "Veri sayfasında her satır bir kalemdir; üst kaydın kolonları her kalemde tekrarlanır. Üst kayıt tutarlarını veri sayfasında toplamayın — toplamlar bu sayfadadır.",
         "tab": "Sekme",
         "subTab": "Alt sekme"

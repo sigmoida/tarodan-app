@@ -319,7 +319,7 @@ function renderEntries(
   entries: readonly ExportSummaryEntry[],
   t: Translate,
 ): WorkbookSummaryRow[] {
-  return entries.flatMap((entry) => {
+  return entries.flatMap((entry): WorkbookSummaryRow[] => {
     const { value } = entry;
     if (value === null || value === undefined) return [];
     if (typeof value === "string" && value.trim() === "") return [];
