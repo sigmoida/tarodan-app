@@ -44,6 +44,10 @@ import {
 import { UserPicker } from "./UserPicker";
 
 /** datetime-local için YEREL "şimdi" (yyyy-mm-ddTHH:mm). */
+/** E-posta HTML editörünün "Görsel ekle" yüklemesi: sunucudaki http(s) adresi. */
+const uploadEmailImage = async (file: File): Promise<string> =>
+  (await adminApi.uploadNotificationImage(file)).data.url;
+
 function localDateTimeMin(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -311,6 +315,7 @@ export function SendNotificationForm({
                     "admin.marketing.notifications.emailHtmlPlaceholder",
                   )}
                   className="min-h-[260px]"
+                  onUploadImage={uploadEmailImage}
                 />
               </SectionCard>
             )}

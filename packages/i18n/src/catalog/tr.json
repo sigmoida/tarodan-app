@@ -4479,6 +4479,21 @@
           "rejectDescription": "Bu yorumu reddetmek istediğinize emin misiniz?",
           "revertTitle": "Yorumu Beklemeye Al",
           "revertDescription": "Bu yorumu yeniden inceleme kuyruğuna almak istediğinize emin misiniz?"
+        },
+        "detail": {
+          "open": "Detay",
+          "title": "Yorum detayı",
+          "noText": "Yorum metni yok",
+          "images": "Görseller",
+          "imageAlt": "Yorum görseli {index}",
+          "adminReply": "Yönetici yanıtı",
+          "author": "Yorumu yazan",
+          "links": {
+            "product": "Ürün",
+            "order": "Sipariş",
+            "trade": "Takas",
+            "seller": "Satıcı"
+          }
         }
       },
       "sellerApplications": {
@@ -5775,7 +5790,10 @@
           "usedReturn": "Ürün kullanılmış olarak iade edilmek isteniyor",
           "reviewComment": "Hızlı kargo, ürün birebir açıklandığı gibi. Teşekkürler!",
           "followerName": "Ayşe D."
-        }
+        },
+        "insertImage": "Görsel ekle",
+        "imageUploadFailed": "Görsel yüklenemedi",
+        "imageNotAnImage": "Yalnızca görsel dosyaları eklenebilir"
       },
       "notifications": {
         "title": "Bildirim Yönetimi",
@@ -6708,7 +6726,36 @@
         "transferQueueFallback": "Anında transfer kuyruğa alınamadı — saatlik ödeme taraması devreye girecek",
         "transferDeferred": "Transfer satırı şu an oluşmadı (engel ya da zaten mevcut olabilir) — bekleyen transfer hemen, engelli olan saatlik taramada işlenir",
         "refundedAmount": "İade Edilen",
-        "earlyReleaseDays": "Erken Bırakma (gün)"
+        "earlyReleaseDays": "Erken Bırakma (gün)",
+        "holdReasons": {
+          "releasable": {
+            "label": "Serbest bırakılabilir",
+            "detail": "Vade doldu, açık iade yok — ödeme satıcıya aktarılabilir."
+          },
+          "not_due": {
+            "label": "Vadesi gelmedi",
+            "detail": "İade penceresi ve bekleme süresi henüz dolmadı."
+          },
+          "frozen": {
+            "label": "İade nedeniyle donduruldu",
+            "detail": "Açık bir iade talebi bu ödemeyi kilitledi — iade sonuçlanana kadar serbest bırakılamaz."
+          },
+          "order_not_terminal": {
+            "label": "Sipariş tamamlanmadı",
+            "detail": "Sipariş henüz teslim edilip tamamlanmadı — escrow saati teslimle başlar."
+          },
+          "seller_at_fault": {
+            "label": "Satıcı kusurlu — ödenmez",
+            "detail": "İade kararında kusur satıcıda; bu ödeme satıcıya aktarılmaz."
+          },
+          "already_released": {
+            "label": "Serbest bırakıldı",
+            "detail": "Bu ödeme zaten satıcıya serbest bırakıldı."
+          }
+        },
+        "filterDue": "Vade",
+        "filterAllDue": "Tümü",
+        "filterOverdueOnly": "Vadesi geçmiş"
       },
       "tax": {
         "title": "Vergi Ayarları",
@@ -7150,7 +7197,9 @@
           "shipped": "Kargoya Verilen",
           "inTransit": "Taşıma Durumunda",
           "delivered": "Teslim Edilen",
-          "other": "Diğer"
+          "other": "Diğer",
+          "cancelled": "İptaller",
+          "refunds": "İadeler"
         },
         "filters": {
           "party": "Alıcı / Satıcı",
@@ -7225,7 +7274,8 @@
             "completed": "sipariş tamamlandı; satıcı ödemesi yapıldı ya da yapılacak"
           },
           "reservationNotReserved": "Bu sipariş için stok ayrılmamıştı (ödemesi hiç başlatılmadı)"
-        }
+        },
+        "shippedBeforeChip": "{days} günden uzun süredir kargoda"
       },
       "trades": {
         "cashPayer": "Nakit / Ödeyen",
@@ -7609,6 +7659,21 @@
           "all": "Tüm türler",
           "cancellation": "İptal iadesi",
           "return": "Ürün iadesi"
+        },
+        "totals": {
+          "helper": "Taraf toplamları birbirinden bağımsızdır; alıcı, satıcı ve platform rakamlarını birbirine eklemeyin. Kalem tablosundaki bileşenler de bu toplamlara ayrıca eklenmez.",
+          "sides": {
+            "buyer": "Alıcı",
+            "seller": "Satıcı",
+            "platform": "Platform"
+          },
+          "lines": {
+            "refund": "İade",
+            "charge": "Kesinti",
+            "retain": "Alıkonulan",
+            "net": "Net"
+          },
+          "shippingRefund": "Kargo iadesi"
         }
       },
       "shipping": {
@@ -7876,7 +7941,9 @@
         "invoicesExhausted": "Denemesi tükenmiş belge",
         "ordersUninvoiced": "Faturasız teslimat",
         "carrierCancellations": "Taşıyıcı iptal görevi",
-        "shipmentsWithoutTracking": "Takip kodu oluşmamış gönderi"
+        "shipmentsWithoutTracking": "Takip kodu oluşmamış gönderi",
+        "holdsUpcoming": "Yaklaşan serbest bırakma",
+        "informationalHint": "Bilgi satırı — bekleyen iş toplamına dahil değildir"
       },
       "alerts": {
         "stuckShippedOrders": "{count} sipariş {threshold} günden uzun süredir kargoda — teslim raporu gelmiyor",
@@ -9296,28 +9363,6 @@
         }
       },
       "escrow": {
-        "reasons": {
-          "frozen": {
-            "label": "Donduruldu",
-            "detail": "Hold açık bir iade talebi nedeniyle kilitli (frozen) — iade sonuçlanana kadar serbest bırakılamaz."
-          },
-          "openRefund": {
-            "label": "Açık iade var",
-            "detail": "Bu sipariş için açık bir iade talebi var — talep sonuçlanana kadar ödeme bekletiliyor."
-          },
-          "notDelivered": {
-            "label": "Teslim bekleniyor",
-            "detail": "Ürün henüz teslim edilmedi — escrow saati teslimle başlar."
-          },
-          "windowNotElapsed": {
-            "label": "Teslim+{days} dolmadı",
-            "detail": "İade penceresi + grace henüz dolmadı — {date} tarihinde serbest bırakılabilir."
-          },
-          "ready": {
-            "label": "Serbest bırakılabilir",
-            "detail": "İade penceresi doldu ve açık iade yok — ödeme satıcıya aktarılabilir."
-          }
-        },
         "cancellation": {
           "beforeShipping": {
             "label": "İptal (kargo öncesi)",

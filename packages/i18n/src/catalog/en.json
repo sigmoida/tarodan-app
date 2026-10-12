@@ -4479,6 +4479,21 @@
           "rejectDescription": "Are you sure you want to reject this review?",
           "revertTitle": "Move Review to Pending",
           "revertDescription": "Are you sure you want to return this review to the review queue?"
+        },
+        "detail": {
+          "open": "Details",
+          "title": "Review details",
+          "noText": "No review text",
+          "images": "Images",
+          "imageAlt": "Review image {index}",
+          "adminReply": "Admin reply",
+          "author": "Written by",
+          "links": {
+            "product": "Product",
+            "order": "Order",
+            "trade": "Trade",
+            "seller": "Seller"
+          }
         }
       },
       "sellerApplications": {
@@ -5775,7 +5790,10 @@
           "usedReturn": "The product is being returned after use",
           "reviewComment": "Fast shipping, and the product was exactly as described. Thank you!",
           "followerName": "Taylor D."
-        }
+        },
+        "insertImage": "Insert image",
+        "imageUploadFailed": "Image could not be uploaded",
+        "imageNotAnImage": "Only image files can be inserted"
       },
       "notifications": {
         "title": "Notification Management",
@@ -6708,7 +6726,36 @@
         "transferQueueFallback": "Immediate transfer could not be queued — the hourly payout sweep will pick it up",
         "transferDeferred": "No transfer row was created right now (blocked or already existing) — a pending transfer is processed immediately, a blocked one by the hourly sweep",
         "refundedAmount": "Refunded",
-        "earlyReleaseDays": "Released early (days)"
+        "earlyReleaseDays": "Released early (days)",
+        "holdReasons": {
+          "releasable": {
+            "label": "Releasable",
+            "detail": "Due date reached, no open refund — the payout can be released to the seller."
+          },
+          "not_due": {
+            "label": "Not due yet",
+            "detail": "The return window and waiting period have not elapsed yet."
+          },
+          "frozen": {
+            "label": "Frozen by a refund",
+            "detail": "An open refund request locked this payout — it cannot be released until the refund is resolved."
+          },
+          "order_not_terminal": {
+            "label": "Order not completed",
+            "detail": "The order has not been delivered and completed yet — the escrow clock starts at delivery."
+          },
+          "seller_at_fault": {
+            "label": "Seller at fault — not payable",
+            "detail": "The refund decision put the fault on the seller; this payout is not released."
+          },
+          "already_released": {
+            "label": "Released",
+            "detail": "This payout has already been released to the seller."
+          }
+        },
+        "filterDue": "Due date",
+        "filterAllDue": "All",
+        "filterOverdueOnly": "Overdue"
       },
       "tax": {
         "title": "Tax Settings",
@@ -7150,7 +7197,9 @@
           "shipped": "Handed to Carrier",
           "inTransit": "In Transit",
           "delivered": "Delivered",
-          "other": "Other"
+          "other": "Other",
+          "cancelled": "Cancellations",
+          "refunds": "Refunds"
         },
         "filters": {
           "party": "Buyer / Seller",
@@ -7225,7 +7274,8 @@
             "completed": "the order is completed; the seller has been or will be paid out"
           },
           "reservationNotReserved": "No stock was reserved for this order (its payment was never started)"
-        }
+        },
+        "shippedBeforeChip": "Shipped more than {days} days ago"
       },
       "trades": {
         "cashPayer": "Cash / Payer",
@@ -7609,6 +7659,21 @@
           "all": "All types",
           "cancellation": "Cancellation refund",
           "return": "Product return"
+        },
+        "totals": {
+          "helper": "Side totals are independent of each other; do not add the buyer, seller and platform figures together. The components in the table above are not added on top of these totals either.",
+          "sides": {
+            "buyer": "Buyer",
+            "seller": "Seller",
+            "platform": "Platform"
+          },
+          "lines": {
+            "refund": "Refund",
+            "charge": "Charge",
+            "retain": "Retained",
+            "net": "Net"
+          },
+          "shippingRefund": "Shipping refund"
         }
       },
       "shipping": {
@@ -7876,7 +7941,9 @@
         "invoicesExhausted": "Documents out of retries",
         "ordersUninvoiced": "Uninvoiced deliveries",
         "carrierCancellations": "Carrier cancellation tasks",
-        "shipmentsWithoutTracking": "Shipments without a tracking id"
+        "shipmentsWithoutTracking": "Shipments without a tracking id",
+        "holdsUpcoming": "Upcoming releases",
+        "informationalHint": "Informational line — not included in the waiting-work total"
       },
       "alerts": {
         "stuckShippedOrders": "{count} orders have been shipped for over {threshold} days with no delivery report",
@@ -9296,28 +9363,6 @@
         }
       },
       "escrow": {
-        "reasons": {
-          "frozen": {
-            "label": "Frozen",
-            "detail": "The hold is locked by an open refund request and cannot be released until the refund is resolved."
-          },
-          "openRefund": {
-            "label": "Open refund",
-            "detail": "This order has an open refund request; payment is held until the request is resolved."
-          },
-          "notDelivered": {
-            "label": "Awaiting delivery",
-            "detail": "The product has not been delivered; the escrow clock starts at delivery."
-          },
-          "windowNotElapsed": {
-            "label": "Delivery+{days} not elapsed",
-            "detail": "The refund window and grace period have not elapsed; funds can be released on {date}."
-          },
-          "ready": {
-            "label": "Ready for release",
-            "detail": "The refund window has elapsed and there is no open refund; payment can be transferred to the seller."
-          }
-        },
         "cancellation": {
           "beforeShipping": {
             "label": "Cancellation (before shipping)",

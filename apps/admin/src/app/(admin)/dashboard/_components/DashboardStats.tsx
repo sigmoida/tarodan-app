@@ -39,6 +39,7 @@ function StatCard({
   return (
     <MetricCard
       label={t(config.labelKey)}
+      description={metric.description}
       loading={loading}
       value={<span className="tabular-nums">{format(metric.period)}</span>}
       footer={
