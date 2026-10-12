@@ -11646,6 +11646,21 @@
       "runNotFound": "Yenileme koşusu bulunamadı",
       "invalidToken": "Yenileme koşusu ya da rapor anahtarı geçersiz",
       "alreadyFinished": "Bu yenileme koşusu zaten tamamlandı"
+    },
+    "netsis": {
+      "disabled": "Netsis entegrasyonu kapalı",
+      "notConfigured": "Netsis bağlantısı yapılandırılmamış (adres ya da kimlik bilgileri eksik)",
+      "sessionBusy": "Ortak Netsis oturumu başka bir süreç tarafından açılıyor; kısa süre sonra tekrar deneyin",
+      "queryNotReadOnly": "Netsis sorgusu yorum içermeyen tek bir SELECT ifadesi olmalı",
+      "recordNotFound": "Netsis kaydı bulunamadı",
+      "error": {
+        "network": "Netsis sunucusuna ulaşılamadı",
+        "auth": "Netsis kimlik bilgilerini ya da oturumu reddetti",
+        "validation": "Netsis isteği geçersiz bularak reddetti",
+        "conflict": "Netsis kaydın zaten var olduğunu bildiriyor",
+        "configuration": "Netsis entegrasyonu yanlış yapılandırılmış",
+        "unknown": "Netsis beklenmeyen bir hata döndürdü"
+      }
     }
   },
   "status": {

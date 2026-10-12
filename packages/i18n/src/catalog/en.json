@@ -11646,6 +11646,21 @@
       "runNotFound": "Refresh run not found",
       "invalidToken": "The refresh run or its report token is not valid",
       "alreadyFinished": "This refresh run has already finished"
+    },
+    "netsis": {
+      "disabled": "The Netsis integration is disabled",
+      "notConfigured": "The Netsis connection is not configured (base URL or credentials missing)",
+      "sessionBusy": "Another process is opening the shared Netsis session; try again shortly",
+      "queryNotReadOnly": "A Netsis query must be a single SELECT statement without comments",
+      "recordNotFound": "Netsis record not found",
+      "error": {
+        "network": "The Netsis server could not be reached",
+        "auth": "Netsis rejected the credentials or the session",
+        "validation": "Netsis rejected the request as invalid",
+        "conflict": "Netsis reports the record already exists",
+        "configuration": "The Netsis integration is misconfigured",
+        "unknown": "Netsis returned an unexpected error"
+      }
     }
   },
   "status": {
