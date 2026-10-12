@@ -39,10 +39,11 @@ describe("routePermission", () => {
     expect(routePermission("/operations/trades")).toBe("trades");
   });
 
-  it("guards the cancellations & refunds screen and the refund-request file with the refund permission", () => {
+  it("guards the cancellations screen, the refunds screen and the refund-request file with the refund permission", () => {
     expect(routePermission("/operations/cancellations-refunds")).toBe(
       "refund_requests",
     );
+    expect(routePermission("/operations/refunds")).toBe("refund_requests");
     // Liste menüden çıktı, dosya yerinde: aynı izinle korunur.
     expect(routePermission("/operations/refund-requests/rr-1")).toBe(
       "refund_requests",
@@ -170,12 +171,12 @@ describe("humanizeSegment", () => {
 });
 
 describe("breadcrumbsFor", () => {
-  it("places the refund-request file under the cancellations & refunds page", () => {
+  it("places the refund-request file under the refunds page", () => {
     const crumbs = breadcrumbsFor(
       "/operations/refund-requests/3f2a9c1e-0000-4000-8000-000000000000",
       t,
     );
-    expect(crumbs.at(-2)?.href).toBe("/operations/cancellations-refunds");
+    expect(crumbs.at(-2)?.href).toBe("/operations/refunds");
     expect(crumbs.at(-1)).toEqual({ label: "admin.nav.detailSuffix" });
   });
 

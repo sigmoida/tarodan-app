@@ -100,6 +100,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         description: t("admin.roles.permissions.refundRequests.description"),
         pages: [
           "/operations/cancellations-refunds",
+          "/operations/refunds",
           "/operations/refund-requests/:id",
         ],
       },

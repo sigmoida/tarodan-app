@@ -1,7 +1,5 @@
 /**
- * Sekmelerin sorgu anahtarları (= invalidation hedefleri). İadeler sekmesi
- * eski iade listesinin anahtarını AYNEN kullanır: iade dosyasındaki
- * mutasyonlar (`invalidates: ["refund-requests"]`) listeyi tazelemeye devam eder.
+ * İptaller listesinin sorgu anahtarı (= invalidation hedefi). İadeler kendi
+ * ekranına taşındı (`operations/refunds/_lib/resource.ts`).
  */
 export const CANCELLATIONS_RESOURCE = "cancellations";
-export const REFUND_REQUESTS_RESOURCE = "refund-requests";

@@ -12,13 +12,13 @@ import {
   ClipboardDocumentIcon,
 } from "@heroicons/react/24/outline";
 import {
-  ADMIN_CANCELLATIONS_REFUNDS_PATH,
   ADMIN_OFFERS_TAB_HREF,
   ADMIN_ORDERS_PATH,
   ADMIN_ORDERS_SCREEN_PERMISSIONS,
   ADMIN_ORDERS_SCREEN_TAB_PERMISSIONS,
   ADMIN_TRADES_TAB_HREF,
 } from "@tarodan/types";
+import { REFUNDS_PATH as ADMIN_REFUNDS_PATH } from "@/app/(admin)/operations/refunds/_lib/screenTabs";
 
 /**
  * The single source for the admin left menu. The nav data lives here
@@ -141,11 +141,22 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "shipping",
         },
         {
-          // İptaller + İadeler tek ekranda; eski iade listesi buraya yönlenir.
+          // İptaller; İadeler ayrı ekran (aşağıda).
           name: t("admin.nav.items.cancellationsRefunds.name"),
           href: "/operations/cancellations-refunds",
           description: t("admin.nav.items.cancellationsRefunds.description"),
           keywords: t("admin.nav.items.cancellationsRefunds.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "refund_requests",
+        },
+        {
+          // İade talepleri; eski iade listesi ve "İptal & İade"nin İadeler
+          // sekmesi buraya yönlenir.
+          name: t("admin.nav.items.refunds.name"),
+          href: ADMIN_REFUNDS_PATH,
+          description: t("admin.nav.items.refunds.description"),
+          keywords: t("admin.nav.items.refunds.keywords")
             .split(",")
             .map((k) => k.trim()),
           permission: "refund_requests",
@@ -544,7 +555,7 @@ const NAV_PARENT_ALIASES: Record<
   string,
   { parent: string; listHref?: string }
 > = {
-  "/operations/refund-requests": { parent: ADMIN_CANCELLATIONS_REFUNDS_PATH },
+  "/operations/refund-requests": { parent: ADMIN_REFUNDS_PATH },
   "/operations/offers": {
     parent: ADMIN_ORDERS_PATH,
     listHref: ADMIN_OFFERS_TAB_HREF,

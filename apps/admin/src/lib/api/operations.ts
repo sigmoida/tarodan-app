@@ -5,6 +5,7 @@ import type {
   AdminOrderCancelRequest,
   AdminOrderCancelResult,
   AdminOrderCounts,
+  AdminRefundBucket,
   AdminTradeCancelPreview,
   AdminTradeCancelResult,
 } from "@tarodan/types";
@@ -105,6 +106,18 @@ export const operationsApi = {
   // RefundRequest admin
   getRefundRequests: (params?: any) =>
     api.get("/admin/refund-requests", { params }),
+  /** İadeler ekranının alt sekme sayaçları (sekme başına, liste filtreleriyle). */
+  getRefundRequestCounts: (params?: Record<string, string>) =>
+    api.get<Record<AdminRefundBucket, number>>(
+      "/admin/refund-requests/counts",
+      { params },
+    ),
+  /** Geçerli sekme + alt sekme + filtrenin XLSX dökümü (uzun biçim). */
+  exportRefundRequests: (params?: Record<string, unknown>) =>
+    api.get("/admin/refund-requests/export", {
+      params,
+      responseType: "blob",
+    }),
   getRefundRequest: (id: string) => api.get(`/admin/refund-requests/${id}`),
   previewRefundDecision: (
     id: string,
