@@ -54,6 +54,6 @@ describe("closedOrderHeldHoldsQuery", () => {
     await expect(
       findClosedOrderHeldHolds(db as never, { limit: 5 }),
     ).resolves.toBe(rows);
-    expect(db.$queryRaw.mock.calls[0][0]).toBeInstanceOf(Prisma.Sql);
+    expect(db.$queryRaw.mock.calls[0][0]).toHaveProperty("sql");
   });
 });

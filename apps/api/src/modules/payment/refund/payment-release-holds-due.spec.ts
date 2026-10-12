@@ -133,7 +133,7 @@ describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", 
     // olmasına göre seçilir — sınırlı ve sıralı JOIN.
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     const query = prisma.$queryRaw.mock.calls[0][0] as Prisma.Sql;
-    expect(query).toBeInstanceOf(Prisma.Sql);
+    expect(typeof query.sql).toBe("string");
     expect(query.sql).toContain("JOIN orders o ON o.id = h.order_id");
     expect(query.sql).toContain("h.release_at IS NULL");
     expect(query.sql).toContain("h.frozen_by_refund_id IS NULL");

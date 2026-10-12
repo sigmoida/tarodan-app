@@ -1,8 +1,9 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import type { Queue } from "bull";
@@ -106,7 +107,8 @@ export class AdminPayoutService {
     private readonly paymentService: PaymentService,
     private readonly payoutCore: PayoutService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
-    private readonly holdResidual: PaymentHoldResidualService,
+    // Sondaki opsiyonel bağımlılık: mevcut dar spec kurulumları 5 argümanla kurar.
+    @Optional() private readonly holdResidual?: PaymentHoldResidualService,
   ) {}
 
   /**
@@ -120,6 +122,11 @@ export class AdminPayoutService {
     if (!reason?.trim()) {
       throw new BadRequestException(
         i18nMessage("server.admin.payment.escrowReasonRequired"),
+      );
+    }
+    if (!this.holdResidual) {
+      throw new Error(
+        "PaymentHoldResidualService is not wired into AdminPayoutService",
       );
     }
     const settled = await this.holdResidual.settleResidual(holdId, {
