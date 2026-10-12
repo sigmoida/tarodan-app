@@ -3,7 +3,7 @@ import type { useTranslations } from "next-intl";
 import {
   TRUST_BADGE_ICONS,
   TRUST_BADGE_LIMITS,
-  type LocalizedText,
+  type AdminTrustBadgeDto,
 } from "@tarodan/types";
 import {
   addLocalizedIssues,
@@ -17,17 +17,12 @@ type T = ReturnType<typeof useTranslations<never>>;
 /** Yalnız istemci ipucu: yayında bu kadar rozetten fazlası sığmaz (sunucu zorlamaz). */
 export const TRUST_BADGE_MAX_ACTIVE = 8;
 
-/** API satırı (`GET /admin/trust-badges`). */
-export interface TrustBadge {
-  id: string;
-  icon: string;
-  title: LocalizedText;
-  description: LocalizedText | null;
-  isActive: boolean;
-  displayOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
+/**
+ * API satırı (`GET /admin/trust-badges`) — sözleşme `@tarodan/types`ta. İkon
+ * burada geniş `string`: liste daralırsa eski satır yine listelenir ve
+ * düzeltilebilir (API admin şeklinde doğrulamaz).
+ */
+export type TrustBadge = Omit<AdminTrustBadgeDto, "icon"> & { icon: string };
 
 export const TRUST_BADGE_LOCALIZED_FIELDS = ["title", "description"] as const;
 

@@ -345,6 +345,30 @@ describe("HeroSlideService.update", () => {
     });
   });
 
+  it("admin formunun değişmeden gönderdiği anahtar/pencere/yerleşim sınırı yoklamaz", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(
+      row({ startDate: new Date("2026-10-01T00:00:00Z"), endDate: null }),
+    );
+    await service.update("slide-1", {
+      title: { tr: "Yeni" },
+      placement: "home",
+      isActive: true,
+      startDate: "2026-10-01T00:00:00.000Z",
+      endDate: null,
+    } as never);
+    expect(heroSlide.findMany).not.toHaveBeenCalled();
+  });
+
+  it("pencere değişince sınır yoklanır", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await service.update("slide-1", {
+      startDate: "2026-10-01T00:00:00.000Z",
+    } as never);
+    expect(heroSlide.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it("pasif slaytı açmak sınırı kendisi hariç yoklar", async () => {
     const { service, heroSlide } = makeService();
     heroSlide.findUnique.mockResolvedValueOnce(row({ isActive: false }));

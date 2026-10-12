@@ -4,7 +4,9 @@ import {
   HERO_IMAGE_SIDES,
   HERO_PLACEMENTS,
   HERO_TEXT_LIMITS,
-  type LocalizedText,
+  type AdminHeroSlideDto,
+  type HeroImageSide,
+  type HeroPlacement,
 } from "@tarodan/types";
 import {
   endOfIstanbulDayIso,
@@ -21,37 +23,10 @@ import {
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export type HeroPlacement = (typeof HERO_PLACEMENTS)[number];
-export type HeroImageSide = (typeof HERO_IMAGE_SIDES)[number];
+export type { HeroImageSide, HeroPlacement };
 
-/** API satırı (`GET /admin/hero-slides`). */
-export interface HeroSlide {
-  id: string;
-  placement: HeroPlacement;
-  isActive: boolean;
-  /** Sunucunun hesapladığı yayın durumu (zaman penceresi + üst sınır). */
-  isLive: boolean;
-  displayOrder: number;
-  startDate: string | null;
-  endDate: string | null;
-  imageUrl: string;
-  mobileImageUrl: string | null;
-  imageSide: HeroImageSide;
-  title: LocalizedText;
-  subtitle: LocalizedText | null;
-  imageAlt: LocalizedText | null;
-  cta1Label: LocalizedText | null;
-  cta1Href: string | null;
-  cta2Label: LocalizedText | null;
-  cta2Href: string | null;
-  hideOnIos: boolean;
-  impressionCount: number;
-  clickCount: number;
-  cta1ClickCount: number;
-  cta2ClickCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
+/** API satırı (`GET /admin/hero-slides`) — sözleşme `@tarodan/types`ta. */
+export type HeroSlide = AdminHeroSlideDto;
 
 /** Çift dilli alanların taban adları (form: `<ad>Tr` / `<ad>En`). */
 export const HERO_LOCALIZED_FIELDS = [

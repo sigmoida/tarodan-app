@@ -26,7 +26,12 @@ export function HeroTable({ onEdit }: { onEdit: (slide: HeroSlide) => void }) {
       optimistic: {
         resources: "hero-slides",
         id: (s) => s.id,
-        patch: (s) => ({ isActive: !s.isActive }),
+        // Kapatılan slayt o an yayından düşer; açılanın yayın durumu pencereye
+        // bağlıdır, onu sunucu yanıtı (yeniden okuma) söyler.
+        patch: (s) => ({
+          isActive: !s.isActive,
+          isLive: s.isActive ? false : s.isLive,
+        }),
       },
     },
   );

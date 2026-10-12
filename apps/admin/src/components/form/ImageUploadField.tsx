@@ -8,7 +8,8 @@ import { useTranslations } from "next-intl";
 import { Panel } from "@/components/detail/Panel";
 import { extractErrorMessage } from "@/lib/error";
 
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+// Sunucu sınırıyla aynı (ads + hero upload uçları 5 MB kabul eder).
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 /**
  * Sürükle-bırak görsel yükleme; alan değeri yüklenen görselin URL'sidir.

@@ -341,10 +341,6 @@
     "passwordResetFailed": "Password reset failed",
     "heroBusinessTitle": "Put Your Business Center Stage",
     "heroBusinessSubtitle": "Reach thousands of collectors and manage every listing from one business account.",
-    "heroRegisterTitle": "Let the Collection Begin",
-    "heroRegisterSubtitle": "Join free and discover your first model today.",
-    "heroDefaultTitle": "Where Collections Come Alive",
-    "heroDefaultSubtitle": "Thousands of diecast models, one place. Find it, own it, grow it.",
     "businessPendingEmailNotice": "Başvurunuz <b>{email}</b> adresi ile incelemede. Sonuç e-posta ile bildirilecek.",
     "businessRejectedEmailNotice": "<b>{email}</b> adresiyle yapılan kurumsal başvurunuz reddedildi.",
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
@@ -2501,18 +2497,6 @@
     "companyBioFallback": "Buying and selling premium diecast vehicles",
     "viewStore": "View Store",
     "slider": {
-      "marketplaceTitle": "Turkey's Largest\nDiecast Marketplace",
-      "marketplaceSubtitle": "Buy, sell, and trade diecast models. Create your Digital Garage and showcase your collection.",
-      "browseMarketplace": "Browse Marketplace",
-      "hotWheelsTitle": "Premium Hot Wheels\nCollections",
-      "hotWheelsSubtitle": "Fast & Furious, Formula 1 and more. Discover rare models.",
-      "exploreHotWheels": "Explore Hot Wheels",
-      "allBrands": "All Brands",
-      "secureTradingTitle": "Secure Trading\nSystem",
-      "secureTradingSubtitle": "Trade your collections with other collectors safely. Protected system for both parties.",
-      "startTrading": "Start Trading",
-      "howItWorks": "How It Works?",
-      "imageAlt": "Diecast model car collection",
       "goToSlide": "Go to slide {index}"
     }
   },
@@ -4257,11 +4241,6 @@
       "unsubscribedToast": "Unsubscribed",
       "subscriptionFailed": "Subscription failed",
       "preferenceRequired": "Select at least one email preference."
-    },
-    "platformFee": {
-      "ariaLabel": "Platform service fee announcement",
-      "notice": "<b>Notice:</b> As of 2 June 2026, a Platform Service Fee of <b>3% of the item price</b> applies to purchases made on TARODAN. <link>Learn more</link>.",
-      "dismiss": "Dismiss banner"
     }
   },
   "stockout": {
@@ -5639,7 +5618,7 @@
         },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
-          "maxSize": "File size must not exceed 2MB",
+          "maxSize": "File must be at most 5 MB",
           "success": "Image uploaded",
           "failed": "Upload failed",
           "dropHint": "Drag and drop the image or",
@@ -7294,11 +7273,8 @@
           "inTransit": "In Transit",
           "delivered": "Delivered",
           "other": "Other",
-          "cancelled": "Cancellations",
-          "refunds": "Refunds",
           "cancelled": "Cancelled",
-          "refunds": "Refunds",
-          "other": "Other"
+          "refunds": "Refunds"
         },
         "filters": {
           "party": "Buyer / Seller",
@@ -8170,12 +8146,11 @@
         "payoutsFailed": "Failed transfers",
         "holdsOverdue": "Overdue escrow",
         "adjustmentsOpen": "Open seller debt",
-        "holdsUpcoming": "Releasing within 7 days",
+        "holdsUpcoming": "Upcoming releases",
         "invoicesExhausted": "Documents out of retries",
         "ordersUninvoiced": "Uninvoiced deliveries",
         "carrierCancellations": "Carrier cancellation tasks",
         "shipmentsWithoutTracking": "Shipments without a tracking id",
-        "holdsUpcoming": "Upcoming releases",
         "informationalHint": "Informational line — not included in the waiting-work total"
       },
       "alerts": {
@@ -12690,32 +12665,6 @@
     "sections": {
       "homesection": {
         "tumunuGor": "Tümünü gör"
-      },
-      "trustbadges": {
-        "guvenliAlisveris": "Güvenli Alışveriş",
-        "sslSertifikaliGuvenliOdeme": "SSL sertifikalı güvenli ödeme",
-        "guvenliKargo": "Güvenli Kargo",
-        "hizliTakipImkaniyla": "Hızlı takip imkanıyla",
-        "iadeImkani": "İade İmkanı",
-        "14GunKosulsuzIade": "{returnWindowDays} gün koşulsuz iade",
-        "taksitImkani": "Taksit İmkanı",
-        "12AyaVaranTaksit": "12 aya varan taksit",
-        "koleksiyonSergile": "Koleksiyon Sergile",
-        "dijitalGarajiniOlustur": "Dijital garajını oluştur",
-        "guvenliTakas": "Güvenli Takas",
-        "guvenliTakasSistemi": "Güvenli takas sistemi",
-        "secureShopping": "Secure Shopping",
-        "sslCertifiedSecurePayment": "SSL certified secure payment",
-        "secureShipping": "Secure Shipping",
-        "withFastTracking": "With fast tracking",
-        "easyReturns": "Easy Returns",
-        "14DaysUnconditionalReturn": "{returnWindowDays, plural, one {# day} other {# days}} unconditional return",
-        "installments": "Installments",
-        "upTo12MonthInstallments": "Up to 12 month installments",
-        "displayCollection": "Display Collection",
-        "createYourDigitalGarage": "Create your digital garage",
-        "safeTrading": "Safe Trading",
-        "secureTradingSystem": "Secure trading system"
       }
     },
     "membership": {

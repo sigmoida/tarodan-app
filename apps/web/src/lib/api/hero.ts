@@ -1,6 +1,10 @@
 /** @format */
 
-import type { HeroSlideDto, TrustBadgeDto } from "@tarodan/types";
+import type {
+  HeroPlacement,
+  HeroSlideDto,
+  TrustBadgeDto,
+} from "@tarodan/types";
 import { getServerApiOrigin } from "./origin";
 
 /**
@@ -9,7 +13,7 @@ import { getServerApiOrigin } from "./origin";
  * (kodda yedek içerik yok). İstemci sayaçları `heroTracking.ts`te: bu modül
  * sunucu zincirinde olduğundan axios istemcisini çekmemeli.
  */
-export type HeroPlacement = "home" | "auth_default" | "auth_register";
+export type { HeroPlacement };
 
 /** `revalidateTag` ile (app/api/revalidate) anında tazelenen önbellek etiketleri. */
 export const HERO_CACHE_TAGS = {

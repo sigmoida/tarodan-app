@@ -48,6 +48,11 @@ function toDateField(value: string | null | undefined): Date | null | undefined 
   return value === null ? null : new Date(value);
 }
 
+/** İki pencere ucu aynı an mı (ikisi de null dahil). */
+function sameInstant(a: Date | null, b: Date | null): boolean {
+  return a === null || b === null ? a === b : a.getTime() === b.getTime();
+}
+
 /** Metin alanı yaması: `undefined` = dokunma; null ya da iki dili boş = temizle. */
 function patchText(
   value: LocalizedText | null | undefined,
@@ -198,13 +203,15 @@ export class HeroSlideService {
 
     await this.assertKeepsRequiredLiveSlide(existing, next, now);
     // Yalnız yayın kümesini büyütebilecek değişiklik sınırı yoklar: açık bir
-    // slaytın metnini düzeltmek, sınır zaten aşılmışsa bile engellenmez.
+    // slaytın metnini düzeltmek, sınır zaten aşılmışsa bile engellenmez. Admin
+    // formu her PATCH'te anahtar/pencere/yerleşimi de gönderir; "alan geldi"
+    // değil "değer değişti" ölçülür, yoksa her metin düzeltmesi sınırı yoklardı.
     const mayGrowLiveSet =
       next.isActive &&
       (!existing.isActive ||
         next.placement !== existing.placement ||
-        startDate !== undefined ||
-        endDate !== undefined);
+        !sameInstant(next.startDate, existing.startDate) ||
+        !sameInstant(next.endDate, existing.endDate));
     if (mayGrowLiveSet) {
       await this.assertLiveCapacity(next.placement, next, now, id);
     }
