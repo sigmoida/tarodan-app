@@ -7,6 +7,7 @@ import { InvoicingService } from "./invoicing.service";
 import { InvoiceQueryService } from "./invoice-query.service";
 import { InvoiceDocumentService } from "./invoice-document.service";
 import { InvoiceDeliveryService } from "./invoice-delivery.service";
+import { FiscalInvoicePdfService } from "./pdf/fiscal-invoice-pdf.service";
 import { InvoiceIssuingService } from "./invoice-issuing.service";
 import { InvoiceReversalService } from "./invoice-reversal.service";
 import { InvoiceSchedulerService } from "./jobs/invoice-scheduler.service";
@@ -86,6 +87,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     InvoiceQueryService,
     InvoiceDocumentService,
     InvoiceDeliveryService,
+    // Sağlayıcının PDF vermediği (Netsis) kayıtların görsel kopyası.
+    FiscalInvoicePdfService,
     InvoiceIssuingService,
     InvoiceReversalService,
     InvoiceSchedulerService,

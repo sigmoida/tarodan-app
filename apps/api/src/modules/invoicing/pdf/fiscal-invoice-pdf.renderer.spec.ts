@@ -95,6 +95,10 @@ describe("buildFiscalInvoicePdfModel", () => {
     expect(meta["ETTN"]).toBe("7f9c2f0e-4a1b-4c55-9d3e-2b6a8c1d0e11");
     expect(meta["Düzenlenme Tarihi"]).toBe("12.10.2026 14:35:20");
     expect(meta["Referans"]).toBe("KYT-10001");
+    // Ham enum değil, yerelleştirilmiş etiket.
+    expect(meta["Durum"]).toBe("Gönderildi");
+    // Oluşturulma: dd.mm.yyyy HH:mm, İstanbul saati (11:35Z -> 14:35).
+    expect(model.footer.generatedAt).toBe("Oluşturulma: 12.10.2026 14:35");
     expect(model.issuer.name).toBe("Tarodan Pazaryeri A.Ş.");
     expect(model.issuer.details).toContainEqual({
       label: "VKN",
@@ -131,6 +135,32 @@ describe("buildFiscalInvoicePdfModel", () => {
     expect(model.returnMarker).toBe("İADE");
     expect(model.billingReference?.text).toContain("TRD2026000000001");
     expect(model.billingReference?.text).toContain("12.10.2026");
+  });
+
+  it.each([
+    ["pending", "Beklemede", "Pending"],
+    ["processing", "Gönderiliyor", "Sending"],
+    ["sent", "Gönderildi", "Sent"],
+    ["signed", "İmzalandı", "Signed"],
+    ["failed", "Başarısız", "Failed"],
+    ["cancelled", "İptal edildi", "Cancelled"],
+  ])("durum '%s' tr/en etiketiyle basılır", (status, tr, en) => {
+    const statusOf = (locale: "tr" | "en") =>
+      buildFiscalInvoicePdfModel(
+        buildFiscalInvoicePdfInputFixture({ status, locale }),
+      ).meta.find((m) => m.label === (locale === "tr" ? "Durum" : "Status"))
+        ?.value;
+
+    expect(statusOf("tr")).toBe(tr);
+    expect(statusOf("en")).toBe(en);
+  });
+
+  it("bilinmeyen durum ham değerle basılır", () => {
+    const model = buildFiscalInvoicePdfModel(
+      buildFiscalInvoicePdfInputFixture({ status: "mystery" }),
+    );
+
+    expect(model.meta.find((m) => m.label === "Durum")?.value).toBe("mystery");
   });
 
   it("numara henüz atanmadıysa künyede açıklama basar", () => {

@@ -11721,7 +11721,16 @@
         "billingReferenceText": "Return invoice for document {documentNumber} ({issueDate}).",
         "generatedAt": "Generated: {date}",
         "page": "Page {page} / {total}",
-        "legal": "This document is the visual copy of the e-document submitted to the Revenue Administration (GİB); its fiscal validity lies in the e-document."
+        "legal": "This document is the visual copy of the e-document submitted to the Revenue Administration (GİB); its fiscal validity lies in the e-document.",
+        "status": {
+          "pending": "Pending",
+          "processing": "Sending",
+          "sent": "Sent",
+          "signed": "Signed",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        },
+        "verificationLabel": "e-Archive document lookup"
       },
       "netsis": {
         "settingsMissing": "Netsis invoicing settings are missing or invalid: {keys}",

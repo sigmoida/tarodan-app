@@ -40,6 +40,12 @@ export const NETSIS_INVOICE_SETTING_KEYS = {
   einvoiceSerial: "netsis.serial.einvoice",
   /** Official Store ürün satışlarının (platform_sale) TEK kartı. */
   productSaleItem: "netsis.item.productSale",
+  /**
+   * OPSİYONEL: alıcının e-Arşiv belgesini doğrulayabileceği sorgulama bağlantısı.
+   * Görsel kopya PDF'inde "Doğrulama" bloğu olarak basılır; boşsa blok yoktur.
+   * Hazırlık kontrolüne (`netsisInvoiceSettingsReadiness`) GİRMEZ.
+   */
+  earchiveVerificationUrl: "netsis.earchive.verificationUrl",
 } as const;
 
 /** Belge türünün hizmet/ürün kartı ayar anahtarı. */
@@ -64,6 +70,8 @@ export interface NetsisInvoiceSettings {
   autoCreateCorporateCari: boolean;
   serials: Record<EInvoiceScenario, string>;
   itemCodes: Record<NetsisItemInvoiceType, string>;
+  /** Boş = PDF'te doğrulama bloğu yok. Yalnızca http(s) bağlantısı kabul edilir. */
+  earchiveVerificationUrl: string;
 }
 
 /** Seed ve admin ekranı için satır tanımı. */
@@ -111,6 +119,13 @@ export const NETSIS_INVOICE_SETTING_DEFINITIONS: readonly NetsisInvoiceSettingDe
       type: "string",
       description: "Netsis: e-Fatura belge serisi (3 karakter)",
     },
+    {
+      key: NETSIS_INVOICE_SETTING_KEYS.earchiveVerificationUrl,
+      value: "",
+      type: "string",
+      description:
+        "Netsis: e-Arşiv belge doğrulama bağlantısı (opsiyonel, PDF'te basılır)",
+    },
     ...ITEM_TYPES.map(
       (type): NetsisInvoiceSettingDefinition => ({
         key: netsisItemSettingKey(type),
@@ -130,6 +145,11 @@ function code(raw: string | undefined, maxLength: number): string {
 function serial(raw: string | undefined): string {
   const value = (raw ?? "").trim().toUpperCase();
   return SERIAL_PATTERN.test(value) ? value : "";
+}
+
+function httpUrl(raw: string | undefined): string {
+  const value = (raw ?? "").trim();
+  return /^https?:\/\/\S+$/i.test(value) ? value : "";
 }
 
 /** "true"/"1"/"yes"/"on" → true; bozuk ya da yok → varsayılan. */
@@ -166,6 +186,7 @@ export function parseNetsisInvoiceSettings(
       EINVOICE: serial(values.get(keys.einvoiceSerial)),
     },
     itemCodes,
+    earchiveVerificationUrl: httpUrl(values.get(keys.earchiveVerificationUrl)),
   };
 }
 

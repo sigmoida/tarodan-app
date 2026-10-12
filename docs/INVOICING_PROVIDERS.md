@@ -160,8 +160,7 @@ sayar, iptal edilmişse göndermez, değilse yalnız `eDocuments.send` yapar.
   `processing`, `rejected` → `failed`, `cancelled` → `cancelled`, `draft` /
   bilinmeyen → `unknown` (teslim katmanı gönderir).
 - `cancelEArchive` → `eDocuments.cancelEArchive`; ağ hatası fırlatılır.
-- `fetchPdf` → `null`. PDF'i kendi şablonumuz üretecek
-  (`pdf/fiscal-invoice-pdf.renderer.ts`, bağlanması sonraki adım).
+- `fetchPdf` → `null`. PDF'i kendi şablonumuz üretir; bkz. "PDF" bölümü.
 - `classifyError`: `NetsisRequestException.kind` → `network`→`network`,
   `conflict`→`duplicate-number`, `auth`/`configuration`→`configuration`,
   diğerleri → `unknown`; ortak oturum kilidi (`sessionBusy`) → `network`,
@@ -208,6 +207,33 @@ doğrulama listesi: `docs/NETSIS.md`.
   muhasebenindir.
 - Ürün satışı belgesinin kargo ve hizmet bedeli satırları da ürün kartıyla
   yazılır (kalem snapshot'ı satır türü taşımaz).
+
+## PDF — kim, ne zaman, nerede
+
+| Sağlayıcı | PDF'i kim üretir                                                    |
+| --------- | ------------------------------------------------------------------- |
+| eLogo     | eLogo (`fetchPdf`); değişmedi                                       |
+| Netsis    | Biz: `fetchPdf` `null` döner, görsel kopyayı `pdf/` basar           |
+
+- **Ne zaman:** (1) gönderim kabul edilince `InvoiceDeliveryService.deliverPdf`;
+  (2) kullanıcı/admin indirmesinde `pdfUrl` boşsa `InvoiceQueryService`;
+  (3) admin "e-postayla gönder" S3'te yoksa. Üçü de aynı çağrıyı kullanır:
+  `FiscalInvoicePdfService.renderForRecord(row)`. Sağlayıcı PDF verdiyse
+  renderer çağrılmaz; numarası ya da ETTN'i olmayan kayıt için hiç basılmaz;
+  eLogo kayıtları için asla basılmaz (geçici bir `null` kopyayı kalıcılaştırıp
+  gerçek PDF'in yolunu kapatmasın).
+- **Neyden:** kayıtlı `FiscalInvoice` satırı. `buildFiscalInvoicePdfInput` belgeyi
+  sağlayıcıya giden belgeyle AYNI kurucudan (`invoice/fiscal-document-input.ts`)
+  çıkarır; tutarlar `computeFiscalDocumentTotals` ile hesaplanır.
+- **Nerede durur:** sağlayıcı PDF'iyle aynı yer — `documents` bucket'ı,
+  `elogo-invoices/` klasörü, `<faturaNo>.pdf`; anahtar `FiscalInvoice.pdfUrl`.
+  İndirmede kopya bir kez basılıp yazılır, sonraki indirmeler `pdfUrl`den gelir.
+  E-posta tek seferdir (`emailSentAt`), PDF kaynağından bağımsız.
+- **Doğrulama bağlantısı (opsiyonel):** `PlatformSetting`
+  `netsis.earchive.verificationUrl` (http/https). Doluysa Netsis PDF'lerine
+  "Doğrulama" bloğu eklenir, boşsa blok yoktur. Hazırlık kontrolünü etkilemez.
+- Yasal geçerlilik entegratördeki e-belgededir; bu PDF görsel kopyadır
+  (PDF altbilgisindeki cümle de bunu söyler).
 
 ## Kayıt — `FiscalInvoice` (DB tablosu bilerek `elogo_invoices`)
 
