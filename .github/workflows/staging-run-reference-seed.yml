@@ -1,0 +1,106 @@
+# Staging: run the REFERENCE seed (apps/api/prisma/seed-production.ts, compiled
+# into the api image as dist-seed/prisma/seed-production.js) inside the running
+# Coolify api container.
+#
+# The reference seed is idempotent (upsert with `update: {}`): it only creates
+# rows that are missing (tax rules, commission rules, platform settings, hero
+# slides / trust badges, …) and never overwrites what an admin edited. Use it
+# after a deploy that introduced new reference data — e.g. the hero CMS, where
+# the storefront renders nothing until at least one slide exists.
+#
+# Same SSH + container-discovery + staging-fingerprint pattern as
+# staging-reset.yml, minus the wipe. Nothing is deleted.
+name: Staging Run Reference Seed
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type STAGING (all caps) to run the reference seed on staging"
+        required: true
+        type: string
+
+concurrency:
+  group: staging-reset
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: Reference seed on staging (Coolify)
+    runs-on: ubuntu-latest
+    environment: staging
+    if: inputs.confirm == 'STAGING'
+    steps:
+      - name: Resolve api app UUID (first field of COOLIFY_STAGING_UUIDS)
+        id: uuid
+        env:
+          UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+        run: |
+          set -euo pipefail
+          api="$(printf '%s' "$UUIDS" | cut -d, -f1 | xargs)"
+          [ -n "$api" ] || { echo "::error::COOLIFY_STAGING_UUIDS is empty."; exit 1; }
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+      - name: Verify SSH secrets are configured
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USERNAME: ${{ secrets.SERVER_USERNAME }}
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
+          [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
+
+      - name: Run the reference seed over SSH (Coolify api container)
+        uses: appleboy/ssh-action@v1
+        env:
+          API_UUID: ${{ steps.uuid.outputs.api }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 15m
+          envs: API_UUID
+          script: |
+            set -euo pipefail
+            log() { echo "[staging-seed] $*"; }
+            die() { echo "[staging-seed] REFUSED: $*" >&2; exit 1; }
+
+            [ -n "${API_UUID:-}" ] || die "API_UUID not set (first field of COOLIFY_STAGING_UUIDS)."
+
+            # --- Discover the Coolify api application container -----------------
+            API_CID="$(docker ps --filter "label=coolify.applicationId=$API_UUID" --format '{{.ID}}' | head -1)"
+            if [ -z "$API_CID" ]; then
+              API_CID="$(docker ps --filter "name=$API_UUID" --format '{{.ID}}' | head -1)"
+            fi
+            [ -n "$API_CID" ] || die "no running api container for UUID '$API_UUID'."
+            log "api container: $API_CID"
+
+            # --- Guard: staging fingerprint (never touch production) -----------
+            FRONTEND_URL="$(docker exec "$API_CID" printenv FRONTEND_URL 2>/dev/null || true)"
+            API_URL="$(docker exec "$API_CID" printenv API_URL 2>/dev/null || true)"
+            APP_ENV="$(docker exec "$API_CID" printenv APP_ENV 2>/dev/null || true)"
+            log "FRONTEND_URL=$FRONTEND_URL | API_URL=$API_URL | APP_ENV=${APP_ENV:-<unset>}"
+            case "$FRONTEND_URL $API_URL" in
+              *staging.tarodan.com.tr*|*staging.tarodan.shop*) : ;;
+              *) die "api FRONTEND_URL/API_URL is not a staging host — refusing." ;;
+            esac
+            case "$FRONTEND_URL" in
+              https://tarodan.com.tr*|https://www.tarodan.com.tr*|https://tarodan.shop*|https://www.tarodan.shop*)
+                die "production domain fingerprint on api — refusing." ;;
+            esac
+            [ "${APP_ENV:-}" != "production" ] || die "APP_ENV=production on the api container — refusing."
+
+            # --- Run the compiled reference seed inside the api container -------
+            # The image ships dist-seed (Dockerfile copies it next to dist).
+            docker exec "$API_CID" test -f dist-seed/prisma/seed-production.js \
+              || die "dist-seed/prisma/seed-production.js missing in the api image (build:seed not run?)."
+            log "running: node dist-seed/prisma/seed-production.js"
+            docker exec "$API_CID" node dist-seed/prisma/seed-production.js
+            log "reference seed finished."
