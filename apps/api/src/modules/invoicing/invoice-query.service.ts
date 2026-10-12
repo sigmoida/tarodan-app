@@ -10,6 +10,10 @@ import {
   E_INVOICE_PROVIDER,
   type EInvoiceProvider,
 } from "./provider/e-invoice-provider";
+import {
+  InvoiceProviderRegistry,
+  providerForRecord,
+} from "./provider/provider-registry";
 import { i18nMessage } from "../i18n";
 import { invoiceDescriptionOf } from "./invoice/invoice-line-description";
 import { INVOICE_PDF_STORAGE } from "./helpers/invoice-pdf";
@@ -56,6 +60,8 @@ export class InvoiceQueryService {
     private readonly prisma: PrismaService,
     @Inject(E_INVOICE_PROVIDER) private readonly provider: EInvoiceProvider,
     @Optional() private readonly storage?: StorageService,
+    // Kesilmiş belgenin kendi sağlayıcısı; yoksa bağlı olan (birim testleri).
+    @Optional() private readonly registry?: InvoiceProviderRegistry,
   ) {}
 
   // ───────────────────────── app: görüntüleme/indirme ─────────────────────────
@@ -172,21 +178,29 @@ export class InvoiceQueryService {
       where: userId
         ? { id: invoiceId, recipientUserId: userId }
         : { id: invoiceId },
-      select: { id: true, ettn: true, invoiceNumber: true, pdfUrl: true },
+      select: {
+        id: true,
+        ettn: true,
+        invoiceNumber: true,
+        pdfUrl: true,
+        provider: true,
+        providerRef: true,
+      },
     });
     if (!inv?.ettn || !inv.invoiceNumber)
       throw new NotFoundException(
         i18nMessage("server.elogo.archiveInvoiceNotFound"),
       );
+    // PDF belgeyi KESEN sağlayıcıdan istenir (sağlayıcı sonradan değişmiş olsa da).
+    const issuer = providerForRecord(this.registry, this.provider, inv.provider);
+    const ref = { ettn: inv.ettn, providerRef: inv.providerRef };
 
     let key = inv.pdfUrl;
     const storageOk = !!this.storage?.isStorageAvailable?.();
 
     // S3'te yoksa canlı çek → yükle → kaydet.
     if (!key && storageOk) {
-      const pdf = await this.provider
-        .fetchPdf({ ettn: inv.ettn })
-        .catch(() => null);
+      const pdf = await issuer.fetchPdf(ref).catch(() => null);
       if (pdf && pdf.length > 200) {
         try {
           const up = await this.storage!.uploadFile(pdf, {
@@ -217,9 +231,7 @@ export class InvoiceQueryService {
       if (url) return { url, invoiceNumber: inv.invoiceNumber };
     }
     // Son çare: canlı buffer (storage yok).
-    const buffer = await this.provider
-      .fetchPdf({ ettn: inv.ettn })
-      .catch(() => null);
+    const buffer = await issuer.fetchPdf(ref).catch(() => null);
     if (!buffer)
       throw new NotFoundException(
         i18nMessage("server.elogo.invoicePdfUnavailable"),

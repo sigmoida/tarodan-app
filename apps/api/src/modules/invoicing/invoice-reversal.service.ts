@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import {
   Prisma,
@@ -29,6 +29,10 @@ import {
   type EInvoiceCancelResult,
   type EInvoiceProvider,
 } from "./provider/e-invoice-provider";
+import {
+  InvoiceProviderRegistry,
+  providerForRecord,
+} from "./provider/provider-registry";
 import { InvoiceDocumentService } from "./invoice-document.service";
 import { InvoiceDeliveryService } from "./invoice-delivery.service";
 
@@ -61,6 +65,8 @@ export class InvoiceReversalService {
     @Inject(E_INVOICE_PROVIDER) private readonly provider: EInvoiceProvider,
     private readonly documents: InvoiceDocumentService,
     private readonly delivery: InvoiceDeliveryService,
+    // Kesilmiş belgenin kendi sağlayıcısı; yoksa bağlı olan (birim testleri).
+    @Optional() private readonly registry?: InvoiceProviderRegistry,
   ) {}
 
   /**
@@ -289,6 +295,14 @@ export class InvoiceReversalService {
           refundAdjustedAt: adjustment?.finalizedAt,
         },
       });
+      if (inv.providerRef) {
+        // Gönderilmemiş ama sağlayıcıda OLUŞMUŞ belge (Netsis fişi açıldı,
+        // e-belgesi gitmedi). Yerel iptal ERP'deki fişi silmez — seri
+        // numarasında boşluk bırakmamak için silme kararı muhasebenindir.
+        this.logger.error(
+          `INVOICE_PROVIDER_ORPHAN ${inv.provider} ${inv.providerRef} (${inv.invoiceNumber ?? inv.id}) iadeyle yerelde iptal edildi; sağlayıcıdaki taslak belge elle kapatılmalı`,
+        );
+      }
       return;
     }
     const rate = Number(inv.vatRate);
@@ -520,15 +534,19 @@ export class InvoiceReversalService {
       inv,
       adjustment,
     );
+    // Kesilmiş belgenin iptali ve durumu belgeyi KESEN sağlayıcıda yapılır
+    // (sağlayıcı değişmiş olsa da). İade faturası ise yeni bir kesimdir ve
+    // bağlı sağlayıcıdan geçer.
+    const issuer = providerForRecord(this.registry, this.provider, inv.provider);
     const canCancel =
       (!adjustment || invoiceAdjustment.fullyRefunded) &&
       alreadyReversed <= 0.009 &&
       inv.documentType === "EARCHIVE" &&
-      this.provider.eArchiveReversalStrategy(inv.issuedAt) === "CANCEL";
+      issuer.eArchiveReversalStrategy(inv.issuedAt) === "CANCEL";
 
     if (canCancel) {
       let cancellationOutcomeUnknown = false;
-      const res: EInvoiceCancelResult = await this.provider
+      const res: EInvoiceCancelResult = await issuer
         .cancelEArchive({ ettn: inv.ettn, providerRef: inv.providerRef })
         .catch((e: unknown): EInvoiceCancelResult => {
           cancellationOutcomeUnknown = true;
@@ -552,7 +570,7 @@ export class InvoiceReversalService {
       }
       // Timeout/transport hatasında provider iptali uygulamış olabilir. IADE
       // faturasına düşmeden önce ETTN durumunu sorgula; aksi halde çift ters kayıt olur.
-      const providerStatus = await this.provider
+      const providerStatus = await issuer
         .getStatus({ ettn: inv.ettn, providerRef: inv.providerRef }, "EARCHIVE")
         .catch(() => null);
       if (providerStatus?.state === "cancelled") {

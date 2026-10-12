@@ -65,11 +65,12 @@ describe("production seeds are independent of the demo seed", () => {
     // her upsert'in update dalı boş olmalı.
     const upserts = source.split("prisma.").slice(1);
     const businessValueWrites = upserts.filter((chunk) =>
-      /^(membershipTier|taxRegion|taxRate|taxRule|shippingTariff)\.upsert/.test(
+      /^(membershipTier|taxRegion|taxRate|taxRule|shippingTariff|platformSetting)\.upsert/.test(
         chunk,
       ),
     );
-    expect(businessValueWrites).toHaveLength(5);
+    // platformSetting: Netsis cari/seri/kart kodları — satır açılır, değer ezilmez.
+    expect(businessValueWrites).toHaveLength(6);
     for (const chunk of businessValueWrites) {
       expect(chunk).toContain("update: {}");
     }

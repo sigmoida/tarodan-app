@@ -12,8 +12,15 @@ import { InvoiceReversalService } from "./invoice-reversal.service";
 import { InvoiceSchedulerService } from "./jobs/invoice-scheduler.service";
 import { InvoiceScheduledProcessor } from "./jobs/invoice-scheduled.processor";
 import { InvoicingController } from "./invoicing.controller";
-import { E_INVOICE_PROVIDER } from "./provider/e-invoice-provider";
+import {
+  E_INVOICE_PROVIDER,
+  type EInvoiceProvider,
+} from "./provider/e-invoice-provider";
 import { ElogoInvoiceProvider } from "./provider/elogo.provider";
+import { NetsisInvoiceProvider } from "./provider/netsis.provider";
+import { InvoiceProviderRegistry } from "./provider/provider-registry";
+import { invoiceProviderName } from "../../config/invoice-provider";
+import { NetsisModule } from "../netsis/netsis.module";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
@@ -29,7 +36,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 /**
  * Gelir e-belgeleri (e-Arşiv / e-Fatura) modülü — kesim, gönderim, ters kayıt,
  * sorgu ve PDF teslimi. Alan servisleri entegratörü `E_INVOICE_PROVIDER` portu
- * üzerinden görür; bugün tek bağlama eLogo'dur (docs/INVOICING_PROVIDERS.md).
+ * üzerinden görür; bağlama `INVOICE_PROVIDER` ile eLogo ya da Netsis'tir
+ * (docs/INVOICING_PROVIDERS.md).
  *
  * eLogo adaptörü Sürat Kargo modülüyle aynı deseni izler: SOAP client factory
  * ile (ELOGO_SOAP_MODE) stub/live arasında seçilir; ElogoService dışarı export
@@ -43,6 +51,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ConfigModule,
     StorageModule,
     TaxModule,
+    // Netsis (ERP) sağlayıcısı `NetsisClientFacade`'i kullanır.
+    NetsisModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   providers: [
@@ -60,8 +70,18 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
       inject: [ConfigService],
     },
     ElogoService,
+    // İki sağlayıcı da kayıtlı: yeni kesimler `INVOICE_PROVIDER`'ın seçtiğinden
+    // geçer, kesilmiş kayıtların durum/iptal/PDF işlemleri kaydın kendi
+    // sağlayıcısından (`InvoiceProviderRegistry`).
     ElogoInvoiceProvider,
-    { provide: E_INVOICE_PROVIDER, useExisting: ElogoInvoiceProvider },
+    NetsisInvoiceProvider,
+    InvoiceProviderRegistry,
+    {
+      provide: E_INVOICE_PROVIDER,
+      useFactory: (registry: InvoiceProviderRegistry): EInvoiceProvider =>
+        registry.get(invoiceProviderName()),
+      inject: [InvoiceProviderRegistry],
+    },
     InvoicingService,
     InvoiceQueryService,
     InvoiceDocumentService,

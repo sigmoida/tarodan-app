@@ -11722,6 +11722,24 @@
         "generatedAt": "Generated: {date}",
         "page": "Page {page} / {total}",
         "legal": "This document is the visual copy of the e-document submitted to the Revenue Administration (GİB); its fiscal validity lies in the e-document."
+      },
+      "netsis": {
+        "settingsMissing": "Netsis invoicing settings are missing or invalid: {keys}",
+        "totalsMismatch": "The amounts Netsis calculated differ from the record ({details}); the document was not sent",
+        "totalsField": {
+          "netAmount": "net amount",
+          "vatAmount": "VAT",
+          "grossAmount": "total"
+        },
+        "retailCariNotFound": "Retail account {code} was not found in Netsis",
+        "corporateCariMissing": "The corporate recipient's account ({code}) does not exist in Netsis and automatic account creation is off",
+        "corporateCariCodeInvalid": "Invalid corporate account code ({code}); a Netsis account code is at most 15 characters",
+        "corporateUserMissing": "Tax number {vkn} is not linked to any user; the corporate account code could not be determined",
+        "itemTypeUnresolved": "The document's Netsis service item could not be determined (type: {type})",
+        "invalidProviderRef": "Invalid Netsis document reference: {ref}",
+        "slipNotFound": "Invoice {number} was not found in Netsis",
+        "staleSlip": "Invoice {number} in Netsis does not match the record's amounts; it must be corrected in Netsis manually",
+        "documentCancelled": "Netsis e-document {number} has been cancelled; it was not resent"
       }
     }
   },

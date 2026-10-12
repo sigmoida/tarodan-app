@@ -189,7 +189,9 @@ describe("InvoiceDeliveryService — sağlayıcı portu üzerinden gönderim", (
     expect(document.lines).toEqual([
       expect.objectContaining({ quantity: 1, unitPrice: 100, vatRate: 20 }),
     ]);
-    expect(context).toEqual({});
+    // Bağlam nötrdür: yerel numaralandırmalı sağlayıcı yalnız alias'ı okur,
+    // kartı/cariyi seçen sağlayıcı türü ve alıcıyı buradan alır.
+    expect(context).toEqual({ invoiceType: "commission", recipientUserId: "u1" });
     expect(row).toMatchObject({
       status: "sent",
       providerRef: "REF-1",

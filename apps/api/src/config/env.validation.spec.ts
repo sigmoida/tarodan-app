@@ -1011,6 +1011,121 @@ describe("validateEnv", () => {
     });
   });
 
+  describe("INVOICE_PROVIDER", () => {
+    const netsisLive = {
+      NETSIS_ENABLED: "true",
+      NETSIS_MODE: "live",
+      NETSIS_BASE_URL: "https://netsis.customer.test:7070",
+      NETSIS_USERNAME: "NETSIS",
+      NETSIS_PASSWORD: "netsis-password",
+      NETSIS_DB_NAME: "TARODAN2026",
+      NETSIS_DB_USER: "TEMELSET",
+      NETSIS_DB_PASSWORD: "db-password",
+    };
+
+    it("defaults to eLogo: production boots unchanged without the key", () => {
+      expect(() => validateEnv({ ...prodBase })).not.toThrow();
+      expect(() =>
+        validateEnv({ ...prodBase, INVOICE_PROVIDER: "elogo" }),
+      ).not.toThrow();
+    });
+
+    it("keeps every eLogo guard while eLogo is selected", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          INVOICE_PROVIDER: "elogo",
+          ELOGO_ENABLED: "false",
+        }),
+      ).toThrow(/ELOGO_ENABLED must be 'true' in production/);
+    });
+
+    it("refuses an unknown provider", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, INVOICE_PROVIDER: "logo" }),
+      ).toThrow(/INVOICE_PROVIDER must be 'elogo' or 'netsis'/);
+    });
+
+    it("netsis in production requires NETSIS_ENABLED", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, INVOICE_PROVIDER: "netsis" }),
+      ).toThrow(/NETSIS_ENABLED must be 'true' in production/);
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          INVOICE_PROVIDER: "netsis",
+          NETSIS_ENABLED: "false",
+        }),
+      ).toThrow(/NETSIS_ENABLED/);
+    });
+
+    it("netsis in production may run with eLogo disabled", () => {
+      expect(() =>
+        validateEnv({
+          ...without(
+            prodBase,
+            "ELOGO_SOAP_MODE",
+            "ELOGO_SOAP_URL",
+            "ELOGO_WS_USERNAME",
+            "ELOGO_WS_PASSWORD",
+          ),
+          ...netsisLive,
+          INVOICE_PROVIDER: "netsis",
+          ELOGO_ENABLED: "false",
+        }),
+      ).not.toThrow();
+    });
+
+    it("netsis selected still validates eLogo when eLogo stays enabled (old documents)", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          INVOICE_PROVIDER: "netsis",
+          ELOGO_SOAP_MODE: "stub",
+        }),
+      ).toThrow(/ELOGO_SOAP_MODE/);
+    });
+
+    it("netsis selected still applies the Netsis live guards", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          INVOICE_PROVIDER: "netsis",
+          NETSIS_MODE: "stub",
+        }),
+      ).toThrow(/NETSIS_MODE.*'live' in production/);
+    });
+
+    it("staging may select netsis with the stub and without enabling it", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, INVOICE_PROVIDER: "netsis" }),
+      ).not.toThrow();
+    });
+
+    it("keeps the declared key (so an .env-file value reaches ConfigService)", () => {
+      expect(
+        validateEnv({ ...prodBase, ...netsisLive, INVOICE_PROVIDER: "netsis" }),
+      ).toMatchObject({ INVOICE_PROVIDER: "netsis" });
+    });
+
+    it("does not guard anything outside production builds", () => {
+      expect(() =>
+        validateEnv({
+          NODE_ENV: "development",
+          DATABASE_URL: "postgresql://u:p@db:5432/app",
+          JWT_SECRET: "dev",
+          JWT_REFRESH_SECRET: "dev",
+          ADMIN_JWT_SECRET: "dev",
+          GUEST_CHECKOUT_OTP_SECRET: "dev",
+          INVOICE_PROVIDER: "netsis",
+        }),
+      ).not.toThrow();
+    });
+  });
+
   it("still requires presence of every secret outside production", () => {
     expect(() =>
       validateEnv({

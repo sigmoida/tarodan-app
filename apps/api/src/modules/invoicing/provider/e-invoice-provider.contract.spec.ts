@@ -1,6 +1,10 @@
 import type { ConfigService } from "@nestjs/config";
+import { EInvoiceProviderName } from "@prisma/client";
+import type { PrismaService } from "../../../prisma";
+import type { NetsisClientFacade } from "../../netsis";
 import type { ElogoService } from "../elogo.service";
 import { ElogoInvoiceProvider } from "./elogo.provider";
+import { NetsisInvoiceProvider } from "./netsis.provider";
 import type { EInvoiceProvider } from "./e-invoice-provider";
 
 /**
@@ -30,6 +34,14 @@ const implementations: Array<[string, () => EInvoiceProvider]> = [
         { get: () => undefined } as unknown as ConfigService,
       ),
   ],
+  [
+    "NetsisInvoiceProvider",
+    () =>
+      new NetsisInvoiceProvider(
+        { enabled: false } as NetsisClientFacade,
+        {} as PrismaService,
+      ),
+  ],
 ];
 
 describe.each(implementations)("EInvoiceProvider contract — %s", (_, make) => {
@@ -55,4 +67,17 @@ describe("ElogoInvoiceProvider", () => {
     expect(provider.name).toBe("elogo");
     expect(provider.numbering).toBe("local");
   });
+});
+
+describe("NetsisInvoiceProvider", () => {
+  it("numarayı ERP verir: numaralandırma SAĞLAYICI", () => {
+    const provider = implementations[1][1]();
+    expect(provider.name).toBe("netsis");
+    expect(provider.numbering).toBe("provider");
+  });
+});
+
+it("her sağlayıcı adı şemadaki EInvoiceProviderName değerlerini birebir karşılar", () => {
+  const names = implementations.map(([, make]) => make().name).sort();
+  expect(names).toEqual(Object.values(EInvoiceProviderName).sort());
 });

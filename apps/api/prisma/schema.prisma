@@ -2592,6 +2592,9 @@ model FiscalInvoice {
   recipientStreet           String?               @map("recipient_street")
   documentType              String                @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
   sendType                  String                @default("ELEKTRONIK") @map("send_type")
+  /// Belge numarası. Yerel numaralandırmada (eLogo) kesimde `FiscalDocSequence`'ten
+  /// dolar; numarayı ERP veriyorsa (Netsis) kayıt NUMARASIZ açılır ve numara
+  /// belge sağlayıcıda oluşunca yazılır — bu yüzden boş olabilir. Tekildir.
   invoiceNumber             String?               @unique @map("invoice_number")
   ettn                      String?               @unique
   netAmount                 Decimal               @map("net_amount") @db.Decimal(10, 2)
