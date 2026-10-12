@@ -1,7 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import type { NetsisItemSlipsApi } from "../gateway/netsis-gateway";
-import { NETSIS_PATHS } from "../helpers/netsis.constants";
-import { readNetsisSlipTotals } from "../helpers/netsis-model.helper";
+import {
+  NETSIS_PATHS,
+  NETSIS_SLIP_BY_TRACKING_KEY_SQL,
+} from "../helpers/netsis.constants";
+import {
+  readNetsisSlipTotals,
+  readNetsisTrackedSlipKey,
+} from "../helpers/netsis-model.helper";
 import {
   asNetsisRecord,
   netsisPathSegment,
@@ -16,6 +22,7 @@ import type {
   NetsisSlipTotals,
 } from "../helpers/netsis.types";
 import { NetsisHttpClient } from "../http/netsis-http.client";
+import { NetsisQueriesClient } from "./netsis-queries.client";
 
 /** VERIFY: yeni numara uçlarının yanıtında numaranın taşındığı alan. */
 const NUMBER_FIELDS = ["FATIRS_NO", "Number", "BelgeNo", "Result"] as const;
@@ -25,10 +32,15 @@ const HTML_FIELDS = ["Html", "HTML", "Result"] as const;
 /**
  * Faturalar (ItemSlips). Gövdeler `netsis.types.ts`'teki tahmini modellerdir;
  * anahtar gerektiren uçlar (Details/Html/Delete) `NetsisItemSlipKey` gönderir.
+ * İzleme anahtarıyla arama için ItemSlips'te uç yok: salt okunur `Queries`
+ * üzerinden yapılır.
  */
 @Injectable()
 export class NetsisItemSlipsClient implements NetsisItemSlipsApi {
-  constructor(private readonly http: NetsisHttpClient) {}
+  constructor(
+    private readonly http: NetsisHttpClient,
+    private readonly queries: NetsisQueriesClient,
+  ) {}
 
   async create(
     slip: NetsisItemSlip,
@@ -103,5 +115,22 @@ export class NetsisItemSlipsClient implements NetsisItemSlipsApi {
     options?: NetsisCallOptions,
   ): Promise<void> {
     await this.http.post(NETSIS_PATHS.itemSlipDelete, key, options);
+  }
+
+  /**
+   * Transaction DIŞINDA okur: yalnız commit edilmiş fişler görünür. Birden
+   * fazla satır varsa (çift fiş zaten oluşmuş) en küçük numaralı — ilk
+   * açılan — döner; fazlası muhasebede elle temizlenir.
+   */
+  async findByTrackingKey(
+    trackingKey: string,
+  ): Promise<NetsisItemSlipKey | null> {
+    const key = trackingKey.trim();
+    // Boş anahtar boş açıklamalı (bizim olmayan) fişlerle eşleşebilirdi.
+    if (!key) return null;
+    const rows = await this.queries.select(NETSIS_SLIP_BY_TRACKING_KEY_SQL, {
+      trackingKey: key,
+    });
+    return rows.length > 0 ? readNetsisTrackedSlipKey(rows[0]) : null;
   }
 }

@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { NetsisHttpClient } from "../http/netsis-http.client";
 import {
   assertNetsisReadOnlySelect,
+  bindNetsisQueryParams,
   NetsisQueriesClient,
 } from "./netsis-queries.client";
 
@@ -42,6 +43,59 @@ describe("assertNetsisReadOnlySelect", () => {
   });
 });
 
+describe("bindNetsisQueryParams", () => {
+  const invalidParam = (sql: string, params?: Record<string, string>) => {
+    let error: unknown;
+    try {
+      bindNetsisQueryParams(sql, params);
+    } catch (e: unknown) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(BadRequestException);
+    return (error as BadRequestException).getResponse();
+  };
+
+  it("binds each @name as an N'…' literal with quotes doubled", () => {
+    expect(
+      bindNetsisQueryParams(
+        "SELECT X FROM T WHERE A = @a AND B = @b_2 AND C = @a",
+        { a: "ab'c", b_2: "ç" },
+      ),
+    ).toBe("SELECT X FROM T WHERE A = N'ab''c' AND B = N'ç' AND C = N'ab''c'");
+  });
+
+  it("leaves a statement without placeholders as is", () => {
+    expect(bindNetsisQueryParams("SELECT 1")).toBe("SELECT 1");
+  });
+
+  it("does not treat @@system variables as placeholders", () => {
+    expect(bindNetsisQueryParams("SELECT @@ROWCOUNT AS n")).toBe(
+      "SELECT @@ROWCOUNT AS n",
+    );
+  });
+
+  it("keeps SQL-looking values inside the literal", () => {
+    expect(
+      bindNetsisQueryParams("SELECT X FROM T WHERE A = @a", {
+        a: "1'; DROP TABLE T --",
+      }),
+    ).toBe("SELECT X FROM T WHERE A = N'1''; DROP TABLE T --'");
+  });
+
+  const rejected: [string, string, Record<string, string>, string][] = [
+    ["a missing value", "SELECT X FROM T WHERE A = @a", {}, "a"],
+    ["an unused value", "SELECT 1", { extra: "x" }, "extra"],
+    ["a control character", "SELECT X WHERE A = @a", { a: "x\u0000y" }, "a"],
+  ];
+
+  it.each(rejected)("rejects %s with a localized 400", (_label, sql, params, name) => {
+    expect(invalidParam(sql, params)).toEqual({
+      i18nKey: "server.netsis.queryParamInvalid",
+      i18nParams: { name },
+    });
+  });
+});
+
 describe("NetsisQueriesClient", () => {
   const http = { post: jest.fn() };
   const client = new NetsisQueriesClient(http as unknown as NetsisHttpClient);
@@ -57,6 +111,24 @@ describe("NetsisQueriesClient", () => {
     expect(http.post).toHaveBeenCalledWith("Queries", {
       Query: "SELECT CARI_KOD FROM TBLCASABIT",
     });
+  });
+
+  it("guards the fixed statement first, then binds the parameters", async () => {
+    http.post.mockResolvedValue([]);
+
+    await client.select("SELECT FATIRS_NO FROM TBLFATUIRS WHERE EKACK1 = @k", {
+      k: "delete me",
+    });
+    expect(http.post).toHaveBeenCalledWith("Queries", {
+      Query: "SELECT FATIRS_NO FROM TBLFATUIRS WHERE EKACK1 = N'delete me'",
+    });
+  });
+
+  it("never reaches Netsis with an unbound placeholder", async () => {
+    await expect(
+      client.select("SELECT X FROM T WHERE A = @a"),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(http.post).not.toHaveBeenCalled();
   });
 
   it("never reaches Netsis with a writing statement", async () => {

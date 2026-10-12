@@ -25,6 +25,12 @@ export interface NetsisPassthrough {
 /** Şekli bilinmeyen ham Netsis kaydı (liste satırı, sorgu sonucu, yanıt). */
 export type NetsisRawRecord = Record<string, unknown>;
 
+/**
+ * `Queries` sorgusunun `@ad` yer tutucularına bağlanan metin değerleri
+ * (`bindNetsisQueryParams`). Yalnız metin: sorgular sabittir, değer veridir.
+ */
+export type NetsisQueryParams = Readonly<Record<string, string>>;
+
 /** Bir çağrıyı açık bir NetOpenX transaction'ına bağlar. */
 export interface NetsisCallOptions {
   transactionId?: string;

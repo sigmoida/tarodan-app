@@ -8,7 +8,10 @@ export type {
   NetsisStubTransactionState,
 } from "./gateway/netsis-stub.gateway";
 export * from "./helpers/netsis.types";
-export { NETSIS_DOC_TYPES } from "./helpers/netsis.constants";
+export {
+  NETSIS_DOC_TYPES,
+  NETSIS_SLIP_TRACKING_KEY_FIELD,
+} from "./helpers/netsis.constants";
 export {
   netsisArpCode,
   netsisSlipKey,

@@ -11796,6 +11796,7 @@
       "notConfigured": "The Netsis connection is not configured (base URL or credentials missing)",
       "sessionBusy": "Another process is opening the shared Netsis session; try again shortly",
       "queryNotReadOnly": "A Netsis query must be a single SELECT statement without comments",
+      "queryParamInvalid": "Netsis query parameter is missing, unused or invalid: {name}",
       "recordNotFound": "Netsis record not found",
       "error": {
         "network": "The Netsis server could not be reached",

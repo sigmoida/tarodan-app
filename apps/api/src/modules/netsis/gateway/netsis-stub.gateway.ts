@@ -1,6 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { isValidNetsisSerial } from "@tarodan/types";
-import { assertNetsisReadOnlySelect } from "../clients/netsis-queries.client";
+import {
+  assertNetsisReadOnlySelect,
+  bindNetsisQueryParams,
+} from "../clients/netsis-queries.client";
+import { NETSIS_SLIP_TRACKING_KEY_FIELD } from "../helpers/netsis.constants";
 import { ensureNetsisItem } from "../helpers/netsis-ensure-item.helper";
 import {
   netsisArpCode,
@@ -11,6 +15,7 @@ import { runInNetsisTransaction } from "../helpers/netsis-transaction.helper";
 import type {
   NetsisArp,
   NetsisBankTransfer,
+  NetsisCallOptions,
   NetsisEDocumentRequest,
   NetsisEDocumentSendResult,
   NetsisEDocumentState,
@@ -20,6 +25,7 @@ import type {
   NetsisItemSlipKey,
   NetsisMixedReceipt,
   NetsisPingResult,
+  NetsisQueryParams,
   NetsisRawRecord,
   NetsisSlipTotals,
   NetsisTransactionContext,
@@ -50,8 +56,10 @@ import type {
  *  - gönderilmiş belge silinemez; yalnız gönderilmiş belge iptal edilebilir.
  *
  * Bilerek basit: transaction commit/rollback yalnız durum kaydeder, rollback
- * yazılanları geri almaz. Gelecekteki faturalama sağlayıcısının spec/e2e'leri
- * için `snapshot()`, `setEDocumentState()` ve `reset()` açıktır.
+ * yazılanları geri almaz — yalnız izleme anahtarı araması
+ * (`findByTrackingKey`) canlıdaki gibi commit edilmemiş fişi görmez.
+ * Faturalama sağlayıcısının spec/e2e'leri için `snapshot()`,
+ * `setEDocumentState()`, `loseNextCommitResponse()` ve `reset()` açıktır.
  */
 
 export type NetsisStubTransactionState = "open" | "committed" | "rolledBack";
@@ -101,8 +109,21 @@ class NetsisStubStore {
   readonly collections = new Map<string, NetsisMixedReceipt>();
   readonly bankTransfers: NetsisBankTransfer[] = [];
   readonly transactions = new Map<string, NetsisStubTransactionState>();
+  /** Fiş (`slipId`) → içinde yazıldığı transaction; transaction dışı yazımda yok. */
+  readonly slipTransactions = new Map<string, string>();
   readonly numberCounters = new Map<string, number>();
+  /** Test kancası: bir sonraki commit uygulanır ama yanıtı "kaybolur". */
+  loseNextCommitResponse = false;
   private sequence = 0;
+
+  /** Transaction dışından okuyan biri fişi görür mü (commit edilmiş ya da tx'siz). */
+  isCommitted(id: string): boolean {
+    const transactionId = this.slipTransactions.get(id);
+    return (
+      transactionId === undefined ||
+      this.transactions.get(transactionId) === "committed"
+    );
+  }
 
   next(): number {
     this.sequence += 1;
@@ -134,7 +155,9 @@ class NetsisStubStore {
     this.collections.clear();
     this.bankTransfers.length = 0;
     this.transactions.clear();
+    this.slipTransactions.clear();
     this.numberCounters.clear();
+    this.loseNextCommitResponse = false;
     this.sequence = 0;
   }
 }
@@ -189,7 +212,10 @@ class StubItems implements NetsisItemsApi {
 class StubItemSlips implements NetsisItemSlipsApi {
   constructor(private readonly store: NetsisStubStore) {}
 
-  async create(slip: NetsisItemSlip): Promise<NetsisItemSlip> {
+  async create(
+    slip: NetsisItemSlip,
+    options?: NetsisCallOptions,
+  ): Promise<NetsisItemSlip> {
     const header = slip.FatUst;
     if (!this.store.arps.has(header.CARI_KODU)) {
       throw invalid(`ARP ${header.CARI_KODU} does not exist`);
@@ -209,6 +235,9 @@ class StubItemSlips implements NetsisItemSlipsApi {
     const stored = clone(slip);
     stored.FatUst.FATIRS_NO = number;
     this.store.slips.set(id, stored);
+    if (options?.transactionId) {
+      this.store.slipTransactions.set(id, options.transactionId);
+    }
     return clone(stored);
   }
 
@@ -245,6 +274,30 @@ class StubItemSlips implements NetsisItemSlipsApi {
     }
     this.store.slips.delete(slipId(key));
     this.store.eDocuments.delete(slipId(key));
+    this.store.slipTransactions.delete(slipId(key));
+  }
+
+  /**
+   * Canlıdaki gibi transaction dışı okuma: açık ya da geri alınmış bir
+   * transaction'da yazılan fiş görünmez. İlk eşleşen (ilk açılan) döner.
+   */
+  async findByTrackingKey(
+    trackingKey: string,
+  ): Promise<NetsisItemSlipKey | null> {
+    const key = trackingKey.trim();
+    if (!key) return null;
+    for (const [id, slip] of this.store.slips) {
+      if (
+        slip.FatUst[NETSIS_SLIP_TRACKING_KEY_FIELD] === key &&
+        this.store.isCommitted(id)
+      ) {
+        return {
+          FaturaTip: slip.FaturaTip,
+          FATIRS_NO: slip.FatUst.FATIRS_NO ?? "",
+        };
+      }
+    }
+    return null;
   }
 
   private require(key: NetsisItemSlipKey): NetsisItemSlip {
@@ -363,6 +416,16 @@ class StubTransactions implements NetsisTransactionsApi {
 
   async commit(transactionId: string): Promise<void> {
     this.close(transactionId, "committed");
+    // Kayıp yanıt: Netsis yazdı, biz duymadık. Commit KALICIDIR; çağıranın
+    // sonraki rollback'i "açık değil" diye düşer (canlıda da öyle).
+    if (this.store.loseNextCommitResponse) {
+      this.store.loseNextCommitResponse = false;
+      throw new NetsisRequestException(
+        "network",
+        null,
+        "stub: commit applied but the response was lost (socket hang up)",
+      );
+    }
   }
 
   async rollback(transactionId: string): Promise<void> {
@@ -406,9 +469,15 @@ class StubPublic implements NetsisPublicApi {
 }
 
 class StubQueries implements NetsisQueriesApi {
-  /** Bekçi canlıdakiyle aynı; stub'da veri olmadığından sonuç boş. */
-  async select(sql: string): Promise<NetsisRawRecord[]> {
-    assertNetsisReadOnlySelect(sql);
+  /**
+   * Bekçi ve parametre bağlama canlıdakiyle aynı; stub'da SQL tablosu
+   * olmadığından sonuç boş (izleme anahtarı araması `itemSlips`'tedir).
+   */
+  async select(
+    sql: string,
+    params?: NetsisQueryParams,
+  ): Promise<NetsisRawRecord[]> {
+    bindNetsisQueryParams(assertNetsisReadOnlySelect(sql), params);
     return [];
   }
 }
@@ -463,6 +532,15 @@ export class NetsisStubGateway implements NetsisGateway {
     );
     if (!document) throw notFound(`e-document ${ettn}`);
     document.state = state;
+  }
+
+  /**
+   * Testler için: bir sonraki `commit` UYGULANIR (fiş kalıcıdır) ama yanıtı
+   * kaybolur — `network` sınıfında hata fırlar. "Netsis transaction'ı commit
+   * etti, HTTP yanıtı bize ulaşmadı" senaryosu; tek seferliktir.
+   */
+  loseNextCommitResponse(): void {
+    this.store.loseNextCommitResponse = true;
   }
 
   reset(): void {

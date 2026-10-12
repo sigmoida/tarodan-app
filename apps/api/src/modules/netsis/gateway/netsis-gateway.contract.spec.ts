@@ -39,6 +39,7 @@ const SURFACE: { [R in ResourceKey]: Surface<NetsisGateway[R]> } = {
     newEInvoiceNumber: true,
     newEArchiveNumber: true,
     delete: true,
+    findByTrackingKey: true,
   },
   eDocuments: { send: true, check: true, cancelEArchive: true, show: true },
   receipts: {
@@ -63,15 +64,16 @@ const SURFACE: { [R in ResourceKey]: Surface<NetsisGateway[R]> } = {
 
 function liveGateway(): NetsisLiveGateway {
   const http = {} as NetsisHttpClient;
+  const queries = new NetsisQueriesClient(http);
   return new NetsisLiveGateway(
     new NetsisArpsClient(http),
     new NetsisItemsClient(http),
-    new NetsisItemSlipsClient(http),
+    new NetsisItemSlipsClient(http, queries),
     new NetsisEDocumentClient(http),
     new NetsisReceiptsClient(http),
     new NetsisTransactionsClient(http),
     new NetsisPublicClient({} as NetsisTransport),
-    new NetsisQueriesClient(http),
+    queries,
     http,
   );
 }

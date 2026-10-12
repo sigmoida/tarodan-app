@@ -1,3 +1,4 @@
+import { NETSIS_SLIP_BY_TRACKING_KEY_SQL } from "../helpers/netsis.constants";
 import { NetsisRequestException } from "../http/netsis-error";
 import type { NetsisHttpClient } from "../http/netsis-http.client";
 import type {
@@ -5,6 +6,7 @@ import type {
   NetsisItemSlipKey,
 } from "../helpers/netsis.types";
 import { NetsisItemSlipsClient } from "./netsis-item-slips.client";
+import { NetsisQueriesClient } from "./netsis-queries.client";
 
 describe("NetsisItemSlipsClient", () => {
   const http = {
@@ -13,7 +15,11 @@ describe("NetsisItemSlipsClient", () => {
     put: jest.fn(),
     delete: jest.fn(),
   };
-  const client = new NetsisItemSlipsClient(http as unknown as NetsisHttpClient);
+  // Gerçek sorgu istemcisi aynı sahte HTTP üzerinden: bağlanan SQL görünür.
+  const client = new NetsisItemSlipsClient(
+    http as unknown as NetsisHttpClient,
+    new NetsisQueriesClient(http as unknown as NetsisHttpClient),
+  );
   const slip: NetsisItemSlip = {
     FaturaTip: "ftSFat",
     FatUst: {
@@ -128,6 +134,64 @@ describe("NetsisItemSlipsClient", () => {
     ).resolves.toBeUndefined();
     expect(http.post).toHaveBeenCalledWith("ItemSlips/Delete", key, {
       transactionId: "T-2",
+    });
+  });
+
+  describe("findByTrackingKey", () => {
+    const ettn = "11111111-2222-4333-8444-555555555555";
+
+    it("runs the read-only lookup through Queries with the key bound as a literal", async () => {
+      http.post.mockResolvedValue([
+        { FATIRS_NO: "EAR2026000000001 ", FTIRSIP: "1" },
+      ]);
+
+      await expect(client.findByTrackingKey(ettn)).resolves.toEqual({
+        FaturaTip: "ftSFat",
+        FATIRS_NO: "EAR2026000000001",
+      });
+      expect(http.post).toHaveBeenCalledTimes(1);
+      expect(http.post).toHaveBeenCalledWith("Queries", {
+        Query: NETSIS_SLIP_BY_TRACKING_KEY_SQL.replace(
+          "@trackingKey",
+          `N'${ettn}'`,
+        ),
+      });
+    });
+
+    it("maps the return slip type and takes the first (oldest) of several rows", async () => {
+      http.post.mockResolvedValue([
+        { FATIRS_NO: "EAR2026000000002", FTIRSIP: 2 },
+        { FATIRS_NO: "EAR2026000000003", FTIRSIP: 2 },
+      ]);
+      await expect(client.findByTrackingKey(ettn)).resolves.toEqual({
+        FaturaTip: "ftAFat",
+        FATIRS_NO: "EAR2026000000002",
+      });
+    });
+
+    it("returns null when Netsis has no such slip", async () => {
+      http.post.mockResolvedValue([]);
+      await expect(client.findByTrackingKey(ettn)).resolves.toBeNull();
+    });
+
+    it("never queries with a blank key (it would match foreign slips)", async () => {
+      await expect(client.findByTrackingKey("  ")).resolves.toBeNull();
+      expect(http.post).not.toHaveBeenCalled();
+    });
+
+    it("escapes quotes in the key instead of concatenating it", async () => {
+      http.post.mockResolvedValue([]);
+      await client.findByTrackingKey("x' OR 1=1");
+      expect(http.post).toHaveBeenCalledWith("Queries", {
+        Query: expect.stringContaining("EKACK1 = N'x'' OR 1=1'"),
+      });
+    });
+
+    it("an unreadable row is an error, never 'not found'", async () => {
+      http.post.mockResolvedValue([{ FATIRS_NO: "EAR1", FTIRSIP: "9" }]);
+      await expect(client.findByTrackingKey(ettn)).rejects.toMatchObject({
+        kind: "unknown",
+      });
     });
   });
 });
