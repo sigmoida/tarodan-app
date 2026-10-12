@@ -217,7 +217,44 @@ talebinde kusur satıcıda **değilse** (`RefundRequest.faultParty`; v1'de
 belirlenemiyorsa asla. Damgasız kalıntı (kargoya verilmeden iptal) hemen
 vadelidir. Karar tek yüklemde: `payout/helpers/hold-release-eligibility.ts` —
 manuel bırakma, cron, payout yolları ve admin hold listesinin `releasable`
-rozeti aynı fonksiyonu okur.
+rozeti aynı fonksiyonu okur. Cron kalıntı adayını **siparişin kapanmış
+olmasından** seçer (`payout/helpers/closed-order-hold-candidates.ts`),
+`refundedAmount > 0`'dan değil: bırakılacak pay hold'u aşarsa iade hiç tüketmez
+ve kalıntı hold'un tamamıdır.
+
+**Satıcı kusurlu kalıntı platformun parasıdır, alıcının değil.** Alıcının
+ödediği `T = ürün + alıcı kargo payı + alıcı ücretleri (+KDV)`; satıcının kargo
+payı T'de **yoktur**, satıcının hak edişinden düşülür. Örnek: ürün 1000, alıcı
+kargo 60, satıcı kargo 40, alıcı ücretleri 80, satıcı ücretleri 100 →
+T = 1140, hold = T − ücretler − tam kargo = 1140 − 80 − 100 − 100 = 860.
+Satıcı kusurlu kargo öncesi iptalde alıcıya **1140 (T'nin tamamı)** döner.
+Satıcı payı tazmin edilseydi hold yalnız 820 tüketilir, 40 kalırdı; o 40
+satıcıya ödenemez (kusurlu) ve alıcıya da iade edilemez (PSP tavanı T, alıcı
+zaten T'yi aldı). Hold tam tüketildiğinde alıcı, satıcı ve platform 0'da
+kapanır — kalıntı, platformun alıcıya T'yi öderken kendi payından koyduğu
+paradır.
+
+- **Kaynak**: satıcı kusurlu kargo öncesi iptal satıcının kargo payını artık
+  tazmin **etmez** (v2 `!hasShipped` dalında `faultParty === "seller"` iken
+  `outbound_shipping / seller_refund` üretilmez; v1 `seller_fault_cancellation`
+  → `compensateSellerShipping: false`). Alıcı iadesi değişmez (T), hold tamamen
+  tüketilir. Satıcı kusurlu iade (kargolanmış) zaten kalıntı üretmiyordu
+  (satıcıya tam kargo borcu, tazmin yok). Alıcı/kargo/platform kusurunda
+  davranış aynıdır.
+- **Birikmiş kalıntılar**: `PaymentHoldResidualService` PSP'ye gitmeden
+  platforma **kapatır** — tek işlemde hold `cancelled` +
+  `refundedAmount = amount` (CAS: tutuluyor, kilitsiz, okunan `refundedAmount`
+  değişmemiş) ve dengeli `adjustment` defter grubu (`seller_escrow` alacak →
+  `platform_commission` borç, anahtar `hold-residual-settle:<holdId>`, memo
+  hold/sipariş numarasını taşır). Uygunluk tek yüklemde:
+  `holdResidualSettleable` (kapanmış sipariş + kalıntı > 0,01 + bırakmayı
+  engelleyen tek neden `seller_at_fault`; kusur belirlenemeyen kalıntı da
+  dahil). Yüzeyler: `POST /admin/payouts/holds/:id/settle-residual`
+  (super_admin/admin, `payouts` izni, sebep zorunlu, denetim kaydı aynı
+  işlemde; uygun değilse 409) ve bakım script'i
+  `settle-seller-fault-residuals` (bkz. OPERATIONS.md). Hold listesi satırı
+  `residualAmount` ve `residualSettleable` taşır; `seller_at_fault` rozeti
+  ("Satıcı kusurlu — ödenmez") doğru kalır ama durum **geçicidir**.
 
 ---
 
@@ -279,7 +316,9 @@ Politika saf ve merkezî: `modules/refund/refund-financial-policy.ts`.
 `wrong_item` / `counterfeit` ayrıca ceza incelemesi işaretler.
 
 **İptal** — `resolveCancellationPolicy(reason, { hasShipped })`: kargoya
-verilmeden maliyet gerçek değildir → iki taraf da bütünlenir. Verildikten sonra
+verilmeden maliyet gerçek değildir → iki taraf da bütünlenir; **satıcı
+kusurunda (`delivery_delayed`) satıcı payı tazmin edilmez** — alıcı yine T'nin
+tamamını alır, hold tamamen tüketilir (bkz. §5 Kalıntı). Verildikten sonra
 maliyet kusurlu tarafa gider: `delivery_delayed`'de gidiş satıcıya yansır;
 cayma nedenlerinde alıcının kargo payı iade edilmez ve koruma bedeli hep kalır.
 
