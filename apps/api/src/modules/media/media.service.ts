@@ -50,6 +50,8 @@ export interface UploadOptions {
     width?: number;
     height?: number;
     fit?: "cover" | "contain" | "fill" | "inside" | "outside";
+    /** "En çok şu kadar" sınırı: küçük görsel büyütülmez (bulanıklaşmasın). */
+    withoutEnlargement?: boolean;
   };
   generateThumbnail?: boolean;
   entityType?: string;
@@ -163,7 +165,10 @@ export class MediaService {
       if (resize && file.mimetype.startsWith("image/") && sharp) {
         buffer = await sharp(buffer)
           .autoOrient()
-          .resize(resize.width, resize.height, { fit: resize.fit || "cover" })
+          .resize(resize.width, resize.height, {
+            fit: resize.fit || "cover",
+            withoutEnlargement: resize.withoutEnlargement,
+          })
           .toBuffer();
       }
 

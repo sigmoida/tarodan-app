@@ -11605,6 +11605,16 @@
       "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
       "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
     },
+    "hero": {
+      "notFound": "Slayt bulunamadı",
+      "trustBadgeNotFound": "Güven rozeti bulunamadı",
+      "titleRequired": "Türkçe başlık zorunludur",
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
+      "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
+      "maxLiveSlides": "Bir yerleşimde aynı anda en fazla {max} slayt yayında olabilir",
+      "lastLiveHomeSlide": "Ana sayfada yayındaki son slayt silinemez veya yayından kaldırılamaz; önce başka bir slaytı yayına alın",
+      "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir"
+    },
     "brand": {
       "notFound": "Marka bulunamadı"
     },

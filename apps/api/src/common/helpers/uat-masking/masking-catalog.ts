@@ -946,6 +946,21 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       // alan adı; kişisel veri taşımaz (reklamla aynı sınıf).
       "advertisement_hotspots.link_url",
       "advertisement_hotspots.label",
+      // Vitrin hero'su + güven rozetleri: admin'in yazdığı pazarlama metni
+      // (LocalizedText JSON), public görsel URL'i ve buton hedefi; kişisel
+      // veri taşımaz (reklamla aynı sınıf).
+      "hero_slides.image_url",
+      "hero_slides.mobile_image_url",
+      "hero_slides.title",
+      "hero_slides.subtitle",
+      "hero_slides.image_alt",
+      "hero_slides.cta1_label",
+      "hero_slides.cta1_href",
+      "hero_slides.cta2_label",
+      "hero_slides.cta2_href",
+      "trust_badges.icon",
+      "trust_badges.title",
+      "trust_badges.description",
       "discounts.name",
       "discounts.description",
       "scheduled_notifications.title",

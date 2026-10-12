@@ -1,4 +1,8 @@
 import type { Prisma } from "@prisma/client";
+import {
+  scheduleWindowWhere,
+  withinScheduleWindow,
+} from "../../../common/helpers/schedule-window";
 
 /**
  * "Reklam şu an yayında mı" — TEK kural. Hem vitrin seçimi (`GET /ads/active`)
@@ -35,24 +39,15 @@ export const AD_LIVE_CAMPAIGN_SELECT = {
   budgetStoppedAt: true,
 } as const satisfies Prisma.DiscountSelect;
 
-/** Pencere sınırları dahil: başlangıç anında ve bitiş anında reklam yayındadır. */
-function withinWindow(
-  now: Date,
-  start: Date | null,
-  end: Date | null,
-): boolean {
-  if (start && start.getTime() > now.getTime()) return false;
-  if (end && end.getTime() < now.getTime()) return false;
-  return true;
-}
-
+// Pencere sınırları dahil: başlangıç anında ve bitiş anında reklam yayındadır
+// (`withinScheduleWindow`, hero slaytlarıyla ortak kural).
 export function isAdLive(ad: AdLiveFields, now: Date = new Date()): boolean {
   if (!ad.isActive) return false;
-  if (!withinWindow(now, ad.startDate, ad.endDate)) return false;
+  if (!withinScheduleWindow(now, ad.startDate, ad.endDate)) return false;
   const campaign = ad.discount;
   if (!campaign) return true;
   if (!campaign.isActive || campaign.budgetStoppedAt) return false;
-  return withinWindow(now, campaign.startDate, campaign.endDate);
+  return withinScheduleWindow(now, campaign.startDate, campaign.endDate);
 }
 
 /**
@@ -60,11 +55,5 @@ export function isAdLive(ad: AdLiveFields, now: Date = new Date()): boolean {
  * daraltma içindir — otorite `isAdLive`'dır, sonuç yine ondan geçirilir.
  */
 export function adLiveWhere(now: Date): Prisma.AdvertisementWhereInput {
-  return {
-    isActive: true,
-    AND: [
-      { OR: [{ startDate: null }, { startDate: { lte: now } }] },
-      { OR: [{ endDate: null }, { endDate: { gte: now } }] },
-    ],
-  };
+  return { isActive: true, AND: scheduleWindowWhere(now) };
 }
