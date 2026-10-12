@@ -7,11 +7,13 @@ import {
   CONSENT_DOCUMENT_I18N_KEYS,
   CONSENT_SOURCE_I18N_KEYS,
   CONSENT_SUBJECT_TYPE_I18N_KEYS,
+  EXPORT_CATALOGS,
   consentSubjectType,
   isConsentDocumentKey,
   type AdminConsentRecordRow,
   type ConsentDocumentStatus,
   type ConsentSubjectType,
+  type ExportCatalogKey,
 } from "@tarodan/types";
 
 import { PrismaService } from "../../../prisma";
@@ -22,11 +24,11 @@ import {
   resolveOrderBy,
 } from "../../../common/list";
 import {
-  renderSheet,
-  toXlsx,
-  type ExportColumn,
-} from "../../../common/helpers/tabular-export";
-import { translateMessage } from "../../i18n/translate";
+  ExportListService,
+  type ExportFile,
+  type ExportRecord,
+  type Translate,
+} from "../../../common/export";
 import { ConsentService } from "../../consent/consent.service";
 import type { ConsentRecordQueryDto } from "../dto/consent-record.dto";
 
@@ -42,9 +44,6 @@ const SEARCH_FIELDS = [
   "checkoutGroup.groupNumber",
   "order.orderNumber",
 ] as const;
-
-/** Tek istekte üretilecek döküm tavanı; aşılırsa başlıkla bildirilir. */
-export const CONSENT_EXPORT_ROW_CAP = 5000;
 
 const ROW_SELECT = {
   id: true,
@@ -90,6 +89,7 @@ export class AdminConsentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly consents: ConsentService,
+    private readonly exports: ExportListService,
   ) {}
 
   async list(query: ConsentRecordQueryDto) {
@@ -106,43 +106,75 @@ export class AdminConsentService {
   }
 
   /**
-   * Geçerli filtrenin Excel dökümü — listeyle AYNI filtre ve sıra. Tavan + 1
-   * okunur: dosyanın sessizce kırpılması, ispat dökümünde fark edilmeden
-   * eksik kayıt demektir; aşım `truncated` ile bildirilir.
+   * Geçerli filtrenin Excel dökümü — listeyle AYNI filtre ve sıra (`id` yalnız
+   * sayfa sınırında eşit anları sabitler). Tavan, kırpılma, Özet ve zorunlu
+   * denetim ortak hatta (`ExportListService`); arama terimi denetime yazılmaz.
    */
-  async exportXlsx(
+  async export(
     query: ConsentRecordQueryDto,
+    actorId: string,
     locale: Locale,
-  ): Promise<{
-    filename: string;
-    body: Buffer;
-    rowCount: number;
-    truncated: boolean;
-  }> {
-    const found = await this.prisma.consentRecord.findMany({
-      where: buildConsentWhere(query),
-      orderBy: this.orderBy(query),
-      select: ROW_SELECT,
-      take: CONSENT_EXPORT_ROW_CAP + 1,
+  ): Promise<ExportFile> {
+    const where = buildConsentWhere(query);
+    const orderBy: Prisma.ConsentRecordOrderByWithRelationInput[] = [
+      this.orderBy(query),
+      { id: "asc" },
+    ];
+    return this.exports.exportList({
+      catalog: EXPORT_CATALOGS.consents,
+      locale,
+      slug: "onay-kayitlari",
+      titleKey: "admin.consents.title",
+      sheetNameKey: "admin.consents.export.sheetName",
+      filters: [
+        {
+          labelKey: "admin.consents.filters.document",
+          value: query.document,
+          valueKey:
+            query.document && isConsentDocumentKey(query.document)
+              ? CONSENT_DOCUMENT_I18N_KEYS[query.document]
+              : undefined,
+        },
+        {
+          labelKey: "admin.consents.filters.action",
+          value: query.action,
+          valueKey: query.action && CONSENT_ACTION_I18N_KEYS[query.action],
+        },
+        {
+          labelKey: "admin.consents.filters.source",
+          value: query.source,
+          valueKey: query.source && CONSENT_SOURCE_I18N_KEYS[query.source],
+        },
+        {
+          labelKey: "admin.consents.filters.subjectType",
+          value: query.subjectType,
+          valueKey:
+            query.subjectType &&
+            CONSENT_SUBJECT_TYPE_I18N_KEYS[query.subjectType],
+        },
+        { labelKey: "common.user", value: query.userId },
+        { labelKey: "admin.finance.common.startDate", value: query.startDate },
+        { labelKey: "admin.finance.common.endDate", value: query.endDate },
+      ],
+      sort: query,
+      fetchPage: async ({ skip, take }) =>
+        (
+          await this.prisma.consentRecord.findMany({
+            where,
+            orderBy,
+            select: ROW_SELECT,
+            skip,
+            take,
+          })
+        ).map(toAdminRow),
+      map: consentExportRecord,
+      audit: {
+        actorId,
+        action: "consent_records_export",
+        entityType: "ConsentRecord",
+        query,
+      },
     });
-    const truncated = found.length > CONSENT_EXPORT_ROW_CAP;
-    const rows = (
-      truncated ? found.slice(0, CONSENT_EXPORT_ROW_CAP) : found
-    ).map(toAdminRow);
-    const t = (key: string) => translateMessage(key, locale);
-    const day = new Date().toISOString().slice(0, 10);
-    return {
-      filename: `onay-kayitlari-${day}.xlsx`,
-      body: await toXlsx([
-        renderSheet(
-          t("admin.consents.export.sheetName"),
-          exportColumns(t),
-          rows,
-        ),
-      ]),
-      rowCount: rows.length,
-      truncated,
-    };
   }
 
   /** Kullanıcı detayı: belge başına en son kayıt + yeniden-onay bekliyor mu. */
@@ -219,53 +251,30 @@ function cookieCategoriesText(details: Record<string, unknown> | null): string {
     .join(", ");
 }
 
-const HEADER = "admin.consents.export";
-
-/** Döküm kolonları — başlık ve etiketler panelin katalog anahtarlarından. */
-export function exportColumns(
-  t: (key: string) => string,
-): ExportColumn<AdminConsentRecordRow>[] {
-  return [
-    { header: t(`${HEADER}.createdAt`), value: (r) => r.createdAt },
-    {
-      header: t(`${HEADER}.document`),
-      value: (r) =>
-        isConsentDocumentKey(r.document)
-          ? t(CONSENT_DOCUMENT_I18N_KEYS[r.document])
-          : r.document,
-    },
-    { header: t(`${HEADER}.version`), value: (r) => r.version },
-    {
-      header: t(`${HEADER}.currentVersion`),
-      value: (r) => t(r.isCurrentVersion ? "common.yes" : "common.no"),
-    },
-    {
-      header: t(`${HEADER}.action`),
-      value: (r) => t(CONSENT_ACTION_I18N_KEYS[r.action]),
-    },
-    {
-      header: t(`${HEADER}.source`),
-      value: (r) => t(CONSENT_SOURCE_I18N_KEYS[r.source]),
-    },
-    {
-      header: t(`${HEADER}.subjectType`),
-      value: (r) => t(CONSENT_SUBJECT_TYPE_I18N_KEYS[r.subjectType]),
-    },
-    { header: t(`${HEADER}.userCode`), value: (r) => r.user?.adminCode },
-    { header: t(`${HEADER}.userName`), value: (r) => r.user?.displayName },
-    { header: t(`${HEADER}.userEmail`), value: (r) => r.user?.email },
-    { header: t(`${HEADER}.guestEmail`), value: (r) => r.guestEmail },
-    { header: t(`${HEADER}.visitorId`), value: (r) => r.visitorId },
-    { header: t(`${HEADER}.ipAddress`), value: (r) => r.ipAddress },
-    { header: t(`${HEADER}.userAgent`), value: (r) => r.userAgent },
-    {
-      header: t(`${HEADER}.cookieCategories`),
-      value: (r) => cookieCategoriesText(r.details),
-    },
-    {
-      header: t(`${HEADER}.checkoutGroup`),
-      value: (r) => r.checkoutGroup?.groupNumber,
-    },
-    { header: t(`${HEADER}.order`), value: (r) => r.order?.orderNumber },
-  ];
+/** Döküm satırı — kolonlar `EXPORT_CATALOGS.consents`, etiketler katalogdan. */
+export function consentExportRecord(
+  r: AdminConsentRecordRow,
+  t: Translate,
+): ExportRecord<ExportCatalogKey<typeof EXPORT_CATALOGS.consents>> {
+  return {
+    createdAt: r.createdAt,
+    document: isConsentDocumentKey(r.document)
+      ? t(CONSENT_DOCUMENT_I18N_KEYS[r.document])
+      : r.document,
+    version: r.version,
+    isCurrentVersion: r.isCurrentVersion,
+    action: t(CONSENT_ACTION_I18N_KEYS[r.action]),
+    source: t(CONSENT_SOURCE_I18N_KEYS[r.source]),
+    subjectType: t(CONSENT_SUBJECT_TYPE_I18N_KEYS[r.subjectType]),
+    userCode: r.user?.adminCode,
+    userName: r.user?.displayName,
+    userEmail: r.user?.email,
+    guestEmail: r.guestEmail,
+    visitorId: r.visitorId,
+    ipAddress: r.ipAddress,
+    userAgent: r.userAgent,
+    cookieCategories: cookieCategoriesText(r.details),
+    checkoutGroup: r.checkoutGroup?.groupNumber,
+    order: r.order?.orderNumber,
+  };
 }

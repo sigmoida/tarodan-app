@@ -1,10 +1,7 @@
 import * as ExcelJS from "exceljs";
 import { CONSENT_DOCUMENTS } from "@tarodan/types";
-import {
-  AdminConsentService,
-  CONSENT_EXPORT_ROW_CAP,
-  buildConsentWhere,
-} from "./admin-consent.service";
+import { ExportListService } from "../../../common/export";
+import { AdminConsentService, buildConsentWhere } from "./admin-consent.service";
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: "c1",
@@ -30,18 +27,39 @@ const row = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+interface FindManyArgs {
+  where: Record<string, unknown>;
+  orderBy: unknown;
+  skip?: number;
+  take?: number;
+}
+
 function makeService(rows: Record<string, unknown>[] = [row()]) {
   const prisma = {
     consentRecord: {
-      findMany: jest.fn().mockResolvedValue(rows),
+      // Liste de döküm de skip/take ile sayfalar; mock gerçek bir tablo gibi
+      // dilimler ki döküm sayfa döngüsü sonlansın.
+      findMany: jest.fn(async (args: FindManyArgs) =>
+        args.take === undefined
+          ? rows
+          : rows.slice(args.skip ?? 0, (args.skip ?? 0) + args.take),
+      ),
       count: jest.fn().mockResolvedValue(rows.length),
     },
   };
   const consents = { getStatus: jest.fn().mockResolvedValue([]) };
+  const audit = {
+    createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+  };
   return {
-    service: new AdminConsentService(prisma as never, consents as never),
+    service: new AdminConsentService(
+      prisma as never,
+      consents as never,
+      new ExportListService(audit as never),
+    ),
     prisma,
     consents,
+    audit,
   };
 }
 
@@ -140,36 +158,53 @@ describe("AdminConsentService.list", () => {
   });
 });
 
-describe("AdminConsentService.exportXlsx", () => {
-  it("listeyle aynı filtreyi uygular ve tavan + 1 okur", async () => {
+describe("AdminConsentService.export", () => {
+  it("listeyle aynı filtre ve sırayla sayfa sayfa okur", async () => {
     const { service, prisma } = makeService();
 
-    await service.exportXlsx({ document: "kvkk" }, "tr");
+    await service.export({ document: "kvkk" }, "admin-1", "tr");
 
     const args = prisma.consentRecord.findMany.mock.calls[0][0];
     expect(args.where.document).toBe("kvkk");
-    expect(args.take).toBe(CONSENT_EXPORT_ROW_CAP + 1);
+    // Listenin sırası + sayfa sınırında eşit anları sabitleyen id.
+    expect(args.orderBy).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
+    expect(args).toMatchObject({ skip: 0, take: 500 });
   });
 
-  it("tavan aşılırsa dosyayı kırpar ve bildirir", async () => {
-    const many = Array.from({ length: CONSENT_EXPORT_ROW_CAP + 1 }, (_, i) =>
-      row({ id: `c${i}` }),
+  it("zorunlu denetim kaydı yazar; arama TERİMİ yazılmaz", async () => {
+    const { service, audit } = makeService();
+
+    const file = await service.export(
+      { search: "ahmet@example.com", action: "granted" },
+      "admin-1",
+      "tr",
     );
-    const { service } = makeService(many);
 
-    const file = await service.exportXlsx({}, "tr");
-
-    expect(file.truncated).toBe(true);
-    expect(file.rowCount).toBe(CONSENT_EXPORT_ROW_CAP);
+    expect(file.filename).toMatch(/^onay-kayitlari-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    const [actor, action, entityType, , , payload] =
+      audit.createRequiredAuditLog.mock.calls[0];
+    expect([actor, action, entityType]).toEqual([
+      "admin-1",
+      "consent_records_export",
+      "ConsentRecord",
+    ]);
+    expect(JSON.stringify(payload)).not.toContain("ahmet@example.com");
+    expect(payload).toMatchObject({
+      resource: "consents",
+      filters: { action: "granted", searchApplied: true, searchLength: 17 },
+      rowCount: 1,
+      truncated: false,
+    });
   });
 
   it("dökümde kanıt kolonları (IP, kullanıcı ajanı, sürüm) yer alır", async () => {
     const { service } = makeService();
 
-    const file = await service.exportXlsx({}, "tr");
+    const file = await service.export({}, "admin-1", "tr");
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file.body as never);
-    const sheet = workbook.worksheets[0];
+    expect(workbook.worksheets[0].name).toBe("Özet");
+    const sheet = workbook.worksheets[1];
     const values = (sheet.getRow(2).values as unknown[]).map(String);
 
     expect(values).toEqual(
@@ -178,7 +213,12 @@ describe("AdminConsentService.exportXlsx", () => {
         "85.105.10.20",
         "Mozilla/5.0",
         "B10001",
+        "Evet", // güncel sürüm
       ]),
+    );
+    // Onay anı gerçek tarih hücresi, İstanbul saatiyle (09:00Z → 12:00).
+    expect(sheet.getRow(2).getCell(1).value).toEqual(
+      new Date("2026-10-01T12:00:00.000Z"),
     );
   });
 });
