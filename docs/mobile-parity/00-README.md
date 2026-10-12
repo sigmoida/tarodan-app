@@ -41,6 +41,7 @@ Sıra tesadüfi değil: para akışı ve yasal zorunluluk taşıyan alanlar önc
 | 21  | `21-test-lane-2026-09-08.md`                | **Canlı test şeridi** — App Review / QA hesapları, PayTR test modu                             |
 | 22  | `22-api-delta-2026-10-05.md`                | **Değişiklik güncesi** (5 Eki) — hukuki onay kayıtları, yeniden-onay kapısı, ödeme onayı       |
 | 23  | `23-api-delta-2026-10-05-legal-identity.md` | **Değişiklik güncesi** (5 Eki) — yasal kimlik (ad, soyad, TCKN), kimlik ekranı, kayıt alanları |
+| 24  | `24-api-delta-hero-trust.md`                | **Değişiklik güncesi** (12 Eki) — admin yönetimli vitrin hero'su ve güven rozetleri            |
 
 **Önce `11` ve `12` okunmalı.** Oradaki istemci sözleşmesi (bearer token, hata kodları,
 sayfalama) her domain dosyasında varsayılır ve tekrar edilmez.
