@@ -40,7 +40,7 @@ export interface CartHead {
   createdAt: Date;
 }
 
-type Party = Prisma.UserGetPayload<{ select: typeof PARTY_SELECT }>;
+export type Party = Prisma.UserGetPayload<{ select: typeof PARTY_SELECT }>;
 type Product = Prisma.ProductGetPayload<{
   select: typeof LIST_PRODUCT_SELECT;
 }>;
@@ -57,7 +57,7 @@ const money = (value: Prisma.Decimal | number | null | undefined) =>
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value : null;
 
-function partyOf(user: Party): AdminOrderParty {
+export function partyOf(user: Party): AdminOrderParty {
   return {
     id: user.id,
     displayName: user.displayName ?? "",
@@ -71,7 +71,10 @@ function partyOf(user: Party): AdminOrderParty {
  * Misafir siparişinde alıcı ortak sistem kullanıcısıdır; gerçek ad/e-posta
  * teslimat adresi snapshot'ındadır. Kullanıcı kodu ve linki üretilmez.
  */
-function buyerOf(user: Party, shippingAddress: unknown): AdminOrderParty {
+export function buyerOf(
+  user: Party,
+  shippingAddress: unknown,
+): AdminOrderParty {
   const address =
     shippingAddress && typeof shippingAddress === "object"
       ? (shippingAddress as Record<string, unknown>)
@@ -126,6 +129,19 @@ function lineOf(order: ListOfferOrder, ctx: RowMapContext): AdminOrderLine {
     hasActiveRefund: order.refundRequests.length > 0,
     product: productOf(order.product, ctx),
   };
+}
+
+/**
+ * Satış komisyonu: satıcı + alıcı komisyonu (KDV hariç, hizmet bedeli değil).
+ * Sipariş listesi ve İadeler ekranı aynı tanımı okur.
+ */
+export function salesCommissionOf(order: {
+  sellerCommissionAmount: Prisma.Decimal | number | null;
+  buyerCommissionAmount: Prisma.Decimal | number | null;
+}): Prisma.Decimal {
+  return money(order.sellerCommissionAmount).plus(
+    money(order.buyerCommissionAmount),
+  );
 }
 
 /**
@@ -255,9 +271,7 @@ function cartRowOf(
       .reduce((acc, line) => acc.plus(line.subtotal), money(0))
       .toNumber(),
     fees: {
-      salesCommission: sum((o) =>
-        money(o.sellerCommissionAmount).plus(money(o.buyerCommissionAmount)),
-      ).toNumber(),
+      salesCommission: sum(salesCommissionOf).toNumber(),
       platformFee: sum((o) =>
         money(o.sellerPlatformFeeAmount).plus(money(o.buyerServiceFeeAmount)),
       ).toNumber(),

@@ -98,6 +98,7 @@ import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.servic
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
 import { AdminTradeCancelService } from "./trade/admin-trade-cancel.service";
 import { AdminRefundService } from "./orders/admin-refund.service";
+import { AdminRefundListService } from "./orders/admin-refund-list.service";
 import { AdminMessagingService } from "./ops/admin-messaging.service";
 import { AdminSupportService } from "./ops/admin-support.service";
 import { AdminContentService } from "./catalog/admin-content.service";
@@ -295,6 +296,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTradeResolutionService,
     AdminTradeCancelService,
     AdminRefundService,
+    AdminRefundListService,
     AdminMessagingService,
     AdminSupportService,
     AdminContentService,

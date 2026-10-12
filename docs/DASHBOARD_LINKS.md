@@ -9,8 +9,8 @@ rozetle gösterir, kuyruklar saymaz — "birebir" bu farkı yok sayar.
 
 | Satır | Bağlantı | Eşleşme |
 | --- | --- | --- |
-| refundsPendingReview | `/operations/cancellations-refunds?view=refunds&status=pending_review` | birebir |
-| refundsDisputed | `…?view=refunds&status=disputed` | birebir |
+| refundsPendingReview | `/operations/refunds?bucket=pending_review` | birebir |
+| refundsDisputed | `/operations/refunds?bucket=disputed` | birebir |
 | tradesAtWarehouse | `/operations/orders?tab=trades` | filtre yok |
 | tradeDisputesOpen | `/operations/orders?tab=trades` | filtre yok |
 | tradeRefundFailures | `/operations/orders?tab=trades` | filtre yok |

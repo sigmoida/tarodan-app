@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Alert, StatusBadge, refundRequestStatusConfig } from "@tarodan/ui";
-import { ADMIN_REFUNDS_VIEW_HREF } from "@tarodan/types";
+import { ADMIN_REFUNDS_PATH } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -115,7 +115,7 @@ export default function RefundRequestDetailPage() {
       fetcher={(rid) =>
         adminApi.getRefundRequest(rid).then((r) => r.data?.data ?? r.data)
       }
-      backHref={ADMIN_REFUNDS_VIEW_HREF}
+      backHref={ADMIN_REFUNDS_PATH}
       emptyTitle={t("admin.operations.refundRequests.notFound")}
       title={(rr) => (
         <>

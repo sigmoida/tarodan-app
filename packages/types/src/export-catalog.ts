@@ -316,6 +316,134 @@ const cancellations = defineExportCatalog("cancellations", [
   { key: "refundState", labelKey: `${CANCEL}.refundState`, type: "status" },
 ]);
 
+const REFUND = "admin.operations.refunds.export";
+
+/**
+ * İadeler — satır = liste satırı: iade talebi ya da takasın bir TARAFI (takas
+ * başına iki satır, `tradeRole` ile). Tutarlar sayı, oranlar yüzde (sayı).
+ */
+const refundRequests = defineExportCatalog("refundRequests", [
+  { key: "refundNo", labelKey: `${REFUND}.refundNo`, type: "text" },
+  { key: "refundDate", labelKey: `${REFUND}.refundDate`, type: "datetime" },
+  { key: "testLane", labelKey: `${REFUND}.testLane`, type: "boolean" },
+  { key: "origin", labelKey: `${REFUND}.origin`, type: "status" },
+  { key: "kind", labelKey: `${REFUND}.kind`, type: "status" },
+  { key: "tradeRole", labelKey: `${REFUND}.tradeRole`, type: "status" },
+  { key: "orderNumber", labelKey: `${REFUND}.orderNumber`, type: "text" },
+  { key: "orderDate", labelKey: `${REFUND}.orderDate`, type: "datetime" },
+  { key: "groupNumber", labelKey: `${REFUND}.groupNumber`, type: "text" },
+  { key: "buyer", labelKey: `${REFUND}.buyer`, type: "text" },
+  { key: "buyerCode", labelKey: `${REFUND}.buyerCode`, type: "text" },
+  { key: "seller", labelKey: `${REFUND}.seller`, type: "text" },
+  { key: "sellerCode", labelKey: `${REFUND}.sellerCode`, type: "text" },
+  { key: "product", labelKey: `${REFUND}.product`, type: "text" },
+  { key: "productCode", labelKey: `${REFUND}.productCode`, type: "text" },
+  { key: "quantity", labelKey: `${REFUND}.quantity`, type: "number" },
+  {
+    key: "refundQuantity",
+    labelKey: `${REFUND}.refundQuantity`,
+    type: "number",
+  },
+  { key: "unitPrice", labelKey: `${REFUND}.unitPrice`, type: "money" },
+  {
+    key: "commissionRate",
+    labelKey: `${REFUND}.commissionRate`,
+    type: "number",
+  },
+  {
+    key: "commissionAmount",
+    labelKey: `${REFUND}.commissionAmount`,
+    type: "money",
+  },
+  {
+    key: "refundableCommissionRate",
+    labelKey: `${REFUND}.refundableCommissionRate`,
+    type: "number",
+  },
+  {
+    key: "refundableCommissionAmount",
+    labelKey: `${REFUND}.refundableCommissionAmount`,
+    type: "money",
+  },
+  {
+    key: "listingCommissionAmount",
+    labelKey: `${REFUND}.listingCommissionAmount`,
+    type: "money",
+  },
+  {
+    key: "offerCommissionAmount",
+    labelKey: `${REFUND}.offerCommissionAmount`,
+    type: "money",
+  },
+  {
+    key: "priceDifference",
+    labelKey: `${REFUND}.priceDifference`,
+    type: "money",
+  },
+  {
+    key: "buyerDeduction",
+    labelKey: `${REFUND}.buyerDeduction`,
+    type: "money",
+  },
+  {
+    key: "sellerDeduction",
+    labelKey: `${REFUND}.sellerDeduction`,
+    type: "money",
+  },
+  { key: "refundAmount", labelKey: `${REFUND}.refundAmount`, type: "money" },
+  { key: "moneyStatus", labelKey: `${REFUND}.moneyStatus`, type: "status" },
+  { key: "refundedAt", labelKey: `${REFUND}.refundedAt`, type: "datetime" },
+  {
+    key: "packageTrackingNo",
+    labelKey: `${REFUND}.packageTrackingNo`,
+    type: "text",
+  },
+  {
+    key: "returnTrackingNo",
+    labelKey: `${REFUND}.returnTrackingNo`,
+    type: "text",
+  },
+  {
+    key: "returnShipmentStatus",
+    labelKey: `${REFUND}.returnShipmentStatus`,
+    type: "status",
+  },
+  {
+    key: "warehouseArrival",
+    labelKey: `${REFUND}.warehouseArrival`,
+    type: "status",
+  },
+  {
+    key: "warehouseDecision",
+    labelKey: `${REFUND}.warehouseDecision`,
+    type: "status",
+  },
+  {
+    key: "warehouseOutboundAt",
+    labelKey: `${REFUND}.warehouseOutboundAt`,
+    type: "datetime",
+  },
+  {
+    key: "returnToCustomersStatus",
+    labelKey: `${REFUND}.returnToCustomersStatus`,
+    type: "status",
+  },
+  { key: "reason", labelKey: `${REFUND}.reason`, type: "text" },
+  { key: "note", labelKey: `${REFUND}.note`, type: "text" },
+  { key: "status", labelKey: `${REFUND}.status`, type: "status" },
+  { key: "completedAt", labelKey: `${REFUND}.completedAt`, type: "datetime" },
+  {
+    key: "returnInvoiceNumber",
+    labelKey: `${REFUND}.returnInvoiceNumber`,
+    type: "text",
+  },
+  {
+    key: "returnInvoiceStatus",
+    labelKey: `${REFUND}.returnInvoiceStatus`,
+    type: "status",
+  },
+]);
+
 /** Kapsamdaki her dökümün kataloğu — sözleşme spec'i bu listeyi dolaşır. */
 export const EXPORT_CATALOGS = {
   payoutHolds,
@@ -325,6 +453,7 @@ export const EXPORT_CATALOGS = {
   deletedIdentities,
   gibReport,
   cancellations,
+  refundRequests,
 } as const;
 
 export type ExportResource = keyof typeof EXPORT_CATALOGS;

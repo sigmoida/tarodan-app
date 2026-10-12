@@ -1,4 +1,7 @@
-import { refundComponentTotals } from "./refund-component-totals";
+import {
+  refundComponentTotals,
+  refundedSalesCommissionNet,
+} from "./refund-component-totals";
 import { calculateRefundFinancialsV2 } from "./refund-financial-policy-v2";
 
 /**
@@ -84,5 +87,42 @@ describe("refundComponentTotals", () => {
     expect(Object.values(refundComponentTotals([]))).toEqual(
       new Array(10).fill(0),
     );
+  });
+});
+
+/**
+ * Admin İadeler ekranının "iade edilecek komisyon"u: yalnız satış komisyonu
+ * bileşenleri (alıcı + satıcı), KDV hariç, sahibine geri dönen muamelelerle.
+ */
+describe("refundedSalesCommissionNet", () => {
+  it("sums the buyer and seller commission returned to their owners (net)", () => {
+    const rows = [
+      { componentCode: "product", treatment: "buyer_refund", netAmount: "500.00" },
+      { componentCode: "buyer_commission", treatment: "buyer_refund", netAmount: "20.00" },
+      { componentCode: "seller_commission", treatment: "seller_refund", netAmount: "40.00" },
+      { componentCode: "buyer_platform_fee", treatment: "buyer_refund", netAmount: "10.00" },
+      { componentCode: "seller_platform_fee", treatment: "platform_retain", netAmount: "5.00" },
+    ];
+    expect(refundedSalesCommissionNet(rows)).toBe(60);
+  });
+
+  it("ignores commission that is retained or charged instead of returned", () => {
+    const rows = [
+      { componentCode: "seller_commission", treatment: "platform_retain", netAmount: "40.00" },
+      { componentCode: "buyer_commission", treatment: "buyer_charge", netAmount: "20.00" },
+    ];
+    expect(refundedSalesCommissionNet(rows)).toBe(0);
+  });
+
+  it("keeps cents exact", () => {
+    const rows = [
+      { componentCode: "buyer_commission", treatment: "buyer_refund", netAmount: "0.10" },
+      { componentCode: "seller_commission", treatment: "seller_refund", netAmount: "0.20" },
+    ];
+    expect(refundedSalesCommissionNet(rows)).toBe(0.3);
+  });
+
+  it("is zero without components (provisional / legacy request)", () => {
+    expect(refundedSalesCommissionNet([])).toBe(0);
   });
 });

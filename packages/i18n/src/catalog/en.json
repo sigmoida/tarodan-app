@@ -7461,6 +7461,139 @@
           "reasonRequired": "Select a cancellation reason"
         }
       },
+      "refunds": {
+        "tabs": {
+          "all": "All Refunds",
+          "direct": "Direct Sale Refunds",
+          "offer": "Offer Refunds",
+          "trade": "Trade Refunds"
+        },
+        "buckets": {
+          "all": "All",
+          "pendingReview": "Pending Review",
+          "awaitingReturn": "Awaiting Item",
+          "atWarehouse": "At Warehouse / Inspection",
+          "refunding": "Refunding",
+          "completed": "Completed",
+          "rejected": "Rejected",
+          "disputed": "Disputed"
+        },
+        "origin": {
+          "direct": "Direct Sale",
+          "offer": "Offer",
+          "trade": "Trade"
+        },
+        "moneyStatus": {
+          "none": "No refund",
+          "pending": "Pending",
+          "refunding": "Refunding",
+          "refunded": "Paid",
+          "failed": "Failed"
+        },
+        "tradeRole": {
+          "initiator": "Trade initiator",
+          "responder": "Trade responder"
+        },
+        "warehouseDecision": {
+          "pending": "Inspection in progress",
+          "approved": "Approved",
+          "rejected": "Rejected"
+        },
+        "export": {
+          "sheetName": "Refunds",
+          "refundNo": "Refund No",
+          "refundDate": "Refund Date",
+          "testLane": "Test lane",
+          "origin": "Type",
+          "kind": "Refund Type",
+          "tradeRole": "Trade Side",
+          "orderNumber": "Order No",
+          "orderDate": "Order Date",
+          "groupNumber": "Group No",
+          "buyer": "Buyer",
+          "buyerCode": "Buyer Code",
+          "seller": "Seller",
+          "sellerCode": "Seller Code",
+          "product": "Product",
+          "productCode": "Product Code",
+          "quantity": "Quantity",
+          "refundQuantity": "Refund Quantity",
+          "unitPrice": "Unit Price",
+          "commissionRate": "Commission Rate (%)",
+          "commissionAmount": "Commission Amount",
+          "refundableCommissionRate": "Refundable Commission Rate (%)",
+          "refundableCommissionAmount": "Refundable Commission Amount",
+          "listingCommissionAmount": "Listing Price Commission",
+          "offerCommissionAmount": "Offer Price Commission",
+          "priceDifference": "Price Difference",
+          "buyerDeduction": "Buyer Deduction",
+          "sellerDeduction": "Seller Deduction",
+          "refundAmount": "Refund Amount",
+          "moneyStatus": "Refund Payment Status",
+          "refundedAt": "Refund Paid At",
+          "packageTrackingNo": "Order Package Tracking No",
+          "returnTrackingNo": "Return Package Tracking No",
+          "returnShipmentStatus": "Return Shipment Status",
+          "warehouseArrival": "Warehouse Arrival Status",
+          "warehouseDecision": "Warehouse Decision",
+          "warehouseOutboundAt": "Warehouse Dispatch",
+          "returnToCustomersStatus": "Return-to-Customer Shipment Status",
+          "reason": "Refund Reason",
+          "note": "Note",
+          "status": "Final Refund Status",
+          "completedAt": "Resolved At",
+          "returnInvoiceNumber": "Return Invoice No",
+          "returnInvoiceStatus": "Return Invoice Status",
+          "refundTotal": "Total refund amount"
+        },
+        "title": "Refunds",
+        "description": "Direct sale, offer and trade refund requests, split by status",
+        "searchPlaceholder": "Refund no, order no, tracking no, buyer / seller name",
+        "empty": "No refund requests yet",
+        "emptyFiltered": "No refund request matches the filters",
+        "columns": {
+          "refundNo": "Refund No",
+          "order": "Order",
+          "party": "Buyer / Seller",
+          "product": "Product",
+          "money": "Money",
+          "cargo": "Cargo",
+          "warehouse": "Warehouse",
+          "reason": "Reason",
+          "amount": "Refund Amount",
+          "status": "Status",
+          "invoice": "Refund Invoice"
+        },
+        "cells": {
+          "group": "Group {number}",
+          "quantity": "{quantity} pcs · refund {refund}",
+          "orderCargo": "Order cargo",
+          "returnCargo": "Return cargo",
+          "role": {
+            "initiator": "Trade initiator",
+            "responder": "Trade responder"
+          }
+        },
+        "money": {
+          "unitPrice": "Unit price",
+          "commission": "Commission",
+          "refundableCommission": "Refundable commission",
+          "deductions": "Deductions (buyer / seller)",
+          "buyerDeduction": "Buyer deduction",
+          "sellerDeduction": "Seller deduction",
+          "commissionSplit": "Commission (listing / offer)",
+          "listingCommission": "Listing commission",
+          "offerCommission": "Offer commission",
+          "priceDifference": "Price difference"
+        },
+        "warehouse": {
+          "arrival": "Arrival",
+          "decision": "Decision",
+          "outbound": "Outbound",
+          "label": "Label",
+          "returnToCustomers": "Return to customers"
+        }
+      },
       "refundRequests": {
         "amountAndFee": "Amount / Fee",
         "feeShort": "Fee reversed",
@@ -7799,12 +7932,8 @@
         }
       },
       "cancellations": {
-        "title": "Cancellations & Refunds",
-        "description": "Cancelled orders, offers and trades together with refund requests on one screen",
-        "views": {
-          "cancellations": "Cancellations",
-          "refunds": "Refunds"
-        },
+        "title": "Cancellations",
+        "description": "Cancelled orders, offers and trades",
         "tabs": {
           "all": "All Cancellations",
           "directSale": "Direct Sale",
@@ -9296,9 +9425,14 @@
           "description": "Bucket folders, files and ownership tracking."
         },
         "cancellationsRefunds": {
-          "name": "Cancellations & Refunds",
-          "description": "Review cancellations and resolve refund requests",
-          "keywords": "cancellation,refund,return,request,tracking,iptal,iade"
+          "name": "Cancellations",
+          "description": "Review cancelled orders, offers and trades",
+          "keywords": "cancellation,cancel,order,offer,trade,iptal"
+        },
+        "refunds": {
+          "name": "Refunds",
+          "description": "Review and resolve refund requests",
+          "keywords": "refund,return,request,tracking,cargo,iade"
         },
         "consents": {
           "name": "Consent Records",

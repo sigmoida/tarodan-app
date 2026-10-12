@@ -1,5 +1,6 @@
 import {
   refundableAmountFor,
+  refundedServiceFeeOf,
   tradePaymentRefundableAmountFor,
   tradeRefundExcludesShipping,
   tradeServiceFeeOf,
@@ -203,6 +204,36 @@ describe("takas iade politikası", () => {
           { handedToCargo: true },
         ),
       ).toBe(0);
+    });
+  });
+
+  describe("refundedServiceFeeOf", () => {
+    it("kusurlu tarafa hizmet bedeli geri verilmez", () => {
+      expect(refundedServiceFeeOf(line)).toBe(0);
+    });
+
+    it("kusursuz tarafın tam iadesi hizmet bedelini de geri verir", () => {
+      expect(refundedServiceFeeOf({ ...line, fullRefundEntitled: true })).toBe(
+        35,
+      );
+    });
+
+    it("v1 satırında komisyon + KDV'si geri verilen bedeldir", () => {
+      expect(
+        refundedServiceFeeOf({
+          totalAmount: 230,
+          shippingAmount: 0,
+          commissionAmount: 25,
+          commissionTaxAmount: 5,
+          fullRefundEntitled: true,
+        }),
+      ).toBe(30);
+    });
+
+    it("tam iade tutarıyla tutarlıdır: kusursuz tarafın iadesi bedeli kapsar", () => {
+      const faultless = { ...line, fullRefundEntitled: true };
+      expect(refundableAmountFor(faultless, { handedToCargo: true })).toBe(295);
+      expect(refundedServiceFeeOf(faultless)).toBe(tradeServiceFeeOf(faultless));
     });
   });
 });

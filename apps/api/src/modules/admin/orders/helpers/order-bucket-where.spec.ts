@@ -3,7 +3,10 @@ import {
   OfferStatus,
   OrderOrigin,
   OrderStatus,
+  RefundAttemptStatus,
+  RefundRequestStatus,
   ShipmentStatus,
+  TradeStatus,
 } from "@prisma/client";
 import {
   ADMIN_ORDER_BUCKETS,
@@ -14,7 +17,10 @@ import {
   ORDER_LINE_STAGES,
   ORDER_LINE_STAGE_RULES,
   ORDER_STATUSES,
+  REFUND_ATTEMPT_STATUSES,
+  REFUND_REQUEST_STATUSES,
   SHIPMENT_STATUSES,
+  TRADE_STATUSES,
   orderCartBucketOf,
   orderLineStageOf,
   type OrderCartBucket,
@@ -38,6 +44,10 @@ describe("commerce status values mirror the Prisma enums", () => {
     ["OfferStatus", OFFER_STATUSES, OfferStatus],
     ["OrderOrigin", ORDER_ORIGINS, OrderOrigin],
     ["CancellationActor", CANCELLATION_ACTORS, CancellationActor],
+    // İadeler ekranının kova kuralı bunları okur (admin-refund-list.ts).
+    ["RefundRequestStatus", REFUND_REQUEST_STATUSES, RefundRequestStatus],
+    ["RefundAttemptStatus", REFUND_ATTEMPT_STATUSES, RefundAttemptStatus],
+    ["TradeStatus", TRADE_STATUSES, TradeStatus],
   ])("%s", (_name, shared, prismaEnum) => {
     expect([...shared].sort()).toEqual(Object.values(prismaEnum).sort());
   });
