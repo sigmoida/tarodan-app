@@ -40,6 +40,7 @@ import { OutboxService } from "../../outbox/outbox.service";
 import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
+  netsisAccountingSyncEvent,
   type InvoiceRefundReversePayload,
 } from "../../outbox/outbox.types";
 import { LedgerService } from "../../ledger/ledger.service";
@@ -1275,6 +1276,14 @@ export class PaymentRefundService {
               dedupeKey: `${OUTBOX_INVOICE_REFUND_REVERSE}:${freshAttempt.id}`,
             });
           }
+
+          // Netsis muhasebe aynası: PSP iadesi kesinleşti → alıcının
+          // carisinde tahsilat ters kaydı. Finalize ile ATOMİK; olay yalnız iş
+          // kaydı açar, Netsis'e bu işlemin içinden gidilmez.
+          await this.outbox?.enqueue(
+            tx,
+            netsisAccountingSyncEvent("refund_reversal", freshAttempt.id),
+          );
 
           await tx.refundAttempt.update({
             where: { id: freshAttempt.id },

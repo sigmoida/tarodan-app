@@ -33,6 +33,8 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     unresolvedAttempt?: boolean;
     /** Faz 6.2 defter kaydı testleri için enjekte edilen LedgerService taklidi. */
     ledger?: { recordRefund: jest.Mock };
+    /** Netsis muhasebe olayı testleri için OutboxService taklidi. */
+    outbox?: { enqueue: jest.Mock };
   }) => {
     const captured = {
       paymentUpdate: undefined as any,
@@ -224,7 +226,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
       {} as any, // tradeRefunds — bu spec yalnız SİPARİŞ iadesini sürüyor
-      undefined, // outbox
+      opts.outbox as any, // outbox (@Optional)
       opts.ledger as any, // Faz 6.2 ledger (@Optional)
     );
     return {
@@ -824,6 +826,33 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
    *    (POST-COMMIT yollar — capture, payout tamamlama — best-effort KALIR: orada
    *    para zaten commit'li, fırlatmak hiçbir şeyi geri almaz.)
    */
+  describe("Netsis muhasebe aynası", () => {
+    it("PSP iadesi kesinleşince finalize tx'iyle TEK olay yazılır", async () => {
+      const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+      const { service, mockTx } = makeService({
+        paymentAmount: 1000,
+        holdAmount: 1000,
+        outbox,
+      });
+
+      await service.processRefund(ORDER_ID, 400, {
+        cancelledBy: CancellationActor.buyer,
+        idempotencyKey: "netsis-refund-400",
+      });
+
+      const netsisCalls = outbox.enqueue.mock.calls.filter(
+        ([, input]) => input.type === "netsis_accounting.sync",
+      );
+      expect(netsisCalls).toHaveLength(1);
+      expect(netsisCalls[0][0]).toBe(mockTx); // iade ile AYNI transaction
+      expect(netsisCalls[0][1]).toEqual({
+        type: "netsis_accounting.sync",
+        payload: { kind: "refund_reversal", sourceId: "attempt-1" },
+        dedupeKey: "netsis_accounting.sync:refund_reversal:attempt-1",
+      });
+    });
+  });
+
   describe("refund_issued defter kaydı", () => {
     it("ters kaydı iade denemesinin kimliğiyle (idempotency) yazar", async () => {
       const ledger = { recordRefund: jest.fn().mockResolvedValue("group-1") };
