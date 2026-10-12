@@ -5,6 +5,7 @@ import {
   Param,
   Query,
   Res,
+  StreamableFile,
   UseGuards,
 } from "@nestjs/common";
 import type { Response } from "express";
@@ -16,14 +17,17 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AdminRole } from "@prisma/client";
+import type { Locale } from "@tarodan/i18n";
 import { ANALYTICS_TABS, isAnalyticsTab } from "@tarodan/types";
 import { AdminRoute } from "../../../auth/decorators/admin-route.decorator";
+import { CurrentUser } from "../../../auth/decorators/current-user.decorator";
 import { RequirePermission } from "../../../auth/decorators/require-permission.decorator";
 import { Roles } from "../../../auth/decorators/roles.decorator";
 import { AdminJwtAuthGuard } from "../../../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../../../auth/guards/roles.guard";
-import { i18nMessage } from "../../../i18n";
-import { AnalyticsExportQueryDto, AnalyticsRangeQueryDto } from "../../dto";
+import { ReqLocale, i18nMessage } from "../../../i18n";
+import { sendExport } from "../../../../common/export";
+import { AnalyticsRangeQueryDto } from "../../dto";
 import { AnalyticsCatalogService } from "./analytics-catalog.service";
 import { AnalyticsExportService } from "./analytics-export.service";
 import { AnalyticsMembershipService } from "./analytics-membership.service";
@@ -107,30 +111,29 @@ export class AdminAnalyticsInsightsController {
 
   /**
    * Dosya, sekmenin KENDİ servisinden dönen yanıttan üretilir — ekranda ne
-   * yazıyorsa dosyada da o yazar.
+   * yazıyorsa dosyada da o yazar. Yalnız XLSX (CSV Türkçe Excel'de tek kolonda
+   * açılıyordu); her indirme denetim kaydı bırakır.
    */
   @Get(":tab/export")
-  @ApiOperation({ summary: "Aktif sekmenin verisini CSV veya XLSX indir" })
+  @ApiOperation({ summary: "Aktif sekmenin verisini XLSX indir" })
   @ApiParam({ name: "tab", enum: ANALYTICS_TABS })
+  @ApiResponse({ status: 200, description: "XLSX file" })
   async export(
     @Param("tab") tab: string,
-    @Query() query: AnalyticsExportQueryDto,
-    @Res() response: Response,
-  ): Promise<void> {
+    @CurrentUser("id") adminId: string,
+    @Query() query: AnalyticsRangeQueryDto,
+    @ReqLocale() locale: Locale,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
     if (!isAnalyticsTab(tab)) {
       throw new BadRequestException(
         i18nMessage("server.admin.analytics.unknownTab"),
       );
     }
 
-    const { format, ...range } = query;
-    const file = await this.exports.export(tab, format ?? "csv", range);
-
-    response.setHeader("Content-Type", file.contentType);
-    response.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${file.filename}"`,
+    return sendExport(
+      response,
+      await this.exports.export(tab, query, adminId, locale),
     );
-    response.send(file.body);
   }
 }
