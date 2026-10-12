@@ -11679,7 +11679,9 @@
         "parentTotal": "Sum of record amounts",
         "notes": "Notes",
         "truncated": "The file holds only the first {count} records; narrow the filter to get them all.",
-        "longFormat": "Each data row is a line item; the parent record's columns repeat on every line. Do not sum parent amounts on the data sheet — the totals are on this sheet."
+        "longFormat": "Each data row is a line item; the parent record's columns repeat on every line. Do not sum parent amounts on the data sheet — the totals are on this sheet.",
+        "tab": "Tab",
+        "subTab": "Sub-tab"
       }
     }
   },
