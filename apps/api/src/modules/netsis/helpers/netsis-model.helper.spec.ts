@@ -2,6 +2,7 @@ import {
   netsisArpCode,
   netsisItemCode,
   netsisSlipKey,
+  readNetsisArpEInvoiceProfile,
   readNetsisEDocumentState,
   readNetsisEttn,
   readNetsisSlipTotals,
@@ -105,6 +106,41 @@ describe("netsis-model.helper", () => {
       [{}, "unknown"],
     ])("%p → %s", (raw, expected) => {
       expect(readNetsisEDocumentState(raw)).toBe(expected);
+    });
+  });
+
+  describe("readNetsisArpEInvoiceProfile", () => {
+    it.each([
+      [{ EFATURA_KULLANICISI: "E", EFATURA_ETIKET: " urn:mail:pk@x " }, true],
+      [{ EFATURA_KULLANICISI: "H" }, false],
+      [{ EFATURA_KULLAN: true }, true],
+      [{ EFatKullanici: 0 }, false],
+      [{ EFATURA_KULLANICISI: "?" }, null],
+      [{}, null],
+    ])("extra info %p → %s", (extra, expected) => {
+      const profile = readNetsisArpEInvoiceProfile({
+        CariTemelBilgi: { CARI_KOD: "K010042" },
+        CariEkBilgi: extra,
+      });
+      expect(profile.isEInvoiceUser).toBe(expected);
+    });
+
+    it("reads the alias and falls back to the basic info container", () => {
+      expect(
+        readNetsisArpEInvoiceProfile({
+          CariTemelBilgi: {
+            CARI_KOD: "K010042",
+            EFATURA_KULLANICISI: "Evet",
+            PK_ETIKET: "urn:mail:pk@x",
+          },
+        }),
+      ).toEqual({ isEInvoiceUser: true, alias: "urn:mail:pk@x" });
+    });
+
+    it("never reports an unknown flag as an e-invoice user", () => {
+      expect(
+        readNetsisArpEInvoiceProfile({ CariTemelBilgi: { CARI_KOD: "K1" } }),
+      ).toEqual({ isEInvoiceUser: null, alias: null });
     });
   });
 

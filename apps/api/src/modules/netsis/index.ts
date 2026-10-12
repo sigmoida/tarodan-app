@@ -10,6 +10,11 @@ export type {
 export * from "./helpers/netsis.types";
 export { NETSIS_DOC_TYPES } from "./helpers/netsis.constants";
 export {
+  netsisArpCode,
+  readNetsisArpEInvoiceProfile,
+} from "./helpers/netsis-model.helper";
+export type { NetsisArpEInvoiceProfile } from "./helpers/netsis-model.helper";
+export {
   classifyNetsisError,
   NetsisRequestException,
 } from "./http/netsis-error";

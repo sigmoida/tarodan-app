@@ -137,3 +137,71 @@ export function readNetsisEttn(raw: NetsisRawRecord): string | null {
   }
   return null;
 }
+
+/** Carinin GİB e-Fatura mükellefiyeti (Netsis'in kendi bayrağından). */
+export interface NetsisArpEInvoiceProfile {
+  /** `null` = bayrak okunamadı (alan yok ya da tanınmayan değer). */
+  isEInvoiceUser: boolean | null;
+  /** e-Fatura posta kutusu etiketi (PK alias), varsa. */
+  alias: string | null;
+}
+
+/**
+ * VERIFY: e-Fatura bayrağının ve PK etiketinin alan adları bilinmiyor.
+ * `EDocument/EDocCurrentUpdate`'in GİB listesinden carinin ek bilgisine
+ * yazdığı varsayıldı (`CariEkBilgi`, yoksa `CariTemelBilgi`). Değerler
+ * Netsis'in "E"/"H" evet-hayır kodları ya da boolean/1-0 olabilir.
+ */
+const ARP_EINVOICE_FLAG_FIELDS = [
+  "EFATURA_KULLANICISI",
+  "EFATURA_KULLAN",
+  "EFATURAKULLANICISI",
+  "EFatKullanici",
+] as const;
+const ARP_EINVOICE_ALIAS_FIELDS = [
+  "EFATURA_ETIKET",
+  "EFATURA_PK_ETIKET",
+  "PK_ETIKET",
+  "GIB_ETIKET",
+] as const;
+
+function yesNo(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    return null;
+  }
+  if (typeof value !== "string") return null;
+  const text = value.trim().toLocaleUpperCase("tr");
+  if (["E", "EVET", "1", "TRUE", "T"].includes(text)) return true;
+  if (["H", "HAYIR", "0", "FALSE", "F"].includes(text)) return false;
+  return null;
+}
+
+/**
+ * Carinin e-Fatura profili. Tanınmayan her şey `null` döner — çağıran
+ * bilinmeyeni asla "mükellef" saymamalı.
+ */
+export function readNetsisArpEInvoiceProfile(
+  arp: NetsisArp,
+): NetsisArpEInvoiceProfile {
+  const sources: NetsisRawRecord[] = [
+    ...(isNetsisRecord(arp.CariEkBilgi) ? [arp.CariEkBilgi] : []),
+    arp.CariTemelBilgi,
+  ];
+  let isEInvoiceUser: boolean | null = null;
+  let alias: string | null = null;
+  for (const source of sources) {
+    for (const field of ARP_EINVOICE_FLAG_FIELDS) {
+      isEInvoiceUser ??= yesNo(source[field]);
+    }
+    for (const field of ARP_EINVOICE_ALIAS_FIELDS) {
+      const value = source[field];
+      if (!alias && typeof value === "string" && value.trim()) {
+        alias = value.trim();
+      }
+    }
+  }
+  return { isEInvoiceUser, alias };
+}
