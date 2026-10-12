@@ -1,15 +1,16 @@
 import { redirect } from "next/navigation";
-import { refundsViewHref } from "../cancellations-refunds/_lib/view";
+import { refundsHref } from "../refunds/_lib/screenTabs";
 
 /**
- * İade talepleri listesi artık "İptal & İade" ekranının İadeler sekmesi —
- * eski adres (yer imleri, eski bildirim linkleri) filtreleriyle birlikte
- * yönlenir. Talep DOSYASI (`/operations/refund-requests/[id]`) yerinde durur.
+ * İade talepleri listesi artık "İadeler" ekranı — eski adres (yer imleri,
+ * eski bildirim linkleri) filtreleriyle birlikte yönlenir (`status` alt
+ * sekmeye, `from`/`to` tarih aralığına çevrilir). Talep DOSYASI
+ * (`/operations/refund-requests/[id]`) yerinde durur.
  */
 export default async function RefundRequestsRedirect({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  redirect(refundsViewHref(await searchParams));
+  redirect(refundsHref(await searchParams));
 }

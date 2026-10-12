@@ -7461,6 +7461,78 @@
           "reasonRequired": "İptal nedeni seçin"
         }
       },
+      "refunds": {
+        "title": "İadeler",
+        "description": "Direk satış, teklif ve takas iade talepleri; durumuna göre ayrılmış",
+        "searchPlaceholder": "İade no, sipariş no, takip no, alıcı / satıcı adı",
+        "empty": "Henüz iade talebi yok",
+        "emptyFiltered": "Filtreye uygun iade talebi bulunamadı",
+        "tabs": {
+          "all": "Tüm İadeler",
+          "direct": "Direk Satış İadeleri",
+          "offer": "Teklif İadeleri",
+          "trade": "Takas İadeleri"
+        },
+        "buckets": {
+          "all": "Tümü",
+          "pending_review": "Onay bekleyen",
+          "awaiting_return": "İade kargosu bekleniyor",
+          "at_warehouse": "Depoda",
+          "refunding": "İade ediliyor",
+          "completed": "Tamamlanan",
+          "rejected": "Reddedilen",
+          "disputed": "İhtilaflı"
+        },
+        "columns": {
+          "refundNo": "İade No",
+          "order": "Sipariş",
+          "party": "Alıcı / Satıcı",
+          "product": "Ürün",
+          "money": "Para",
+          "cargo": "Kargo",
+          "warehouse": "Depo",
+          "reason": "Neden",
+          "amount": "İade Tutarı",
+          "status": "Durum",
+          "invoice": "İade Faturası"
+        },
+        "cells": {
+          "group": "Grup {number}",
+          "quantity": "{quantity} adet · iade {refund}",
+          "orderCargo": "Sipariş kargo",
+          "returnCargo": "İade kargo",
+          "role": {
+            "initiator": "Takas başlatan",
+            "responder": "Takas devam ettiren"
+          }
+        },
+        "money": {
+          "unitPrice": "Birim fiyat",
+          "commission": "Komisyon",
+          "refundableCommission": "İade edilebilir komisyon",
+          "deductions": "Kesinti (alıcı / satıcı)",
+          "buyerDeduction": "Alıcı kesintisi",
+          "sellerDeduction": "Satıcı kesintisi",
+          "commissionSplit": "Komisyon (ilan / teklif)",
+          "listingCommission": "İlan komisyonu",
+          "offerCommission": "Teklif komisyonu",
+          "priceDifference": "Fiyat farkı"
+        },
+        "moneyStatus": {
+          "none": "İade yok",
+          "pending": "Bekliyor",
+          "refunding": "İade ediliyor",
+          "refunded": "Ödendi",
+          "failed": "Başarısız"
+        },
+        "warehouse": {
+          "arrival": "Varış",
+          "decision": "Karar",
+          "outbound": "Çıkış",
+          "label": "Etiket",
+          "returnToCustomers": "Müşterilere dönüş"
+        }
+      },
       "refundRequests": {
         "amountAndFee": "Tutar / Kesinti",
         "feeShort": "Kesinti",
@@ -7799,12 +7871,8 @@
         }
       },
       "cancellations": {
-        "title": "İptal & İade",
-        "description": "İptal edilen siparişler, teklifler ve takaslar ile iade talepleri tek ekranda",
-        "views": {
-          "cancellations": "İptaller",
-          "refunds": "İadeler"
-        },
+        "title": "İptaller",
+        "description": "İptal edilen siparişler, teklifler ve takaslar",
         "tabs": {
           "all": "Tüm İptaller",
           "directSale": "Direkt Satış",
@@ -9296,9 +9364,14 @@
           "description": "Bucket klasörleri, dosyalar ve sahiplik takibi."
         },
         "cancellationsRefunds": {
-          "name": "İptal & İade",
-          "description": "İptalleri ve iade taleplerini inceleyin ve sonuçlandırın",
-          "keywords": "iptal,iade,refund,cancellation,talep,takip"
+          "name": "İptaller",
+          "description": "İptal edilen siparişleri, teklifleri ve takasları inceleyin",
+          "keywords": "iptal,cancellation,sipariş,teklif,takas"
+        },
+        "refunds": {
+          "name": "İadeler",
+          "description": "İade taleplerini inceleyin ve sonuçlandırın",
+          "keywords": "iade,refund,return,talep,takip,kargo"
         },
         "consents": {
           "name": "Onay Kayıtları",

@@ -7461,6 +7461,78 @@
           "reasonRequired": "Select a cancellation reason"
         }
       },
+      "refunds": {
+        "title": "Refunds",
+        "description": "Direct sale, offer and trade refund requests, split by status",
+        "searchPlaceholder": "Refund no, order no, tracking no, buyer / seller name",
+        "empty": "No refund requests yet",
+        "emptyFiltered": "No refund request matches the filters",
+        "tabs": {
+          "all": "All Refunds",
+          "direct": "Direct Sale Refunds",
+          "offer": "Offer Refunds",
+          "trade": "Trade Refunds"
+        },
+        "buckets": {
+          "all": "All",
+          "pending_review": "Pending review",
+          "awaiting_return": "Awaiting return shipment",
+          "at_warehouse": "At warehouse",
+          "refunding": "Refunding",
+          "completed": "Completed",
+          "rejected": "Rejected",
+          "disputed": "Disputed"
+        },
+        "columns": {
+          "refundNo": "Refund No",
+          "order": "Order",
+          "party": "Buyer / Seller",
+          "product": "Product",
+          "money": "Money",
+          "cargo": "Cargo",
+          "warehouse": "Warehouse",
+          "reason": "Reason",
+          "amount": "Refund Amount",
+          "status": "Status",
+          "invoice": "Refund Invoice"
+        },
+        "cells": {
+          "group": "Group {number}",
+          "quantity": "{quantity} pcs · refund {refund}",
+          "orderCargo": "Order cargo",
+          "returnCargo": "Return cargo",
+          "role": {
+            "initiator": "Trade initiator",
+            "responder": "Trade responder"
+          }
+        },
+        "money": {
+          "unitPrice": "Unit price",
+          "commission": "Commission",
+          "refundableCommission": "Refundable commission",
+          "deductions": "Deductions (buyer / seller)",
+          "buyerDeduction": "Buyer deduction",
+          "sellerDeduction": "Seller deduction",
+          "commissionSplit": "Commission (listing / offer)",
+          "listingCommission": "Listing commission",
+          "offerCommission": "Offer commission",
+          "priceDifference": "Price difference"
+        },
+        "moneyStatus": {
+          "none": "No refund",
+          "pending": "Pending",
+          "refunding": "Refunding",
+          "refunded": "Paid",
+          "failed": "Failed"
+        },
+        "warehouse": {
+          "arrival": "Arrival",
+          "decision": "Decision",
+          "outbound": "Outbound",
+          "label": "Label",
+          "returnToCustomers": "Return to customers"
+        }
+      },
       "refundRequests": {
         "amountAndFee": "Amount / Fee",
         "feeShort": "Fee reversed",
@@ -7799,12 +7871,8 @@
         }
       },
       "cancellations": {
-        "title": "Cancellations & Refunds",
-        "description": "Cancelled orders, offers and trades together with refund requests on one screen",
-        "views": {
-          "cancellations": "Cancellations",
-          "refunds": "Refunds"
-        },
+        "title": "Cancellations",
+        "description": "Cancelled orders, offers and trades",
         "tabs": {
           "all": "All Cancellations",
           "directSale": "Direct Sale",
@@ -9296,9 +9364,14 @@
           "description": "Bucket folders, files and ownership tracking."
         },
         "cancellationsRefunds": {
-          "name": "Cancellations & Refunds",
-          "description": "Review cancellations and resolve refund requests",
-          "keywords": "cancellation,refund,return,request,tracking,iptal,iade"
+          "name": "Cancellations",
+          "description": "Review cancelled orders, offers and trades",
+          "keywords": "cancellation,cancel,order,offer,trade,iptal"
+        },
+        "refunds": {
+          "name": "Refunds",
+          "description": "Review and resolve refund requests",
+          "keywords": "refund,return,request,tracking,cargo,iade"
         },
         "consents": {
           "name": "Consent Records",
