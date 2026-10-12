@@ -20,6 +20,24 @@ describe("ad event tracking", () => {
     );
   });
 
+  it("hotspot kimliğini kodlayarak sorguya ekler", () => {
+    expect(adEventUrl("abc", "click", "h 1")).toBe(
+      "/gateway/ads/abc/click?hotspot=h%201",
+    );
+    expect(adEventUrl("abc", "click")).toBe("/gateway/ads/abc/click");
+  });
+
+  it("trackAdEvent hotspot kimliğini beacon adresine taşır", () => {
+    const sendBeacon = vi.fn().mockReturnValue(true);
+    vi.stubGlobal("navigator", { sendBeacon });
+
+    trackAdEvent("abc", "click", "h1");
+
+    expect(sendBeacon).toHaveBeenCalledWith(
+      "/gateway/ads/abc/click?hotspot=h1",
+    );
+  });
+
   it("sendBeacon kabul ederse fetch kullanılmaz", () => {
     const sendBeacon = vi.fn().mockReturnValue(true);
     const fetchMock = vi.fn();

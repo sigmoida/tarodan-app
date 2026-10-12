@@ -27,7 +27,9 @@ export function useActiveAds(position: AdPosition, enabled = true) {
         deviceType: device ?? undefined,
       });
       const body = res.data?.data ?? res.data ?? [];
-      return (Array.isArray(body) ? body : []) as Advertisement[];
+      const list = (Array.isArray(body) ? body : []) as Advertisement[];
+      // Eski API yanıtında `hotspots` yok → boş say.
+      return list.map((ad) => ({ ...ad, hotspots: ad.hotspots ?? [] }));
     },
     enabled: enabled && device !== null,
     // Afişler saatlerce değişmez; her gezinmede yeniden sormak gereksiz yük.
