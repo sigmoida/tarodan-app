@@ -217,17 +217,52 @@ describe("notification-preferences", () => {
       expect(shouldDeliver(pushOff, "admin_broadcast", "push")).toBe(true);
     });
 
-    it("pazarlama duyurusu kategori düğmesine bağlı değildir (izin kapısı kitlede)", () => {
-      // JSON'daki marketingEmails kayıtta yazılmaz (varsayılan false); izinli
-      // kullanıcıyı burada susturmak izin kolonunu boşa çıkarırdı.
-      expect(categoryForType(MARKETING_BROADCAST_PREFERENCE_TYPE)).toBeNull();
+    it("pazarlama duyurusu kampanya (PROMOTION) kategorisine bağlıdır", () => {
+      expect(categoryForType(MARKETING_BROADCAST_PREFERENCE_TYPE)).toBe(
+        categoryForType(NotificationType.PROMOTION),
+      );
+      expect(categoryForType(MARKETING_BROADCAST_PREFERENCE_TYPE)).toBe(
+        "marketingEmails",
+      );
+    });
+
+    it("kampanya tercihi kapalıysa pazarlama push'u gitmez, duyuru gider", () => {
+      const off = withPrefs({ marketingEmails: false });
+      expect(
+        shouldDeliver(off, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(false);
+      expect(
+        shouldDeliver(off, MARKETING_BROADCAST_PREFERENCE_TYPE, "in_app"),
+      ).toBe(false);
+      expect(shouldDeliver(off, "admin_broadcast", "push")).toBe(true);
+    });
+
+    it("kampanya tercihi açıksa pazarlama push'u gider", () => {
       expect(
         shouldDeliver(
-          withPrefs({ marketingEmails: false }),
+          withPrefs({ marketingEmails: true }),
           MARKETING_BROADCAST_PREFERENCE_TYPE,
           "push",
         ),
       ).toBe(true);
+    });
+
+    it("kayıtlı tercihi olmayan kullanıcı varsayılanı alır (kapalı)", () => {
+      expect(DEFAULT_NOTIFICATION_SETTINGS.marketingEmails).toBe(false);
+      expect(
+        shouldDeliver(
+          resolveSettings(null),
+          MARKETING_BROADCAST_PREFERENCE_TYPE,
+          "push",
+        ),
+      ).toBe(false);
+      expect(
+        shouldDeliver(
+          resolveSettings({}),
+          MARKETING_BROADCAST_PREFERENCE_TYPE,
+          "push",
+        ),
+      ).toBe(false);
     });
   });
 });

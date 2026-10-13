@@ -51,12 +51,13 @@ const ALWAYS_SEND = new Set<string>([
 /**
  * Pazarlama türündeki admin duyurusunun tercih anahtarı (Apple 4.5.4, İYS).
  *
- * Kitle gönderimde zaten pazarlama iznine (`User.acceptsMarketingEmails`)
- * göre süzülür; bu anahtar ayrıca ALWAYS_SEND muafiyetini kaldırır, böylece
- * push master anahtarını kapatmış kullanıcıya pazarlama push'u gitmez.
- * Kategori eşlemesi yoktur: kategori düğmesi (`marketingEmails`) JSON'da
- * kayıt sırasında yazılmadığından izinli kullanıcıyı yanlışlıkla susturur —
- * izin kapısı kolondur. Veritabanına yazılmaz; yalnız tercih kararı içindir.
+ * Push ve zil kanalı kampanya (PROMOTION) kategorisine bağlıdır: bu anahtar
+ * `categoryForType` ile `marketingEmails` düğmesine eşlenir, yani kullanıcı
+ * kampanya bildirimlerini kapalı tutuyorsa (varsayılan: kapalı) pazarlama
+ * duyurusu gitmez. Aynı kural kitle süzgecinde de uygulanır
+ * (`PROMOTION_PREFERENCE_WHERE`). E-posta kanalı ayrıdır: kitlede
+ * `User.acceptsMarketingEmails` kolonu (e-posta izni) belirler. Anahtar
+ * ALWAYS_SEND dışındadır; veritabanına yazılmaz, yalnız tercih kararı içindir.
  */
 export const MARKETING_BROADCAST_PREFERENCE_TYPE = "admin_broadcast:marketing";
 
@@ -102,7 +103,8 @@ export function categoryForType(type: string): PreferenceCategory | null {
 
   if (
     type === NotificationType.PROMOTION ||
-    type === NotificationType.SPECIAL_OFFER
+    type === NotificationType.SPECIAL_OFFER ||
+    type === MARKETING_BROADCAST_PREFERENCE_TYPE
   ) {
     return "marketingEmails";
   }

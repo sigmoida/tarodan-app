@@ -31,6 +31,7 @@ import { NewsletterService } from "../../marketing/newsletter.service";
 import {
   audienceUserWhere,
   MARKETING_CONSENT_WHERE,
+  PROMOTION_PREFERENCE_WHERE,
 } from "./notification-audience";
 import { sanitizeEmailHtml } from "../../../common/helpers/email-html-sanitizer";
 import {
@@ -155,7 +156,8 @@ export class AdminNotificationService {
 
   /**
    * Kitle sayacı: `total` duyurunun, `marketing` pazarlama e-postasının
-   * ulaşacağı kullanıcı sayısı (izin bayrağı açık olanlar). Abonelik
+   * (e-posta izni açık olanlar), `promotion` pazarlama push + zil satırının
+   * (kampanya bildirim tercihi açık olanlar) ulaşacağı kullanıcı sayısı. Abonelik
    * tablosundaki ayrı çıkış kayıtları sayıya dahil değildir; gönderimde
    * onlar da atlanır, yani gerçek sayı bundan biraz düşük olabilir.
    */
@@ -164,13 +166,16 @@ export class AdminNotificationService {
       dto.targetType === "user_ids"
         ? { id: { in: dto.userIds ?? [] }, isBanned: false }
         : audienceUserWhere(dto.targetType, dto.segmentCriteria);
-    const [total, marketing] = await Promise.all([
+    const [total, marketing, promotion] = await Promise.all([
       this.prisma.user.count({ where }),
       this.prisma.user.count({
         where: { ...where, ...MARKETING_CONSENT_WHERE },
       }),
+      this.prisma.user.count({
+        where: { ...where, ...PROMOTION_PREFERENCE_WHERE },
+      }),
     ]);
-    return { total, marketing };
+    return { total, marketing, promotion };
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================
@@ -272,42 +277,77 @@ export class AdminNotificationService {
   }
 
   /**
-   * Yayının alıcıları. Pazarlama türünde (S1 — Apple 4.5.4, İYS) kitle
-   * pazarlama iznine göre süzülür: izni olmayan kullanıcıya ne push ne zil
-   * satırı ne e-posta gider. Duyuru türünde davranış değişmez — `user_ids`
-   * listesi olduğu gibi kullanılır.
+   * Hedefin süzülmemiş kullanıcı filtresi (yasaklılar hariç); `user_ids`
+   * için açık kimlik listesi, `all`/`segment` için kitle filtresi. Çözülemeyen
+   * hedef (segmentsiz `segment`) için `null`.
    */
-  private async resolveTargetUserIds(
+  private baseAudienceWhere(
     dto: AdminBroadcastInput,
-    isMarketing: boolean,
-  ): Promise<string[]> {
+  ): Prisma.UserWhereInput | null {
     if (dto.targetType === "user_ids") {
-      const userIds = dto.userIds || [];
-      if (!isMarketing || userIds.length === 0) return userIds;
-      const users = await this.prisma.user.findMany({
-        where: {
-          id: { in: userIds },
-          isBanned: false,
-          ...MARKETING_CONSENT_WHERE,
-        },
-        select: { id: true },
-      });
-      return users.map((u) => u.id);
+      return { id: { in: dto.userIds ?? [] }, isBanned: false };
     }
     if (
       dto.targetType === "all" ||
       (dto.targetType === "segment" && dto.segmentCriteria)
     ) {
-      const users = await this.prisma.user.findMany({
-        where: {
-          ...audienceUserWhere(dto.targetType, dto.segmentCriteria),
-          ...(isMarketing ? MARKETING_CONSENT_WHERE : {}),
-        },
-        select: { id: true },
-      });
-      return users.map((u) => u.id);
+      return audienceUserWhere(dto.targetType, dto.segmentCriteria);
     }
-    return [];
+    return null;
+  }
+
+  private async userIdsWhere(where: Prisma.UserWhereInput): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where,
+      select: { id: true },
+    });
+    return users.map((u) => u.id);
+  }
+
+  /**
+   * Yayının alıcıları, kanala göre. Duyuru türünde (işlemsel/güvenlik) herkes
+   * her kanalda alıcıdır; `user_ids` listesi olduğu gibi kullanılır.
+   *
+   * Pazarlama türünde (S1 — Apple 4.5.4, İYS) iki ayrı kapı vardır:
+   *  - push + zil satırı: kullanıcının kampanya (PROMOTION) bildirim tercihi
+   *    (`PROMOTION_PREFERENCE_WHERE`),
+   *  - e-posta: e-posta pazarlama izni (`MARKETING_CONSENT_WHERE`).
+   * İkisi de açık olmayan kullanıcı o kanaldan almaz. Yalnız e-posta kanalı
+   * seçildiyse zil satırı da yalnız e-posta alıcılarına yazılır (kitle
+   * genişlemez).
+   */
+  private async resolveAudience(
+    dto: AdminBroadcastInput,
+    isMarketing: boolean,
+  ): Promise<{ all: string[]; pushInApp: string[]; email: string[] }> {
+    const base = this.baseAudienceWhere(dto);
+    if (!base) return { all: [], pushInApp: [], email: [] };
+
+    if (!isMarketing) {
+      const ids =
+        dto.targetType === "user_ids"
+          ? (dto.userIds ?? [])
+          : await this.userIdsWhere(base);
+      return { all: ids, pushInApp: ids, email: ids };
+    }
+
+    const sendsEmail = dto.channels.includes("email");
+    const emailOnly = dto.channels.every((c) => c === "email");
+    const [promotion, consent] = await Promise.all([
+      this.userIdsWhere({ ...base, ...PROMOTION_PREFERENCE_WHERE }),
+      sendsEmail
+        ? this.userIdsWhere({ ...base, ...MARKETING_CONSENT_WHERE })
+        : Promise.resolve([] as string[]),
+    ]);
+    const consenting = new Set(consent);
+    const pushInApp = emailOnly
+      ? promotion.filter((id) => consenting.has(id))
+      : promotion;
+    return {
+      all: [...new Set([...pushInApp, ...consent])],
+      pushInApp,
+      email: consent,
+    };
   }
 
   /**
@@ -340,7 +380,9 @@ export class AdminNotificationService {
     data.mailingType = emailContent.mailingType;
 
     try {
-      targetUserIds = await this.resolveTargetUserIds(dto, isMarketing);
+      const audience = await this.resolveAudience(dto, isMarketing);
+      targetUserIds = audience.all;
+      const pushInAppIds = new Set(audience.pushInApp);
 
       if (targetUserIds.length === 0) {
         throw new BadRequestException(
@@ -352,12 +394,12 @@ export class AdminNotificationService {
         );
       }
 
-      // Pazarlama e-postası: yalnız izni açık, çıkmamış üyeler (+ çıkış token'ı).
-      // Duyuruda harita yok → herkese gider (eski davranış).
+      // Pazarlama e-postası: yalnız e-posta izni açık, çıkmamış üyeler (+ çıkış
+      // token'ı). Duyuruda harita yok → herkese gider (eski davranış).
       const marketingTokens =
         sendsEmail && isMarketing
           ? await this.newsletter.resolveMarketingUnsubscribeTokens(
-              targetUserIds,
+              audience.email,
             )
           : undefined;
       // Geçmişte "gönderildi" satırı yalnız gerçekten e-posta gidenlere yazılır.
@@ -384,16 +426,19 @@ export class AdminNotificationService {
 
       for (const userId of targetUserIds) {
         // Always create an in_app entry so users see it in their notification center
-        notificationLogs.push({
-          userId,
-          channel: "in_app",
-          type: "admin_broadcast",
-          title: dto.title,
-          body: dto.body,
-          data,
-          status: "sent",
-          sentAt: new Date(),
-        });
+        // (pazarlamada yalnız kampanya tercihi açık kullanıcıya).
+        if (pushInAppIds.has(userId)) {
+          notificationLogs.push({
+            userId,
+            channel: "in_app",
+            type: "admin_broadcast",
+            title: dto.title,
+            body: dto.body,
+            data,
+            status: "sent",
+            sentAt: new Date(),
+          });
+        }
 
         // Create entries for other selected channels (for tracking/audit)
         for (const channel of dto.channels) {
@@ -413,6 +458,8 @@ export class AdminNotificationService {
             });
             continue;
           }
+          // Push vb. kanallar zil ile aynı kitleye gider.
+          if (!pushInAppIds.has(userId)) continue;
           notificationLogs.push({
             userId,
             channel,
@@ -447,6 +494,8 @@ export class AdminNotificationService {
         emailSubject: emailContent.emailSubject,
         emailHtml: emailContent.emailHtml,
         marketingUnsubscribeTokens: marketingTokens,
+        // Pazarlamada push yalnız kampanya tercihi açık kullanıcılara gider.
+        pushUserIds: isMarketing ? audience.pushInApp : undefined,
       });
 
       // Update the logs we created to 'sent' status since we just emitted them

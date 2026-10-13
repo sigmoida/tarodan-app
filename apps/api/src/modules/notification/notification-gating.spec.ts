@@ -298,8 +298,32 @@ describe("Notification preference gating (wiring)", () => {
       expect(mockPrisma.notificationLog.create).not.toHaveBeenCalled();
     });
 
-    it("pazarlama duyurusu push'u istemciye type=admin_broadcast olarak gider", async () => {
+    it("pazarlama duyurusu + kampanya tercihi kapalı → push GİTMEZ", async () => {
+      storedSettings = { marketingEmails: false };
+
+      await worker.handleSendNotification(broadcastJob("marketing"));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("pazarlama duyurusu + kayıtlı tercih yok (varsayılan kapalı) → push GİTMEZ", async () => {
       storedSettings = null;
+
+      await worker.handleSendNotification(broadcastJob("marketing"));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("duyuru + kampanya tercihi kapalı → push yine GİDER", async () => {
+      storedSettings = { marketingEmails: false };
+
+      await worker.handleSendNotification(broadcastJob("announcement"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("pazarlama duyurusu push'u istemciye type=admin_broadcast olarak gider", async () => {
+      storedSettings = { marketingEmails: true };
 
       await worker.handleSendNotification(broadcastJob("marketing"));
 
