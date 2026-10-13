@@ -1,0 +1,266 @@
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { Prisma } from "@prisma/client";
+import appleSignin from "apple-signin-auth";
+import { PrismaService } from "../../../prisma";
+import { OutboxService } from "../../outbox/outbox.service";
+import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
+import {
+  OUTBOX_APPLE_TOKEN_REVOKE,
+  type AppleTokenRevokePayload,
+} from "../../outbox/outbox.types";
+import { errorMessage } from "../../../common/helpers/error-message";
+import { AppleTokenCipher } from "./apple-token-cipher";
+
+/** Apple client secret'ını imzalayan anahtar (Apple Developer → Keys, .p8). */
+interface AppleSigningKey {
+  teamId: string;
+  keyId: string;
+  privateKey: string;
+}
+
+/** Apple'ın token/revoke uçlarının hata gövdesi (`{ error }`); başarıda boş. */
+const appleError = (response: unknown): string | null => {
+  if (response && typeof response === "object" && "error" in response) {
+    return String((response as { error: unknown }).error);
+  }
+  return null;
+};
+
+/** Teşhis kolonu sınırı — Apple/ağ hata metni token içermez, yine de kısa. */
+const MAX_ERROR_LENGTH = 500;
+
+/**
+ * Sign in with Apple token yaşam döngüsü (App Store 5.1.1(v)): girişte gelen
+ * `authorizationCode`u refresh token'a çevirip şifreli saklar, hesap silmede
+ * iptali outbox'a yazar ve iptal handler'ını sağlar.
+ *
+ * Yapılandırma env'den gelir (APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY +
+ * APPLE_TOKEN_ENCRYPTION_KEY). Eksikse özellik NO-OP'tur ve uyarı loglanır:
+ * giriş ve hesap silme hiçbir koşulda bu servis yüzünden düşmez.
+ *
+ * Client id, girişin yapıldığı uygulamanınkidir (identity token `aud`:
+ * com.tarodan.app ya da staging'de com.tarodan.app.staging); kod o client id
+ * ile çevrilir, iptal de satırda saklanan AYNI client id ile yapılır.
+ */
+@Injectable()
+export class AppleTokenService implements OnModuleInit {
+  private readonly logger = new Logger(AppleTokenService.name);
+  private warnedNotConfigured = false;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly cipher: AppleTokenCipher,
+    private readonly outbox: OutboxService,
+    private readonly registry: OutboxHandlerRegistry,
+  ) {}
+
+  onModuleInit(): void {
+    this.registry.register(OUTBOX_APPLE_TOKEN_REVOKE, (payload) =>
+      this.revoke((payload as AppleTokenRevokePayload).appleSignInTokenId),
+    );
+  }
+
+  /** İmza anahtarı + şifreleme anahtarı hazır mı? */
+  isEnabled(): boolean {
+    return this.signingKey() !== null && this.cipher.isAvailable();
+  }
+
+  /**
+   * Girişte gelen `authorizationCode`u Apple'ın token ucunda refresh token'a
+   * çevirir ve şifreli saklar (kullanıcı × client id başına tek satır; yeni
+   * giriş eskisinin yerine geçer). ASLA fırlatmaz: kod tek kullanımlık ve
+   * 5 dakikalık; çevrilemezse giriş yine başarılıdır, bir sonraki giriş yeni
+   * bir kodla yeniden dener.
+   */
+  async storeFromAuthorizationCode(input: {
+    userId: string;
+    clientId: string;
+    authorizationCode: string;
+  }): Promise<void> {
+    if (!this.isEnabled()) {
+      this.warnNotConfigured();
+      return;
+    }
+    try {
+      const response = await appleSignin.getAuthorizationToken(
+        input.authorizationCode,
+        {
+          clientID: input.clientId,
+          clientSecret: this.clientSecret(input.clientId),
+          // Native akışta redirect_uri yoktur; kütüphane boş değeri göndermez.
+          redirectUri: "",
+        },
+      );
+      const refreshToken = response?.refresh_token;
+      if (!refreshToken) {
+        this.logger.warn(
+          `Apple authorization code could not be exchanged (user=${input.userId}, client=${input.clientId}): ${appleError(response) ?? "no refresh_token"}`,
+        );
+        return;
+      }
+      const refreshTokenEncrypted = this.cipher.encrypt(refreshToken);
+      await this.prisma.appleSignInToken.upsert({
+        where: {
+          userId_clientId: { userId: input.userId, clientId: input.clientId },
+        },
+        create: {
+          userId: input.userId,
+          clientId: input.clientId,
+          refreshTokenEncrypted,
+        },
+        update: {
+          refreshTokenEncrypted,
+          revokedAt: null,
+          lastRevokeError: null,
+        },
+      });
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Apple refresh token could not be stored (user=${input.userId}, client=${input.clientId}): ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Hesap silme transaction'ı İÇİNDE çağrılır: kullanıcının iptal edilmemiş
+   * token satırlarını damgalar ve her biri için iptal işini outbox'a yazar.
+   * Apple çağrısı commit sonrası drainer'dadır; başarısızlık silmeyi
+   * engellemez, outbox geri çekilerek yeniden dener (kalıcı hatada DLQ).
+   *
+   * @returns kuyruğa alınan iptal sayısı
+   */
+  async requestRevocation(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<number> {
+    const tokens = await tx.appleSignInToken.findMany({
+      where: {
+        userId,
+        refreshTokenEncrypted: { not: null },
+        revokedAt: null,
+        revokeRequestedAt: null,
+      },
+      select: { id: true },
+    });
+    if (tokens.length === 0) return 0;
+
+    await tx.appleSignInToken.updateMany({
+      where: { id: { in: tokens.map((token) => token.id) } },
+      data: { revokeRequestedAt: new Date() },
+    });
+    for (const token of tokens) {
+      await this.outbox.enqueue(tx, {
+        type: OUTBOX_APPLE_TOKEN_REVOKE,
+        payload: {
+          appleSignInTokenId: token.id,
+        } satisfies AppleTokenRevokePayload,
+        dedupeKey: `apple-token-revoke:${token.id}`,
+      });
+    }
+    return tokens.length;
+  }
+
+  /**
+   * Outbox handler'ı — at-least-once çalışır, idempotent: iptal edilmiş ya da
+   * token'ı kalmamış satır no-op'tur. Apple hatası fırlatılır (outbox yeniden
+   * dener); yapılandırma yoksa no-op + uyarı (sonsuz deneme yerine; satırda
+   * iz kalır, `lastRevokeError`).
+   */
+  async revoke(appleSignInTokenId: string): Promise<void> {
+    const row = await this.prisma.appleSignInToken.findUnique({
+      where: { id: appleSignInTokenId },
+    });
+    if (!row) {
+      this.logger.warn(
+        `Apple token revoke: row ${appleSignInTokenId} not found — no-op`,
+      );
+      return;
+    }
+    if (row.revokedAt || !row.refreshTokenEncrypted) return;
+
+    if (!this.isEnabled()) {
+      this.warnNotConfigured();
+      await this.recordError(row.id, "not_configured");
+      return;
+    }
+
+    let response: unknown;
+    try {
+      response = await appleSignin.revokeAuthorizationToken(
+        this.cipher.decrypt(row.refreshTokenEncrypted),
+        {
+          clientID: row.clientId,
+          clientSecret: this.clientSecret(row.clientId),
+          tokenTypeHint: "refresh_token",
+        },
+      );
+    } catch (error: unknown) {
+      await this.recordError(row.id, errorMessage(error));
+      throw error;
+    }
+    const failure = appleError(response);
+    if (failure) {
+      await this.recordError(row.id, `apple:${failure}`);
+      throw new Error(
+        `Apple token revoke failed for ${row.id} (client=${row.clientId}): ${failure}`,
+      );
+    }
+
+    await this.prisma.appleSignInToken.update({
+      where: { id: row.id },
+      data: {
+        revokedAt: new Date(),
+        // İptal edilmiş token saklanmaz.
+        refreshTokenEncrypted: null,
+        lastRevokeError: null,
+      },
+    });
+    this.logger.log(
+      `Apple token revoked (row=${row.id}, user=${row.userId}, client=${row.clientId})`,
+    );
+  }
+
+  private async recordError(id: string, message: string): Promise<void> {
+    await this.prisma.appleSignInToken
+      .update({
+        where: { id },
+        data: { lastRevokeError: message.slice(0, MAX_ERROR_LENGTH) },
+      })
+      .catch(() => undefined);
+  }
+
+  /** Apple'ın istediği ES256 client secret (5 dk geçerli JWT). */
+  private clientSecret(clientId: string): string {
+    const key = this.signingKey();
+    if (!key) throw new Error("Apple signing key is not configured");
+    return appleSignin.getClientSecret({
+      clientID: clientId,
+      teamID: key.teamId,
+      keyIdentifier: key.keyId,
+      privateKey: key.privateKey,
+      expAfter: 300,
+    });
+  }
+
+  private signingKey(): AppleSigningKey | null {
+    const teamId = this.config.get<string>("APPLE_TEAM_ID")?.trim();
+    const keyId = this.config.get<string>("APPLE_KEY_ID")?.trim();
+    // Tek satırlık env değerinde PEM satır sonları `\n` olarak yazılabilir.
+    const privateKey = this.config
+      .get<string>("APPLE_PRIVATE_KEY")
+      ?.replace(/\\n/g, "\n")
+      .trim();
+    if (!teamId || !keyId || !privateKey) return null;
+    return { teamId, keyId, privateKey };
+  }
+
+  private warnNotConfigured(): void {
+    if (this.warnedNotConfigured) return;
+    this.warnedNotConfigured = true;
+    this.logger.warn(
+      "Sign in with Apple token revocation is disabled: APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY missing (App Store 5.1.1(v))",
+    );
+  }
+}

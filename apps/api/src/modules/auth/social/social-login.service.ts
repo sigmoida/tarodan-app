@@ -4,7 +4,8 @@ import { AuthResponseDto } from "../dto";
 import { AuthTokenService } from "../auth-token.service";
 import { StorageService } from "../../storage/storage.service";
 import { GoogleAuthService } from "./google-auth.service";
-import { AppleAuthService } from "./apple-auth.service";
+import { AppleAuthService, type AppleProfile } from "./apple-auth.service";
+import { AppleTokenService } from "./apple-token.service";
 import { allocateUsernameFromEmail } from "../utils/username.util";
 import { resolveAvatarUrl } from "../utils/avatar-url.util";
 import { i18nMessage } from "../../i18n";
@@ -33,6 +34,7 @@ export class SocialLoginService {
     private readonly storageService: StorageService,
     private readonly googleAuthService: GoogleAuthService,
     private readonly appleAuthService: AppleAuthService,
+    private readonly appleTokens: AppleTokenService,
   ) {}
 
   /**
@@ -219,14 +221,37 @@ export class SocialLoginService {
    * Apple identity token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
    * → yoksa yeni kullanıcı. Relay email olduğu gibi kaydedilir; kimlik anahtarı sub.
    * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
+   *
+   * `authorizationCode` (mobil 1.0.6+) varsa giriş yanıtı üretildikten SONRA
+   * refresh token'a çevrilip şifreli saklanır — hesap silmede Apple'a iptal
+   * edilir (App Store 5.1.1(v)). Bu adım girişi hiçbir koşulda düşürmez; kodu
+   * göndermeyen eski istemci aynen çalışır.
    */
   async loginWithApple(
     identityToken: string,
     fullName?: string,
+    authorizationCode?: string,
   ): Promise<AuthResponseDto> {
     const profile =
       await this.appleAuthService.verifyIdentityToken(identityToken);
+    const userId = await this.resolveAppleUserId(profile, fullName);
+    const response = await this.buildUserAuthResponse(userId);
+    if (authorizationCode) {
+      await this.appleTokens.storeFromAuthorizationCode({
+        userId,
+        // Kod, girişin yapıldığı uygulamanın client id'siyle çevrilir.
+        clientId: profile.audience,
+        authorizationCode,
+      });
+    }
+    return response;
+  }
 
+  /** Apple kimliğini bir kullanıcıya bağlar: var olan, e-postayla eşleşen ya da yeni. */
+  private async resolveAppleUserId(
+    profile: AppleProfile,
+    fullName?: string,
+  ): Promise<string> {
     // 1) Mevcut OAuthAccount?
     const existing = await this.prisma.oAuthAccount.findUnique({
       where: {
@@ -237,7 +262,7 @@ export class SocialLoginService {
       },
     });
     if (existing) {
-      return this.buildUserAuthResponse(existing.userId);
+      return existing.userId;
     }
 
     // 2) Aynı e-postalı (silinmemiş) kullanıcı? → oto-bağla.
@@ -253,7 +278,7 @@ export class SocialLoginService {
           userId: byEmail.id,
         },
       });
-      return this.buildUserAuthResponse(byEmail.id);
+      return byEmail.id;
     }
 
     // 3) Yeni kullanıcı (Google ile aynı kural: kullanıcı adı e-postadan türer)
@@ -280,6 +305,6 @@ export class SocialLoginService {
         userId: created.id,
       },
     });
-    return this.buildUserAuthResponse(created.id);
+    return created.id;
   }
 }

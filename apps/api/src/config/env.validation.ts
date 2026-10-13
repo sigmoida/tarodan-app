@@ -140,6 +140,17 @@ const envSchema = z
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     APPLE_CLIENT_ID: z.string().optional(),
     APPLE_SERVICES_ID: z.string().optional(),
+    // Sign in with Apple token iptali (App Store 5.1.1(v)): mobil giriş
+    // `authorizationCode`u bu anahtarla imzalanan client secret ile refresh
+    // token'a çevrilir, hesap silmede Apple'a iptal edilir. Dördü birden yoksa
+    // özellik no-op olur (uyarı: `appleTokenRevocationWarnings`). Private key
+    // .p8 içeriğidir (PEM); tek satır env için satır sonları `\n` yazılabilir.
+    // Refresh token'lar APPLE_TOKEN_ENCRYPTION_KEY ile şifreli saklanır (canlı
+    // dışında boşsa JWT_SECRET'a düşer — 2FA/posta kutusu ile aynı kolaylık).
+    APPLE_TEAM_ID: z.string().optional(),
+    APPLE_KEY_ID: z.string().optional(),
+    APPLE_PRIVATE_KEY: z.string().optional(),
+    APPLE_TOKEN_ENCRYPTION_KEY: z.string().optional(),
 
     // NetGSM — phone-verification OTP. Required in production: without the
     // credentials the provider falls back to a mock that logs the code and
@@ -472,27 +483,35 @@ const envSchema = z
       });
     }
 
-    // Gönderici kutu şifre anahtarı OPSİYONEL (hiç kutu yokken gerekmez) ama
+    // Durağan sır anahtarları (gönderici kutu şifreleri, Apple refresh
+    // token'ları) OPSİYONEL — özellik kullanılmadıkça gerekmez — ama
     // verildiyse güçlü ve diğer sırlardan ayrı olmalı: 2FA anahtarıyla aynı
-    // olursa ikisinin döndürülmesi birbirine bağlanır.
-    const mailAccountKey = env.MAIL_ACCOUNT_ENCRYPTION_KEY?.trim() ?? "";
-    if (mailAccountKey) {
+    // olursa ikisinin döndürülmesi birbirine bağlanır. Birbirlerinden de ayrı.
+    const atRestKeys = [
+      "MAIL_ACCOUNT_ENCRYPTION_KEY",
+      "APPLE_TOKEN_ENCRYPTION_KEY",
+    ] as const;
+    for (const key of atRestKeys) {
+      const value = env[key]?.trim() ?? "";
+      if (!value) continue;
       if (
-        mailAccountKey.length < MIN_PROD_SECRET_LENGTH ||
-        KNOWN_PLACEHOLDER.test(mailAccountKey)
+        value.length < MIN_PROD_SECRET_LENGTH ||
+        KNOWN_PLACEHOLDER.test(value)
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["MAIL_ACCOUNT_ENCRYPTION_KEY"],
-          message: `MAIL_ACCOUNT_ENCRYPTION_KEY must be at least ${MIN_PROD_SECRET_LENGTH} characters and not the committed placeholder in production`,
+          path: [key],
+          message: `${key} must be at least ${MIN_PROD_SECRET_LENGTH} characters and not the committed placeholder in production`,
         });
       }
-      if (signing.includes(mailAccountKey)) {
+      const others = atRestKeys
+        .filter((other) => other !== key)
+        .map((other) => env[other]?.trim());
+      if (signing.includes(value) || others.includes(value)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["MAIL_ACCOUNT_ENCRYPTION_KEY"],
-          message:
-            "MAIL_ACCOUNT_ENCRYPTION_KEY must differ from the authentication, payment capability, guest OTP and two-factor secrets",
+          path: [key],
+          message: `${key} must differ from the authentication, payment capability, guest OTP, two-factor and other at-rest encryption secrets`,
         });
       }
     }
@@ -929,6 +948,31 @@ export function socialSignInWarnings(
   );
 }
 
+/**
+ * Sign in with Apple token iptali (App Store 5.1.1(v)) canlıda kapalı mı?
+ * Native giriş açıkken (APPLE_CLIENT_ID) iptal anahtarlarından biri eksikse
+ * özellik sessizce no-op olur: hesap silmede Apple bağlantısı kalır. Açılışı
+ * durdurmaz (giriş çalışmaya devam eder), ama görünür olmalı.
+ */
+export function appleTokenRevocationWarnings(
+  config: Record<string, unknown>,
+): string[] {
+  if (config.NODE_ENV !== "production") return [];
+  if (!String(config.APPLE_CLIENT_ID ?? "").trim()) return [];
+  const missing = (
+    [
+      "APPLE_TEAM_ID",
+      "APPLE_KEY_ID",
+      "APPLE_PRIVATE_KEY",
+      "APPLE_TOKEN_ENCRYPTION_KEY",
+    ] as const
+  ).filter((key) => !String(config[key] ?? "").trim());
+  if (missing.length === 0) return [];
+  return [
+    `${missing.join(", ")} not set — Sign in with Apple tokens are not stored or revoked on account deletion (App Store 5.1.1(v))`,
+  ];
+}
+
 export function validateEnv(
   config: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -939,7 +983,10 @@ export function validateEnv(
       .join("\n");
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
-  for (const warning of socialSignInWarnings(config)) {
+  for (const warning of [
+    ...socialSignInWarnings(config),
+    ...appleTokenRevocationWarnings(config),
+  ]) {
     console.warn(`[env] ${warning}`);
   }
   return result.data;

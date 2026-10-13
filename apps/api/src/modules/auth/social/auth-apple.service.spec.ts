@@ -12,6 +12,7 @@ import { AuthLoginService } from "../auth-login.service";
 import { SocialLoginService } from "./social-login.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
+import { AppleTokenService } from "./apple-token.service";
 import { PrismaService } from "../../../prisma";
 import { NotificationService } from "../../notification/notification.service";
 import { CacheService } from "../../cache/cache.service";
@@ -24,6 +25,9 @@ import { LegalIdentityService } from "../../legal-identity/legal-identity.servic
 describe("AuthService.loginWithApple", () => {
   let service: AuthService;
   const apple = { verifyIdentityToken: jest.fn() };
+  const appleTokens = {
+    storeFromAuthorizationCode: jest.fn().mockResolvedValue(undefined),
+  };
   const baseUser = {
     id: "u1",
     email: "a@b.com",
@@ -87,6 +91,7 @@ describe("AuthService.loginWithApple", () => {
         },
         { provide: GoogleAuthService, useValue: { verifyIdToken: jest.fn() } },
         { provide: AppleAuthService, useValue: apple },
+        { provide: AppleTokenService, useValue: appleTokens },
         { provide: SecurityService, useValue: { validateTOTP: jest.fn() } },
         {
           provide: NewsletterService,
@@ -215,5 +220,52 @@ describe("AuthService.loginWithApple", () => {
         data: expect.objectContaining({ displayName: "new" }),
       }),
     );
+  });
+
+  // App Store 5.1.1(v): mobil 1.0.6 authorizationCode gönderir; sunucu girişin
+  // yapıldığı client id ile refresh token'a çevirip saklar (hesap silmede iptal).
+  describe("authorizationCode", () => {
+    beforeEach(() => {
+      apple.verifyIdentityToken.mockResolvedValue({
+        sub: "ap1",
+        email: "a@b.com",
+        isPrivateEmail: false,
+        audience: "com.tarodan.app.staging",
+      });
+      prisma.oAuthAccount.findUnique.mockResolvedValue({
+        id: "oa1",
+        userId: "u1",
+      });
+      prisma.user.findUnique.mockResolvedValue(baseUser);
+    });
+
+    it("stores the refresh token for the signed-in client id", async () => {
+      await service.loginWithApple("tok", undefined, "code-1");
+
+      expect(appleTokens.storeFromAuthorizationCode).toHaveBeenCalledWith({
+        userId: "u1",
+        clientId: "com.tarodan.app.staging",
+        authorizationCode: "code-1",
+      });
+    });
+
+    it("old clients without a code log in exactly as before", async () => {
+      const res = await service.loginWithApple("tok");
+
+      expect(appleTokens.storeFromAuthorizationCode).not.toHaveBeenCalled();
+      expect(res.tokens.accessToken).toBe("tok");
+    });
+
+    it("does not store a token when the login itself is refused", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...baseUser,
+        deletedAt: new Date(),
+      });
+
+      await expect(
+        service.loginWithApple("tok", undefined, "code-1"),
+      ).rejects.toBeDefined();
+      expect(appleTokens.storeFromAuthorizationCode).not.toHaveBeenCalled();
+    });
   });
 });

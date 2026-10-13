@@ -26,6 +26,11 @@ const SENSITIVE_KEYS = new Set([
   "verifytoken",
   "confirmtoken",
   "idtoken",
+  // Sign in with Apple: giriş gövdesindeki kimlik belirteci ve tek kullanımlık
+  // yetkilendirme kodu (refresh token'a çevrilir) ile şifreli token kolonu.
+  "identitytoken",
+  "authorizationcode",
+  "refreshtokenencrypted",
   "authorization",
   "cookie",
   "setcookie",

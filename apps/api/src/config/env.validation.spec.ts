@@ -1,4 +1,8 @@
-import { socialSignInWarnings, validateEnv } from "./env.validation";
+import {
+  appleTokenRevocationWarnings,
+  socialSignInWarnings,
+  validateEnv,
+} from "./env.validation";
 
 /**
  * Boot/unit guard for issues #62 + #68: a missing or placeholder secret under
@@ -592,6 +596,96 @@ describe("validateEnv", () => {
         MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
       });
       expect(result.MAIL_ACCOUNT_ENCRYPTION_KEY).toBe("m".repeat(40));
+    });
+  });
+
+  // Sign in with Apple refresh token'ları (App Store 5.1.1(v)) kendi
+  // anahtarıyla şifrelenir; posta kutusu anahtarıyla aynı kural.
+  describe("APPLE_TOKEN_ENCRYPTION_KEY", () => {
+    it("is optional", () => {
+      expect(() => validateEnv(prodBase)).not.toThrow();
+    });
+
+    it("rejects a short key in production", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, APPLE_TOKEN_ENCRYPTION_KEY: "short" }),
+      ).toThrow(/APPLE_TOKEN_ENCRYPTION_KEY/);
+    });
+
+    it("rejects reusing an authentication secret", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          APPLE_TOKEN_ENCRYPTION_KEY: strongSecrets.JWT_SECRET,
+        }),
+      ).toThrow(/APPLE_TOKEN_ENCRYPTION_KEY must differ/);
+    });
+
+    it("rejects sharing the mail account key", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
+          APPLE_TOKEN_ENCRYPTION_KEY: "m".repeat(40),
+        }),
+      ).toThrow(/APPLE_TOKEN_ENCRYPTION_KEY must differ/);
+    });
+
+    it("keeps the Apple keys in the validated config so env values reach the app", () => {
+      const result = validateEnv({
+        ...prodBase,
+        APPLE_TEAM_ID: "TEAM123456",
+        APPLE_KEY_ID: "KEY1234567",
+        APPLE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----",
+        APPLE_TOKEN_ENCRYPTION_KEY: "a".repeat(20) + "z".repeat(20),
+      });
+      expect(result.APPLE_TEAM_ID).toBe("TEAM123456");
+      expect(result.APPLE_KEY_ID).toBe("KEY1234567");
+      expect(result.APPLE_PRIVATE_KEY).toBe("-----BEGIN PRIVATE KEY-----");
+      expect(result.APPLE_TOKEN_ENCRYPTION_KEY).toBe(
+        "a".repeat(20) + "z".repeat(20),
+      );
+    });
+  });
+
+  describe("appleTokenRevocationWarnings", () => {
+    const appleKeys = {
+      APPLE_TEAM_ID: "TEAM123456",
+      APPLE_KEY_ID: "KEY1234567",
+      APPLE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----",
+      APPLE_TOKEN_ENCRYPTION_KEY: "t".repeat(40),
+    };
+
+    it("warns (does not throw) when native Apple sign-in is on but revocation keys are missing", () => {
+      const warnings = appleTokenRevocationWarnings(prodBase);
+      expect(warnings).toEqual([expect.stringContaining("APPLE_TEAM_ID")]);
+      expect(warnings[0]).toContain("5.1.1(v)");
+      expect(() => validateEnv(prodBase)).not.toThrow();
+    });
+
+    it("names only the missing keys", () => {
+      expect(
+        appleTokenRevocationWarnings({
+          ...prodBase,
+          ...appleKeys,
+          APPLE_PRIVATE_KEY: "",
+        }),
+      ).toEqual([expect.stringMatching(/^APPLE_PRIVATE_KEY not set/)]);
+    });
+
+    it("is quiet when everything is configured", () => {
+      expect(
+        appleTokenRevocationWarnings({ ...prodBase, ...appleKeys }),
+      ).toEqual([]);
+    });
+
+    it("is quiet without native Apple sign-in and outside production", () => {
+      expect(
+        appleTokenRevocationWarnings(without(prodBase, "APPLE_CLIENT_ID")),
+      ).toEqual([]);
+      expect(
+        appleTokenRevocationWarnings({ ...prodBase, NODE_ENV: "development" }),
+      ).toEqual([]);
     });
   });
 

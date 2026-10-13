@@ -234,7 +234,7 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
 | Method | Path           | Auth   | Amaç                                                         |
 | ------ | -------------- | ------ | ------------------------------------------------------------ |
 | `POST` | `/auth/google` | public | Web: `{ code }` · **Native: `{ idToken }`** (throttle 10/dk) |
-| `POST` | `/auth/apple`  | public | `{ identityToken, fullName? }` (throttle 10/dk)              |
+| `POST` | `/auth/apple`  | public | `{ identityToken, fullName?, authorizationCode? }` (10/dk)   |
 
 - Web auth-code akışı kullanıyor; **mobil `idToken` göndermeli** — backend bu şekli zaten destekliyor.
 - **Apple Sign-In web'de de açık** (2026-08-13): giriş ve kayıt formlarında buton var, popup akışı
@@ -243,7 +243,14 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
   web token'ının audience'ı Services ID olur. iOS'ta Google ile giriş sunuluyorsa Apple Sign-In
   App Store için **zorunludur** → mobilde de uygulanmalı.
 - Apple'ın web akışında **client secret gerekmiyor**: `id_token` JWKS ile doğrulanıyor, Apple'ın token
-  endpoint'i hiç çağrılmıyor. `.p8` yalnızca mobilde hesap silme (token iptali) için gerekecek.
+  endpoint'i hiç çağrılmıyor. `.p8` yalnızca mobilde hesap silme (token iptali) için gerekiyor.
+- **Token iptali (App Store 5.1.1(v), 2026-10):** mobil (1.0.6+) `authorizationCode` da gönderir.
+  Sunucu kodu girişin yapıldığı client id (identity token `aud`: `com.tarodan.app` / staging
+  `com.tarodan.app.staging`) ile Apple'da refresh token'a çevirir ve şifreli saklar
+  (`apple_sign_in_tokens`). `DELETE /users/me` iptali outbox'a yazar (`apple.token_revoke`); Apple
+  çağrısı commit sonrası, yeniden denenerek yapılır, silmeyi engellemez. Kodu göndermeyen eski
+  istemci ve web aynen çalışır (iptal edilecek token yoktur). Env: `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+  `APPLE_PRIVATE_KEY`, `APPLE_TOKEN_ENCRYPTION_KEY`; biri eksikse özellik loglanan bir no-op'tur.
 - Yanıt normal login ile aynı: `{ user, tokens }`.
 
 ### Kabul kriterleri
