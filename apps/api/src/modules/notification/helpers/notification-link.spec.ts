@@ -491,7 +491,7 @@ describe("bildirim hedefleri", () => {
 });
 
 describe("withDefaultAudience", () => {
-  /** Satıcı sipariş ekranına giden tipler — mobilin tip yedeğinin listesi. */
+  /** Satıcı sipariş ekranına (`/seller/orders/…`) giden tipler. */
   const SELLER_ORDER_TYPES = [
     NotificationType.ORDER_CANCELLED_SELLER,
     NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER,
@@ -503,6 +503,10 @@ describe("withDefaultAudience", () => {
     NotificationType.REFUND_RETURN_DELIVERED_SELLER,
     NotificationType.REFUND_COMPLETED_SELLER,
     NotificationType.REFUND_AUTO_ACCEPTED_SELLER,
+    // Kendi kalıbıyla (fallback'li) satıcı sipariş ekranına giden tipler.
+    NotificationType.SELLER_ADDRESS_REQUIRED,
+    NotificationType.CARGO_CODE_READY,
+    NotificationType.OFFER_COUNTER_ACCEPTED,
   ];
 
   it.each(SELLER_ORDER_TYPES)("%s — audience=seller eklenir", (type) => {
@@ -532,6 +536,29 @@ describe("withDefaultAudience", () => {
   it("satıcı sipariş ekranı OLMAYAN hiçbir tipin verisini değiştirmez", () => {
     const sellerTypes = new Set<NotificationType>(SELLER_ORDER_TYPES);
     for (const type of ALL_TYPES.filter((t) => !sellerTypes.has(t))) {
+      const data = { orderId: "o1" };
+      expect(withDefaultAudience(type, data)).toBe(data);
+    }
+  });
+
+  it("küme link kalıbından türer: /seller/orders/ kalıplı her pattern tipi içindedir", () => {
+    const patternSellerTypes = ALL_TYPES.filter((type) => {
+      const spec = NOTIFICATION_LINKS[type];
+      return (
+        spec.kind === "pattern" && spec.pattern.startsWith("/seller/orders/")
+      );
+    });
+    for (const type of patternSellerTypes) {
+      expect(withDefaultAudience(type, { orderId: "o1" })?.audience).toBe(
+        "seller",
+      );
+    }
+  });
+
+  it("iki yöne giden (byAudience) tiplere varsayılan audience eklenmez", () => {
+    for (const type of ALL_TYPES.filter(
+      (t) => NOTIFICATION_LINKS[t].kind === "audience",
+    )) {
       const data = { orderId: "o1" };
       expect(withDefaultAudience(type, data)).toBe(data);
     }

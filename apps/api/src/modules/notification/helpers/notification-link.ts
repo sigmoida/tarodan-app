@@ -327,12 +327,18 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.EMAIL_VERIFICATION]: none,
 };
 
+/** Satıcı sipariş ekranı yolu öneki (`SELLER_ORDER` ve fallback'li türevleri). */
+const SELLER_ORDER_PATH_PREFIX = "/seller/orders/";
+
 /**
- * Hedefi satıcı sipariş ekranı olan tipler (`SELLER_ORDER`'ı doğrudan kullananlar):
- * `*_seller` sipariş/iade tipleri, PRODUCT_SOLD, CARGO_MOVEMENT_MISSING. Bunlar
- * yalnız satıcıya gider; hedef kitle TİPTEN bellidir. Kümeyi haritadan türetmek
- * ("satıcı ekranına giden = satıcıya gider") ayrı bir liste tutmayı ve
- * haritayla ayrışmasını önler.
+ * Hedefi satıcı sipariş ekranı olan tipler: `*_seller` sipariş/iade tipleri,
+ * PRODUCT_SOLD, CARGO_MOVEMENT_MISSING ve kendi kalıbıyla (`fallback`'li)
+ * `/seller/orders/…`a giden SELLER_ADDRESS_REQUIRED, CARGO_CODE_READY,
+ * OFFER_COUNTER_ACCEPTED. Bunlar yalnız satıcıya gider; hedef kitle TİPTEN
+ * bellidir. Kümeyi haritadan LİNK KALIBINA bakarak türetmek ("satıcı ekranına
+ * giden = satıcıya gider") ayrı bir liste tutmayı ve haritayla ayrışmasını önler.
+ * İki yöne giden tipler (`byAudience`) kasıtlı olarak dışarıdadır: onların
+ * `audience`ı üretici verir.
  */
 const SELLER_ORDER_TYPES: ReadonlySet<NotificationType> = new Set(
   (
@@ -341,7 +347,11 @@ const SELLER_ORDER_TYPES: ReadonlySet<NotificationType> = new Set(
       NotificationLinkSpec,
     ][]
   )
-    .filter(([, spec]) => spec === SELLER_ORDER)
+    .filter(
+      ([, spec]) =>
+        spec.kind === "pattern" &&
+        spec.pattern.startsWith(SELLER_ORDER_PATH_PREFIX),
+    )
     .map(([type]) => type),
 );
 

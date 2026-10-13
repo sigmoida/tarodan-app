@@ -70,6 +70,10 @@ describe("bildirim dağıtımı — satıcı hedef kitlesi", () => {
       NotificationType.ORDER_CANCELLED_SELLER,
       NotificationType.CARGO_MOVEMENT_MISSING,
       NotificationType.REFUND_COMPLETED_SELLER,
+      // Kendi kalıbıyla /seller/orders'a giden tipler
+      NotificationType.SELLER_ADDRESS_REQUIRED,
+      NotificationType.CARGO_CODE_READY,
+      NotificationType.OFFER_COUNTER_ACCEPTED,
     ])(
       "%s: push, zil kaydı ve realtime olayı audience=seller taşır",
       async (type) => {
