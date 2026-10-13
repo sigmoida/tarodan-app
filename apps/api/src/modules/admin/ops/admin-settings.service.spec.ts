@@ -31,7 +31,7 @@ describe("AdminSettingsService warehouse address", () => {
       $transaction: jest.fn((fn: any) => fn(prisma)),
     };
     audit = { createAuditLog: jest.fn() };
-    service = new AdminSettingsService(prisma, audit);
+    service = new AdminSettingsService(prisma, audit, { get: jest.fn() } as any);
   });
 
   it("returns null when the warehouse_address_id setting is unset", async () => {
@@ -133,7 +133,9 @@ describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
     prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
     const audit = { createAuditLog: jest.fn() };
     return {
-      service: new AdminSettingsService(prisma as any, audit as any),
+      service: new AdminSettingsService(prisma as any, audit as any, {
+        get: jest.fn(),
+      } as any),
       prisma,
     };
   };
@@ -167,5 +169,39 @@ describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
     });
 
     expect(prisma.platformSetting.upsert).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Herkese açık ayarlar teklif alt sınırını taşır: mobil formu %50 sabit
+ * varsayıyordu; sunucunun UYGULADIĞI değer (config/offer.ts) buradan okunur.
+ */
+describe("AdminSettingsService.getPublicSettings — min_offer_percentage", () => {
+  const makeService = (env: Record<string, string>) => {
+    const prisma: any = {
+      platformSetting: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { settingKey: "max_message_length", settingValue: "500" },
+          ]),
+      },
+    };
+    const config = { get: jest.fn((key: string) => env[key]) };
+    return new AdminSettingsService(prisma, {} as any, config as any);
+  };
+
+  it("env yoksa varsayılan %50", async () => {
+    const result = await makeService({}).getPublicSettings();
+    expect(result.min_offer_percentage).toBe(50);
+    // mevcut alanlar değişmez
+    expect(result.max_message_length).toBe(500);
+  });
+
+  it("env değerini sunucunun uyguladığı sayı olarak döner", async () => {
+    const result = await makeService({
+      MIN_OFFER_PERCENTAGE: "70",
+    }).getPublicSettings();
+    expect(result.min_offer_percentage).toBe(70);
   });
 });

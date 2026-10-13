@@ -40,6 +40,7 @@ import {
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
 import { offerExpiresAt } from "./helpers/offer-expiry";
+import { resolveMinOfferPercentage } from "../../config/offer";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
 import { offerConvertedNotice } from "../mail-routing/helpers/mail-internal-notices";
@@ -72,10 +73,7 @@ export class OfferService {
     @Optional()
     private readonly mailNotifier?: MailInternalNotifier,
   ) {
-    this.minOfferPercentage = parseInt(
-      this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
-      10,
-    );
+    this.minOfferPercentage = resolveMinOfferPercentage(this.configService);
   }
 
   /**
