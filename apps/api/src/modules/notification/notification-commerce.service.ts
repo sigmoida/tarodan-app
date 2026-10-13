@@ -482,6 +482,20 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * Teklifi veren alıcı hesabını silince kapanan teklif — SATICIYA. İlan
+   * silmeyle (alıcıya giden) ayrı şablon: "ilan kaldırıldı" metni burada yanlış.
+   */
+  async notifyOfferCancelledBuyerDeleted(sellerId: string, productId: string) {
+    const data = await this.buildStockoutData(productId);
+    return this.dispatch.send({
+      userId: sellerId,
+      type: NotificationType.OFFER_CANCELLED_BUYER_DELETED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data,
+    });
+  }
+
   async notifyReservationReleased(
     buyerId: string,
     orderId: string,
@@ -940,6 +954,7 @@ export class NotificationCommerceService {
         displayName: true,
         preferredLanguage: true,
         notificationSettings: true,
+        acceptsMarketingEmails: true,
       },
     });
     if (!user) {
@@ -955,7 +970,10 @@ export class NotificationCommerceService {
       // Tercihle susturulan bildirim "gönderilemedi" sayılmaz (yeniden denenmez).
       if (
         !shouldDeliver(
-          resolveSettings(user.notificationSettings),
+          resolveSettings(
+            user.notificationSettings,
+            user.acceptsMarketingEmails,
+          ),
           type,
           "in_app",
         )

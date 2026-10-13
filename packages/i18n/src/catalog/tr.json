@@ -5946,7 +5946,8 @@
           "emailSubjectRequired": "E-posta konusu zorunludur",
           "emailSubjectMax": "E-posta konusu en fazla 240 karakter olabilir",
           "emailHtmlRequired": "E-posta içeriği zorunludur",
-          "emailHtmlMax": "E-posta içeriği en fazla 200.000 karakter olabilir"
+          "emailHtmlMax": "E-posta içeriği en fazla 200.000 karakter olabilir",
+          "mailingTypeRequired": "Bildirim türünü seçin"
         },
         "pushTextTitle": "Push ve uygulama içi metin",
         "emailSectionTitle": "E-posta",
@@ -5957,11 +5958,12 @@
         "contentColumn": "E-posta",
         "recipientCount": "{total} kullanıcıdan {count} kişiye ulaşır",
         "mailingType": {
-          "label": "Gönderim türü",
+          "label": "Bildirim türü",
           "announcement": "Duyuru",
           "marketing": "Pazarlama",
-          "announcementHint": "Pazarlama iznine bakılmaksızın kitledeki herkese gider.",
-          "marketingHint": "Yalnızca pazarlama e-postası almayı kabul eden kullanıcılara, abonelikten çıkış linkiyle gider."
+          "announcementHint": "İşlemsel, hizmet ya da güvenlik duyurusu. Bildirim tercihinden bağımsız olarak kitledeki herkese gider (push, bildirim kutusu, e-posta). Kampanya ya da indirim için kullanmayın.",
+          "marketingHint": "Kampanya, indirim ya da tanıtım. Yalnızca pazarlama iletisine izin veren kullanıcılara gider — push ve bildirim kutusu dahil; e-postada abonelikten çıkış linki bulunur.",
+          "placeholder": "Tür seçin"
         }
       },
       "pages": {
@@ -8475,7 +8477,7 @@
     },
     "reports": {
       "title": "İstek, Öneri ve Şikayet",
-      "description": "Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler",
+      "description": "Kullanıcıların ürün, kullanıcı, koleksiyon, mesaj ve değerlendirmeler için gönderdiği şikayetler",
       "loadError": "Şikayetler yüklenirken hata oluştu",
       "empty": "Henüz şikayet yok",
       "allTypes": "Tüm Türler",
@@ -8489,7 +8491,8 @@
       "type": {
         "product": "Ürün",
         "collection": "Koleksiyon",
-        "message": "Mesaj"
+        "message": "Mesaj",
+        "review": "Değerlendirme"
       },
       "reason": {
         "spam": "Spam",
@@ -8532,7 +8535,14 @@
         "openTarget": "İçeriği aç",
         "reporterTitle": "Şikayet Eden",
         "adminNote": "Kullanıcıya iletilen açıklama",
-        "listingStatus": "İlan durumu"
+        "listingStatus": "İlan durumu",
+        "reviewAuthor": "Yazan",
+        "reviewSubject": "Değerlendirilen",
+        "reviewKind": "Değerlendirme türü",
+        "reviewKindProduct": "Ürün yorumu",
+        "reviewKindSeller": "Satıcı değerlendirmesi",
+        "reviewContent": "Yorum metni",
+        "reviewNoText": "Yalnız puan verilmiş, metin yok"
       },
       "statusModal": {
         "noteHelp": "Şikayeti \"Çözüldü\" ya da \"Reddedildi\" olarak kapattığınızda bu metin şikayet edene bildirim ve e-posta olarak iletilir.",
@@ -10412,6 +10422,10 @@
         "title": "Teklifiniz iptal edildi: ilan yayından kaldırıldı",
         "message": "{productTitle} adlı ürün için verdiğiniz teklif, satıcı ilanı yayından kaldırdığı için iptal edildi."
       },
+      "offerCancelledBuyerDeleted": {
+        "title": "Teklif kapandı: alıcı hesabını sildi",
+        "message": "{productTitle} ürününüze teklif veren alıcı hesabını sildiği için teklif kapatıldı."
+      },
       "productApproved": {
         "title": "İlanınız Yayında! 🎉",
         "message": "{productTitle} ilanınız onaylandı ve yayına alındı."
@@ -10470,7 +10484,7 @@
       },
       "userReportedAdmin": {
         "title": "Yeni Şikayet",
-        "message": "{reporterName} {type, select, product {bir ilanı} collection {bir koleksiyonu} message {bir mesajı} other {bir kullanıcıyı}} şikayet etti: {reason, select, spam {Spam} inappropriate_content {Uygunsuz İçerik} fake_product {Sahte/Yanıltıcı Ürün} scam {Dolandırıcılık} harassment {Taciz} hate_speech {Nefret Söylemi} counterfeit {Taklit Ürün} wrong_category {Yanlış Kategori} misleading_info {Yanıltıcı Bilgi} other {Diğer}}."
+        "message": "{reporterName} {type, select, product {bir ilanı} collection {bir koleksiyonu} message {bir mesajı} review {bir değerlendirmeyi} other {bir kullanıcıyı}} şikayet etti: {reason, select, spam {Spam} inappropriate_content {Uygunsuz İçerik} fake_product {Sahte/Yanıltıcı Ürün} scam {Dolandırıcılık} harassment {Taciz} hate_speech {Nefret Söylemi} counterfeit {Taklit Ürün} wrong_category {Yanlış Kategori} misleading_info {Yanıltıcı Bilgi} other {Diğer}}."
       },
       "wishlistItemSold": {
         "title": "Kaçırdınız! 😢",
@@ -10693,7 +10707,7 @@
         "message": "Kargonuzda bir süredir hareket görünmüyor. Ekibimiz taşıyıcıyla durumu takip ediyor; sizin bir işlem yapmanıza gerek yok."
       },
       "reportResolved": {
-        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}",
+        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} review {Bir değerlendirme hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}",
         "title": "Şikayetiniz Sonuçlandı"
       },
       "orderPreparingExtended": {
@@ -11160,7 +11174,6 @@
       "corporateApplicationNotFound": "Kurumsal başvuru bulunamadı",
       "deleteAccountBlocked": "Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:",
       "deleteAccountFailed": "Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.",
-      "deleteBlockedActiveListings": "{count} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.",
       "deleteBlockedActiveTrades": "{count} aktif takas teklifiniz bulunmaktadır. Lütfen takas işlemlerinizi tamamlayın veya iptal edin.",
       "deleteBlockedOpenRefunds": "{count} açık iade süreciniz bulunmaktadır. Lütfen iade süreçlerinin tamamlanmasını bekleyin.",
       "deleteBlockedPaymentHolds": "{count} sonuçlanmamış ödeme blokajınız bulunmaktadır. Lütfen para akışının tamamlanmasını bekleyin.",
@@ -11185,7 +11198,8 @@
       "userBlocked": "{displayName} engellendi",
       "userUnblocked": "Engel kaldırıldı",
       "usernameAlreadySet": "Kullanıcı adı daha önce belirlenmiş.",
-      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir."
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+      "deleteBlockedReservedListings": "{count} ilanınız süren bir satışa ya da takasa bağlı. Bu işlemler tamamlandığında hesabınızı silebilirsiniz."
     },
     "membership": {
       "alreadyCancelled": "Üyelik zaten iptal edilmiş",
@@ -11466,7 +11480,8 @@
         "sendFailed": "Bildirim gönderilemedi",
         "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
         "emailHtmlEmpty": "E-posta HTML'i güvensiz işaretlemeler çıkarıldıktan sonra kullanılabilir içerik barındırmıyor",
-        "scheduledNotFound": "Zamanlanmış bildirim bulunamadı"
+        "scheduledNotFound": "Zamanlanmış bildirim bulunamadı",
+        "noMarketingConsentAudience": "Seçilen kitlede pazarlama iletisine izin veren kullanıcı yok"
       },
       "payment": {
         "partialAmountRequired": "Kısmi iade için geçerli bir iade tutarı gerekir",
@@ -11675,7 +11690,8 @@
       "sendForbidden": "Bu konuya mesaj gönderme yetkiniz yok",
       "viewForbidden": "Bu konuyu görüntüleme yetkiniz yok",
       "messageTooLong": "Mesaj uzunluğu maksimum {max} karakter olabilir. Mevcut uzunluk: {length}",
-      "dailyLimitReached": "Günlük mesaj limitinize ({limit}) ulaştınız. Yarın tekrar deneyin."
+      "dailyLimitReached": "Günlük mesaj limitinize ({limit}) ulaştınız. Yarın tekrar deneyin.",
+      "contentRejected": "Metniniz uygunsuz ya da paylaşılamayacak içerik (ör. küfür, iletişim bilgisi) barındırdığı için gönderilemedi. Lütfen düzenleyip tekrar deneyin."
     },
     "wishlist": {
       "ownProduct": "Kendi ürününüzü istek listesine ekleyemezsiniz",
@@ -12219,7 +12235,8 @@
         "traded": "Tarodan'da takas edildi",
         "return_quarantine": "İade kontrolü bekliyor",
         "seller_suspended": "Satıcı hesabı askıya alındı",
-        "policy_violation": "Kural ihlali"
+        "policy_violation": "Kural ihlali",
+        "account_deleted": "Satıcı hesabını sildi"
       },
       "actor": {
         "seller": "Satıcı",

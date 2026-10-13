@@ -4011,7 +4011,7 @@ enum ProductInactiveReason {
 /// `LISTING_REMOVAL_REASONS` ile BİREBİR aynıdır (kontrat spec'i korur):
 /// satıcı (not_given = nedensiz eski istemci, changed_mind, sold_elsewhere,
 /// paused_temporarily), sistem (expired, out_of_stock, traded, return_quarantine,
-/// seller_suspended), yönetici (policy_violation).
+/// seller_suspended, account_deleted), yönetici (policy_violation).
 enum ListingRemovalReason {
   not_given
   changed_mind
@@ -4022,6 +4022,9 @@ enum ListingRemovalReason {
   traded
   return_quarantine
   seller_suspended
+  /// Satıcı hesabını sildi: aktif ve onay bekleyen ilanları silme anında
+  /// pasife alındı (20261013110000_listing_removal_account_deleted).
+  account_deleted
   policy_violation
 }
 

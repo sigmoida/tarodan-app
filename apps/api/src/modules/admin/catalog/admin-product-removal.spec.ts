@@ -276,6 +276,7 @@ describe("listingRemovalFilterWhere", () => {
             "traded",
             "return_quarantine",
             "seller_suspended",
+            "account_deleted",
           ],
         },
       },

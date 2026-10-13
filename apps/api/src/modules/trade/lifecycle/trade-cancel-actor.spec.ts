@@ -29,7 +29,11 @@ describe("TradeLifecycleService — iptal/ret aktörü", () => {
     Object.assign(svc, {
       validTransitions: TRADE_VALID_TRANSITIONS,
       logger: { warn: jest.fn(), log: jest.fn(), error: jest.fn() },
-      prisma: { $transaction: jest.fn((fn: any) => fn(tx)) },
+      prisma: {
+        $transaction: jest.fn((fn: any) => fn(tx)),
+        // İşlem öncesi kilitsiz yetki/durum ön okuması.
+        trade: { findUnique: jest.fn().mockResolvedValue(trade) },
+      },
       getTradeWithLock: jest.fn().mockResolvedValue(trade),
       productLockService: { releaseReservation: jest.fn() },
       paymentService: { refundTradeCashTracked: jest.fn() },

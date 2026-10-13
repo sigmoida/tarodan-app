@@ -187,6 +187,9 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_BY_ADMIN]: LISTING,
+  [NotificationType.OFFER_CANCELLED_BUYER_DELETED]: pattern(
+    "/profile/offers?tab=received",
+  ),
 
   // ── Ürün / ilan ──────────────────────────────────────────────────────────
   [NotificationType.PRODUCT_APPROVED]: LISTING,

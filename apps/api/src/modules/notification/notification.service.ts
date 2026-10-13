@@ -285,6 +285,11 @@ export class NotificationService {
     return this.commerce.notifyOfferCancelledListingRemoved(buyerId, productId);
   }
 
+  /** Alıcı hesabını silince kapanan teklif — satıcıya bildirim. */
+  async notifyOfferCancelledBuyerDeleted(sellerId: string, productId: string) {
+    return this.commerce.notifyOfferCancelledBuyerDeleted(sellerId, productId);
+  }
+
   async notifyReservationReleased(
     buyerId: string,
     orderId: string,

@@ -5946,7 +5946,8 @@
           "emailSubjectRequired": "Email subject is required",
           "emailSubjectMax": "Email subject can be at most 240 characters",
           "emailHtmlRequired": "Email content is required",
-          "emailHtmlMax": "Email content can be at most 200,000 characters"
+          "emailHtmlMax": "Email content can be at most 200,000 characters",
+          "mailingTypeRequired": "Select the notification type"
         },
         "pushTextTitle": "Push and in-app text",
         "emailSectionTitle": "Email",
@@ -5957,11 +5958,12 @@
         "contentColumn": "Email",
         "recipientCount": "Reaches {count} of {total} users",
         "mailingType": {
-          "label": "Mailing type",
+          "label": "Notification type",
           "announcement": "Announcement",
           "marketing": "Marketing",
-          "announcementHint": "Sent to every audience member, regardless of marketing consent.",
-          "marketingHint": "Sent only to users who agreed to marketing emails, with an unsubscribe link."
+          "announcementHint": "A transactional, service or security notice. Reaches everyone in the audience regardless of notification preferences (push, inbox, email). Do not use it for campaigns or discounts.",
+          "marketingHint": "A campaign, discount or promotion. Reaches only users who consented to marketing messages — push and inbox included; the email carries an unsubscribe link.",
+          "placeholder": "Select a type"
         }
       },
       "pages": {
@@ -8475,7 +8477,7 @@
     },
     "reports": {
       "title": "Requests, Suggestions & Complaints",
-      "description": "Complaints submitted by users for products, users, collections, and messages",
+      "description": "Complaints submitted by users for products, users, collections, messages, and reviews",
       "loadError": "Failed to load complaints",
       "empty": "No complaints yet",
       "allTypes": "All Types",
@@ -8489,7 +8491,8 @@
       "type": {
         "product": "Product",
         "collection": "Collection",
-        "message": "Message"
+        "message": "Message",
+        "review": "Review"
       },
       "reason": {
         "spam": "Spam",
@@ -8532,7 +8535,14 @@
         "openTarget": "Open content",
         "reporterTitle": "Reported By",
         "adminNote": "Explanation sent to the user",
-        "listingStatus": "Listing status"
+        "listingStatus": "Listing status",
+        "reviewAuthor": "Author",
+        "reviewSubject": "Reviewed",
+        "reviewKind": "Review type",
+        "reviewKindProduct": "Product review",
+        "reviewKindSeller": "Seller rating",
+        "reviewContent": "Review text",
+        "reviewNoText": "Score only, no text"
       },
       "statusModal": {
         "noteHelp": "When you close the report as \"Resolved\" or \"Dismissed\", this text is sent to the reporter as a notification and an email.",
@@ -10412,6 +10422,10 @@
         "title": "Your offer was cancelled: listing removed",
         "message": "Your offer for {productTitle} was cancelled because the seller removed the listing."
       },
+      "offerCancelledBuyerDeleted": {
+        "title": "Offer closed: the buyer deleted their account",
+        "message": "The offer on {productTitle} was closed because the buyer deleted their account."
+      },
       "productApproved": {
         "title": "Your Listing Is Live! 🎉",
         "message": "Your listing {productTitle} has been approved and published."
@@ -10470,7 +10484,7 @@
       },
       "userReportedAdmin": {
         "title": "New Report",
-        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
+        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
       },
       "wishlistItemSold": {
         "title": "You Missed It! 😢",
@@ -10693,7 +10707,7 @@
         "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
       },
       "reportResolved": {
-        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
+        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
         "title": "Your Report Has Been Reviewed"
       },
       "orderPreparingExtended": {
@@ -11160,7 +11174,6 @@
       "corporateApplicationNotFound": "Corporate application not found",
       "deleteAccountBlocked": "To delete your account, you must first complete the following:",
       "deleteAccountFailed": "An error occurred while deleting your account. Please contact support.",
-      "deleteBlockedActiveListings": "You have {count} active listings. Please remove all of your listings first.",
       "deleteBlockedActiveTrades": "You have {count} active trade offers. Please complete or cancel your trades.",
       "deleteBlockedOpenRefunds": "You have {count} open refund processes. Please wait for the refunds to finish.",
       "deleteBlockedPaymentHolds": "You have {count} unsettled payment holds. Please wait for the money flow to finish.",
@@ -11185,7 +11198,8 @@
       "userBlocked": "{displayName} has been blocked",
       "userUnblocked": "Block removed",
       "usernameAlreadySet": "The username has already been set.",
-      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores."
+      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores.",
+      "deleteBlockedReservedListings": "{count} of your listings are tied to a sale or trade in progress. You can delete your account once those are complete."
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",
@@ -11466,7 +11480,8 @@
         "sendFailed": "The notification could not be sent",
         "scheduleInFuture": "The scheduled time must be in the future",
         "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
-        "scheduledNotFound": "Scheduled notification not found"
+        "scheduledNotFound": "Scheduled notification not found",
+        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages"
       },
       "payment": {
         "partialAmountRequired": "A valid refund amount is required for a partial refund",
@@ -11675,7 +11690,8 @@
       "sendForbidden": "You are not allowed to send messages in this thread",
       "viewForbidden": "You are not allowed to view this thread",
       "messageTooLong": "A message can be at most {max} characters. Current length: {length}",
-      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow."
+      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow.",
+      "contentRejected": "Your text contains content that cannot be shared (such as offensive language or contact details). Please edit it and try again."
     },
     "wishlist": {
       "ownProduct": "You cannot add your own product to a wishlist",
@@ -12219,7 +12235,8 @@
         "traded": "Traded on Tarodan",
         "return_quarantine": "Awaiting return check",
         "seller_suspended": "Seller account suspended",
-        "policy_violation": "Policy violation"
+        "policy_violation": "Policy violation",
+        "account_deleted": "Seller deleted their account"
       },
       "actor": {
         "seller": "Seller",

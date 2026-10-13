@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { UserBlockService } from "../user-block/user-block.service";
-import { excludeIds } from "../user-block/user-block.helpers";
 import { Prisma, ProductKind } from "@prisma/client";
 import {
   fulltextCollectionSearch,
@@ -32,6 +31,12 @@ import {
   publicName,
 } from "../../common/helpers/public-identity";
 import { i18nMessage } from "../i18n";
+import { AccountLaneService } from "../account-lane/account-lane.service";
+import { LIVE_LANE } from "../account-lane/account-lane";
+import {
+  collectionOwnerVisibleWhere,
+  type CollectionViewerScope,
+} from "./collection-visibility";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -69,7 +74,35 @@ export class CollectionCrudService {
     private readonly common: CollectionCommonService,
     private readonly cover: CollectionCoverService,
     private readonly userBlocks: UserBlockService,
+    private readonly lanes: AccountLaneService,
   ) {}
+
+  /** Viewer'ın keşif kapsamı: gizli kullanıcılar (engel) + hesap şeridi. */
+  private async viewerScope(viewerId?: string): Promise<CollectionViewerScope> {
+    const [hiddenUserIds, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
+    return { hiddenUserIds, lane };
+  }
+
+  /**
+   * Detay kapısı: keşif listesiyle AYNI yüklem (`collectionOwnerVisibleWhere`).
+   * Sahibi engelli ya da başka şeritte olan koleksiyon "yok" davranır (404) —
+   * listede görünen her koleksiyonun detayı açılır, açılmayan listede görünmez.
+   */
+  private async assertCollectionVisible(
+    collectionId: string,
+    viewerId?: string,
+  ): Promise<void> {
+    const scope = await this.viewerScope(viewerId);
+    const visible = await this.prisma.collection.count({
+      where: { id: collectionId, ...collectionOwnerVisibleWhere(scope) },
+    });
+    if (visible !== 1) {
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
+    }
+  }
 
   /** Sahip ile viewer arasında engel varsa koleksiyon "yok" davranır (404). */
   private assertOwnerVisible(ownerId: string, viewerId?: string) {
@@ -170,7 +203,7 @@ export class CollectionCrudService {
     if (!basicCollection) {
       throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
-    await this.assertOwnerVisible(basicCollection.userId, viewerId);
+    await this.assertCollectionVisible(basicCollection.id, viewerId);
 
     // Now get full collection with relations
     const collection = await this.prisma.collection.findUnique({
@@ -350,7 +383,7 @@ export class CollectionCrudService {
     if (!collection) {
       throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
-    await this.assertOwnerVisible(collection.userId, viewerId);
+    await this.assertCollectionVisible(collection.id, viewerId);
 
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
@@ -500,8 +533,9 @@ export class CollectionCrudService {
   ): Promise<CollectionListResponseDto> {
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-    // Engelli sahiplerin (simetrik) koleksiyonları keşiften düşer.
-    const hiddenUserIds = await this.userBlocks.getHiddenUserIds(viewerId);
+    // Engelli sahiplerin (simetrik) ve başka şeritteki sahiplerin koleksiyonları
+    // keşiften düşer — detayla aynı kural (collectionOwnerVisibleWhere).
+    const scope = await this.viewerScope(viewerId);
 
     let resolvedCategoryId = categoryId;
     if (!resolvedCategoryId && categorySlug?.trim()) {
@@ -513,12 +547,25 @@ export class CollectionCrudService {
       resolvedCategoryId = cat?.id ?? undefined;
     }
 
+    // Test şeridi: koleksiyon indeksi yalnız canlı sahipleri taşır (ürün
+    // aramasıyla aynı); test viewer'ı her zaman Postgres yoluyla listelenir.
+    if (scope.lane !== LIVE_LANE) {
+      return this.browsePublicCollectionsPrisma(
+        safePage,
+        safePageSize,
+        sortBy,
+        search,
+        resolvedCategoryId,
+        scope,
+      );
+    }
+
     // Try Elasticsearch first
     const esResult = await this.searchService.searchCollections({
       query: search,
       categoryId: resolvedCategoryId,
       isPublic: true,
-      excludeUserIds: hiddenUserIds,
+      excludeUserIds: scope.hiddenUserIds,
       sortBy,
       page: safePage,
       pageSize: safePageSize,
@@ -541,7 +588,7 @@ export class CollectionCrudService {
           sortBy,
           search,
           resolvedCategoryId,
-          hiddenUserIds,
+          scope,
         );
       }
 
@@ -550,6 +597,7 @@ export class CollectionCrudService {
         esResult.total,
         safePage,
         safePageSize,
+        scope,
       );
       if (hydrated.collections.length < validIds.length * 0.5) {
         this.logger.warn(
@@ -562,7 +610,7 @@ export class CollectionCrudService {
           sortBy,
           search,
           resolvedCategoryId,
-          hiddenUserIds,
+          scope,
         );
       }
       return hydrated;
@@ -575,7 +623,7 @@ export class CollectionCrudService {
       sortBy,
       search,
       resolvedCategoryId,
-      hiddenUserIds,
+      scope,
     );
   }
 
@@ -584,9 +632,12 @@ export class CollectionCrudService {
     total: number,
     page: number,
     pageSize: number,
+    scope: CollectionViewerScope,
   ): Promise<CollectionListResponseDto> {
+    // Görünürlük kuralı hidrasyonda da uygulanır: bayat bir ES dokümanı
+    // (ör. sonradan test şeridine alınmış sahip) listeye sızmaz.
     const collections = await this.prisma.collection.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, ...collectionOwnerVisibleWhere(scope) },
       include: {
         user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         category: { select: { id: true, name: true, slug: true } },
@@ -648,12 +699,12 @@ export class CollectionCrudService {
     sortBy: string,
     search?: string,
     resolvedCategoryId?: string,
-    hiddenUserIds: string[] = [],
+    scope: CollectionViewerScope = { hiddenUserIds: [], lane: LIVE_LANE },
   ): Promise<CollectionListResponseDto> {
     const where: Prisma.CollectionWhereInput = {
       isPublic: true,
       ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
-      userId: excludeIds(hiddenUserIds),
+      ...collectionOwnerVisibleWhere(scope),
     };
 
     if (search && search.trim() !== "") {

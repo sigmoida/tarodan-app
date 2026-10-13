@@ -29,6 +29,7 @@ import {
 } from "../_lib/types";
 import { targetHref, type ReportDetail } from "../_lib/detail";
 import { ReportStatusModal } from "./_modals/ReportStatusModal";
+import { ReviewTargetFields } from "./_sections/ReviewTargetFields";
 
 export default function ReportDetailPage() {
   const t = useTranslations();
@@ -243,6 +244,10 @@ export default function ReportDetailPage() {
                               </Panel>
                             </Field>
                           </DataList>
+                        )}
+
+                        {report.type === "review" && (
+                          <ReviewTargetFields target={target} />
                         )}
 
                         {(report.type === "product" ||

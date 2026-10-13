@@ -27,6 +27,43 @@ export const TR_MOBILE_PHONE_PATTERN_SOURCE =
 export const EMAIL_PATTERN_SOURCE =
   "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}";
 
+/**
+ * Kelime sınırı için Türkçe harf + rakam sınıfı (köşeli parantez içi). `\b`
+ * yalnız ASCII harfleri tanır: "tamamını" içinde "amını", "MiG 29" içinde "ig"
+ * kelime başı sanılıyordu. Kalıplar `gi` (u'suz) derlendiği için büyük/küçük
+ * eşleşme ASCII ve ÇĞÖŞÜ'de kendiliğinden olur; İ ve ı ayrıca yazılır.
+ */
+export const TR_WORD_CHARS = "A-Za-z0-9ÇçĞğİıÖöŞşÜüÂâÎîÛû";
+
+/** Sınıfın harf kısmı (kelime SONU kontrolü: ardından rakam gelebilir, "wp0532"). */
+export const TR_LETTERS = "A-Za-zÇçĞğİıÖöŞşÜüÂâÎîÛû";
+
+/** Önü harf/rakam olmayan (kelime başı) ve ardı harf olmayan alternatifler. */
+export function wordLedSource(alternatives: readonly string[]): string {
+  return `(?<![${TR_WORD_CHARS}])(?:${alternatives.join("|")})(?![${TR_LETTERS}])`;
+}
+
+/**
+ * WhatsApp numarası ("wp: 0532…", "whatsapp 532…"). "wa"/"wp" kelime olarak
+ * aranır: model adları ("Kawasaki", "Swap") içinden eşleşmez.
+ */
+export const WHATSAPP_PATTERN_SOURCE = `${wordLedSource([
+  "whatsapp",
+  "wp",
+  "wa",
+  "w\\s*a",
+])}[\\s:]*[\\d+()-]+`;
+
+/**
+ * Instagram kullanıcı adı ("ig: tarodan", "insta @x"). "ig" kelime olarak
+ * aranır: "Big Rig", "MiG 29", "Big Air" eşleşmez.
+ */
+export const INSTAGRAM_HANDLE_PATTERN_SOURCE = `${wordLedSource([
+  "instagram",
+  "insta",
+  "ig",
+])}[:\\s@]+[A-Za-z0-9_.]+`;
+
 /** TR IBAN: `TR` + 24 rakam, dörtlü gruplar arasında tek boşluk olabilir. */
 export const TR_IBAN_PATTERN_SOURCE =
   "\\bTR\\s?\\d{2}(?:\\s?\\d{4}){5}\\s?\\d{2}\\b";

@@ -315,6 +315,7 @@ const REPORT_TYPE_LABELS: Record<string, string> = {
   user: "Kullanıcı",
   collection: "Koleksiyon",
   message: "Mesaj",
+  review: "Değerlendirme",
 };
 
 const REPORT_REASON_LABELS: Record<string, string> = {

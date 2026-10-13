@@ -23,3 +23,13 @@ export function audienceUserWhere(
   }
   return where;
 }
+
+/**
+ * Pazarlama izni kapısı (Apple 4.5.4, İYS): pazarlama türündeki duyuru —
+ * push, zil satırı ve e-posta — yalnız bu filtreyi geçen kullanıcılara gider.
+ * İznin tek kaynağı `User.acceptsMarketingEmails` kolonudur (profil düğmesi,
+ * kayıt onayı ve bülten çıkışı onu yazar). Sayaç da aynı filtreyi kullanır.
+ */
+export const MARKETING_CONSENT_WHERE = {
+  acceptsMarketingEmails: true,
+} as const satisfies Prisma.UserWhereInput;

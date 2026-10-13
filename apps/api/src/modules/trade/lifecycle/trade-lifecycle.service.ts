@@ -25,6 +25,7 @@ import {
   ShipmentStatus,
   PaymentStatus,
   Prisma,
+  type Trade,
 } from "@prisma/client";
 import {
   getAvailableQuantity,
@@ -82,9 +83,15 @@ import {
 import { calculateServiceTax } from "../../order/helpers/order-service-tax.helper";
 import { OrderTaxPolicyService } from "../../order/pricing/order-tax-policy.service";
 import {
+  ContentFilterService,
+  unscreenedText,
+  type ScreenedText,
+} from "../../messaging/content-filter.service";
+import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { lockActiveUsersShared } from "../../user/helpers/user-row-lock";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -112,7 +119,50 @@ export class TradeLifecycleService {
     @Optional() private readonly discountService?: DiscountService,
     // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI, fırlatmaz.
     @Optional() private readonly mailNotifier?: MailInternalNotifier,
+    // Takas mesajı ve red/iptal gerekçesi mesajlaşmayla AYNI içerik
+    // filtresinden geçer (Apple 1.2). TradeModule MessagingModule'ü içe
+    // aktarır; dar test kurulumlarında yok.
+    @Optional() private readonly contentFilter?: ContentFilterService,
   ) {}
+
+  /**
+   * Karşı tarafa görünen serbest metni mesajlaşma filtresinden geçirir (S9a):
+   * uygunsuz içerik 400, iletişim bilgisi maskelenir; boş metin aynen döner.
+   * Yavaş olabilir (AI) — işlem AÇILMADAN çağrılır.
+   */
+  private async screenText<T extends string | null | undefined>(
+    text: T,
+    authorId: string,
+    field: "trade_message" | "trade_reject_reason" | "trade_cancel_reason",
+    tradeId?: string,
+  ): Promise<T | string> {
+    return this.contentFilter
+      ? this.contentFilter.screenUnqueuedText(text, {
+          entityType: "trade",
+          entityId: tradeId ?? null,
+          userId: authorId,
+          field,
+        })
+      : text;
+  }
+
+  /**
+   * Yeni takasın mesajı: tarama takas YOKKEN yapılır, bu yüzden inceleme kaydı
+   * (admin "AI Denetim") takas yazıldıktan sonra `recordFlag(tradeId)` ile
+   * takasın kimliğine bağlanır.
+   */
+  private async screenNewTradeMessage<T extends string | null | undefined>(
+    text: T,
+    authorId: string,
+  ): Promise<ScreenedText<T>> {
+    return this.contentFilter
+      ? this.contentFilter.screenUnqueuedTextDeferred(text, {
+          entityType: "trade",
+          userId: authorId,
+          field: "trade_message",
+        })
+      : unscreenedText(text);
+  }
 
   /**
    * Personel bildirimi (`trade.started` / `trade.disputed`). Commit sonrası
@@ -336,9 +386,18 @@ export class TradeLifecycleService {
     // Referans işlem dışında üretilir: çakışma kontrolü transaction'ı
     // gereksiz yere uzatmasın.
     const tradeNumber = await this.generateTradeNumber();
+    const screenedMessage = await this.screenNewTradeMessage(
+      dto.message,
+      initiatorId,
+    );
+    const initiatorMessage = screenedMessage.text;
 
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
+      // İki taraf da hesap silme ile serileşir: silinen hesapta açık takas
+      // kalmasın (ilk kilit; user-row-lock).
+      await lockActiveUsersShared(tx, [initiatorId, dto.receiverId]);
+
       // CRITICAL: Don't reserve products when trade is pending
       // Products should remain active and available for purchase
       // Only reserve when trade is accepted
@@ -353,7 +412,7 @@ export class TradeLifecycleService {
           status: TradeStatus.pending,
           cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
           cashPayerId,
-          initiatorMessage: dto.message,
+          initiatorMessage,
           initiatorAddressId,
           responseDeadline,
           // Yeni takaslar v2 fiyatlamasıyla açılır: iki taraf da sabit hizmet
@@ -392,6 +451,14 @@ export class TradeLifecycleService {
 
       return newTrade;
     });
+
+    // İncelemeye işaretlenen mesaj artık takas kimliğiyle kaydedilir; hata
+    // takası geri çevirmez.
+    await screenedMessage
+      .recordFlag(trade.id)
+      .catch((error) =>
+        this.logger.warn(`trade message review flag failed: ${error}`),
+      );
 
     // Send notification to receiver about new trade offer
     try {
@@ -462,12 +529,21 @@ export class TradeLifecycleService {
       this.prisma,
       "tradeShippingDays",
     );
+    const receiverMessage = await this.screenText(
+      dto.message,
+      userId,
+      "trade_message",
+      tradeId,
+    );
 
     let tradeInitiatorId: string;
     let acceptedNextStatus: TradeStatus | null = null;
     let receiverAddressId: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
+      // Kabul eden alıcı hesap silme ile serileşir (ilk kilit; user-row-lock).
+      await lockActiveUsersShared(tx, [userId]);
+
       // Lock trade row first
       const trade = await this.getTradeWithLock(tradeId, tx);
 
@@ -601,7 +677,7 @@ export class TradeLifecycleService {
         where: { id: tradeId, version: trade.version },
         data: {
           status: nextStatus,
-          receiverMessage: dto.message,
+          receiverMessage,
           receiverAddressId,
           acceptedAt: now,
           paymentDeadline: isV2 || trade.cashPayerId ? paymentDeadline : null,
@@ -750,24 +826,22 @@ export class TradeLifecycleService {
     userId: string,
     dto: RejectTradeDto,
   ): Promise<TradeResponseDto> {
+    // Önce yetki + durum (kilitsiz ön okuma), SONRA metin taraması: yetkisiz
+    // ya da reddedilemez takasta AI beklenmez ve doğru hata döner. Tarama
+    // yavaş olabileceği için işlemin dışında kalır; işlem kilitli satırda
+    // aynı kapıyı yeniden uygular.
+    this.assertCanReject(await this.findTradeOrThrow(tradeId), userId);
+    const reason = await this.screenText(
+      dto.reason,
+      userId,
+      "trade_reject_reason",
+      tradeId,
+    );
     let tradeInitiatorId: string;
 
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
-
-      if (trade.receiverId !== userId) {
-        throw new ForbiddenException(
-          i18nMessage("server.trade.onlyReceiverCanReject"),
-        );
-      }
-
-      if (!this.canTransition(trade.status, TradeStatus.rejected)) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.cannotRejectInStatus", {
-            status: trade.status,
-          }),
-        );
-      }
+      this.assertCanReject(trade, userId);
 
       tradeInitiatorId = trade.initiatorId;
 
@@ -798,7 +872,7 @@ export class TradeLifecycleService {
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
-          ...tradeRejectedData(dto.reason),
+          ...tradeRejectedData(reason),
           version: { increment: 1 },
         },
       });
@@ -1038,6 +1112,13 @@ export class TradeLifecycleService {
         { required: false },
       );
 
+    const initiatorMessage = await this.screenText(
+      dto.message,
+      userId,
+      "trade_message",
+      tradeId,
+    );
+
     // Update trade in transaction
     // Not: Counter offer sadece pending trade'de yapılır. Pending'de quantity
     // düşürülmemiştir, dolayısıyla burada stok manipülasyonu gerekmez.
@@ -1056,7 +1137,7 @@ export class TradeLifecycleService {
           initiatorAddressId: newInitiatorAddressId, // Yeni initiator'ın adresi (swap ile güncellenmeli)
           cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
           cashPayerId,
-          initiatorMessage: dto.message, // New initiator's message
+          initiatorMessage, // New initiator's message
           receiverMessage: null, // Clear old receiver message
           responseDeadline,
           // Karşı teklif yanıt aşamasını baştan başlatır: extend_once hakkı da.
@@ -1133,69 +1214,29 @@ export class TradeLifecycleService {
     userId: string,
     dto: CancelTradeDto,
   ): Promise<TradeResponseDto> {
+    // Önce yetki + durum (kilitsiz ön okuma), SONRA gerekçe taraması: zaten
+    // iptal edilmiş takas idempotent başarı döner (AI beklemeden), yetkisiz ya
+    // da iptal edilemez takasta doğru hata gelir. İşlem kilitli satırda aynı
+    // kapıyı yeniden uygular.
+    const current = await this.findTradeOrThrow(tradeId);
+    if (
+      (await this.cancelGate(this.prisma, current, userId)) ===
+      "already_cancelled"
+    ) {
+      return this.tradeQuery.getTradeById(tradeId, userId);
+    }
+    const cancelReason = await this.screenText(
+      dto.reason,
+      userId,
+      "trade_cancel_reason",
+      tradeId,
+    );
     let alreadyCancelled = false;
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
-
-      if (trade.initiatorId !== userId && trade.receiverId !== userId) {
-        throw new ForbiddenException(
-          i18nMessage("server.trade.notAuthorizedToCancel"),
-        );
-      }
-
-      // Idempotent: second cancel after the first already succeeded returns the
-      // existing trade instead of failing on the transition guard.
-      if (trade.status === TradeStatus.cancelled) {
+      if ((await this.cancelGate(tx, trade, userId)) === "already_cancelled") {
         alreadyCancelled = true;
         return;
-      }
-
-      if (!this.canTransition(trade.status, TradeStatus.cancelled)) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.cannotCancelInStatus", {
-            status: trade.status,
-          }),
-        );
-      }
-
-      // Legacy flow: after both shipped can't cancel
-      if (
-        trade.status === TradeStatus.both_shipped ||
-        trade.status === TradeStatus.initiator_received ||
-        trade.status === TradeStatus.receiver_received
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.cannotCancelAfterBothShipped"),
-        );
-      }
-
-      // Safe-trade flow: once items reach warehouse, only admin can intervene
-      if (
-        trade.status === TradeStatus.at_warehouse ||
-        trade.status === TradeStatus.admin_reviewing ||
-        trade.status === TradeStatus.shipping_to_recipients ||
-        trade.status === TradeStatus.returning
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.cannotCancelAfterWarehouseArrival"),
-        );
-      }
-
-      // Kullanıcı kuralı: ürün KARGOYA VERİLDİKTEN sonra takas iptal edilemez
-      // (ne iptal ne iade). shipping_to_warehouse'da taraflardan biri kendi
-      // to_warehouse gönderisini kargoya verdiyse (shippedAt) ya da depoya
-      // ulaştıysa (firstWarehouseArrivalAt) kullanıcı artık iptal edemez; bu
-      // noktadan sonra yalnızca admin müdahale eder (force-cancel-stuck/reject).
-      if (trade.status === TradeStatus.shipping_to_warehouse) {
-        const handedToCargo = await tx.tradeShipment.findFirst({
-          where: { tradeId, leg: "to_warehouse", shippedAt: { not: null } },
-          select: { id: true },
-        });
-        if (handedToCargo || trade.firstWarehouseArrivalAt !== null) {
-          throw new BadRequestException(
-            i18nMessage("server.trade.cannotCancelAfterShippedToCargo"),
-          );
-        }
       }
 
       // Restore stock only for accepted+ trades (pending have nothing decremented)
@@ -1223,7 +1264,7 @@ export class TradeLifecycleService {
         where: { id: tradeId, version: trade.version },
         data: {
           ...tradeCancelledData(tradePartyActor(trade, userId)),
-          cancelReason: dto.reason,
+          cancelReason,
           version: { increment: 1 },
         },
       });
@@ -1797,6 +1838,112 @@ export class TradeLifecycleService {
    * the transaction commits/rolls-back, providing real pessimistic locking.
    * Falls back to the root PrismaService when no tx is supplied (legacy callers).
    */
+  private async findTradeOrThrow(tradeId: string) {
+    const trade = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+    });
+    if (!trade) {
+      throw new NotFoundException(i18nMessage("server.trade.notFound"));
+    }
+    return trade;
+  }
+
+  /** Red kapısı — ön okumada ve kilitli satırda AYNI kural. */
+  private assertCanReject(
+    trade: { receiverId: string; status: TradeStatus },
+    userId: string,
+  ): void {
+    if (trade.receiverId !== userId) {
+      throw new ForbiddenException(
+        i18nMessage("server.trade.onlyReceiverCanReject"),
+      );
+    }
+
+    if (!this.canTransition(trade.status, TradeStatus.rejected)) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.cannotRejectInStatus", {
+          status: trade.status,
+        }),
+      );
+    }
+  }
+
+  /**
+   * İptal kapısı — ön okumada (kilitsiz) ve kilitli satırda AYNI kural.
+   * Zaten iptal edilmişse `already_cancelled` (idempotent başarı).
+   */
+  private async cancelGate(
+    client: Prisma.TransactionClient,
+    trade: Trade,
+    userId: string,
+  ): Promise<"already_cancelled" | "open"> {
+    if (trade.initiatorId !== userId && trade.receiverId !== userId) {
+      throw new ForbiddenException(
+        i18nMessage("server.trade.notAuthorizedToCancel"),
+      );
+    }
+
+    // Idempotent: second cancel after the first already succeeded returns the
+    // existing trade instead of failing on the transition guard.
+    if (trade.status === TradeStatus.cancelled) {
+      return "already_cancelled";
+    }
+
+    if (!this.canTransition(trade.status, TradeStatus.cancelled)) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.cannotCancelInStatus", {
+          status: trade.status,
+        }),
+      );
+    }
+
+    // Legacy flow: after both shipped can't cancel
+    if (
+      trade.status === TradeStatus.both_shipped ||
+      trade.status === TradeStatus.initiator_received ||
+      trade.status === TradeStatus.receiver_received
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.cannotCancelAfterBothShipped"),
+      );
+    }
+
+    // Safe-trade flow: once items reach warehouse, only admin can intervene
+    if (
+      trade.status === TradeStatus.at_warehouse ||
+      trade.status === TradeStatus.admin_reviewing ||
+      trade.status === TradeStatus.shipping_to_recipients ||
+      trade.status === TradeStatus.returning
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.trade.cannotCancelAfterWarehouseArrival"),
+      );
+    }
+
+    // Kullanıcı kuralı: ürün KARGOYA VERİLDİKTEN sonra takas iptal edilemez
+    // (ne iptal ne iade). shipping_to_warehouse'da taraflardan biri kendi
+    // to_warehouse gönderisini kargoya verdiyse (shippedAt) ya da depoya
+    // ulaştıysa (firstWarehouseArrivalAt) kullanıcı artık iptal edemez; bu
+    // noktadan sonra yalnızca admin müdahale eder (force-cancel-stuck/reject).
+    if (trade.status === TradeStatus.shipping_to_warehouse) {
+      const handedToCargo = await client.tradeShipment.findFirst({
+        where: {
+          tradeId: trade.id,
+          leg: "to_warehouse",
+          shippedAt: { not: null },
+        },
+        select: { id: true },
+      });
+      if (handedToCargo || trade.firstWarehouseArrivalAt !== null) {
+        throw new BadRequestException(
+          i18nMessage("server.trade.cannotCancelAfterShippedToCargo"),
+        );
+      }
+    }
+
+    return "open";
+  }
+
   private async getTradeWithLock(
     tradeId: string,
     tx?: Prisma.TransactionClient,

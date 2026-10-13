@@ -54,6 +54,21 @@ import {
 } from "../../../common/helpers/public-identity";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
 import {
+  ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES,
+  deactivateListingsForAccountDeletion,
+  type AccountDeletionListingsResult,
+} from "../../product/helpers/account-deletion-listings";
+import {
+  cancelBuyerOffersForAccountDeletion,
+  type CancelledBuyerOffer,
+} from "../../offer/helpers/account-deletion-offers";
+import { lockUserForDeletion } from "../helpers/user-row-lock";
+import { SearchService } from "../../search/search.service";
+import { refreshProductVisibility } from "../../product/helpers/product-visibility";
+import { errorMessage } from "../../../common/helpers/error-message";
+import { CacheService } from "../../cache/cache.service";
+import { NotificationService } from "../../notification/notification.service";
+import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
   computeRetainUntil,
@@ -76,6 +91,18 @@ export interface DeleteAccountOptions {
  * (anonimleştirme), verifyUser, upgradToSeller, getPublicProfile. Avatar
  * çözümü için common'a delege eder (this.common.resolveAvatarUrl).
  */
+/** Silme engeli istisnası mı? (işlem içinden yeniden fırlatılır, sarılmaz) */
+function isDeletionBlocked(error: unknown): error is BadRequestException {
+  if (!(error instanceof BadRequestException)) return false;
+  const body = error.getResponse();
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { i18nKey?: unknown }).i18nKey ===
+      "server.user.deleteAccountBlocked"
+  );
+}
+
 @Injectable()
 export class UserProfileService {
   private readonly logger = new Logger(UserProfileService.name);
@@ -87,6 +114,9 @@ export class UserProfileService {
     private readonly userBlocks: UserBlockService,
     private readonly consents: ConsentService,
     private readonly newsletter: NewsletterService,
+    private readonly searchService: SearchService,
+    private readonly cache: CacheService,
+    private readonly notifications: NotificationService,
     // Sign in with Apple token iptali (App Store 5.1.1(v)). UserModule
     // AppleTokenModule'ü içe aktarır; dar test kurulumlarında yok.
     @Optional() private readonly appleTokens?: AppleTokenService,
@@ -488,11 +518,17 @@ export class UserProfileService {
   /**
    * Bildirim tercihlerini getir. Kayıt yoksa varsayılanlar döner; kısmi
    * kayıtlar varsayılanların üzerine birleştirilir.
+   *
+   * `marketingEmails` kolondan okunur: pazarlama izninin tek kaynağı
+   * `User.acceptsMarketingEmails`'tir (kayıt onayı ve bülten çıkışı yalnız
+   * kolonu yazar). JSON'dan okununca kayıtta izin veren kullanıcı düğmeyi
+   * KAPALI görüyor ama pazarlama iletisi almaya devam ediyordu (S1, Apple
+   * 4.5.4 — kapatma yolu gerçeği göstermeli).
    */
   async getNotificationSettings(userId: string): Promise<NotificationSettings> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notificationSettings: true },
+      select: { notificationSettings: true, acceptsMarketingEmails: true },
     });
 
     if (!user) {
@@ -501,7 +537,11 @@ export class UserProfileService {
 
     const stored =
       (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
-    return { ...DEFAULT_NOTIFICATION_SETTINGS, ...stored };
+    return {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...stored,
+      marketingEmails: user.acceptsMarketingEmails === true,
+    };
   }
 
   /**
@@ -535,11 +575,17 @@ export class UserProfileService {
       marketingBefore !== null &&
       marketingBefore.acceptsMarketingEmails !== patch.marketingEmails;
 
+    // JSON'a pazarlama anahtarı yazılmaz: izin yalnız `acceptsMarketingEmails`
+    // kolonundadır; JSON'daki kopya bayatlayıp ikinci bir kaynağa dönüşürdü.
+    const storedSettings: Partial<NotificationSettings> = { ...merged };
+    delete storedSettings.marketingEmails;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
         data: {
-          notificationSettings: merged as unknown as Prisma.InputJsonValue,
+          notificationSettings:
+            storedSettings as unknown as Prisma.InputJsonValue,
           // marketingEmails düğmesi pazarlama e-postalarının kullanıcıya görünen
           // TEK anahtarıdır; gerçek gönderim kapıları ise User.acceptsMarketingEmails
           // kolonunu okur (bülten aboneliği, fiyat-düşüş e-postası, üyelik teklif
@@ -578,9 +624,11 @@ export class UserProfileService {
   /**
    * Delete user account
    * Only allowed if:
-   * - All products are removed (inactive, sold, rejected, draft)
+   * - No reserved listings (bound to a sale or trade in progress)
    * - No active trades (pending, accepted, shipped, etc.)
    * - No pending orders (pending_payment, paid, preparing, shipped, delivered)
+   * Active and pending listings no longer block (S3 — Apple 5.1.1(v), Play):
+   * they are deactivated inside the deletion transaction.
    *
    * Kimlik, anonimleştirmeden ÖNCE `DeletedUserIdentity`'ye kopyalanır; arşiv
    * yazılamazsa hesap da silinmez (aylık resmî bildirim yükümlülüğü).
@@ -594,180 +642,10 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    // Check 1: Active products (active, pending, reserved)
-    const activeProducts = await this.prisma.product.findMany({
-      where: {
-        ...catalogProductWhere(),
-        sellerId: userId,
-        status: {
-          in: [
-            ProductStatus.active,
-            ProductStatus.pending,
-            ProductStatus.reserved,
-          ],
-        },
-      },
-      select: { id: true, title: true, status: true },
-    });
-
-    // Check 2: every non-terminal legacy and escrow trade state.
-    const activeTrades = await this.prisma.trade.findMany({
-      where: {
-        OR: [{ initiatorId: userId }, { receiverId: userId }],
-        status: {
-          in: [
-            TradeStatus.pending,
-            TradeStatus.accepted,
-            TradeStatus.initiator_shipped,
-            TradeStatus.receiver_shipped,
-            TradeStatus.both_shipped,
-            TradeStatus.initiator_received,
-            TradeStatus.receiver_received,
-            TradeStatus.awaiting_payment,
-            TradeStatus.shipping_to_warehouse,
-            TradeStatus.at_warehouse,
-            TradeStatus.admin_reviewing,
-            TradeStatus.shipping_to_recipients,
-            TradeStatus.returning,
-            TradeStatus.disputed,
-          ],
-        },
-      },
-      select: { id: true, tradeNumber: true, status: true },
-    });
-
-    // Check 3: every order state with an unfinished fulfilment/refund obligation.
-    const pendingOrders = await this.prisma.order.findMany({
-      where: {
-        OR: [{ buyerId: userId }, { sellerId: userId }],
-        status: {
-          in: [
-            OrderStatus.pending_payment,
-            OrderStatus.paid,
-            OrderStatus.preparing,
-            OrderStatus.shipped,
-            OrderStatus.delivered,
-            OrderStatus.awaiting_buyer_confirmation,
-            OrderStatus.refund_requested,
-          ],
-        },
-      },
-      select: { id: true, orderNumber: true, status: true },
-    });
-
-    const openRefunds = await this.prisma.refundRequest.findMany({
-      where: {
-        OR: [
-          { requesterId: userId },
-          { order: { OR: [{ buyerId: userId }, { sellerId: userId }] } },
-        ],
-        status: {
-          in: [
-            RefundRequestStatus.pending_review,
-            RefundRequestStatus.approved,
-            RefundRequestStatus.wait_for_delivery,
-            RefundRequestStatus.return_shipment_open,
-            RefundRequestStatus.return_in_transit,
-            RefundRequestStatus.return_delivered,
-            RefundRequestStatus.disputed,
-          ],
-        },
-      },
-      select: { id: true, status: true },
-    });
-
-    const pendingPayouts = await this.prisma.payoutTransfer.findMany({
-      where: {
-        sellerId: userId,
-        status: {
-          in: [
-            PayoutStatus.pending,
-            PayoutStatus.processing,
-            PayoutStatus.retry_pending,
-            PayoutStatus.returned,
-          ],
-        },
-      },
-      select: { id: true, status: true },
-    });
-
-    const openPaymentHolds = await this.prisma.paymentHold.findMany({
-      where: {
-        sellerId: userId,
-        status: {
-          in: [PaymentHoldStatus.held, PaymentHoldStatus.released],
-        },
-      },
-      select: { id: true, status: true },
-    });
-
-    // Build blocking reasons as catalog payloads; AllExceptionsFilter renders
-    // both the top-level message and each errors[] entry in the request locale
-    // while preserving the {errors, details} contract the client relies on (#224).
-    const errors: ReturnType<typeof i18nMessage>[] = [];
-
-    if (activeProducts.length > 0) {
-      errors.push(
-        i18nMessage("server.user.deleteBlockedActiveListings", {
-          count: activeProducts.length,
-        }),
-      );
-    }
-
-    if (activeTrades.length > 0) {
-      errors.push(
-        i18nMessage("server.user.deleteBlockedActiveTrades", {
-          count: activeTrades.length,
-        }),
-      );
-    }
-
-    if (pendingOrders.length > 0) {
-      errors.push(
-        i18nMessage("server.user.deleteBlockedPendingOrders", {
-          count: pendingOrders.length,
-        }),
-      );
-    }
-
-    if (openRefunds.length > 0) {
-      errors.push(
-        i18nMessage("server.user.deleteBlockedOpenRefunds", {
-          count: openRefunds.length,
-        }),
-      );
-    }
-
-    if (pendingPayouts.length > 0) {
-      errors.push(
-        i18nMessage("server.user.deleteBlockedPendingPayouts", {
-          count: pendingPayouts.length,
-        }),
-      );
-    }
-
-    if (openPaymentHolds.length > 0) {
-      errors.push(
-        i18nMessage("server.user.deleteBlockedPaymentHolds", {
-          count: openPaymentHolds.length,
-        }),
-      );
-    }
-
-    if (errors.length > 0) {
-      throw new BadRequestException({
-        ...i18nMessage("server.user.deleteAccountBlocked"),
-        errors,
-        details: {
-          activeProducts: activeProducts.length,
-          activeTrades: activeTrades.length,
-          pendingOrders: pendingOrders.length,
-          openRefunds: openRefunds.length,
-          pendingPayouts: pendingPayouts.length,
-          openPaymentHolds: openPaymentHolds.length,
-        },
-      });
-    }
+    // Engeller işlem dışında hızlı ret için bir kez, işlem İÇİNDE (ilanlar
+    // kilitlenip pasife alındıktan sonra) bir kez daha denetlenir: arada
+    // başlayan checkout/takas açık siparişle anonimleşmiş hesap bırakmasın.
+    await this.assertNoDeletionBlockers(this.prisma, userId);
 
     // Tüm kontroller geçti → hesabı ANONİMLEŞTİR (hard-delete DEĞİL).
     // User satırı KORUNUR; böylece sipariş/fatura/ödeme/iade gibi finansal FK'lar bozulmaz
@@ -775,9 +653,20 @@ export class UserProfileService {
     // Silinen: kimlik-doğrulama/oturum, ödeme kimlik bilgileri ve doğrudan iletişim PII'si.
     // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
     // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
+    let deactivated: AccountDeletionListingsResult = {
+      productIds: [],
+      cancelledOffers: [],
+    };
+    let cancelledBuyerOffers: CancelledBuyerOffer[] = [];
     try {
       await this.prisma.$transaction(
         async (tx) => {
+          // Kullanıcı satırı FOR UPDATE: bu hesabı alıcı/takas tarafı olarak
+          // kullanan checkout, teklif kabulü ve takas işlemleri (FOR SHARE)
+          // silme commit olana dek bekler ya da önce biter ve aşağıdaki engel
+          // denetimince görülür (bkz. user-row-lock). İlk kilit olmalı.
+          await lockUserForDeletion(tx, userId);
+
           // 0) YASAL KİMLİK ARŞİVİ — her şeyden ÖNCE.
           // Aylık resmî bildirim, hesap silinse de kimliği gerektiriyor; bu
           // satır yazılmadan hiçbir şey yok edilmemeli. Sıra zorunlu: (3)
@@ -786,7 +675,25 @@ export class UserProfileService {
           // veriyi sessizce ve kalıcı olarak kaybettirirdi.
           await this.archiveIdentity(tx, userId, options);
 
-          // 0c) Sign in with Apple token iptali (App Store 5.1.1(v)): iş
+          // 0b) Yayındaki ve onay bekleyen ilanlar pasife (neden:
+          // account_deleted). Anonimleştirmeyle AYNI transaction: silme
+          // düşerse ilanlar da açık kalır.
+          deactivated = await deactivateListingsForAccountDeletion(tx, userId);
+
+          // 0b2) Hesabın ALICI olarak verdiği açık teklifler de kapanır:
+          // satıcı anonim alıcıdan gelen teklifi kabul edip açık siparişli
+          // silinmiş hesap bırakamasın. Satıcılara commit sonrası bildirim.
+          cancelledBuyerOffers = await cancelBuyerOffersForAccountDeletion(
+            tx,
+            userId,
+          );
+
+          // 0c) Engeller KİLİT ALTINDA yeniden: ilanlar kilitlenip pasife
+          // alındı; dış denetimden bu yana başlamış bir sipariş/takas/ödeme
+          // varsa burada görünür ve tüm işlem geri alınır.
+          await this.assertNoDeletionBlockers(tx, userId);
+
+          // 0d) Sign in with Apple token iptali (App Store 5.1.1(v)): iş
           // outbox'a bu transaction'la yazılır, Apple çağrısı commit SONRASI
           // drainer'dadır. Apple'a ulaşılamaması silmeyi engellemez; outbox
           // yeniden dener. OAuthAccount aşağıda silinir, token satırı kalır.
@@ -863,6 +770,8 @@ export class UserProfileService {
       // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
       // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
     } catch (error: any) {
+      // İşlem içi engel denetimi: istemci sözleşmesi aynı 400 (errors[]/details).
+      if (isDeletionBlocked(error)) throw error;
       // Ayırt edilebilir işaret: "arşiv yazılamadı" ile "FK patladı" aynı 400'e
       // düşüyor; log'da ayrışmazsa kimlik kaybı riski taşıyan hata fark edilmez.
       this.logger.error(
@@ -870,6 +779,262 @@ export class UserProfileService {
       );
       throw new BadRequestException(
         i18nMessage("server.user.deleteAccountFailed"),
+      );
+    }
+
+    // Commit SONRASI: hesap silindi; arama/önbellek senkronu ve bildirimler
+    // silmeyi geri çeviremez, hata yalnız loglanır.
+    await this.syncDeactivatedListings(userId, deactivated.productIds);
+    await this.notifyCancelledOfferBuyers(deactivated.cancelledOffers);
+    await this.notifyCancelledOfferSellers(cancelledBuyerOffers);
+  }
+
+  /**
+   * Silinen alıcının kapanan tekliflerinin SATICILARINA bildirim (ilan
+   * bildirimi alıcıya gider, bu satıcıya). Bildirim hatası yutulur.
+   */
+  private async notifyCancelledOfferSellers(
+    offers: CancelledBuyerOffer[],
+  ): Promise<void> {
+    for (const offer of offers) {
+      await this.notifications
+        .notifyOfferCancelledBuyerDeleted(offer.sellerId, offer.productId)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `offer-cancelled (buyer deleted) notification failed (${offer.id}): ${errorMessage(error)}`,
+          ),
+        );
+    }
+  }
+
+  /**
+   * Hesap silmeyle kapanan tekliflerin alıcılarına bildirim — satıcının ilan
+   * silme yoluyla AYNI şablon (`OFFER_CANCELLED_LISTING_REMOVED`); alıcı
+   * süre dolana dek "yanıt bekliyor" görmez. Bildirim hatası yutulur.
+   */
+  private async notifyCancelledOfferBuyers(
+    offers: AccountDeletionListingsResult["cancelledOffers"],
+  ): Promise<void> {
+    for (const offer of offers) {
+      await this.notifications
+        .notifyOfferCancelledListingRemoved(offer.buyerId, offer.productId)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `offer-cancelled notification (account deletion) failed (${offer.id}): ${errorMessage(error)}`,
+          ),
+        );
+    }
+  }
+
+  /**
+   * Hesap silmeyi engelleyen açık yükümlülükler (rezerve ilan, takas, sipariş,
+   * iade, payout, blokaj). Varsa 400 `server.user.deleteAccountBlocked`
+   * (`errors[]` + `details` sözleşmesi). Silme bunu işlem dışında ve işlem
+   * içinde AYNI kuralla çağırır (`client` = prisma ya da tx).
+   */
+  private async assertNoDeletionBlockers(
+    client: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<void> {
+    // Check 1: süren satışa/takasa bağlı (rezerve) ilanlar. Aktif ve onay
+    // bekleyen ilanlar artık engel değil — silme transaction'ında pasife
+    // alınır (deactivateListingsForAccountDeletion).
+    const activeProducts = await client.product.findMany({
+      where: {
+        ...catalogProductWhere(),
+        sellerId: userId,
+        status: { in: [...ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES] },
+      },
+      select: { id: true, title: true, status: true },
+    });
+
+    // Check 2: every non-terminal legacy and escrow trade state.
+    const activeTrades = await client.trade.findMany({
+      where: {
+        OR: [{ initiatorId: userId }, { receiverId: userId }],
+        status: {
+          in: [
+            TradeStatus.pending,
+            TradeStatus.accepted,
+            TradeStatus.initiator_shipped,
+            TradeStatus.receiver_shipped,
+            TradeStatus.both_shipped,
+            TradeStatus.initiator_received,
+            TradeStatus.receiver_received,
+            TradeStatus.awaiting_payment,
+            TradeStatus.shipping_to_warehouse,
+            TradeStatus.at_warehouse,
+            TradeStatus.admin_reviewing,
+            TradeStatus.shipping_to_recipients,
+            TradeStatus.returning,
+            TradeStatus.disputed,
+          ],
+        },
+      },
+      select: { id: true, tradeNumber: true, status: true },
+    });
+
+    // Check 3: every order state with an unfinished fulfilment/refund obligation.
+    const pendingOrders = await client.order.findMany({
+      where: {
+        OR: [{ buyerId: userId }, { sellerId: userId }],
+        status: {
+          in: [
+            OrderStatus.pending_payment,
+            OrderStatus.paid,
+            OrderStatus.preparing,
+            OrderStatus.shipped,
+            OrderStatus.delivered,
+            OrderStatus.awaiting_buyer_confirmation,
+            OrderStatus.refund_requested,
+          ],
+        },
+      },
+      select: { id: true, orderNumber: true, status: true },
+    });
+
+    const openRefunds = await client.refundRequest.findMany({
+      where: {
+        OR: [
+          { requesterId: userId },
+          { order: { OR: [{ buyerId: userId }, { sellerId: userId }] } },
+        ],
+        status: {
+          in: [
+            RefundRequestStatus.pending_review,
+            RefundRequestStatus.approved,
+            RefundRequestStatus.wait_for_delivery,
+            RefundRequestStatus.return_shipment_open,
+            RefundRequestStatus.return_in_transit,
+            RefundRequestStatus.return_delivered,
+            RefundRequestStatus.disputed,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const pendingPayouts = await client.payoutTransfer.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [
+            PayoutStatus.pending,
+            PayoutStatus.processing,
+            PayoutStatus.retry_pending,
+            PayoutStatus.returned,
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    const openPaymentHolds = await client.paymentHold.findMany({
+      where: {
+        sellerId: userId,
+        status: {
+          in: [PaymentHoldStatus.held, PaymentHoldStatus.released],
+        },
+      },
+      select: { id: true, status: true },
+    });
+
+    // Build blocking reasons as catalog payloads; AllExceptionsFilter renders
+    // both the top-level message and each errors[] entry in the request locale
+    // while preserving the {errors, details} contract the client relies on (#224).
+    const errors: ReturnType<typeof i18nMessage>[] = [];
+
+    if (activeProducts.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedReservedListings", {
+          count: activeProducts.length,
+        }),
+      );
+    }
+
+    if (activeTrades.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedActiveTrades", {
+          count: activeTrades.length,
+        }),
+      );
+    }
+
+    if (pendingOrders.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPendingOrders", {
+          count: pendingOrders.length,
+        }),
+      );
+    }
+
+    if (openRefunds.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedOpenRefunds", {
+          count: openRefunds.length,
+        }),
+      );
+    }
+
+    if (pendingPayouts.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPendingPayouts", {
+          count: pendingPayouts.length,
+        }),
+      );
+    }
+
+    if (openPaymentHolds.length > 0) {
+      errors.push(
+        i18nMessage("server.user.deleteBlockedPaymentHolds", {
+          count: openPaymentHolds.length,
+        }),
+      );
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException({
+        ...i18nMessage("server.user.deleteAccountBlocked"),
+        errors,
+        details: {
+          // Ad sözleşme gereği korunur (mobil 1.0.5/1.0.6 okur); artık yalnız
+          // silmeyi engelleyen REZERVE ilanları sayar.
+          activeProducts: activeProducts.length,
+          activeTrades: activeTrades.length,
+          pendingOrders: pendingOrders.length,
+          openRefunds: openRefunds.length,
+          pendingPayouts: pendingPayouts.length,
+          openPaymentHolds: openPaymentHolds.length,
+        },
+      });
+    }
+  }
+
+  /**
+   * Hesap silmede pasife alınan ilanların görünürlüğünü tazeler — ilan
+   * yazımlarının ortak üçlüsü `refreshProductVisibility` (detay/liste önbelleği,
+   * arama dizini, web ISR) + satıcının üyelik önbelleği (ilan sayacı). Aksi
+   * hâlde ES ve web ISR silinen satıcının ilanlarını göstermeye devam ederdi.
+   * Commit sonrasıdır: hata yalnız loglanır, silmeyi geri çevirmez.
+   */
+  private async syncDeactivatedListings(
+    sellerId: string,
+    productIds: string[],
+  ): Promise<void> {
+    if (productIds.length === 0) return;
+    try {
+      await refreshProductVisibility(
+        {
+          cache: this.cache,
+          searchService: this.searchService,
+          logger: this.logger,
+        },
+        productIds,
+      );
+      await this.cache.del(`membership:${sellerId}`);
+    } catch (error) {
+      this.logger.warn(
+        `account-deletion listing visibility refresh failed: ${errorMessage(error)}`,
       );
     }
   }

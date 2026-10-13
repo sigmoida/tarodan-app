@@ -1,5 +1,10 @@
 import { UserProfileService } from "./user-profile.service";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { ANONYMIZED_DISPLAY_NAME } from "../../../common/helpers/deleted-user-identity";
+
+jest.mock("../../../common/helpers/revalidate", () => ({
+  notifyWebRevalidate: jest.fn(),
+}));
 
 /**
  * Hesap silme, kimliği geri dönülemez şekilde anonimleştiriyor. Yasal aylık
@@ -31,8 +36,59 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     deletedAt: null,
   };
 
-  function makeService(overrides: { upsert?: jest.Mock } = {}) {
+  function makeService(
+    overrides: {
+      upsert?: jest.Mock;
+      listings?: Array<{ id: string; status: string }>;
+      /** İşlem İÇİ engel denetiminde görünen açık sipariş (yarış). */
+      ordersInTx?: Array<{ id: string; status: string }>;
+      /** Pasife alınan ilanlardaki açık teklifler. */
+      openOffers?: Array<{ id: string; buyerId: string; productId: string }>;
+      /** Silinen hesabın ALICI olarak verdiği açık teklifler. */
+      buyerOffers?: Array<{ id: string; sellerId: string; productId: string }>;
+    } = {},
+  ) {
+    const listings = overrides.listings ?? [];
+    const txEmpty = () => ({ findMany: jest.fn().mockResolvedValue([]) });
     const tx = {
+      // İlan satırı kilidi (SELECT … FOR UPDATE).
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      // S3: aktif / onay bekleyen ilanlar silme transaction'ında pasife.
+      product: {
+        // Rezerve-ilan engel sorgusu boş; pasifleştirme okumaları ilanları görür.
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            where?.status?.in?.length === 1 && where.status.in[0] === "reserved"
+              ? []
+              : listings,
+          ),
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      // İşlem içi engel denetimi.
+      trade: txEmpty(),
+      order: {
+        findMany: jest.fn().mockResolvedValue(overrides.ordersInTx ?? []),
+      },
+      refundRequest: txEmpty(),
+      payoutTransfer: txEmpty(),
+      paymentHold: txEmpty(),
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      offer: {
+        // Alıcı tarafı sorguları `where.buyerId` (aday okuma) ya da
+        // `where.cancelReason` (yazım sonrası yeniden okuma) ile, ilan tarafı
+        // `productId` ile gelir.
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            where?.buyerId || where?.cancelReason
+              ? (overrides.buyerOffers ?? [])
+              : (overrides.openOffers ?? []),
+          ),
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
         update: jest.fn().mockResolvedValue(user),
@@ -82,6 +138,17 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       $transaction: jest.fn((fn: (client: unknown) => unknown) => fn(tx)),
     };
 
+    const search = { syncProduct: jest.fn().mockResolvedValue(undefined) };
+    const cache = {
+      del: jest.fn().mockResolvedValue(undefined),
+      delPattern: jest.fn().mockResolvedValue(undefined),
+    };
+    const notifications = {
+      notifyOfferCancelledListingRemoved: jest
+        .fn()
+        .mockResolvedValue(undefined),
+      notifyOfferCancelledBuyerDeleted: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new UserProfileService(
       prisma as never,
       {} as never,
@@ -89,8 +156,11 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       {} as never,
       { recordMarketingChange: jest.fn() } as never, // consents
       { syncUserConsent: jest.fn() } as never, // newsletter
+      search as never,
+      cache as never,
+      notifications as never,
     );
-    return { service, prisma, tx };
+    return { service, prisma, tx, search, cache, notifications };
   }
 
   it("arşivi, adresler silinmeden ve satır anonimleştirilmeden ÖNCE yazar", async () => {
@@ -210,5 +280,246 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     const { data } = tx.user.update.mock.calls[0][0];
     expect(data.email).toBe("deleted_user-1@deleted.local");
     expect(data.displayName).toBe(ANONYMIZED_DISPLAY_NAME);
+  });
+
+  describe("aktif ilanlar (S3 — Apple 5.1.1(v))", () => {
+    const listings = [
+      { id: "p-active", status: "active" },
+      { id: "p-pending", status: "pending" },
+    ];
+
+    it("ilanlar anonimleştirmeyle AYNI transaction'da, arşivden sonra pasife alınır", async () => {
+      const { service, tx } = makeService({ listings });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.product.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: "inactive" } }),
+      );
+      const deactivateOrder = tx.product.updateMany.mock.invocationCallOrder[0];
+      expect(
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+      ).toBeLessThan(deactivateOrder);
+      expect(deactivateOrder).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("commit sonrası arama dizini, önbellek, web ISR ve üyelik önbelleği tazelenir", async () => {
+      const { service, search, cache } = makeService({ listings });
+
+      await service.deleteAccount("user-1");
+
+      expect(search.syncProduct).toHaveBeenCalledWith("p-active");
+      expect(search.syncProduct).toHaveBeenCalledWith("p-pending");
+      expect(cache.delPattern).toHaveBeenCalledWith("products:list:*");
+      expect(cache.del).toHaveBeenCalledWith("products:detail:p-active");
+      // refreshProductVisibility: web ISR de tazelenir.
+      expect(notifyWebRevalidate).toHaveBeenCalledWith([
+        "products:list",
+        "product:p-active",
+        "product:p-pending",
+      ]);
+      // İlan sayacı üyelik önbelleğinde.
+      expect(cache.del).toHaveBeenCalledWith("membership:user-1");
+    });
+
+    it("ilan yoksa senkron çağrısı yapılmaz", async () => {
+      const { service, search, cache } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(search.syncProduct).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+    });
+
+    it("senkron hatası silmeyi başarısız göstermez (hesap zaten silindi)", async () => {
+      const { service, search, cache } = makeService({ listings });
+      cache.delPattern.mockRejectedValue(new Error("redis down"));
+      search.syncProduct.mockRejectedValue(new Error("es down"));
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme transaction'ı düşerse senkron yapılmaz", async () => {
+      const upsert = jest.fn().mockRejectedValue(new Error("db down"));
+      const { service, search } = makeService({ upsert, listings });
+
+      await expect(service.deleteAccount("user-1")).rejects.toBeDefined();
+      expect(search.syncProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  // P1 inceleme (TOCTOU): dış denetimden sonra başlayan bir checkout, ilanlar
+  // kilitlenip pasife alındıktan sonraki işlem içi denetimde görünür.
+  describe("işlem içi engel denetimi", () => {
+    it("pasifleştirmeden SONRA, anonimleştirmeden ÖNCE yeniden denetler", async () => {
+      const { service, tx } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+      });
+
+      await service.deleteAccount("user-1");
+
+      const statusUpdate = tx.product.updateMany.mock.invocationCallOrder[0];
+      const blockerCheck = tx.order.findMany.mock.invocationCallOrder[0];
+      expect(statusUpdate).toBeLessThan(blockerCheck);
+      expect(blockerCheck).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("arada açılmış sipariş → aynı engel yanıtı, hesap anonimleşmez", async () => {
+      const { service, tx, search } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        ordersInTx: [{ id: "o1", status: "pending_payment" }],
+      });
+
+      const error = (await service.deleteAccount("user-1").then(
+        () => {
+          throw new Error("deleteAccount reddedilmeliydi");
+        },
+        (e: unknown) => e,
+      )) as { getResponse(): any };
+
+      const body = error.getResponse();
+      expect(body.i18nKey).toBe("server.user.deleteAccountBlocked");
+      expect(body.details.pendingOrders).toBe(1);
+      expect(tx.user.update).not.toHaveBeenCalled();
+      // İşlem geri alındı: commit sonrası senkron da yok.
+      expect(search.syncProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  // P1 inceleme: hesap silmeyle kapanan tekliflerin alıcıları, satıcının ilan
+  // silme yoluyla aynı bildirimi alır (commit SONRASI).
+  describe("kapanan tekliflerin alıcıları", () => {
+    const openOffers = [{ id: "o1", buyerId: "b1", productId: "p-active" }];
+
+    it("commit sonrası bildirim gider", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledListingRemoved,
+      ).toHaveBeenCalledWith("b1", "p-active");
+    });
+
+    it("bildirim hatası silmeyi bozmaz", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+      });
+      notifications.notifyOfferCancelledListingRemoved.mockRejectedValue(
+        new Error("push down"),
+      );
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa bildirim gitmez", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(
+        notifications.notifyOfferCancelledListingRemoved,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  // Hesap silme ile alıcı/takas tarafı yarışı (TOCTOU): silme kullanıcı satırını
+  // FOR UPDATE kilitler; böylece eşzamanlı checkout/teklif kabulü/takas ya
+  // beklemeden önce biter (engel denetimi görür) ya da silmeden sonra reddedilir.
+  describe("kullanıcı satırı kilidi", () => {
+    it("ilk iş kullanıcı satırını FOR UPDATE kilitler (arşivden ve ilan kilidinden önce)", async () => {
+      const { service, tx } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+      });
+
+      await service.deleteAccount("user-1");
+
+      const firstQuery = (tx.$queryRaw.mock.calls[0][0] as string[])
+        .join("?")
+        .replace(/\s+/g, " ");
+      expect(firstQuery).toContain("FROM users WHERE id = ?");
+      expect(firstQuery).toContain("FOR UPDATE");
+      expect(tx.$queryRaw.mock.calls[0][1]).toBe("user-1");
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+      );
+      // İlan satırı kilidi sonra gelir.
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // Silinen kullanıcının ALICI olarak verdiği bekleyen teklifler kapanır;
+  // satıcılara (mevcut ilan-silme bildiriminden ayrı şablonla) haber gider.
+  describe("alıcı olarak verilen teklifler", () => {
+    const buyerOffers = [{ id: "bo1", sellerId: "s1", productId: "p-x" }];
+
+    it("transaction içinde, engel denetiminden önce kapatılır", async () => {
+      const { service, tx } = makeService({ buyerOffers });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.offer.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "cancelled" }),
+        }),
+      );
+      expect(tx.offer.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.order.findMany.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("commit sonrası satıcılara bildirim gider", async () => {
+      const { service, notifications } = makeService({ buyerOffers });
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledBuyerDeleted,
+      ).toHaveBeenCalledWith("s1", "p-x");
+    });
+
+    it("bildirim hatası silmeyi bozmaz", async () => {
+      const { service, notifications } = makeService({ buyerOffers });
+      notifications.notifyOfferCancelledBuyerDeleted.mockRejectedValue(
+        new Error("push down"),
+      );
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa satıcılara bildirim gitmez", async () => {
+      const { service, notifications } = makeService({
+        buyerOffers,
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(
+        notifications.notifyOfferCancelledBuyerDeleted,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("teklifi olmayan hesapta bildirim yok", async () => {
+      const { service, notifications } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledBuyerDeleted,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

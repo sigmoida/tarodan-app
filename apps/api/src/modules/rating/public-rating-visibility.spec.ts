@@ -1,4 +1,5 @@
 import { RatingService } from "./rating.service";
+import { userBlockServiceStub } from "../user-block/user-block.testing";
 import { ProductCommonService } from "../product/product-common.service";
 import { publicProductRatingWhere } from "../../common/helpers/public-rating";
 
@@ -28,6 +29,7 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
         {} as any,
         {} as any,
         { isEnabled: false } as any,
+        userBlockServiceStub() as any,
       );
       return { service, prisma };
     };
@@ -81,6 +83,7 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
         {} as any,
         {} as any,
         { isEnabled: false } as any,
+        userBlockServiceStub() as any,
       );
       return { service, prisma };
     };

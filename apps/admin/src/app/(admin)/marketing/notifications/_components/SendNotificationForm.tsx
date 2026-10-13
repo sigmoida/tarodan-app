@@ -177,7 +177,12 @@ export function SendNotificationForm({
     !emailSelected ||
     (values.emailSubject.trim().length > 0 &&
       values.emailHtml.trim().length > 0);
-  const canSend = titleOk && bodyOk && values.channels.length > 0 && emailOk;
+  const canSend =
+    titleOk &&
+    bodyOk &&
+    values.channels.length > 0 &&
+    values.mailingType !== "" &&
+    emailOk;
 
   return (
     <>
@@ -247,6 +252,43 @@ export function SendNotificationForm({
               </div>
             </SectionCard>
 
+            {/* Tür her kanalı belirler (push + bildirim kutusu + e-posta);
+                bu yüzden e-posta bölümünde değil, her gönderimde görünür. */}
+            <SectionCard
+              title={t("admin.marketing.notifications.mailingType.label")}
+              bodyClassName="space-y-2"
+            >
+              <FormSelect
+                name="mailingType"
+                placeholder={t(
+                  "admin.marketing.notifications.mailingType.placeholder",
+                )}
+                options={mailingTypes}
+              />
+              {values.mailingType && (
+                <p className="text-xs text-muted">
+                  {values.mailingType === "marketing"
+                    ? t(
+                        "admin.marketing.notifications.mailingType.marketingHint",
+                      )
+                    : t(
+                        "admin.marketing.notifications.mailingType.announcementHint",
+                      )}
+                </p>
+              )}
+              {values.mailingType && audienceCounts && (
+                <p className="text-xs font-medium text-body">
+                  {t("admin.marketing.notifications.recipientCount", {
+                    count:
+                      values.mailingType === "marketing"
+                        ? audienceCounts.marketing
+                        : audienceCounts.total,
+                    total: audienceCounts.total,
+                  })}
+                </p>
+              )}
+            </SectionCard>
+
             <SectionCard
               title={t("admin.marketing.notifications.deliveryChannel")}
               bodyClassName="space-y-4"
@@ -282,33 +324,6 @@ export function SendNotificationForm({
                     "admin.marketing.notifications.emailSubjectPlaceholder",
                   )}
                 />
-                <div className="space-y-2">
-                  <FormSelect
-                    name="mailingType"
-                    label={t("admin.marketing.notifications.mailingType.label")}
-                    options={mailingTypes}
-                  />
-                  <p className="text-xs text-muted">
-                    {values.mailingType === "marketing"
-                      ? t(
-                          "admin.marketing.notifications.mailingType.marketingHint",
-                        )
-                      : t(
-                          "admin.marketing.notifications.mailingType.announcementHint",
-                        )}
-                  </p>
-                  {audienceCounts && (
-                    <p className="text-xs font-medium text-body">
-                      {t("admin.marketing.notifications.recipientCount", {
-                        count:
-                          values.mailingType === "marketing"
-                            ? audienceCounts.marketing
-                            : audienceCounts.total,
-                        total: audienceCounts.total,
-                      })}
-                    </p>
-                  )}
-                </div>
                 <EmailHtmlEditor
                   name="emailHtml"
                   placeholder={t(
@@ -487,6 +502,12 @@ export function SendNotificationForm({
                     targets.find((target) => target.key === values.targetType)
                       ?.label
                   }
+                </Field>
+                <Field
+                  label={t("admin.marketing.notifications.mailingType.label")}
+                >
+                  {mailingTypes.find((type) => type.value === values.mailingType)
+                    ?.label ?? "—"}
                 </Field>
                 <Field label={t("admin.marketing.notifications.channels")}>
                   {values.channels.length === 0

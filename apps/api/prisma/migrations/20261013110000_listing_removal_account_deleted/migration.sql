@@ -1,0 +1,16 @@
+-- İlan kaldırma nedeni: `account_deleted` (docs/LISTING_REMOVAL_REASONS.md).
+--
+-- Hesap silme artık aktif ilan yüzünden reddedilmez (Apple 5.1.1(v), Play hesap
+-- silme politikası): satıcının aktif ve onay bekleyen ilanları silme anında
+-- pasife alınır ve nedeni "satıcı hesabını sildi" olarak kaydedilir.
+--
+-- CANLI VERİ GÜVENLİĞİ: yalnız ekleme. Tek bir yeni enum değeri; hiçbir tablo,
+-- kolon ya da satır değişmez. GERİ DOLDURMA YOK: bu göçten önce silinen
+-- hesapların ilanları zaten engel yüzünden pasife alınmış ya da kaldırılmıştı.
+-- Geri alma: değer kullanılmıyorsa bırakılması zararsızdır (PostgreSQL enum
+-- değeri silmeyi desteklemez); kod geri alınırsa değer yalnız yazılmaz olur.
+--
+-- Kataloğun sırasını korumak için `seller_suspended`tan hemen sonra eklenir.
+-- NOT: yeni enum değeri bu göç içinde kullanılmaz, bu yüzden göç transaction'ı
+-- içinde güvenlidir (PostgreSQL 12+).
+ALTER TYPE "ListingRemovalReason" ADD VALUE IF NOT EXISTS 'account_deleted' AFTER 'seller_suspended';

@@ -1,6 +1,9 @@
 import {
   EMAIL_PATTERN_SOURCE,
+  INSTAGRAM_HANDLE_PATTERN_SOURCE,
   TR_MOBILE_PHONE_PATTERN_SOURCE,
+  WHATSAPP_PATTERN_SOURCE,
+  wordLedSource,
 } from "./contact-patterns";
 import { ContentFilterService } from "../../modules/messaging/content-filter.service";
 
@@ -53,5 +56,40 @@ describe("content filter uses the shared patterns", () => {
         }),
       ]),
     );
+  });
+});
+
+// P1 inceleme: kelime sınırsız kalıplar diecast notlarını yakalıyordu.
+describe("social contact patterns are Turkish word-bounded", () => {
+  const matches = (source: string, text: string) =>
+    new RegExp(source, "gi").test(text);
+
+  it.each([
+    "Big Rig modeli",
+    "MiG 29 maketi",
+    "Hot Wheels Big Air",
+    "Kawasaki 1 adet",
+  ])("does not match a model name: %s", (text) => {
+    expect(matches(INSTAGRAM_HANDLE_PATTERN_SOURCE, text)).toBe(false);
+    expect(matches(WHATSAPP_PATTERN_SOURCE, text)).toBe(false);
+  });
+
+  it.each(["ig: tarodan_shop", "Instagram @tarodan", "insta tarodan.tr"])(
+    "matches an Instagram handle: %s",
+    (text) => {
+      expect(matches(INSTAGRAM_HANDLE_PATTERN_SOURCE, text)).toBe(true);
+    },
+  );
+
+  it.each(["wp 05321234567", "WhatsApp: +90 532", "wa:0532"])(
+    "matches a WhatsApp number: %s",
+    (text) => {
+      expect(matches(WHATSAPP_PATTERN_SOURCE, text)).toBe(true);
+    },
+  );
+
+  it("treats Turkish letters as word characters (ş, ğ)", () => {
+    expect(matches(wordLedSource(["ig"]), "Şig: x")).toBe(false);
+    expect(matches(wordLedSource(["ig"]), "ğig: x")).toBe(false);
   });
 });

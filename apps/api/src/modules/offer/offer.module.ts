@@ -15,6 +15,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
 import { OrderModule } from "../order/order.module";
 import { ProductModule } from "../product/product.module";
+import { MessagingModule } from "../messaging/messaging.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -28,6 +29,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     StorageModule,
     OrderModule,
     ProductModule,
+    // Teklif notu mesajlaşmayla aynı içerik filtresinden geçer (Apple 1.2).
+    MessagingModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OfferController],
