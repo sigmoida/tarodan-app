@@ -39,7 +39,12 @@ describe("TradeLifecycleService — takas metinleri içerik filtresi", () => {
     await expect(
       service.rejectTrade("t1", "u1", { reason: "küfür" }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(screen).toHaveBeenCalledWith("küfür");
+    expect(screen).toHaveBeenCalledWith("küfür", {
+      entityType: "trade",
+      entityId: "t1",
+      userId: "u1",
+      field: "trade_reject_reason",
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 

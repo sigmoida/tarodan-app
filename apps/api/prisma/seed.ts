@@ -70,6 +70,10 @@ import {
 } from "./seed-demo-config";
 import { SEED_COMMISSION_RULE_SET_IDS } from "./seed-ids";
 import { seedHeroContent } from "./seed-hero-content";
+import {
+  INSTAGRAM_HANDLE_PATTERN_SOURCE,
+  WHATSAPP_PATTERN_SOURCE,
+} from "../src/common/helpers/contact-patterns";
 import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
 const prisma = new PrismaClient();
 
@@ -1288,14 +1292,17 @@ async function main() {
         priority: 10,
       },
     }),
+    // Kalıp ortak kaynaktan (Türkçe kelime sınırlı): "Kawasaki 1" ya da
+    // "Big Rig" eşleşmez. `update` kalıbı tazeler — eski sınırsız kalıp
+    // meşru teklif notlarını yakalıyordu.
     prisma.contentFilter.upsert({
       where: { id: "whatsapp-filter" },
-      update: {},
+      update: { pattern: WHATSAPP_PATTERN_SOURCE },
       create: {
         id: "whatsapp-filter",
         filterType: "social_media",
         name: "WhatsApp",
-        pattern: "(whatsapp|wp|wa)[\\s:]*[\\d+()-]+",
+        pattern: WHATSAPP_PATTERN_SOURCE,
         replacement: "[iletişim bilgisi gizlendi]",
         requiresApproval: true,
         priority: 10,
@@ -1303,12 +1310,12 @@ async function main() {
     }),
     prisma.contentFilter.upsert({
       where: { id: "instagram-filter" },
-      update: {},
+      update: { pattern: INSTAGRAM_HANDLE_PATTERN_SOURCE },
       create: {
         id: "instagram-filter",
         filterType: "social_media",
         name: "Instagram",
-        pattern: "(instagram|ig|insta)[:\\s@]+[a-zA-Z0-9_.]+",
+        pattern: INSTAGRAM_HANDLE_PATTERN_SOURCE,
         replacement: "[sosyal medya gizlendi]",
         requiresApproval: true,
         priority: 8,

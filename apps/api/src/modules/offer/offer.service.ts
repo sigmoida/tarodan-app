@@ -121,9 +121,14 @@ export class OfferService {
    */
   private async screenMessage(
     message: string | undefined,
+    authorId: string,
   ): Promise<string | null> {
     const screened = this.contentFilter
-      ? await this.contentFilter.screenUnqueuedText(message)
+      ? await this.contentFilter.screenUnqueuedText(message, {
+          entityType: "offer",
+          userId: authorId,
+          field: "offer_message",
+        })
       : message;
     return screened || null;
   }
@@ -146,7 +151,7 @@ export class OfferService {
     // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
     // bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
-    const message = await this.screenMessage(dto.message);
+    const message = await this.screenMessage(dto.message, buyerId);
     // Use transaction with row locking for race condition prevention
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock product row with FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -754,7 +759,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
-    const message = await this.screenMessage(dto.message);
+    const message = await this.screenMessage(dto.message, sellerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -888,7 +893,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
-    const message = await this.screenMessage(dto.message);
+    const message = await this.screenMessage(dto.message, buyerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },

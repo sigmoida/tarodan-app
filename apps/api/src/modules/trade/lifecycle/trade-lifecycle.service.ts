@@ -126,9 +126,17 @@ export class TradeLifecycleService {
    */
   private async screenText<T extends string | null | undefined>(
     text: T,
+    authorId: string,
+    field: "trade_message" | "trade_reject_reason" | "trade_cancel_reason",
+    tradeId?: string,
   ): Promise<T | string> {
     return this.contentFilter
-      ? this.contentFilter.screenUnqueuedText(text)
+      ? this.contentFilter.screenUnqueuedText(text, {
+          entityType: "trade",
+          entityId: tradeId ?? null,
+          userId: authorId,
+          field,
+        })
       : text;
   }
 
@@ -354,7 +362,11 @@ export class TradeLifecycleService {
     // Referans işlem dışında üretilir: çakışma kontrolü transaction'ı
     // gereksiz yere uzatmasın.
     const tradeNumber = await this.generateTradeNumber();
-    const initiatorMessage = await this.screenText(dto.message);
+    const initiatorMessage = await this.screenText(
+      dto.message,
+      initiatorId,
+      "trade_message",
+    );
 
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
@@ -481,7 +493,12 @@ export class TradeLifecycleService {
       this.prisma,
       "tradeShippingDays",
     );
-    const receiverMessage = await this.screenText(dto.message);
+    const receiverMessage = await this.screenText(
+      dto.message,
+      userId,
+      "trade_message",
+      tradeId,
+    );
 
     let tradeInitiatorId: string;
     let acceptedNextStatus: TradeStatus | null = null;
@@ -770,7 +787,12 @@ export class TradeLifecycleService {
     userId: string,
     dto: RejectTradeDto,
   ): Promise<TradeResponseDto> {
-    const reason = await this.screenText(dto.reason);
+    const reason = await this.screenText(
+      dto.reason,
+      userId,
+      "trade_reject_reason",
+      tradeId,
+    );
     let tradeInitiatorId: string;
 
     await this.prisma.$transaction(async (tx) => {
@@ -1059,7 +1081,12 @@ export class TradeLifecycleService {
         { required: false },
       );
 
-    const initiatorMessage = await this.screenText(dto.message);
+    const initiatorMessage = await this.screenText(
+      dto.message,
+      userId,
+      "trade_message",
+      tradeId,
+    );
 
     // Update trade in transaction
     // Not: Counter offer sadece pending trade'de yapılır. Pending'de quantity
@@ -1156,7 +1183,12 @@ export class TradeLifecycleService {
     userId: string,
     dto: CancelTradeDto,
   ): Promise<TradeResponseDto> {
-    const cancelReason = await this.screenText(dto.reason);
+    const cancelReason = await this.screenText(
+      dto.reason,
+      userId,
+      "trade_cancel_reason",
+      tradeId,
+    );
     let alreadyCancelled = false;
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);

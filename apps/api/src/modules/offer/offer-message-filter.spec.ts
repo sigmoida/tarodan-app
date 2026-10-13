@@ -66,7 +66,12 @@ describe("OfferService — teklif notu içerik filtresi", () => {
         message: "küfür",
       } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(screen).toHaveBeenCalledWith("küfür");
+    // Yazan kullanıcı inceleme kaydı için iletilir.
+    expect(screen).toHaveBeenCalledWith("küfür", {
+      entityType: "offer",
+      userId: "b1",
+      field: "offer_message",
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 

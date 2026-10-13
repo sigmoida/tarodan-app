@@ -9,7 +9,11 @@ import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { i18nMessage } from "../i18n";
 import {
   EMAIL_PATTERN_SOURCE,
+  INSTAGRAM_HANDLE_PATTERN_SOURCE,
   TR_MOBILE_PHONE_PATTERN_SOURCE,
+  TR_WORD_CHARS,
+  WHATSAPP_PATTERN_SOURCE,
+  wordLedSource,
 } from "../../common/helpers/contact-patterns";
 
 export interface FilterMatch {
@@ -32,6 +36,23 @@ export interface FilterResult {
   aiFlagged: boolean;
 }
 
+/**
+ * İletişim bilgisi kuralları: kuyruğu olmayan metinde (teklif notu, takas
+ * mesajı) yalnız MASKELENİR — paylaşım engellenir, metin gider.
+ */
+const CONTACT_FILTER_TYPES = new Set(["phone", "email", "social_media", "url"]);
+
+/** Kuyruksuz metnin kaynağı — inceleme kaydı (ModerationEvent) için. */
+export interface UnqueuedTextContext {
+  /** offer | trade */
+  entityType: string;
+  /** Metni yazan kullanıcı. */
+  userId: string;
+  /** offer_message | trade_message | trade_reject_reason | trade_cancel_reason */
+  field: string;
+  entityId?: string | null;
+}
+
 export interface ContentFilterRule {
   id: string;
   filterType: string;
@@ -50,12 +71,20 @@ export class ContentFilterService implements OnModuleInit {
 
   // Türkçe küfür/argo — Detoxify (AI) tek/kısa kelimelerde tutarsız olduğu için
   // bilinen küfürleri skordan bağımsız deterministik yakalayan liste.
-  // Çok karakterli kökler (suffix alabilir): orospu, amcık, siktir...
-  private readonly profanityStrong =
-    /(orospu|amc[ıi]k|am[ıi]na|am[ıi]n[ıi]|sikt[ıi]r|sike[yn]|siki[mş]|sikik|sikiş|sikey|yarr?a[gkğ]|kaltak|pezeven|kah[pb]e|ibne|ipne|gavat|kavat|sürtük|taşş?ak|puşt|yavşak|şerefsiz|götver|götoş|götlek|götveren|soka(y[ıi]m|r[ıi]m)|piçkuru|sülaleni|avradını|amına ?koy)/i;
+  // Çok karakterli kökler (suffix alabilir): orospu, amcık, siktir... Kök
+  // KELİME BAŞINDA aranır (Türkçe harf sınırı; `\b` ASCII dışında çalışmaz):
+  // "Fiyatın tamamını" içinde "amını", "tamamcık" içinde "amcık" eşleşmez.
+  // Bitişik yazılmış bileşikler ("…sınısikeyim") bilinçli olarak kaçırılır;
+  // onları AI katmanı yakalar.
+  private readonly profanityStrong = new RegExp(
+    `(?<![${TR_WORD_CHARS}])(orospu|amc[ıi]k|am[ıi]na|am[ıi]n[ıi]|sikt[ıi]r|sike[yn]|siki[mş]|sikik|sikiş|sikey|yarr?a[gkğ]|kaltak|pezeven|kah[pb]e|ibne|ipne|gavat|kavat|sürtük|taşş?ak|puşt|yavşak|şerefsiz|götver|götoş|götlek|götveren|soka(y[ıi]m|r[ıi]m)|piçkuru|sülaleni|avradını|amına ?koy)`,
+    "i",
+  );
   // Kısa/riskli kelimeler: yalnızca TAM kelime (Türkçe harf sınırlı) — "göt" yakalanır, "götür" yakalanmaz.
-  private readonly profanityExact =
-    /(?<![a-zçğıöşü0-9])(am|oç|piç|göt|sik)(?![a-zçğıöşü0-9])/i;
+  private readonly profanityExact = new RegExp(
+    `(?<![${TR_WORD_CHARS}])(am|oç|piç|göt|sik)(?![${TR_WORD_CHARS}])`,
+    "i",
+  );
 
   private hasProfanity(content: string): boolean {
     return (
@@ -209,29 +238,59 @@ export class ContentFilterService implements OnModuleInit {
   /**
    * Onay kuyruğu OLMAYAN kullanıcılar arası serbest metin (teklif notu, takas
    * mesajı, takas red/iptal gerekçesi) için mesajlaşmayla AYNI filtre — TEK
-   * kaynak (S9a, Apple 1.2). Mesajlaşmadaki üç sonucun kuyruksuz karşılığı:
+   * kaynak (S9a, Apple 1.2). DM'de onaya düşecek her şeyi burada reddetmek
+   * meşru notları da kesiyordu (yanlış pozitif kural → sert 400), bu yüzden
+   * kuyruksuz karşılık katmana göre ayrılır:
    *
    * - temiz → metin aynen kaydedilir;
-   * - yalnız maskelenen kural (ör. iletişim bilgisi, onay istemeyen) →
-   *   maskelenmiş metin kaydedilir (DM'de alıcının gördüğü `filteredContent`);
-   * - onay gerektiren sonuç (küfür, AI toksik, onay isteyen kural) → DM'de
-   *   yönetici onayına düşerdi; burada kuyruk olmadığı için istek 400 ile
-   *   reddedilir, kullanıcı metni düzeltip yeniden gönderir.
+   * - deterministik küfür listesi → 400 `server.messaging.contentRejected`;
+   * - iletişim bilgisi kuralları → maskelenmiş metin kaydedilir;
+   * - diğer onay isteyen kurallar ve AI toksik → REDDEDİLMEZ: maskeli metin
+   *   kaydedilir ve admin incelemesi için işaretlenir (ModerationEvent
+   *   `decision: "flag"` → admin "AI Denetim" ve kullanıcının etkinlik sekmesi).
    *
    * Yavaş olabilir (AI çağrısı): transaction AÇILMADAN çağrılmalıdır.
    */
   async screenUnqueuedText<T extends string | null | undefined>(
     content: T,
+    ctx?: UnqueuedTextContext,
   ): Promise<T | string> {
     if (!content || !content.trim()) return content;
     const result = await this.moderateWithAI(content);
     if (result.isClean) return content;
-    if (result.requiresApproval) {
+    if (result.profanity) {
       throw new BadRequestException(
         i18nMessage("server.messaging.contentRejected"),
       );
     }
+    const reviewRules = result.matches.filter(
+      (match) =>
+        match.requiresApproval && !CONTACT_FILTER_TYPES.has(match.filterType),
+    );
+    if (result.aiFlagged || reviewRules.length > 0) {
+      await this.flagForReview(result, ctx);
+    }
     return result.filteredContent;
+  }
+
+  /** Kuyruksuz metni admin incelemesine işaretle; asla fırlatmaz. */
+  private async flagForReview(
+    result: FilterResult,
+    ctx?: UnqueuedTextContext,
+  ): Promise<void> {
+    this.logger.warn(
+      `Unqueued text flagged for review (entity=${ctx?.entityType ?? "unknown"}, field=${ctx?.field ?? "unknown"}, user=${ctx?.userId ?? "unknown"}): ${result.flaggedReason ?? ""}`,
+    );
+    if (!ctx) return;
+    await this.aiClient.recordEvent({
+      entityType: ctx.entityType,
+      entityId: ctx.entityId ?? null,
+      userId: ctx.userId,
+      kind: "text",
+      field: ctx.field,
+      decision: "flag",
+      reason: result.flaggedReason,
+    });
   }
 
   /**
@@ -261,31 +320,31 @@ export class ContentFilterService implements OnModuleInit {
       // WhatsApp
       {
         type: "social_media",
-        pattern: "(whatsapp|wp|wa|w\\s*a)[\\s:]*[\\d+()-]+",
+        pattern: WHATSAPP_PATTERN_SOURCE,
         name: "WhatsApp",
       },
       // Instagram
       {
         type: "social_media",
-        pattern: "(instagram|ig|insta)[:\\s@]+[a-zA-Z0-9_.]+",
+        pattern: INSTAGRAM_HANDLE_PATTERN_SOURCE,
         name: "Instagram",
       },
       // Telegram
       {
         type: "social_media",
-        pattern: "(telegram|tg)[:\\s@]+[a-zA-Z0-9_.]+",
+        pattern: `${wordLedSource(["telegram", "tg"])}[:\\s@]+[a-zA-Z0-9_.]+`,
         name: "Telegram",
       },
       // Discord
       {
         type: "social_media",
-        pattern: "(discord)[:\\s#]+[a-zA-Z0-9_.#]+",
+        pattern: `${wordLedSource(["discord"])}[:\\s#]+[a-zA-Z0-9_.#]+`,
         name: "Discord",
       },
       // Facebook
       {
         type: "social_media",
-        pattern: "(facebook|fb)[:\\s/]+[a-zA-Z0-9_.]+",
+        pattern: `${wordLedSource(["facebook", "fb"])}[:\\s/]+[a-zA-Z0-9_.]+`,
         name: "Facebook",
       },
       // URLs
