@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
+import { hasProfanity } from "../../common/helpers/profanity";
 
 /**
  * Bir AI denetiminin hangi varlığa ait olduğunu tarif eden bağlam.
@@ -65,17 +66,9 @@ export class ModerationAiClient {
     return this.enabled;
   }
 
-  // Türkçe küfür/argo — deterministik (AI tek kelimelerde tutarsız).
-  private readonly profanityStrong =
-    /(orospu|amc[ıi]k|am[ıi]na|am[ıi]n[ıi]|sikt[ıi]r|sike[yn]|siki[mş]|sikik|sikiş|sikey|yarr?a[gkğ]|kaltak|pezeven|kah[pb]e|ibne|ipne|gavat|kavat|sürtük|taşş?ak|puşt|yavşak|şerefsiz|götver|götoş|götlek|götveren|soka(y[ıi]m|r[ıi]m)|piçkuru|sülaleni|avradını|amına ?koy)/i;
-  private readonly profanityExact =
-    /(?<![a-zçğıöşü0-9])(am|oç|piç|göt|sik)(?![a-zçğıöşü0-9])/i;
-
+  /** Türkçe küfür/argo — deterministik; liste `common/helpers/profanity` içinde (tek kaynak). */
   hasProfanity(text: string): boolean {
-    return (
-      this.profanityStrong.test(text || "") ||
-      this.profanityExact.test(text || "")
-    );
+    return hasProfanity(text);
   }
 
   /** Metin (ürün başlığı/açıklaması vb.) küfür/toksik mi? */

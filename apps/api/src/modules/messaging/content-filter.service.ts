@@ -11,10 +11,13 @@ import {
   EMAIL_PATTERN_SOURCE,
   INSTAGRAM_HANDLE_PATTERN_SOURCE,
   TR_MOBILE_PHONE_PATTERN_SOURCE,
-  TR_WORD_CHARS,
   WHATSAPP_PATTERN_SOURCE,
   wordLedSource,
 } from "../../common/helpers/contact-patterns";
+import {
+  maskAmbiguousProfanity,
+  scanProfanity,
+} from "../../common/helpers/profanity";
 
 export interface FilterMatch {
   name: string;
@@ -30,8 +33,13 @@ export interface FilterResult {
   flaggedReason: string | null;
   /** Eşleşen DB kuralları (maske + onay kararı için ayrıntı). */
   matches: FilterMatch[];
-  /** Deterministik küfür listesi eşleşti. */
+  /** Belirsiz olmayan küfür (deterministik liste) eşleşti. */
   profanity: boolean;
+  /**
+   * Türkçede meşru kelimelerle çakışan kısa kök ("am", "sik") eşleşti: sert
+   * reddedilmez, kuyruksuz metinde maskelenip incelemeye işaretlenir.
+   */
+  ambiguousProfanity: boolean;
   /** AI metin moderasyonu toksik dedi. */
   aiFlagged: boolean;
 }
@@ -68,29 +76,6 @@ export interface ContentFilterRule {
 export class ContentFilterService implements OnModuleInit {
   private readonly logger = new Logger(ContentFilterService.name);
   private filters: ContentFilterRule[] = [];
-
-  // Türkçe küfür/argo — Detoxify (AI) tek/kısa kelimelerde tutarsız olduğu için
-  // bilinen küfürleri skordan bağımsız deterministik yakalayan liste.
-  // Çok karakterli kökler (suffix alabilir): orospu, amcık, siktir... Kök
-  // KELİME BAŞINDA aranır (Türkçe harf sınırı; `\b` ASCII dışında çalışmaz):
-  // "Fiyatın tamamını" içinde "amını", "tamamcık" içinde "amcık" eşleşmez.
-  // Bitişik yazılmış bileşikler ("…sınısikeyim") bilinçli olarak kaçırılır;
-  // onları AI katmanı yakalar.
-  private readonly profanityStrong = new RegExp(
-    `(?<![${TR_WORD_CHARS}])(orospu|amc[ıi]k|am[ıi]na|am[ıi]n[ıi]|sikt[ıi]r|sike[yn]|siki[mş]|sikik|sikiş|sikey|yarr?a[gkğ]|kaltak|pezeven|kah[pb]e|ibne|ipne|gavat|kavat|sürtük|taşş?ak|puşt|yavşak|şerefsiz|götver|götoş|götlek|götveren|soka(y[ıi]m|r[ıi]m)|piçkuru|sülaleni|avradını|amına ?koy)`,
-    "i",
-  );
-  // Kısa/riskli kelimeler: yalnızca TAM kelime (Türkçe harf sınırlı) — "göt" yakalanır, "götür" yakalanmaz.
-  private readonly profanityExact = new RegExp(
-    `(?<![${TR_WORD_CHARS}])(am|oç|piç|göt|sik)(?![${TR_WORD_CHARS}])`,
-    "i",
-  );
-
-  private hasProfanity(content: string): boolean {
-    return (
-      this.profanityStrong.test(content) || this.profanityExact.test(content)
-    );
-  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -174,6 +159,7 @@ export class ContentFilterService implements OnModuleInit {
       flaggedReason,
       matches: matched,
       profanity: false,
+      ambiguousProfanity: false,
       aiFlagged: false,
     };
   }
@@ -192,7 +178,9 @@ export class ContentFilterService implements OnModuleInit {
 
     // Deterministik Türkçe küfür listesi — AI'dan bağımsız, her zaman çalışır
     // (Detoxify tek/kısa kelimelerde tutarsız: "am"/"orospu" eşik altı kalabiliyor).
-    const profanity = this.hasProfanity(content);
+    const scan = scanProfanity(content);
+    const profanity = scan.strong;
+    const ambiguousProfanity = scan.ambiguous.length > 0;
 
     // Lokal AI metin moderasyonu (Detoxify multilingual — Türkçe dahil).
     // services/ai-moderation kapalı/erişilemezse null döner → diğer katmanlar
@@ -210,11 +198,13 @@ export class ContentFilterService implements OnModuleInit {
     const flaggedPatterns = [
       ...regexResult.flaggedPatterns,
       ...(profanity ? ["profanity"] : []),
+      ...(ambiguousProfanity ? ["profanity_ambiguous"] : []),
       ...(aiFlagged ? [`ai:${ai?.reason ?? "toxic"}`] : []),
     ];
     const reasons = [
       regexResult.flaggedReason,
       profanity ? "Uygunsuz dil (küfür)" : null,
+      ambiguousProfanity ? "Olası uygunsuz dil (belirsiz kısa kök)" : null,
       aiFlagged
         ? `AI moderasyon: uygunsuz içerik${ai?.reason ? ` (${ai.reason})` : ""}`
         : null,
@@ -227,10 +217,15 @@ export class ContentFilterService implements OnModuleInit {
       filteredContent: regexResult.filteredContent,
       flaggedPatterns,
       // En ağır sonuç: herhangi bir katman onay istiyorsa onay.
-      requiresApproval: regexResult.requiresApproval || profanity || aiFlagged,
+      requiresApproval:
+        regexResult.requiresApproval ||
+        profanity ||
+        ambiguousProfanity ||
+        aiFlagged,
       flaggedReason: reasons.length > 0 ? reasons.join("; ") : null,
       matches: regexResult.matches,
       profanity,
+      ambiguousProfanity,
       aiFlagged,
     };
   }
@@ -243,7 +238,10 @@ export class ContentFilterService implements OnModuleInit {
    * kuyruksuz karşılık katmana göre ayrılır:
    *
    * - temiz → metin aynen kaydedilir;
-   * - deterministik küfür listesi → 400 `server.messaging.contentRejected`;
+   * - deterministik küfür listesi (belirsiz olmayan) → 400
+   *   `server.messaging.contentRejected`;
+   * - belirsiz kısa kök ("am", "sik": "8 am", "sık sık") → REDDEDİLMEZ,
+   *   maskelenir ve incelemeye işaretlenir;
    * - iletişim bilgisi kuralları → maskelenmiş metin kaydedilir;
    * - diğer onay isteyen kurallar ve AI toksik → REDDEDİLMEZ: maskeli metin
    *   kaydedilir ve admin incelemesi için işaretlenir (ModerationEvent
@@ -267,10 +265,14 @@ export class ContentFilterService implements OnModuleInit {
       (match) =>
         match.requiresApproval && !CONTACT_FILTER_TYPES.has(match.filterType),
     );
-    if (result.aiFlagged || reviewRules.length > 0) {
+    if (
+      result.aiFlagged ||
+      result.ambiguousProfanity ||
+      reviewRules.length > 0
+    ) {
       await this.flagForReview(result, ctx);
     }
-    return result.filteredContent;
+    return maskAmbiguousProfanity(result.filteredContent);
   }
 
   /** Kuyruksuz metni admin incelemesine işaretle; asla fırlatmaz. */

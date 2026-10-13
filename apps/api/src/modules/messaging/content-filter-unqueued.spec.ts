@@ -97,19 +97,41 @@ describe("ContentFilterService.screenUnqueuedText", () => {
     expect(aiClient.recordEvent).not.toHaveBeenCalled();
   });
 
-  it.each(["orospu çocuğu", "Siktir git", "AMINA KOYAYIM", "sana göt"])(
-    "gerçek küfür reddedilir: %s",
-    async (text) => {
-      const { service } = await makeService();
+  it.each([
+    "orospu çocuğu",
+    "Siktir git",
+    "AMINA KOYAYIM",
+    "sana göt",
+    // Türkçe büyük harf (İ) — `i` bayraklı kalıp katlamıyordu.
+    "SİKTİR",
+    "İBNE",
+    "ŞEREFSİZ",
+  ])("gerçek küfür reddedilir: %s", async (text) => {
+    const { service } = await makeService();
 
-      const error = await service
-        .screenUnqueuedText(text, ctx)
-        .catch((e: unknown) => e);
+    const error = await service
+      .screenUnqueuedText(text, ctx)
+      .catch((e: unknown) => e);
 
-      expect(error).toBeInstanceOf(BadRequestException);
-      expect((error as BadRequestException).getResponse()).toMatchObject({
-        i18nKey: "server.messaging.contentRejected",
-      });
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect((error as BadRequestException).getResponse()).toMatchObject({
+      i18nKey: "server.messaging.contentRejected",
+    });
+  });
+
+  it.each([
+    ["sik sik kullanildi", "*** *** kullanildi"],
+    ["SIK SIK kullanıldı", "*** *** kullanıldı"],
+    ["8 am teslim", "8 *** teslim"],
+  ])(
+    "belirsiz kısa kök reddedilmez: maskelenir ve incelemeye işaretlenir: %s",
+    async (text, masked) => {
+      const { service, aiClient } = await makeService();
+
+      await expect(service.screenUnqueuedText(text, ctx)).resolves.toBe(masked);
+      expect(aiClient.recordEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ decision: "flag", kind: "text" }),
+      );
     },
   );
 
