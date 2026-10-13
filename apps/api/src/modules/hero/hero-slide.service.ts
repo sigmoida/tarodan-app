@@ -81,14 +81,18 @@ type HeroLiveState = HeroLiveFields & {
 };
 
 /**
- * Slaytın native uygulamada ana sayfa listesini DOLDURABİLİR mi: açık, native'de
- * gizlenmemiş ve bitmemiş. Web bayrağı yok sayar, yani native'i dolduran liste
- * web'i de doldurur; koruma bu yüzden native görünümü esas alır.
+ * Slayt ana sayfa listesini DOLDURABİLİR mi: açık ve bitmemiş. `native` iken
+ * ayrıca native'de gizlenmemiş olmalı (mobil `hideOnIos` slaytları süzer); web
+ * bayrağı yok sayar.
  */
-function countsTowardNativeList(slide: HeroLiveState, now: Date): boolean {
+function fillsHomeList(
+  slide: HeroLiveFields & { hideOnIos?: boolean },
+  now: Date,
+  scope: "web" | "native",
+): boolean {
   return (
     slide.isActive &&
-    !slide.hideOnIos &&
+    (scope === "web" || slide.hideOnIos !== true) &&
     (slide.endDate === null || slide.endDate.getTime() >= now.getTime())
   );
 }
@@ -393,11 +397,12 @@ export class HeroSlideService {
    * ŞİMDİDEN itibaren kesintisiz dolu kalacağı anı ERKENE çekemez. `next` null =
    * silme.
    *
-   * İki şeyi hesaba katar (ikisi de eskiden boşluktu):
-   *  - bitiş tarihi: yayındaki başka slayt yarın bitiyorsa, kalıcı slaytı silmek
-   *    ya da tek slayta bitiş tarihi vermek slider'ı yarın boş bırakır;
-   *  - `hideOnIos` (artık "native uygulamada gizle"): yalnız gizlenmeyenler native
-   *    listeyi doldurur; son gizlenmeyen slaytı gizlemek mobili boş bırakırdı.
+   * Bu kural İKİ görünüm için ayrı ayrı uygulanır:
+   *  - web: `hideOnIos`'a bakmaz (web bayrağı yok sayar) — son canlı slaytı
+   *    `hideOnIos=true` olsa bile silmek/kapatmak web ana sayfasını boşaltır;
+   *  - native: yalnız `hideOnIos=false` slaytlar mobil listeyi doldurur.
+   * Bitiş tarihleri de hesaba katılır: diğer slayt yarın bitiyorsa kalıcı
+   * slaytı silmek ya da tek slayta bitiş vermek slider'ı yarın boş bırakır.
    *
    * Kıyas "önce / sonra" yapılır, mutlak değil: zaten kesintili olan bir slider'ın
    * metnini düzeltmek engellenmez; yalnız durumu KÖTÜLEŞTİREN değişiklik 409.
@@ -408,8 +413,9 @@ export class HeroSlideService {
     now: Date,
   ): Promise<void> {
     if (!HERO_PLACEMENTS_REQUIRING_LIVE_SLIDE.has(existing.placement)) return;
-    // Zaten listeyi doldurmayan slaytın değişikliği kapsamı azaltamaz.
-    if (!countsTowardNativeList(existing, now)) return;
+    // Zaten listeyi (hiçbir görünümde) doldurmayan slaytın değişikliği kapsamı
+    // azaltamaz.
+    if (!fillsHomeList(existing, now, "web")) return;
     // Kapsamı etkileyen hiçbir alan değişmediyse (metin, buton, sıra, görsel)
     // sorgu atılmaz.
     if (
@@ -428,21 +434,27 @@ export class HeroSlideService {
         placement: existing.placement,
         id: { not: existing.id },
         isActive: true,
-        hideOnIos: false,
       },
-      select: { startDate: true, endDate: true },
+      select: { startDate: true, endDate: true, hideOnIos: true },
     });
-    const before = guaranteedCoverageUntil([...others, existing], now);
-    const staysOnHome =
-      next !== null &&
-      next.placement === existing.placement &&
-      countsTowardNativeList(next, now);
-    const after = guaranteedCoverageUntil(
-      staysOnHome ? [...others, next] : others,
-      now,
-    );
-    if (after < before) {
-      throw new ConflictException(i18nMessage("server.hero.lastLiveHomeSlide"));
+    const active = others.map((slide) => ({ ...slide, isActive: true }));
+    const stays =
+      next !== null && next.placement === existing.placement ? next : null;
+    for (const scope of ["web", "native"] as const) {
+      const rest = active.filter((slide) => fillsHomeList(slide, now, scope));
+      const before = guaranteedCoverageUntil(
+        fillsHomeList(existing, now, scope) ? [...rest, existing] : rest,
+        now,
+      );
+      const after = guaranteedCoverageUntil(
+        stays && fillsHomeList(stays, now, scope) ? [...rest, stays] : rest,
+        now,
+      );
+      if (after < before) {
+        throw new ConflictException(
+          i18nMessage("server.hero.lastLiveHomeSlide"),
+        );
+      }
     }
   }
 

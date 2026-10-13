@@ -382,11 +382,51 @@ describe("HeroSlideService.update", () => {
     });
   });
 
-  it("native'de gizli slayt diğeri olarak SAYILMAZ (sorgu hideOnIos=false ister)", async () => {
+  it("native'de gizli slayt, native listede 'diğer slayt' SAYILMAZ → 409", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.findMany.mockResolvedValueOnce([OPEN]);
+    // Web'de ikincisi de görünür ama mobilde süzülür: mobil liste boşalırdı.
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: true },
+    ]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.update).not.toHaveBeenCalled();
+  });
+
+  it("native'de görünen başka slayt varsa kapatılabilir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: false },
+    ]);
     await service.update("slide-1", { isActive: false });
-    expect(heroSlide.findMany.mock.calls[0][0].where.hideOnIos).toBe(false);
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
+  // Web hideOnIos'u yok sayar: native'de gizli SON canlı slaytı kapatmak web
+  // ana sayfasını boşaltır (eski web denetimi korunur).
+  it("hideOnIos=true olan SON canlı ana sayfa slaytını kapatmak → 409 (web boşalır)", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.update).not.toHaveBeenCalled();
+  });
+
+  it("hideOnIos=true slayt, web'de başka canlı slayt varsa kapatılabilir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: true },
+    ]);
+    await service.update("slide-1", { isActive: false });
+    expect(heroSlide.update).toHaveBeenCalled();
   });
 
   it("zaten kesintili slider'ın metnini düzeltmek engellenmez", async () => {
@@ -523,11 +563,23 @@ describe("HeroSlideService.remove", () => {
     expect(heroSlide.delete).toHaveBeenCalled();
   });
 
-  it("native'de gizli slayt silinirken koruma devreye girmez", async () => {
+  it("hideOnIos=true olan SON canlı ana sayfa slaytı da silinemez (web boşalır)", async () => {
     const { service, heroSlide } = makeService();
     heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await expect(service.remove("slide-1")).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.delete).not.toHaveBeenCalled();
+  });
+
+  it("hideOnIos=true slayt, web'de başka canlı slayt varken silinir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: true },
+    ]);
     await service.remove("slide-1");
-    expect(heroSlide.findMany).not.toHaveBeenCalled();
     expect(heroSlide.delete).toHaveBeenCalled();
   });
 });
