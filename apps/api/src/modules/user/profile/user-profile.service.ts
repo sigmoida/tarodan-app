@@ -55,6 +55,7 @@ import {
   deactivateListingsForAccountDeletion,
 } from "../../product/helpers/account-deletion-listings";
 import { SearchService } from "../../search/search.service";
+import { refreshProductVisibility } from "../../product/helpers/product-visibility";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { CacheService } from "../../cache/cache.service";
 import {
@@ -742,7 +743,7 @@ export class UserProfileService {
 
     // Commit SONRASI: hesap silindi; arama/önbellek senkronu silmeyi geri
     // çeviremez, hata yalnız loglanır.
-    await this.syncDeactivatedListings(deactivatedListingIds);
+    await this.syncDeactivatedListings(userId, deactivatedListingIds);
   }
 
   /**
@@ -930,31 +931,31 @@ export class UserProfileService {
   }
 
   /**
-   * Hesap silmede pasife alınan ilanları arama dizininden ve liste/detay
-   * önbelleğinden düşürür. Aksi hâlde ES dokümanı eski (active) hâliyle kalıp
-   * aramada görünür, detay 404 verirdi (satıcının ilan kaldırmasıyla aynı
-   * adımlar).
+   * Hesap silmede pasife alınan ilanların görünürlüğünü tazeler — ilan
+   * yazımlarının ortak üçlüsü `refreshProductVisibility` (detay/liste önbelleği,
+   * arama dizini, web ISR) + satıcının üyelik önbelleği (ilan sayacı). Aksi
+   * hâlde ES ve web ISR silinen satıcının ilanlarını göstermeye devam ederdi.
+   * Commit sonrasıdır: hata yalnız loglanır, silmeyi geri çevirmez.
    */
-  private async syncDeactivatedListings(productIds: string[]): Promise<void> {
+  private async syncDeactivatedListings(
+    sellerId: string,
+    productIds: string[],
+  ): Promise<void> {
     if (productIds.length === 0) return;
     try {
-      await this.cache.delPattern("products:list:*");
-      await Promise.all(
-        productIds.map((id) => this.cache.del(`products:detail:${id}`)),
+      await refreshProductVisibility(
+        {
+          cache: this.cache,
+          searchService: this.searchService,
+          logger: this.logger,
+        },
+        productIds,
       );
+      await this.cache.del(`membership:${sellerId}`);
     } catch (error) {
       this.logger.warn(
-        `account-deletion listing cache invalidation failed: ${errorMessage(error)}`,
+        `account-deletion listing visibility refresh failed: ${errorMessage(error)}`,
       );
-    }
-    for (const id of productIds) {
-      this.searchService
-        .syncProduct(id)
-        .catch((error) =>
-          this.logger.warn(
-            `ES sync (account deletion) failed for ${id}: ${errorMessage(error)}`,
-          ),
-        );
     }
   }
 

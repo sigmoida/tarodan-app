@@ -1,5 +1,10 @@
 import { UserProfileService } from "./user-profile.service";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { ANONYMIZED_DISPLAY_NAME } from "../../../common/helpers/deleted-user-identity";
+
+jest.mock("../../../common/helpers/revalidate", () => ({
+  notifyWebRevalidate: jest.fn(),
+}));
 
 /**
  * Hesap silme, kimliği geri dönülemez şekilde anonimleştiriyor. Yasal aylık
@@ -277,7 +282,7 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       );
     });
 
-    it("commit sonrası arama dizini ve önbellek senkronlanır", async () => {
+    it("commit sonrası arama dizini, önbellek, web ISR ve üyelik önbelleği tazelenir", async () => {
       const { service, search, cache } = makeService({ listings });
 
       await service.deleteAccount("user-1");
@@ -286,6 +291,14 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       expect(search.syncProduct).toHaveBeenCalledWith("p-pending");
       expect(cache.delPattern).toHaveBeenCalledWith("products:list:*");
       expect(cache.del).toHaveBeenCalledWith("products:detail:p-active");
+      // refreshProductVisibility: web ISR de tazelenir.
+      expect(notifyWebRevalidate).toHaveBeenCalledWith([
+        "products:list",
+        "product:p-active",
+        "product:p-pending",
+      ]);
+      // İlan sayacı üyelik önbelleğinde.
+      expect(cache.del).toHaveBeenCalledWith("membership:user-1");
     });
 
     it("ilan yoksa senkron çağrısı yapılmaz", async () => {
