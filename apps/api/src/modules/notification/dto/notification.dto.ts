@@ -57,6 +57,8 @@ export enum NotificationType {
   /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
   OFFER_CANCELLED_LISTING_REMOVED = "offer_cancelled_listing_removed",
   OFFER_CANCELLED_BY_ADMIN = "offer_cancelled_by_admin",
+  /** Teklifi veren alıcı hesabını sildiği için teklif kapandı — satıcıya gider. */
+  OFFER_CANCELLED_BUYER_DELETED = "offer_cancelled_buyer_deleted",
 
   // Product notifications
   PRODUCT_APPROVED = "product_approved",

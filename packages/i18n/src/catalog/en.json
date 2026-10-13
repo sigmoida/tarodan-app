@@ -10422,6 +10422,10 @@
         "title": "Your offer was cancelled: listing removed",
         "message": "Your offer for {productTitle} was cancelled because the seller removed the listing."
       },
+      "offerCancelledBuyerDeleted": {
+        "title": "Offer closed: the buyer deleted their account",
+        "message": "The offer on {productTitle} was closed because the buyer deleted their account."
+      },
       "productApproved": {
         "title": "Your Listing Is Live! 🎉",
         "message": "Your listing {productTitle} has been approved and published."

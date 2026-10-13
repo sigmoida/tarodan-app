@@ -10422,6 +10422,10 @@
         "title": "Teklifiniz iptal edildi: ilan yayından kaldırıldı",
         "message": "{productTitle} adlı ürün için verdiğiniz teklif, satıcı ilanı yayından kaldırdığı için iptal edildi."
       },
+      "offerCancelledBuyerDeleted": {
+        "title": "Teklif kapandı: alıcı hesabını sildi",
+        "message": "{productTitle} ürününüze teklif veren alıcı hesabını sildiği için teklif kapatıldı."
+      },
       "productApproved": {
         "title": "İlanınız Yayında! 🎉",
         "message": "{productTitle} ilanınız onaylandı ve yayına alındı."

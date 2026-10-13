@@ -482,6 +482,20 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * Teklifi veren alıcı hesabını silince kapanan teklif — SATICIYA. İlan
+   * silmeyle (alıcıya giden) ayrı şablon: "ilan kaldırıldı" metni burada yanlış.
+   */
+  async notifyOfferCancelledBuyerDeleted(sellerId: string, productId: string) {
+    const data = await this.buildStockoutData(productId);
+    return this.dispatch.send({
+      userId: sellerId,
+      type: NotificationType.OFFER_CANCELLED_BUYER_DELETED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data,
+    });
+  }
+
   async notifyReservationReleased(
     buyerId: string,
     orderId: string,

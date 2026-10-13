@@ -55,6 +55,8 @@ export const OFFER_CANCEL_REASON = {
    */
   orderRefunded: "Bağlı sipariş iade edildiği için teklif kapatıldı",
   accountBanned: "Hesap askıya alındığı için teklif kapatıldı",
+  /** Teklifi veren alıcı hesabını sildi (hesap silme transaction'ı). */
+  buyerAccountDeleted: "Alıcı hesabını sildiği için teklif kapatıldı",
 } as const;
 
 /** Yönetici iptali: serbest gerekçe sabit önekle saklanır; ekranlar öneki tanır. */

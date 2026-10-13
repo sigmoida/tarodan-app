@@ -55,6 +55,10 @@ import {
   deactivateListingsForAccountDeletion,
   type AccountDeletionListingsResult,
 } from "../../product/helpers/account-deletion-listings";
+import {
+  cancelBuyerOffersForAccountDeletion,
+  type CancelledBuyerOffer,
+} from "../../offer/helpers/account-deletion-offers";
 import { SearchService } from "../../search/search.service";
 import { refreshProductVisibility } from "../../product/helpers/product-visibility";
 import { errorMessage } from "../../../common/helpers/error-message";
@@ -646,6 +650,7 @@ export class UserProfileService {
       productIds: [],
       cancelledOffers: [],
     };
+    let cancelledBuyerOffers: CancelledBuyerOffer[] = [];
     try {
       await this.prisma.$transaction(
         async (tx) => {
@@ -661,6 +666,14 @@ export class UserProfileService {
           // account_deleted). Anonimleştirmeyle AYNI transaction: silme
           // düşerse ilanlar da açık kalır.
           deactivated = await deactivateListingsForAccountDeletion(tx, userId);
+
+          // 0b2) Hesabın ALICI olarak verdiği açık teklifler de kapanır:
+          // satıcı anonim alıcıdan gelen teklifi kabul edip açık siparişli
+          // silinmiş hesap bırakamasın. Satıcılara commit sonrası bildirim.
+          cancelledBuyerOffers = await cancelBuyerOffersForAccountDeletion(
+            tx,
+            userId,
+          );
 
           // 0c) Engeller KİLİT ALTINDA yeniden: ilanlar kilitlenip pasife
           // alındı; dış denetimden bu yana başlamış bir sipariş/takas/ödeme
@@ -754,6 +767,25 @@ export class UserProfileService {
     // silmeyi geri çeviremez, hata yalnız loglanır.
     await this.syncDeactivatedListings(userId, deactivated.productIds);
     await this.notifyCancelledOfferBuyers(deactivated.cancelledOffers);
+    await this.notifyCancelledOfferSellers(cancelledBuyerOffers);
+  }
+
+  /**
+   * Silinen alıcının kapanan tekliflerinin SATICILARINA bildirim (ilan
+   * bildirimi alıcıya gider, bu satıcıya). Bildirim hatası yutulur.
+   */
+  private async notifyCancelledOfferSellers(
+    offers: CancelledBuyerOffer[],
+  ): Promise<void> {
+    for (const offer of offers) {
+      await this.notifications
+        .notifyOfferCancelledBuyerDeleted(offer.sellerId, offer.productId)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `offer-cancelled (buyer deleted) notification failed (${offer.id}): ${errorMessage(error)}`,
+          ),
+        );
+    }
   }
 
   /**

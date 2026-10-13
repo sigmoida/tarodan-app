@@ -196,6 +196,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.offerCancelledListingRemoved.message",
     icon: "❌",
   },
+  [NotificationType.OFFER_CANCELLED_BUYER_DELETED]: {
+    titleKey: "server.notification.offerCancelledBuyerDeleted.title",
+    messageKey: "server.notification.offerCancelledBuyerDeleted.message",
+    icon: "❌",
+  },
   [NotificationType.PRODUCT_APPROVED]: {
     titleKey: "server.notification.productApproved.title",
     messageKey: "server.notification.productApproved.message",
