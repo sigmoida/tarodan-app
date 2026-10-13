@@ -77,11 +77,12 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       offer: {
-        // Alıcı tarafı sorguları `where.buyerId` ile, ilan tarafı `productId`
-        // ile gelir.
+        // Alıcı tarafı sorguları `where.buyerId` (aday okuma) ya da
+        // `where.cancelReason` (yazım sonrası yeniden okuma) ile, ilan tarafı
+        // `productId` ile gelir.
         findMany: jest.fn(({ where }: any) =>
           Promise.resolve(
-            where?.buyerId
+            where?.buyerId || where?.cancelReason
               ? (overrides.buyerOffers ?? [])
               : (overrides.openOffers ?? []),
           ),
