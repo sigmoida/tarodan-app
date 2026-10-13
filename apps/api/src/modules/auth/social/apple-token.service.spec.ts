@@ -20,7 +20,9 @@ jest.mock("apple-signin-auth");
  *
  * Kurallar: kod girişin client id'siyle refresh token'a çevrilir ve ŞİFRELİ
  * saklanır; hesap silme iptali outbox'a yazar; iptal handler'ı idempotenttir,
- * Apple hatasında fırlatır (yeniden deneme), yapılandırma yoksa no-op + iz.
+ * Apple hatasında fırlatır (yeniden deneme); yapılandırma yoksa girişte no-op
+ * (token saklanmaz), iptal işinde fırlatır (yeniden dener, sonunda DLQ;
+ * düzeltmeden sonra redrive).
  * Giriş ve silme bu servis yüzünden hiçbir koşulda düşmez.
  */
 describe("AppleTokenService", () => {

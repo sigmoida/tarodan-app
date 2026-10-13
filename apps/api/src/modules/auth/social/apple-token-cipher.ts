@@ -14,7 +14,8 @@ import { isProduction } from "../../../config/environment";
  * kutusu anahtarı döndürülünce Apple token'ları okunmaz hale gelmesin).
  *
  * Canlıda anahtar yoksa token ne yazılır ne okunur (`isAvailable() === false`):
- * giriş çalışır, iptal özelliği no-op olur. Canlı dışında boş anahtar
+ * giriş çalışır, iptal özelliği çalışmaz (saklama yok; kuyruktaki iptal
+ * işleri hata verip yeniden denenir, bkz. `AppleTokenService`). Canlı dışında boş anahtar
  * JWT_SECRET'a düşer (2FA ve posta kutusu ile aynı geliştirme kolaylığı).
  */
 @Injectable()

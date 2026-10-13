@@ -253,7 +253,11 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
   SON girişin token'ı tutulur; yeni cihaz girişi eskisini iptal etmeden ezer — Apple'ın revoke'u
   uygulamaya verilen yetkinin tamamını düşürdüğü için eskiyi iptal etmek yeni oturumu da bozar,
   silmede son token'ın iptali yetkiyi bütünüyle kaldırır. Env: `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
-  `APPLE_PRIVATE_KEY`, `APPLE_TOKEN_ENCRYPTION_KEY`; biri eksikse özellik loglanan bir no-op'tur.
+  `APPLE_PRIVATE_KEY`, `APPLE_TOKEN_ENCRYPTION_KEY`; biri eksikse uyarı loglanır: girişte token
+  saklanmaz, hesap silmede yazılmış iptal işi yeniden denenir (~1 gün) ve sonra DLQ'ya düşer —
+  kendiliğinden toparlanmaz; env düzeltilince `redrive-apple-token-revocations` script'iyle yeniden
+  kuyruğa alınır (`docs/OPERATIONS.md`). Kalıcı Apple reddinde (`invalid_grant`, 3 denemeden sonra
+  `invalid_client`) iş DLQ'ya düşer ve şifreli token silinmez; aynı script geri getirir.
 - Yanıt normal login ile aynı: `{ user, tokens }`.
 
 ### Kabul kriterleri

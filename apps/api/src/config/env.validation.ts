@@ -143,7 +143,9 @@ const envSchema = z
     // Sign in with Apple token iptali (App Store 5.1.1(v)): mobil giriş
     // `authorizationCode`u bu anahtarla imzalanan client secret ile refresh
     // token'a çevrilir, hesap silmede Apple'a iptal edilir. Dördü birden yoksa
-    // özellik no-op olur (uyarı: `appleTokenRevocationWarnings`). Private key
+    // özellik çalışmaz (uyarı: `appleTokenRevocationWarnings`; hesap silmede
+    // yazılmış iptal işi ~1 gün yeniden denenir, sonra DLQ — redrive script'i
+    // gerekir, bkz. docs/OPERATIONS.md). Private key
     // .p8 içeriğidir (PEM); tek satır env için satır sonları `\n` yazılabilir.
     // Refresh token'lar APPLE_TOKEN_ENCRYPTION_KEY ile şifreli saklanır (canlı
     // dışında boşsa JWT_SECRET'a düşer — 2FA/posta kutusu ile aynı kolaylık).
@@ -950,9 +952,10 @@ export function socialSignInWarnings(
 
 /**
  * Sign in with Apple token iptali (App Store 5.1.1(v)) canlıda kapalı mı?
- * İptal anahtarlarından biri eksikse özellik no-op olur: hesap silmede Apple
- * bağlantısı kalır. Açılışı durdurmaz (giriş çalışmaya devam eder), ama
- * görünür olmalı.
+ * İptal anahtarlarından biri eksikse özellik çalışmaz: girişte token saklanmaz,
+ * hesap silmede Apple bağlantısı kalır (kuyruktaki iptal işi ~1 gün denenip
+ * DLQ'ya düşer; env düzeltilince redrive script'i gerekir). Açılışı durdurmaz
+ * (giriş çalışmaya devam eder), ama görünür olmalı.
  *
  * APPLE_CLIENT_ID'ye bakılmaz: Apple girişi canlıda HER ZAMAN açıktır —
  * env yoksa `AppleAuthService` varsayılan bundle id'yi (`com.tarodan.app`)

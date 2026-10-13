@@ -48,7 +48,7 @@ export const PERSIST_TOKEN_TX_OPTIONS = {
 } as const;
 
 const NOT_CONFIGURED_MESSAGE =
-  "Apple token revocation is not configured (APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY) — the job retries and dead-letters until it is";
+  "Apple token revocation is not configured (APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY) — the job is retried for about a day and then dead-lettered; it does NOT recover on its own after that: once the env is fixed, requeue dead jobs with the redrive script (docs/OPERATIONS.md, redrive-apple-token-revocations)";
 
 /**
  * `invalid_client` için deneme üst sınırı. Yeni oluşturulan/bağlanan Apple
@@ -100,8 +100,13 @@ const PERMANENT_APPLE_ERROR_CODES: ReadonlySet<string> = new Set([
  * iptali outbox'a yazar ve iptal handler'ını sağlar.
  *
  * Yapılandırma env'den gelir (APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY +
- * APPLE_TOKEN_ENCRYPTION_KEY). Eksikse özellik NO-OP'tur ve uyarı loglanır:
- * giriş ve hesap silme hiçbir koşulda bu servis yüzünden düşmez.
+ * APPLE_TOKEN_ENCRYPTION_KEY). Eksikse uyarı loglanır ve:
+ * - girişte token saklanmaz (no-op; saklanmamış token'ın iptali de gerekmez);
+ * - hesap silmede zaten kuyruğa yazılmış iptal işi NO-OP DEĞİLDİR: yeniden
+ *   denenir, ~1 gün sonra DLQ'ya düşer ve kendiliğinden toparlanmaz —
+ *   düzeltmeden sonra `maintenance/redrive-apple-token-revocations.ts` ile
+ *   yeniden kuyruğa alınır (docs/OPERATIONS.md).
+ * Giriş ve hesap silme hiçbir koşulda bu servis yüzünden düşmez.
  *
  * Client id, girişin yapıldığı uygulamanınkidir (identity token `aud`:
  * com.tarodan.app ya da staging'de com.tarodan.app.staging); kod o client id
@@ -402,7 +407,9 @@ export class AppleTokenService implements OnModuleInit {
    * token'ı kalmamış satır no-op'tur. Apple hatası fırlatılır (outbox yeniden
    * dener). Yapılandırma yoksa da FIRLATIR: işi "tamamlandı" saymak, env
    * düzeltilse bile iptali hiç denemez ve şifreli token'ı silinmiş kullanıcıda
-   * bırakırdı. Denemeler biterse iş DLQ'ya düşer (dashboard alarmı).
+   * bırakırdı. Denemeler biterse iş DLQ'ya düşer (dashboard alarmı) ve
+   * KENDİLİĞİNDEN toparlanmaz: nedeni düzelttikten sonra redrive script'i
+   * (`redriveDeadRevocations`) şifreli token'ı duran işleri yeniden kuyruğa alır.
    *
    * @param attempt bu denemenin 1 tabanlı sırası (outbox `attempts + 1`);
    *   `invalid_client` sınırı için.
