@@ -482,11 +482,17 @@ export class UserProfileService {
   /**
    * Bildirim tercihlerini getir. Kayıt yoksa varsayılanlar döner; kısmi
    * kayıtlar varsayılanların üzerine birleştirilir.
+   *
+   * `marketingEmails` kolondan okunur: pazarlama izninin tek kaynağı
+   * `User.acceptsMarketingEmails`'tir (kayıt onayı ve bülten çıkışı yalnız
+   * kolonu yazar). JSON'dan okununca kayıtta izin veren kullanıcı düğmeyi
+   * KAPALI görüyor ama pazarlama iletisi almaya devam ediyordu (S1, Apple
+   * 4.5.4 — kapatma yolu gerçeği göstermeli).
    */
   async getNotificationSettings(userId: string): Promise<NotificationSettings> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notificationSettings: true },
+      select: { notificationSettings: true, acceptsMarketingEmails: true },
     });
 
     if (!user) {
@@ -495,7 +501,11 @@ export class UserProfileService {
 
     const stored =
       (user.notificationSettings as Partial<NotificationSettings> | null) ?? {};
-    return { ...DEFAULT_NOTIFICATION_SETTINGS, ...stored };
+    return {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...stored,
+      marketingEmails: user.acceptsMarketingEmails === true,
+    };
   }
 
   /**

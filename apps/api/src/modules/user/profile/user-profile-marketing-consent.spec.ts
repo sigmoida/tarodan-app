@@ -90,3 +90,63 @@ describe("UserProfileService.updateNotificationSettings — pazarlama izni", () 
     expect(consents.recordMarketingChange).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * S1 — Apple 4.5.4: kapatma yolu gerçeği göstermeli. Pazarlama düğmesi izin
+ * KOLONUNDAN okunur; kayıtta izin veren kullanıcı (JSON'da anahtar yok)
+ * düğmeyi kapalı görüp pazarlama iletisi almaya devam etmemeli.
+ */
+describe("UserProfileService.getNotificationSettings — pazarlama düğmesi", () => {
+  const makeService = (row: Record<string, unknown> | null) => {
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue(row) },
+    };
+    const service = new UserProfileService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    return { service, prisma };
+  };
+
+  it("kayıtta izin verilmiş, JSON boş → düğme AÇIK görünür", async () => {
+    const { service } = makeService({
+      notificationSettings: null,
+      acceptsMarketingEmails: true,
+    });
+
+    const settings = await service.getNotificationSettings("u1");
+
+    expect(settings.marketingEmails).toBe(true);
+  });
+
+  it("JSON açık ama izin geri çekilmiş (bülten çıkışı) → düğme KAPALI görünür", async () => {
+    const { service } = makeService({
+      notificationSettings: { marketingEmails: true, orderUpdates: false },
+      acceptsMarketingEmails: false,
+    });
+
+    const settings = await service.getNotificationSettings("u1");
+
+    expect(settings.marketingEmails).toBe(false);
+    // Diğer tercihler JSON'dan gelmeye devam eder.
+    expect(settings.orderUpdates).toBe(false);
+  });
+
+  it("izin kolonu sorguda seçilir", async () => {
+    const { service, prisma } = makeService({
+      notificationSettings: null,
+      acceptsMarketingEmails: false,
+    });
+
+    await service.getNotificationSettings("u1");
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "u1" },
+      select: { notificationSettings: true, acceptsMarketingEmails: true },
+    });
+  });
+});
