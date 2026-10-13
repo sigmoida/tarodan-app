@@ -1,5 +1,8 @@
 import appleSignin from "apple-signin-auth";
-import { AppleTokenService } from "./apple-token.service";
+import {
+  APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
+  AppleTokenService,
+} from "./apple-token.service";
 import { AppleTokenCipher } from "./apple-token-cipher";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import { OUTBOX_APPLE_TOKEN_REVOKE } from "../../outbox/outbox.types";
@@ -200,6 +203,8 @@ describe("AppleTokenService", () => {
         type: OUTBOX_APPLE_TOKEN_REVOKE,
         payload: { appleSignInTokenId: "t1" },
         dedupeKey: "apple-token-revoke:t1",
+        // Apple kesintisi / env düzeltmesi için ~1 günlük deneme penceresi.
+        maxAttempts: APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
       });
       expect(outbox.enqueue).toHaveBeenCalledTimes(2);
     });
@@ -309,7 +314,8 @@ describe("AppleTokenService", () => {
       });
     });
 
-    it("missing Apple config: no-op with a trace on the row", async () => {
+    // İşi "tamamlandı" saymak env sonradan düzelse de iptali hiç denemezdi.
+    it("missing Apple config: thrown (retried / dead-lettered) with a trace on the row", async () => {
       const configured = makeService();
       const encrypted = configured.cipher.encrypt("rt-secret");
       const { service, prisma } = makeService({
@@ -323,8 +329,9 @@ describe("AppleTokenService", () => {
         revokedAt: null,
       });
 
-      await expect(service.revoke("t1")).resolves.toBeUndefined();
+      await expect(service.revoke("t1")).rejects.toThrow(/not configured/);
       expect(fetchMock).not.toHaveBeenCalled();
+      expect(prisma.appleSignInToken.update).toHaveBeenCalledTimes(1);
       expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
         where: { id: "t1" },
         data: { lastRevokeError: "not_configured" },

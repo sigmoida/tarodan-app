@@ -24,6 +24,16 @@ interface AppleSigningKey {
 const MAX_ERROR_LENGTH = 500;
 
 /**
+ * İptal işinin deneme sayısı. Varsayılan 8 (10 sn → 1 sa geri çekilme) ~20
+ * dakikada DLQ'ya düşer; Apple kesintisi ya da eksik env'in düzeltilmesi
+ * için ~1 günlük pencere bırakılır (9. denemeden sonra saatte bir).
+ */
+export const APPLE_TOKEN_REVOKE_MAX_ATTEMPTS = 30;
+
+const NOT_CONFIGURED_MESSAGE =
+  "Apple token revocation is not configured (APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY) — the job retries and dead-letters until it is";
+
+/**
  * Sign in with Apple token yaşam döngüsü (App Store 5.1.1(v)): girişte gelen
  * `authorizationCode`u refresh token'a çevirip şifreli saklar, hesap silmede
  * iptali outbox'a yazar ve iptal handler'ını sağlar.
@@ -149,6 +159,7 @@ export class AppleTokenService implements OnModuleInit {
           appleSignInTokenId: token.id,
         } satisfies AppleTokenRevokePayload,
         dedupeKey: `apple-token-revoke:${token.id}`,
+        maxAttempts: APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
       });
     }
     return tokens.length;
@@ -157,8 +168,9 @@ export class AppleTokenService implements OnModuleInit {
   /**
    * Outbox handler'ı — at-least-once çalışır, idempotent: iptal edilmiş ya da
    * token'ı kalmamış satır no-op'tur. Apple hatası fırlatılır (outbox yeniden
-   * dener); yapılandırma yoksa no-op + uyarı (sonsuz deneme yerine; satırda
-   * iz kalır, `lastRevokeError`).
+   * dener). Yapılandırma yoksa da FIRLATIR: işi "tamamlandı" saymak, env
+   * düzeltilse bile iptali hiç denemez ve şifreli token'ı silinmiş kullanıcıda
+   * bırakırdı. Denemeler biterse iş DLQ'ya düşer (dashboard alarmı).
    */
   async revoke(appleSignInTokenId: string): Promise<void> {
     const row = await this.prisma.appleSignInToken.findUnique({
@@ -175,7 +187,7 @@ export class AppleTokenService implements OnModuleInit {
     if (!this.isEnabled()) {
       this.warnNotConfigured();
       await this.recordError(row.id, "not_configured");
-      return;
+      throw new Error(NOT_CONFIGURED_MESSAGE);
     }
 
     let response: Awaited<ReturnType<typeof postAppleEndpoint>>;
