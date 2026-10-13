@@ -39,10 +39,19 @@ const NOT_CONFIGURED_MESSAGE =
   "Apple token revocation is not configured (APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY) — the job retries and dead-letters until it is";
 
 /**
+ * `invalid_client` için deneme üst sınırı. Yeni oluşturulan/bağlanan Apple
+ * anahtarı ya da client id eşlemesi yayılırken Apple kısa süre bunu döndürebilir;
+ * birkaç deneme (10 sn, 20 sn geri çekilme) bu penceresini karşılar, sonra
+ * gerçekten yanlış yapılandırma sayılıp DLQ'ya düşer.
+ */
+export const APPLE_INVALID_CLIENT_MAX_ATTEMPTS = 3;
+
+/**
  * Apple revoke hatasının sınıfı (OAuth hata kodu, RFC 6749 §5.2 / 7009):
- * - `permanent`: istek/kimlik reddedildi (`invalid_grant`, `invalid_client`,
- *   `unauthorized_client`, `unsupported_client`, `invalid_request`,
- *   `unsupported_grant_type`, `unsupported_token_type`) → DLQ. Şifreli token
+ * - `permanent`: istek/kimlik reddedildi (`invalid_grant`, `unauthorized_client`,
+ *   `unsupported_client`, `invalid_request`, `unsupported_grant_type`,
+ *   `unsupported_token_type`; `invalid_client` ise ilk
+ *   `APPLE_INVALID_CLIENT_MAX_ATTEMPTS` denemeden sonra) → DLQ. Şifreli token
  *   SİLİNMEZ: Apple `invalid_grant`ı geçersiz token kadar yanlış/uyuşmayan
  *   client id için de döndürür; "zaten iptal" varsayıp token'ı silmek, düzeltme
  *   sonrası yeniden denemeyi imkânsız kılar. Zaten iptal edilmiş token'ın
@@ -51,7 +60,14 @@ const NOT_CONFIGURED_MESSAGE =
  */
 export function classifyAppleRevokeFailure(
   code: string | null,
+  /** Bu denemenin 1 tabanlı sırası (outbox `attempts + 1`). */
+  attempt = 1,
 ): "permanent" | "transient" {
+  if (code === "invalid_client") {
+    return attempt >= APPLE_INVALID_CLIENT_MAX_ATTEMPTS
+      ? "permanent"
+      : "transient";
+  }
   return code && PERMANENT_APPLE_ERROR_CODES.has(code)
     ? "permanent"
     : "transient";
@@ -59,7 +75,6 @@ export function classifyAppleRevokeFailure(
 
 const PERMANENT_APPLE_ERROR_CODES: ReadonlySet<string> = new Set([
   "invalid_grant",
-  "invalid_client",
   "unauthorized_client",
   "unsupported_client",
   "invalid_request",
@@ -94,8 +109,11 @@ export class AppleTokenService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    this.registry.register(OUTBOX_APPLE_TOKEN_REVOKE, (payload) =>
-      this.revoke((payload as AppleTokenRevokePayload).appleSignInTokenId),
+    this.registry.register(OUTBOX_APPLE_TOKEN_REVOKE, (payload, event) =>
+      this.revoke(
+        (payload as AppleTokenRevokePayload).appleSignInTokenId,
+        event.attempts + 1,
+      ),
     );
   }
 
@@ -278,8 +296,11 @@ export class AppleTokenService implements OnModuleInit {
    * dener). Yapılandırma yoksa da FIRLATIR: işi "tamamlandı" saymak, env
    * düzeltilse bile iptali hiç denemez ve şifreli token'ı silinmiş kullanıcıda
    * bırakırdı. Denemeler biterse iş DLQ'ya düşer (dashboard alarmı).
+   *
+   * @param attempt bu denemenin 1 tabanlı sırası (outbox `attempts + 1`);
+   *   `invalid_client` sınırı için.
    */
-  async revoke(appleSignInTokenId: string): Promise<void> {
+  async revoke(appleSignInTokenId: string, attempt = 1): Promise<void> {
     const row = await this.prisma.appleSignInToken.findUnique({
       where: { id: appleSignInTokenId },
     });
@@ -329,7 +350,7 @@ export class AppleTokenService implements OnModuleInit {
     if (!response.ok) {
       const code = appleErrorCode(response);
       const failure = `apple:${response.status}:${code ?? "no_error_code"}`;
-      const outcome = classifyAppleRevokeFailure(code);
+      const outcome = classifyAppleRevokeFailure(code, attempt);
 
       await this.recordError(row.id, failure);
       const message = `Apple token revoke failed for ${row.id} (client=${row.clientId}): ${failure}`;

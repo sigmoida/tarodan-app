@@ -1,5 +1,6 @@
 import appleSignin from "apple-signin-auth";
 import {
+  APPLE_INVALID_CLIENT_MAX_ATTEMPTS,
   APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
   AppleTokenService,
   classifyAppleRevokeFailure,
@@ -440,7 +441,6 @@ describe("AppleTokenService", () => {
     // düzeltmeden sonra yeniden kuyruğa alınabilsin.
     it.each([
       "invalid_grant",
-      "invalid_client",
       "unauthorized_client",
       "unsupported_client",
     ])(
@@ -462,6 +462,53 @@ describe("AppleTokenService", () => {
         });
       },
     );
+
+    // Yeni bağlanan Apple anahtarı yayılırken geçici invalid_client dönebilir:
+    // birkaç deneme sonra kalıcı sayılır.
+    it("invalid_client: retried below the attempt limit, token kept", async () => {
+      appleReplies(400, { error: "invalid_client" });
+      const { service, prisma, cipher } = makeService();
+      prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
+
+      const error = await service
+        .revoke("t1", APPLE_INVALID_CLIENT_MAX_ATTEMPTS - 1)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(PermanentOutboxError);
+      expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
+        where: { id: "t1" },
+        data: { lastRevokeError: "apple:400:invalid_client" },
+      });
+    });
+
+    it("invalid_client: permanent on the last allowed attempt", async () => {
+      appleReplies(400, { error: "invalid_client" });
+      const { service, prisma, cipher } = makeService();
+      prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
+
+      await expect(
+        service.revoke("t1", APPLE_INVALID_CLIENT_MAX_ATTEMPTS),
+      ).rejects.toBeInstanceOf(PermanentOutboxError);
+    });
+
+    it("outbox handler passes the 1-based attempt (attempts + 1) to revoke", async () => {
+      appleReplies(400, { error: "invalid_client" });
+      const { service, prisma, cipher, registry } = makeService();
+      prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
+      service.onModuleInit();
+      const handler = registry.get(OUTBOX_APPLE_TOKEN_REVOKE)!;
+      const payload = { appleSignInTokenId: "t1" };
+
+      await expect(
+        handler(payload, { attempts: 0 } as never),
+      ).rejects.not.toBeInstanceOf(PermanentOutboxError);
+      await expect(
+        handler(payload, {
+          attempts: APPLE_INVALID_CLIENT_MAX_ATTEMPTS - 1,
+        } as never),
+      ).rejects.toBeInstanceOf(PermanentOutboxError);
+    });
 
     it("429 / unknown code: transient → plain error, retried", async () => {
       appleReplies(429);
@@ -534,9 +581,24 @@ describe("AppleTokenService", () => {
   });
 
   describe("classifyAppleRevokeFailure", () => {
+    it("invalid_client is transient until the attempt limit", () => {
+      expect(classifyAppleRevokeFailure("invalid_client")).toBe("transient");
+      expect(
+        classifyAppleRevokeFailure(
+          "invalid_client",
+          APPLE_INVALID_CLIENT_MAX_ATTEMPTS - 1,
+        ),
+      ).toBe("transient");
+      expect(
+        classifyAppleRevokeFailure(
+          "invalid_client",
+          APPLE_INVALID_CLIENT_MAX_ATTEMPTS,
+        ),
+      ).toBe("permanent");
+    });
+
     it.each([
       ["invalid_grant", "permanent"],
-      ["invalid_client", "permanent"],
       ["invalid_request", "permanent"],
       ["temporarily_unavailable", "transient"],
       [null, "transient"],
