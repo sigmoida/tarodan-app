@@ -98,6 +98,17 @@ export function TrustBadgeFormModal({
           </div>
         )}
       </LocaleTabs>
+      <FormCheckbox
+        name="hideOnIos"
+        label={
+          <span>
+            {t("admin.marketing.hero.hideOnIos")}
+            <span className="block text-xs text-muted">
+              {t("admin.marketing.hero.hideOnIosHint")}
+            </span>
+          </span>
+        }
+      />
       <FormCheckbox name="isActive" label={t("common.active")} />
     </FormModal>
   );

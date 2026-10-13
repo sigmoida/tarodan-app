@@ -64,7 +64,6 @@ function makeService() {
       .fn()
       .mockImplementation(({ data }) => Promise.resolve(row({ ...data }))),
     delete: jest.fn().mockResolvedValue(row()),
-    count: jest.fn().mockResolvedValue(1),
     aggregate: jest.fn().mockResolvedValue({ _max: { displayOrder: 2 } }),
   };
   const $transaction = jest.fn().mockResolvedValue([]);
@@ -185,7 +184,10 @@ describe("HeroSlideService.create", () => {
     await expect(
       service.create(createDto({ cta2Label: { tr: "Git" } })),
     ).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.ctaIncomplete", i18nParams: { slot: 2 } },
+      response: {
+        i18nKey: "server.hero.ctaIncomplete",
+        i18nParams: { slot: 2 },
+      },
     });
     expect(heroSlide.create).not.toHaveBeenCalled();
   });
@@ -218,7 +220,10 @@ describe("HeroSlideService.create", () => {
     heroSlide.findMany.mockResolvedValueOnce(Array(5).fill(OPEN));
 
     await expect(service.create(createDto())).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.maxLiveSlides", i18nParams: { max: 5 } },
+      response: {
+        i18nKey: "server.hero.maxLiveSlides",
+        i18nParams: { max: 5 },
+      },
     });
     expect(heroSlide.create).not.toHaveBeenCalled();
     // Sınır, bitmemiş açık slaytlar üzerinden yoklanır.
@@ -281,7 +286,10 @@ describe("HeroSlideService.update", () => {
     await expect(
       service.update("slide-1", { cta1Href: null } as never),
     ).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.ctaIncomplete", i18nParams: { slot: 1 } },
+      response: {
+        i18nKey: "server.hero.ctaIncomplete",
+        i18nParams: { slot: 1 },
+      },
     });
     expect(heroSlide.update).not.toHaveBeenCalled();
   });
@@ -300,37 +308,155 @@ describe("HeroSlideService.update", () => {
     ["bitişi geçmişe çekme", { endDate: "2026-10-01T00:00:00.000Z" }],
     ["başlangıcı ileri atma", { startDate: "2026-11-01T00:00:00.000Z" }],
     ["auth yerleşimine taşıma", { placement: "auth_default" }],
-  ])(
-    "yayındaki SON ana sayfa slaytında %s → 409",
-    async (_d, dto) => {
-      const { service, heroSlide } = makeService();
-      heroSlide.count.mockResolvedValueOnce(0);
-      await expect(
-        service.update("slide-1", dto as never),
-      ).rejects.toMatchObject({
-        response: { i18nKey: "server.hero.lastLiveHomeSlide" },
-      });
-      expect(heroSlide.update).not.toHaveBeenCalled();
-      expect(heroSlide.count.mock.calls[0][0].where).toMatchObject({
-        placement: "home",
-        id: { not: "slide-1" },
-        isActive: true,
-      });
-    },
-  );
-
-  it("yayında başka ana sayfa slaytı varken kapatılabilir", async () => {
+    ["native'de gizleme", { hideOnIos: true }],
+    // İleri tarihli bitiş: şimdi hâlâ yayında ama slider o gün boş kalır.
+    ["ileri tarihli bitiş verme", { endDate: "2026-10-20T00:00:00.000Z" }],
+  ])("yayındaki SON ana sayfa slaytında %s → 409", async (_d, dto) => {
     const { service, heroSlide } = makeService();
-    heroSlide.count.mockResolvedValueOnce(1);
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await expect(service.update("slide-1", dto as never)).rejects.toMatchObject(
+      {
+        response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+      },
+    );
+    expect(heroSlide.update).not.toHaveBeenCalled();
+    expect(heroSlide.findMany.mock.calls[0][0].where).toMatchObject({
+      placement: "home",
+      id: { not: "slide-1" },
+      isActive: true,
+      // native'de gizlenenler listeyi doldurmaz → koruma onları saymaz
+      hideOnIos: false,
+    });
+  });
+
+  it("yayında başka (kalıcı) ana sayfa slaytı varken kapatılabilir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([OPEN]);
     await service.update("slide-1", { isActive: false });
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
+  it("diğer slayt yakında bitiyorsa kalıcı slaytı kapatmak → 409", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: day(7) },
+    ]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+  });
+
+  it("bitişi, kesintisiz devralan başka bir slayt varken verilebilir", async () => {
+    const { service, heroSlide } = makeService();
+    // Bu slayt 7 gün sonra biter; diğeri tam o gün başlar ve kalıcıdır.
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: day(7), endDate: null },
+    ]);
+    await service.update("slide-1", { endDate: day(7).toISOString() } as never);
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
+  it("tek canlı slayt silinirken 50 sn sonra başlayacak slayt varsa → 409 (home 50 sn boş kalırdı)", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: new Date(NOW.getTime() + 50_000), endDate: null },
+    ]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+  });
+
+  it("admin formunun günlük devri (gün sonu → ertesi gün başı) 409 almaz", async () => {
+    const { service, heroSlide } = makeService();
+    // Bu slayt yarın gün sonunda biter; öbürü ertesi günün başında başlar.
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: new Date("2026-10-14T00:00:00.000+03:00"), endDate: null },
+    ]);
+    await service.update("slide-1", {
+      endDate: "2026-10-13T23:59:59.999+03:00",
+    } as never);
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
+  it("devralan slayt arada boşluk bırakıyorsa bitiş verilemez", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: day(8), endDate: null },
+    ]);
+    await expect(
+      service.update("slide-1", { endDate: day(7).toISOString() } as never),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+  });
+
+  it("native'de gizli slayt, native listede 'diğer slayt' SAYILMAZ → 409", async () => {
+    const { service, heroSlide } = makeService();
+    // Web'de ikincisi de görünür ama mobilde süzülür: mobil liste boşalırdı.
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: true },
+    ]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.update).not.toHaveBeenCalled();
+  });
+
+  it("native'de görünen başka slayt varsa kapatılabilir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: false },
+    ]);
+    await service.update("slide-1", { isActive: false });
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
+  // Web hideOnIos'u yok sayar: native'de gizli SON canlı slaytı kapatmak web
+  // ana sayfasını boşaltır (eski web denetimi korunur).
+  it("hideOnIos=true olan SON canlı ana sayfa slaytını kapatmak → 409 (web boşalır)", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.update).not.toHaveBeenCalled();
+  });
+
+  it("hideOnIos=true slayt, web'de başka canlı slayt varsa kapatılabilir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: true },
+    ]);
+    await service.update("slide-1", { isActive: false });
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
+  it("zaten kesintili slider'ın metnini düzeltmek engellenmez", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ endDate: day(3) }));
+    await service.update("slide-1", { title: { tr: "Yeni" } } as never);
+    // Kapsamı etkileyen alan değişmedi → koruma sorgusu bile atılmaz.
+    expect(heroSlide.findMany).not.toHaveBeenCalled();
     expect(heroSlide.update).toHaveBeenCalled();
   });
 
   it("auth slaytı son da olsa kapatılabilir (guard yalnız ana sayfa)", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.findUnique.mockResolvedValueOnce(row({ placement: "auth_default" }));
+    heroSlide.findUnique.mockResolvedValueOnce(
+      row({ placement: "auth_default" }),
+    );
     await service.update("slide-1", { isActive: false });
-    expect(heroSlide.count).not.toHaveBeenCalled();
+    expect(heroSlide.findMany).not.toHaveBeenCalled();
     expect(heroSlide.update).toHaveBeenCalled();
     expect(notifyWebRevalidate).toHaveBeenCalledWith(["auth:hero"]);
   });
@@ -362,11 +488,17 @@ describe("HeroSlideService.update", () => {
 
   it("pencere değişince sınır yoklanır", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.findMany.mockResolvedValueOnce([]);
+    heroSlide.findMany.mockResolvedValue([]);
     await service.update("slide-1", {
       startDate: "2026-10-01T00:00:00.000Z",
     } as never);
-    expect(heroSlide.findMany).toHaveBeenCalledTimes(1);
+    // Biri "slider boş kalmasın" koruması, biri 5'lik yayın sınırı.
+    expect(heroSlide.findMany).toHaveBeenCalledTimes(2);
+    expect(heroSlide.findMany.mock.calls[1][0].where).toMatchObject({
+      placement: "home",
+      isActive: true,
+      OR: [{ endDate: null }, { endDate: { gte: NOW } }],
+    });
   });
 
   it("pasif slaytı açmak sınırı kendisi hariç yoklar", async () => {
@@ -383,9 +515,14 @@ describe("HeroSlideService.update", () => {
 
   it("yerleşim değişince iki yüzey de tazelenir", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.findUnique.mockResolvedValueOnce(row({ placement: "auth_default" }));
+    heroSlide.findUnique.mockResolvedValueOnce(
+      row({ placement: "auth_default" }),
+    );
     await service.update("slide-1", { placement: "home" } as never);
-    expect(notifyWebRevalidate).toHaveBeenCalledWith(["auth:hero", "home:hero"]);
+    expect(notifyWebRevalidate).toHaveBeenCalledWith([
+      "auth:hero",
+      "home:hero",
+    ]);
   });
 });
 
@@ -395,7 +532,7 @@ describe("HeroSlideService.remove", () => {
 
   it("yayındaki son ana sayfa slaytı silinemez → 409", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.count.mockResolvedValueOnce(0);
+    heroSlide.findMany.mockResolvedValueOnce([]);
     await expect(service.remove("slide-1")).rejects.toMatchObject({
       response: { i18nKey: "server.hero.lastLiveHomeSlide" },
     });
@@ -406,13 +543,65 @@ describe("HeroSlideService.remove", () => {
     const { service, heroSlide } = makeService();
     heroSlide.findUnique.mockResolvedValueOnce(row({ isActive: false }));
     await service.remove("slide-1");
-    expect(heroSlide.count).not.toHaveBeenCalled();
+    expect(heroSlide.findMany).not.toHaveBeenCalled();
     expect(heroSlide.delete).toHaveBeenCalledWith({ where: { id: "slide-1" } });
   });
 
-  it("başka yayında ana sayfa slaytı varsa silinir", async () => {
+  it("başka kalıcı yayında ana sayfa slaytı varsa silinir", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.count.mockResolvedValueOnce(2);
+    heroSlide.findMany.mockResolvedValueOnce([OPEN, OPEN]);
+    await service.remove("slide-1");
+    expect(heroSlide.delete).toHaveBeenCalled();
+  });
+
+  it("geriye yalnız bitiş tarihli slayt kalacaksa kalıcı slayt silinemez", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: day(2) },
+    ]);
+    await expect(service.remove("slide-1")).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.delete).not.toHaveBeenCalled();
+  });
+
+  it("silinen slayt zaten bitiş tarihliyse ve diğeri onu kapsıyorsa silinir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ endDate: day(2) }));
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: day(5) },
+    ]);
+    await service.remove("slide-1");
+    expect(heroSlide.delete).toHaveBeenCalled();
+  });
+
+  it("tek canlı slayt silinirken 50 sn sonra başlayacak slayt varsa → 409", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: new Date(NOW.getTime() + 50_000), endDate: null },
+    ]);
+    await expect(service.remove("slide-1")).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.delete).not.toHaveBeenCalled();
+  });
+
+  it("hideOnIos=true olan SON canlı ana sayfa slaytı da silinemez (web boşalır)", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await expect(service.remove("slide-1")).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.delete).not.toHaveBeenCalled();
+  });
+
+  it("hideOnIos=true slayt, web'de başka canlı slayt varken silinir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ hideOnIos: true }));
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: null, endDate: null, hideOnIos: true },
+    ]);
     await service.remove("slide-1");
     expect(heroSlide.delete).toHaveBeenCalled();
   });

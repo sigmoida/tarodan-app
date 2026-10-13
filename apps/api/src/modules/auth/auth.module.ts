@@ -23,6 +23,7 @@ import { StorageModule } from "../storage/storage.module";
 import { BannedUserGuard } from "./guards/banned-user.guard";
 import { GoogleAuthService } from "./social/google-auth.service";
 import { AppleAuthService } from "./social/apple-auth.service";
+import { AppleTokenModule } from "./social/apple-token.module";
 import { RolesGuard } from "./guards/roles.guard";
 import { PhoneVerificationService } from "./verification/phone-verification.service";
 import { EmailChangeService } from "./verification/email-change.service";
@@ -57,6 +58,9 @@ import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
     // Kayıt formundaki yasal kimlik (ad, soyad, TCKN): tekillik + hız bütçesi
     // LegalIdentityService'te. Yaprak modül, döngü yok.
     LegalIdentityModule,
+    // Apple girişindeki authorizationCode → şifreli refresh token (hesap
+    // silmede iptal için). Yaprak modül, döngü yok.
+    AppleTokenModule,
     // Toplu aktivasyon maili kuyruğa yazılır. Bull KÖK bağlantısı global
     // (BullRootModule), bu yüzden PROCESS_ROLE=web süreci de üretici olabilir;
     // işi tüketen worker ayrı rolde koşar.

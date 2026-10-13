@@ -5470,11 +5470,11 @@
           "clicks": "Clicks",
           "cta1Clicks": "Button 1",
           "cta2Clicks": "Button 2",
-          "ios": "iOS"
+          "ios": "Mobile"
         },
-        "hiddenOnIos": "Hidden on iOS",
-        "hideOnIos": "Hide in the iOS app",
-        "hideOnIosHint": "Not shown in the iOS app (e.g. collection creation)",
+        "hiddenOnIos": "Hidden in the app",
+        "hideOnIos": "Hide in the mobile app",
+        "hideOnIosHint": "Not shown in the mobile app (iOS and Android); still shown on the web (e.g. collection creation)",
         "desktopImage": "Desktop image",
         "mobileImage": "Mobile image (optional)",
         "mobileImageHint": "When empty, the desktop image is used on every device.",
@@ -5578,7 +5578,7 @@
           "title": "Clickable areas",
           "disabled": "Upload an image first",
           "help": "Drag on the image to draw an area; drag an area to move it, use its corners to resize it, press Delete to remove it. Areas cannot overlap. On an image ad only these areas are clickable; clicking elsewhere does nothing.",
-          "mobileNote": "Image ads are not clickable on mobile until the mobile app supports areas.",
+          "mobileNote": "Image ads are not clickable in older mobile app versions that lack area support; in current versions only these areas are clickable.",
           "count": "{count} / {max}",
           "maxReached": "You can add at most {max} areas.",
           "emptyWarning": "This image has no clickable area; the ad cannot be clicked.",
@@ -5614,7 +5614,7 @@
         },
         "device": {
           "desktop": "Desktop",
-          "mobile": "Mobile"
+          "mobile": "Mobile (mobile web and app)"
         },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
@@ -5643,7 +5643,7 @@
           "campaignEnded": "Campaign ended"
         },
         "linkUrl": "Link URL",
-        "linkUrlHelper": "A full address starting with https://… or a site path such as /category/cars.",
+        "linkUrlHelper": "A full address starting with https://… or a site path such as /listings?category=cars (opens on the web and in the mobile app).",
         "content": "Text",
         "contentPlaceholder": "Short text for an image-free announcement",
         "contentHelper": "Plain text, up to 500 characters. Use it for text-only or announcement banners.",
@@ -5652,11 +5652,11 @@
         "campaignHelper": "An ad linked to a campaign stops running automatically when the campaign ends.",
         "displayOrderHelper": "When several ads share a spot they rotate in turn; the smaller number comes first.",
         "positionHint": {
-          "topbar": "A thin strip at the very top of every page. Suggested: 728×90 (shown at strip height) or a small logo-like image; text works too.",
-          "header": "Large banner under the site header on the home and listing pages. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
-          "footer": "Banner above the site footer. Suggested: 970×250, 320×100 on mobile.",
-          "inline": "Between product rows on listing, search and category pages. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
-          "popup": "A window shown to a visitor at most once a day. Suggested: 600×600, 320×480 on mobile."
+          "topbar": "A thin strip at the very top of the page. Web: every page; mobile app: home screen only. Suggested: 728×90 (shown at strip height) or a small logo-like image; text works too.",
+          "header": "Large banner under the header. Web: home and listing pages; mobile app: home screen and the listings screen. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
+          "footer": "Banner above the footer. Web: home and listing pages; mobile app: home screen and the end of the listings screen. Suggested: 970×250, 320×100 on mobile.",
+          "inline": "Between product rows. Web: listing, search and category pages; mobile app: the listings screen only. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
+          "popup": "A window shown to a visitor at most once a day. Web: every storefront page; mobile app: home screen only. Suggested: 600×600, 320×480 on mobile."
         }
       },
       "discounts": {
@@ -11602,7 +11602,7 @@
       "endBeforeStart": "The end date cannot be before the start date",
       "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
       "maxLiveSlides": "At most {max} slides can be live at the same time in one placement",
-      "lastLiveHomeSlide": "The last live home page slide cannot be deleted or taken offline; put another slide live first",
+      "lastLiveHomeSlide": "The home slider can never be empty: this change would leave a moment with no live slide that is also visible in the mobile app. Publish another slide that takes over without a gap first, or review the end date",
       "reorderMixedPlacement": "Only slides of the same placement can be reordered together"
     },
     "brand": {

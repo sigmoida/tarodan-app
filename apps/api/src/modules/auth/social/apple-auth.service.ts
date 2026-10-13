@@ -7,6 +7,13 @@ export interface AppleProfile {
   sub: string;
   email: string;
   isPrivateEmail: boolean;
+  /**
+   * Token'ın verildiği client id (`aud`): native bundle id (com.tarodan.app,
+   * staging'de com.tarodan.app.staging) ya da web Services ID. Doğrulamada
+   * izinli listeden geçmiştir; Apple refresh token'ı bu client id ile çevrilir
+   * ve iptal edilir.
+   */
+  audience: string;
 }
 
 @Injectable()
@@ -52,10 +59,12 @@ export class AppleAuthService {
     }
     const isPrivate =
       payload.is_private_email === true || payload.is_private_email === "true";
+    const audience = Array.isArray(payload.aud) ? payload.aud[0] : payload.aud;
     return {
       sub: String(payload.sub),
       email: String(payload.email),
       isPrivateEmail: isPrivate,
+      audience: String(audience ?? ""),
     };
   }
 }

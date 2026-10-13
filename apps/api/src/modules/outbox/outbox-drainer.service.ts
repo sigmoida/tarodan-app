@@ -8,11 +8,13 @@ import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { OutboxHandlerRegistry } from "./outbox-handler.registry";
 import { outboxStaleProcessingMs } from "../../config/alert-thresholds";
+import { PermanentOutboxError } from "./outbox-errors";
 
 /**
  * OutboxDrainerService — `pending & nextAttemptAt<=now` satırlarını CAS ile claim edip
  * kayıtlı handler'a verir. Başarı → completed; hata → attempts++ + exponential backoff;
- * maxAttempts aşılınca → dead (DLQ + alarm log). At-least-once: handler'lar idempotent.
+ * maxAttempts aşılınca ya da handler `PermanentOutboxError` fırlatınca → dead (DLQ +
+ * alarm log). At-least-once: handler'lar idempotent.
  *
  * Faz 7.5: `runDrain()` yalnızca Bull processor'dan (OutboxScheduledProcessor
  * 'outbox-drain') çağrılır — tek-sefer garantisi + ayrı worker.
@@ -131,7 +133,10 @@ export class OutboxDrainerService implements OnModuleInit {
       } catch (error: any) {
         const attempts = row.attempts + 1;
         const msg = String(error?.message ?? error).slice(0, 1000);
-        if (attempts >= row.maxAttempts) {
+        if (
+          attempts >= row.maxAttempts ||
+          error instanceof PermanentOutboxError
+        ) {
           await this.prisma.outboxEvent.update({
             where: { id: row.id },
             data: {

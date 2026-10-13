@@ -12,6 +12,10 @@
  *    `users` tablosu + `admin_users` satırıdır (bootstrap-production-admin.ts
  *    ile aynı biçim). Üyelerin yasal ad/TCKN ve onay kayıtları BİLİNÇLİ boştur:
  *    kişiler zorunlu onay ve kimlik diyaloglarını kendileri geçer.
+ *  - Senaryo hesapları (`fixtures`): gerçek kişi değil, testçinin onay / kimlik
+ *    ekranını görmesi için (`consent_pending`, `identity_missing`). Kapıları
+ *    tek yerde planlanır (`planUatFixtureGates`); onay ve sentetik kimlik
+ *    üyelerin kullandığı aynı yardımcılarla yazılır.
  *  - Her üyeye birkaç ACTIVE başlangıç ilanı (`data/uat/listings.json`),
  *    lansman kataloğundan. Görseller bu dosyada değil, workflow'un ardından
  *    çalıştırdığı `seed-media.ts` ile bağlanır (slug eşlemesi).
@@ -28,7 +32,12 @@
  *
  * Demo seed'ine bağlı değildir — `seed-independence.spec.ts` doğrular.
  */
-import { AdminRole, PrismaClient, SellerType } from "@prisma/client";
+import {
+  AdminRole,
+  ConsentSource,
+  PrismaClient,
+  SellerType,
+} from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import {
   assertUatSeedAllowed,
@@ -36,12 +45,15 @@ import {
   parseUatListings,
   parseUatSeedMode,
   planUatAccountSync,
+  planUatFixtureGates,
   planUatSeedSteps,
   resolveUatPassword,
   shouldResetPasswords,
   UatAccountKind,
+  UatFixture,
   UatMember,
 } from "../src/common/helpers/seed-uat-accounts";
+import { grantPendingAccountConsents } from "../src/modules/consent/helpers/account-consents";
 import {
   Accounts,
   BusinessConfig,
@@ -180,6 +192,26 @@ async function syncAccount(
   return userId;
 }
 
+/**
+ * Senaryo hesabının sözleşme kapısını uygular. Yalnız EKLER: onay tablosu
+ * ekleme-yalnız — yeniden koşu, testçinin geçtiği kapıyı geri kapatmaz
+ * (sıfırlamak için staging reset / yenileme). Yasal kimlik hiçbir hesaba
+ * yazılmaz (bkz. docs/IDENTITY.md "Seed ve test hesapları").
+ */
+async function applyFixtureGates(
+  fixture: UatFixture,
+  userId: string,
+): Promise<void> {
+  const gates = planUatFixtureGates(fixture.scenario);
+  await grantPendingAccountConsents(
+    prisma,
+    userId,
+    ConsentSource.registration,
+    { only: gates.consentDocuments },
+  );
+  log(`fixture ${fixture.email}: ${fixture.scenario}`);
+}
+
 async function main(): Promise<void> {
   assertUatSeedAllowed(process.env);
 
@@ -197,7 +229,7 @@ async function main(): Promise<void> {
 
   if (!steps.accounts) {
     log(
-      `check OK: ${accounts.members.length} members, ${accounts.staff.length} staff, ${listings.length} listings; password accepted.`,
+      `check OK: ${accounts.members.length} members, ${accounts.fixtures.length} fixtures, ${accounts.staff.length} staff, ${listings.length} listings; password accepted.`,
     );
     return;
   }
@@ -221,6 +253,12 @@ async function main(): Promise<void> {
       member.email,
       await syncAccount(member, "member", context, hash),
     );
+  }
+
+  for (const fixture of accounts.fixtures) {
+    const userId = await syncAccount(fixture, "member", context, hash);
+    userIds.set(fixture.email, userId);
+    await applyFixtureGates(fixture, userId);
   }
 
   // Depo adresi (readiness ister): ilk süper adminin adresi. Adminler gerçek

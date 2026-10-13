@@ -25,6 +25,7 @@ const row = (over: Partial<TrustBadge> = {}): TrustBadge => ({
     tr: "{returnWindowDays} gün koşulsuz iade",
     en: "{returnWindowDays}-day unconditional returns",
   },
+  hideOnIos: false,
   createdAt: new Date("2026-10-01T00:00:00Z"),
   updatedAt: new Date("2026-10-02T00:00:00Z"),
   ...over,
@@ -97,8 +98,15 @@ describe("TrustBadgeService — vitrin okuması", () => {
           tr: "21 gün koşulsuz iade",
           en: "21-day unconditional returns",
         },
+        hideOnIos: false,
       },
     ]);
+  });
+
+  it("mobilde gizli rozetin bayrağı public şekilde taşınır (süzmeyi istemci yapar)", async () => {
+    const { service } = makeService([row({ hideOnIos: true })]);
+    const [badge] = await service.listLive();
+    expect(badge.hideOnIos).toBe(true);
   });
 
   it("süreler okunamazsa kayıt varsayılanına (14) düşer, rozet kaybolmaz", async () => {
@@ -153,9 +161,34 @@ describe("TrustBadgeService — admin", () => {
       title: { tr: "Güvenli Kargo", en: null },
       description: Prisma.DbNull,
       isActive: true,
+      hideOnIos: false,
       displayOrder: 6,
     });
     expect(notifyWebRevalidate).toHaveBeenCalledWith(["home:trust"]);
+  });
+
+  it("oluştururken hideOnIos verilirse yazılır", async () => {
+    const { service, trustBadge } = makeService();
+    await service.create({
+      icon: "truck",
+      title: { tr: "Mobilde yok" },
+      hideOnIos: true,
+    } as never);
+    expect(trustBadge.create.mock.calls[0][0].data.hideOnIos).toBe(true);
+  });
+
+  it("admin şekli hideOnIos taşır", async () => {
+    const { service } = makeService([row({ hideOnIos: true })]);
+    const [badge] = await service.list();
+    expect(badge.hideOnIos).toBe(true);
+  });
+
+  it("güncellemede hideOnIos yazılır, verilmezse dokunulmaz", async () => {
+    const { service, trustBadge } = makeService();
+    await service.update("badge-1", { hideOnIos: true } as never);
+    expect(trustBadge.update.mock.calls[0][0].data.hideOnIos).toBe(true);
+    await service.update("badge-1", { isActive: false } as never);
+    expect(trustBadge.update.mock.calls[1][0].data.hideOnIos).toBeUndefined();
   });
 
   it("güncellemede null açıklamayı temizler, undefined dokunmaz", async () => {

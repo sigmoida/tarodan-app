@@ -121,6 +121,7 @@ model User {
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
   oauthAccounts           OAuthAccount[]
+  appleSignInTokens       AppleSignInToken[]
   reports                 Report[]                 @relation("ReporterReports")
   productBoosts           ProductBoost[]
   deletedIdentity         DeletedUserIdentity?
@@ -432,6 +433,42 @@ model OAuthAccount {
   @@unique([provider, providerUserId])
   @@index([userId])
   @@map("oauth_accounts")
+}
+
+/// Sign in with Apple refresh token'ı — YALNIZ hesap silmede Apple'a iptal
+/// (revoke) için tutulur (App Store 5.1.1(v)). Mobil giriş `authorizationCode`
+/// gönderdiğinde Apple'ın token uç noktasında refresh token'a çevrilir; kod
+/// göndermeyen eski istemci ve web girişi satır üretmez.
+///
+/// OAuthAccount'ta değil, ayrı tabloda: hesap silme transaction'ı OAuthAccount
+/// satırlarını siler, iptal ise commit SONRASI outbox'tan (yeniden denenerek)
+/// yapılır — token o ana kadar burada yaşar. Kullanıcı × client id başına tek
+/// CANLI satır (`revokeRequestedAt` boş) vardır; iptali istenmiş satırların
+/// üzerine yazılmaz, silmeyle yarışan bir giriş iptal-istenmiş yeni satır açar
+/// (bu yüzden unique değil, indeks).
+model AppleSignInToken {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id")
+  /// Girişin yapıldığı client id = identity token'ın `aud`'u (com.tarodan.app,
+  /// staging'de com.tarodan.app.staging). Kod bu client id ile çevrildi; iptal
+  /// de AYNI client id ile yapılmak zorunda.
+  clientId              String    @map("client_id")
+  /// AES-256-GCM (common/security/secret-cipher, APPLE_TOKEN_ENCRYPTION_KEY).
+  /// İptal başarıyla bitince NULL'lanır — iptal edilmiş token tutulmaz.
+  refreshTokenEncrypted String?   @map("refresh_token_encrypted")
+  /// Hesap silme anı: iptal işi outbox'a yazıldı. Bu satır artık yeni bir
+  /// girişle güncellenmez (silinen kullanıcıya giriş yolu yok).
+  revokeRequestedAt     DateTime? @map("revoke_requested_at")
+  /// Apple iptali onayladı (claim damgası: handler tekrar çalışırsa no-op).
+  revokedAt             DateTime? @map("revoked_at")
+  /// Son başarısız deneme ya da no-op nedeni (teşhis; token içermez).
+  lastRevokeError       String?   @map("last_revoke_error")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, clientId])
+  @@map("apple_sign_in_tokens")
 }
 
 model TwoFactorSecret {
@@ -3688,8 +3725,9 @@ model HeroSlide {
   cta1Href        String?       @map("cta1_href")
   cta2Label       Json?         @map("cta2_label")
   cta2Href        String?       @map("cta2_href")
-  /// Mobil uygulama iOS'ta bu slaytı göstermez (mağaza incelemesine takılacak
-  /// içerik — ör. ödeme/üyelik çağrısı). Web yok sayar.
+  /// Mobil uygulama (iOS VE Android) bu slaytı göstermez — dijital satış
+  /// native'de kapalı (mağaza kuralları), ör. ödeme/üyelik çağrısı. Web yok
+  /// sayar. Ad tarihçe gereği "iOS" kaldı; API sözleşmesi (mobil) bu adı bekler.
   hideOnIos       Boolean       @default(false) @map("hide_on_ios")
   /// Yalnız yayındaki slaytta, IP+slayt(+buton) başına tekilleştirilerek artar
   /// (gösterim 30 dk, tık 10 sn) — reklam sayaçlarıyla aynı pencere.
@@ -3719,6 +3757,9 @@ model TrustBadge {
   /// (`{returnWindowDays}`); public uç güncel değerle doldurur.
   title        Json
   description  Json?
+  /// Mobil uygulama (iOS VE Android) bu rozeti göstermez; web yok sayar. Slayttaki
+  /// `hideOnIos` ile aynı anlam ve ad (bkz. HeroSlide.hideOnIos).
+  hideOnIos    Boolean  @default(false) @map("hide_on_ios")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

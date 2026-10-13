@@ -11,12 +11,12 @@ aşağıdakiler sözleşmedir. Mevcut mobil sürümü kırmaz (yeni uçlar, eski
 
 ## Öncelikli uygulama özeti
 
-| Öncelik | Mobil değişiklik                                                                                     | Yapılmazsa                                                     |
-| ------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **P0**  | Ana sayfa slider'ını `GET /hero-slides?placement=home`'dan çiz; gömülü slaytları kaldır              | Admin'in değişiklikleri mobilde görünmez, web ile ayrışır      |
-| P1      | Rozet şeridini `GET /trust-badges`'ten çiz                                                           | Rozetler ve iade süresi web'den ayrışır                        |
-| P1      | Gösterim/tık beacon'ları (`impression`, `click?cta=`)                                                | Admin istatistiği yalnız web'i sayar                           |
-| P2      | Auth ekranında görsel varsa `auth_default` / `auth_register` slaytını kullan                         | —                                                              |
+| Öncelik | Mobil değişiklik                                                                        | Yapılmazsa                                                |
+| ------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **P0**  | Ana sayfa slider'ını `GET /hero-slides?placement=home`'dan çiz; gömülü slaytları kaldır | Admin'in değişiklikleri mobilde görünmez, web ile ayrışır |
+| P1      | Rozet şeridini `GET /trust-badges`'ten çiz                                              | Rozetler ve iade süresi web'den ayrışır                   |
+| P1      | Gösterim/tık beacon'ları (`impression`, `click?cta=`)                                   | Admin istatistiği yalnız web'i sayar                      |
+| P2      | Auth ekranında görsel varsa `auth_default` / `auth_register` slaytını kullan            | —                                                         |
 
 ## 1. Uçlar (hepsi public, oturum gerekmez)
 
@@ -29,27 +29,47 @@ POST /hero-slides/:id/click?cta=1|2    (butona dokunuş)          → 204
 ```
 
 ```ts
-interface LocalizedText { tr: string; en?: string | null }
+interface LocalizedText {
+  tr: string;
+  en?: string | null;
+}
 interface HeroSlideDto {
-  id: string; placement: "home" | "auth_default" | "auth_register";
-  imageUrl: string; mobileImageUrl: string | null; imageSide: "left" | "right";
-  title: LocalizedText; subtitle: LocalizedText | null; imageAlt: LocalizedText | null;
+  id: string;
+  placement: "home" | "auth_default" | "auth_register";
+  imageUrl: string;
+  mobileImageUrl: string | null;
+  imageSide: "left" | "right";
+  title: LocalizedText;
+  subtitle: LocalizedText | null;
+  imageAlt: LocalizedText | null;
   cta1: { label: LocalizedText; href: string } | null;
   cta2: { label: LocalizedText; href: string } | null;
   hideOnIos: boolean;
 }
 interface TrustBadgeDto {
   id: string;
-  icon: "shield-check" | "truck" | "arrow-path" | "credit-card" | "rectangle-stack" | "arrows-right-left";
-  title: LocalizedText; description: LocalizedText | null;
+  icon:
+    | "shield-check"
+    | "truck"
+    | "arrow-path"
+    | "credit-card"
+    | "rectangle-stack"
+    | "arrows-right-left";
+  title: LocalizedText;
+  description: LocalizedText | null;
+  hideOnIos: boolean; // native'de (iOS + Android) gizle; web yok sayar
 }
 ```
 
 - `placement` zorunlu; bilinmeyen değer `400`. Liste zaten yayındakiler (açık + tarih
   penceresinde), `displayOrder` sırasıyla ve en çok 5 öğe; istemci yeniden süzmez/sıralamaz.
 - `Cache-Control: public, max-age=60` — zamanlanmış slayt en geç bir dakikada görünür.
-- `placement=home` her zaman en az bir slayt döner (sunucu son yayındaki ana sayfa slaytının
-  kaldırılmasını reddeder). Auth yerleşimi boş dönebilir: görsel paneli gizleyin.
+- `placement=home` için sunucu, slider'ı boş bırakacak değişikliği reddeder (silme, kapatma,
+  bitiş tarihi verme, native'de gizleme; ileri tarihli bitişler ve `hideOnIos` hesaba katılır).
+  Yine de tarihi kendiliğinden biten son slayt listeyi boşaltabilir: istemci boş `home` listesine
+  hazırlıklı olmalı. Auth yerleşimi boş dönebilir: görsel paneli gizleyin.
+  Mobil native listede `hideOnIos: true` olanlar süzülür (aşağıda §3); sunucu koruması bunu bilir,
+  ama süzmeyi yine istemci yapar.
 
 ## 2. Dil seçimi
 
@@ -62,8 +82,10 @@ sonudur (web `whitespace-pre-line`).
 - Görsel: **`mobileImageUrl ?? imageUrl`**.
 - `imageSide` geniş ekran (tablet yatay) içindir; telefonda görsel üstte, metin altta.
 - Erişilebilirlik etiketi `imageAlt`, yoksa başlık.
-- **`hideOnIos: true` olan slaytı iOS'ta göstermeyin** (Android'de gösterin). Bu süzme
-  istemcidedir; sunucu platform bilmez.
+- **`hideOnIos: true` olan slaytı native uygulamada göstermeyin** (iOS VE Android; 2026-10-12
+  kararı: dijital satış native'de iki mağazada da kapalı). Alan adı geriye uyum için `hideOnIos`
+  kaldı, anlamı "native'de gizle"dir. Bu süzme istemcidedir; sunucu platform bilmez, web alanı
+  yok sayar. Aynı bayrak güven rozetlerinde de vardır (`TrustBadgeDto.hideOnIos`, §6).
 
 ## 4. Butonlar ve bağlantılar
 
@@ -85,4 +107,6 @@ da tek `/` ile başlayan site içi yoldur — reklam bağlantısıyla aynı kura
   anahtarlı rozeti göstermez** (liste ileride büyüyebilir).
 - Metindeki süreler (ör. iade günü) sunucuda Süreler ve Kurallar'dan doldurulmuş gelir; mobil
   `{…}` belirteci işlemez.
+- `hideOnIos: true` rozeti mobil uygulama göstermez (iOS ve Android); web yok sayar. Alan
+  eklemedir: eski istemci yok sayar, `false` varsayılandır.
 - Liste admin sırasıyla gelir; web 6 sütun, telefonda 3 sütun ızgara.

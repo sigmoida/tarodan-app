@@ -31,6 +31,7 @@ import {
   FiscalInvoiceStatus,
   ShippingTariffStatus,
   CouponReservationStatus,
+  ConsentSource,
   Prisma,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -75,6 +76,7 @@ import {
   WHATSAPP_PATTERN_SOURCE,
 } from "../src/common/helpers/contact-patterns";
 import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
+import { grantPendingAccountConsents } from "../src/modules/consent/helpers/account-consents";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -6258,6 +6260,34 @@ async function main() {
       },
     });
   }
+
+  // --- 28c'. Demo üyelerin sözleşme onayı ---
+  // Mobil 1.0.6 girişte `GET /consents/me/pending` boş değilse kapatılamaz onay
+  // ekranı açar; auto-login'li Maestro akışları (zeynep, ahmet, ali, …) orada
+  // takılırdı. Banlı ve "yeni" hesap bilerek dışarıda: ilki girişe hiç ulaşmaz,
+  // ikincisi yeni-üye durumunu temsil eder. İdempotent: güncel onayı olana satır
+  // eklenmez, sürüm değişince yalnız yenisi eklenir.
+  //
+  // Yasal kimlik (ad, soyad, TCKN) BİLİNÇLİ yazılmaz: seed'e gömülü numaralar
+  // public repoda kalıcı olurdu ve gerçek bir kişiye ait olmadıkları garanti
+  // edilemez. Muafiyet (`required:false`) yalnız test şeridine (`isTestAccount`)
+  // aittir; demo hesaplarına verilemez çünkü şerit canlı vitrinden ve diğer
+  // demo hesaplarından yalıtır. Kimlik ekranını geçmesi gereken otomasyon test
+  // şeridi hesabı kullanır (docs/IDENTITY.md "Seed ve test hesapları").
+  const demoMembers = [
+    ...users.filter((u) => String(u.email).endsWith("@demo.com")),
+    corporateSeller,
+  ];
+  for (const member of demoMembers) {
+    await grantPendingAccountConsents(
+      prisma,
+      member.id,
+      ConsentSource.registration,
+    );
+  }
+  console.log(
+    `✅ Demo members: required consents on file (${demoMembers.length})`,
+  );
 
   // --- 28d. Üyelik durum çeşitleri (MEVCUT demo kullanıcılarında) ---
   // cancelled: iptal edildi ama ödenmiş dönem sonuna kadar aktif (currentPeriodEnd gelecekte).

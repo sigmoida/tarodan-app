@@ -1,8 +1,20 @@
 {
-  "_note": "Şifre buraya YAZILMAZ; UAT_SEED_PASSWORD env'inden okunur. Yeni kişi eklemek = ilgili listeye tek satır. Üye ve personel listeleri ayrıdır: aynı adres ikisinde birden olamaz. Üyelerin yasal ad/TCKN ve onay kayıtları BİLİNÇLİ olarak boş: kişiler zorunlu onay ve kimlik diyaloglarını kendileri geçer.",
+  "_note": "Şifre buraya YAZILMAZ; UAT_SEED_PASSWORD env'inden okunur. Yeni kişi eklemek = ilgili listeye tek satır. Üye ve personel listeleri ayrıdır: aynı adres ikisinde birden olamaz. Üyelerin yasal ad/TCKN ve onay kayıtları BİLİNÇLİ olarak boş: kişiler zorunlu onay ve kimlik diyaloglarını kendileri geçer. \"fixtures\": gerçek kişi olmayan senaryo hesapları (consent_pending: KVKK onaysız; identity_missing: yasal kimlik boş); aynı şifre, example.com adresleri (posta gitmez). Bkz. docs/UAT.md.",
   "members": [
     { "email": "nur@tarodan.com.tr", "displayName": "Nur" },
     { "email": "serhat@tarodan.com.tr", "displayName": "Serhat" }
+  ],
+  "fixtures": [
+    {
+      "email": "uat-consent-pending@example.com",
+      "displayName": "UAT Onay Bekleyen",
+      "scenario": "consent_pending"
+    },
+    {
+      "email": "uat-identity-missing@example.com",
+      "displayName": "UAT Kimliksiz",
+      "scenario": "identity_missing"
+    }
   ],
   "staff": [
     {

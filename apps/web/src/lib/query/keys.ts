@@ -96,6 +96,8 @@ export const queryKeys = {
     tiers: () => ["membership", "tiers"] as const,
     /** The current user's membership (tier + status + period). */
     me: () => ["membership", "me"] as const,
+    /** The current user's permissions/limits, incl. the tier's `isAdFree` flag. */
+    limits: () => ["membership", "limits"] as const,
   },
   // NOTE: every factory below returns the SAME array a call site used inline
   // before the registry existed — do NOT change the string values, or an

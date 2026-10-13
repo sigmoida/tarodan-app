@@ -185,9 +185,11 @@ export class CreateMembershipTierDto {
   sortOrder?: number;
 
   /**
-   * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
-   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   * Katman reklamsız mı. Eskiden dekoratörsüzdü: global ValidationPipe
+   * (`whitelist`) alanı SESSİZCE düşürüyordu ve yeni katmanda hep false kalıyordu.
    */
+  @IsOptional()
+  @IsBoolean()
   isAdFree?: boolean;
 
   @Type(() => Number)
@@ -210,12 +212,9 @@ export class MembershipTierResponseDto {
   maxImagesPerListing: number;
   canCreateCollections: boolean;
   canTrade: boolean;
-  /**
-   * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
-   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
-   */
-  isAdFree?: boolean;
-  /** DEVRE DIŞI (isAdFree gibi): yeni yanıtlarda doldurulmaz, hiçbir yerde okunmaz. */
+  /** Katman reklamsız mı (admin kutusu); `true` ise istemci banner çizmez. */
+  isAdFree: boolean;
+  /** DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı; yeni yanıtlarda doldurulmaz, hiçbir yerde okunmaz. */
   featuredListingSlots?: number;
   isActive: boolean;
 }
@@ -261,10 +260,10 @@ export class MembershipLimitsDto {
   canTrade: boolean;
   canCreateCollection: boolean;
   /**
-   * DEVRE DIŞI: banner'lar herkese gösterilir. Alan geriye uyum için duruyor;
-   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   * Üyeliğin katmanı reklamsız mı (admin → Üyelik Katmanları kutusu). `true`
+   * ise web ve mobil banner çizmez; eski istemci alanı yok sayar.
    */
-  isAdFree?: boolean;
+  isAdFree: boolean;
   maxImages: number;
   maxFreeListings: number; // Total max free listings for tier
   maxTotalListings: number; // Total max listings for tier

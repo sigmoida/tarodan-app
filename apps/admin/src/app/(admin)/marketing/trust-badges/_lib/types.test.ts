@@ -12,7 +12,10 @@ import {
 const t = ((key: string, vars?: Record<string, unknown>) =>
   vars ? `${key}:${JSON.stringify(vars)}` : key) as never;
 
-const valid: TrustBadgeFormValues = { ...emptyTrustBadgeForm, titleTr: "Güvenli" };
+const valid: TrustBadgeFormValues = {
+  ...emptyTrustBadgeForm,
+  titleTr: "Güvenli",
+};
 
 const issues = (v: Partial<TrustBadgeFormValues>) => {
   const r = trustBadgeSchema(t).safeParse({ ...valid, ...v });
@@ -64,7 +67,9 @@ describe("trustBadgeSchema", () => {
 
 describe("trustBadgeFormToPayload", () => {
   it("create omits an empty description", () => {
-    expect(trustBadgeFormToPayload(valid, "create").description).toBeUndefined();
+    expect(
+      trustBadgeFormToPayload(valid, "create").description,
+    ).toBeUndefined();
   });
 
   it("update clears an emptied description with null", () => {
@@ -80,6 +85,7 @@ describe("trustBadgeFormToPayload", () => {
       title: { tr: "Güvenli", en: "Secure" },
       description: { tr: "Açıklama", en: null },
       isActive: false,
+      hideOnIos: true,
     } as unknown as TrustBadge;
     const form = trustBadgeToForm(badge);
     expect(trustBadgeFormToPayload(form, "update")).toEqual({
@@ -87,6 +93,16 @@ describe("trustBadgeFormToPayload", () => {
       title: { tr: "Güvenli", en: "Secure" },
       description: { tr: "Açıklama", en: null },
       isActive: false,
+      hideOnIos: true,
     });
+  });
+
+  it("native gizleme bayrağı kapalı başlar ve payload'a taşınır", () => {
+    expect(emptyTrustBadgeForm.hideOnIos).toBe(false);
+    expect(trustBadgeFormToPayload(valid, "create").hideOnIos).toBe(false);
+    expect(
+      trustBadgeFormToPayload({ ...valid, hideOnIos: true }, "update")
+        .hideOnIos,
+    ).toBe(true);
   });
 });
