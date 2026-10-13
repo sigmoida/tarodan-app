@@ -212,13 +212,14 @@ export class PushWorker {
     // Kullanıcı bildirim tercihleri (Bulgu #9): event.service → pushQueue yolu da
     // tercihe uymalı. Kategori kapalıysa zil + push birlikte atlanır; kategori
     // açık ama push master kapalıysa zil kalır, push atlanır.
+    // Kampanya düğmesi için yedek kaynak e-posta izni kolonudur (resolveSettings).
+    const prefs = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true, acceptsMarketingEmails: true },
+    });
     const settings = resolveSettings(
-      (
-        await this.prisma.user.findUnique({
-          where: { id: userId },
-          select: { notificationSettings: true },
-        })
-      )?.notificationSettings,
+      prefs?.notificationSettings,
+      prefs?.acceptsMarketingEmails,
     );
     const inAppAllowed = shouldDeliver(settings, notificationType, "in_app");
 

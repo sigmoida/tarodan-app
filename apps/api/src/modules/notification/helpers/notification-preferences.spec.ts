@@ -264,5 +264,26 @@ describe("notification-preferences", () => {
         ),
       ).toBe(false);
     });
+
+    it("resolveSettings: anahtar yokken kolon yedek kaynaktır, açık anahtar kazanır", () => {
+      expect(resolveSettings(null, true).marketingEmails).toBe(true);
+      expect(resolveSettings({}, true).marketingEmails).toBe(true);
+      expect(
+        resolveSettings({ marketingEmails: false }, true).marketingEmails,
+      ).toBe(false);
+      expect(
+        resolveSettings({ marketingEmails: true }, false).marketingEmails,
+      ).toBe(true);
+      // Kolon geçilmezse davranış değişmez.
+      expect(resolveSettings(null).marketingEmails).toBe(false);
+      expect(resolveSettings(null, null).marketingEmails).toBe(false);
+    });
+
+    it("kolon yedeği yalnız kampanya düğmesini etkiler", () => {
+      const settings = resolveSettings({ orderUpdates: false }, true);
+      expect(settings.orderUpdates).toBe(false);
+      expect(settings.messageAlerts).toBe(true);
+      expect(settings.pushNotifications).toBe(true);
+    });
   });
 });

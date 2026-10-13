@@ -9,18 +9,35 @@ import { AdminNotificationService } from "./admin-notification.service";
  * duyuru (işlemsel/güvenlik) türü aynen herkese gider.
  */
 describe("AdminNotificationService — pazarlama türü kitlesi", () => {
-  const PROMOTION_ON = {
-    notificationSettings: { path: ["marketingEmails"], equals: true },
+  const PROMOTION_CANDIDATES = {
+    OR: [
+      { acceptsMarketingEmails: true },
+      {
+        notificationSettings: { path: ["marketingEmails"], equals: true },
+      },
+    ],
   };
 
+  /** Kampanya adayı satırı: JSON anahtarı ve e-posta izni kolonu ayrı verilir. */
+  type PromotionRow = {
+    id: string;
+    notificationSettings?: Record<string, unknown> | null;
+    acceptsMarketingEmails?: boolean;
+  };
+  const promoted = (id: string): PromotionRow => ({
+    id,
+    notificationSettings: { marketingEmails: true },
+    acceptsMarketingEmails: true,
+  });
+
   /**
-   * `promotion`: kampanya tercihi açık kullanıcılar, `consenting`: e-posta
-   * izni açık kullanıcılar. Filtreye bakıp ilgili listeyi döner; filtresiz
-   * (duyuru) sorgu `everyone` döner.
+   * `promotion`: kampanya aday satırları (kimlik verilirse tercihi açık),
+   * `consenting`: e-posta izni açık kullanıcılar. Filtreye bakıp ilgili
+   * listeyi döner; filtresiz (duyuru) sorgu `everyone` döner.
    */
   const makeService = (
     lists: {
-      promotion?: string[];
+      promotion?: Array<string | PromotionRow>;
       consenting?: string[];
       everyone?: string[];
     } = {},
@@ -33,11 +50,12 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
       },
       user: {
         findMany: jest.fn().mockImplementation(async ({ where }: any) => {
-          const ids = where.notificationSettings
-            ? promotion
-            : where.acceptsMarketingEmails
-              ? consenting
-              : everyone;
+          if (where.OR) {
+            return promotion.map((p) =>
+              typeof p === "string" ? promoted(p) : p,
+            );
+          }
+          const ids = where.acceptsMarketingEmails ? consenting : everyone;
           return ids.map((id) => ({ id }));
         }),
       },
@@ -94,7 +112,11 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
 
     expect(prisma.user.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.user.findMany).toHaveBeenCalledWith({
-      where: { id: { in: ["u1", "u2"] }, isBanned: false, ...PROMOTION_ON },
+      where: {
+        id: { in: ["u1", "u2"] },
+        isBanned: false,
+        ...PROMOTION_CANDIDATES,
+      },
       select: { id: true },
     });
     expect(channelRows(prisma, "in_app")).toEqual(["u1"]);
@@ -120,6 +142,57 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
     expect(
       eventService.emitAdminBroadcast.mock.calls[0][0].userIds,
     ).not.toContain("u2");
+  });
+
+  it.each([
+    ["JSON true", { notificationSettings: { marketingEmails: true } }, true],
+    [
+      "JSON false + kolon true",
+      {
+        notificationSettings: { marketingEmails: false },
+        acceptsMarketingEmails: true,
+      },
+      false,
+    ],
+    [
+      "anahtar yok + kolon true",
+      { notificationSettings: null, acceptsMarketingEmails: true },
+      true,
+    ],
+    [
+      "anahtar yok (başka anahtar var) + kolon true",
+      {
+        notificationSettings: { orderUpdates: false },
+        acceptsMarketingEmails: true,
+      },
+      true,
+    ],
+    [
+      "anahtar yok + kolon false",
+      { notificationSettings: null, acceptsMarketingEmails: false },
+      false,
+    ],
+  ])("pazarlama push+zil kampanya kararı: %s", async (_name, row, expected) => {
+    const { service, prisma, eventService } = makeService({
+      promotion: [{ id: "u1", ...row }],
+    });
+
+    const send = service.sendNotification(
+      "admin-1",
+      dto({ channels: ["push"], mailingType: "marketing" }),
+    );
+
+    if (!expected) {
+      await expect(send).rejects.toBeInstanceOf(BadRequestException);
+      expect(eventService.emitAdminBroadcast).not.toHaveBeenCalled();
+      return;
+    }
+    await send;
+    expect(channelRows(prisma, "in_app")).toEqual(["u1"]);
+    expect(channelRows(prisma, "push")).toEqual(["u1"]);
+    expect(
+      eventService.emitAdminBroadcast.mock.calls[0][0].pushUserIds,
+    ).toEqual(["u1"]);
   });
 
   it("pazarlama: e-posta e-posta iznine uyar, push+zil kampanya tercihine uyar", async () => {
@@ -174,7 +247,7 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
     );
 
     expect(prisma.user.findMany).toHaveBeenCalledWith({
-      where: { isBanned: false, ...PROMOTION_ON },
+      where: { isBanned: false, ...PROMOTION_CANDIDATES },
       select: { id: true },
     });
   });
@@ -194,7 +267,7 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
     );
 
     expect(prisma.user.findMany).toHaveBeenCalledWith({
-      where: { isBanned: false, isSeller: true, ...PROMOTION_ON },
+      where: { isBanned: false, isSeller: true, ...PROMOTION_CANDIDATES },
       select: { id: true },
     });
   });

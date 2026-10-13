@@ -31,8 +31,10 @@ import { NewsletterService } from "../../marketing/newsletter.service";
 import {
   audienceUserWhere,
   MARKETING_CONSENT_WHERE,
-  PROMOTION_PREFERENCE_WHERE,
+  PROMOTION_CANDIDATE_WHERE,
+  PROMOTION_PREFERENCE_SELECT,
 } from "./notification-audience";
+import { acceptsPromotion } from "../../notification/helpers/notification-preferences";
 import { sanitizeEmailHtml } from "../../../common/helpers/email-html-sanitizer";
 import {
   buildBroadcastEmail,
@@ -171,11 +173,9 @@ export class AdminNotificationService {
       this.prisma.user.count({
         where: { ...where, ...MARKETING_CONSENT_WHERE },
       }),
-      this.prisma.user.count({
-        where: { ...where, ...PROMOTION_PREFERENCE_WHERE },
-      }),
+      this.promotionUserIds(where),
     ]);
-    return { total, marketing, promotion };
+    return { total, marketing, promotion: promotion.length };
   }
 
   // ==================== NOTIFICATION MANAGEMENT ====================
@@ -296,6 +296,25 @@ export class AdminNotificationService {
     return null;
   }
 
+  /**
+   * Kampanya tercihi açık kullanıcılar (pazarlama push + zil kitlesi). Aday
+   * kümesi veritabanından, kesin karar `acceptsPromotion` ile (push worker'ın
+   * kullandığı kuralın aynısı).
+   */
+  private async promotionUserIds(
+    where: Prisma.UserWhereInput,
+  ): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where: { ...where, ...PROMOTION_CANDIDATE_WHERE },
+      select: PROMOTION_PREFERENCE_SELECT,
+    });
+    return users
+      .filter((u) =>
+        acceptsPromotion(u.notificationSettings, u.acceptsMarketingEmails),
+      )
+      .map((u) => u.id);
+  }
+
   private async userIdsWhere(where: Prisma.UserWhereInput): Promise<string[]> {
     const users = await this.prisma.user.findMany({
       where,
@@ -310,7 +329,7 @@ export class AdminNotificationService {
    *
    * Pazarlama türünde (S1 — Apple 4.5.4, İYS) iki ayrı kapı vardır:
    *  - push + zil satırı: kullanıcının kampanya (PROMOTION) bildirim tercihi
-   *    (`PROMOTION_PREFERENCE_WHERE`),
+   *    (`acceptsPromotion`: JSON anahtarı, yoksa e-posta izni kolonu),
    *  - e-posta: e-posta pazarlama izni (`MARKETING_CONSENT_WHERE`).
    * İkisi de açık olmayan kullanıcı o kanaldan almaz. Yalnız e-posta kanalı
    * seçildiyse zil satırı da yalnız e-posta alıcılarına yazılır (kitle
@@ -334,7 +353,7 @@ export class AdminNotificationService {
     const sendsEmail = dto.channels.includes("email");
     const emailOnly = dto.channels.every((c) => c === "email");
     const [promotion, consent] = await Promise.all([
-      this.userIdsWhere({ ...base, ...PROMOTION_PREFERENCE_WHERE }),
+      this.promotionUserIds(base),
       sendsEmail
         ? this.userIdsWhere({ ...base, ...MARKETING_CONSENT_WHERE })
         : Promise.resolve([] as string[]),

@@ -6,6 +6,13 @@ import { categoryForType } from "../../notification/helpers/notification-prefere
 const PROMOTION_PREFERENCE_KEY =
   categoryForType(NotificationType.PROMOTION) ?? "marketingEmails";
 
+/** `acceptsPromotion` kararı için gereken kullanıcı alanları. */
+export const PROMOTION_PREFERENCE_SELECT = {
+  id: true,
+  notificationSettings: true,
+  acceptsMarketingEmails: true,
+} as const satisfies Prisma.UserSelect;
+
 /**
  * Toplu bildirim kitlesinin `all` / `segment` karşılığı olan kullanıcı filtresi.
  * Anında gönderim, zamanlanmış gönderim ve alıcı sayacı aynı kuralı kullanır —
@@ -35,24 +42,25 @@ export function audienceUserWhere(
  * e-postası yalnız bu filtreyi geçen kullanıcılara gider. İznin tek kaynağı
  * `User.acceptsMarketingEmails` kolonudur (profil düğmesi, kayıt onayı ve
  * bülten çıkışı onu yazar). Push ve zil bu kapıya bağlı DEĞİLDİR — onlar
- * `PROMOTION_PREFERENCE_WHERE` ile süzülür.
+ * `PROMOTION_CANDIDATE_WHERE` + `acceptsPromotion` ile süzülür.
  */
 export const MARKETING_CONSENT_WHERE = {
   acceptsMarketingEmails: true,
 } as const satisfies Prisma.UserWhereInput;
 
 /**
- * Pazarlama PUSH + ZİL kapısı: kullanıcının kampanya (PROMOTION) bildirim
- * tercihi. Gönderim yolundaki karar (`shouldDeliver`) ile aynı anahtarı okur
- * (`categoryForType(PROMOTION)` → `marketingEmails`) ve aynı varsayılanı
- * uygular: kayıtlı tercihi olmayan kullanıcı `DEFAULT_NOTIFICATION_SETTINGS`
- * değerini alır. Varsayılan kapalı olduğundan yalnız açıkça `true` yazmış
- * kullanıcı eşleşir (JSON'u boş / anahtarı eksik kullanıcı eşleşmez).
- * Varsayılan açık yapılırsa bu filtre de değişmeli; spec bunu zorlar.
+ * Pazarlama PUSH + ZİL kapısının veritabanı ön süzgeci (aday kümesi).
+ * Kesin karar `acceptsPromotion` ile verilir (kampanya JSON anahtarı `true`,
+ * ya da anahtar yokken e-posta izni kolonu `true`; anahtar açıkça `false`
+ * ise gitmez) — JSON'da "anahtar yok" Prisma süzgecinde güvenle ifade
+ * edilemediğinden aday kümesi geniş tutulur, eleme kodda yapılır. Gönderim
+ * anındaki push worker aynı fonksiyonu kullandığından iki yer ayrışmaz.
  */
-export const PROMOTION_PREFERENCE_WHERE = {
-  notificationSettings: {
-    path: [PROMOTION_PREFERENCE_KEY],
-    equals: true,
-  },
+export const PROMOTION_CANDIDATE_WHERE = {
+  OR: [
+    { acceptsMarketingEmails: true },
+    {
+      notificationSettings: { path: [PROMOTION_PREFERENCE_KEY], equals: true },
+    },
+  ],
 } as const satisfies Prisma.UserWhereInput;
