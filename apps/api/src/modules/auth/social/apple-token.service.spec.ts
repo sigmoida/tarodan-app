@@ -17,8 +17,34 @@ jest.mock("apple-signin-auth");
  */
 describe("AppleTokenService", () => {
   const exchange = appleSignin.getAuthorizationToken as jest.Mock;
-  const revokeCall = appleSignin.revokeAuthorizationToken as jest.Mock;
   const clientSecret = appleSignin.getClientSecret as jest.Mock;
+  const fetchMock = jest.fn();
+  const originalFetch = global.fetch;
+
+  /** Apple ucunun yanıtı: durum + (varsa) JSON gövde. */
+  const appleReplies = (status: number, body?: Record<string, unknown>) =>
+    fetchMock.mockResolvedValue({
+      status,
+      ok: status >= 200 && status < 300,
+      text: async () => (body ? JSON.stringify(body) : ""),
+    });
+
+  /** Son Apple isteğinin yolu ve form parametreleri. */
+  const lastAppleRequest = () => {
+    const [url, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    return {
+      url: String(url),
+      params: Object.fromEntries(new URLSearchParams(init.body)),
+      init,
+    };
+  };
+
+  beforeAll(() => {
+    global.fetch = fetchMock as never;
+  });
+  afterAll(() => {
+    global.fetch = originalFetch;
+  });
 
   const fullConfig: Record<string, string> = {
     APPLE_TEAM_ID: "TEAM123456",
@@ -52,6 +78,7 @@ describe("AppleTokenService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     clientSecret.mockReturnValue("client-secret-jwt");
   });
 
@@ -206,16 +233,19 @@ describe("AppleTokenService", () => {
     });
 
     it("revokes with the stored client id, then forgets the token", async () => {
-      revokeCall.mockResolvedValue("");
+      appleReplies(200);
       const { service, prisma, cipher } = makeService();
       prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
 
       await service.revoke("t1");
 
-      expect(revokeCall).toHaveBeenCalledWith("rt-secret", {
-        clientID: "com.tarodan.app",
-        clientSecret: "client-secret-jwt",
-        tokenTypeHint: "refresh_token",
+      const request = lastAppleRequest();
+      expect(request.url).toBe("https://appleid.apple.com/auth/revoke");
+      expect(request.params).toEqual({
+        client_id: "com.tarodan.app",
+        client_secret: "client-secret-jwt",
+        token: "rt-secret",
+        token_type_hint: "refresh_token",
       });
       expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
         where: { id: "t1" },
@@ -235,24 +265,27 @@ describe("AppleTokenService", () => {
 
       await service.revoke("t1");
 
-      expect(revokeCall).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
       expect(prisma.appleSignInToken.update).not.toHaveBeenCalled();
     });
 
-    it("Apple error: recorded and thrown so the outbox retries", async () => {
-      revokeCall.mockResolvedValue({ error: "invalid_client" });
+    // Kütüphane boş gövdeli 5xx'i "" döndürüp başarı gibi gösteriyordu: token
+    // iptal edilmeden siliniyor, iş bir daha denenmiyordu.
+    it("5xx with an empty body is NOT success: token kept, thrown for retry", async () => {
+      appleReplies(503);
       const { service, prisma, cipher } = makeService();
       prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
 
-      await expect(service.revoke("t1")).rejects.toThrow(/invalid_client/);
+      await expect(service.revoke("t1")).rejects.toThrow(/apple:503/);
+      expect(prisma.appleSignInToken.update).toHaveBeenCalledTimes(1);
       expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
         where: { id: "t1" },
-        data: { lastRevokeError: "apple:invalid_client" },
+        data: { lastRevokeError: "apple:503:no_error_code" },
       });
     });
 
     it("network failure: recorded and thrown", async () => {
-      revokeCall.mockRejectedValue(new Error("ETIMEDOUT"));
+      fetchMock.mockRejectedValue(new Error("ETIMEDOUT"));
       const { service, prisma, cipher } = makeService();
       prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
 
@@ -278,7 +311,7 @@ describe("AppleTokenService", () => {
       });
 
       await expect(service.revoke("t1")).resolves.toBeUndefined();
-      expect(revokeCall).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
       expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
         where: { id: "t1" },
         data: { lastRevokeError: "not_configured" },
@@ -290,7 +323,7 @@ describe("AppleTokenService", () => {
       prisma.appleSignInToken.findUnique.mockResolvedValue(null);
 
       await expect(service.revoke("missing")).resolves.toBeUndefined();
-      expect(revokeCall).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

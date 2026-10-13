@@ -11,6 +11,7 @@ import {
 } from "../../outbox/outbox.types";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { AppleTokenCipher } from "./apple-token-cipher";
+import { appleErrorCode, postAppleEndpoint } from "./apple-id-endpoint";
 
 /** Apple client secret'ını imzalayan anahtar (Apple Developer → Keys, .p8). */
 interface AppleSigningKey {
@@ -186,23 +187,23 @@ export class AppleTokenService implements OnModuleInit {
       return;
     }
 
-    let response: unknown;
+    let response: Awaited<ReturnType<typeof postAppleEndpoint>>;
     try {
-      response = await appleSignin.revokeAuthorizationToken(
-        this.cipher.decrypt(row.refreshTokenEncrypted),
-        {
-          clientID: row.clientId,
-          clientSecret: this.clientSecret(row.clientId),
-          tokenTypeHint: "refresh_token",
-        },
-      );
+      response = await postAppleEndpoint("/auth/revoke", {
+        client_id: row.clientId,
+        client_secret: this.clientSecret(row.clientId),
+        token: this.cipher.decrypt(row.refreshTokenEncrypted),
+        token_type_hint: "refresh_token",
+      });
     } catch (error: unknown) {
       await this.recordError(row.id, errorMessage(error));
       throw error;
     }
-    const failure = appleError(response);
-    if (failure) {
-      await this.recordError(row.id, `apple:${failure}`);
+    // Yalnız 2xx başarıdır: boş gövdeli 5xx iptal edilmemiş token'ı
+    // "iptal edildi" sayıp silerdi (yeniden denenemezdi).
+    if (!response.ok) {
+      const failure = `apple:${response.status}:${appleErrorCode(response) ?? "no_error_code"}`;
+      await this.recordError(row.id, failure);
       throw new Error(
         `Apple token revoke failed for ${row.id} (client=${row.clientId}): ${failure}`,
       );
