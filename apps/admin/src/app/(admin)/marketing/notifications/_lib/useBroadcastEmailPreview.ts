@@ -6,7 +6,11 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { EmailPreviewData } from "@/components/email/EmailPreviewPane";
-import { audienceFromForm, type SendForm } from "./types";
+import {
+  audienceFromForm,
+  mailingTypeFromForm,
+  type SendForm,
+} from "./types";
 
 const PREVIEW_DEBOUNCE_MS = 800;
 const AUDIENCE_DEBOUNCE_MS = 500;
@@ -34,7 +38,7 @@ export function useBroadcastEmailPreview(values: SendForm) {
       body: values.body,
       emailSubject: values.emailSubject,
       emailHtml: values.emailHtml,
-      mailingType: values.mailingType,
+      mailingType: mailingTypeFromForm(values),
     },
     PREVIEW_DEBOUNCE_MS,
   );
@@ -68,7 +72,8 @@ export interface AudienceCounts {
 
 /**
  * Seçili hedefin toplam / pazarlama-izinli alıcı sayısı. Duyuru herkese,
- * pazarlama yalnız izinlilere gider; yönetici seçimini bu sayıya bakarak yapar.
+ * pazarlama yalnız izinlilere gider — push ve bildirim kutusu dahil, yani
+ * sayı kanaldan bağımsızdır; yönetici türü bu sayıya bakarak seçer.
  * Hedef henüz belirsizse (kullanıcı seçilmedi) sorgu atılmaz.
  */
 export function useAudienceCounts(values: SendForm) {
@@ -77,8 +82,7 @@ export function useAudienceCounts(values: SendForm) {
     AUDIENCE_DEBOUNCE_MS,
   );
   const ready =
-    values.channels.includes("email") &&
-    (audience.targetType !== "user_ids" || (audience.userIds?.length ?? 0) > 0);
+    audience.targetType !== "user_ids" || (audience.userIds?.length ?? 0) > 0;
 
   const query = useQuery({
     queryKey: adminKeys.preview("notification-audience", audience),

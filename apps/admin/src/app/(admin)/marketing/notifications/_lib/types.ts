@@ -9,7 +9,6 @@ import { z } from "zod";
 import {
   BROADCAST_EMAIL_HTML_MAX,
   BROADCAST_EMAIL_SUBJECT_MAX,
-  DEFAULT_MAILING_TYPE,
   MAILING_TYPES,
   type MailingType,
 } from "@tarodan/types";
@@ -26,7 +25,7 @@ export interface NotificationLog {
   body: string;
   status: string;
   createdAt: string;
-  /** E-posta satırlarında: `hasHtmlEmail` (HTML e-posta) + `mailingType`. */
+  /** `mailingType` her yayın satırında; `hasHtmlEmail` yalnız e-posta satırında. */
   data?: { hasHtmlEmail?: boolean; mailingType?: MailingType } | null;
   user?: { displayName: string; email: string };
 }
@@ -149,7 +148,10 @@ export const sendNotificationSchema = (t: T) =>
           BROADCAST_EMAIL_HTML_MAX,
           t("admin.marketing.notifications.validation.emailHtmlMax"),
         ),
-      mailingType: z.enum(MAILING_TYPES),
+      // Duyuru türü TÜM kanalları belirler (push + bildirim kutusu + e-posta):
+      // pazarlama yalnız izinlilere gider. Başta seçilmemiştir ("") — yönetici
+      // türü her gönderimde açıkça seçer (Apple 4.5.4 / İYS).
+      mailingType: z.union([z.literal(""), z.enum(MAILING_TYPES)]),
       targetType: z.enum(["all", "segment", "user_ids"]),
       // Seçimler {value: userId, label: görünen ad} olarak taşınır — çipler
       // arama sonuçları değişse de etiketini korur (SearchableMultiSelect).
@@ -158,6 +160,15 @@ export const sendNotificationSchema = (t: T) =>
       membershipTier: z.enum(["", "free", "basic", "premium", "business"]),
     })
     .superRefine((values, ctx) => {
+      if (!values.mailingType) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["mailingType"],
+          message: t(
+            "admin.marketing.notifications.validation.mailingTypeRequired",
+          ),
+        });
+      }
       if (values.targetType === "user_ids" && values.users.length === 0) {
         ctx.addIssue({
           code: "custom",
@@ -213,8 +224,8 @@ export const emptySendForm: SendForm = {
   channels: ["push"],
   emailSubject: "",
   emailHtml: "",
-  // Varsayılan duyuru: eski davranış (herkese) sessizce değişmez.
-  mailingType: DEFAULT_MAILING_TYPE,
+  // Varsayılan YOK: tür açıkça seçilmeden gönderilemez.
+  mailingType: "",
   targetType: "all",
   users: [],
   isSeller: "",
@@ -235,13 +246,17 @@ export function audienceFromForm(f: SendForm) {
   return { targetType: f.targetType, userIds, segmentCriteria };
 }
 
+/** Seçili tür; seçilmemişse (`""`) alan hiç gönderilmez. */
+export function mailingTypeFromForm(f: SendForm): MailingType | undefined {
+  return f.mailingType || undefined;
+}
+
 /** E-posta kanalı seçiliyse e-postaya özel alanlar; değilse hiçbiri gönderilmez. */
 export function emailFieldsFromForm(f: SendForm) {
   if (!f.channels.includes("email")) return {};
   return {
     emailSubject: f.emailSubject,
     emailHtml: f.emailHtml,
-    mailingType: f.mailingType,
   };
 }
 
@@ -251,6 +266,8 @@ export function sendFormToPayload(f: SendForm) {
     title: f.title,
     body: f.body,
     channels: f.channels,
+    // Tür kanaldan bağımsız gider: yalnız push'ta da pazarlama süzgeci çalışır.
+    mailingType: mailingTypeFromForm(f),
     ...audienceFromForm(f),
     ...emailFieldsFromForm(f),
   };

@@ -5946,7 +5946,8 @@
           "emailSubjectRequired": "E-posta konusu zorunludur",
           "emailSubjectMax": "E-posta konusu en fazla 240 karakter olabilir",
           "emailHtmlRequired": "E-posta içeriği zorunludur",
-          "emailHtmlMax": "E-posta içeriği en fazla 200.000 karakter olabilir"
+          "emailHtmlMax": "E-posta içeriği en fazla 200.000 karakter olabilir",
+          "mailingTypeRequired": "Bildirim türünü seçin"
         },
         "pushTextTitle": "Push ve uygulama içi metin",
         "emailSectionTitle": "E-posta",
@@ -5957,11 +5958,12 @@
         "contentColumn": "E-posta",
         "recipientCount": "{total} kullanıcıdan {count} kişiye ulaşır",
         "mailingType": {
-          "label": "Gönderim türü",
+          "label": "Bildirim türü",
           "announcement": "Duyuru",
           "marketing": "Pazarlama",
-          "announcementHint": "Pazarlama iznine bakılmaksızın kitledeki herkese gider.",
-          "marketingHint": "Yalnızca pazarlama e-postası almayı kabul eden kullanıcılara, abonelikten çıkış linkiyle gider."
+          "announcementHint": "İşlemsel, hizmet ya da güvenlik duyurusu. Bildirim tercihinden bağımsız olarak kitledeki herkese gider (push, bildirim kutusu, e-posta). Kampanya ya da indirim için kullanmayın.",
+          "marketingHint": "Kampanya, indirim ya da tanıtım. Yalnızca pazarlama iletisine izin veren kullanıcılara gider — push ve bildirim kutusu dahil; e-postada abonelikten çıkış linki bulunur.",
+          "placeholder": "Tür seçin"
         }
       },
       "pages": {

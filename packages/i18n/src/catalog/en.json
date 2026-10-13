@@ -5946,7 +5946,8 @@
           "emailSubjectRequired": "Email subject is required",
           "emailSubjectMax": "Email subject can be at most 240 characters",
           "emailHtmlRequired": "Email content is required",
-          "emailHtmlMax": "Email content can be at most 200,000 characters"
+          "emailHtmlMax": "Email content can be at most 200,000 characters",
+          "mailingTypeRequired": "Select the notification type"
         },
         "pushTextTitle": "Push and in-app text",
         "emailSectionTitle": "Email",
@@ -5957,11 +5958,12 @@
         "contentColumn": "Email",
         "recipientCount": "Reaches {count} of {total} users",
         "mailingType": {
-          "label": "Mailing type",
+          "label": "Notification type",
           "announcement": "Announcement",
           "marketing": "Marketing",
-          "announcementHint": "Sent to every audience member, regardless of marketing consent.",
-          "marketingHint": "Sent only to users who agreed to marketing emails, with an unsubscribe link."
+          "announcementHint": "A transactional, service or security notice. Reaches everyone in the audience regardless of notification preferences (push, inbox, email). Do not use it for campaigns or discounts.",
+          "marketingHint": "A campaign, discount or promotion. Reaches only users who consented to marketing messages — push and inbox included; the email carries an unsubscribe link.",
+          "placeholder": "Select a type"
         }
       },
       "pages": {
