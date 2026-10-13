@@ -7,8 +7,8 @@ import {
   Query,
   Request,
   ParseUUIDPipe,
-} from '@nestjs/common';
-import { RatingService } from './rating.service';
+} from "@nestjs/common";
+import { RatingService } from "./rating.service";
 import {
   CreateUserRatingDto,
   CreateProductRatingDto,
@@ -16,10 +16,11 @@ import {
   ProductRatingResponseDto,
   UserRatingStatsDto,
   ProductRatingStatsDto,
-} from './dto';
-import { Public } from '../auth/decorators/public.decorator';
+} from "./dto";
+import { Public } from "../auth/decorators/public.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 
-@Controller('ratings')
+@Controller("ratings")
 export class RatingController {
   constructor(private readonly ratingService: RatingService) {}
 
@@ -27,7 +28,7 @@ export class RatingController {
    * Create a user rating (after order/trade)
    * POST /ratings/users
    */
-  @Post('users')
+  @Post("users")
   async createUserRating(
     @Request() req: any,
     @Body() dto: CreateUserRatingDto,
@@ -39,7 +40,7 @@ export class RatingController {
    * Create a product rating (after order)
    * POST /ratings/products
    */
-  @Post('products')
+  @Post("products")
   async createProductRating(
     @Request() req: any,
     @Body() dto: CreateProductRatingDto,
@@ -52,13 +53,15 @@ export class RatingController {
    * GET /ratings/users/:userId
    */
   @Public()
-  @Get('users/:userId')
+  @Get("users/:userId")
   async getUserRatings(
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Query('page') page?: number,
-    @Query('pageSize') pageSize?: number,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Query("page") page?: number,
+    @Query("pageSize") pageSize?: number,
+    @CurrentUser("id") viewerId?: string,
   ) {
-    return this.ratingService.getUserRatings(userId, page, pageSize);
+    // Oturum varsa engel ilişkisindeki kullanıcıların değerlendirmeleri düşer.
+    return this.ratingService.getUserRatings(userId, page, pageSize, viewerId);
   }
 
   /**
@@ -66,9 +69,9 @@ export class RatingController {
    * GET /ratings/users/:userId/stats
    */
   @Public()
-  @Get('users/:userId/stats')
+  @Get("users/:userId/stats")
   async getUserRatingStats(
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
   ): Promise<UserRatingStatsDto> {
     return this.ratingService.getUserRatingStats(userId);
   }
@@ -78,15 +81,23 @@ export class RatingController {
    * GET /ratings/products/:productId
    */
   @Public()
-  @Get('products/:productId')
+  @Get("products/:productId")
   async getProductRatings(
-    @Param('productId', ParseUUIDPipe) productId: string,
-    @Query('page') page?: number,
-    @Query('pageSize') pageSize?: number,
-    @Query('sortBy') sortBy?: string,
-    @Query('score') score?: number,
+    @Param("productId", ParseUUIDPipe) productId: string,
+    @Query("page") page?: number,
+    @Query("pageSize") pageSize?: number,
+    @Query("sortBy") sortBy?: string,
+    @Query("score") score?: number,
+    @CurrentUser("id") viewerId?: string,
   ) {
-    return this.ratingService.getProductRatings(productId, page, pageSize, sortBy, score);
+    return this.ratingService.getProductRatings(
+      productId,
+      page,
+      pageSize,
+      sortBy,
+      score,
+      viewerId,
+    );
   }
 
   /**
@@ -94,9 +105,9 @@ export class RatingController {
    * GET /ratings/products/:productId/stats
    */
   @Public()
-  @Get('products/:productId/stats')
+  @Get("products/:productId/stats")
   async getProductRatingStats(
-    @Param('productId', ParseUUIDPipe) productId: string,
+    @Param("productId", ParseUUIDPipe) productId: string,
   ): Promise<ProductRatingStatsDto> {
     return this.ratingService.getProductRatingStats(productId);
   }
@@ -105,9 +116,9 @@ export class RatingController {
    * Mark product rating as helpful
    * POST /ratings/products/:ratingId/helpful
    */
-  @Post('products/:ratingId/helpful')
+  @Post("products/:ratingId/helpful")
   async markHelpful(
-    @Param('ratingId', ParseUUIDPipe) ratingId: string,
+    @Param("ratingId", ParseUUIDPipe) ratingId: string,
   ): Promise<ProductRatingResponseDto> {
     return this.ratingService.markProductRatingHelpful(ratingId);
   }
