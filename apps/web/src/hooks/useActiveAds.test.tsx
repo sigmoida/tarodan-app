@@ -53,7 +53,17 @@ describe("useActiveAds — reklamsızlık tüm yuvalar için", () => {
         </QueryClientProvider>,
       );
     });
-    await act(async () => {});
+    await flush();
+  }
+
+  // react-query notifies observers on a setTimeout(0) tick, so an empty act()
+  // is not enough for the resolved data to reach the hook (flaky on CI).
+  async function flush() {
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
   }
 
   beforeEach(() => {
@@ -122,12 +132,12 @@ describe("useActiveAds — reklamsızlık tüm yuvalar için", () => {
         );
       });
     await render();
-    await act(async () => {});
+    await flush();
     expect(latest?.ads).toEqual([]);
 
     visibility = "visible";
     await render();
-    await act(async () => {});
+    await flush();
     expect(latest?.ads).toHaveLength(1);
     expect(getActive).toHaveBeenCalledTimes(1);
   });
