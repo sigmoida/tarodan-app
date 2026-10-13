@@ -34,7 +34,28 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
   };
 
   const makeService = (appleTokens?: { requestRevocation: jest.Mock }) => {
+    const txEmpty = () => ({ findMany: jest.fn().mockResolvedValue([]) });
     const tx = {
+      // Kullanıcı satırı kilidi + ilan satırı kilidi (SELECT … FOR UPDATE).
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      // Hesap silme adımları: ilan pasifleştirme, alıcı teklifleri, işlem içi
+      // engel denetimi — hepsi boş (Apple dışı bir yan etki yok).
+      product: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      offer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      trade: txEmpty(),
+      order: txEmpty(),
+      refundRequest: txEmpty(),
+      payoutTransfer: txEmpty(),
+      paymentHold: txEmpty(),
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
         update: jest.fn().mockResolvedValue(user),
@@ -74,6 +95,12 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
       {} as never,
       { recordMarketingChange: jest.fn() } as never, // consents
       { syncUserConsent: jest.fn() } as never, // newsletter
+      { syncProduct: jest.fn() } as never, // search
+      { del: jest.fn(), delPattern: jest.fn() } as never, // cache
+      {
+        notifyOfferCancelledListingRemoved: jest.fn(),
+        notifyOfferCancelledBuyerDeleted: jest.fn(),
+      } as never, // notifications
       appleTokens as never,
     );
     return { service, tx, prisma };
