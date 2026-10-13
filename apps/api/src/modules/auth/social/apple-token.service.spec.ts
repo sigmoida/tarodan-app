@@ -100,12 +100,31 @@ describe("AppleTokenService", () => {
   describe("storeFromAuthorizationCode", () => {
     const input = {
       userId: "u1",
+      appleUserId: "apple-sub-1",
       clientId: "com.tarodan.app.staging",
       authorizationCode: "code-1",
     };
 
+    /** Apple token yanıtındaki id_token (imzasız test JWT'si). */
+    const idToken = (claims: Record<string, unknown>) =>
+      [
+        "e30",
+        Buffer.from(JSON.stringify(claims)).toString("base64url"),
+        "sig",
+      ].join(".");
+    const exchangeOk = (
+      claims: Record<string, unknown> = {
+        sub: "apple-sub-1",
+        aud: "com.tarodan.app.staging",
+      },
+    ) =>
+      appleReplies(200, {
+        refresh_token: "rt-secret",
+        id_token: idToken(claims),
+      });
+
     it("exchanges the code with the sign-in client id and stores the token encrypted", async () => {
-      appleReplies(200, { refresh_token: "rt-secret" });
+      exchangeOk();
       const { service, prisma, cipher } = makeService();
 
       await service.storeFromAuthorizationCode(input);
@@ -143,7 +162,7 @@ describe("AppleTokenService", () => {
     });
 
     it("a new login replaces the user's LIVE row only", async () => {
-      appleReplies(200, { refresh_token: "rt-secret" });
+      exchangeOk();
       const { service, prisma } = makeService(fullConfig, {
         liveRow: { id: "live-1" },
       });
@@ -170,7 +189,7 @@ describe("AppleTokenService", () => {
     });
 
     it("locks the user row before writing (serialised with account deletion)", async () => {
-      appleReplies(200, { refresh_token: "rt-secret" });
+      exchangeOk();
       const { service, prisma } = makeService();
 
       await service.storeFromAuthorizationCode(input);
@@ -185,7 +204,7 @@ describe("AppleTokenService", () => {
     // Silmeyle eşzamanlı biten giriş: silinmiş kullanıcıya iptal edilmeyecek
     // token yazılmamalı.
     it("user already deleted: token written as revoke-requested and revoke queued", async () => {
-      appleReplies(200, { refresh_token: "rt-secret" });
+      exchangeOk();
       const { service, prisma, outbox } = makeService(fullConfig, {
         user: { deleted_at: new Date() },
         liveRow: { id: "live-1" },
@@ -208,6 +227,33 @@ describe("AppleTokenService", () => {
           dedupeKey: "apple-token-revoke:new-row",
         }),
       );
+    });
+
+    // Kod kimliğe bağlı olmalı: başka bir Apple hesabının ya da uygulamanın
+    // kodu bu kullanıcıya yazılmaz.
+    it.each([
+      [
+        "another Apple account",
+        { sub: "someone-else", aud: "com.tarodan.app.staging" },
+      ],
+      ["another client id", { sub: "apple-sub-1", aud: "com.other.app" }],
+    ])("code belonging to %s is not stored", async (_label, claims) => {
+      exchangeOk(claims);
+      const { service, prisma } = makeService();
+
+      await service.storeFromAuthorizationCode(input);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.appleSignInToken.create).not.toHaveBeenCalled();
+    });
+
+    it("token response without an id_token is not stored", async () => {
+      appleReplies(200, { refresh_token: "rt-secret" });
+      const { service, prisma } = makeService();
+
+      await service.storeFromAuthorizationCode(input);
+
+      expect(prisma.appleSignInToken.create).not.toHaveBeenCalled();
     });
 
     it("Apple error response: nothing stored, login not affected", async () => {

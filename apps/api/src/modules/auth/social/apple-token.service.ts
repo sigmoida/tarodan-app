@@ -11,7 +11,11 @@ import {
 } from "../../outbox/outbox.types";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { AppleTokenCipher } from "./apple-token-cipher";
-import { appleErrorCode, postAppleEndpoint } from "./apple-id-endpoint";
+import {
+  appleErrorCode,
+  idTokenClaims,
+  postAppleEndpoint,
+} from "./apple-id-endpoint";
 
 /** Apple client secret'ını imzalayan anahtar (Apple Developer → Keys, .p8). */
 interface AppleSigningKey {
@@ -80,6 +84,8 @@ export class AppleTokenService implements OnModuleInit {
    */
   async storeFromAuthorizationCode(input: {
     userId: string;
+    /** Doğrulanmış identity token'ın `sub`'ı — kod bu kimliğe ait olmalı. */
+    appleUserId: string;
     clientId: string;
     authorizationCode: string;
   }): Promise<void> {
@@ -99,6 +105,15 @@ export class AppleTokenService implements OnModuleInit {
       if (!response.ok || typeof refreshToken !== "string" || !refreshToken) {
         this.logger.warn(
           `Apple authorization code could not be exchanged (user=${input.userId}, client=${input.clientId}): ${response.status} ${appleErrorCode(response) ?? "no refresh_token"}`,
+        );
+        return;
+      }
+      // Kod kimliğe bağlı olmalı: istemci başka bir Apple hesabının (ya da
+      // başka bir uygulamanın) kodunu göndermişse token bu kullanıcıya yazılmaz.
+      const claims = idTokenClaims(response.body?.id_token);
+      if (claims?.sub !== input.appleUserId || claims?.aud !== input.clientId) {
+        this.logger.warn(
+          `Apple authorization code does not belong to the signed-in identity (user=${input.userId}, client=${input.clientId}) — not stored`,
         );
         return;
       }

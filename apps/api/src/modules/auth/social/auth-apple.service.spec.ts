@@ -244,6 +244,7 @@ describe("AuthService.loginWithApple", () => {
 
       expect(appleTokens.storeFromAuthorizationCode).toHaveBeenCalledWith({
         userId: "u1",
+        appleUserId: "ap1",
         clientId: "com.tarodan.app.staging",
         authorizationCode: "code-1",
       });

@@ -56,6 +56,20 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Token yanıtındaki `id_token`ın iddiaları (imza DOĞRULANMAZ: belirteç Apple'dan
+ * TLS üzerinden, bizim client secret'ımızla alınan yanıttan okunur — amaç
+ * kodun hangi kimliğe/uygulamaya ait olduğunu görmektir). Okunamazsa null.
+ */
+export function idTokenClaims(
+  idToken: unknown,
+): { sub?: unknown; aud?: unknown } | null {
+  if (typeof idToken !== "string") return null;
+  const payload = idToken.split(".")[1];
+  if (!payload) return null;
+  return parseJsonObject(Buffer.from(payload, "base64url").toString("utf8"));
+}
+
 /** Hata gövdesindeki OAuth hata kodu (`invalid_grant` vb.), yoksa null. */
 export function appleErrorCode(
   response: Pick<AppleEndpointResponse, "body">,

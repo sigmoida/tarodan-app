@@ -1,6 +1,7 @@
 import {
   APPLE_REQUEST_TIMEOUT_MS,
   appleErrorCode,
+  idTokenClaims,
   postAppleEndpoint,
 } from "./apple-id-endpoint";
 
@@ -78,4 +79,23 @@ describe("postAppleEndpoint", () => {
 
     await expect(pending).rejects.toThrow(/aborted/);
   });
+});
+
+describe("idTokenClaims", () => {
+  it("reads sub and aud from the token payload", () => {
+    const payload = Buffer.from(
+      JSON.stringify({ sub: "s1", aud: "com.tarodan.app" }),
+    ).toString("base64url");
+    expect(idTokenClaims(`e30.${payload}.sig`)).toEqual({
+      sub: "s1",
+      aud: "com.tarodan.app",
+    });
+  });
+
+  it.each([undefined, 42, "", "no-dots", "a.!!!.c"])(
+    "unreadable token (%p) → null",
+    (token) => {
+      expect(idTokenClaims(token)).toBeNull();
+    },
+  );
 });

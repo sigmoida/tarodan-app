@@ -242,6 +242,7 @@ export class SocialLoginService {
       void this.appleTokens
         .storeFromAuthorizationCode({
           userId,
+          appleUserId: profile.sub,
           // Kod, girişin yapıldığı uygulamanın client id'siyle çevrilir.
           clientId: profile.audience,
           authorizationCode,
