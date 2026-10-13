@@ -26,7 +26,7 @@ apps/web/src/components/notifications/NotificationBell.tsx
 | `GET`  | `/messages/unread-count`         | bearer | `{ count }` — **web kullanmıyor, mobil kullanmalı**               |
 | `GET`  | `/messages/daily-limit`          | bearer | Katman başına günlük mesaj hakkı — **hiçbir yerde gösterilmiyor** |
 | `POST` | `/media/upload?folder=messages`  | bearer | Görsel eki (multipart `file`)                                     |
-| `GET`  | `/admin/settings/public`         | public | `max_message_length` (varsayılan **1000**)                        |
+| `GET`  | `/admin/settings/public`         | public | `max_message_length` (varsayılan **1000**), `min_offer_percentage` (teklif alt sınırı %, varsayılan **50**) |
 | `POST` | `/user-reports`                  | bearer | Mesaj/kullanıcı şikayeti                                          |
 
 ### Satıcıyla sohbet açma (ürün detayından)

@@ -97,6 +97,7 @@ export class TrustBadgeService {
         ),
         // Varsayılanların tek yeri burası (DTO'da başlangıç değeri yok).
         isActive: dto.isActive ?? true,
+        hideOnIos: dto.hideOnIos ?? false,
         displayOrder: dto.displayOrder ?? (await this.nextDisplayOrder()),
       },
     });
@@ -119,6 +120,7 @@ export class TrustBadgeService {
         title: title ? localizedJson(title) : undefined,
         description: nullableLocalizedJson(patchText(dto.description)),
         isActive: dto.isActive,
+        hideOnIos: dto.hideOnIos,
         displayOrder: dto.displayOrder,
       },
     });

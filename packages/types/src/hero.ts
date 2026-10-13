@@ -8,7 +8,11 @@ import type { LocalizedText } from "./localized-text";
  */
 
 /** Slaytın gösterildiği yer. `auth_register` kayıt ekranları, `auth_default` diğer giriş ekranları. */
-export const HERO_PLACEMENTS = ["home", "auth_default", "auth_register"] as const;
+export const HERO_PLACEMENTS = [
+  "home",
+  "auth_default",
+  "auth_register",
+] as const;
 export type HeroPlacement = (typeof HERO_PLACEMENTS)[number];
 
 /** Görselin geniş ekranda durduğu taraf; metin öbür tarafa yerleşir. */
@@ -49,7 +53,10 @@ export interface HeroSlideDto {
   imageAlt: LocalizedText | null;
   cta1: HeroCtaDto | null;
   cta2: HeroCtaDto | null;
-  /** Mobil uygulama iOS'ta bu slaytı göstermez; web yok sayar. */
+  /**
+   * Mobil uygulama (iOS VE Android) bu slaytı göstermez; web yok sayar. Ad tarihçe
+   * gereği "iOS" kaldı (mobil sözleşmesi) — anlam "native uygulamada gizle".
+   */
   hideOnIos: boolean;
 }
 
@@ -114,6 +121,8 @@ export interface TrustBadgeDto {
   icon: TrustBadgeIcon;
   title: LocalizedText;
   description: LocalizedText | null;
+  /** Mobil uygulama (iOS VE Android) bu rozeti göstermez; web yok sayar. */
+  hideOnIos: boolean;
 }
 
 /** Admin listesi/detayı (`/admin/trust-badges`) — metin ham (belirteçli) döner. */

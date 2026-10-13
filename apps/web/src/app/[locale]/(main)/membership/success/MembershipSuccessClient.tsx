@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useMembershipSettle } from "@/hooks/useMembershipSettle";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { CheckCircleIcon } from "@heroicons/react/24/solid";
@@ -32,6 +33,15 @@ export default function MembershipSuccessClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuthStore();
+
+  // Her satın alma / değişiklik yolu (PayTR dönüşü, test bypass'ı, ertelemeli
+  // düşürme) bu sayfada biter. PayTR dönüşünde ödeme henüz doğrulanmamış
+  // olabilir: üyelik sorguları (reklamsızlık dahil) katman gerçekten değişene
+  // kadar sınırlı sayıda yeniden okunur.
+  useMembershipSettle({
+    expectedTier: searchParams.get("tier"),
+    skipWait: searchParams.get("scheduled") === "1",
+  });
 
   // Soft guard: this page is only meaningful for a signed-in member who just
   // completed an upgrade. Anonymous visitors hitting the URL directly are sent

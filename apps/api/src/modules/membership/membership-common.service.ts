@@ -287,8 +287,11 @@ export class MembershipCommonService {
       maxImagesPerListing: tier.maxImagesPerListing,
       canCreateCollections: tier.canCreateCollections,
       canTrade: tier.canTrade,
-      // isAdFree + featuredListingSlots DEVRE DIŞI: banner herkese gösterilir,
-      // öne çıkarmayı ücretli paketler devraldı — vaat edilmez, dönülmez.
+      // Reklamsızlık admin'in katman formundaki kutusundan gelir (tek kaynak
+      // MembershipTier.isAdFree); web BannerSlot ve mobil buna uyar.
+      // featuredListingSlots DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı
+      // — vaat edilmez, dönülmez.
+      isAdFree: tier.isAdFree === true,
       isActive: tier.isActive,
     };
   }

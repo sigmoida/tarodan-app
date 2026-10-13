@@ -6,7 +6,7 @@ import { OrderStatus, OfferStatus, PaymentStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { sellerNetAmountOf } from "./helpers/order-net.helper";
 import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
-import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
+import { deriveOrderCancelCategory } from "./helpers/order-cancel-reasons";
 import { escrowReleaseAtOf } from "./helpers/order-escrow-release";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 
@@ -144,33 +144,6 @@ export class OrderCommonService {
     const available = getAvailableQuantity(order.product);
     if (available !== null && available < 1) return false;
     return true;
-  }
-
-  /**
-   * Ham cancelReason'ı stabil bir kategoriye eşler; frontend bu kategoriye göre
-   * kullanıcı dostu mesaj gösterir. Admin'in yazdığı serbest metinler 'other'
-   * olarak kalır ve ham haliyle gösterilir. Sadece iptal edilmiş siparişler için
-   * anlamlıdır; aksi halde null döner.
-   */
-  private deriveCancelCategory(order: any): string | null {
-    if (order.status !== OrderStatus.cancelled) return null;
-    const reason = (order.cancelReason ?? "").trim();
-    if (!reason) return "buyer_cancelled";
-    if (reason === ORDER_CANCEL_REASON.paymentWindowExpired)
-      return "payment_timeout";
-    if (reason === ORDER_CANCEL_REASON.sellerShipDeadlineExpired)
-      return "seller_no_ship";
-    if (reason.includes("Stok tüken")) return "stockout";
-    if (reason.includes("takas")) return "trade_reserved";
-    if (reason === ORDER_CANCEL_REASON.replacedByNewCheckout)
-      return "bulk_replaced";
-    if (reason === "Alıcı lehine iptal edildi") return "admin_buyer_favor";
-    if (
-      reason === "Admin tarafından iptal edildi" ||
-      reason.startsWith("Admin force-cancel")
-    )
-      return "admin";
-    return "other";
   }
 
   /**
@@ -406,7 +379,7 @@ export class OrderCommonService {
       // 'iptal' (kargo öncesi) | 'iade' (kargo sonrası). status para akışı için
       // 'refunded' olabilir; UI bu alanla "İade" yerine "İptal" gösterir.
       cancellationType: order.cancellationType ?? null,
-      cancelCategory: this.deriveCancelCategory(order),
+      cancelCategory: deriveOrderCancelCategory(order),
       canReactivate: this.computeCanReactivate(order, userId),
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,

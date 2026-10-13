@@ -327,6 +327,52 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.EMAIL_VERIFICATION]: none,
 };
 
+/** Satıcı sipariş ekranı yolu öneki (`SELLER_ORDER` ve fallback'li türevleri). */
+const SELLER_ORDER_PATH_PREFIX = "/seller/orders/";
+
+/**
+ * Hedefi satıcı sipariş ekranı olan tipler: `*_seller` sipariş/iade tipleri,
+ * PRODUCT_SOLD, CARGO_MOVEMENT_MISSING ve kendi kalıbıyla (`fallback`'li)
+ * `/seller/orders/…`a giden SELLER_ADDRESS_REQUIRED, CARGO_CODE_READY,
+ * OFFER_COUNTER_ACCEPTED. Bunlar yalnız satıcıya gider; hedef kitle TİPTEN
+ * bellidir. Kümeyi haritadan LİNK KALIBINA bakarak türetmek ("satıcı ekranına
+ * giden = satıcıya gider") ayrı bir liste tutmayı ve haritayla ayrışmasını önler.
+ * İki yöne giden tipler (`byAudience`) kasıtlı olarak dışarıdadır: onların
+ * `audience`ı üretici verir.
+ */
+const SELLER_ORDER_TYPES: ReadonlySet<NotificationType> = new Set(
+  (
+    Object.entries(NOTIFICATION_LINKS) as [
+      NotificationType,
+      NotificationLinkSpec,
+    ][]
+  )
+    .filter(
+      ([, spec]) =>
+        spec.kind === "pattern" &&
+        spec.pattern.startsWith(SELLER_ORDER_PATH_PREFIX),
+    )
+    .map(([type]) => type),
+);
+
+/**
+ * Satıcıya giden bildirimin verisine `audience: "seller"` ekler.
+ *
+ * Neden: push payload'ı `{ ...data, type }`'tir ve `link` yalnız zil kaydında
+ * durur; satıcı tipleri `audience` taşımadığı için mobil push dokunuşunda hedef
+ * kitleyi tip adından tahmin ediyordu. Üretici `audience` verdiyse ona dokunulmaz
+ * (açık değer kazanır); alıcıya giden hiçbir tipin verisi değişmez. Tek
+ * noktadan, dağıtım katmanında uygulanır — her üreticiye ayrı ayrı yazılmaz.
+ */
+export function withDefaultAudience(
+  type: NotificationType,
+  data?: Record<string, any>,
+): Record<string, any> | undefined {
+  if (!SELLER_ORDER_TYPES.has(type)) return data;
+  if (data?.audience !== undefined) return data;
+  return { ...data, audience: "seller" };
+}
+
 const KNOWN_TYPES = new Set<string>(Object.values(NotificationType));
 
 /**

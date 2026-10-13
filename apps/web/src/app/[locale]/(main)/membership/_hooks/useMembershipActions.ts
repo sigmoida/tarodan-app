@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { membershipApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { invalidateMembershipQueries } from "@/lib/query/invalidateMembership";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useTranslations } from "next-intl";
 import type { MembershipDetails } from "../_lib/types";
@@ -13,14 +14,15 @@ import type { MembershipDetails } from "../_lib/types";
 /**
  * The three membership management mutations (auto-renew toggle, cancel,
  * cancel-scheduled-change). Each owns its toast + invalidation of the
- * `/membership/me` query; the cancel confirms first.
+ * `/membership/me` + `/membership/me/limits` queries; the cancel confirms first.
  */
 export function useMembershipActions() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const t = useTranslations();
   const meKey = queryKeys.membership.me();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: meKey });
+  // `me` + `limits`: katman değişince reklamsızlık / limitler de bayatlar.
+  const invalidate = () => invalidateMembershipQueries(queryClient);
 
   const autoRenew = useMutation({
     mutationFn: (next: boolean) => membershipApi.setAutoRenew(next),

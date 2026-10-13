@@ -81,7 +81,22 @@ function TopAdItem({ ad }: { ad: Advertisement }) {
  */
 export default function TopAdsBar() {
   const t = useTranslations();
-  const { ads: topAds } = useActiveAds("topbar");
+  const { ads: topAds, reserved } = useActiveAds("topbar");
+
+  // Üyenin katmanı (reklamsız mı) henüz bilinmiyor ama afişler hazır: şeridin
+  // yüksekliğini (h-9) boş tutar. Reklamsız değilse içerik dolar, kayma olmaz.
+  if (reserved) {
+    return (
+      <div
+        className="w-full border-b border-border bg-surface-alt"
+        aria-hidden="true"
+      >
+        <Container>
+          <div className="h-9" />
+        </Container>
+      </div>
+    );
+  }
 
   if (topAds.length === 0) return null;
 
