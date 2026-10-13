@@ -10,6 +10,7 @@ import {
   type AppleTokenRevokePayload,
 } from "../../outbox/outbox.types";
 import { errorMessage } from "../../../common/helpers/error-message";
+import { PermanentOutboxError } from "../../outbox/outbox-errors";
 import { AppleTokenCipher } from "./apple-token-cipher";
 import {
   appleErrorCode,
@@ -36,6 +37,36 @@ export const APPLE_TOKEN_REVOKE_MAX_ATTEMPTS = 30;
 
 const NOT_CONFIGURED_MESSAGE =
   "Apple token revocation is not configured (APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY) — the job retries and dead-letters until it is";
+
+/**
+ * Apple revoke hatasının sınıfı (OAuth hata kodu, RFC 6749 §5.2 / 7009):
+ * - `already_revoked`: `invalid_grant` — token geçersiz/iptal edilmiş, kullanıcı
+ *   bağlantıyı Apple'da zaten kaldırmış olabilir. İş tamamdır.
+ * - `permanent`: istemci kimliği/isteği reddedildi (`invalid_client`,
+ *   `unauthorized_client`, `unsupported_client`, `invalid_request`,
+ *   `unsupported_grant_type`, `unsupported_token_type`) — anahtar ya da client
+ *   id yapılandırması düzelmeden tekrar denemek boşuna → DLQ.
+ * - `transient`: kod yok (5xx, boş gövde) ya da başka bir kod — yeniden dene.
+ */
+export function classifyAppleRevokeFailure(
+  code: string | null,
+): "already_revoked" | "permanent" | "transient" {
+  if (code === "invalid_grant") return "already_revoked";
+  if (
+    code &&
+    [
+      "invalid_client",
+      "unauthorized_client",
+      "unsupported_client",
+      "invalid_request",
+      "unsupported_grant_type",
+      "unsupported_token_type",
+    ].includes(code)
+  ) {
+    return "permanent";
+  }
+  return "transient";
+}
 
 /**
  * Sign in with Apple token yaşam döngüsü (App Store 5.1.1(v)): girişte gelen
@@ -260,40 +291,76 @@ export class AppleTokenService implements OnModuleInit {
       throw new Error(NOT_CONFIGURED_MESSAGE);
     }
 
-    let response: Awaited<ReturnType<typeof postAppleEndpoint>>;
+    // Yapılandırma/anahtar hataları kalıcıdır: imza kurulamıyor ya da şifreli
+    // token bu anahtarla açılmıyorsa (anahtar döndürülmüş) tekrar denemek
+    // sonucu değiştirmez → doğrudan DLQ.
+    let params: Record<string, string>;
     try {
-      response = await postAppleEndpoint("/auth/revoke", {
+      params = {
         client_id: row.clientId,
         client_secret: this.clientSecret(row.clientId),
         token: this.cipher.decrypt(row.refreshTokenEncrypted),
         token_type_hint: "refresh_token",
-      });
+      };
     } catch (error: unknown) {
-      await this.recordError(row.id, errorMessage(error));
-      throw error;
-    }
-    // Yalnız 2xx başarıdır: boş gövdeli 5xx iptal edilmemiş token'ı
-    // "iptal edildi" sayıp silerdi (yeniden denenemezdi).
-    if (!response.ok) {
-      const failure = `apple:${response.status}:${appleErrorCode(response) ?? "no_error_code"}`;
-      await this.recordError(row.id, failure);
-      throw new Error(
-        `Apple token revoke failed for ${row.id} (client=${row.clientId}): ${failure}`,
+      await this.recordError(row.id, `config:${errorMessage(error)}`);
+      throw new PermanentOutboxError(
+        `Apple token revoke for ${row.id} cannot be prepared (check APPLE_PRIVATE_KEY / APPLE_KEY_ID / APPLE_TOKEN_ENCRYPTION_KEY): ${errorMessage(error)}`,
       );
     }
 
-    await this.prisma.appleSignInToken.update({
-      where: { id: row.id },
-      data: {
-        revokedAt: new Date(),
-        // İptal edilmiş token saklanmaz.
-        refreshTokenEncrypted: null,
-        lastRevokeError: null,
-      },
-    });
+    let response: Awaited<ReturnType<typeof postAppleEndpoint>>;
+    try {
+      response = await postAppleEndpoint("/auth/revoke", params);
+    } catch (error: unknown) {
+      // Ağ hatası / zaman aşımı: geçici, yeniden denenir.
+      await this.recordError(row.id, errorMessage(error));
+      throw error;
+    }
+
+    // Yalnız 2xx başarıdır: boş gövdeli 5xx iptal edilmemiş token'ı
+    // "iptal edildi" sayıp silerdi (yeniden denenemezdi).
+    if (!response.ok) {
+      const code = appleErrorCode(response);
+      const failure = `apple:${response.status}:${code ?? "no_error_code"}`;
+      const outcome = classifyAppleRevokeFailure(code);
+
+      if (outcome === "already_revoked") {
+        // Kullanıcı bağlantıyı Apple'da zaten kaldırmış ya da token geçersiz:
+        // iptal edilecek bir şey yok — iş tamam, token tutulmaz.
+        await this.markRevoked(row.id, failure);
+        this.logger.log(
+          `Apple token already invalid at Apple, treated as revoked (row=${row.id}, client=${row.clientId})`,
+        );
+        return;
+      }
+
+      await this.recordError(row.id, failure);
+      const message = `Apple token revoke failed for ${row.id} (client=${row.clientId}): ${failure}`;
+      if (outcome === "permanent") {
+        throw new PermanentOutboxError(
+          `${message} — Apple rejected our client credentials; check that the Sign in with Apple key is bound to this client id`,
+        );
+      }
+      throw new Error(message);
+    }
+
+    await this.markRevoked(row.id, null);
     this.logger.log(
       `Apple token revoked (row=${row.id}, user=${row.userId}, client=${row.clientId})`,
     );
+  }
+
+  /** İptal tamam: damga + token NULL (iptal edilmiş token saklanmaz). */
+  private async markRevoked(id: string, note: string | null): Promise<void> {
+    await this.prisma.appleSignInToken.update({
+      where: { id },
+      data: {
+        revokedAt: new Date(),
+        refreshTokenEncrypted: null,
+        lastRevokeError: note,
+      },
+    });
   }
 
   private async recordError(id: string, message: string): Promise<void> {

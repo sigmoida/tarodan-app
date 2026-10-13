@@ -2,7 +2,9 @@ import appleSignin from "apple-signin-auth";
 import {
   APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
   AppleTokenService,
+  classifyAppleRevokeFailure,
 } from "./apple-token.service";
+import { PermanentOutboxError } from "../../outbox/outbox-errors";
 import { AppleTokenCipher } from "./apple-token-cipher";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import { OUTBOX_APPLE_TOKEN_REVOKE } from "../../outbox/outbox.types";
@@ -433,6 +435,65 @@ describe("AppleTokenService", () => {
       });
     });
 
+    it("invalid_grant: already invalid at Apple → treated as revoked, token forgotten", async () => {
+      appleReplies(400, { error: "invalid_grant" });
+      const { service, prisma, cipher } = makeService();
+      prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
+
+      await expect(service.revoke("t1")).resolves.toBeUndefined();
+      expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
+        where: { id: "t1" },
+        data: {
+          revokedAt: expect.any(Date),
+          refreshTokenEncrypted: null,
+          lastRevokeError: "apple:400:invalid_grant",
+        },
+      });
+    });
+
+    it.each(["invalid_client", "unauthorized_client", "unsupported_client"])(
+      "%s: permanent → dead-lettered at once, token kept",
+      async (code) => {
+        appleReplies(400, { error: code });
+        const { service, prisma, cipher } = makeService();
+        prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
+
+        const error = await service.revoke("t1").catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(PermanentOutboxError);
+        expect((error as Error).message).toContain(code);
+        expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
+          where: { id: "t1" },
+          data: { lastRevokeError: `apple:400:${code}` },
+        });
+      },
+    );
+
+    it("429 / unknown code: transient → plain error, retried", async () => {
+      appleReplies(429);
+      const { service, prisma, cipher } = makeService();
+      prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
+
+      const error = await service.revoke("t1").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(PermanentOutboxError);
+    });
+
+    it("token unreadable with the current key (rotated): permanent, no Apple call", async () => {
+      const { service, prisma } = makeService();
+      const other = makeService({
+        ...fullConfig,
+        APPLE_TOKEN_ENCRYPTION_KEY: "x".repeat(40),
+      });
+      prisma.appleSignInToken.findUnique.mockResolvedValue(row(other.cipher));
+
+      await expect(service.revoke("t1")).rejects.toBeInstanceOf(
+        PermanentOutboxError,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("network failure: recorded and thrown", async () => {
       fetchMock.mockRejectedValue(new Error("ETIMEDOUT"));
       const { service, prisma, cipher } = makeService();
@@ -475,6 +536,18 @@ describe("AppleTokenService", () => {
 
       await expect(service.revoke("missing")).resolves.toBeUndefined();
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("classifyAppleRevokeFailure", () => {
+    it.each([
+      ["invalid_grant", "already_revoked"],
+      ["invalid_client", "permanent"],
+      ["invalid_request", "permanent"],
+      ["temporarily_unavailable", "transient"],
+      [null, "transient"],
+    ] as const)("%p → %s", (code, outcome) => {
+      expect(classifyAppleRevokeFailure(code)).toBe(outcome);
     });
   });
 });
