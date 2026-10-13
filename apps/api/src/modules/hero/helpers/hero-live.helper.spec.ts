@@ -169,6 +169,21 @@ describe("guaranteedCoverageUntil", () => {
     ).toBe(NEVER);
   });
 
+  it("tolerans 'şimdi' anına uygulanmaz: 50 sn sonra başlayacak pencere şu an örtmez", () => {
+    expect(
+      guaranteedCoverageUntil([w(new Date(NOW.getTime() + 50_000), null)], NOW),
+    ).toBe(NOW.getTime());
+  });
+
+  it("şu an biten pencere + 50 sn sonra başlayan: ardışık boşluk tolere edilir", () => {
+    expect(
+      guaranteedCoverageUntil(
+        [w(null, NOW), w(new Date(NOW.getTime() + 50_000), null)],
+        NOW,
+      ),
+    ).toBe(NEVER);
+  });
+
   it("1 dakikaya kadar boşluk tolere edilir, aşan boşluk kesintidir", () => {
     const end = day(2);
     const at = (gapMs: number) => new Date(end.getTime() + gapMs);

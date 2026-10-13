@@ -98,9 +98,10 @@ export const HERO_COVERAGE_GAP_TOLERANCE_MS = 60_000;
  * Pencerelerin birleşiminin ŞİMDİDEN itibaren kesintisiz örttüğü son an
  * (ms); hiç sonlanmıyorsa `Infinity`, şu an hiçbiri açık değilse `now`.
  *
- * Sınırlar dahildir ve en çok `HERO_COVERAGE_GAP_TOLERANCE_MS` (1 dk) boşluk
- * kesinti sayılmaz: biri gün sonunda bitip öbürü ertesi gün başında başlıyorsa
- * kesinti yoktur. "Slider boş kalamaz" koruması bunu kullanır: bir değişiklik bu
+ * Sınırlar dahildir ve ardışık iki pencere arasındaki en çok
+ * `HERO_COVERAGE_GAP_TOLERANCE_MS` (1 dk) boşluk kesinti sayılmaz: biri gün
+ * sonunda bitip öbürü ertesi gün başında başlıyorsa kesinti yoktur. Tolerans
+ * "şimdi" anına UYGULANMAZ: şu an açık pencere yoksa örtü `now`dır. "Slider boş kalamaz" koruması bunu kullanır: bir değişiklik bu
  * anı ERKENE çekiyorsa slider ileride boş kalacaktır (ör. tek kalıcı slaytın
  * bitiş tarihi verilmesi ya da kalıcı slaytın silinip geriye bitiş tarihli bir
  * slaytın kalması).
@@ -122,9 +123,14 @@ export function guaranteedCoverageUntil(
     .sort((a, b) => a.start - b.start);
 
   let covered = nowMs;
+  let coveringNow = false;
   for (const window of open) {
-    // Boşluk toleransı aşıldı → örtü burada biter.
-    if (window.start - covered > HERO_COVERAGE_GAP_TOLERANCE_MS) break;
+    // "Şimdi" anında TOLERANS YOK: ilk pencere şu an açık olmalı
+    // (başlangıç <= now). Tolerans yalnız ARDIŞIK iki pencere arasındaki
+    // boşluk içindir; 50 sn sonra başlayacak slayt şu an canlı sayılmaz.
+    const tolerance = coveringNow ? HERO_COVERAGE_GAP_TOLERANCE_MS : 0;
+    if (window.start - covered > tolerance) break;
+    coveringNow = true;
     covered = Math.max(covered, window.end);
     if (covered === Number.POSITIVE_INFINITY) break;
   }

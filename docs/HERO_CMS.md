@@ -41,7 +41,7 @@ server.hero.maxLiveSlides`. Başka bir slaytın bitişinden sonraya zamanlanan s
     vermek) slider'ı yarın boş bırakır → reddedilir. Başka bir slayt bitişi tam devralıyorsa
     (biri bittiği an öbürü başlar; sınırlar dahil) kabul edilir. Admin formu bitişi gün sonu
     (`23:59:59.999`), başlangıcı gün başı (`00:00:00.000`) gönderdiği için ardışık günlük devirdeki
-    1 ms'lik fark kesinti SAYILMAZ; en çok 1 dakikalık boşluk tolere edilir, daha uzunu kesintidir.
+    1 ms'lik fark kesinti SAYILMAZ; ardışık iki pencere arasında en çok 1 dakikalık boşluk tolere edilir, daha uzunu kesintidir. Tolerans "şimdi" anına uygulanmaz: şu an açık bir slayt şarttır (50 sn sonra başlayacak slayt şu an canlı sayılmaz).
   - **`hideOnIos`** (native uygulamada gizle): kural İKİ görünüm için ayrı uygulanır. Web
     bayrağı yok sayar: web listesi için her canlı slayt sayılır (son canlı slaytı `hideOnIos=true`
     olsa bile silmek/kapatmak web ana sayfasını boşaltır → 409). Native liste için yalnız

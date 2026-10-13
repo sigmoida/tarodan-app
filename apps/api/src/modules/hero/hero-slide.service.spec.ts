@@ -358,6 +358,18 @@ describe("HeroSlideService.update", () => {
     expect(heroSlide.update).toHaveBeenCalled();
   });
 
+  it("tek canlı slayt silinirken 50 sn sonra başlayacak slayt varsa → 409 (home 50 sn boş kalırdı)", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: new Date(NOW.getTime() + 50_000), endDate: null },
+    ]);
+    await expect(
+      service.update("slide-1", { isActive: false }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+  });
+
   it("admin formunun günlük devri (gün sonu → ertesi gün başı) 409 almaz", async () => {
     const { service, heroSlide } = makeService();
     // Bu slayt yarın gün sonunda biter; öbürü ertesi günün başında başlar.
@@ -561,6 +573,17 @@ describe("HeroSlideService.remove", () => {
     ]);
     await service.remove("slide-1");
     expect(heroSlide.delete).toHaveBeenCalled();
+  });
+
+  it("tek canlı slayt silinirken 50 sn sonra başlayacak slayt varsa → 409", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: new Date(NOW.getTime() + 50_000), endDate: null },
+    ]);
+    await expect(service.remove("slide-1")).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
+    });
+    expect(heroSlide.delete).not.toHaveBeenCalled();
   });
 
   it("hideOnIos=true olan SON canlı ana sayfa slaytı da silinemez (web boşalır)", async () => {
