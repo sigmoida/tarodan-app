@@ -1,5 +1,6 @@
 import { SearchProductService } from "./query/search-product.service";
 import { SearchAutocompleteService } from "./query/search-autocomplete.service";
+import { SearchCollectionService } from "./query/search-collection.service";
 
 /**
  * ES indeksi YALNIZ canlı ilanları taşır (indexableProductWhere → canlı satıcı).
@@ -79,6 +80,66 @@ describe("search — test lane", () => {
       await service.autocomplete("por", 5, [], "test");
       const where = (prisma.product.findMany.mock.calls[0] as any[])[0].where;
       expect(JSON.stringify(where)).toContain('"isTestAccount":true');
+    });
+  });
+
+  // S13 — koleksiyon indeksi de yalnız canlı sahipleri taşır: test şeridi
+  // viewer'ı keşfi Postgres'ten kendi şeridiyle listeler, canlı viewer'a ES
+  // test koleksiyonu döndürmez.
+  describe("SearchCollectionService — live-only index", () => {
+    const build = (owner: { isTestAccount: boolean }) => {
+      const client = {
+        index: jest.fn().mockResolvedValue({}),
+        delete: jest.fn().mockResolvedValue({}),
+      };
+      const prisma = {
+        collection: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: "c1",
+            userId: "u1",
+            name: "Koleksiyon",
+            isPublic: true,
+            user: { id: "u1", ...owner },
+            _count: { items: 0 },
+          }),
+        },
+      };
+      const service = new SearchCollectionService(
+        prisma as never,
+        { getPublicAssetUrl: () => undefined } as never,
+        {
+          isAvailable: () => true,
+          client,
+          collectionsIndex: "collections",
+        } as never,
+      );
+      return { service, client, prisma };
+    };
+
+    it("test şeridi sahibinin koleksiyonu indekslenmez, varsa silinir", async () => {
+      const { service, client } = build({ isTestAccount: true });
+      await service.indexCollection("c1");
+      expect(client.index).not.toHaveBeenCalled();
+      expect(client.delete).toHaveBeenCalledWith({
+        index: "collections",
+        id: "c1",
+      });
+    });
+
+    it("canlı sahibin koleksiyonu indekslenir; şerit bayrağı dokümana yazılmaz", async () => {
+      const { service, client } = build({ isTestAccount: false });
+      await service.indexCollection("c1");
+      expect(client.index).toHaveBeenCalledTimes(1);
+      const [{ document }] = client.index.mock.calls[0];
+      expect(document).not.toHaveProperty("isTestAccount");
+      expect(client.delete).not.toHaveBeenCalled();
+    });
+
+    it("sahibin şerit bayrağı indeks sorgusunda seçilir", async () => {
+      const { service, prisma } = build({ isTestAccount: false });
+      await service.indexCollection("c1");
+      const include = prisma.collection.findUnique.mock.calls[0][0].include;
+      expect(include.user.select.isTestAccount).toBe(true);
     });
   });
 });
