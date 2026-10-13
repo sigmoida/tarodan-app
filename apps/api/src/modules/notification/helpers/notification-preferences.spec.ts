@@ -265,25 +265,42 @@ describe("notification-preferences", () => {
       ).toBe(false);
     });
 
-    it("resolveSettings: anahtar yokken kolon yedek kaynaktır, açık anahtar kazanır", () => {
-      expect(resolveSettings(null, true).marketingEmails).toBe(true);
-      expect(resolveSettings({}, true).marketingEmails).toBe(true);
-      expect(
-        resolveSettings({ marketingEmails: false }, true).marketingEmails,
-      ).toBe(false);
+    it("resolveSettings: kolon geçilirse JSON'daki marketingEmails yok sayılır", () => {
+      // Kolon tek kaynak: bayat JSON kararı değiştirmez.
       expect(
         resolveSettings({ marketingEmails: true }, false).marketingEmails,
+      ).toBe(false);
+      expect(
+        resolveSettings({ marketingEmails: false }, true).marketingEmails,
       ).toBe(true);
-      // Kolon geçilmezse davranış değişmez.
+      expect(resolveSettings(null, true).marketingEmails).toBe(true);
+      expect(resolveSettings({}, false).marketingEmails).toBe(false);
+    });
+
+    it("kolon geçilmezse JSON/varsayılan geçerlidir", () => {
       expect(resolveSettings(null).marketingEmails).toBe(false);
+      expect(resolveSettings({ marketingEmails: true }).marketingEmails).toBe(
+        true,
+      );
       expect(resolveSettings(null, null).marketingEmails).toBe(false);
     });
 
-    it("kolon yedeği yalnız kampanya düğmesini etkiler", () => {
+    it("kolon yalnız kampanya düğmesini etkiler", () => {
       const settings = resolveSettings({ orderUpdates: false }, true);
       expect(settings.orderUpdates).toBe(false);
       expect(settings.messageAlerts).toBe(true);
       expect(settings.pushNotifications).toBe(true);
+    });
+
+    it("pazarlama duyurusu kararı kolonu izler (kolon açık → gider, kapalı → gitmez)", () => {
+      const on = resolveSettings({ marketingEmails: false }, true);
+      const off = resolveSettings({ marketingEmails: true }, false);
+      expect(
+        shouldDeliver(on, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(true);
+      expect(
+        shouldDeliver(off, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(false);
     });
   });
 });

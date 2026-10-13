@@ -52,12 +52,11 @@ const ALWAYS_SEND = new Set<string>([
  * Pazarlama türündeki admin duyurusunun tercih anahtarı (Apple 4.5.4, İYS).
  *
  * Push ve zil kanalı kampanya (PROMOTION) kategorisine bağlıdır: bu anahtar
- * `categoryForType` ile `marketingEmails` düğmesine eşlenir, yani kullanıcı
- * kampanya bildirimlerini kapalı tutuyorsa (varsayılan: kapalı) pazarlama
- * duyurusu gitmez. Aynı kural kitle süzgecinde de uygulanır
- * (`acceptsPromotion`). E-posta kanalı ayrıdır: kitlede
- * `User.acceptsMarketingEmails` kolonu (e-posta izni) belirler. Anahtar
- * ALWAYS_SEND dışındadır; veritabanına yazılmaz, yalnız tercih kararı içindir.
+ * `categoryForType` ile `marketingEmails` düğmesine eşlenir. Düğmenin tek
+ * kaynağı `User.acceptsMarketingEmails` kolonudur (bkz. `resolveSettings`);
+ * kitle de aynı kolonla süzülür (`MARKETING_CONSENT_WHERE`), yani audience ile
+ * gönderim anı aynı kararı verir. Anahtar ALWAYS_SEND dışındadır;
+ * veritabanına yazılmaz, yalnız tercih kararı içindir.
  */
 export const MARKETING_BROADCAST_PREFERENCE_TYPE = "admin_broadcast:marketing";
 
@@ -146,42 +145,25 @@ export function preferenceTypeFor(
 /**
  * Ham notificationSettings (Json|null) → varsayılanlarla birleştirilmiş tam nesne.
  *
- * `acceptsMarketingEmails` verilirse kampanya düğmesi (`marketingEmails`)
- * için YEDEK kaynaktır: JSON'da anahtar açıkça yazılmışsa o kazanır, yoksa
- * kolon geçerlidir. Profil düğmesi kayıt onayını kolondan gösterdiği için
- * (bkz. UserProfileService.getNotificationSettings) gönderim kararı da aynı
- * gerçeği görmeli. Kolon geçilmezse davranış değişmez.
+ * Pazarlama izninin (`marketingEmails` kategorisi) TEK kaynağı
+ * `User.acceptsMarketingEmails` kolonudur (profil düğmesi, kayıt onayı ve
+ * bülten çıkışı onu yazar). Kolon geçilirse JSON'daki `marketingEmails`
+ * anahtarı (bayat kalabilir) yok sayılır ve kolon geçerli olur; her gönderim
+ * yolu kolonu bu parametreyle geçirmelidir. Kolon geçilmezse JSON/varsayılan
+ * kullanılır.
  */
 export function resolveSettings(
   raw: unknown,
   acceptsMarketingEmails?: boolean | null,
 ): NotificationSettings {
-  const stored = (raw as Partial<NotificationSettings> | null) ?? {};
-  const settings = { ...DEFAULT_NOTIFICATION_SETTINGS, ...stored };
-  if (
-    typeof stored.marketingEmails !== "boolean" &&
-    typeof acceptsMarketingEmails === "boolean"
-  ) {
+  const settings = {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...((raw as Partial<NotificationSettings> | null) ?? {}),
+  };
+  if (typeof acceptsMarketingEmails === "boolean") {
     settings.marketingEmails = acceptsMarketingEmails;
   }
   return settings;
-}
-
-/**
- * Pazarlama push + zil satırı bu kullanıcıya gönderilebilir mi? Kampanya
- * (PROMOTION) tercihi: JSON anahtarı `true` ya da (anahtar yok ve e-posta
- * izni kolonu `true`). Anahtar açıkça `false` ise gitmez. Gönderim anındaki
- * karar (push worker) ve kitle süzgeci bu tek fonksiyonu kullanır.
- */
-export function acceptsPromotion(
-  rawSettings: unknown,
-  acceptsMarketingEmails: boolean | null | undefined,
-): boolean {
-  return shouldDeliver(
-    resolveSettings(rawSettings, acceptsMarketingEmails),
-    MARKETING_BROADCAST_PREFERENCE_TYPE,
-    "in_app",
-  );
 }
 
 /**

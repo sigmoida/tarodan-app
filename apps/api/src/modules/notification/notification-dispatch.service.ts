@@ -126,10 +126,18 @@ export class NotificationDispatchService {
   ): Promise<{ settings: NotificationSettings; locale: Locale }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notificationSettings: true, preferredLanguage: true },
+      select: {
+        notificationSettings: true,
+        acceptsMarketingEmails: true,
+        preferredLanguage: true,
+      },
     });
     return {
-      settings: resolveSettings(user?.notificationSettings),
+      // Pazarlama düğmesinin tek kaynağı izin kolonudur (resolveSettings).
+      settings: resolveSettings(
+        user?.notificationSettings,
+        user?.acceptsMarketingEmails,
+      ),
       locale: isLocale(user?.preferredLanguage)
         ? user.preferredLanguage
         : defaultLocale,

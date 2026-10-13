@@ -234,11 +234,6 @@ export interface AdminBroadcastPayload {
    * herkese gider.
    */
   marketingUnsubscribeTokens?: Map<string, string>;
-  /**
-   * Doluysa push yalnız bu kullanıcılara gider (pazarlamada kampanya tercihi
-   * açık olanlar). Boşsa `userIds`'in hepsine. E-postayı etkilemez.
-   */
-  pushUserIds?: string[];
 }
 
 export interface InAppNotificationPayload {
@@ -1293,10 +1288,6 @@ export class EventService {
       ? prepareBroadcastEmailContent(payload)
       : undefined;
 
-    const pushAudience = payload.pushUserIds
-      ? new Set(payload.pushUserIds)
-      : undefined;
-
     // Fetch user details in chunks
     const chunkSize = 100;
     for (let i = 0; i < payload.userIds.length; i += chunkSize) {
@@ -1352,11 +1343,7 @@ export class EventService {
         }
 
         // Send push if requested and the user has at least one active device token
-        if (
-          payload.channels.includes("push") &&
-          user.pushTokens.length > 0 &&
-          (!pushAudience || pushAudience.has(user.id))
-        ) {
+        if (payload.channels.includes("push") && user.pushTokens.length > 0) {
           await this.pushQueue.add("send-notification", {
             userId: user.id,
             title: payload.title,

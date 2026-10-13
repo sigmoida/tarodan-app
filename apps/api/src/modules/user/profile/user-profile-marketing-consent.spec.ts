@@ -76,6 +76,30 @@ describe("UserProfileService.updateNotificationSettings — pazarlama izni", () 
     );
   });
 
+  it("JSON'a pazarlama anahtarı yazılmaz; izin yalnız kolondadır", async () => {
+    const { service, tx } = makeService(false);
+
+    await service.updateNotificationSettings("u1", {
+      marketingEmails: true,
+      orderUpdates: false,
+    });
+
+    const data = tx.user.update.mock.calls[0][0].data;
+    expect(data.acceptsMarketingEmails).toBe(true);
+    expect(data.notificationSettings).not.toHaveProperty("marketingEmails");
+    expect(data.notificationSettings).toMatchObject({ orderUpdates: false });
+  });
+
+  it("pazarlama dışı değişiklikte kolon yazılmaz", async () => {
+    const { service, tx } = makeService(true);
+
+    await service.updateNotificationSettings("u1", { orderUpdates: false });
+
+    expect(tx.user.update.mock.calls[0][0].data).not.toHaveProperty(
+      "acceptsMarketingEmails",
+    );
+  });
+
   it("değer değişmediyse kayıt yazmaz, listeye dokunmaz", async () => {
     const { service, consents, newsletter } = makeService(true);
 

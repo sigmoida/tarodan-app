@@ -24,12 +24,8 @@ describe("AdminNotificationService — HTML e-posta", () => {
       },
       user: {
         count: jest.fn().mockResolvedValue(0),
-        // Pazarlama kitlesi sorgusu: varsayılan olarak iki alıcı da izinli
-        // (kampanya kararı için e-posta izni kolonu yeterli).
-        findMany: jest.fn().mockResolvedValue([
-          { id: "u1", acceptsMarketingEmails: true },
-          { id: "u2", acceptsMarketingEmails: true },
-        ]),
+        // Pazarlama kitlesi sorgusu: varsayılan olarak iki alıcı da izinli.
+        findMany: jest.fn().mockResolvedValue([{ id: "u1" }, { id: "u2" }]),
       },
     };
     const eventService = {
@@ -168,12 +164,9 @@ describe("AdminNotificationService — HTML e-posta", () => {
       expect(result.emailRecipientCount).toBe(1);
     });
 
-    it("push satırları kampanya tercihi açık üyelere yazılır (S1)", async () => {
+    it("push satırları da yalnız izinli üyelere yazılır (S1)", async () => {
       const { service, prisma } = makeService();
-      // İlk sorgu push+zil kitlesi (kampanya tercihi), ikincisi e-posta izni.
-      prisma.user.findMany.mockResolvedValueOnce([
-        { id: "u1", acceptsMarketingEmails: true },
-      ]);
+      prisma.user.findMany.mockResolvedValueOnce([{ id: "u1" }]);
 
       await service.sendNotification(
         "admin-1",
@@ -258,47 +251,18 @@ describe("AdminNotificationService — HTML e-posta", () => {
   });
 
   describe("kitle sayacı", () => {
-    it("toplam, e-posta izinli ve kampanya tercihli sayıyı ayrı döner", async () => {
+    it("toplam ve pazarlama-izinli sayıyı ayrı döner", async () => {
       const { service, prisma } = makeService();
       prisma.user.count.mockResolvedValueOnce(120).mockResolvedValueOnce(45);
-      // Kampanya adayları: u2 JSON'da açıkça kapatmış → sayılmaz.
-      prisma.user.findMany.mockResolvedValueOnce([
-        { id: "u1", acceptsMarketingEmails: true },
-        {
-          id: "u2",
-          acceptsMarketingEmails: true,
-          notificationSettings: { marketingEmails: false },
-        },
-        { id: "u3", notificationSettings: { marketingEmails: true } },
-      ]);
 
       const result = await service.countAudience({ targetType: "all" });
 
-      expect(result).toEqual({ total: 120, marketing: 45, promotion: 2 });
+      expect(result).toEqual({ total: 120, marketing: 45 });
       expect(prisma.user.count).toHaveBeenNthCalledWith(1, {
         where: { isBanned: false },
       });
       expect(prisma.user.count).toHaveBeenNthCalledWith(2, {
         where: { isBanned: false, acceptsMarketingEmails: true },
-      });
-      expect(prisma.user.findMany).toHaveBeenCalledWith({
-        where: {
-          isBanned: false,
-          OR: [
-            { acceptsMarketingEmails: true },
-            {
-              notificationSettings: {
-                path: ["marketingEmails"],
-                equals: true,
-              },
-            },
-          ],
-        },
-        select: {
-          id: true,
-          notificationSettings: true,
-          acceptsMarketingEmails: true,
-        },
       });
     });
 

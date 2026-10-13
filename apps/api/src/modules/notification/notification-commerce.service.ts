@@ -940,6 +940,7 @@ export class NotificationCommerceService {
         displayName: true,
         preferredLanguage: true,
         notificationSettings: true,
+        acceptsMarketingEmails: true,
       },
     });
     if (!user) {
@@ -955,7 +956,10 @@ export class NotificationCommerceService {
       // Tercihle susturulan bildirim "gönderilemedi" sayılmaz (yeniden denenmez).
       if (
         !shouldDeliver(
-          resolveSettings(user.notificationSettings),
+          resolveSettings(
+            user.notificationSettings,
+            user.acceptsMarketingEmails,
+          ),
           type,
           "in_app",
         )

@@ -564,11 +564,17 @@ export class UserProfileService {
       marketingBefore !== null &&
       marketingBefore.acceptsMarketingEmails !== patch.marketingEmails;
 
+    // JSON'a pazarlama anahtarı yazılmaz: izin yalnız `acceptsMarketingEmails`
+    // kolonundadır; JSON'daki kopya bayatlayıp ikinci bir kaynağa dönüşürdü.
+    const storedSettings: Partial<NotificationSettings> = { ...merged };
+    delete storedSettings.marketingEmails;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
         data: {
-          notificationSettings: merged as unknown as Prisma.InputJsonValue,
+          notificationSettings:
+            storedSettings as unknown as Prisma.InputJsonValue,
           // marketingEmails düğmesi pazarlama e-postalarının kullanıcıya görünen
           // TEK anahtarıdır; gerçek gönderim kapıları ise User.acceptsMarketingEmails
           // kolonunu okur (bülten aboneliği, fiyat-düşüş e-postası, üyelik teklif
