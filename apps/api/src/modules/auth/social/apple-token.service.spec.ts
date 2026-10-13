@@ -2,6 +2,7 @@ import appleSignin from "apple-signin-auth";
 import {
   APPLE_INVALID_CLIENT_MAX_ATTEMPTS,
   APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
+  PERSIST_TOKEN_TX_OPTIONS,
   AppleTokenService,
   classifyAppleRevokeFailure,
 } from "./apple-token.service";
@@ -9,6 +10,7 @@ import { PermanentOutboxError } from "../../outbox/outbox-errors";
 import { AppleTokenCipher } from "./apple-token-cipher";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import { OUTBOX_APPLE_TOKEN_REVOKE } from "../../outbox/outbox.types";
+import { ACCOUNT_DELETION_TX_TIMEOUT_MS } from "../../user/helpers/account-deletion.constants";
 import { isEncryptedSecret } from "../../../common/security/secret-cipher";
 
 jest.mock("apple-signin-auth");
@@ -72,6 +74,8 @@ describe("AppleTokenService", () => {
     const cipher = new AppleTokenCipher(configService as never);
     const user = opts.user === undefined ? { deleted_at: null } : opts.user;
     const prisma: Record<string, any> = {
+      // Saklama başarısız olduktan sonra hesabın durumu (kilitsiz okuma).
+      user: { findUnique: jest.fn().mockResolvedValue({ deletedAt: null }) },
       $queryRaw: jest.fn().mockResolvedValue(user ? [user] : []),
       appleSignInToken: {
         findUnique: jest.fn(),
@@ -235,6 +239,146 @@ describe("AppleTokenService", () => {
           dedupeKey: "apple-token-revoke:new-row",
         }),
       );
+    });
+
+    it("persist transaction outwaits the account-deletion lock (timeout and maxWait above its 60s)", async () => {
+      exchangeOk();
+      const { service, prisma } = makeService();
+
+      await service.storeFromAuthorizationCode(input);
+
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        PERSIST_TOKEN_TX_OPTIONS,
+      );
+      expect(PERSIST_TOKEN_TX_OPTIONS.timeout).toBeGreaterThan(
+        ACCOUNT_DELETION_TX_TIMEOUT_MS,
+      );
+      expect(PERSIST_TOKEN_TX_OPTIONS.maxWait).toBeGreaterThan(
+        ACCOUNT_DELETION_TX_TIMEOUT_MS,
+      );
+    });
+
+    // Silme kilidi tutarken persist işlemi zaman aşımına uğrarsa token ne
+    // saklanır ne kuyruğa girer: silinmiş hesapta Apple'a doğrudan iptal.
+    describe("persist fails (lock wait timeout / DB error)", () => {
+      const reply = (status: number, body?: Record<string, unknown>) => ({
+        status,
+        ok: status >= 200 && status < 300,
+        text: async () => (body ? JSON.stringify(body) : ""),
+      });
+      /** 1. çağrı kod takası, 2. çağrı (varsa) doğrudan iptal. */
+      const arrange = (
+        accountLookup: () => Promise<{ deletedAt: Date | null } | null>,
+        revokeReply: ReturnType<typeof reply> = reply(200),
+      ) => {
+        const ctx = makeService();
+        ctx.prisma.$transaction.mockRejectedValue(
+          new Error("Transaction API error: Transaction already closed"),
+        );
+        ctx.prisma.user.findUnique.mockImplementation(accountLookup);
+        fetchMock
+          .mockReset()
+          .mockResolvedValueOnce(
+            reply(200, {
+              refresh_token: "rt-secret",
+              id_token: idToken({
+                sub: "apple-sub-1",
+                aud: "com.tarodan.app.staging",
+              }),
+            }),
+          )
+          .mockResolvedValueOnce(revokeReply);
+        return ctx;
+      };
+      const revokeCalls = () =>
+        fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/revoke"));
+
+      it("account deleted meanwhile: the token is revoked directly at Apple", async () => {
+        const { service, prisma } = arrange(async () => ({
+          deletedAt: new Date(),
+        }));
+
+        await expect(
+          service.storeFromAuthorizationCode(input),
+        ).resolves.toBeUndefined();
+
+        expect(prisma.user.findUnique).toHaveBeenCalledWith({
+          where: { id: "u1" },
+          select: { deletedAt: true },
+        });
+        expect(revokeCalls()).toHaveLength(1);
+        expect(lastAppleRequest().params).toEqual({
+          client_id: "com.tarodan.app.staging",
+          client_secret: "client-secret-jwt",
+          token: "rt-secret",
+          token_type_hint: "refresh_token",
+        });
+      });
+
+      it("user row gone entirely: also revoked directly", async () => {
+        const { service } = arrange(async () => null);
+
+        await service.storeFromAuthorizationCode(input);
+
+        expect(revokeCalls()).toHaveLength(1);
+      });
+
+      it("live account: nothing is revoked (the next sign-in stores a fresh token)", async () => {
+        const { service } = arrange(async () => ({ deletedAt: null }));
+
+        await service.storeFromAuthorizationCode(input);
+
+        expect(revokeCalls()).toHaveLength(0);
+      });
+
+      it("account state unreadable: not revoked, never throws", async () => {
+        const { service } = arrange(async () => {
+          throw new Error("db down");
+        });
+
+        await expect(
+          service.storeFromAuthorizationCode(input),
+        ).resolves.toBeUndefined();
+        expect(revokeCalls()).toHaveLength(0);
+      });
+
+      it("Apple rejects or is unreachable on the direct revoke: still never throws", async () => {
+        const rejected = arrange(
+          async () => ({ deletedAt: new Date() }),
+          reply(400, { error: "invalid_client" }),
+        );
+        await expect(
+          rejected.service.storeFromAuthorizationCode(input),
+        ).resolves.toBeUndefined();
+
+        const unreachable = arrange(async () => ({ deletedAt: new Date() }));
+        fetchMock
+          .mockReset()
+          .mockResolvedValueOnce(
+            reply(200, {
+              refresh_token: "rt-secret",
+              id_token: idToken({
+                sub: "apple-sub-1",
+                aud: "com.tarodan.app.staging",
+              }),
+            }),
+          )
+          .mockRejectedValueOnce(new Error("ETIMEDOUT"));
+        await expect(
+          unreachable.service.storeFromAuthorizationCode(input),
+        ).resolves.toBeUndefined();
+      });
+
+      it("a code that does not belong to the identity is never revoked or stored", async () => {
+        const ctx = makeService();
+        exchangeOk({ sub: "someone-else", aud: "com.tarodan.app.staging" });
+
+        await ctx.service.storeFromAuthorizationCode(input);
+
+        expect(ctx.prisma.user.findUnique).not.toHaveBeenCalled();
+        expect(revokeCalls()).toHaveLength(0);
+      });
     });
 
     // Kod kimliğe bağlı olmalı: başka bir Apple hesabının ya da uygulamanın
@@ -444,11 +588,7 @@ describe("AppleTokenService", () => {
     // invalid_grant "zaten iptal" DEĞİL (o 200 döner): Apple bunu yanlış client
     // id / geçersiz token için de verir. Token silinmez, iş DLQ'ya gider ki
     // düzeltmeden sonra yeniden kuyruğa alınabilsin.
-    it.each([
-      "invalid_grant",
-      "unauthorized_client",
-      "unsupported_client",
-    ])(
+    it.each(["invalid_grant", "unauthorized_client", "unsupported_client"])(
       "%s: permanent → dead-lettered at once, token kept",
       async (code) => {
         appleReplies(400, { error: code });

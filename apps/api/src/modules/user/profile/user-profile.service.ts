@@ -26,6 +26,7 @@ import { ConsentService } from "../../consent/consent.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
 import { AppleTokenService } from "../../auth/social/apple-token.service";
 import { computeTrustScore } from "../helpers/trust-score";
+import { ACCOUNT_DELETION_TX_TIMEOUT_MS } from "../helpers/account-deletion.constants";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
@@ -854,7 +855,7 @@ export class UserProfileService {
           });
         },
         {
-          timeout: 60000,
+          timeout: ACCOUNT_DELETION_TX_TIMEOUT_MS,
         },
       );
 

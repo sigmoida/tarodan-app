@@ -11,6 +11,7 @@ import {
 } from "../../outbox/outbox.types";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { PermanentOutboxError } from "../../outbox/outbox-errors";
+import { ACCOUNT_DELETION_TX_TIMEOUT_MS } from "../../user/helpers/account-deletion.constants";
 import { AppleTokenCipher } from "./apple-token-cipher";
 import {
   appleErrorCode,
@@ -34,6 +35,17 @@ const MAX_ERROR_LENGTH = 500;
  * için ~1 günlük pencere bırakılır (9. denemeden sonra saatte bir).
  */
 export const APPLE_TOKEN_REVOKE_MAX_ATTEMPTS = 30;
+
+/**
+ * `persistToken` işlemi hesap silme işleminin tuttuğu kullanıcı kilidini
+ * bekleyebilir (en çok `ACCOUNT_DELETION_TX_TIMEOUT_MS`). Prisma varsayılanları
+ * (timeout 5 sn, maxWait 2 sn) bu beklemede işlemi düşürür: token ne saklanır
+ * ne iptale alınırdı. İkisi de silme süresinden büyük tutulur.
+ */
+export const PERSIST_TOKEN_TX_OPTIONS = {
+  timeout: ACCOUNT_DELETION_TX_TIMEOUT_MS + 15_000,
+  maxWait: ACCOUNT_DELETION_TX_TIMEOUT_MS + 5_000,
+} as const;
 
 const NOT_CONFIGURED_MESSAGE =
   "Apple token revocation is not configured (APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY) — the job retries and dead-letters until it is";
@@ -141,6 +153,9 @@ export class AppleTokenService implements OnModuleInit {
       this.warnNotConfigured();
       return;
     }
+    // Kimliği doğrulanmış (kod bu kullanıcıya ait) düz refresh token; yalnız
+    // saklama başarısız olursa doğrudan iptal için tutulur, loglanmaz.
+    let verifiedRefreshToken: string | null = null;
     try {
       // Native akışta redirect_uri yoktur.
       const response = await postAppleEndpoint("/auth/token", {
@@ -165,6 +180,7 @@ export class AppleTokenService implements OnModuleInit {
         );
         return;
       }
+      verifiedRefreshToken = refreshToken;
       await this.persistToken(
         input.userId,
         input.clientId,
@@ -174,6 +190,13 @@ export class AppleTokenService implements OnModuleInit {
       this.logger.warn(
         `Apple refresh token could not be stored (user=${input.userId}, client=${input.clientId}): ${errorMessage(error)}`,
       );
+      if (verifiedRefreshToken) {
+        await this.revokeIfAccountDeleted(
+          input.userId,
+          input.clientId,
+          verifiedRefreshToken,
+        );
+      }
     }
   }
 
@@ -239,7 +262,75 @@ export class AppleTokenService implements OnModuleInit {
           data: { userId, clientId, refreshTokenEncrypted },
         });
       }
-    });
+    }, PERSIST_TOKEN_TX_OPTIONS);
+  }
+
+  /**
+   * Token saklanamadı (işlem zaman aşımı, DB hatası…) ve hesap bu arada
+   * silinmiş olabilir: silinmiş kullanıcıda iptal edilmemiş yetki kalmasın
+   * diye token'ı Apple'a DOĞRUDAN, en iyi çabayla iptal eder. Canlı hesapta
+   * bir şey yapılmaz (iptal, yetkiyi kullanıcının canlı oturumundan da
+   * kaldırırdı; sonraki giriş yeni bir kodla yeniden saklar). Hesabın durumu
+   * okunamazsa da iptal edilmez. ASLA fırlatmaz.
+   */
+  private async revokeIfAccountDeleted(
+    userId: string,
+    clientId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { deletedAt: true },
+      });
+      if (user && !user.deletedAt) return;
+    } catch (error: unknown) {
+      this.logger.error(
+        `Apple token not stored and account state unknown — not revoked (user=${userId}, client=${clientId}): ${errorMessage(error)}`,
+      );
+      return;
+    }
+    await this.revokeDirectly(userId, clientId, refreshToken);
+  }
+
+  /** Apple'a doğrudan (outbox'sız, satırsız) iptal; en iyi çaba, asla fırlatmaz. */
+  private async revokeDirectly(
+    userId: string,
+    clientId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    try {
+      const response = await postAppleEndpoint(
+        "/auth/revoke",
+        this.revokeParams(clientId, refreshToken),
+      );
+      if (response.ok) {
+        this.logger.warn(
+          `Apple token of a deleted account revoked directly (user=${userId}, client=${clientId})`,
+        );
+        return;
+      }
+      this.logger.error(
+        `Apple token of a deleted account could NOT be revoked directly (user=${userId}, client=${clientId}): apple:${response.status}:${appleErrorCode(response) ?? "no_error_code"}`,
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `Apple token of a deleted account could NOT be revoked directly (user=${userId}, client=${clientId}): ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  /** `/auth/revoke` form parametreleri (client secret imzası kurulamazsa fırlatır). */
+  private revokeParams(
+    clientId: string,
+    refreshToken: string,
+  ): Record<string, string> {
+    return {
+      client_id: clientId,
+      client_secret: this.clientSecret(clientId),
+      token: refreshToken,
+      token_type_hint: "refresh_token",
+    };
   }
 
   private async enqueueRevoke(
@@ -323,12 +414,10 @@ export class AppleTokenService implements OnModuleInit {
     // sonucu değiştirmez → doğrudan DLQ.
     let params: Record<string, string>;
     try {
-      params = {
-        client_id: row.clientId,
-        client_secret: this.clientSecret(row.clientId),
-        token: this.cipher.decrypt(row.refreshTokenEncrypted),
-        token_type_hint: "refresh_token",
-      };
+      params = this.revokeParams(
+        row.clientId,
+        this.cipher.decrypt(row.refreshTokenEncrypted),
+      );
     } catch (error: unknown) {
       await this.recordError(row.id, `config:${errorMessage(error)}`);
       throw new PermanentOutboxError(

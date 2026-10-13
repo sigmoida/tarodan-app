@@ -1,4 +1,5 @@
 import { UserProfileService } from "./user-profile.service";
+import { ACCOUNT_DELETION_TX_TIMEOUT_MS } from "../helpers/account-deletion.constants";
 
 /**
  * App Store 5.1.1(v) — Sign in with Apple ile açılmış hesap silinince Apple
@@ -75,7 +76,7 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
       { syncUserConsent: jest.fn() } as never, // newsletter
       appleTokens as never,
     );
-    return { service, tx };
+    return { service, tx, prisma };
   };
 
   it("iptali silme transaction'ında, OAuth bağları silinmeden ÖNCE kuyruğa yazar", async () => {
@@ -92,6 +93,18 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
     expect(
       tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
     ).toBeLessThan(appleTokens.requestRevocation.mock.invocationCallOrder[0]);
+  });
+
+  // AppleTokenService.persistToken'ın kilit bekleme süresi bu değerden türer.
+  it("silme transaction'ı paylaşılan zaman aşımıyla açılır", async () => {
+    const appleTokens = { requestRevocation: jest.fn().mockResolvedValue(0) };
+    const { service, prisma } = makeService(appleTokens);
+
+    await service.deleteAccount("user-1");
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: ACCOUNT_DELETION_TX_TIMEOUT_MS,
+    });
   });
 
   it("Apple token'ı olmayan kullanıcı aynen silinir", async () => {
