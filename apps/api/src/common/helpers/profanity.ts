@@ -78,10 +78,10 @@ function asciiLowerCase(text: string): string {
 }
 
 function ranges(regex: RegExp, text: string): Array<[number, number]> {
-  return [...text.matchAll(regex)].map((m) => [
-    m.index ?? 0,
-    (m.index ?? 0) + m[0].length,
-  ]);
+  return [...text.matchAll(regex)].map((m): [number, number] => {
+    const start = m.index ?? 0;
+    return [start, start + m[0].length];
+  });
 }
 
 export interface ProfanityScan {
