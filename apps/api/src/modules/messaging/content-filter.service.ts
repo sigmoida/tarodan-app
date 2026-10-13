@@ -61,6 +61,24 @@ export interface UnqueuedTextContext {
   entityId?: string | null;
 }
 
+/**
+ * Taranmış kuyruksuz metin. Sonucu metne bağlı varlık (teklif, takas) henüz
+ * YOKKEN taranan akışlar (oluşturma) için inceleme kaydı varlık yazıldıktan
+ * SONRA `recordFlag(entityId)` ile atılır; işaret yoksa çağrı no-op'tur.
+ */
+export interface ScreenedText<T> {
+  text: T | string;
+  recordFlag(entityId: string | null): Promise<void>;
+}
+
+/** Filtresiz kurulum (dar test kurulumu) için: metin aynen, işaret yok. */
+export function unscreenedText<T>(text: T): ScreenedText<T> {
+  return { text, recordFlag: async () => undefined };
+}
+
+/** İnceleme gerekçesine eklenen işaretlenen metnin üst sınırı (karakter). */
+const FLAGGED_TEXT_EXCERPT_LENGTH = 500;
+
 export interface ContentFilterRule {
   id: string;
   filterType: string;
@@ -253,9 +271,24 @@ export class ContentFilterService implements OnModuleInit {
     content: T,
     ctx?: UnqueuedTextContext,
   ): Promise<T | string> {
-    if (!content || !content.trim()) return content;
+    const screened = await this.screenUnqueuedTextDeferred(content, ctx);
+    await screened.recordFlag(ctx?.entityId ?? null);
+    return screened.text;
+  }
+
+  /**
+   * `screenUnqueuedText` ile AYNI tarama; inceleme kaydı hemen değil, çağıranın
+   * `recordFlag(entityId)` çağrısıyla yazılır. Metne bağlı varlığın kimliği
+   * tarama anında yoksa (yeni teklif / yeni takas) kayıt varlık oluşunca atılır;
+   * böylece "AI Denetim" kaydı ilgili teklife/takasa bağlanır.
+   */
+  async screenUnqueuedTextDeferred<T extends string | null | undefined>(
+    content: T,
+    ctx?: UnqueuedTextContext,
+  ): Promise<ScreenedText<T>> {
+    if (!content || !content.trim()) return unscreenedText(content);
     const result = await this.moderateWithAI(content);
-    if (result.isClean) return content;
+    if (result.isClean) return unscreenedText(content);
     if (result.profanity) {
       throw new BadRequestException(
         i18nMessage("server.messaging.contentRejected"),
@@ -265,25 +298,39 @@ export class ContentFilterService implements OnModuleInit {
       (match) =>
         match.requiresApproval && !CONTACT_FILTER_TYPES.has(match.filterType),
     );
-    if (
-      result.aiFlagged ||
-      result.ambiguousProfanity ||
-      reviewRules.length > 0
-    ) {
-      await this.flagForReview(result, ctx);
-    }
-    return maskAmbiguousProfanity(result.filteredContent);
+    const needsReview =
+      result.aiFlagged || result.ambiguousProfanity || reviewRules.length > 0;
+    return {
+      text: maskAmbiguousProfanity(result.filteredContent),
+      recordFlag: async (entityId) => {
+        if (!needsReview) return;
+        await this.flagForReview(
+          result,
+          content,
+          ctx && { ...ctx, entityId: entityId ?? ctx.entityId ?? null },
+        );
+      },
+    };
   }
 
-  /** Kuyruksuz metni admin incelemesine işaretle; asla fırlatmaz. */
+  /**
+   * Kuyruksuz metni admin incelemesine işaretle; asla fırlatmaz. Gerekçeye
+   * işaretlenen ORİJİNAL metin (kısaltılmış) eklenir: kayıt maskeli metni
+   * değil, yöneticinin görmesi gereken gerçek içeriği gösterir.
+   */
   private async flagForReview(
     result: FilterResult,
+    original: string,
     ctx?: UnqueuedTextContext,
   ): Promise<void> {
     this.logger.warn(
       `Unqueued text flagged for review (entity=${ctx?.entityType ?? "unknown"}, field=${ctx?.field ?? "unknown"}, user=${ctx?.userId ?? "unknown"}): ${result.flaggedReason ?? ""}`,
     );
-    if (!ctx) return;
+    if (!ctx?.entityType) return;
+    const excerpt =
+      original.length > FLAGGED_TEXT_EXCERPT_LENGTH
+        ? `${original.slice(0, FLAGGED_TEXT_EXCERPT_LENGTH)}…`
+        : original;
     await this.aiClient.recordEvent({
       entityType: ctx.entityType,
       entityId: ctx.entityId ?? null,
@@ -291,7 +338,7 @@ export class ContentFilterService implements OnModuleInit {
       kind: "text",
       field: ctx.field,
       decision: "flag",
-      reason: result.flaggedReason,
+      reason: `${result.flaggedReason ?? ""} | ${excerpt}`.trim(),
     });
   }
 

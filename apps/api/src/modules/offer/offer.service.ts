@@ -43,7 +43,11 @@ import { offerExpiresAt } from "./helpers/offer-expiry";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
 import { offerConvertedNotice } from "../mail-routing/helpers/mail-internal-notices";
-import { ContentFilterService } from "../messaging/content-filter.service";
+import {
+  ContentFilterService,
+  unscreenedText,
+  type ScreenedText,
+} from "../messaging/content-filter.service";
 import { lockActiveUsersShared } from "../user/helpers/user-row-lock";
 
 @Injectable()
@@ -119,19 +123,48 @@ export class OfferService {
   /**
    * Teklif notunu mesajlaşma filtresinden geçirir (S9a): uygunsuz içerik 400,
    * iletişim bilgisi maskelenir. Yavaş olabilir — işlem AÇILMADAN çağrılır.
+   * Karşı tekliflerde inceleme kaydı hemen, yanıt verilen teklifin kimliğiyle
+   * (`relatedOfferId`) atılır.
    */
   private async screenMessage(
     message: string | undefined,
     authorId: string,
+    relatedOfferId: string,
   ): Promise<string | null> {
     const screened = this.contentFilter
       ? await this.contentFilter.screenUnqueuedText(message, {
           entityType: "offer",
+          entityId: relatedOfferId,
           userId: authorId,
           field: "offer_message",
         })
       : message;
     return screened || null;
+  }
+
+  /**
+   * Yeni teklifin notu: tarama teklif YOKKEN yapılır, bu yüzden inceleme kaydı
+   * (admin "AI Denetim") teklif yazıldıktan sonra `recordFlag(offerId)` ile
+   * teklifin kimliğine bağlanır.
+   */
+  private async screenNewOfferMessage(
+    message: string | undefined,
+    authorId: string,
+  ): Promise<{
+    message: string | null;
+    recordFlag: ScreenedText<string | undefined>["recordFlag"];
+  }> {
+    const screened = this.contentFilter
+      ? await this.contentFilter.screenUnqueuedTextDeferred(message, {
+          entityType: "offer",
+          userId: authorId,
+          field: "offer_message",
+        })
+      : unscreenedText(message);
+    return {
+      message: screened.text || null,
+      recordFlag: screened.recordFlag,
+    };
   }
 
   private hasLapsed(expiresAt: Date, extendable: boolean): boolean {
@@ -152,7 +185,10 @@ export class OfferService {
     // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
     // bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
-    const message = await this.screenMessage(dto.message, buyerId);
+    const { message, recordFlag } = await this.screenNewOfferMessage(
+      dto.message,
+      buyerId,
+    );
     // Use transaction with row locking for race condition prevention
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock product row with FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -279,6 +315,12 @@ export class OfferService {
         sellerName: publicName(product.seller),
       };
     });
+
+    // İncelemeye işaretlenen not artık teklif kimliğiyle kaydedilir; hata
+    // teklifi geri çevirmez.
+    await recordFlag(result.offer.id).catch((error) =>
+      this.logger.warn(`offer note review flag failed: ${error}`),
+    );
 
     // Emit offer.created event AFTER transaction commits
     try {
@@ -769,7 +811,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
-    const message = await this.screenMessage(dto.message, sellerId);
+    const message = await this.screenMessage(dto.message, sellerId, offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -903,7 +945,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
-    const message = await this.screenMessage(dto.message, buyerId);
+    const message = await this.screenMessage(dto.message, buyerId, offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },

@@ -161,4 +161,35 @@ describe("TradeLifecycleService — takas metinleri içerik filtresi", () => {
       service.rejectTrade("t1", "u1", { reason: "olmadı" }),
     ).rejects.toThrow("tx-reached");
   });
+
+  // Yeni takasta tarama takas YOKKEN yapılır: kayıt takas yazıldıktan sonra
+  // takas kimliğiyle atılır (createTrade → recordFlag(trade.id)).
+  describe("yeni takas mesajı (ertelenmiş tarama)", () => {
+    it("ertelenmiş taramayı takas bağlamıyla çağırır", async () => {
+      const recordFlag = jest.fn();
+      const deferred = jest.fn().mockResolvedValue({ text: "m", recordFlag });
+      const { service } = build(null);
+      (service as any).contentFilter = {
+        screenUnqueuedTextDeferred: deferred,
+      };
+
+      const screened = await (service as any).screenNewTradeMessage("m", "u1");
+
+      expect(deferred).toHaveBeenCalledWith("m", {
+        entityType: "trade",
+        userId: "u1",
+        field: "trade_message",
+      });
+      expect(screened.recordFlag).toBe(recordFlag);
+    });
+
+    it("filtre yoksa metin aynen döner, recordFlag no-op", async () => {
+      const { service } = build(null);
+
+      const screened = await (service as any).screenNewTradeMessage("m", "u1");
+
+      expect(screened.text).toBe("m");
+      await expect(screened.recordFlag("t9")).resolves.toBeUndefined();
+    });
+  });
 });

@@ -82,7 +82,11 @@ import {
 } from "../../../common/helpers/generate-reference";
 import { calculateServiceTax } from "../../order/helpers/order-service-tax.helper";
 import { OrderTaxPolicyService } from "../../order/pricing/order-tax-policy.service";
-import { ContentFilterService } from "../../messaging/content-filter.service";
+import {
+  ContentFilterService,
+  unscreenedText,
+  type ScreenedText,
+} from "../../messaging/content-filter.service";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -140,6 +144,24 @@ export class TradeLifecycleService {
           field,
         })
       : text;
+  }
+
+  /**
+   * Yeni takasın mesajı: tarama takas YOKKEN yapılır, bu yüzden inceleme kaydı
+   * (admin "AI Denetim") takas yazıldıktan sonra `recordFlag(tradeId)` ile
+   * takasın kimliğine bağlanır.
+   */
+  private async screenNewTradeMessage<T extends string | null | undefined>(
+    text: T,
+    authorId: string,
+  ): Promise<ScreenedText<T>> {
+    return this.contentFilter
+      ? this.contentFilter.screenUnqueuedTextDeferred(text, {
+          entityType: "trade",
+          userId: authorId,
+          field: "trade_message",
+        })
+      : unscreenedText(text);
   }
 
   /**
@@ -364,11 +386,11 @@ export class TradeLifecycleService {
     // Referans işlem dışında üretilir: çakışma kontrolü transaction'ı
     // gereksiz yere uzatmasın.
     const tradeNumber = await this.generateTradeNumber();
-    const initiatorMessage = await this.screenText(
+    const screenedMessage = await this.screenNewTradeMessage(
       dto.message,
       initiatorId,
-      "trade_message",
     );
+    const initiatorMessage = screenedMessage.text;
 
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
@@ -429,6 +451,14 @@ export class TradeLifecycleService {
 
       return newTrade;
     });
+
+    // İncelemeye işaretlenen mesaj artık takas kimliğiyle kaydedilir; hata
+    // takası geri çevirmez.
+    await screenedMessage
+      .recordFlag(trade.id)
+      .catch((error) =>
+        this.logger.warn(`trade message review flag failed: ${error}`),
+      );
 
     // Send notification to receiver about new trade offer
     try {

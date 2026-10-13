@@ -198,4 +198,98 @@ describe("ContentFilterService.screenUnqueuedText", () => {
       expect(aiClient.moderateText).not.toHaveBeenCalled();
     },
   );
+
+  // P1 inceleme: kayıt ilgili teklife/takasa bağlanmalı ve işaretlenen metni
+  // taşımalı ki admin "AI Denetim"de neyin işaretlendiğini görsün.
+  describe("inceleme kaydı: varlık kimliği ve işaretlenen metin", () => {
+    const aiToxic = { toxic: true, reason: "insult" };
+
+    it("tarama anında kimlik varsa kayıt o kimlikle atılır", async () => {
+      const { service, aiClient } = await makeService([], aiToxic);
+
+      await service.screenUnqueuedText("kibar ama toksik", {
+        ...ctx,
+        entityId: "o1",
+      });
+
+      expect(aiClient.recordEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "offer",
+          entityId: "o1",
+          decision: "flag",
+        }),
+      );
+    });
+
+    it("işaretlenen ORİJİNAL metin gerekçeye eklenir", async () => {
+      const { service, aiClient } = await makeService([], aiToxic);
+
+      await service.screenUnqueuedText("kibar ama toksik", ctx);
+
+      const { reason } = aiClient.recordEvent.mock.calls[0][0];
+      expect(reason).toContain("AI moderasyon");
+      expect(reason).toContain("kibar ama toksik");
+    });
+
+    it("maskelenmiş metin değil, orijinal metin kaydedilir", async () => {
+      const { service, aiClient } = await makeService();
+
+      await service.screenUnqueuedText("8 am teslim ara 0532 123 45 67", ctx);
+
+      const { reason } = aiClient.recordEvent.mock.calls[0][0];
+      expect(reason).toContain("0532 123 45 67");
+    });
+
+    it("çok uzun metin kısaltılır", async () => {
+      const { service, aiClient } = await makeService([], aiToxic);
+
+      await service.screenUnqueuedText("x".repeat(2000), ctx);
+
+      const { reason } = aiClient.recordEvent.mock.calls[0][0];
+      expect(reason.length).toBeLessThan(700);
+      expect(reason).toContain("…");
+    });
+
+    it("ertelenmiş tarama: kayıt varlık yazılınca kimlikle atılır, öncesinde değil", async () => {
+      const { service, aiClient } = await makeService([], aiToxic);
+
+      const screened = await service.screenUnqueuedTextDeferred(
+        "kibar ama toksik",
+        ctx,
+      );
+      expect(screened.text).toBe("kibar ama toksik");
+      expect(aiClient.recordEvent).not.toHaveBeenCalled();
+
+      await screened.recordFlag("offer-9");
+
+      expect(aiClient.recordEvent).toHaveBeenCalledTimes(1);
+      expect(aiClient.recordEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType: "offer", entityId: "offer-9" }),
+      );
+    });
+
+    it("ertelenmiş tarama: incelemeye düşmeyen metinde recordFlag no-op", async () => {
+      const { service, aiClient } = await makeService();
+
+      const clean = await service.screenUnqueuedTextDeferred("merhaba", ctx);
+      await clean.recordFlag("offer-9");
+      const masked = await service.screenUnqueuedTextDeferred(
+        "ali@example.com",
+        ctx,
+      );
+      await masked.recordFlag("offer-9");
+
+      expect(masked.text).toBe("[email gizlendi]");
+      expect(aiClient.recordEvent).not.toHaveBeenCalled();
+    });
+
+    it("ertelenmiş tarama küfürde yine 400 fırlatır", async () => {
+      const { service, aiClient } = await makeService();
+
+      await expect(
+        service.screenUnqueuedTextDeferred("orospu çocuğu", ctx),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(aiClient.recordEvent).not.toHaveBeenCalled();
+    });
+  });
 });
