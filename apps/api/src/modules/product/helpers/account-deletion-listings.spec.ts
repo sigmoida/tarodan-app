@@ -180,6 +180,8 @@ describe("deactivateListingsForAccountDeletion", () => {
 
     const sql = (tx.$queryRaw.mock.calls[0][0] as string[]).join("?");
     expect(sql).toContain("FOR UPDATE");
+    // Sabit kilit sırası: eşzamanlı işlemler kilitlenmesin.
+    expect(sql.replace(/\s+/g, " ")).toContain("ORDER BY id FOR UPDATE");
     expect(sql).toContain("'reserved'");
     expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       tx.product.findMany.mock.invocationCallOrder[0],

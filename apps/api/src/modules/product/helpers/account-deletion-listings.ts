@@ -38,7 +38,8 @@ export type AccountDeletionListingsDb = Pick<
  * transaction'ı İÇİNDE çağrılır (anonimleştirme düşerse ilanlar da açık kalır).
  *
  * - Önce satıcının açık (yayında / onayda / rezerve) ilan satırları
- *   `FOR UPDATE` ile kilitlenir: eşzamanlı checkout/rezervasyon ürün satırını
+ *   `ORDER BY id` + `FOR UPDATE` ile (sabit sırayla — eşzamanlı iki işlem
+ *   ters sırada kilitleyip kilitlenmesin) kilitlenir: eşzamanlı checkout/rezervasyon ürün satırını
  *   kilitlediği için ya önce biter (çağıranın işlem içi engel kontrolü onu
  *   görür) ya da bu işlem bitene kadar bekler ve ilanı pasif bulur.
  * - Kayıt, teklif kapatma ve dönen kimlikler GERÇEKTEN pasife alınan
@@ -77,6 +78,7 @@ export async function deactivateListingsForAccountDeletion(
     WHERE seller_id = ${sellerId}
       AND kind = 'listing'
       AND status IN ('active', 'pending', 'reserved')
+    ORDER BY id
     FOR UPDATE`;
 
   const listings = await tx.product.findMany({
