@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { UserBlockService } from "../../user-block/user-block.service";
@@ -23,7 +24,9 @@ import {
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { ConsentService } from "../../consent/consent.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
+import { AppleTokenService } from "../../auth/social/apple-token.service";
 import { computeTrustScore } from "../helpers/trust-score";
+import { ACCOUNT_DELETION_TX_TIMEOUT_MS } from "../helpers/account-deletion.constants";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
@@ -84,6 +87,9 @@ export class UserProfileService {
     private readonly userBlocks: UserBlockService,
     private readonly consents: ConsentService,
     private readonly newsletter: NewsletterService,
+    // Sign in with Apple token iptali (App Store 5.1.1(v)). UserModule
+    // AppleTokenModule'ü içe aktarır; dar test kurulumlarında yok.
+    @Optional() private readonly appleTokens?: AppleTokenService,
   ) {}
 
   /**
@@ -780,6 +786,12 @@ export class UserProfileService {
           // veriyi sessizce ve kalıcı olarak kaybettirirdi.
           await this.archiveIdentity(tx, userId, options);
 
+          // 0c) Sign in with Apple token iptali (App Store 5.1.1(v)): iş
+          // outbox'a bu transaction'la yazılır, Apple çağrısı commit SONRASI
+          // drainer'dadır. Apple'a ulaşılamaması silmeyi engellemez; outbox
+          // yeniden dener. OAuthAccount aşağıda silinir, token satırı kalır.
+          await this.appleTokens?.requestRevocation(tx, userId);
+
           // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
           await tx.refreshToken.deleteMany({ where: { userId } });
           await tx.passwordResetToken.deleteMany({ where: { userId } });
@@ -843,7 +855,7 @@ export class UserProfileService {
           });
         },
         {
-          timeout: 60000,
+          timeout: ACCOUNT_DELETION_TX_TIMEOUT_MS,
         },
       );
 

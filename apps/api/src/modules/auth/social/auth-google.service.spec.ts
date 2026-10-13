@@ -13,6 +13,7 @@ import { AuthLoginService } from "../auth-login.service";
 import { SocialLoginService } from "./social-login.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
+import { AppleTokenService } from "./apple-token.service";
 import { PrismaService } from "../../../prisma";
 import { NotificationService } from "../../notification/notification.service";
 import { CacheService } from "../../cache/cache.service";
@@ -92,6 +93,10 @@ describe("AuthService.loginWithGoogle", () => {
         {
           provide: AppleAuthService,
           useValue: { verifyIdentityToken: jest.fn() },
+        },
+        {
+          provide: AppleTokenService,
+          useValue: { storeFromAuthorizationCode: jest.fn() },
         },
         { provide: SecurityService, useValue: { validateTOTP: jest.fn() } },
         {

@@ -14,6 +14,7 @@ import { AuthLoginService } from "./auth-login.service";
 import { SocialLoginService } from "./social/social-login.service";
 import { GoogleAuthService } from "./social/google-auth.service";
 import { AppleAuthService } from "./social/apple-auth.service";
+import { AppleTokenService } from "./social/apple-token.service";
 import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
@@ -66,6 +67,10 @@ describe("AuthService.login - password login edge cases", () => {
         {
           provide: AppleAuthService,
           useValue: { verifyIdentityToken: jest.fn() },
+        },
+        {
+          provide: AppleTokenService,
+          useValue: { storeFromAuthorizationCode: jest.fn() },
         },
         { provide: SecurityService, useValue: security },
         {

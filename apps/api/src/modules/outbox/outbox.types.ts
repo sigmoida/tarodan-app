@@ -85,6 +85,19 @@ export interface SavedCardProviderDeletePayload {
 }
 
 /**
+ * Hesap silmede Sign in with Apple refresh token'ını Apple'a iptal et (App
+ * Store 5.1.1(v)). Silme tx'iyle ATOMİK yazılır; Apple çağrısı commit sonrası
+ * drainer'dan, hata olursa geri çekilerek yeniden denenir — silmeyi engellemez.
+ * Payload yalnız yerel satır kimliğini taşır; şifreli token handler içinde
+ * taze okunur ve outbox tablosuna YAZILMAZ.
+ */
+export const OUTBOX_APPLE_TOKEN_REVOKE = "apple.token_revoke";
+
+export interface AppleTokenRevokePayload {
+  appleSignInTokenId: string;
+}
+
+/**
  * Platform (admin) takas iptalinin taraf duyurusu. İptal ve zorunlu denetim
  * kaydıyla AYNI tx'te yazılır: iptal commit olduysa duyuru kesin gider.
  *

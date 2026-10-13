@@ -24,6 +24,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { UserBlockModule } from "../user-block/user-block.module";
 import { ConsentModule } from "../consent/consent.module";
 import { MarketingModule } from "../marketing/marketing.module";
+import { AppleTokenModule } from "../auth/social/apple-token.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
 
 @Module({
@@ -37,6 +38,9 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     // İkisi de User'a bağlı değil, döngü yok.
     ConsentModule,
     MarketingModule,
+    // Hesap silmede Sign in with Apple token iptali kuyruğa yazılır (App Store
+    // 5.1.1(v)). Yaprak modül; AuthModule'e bağlanmaz, döngü yok.
+    AppleTokenModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],
