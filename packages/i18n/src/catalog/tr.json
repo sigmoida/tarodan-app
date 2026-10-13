@@ -11587,7 +11587,7 @@
       "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
       "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
       "maxLiveSlides": "Bir yerleşimde aynı anda en fazla {max} slayt yayında olabilir",
-      "lastLiveHomeSlide": "Ana sayfada yayındaki son slayt silinemez veya yayından kaldırılamaz; önce başka bir slaytı yayına alın",
+      "lastLiveHomeSlide": "Ana sayfa slider'ı hiçbir an boş kalamaz: bu değişiklik, ana sayfada mobilde de görünen bir slaytın bulunmadığı bir an bırakıyor. Önce kesintisiz devralacak başka bir slaytı yayına alın ya da bitiş tarihini gözden geçirin",
       "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir"
     },
     "brand": {

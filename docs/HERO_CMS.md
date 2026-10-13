@@ -7,15 +7,14 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
 
 ## Model
 
-| Tablo          | Ne taşır                                                                                                                                                                                                       |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tablo          | Ne taşır                                                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hero_slides`  | `placement` (`home` · `auth_default` · `auth_register`), `isActive`, `displayOrder`, `startDate?`/`endDate?`, `imageUrl`, `mobileImageUrl?`, `imageSide` (`left`/`right`), metinler, 2 buton, `hideOnIos`, sayaçlar |
-| `trust_badges` | `icon` (`TRUST_BADGE_ICONS`), `title`, `description?`, `isActive`, `displayOrder`                                                                                                                              |
+| `trust_badges` | `icon` (`TRUST_BADGE_ICONS`), `title`, `description?`, `isActive`, `displayOrder`                                                                                                                                   |
 
 - **Metinler `LocalizedText` JSON'udur**: `{ tr, en? }`. Türkçe zorunlu; İngilizce boşsa
   istemci Türkçeye düşer (`pickLocalized`). Kural tek yerde: `validateLocalizedText` (admin
-  formu + API). Sınırlar `HERO_TEXT_LIMITS` (başlık 120, alt başlık 240, buton 40, görsel metni
-  160) ve `TRUST_BADGE_LIMITS` (başlık 60, açıklama 160).
+  formu + API). Sınırlar `HERO_TEXT_LIMITS` (başlık 120, alt başlık 240, buton 40, görsel metni 160) ve `TRUST_BADGE_LIMITS` (başlık 60, açıklama 160).
 - **Buton** = etiket + bağlantı çifti; ikisi birlikte var ya da yok (`server.hero.ctaIncomplete`).
   Bağlantı reklamla aynı kural: mutlak `http(s)` ya da tek `/` ile başlayan site içi yol.
 - `auth_register` kayıt ekranlarında, `auth_default` diğer auth ekranlarında kullanılır.
@@ -29,32 +28,40 @@ Yayında = `isActive` + tarih penceresinin içinde (sınırlar dahil; reklamla o
 
 - **En çok 5 yayında slayt** (`HERO_MAX_SLIDES`, yerleşim başına): pencereler şimdiden itibaren
   kesiştirilir — aynı anda 5'ten fazlası açık olacaksa oluşturma/açma `409
-  server.hero.maxLiveSlides`. Başka bir slaytın bitişinden sonraya zamanlanan slayt kabul edilir.
-- **Son yayındaki ana sayfa slaytı korunur**: silmek, kapatmak, penceresini dışarı almak ya da
-  başka yerleşime taşımak `409 server.hero.lastLiveHomeSlide`. Auth yerleşimleri boş kalabilir
-  (web paneli gizler). Not: tarihi kendiliğinden biten son slaytı guard engelleyemez — admin
-  listesinde `isLive` uyarısı ve lansman doğrulaması (`verify:prod:launch`) bunu yakalar.
+server.hero.maxLiveSlides`. Başka bir slaytın bitişinden sonraya zamanlanan slayt kabul edilir.
+- **Ana sayfa slider'ı hiçbir an boş kalamaz** (`409 server.hero.lastLiveHomeSlide`): silmek,
+  kapatmak, penceresini kısaltmak/dışarı almak, başka yerleşime taşımak ya da native'de gizlemek,
+  slider'ın ŞİMDİDEN itibaren kesintisiz dolu kalacağı anı erkene çekemez. Hesap iki şeyi sayar:
+  - **Bitiş tarihi**: diğer slaytlar yarın bitiyorsa kalıcı slaytı silmek (ya da tek slayta bitiş
+    vermek) slider'ı yarın boş bırakır → reddedilir. Başka bir slayt bitişi tam devralıyorsa
+    (biri bittiği an öbürü başlar; sınırlar dahil) kabul edilir; bir milisaniyelik boşluk bile boşluktur.
+  - **`hideOnIos`** (native uygulamada gizle): yalnız gizlenmeyen slaytlar mobil listeyi doldurur.
+    Web bayrağı yok sayar, yani native'i dolduran liste web'i de doldurur; koruma native görünümü esas alır.
+    Kıyas "önce / sonra"dır, mutlak değil: zaten kesintili bir slider'ın metnini düzeltmek engellenmez,
+    yalnız durumu kötüleştiren değişiklik reddedilir. Auth yerleşimleri boş kalabilir (web paneli
+    gizler). Not: tarihi kendiliğinden biten son slaytı koruma engelleyemez (yalnız YENİ değişikliği
+    denetler) — admin listesinde `isLive` uyarısı ve lansman doğrulaması (`verify:prod:launch`) bunu yakalar.
 
 ## Uçlar
 
 Public (`@Public`, `Cache-Control: public, max-age=60`):
 
-| Uç                                       | Açıklama                                                                                             |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `GET /hero-slides?placement=`            | `HeroSlideDto[]` — yayındakiler, `displayOrder` sırasıyla, en çok 5; iki dil birden                  |
-| `GET /trust-badges`                      | `TrustBadgeDto[]` — açık rozetler; `{returnWindowDays}` gibi süre belirteçleri dolu                  |
-| `POST /hero-slides/:id/impression`       | 204, beacon dostu                                                                                    |
-| `POST /hero-slides/:id/click?cta=1\|2`   | 204; `cta` yoksa görsele tık, varsa butona (slayt toplamı + buton sayacı birlikte artar)             |
+| Uç                                     | Açıklama                                                                                 |
+| -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /hero-slides?placement=`          | `HeroSlideDto[]` — yayındakiler, `displayOrder` sırasıyla, en çok 5; iki dil birden      |
+| `GET /trust-badges`                    | `TrustBadgeDto[]` — açık rozetler; `{returnWindowDays}` gibi süre belirteçleri dolu      |
+| `POST /hero-slides/:id/impression`     | 204, beacon dostu                                                                        |
+| `POST /hero-slides/:id/click?cta=1\|2` | 204; `cta` yoksa görsele tık, varsa butona (slayt toplamı + buton sayacı birlikte artar) |
 
 Admin (`super_admin`/`admin`/`moderator`; izin matrisinde `hero-slides` ve `trust-badges` → `ads`):
 
-| Uç                                                                             | Açıklama                                                     |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| `GET /admin/hero-slides?placement=` · `GET /admin/hero-slides/:id`             | `AdminHeroSlideDto` — pasif/zamanlanmış dahil, sayaçlarıyla  |
-| `POST` · `PATCH /:id` · `DELETE /:id` (204)                                    | PATCH'te alan yok = dokunma, `null` = temizle                |
-| `PATCH /admin/hero-slides/reorder { ids }`                                     | Tek yerleşim; dizi sırası = `displayOrder`                   |
-| `POST /admin/hero-slides/upload` (multipart `file`)                            | jpeg/png/webp, 5 MB, `products/hero/`, en çok 2400 px en → `{ url }` |
-| `/admin/trust-badges` (GET, GET `:id`, POST, PATCH, DELETE, `PATCH reorder`)   | Aynı desen, yükleme yok; metin ham (belirteçli) döner        |
+| Uç                                                                           | Açıklama                                                             |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `GET /admin/hero-slides?placement=` · `GET /admin/hero-slides/:id`           | `AdminHeroSlideDto` — pasif/zamanlanmış dahil, sayaçlarıyla          |
+| `POST` · `PATCH /:id` · `DELETE /:id` (204)                                  | PATCH'te alan yok = dokunma, `null` = temizle                        |
+| `PATCH /admin/hero-slides/reorder { ids }`                                   | Tek yerleşim; dizi sırası = `displayOrder`                           |
+| `POST /admin/hero-slides/upload` (multipart `file`)                          | jpeg/png/webp, 5 MB, `products/hero/`, en çok 2400 px en → `{ url }` |
+| `/admin/trust-badges` (GET, GET `:id`, POST, PATCH, DELETE, `PATCH reorder`) | Aynı desen, yükleme yok; metin ham (belirteçli) döner                |
 
 Her yazım admin denetim kaydına (`hero_slide_*`, `trust_badge_*`, önce/sonra) yazılır.
 

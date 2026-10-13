@@ -22,6 +22,7 @@ import { i18nMessage } from "../i18n";
 import { CreateHeroSlideDto, UpdateHeroSlideDto } from "./dto";
 import {
   HERO_PLACEMENTS_REQUIRING_LIVE_SLIDE,
+  guaranteedCoverageUntil,
   heroSlideLiveWhere,
   isHeroSlideLive,
   peakConcurrentWindows,
@@ -34,7 +35,10 @@ import {
   toAdminHeroSlideDto,
   toHeroSlideDto,
 } from "./helpers/hero-slide.mapper";
-import { HERO_IMAGE_UPLOAD, heroRevalidateTags } from "./helpers/hero.constants";
+import {
+  HERO_IMAGE_UPLOAD,
+  heroRevalidateTags,
+} from "./helpers/hero.constants";
 
 /** Yerleşim içi sıra; eşitlikte önce eklenen önce. */
 const HERO_SLIDE_ORDER_BY: Prisma.HeroSlideOrderByWithRelationInput[] = [
@@ -43,7 +47,9 @@ const HERO_SLIDE_ORDER_BY: Prisma.HeroSlideOrderByWithRelationInput[] = [
 ];
 
 /** Güncelleme alanı: `undefined` = dokunma, `null` = temizle, değer = yaz. */
-function toDateField(value: string | null | undefined): Date | null | undefined {
+function toDateField(
+  value: string | null | undefined,
+): Date | null | undefined {
   if (value === undefined) return undefined;
   return value === null ? null : new Date(value);
 }
@@ -65,8 +71,27 @@ interface CtaPair {
   href: string | null;
 }
 
-/** Yayın kuralının gördüğü slayt hali (yerleşim + anahtar + pencere). */
-type HeroLiveState = HeroLiveFields & { placement: HeroPlacement };
+/**
+ * "Slider boş kalmasın" korumasının gördüğü slayt hali: yerleşim + anahtar +
+ * pencere + native gizleme bayrağı.
+ */
+type HeroLiveState = HeroLiveFields & {
+  placement: HeroPlacement;
+  hideOnIos: boolean;
+};
+
+/**
+ * Slaytın native uygulamada ana sayfa listesini DOLDURABİLİR mi: açık, native'de
+ * gizlenmemiş ve bitmemiş. Web bayrağı yok sayar, yani native'i dolduran liste
+ * web'i de doldurur; koruma bu yüzden native görünümü esas alır.
+ */
+function countsTowardNativeList(slide: HeroLiveState, now: Date): boolean {
+  return (
+    slide.isActive &&
+    !slide.hideOnIos &&
+    (slide.endDate === null || slide.endDate.getTime() >= now.getTime())
+  );
+}
 
 /**
  * Vitrin hero slaytları — public okuma ve admin yazma yolu (admin katmanı
@@ -75,8 +100,9 @@ type HeroLiveState = HeroLiveFields & { placement: HeroPlacement };
  *
  * İki iş kuralı burada:
  *  - bir yerleşimde AYNI ANDA en çok `HERO_MAX_SLIDES` yayında slayt (409),
- *  - yayındaki SON ana sayfa slaytı silinemez/kapatılamaz (409): kodda yedek
- *    slayt yok, slider boş kalırdı.
+ *  - ana sayfa slider'ı hiçbir an boş kalamaz (409): kodda yedek slayt yok.
+ *    Son yayındaki slayt silinemez/kapatılamaz, bitiş tarihi verilerek ileride
+ *    boşluk bırakılamaz, native'de gizlenerek mobil listesi boşaltılamaz.
  */
 @Injectable()
 export class HeroSlideService {
@@ -163,7 +189,10 @@ export class HeroSlideService {
   }
 
   /** Alan yok (`undefined`) = dokunma; `null` = temizle. */
-  async update(id: string, dto: UpdateHeroSlideDto): Promise<AdminHeroSlideDto> {
+  async update(
+    id: string,
+    dto: UpdateHeroSlideDto,
+  ): Promise<AdminHeroSlideDto> {
     const now = new Date();
     const existing = await this.findOrThrow(id);
 
@@ -175,6 +204,7 @@ export class HeroSlideService {
       isActive: dto.isActive ?? existing.isActive,
       startDate: startDate === undefined ? existing.startDate : startDate,
       endDate: endDate === undefined ? existing.endDate : endDate,
+      hideOnIos: dto.hideOnIos ?? existing.hideOnIos,
     };
     this.assertWindowOrder(next.startDate, next.endDate);
 
@@ -358,9 +388,19 @@ export class HeroSlideService {
   }
 
   /**
-   * Yayındaki son zorunlu-yerleşim (ana sayfa) slaytı silinemez, kapatılamaz,
-   * penceresi dışına alınamaz ve başka yerleşime taşınamaz. `next` null =
+   * Ana sayfa slider'ı hiçbir an boş kalamaz (kodda yedek slayt yok): silme,
+   * kapatma, pencere değişikliği, yerleşim taşıma ve native'de gizleme, slider'ın
+   * ŞİMDİDEN itibaren kesintisiz dolu kalacağı anı ERKENE çekemez. `next` null =
    * silme.
+   *
+   * İki şeyi hesaba katar (ikisi de eskiden boşluktu):
+   *  - bitiş tarihi: yayındaki başka slayt yarın bitiyorsa, kalıcı slaytı silmek
+   *    ya da tek slayta bitiş tarihi vermek slider'ı yarın boş bırakır;
+   *  - `hideOnIos` (artık "native uygulamada gizle"): yalnız gizlenmeyenler native
+   *    listeyi doldurur; son gizlenmeyen slaytı gizlemek mobili boş bırakırdı.
+   *
+   * Kıyas "önce / sonra" yapılır, mutlak değil: zaten kesintili olan bir slider'ın
+   * metnini düzeltmek engellenmez; yalnız durumu KÖTÜLEŞTİREN değişiklik 409.
    */
   private async assertKeepsRequiredLiveSlide(
     existing: HeroSlide,
@@ -368,22 +408,40 @@ export class HeroSlideService {
     now: Date,
   ): Promise<void> {
     if (!HERO_PLACEMENTS_REQUIRING_LIVE_SLIDE.has(existing.placement)) return;
-    if (!isHeroSlideLive(existing, now)) return;
+    // Zaten listeyi doldurmayan slaytın değişikliği kapsamı azaltamaz.
+    if (!countsTowardNativeList(existing, now)) return;
+    // Kapsamı etkileyen hiçbir alan değişmediyse (metin, buton, sıra, görsel)
+    // sorgu atılmaz.
     if (
       next &&
       next.placement === existing.placement &&
-      isHeroSlideLive(next, now)
+      next.isActive === existing.isActive &&
+      next.hideOnIos === existing.hideOnIos &&
+      sameInstant(next.startDate, existing.startDate) &&
+      sameInstant(next.endDate, existing.endDate)
     ) {
       return;
     }
-    const otherLive = await this.prisma.heroSlide.count({
+
+    const others = await this.prisma.heroSlide.findMany({
       where: {
         placement: existing.placement,
         id: { not: existing.id },
-        ...heroSlideLiveWhere(now),
+        isActive: true,
+        hideOnIos: false,
       },
+      select: { startDate: true, endDate: true },
     });
-    if (otherLive === 0) {
+    const before = guaranteedCoverageUntil([...others, existing], now);
+    const staysOnHome =
+      next !== null &&
+      next.placement === existing.placement &&
+      countsTowardNativeList(next, now);
+    const after = guaranteedCoverageUntil(
+      staysOnHome ? [...others, next] : others,
+      now,
+    );
+    if (after < before) {
       throw new ConflictException(i18nMessage("server.hero.lastLiveHomeSlide"));
     }
   }

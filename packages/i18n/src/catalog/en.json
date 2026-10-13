@@ -11587,7 +11587,7 @@
       "endBeforeStart": "The end date cannot be before the start date",
       "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
       "maxLiveSlides": "At most {max} slides can be live at the same time in one placement",
-      "lastLiveHomeSlide": "The last live home page slide cannot be deleted or taken offline; put another slide live first",
+      "lastLiveHomeSlide": "The home slider can never be empty: this change would leave a moment with no live slide that is also visible in the mobile app. Publish another slide that takes over without a gap first, or review the end date",
       "reorderMixedPlacement": "Only slides of the same placement can be reordered together"
     },
     "brand": {

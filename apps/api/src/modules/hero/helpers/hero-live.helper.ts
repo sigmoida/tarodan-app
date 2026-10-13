@@ -85,3 +85,38 @@ export function peakConcurrentWindows(
   }
   return peak;
 }
+
+/**
+ * Pencerelerin birleşiminin ŞİMDİDEN itibaren kesintisiz örttüğü son an
+ * (ms); hiç sonlanmıyorsa `Infinity`, şu an hiçbiri açık değilse `now`.
+ *
+ * Sınırlar dahildir: biri tam bittiği anda öbürü başlıyorsa kesinti yoktur,
+ * bir milisaniyelik boşluk bile "boş liste"dir. "Slider boş kalamaz" koruması
+ * bunu kullanır: bir değişiklik bu anı ERKENE çekiyorsa slider ileride boş
+ * kalacaktır (ör. tek kalıcı slaytın bitiş tarihi verilmesi ya da kalıcı
+ * slaytın silinip geriye bitiş tarihli bir slaytın kalması).
+ */
+export function guaranteedCoverageUntil(
+  windows: readonly HeroWindow[],
+  now: Date,
+): number {
+  const nowMs = now.getTime();
+  const open = windows
+    .map((window) => ({
+      start: Math.max(
+        window.startDate?.getTime() ?? Number.NEGATIVE_INFINITY,
+        nowMs,
+      ),
+      end: window.endDate?.getTime() ?? Number.POSITIVE_INFINITY,
+    }))
+    .filter((window) => window.end >= nowMs && window.end >= window.start)
+    .sort((a, b) => a.start - b.start);
+
+  let covered = nowMs;
+  for (const window of open) {
+    if (window.start > covered) break; // boşluk
+    covered = Math.max(covered, window.end);
+    if (covered === Number.POSITIVE_INFINITY) break;
+  }
+  return covered;
+}
