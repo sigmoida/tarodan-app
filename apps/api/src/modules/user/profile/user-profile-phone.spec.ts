@@ -40,6 +40,7 @@ describe("UserProfileService.updateProfile — telefon", () => {
       { syncUserConsent: jest.fn() } as never, // newsletter
       {} as never, // search
       {} as never, // cache
+      {} as never, // notifications
     );
     jest.spyOn(service, "findByIdWithAddresses").mockResolvedValue({} as never);
     const written = () => prisma.user.update.mock.calls[0][0].data;

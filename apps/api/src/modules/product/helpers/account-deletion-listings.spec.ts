@@ -21,6 +21,9 @@ describe("deactivateListingsForAccountDeletion", () => {
     listings: Array<{ id: string; status: ProductStatus }>,
     /** Yazımdan sonra inactive okunanlar (varsayılan: hepsi). */
     deactivatedIds: string[] = listings.map((listing) => listing.id),
+    openOffers: Array<{ id: string; buyerId: string; productId: string }> = [
+      { id: "o1", buyerId: "b1", productId: "p-active" },
+    ],
   ) => ({
     $queryRaw: jest.fn().mockResolvedValue([]),
     product: {
@@ -33,7 +36,10 @@ describe("deactivateListingsForAccountDeletion", () => {
     productRemovalEvent: {
       createMany: jest.fn().mockResolvedValue({ count: listings.length }),
     },
-    offer: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    offer: {
+      findMany: jest.fn().mockResolvedValue(openOffers),
+      updateMany: jest.fn().mockResolvedValue({ count: openOffers.length }),
+    },
   });
 
   const listings = [
@@ -59,7 +65,7 @@ describe("deactivateListingsForAccountDeletion", () => {
   it("ilanları pasife alır ve kimliklerini döner", async () => {
     const tx = makeTx(listings);
 
-    const ids = await deactivateListingsForAccountDeletion(
+    const { productIds: ids } = await deactivateListingsForAccountDeletion(
       tx as never,
       "seller-1",
     );
@@ -99,27 +105,55 @@ describe("deactivateListingsForAccountDeletion", () => {
     ]);
   });
 
-  it("bu ilanlardaki açık teklifleri gerekçeyle kapatır", async () => {
+  it("bu ilanlardaki açık teklifleri gerekçeyle kapatır ve alıcıları döner", async () => {
     const tx = makeTx(listings);
 
-    await deactivateListingsForAccountDeletion(tx as never, "seller-1");
+    const result = await deactivateListingsForAccountDeletion(
+      tx as never,
+      "seller-1",
+    );
 
+    const openOfferWhere = {
+      productId: { in: ["p-active", "p-pending"] },
+      OR: [
+        { status: OfferStatus.pending },
+        // Siparişi hiç açılmamış kabul (savunma); siparişli kabul edilmiş
+        // teklif ya açık sipariş engeline takılır ya da satış geçmişidir.
+        { status: OfferStatus.accepted, order: { is: null } },
+      ],
+    };
+    expect(tx.offer.findMany).toHaveBeenCalledWith({
+      where: openOfferWhere,
+      select: { id: true, buyerId: true, productId: true },
+    });
     expect(tx.offer.updateMany).toHaveBeenCalledWith({
-      where: {
-        productId: { in: ["p-active", "p-pending"] },
-        status: OfferStatus.pending,
-      },
+      where: { ...openOfferWhere, id: { in: ["o1"] } },
       data: {
         status: OfferStatus.cancelled,
         cancelReason: OFFER_CANCEL_REASON.listingDeleted,
       },
     });
+    expect(result.cancelledOffers).toEqual([
+      { id: "o1", buyerId: "b1", productId: "p-active" },
+    ]);
+  });
+
+  it("açık teklif yoksa teklif yazımı yapılmaz", async () => {
+    const tx = makeTx(listings, undefined, []);
+
+    const result = await deactivateListingsForAccountDeletion(
+      tx as never,
+      "seller-1",
+    );
+
+    expect(tx.offer.updateMany).not.toHaveBeenCalled();
+    expect(result.cancelledOffers).toEqual([]);
   });
 
   it("ilan yoksa hiçbir şey yazmaz", async () => {
     const tx = makeTx([]);
 
-    const ids = await deactivateListingsForAccountDeletion(
+    const { productIds: ids } = await deactivateListingsForAccountDeletion(
       tx as never,
       "seller-1",
     );
@@ -157,7 +191,7 @@ describe("deactivateListingsForAccountDeletion", () => {
   it("uses only the rows the update actually changed", async () => {
     const tx = makeTx(listings, ["p-pending"]);
 
-    const ids = await deactivateListingsForAccountDeletion(
+    const { productIds: ids } = await deactivateListingsForAccountDeletion(
       tx as never,
       "seller-1",
     );
@@ -167,7 +201,7 @@ describe("deactivateListingsForAccountDeletion", () => {
     expect(rows.map((row: { productId: string }) => row.productId)).toEqual([
       "p-pending",
     ]);
-    expect(tx.offer.updateMany.mock.calls[0][0].where.productId).toEqual({
+    expect(tx.offer.findMany.mock.calls[0][0].where.productId).toEqual({
       in: ["p-pending"],
     });
   });
@@ -177,8 +211,9 @@ describe("deactivateListingsForAccountDeletion", () => {
 
     await expect(
       deactivateListingsForAccountDeletion(tx as never, "seller-1"),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ productIds: [], cancelledOffers: [] });
     expect(tx.productRemovalEvent.createMany).not.toHaveBeenCalled();
+    expect(tx.offer.findMany).not.toHaveBeenCalled();
     expect(tx.offer.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -53,11 +53,13 @@ import { catalogProductWhere } from "../../product/helpers/catalog-product-where
 import {
   ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES,
   deactivateListingsForAccountDeletion,
+  type AccountDeletionListingsResult,
 } from "../../product/helpers/account-deletion-listings";
 import { SearchService } from "../../search/search.service";
 import { refreshProductVisibility } from "../../product/helpers/product-visibility";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { CacheService } from "../../cache/cache.service";
+import { NotificationService } from "../../notification/notification.service";
 import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
@@ -106,6 +108,7 @@ export class UserProfileService {
     private readonly newsletter: NewsletterService,
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
+    private readonly notifications: NotificationService,
   ) {}
 
   /**
@@ -633,7 +636,10 @@ export class UserProfileService {
     // Silinen: kimlik-doğrulama/oturum, ödeme kimlik bilgileri ve doğrudan iletişim PII'si.
     // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
     // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
-    let deactivatedListingIds: string[] = [];
+    let deactivated: AccountDeletionListingsResult = {
+      productIds: [],
+      cancelledOffers: [],
+    };
     try {
       await this.prisma.$transaction(
         async (tx) => {
@@ -648,10 +654,7 @@ export class UserProfileService {
           // 0b) Yayındaki ve onay bekleyen ilanlar pasife (neden:
           // account_deleted). Anonimleştirmeyle AYNI transaction: silme
           // düşerse ilanlar da açık kalır.
-          deactivatedListingIds = await deactivateListingsForAccountDeletion(
-            tx,
-            userId,
-          );
+          deactivated = await deactivateListingsForAccountDeletion(tx, userId);
 
           // 0c) Engeller KİLİT ALTINDA yeniden: ilanlar kilitlenip pasife
           // alındı; dış denetimden bu yana başlamış bir sipariş/takas/ödeme
@@ -741,9 +744,29 @@ export class UserProfileService {
       );
     }
 
-    // Commit SONRASI: hesap silindi; arama/önbellek senkronu silmeyi geri
-    // çeviremez, hata yalnız loglanır.
-    await this.syncDeactivatedListings(userId, deactivatedListingIds);
+    // Commit SONRASI: hesap silindi; arama/önbellek senkronu ve bildirimler
+    // silmeyi geri çeviremez, hata yalnız loglanır.
+    await this.syncDeactivatedListings(userId, deactivated.productIds);
+    await this.notifyCancelledOfferBuyers(deactivated.cancelledOffers);
+  }
+
+  /**
+   * Hesap silmeyle kapanan tekliflerin alıcılarına bildirim — satıcının ilan
+   * silme yoluyla AYNI şablon (`OFFER_CANCELLED_LISTING_REMOVED`); alıcı
+   * süre dolana dek "yanıt bekliyor" görmez. Bildirim hatası yutulur.
+   */
+  private async notifyCancelledOfferBuyers(
+    offers: AccountDeletionListingsResult["cancelledOffers"],
+  ): Promise<void> {
+    for (const offer of offers) {
+      await this.notifications
+        .notifyOfferCancelledListingRemoved(offer.buyerId, offer.productId)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `offer-cancelled notification (account deletion) failed (${offer.id}): ${errorMessage(error)}`,
+          ),
+        );
+    }
   }
 
   /**

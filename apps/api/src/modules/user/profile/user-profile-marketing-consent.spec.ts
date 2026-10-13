@@ -34,6 +34,7 @@ describe("UserProfileService.updateNotificationSettings — pazarlama izni", () 
       newsletter as never,
       {} as never, // search
       {} as never, // cache
+      {} as never, // notifications
     );
     return { service, tx, consents, newsletter };
   };
@@ -112,6 +113,7 @@ describe("UserProfileService.getNotificationSettings — pazarlama düğmesi", (
       {} as never,
       {} as never, // search
       {} as never, // cache
+      {} as never, // notifications
     );
     return { service, prisma };
   };

@@ -44,6 +44,7 @@ describe("UserProfileService account deletion obligations", () => {
       { syncUserConsent: jest.fn() } as never, // newsletter
       {} as never, // search
       {} as never, // cache
+      {} as never, // notifications
     );
 
     await expect(service.deleteAccount("user-1")).rejects.toThrow();
@@ -71,6 +72,11 @@ describe("UserProfileService account deletion obligations", () => {
       prisma.order.findMany.mock.calls[0][0].where.status.in;
     expect(orderStatuses).toEqual(
       expect.arrayContaining([
+        // Kabul edilmiş teklif siparişi pending_payment açılır: ödemesi
+        // beklenen kabul edilmiş teklif silmeyi engeller; ödenmişse paid ve
+        // sonrası engeller (P1 inceleme 7 doğrulaması).
+        OrderStatus.pending_payment,
+        OrderStatus.paid,
         OrderStatus.awaiting_buyer_confirmation,
         OrderStatus.refund_requested,
       ]),
@@ -144,6 +150,7 @@ describe("UserProfileService account deletion obligations", () => {
       {} as never, // newsletter
       {} as never, // search
       {} as never, // cache
+      {} as never, // notifications
     );
     return { service, prisma };
   };

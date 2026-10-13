@@ -47,18 +47,31 @@ export type AccountDeletionListingsDb = Pick<
  * - Statü `inactive`; `inactiveReason` yazılmaz (satıcı artık giriş yapamaz,
  *   "yenile / doğrudan aç" işaretinin anlamı yok). Neden `account_deleted`
  *   sistem nedenidir; işlemi başlatan kullanıcı kayda geçer.
- * - Bu ilanlardaki AÇIK teklifler gerekçeyle kapanır: alıcı süre dolana dek
- *   "yanıt bekliyor" görmesin (satıcının ilan kaldırmasıyla aynı gerekçe).
+ * - Bu ilanlardaki açık teklifler gerekçeyle kapanır (satıcının ilan
+ *   kaldırmasıyla aynı gerekçe): bekleyen teklifler ve — savunma olarak —
+ *   siparişi hiç açılmamış kabul edilmiş teklifler. Kabulde sipariş
+ *   `pending_payment` açıldığından, ödemesi bekleyen kabul edilmiş teklif
+ *   açık sipariş engeline takılır (silme geri alınır); siparişi biten
+ *   (tamamlanmış/iptal) kabul edilmiş teklif satış geçmişidir, dokunulmaz.
  *
- * Arama dizini ve önbellek commit SONRASI çağıranın işidir (tx içindeki yazım
- * henüz görünmez); dönen kimlikler bunun için.
- *
- * @returns pasife alınan ilanların kimlikleri
+ * Arama dizini, önbellek ve alıcı bildirimleri commit SONRASI çağıranın işidir
+ * (tx içindeki yazım henüz görünmez); dönen kimlikler bunun için.
  */
+export interface AccountDeletionListingsResult {
+  /** Gerçekten pasife alınan ilanlar. */
+  productIds: string[];
+  /** Kapatılan teklifler — alıcılarına commit sonrası bildirim gider. */
+  cancelledOffers: Array<{ id: string; buyerId: string; productId: string }>;
+}
+
 export async function deactivateListingsForAccountDeletion(
   tx: AccountDeletionListingsDb,
   sellerId: string,
-): Promise<string[]> {
+): Promise<AccountDeletionListingsResult> {
+  const nothing: AccountDeletionListingsResult = {
+    productIds: [],
+    cancelledOffers: [],
+  };
   await tx.$queryRaw`
     SELECT id FROM products
     WHERE seller_id = ${sellerId}
@@ -74,7 +87,7 @@ export async function deactivateListingsForAccountDeletion(
     },
     select: { id: true, status: true },
   });
-  if (listings.length === 0) return [];
+  if (listings.length === 0) return nothing;
 
   const candidateIds = listings.map((listing) => listing.id);
   await tx.product.updateMany({
@@ -95,7 +108,7 @@ export async function deactivateListingsForAccountDeletion(
     ).map((row) => row.id),
   );
   const changed = listings.filter((listing) => deactivated.has(listing.id));
-  if (changed.length === 0) return [];
+  if (changed.length === 0) return nothing;
   const ids = changed.map((listing) => listing.id);
 
   await recordListingRemovals(
@@ -108,12 +121,28 @@ export async function deactivateListingsForAccountDeletion(
       actorUserId: sellerId,
     })),
   );
-  await tx.offer.updateMany({
-    where: { productId: { in: ids }, status: OfferStatus.pending },
-    data: {
-      status: OfferStatus.cancelled,
-      cancelReason: OFFER_CANCEL_REASON.listingDeleted,
-    },
+  const openOfferWhere: Prisma.OfferWhereInput = {
+    productId: { in: ids },
+    OR: [
+      { status: OfferStatus.pending },
+      { status: OfferStatus.accepted, order: { is: null } },
+    ],
+  };
+  const cancelledOffers = await tx.offer.findMany({
+    where: openOfferWhere,
+    select: { id: true, buyerId: true, productId: true },
   });
-  return ids;
+  if (cancelledOffers.length > 0) {
+    await tx.offer.updateMany({
+      where: {
+        ...openOfferWhere,
+        id: { in: cancelledOffers.map((offer) => offer.id) },
+      },
+      data: {
+        status: OfferStatus.cancelled,
+        cancelReason: OFFER_CANCEL_REASON.listingDeleted,
+      },
+    });
+  }
+  return { productIds: ids, cancelledOffers };
 }

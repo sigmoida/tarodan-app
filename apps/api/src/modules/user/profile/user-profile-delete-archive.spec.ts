@@ -42,6 +42,8 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       listings?: Array<{ id: string; status: string }>;
       /** İşlem İÇİ engel denetiminde görünen açık sipariş (yarış). */
       ordersInTx?: Array<{ id: string; status: string }>;
+      /** Pasife alınan ilanlardaki açık teklifler. */
+      openOffers?: Array<{ id: string; buyerId: string; productId: string }>;
     } = {},
   ) {
     const listings = overrides.listings ?? [];
@@ -72,7 +74,10 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       productRemovalEvent: {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
-      offer: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      offer: {
+        findMany: jest.fn().mockResolvedValue(overrides.openOffers ?? []),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
         update: jest.fn().mockResolvedValue(user),
@@ -127,6 +132,11 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       del: jest.fn().mockResolvedValue(undefined),
       delPattern: jest.fn().mockResolvedValue(undefined),
     };
+    const notifications = {
+      notifyOfferCancelledListingRemoved: jest
+        .fn()
+        .mockResolvedValue(undefined),
+    };
     const service = new UserProfileService(
       prisma as never,
       {} as never,
@@ -136,8 +146,9 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       { syncUserConsent: jest.fn() } as never, // newsletter
       search as never,
       cache as never,
+      notifications as never,
     );
-    return { service, prisma, tx, search, cache };
+    return { service, prisma, tx, search, cache, notifications };
   }
 
   it("arşivi, adresler silinmeden ve satır anonimleştirilmeden ÖNCE yazar", async () => {
@@ -361,6 +372,51 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       expect(tx.user.update).not.toHaveBeenCalled();
       // İşlem geri alındı: commit sonrası senkron da yok.
       expect(search.syncProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  // P1 inceleme: hesap silmeyle kapanan tekliflerin alıcıları, satıcının ilan
+  // silme yoluyla aynı bildirimi alır (commit SONRASI).
+  describe("kapanan tekliflerin alıcıları", () => {
+    const openOffers = [{ id: "o1", buyerId: "b1", productId: "p-active" }];
+
+    it("commit sonrası bildirim gider", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledListingRemoved,
+      ).toHaveBeenCalledWith("b1", "p-active");
+    });
+
+    it("bildirim hatası silmeyi bozmaz", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+      });
+      notifications.notifyOfferCancelledListingRemoved.mockRejectedValue(
+        new Error("push down"),
+      );
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa bildirim gitmez", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(
+        notifications.notifyOfferCancelledListingRemoved,
+      ).not.toHaveBeenCalled();
     });
   });
 });
