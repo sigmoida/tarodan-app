@@ -435,23 +435,15 @@ describe("AppleTokenService", () => {
       });
     });
 
-    it("invalid_grant: already invalid at Apple → treated as revoked, token forgotten", async () => {
-      appleReplies(400, { error: "invalid_grant" });
-      const { service, prisma, cipher } = makeService();
-      prisma.appleSignInToken.findUnique.mockResolvedValue(row(cipher));
-
-      await expect(service.revoke("t1")).resolves.toBeUndefined();
-      expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
-        where: { id: "t1" },
-        data: {
-          revokedAt: expect.any(Date),
-          refreshTokenEncrypted: null,
-          lastRevokeError: "apple:400:invalid_grant",
-        },
-      });
-    });
-
-    it.each(["invalid_client", "unauthorized_client", "unsupported_client"])(
+    // invalid_grant "zaten iptal" DEĞİL (o 200 döner): Apple bunu yanlış client
+    // id / geçersiz token için de verir. Token silinmez, iş DLQ'ya gider ki
+    // düzeltmeden sonra yeniden kuyruğa alınabilsin.
+    it.each([
+      "invalid_grant",
+      "invalid_client",
+      "unauthorized_client",
+      "unsupported_client",
+    ])(
       "%s: permanent → dead-lettered at once, token kept",
       async (code) => {
         appleReplies(400, { error: code });
@@ -462,6 +454,8 @@ describe("AppleTokenService", () => {
 
         expect(error).toBeInstanceOf(PermanentOutboxError);
         expect((error as Error).message).toContain(code);
+        // Yalnız teşhis yazılır; revokedAt / şifreli token'a dokunulmaz.
+        expect(prisma.appleSignInToken.update).toHaveBeenCalledTimes(1);
         expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
           where: { id: "t1" },
           data: { lastRevokeError: `apple:400:${code}` },
@@ -541,7 +535,7 @@ describe("AppleTokenService", () => {
 
   describe("classifyAppleRevokeFailure", () => {
     it.each([
-      ["invalid_grant", "already_revoked"],
+      ["invalid_grant", "permanent"],
       ["invalid_client", "permanent"],
       ["invalid_request", "permanent"],
       ["temporarily_unavailable", "transient"],

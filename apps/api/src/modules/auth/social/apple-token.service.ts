@@ -40,33 +40,32 @@ const NOT_CONFIGURED_MESSAGE =
 
 /**
  * Apple revoke hatasının sınıfı (OAuth hata kodu, RFC 6749 §5.2 / 7009):
- * - `already_revoked`: `invalid_grant` — token geçersiz/iptal edilmiş, kullanıcı
- *   bağlantıyı Apple'da zaten kaldırmış olabilir. İş tamamdır.
- * - `permanent`: istemci kimliği/isteği reddedildi (`invalid_client`,
+ * - `permanent`: istek/kimlik reddedildi (`invalid_grant`, `invalid_client`,
  *   `unauthorized_client`, `unsupported_client`, `invalid_request`,
- *   `unsupported_grant_type`, `unsupported_token_type`) — anahtar ya da client
- *   id yapılandırması düzelmeden tekrar denemek boşuna → DLQ.
+ *   `unsupported_grant_type`, `unsupported_token_type`) → DLQ. Şifreli token
+ *   SİLİNMEZ: Apple `invalid_grant`ı geçersiz token kadar yanlış/uyuşmayan
+ *   client id için de döndürür; "zaten iptal" varsayıp token'ı silmek, düzeltme
+ *   sonrası yeniden denemeyi imkânsız kılar. Zaten iptal edilmiş token'ın
+ *   revoke'u normalde 200 döner.
  * - `transient`: kod yok (5xx, boş gövde) ya da başka bir kod — yeniden dene.
  */
 export function classifyAppleRevokeFailure(
   code: string | null,
-): "already_revoked" | "permanent" | "transient" {
-  if (code === "invalid_grant") return "already_revoked";
-  if (
-    code &&
-    [
-      "invalid_client",
-      "unauthorized_client",
-      "unsupported_client",
-      "invalid_request",
-      "unsupported_grant_type",
-      "unsupported_token_type",
-    ].includes(code)
-  ) {
-    return "permanent";
-  }
-  return "transient";
+): "permanent" | "transient" {
+  return code && PERMANENT_APPLE_ERROR_CODES.has(code)
+    ? "permanent"
+    : "transient";
 }
+
+const PERMANENT_APPLE_ERROR_CODES: ReadonlySet<string> = new Set([
+  "invalid_grant",
+  "invalid_client",
+  "unauthorized_client",
+  "unsupported_client",
+  "invalid_request",
+  "unsupported_grant_type",
+  "unsupported_token_type",
+]);
 
 /**
  * Sign in with Apple token yaşam döngüsü (App Store 5.1.1(v)): girişte gelen
@@ -332,40 +331,30 @@ export class AppleTokenService implements OnModuleInit {
       const failure = `apple:${response.status}:${code ?? "no_error_code"}`;
       const outcome = classifyAppleRevokeFailure(code);
 
-      if (outcome === "already_revoked") {
-        // Kullanıcı bağlantıyı Apple'da zaten kaldırmış ya da token geçersiz:
-        // iptal edilecek bir şey yok — iş tamam, token tutulmaz.
-        await this.markRevoked(row.id, failure);
-        this.logger.log(
-          `Apple token already invalid at Apple, treated as revoked (row=${row.id}, client=${row.clientId})`,
-        );
-        return;
-      }
-
       await this.recordError(row.id, failure);
       const message = `Apple token revoke failed for ${row.id} (client=${row.clientId}): ${failure}`;
       if (outcome === "permanent") {
         throw new PermanentOutboxError(
-          `${message} — Apple rejected our client credentials; check that the Sign in with Apple key is bound to this client id`,
+          `${message} — Apple rejected the request (invalid token or client credentials); the encrypted token is kept: check that the Sign in with Apple key is bound to client id ${row.clientId}, then redrive the dead job (docs/OPERATIONS.md)`,
         );
       }
       throw new Error(message);
     }
 
-    await this.markRevoked(row.id, null);
+    await this.markRevoked(row.id);
     this.logger.log(
       `Apple token revoked (row=${row.id}, user=${row.userId}, client=${row.clientId})`,
     );
   }
 
   /** İptal tamam: damga + token NULL (iptal edilmiş token saklanmaz). */
-  private async markRevoked(id: string, note: string | null): Promise<void> {
+  private async markRevoked(id: string): Promise<void> {
     await this.prisma.appleSignInToken.update({
       where: { id },
       data: {
         revokedAt: new Date(),
         refreshTokenEncrypted: null,
-        lastRevokeError: note,
+        lastRevokeError: null,
       },
     });
   }
