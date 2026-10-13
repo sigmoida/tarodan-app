@@ -274,6 +274,12 @@ iki sabit senaryo hesabıyla denenir. Bunlar gerçek kişi değildir
 - Testçinin geçtiği kapı kalıcıdır (onay tablosu ekleme-yalnız, kimlik bir kez
   girilir). Başa dönmek için staging reset ya da yenileme: seed hesabı yeniden
   kurar. Seed'in yeniden koşusu kapıyı geri KAPATMAZ.
+- **Resetsiz uygulama:** GitHub Actions → **Staging Run UAT Accounts** (`confirm:
+STAGING`). `seed-uat.js --accounts-only` ile eksik üyeleri / senaryo hesaplarını
+  ekler; var olan hesapların şifresi değişmez, ilan ve referans veri yazılmaz.
+  Aynı koşuda test şeridi onay backfill'i seçilebilir (`backfill`: `none` /
+  `dry-run` varsayılan / `apply`; `apply` için `db_name` — önce `dry-run` çıktısındaki
+  hedef veritabanı adına bakın). Çıktı Actions log'unda görünür.
 - Diğer üyeler (`nur@`, `serhat@`) iki kapıyı da kendileri geçer; senaryo
   hesapları kapıyı görmek isteyen herkes içindir.
 - Hiçbir seed hesabına yasal kimlik yazılmaz ve muafiyet verilmez (bkz.

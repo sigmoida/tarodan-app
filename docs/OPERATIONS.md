@@ -56,6 +56,11 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
   `withdrawn` olan belge ATLANIR (bilinçli geri çekme yeniden onaylanmaz) ve
   raporlanır. Yeni açılan hesapların onay satırlarında IP ve kullanıcı ajanı boştur
   (yöneticinin isteği kanıt olarak damgalanmaz).
+  Staging'de elle `docker exec` yerine GitHub Actions → **Staging Run UAT Accounts**
+  kullanılabilir: `backfill=dry-run` (varsayılan) yazmadan raporlar, `backfill=apply` +
+  `db_name=<ad>` yazar (workflow önce dry-run çıktısını da basar; ad yine betik
+  tarafından hedef DB ile doğrulanır). Aynı koşu UAT hesaplarını da uygular
+  (`seed-uat.js --accounts-only`).
 - **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1` — pazaryeri VE üyelik
   mağazasında; oto-yenileme de test modunda çekilir), PayTR iadesi (aşağıda),
   Sürat gönderisi (`TEST…` takip kodu), eLogo belgesi (üyelik faturası dahil),
