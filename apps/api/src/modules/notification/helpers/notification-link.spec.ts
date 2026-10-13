@@ -6,6 +6,7 @@ import {
   isKnownNotificationType,
   requiredFieldsFor,
   resolveWebNotificationLink,
+  withDefaultAudience,
 } from "./notification-link";
 
 /**
@@ -486,5 +487,62 @@ describe("bildirim hedefleri", () => {
     ])("eski link doğrulamadan geçmez: %s", (_name, legacy) => {
       expect(normalizeLegacyNotificationLink(legacy)).toBeNull();
     });
+  });
+});
+
+describe("withDefaultAudience", () => {
+  /** Satıcı sipariş ekranına giden tipler — mobilin tip yedeğinin listesi. */
+  const SELLER_ORDER_TYPES = [
+    NotificationType.ORDER_CANCELLED_SELLER,
+    NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER,
+    NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
+    NotificationType.PRODUCT_SOLD,
+    NotificationType.CARGO_MOVEMENT_MISSING,
+    NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
+    NotificationType.REFUND_RETURN_SHIPPED_SELLER,
+    NotificationType.REFUND_RETURN_DELIVERED_SELLER,
+    NotificationType.REFUND_COMPLETED_SELLER,
+    NotificationType.REFUND_AUTO_ACCEPTED_SELLER,
+  ];
+
+  it.each(SELLER_ORDER_TYPES)("%s — audience=seller eklenir", (type) => {
+    expect(withDefaultAudience(type, { orderId: "o1" })).toEqual({
+      orderId: "o1",
+      audience: "seller",
+    });
+  });
+
+  it("veri yoksa da audience taşıyan bir nesne döner", () => {
+    expect(
+      withDefaultAudience(NotificationType.PRODUCT_SOLD, undefined),
+    ).toEqual({ audience: "seller" });
+  });
+
+  it("üreticinin verdiği audience'a dokunmaz", () => {
+    const data = { orderId: "o1", audience: "buyer" };
+    expect(withDefaultAudience(NotificationType.PRODUCT_SOLD, data)).toBe(data);
+  });
+
+  it("girdiyi değiştirmez", () => {
+    const data = { orderId: "o1" };
+    withDefaultAudience(NotificationType.PRODUCT_SOLD, data);
+    expect(data).toEqual({ orderId: "o1" });
+  });
+
+  it("satıcı sipariş ekranı OLMAYAN hiçbir tipin verisini değiştirmez", () => {
+    const sellerTypes = new Set<NotificationType>(SELLER_ORDER_TYPES);
+    for (const type of ALL_TYPES.filter((t) => !sellerTypes.has(t))) {
+      const data = { orderId: "o1" };
+      expect(withDefaultAudience(type, data)).toBe(data);
+    }
+  });
+
+  it("türetilen küme, satıcı ekranına giden tiplerle birebir örtüşür", () => {
+    // Harita değişirse (yeni *_SELLER tipi eklendi) bu liste bilinçli güncellenir.
+    const resolvedSeller = ALL_TYPES.filter(
+      (type) =>
+        withDefaultAudience(type, { orderId: "o1" })?.audience === "seller",
+    );
+    expect(new Set(resolvedSeller)).toEqual(new Set(SELLER_ORDER_TYPES));
   });
 });
