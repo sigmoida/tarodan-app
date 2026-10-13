@@ -241,6 +241,38 @@ describe("AppleTokenService", () => {
       );
     });
 
+    // Kullanıcı satırı hiç yoksa satır açmak FK ihlali olurdu: yazma yok,
+    // token Apple'a doğrudan iptal edilir.
+    it("user row gone entirely: no row created, token revoked directly", async () => {
+      const ctx = makeService(fullConfig, { user: null });
+      fetchMock
+        .mockResolvedValueOnce({
+          status: 200,
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              refresh_token: "rt-secret",
+              id_token: idToken({
+                sub: "apple-sub-1",
+                aud: "com.tarodan.app.staging",
+              }),
+            }),
+        })
+        .mockResolvedValueOnce({ status: 200, ok: true, text: async () => "" });
+
+      await ctx.service.storeFromAuthorizationCode(input);
+
+      expect(ctx.prisma.appleSignInToken.create).not.toHaveBeenCalled();
+      expect(ctx.prisma.appleSignInToken.update).not.toHaveBeenCalled();
+      expect(ctx.outbox.enqueue).not.toHaveBeenCalled();
+      const request = lastAppleRequest();
+      expect(request.url).toBe("https://appleid.apple.com/auth/revoke");
+      expect(request.params).toMatchObject({
+        client_id: "com.tarodan.app.staging",
+        token: "rt-secret",
+      });
+    });
+
     it("persist transaction outwaits the account-deletion lock (timeout and maxWait above its 60s)", async () => {
       exchangeOk();
       const { service, prisma } = makeService();

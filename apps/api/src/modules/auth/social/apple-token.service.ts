@@ -181,11 +181,19 @@ export class AppleTokenService implements OnModuleInit {
         return;
       }
       verifiedRefreshToken = refreshToken;
-      await this.persistToken(
+      const stored = await this.persistToken(
         input.userId,
         input.clientId,
         this.cipher.encrypt(refreshToken),
       );
+      if (!stored) {
+        // Kullanıcı satırı hiç yok: token satırı açılamaz (FK) ve iptali
+        // sürdürecek bir iş de yoktur → Apple'a doğrudan iptal.
+        this.logger.warn(
+          `Apple token arrived for a user that no longer exists (user=${input.userId}, client=${input.clientId}) — revoking directly`,
+        );
+        await this.revokeDirectly(input.userId, input.clientId, refreshToken);
+      }
     } catch (error: unknown) {
       this.logger.warn(
         `Apple refresh token could not be stored (user=${input.userId}, client=${input.clientId}): ${errorMessage(error)}`,
@@ -208,6 +216,9 @@ export class AppleTokenService implements OnModuleInit {
    * - silme önce kilitlerse (ya da kullanıcı zaten silinmişse) token
    *   iptal-istenmiş YENİ bir satır olarak yazılır ve iptal işi hemen
    *   kuyruğa girer — silinmiş kullanıcıda iptal edilmeyecek token kalmaz.
+   * - kullanıcı satırı hiç yoksa (hesaplar anonimleştirilir, normalde
+   *   silinmez) satır yazılamaz — FK ihlali olurdu; `false` döner ve çağıran
+   *   token'ı Apple'a doğrudan iptal eder.
    * İptali istenmiş satırın üzerine ASLA yazılmaz: güncelleme yalnız
    * kullanıcının canlı (`revokeRequestedAt` boş) satırına yapılır.
    *
@@ -217,17 +228,21 @@ export class AppleTokenService implements OnModuleInit {
    * yeni oturumunun yetkisini de düşürür. Hesap silmede en son token'ın
    * iptali yetkinin tamamını kaldırır; ezilen token o andan sonra kullanılmaz
    * ve saklanmaz.
+   *
+   * @returns false: kullanıcı satırı yok, hiçbir şey yazılmadı
    */
   private async persistToken(
     userId: string,
     clientId: string,
     refreshTokenEncrypted: string,
-  ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
       const [user] = await tx.$queryRaw<Array<{ deleted_at: Date | null }>>`
         SELECT "deleted_at" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
 
-      if (!user || user.deleted_at) {
+      if (!user) return false;
+
+      if (user.deleted_at) {
         const row = await tx.appleSignInToken.create({
           data: {
             userId,
@@ -241,7 +256,7 @@ export class AppleTokenService implements OnModuleInit {
         this.logger.warn(
           `Apple token arrived after account deletion (user=${userId}, client=${clientId}) — queued for revocation`,
         );
-        return;
+        return true;
       }
 
       const live = await tx.appleSignInToken.findFirst({
@@ -262,6 +277,7 @@ export class AppleTokenService implements OnModuleInit {
           data: { userId, clientId, refreshTokenEncrypted },
         });
       }
+      return true;
     }, PERSIST_TOKEN_TX_OPTIONS);
   }
 
