@@ -35,16 +35,35 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     overrides: {
       upsert?: jest.Mock;
       listings?: Array<{ id: string; status: string }>;
+      /** İşlem İÇİ engel denetiminde görünen açık sipariş (yarış). */
+      ordersInTx?: Array<{ id: string; status: string }>;
     } = {},
   ) {
+    const listings = overrides.listings ?? [];
+    const txEmpty = () => ({ findMany: jest.fn().mockResolvedValue([]) });
     const tx = {
       // İlan satırı kilidi (SELECT … FOR UPDATE).
       $queryRaw: jest.fn().mockResolvedValue([]),
       // S3: aktif / onay bekleyen ilanlar silme transaction'ında pasife.
       product: {
-        findMany: jest.fn().mockResolvedValue(overrides.listings ?? []),
+        // Rezerve-ilan engel sorgusu boş; pasifleştirme okumaları ilanları görür.
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            where?.status?.in?.length === 1 && where.status.in[0] === "reserved"
+              ? []
+              : listings,
+          ),
+        ),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      // İşlem içi engel denetimi.
+      trade: txEmpty(),
+      order: {
+        findMany: jest.fn().mockResolvedValue(overrides.ordersInTx ?? []),
+      },
+      refundRequest: txEmpty(),
+      payoutTransfer: txEmpty(),
+      paymentHold: txEmpty(),
       productRemovalEvent: {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
@@ -291,6 +310,43 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       const { service, search } = makeService({ upsert, listings });
 
       await expect(service.deleteAccount("user-1")).rejects.toBeDefined();
+      expect(search.syncProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  // P1 inceleme (TOCTOU): dış denetimden sonra başlayan bir checkout, ilanlar
+  // kilitlenip pasife alındıktan sonraki işlem içi denetimde görünür.
+  describe("işlem içi engel denetimi", () => {
+    it("pasifleştirmeden SONRA, anonimleştirmeden ÖNCE yeniden denetler", async () => {
+      const { service, tx } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+      });
+
+      await service.deleteAccount("user-1");
+
+      const statusUpdate = tx.product.updateMany.mock.invocationCallOrder[0];
+      const blockerCheck = tx.order.findMany.mock.invocationCallOrder[0];
+      expect(statusUpdate).toBeLessThan(blockerCheck);
+      expect(blockerCheck).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("arada açılmış sipariş → aynı engel yanıtı, hesap anonimleşmez", async () => {
+      const { service, tx, search } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        ordersInTx: [{ id: "o1", status: "pending_payment" }],
+      });
+
+      const error = await service
+        .deleteAccount("user-1")
+        .catch((e: unknown) => e as { getResponse(): any });
+
+      const body = error.getResponse();
+      expect(body.i18nKey).toBe("server.user.deleteAccountBlocked");
+      expect(body.details.pendingOrders).toBe(1);
+      expect(tx.user.update).not.toHaveBeenCalled();
+      // İşlem geri alındı: commit sonrası senkron da yok.
       expect(search.syncProduct).not.toHaveBeenCalled();
     });
   });

@@ -80,6 +80,18 @@ export interface DeleteAccountOptions {
  * (anonimleştirme), verifyUser, upgradToSeller, getPublicProfile. Avatar
  * çözümü için common'a delege eder (this.common.resolveAvatarUrl).
  */
+/** Silme engeli istisnası mı? (işlem içinden yeniden fırlatılır, sarılmaz) */
+function isDeletionBlocked(error: unknown): error is BadRequestException {
+  if (!(error instanceof BadRequestException)) return false;
+  const body = error.getResponse();
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { i18nKey?: unknown }).i18nKey ===
+      "server.user.deleteAccountBlocked"
+  );
+}
+
 @Injectable()
 export class UserProfileService {
   private readonly logger = new Logger(UserProfileService.name);
@@ -609,10 +621,144 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
+    // Engeller işlem dışında hızlı ret için bir kez, işlem İÇİNDE (ilanlar
+    // kilitlenip pasife alındıktan sonra) bir kez daha denetlenir: arada
+    // başlayan checkout/takas açık siparişle anonimleşmiş hesap bırakmasın.
+    await this.assertNoDeletionBlockers(this.prisma, userId);
+
+    // Tüm kontroller geçti → hesabı ANONİMLEŞTİR (hard-delete DEĞİL).
+    // User satırı KORUNUR; böylece sipariş/fatura/ödeme/iade gibi finansal FK'lar bozulmaz
+    // (orders_buyer_id_fkey vb. ihlali engellenir — eski kod tx.user.delete'te patlıyordu).
+    // Silinen: kimlik-doğrulama/oturum, ödeme kimlik bilgileri ve doğrudan iletişim PII'si.
+    // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
+    // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
+    let deactivatedListingIds: string[] = [];
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          // 0) YASAL KİMLİK ARŞİVİ — her şeyden ÖNCE.
+          // Aylık resmî bildirim, hesap silinse de kimliği gerektiriyor; bu
+          // satır yazılmadan hiçbir şey yok edilmemeli. Sıra zorunlu: (3)
+          // adresleri, (4) e-posta/telefon/VKN'yi geri dönülemez şekilde
+          // siliyor. Commit sonrasına bırakılamaz — araya giren bir çökme
+          // veriyi sessizce ve kalıcı olarak kaybettirirdi.
+          await this.archiveIdentity(tx, userId, options);
+
+          // 0b) Yayındaki ve onay bekleyen ilanlar pasife (neden:
+          // account_deleted). Anonimleştirmeyle AYNI transaction: silme
+          // düşerse ilanlar da açık kalır.
+          deactivatedListingIds = await deactivateListingsForAccountDeletion(
+            tx,
+            userId,
+          );
+
+          // 0c) Engeller KİLİT ALTINDA yeniden: ilanlar kilitlenip pasife
+          // alındı; dış denetimden bu yana başlamış bir sipariş/takas/ödeme
+          // varsa burada görünür ve tüm işlem geri alınır.
+          await this.assertNoDeletionBlockers(tx, userId);
+
+          // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
+          await tx.refreshToken.deleteMany({ where: { userId } });
+          await tx.passwordResetToken.deleteMany({ where: { userId } });
+          await tx.emailVerificationToken.deleteMany({ where: { userId } });
+          await tx.pushToken.deleteMany({ where: { userId } });
+          await tx.oAuthAccount.deleteMany({ where: { userId } });
+          await tx.twoFactorSecret.deleteMany({ where: { userId } });
+
+          // 2) Ödeme kimlik bilgileri (kayıtlı kartlar)
+          await tx.savedCard.deleteMany({ where: { userId } });
+
+          // 3) Doğrudan PII / kişisel veriler
+          await tx.address.deleteMany({ where: { userId } });
+          await tx.notificationLog.deleteMany({ where: { userId } });
+
+          // 3b) Pazarlama listesinden çıkar. E-posta birazdan
+          // `deleted_...@deleted.local` olarak anonimleştirileceği için abone
+          // satırı gerçek adresle öksüz kalır ve hesap silinmiş olmasına rağmen
+          // bülten gitmeye devam ederdi. Aynı transaction'da olmalı.
+          await tx.newsletterSubscriber.updateMany({
+            where: { email: user.email.toLowerCase(), unsubscribedAt: null },
+            data: { unsubscribedAt: new Date(), updatedAt: new Date() },
+          });
+
+          // Pazarlama izni silmeyle kapanır: açıksa geri çekme tarihli kaydı.
+          if (user.acceptsMarketingEmails) {
+            await this.consents.recordMarketingChange(
+              {
+                userId,
+                granted: false,
+                source: ConsentSource.account_deletion,
+              },
+              tx,
+            );
+          }
+
+          // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
+          //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              email: anonymizedEmailFor(userId),
+              phone: null,
+              passwordHash: "",
+              displayName: ANONYMIZED_DISPLAY_NAME,
+              avatarUrl: null,
+              bio: null,
+              fcmToken: null,
+              companyName: null,
+              taxId: null,
+              // Yasal kimlik arşive (0. adım) kopyalandı; canlı satırda kalmaz.
+              // TCKN tekil olduğu için NULL'lanması numarayı da serbest bırakır
+              // (e-posta/telefon gibi: aynı kişi yeniden kayıt olabilir).
+              legalFirstName: null,
+              legalLastName: null,
+              nationalId: null,
+              acceptsMarketingEmails: false,
+              isSeller: false,
+              deletedAt: new Date(),
+            },
+          });
+        },
+        {
+          timeout: 60000,
+        },
+      );
+
+      this.logger.log(`User account anonymized (soft-deleted): ${userId}`);
+      // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
+      // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
+    } catch (error: any) {
+      // İşlem içi engel denetimi: istemci sözleşmesi aynı 400 (errors[]/details).
+      if (isDeletionBlocked(error)) throw error;
+      // Ayırt edilebilir işaret: "arşiv yazılamadı" ile "FK patladı" aynı 400'e
+      // düşüyor; log'da ayrışmazsa kimlik kaybı riski taşıyan hata fark edilmez.
+      this.logger.error(
+        `deleted-identity-archive-or-anonymize-failed userId=${userId}: ${error?.message}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.user.deleteAccountFailed"),
+      );
+    }
+
+    // Commit SONRASI: hesap silindi; arama/önbellek senkronu silmeyi geri
+    // çeviremez, hata yalnız loglanır.
+    await this.syncDeactivatedListings(deactivatedListingIds);
+  }
+
+  /**
+   * Hesap silmeyi engelleyen açık yükümlülükler (rezerve ilan, takas, sipariş,
+   * iade, payout, blokaj). Varsa 400 `server.user.deleteAccountBlocked`
+   * (`errors[]` + `details` sözleşmesi). Silme bunu işlem dışında ve işlem
+   * içinde AYNI kuralla çağırır (`client` = prisma ya da tx).
+   */
+  private async assertNoDeletionBlockers(
+    client: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<void> {
     // Check 1: süren satışa/takasa bağlı (rezerve) ilanlar. Aktif ve onay
     // bekleyen ilanlar artık engel değil — silme transaction'ında pasife
     // alınır (deactivateListingsForAccountDeletion).
-    const activeProducts = await this.prisma.product.findMany({
+    const activeProducts = await client.product.findMany({
       where: {
         ...catalogProductWhere(),
         sellerId: userId,
@@ -622,7 +768,7 @@ export class UserProfileService {
     });
 
     // Check 2: every non-terminal legacy and escrow trade state.
-    const activeTrades = await this.prisma.trade.findMany({
+    const activeTrades = await client.trade.findMany({
       where: {
         OR: [{ initiatorId: userId }, { receiverId: userId }],
         status: {
@@ -648,7 +794,7 @@ export class UserProfileService {
     });
 
     // Check 3: every order state with an unfinished fulfilment/refund obligation.
-    const pendingOrders = await this.prisma.order.findMany({
+    const pendingOrders = await client.order.findMany({
       where: {
         OR: [{ buyerId: userId }, { sellerId: userId }],
         status: {
@@ -666,7 +812,7 @@ export class UserProfileService {
       select: { id: true, orderNumber: true, status: true },
     });
 
-    const openRefunds = await this.prisma.refundRequest.findMany({
+    const openRefunds = await client.refundRequest.findMany({
       where: {
         OR: [
           { requesterId: userId },
@@ -687,7 +833,7 @@ export class UserProfileService {
       select: { id: true, status: true },
     });
 
-    const pendingPayouts = await this.prisma.payoutTransfer.findMany({
+    const pendingPayouts = await client.payoutTransfer.findMany({
       where: {
         sellerId: userId,
         status: {
@@ -702,7 +848,7 @@ export class UserProfileService {
       select: { id: true, status: true },
     });
 
-    const openPaymentHolds = await this.prisma.paymentHold.findMany({
+    const openPaymentHolds = await client.paymentHold.findMany({
       where: {
         sellerId: userId,
         status: {
@@ -781,117 +927,6 @@ export class UserProfileService {
         },
       });
     }
-
-    // Tüm kontroller geçti → hesabı ANONİMLEŞTİR (hard-delete DEĞİL).
-    // User satırı KORUNUR; böylece sipariş/fatura/ödeme/iade gibi finansal FK'lar bozulmaz
-    // (orders_buyer_id_fkey vb. ihlali engellenir — eski kod tx.user.delete'te patlıyordu).
-    // Silinen: kimlik-doğrulama/oturum, ödeme kimlik bilgileri ve doğrudan iletişim PII'si.
-    // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
-    // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
-    let deactivatedListingIds: string[] = [];
-    try {
-      await this.prisma.$transaction(
-        async (tx) => {
-          // 0) YASAL KİMLİK ARŞİVİ — her şeyden ÖNCE.
-          // Aylık resmî bildirim, hesap silinse de kimliği gerektiriyor; bu
-          // satır yazılmadan hiçbir şey yok edilmemeli. Sıra zorunlu: (3)
-          // adresleri, (4) e-posta/telefon/VKN'yi geri dönülemez şekilde
-          // siliyor. Commit sonrasına bırakılamaz — araya giren bir çökme
-          // veriyi sessizce ve kalıcı olarak kaybettirirdi.
-          await this.archiveIdentity(tx, userId, options);
-
-          // 0b) Yayındaki ve onay bekleyen ilanlar pasife (neden:
-          // account_deleted). Anonimleştirmeyle AYNI transaction: silme
-          // düşerse ilanlar da açık kalır.
-          deactivatedListingIds = await deactivateListingsForAccountDeletion(
-            tx,
-            userId,
-          );
-
-          // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
-          await tx.refreshToken.deleteMany({ where: { userId } });
-          await tx.passwordResetToken.deleteMany({ where: { userId } });
-          await tx.emailVerificationToken.deleteMany({ where: { userId } });
-          await tx.pushToken.deleteMany({ where: { userId } });
-          await tx.oAuthAccount.deleteMany({ where: { userId } });
-          await tx.twoFactorSecret.deleteMany({ where: { userId } });
-
-          // 2) Ödeme kimlik bilgileri (kayıtlı kartlar)
-          await tx.savedCard.deleteMany({ where: { userId } });
-
-          // 3) Doğrudan PII / kişisel veriler
-          await tx.address.deleteMany({ where: { userId } });
-          await tx.notificationLog.deleteMany({ where: { userId } });
-
-          // 3b) Pazarlama listesinden çıkar. E-posta birazdan
-          // `deleted_...@deleted.local` olarak anonimleştirileceği için abone
-          // satırı gerçek adresle öksüz kalır ve hesap silinmiş olmasına rağmen
-          // bülten gitmeye devam ederdi. Aynı transaction'da olmalı.
-          await tx.newsletterSubscriber.updateMany({
-            where: { email: user.email.toLowerCase(), unsubscribedAt: null },
-            data: { unsubscribedAt: new Date(), updatedAt: new Date() },
-          });
-
-          // Pazarlama izni silmeyle kapanır: açıksa geri çekme tarihli kaydı.
-          if (user.acceptsMarketingEmails) {
-            await this.consents.recordMarketingChange(
-              {
-                userId,
-                granted: false,
-                source: ConsentSource.account_deletion,
-              },
-              tx,
-            );
-          }
-
-          // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
-          //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.
-          await tx.user.update({
-            where: { id: userId },
-            data: {
-              email: anonymizedEmailFor(userId),
-              phone: null,
-              passwordHash: "",
-              displayName: ANONYMIZED_DISPLAY_NAME,
-              avatarUrl: null,
-              bio: null,
-              fcmToken: null,
-              companyName: null,
-              taxId: null,
-              // Yasal kimlik arşive (0. adım) kopyalandı; canlı satırda kalmaz.
-              // TCKN tekil olduğu için NULL'lanması numarayı da serbest bırakır
-              // (e-posta/telefon gibi: aynı kişi yeniden kayıt olabilir).
-              legalFirstName: null,
-              legalLastName: null,
-              nationalId: null,
-              acceptsMarketingEmails: false,
-              isSeller: false,
-              deletedAt: new Date(),
-            },
-          });
-        },
-        {
-          timeout: 60000,
-        },
-      );
-
-      this.logger.log(`User account anonymized (soft-deleted): ${userId}`);
-      // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
-      // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
-    } catch (error: any) {
-      // Ayırt edilebilir işaret: "arşiv yazılamadı" ile "FK patladı" aynı 400'e
-      // düşüyor; log'da ayrışmazsa kimlik kaybı riski taşıyan hata fark edilmez.
-      this.logger.error(
-        `deleted-identity-archive-or-anonymize-failed userId=${userId}: ${error?.message}`,
-      );
-      throw new BadRequestException(
-        i18nMessage("server.user.deleteAccountFailed"),
-      );
-    }
-
-    // Commit SONRASI: hesap silindi; arama/önbellek senkronu silmeyi geri
-    // çeviremez, hata yalnız loglanır.
-    await this.syncDeactivatedListings(deactivatedListingIds);
   }
 
   /**
