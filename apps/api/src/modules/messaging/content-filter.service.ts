@@ -12,12 +12,24 @@ import {
   TR_MOBILE_PHONE_PATTERN_SOURCE,
 } from "../../common/helpers/contact-patterns";
 
+export interface FilterMatch {
+  name: string;
+  filterType: string;
+  requiresApproval: boolean;
+}
+
 export interface FilterResult {
   isClean: boolean;
   filteredContent: string;
   flaggedPatterns: string[];
   requiresApproval: boolean;
   flaggedReason: string | null;
+  /** Eşleşen DB kuralları (maske + onay kararı için ayrıntı). */
+  matches: FilterMatch[];
+  /** Deterministik küfür listesi eşleşti. */
+  profanity: boolean;
+  /** AI metin moderasyonu toksik dedi. */
+  aiFlagged: boolean;
 }
 
 export interface ContentFilterRule {
@@ -90,6 +102,7 @@ export class ContentFilterService implements OnModuleInit {
   filterContent(content: string): FilterResult {
     let filteredContent = content;
     const flaggedPatterns: string[] = [];
+    const matched: FilterMatch[] = [];
     let requiresApproval = false;
 
     // Apply each filter in priority order
@@ -105,6 +118,11 @@ export class ContentFilterService implements OnModuleInit {
 
         // Track which patterns were flagged
         flaggedPatterns.push(filter.name);
+        matched.push({
+          name: filter.name,
+          filterType: filter.filterType,
+          requiresApproval: filter.requiresApproval,
+        });
 
         // Check if any filter requires admin approval
         if (filter.requiresApproval) {
@@ -125,6 +143,9 @@ export class ContentFilterService implements OnModuleInit {
       flaggedPatterns,
       requiresApproval,
       flaggedReason,
+      matches: matched,
+      profanity: false,
+      aiFlagged: false,
     };
   }
 
@@ -134,54 +155,55 @@ export class ContentFilterService implements OnModuleInit {
    * Can be extended to call external AI moderation APIs
    */
   async moderateWithAI(content: string): Promise<FilterResult> {
-    // Step 1: Apply regex filters first
+    // ÜÇ katman da HER ZAMAN değerlendirilir ve en ağır sonuç uygulanır.
+    // Eskiden herhangi bir regex eşleşmesi erken dönüyordu: yalnız maskelenen
+    // bir kural (ör. telefon) eşleşince küfür ve AI hiç bakılmıyor, küfürlü
+    // mesaj maskelenip onaysız gidiyordu.
     const regexResult = this.filterContent(content);
-
-    // If regex already flagged it, no need for AI
-    if (!regexResult.isClean) {
-      return regexResult;
-    }
 
     // Deterministik Türkçe küfür listesi — AI'dan bağımsız, her zaman çalışır
     // (Detoxify tek/kısa kelimelerde tutarsız: "am"/"orospu" eşik altı kalabiliyor).
-    if (this.hasProfanity(content)) {
-      return {
-        isClean: false,
-        filteredContent: regexResult.filteredContent,
-        flaggedPatterns: [...regexResult.flaggedPatterns, "profanity"],
-        requiresApproval: true,
-        flaggedReason: "Uygunsuz dil (küfür)",
-      };
-    }
+    const profanity = this.hasProfanity(content);
 
-    // Step 2: Lokal AI metin moderasyonu (Detoxify multilingual — Türkçe dahil).
-    // services/ai-moderation kapalı/erişilemezse null döner -> regex sonucu kullanılır
-    // (istek bloklanmaz, sistem bozulmaz).
+    // Lokal AI metin moderasyonu (Detoxify multilingual — Türkçe dahil).
+    // services/ai-moderation kapalı/erişilemezse null döner → diğer katmanlar
+    // geçerlidir (istek bloklanmaz, sistem bozulmaz).
+    let ai: { toxic?: boolean; reason?: string | null } | null = null;
     try {
-      const ai = await this.aiClient.moderateText(content);
-      if (ai?.toxic) {
-        return {
-          isClean: false,
-          filteredContent: regexResult.filteredContent,
-          flaggedPatterns: [
-            ...regexResult.flaggedPatterns,
-            `ai:${ai.reason ?? "toxic"}`,
-          ],
-          requiresApproval: true,
-          flaggedReason: `AI moderasyon: uygunsuz içerik${
-            ai.reason ? ` (${ai.reason})` : ""
-          }`,
-        };
-      }
+      ai = await this.aiClient.moderateText(content);
     } catch (error) {
       this.logger.warn(
-        "AI metin moderasyonu başarısız, regex sonucu kullanılıyor",
+        "AI metin moderasyonu başarısız, regex/küfür sonucu kullanılıyor",
       );
     }
+    const aiFlagged = Boolean(ai?.toxic);
+
+    const flaggedPatterns = [
+      ...regexResult.flaggedPatterns,
+      ...(profanity ? ["profanity"] : []),
+      ...(aiFlagged ? [`ai:${ai?.reason ?? "toxic"}`] : []),
+    ];
+    const reasons = [
+      regexResult.flaggedReason,
+      profanity ? "Uygunsuz dil (küfür)" : null,
+      aiFlagged
+        ? `AI moderasyon: uygunsuz içerik${ai?.reason ? ` (${ai.reason})` : ""}`
+        : null,
+    ].filter((reason): reason is string => Boolean(reason));
 
     // Not: Mesaj görseli artık YÜKLEME anında (dosyanın kendisi, base64) denetlenir
     // -> media.controller.uploadFile (folder=messages). Burada URL denetimi yok.
-    return regexResult;
+    return {
+      isClean: flaggedPatterns.length === 0,
+      filteredContent: regexResult.filteredContent,
+      flaggedPatterns,
+      // En ağır sonuç: herhangi bir katman onay istiyorsa onay.
+      requiresApproval: regexResult.requiresApproval || profanity || aiFlagged,
+      flaggedReason: reasons.length > 0 ? reasons.join("; ") : null,
+      matches: regexResult.matches,
+      profanity,
+      aiFlagged,
+    };
   }
 
   /**
