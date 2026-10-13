@@ -249,6 +249,18 @@ describe("AuthService.loginWithApple", () => {
       });
     });
 
+    it("the login does not wait for Apple (exchange runs in the background)", async () => {
+      // Hiç bitmeyen takas: giriş yine de döner.
+      appleTokens.storeFromAuthorizationCode.mockReturnValueOnce(
+        new Promise(() => undefined),
+      );
+
+      const res = await service.loginWithApple("tok", undefined, "code-1");
+
+      expect(res.tokens.accessToken).toBe("tok");
+      expect(appleTokens.storeFromAuthorizationCode).toHaveBeenCalled();
+    });
+
     it("old clients without a code log in exactly as before", async () => {
       const res = await service.loginWithApple("tok");
 

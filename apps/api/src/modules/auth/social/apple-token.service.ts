@@ -20,14 +20,6 @@ interface AppleSigningKey {
   privateKey: string;
 }
 
-/** Apple'ın token/revoke uçlarının hata gövdesi (`{ error }`); başarıda boş. */
-const appleError = (response: unknown): string | null => {
-  if (response && typeof response === "object" && "error" in response) {
-    return String((response as { error: unknown }).error);
-  }
-  return null;
-};
-
 /** Teşhis kolonu sınırı — Apple/ağ hata metni token içermez, yine de kısa. */
 const MAX_ERROR_LENGTH = 500;
 
@@ -73,7 +65,8 @@ export class AppleTokenService implements OnModuleInit {
    * çevirir ve şifreli saklar (kullanıcı × client id başına tek satır; yeni
    * giriş eskisinin yerine geçer). ASLA fırlatmaz: kod tek kullanımlık ve
    * 5 dakikalık; çevrilemezse giriş yine başarılıdır, bir sonraki giriş yeni
-   * bir kodla yeniden dener.
+   * bir kodla yeniden dener. Giriş bunu BEKLEMEZ (arka planda çalışır) ve
+   * Apple çağrısı `APPLE_REQUEST_TIMEOUT_MS` ile sınırlıdır.
    */
   async storeFromAuthorizationCode(input: {
     userId: string;
@@ -85,19 +78,17 @@ export class AppleTokenService implements OnModuleInit {
       return;
     }
     try {
-      const response = await appleSignin.getAuthorizationToken(
-        input.authorizationCode,
-        {
-          clientID: input.clientId,
-          clientSecret: this.clientSecret(input.clientId),
-          // Native akışta redirect_uri yoktur; kütüphane boş değeri göndermez.
-          redirectUri: "",
-        },
-      );
-      const refreshToken = response?.refresh_token;
-      if (!refreshToken) {
+      // Native akışta redirect_uri yoktur.
+      const response = await postAppleEndpoint("/auth/token", {
+        client_id: input.clientId,
+        client_secret: this.clientSecret(input.clientId),
+        code: input.authorizationCode,
+        grant_type: "authorization_code",
+      });
+      const refreshToken = response.body?.refresh_token;
+      if (!response.ok || typeof refreshToken !== "string" || !refreshToken) {
         this.logger.warn(
-          `Apple authorization code could not be exchanged (user=${input.userId}, client=${input.clientId}): ${appleError(response) ?? "no refresh_token"}`,
+          `Apple authorization code could not be exchanged (user=${input.userId}, client=${input.clientId}): ${response.status} ${appleErrorCode(response) ?? "no refresh_token"}`,
         );
         return;
       }

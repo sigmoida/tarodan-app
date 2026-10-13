@@ -223,9 +223,9 @@ export class SocialLoginService {
    * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
    *
    * `authorizationCode` (mobil 1.0.6+) varsa giriş yanıtı üretildikten SONRA
-   * refresh token'a çevrilip şifreli saklanır — hesap silmede Apple'a iptal
-   * edilir (App Store 5.1.1(v)). Bu adım girişi hiçbir koşulda düşürmez; kodu
-   * göndermeyen eski istemci aynen çalışır.
+   * ARKA PLANDA refresh token'a çevrilip şifreli saklanır — hesap silmede
+   * Apple'a iptal edilir (App Store 5.1.1(v)). Giriş bunu beklemez ve bu adım
+   * girişi hiçbir koşulda düşürmez; kodu göndermeyen eski istemci aynen çalışır.
    */
   async loginWithApple(
     identityToken: string,
@@ -237,12 +237,20 @@ export class SocialLoginService {
     const userId = await this.resolveAppleUserId(profile, fullName);
     const response = await this.buildUserAuthResponse(userId);
     if (authorizationCode) {
-      await this.appleTokens.storeFromAuthorizationCode({
-        userId,
-        // Kod, girişin yapıldığı uygulamanın client id'siyle çevrilir.
-        clientId: profile.audience,
-        authorizationCode,
-      });
+      // Beklenmez: yavaş Apple girişleri tutmasın. Servis fırlatmaz; yine de
+      // reddedilen bir söz işlenmemiş kalmasın.
+      void this.appleTokens
+        .storeFromAuthorizationCode({
+          userId,
+          // Kod, girişin yapıldığı uygulamanın client id'siyle çevrilir.
+          clientId: profile.audience,
+          authorizationCode,
+        })
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Apple token store failed after login (user=${userId}): ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
     }
     return response;
   }

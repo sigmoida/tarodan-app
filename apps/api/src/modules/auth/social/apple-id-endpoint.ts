@@ -8,6 +8,13 @@
  */
 export const APPLE_ID_ENDPOINT = "https://appleid.apple.com";
 
+/**
+ * Apple çağrısı üst sınırı. Yavaş bir Apple ne girişi (takas arka planda) ne
+ * outbox drainer'ını (iptal) tutmalı; süre dolunca istek iptal edilir ve
+ * çağıran onu geçici hata sayar.
+ */
+export const APPLE_REQUEST_TIMEOUT_MS = 5_000;
+
 export interface AppleEndpointResponse {
   status: number;
   /** Yalnız 2xx. */
@@ -19,26 +26,34 @@ export interface AppleEndpointResponse {
 export async function postAppleEndpoint(
   path: "/auth/token" | "/auth/revoke",
   params: Record<string, string>,
+  timeoutMs: number = APPLE_REQUEST_TIMEOUT_MS,
 ): Promise<AppleEndpointResponse> {
-  const res = await fetch(`${APPLE_ID_ENDPOINT}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(params),
-  });
-  const text = await res.text();
-  let body: Record<string, unknown> | null = null;
-  if (text) {
-    try {
-      const parsed: unknown = JSON.parse(text);
-      body =
-        parsed && typeof parsed === "object"
-          ? (parsed as Record<string, unknown>)
-          : null;
-    } catch {
-      body = null;
-    }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${APPLE_ID_ENDPOINT}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params),
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    return { status: res.status, ok: res.ok, body: parseJsonObject(text) };
+  } finally {
+    clearTimeout(timer);
   }
-  return { status: res.status, ok: res.ok, body };
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  if (!text) return null;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Hata gövdesindeki OAuth hata kodu (`invalid_grant` vb.), yoksa null. */

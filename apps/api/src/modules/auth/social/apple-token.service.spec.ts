@@ -16,7 +16,6 @@ jest.mock("apple-signin-auth");
  * Giriş ve silme bu servis yüzünden hiçbir koşulda düşmez.
  */
 describe("AppleTokenService", () => {
-  const exchange = appleSignin.getAuthorizationToken as jest.Mock;
   const clientSecret = appleSignin.getClientSecret as jest.Mock;
   const fetchMock = jest.fn();
   const originalFetch = global.fetch;
@@ -90,7 +89,7 @@ describe("AppleTokenService", () => {
     };
 
     it("exchanges the code with the sign-in client id and stores the token encrypted", async () => {
-      exchange.mockResolvedValue({ refresh_token: "rt-secret" });
+      appleReplies(200, { refresh_token: "rt-secret" });
       const { service, prisma, cipher } = makeService();
 
       await service.storeFromAuthorizationCode(input);
@@ -105,11 +104,16 @@ describe("AppleTokenService", () => {
             "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
         }),
       );
-      expect(exchange).toHaveBeenCalledWith("code-1", {
-        clientID: "com.tarodan.app.staging",
-        clientSecret: "client-secret-jwt",
-        redirectUri: "",
+      const request = lastAppleRequest();
+      expect(request.url).toBe("https://appleid.apple.com/auth/token");
+      expect(request.params).toEqual({
+        client_id: "com.tarodan.app.staging",
+        client_secret: "client-secret-jwt",
+        code: "code-1",
+        grant_type: "authorization_code",
       });
+      // Apple çağrısı süre sınırlı (AbortController).
+      expect(request.init.signal).toBeDefined();
       const call = prisma.appleSignInToken.upsert.mock.calls[0][0];
       expect(call.where).toEqual({
         userId_clientId: { userId: "u1", clientId: "com.tarodan.app.staging" },
@@ -124,7 +128,7 @@ describe("AppleTokenService", () => {
     });
 
     it("Apple error response: nothing stored, login not affected", async () => {
-      exchange.mockResolvedValue({ error: "invalid_grant" });
+      appleReplies(400, { error: "invalid_grant" });
       const { service, prisma } = makeService();
 
       await expect(
@@ -133,8 +137,17 @@ describe("AppleTokenService", () => {
       expect(prisma.appleSignInToken.upsert).not.toHaveBeenCalled();
     });
 
-    it("network failure never throws", async () => {
-      exchange.mockRejectedValue(new Error("ECONNRESET"));
+    it("5xx is not an exchange, even with a body", async () => {
+      appleReplies(500, { refresh_token: "rt-secret" });
+      const { service, prisma } = makeService();
+
+      await service.storeFromAuthorizationCode(input);
+
+      expect(prisma.appleSignInToken.upsert).not.toHaveBeenCalled();
+    });
+
+    it("network failure or timeout never throws", async () => {
+      fetchMock.mockRejectedValue(new Error("This operation was aborted"));
       const { service } = makeService();
 
       await expect(
@@ -150,7 +163,7 @@ describe("AppleTokenService", () => {
       await service.storeFromAuthorizationCode(input);
 
       expect(service.isEnabled()).toBe(false);
-      expect(exchange).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
       expect(prisma.appleSignInToken.upsert).not.toHaveBeenCalled();
     });
   });
