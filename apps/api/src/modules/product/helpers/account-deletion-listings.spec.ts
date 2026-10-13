@@ -17,9 +17,17 @@ import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
  * alır, nedeni `account_deleted` olarak kaydeder ve açık teklifleri kapatır.
  */
 describe("deactivateListingsForAccountDeletion", () => {
-  const makeTx = (listings: Array<{ id: string; status: ProductStatus }>) => ({
+  const makeTx = (
+    listings: Array<{ id: string; status: ProductStatus }>,
+    /** Yazımdan sonra inactive okunanlar (varsayılan: hepsi). */
+    deactivatedIds: string[] = listings.map((listing) => listing.id),
+  ) => ({
+    $queryRaw: jest.fn().mockResolvedValue([]),
     product: {
-      findMany: jest.fn().mockResolvedValue(listings),
+      findMany: jest
+        .fn()
+        .mockResolvedValueOnce(listings)
+        .mockResolvedValueOnce(deactivatedIds.map((id) => ({ id }))),
       updateMany: jest.fn().mockResolvedValue({ count: listings.length }),
     },
     productRemovalEvent: {
@@ -38,7 +46,7 @@ describe("deactivateListingsForAccountDeletion", () => {
 
     await deactivateListingsForAccountDeletion(tx as never, "seller-1");
 
-    expect(tx.product.findMany).toHaveBeenCalledWith({
+    expect(tx.product.findMany).toHaveBeenNthCalledWith(1, {
       where: {
         kind: ProductKind.listing,
         sellerId: "seller-1",
@@ -129,5 +137,48 @@ describe("deactivateListingsForAccountDeletion", () => {
     expect(ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES).toEqual([
       ProductStatus.reserved,
     ]);
+  });
+
+  it("locks the seller's open listing rows before reading them", async () => {
+    const tx = makeTx(listings);
+
+    await deactivateListingsForAccountDeletion(tx as never, "seller-1");
+
+    const sql = (tx.$queryRaw.mock.calls[0][0] as string[]).join("?");
+    expect(sql).toContain("FOR UPDATE");
+    expect(sql).toContain("'reserved'");
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.product.findMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  // Okuma ile yazım arasında rezerve olan ilan: kayıt, teklif kapatma ve
+  // dönen kimlikler yalnız GERÇEKTEN pasife alınan satırlardan gelir.
+  it("uses only the rows the update actually changed", async () => {
+    const tx = makeTx(listings, ["p-pending"]);
+
+    const ids = await deactivateListingsForAccountDeletion(
+      tx as never,
+      "seller-1",
+    );
+
+    expect(ids).toEqual(["p-pending"]);
+    const rows = tx.productRemovalEvent.createMany.mock.calls[0][0].data;
+    expect(rows.map((row: { productId: string }) => row.productId)).toEqual([
+      "p-pending",
+    ]);
+    expect(tx.offer.updateMany.mock.calls[0][0].where.productId).toEqual({
+      in: ["p-pending"],
+    });
+  });
+
+  it("nothing changed → no removal record, no offer change", async () => {
+    const tx = makeTx(listings, []);
+
+    await expect(
+      deactivateListingsForAccountDeletion(tx as never, "seller-1"),
+    ).resolves.toEqual([]);
+    expect(tx.productRemovalEvent.createMany).not.toHaveBeenCalled();
+    expect(tx.offer.updateMany).not.toHaveBeenCalled();
   });
 });

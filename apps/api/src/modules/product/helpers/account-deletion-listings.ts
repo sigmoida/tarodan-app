@@ -30,13 +30,20 @@ export const ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES = [
 /** Pasife almanın dokunduğu tablolar — silme transaction'ının `tx`'i. */
 export type AccountDeletionListingsDb = Pick<
   Prisma.TransactionClient,
-  "product" | "productRemovalEvent" | "offer"
+  "product" | "productRemovalEvent" | "offer" | "$queryRaw"
 >;
 
 /**
  * Satıcının yayındaki ve onay bekleyen ilanlarını pasife alır; hesap silme
  * transaction'ı İÇİNDE çağrılır (anonimleştirme düşerse ilanlar da açık kalır).
  *
+ * - Önce satıcının açık (yayında / onayda / rezerve) ilan satırları
+ *   `FOR UPDATE` ile kilitlenir: eşzamanlı checkout/rezervasyon ürün satırını
+ *   kilitlediği için ya önce biter (çağıranın işlem içi engel kontrolü onu
+ *   görür) ya da bu işlem bitene kadar bekler ve ilanı pasif bulur.
+ * - Kayıt, teklif kapatma ve dönen kimlikler GERÇEKTEN pasife alınan
+ *   satırlardan gelir (yazımdan sonra yeniden okunur) — okuma ile yazım
+ *   arasında rezerve olan bir ilan yanlış "account_deleted" kaydı almaz.
  * - Statü `inactive`; `inactiveReason` yazılmaz (satıcı artık giriş yapamaz,
  *   "yenile / doğrudan aç" işaretinin anlamı yok). Neden `account_deleted`
  *   sistem nedenidir; işlemi başlatan kullanıcı kayda geçer.
@@ -52,6 +59,13 @@ export async function deactivateListingsForAccountDeletion(
   tx: AccountDeletionListingsDb,
   sellerId: string,
 ): Promise<string[]> {
+  await tx.$queryRaw`
+    SELECT id FROM products
+    WHERE seller_id = ${sellerId}
+      AND kind = 'listing'
+      AND status IN ('active', 'pending', 'reserved')
+    FOR UPDATE`;
+
   const listings = await tx.product.findMany({
     where: {
       ...catalogProductWhere(),
@@ -62,19 +76,31 @@ export async function deactivateListingsForAccountDeletion(
   });
   if (listings.length === 0) return [];
 
-  const ids = listings.map((listing) => listing.id);
-  // Statü filtresi tekrarlanır: okuma ile yazım arasında satışa giren
-  // (rezerve olan) ilanın statüsü pasife ezilmez.
+  const candidateIds = listings.map((listing) => listing.id);
   await tx.product.updateMany({
     where: {
-      id: { in: ids },
+      id: { in: candidateIds },
       status: { in: [...ACCOUNT_DELETION_DEACTIVATED_STATUSES] },
     },
     data: { status: ProductStatus.inactive },
   });
+  // Gerçekten pasife alınanlar: kilit altında hepsi olmalı; yine de kayıt ve
+  // teklifler yalnız yazımın değiştirdiği satırlara dayanır.
+  const deactivated = new Set(
+    (
+      await tx.product.findMany({
+        where: { id: { in: candidateIds }, status: ProductStatus.inactive },
+        select: { id: true },
+      })
+    ).map((row) => row.id),
+  );
+  const changed = listings.filter((listing) => deactivated.has(listing.id));
+  if (changed.length === 0) return [];
+  const ids = changed.map((listing) => listing.id);
+
   await recordListingRemovals(
     tx,
-    listings.map((listing) => ({
+    changed.map((listing) => ({
       productId: listing.id,
       statusBefore: listing.status,
       statusAfter: ProductStatus.inactive,

@@ -38,6 +38,8 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     } = {},
   ) {
     const tx = {
+      // İlan satırı kilidi (SELECT … FOR UPDATE).
+      $queryRaw: jest.fn().mockResolvedValue([]),
       // S3: aktif / onay bekleyen ilanlar silme transaction'ında pasife.
       product: {
         findMany: jest.fn().mockResolvedValue(overrides.listings ?? []),
