@@ -23,14 +23,17 @@ export interface MinOfferEnvReader {
 /**
  * Geçerli değer 0–100 arası tam sayıdır. `0` GEÇERLİDİR ve "alt sınır yok"
  * demektir (eski davranış korunur: operatör tabanı bilerek kapatabilir).
- * Okunamayan (boş, sayı olmayan) ya da aralık dışı (negatif, >100) değer
- * varsayılana (%50) düşer: eskiden `parseInt` NaN üretince alt sınır
+ * Yalnız saf tam sayı metni (`/^\d+$/`) kabul edilir; "0.5", "0,5", "05abc", "-5",
+ * boş ya da aralık dışı (>100) değer varsayılana (%50) düşer: eskiden `parseInt` NaN üretince alt sınır
  * karşılaştırması hiçbir teklifi reddetmiyordu.
  */
 export function resolveMinOfferPercentage(env: MinOfferEnvReader): number {
-  const raw = env.get("MIN_OFFER_PERCENTAGE");
-  const value = raw === undefined ? NaN : parseInt(raw, 10);
-  return Number.isInteger(value) && value >= 0 && value <= 100
-    ? value
-    : DEFAULT_MIN_OFFER_PERCENTAGE;
+  const raw = env.get("MIN_OFFER_PERCENTAGE")?.trim();
+  // Yalnız saf tam sayı metni: parseInt "0.5"i 0, "05abc"yi 5 yapıp tabanı
+  // sessizce kapatır/değiştirirdi. Başka her biçim varsayılana düşer.
+  if (raw === undefined || !/^\d+$/.test(raw)) {
+    return DEFAULT_MIN_OFFER_PERCENTAGE;
+  }
+  const value = Number(raw);
+  return value >= 0 && value <= 100 ? value : DEFAULT_MIN_OFFER_PERCENTAGE;
 }
