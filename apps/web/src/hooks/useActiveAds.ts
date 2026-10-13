@@ -8,6 +8,7 @@ import {
   type Advertisement,
   type AdPosition,
 } from "@/lib/api/advertisements";
+import { useBannerVisibility } from "./useBannerVisibility";
 import { useDeviceType } from "./useDeviceType";
 
 /**
@@ -15,9 +16,15 @@ import { useDeviceType } from "./useDeviceType";
  * atılmaz; cihaz anahtarda olduğu için ekran daralıp genişleyince doğru set
  * gelir ve eski cihazın geç yanıtı yeni sonucun üstüne yazmaz. Yuva render'ı
  * react-query bağlamı gerektirir (QueryProvider içinde kullanın).
+ *
+ * TÜM reklam yuvaları (banner, satır arası, üst şerit, popup) afişi buradan alır;
+ * reklamsız katmandaki üyeye (admin → Üyelik Katmanları → "reklamsız") hiçbir
+ * yuva afiş göstermez ve istek de atılmaz — kural tek yerde
+ * (`useBannerVisibility`), yuvalar ayrı ayrı uygulamaz.
  */
 export function useActiveAds(position: AdPosition, enabled = true) {
   const device = useDeviceType();
+  const visible = useBannerVisibility();
 
   const query = useQuery({
     queryKey: ["advertisements", position, device],
@@ -31,11 +38,13 @@ export function useActiveAds(position: AdPosition, enabled = true) {
       // Eski API yanıtında `hotspots` yok → boş say.
       return list.map((ad) => ({ ...ad, hotspots: ad.hotspots ?? [] }));
     },
-    enabled: enabled && device !== null,
+    enabled: enabled && visible && device !== null,
     // Afişler saatlerce değişmez; her gezinmede yeniden sormak gereksiz yük.
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 
-  return { ads: query.data ?? [], device };
+  // Gizliyken önbellekteki (örn. oturum açılmadan önce çekilmiş) afişler de
+  // sızmasın.
+  return { ads: visible ? (query.data ?? []) : [], device };
 }

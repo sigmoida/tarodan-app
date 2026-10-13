@@ -3,7 +3,6 @@
 "use client";
 
 import { useActiveAds } from "@/hooks/useActiveAds";
-import { useBannerVisibility } from "@/hooks/useBannerVisibility";
 import type { AdPosition } from "@/lib/api/advertisements";
 import { pickAd } from "@/lib/ads/pickAd";
 import AdCreative from "./AdCreative";
@@ -19,8 +18,8 @@ import AdCreative from "./AdCreative";
  * bağlıysa (ör. "komisyonsuz alışveriş") başlığın yanında kupon kodu görünür ve
  * kampanya bitince API afişi zaten döndürmez.
  *
- * Reklamsız katmandaki (admin → Üyelik Katmanları → "reklamsız") üyeye çizilmez;
- * karar `useBannerVisibility`te. Misafir ve diğer katmanlar banner görür.
+ * Reklamsız katmandaki üyeye çizilmez; karar `useActiveAds` içinde
+ * (`useBannerVisibility`), tüm yuvalar için ortak.
  */
 export default function BannerSlot({
   position,
@@ -29,10 +28,8 @@ export default function BannerSlot({
   position: Extract<AdPosition, "header" | "footer">;
   className?: string;
 }) {
-  const visible = useBannerVisibility();
-  // Reklamsız üyede afiş isteği de atılmaz.
-  const { ads } = useActiveAds(position, visible);
-  const ad = visible ? pickAd(ads, position) : null;
+  const { ads } = useActiveAds(position);
+  const ad = pickAd(ads, position);
   if (!ad) return null;
 
   return (
