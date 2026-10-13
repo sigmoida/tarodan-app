@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { Prisma } from "@prisma/client";
+import { OutboxStatus, type Prisma } from "@prisma/client";
 import appleSignin from "apple-signin-auth";
 import { PrismaService } from "../../../prisma";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -366,6 +366,74 @@ export class AppleTokenService implements OnModuleInit {
     this.logger.log(
       `Apple token revoked (row=${row.id}, user=${row.userId}, client=${row.clientId})`,
     );
+  }
+
+  /**
+   * DLQ'ya düşmüş (`dead`) `apple.token_revoke` işlerini yeniden kuyruğa alır
+   * (bakım script'i: `maintenance/redrive-apple-token-revocations.ts`). Dedupe
+   * upsert'i ölü işe dokunmaz ve `requestRevocation` iptali istenmiş satırı
+   * atlar; bu yüzden yanlış yapılandırma (client id / anahtar bağı) ya da
+   * eksik env düzeltildikten sonra işi geri getirmenin tek yolu budur.
+   *
+   * Yalnız hâlâ iptal edilebilir olanlar alınır: satırın şifreli token'ı
+   * duruyor ve `revokedAt` boş. Yapılandırma hâlâ eksikse uygulama reddedilir
+   * (iş yine ölürdü). Kuru koşu sayar, yazmaz. İdempotent: yeniden kuyruğa
+   * alınan iş artık `dead` değildir.
+   */
+  async redriveDeadRevocations(opts: { dryRun: boolean }): Promise<{
+    dead: number;
+    redrivable: number;
+    requeued: number;
+  }> {
+    const deadEvents = await this.prisma.outboxEvent.findMany({
+      where: { type: OUTBOX_APPLE_TOKEN_REVOKE, status: OutboxStatus.dead },
+      select: { id: true, payload: true },
+    });
+    const tokenIdOf = (payload: unknown): string | undefined => {
+      const id = (payload as Partial<AppleTokenRevokePayload> | null)
+        ?.appleSignInTokenId;
+      return typeof id === "string" ? id : undefined;
+    };
+    const tokenIds = deadEvents
+      .map((event) => tokenIdOf(event.payload))
+      .filter((id): id is string => id !== undefined);
+    const revocable = new Set(
+      (
+        await this.prisma.appleSignInToken.findMany({
+          where: {
+            id: { in: tokenIds },
+            refreshTokenEncrypted: { not: null },
+            revokedAt: null,
+          },
+          select: { id: true },
+        })
+      ).map((token) => token.id),
+    );
+    const eventIds = deadEvents
+      .filter((event) => revocable.has(tokenIdOf(event.payload) ?? ""))
+      .map((event) => event.id);
+    const counts = { dead: deadEvents.length, redrivable: eventIds.length };
+
+    if (opts.dryRun || eventIds.length === 0) return { ...counts, requeued: 0 };
+    if (!this.isEnabled()) {
+      this.warnNotConfigured();
+      throw new Error(
+        "Apple token revocation is not configured — set APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY / APPLE_TOKEN_ENCRYPTION_KEY first, otherwise the redriven jobs would fail again",
+      );
+    }
+    // CAS: yalnız hâlâ `dead` olanlar (eşzamanlı ikinci koşu çift saymaz).
+    const result = await this.prisma.outboxEvent.updateMany({
+      where: { id: { in: eventIds }, status: OutboxStatus.dead },
+      data: {
+        status: OutboxStatus.pending,
+        attempts: 0,
+        nextAttemptAt: new Date(),
+      },
+    });
+    this.logger.warn(
+      `Apple token revoke: ${result.count} dead job(s) requeued for redrive`,
+    );
+    return { ...counts, requeued: result.count };
   }
 
   /** İptal tamam: damga + token NULL (iptal edilmiş token saklanmaz). */

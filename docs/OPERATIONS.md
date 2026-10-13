@@ -498,6 +498,37 @@ varsa yeniden çalıştırmak güvenlidir. Tek hold için panel ucu:
 `POST /admin/payouts/holds/:id/settle-residual` (sebep zorunlu, denetim
 kaydı yazılır).
 
+### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
+
+Hesap silme, Sign in with Apple refresh token'ının Apple'da iptalini outbox'a
+yazar (`apple.token_revoke`; App Store 5.1.1(v)). Silme bu işe bağlı değildir;
+iş yeniden denenir. DLQ'ya (`outbox_events.status = 'dead'`, log:
+`OUTBOX_DEAD type=apple.token_revoke`) şu durumlarda düşer:
+
+- `invalid_grant`, `unauthorized_client`, `invalid_request` vb. kalıcı Apple
+  reddi; `invalid_client` ise 3 denemeden sonra. Apple `invalid_grant`ı
+  geçersiz token kadar yanlış/uyuşmayan client id için de döndürür; şifreli
+  token bu yüzden **silinmez** (`apple_sign_in_tokens.last_revoke_error`
+  teşhistir).
+- `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` /
+  `APPLE_TOKEN_ENCRYPTION_KEY` eksik ya da anahtar okunamıyor: iş ~1 gün
+  (30 deneme) yeniden denenir, sonra düşer. **Kendiliğinden toparlanmaz** —
+  düşmüş işi aşağıdaki script geri getirir.
+
+Önce nedeni düzeltin (Apple anahtarının `com.tarodan.app` ana App ID'ye
+bağlanması, env değerleri), sonra yeniden kuyruğa alın. Dedupe upsert'i ölü
+işe dokunmadığı için başka yol yoktur. Varsayılan kuru koşudur (yalnız sayar):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/redrive-apple-token-revocations.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/redrive-apple-token-revocations.js --apply'
+```
+
+Yerelde: `pnpm --filter @tarodan/api redrive:prod:apple-token-revocations`.
+Yalnız şifreli token'ı duran ve `revoked_at` boş satırların işleri alınır;
+yapılandırma hâlâ eksikse `--apply` reddedilir. Yeniden kuyruğa alınan iş taze
+deneme hakkıyla bir sonraki drain turunda (en geç 1 dk) koşar. İdempotenttir.
+
 ### Her ay: silinen hesap bildirimi
 
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel

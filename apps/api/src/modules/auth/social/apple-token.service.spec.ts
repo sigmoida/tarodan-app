@@ -75,10 +75,15 @@ describe("AppleTokenService", () => {
       $queryRaw: jest.fn().mockResolvedValue(user ? [user] : []),
       appleSignInToken: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(opts.liveRow ?? null),
         create: jest.fn().mockResolvedValue({ id: "new-row" }),
         update: jest.fn().mockResolvedValue({}),
       },
+    };
+    prisma.outboxEvent = {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     };
     // persistToken'ın işlemi: tx = aynı taklit.
     prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
@@ -577,6 +582,112 @@ describe("AppleTokenService", () => {
 
       await expect(service.revoke("missing")).resolves.toBeUndefined();
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("redriveDeadRevocations (maintenance redrive of the DLQ)", () => {
+    const deadJob = (id: string, tokenId: string) => ({
+      id,
+      payload: { appleSignInTokenId: tokenId },
+    });
+
+    /** Ölü işler + bunlardan hâlâ iptal edilebilir olan token satırları. */
+    const arrange = (
+      service: ReturnType<typeof makeService>,
+      dead: ReturnType<typeof deadJob>[],
+      revocableTokenIds: string[],
+    ) => {
+      service.prisma.outboxEvent.findMany.mockResolvedValue(dead);
+      service.prisma.appleSignInToken.findMany.mockResolvedValue(
+        revocableTokenIds.map((id) => ({ id })),
+      );
+      service.prisma.outboxEvent.updateMany.mockImplementation(
+        async ({ where }: { where: { id: { in: string[] } } }) => ({
+          count: where.id.in.length,
+        }),
+      );
+    };
+
+    it("looks only at dead apple.token_revoke jobs whose token is still revocable", async () => {
+      const ctx = makeService();
+      arrange(ctx, [deadJob("e1", "t1")], ["t1"]);
+
+      await ctx.service.redriveDeadRevocations({ dryRun: true });
+
+      expect(ctx.prisma.outboxEvent.findMany).toHaveBeenCalledWith({
+        where: { type: OUTBOX_APPLE_TOKEN_REVOKE, status: "dead" },
+        select: { id: true, payload: true },
+      });
+      expect(ctx.prisma.appleSignInToken.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["t1"] },
+          refreshTokenEncrypted: { not: null },
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
+    });
+
+    it("dry run counts and writes nothing", async () => {
+      const ctx = makeService();
+      arrange(ctx, [deadJob("e1", "t1"), deadJob("e2", "t2")], ["t1"]);
+
+      await expect(
+        ctx.service.redriveDeadRevocations({ dryRun: true }),
+      ).resolves.toEqual({ dead: 2, redrivable: 1, requeued: 0 });
+      expect(ctx.prisma.outboxEvent.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("apply requeues only the jobs with a revocable token, with a fresh attempt budget", async () => {
+      const ctx = makeService();
+      // e2'nin token'ı artık yok / iptal edilmiş → yeniden kuyruğa alınmaz.
+      arrange(ctx, [deadJob("e1", "t1"), deadJob("e2", "t2")], ["t1"]);
+
+      await expect(
+        ctx.service.redriveDeadRevocations({ dryRun: false }),
+      ).resolves.toEqual({ dead: 2, redrivable: 1, requeued: 1 });
+      expect(ctx.prisma.outboxEvent.updateMany).toHaveBeenCalledWith({
+        // CAS: yalnız hâlâ dead olanlar.
+        where: { id: { in: ["e1"] }, status: "dead" },
+        data: {
+          status: "pending",
+          attempts: 0,
+          nextAttemptAt: expect.any(Date),
+        },
+      });
+    });
+
+    it("nothing to redrive: no write", async () => {
+      const ctx = makeService();
+      arrange(ctx, [deadJob("e1", "t1")], []);
+
+      await expect(
+        ctx.service.redriveDeadRevocations({ dryRun: false }),
+      ).resolves.toEqual({ dead: 1, redrivable: 0, requeued: 0 });
+      expect(ctx.prisma.outboxEvent.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("apply is refused while Apple revocation is still not configured", async () => {
+      const ctx = makeService({ APPLE_TOKEN_ENCRYPTION_KEY: "k".repeat(40) });
+      arrange(ctx, [deadJob("e1", "t1")], ["t1"]);
+
+      await expect(
+        ctx.service.redriveDeadRevocations({ dryRun: false }),
+      ).rejects.toThrow(/not configured/);
+      expect(ctx.prisma.outboxEvent.updateMany).not.toHaveBeenCalled();
+      // Kuru koşu yapılandırmadan bağımsız raporlar.
+      await expect(
+        ctx.service.redriveDeadRevocations({ dryRun: true }),
+      ).resolves.toEqual({ dead: 1, redrivable: 1, requeued: 0 });
+    });
+
+    it("ignores a dead job whose payload has no token id", async () => {
+      const ctx = makeService();
+      arrange(ctx, [{ id: "e1", payload: {} as never }], []);
+
+      await expect(
+        ctx.service.redriveDeadRevocations({ dryRun: false }),
+      ).resolves.toEqual({ dead: 1, redrivable: 0, requeued: 0 });
     });
   });
 

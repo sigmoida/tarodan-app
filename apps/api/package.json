@@ -25,6 +25,7 @@
     "elogo:reissue-demo:prod": "node dist-seed/maintenance/reissue-demo-elogo-invoices.js",
     "notify:prod:membership-card-readd": "node dist-seed/maintenance/notify-membership-card-readd.js",
     "settle:prod:seller-fault-residuals": "node dist-seed/maintenance/settle-seller-fault-residuals.js",
+    "redrive:prod:apple-token-revocations": "node dist-seed/maintenance/redrive-apple-token-revocations.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "predev": "prisma generate",
