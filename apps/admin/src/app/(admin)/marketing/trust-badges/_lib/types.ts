@@ -48,6 +48,8 @@ export const trustBadgeSchema = (t: T) =>
         maxMessage(t, TRUST_BADGE_LIMITS.description),
       ),
       isActive: z.boolean().default(true),
+      // Mobil uygulamada (iOS ve Android) gizle; web yok sayar.
+      hideOnIos: z.boolean().default(false),
     })
     .superRefine((v, ctx) => {
       const messages = {
@@ -67,6 +69,7 @@ export const emptyTrustBadgeForm: TrustBadgeFormValues = {
   ...localizedToForm("title"),
   ...localizedToForm("description"),
   isActive: true,
+  hideOnIos: false,
 };
 
 export const trustBadgeToForm = (b: TrustBadge): TrustBadgeFormValues => ({
@@ -74,6 +77,7 @@ export const trustBadgeToForm = (b: TrustBadge): TrustBadgeFormValues => ({
   ...localizedToForm("title", b.title),
   ...localizedToForm("description", b.description),
   isActive: b.isActive,
+  hideOnIos: b.hideOnIos,
 });
 
 /** create: boş açıklama atlanır; update: boşaltılan açıklama `null` ile temizlenir. */
@@ -86,6 +90,7 @@ export function trustBadgeFormToPayload(
     title: localizedFromForm(v, "title", mode),
     description: localizedFromForm(v, "description", mode),
     isActive: v.isActive,
+    hideOnIos: v.hideOnIos,
   };
 }
 

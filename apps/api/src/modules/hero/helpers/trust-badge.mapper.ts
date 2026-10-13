@@ -64,6 +64,7 @@ export function toTrustBadgeDto(
     icon: badge.icon,
     title: fillLocalized(title, values),
     description: description ? fillLocalized(description, values) : null,
+    hideOnIos: badge.hideOnIos,
   };
 }
 
@@ -76,6 +77,7 @@ export function toAdminTrustBadgeDto(badge: TrustBadge): AdminTrustBadgeDto {
     icon: badge.icon as TrustBadgeIcon,
     title: parseLocalizedText(badge.title) ?? { tr: "", en: null },
     description: parseLocalizedText(badge.description),
+    hideOnIos: badge.hideOnIos,
     isActive: badge.isActive,
     displayOrder: badge.displayOrder,
     createdAt: badge.createdAt.toISOString(),

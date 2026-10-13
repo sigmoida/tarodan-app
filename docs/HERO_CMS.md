@@ -10,7 +10,7 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
 | Tablo          | Ne taşır                                                                                                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hero_slides`  | `placement` (`home` · `auth_default` · `auth_register`), `isActive`, `displayOrder`, `startDate?`/`endDate?`, `imageUrl`, `mobileImageUrl?`, `imageSide` (`left`/`right`), metinler, 2 buton, `hideOnIos`, sayaçlar |
-| `trust_badges` | `icon` (`TRUST_BADGE_ICONS`), `title`, `description?`, `isActive`, `displayOrder`                                                                                                                                   |
+| `trust_badges` | `icon` (`TRUST_BADGE_ICONS`), `title`, `description?`, `hideOnIos`, `isActive`, `displayOrder`                                                                                                                      |
 
 - **Metinler `LocalizedText` JSON'udur**: `{ tr, en? }`. Türkçe zorunlu; İngilizce boşsa
   istemci Türkçeye düşer (`pickLocalized`). Kural tek yerde: `validateLocalizedText` (admin
@@ -18,7 +18,12 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
 - **Buton** = etiket + bağlantı çifti; ikisi birlikte var ya da yok (`server.hero.ctaIncomplete`).
   Bağlantı reklamla aynı kural: mutlak `http(s)` ya da tek `/` ile başlayan site içi yol.
 - `auth_register` kayıt ekranlarında, `auth_default` diğer auth ekranlarında kullanılır.
-- `hideOnIos`: mobil uygulama iOS'ta slaytı göstermez (mağaza incelemesi); web yok sayar.
+- `hideOnIos` = **"native uygulamada gizle"**: mobil uygulama bayraklı slaytı (ve güven rozetini)
+  iOS'ta da Android'de de göstermez; web yok sayar. Dijital satış native'de artık iki mağazada da
+  kapalı olduğundan bayrak platformdan bağımsızdır. API alan adı `hideOnIos` KALDI (mobil
+  sözleşmesi: 1.0.5/1.0.6 bu adı okur); yalnız anlam ve admin metni genişledi. Süzmeyi istemci yapar,
+  sunucu liste döndürürken bayraklıları çıkarmaz (web de aynı listeyi okur). Ana sayfa "boş kalmasın"
+  koruması bayraklı slaytları saymaz (aşağıda).
 
 ## Yayın kuralı
 

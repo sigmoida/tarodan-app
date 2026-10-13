@@ -133,7 +133,8 @@ export class CreateHeroSlideDto {
   cta2Href?: string | null;
 
   @ApiPropertyOptional({
-    description: "Mobile app hides this slide on iOS; web ignores it",
+    description:
+      "Mobile app (iOS and Android) hides this slide; web ignores it",
     default: false,
   })
   @IsOptionalNotNull()

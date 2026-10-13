@@ -57,6 +57,7 @@ interface TrustBadgeDto {
     | "arrows-right-left";
   title: LocalizedText;
   description: LocalizedText | null;
+  hideOnIos: boolean; // native'de (iOS + Android) gizle; web yok sayar
 }
 ```
 
@@ -81,8 +82,10 @@ sonudur (web `whitespace-pre-line`).
 - Görsel: **`mobileImageUrl ?? imageUrl`**.
 - `imageSide` geniş ekran (tablet yatay) içindir; telefonda görsel üstte, metin altta.
 - Erişilebilirlik etiketi `imageAlt`, yoksa başlık.
-- **`hideOnIos: true` olan slaytı iOS'ta göstermeyin** (Android'de gösterin). Bu süzme
-  istemcidedir; sunucu platform bilmez.
+- **`hideOnIos: true` olan slaytı native uygulamada göstermeyin** (iOS VE Android; 2026-10-12
+  kararı: dijital satış native'de iki mağazada da kapalı). Alan adı geriye uyum için `hideOnIos`
+  kaldı, anlamı "native'de gizle"dir. Bu süzme istemcidedir; sunucu platform bilmez, web alanı
+  yok sayar. Aynı bayrak güven rozetlerinde de vardır (`TrustBadgeDto.hideOnIos`, §6).
 
 ## 4. Butonlar ve bağlantılar
 
@@ -104,4 +107,6 @@ da tek `/` ile başlayan site içi yoldur — reklam bağlantısıyla aynı kura
   anahtarlı rozeti göstermez** (liste ileride büyüyebilir).
 - Metindeki süreler (ör. iade günü) sunucuda Süreler ve Kurallar'dan doldurulmuş gelir; mobil
   `{…}` belirteci işlemez.
+- `hideOnIos: true` rozeti mobil uygulama göstermez (iOS ve Android); web yok sayar. Alan
+  eklemedir: eski istemci yok sayar, `false` varsayılandır.
 - Liste admin sırasıyla gelir; web 6 sütun, telefonda 3 sütun ızgara.

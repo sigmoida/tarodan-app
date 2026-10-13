@@ -5470,11 +5470,11 @@
           "clicks": "Tık",
           "cta1Clicks": "Düğme 1",
           "cta2Clicks": "Düğme 2",
-          "ios": "iOS"
+          "ios": "Mobil"
         },
-        "hiddenOnIos": "iOS'ta gizli",
-        "hideOnIos": "iOS uygulamasında gösterme",
-        "hideOnIosHint": "iOS uygulamasında gösterilmez (örn. koleksiyon oluşturma)",
+        "hiddenOnIos": "Mobilde gizli",
+        "hideOnIos": "Mobil uygulamada gösterme",
+        "hideOnIosHint": "Mobil uygulamada (iOS ve Android) gösterilmez; web'de görünür (örn. koleksiyon oluşturma)",
         "desktopImage": "Masaüstü görseli",
         "mobileImage": "Mobil görsel (isteğe bağlı)",
         "mobileImageHint": "Boşsa her cihazda masaüstü görseli kullanılır.",

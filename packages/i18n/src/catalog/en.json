@@ -5470,11 +5470,11 @@
           "clicks": "Clicks",
           "cta1Clicks": "Button 1",
           "cta2Clicks": "Button 2",
-          "ios": "iOS"
+          "ios": "Mobile"
         },
-        "hiddenOnIos": "Hidden on iOS",
-        "hideOnIos": "Hide in the iOS app",
-        "hideOnIosHint": "Not shown in the iOS app (e.g. collection creation)",
+        "hiddenOnIos": "Hidden in the app",
+        "hideOnIos": "Hide in the mobile app",
+        "hideOnIosHint": "Not shown in the mobile app (iOS and Android); still shown on the web (e.g. collection creation)",
         "desktopImage": "Desktop image",
         "mobileImage": "Mobile image (optional)",
         "mobileImageHint": "When empty, the desktop image is used on every device.",
