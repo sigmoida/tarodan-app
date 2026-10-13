@@ -656,7 +656,7 @@ describe("validateEnv", () => {
       APPLE_TOKEN_ENCRYPTION_KEY: "t".repeat(40),
     };
 
-    it("warns (does not throw) when native Apple sign-in is on but revocation keys are missing", () => {
+    it("warns (does not throw) when revocation keys are missing in production", () => {
       const warnings = appleTokenRevocationWarnings(prodBase);
       expect(warnings).toEqual([expect.stringContaining("APPLE_TEAM_ID")]);
       expect(warnings[0]).toContain("5.1.1(v)");
@@ -679,10 +679,15 @@ describe("validateEnv", () => {
       ).toEqual([]);
     });
 
-    it("is quiet without native Apple sign-in and outside production", () => {
+    // APPLE_CLIENT_ID yoksa da Apple girişi açıktır (varsayılan bundle id
+    // kabul edilir); uyarı o durumda susmamalı.
+    it("still warns without APPLE_CLIENT_ID (default audience keeps Apple sign-in on)", () => {
       expect(
         appleTokenRevocationWarnings(without(prodBase, "APPLE_CLIENT_ID")),
-      ).toEqual([]);
+      ).toEqual([expect.stringContaining("APPLE_TEAM_ID")]);
+    });
+
+    it("is quiet outside production", () => {
       expect(
         appleTokenRevocationWarnings({ ...prodBase, NODE_ENV: "development" }),
       ).toEqual([]);

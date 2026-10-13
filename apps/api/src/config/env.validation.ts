@@ -950,15 +950,18 @@ export function socialSignInWarnings(
 
 /**
  * Sign in with Apple token iptali (App Store 5.1.1(v)) canlıda kapalı mı?
- * Native giriş açıkken (APPLE_CLIENT_ID) iptal anahtarlarından biri eksikse
- * özellik sessizce no-op olur: hesap silmede Apple bağlantısı kalır. Açılışı
- * durdurmaz (giriş çalışmaya devam eder), ama görünür olmalı.
+ * İptal anahtarlarından biri eksikse özellik no-op olur: hesap silmede Apple
+ * bağlantısı kalır. Açılışı durdurmaz (giriş çalışmaya devam eder), ama
+ * görünür olmalı.
+ *
+ * APPLE_CLIENT_ID'ye bakılmaz: Apple girişi canlıda HER ZAMAN açıktır —
+ * env yoksa `AppleAuthService` varsayılan bundle id'yi (`com.tarodan.app`)
+ * kabul eder. Uyarıyı APPLE_CLIENT_ID'ye bağlamak tam o durumda susardı.
  */
 export function appleTokenRevocationWarnings(
   config: Record<string, unknown>,
 ): string[] {
   if (config.NODE_ENV !== "production") return [];
-  if (!String(config.APPLE_CLIENT_ID ?? "").trim()) return [];
   const missing = (
     [
       "APPLE_TEAM_ID",
