@@ -87,6 +87,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { lockActiveUsersShared } from "../../user/helpers/user-row-lock";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -371,6 +372,10 @@ export class TradeLifecycleService {
 
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
+      // İki taraf da hesap silme ile serileşir: silinen hesapta açık takas
+      // kalmasın (ilk kilit; user-row-lock).
+      await lockActiveUsersShared(tx, [initiatorId, dto.receiverId]);
+
       // CRITICAL: Don't reserve products when trade is pending
       // Products should remain active and available for purchase
       // Only reserve when trade is accepted
@@ -506,6 +511,9 @@ export class TradeLifecycleService {
     let receiverAddressId: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
+      // Kabul eden alıcı hesap silme ile serileşir (ilk kilit; user-row-lock).
+      await lockActiveUsersShared(tx, [userId]);
+
       // Lock trade row first
       const trade = await this.getTradeWithLock(tradeId, tx);
 

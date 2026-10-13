@@ -431,6 +431,31 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     });
   });
 
+  // Hesap silme ile alıcı/takas tarafı yarışı (TOCTOU): silme kullanıcı satırını
+  // FOR UPDATE kilitler; böylece eşzamanlı checkout/teklif kabulü/takas ya
+  // beklemeden önce biter (engel denetimi görür) ya da silmeden sonra reddedilir.
+  describe("kullanıcı satırı kilidi", () => {
+    it("ilk iş kullanıcı satırını FOR UPDATE kilitler (arşivden ve ilan kilidinden önce)", async () => {
+      const { service, tx } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+      });
+
+      await service.deleteAccount("user-1");
+
+      const firstQuery = (tx.$queryRaw.mock.calls[0][0] as string[])
+        .join("?")
+        .replace(/\s+/g, " ");
+      expect(firstQuery).toContain("FROM users WHERE id = ?");
+      expect(firstQuery).toContain("FOR UPDATE");
+      expect(tx.$queryRaw.mock.calls[0][1]).toBe("user-1");
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+      );
+      // İlan satırı kilidi sonra gelir.
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+  });
+
   // Silinen kullanıcının ALICI olarak verdiği bekleyen teklifler kapanır;
   // satıcılara (mevcut ilan-silme bildiriminden ayrı şablonla) haber gider.
   describe("alıcı olarak verilen teklifler", () => {

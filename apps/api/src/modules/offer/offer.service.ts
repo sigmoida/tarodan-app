@@ -44,6 +44,7 @@ import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
 import { offerConvertedNotice } from "../mail-routing/helpers/mail-internal-notices";
 import { ContentFilterService } from "../messaging/content-filter.service";
+import { lockActiveUsersShared } from "../user/helpers/user-row-lock";
 
 @Injectable()
 export class OfferService {
@@ -330,6 +331,15 @@ export class OfferService {
     const paymentExpiresAt = await paymentWindowEnd(this.prisma);
     const extendable = await this.readExtendable(offerId);
     const result = await this.prisma.$transaction(async (tx) => {
+      // Kabul alıcıya sipariş açar: alıcı hesap silme ile serileşir. Alıcı
+      // kimliği değişmez, bu yüzden teklif satırı kilitlenmeden önce okunur
+      // (kilit sırası: kullanıcı → teklif → ürün; silme de kullanıcıdan başlar).
+      const offerOwner = await tx.offer.findUnique({
+        where: { id: offerId },
+        select: { buyerId: true },
+      });
+      if (offerOwner) await lockActiveUsersShared(tx, [offerOwner.buyerId]);
+
       // Lock offer row with FOR UPDATE
       const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
         SELECT o.id

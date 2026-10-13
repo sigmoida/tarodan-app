@@ -56,6 +56,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { lockActiveUsersShared } from "../../user/helpers/user-row-lock";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -180,6 +181,8 @@ export class OrderCheckoutGroupService {
       const paymentExpiresAt = await paymentWindowEnd(this.prisma);
       result = await this.prisma.$transaction(
         async (tx) => {
+          // Üye alıcı: hesap silme ile serileşir (ilk kilit; user-row-lock).
+          if (!isGuest) await lockActiveUsersShared(tx, [buyerId]);
           const lockedRows = await tx.$queryRaw<{ id: string }[]>`
           SELECT p.id
           FROM products p

@@ -59,6 +59,7 @@ import {
   cancelBuyerOffersForAccountDeletion,
   type CancelledBuyerOffer,
 } from "../../offer/helpers/account-deletion-offers";
+import { lockUserForDeletion } from "../helpers/user-row-lock";
 import { SearchService } from "../../search/search.service";
 import { refreshProductVisibility } from "../../product/helpers/product-visibility";
 import { errorMessage } from "../../../common/helpers/error-message";
@@ -654,6 +655,12 @@ export class UserProfileService {
     try {
       await this.prisma.$transaction(
         async (tx) => {
+          // Kullanıcı satırı FOR UPDATE: bu hesabı alıcı/takas tarafı olarak
+          // kullanan checkout, teklif kabulü ve takas işlemleri (FOR SHARE)
+          // silme commit olana dek bekler ya da önce biter ve aşağıdaki engel
+          // denetimince görülür (bkz. user-row-lock). İlk kilit olmalı.
+          await lockUserForDeletion(tx, userId);
+
           // 0) YASAL KİMLİK ARŞİVİ — her şeyden ÖNCE.
           // Aylık resmî bildirim, hesap silinse de kimliği gerektiriyor; bu
           // satır yazılmadan hiçbir şey yok edilmemeli. Sıra zorunlu: (3)

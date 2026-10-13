@@ -95,4 +95,59 @@ describe("OfferService — user blocks", () => {
       service.buyerCounter("o1", "b1", { amount: 95 } as any),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  // Hesap silme ile serileşme: kabul alıcıya sipariş açar; alıcının kullanıcı
+  // satırı FOR SHARE kilitlenir (silme FOR UPDATE alır) ve teklif satırından
+  // ÖNCE alınır (silme de kullanıcıdan başlar → kilit sırası tutarlı).
+  describe("accept — alıcı hesap silme kilidi", () => {
+    const sqlOf = (call: unknown[]) =>
+      (call[0] as string[]).join("?").replace(/\s+/g, " ");
+
+    it("alıcının kullanıcı satırı, teklif satırı kilidinden önce FOR SHARE kilitlenir", async () => {
+      const { service, tx } = build(true);
+      const queryRaw = jest
+        .fn()
+        .mockResolvedValueOnce([{ id: "b1", deleted_at: null }])
+        .mockResolvedValue([{ id: "o1" }]);
+      (tx as any).$queryRaw = queryRaw;
+      tx.offer.findUnique.mockResolvedValue({
+        id: "o1",
+        buyerId: "b1",
+        sellerId: "s1",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 60_000),
+        product,
+      });
+
+      await service.accept("o1", "s1").catch(() => undefined);
+
+      expect(sqlOf(queryRaw.mock.calls[0])).toContain("FROM users");
+      expect(sqlOf(queryRaw.mock.calls[0])).toContain("FOR SHARE");
+      expect(queryRaw.mock.calls[0][1].values).toEqual(["b1"]);
+      expect(sqlOf(queryRaw.mock.calls[1])).toContain('FROM "offers"');
+    });
+
+    it("alıcı hesabı silinmişse kabul reddedilir, sipariş açılmaz", async () => {
+      const { service, tx } = build(false);
+      (tx as any).$queryRaw = jest
+        .fn()
+        .mockResolvedValue([{ id: "b1", deleted_at: new Date() }]);
+      tx.offer.findUnique.mockResolvedValue({
+        id: "o1",
+        buyerId: "b1",
+        sellerId: "s1",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 60_000),
+        product,
+      });
+
+      const error = await service.accept("o1", "s1").catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        i18nKey: "server.auth.accountDeleted",
+      });
+      expect((tx as any).$queryRaw).toHaveBeenCalledTimes(1);
+    });
+  });
 });
