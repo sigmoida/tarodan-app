@@ -204,4 +204,11 @@ describe("AdminSettingsService.getPublicSettings — min_offer_percentage", () =
     }).getPublicSettings();
     expect(result.min_offer_percentage).toBe(70);
   });
+
+  it("0 (alt sınır yok) 0 olarak döner, %50'ye çevrilmez", async () => {
+    const result = await makeService({
+      MIN_OFFER_PERCENTAGE: "0",
+    }).getPublicSettings();
+    expect(result.min_offer_percentage).toBe(0);
+  });
 });

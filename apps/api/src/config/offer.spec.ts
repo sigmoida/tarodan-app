@@ -14,6 +14,7 @@ describe("resolveMinOfferPercentage", () => {
   });
 
   it.each([
+    ["0", 0],
     ["1", 1],
     ["50", 50],
     ["70", 70],
@@ -24,10 +25,16 @@ describe("resolveMinOfferPercentage", () => {
   });
 
   // parseInt NaN üretince eski kod alt sınırı hiç uygulamıyordu (her teklif geçerdi).
-  it.each(["", "abc", "0", "-5", "101", "1000"])(
+  it.each(["", "abc", "-5", "101", "1000"])(
     "geçersiz değer %j varsayılana düşer",
     (raw) => {
       expect(resolveMinOfferPercentage(env(raw))).toBe(50);
     },
   );
+});
+
+describe("resolveMinOfferPercentage — 0 = alt sınır yok", () => {
+  it("0 varsayılana ZORLANMAZ (operatör tabanı kapatabilir)", () => {
+    expect(resolveMinOfferPercentage(env("0"))).toBe(0);
+  });
 });
