@@ -56,16 +56,29 @@ describe("AppleTokenService", () => {
     APPLE_TOKEN_ENCRYPTION_KEY: "k".repeat(40),
   };
 
-  const makeService = (config: Record<string, string> = fullConfig) => {
+  const makeService = (
+    config: Record<string, string> = fullConfig,
+    opts: {
+      /** Kilitlenen kullanıcı satırı; null = satır yok. */
+      user?: { deleted_at: Date | null } | null;
+      /** Kullanıcının canlı (iptali istenmemiş) token satırı. */
+      liveRow?: { id: string } | null;
+    } = {},
+  ) => {
     const configService = { get: (key: string) => config[key] };
     const cipher = new AppleTokenCipher(configService as never);
-    const prisma = {
+    const user = opts.user === undefined ? { deleted_at: null } : opts.user;
+    const prisma: Record<string, any> = {
+      $queryRaw: jest.fn().mockResolvedValue(user ? [user] : []),
       appleSignInToken: {
-        upsert: jest.fn().mockResolvedValue({}),
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(opts.liveRow ?? null),
+        create: jest.fn().mockResolvedValue({ id: "new-row" }),
         update: jest.fn().mockResolvedValue({}),
       },
     };
+    // persistToken'ın işlemi: tx = aynı taklit.
+    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
     const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
     const registry = new OutboxHandlerRegistry();
     const service = new AppleTokenService(
@@ -117,16 +130,83 @@ describe("AppleTokenService", () => {
       });
       // Apple çağrısı süre sınırlı (AbortController).
       expect(request.init.signal).toBeDefined();
-      const call = prisma.appleSignInToken.upsert.mock.calls[0][0];
-      expect(call.where).toEqual({
-        userId_clientId: { userId: "u1", clientId: "com.tarodan.app.staging" },
+      const call = prisma.appleSignInToken.create.mock.calls[0][0];
+      expect(call.data).toEqual({
+        userId: "u1",
+        clientId: "com.tarodan.app.staging",
+        refreshTokenEncrypted: expect.any(String),
       });
-      const stored = call.create.refreshTokenEncrypted as string;
+      const stored = call.data.refreshTokenEncrypted as string;
       expect(stored).not.toContain("rt-secret");
       expect(isEncryptedSecret(stored)).toBe(true);
       expect(cipher.decrypt(stored)).toBe("rt-secret");
-      expect(call.update).toEqual(
-        expect.objectContaining({ revokedAt: null, lastRevokeError: null }),
+    });
+
+    it("a new login replaces the user's LIVE row only", async () => {
+      appleReplies(200, { refresh_token: "rt-secret" });
+      const { service, prisma } = makeService(fullConfig, {
+        liveRow: { id: "live-1" },
+      });
+
+      await service.storeFromAuthorizationCode(input);
+
+      expect(prisma.appleSignInToken.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: "u1",
+          clientId: "com.tarodan.app.staging",
+          revokeRequestedAt: null,
+        },
+        select: { id: true },
+      });
+      expect(prisma.appleSignInToken.update).toHaveBeenCalledWith({
+        where: { id: "live-1" },
+        data: expect.objectContaining({
+          refreshTokenEncrypted: expect.any(String),
+          revokedAt: null,
+          lastRevokeError: null,
+        }),
+      });
+      expect(prisma.appleSignInToken.create).not.toHaveBeenCalled();
+    });
+
+    it("locks the user row before writing (serialised with account deletion)", async () => {
+      appleReplies(200, { refresh_token: "rt-secret" });
+      const { service, prisma } = makeService();
+
+      await service.storeFromAuthorizationCode(input);
+
+      const sql = (prisma.$queryRaw.mock.calls[0][0] as string[]).join("?");
+      expect(sql).toMatch(/FROM "users" WHERE "id" = \? FOR UPDATE/);
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.appleSignInToken.create.mock.invocationCallOrder[0],
+      );
+    });
+
+    // Silmeyle eşzamanlı biten giriş: silinmiş kullanıcıya iptal edilmeyecek
+    // token yazılmamalı.
+    it("user already deleted: token written as revoke-requested and revoke queued", async () => {
+      appleReplies(200, { refresh_token: "rt-secret" });
+      const { service, prisma, outbox } = makeService(fullConfig, {
+        user: { deleted_at: new Date() },
+        liveRow: { id: "live-1" },
+      });
+
+      await service.storeFromAuthorizationCode(input);
+
+      expect(prisma.appleSignInToken.update).not.toHaveBeenCalled();
+      expect(prisma.appleSignInToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: "u1",
+          revokeRequestedAt: expect.any(Date),
+        }),
+        select: { id: true },
+      });
+      expect(outbox.enqueue).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({
+          payload: { appleSignInTokenId: "new-row" },
+          dedupeKey: "apple-token-revoke:new-row",
+        }),
       );
     });
 
@@ -137,7 +217,7 @@ describe("AppleTokenService", () => {
       await expect(
         service.storeFromAuthorizationCode(input),
       ).resolves.toBeUndefined();
-      expect(prisma.appleSignInToken.upsert).not.toHaveBeenCalled();
+      expect(prisma.appleSignInToken.create).not.toHaveBeenCalled();
     });
 
     it("5xx is not an exchange, even with a body", async () => {
@@ -146,7 +226,7 @@ describe("AppleTokenService", () => {
 
       await service.storeFromAuthorizationCode(input);
 
-      expect(prisma.appleSignInToken.upsert).not.toHaveBeenCalled();
+      expect(prisma.appleSignInToken.create).not.toHaveBeenCalled();
     });
 
     it("network failure or timeout never throws", async () => {
@@ -167,12 +247,13 @@ describe("AppleTokenService", () => {
 
       expect(service.isEnabled()).toBe(false);
       expect(fetchMock).not.toHaveBeenCalled();
-      expect(prisma.appleSignInToken.upsert).not.toHaveBeenCalled();
+      expect(prisma.appleSignInToken.create).not.toHaveBeenCalled();
     });
   });
 
   describe("requestRevocation (account deletion transaction)", () => {
     const makeTx = (ids: string[]) => ({
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "u1" }]),
       appleSignInToken: {
         findMany: jest.fn().mockResolvedValue(ids.map((id) => ({ id }))),
         updateMany: jest.fn().mockResolvedValue({ count: ids.length }),
@@ -186,6 +267,10 @@ describe("AppleTokenService", () => {
       const count = await service.requestRevocation(tx as never, "u1");
 
       expect(count).toBe(2);
+      // Kullanıcı satırı kilidi token okumasından önce (persistToken ile sıra).
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.appleSignInToken.findMany.mock.invocationCallOrder[0],
+      );
       expect(tx.appleSignInToken.findMany).toHaveBeenCalledWith({
         where: {
           userId: "u1",

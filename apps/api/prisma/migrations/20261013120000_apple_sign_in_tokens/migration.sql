@@ -2,7 +2,7 @@
 -- `authorizationCode`u refresh token'a çevrilip ŞİFRELİ saklanır, hesap
 -- silmede Apple'a iptal edilir (outbox `apple.token_revoke`).
 --
--- CANLI VERİ GÜVENLİĞİ: yalnız ekleme. Bir yeni tablo + unique indeks + FK;
+-- CANLI VERİ GÜVENLİĞİ: yalnız ekleme. Bir yeni tablo + indeks + FK;
 -- mevcut hiçbir tabloya/kolona dokunulmaz, geri doldurma yok (mevcut Apple
 -- kullanıcılarının token'ı bir sonraki girişlerinde yazılır).
 -- Geri alma: `DROP TABLE "apple_sign_in_tokens";` (yalnız bu özelliğin verisi).
@@ -24,7 +24,10 @@ CREATE TABLE "apple_sign_in_tokens" (
     CONSTRAINT "apple_sign_in_tokens_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "apple_sign_in_tokens_user_id_client_id_key" ON "apple_sign_in_tokens"("user_id", "client_id");
+-- Unique DEĞİL: kullanıcı × client id başına tek canlı satır uygulamada
+-- (kullanıcı satırı kilidiyle) korunur; silmeyle yarışan giriş iptal-istenmiş
+-- ikinci bir satır açabilir.
+CREATE INDEX "apple_sign_in_tokens_user_id_client_id_idx" ON "apple_sign_in_tokens"("user_id", "client_id");
 
 ALTER TABLE "apple_sign_in_tokens"
   ADD CONSTRAINT "apple_sign_in_tokens_user_id_fkey"

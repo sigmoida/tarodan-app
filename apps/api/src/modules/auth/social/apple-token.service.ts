@@ -72,8 +72,8 @@ export class AppleTokenService implements OnModuleInit {
 
   /**
    * Girişte gelen `authorizationCode`u Apple'ın token ucunda refresh token'a
-   * çevirir ve şifreli saklar (kullanıcı × client id başına tek satır; yeni
-   * giriş eskisinin yerine geçer). ASLA fırlatmaz: kod tek kullanımlık ve
+   * çevirir ve şifreli saklar (kullanıcı × client id başına tek CANLI satır;
+   * yeni giriş onun yerine geçer — bkz. `persistToken`). ASLA fırlatmaz: kod tek kullanımlık ve
    * 5 dakikalık; çevrilemezse giriş yine başarılıdır, bir sonraki giriş yeni
    * bir kodla yeniden dener. Giriş bunu BEKLEMEZ (arka planda çalışır) ve
    * Apple çağrısı `APPLE_REQUEST_TIMEOUT_MS` ile sınırlıdır.
@@ -102,22 +102,11 @@ export class AppleTokenService implements OnModuleInit {
         );
         return;
       }
-      const refreshTokenEncrypted = this.cipher.encrypt(refreshToken);
-      await this.prisma.appleSignInToken.upsert({
-        where: {
-          userId_clientId: { userId: input.userId, clientId: input.clientId },
-        },
-        create: {
-          userId: input.userId,
-          clientId: input.clientId,
-          refreshTokenEncrypted,
-        },
-        update: {
-          refreshTokenEncrypted,
-          revokedAt: null,
-          lastRevokeError: null,
-        },
-      });
+      await this.persistToken(
+        input.userId,
+        input.clientId,
+        this.cipher.encrypt(refreshToken),
+      );
     } catch (error: unknown) {
       this.logger.warn(
         `Apple refresh token could not be stored (user=${input.userId}, client=${input.clientId}): ${errorMessage(error)}`,
@@ -126,8 +115,80 @@ export class AppleTokenService implements OnModuleInit {
   }
 
   /**
+   * Token'ı hesap silmeyle YARIŞMADAN yazar. Kullanıcı satırı `FOR UPDATE` ile
+   * kilitlenir; `requestRevocation` da aynı satırı kilitlediği için ikisi
+   * sıralanır:
+   * - giriş önce kilitlerse token yazılır, silme ardından onu da iptale alır;
+   * - silme önce kilitlerse (ya da kullanıcı zaten silinmişse) token
+   *   iptal-istenmiş YENİ bir satır olarak yazılır ve iptal işi hemen
+   *   kuyruğa girer — silinmiş kullanıcıda iptal edilmeyecek token kalmaz.
+   * İptali istenmiş satırın üzerine ASLA yazılmaz: güncelleme yalnız
+   * kullanıcının canlı (`revokeRequestedAt` boş) satırına yapılır.
+   */
+  private async persistToken(
+    userId: string,
+    clientId: string,
+    refreshTokenEncrypted: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const [user] = await tx.$queryRaw<Array<{ deleted_at: Date | null }>>`
+        SELECT "deleted_at" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
+
+      if (!user || user.deleted_at) {
+        const row = await tx.appleSignInToken.create({
+          data: {
+            userId,
+            clientId,
+            refreshTokenEncrypted,
+            revokeRequestedAt: new Date(),
+          },
+          select: { id: true },
+        });
+        await this.enqueueRevoke(tx, row.id);
+        this.logger.warn(
+          `Apple token arrived after account deletion (user=${userId}, client=${clientId}) — queued for revocation`,
+        );
+        return;
+      }
+
+      const live = await tx.appleSignInToken.findFirst({
+        where: { userId, clientId, revokeRequestedAt: null },
+        select: { id: true },
+      });
+      if (live) {
+        await tx.appleSignInToken.update({
+          where: { id: live.id },
+          data: {
+            refreshTokenEncrypted,
+            revokedAt: null,
+            lastRevokeError: null,
+          },
+        });
+      } else {
+        await tx.appleSignInToken.create({
+          data: { userId, clientId, refreshTokenEncrypted },
+        });
+      }
+    });
+  }
+
+  private async enqueueRevoke(
+    tx: Prisma.TransactionClient,
+    appleSignInTokenId: string,
+  ): Promise<void> {
+    await this.outbox.enqueue(tx, {
+      type: OUTBOX_APPLE_TOKEN_REVOKE,
+      payload: { appleSignInTokenId } satisfies AppleTokenRevokePayload,
+      dedupeKey: `apple-token-revoke:${appleSignInTokenId}`,
+      maxAttempts: APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
+    });
+  }
+
+  /**
    * Hesap silme transaction'ı İÇİNDE çağrılır: kullanıcının iptal edilmemiş
    * token satırlarını damgalar ve her biri için iptal işini outbox'a yazar.
+   * Önce kullanıcı satırını kilitler (`persistToken` ile sıralanır: eşzamanlı
+   * bir girişin token'ı ya burada görülür ya da iptal-istenmiş yazılır).
    * Apple çağrısı commit sonrası drainer'dadır; başarısızlık silmeyi
    * engellemez, outbox geri çekilerek yeniden dener (kalıcı hatada DLQ).
    *
@@ -137,6 +198,7 @@ export class AppleTokenService implements OnModuleInit {
     tx: Prisma.TransactionClient,
     userId: string,
   ): Promise<number> {
+    await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
     const tokens = await tx.appleSignInToken.findMany({
       where: {
         userId,
@@ -153,14 +215,7 @@ export class AppleTokenService implements OnModuleInit {
       data: { revokeRequestedAt: new Date() },
     });
     for (const token of tokens) {
-      await this.outbox.enqueue(tx, {
-        type: OUTBOX_APPLE_TOKEN_REVOKE,
-        payload: {
-          appleSignInTokenId: token.id,
-        } satisfies AppleTokenRevokePayload,
-        dedupeKey: `apple-token-revoke:${token.id}`,
-        maxAttempts: APPLE_TOKEN_REVOKE_MAX_ATTEMPTS,
-      });
+      await this.enqueueRevoke(tx, token.id);
     }
     return tokens.length;
   }

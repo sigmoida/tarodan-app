@@ -442,8 +442,10 @@ model OAuthAccount {
 ///
 /// OAuthAccount'ta değil, ayrı tabloda: hesap silme transaction'ı OAuthAccount
 /// satırlarını siler, iptal ise commit SONRASI outbox'tan (yeniden denenerek)
-/// yapılır — token o ana kadar burada yaşar. Satır kullanıcı başına, girişin
-/// yapıldığı client id başına tektir.
+/// yapılır — token o ana kadar burada yaşar. Kullanıcı × client id başına tek
+/// CANLI satır (`revokeRequestedAt` boş) vardır; iptali istenmiş satırların
+/// üzerine yazılmaz, silmeyle yarışan bir giriş iptal-istenmiş yeni satır açar
+/// (bu yüzden unique değil, indeks).
 model AppleSignInToken {
   id                    String    @id @default(uuid())
   userId                String    @map("user_id")
@@ -465,7 +467,7 @@ model AppleSignInToken {
   updatedAt             DateTime  @updatedAt @map("updated_at")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, clientId])
+  @@index([userId, clientId])
   @@map("apple_sign_in_tokens")
 }
 
