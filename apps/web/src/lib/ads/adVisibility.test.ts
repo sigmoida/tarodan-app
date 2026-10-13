@@ -1,45 +1,88 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { shouldShowBanner } from "./adVisibility";
+import { resolveBannerVisibility } from "./adVisibility";
 
-const base = {
+const member = {
   isAuthLoading: false,
   isAuthenticated: true,
   limitsStatus: "success" as const,
-  isAdFree: false,
+  isAdFree: false as boolean | undefined,
 };
 
-describe("shouldShowBanner", () => {
-  it("misafire banner gösterilir (limit sorgusu beklenmez)", () => {
+describe("resolveBannerVisibility", () => {
+  it("misafire görünür (limit sorgusu beklenmez)", () => {
     expect(
-      shouldShowBanner({
-        ...base,
+      resolveBannerVisibility({
+        ...member,
         isAuthenticated: false,
         limitsStatus: "pending",
+        isAdFree: undefined,
       }),
-    ).toBe(true);
+    ).toBe("visible");
   });
 
-  it("reklamsız katmanda banner çizilmez", () => {
-    expect(shouldShowBanner({ ...base, isAdFree: true })).toBe(false);
+  it("reklamsız katmanda gizli", () => {
+    expect(resolveBannerVisibility({ ...member, isAdFree: true })).toBe(
+      "hidden",
+    );
   });
 
-  it("reklamlı katmanda (free/basic) banner gösterilir", () => {
-    expect(shouldShowBanner({ ...base, isAdFree: false })).toBe(true);
+  it("reklamlı katmanda (free/basic) görünür", () => {
+    expect(resolveBannerVisibility({ ...member, isAdFree: false })).toBe(
+      "visible",
+    );
   });
 
-  it("oturum durumu belli olana kadar bekler (reklamsız üyeye flaş yok)", () => {
-    expect(shouldShowBanner({ ...base, isAuthLoading: true })).toBe(false);
-  });
-
-  it("giriş yapmış kullanıcının limitleri gelene kadar bekler", () => {
-    expect(shouldShowBanner({ ...base, limitsStatus: "pending" })).toBe(false);
-  });
-
-  it("limitler okunamazsa banner gösterilir (belirsizlikte reklamsız sayılmaz)", () => {
+  it("giriş yapmış üyenin limitleri gelene kadar beklemede (afiş paralel çekilir, çizilmez)", () => {
     expect(
-      shouldShowBanner({ ...base, limitsStatus: "error", isAdFree: true }),
-    ).toBe(true);
+      resolveBannerVisibility({
+        ...member,
+        limitsStatus: "pending",
+        isAdFree: undefined,
+      }),
+    ).toBe("pending");
+  });
+
+  it("oturum durumu henüz belli değilken ve değer bilinmiyorsa beklemede", () => {
+    expect(
+      resolveBannerVisibility({
+        isAuthLoading: true,
+        isAuthenticated: false,
+        limitsStatus: "pending",
+        isAdFree: undefined,
+      }),
+    ).toBe("pending");
+  });
+
+  it("checkAuth isLoading=true'ya dönünce son bilinen görünürlük korunur (titreme yok)", () => {
+    const refreshing = { ...member, isAuthLoading: true };
+    expect(resolveBannerVisibility({ ...refreshing, isAdFree: true })).toBe(
+      "hidden",
+    );
+    expect(resolveBannerVisibility({ ...refreshing, isAdFree: false })).toBe(
+      "visible",
+    );
+  });
+
+  it("limitler okunamazsa görünür (belirsizlikte reklamsız sayılmaz)", () => {
+    expect(
+      resolveBannerVisibility({
+        ...member,
+        limitsStatus: "error",
+        isAdFree: undefined,
+      }),
+    ).toBe("visible");
+  });
+
+  it("çıkış yapmış (misafir) kullanıcıda önceki üyenin önbelleği gizlemez", () => {
+    expect(
+      resolveBannerVisibility({
+        isAuthLoading: false,
+        isAuthenticated: false,
+        limitsStatus: "success",
+        isAdFree: true,
+      }),
+    ).toBe("visible");
   });
 });

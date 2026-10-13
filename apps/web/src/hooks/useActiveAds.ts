@@ -21,10 +21,15 @@ import { useDeviceType } from "./useDeviceType";
  * reklamsız katmandaki üyeye (admin → Üyelik Katmanları → "reklamsız") hiçbir
  * yuva afiş göstermez ve istek de atılmaz — kural tek yerde
  * (`useBannerVisibility`), yuvalar ayrı ayrı uygulamaz.
+ *
+ * Afişler oturum / limit sorgusunu BEKLEMEZ: üyenin katmanı bilinmezken
+ * (`pending`) afişler paralel çekilir, yalnız çizilmez (`ads` boş). Gizleme
+ * yalnız reklamsızlık kesinleşince olur. `reserved`: afişler hazır ama karar
+ * bekliyor — yuva ölçüsünü yer tutucuyla korur (üst şerit; layout kayması olmasın).
  */
 export function useActiveAds(position: AdPosition, enabled = true) {
   const device = useDeviceType();
-  const visible = useBannerVisibility();
+  const visibility = useBannerVisibility();
 
   const query = useQuery({
     queryKey: ["advertisements", position, device],
@@ -38,13 +43,15 @@ export function useActiveAds(position: AdPosition, enabled = true) {
       // Eski API yanıtında `hotspots` yok → boş say.
       return list.map((ad) => ({ ...ad, hotspots: ad.hotspots ?? [] }));
     },
-    enabled: enabled && visible && device !== null,
+    enabled: enabled && visibility !== "hidden" && device !== null,
     // Afişler saatlerce değişmez; her gezinmede yeniden sormak gereksiz yük.
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 
-  // Gizliyken önbellekteki (örn. oturum açılmadan önce çekilmiş) afişler de
-  // sızmasın.
-  return { ads: visible ? (query.data ?? []) : [], device };
+  // Gizliyken ya da karar beklerken önbellekteki afişler çizilmesin (örn. oturum
+  // açılmadan önce çekilmiş set reklamsız üyeye sızmasın).
+  const ads = visibility === "visible" ? (query.data ?? []) : [];
+  const reserved = visibility === "pending" && (query.data?.length ?? 0) > 0;
+  return { ads, reserved, device };
 }

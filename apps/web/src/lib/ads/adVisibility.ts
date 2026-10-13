@@ -1,26 +1,36 @@
 /** @format */
 
 /**
- * Banner gösterilsin mi — karar tek yerde. Admin'in üyelik katmanı formundaki
- * "reklamsız" kutusu (`isAdFree`) belirler; `GET /membership/me/limits` taşır.
+ * Reklam yuvaları görünür mü — karar tek yerde. Admin'in üyelik katmanı
+ * formundaki "reklamsız" kutusu (`isAdFree`) belirler; `GET /membership/me/limits`
+ * taşır.
  *
- *  - Misafir: banner görünür (üyeliği yok).
- *  - Oturum durumu henüz belli değil, ya da giriş yapmış kullanıcının limitleri
- *    henüz gelmedi: banner BEKLER. Aksi halde reklamsız üye her sayfada bir an
- *    reklam görür ve afiş isteği boşuna atılırdı.
- *  - Limitler okunamadı (hata): banner görünür. Reklamsızlık bir ayrıcalık;
- *    belirsizlikte site kendi duyurusunu göstermeye devam eder.
- *  - Aksi halde katmanın `isAdFree` değeri: `true` ise banner çizilmez.
+ *  - `hidden`: reklamsız olduğu KESİNLEŞTİ (`isAdFree === true`). Afiş istenmez,
+ *    çizilmez. Daha önce öğrenilmiş değer, oturum durumu yenilenirken
+ *    (`checkAuth` → `isAuthLoading`) de geçerlidir: yuvalar unmount/remount olup
+ *    titremez.
+ *  - `visible`: misafir, reklamlı katman (`isAdFree === false`) ya da limitler
+ *    okunamadı (belirsizlikte site kendi duyurusunu göstermeye devam eder).
+ *  - `pending`: giriş yapmış kullanıcının katmanı henüz bilinmiyor. Afişler bu
+ *    sırada PARALEL çekilir (auth + limits zincirini beklemez); yalnız
+ *    çizilmez, yuva ölçüsünü korur. Reklamsız olmayan üyede limitler gelir
+ *    gelmez afişler hazırdır.
  */
-export function shouldShowBanner(state: {
+export type BannerVisibility = "visible" | "hidden" | "pending";
+
+export function resolveBannerVisibility(state: {
   isAuthLoading: boolean;
   isAuthenticated: boolean;
   limitsStatus: "pending" | "error" | "success";
-  isAdFree: boolean;
-}): boolean {
-  if (state.isAuthLoading) return false;
-  if (!state.isAuthenticated) return true;
-  if (state.limitsStatus === "pending") return false;
-  if (state.limitsStatus === "error") return true;
-  return !state.isAdFree;
+  /** Önbellekteki son bilinen değer; hiç öğrenilmediyse `undefined`. */
+  isAdFree: boolean | undefined;
+}): BannerVisibility {
+  const maybeMember = state.isAuthLoading || state.isAuthenticated;
+  // Kesinleşmiş reklamsızlık: oturum yenilenirken bile korunur.
+  if (maybeMember && state.isAdFree === true) return "hidden";
+  // Misafir (oturum durumu belli): üyeliği yok.
+  if (!state.isAuthLoading && !state.isAuthenticated) return "visible";
+  if (state.isAdFree === false) return "visible";
+  if (state.limitsStatus === "error") return "visible";
+  return "pending";
 }

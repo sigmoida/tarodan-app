@@ -4,16 +4,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { membershipApi } from "@/lib/api";
-import { shouldShowBanner } from "@/lib/ads/adVisibility";
+import {
+  resolveBannerVisibility,
+  type BannerVisibility,
+} from "@/lib/ads/adVisibility";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 
 /**
- * Banner yuvaları çizilsin mi: üyelik katmanının `isAdFree` kutusuna uyar
- * (kural: `shouldShowBanner`). Limit sorgusu yalnız giriş yapmış kullanıcıda
- * atılır; misafir hiçbir ek istek yapmaz.
+ * Reklam yuvaları görünür mü: üyelik katmanının `isAdFree` kutusuna uyar
+ * (kural: `resolveBannerVisibility`). Limit sorgusu yalnız giriş yapmış
+ * kullanıcıda atılır; misafir hiçbir ek istek yapmaz. Sorgu verisi önbellekte
+ * kalır: `checkAuth` `isLoading`'i tekrar açsa da son bilinen değer korunur.
  */
-export function useBannerVisibility(): boolean {
+export function useBannerVisibility(): BannerVisibility {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
 
   const limits = useQuery({
@@ -23,15 +27,16 @@ export function useBannerVisibility(): boolean {
       return { isAdFree: res.data?.isAdFree === true };
     },
     enabled: isAuthenticated && !isAuthLoading,
-    // Katman nadiren değişir; her sayfa geçişinde yeniden sormak gereksiz yük.
+    // Katman nadiren değişir; üyelik değişince `invalidateMembershipQueries`
+    // tazeler.
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
 
-  return shouldShowBanner({
+  return resolveBannerVisibility({
     isAuthLoading,
     isAuthenticated,
     limitsStatus: limits.status,
-    isAdFree: limits.data?.isAdFree ?? false,
+    isAdFree: limits.data?.isAdFree,
   });
 }
