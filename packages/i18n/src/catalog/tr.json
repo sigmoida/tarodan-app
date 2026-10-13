@@ -8477,7 +8477,7 @@
     },
     "reports": {
       "title": "İstek, Öneri ve Şikayet",
-      "description": "Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler",
+      "description": "Kullanıcıların ürün, kullanıcı, koleksiyon, mesaj ve değerlendirmeler için gönderdiği şikayetler",
       "loadError": "Şikayetler yüklenirken hata oluştu",
       "empty": "Henüz şikayet yok",
       "allTypes": "Tüm Türler",
@@ -8491,7 +8491,8 @@
       "type": {
         "product": "Ürün",
         "collection": "Koleksiyon",
-        "message": "Mesaj"
+        "message": "Mesaj",
+        "review": "Değerlendirme"
       },
       "reason": {
         "spam": "Spam",
@@ -8534,7 +8535,14 @@
         "openTarget": "İçeriği aç",
         "reporterTitle": "Şikayet Eden",
         "adminNote": "Kullanıcıya iletilen açıklama",
-        "listingStatus": "İlan durumu"
+        "listingStatus": "İlan durumu",
+        "reviewAuthor": "Yazan",
+        "reviewSubject": "Değerlendirilen",
+        "reviewKind": "Değerlendirme türü",
+        "reviewKindProduct": "Ürün yorumu",
+        "reviewKindSeller": "Satıcı değerlendirmesi",
+        "reviewContent": "Yorum metni",
+        "reviewNoText": "Yalnız puan verilmiş, metin yok"
       },
       "statusModal": {
         "noteHelp": "Şikayeti \"Çözüldü\" ya da \"Reddedildi\" olarak kapattığınızda bu metin şikayet edene bildirim ve e-posta olarak iletilir.",
@@ -10472,7 +10480,7 @@
       },
       "userReportedAdmin": {
         "title": "Yeni Şikayet",
-        "message": "{reporterName} {type, select, product {bir ilanı} collection {bir koleksiyonu} message {bir mesajı} other {bir kullanıcıyı}} şikayet etti: {reason, select, spam {Spam} inappropriate_content {Uygunsuz İçerik} fake_product {Sahte/Yanıltıcı Ürün} scam {Dolandırıcılık} harassment {Taciz} hate_speech {Nefret Söylemi} counterfeit {Taklit Ürün} wrong_category {Yanlış Kategori} misleading_info {Yanıltıcı Bilgi} other {Diğer}}."
+        "message": "{reporterName} {type, select, product {bir ilanı} collection {bir koleksiyonu} message {bir mesajı} review {bir değerlendirmeyi} other {bir kullanıcıyı}} şikayet etti: {reason, select, spam {Spam} inappropriate_content {Uygunsuz İçerik} fake_product {Sahte/Yanıltıcı Ürün} scam {Dolandırıcılık} harassment {Taciz} hate_speech {Nefret Söylemi} counterfeit {Taklit Ürün} wrong_category {Yanlış Kategori} misleading_info {Yanıltıcı Bilgi} other {Diğer}}."
       },
       "wishlistItemSold": {
         "title": "Kaçırdınız! 😢",
@@ -10695,7 +10703,7 @@
         "message": "Kargonuzda bir süredir hareket görünmüyor. Ekibimiz taşıyıcıyla durumu takip ediyor; sizin bir işlem yapmanıza gerek yok."
       },
       "reportResolved": {
-        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}",
+        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} review {Bir değerlendirme hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}",
         "title": "Şikayetiniz Sonuçlandı"
       },
       "orderPreparingExtended": {

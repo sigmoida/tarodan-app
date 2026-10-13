@@ -8477,7 +8477,7 @@
     },
     "reports": {
       "title": "Requests, Suggestions & Complaints",
-      "description": "Complaints submitted by users for products, users, collections, and messages",
+      "description": "Complaints submitted by users for products, users, collections, messages, and reviews",
       "loadError": "Failed to load complaints",
       "empty": "No complaints yet",
       "allTypes": "All Types",
@@ -8491,7 +8491,8 @@
       "type": {
         "product": "Product",
         "collection": "Collection",
-        "message": "Message"
+        "message": "Message",
+        "review": "Review"
       },
       "reason": {
         "spam": "Spam",
@@ -8534,7 +8535,14 @@
         "openTarget": "Open content",
         "reporterTitle": "Reported By",
         "adminNote": "Explanation sent to the user",
-        "listingStatus": "Listing status"
+        "listingStatus": "Listing status",
+        "reviewAuthor": "Author",
+        "reviewSubject": "Reviewed",
+        "reviewKind": "Review type",
+        "reviewKindProduct": "Product review",
+        "reviewKindSeller": "Seller rating",
+        "reviewContent": "Review text",
+        "reviewNoText": "Score only, no text"
       },
       "statusModal": {
         "noteHelp": "When you close the report as \"Resolved\" or \"Dismissed\", this text is sent to the reporter as a notification and an email.",
@@ -10472,7 +10480,7 @@
       },
       "userReportedAdmin": {
         "title": "New Report",
-        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
+        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
       },
       "wishlistItemSold": {
         "title": "You Missed It! 😢",
@@ -10695,7 +10703,7 @@
         "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
       },
       "reportResolved": {
-        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
+        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
         "title": "Your Report Has Been Reviewed"
       },
       "orderPreparingExtended": {
