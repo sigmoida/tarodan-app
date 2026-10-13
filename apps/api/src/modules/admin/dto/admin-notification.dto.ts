@@ -41,7 +41,7 @@ export class BroadcastEmailContentDto {
     enum: MAILING_TYPES,
     default: "announcement",
     description:
-      "announcement: herkese (varsayılan). marketing: yalnız pazarlama izni olanlara, çıkış linkiyle.",
+      "Duyurunun türü — tüm kanalları (push, zil, e-posta) belirler. announcement: işlemsel/güvenlik duyurusu, tercihten bağımsız herkese (varsayılan; eski çağıranlar için güvenli). marketing: yalnız pazarlama izni olanlara (push ve zil dahil), e-postada çıkış linkiyle.",
   })
   @IsOptional()
   @IsIn(MAILING_TYPES)

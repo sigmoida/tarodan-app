@@ -3,7 +3,6 @@
  * önizleme (admin ucu) aynı fonksiyonu çağırır, böylece önizleme gerçekte
  * gidenin birebir aynısıdır.
  */
-import type { MailingType } from "@tarodan/types";
 import {
   escapeEmailHtml,
   wrapEmailTemplateLayout,
@@ -97,7 +96,11 @@ export function buildBroadcastEmail(
   });
 }
 
-/** Pazarlama e-postası mı? (`undefined` eski çağıranlar = duyuru). */
-export function isMarketingMailing(type: MailingType | undefined): boolean {
+/**
+ * Pazarlama gönderimi mi? (`undefined` eski çağıranlar = duyuru). Tür artık
+ * yalnız e-postayı değil duyurunun tamamını (push + zil) belirler; push
+ * kuyruğu verisinden gelen ham değer de buradan okunur, o yüzden `unknown`.
+ */
+export function isMarketingMailing(type: unknown): boolean {
   return type === "marketing";
 }

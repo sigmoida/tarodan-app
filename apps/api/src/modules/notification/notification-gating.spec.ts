@@ -260,5 +260,56 @@ describe("Notification preference gating (wiring)", () => {
       expect(mockPrisma.notificationLog.create).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    // S1 — Apple 4.5.4 / İYS: admin duyurusu türüne göre davranır.
+    const broadcastJob = (mailingType?: string) =>
+      ({
+        id: "job-2",
+        data: {
+          userId: "user-1",
+          title: "Duyuru",
+          body: "Gövde",
+          data: { type: "admin_broadcast", mailingType },
+        },
+      }) as any;
+
+    it("pazarlama duyurusu + pushNotifications=false → push GİTMEZ, zil yazılmaz", async () => {
+      storedSettings = { pushNotifications: false };
+
+      const res = await worker.handleSendNotification(
+        broadcastJob("marketing"),
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      // Zil satırını admin servisi (izinli kitleye) yazar; worker yazmaz.
+      expect(mockPrisma.notificationLog.create).not.toHaveBeenCalled();
+      expect(res).toMatchObject({
+        pushSent: false,
+        reason: "Suppressed by user preference",
+      });
+    });
+
+    it("duyuru (işlemsel/güvenlik) + pushNotifications=false → push yine GİDER", async () => {
+      storedSettings = { pushNotifications: false };
+
+      await worker.handleSendNotification(broadcastJob("announcement"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.notificationLog.create).not.toHaveBeenCalled();
+    });
+
+    it("pazarlama duyurusu push'u istemciye type=admin_broadcast olarak gider", async () => {
+      storedSettings = null;
+
+      await worker.handleSendNotification(broadcastJob("marketing"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+      const messages = Array.isArray(sent) ? sent : [sent];
+      expect(messages[0].data).toMatchObject({
+        type: "admin_broadcast",
+        mailingType: "marketing",
+      });
+    });
   });
 });

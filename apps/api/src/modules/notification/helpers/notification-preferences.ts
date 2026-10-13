@@ -14,8 +14,11 @@
  *    kanallarda (push + in-app/zil + email) açar/kapatır.
  *  - in-app (zil) için ayrı master yok: kategori kapalı değilse her zaman düşer.
  *  - ALWAYS_SEND tipleri (güvenlik/hesap/sistem) tercihten bağımsız gider.
+ *  - Admin duyurusu türüne göre ayrılır (`preferenceTypeFor`): duyuru
+ *    ALWAYS_SEND'dedir, pazarlama türü değildir.
  */
 import { NotificationType } from "../dto/notification.dto";
+import { isMarketingMailing } from "../../../common/helpers/broadcast-email";
 import {
   NotificationSettings,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -44,6 +47,18 @@ const ALWAYS_SEND = new Set<string>([
   NotificationType.SELLER_APPLICATION_REJECTED,
   "admin_broadcast",
 ]);
+
+/**
+ * Pazarlama türündeki admin duyurusunun tercih anahtarı (Apple 4.5.4, İYS).
+ *
+ * Kitle gönderimde zaten pazarlama iznine (`User.acceptsMarketingEmails`)
+ * göre süzülür; bu anahtar ayrıca ALWAYS_SEND muafiyetini kaldırır, böylece
+ * push master anahtarını kapatmış kullanıcıya pazarlama push'u gitmez.
+ * Kategori eşlemesi yoktur: kategori düğmesi (`marketingEmails`) JSON'da
+ * kayıt sırasında yazılmadığından izinli kullanıcıyı yanlışlıkla susturur —
+ * izin kapısı kolondur. Veritabanına yazılmaz; yalnız tercih kararı içindir.
+ */
+export const MARKETING_BROADCAST_PREFERENCE_TYPE = "admin_broadcast:marketing";
 
 /**
  * Admin OPERASYON alarmları: önek eşlemesinden açıkça muaftır. Bunlar tüketici
@@ -104,6 +119,26 @@ export function categoryForType(type: string): PreferenceCategory | null {
   }
 
   return null;
+}
+
+/**
+ * Tercih kararında kullanılacak tip. Bildirim verisindeki `type` aynen
+ * kullanılır; yalnız pazarlama türündeki admin duyurusu (`mailingType:
+ * "marketing"`) ALWAYS_SEND dışındaki anahtara çevrilir. İstemciye giden
+ * `type` değişmez (mobil yönlendirmesi `admin_broadcast` bekler).
+ */
+export function preferenceTypeFor(
+  data: { type?: unknown; mailingType?: unknown } | null | undefined,
+): string {
+  const type =
+    typeof data?.type === "string" && data.type ? data.type : "general";
+  if (
+    type === NotificationType.ADMIN_BROADCAST &&
+    isMarketingMailing(data?.mailingType)
+  ) {
+    return MARKETING_BROADCAST_PREFERENCE_TYPE;
+  }
+  return type;
 }
 
 /** Ham notificationSettings (Json|null) → varsayılanlarla birleştirilmiş tam nesne. */

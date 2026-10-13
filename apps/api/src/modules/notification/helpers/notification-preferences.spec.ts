@@ -1,5 +1,7 @@
 import {
   categoryForType,
+  MARKETING_BROADCAST_PREFERENCE_TYPE,
+  preferenceTypeFor,
   resolveSettings,
   shouldDeliver,
 } from "./notification-preferences";
@@ -172,6 +174,60 @@ describe("notification-preferences", () => {
         shouldDeliver(s, NotificationType.EMAIL_VERIFICATION, "email"),
       ).toBe(true);
       expect(shouldDeliver(s, "admin_broadcast", "push")).toBe(true);
+    });
+  });
+
+  // S1 — Apple 4.5.4 / İYS: pazarlama türündeki admin duyurusu ALWAYS_SEND'den
+  // yararlanmaz; duyuru (işlemsel/güvenlik) türü yararlanmaya devam eder.
+  describe("preferenceTypeFor", () => {
+    it("pazarlama türündeki admin duyurusu ayrı tercih anahtarına çevrilir", () => {
+      expect(
+        preferenceTypeFor({
+          type: "admin_broadcast",
+          mailingType: "marketing",
+        }),
+      ).toBe(MARKETING_BROADCAST_PREFERENCE_TYPE);
+    });
+
+    it("duyuru türü ve türsüz (eski) admin duyurusu aynen kalır", () => {
+      expect(
+        preferenceTypeFor({
+          type: "admin_broadcast",
+          mailingType: "announcement",
+        }),
+      ).toBe("admin_broadcast");
+      expect(preferenceTypeFor({ type: "admin_broadcast" })).toBe(
+        "admin_broadcast",
+      );
+    });
+
+    it("başka tiplerde mailingType yok sayılır; tip yoksa 'general'", () => {
+      expect(
+        preferenceTypeFor({ type: "order_shipped", mailingType: "marketing" }),
+      ).toBe("order_shipped");
+      expect(preferenceTypeFor(undefined)).toBe("general");
+      expect(preferenceTypeFor({ type: "" })).toBe("general");
+    });
+
+    it("pazarlama duyurusu push master anahtarına uyar, duyuru uymaz", () => {
+      const pushOff = withPrefs({ pushNotifications: false });
+      expect(
+        shouldDeliver(pushOff, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(false);
+      expect(shouldDeliver(pushOff, "admin_broadcast", "push")).toBe(true);
+    });
+
+    it("pazarlama duyurusu kategori düğmesine bağlı değildir (izin kapısı kitlede)", () => {
+      // JSON'daki marketingEmails kayıtta yazılmaz (varsayılan false); izinli
+      // kullanıcıyı burada susturmak izin kolonunu boşa çıkarırdı.
+      expect(categoryForType(MARKETING_BROADCAST_PREFERENCE_TYPE)).toBeNull();
+      expect(
+        shouldDeliver(
+          withPrefs({ marketingEmails: false }),
+          MARKETING_BROADCAST_PREFERENCE_TYPE,
+          "push",
+        ),
+      ).toBe(true);
     });
   });
 });

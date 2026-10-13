@@ -11466,7 +11466,8 @@
         "sendFailed": "The notification could not be sent",
         "scheduleInFuture": "The scheduled time must be in the future",
         "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
-        "scheduledNotFound": "Scheduled notification not found"
+        "scheduledNotFound": "Scheduled notification not found",
+        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages"
       },
       "payment": {
         "partialAmountRequired": "A valid refund amount is required for a partial refund",

@@ -11466,7 +11466,8 @@
         "sendFailed": "Bildirim gönderilemedi",
         "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
         "emailHtmlEmpty": "E-posta HTML'i güvensiz işaretlemeler çıkarıldıktan sonra kullanılabilir içerik barındırmıyor",
-        "scheduledNotFound": "Zamanlanmış bildirim bulunamadı"
+        "scheduledNotFound": "Zamanlanmış bildirim bulunamadı",
+        "noMarketingConsentAudience": "Seçilen kitlede pazarlama iletisine izin veren kullanıcı yok"
       },
       "payment": {
         "partialAmountRequired": "Kısmi iade için geçerli bir iade tutarı gerekir",
