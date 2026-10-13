@@ -1,4 +1,5 @@
 import { AdminRole } from "@prisma/client";
+import { ACCOUNT_REQUIRED_CONSENTS } from "@tarodan/types";
 import { resolveSeedProductAssetBase } from "./seed-media-mapping";
 
 /**
@@ -31,9 +32,53 @@ export interface UatStaff extends UatMember {
   role: AdminRole;
 }
 
+/**
+ * Sabit senaryo hesabı: gerçek kişi değil, testçinin belirli bir kapıyı görmesi
+ * için açılır (mobil test listesi B2/B3/B4). Üye gibi davranır (`kind=member`).
+ *  - `consent_pending`: zorunlu sözleşmelerden biri (KVKK) onaysız →
+ *    yeniden-onay ekranı (onaydan sonra yasal kimlik ekranı da çıkar: hiçbir
+ *    seed hesabına kimlik yazılmaz);
+ *  - `identity_missing`: sözleşmeleri onaylı, yasal kimliği boş → ödeme / ilan /
+ *    banka akışında kimlik ekranı. Muaf OLMAMALI (ekranı göstermesi gerek).
+ */
+export const UAT_FIXTURE_SCENARIOS = [
+  "consent_pending",
+  "identity_missing",
+] as const;
+export type UatFixtureScenario = (typeof UAT_FIXTURE_SCENARIOS)[number];
+
+export interface UatFixture extends UatMember {
+  scenario: UatFixtureScenario;
+}
+
 export interface UatAccounts {
   members: UatMember[];
   staff: UatStaff[];
+  fixtures: UatFixture[];
+}
+
+/** Senaryonun kapısı: hangi belgeler onaylı (yasal kimlik hiçbir senaryoda yazılmaz). */
+export interface UatFixtureGates {
+  /** Yürürlükteki sürümle onaylanacak belgeler; kalan zorunlu belge BEKLER. */
+  consentDocuments: readonly string[];
+}
+
+/** Onaysız bırakılan belge: KVKK ayrı kutu olduğundan tek başına bekleyebilir. */
+const CONSENT_PENDING_DOCUMENT = "kvkk";
+
+export function planUatFixtureGates(
+  scenario: UatFixtureScenario,
+): UatFixtureGates {
+  switch (scenario) {
+    case "consent_pending":
+      return {
+        consentDocuments: ACCOUNT_REQUIRED_CONSENTS.filter(
+          (document) => document !== CONSENT_PENDING_DOCUMENT,
+        ),
+      };
+    case "identity_missing":
+      return { consentDocuments: ACCOUNT_REQUIRED_CONSENTS };
+  }
 }
 
 export interface UatListing {
@@ -195,12 +240,21 @@ function parseAccountBase(
   return { email, displayName };
 }
 
-/** `data/uat/accounts.json` içeriğini doğrular ve normalleştirir. */
+/**
+ * `data/uat/accounts.json` içeriğini doğrular ve normalleştirir. `fixtures`
+ * isteğe bağlıdır (yoksa boş): senaryo hesabı olmayan eski dosyalar çalışır.
+ */
 export function parseUatAccounts(raw: unknown): UatAccounts {
   if (!isRecord(raw)) throw new Error("accounts.json: expected an object");
-  const { members, staff } = raw;
-  if (!Array.isArray(members) || !Array.isArray(staff)) {
-    throw new Error('accounts.json: "members" and "staff" must be arrays');
+  const { members, staff, fixtures = [] } = raw;
+  if (
+    !Array.isArray(members) ||
+    !Array.isArray(staff) ||
+    !Array.isArray(fixtures)
+  ) {
+    throw new Error(
+      'accounts.json: "members", "staff" and "fixtures" must be arrays',
+    );
   }
   const seen = new Set<string>();
   const parsedMembers = members.map((entry, index) =>
@@ -218,7 +272,23 @@ export function parseUatAccounts(raw: unknown): UatAccounts {
     }
     return { ...base, role: role as AdminRole };
   });
-  return { members: parsedMembers, staff: parsedStaff };
+  const parsedFixtures = fixtures.map((entry, index) => {
+    const where = `fixtures[${index}]`;
+    const base = parseAccountBase(entry, where, seen);
+    const scenario = (entry as Record<string, unknown>).scenario;
+    if (
+      typeof scenario !== "string" ||
+      !(UAT_FIXTURE_SCENARIOS as readonly string[]).includes(scenario)
+    ) {
+      throw new Error(`${where}: unknown scenario`);
+    }
+    return { ...base, scenario: scenario as UatFixtureScenario };
+  });
+  return {
+    members: parsedMembers,
+    staff: parsedStaff,
+    fixtures: parsedFixtures,
+  };
 }
 
 /**

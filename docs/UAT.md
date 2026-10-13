@@ -255,6 +255,31 @@ Satıcının çıkış adresi kayıtlı olmalı (yoksa kargo etiketi açılmaz v
 
 ---
 
+### 4.4 Senaryo hesapları: onay ve kimlik ekranı
+
+Mobil 1.0.6'nın kapıları (zorunlu sözleşme yeniden-onayı, yasal kimlik ekranı)
+iki sabit senaryo hesabıyla denenir. Bunlar gerçek kişi değildir
+(`data/uat/accounts.json` → `fixtures`); UAT seed'i (staging reset ve
+`--accounts-only` yenileme) her koşuda ekler.
+
+| Hesap (e-posta)                    | Durum                                                 | Beklenen                                                                         |
+| ---------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `uat-consent-pending@example.com`  | Zorunlu sözleşmelerden KVKK onaysız; yasal kimlik boş | Girişte kapatılamaz onay ekranı, yalnız KVKK bekler; onaydan sonra kimlik ekranı |
+| `uat-identity-missing@example.com` | Sözleşmeler onaylı; ad, soyad ve TCKN boş             | Giriş açılır; ödeme / ilan / banka akışına girince kimlik ekranı                 |
+
+- **Şifre** tüm sabit hesaplarla aynıdır: `UAT_SEED_PASSWORD` (GitHub `staging`
+  environment secret'ı; staging api konteynerine de aynı değer verilir). Depoya
+  yazılmaz; ekibin parola yöneticisinden alınır. Adresler `example.com` olduğu
+  için posta hiçbir yere gitmez (şifre sıfırlama bu hesaplarda çalışmaz).
+- Testçinin geçtiği kapı kalıcıdır (onay tablosu ekleme-yalnız, kimlik bir kez
+  girilir). Başa dönmek için staging reset ya da yenileme: seed hesabı yeniden
+  kurar. Seed'in yeniden koşusu kapıyı geri KAPATMAZ.
+- Diğer üyeler (`nur@`, `serhat@`) iki kapıyı da kendileri geçer; senaryo
+  hesapları kapıyı görmek isteyen herkes içindir.
+- Hiçbir seed hesabına yasal kimlik yazılmaz ve muafiyet verilmez (bkz.
+  `IDENTITY.md` "Seed ve test hesapları"); iki senaryo hesabı da kimlik ekranını
+  görür.
+
 ## 5. Sorun giderme
 
 | Belirti                                          | Sebep / çözüm                                                                                       |

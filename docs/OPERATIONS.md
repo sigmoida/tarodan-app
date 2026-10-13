@@ -39,6 +39,23 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
 
 - **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
   audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
+- **Sözleşme onayı ve kimlik:** yeni hesap zorunlu sözleşmeleri (şartlar, gizlilik,
+  KVKK) yürürlükteki sürümle onaylı açılır; yoksa mobil 1.0.6 girişte kapatılamaz
+  onay ekranı açar. Yasal kimlik (ad, soyad, TCKN) istenmez: test şeridi kimlik
+  kapısından muaftır (`required: false`). Bu değişiklikten ÖNCE açılmış hesaplar ve
+  belge sürümü her değiştiğinde (CONSENTS.md) tamamlama:
+  `docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-test-account-consents.js'`
+  — VARSAYILAN dry-run'dır: hedef veritabanını (host/db, şifresiz), etkilenecek
+  hesap / satır sayısını ve atlananları yazar, hiçbir şey yazmaz. Yazmak için aynı
+  komuta `--apply --db=<veritabanı adı>` eklenir; ad, çıktıdaki hedef veritabanıyla
+  birebir eşleşmezse (ya da hedef doğrulanamazsa: boş host / Unix socket URL'si)
+  betik yazmaz. Eski `--confirm` artık kabul edilmez. Tablo ekleme-yalnızdır, geri
+  alınamaz. Yazma sonunda "yazılan N / planlanan M" yazılır (fark uyarı verir);
+  bağlantı hatasında o ana kadar yazılan raporlanır ve tekrar koşmak güvenlidir.
+  İdempotent; yalnız eksik / eski sürümdeki belgeye satır ekler. En son kaydı
+  `withdrawn` olan belge ATLANIR (bilinçli geri çekme yeniden onaylanmaz) ve
+  raporlanır. Yeni açılan hesapların onay satırlarında IP ve kullanıcı ajanı boştur
+  (yöneticinin isteği kanıt olarak damgalanmaz).
 - **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1` — pazaryeri VE üyelik
   mağazasında; oto-yenileme de test modunda çekilir), PayTR iadesi (aşağıda),
   Sürat gönderisi (`TEST…` takip kodu), eLogo belgesi (üyelik faturası dahil),

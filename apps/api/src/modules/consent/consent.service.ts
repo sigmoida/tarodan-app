@@ -14,28 +14,16 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { getRequestClientInfo } from "../../common/context/request-context";
+import { findPendingAccountConsents } from "./helpers/account-consents";
+import { toConsentRow, type ConsentEntry } from "./helpers/consent-row";
 import {
   computePendingConsents,
   latestByDocument,
 } from "./helpers/pending-consents";
 
-/** Onayın kime ait olduğu — üç kimlikten en az biri dolu olmalı. */
-export interface ConsentSubject {
-  userId?: string | null;
-  visitorId?: string | null;
-  guestEmail?: string | null;
-}
-
-export interface ConsentEntry {
-  document: ConsentDocumentKey;
-  source: ConsentSource;
-  subject: ConsentSubject;
-  /** Varsayılan `granted`. */
-  action?: ConsentAction;
-  details?: Prisma.InputJsonValue;
-  checkoutGroupId?: string | null;
-  orderId?: string | null;
-}
+// Tipler helpers/consent-row.ts'te yaşar (seed'ler de aynı satırı üretir);
+// buradan yeniden dışa açılır ki mevcut import'lar değişmesin.
+export type { ConsentEntry, ConsentSubject } from "./helpers/consent-row";
 
 /** Yazım için gereken en dar istemci: PrismaService ya da bir transaction. */
 export type ConsentWriter = Pick<Prisma.TransactionClient, "consentRecord">;
@@ -62,7 +50,7 @@ export class ConsentService {
     if (entries.length === 0) return 0;
     const { ipAddress, userAgent } = getRequestClientInfo();
     const { count } = await db.consentRecord.createMany({
-      data: entries.map((entry) => toRow(entry, ipAddress, userAgent)),
+      data: entries.map((entry) => toConsentRow(entry, ipAddress, userAgent)),
     });
     return count;
   }
@@ -90,13 +78,7 @@ export class ConsentService {
 
   /** Yeniden-onay kapısı: üyenin onaylaması gereken belgeler. Boş = kapı açık. */
   async getPending(userId: string): Promise<PendingConsent[]> {
-    const rows = await this.prisma.consentRecord.findMany({
-      where: { userId, document: { in: [...ACCOUNT_REQUIRED_CONSENTS] } },
-      select: { document: true, version: true, action: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
-    return computePendingConsents(rows);
+    return findPendingAccountConsents(this.prisma, userId);
   }
 
   /**
@@ -221,32 +203,4 @@ export class ConsentService {
       };
     });
   }
-}
-
-function toRow(
-  entry: ConsentEntry,
-  ipAddress: string | null,
-  userAgent: string | null,
-): Prisma.ConsentRecordCreateManyInput {
-  if (!isConsentDocumentKey(entry.document)) {
-    throw new Error(`Unknown consent document: ${String(entry.document)}`);
-  }
-  const { userId, visitorId, guestEmail } = entry.subject;
-  if (!userId && !visitorId && !guestEmail) {
-    throw new Error(`Consent record without a subject: ${entry.document}`);
-  }
-  return {
-    document: entry.document,
-    version: CONSENT_DOCUMENTS[entry.document].version,
-    action: entry.action ?? ConsentAction.granted,
-    source: entry.source,
-    userId: userId ?? null,
-    visitorId: visitorId ?? null,
-    guestEmail: guestEmail ? guestEmail.trim().toLowerCase() : null,
-    details: entry.details ?? undefined,
-    checkoutGroupId: entry.checkoutGroupId ?? null,
-    orderId: entry.orderId ?? null,
-    ipAddress,
-    userAgent,
-  };
 }

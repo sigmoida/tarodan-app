@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
+import { PLATFORM_ENTITY } from "@/lib/legal/platform-entity";
 import type { Translate } from "@/types/i18n";
 import CookiePreferencesPanel from "./CookiePreferencesPanel";
 
@@ -110,9 +111,6 @@ const BROWSER_GUIDES = [
     href: "https://support.microsoft.com/tr-tr/microsoft-edge",
   },
 ];
-
-const SUPPORT_EMAIL = "destek@tarodan.com.tr";
-const SUPPORT_PHONE = "0850 XXX XX XX";
 
 export default async function CookiesClient() {
   const t = await getTranslations();
@@ -288,11 +286,11 @@ export default async function CookiesClient() {
           <ul>
             <li>
               <strong>{t("legal.cookies.page.contactEmailLabel")}</strong>{" "}
-              {SUPPORT_EMAIL}
+              {PLATFORM_ENTITY.email}
             </li>
             <li>
               <strong>{t("legal.cookies.page.contactPhoneLabel")}</strong>{" "}
-              {SUPPORT_PHONE}
+              {PLATFORM_ENTITY.phone}
             </li>
           </ul>
         </div>
