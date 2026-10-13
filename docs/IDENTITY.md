@@ -151,6 +151,25 @@ sipariş karşı tarafı, mesaj), arama dizini, bildirim ve log:
   (gerçek uçlarla süzgeç + `users`tan bu alanları SEÇEN dosyalar için kaynak
   taraması).
 
+### Seed ve test hesapları
+
+- **Test şeridi** (`isTestAccount`, admin → Test Araçları ile açılan App Review /
+  QA hesapları) kapıdan **muaftır**: `required: false`, hiçbir akışta kimlik
+  ekranı çıkmaz. Hesaba kimlik yazılmaz.
+- **Demo seed** (`prisma/seed.ts`, yerel) ve **UAT seed** hesaplarına yasal kimlik
+  YAZILMAZ ve muafiyet de verilmez. Seed'e gömülü TCKN'ler public repoda kalıcı
+  olurdu, gerçek bir kişiye ait olmadıkları garanti edilemez (KVKK) ve numara
+  sıraya bağlı üretildiğinde tekillik (`users_national_id_key`) çakışması seed'i
+  düşürür. Muafiyet (`isLegalIdentityExempt`) yalnız test şeridine ve personele
+  aittir; `isTestAccount` aynı zamanda hesabı canlı vitrinden ve test dışı diğer
+  hesaplardan yalıtır (sepet / teklif / takas 403), bu yüzden demo ya da UAT
+  üyelerine verilemez. Sonuç: bu hesaplar banka / ödeme / ilan akışında kimlik
+  ekranını görür. Kimlik ekranını geçmesi gereken otomasyon (Maestro) test şeridi
+  hesabı kullanır ya da ekranı bir kez doldurur.
+- **UAT senaryo hesapları** (`data/uat/accounts.json` `fixtures`, bkz. `UAT.md` §4.4):
+  `identity_missing` kimlik ekranını göstermek için kimliksiz kalır;
+  `consent_pending` önce onay ekranını, onaydan sonra kimlik ekranını da görür.
+
 ### Saklama
 
 Repo'daki yerleşik uygulama: kimlik numaraları **düz metin** kolonlarda

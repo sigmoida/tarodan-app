@@ -1,4 +1,6 @@
 import { ConflictException } from "@nestjs/common";
+import { ConsentSource } from "@prisma/client";
+import { ACCOUNT_REQUIRED_CONSENTS } from "@tarodan/types";
 import { TestLaneService } from "./test-lane.service";
 
 jest.mock("bcrypt", () => ({ hash: jest.fn(async () => "hashed") }));
@@ -54,6 +56,10 @@ describe("TestLaneService", () => {
         })),
       },
       address: { create: jest.fn(async () => ({})) },
+      consentRecord: {
+        findMany: jest.fn(async () => []),
+        createMany: jest.fn(async () => ({ count: 3 })),
+      },
     };
     const prisma: Record<string, any> = {
       user: {
@@ -98,6 +104,32 @@ describe("TestLaneService", () => {
       });
       expect(lanes.invalidate).toHaveBeenCalledWith("u-new");
       expect(row).toMatchObject({ id: "u-new", orders: 0, listings: 0 });
+    });
+
+    it("records the current required consents in the same transaction, WITHOUT the admin's request evidence", async () => {
+      const { service, tx } = build();
+      await service.createAccount({
+        email: "review@tarodan.com.tr",
+        password: "Secret123!",
+        displayName: "Reviewer",
+      });
+      // Onay penceresi test hesabında kapatılamaz ekran olurdu; hesap yoksa onay
+      // da yok (aynı transaction).
+      const rows = tx.consentRecord.createMany.mock.calls[0][0].data;
+      expect(rows.map((r: any) => r.document).sort()).toEqual(
+        [...ACCOUNT_REQUIRED_CONSENTS].sort(),
+      );
+      for (const row of rows) {
+        expect(row).toMatchObject({
+          userId: "u-new",
+          source: ConsentSource.registration,
+          action: "granted",
+          // consent_records ekleme-yalnız: süper admin'in IP'si "kullanıcı
+          // kayıtta onayladı" diye kalıcı yanlış kanıt olurdu.
+          ipAddress: null,
+          userAgent: null,
+        });
+      }
     });
 
     it("refuses a duplicate email/phone with 409", async () => {
