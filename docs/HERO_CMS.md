@@ -39,7 +39,9 @@ server.hero.maxLiveSlides`. Başka bir slaytın bitişinden sonraya zamanlanan s
   slider'ın ŞİMDİDEN itibaren kesintisiz dolu kalacağı anı erkene çekemez. Hesap iki şeyi sayar:
   - **Bitiş tarihi**: diğer slaytlar yarın bitiyorsa kalıcı slaytı silmek (ya da tek slayta bitiş
     vermek) slider'ı yarın boş bırakır → reddedilir. Başka bir slayt bitişi tam devralıyorsa
-    (biri bittiği an öbürü başlar; sınırlar dahil) kabul edilir; bir milisaniyelik boşluk bile boşluktur.
+    (biri bittiği an öbürü başlar; sınırlar dahil) kabul edilir. Admin formu bitişi gün sonu
+    (`23:59:59.999`), başlangıcı gün başı (`00:00:00.000`) gönderdiği için ardışık günlük devirdeki
+    1 ms'lik fark kesinti SAYILMAZ; en çok 1 dakikalık boşluk tolere edilir, daha uzunu kesintidir.
   - **`hideOnIos`** (native uygulamada gizle): yalnız gizlenmeyen slaytlar mobil listeyi doldurur.
     Web bayrağı yok sayar, yani native'i dolduran liste web'i de doldurur; koruma native görünümü esas alır.
     Kıyas "önce / sonra"dır, mutlak değil: zaten kesintili bir slider'ın metnini düzeltmek engellenmez,

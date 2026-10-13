@@ -358,6 +358,18 @@ describe("HeroSlideService.update", () => {
     expect(heroSlide.update).toHaveBeenCalled();
   });
 
+  it("admin formunun günlük devri (gün sonu → ertesi gün başı) 409 almaz", async () => {
+    const { service, heroSlide } = makeService();
+    // Bu slayt yarın gün sonunda biter; öbürü ertesi günün başında başlar.
+    heroSlide.findMany.mockResolvedValueOnce([
+      { startDate: new Date("2026-10-14T00:00:00.000+03:00"), endDate: null },
+    ]);
+    await service.update("slide-1", {
+      endDate: "2026-10-13T23:59:59.999+03:00",
+    } as never);
+    expect(heroSlide.update).toHaveBeenCalled();
+  });
+
   it("devralan slayt arada boşluk bırakıyorsa bitiş verilemez", async () => {
     const { service, heroSlide } = makeService();
     heroSlide.findMany.mockResolvedValueOnce([

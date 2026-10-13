@@ -87,14 +87,23 @@ export function peakConcurrentWindows(
 }
 
 /**
+ * Ardışık iki pencere arasında KESİNTİ sayılmayan en büyük boşluk. Admin formu
+ * bitişi gün sonu (`T23:59:59.999`), başlangıcı gün başı (`T00:00:00.000`)
+ * olarak gönderir; normal günlük devirde aradaki 1 ms'lik fark "boş liste"
+ * sayılıp 409 üretmemeli. Bir dakikayı aşan boşluk gerçek kesintidir.
+ */
+export const HERO_COVERAGE_GAP_TOLERANCE_MS = 60_000;
+
+/**
  * Pencerelerin birleşiminin ŞİMDİDEN itibaren kesintisiz örttüğü son an
  * (ms); hiç sonlanmıyorsa `Infinity`, şu an hiçbiri açık değilse `now`.
  *
- * Sınırlar dahildir: biri tam bittiği anda öbürü başlıyorsa kesinti yoktur,
- * bir milisaniyelik boşluk bile "boş liste"dir. "Slider boş kalamaz" koruması
- * bunu kullanır: bir değişiklik bu anı ERKENE çekiyorsa slider ileride boş
- * kalacaktır (ör. tek kalıcı slaytın bitiş tarihi verilmesi ya da kalıcı
- * slaytın silinip geriye bitiş tarihli bir slaytın kalması).
+ * Sınırlar dahildir ve en çok `HERO_COVERAGE_GAP_TOLERANCE_MS` (1 dk) boşluk
+ * kesinti sayılmaz: biri gün sonunda bitip öbürü ertesi gün başında başlıyorsa
+ * kesinti yoktur. "Slider boş kalamaz" koruması bunu kullanır: bir değişiklik bu
+ * anı ERKENE çekiyorsa slider ileride boş kalacaktır (ör. tek kalıcı slaytın
+ * bitiş tarihi verilmesi ya da kalıcı slaytın silinip geriye bitiş tarihli bir
+ * slaytın kalması).
  */
 export function guaranteedCoverageUntil(
   windows: readonly HeroWindow[],
@@ -114,7 +123,8 @@ export function guaranteedCoverageUntil(
 
   let covered = nowMs;
   for (const window of open) {
-    if (window.start > covered) break; // boşluk
+    // Boşluk toleransı aşıldı → örtü burada biter.
+    if (window.start - covered > HERO_COVERAGE_GAP_TOLERANCE_MS) break;
     covered = Math.max(covered, window.end);
     if (covered === Number.POSITIVE_INFINITY) break;
   }

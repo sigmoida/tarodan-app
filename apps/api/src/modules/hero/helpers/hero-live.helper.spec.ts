@@ -1,4 +1,5 @@
 import {
+  HERO_COVERAGE_GAP_TOLERANCE_MS,
   guaranteedCoverageUntil,
   heroSlideLiveWhere,
   isHeroSlideLive,
@@ -159,12 +160,30 @@ describe("guaranteedCoverageUntil", () => {
     ).toBe(day(2).getTime());
   });
 
-  it("bir milisaniyelik boşluk bile boşluktur", () => {
+  it("admin formunun gün sonu → ertesi gün başı devri (1 ms) kesinti sayılmaz", () => {
+    // Form: bitiş T23:59:59.999+03:00, başlangıç T00:00:00.000+03:00.
+    const end = new Date("2026-10-14T23:59:59.999+03:00");
+    const nextStart = new Date("2026-10-15T00:00:00.000+03:00");
+    expect(
+      guaranteedCoverageUntil([w(null, end), w(nextStart, null)], NOW),
+    ).toBe(NEVER);
+  });
+
+  it("1 dakikaya kadar boşluk tolere edilir, aşan boşluk kesintidir", () => {
     const end = day(2);
-    const start = new Date(end.getTime() + 1);
-    expect(guaranteedCoverageUntil([w(null, end), w(start, null)], NOW)).toBe(
-      end.getTime(),
-    );
+    const at = (gapMs: number) => new Date(end.getTime() + gapMs);
+    expect(
+      guaranteedCoverageUntil(
+        [w(null, end), w(at(HERO_COVERAGE_GAP_TOLERANCE_MS), null)],
+        NOW,
+      ),
+    ).toBe(NEVER);
+    expect(
+      guaranteedCoverageUntil(
+        [w(null, end), w(at(HERO_COVERAGE_GAP_TOLERANCE_MS + 1), null)],
+        NOW,
+      ),
+    ).toBe(end.getTime());
   });
 
   it("girdi sırasından bağımsızdır", () => {
