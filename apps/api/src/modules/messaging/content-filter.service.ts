@@ -1,10 +1,16 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { ModerationAiClient } from '../moderation/moderation-ai.client';
+import {
+  BadRequestException,
+  Injectable,
+  OnModuleInit,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { i18nMessage } from "../i18n";
 import {
   EMAIL_PATTERN_SOURCE,
   TR_MOBILE_PHONE_PATTERN_SOURCE,
-} from '../../common/helpers/contact-patterns';
+} from "../../common/helpers/contact-patterns";
 
 export interface FilterResult {
   isClean: boolean;
@@ -60,7 +66,7 @@ export class ContentFilterService implements OnModuleInit {
   async loadFilters(): Promise<void> {
     const dbFilters = await this.prisma.contentFilter.findMany({
       where: { isActive: true },
-      orderBy: { priority: 'desc' },
+      orderBy: { priority: "desc" },
     });
 
     this.filters = dbFilters.map((f) => ({
@@ -71,7 +77,7 @@ export class ContentFilterService implements OnModuleInit {
       replacement: f.replacement,
       requiresApproval: f.requiresApproval,
       priority: f.priority,
-      regex: new RegExp(f.pattern, 'gi'),
+      regex: new RegExp(f.pattern, "gi"),
     }));
 
     this.logger.log(`Loaded ${this.filters.length} content filters`);
@@ -89,14 +95,17 @@ export class ContentFilterService implements OnModuleInit {
     // Apply each filter in priority order
     for (const filter of this.filters) {
       const matches = content.match(filter.regex);
-      
+
       if (matches && matches.length > 0) {
         // Replace matches with filter replacement
-        filteredContent = filteredContent.replace(filter.regex, filter.replacement);
-        
+        filteredContent = filteredContent.replace(
+          filter.regex,
+          filter.replacement,
+        );
+
         // Track which patterns were flagged
         flaggedPatterns.push(filter.name);
-        
+
         // Check if any filter requires admin approval
         if (filter.requiresApproval) {
           requiresApproval = true;
@@ -105,9 +114,10 @@ export class ContentFilterService implements OnModuleInit {
     }
 
     const isClean = flaggedPatterns.length === 0;
-    const flaggedReason = flaggedPatterns.length > 0
-      ? `Tespit edilen içerik: ${flaggedPatterns.join(', ')}`
-      : null;
+    const flaggedReason =
+      flaggedPatterns.length > 0
+        ? `Tespit edilen içerik: ${flaggedPatterns.join(", ")}`
+        : null;
 
     return {
       isClean,
@@ -138,9 +148,9 @@ export class ContentFilterService implements OnModuleInit {
       return {
         isClean: false,
         filteredContent: regexResult.filteredContent,
-        flaggedPatterns: [...regexResult.flaggedPatterns, 'profanity'],
+        flaggedPatterns: [...regexResult.flaggedPatterns, "profanity"],
         requiresApproval: true,
-        flaggedReason: 'Uygunsuz dil (küfür)',
+        flaggedReason: "Uygunsuz dil (küfür)",
       };
     }
 
@@ -155,17 +165,17 @@ export class ContentFilterService implements OnModuleInit {
           filteredContent: regexResult.filteredContent,
           flaggedPatterns: [
             ...regexResult.flaggedPatterns,
-            `ai:${ai.reason ?? 'toxic'}`,
+            `ai:${ai.reason ?? "toxic"}`,
           ],
           requiresApproval: true,
           flaggedReason: `AI moderasyon: uygunsuz içerik${
-            ai.reason ? ` (${ai.reason})` : ''
+            ai.reason ? ` (${ai.reason})` : ""
           }`,
         };
       }
     } catch (error) {
       this.logger.warn(
-        'AI metin moderasyonu başarısız, regex sonucu kullanılıyor',
+        "AI metin moderasyonu başarısız, regex sonucu kullanılıyor",
       );
     }
 
@@ -175,81 +185,111 @@ export class ContentFilterService implements OnModuleInit {
   }
 
   /**
+   * Onay kuyruğu OLMAYAN kullanıcılar arası serbest metin (teklif notu, takas
+   * mesajı, takas red/iptal gerekçesi) için mesajlaşmayla AYNI filtre — TEK
+   * kaynak (S9a, Apple 1.2). Mesajlaşmadaki üç sonucun kuyruksuz karşılığı:
+   *
+   * - temiz → metin aynen kaydedilir;
+   * - yalnız maskelenen kural (ör. iletişim bilgisi, onay istemeyen) →
+   *   maskelenmiş metin kaydedilir (DM'de alıcının gördüğü `filteredContent`);
+   * - onay gerektiren sonuç (küfür, AI toksik, onay isteyen kural) → DM'de
+   *   yönetici onayına düşerdi; burada kuyruk olmadığı için istek 400 ile
+   *   reddedilir, kullanıcı metni düzeltip yeniden gönderir.
+   *
+   * Yavaş olabilir (AI çağrısı): transaction AÇILMADAN çağrılmalıdır.
+   */
+  async screenUnqueuedText<T extends string | null | undefined>(
+    content: T,
+  ): Promise<T | string> {
+    if (!content || !content.trim()) return content;
+    const result = await this.moderateWithAI(content);
+    if (result.isClean) return content;
+    if (result.requiresApproval) {
+      throw new BadRequestException(
+        i18nMessage("server.messaging.contentRejected"),
+      );
+    }
+    return result.filteredContent;
+  }
+
+  /**
    * Builtin patterns for common cases (backup if DB is empty)
    */
-  getBuiltinPatterns(): Array<{type: string; pattern: string; name: string}> {
+  getBuiltinPatterns(): Array<{ type: string; pattern: string; name: string }> {
     return [
       // Turkish phone numbers — shared with UAT masking (common/helpers/contact-patterns)
       {
-        type: 'phone',
+        type: "phone",
         pattern: TR_MOBILE_PHONE_PATTERN_SOURCE,
-        name: 'Türk Telefon Numarası',
+        name: "Türk Telefon Numarası",
       },
       // International phone
       {
-        type: 'phone',
-        pattern: '\\+?\\d{1,3}[-.\\s]?\\(?\\d{1,4}\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}',
-        name: 'Uluslararası Telefon',
+        type: "phone",
+        pattern:
+          "\\+?\\d{1,3}[-.\\s]?\\(?\\d{1,4}\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}",
+        name: "Uluslararası Telefon",
       },
       // Email
       {
-        type: 'email',
+        type: "email",
         pattern: EMAIL_PATTERN_SOURCE,
-        name: 'E-posta Adresi',
+        name: "E-posta Adresi",
       },
       // WhatsApp
       {
-        type: 'social_media',
-        pattern: '(whatsapp|wp|wa|w\\s*a)[\\s:]*[\\d+()-]+',
-        name: 'WhatsApp',
+        type: "social_media",
+        pattern: "(whatsapp|wp|wa|w\\s*a)[\\s:]*[\\d+()-]+",
+        name: "WhatsApp",
       },
       // Instagram
       {
-        type: 'social_media',
-        pattern: '(instagram|ig|insta)[:\\s@]+[a-zA-Z0-9_.]+',
-        name: 'Instagram',
+        type: "social_media",
+        pattern: "(instagram|ig|insta)[:\\s@]+[a-zA-Z0-9_.]+",
+        name: "Instagram",
       },
       // Telegram
       {
-        type: 'social_media',
-        pattern: '(telegram|tg)[:\\s@]+[a-zA-Z0-9_.]+',
-        name: 'Telegram',
+        type: "social_media",
+        pattern: "(telegram|tg)[:\\s@]+[a-zA-Z0-9_.]+",
+        name: "Telegram",
       },
       // Discord
       {
-        type: 'social_media',
-        pattern: '(discord)[:\\s#]+[a-zA-Z0-9_.#]+',
-        name: 'Discord',
+        type: "social_media",
+        pattern: "(discord)[:\\s#]+[a-zA-Z0-9_.#]+",
+        name: "Discord",
       },
       // Facebook
       {
-        type: 'social_media',
-        pattern: '(facebook|fb)[:\\s/]+[a-zA-Z0-9_.]+',
-        name: 'Facebook',
+        type: "social_media",
+        pattern: "(facebook|fb)[:\\s/]+[a-zA-Z0-9_.]+",
+        name: "Facebook",
       },
       // URLs
       {
-        type: 'url',
-        pattern: 'https?:\\/\\/[^\\s]+',
-        name: 'URL Link',
+        type: "url",
+        pattern: "https?:\\/\\/[^\\s]+",
+        name: "URL Link",
       },
       // Spelled out numbers (Turkish)
       {
-        type: 'phone',
-        pattern: '(beş|dört|üç|iki|bir|sıfır|altı|yedi|sekiz|dokuz)\\s*(beş|dört|üç|iki|bir|sıfır|altı|yedi|sekiz|dokuz)\\s*(beş|dört|üç|iki|bir|sıfır|altı|yedi|sekiz|dokuz)',
-        name: 'Yazıyla Numara',
+        type: "phone",
+        pattern:
+          "(beş|dört|üç|iki|bir|sıfır|altı|yedi|sekiz|dokuz)\\s*(beş|dört|üç|iki|bir|sıfır|altı|yedi|sekiz|dokuz)\\s*(beş|dört|üç|iki|bir|sıfır|altı|yedi|sekiz|dokuz)",
+        name: "Yazıyla Numara",
       },
       // Hidden numbers with spaces
       {
-        type: 'phone',
-        pattern: '\\d\\s+\\d\\s+\\d\\s+\\d\\s+\\d\\s+\\d\\s+\\d',
-        name: 'Gizli Numara',
+        type: "phone",
+        pattern: "\\d\\s+\\d\\s+\\d\\s+\\d\\s+\\d\\s+\\d\\s+\\d",
+        name: "Gizli Numara",
       },
       // Number with dashes/dots as separators
       {
-        type: 'phone',
-        pattern: '\\d{2,3}[-.\\s]\\d{2,3}[-.\\s]\\d{2,4}',
-        name: 'Formatlanmış Numara',
+        type: "phone",
+        pattern: "\\d{2,3}[-.\\s]\\d{2,3}[-.\\s]\\d{2,4}",
+        name: "Formatlanmış Numara",
       },
     ];
   }
@@ -259,7 +299,7 @@ export class ContentFilterService implements OnModuleInit {
    */
   testPattern(pattern: string, content: string): boolean {
     try {
-      const regex = new RegExp(pattern, 'gi');
+      const regex = new RegExp(pattern, "gi");
       return regex.test(content);
     } catch {
       return false;

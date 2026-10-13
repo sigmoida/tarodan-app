@@ -43,6 +43,7 @@ import { offerExpiresAt } from "./helpers/offer-expiry";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
 import { offerConvertedNotice } from "../mail-routing/helpers/mail-internal-notices";
+import { ContentFilterService } from "../messaging/content-filter.service";
 
 @Injectable()
 export class OfferService {
@@ -71,6 +72,10 @@ export class OfferService {
     // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
     @Optional()
     private readonly mailNotifier?: MailInternalNotifier,
+    // Teklif notu mesajlaşmayla AYNI içerik filtresinden geçer (Apple 1.2).
+    // OfferModule MessagingModule'ü içe aktarır; dar test kurulumlarında yok.
+    @Optional()
+    private readonly contentFilter?: ContentFilterService,
   ) {
     this.minOfferPercentage = parseInt(
       this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
@@ -110,6 +115,19 @@ export class OfferService {
    * dolmuştur. Karar `OfferExtensionPolicy` ile cron'la AYNI kuraldır
    * (`extendable`: işlemden önce `readExtendable` ile okunmuş karar).
    */
+  /**
+   * Teklif notunu mesajlaşma filtresinden geçirir (S9a): uygunsuz içerik 400,
+   * iletişim bilgisi maskelenir. Yavaş olabilir — işlem AÇILMADAN çağrılır.
+   */
+  private async screenMessage(
+    message: string | undefined,
+  ): Promise<string | null> {
+    const screened = this.contentFilter
+      ? await this.contentFilter.screenUnqueuedText(message)
+      : message;
+    return screened || null;
+  }
+
   private hasLapsed(expiresAt: Date, extendable: boolean): boolean {
     return new Date() > new Date(expiresAt) && !extendable;
   }
@@ -128,6 +146,7 @@ export class OfferService {
     // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
     // bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
+    const message = await this.screenMessage(dto.message);
     // Use transaction with row locking for race condition prevention
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock product row with FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -215,7 +234,7 @@ export class OfferService {
           buyerId,
           sellerId: product.sellerId,
           amount: dto.amount,
-          message: dto.message || null,
+          message,
           status: OfferStatus.pending,
           expiresAt,
         },
@@ -735,6 +754,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
+    const message = await this.screenMessage(dto.message);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -808,7 +828,7 @@ export class OfferService {
           buyerId: offer.buyerId,
           sellerId: offer.sellerId,
           amount: dto.amount,
-          message: dto.message ?? null,
+          message,
           status: OfferStatus.pending,
           buyerMustAccept: true,
           expiresAt,
@@ -868,6 +888,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
+    const message = await this.screenMessage(dto.message);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -940,7 +961,7 @@ export class OfferService {
           buyerId: offer.buyerId,
           sellerId: offer.sellerId,
           amount: dto.amount,
-          message: dto.message ?? null,
+          message,
           status: OfferStatus.pending,
           buyerMustAccept: false,
           expiresAt,

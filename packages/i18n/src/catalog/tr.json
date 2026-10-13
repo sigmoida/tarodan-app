@@ -11678,7 +11678,8 @@
       "sendForbidden": "Bu konuya mesaj gönderme yetkiniz yok",
       "viewForbidden": "Bu konuyu görüntüleme yetkiniz yok",
       "messageTooLong": "Mesaj uzunluğu maksimum {max} karakter olabilir. Mevcut uzunluk: {length}",
-      "dailyLimitReached": "Günlük mesaj limitinize ({limit}) ulaştınız. Yarın tekrar deneyin."
+      "dailyLimitReached": "Günlük mesaj limitinize ({limit}) ulaştınız. Yarın tekrar deneyin.",
+      "contentRejected": "Metniniz uygunsuz ya da paylaşılamayacak içerik (ör. küfür, iletişim bilgisi) barındırdığı için gönderilemedi. Lütfen düzenleyip tekrar deneyin."
     },
     "wishlist": {
       "ownProduct": "Kendi ürününüzü istek listesine ekleyemezsiniz",

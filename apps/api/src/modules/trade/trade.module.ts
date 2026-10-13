@@ -30,6 +30,7 @@ import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service
 import { DiscountModule } from "../discount/discount.module";
 
 import { UserBlockModule } from "../user-block/user-block.module";
+import { MessagingModule } from "../messaging/messaging.module";
 
 @Module({
   imports: [
@@ -49,6 +50,9 @@ import { UserBlockModule } from "../user-block/user-block.module";
     WarehouseAddressModule,
     // Takas hizmet bedeli kampanyası (İ25) — DiscountService kabulde çözer.
     DiscountModule,
+    // Takas mesajı ve red/iptal gerekçesi mesajlaşmayla aynı içerik
+    // filtresinden geçer (Apple 1.2).
+    MessagingModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [TradeController],

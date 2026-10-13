@@ -11678,7 +11678,8 @@
       "sendForbidden": "You are not allowed to send messages in this thread",
       "viewForbidden": "You are not allowed to view this thread",
       "messageTooLong": "A message can be at most {max} characters. Current length: {length}",
-      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow."
+      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow.",
+      "contentRejected": "Your text contains content that cannot be shared (such as offensive language or contact details). Please edit it and try again."
     },
     "wishlist": {
       "ownProduct": "You cannot add your own product to a wishlist",

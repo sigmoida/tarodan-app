@@ -81,6 +81,7 @@ import {
 } from "../../../common/helpers/generate-reference";
 import { calculateServiceTax } from "../../order/helpers/order-service-tax.helper";
 import { OrderTaxPolicyService } from "../../order/pricing/order-tax-policy.service";
+import { ContentFilterService } from "../../messaging/content-filter.service";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -112,7 +113,24 @@ export class TradeLifecycleService {
     @Optional() private readonly discountService?: DiscountService,
     // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI, fırlatmaz.
     @Optional() private readonly mailNotifier?: MailInternalNotifier,
+    // Takas mesajı ve red/iptal gerekçesi mesajlaşmayla AYNI içerik
+    // filtresinden geçer (Apple 1.2). TradeModule MessagingModule'ü içe
+    // aktarır; dar test kurulumlarında yok.
+    @Optional() private readonly contentFilter?: ContentFilterService,
   ) {}
+
+  /**
+   * Karşı tarafa görünen serbest metni mesajlaşma filtresinden geçirir (S9a):
+   * uygunsuz içerik 400, iletişim bilgisi maskelenir; boş metin aynen döner.
+   * Yavaş olabilir (AI) — işlem AÇILMADAN çağrılır.
+   */
+  private async screenText<T extends string | null | undefined>(
+    text: T,
+  ): Promise<T | string> {
+    return this.contentFilter
+      ? this.contentFilter.screenUnqueuedText(text)
+      : text;
+  }
 
   /**
    * Personel bildirimi (`trade.started` / `trade.disputed`). Commit sonrası
@@ -336,6 +354,7 @@ export class TradeLifecycleService {
     // Referans işlem dışında üretilir: çakışma kontrolü transaction'ı
     // gereksiz yere uzatmasın.
     const tradeNumber = await this.generateTradeNumber();
+    const initiatorMessage = await this.screenText(dto.message);
 
     // Create trade in transaction
     const trade = await this.prisma.$transaction(async (tx) => {
@@ -353,7 +372,7 @@ export class TradeLifecycleService {
           status: TradeStatus.pending,
           cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
           cashPayerId,
-          initiatorMessage: dto.message,
+          initiatorMessage,
           initiatorAddressId,
           responseDeadline,
           // Yeni takaslar v2 fiyatlamasıyla açılır: iki taraf da sabit hizmet
@@ -462,6 +481,7 @@ export class TradeLifecycleService {
       this.prisma,
       "tradeShippingDays",
     );
+    const receiverMessage = await this.screenText(dto.message);
 
     let tradeInitiatorId: string;
     let acceptedNextStatus: TradeStatus | null = null;
@@ -601,7 +621,7 @@ export class TradeLifecycleService {
         where: { id: tradeId, version: trade.version },
         data: {
           status: nextStatus,
-          receiverMessage: dto.message,
+          receiverMessage,
           receiverAddressId,
           acceptedAt: now,
           paymentDeadline: isV2 || trade.cashPayerId ? paymentDeadline : null,
@@ -750,6 +770,7 @@ export class TradeLifecycleService {
     userId: string,
     dto: RejectTradeDto,
   ): Promise<TradeResponseDto> {
+    const reason = await this.screenText(dto.reason);
     let tradeInitiatorId: string;
 
     await this.prisma.$transaction(async (tx) => {
@@ -798,7 +819,7 @@ export class TradeLifecycleService {
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
-          ...tradeRejectedData(dto.reason),
+          ...tradeRejectedData(reason),
           version: { increment: 1 },
         },
       });
@@ -1038,6 +1059,8 @@ export class TradeLifecycleService {
         { required: false },
       );
 
+    const initiatorMessage = await this.screenText(dto.message);
+
     // Update trade in transaction
     // Not: Counter offer sadece pending trade'de yapılır. Pending'de quantity
     // düşürülmemiştir, dolayısıyla burada stok manipülasyonu gerekmez.
@@ -1056,7 +1079,7 @@ export class TradeLifecycleService {
           initiatorAddressId: newInitiatorAddressId, // Yeni initiator'ın adresi (swap ile güncellenmeli)
           cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
           cashPayerId,
-          initiatorMessage: dto.message, // New initiator's message
+          initiatorMessage, // New initiator's message
           receiverMessage: null, // Clear old receiver message
           responseDeadline,
           // Karşı teklif yanıt aşamasını baştan başlatır: extend_once hakkı da.
@@ -1133,6 +1156,7 @@ export class TradeLifecycleService {
     userId: string,
     dto: CancelTradeDto,
   ): Promise<TradeResponseDto> {
+    const cancelReason = await this.screenText(dto.reason);
     let alreadyCancelled = false;
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
@@ -1223,7 +1247,7 @@ export class TradeLifecycleService {
         where: { id: tradeId, version: trade.version },
         data: {
           ...tradeCancelledData(tradePartyActor(trade, userId)),
-          cancelReason: dto.reason,
+          cancelReason,
           version: { increment: 1 },
         },
       });
