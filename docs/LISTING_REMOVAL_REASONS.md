@@ -24,6 +24,7 @@ Tek kaynak: `packages/types/src/listing-removal.ts` (katalog + doğrulama kural�
 | `traded`             | sistem  | Takas Tarodan'da TAMAMLANDI ve stoğu o bitirdi ("Tarodan'da takas edildi"). Tamamlanmadan stok düşen yollar `out_of_stock` kalır | —                                             |
 | `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                                                         | —                                             |
 | `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                                                        | işlemi yapan yönetici kayda geçer             |
+| `account_deleted`    | sistem  | Satıcı hesabını sildi: aktif ve onay bekleyen ilanlar `inactive` (rezerve ilan silmeyi engeller)                                 | silmeyi başlatan kullanıcı kayda geçer        |
 | `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                                                                | **ihlal kodu**; `other` ise açıklama zorunlu  |
 
 Başka platformda satış — platformlar: `letgo`, `instagram`, `dolap`,
@@ -48,6 +49,11 @@ dışında), en fazla 500 karakter.
 `traded` sonradan eklendi (göç `20261005220000_listing_removal_followups`,
 `ALTER TYPE ... ADD VALUE`): geçmiş kayıtlar geri doldurulmadı, bu göçten önce
 takasla düşen ilanlar `out_of_stock` kalır.
+
+`account_deleted` da sonradan eklendi (göç
+`20261013110000_listing_removal_account_deleted`): hesap silme aktif ilan
+yüzünden reddedilmez, ilanlar silme transaction'ında pasife alınır. Geri
+doldurma yok.
 
 ## Nerede kaydedilir
 
@@ -170,6 +176,7 @@ andır.
 | `TradeReconciliationService` (kargoda kayıp; takas tamamlanmadı)               | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `finalizeReturningTradeIfResolved` (iade kolisi kayıp)                         | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `AdminStaffService.banUser`                                                    | `active` → `suspended`, `pending` → `rejected` | `seller_suspended`                         |
+| `deactivateListingsForAccountDeletion` (`UserProfileService.deleteAccount`)    | `active` / `pending` → `inactive`              | `account_deleted`                          |
 | `AdminProductService.rejectProduct` (+ toplu red, moderasyon kuyruğu)          | → `rejected`                                   | `policy_violation` + ihlal kodu            |
 | `AdminProductService.deleteProduct` (yumuşak)                                  | → `deleted`                                    | `policy_violation` + ihlal kodu            |
 | `ProductRenewalService.markExpired` (yönetici bakımı)                          | `inactive` işareti → `expired`                 | `expired` (sayılmaz)                       |

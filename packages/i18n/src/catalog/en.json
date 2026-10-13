@@ -11162,7 +11162,6 @@
       "corporateApplicationNotFound": "Corporate application not found",
       "deleteAccountBlocked": "To delete your account, you must first complete the following:",
       "deleteAccountFailed": "An error occurred while deleting your account. Please contact support.",
-      "deleteBlockedActiveListings": "You have {count} active listings. Please remove all of your listings first.",
       "deleteBlockedActiveTrades": "You have {count} active trade offers. Please complete or cancel your trades.",
       "deleteBlockedOpenRefunds": "You have {count} open refund processes. Please wait for the refunds to finish.",
       "deleteBlockedPaymentHolds": "You have {count} unsettled payment holds. Please wait for the money flow to finish.",
@@ -11187,7 +11186,8 @@
       "userBlocked": "{displayName} has been blocked",
       "userUnblocked": "Block removed",
       "usernameAlreadySet": "The username has already been set.",
-      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores."
+      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores.",
+      "deleteBlockedReservedListings": "{count} of your listings are tied to a sale or trade in progress. You can delete your account once those are complete."
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",
@@ -12222,7 +12222,8 @@
         "traded": "Traded on Tarodan",
         "return_quarantine": "Awaiting return check",
         "seller_suspended": "Seller account suspended",
-        "policy_violation": "Policy violation"
+        "policy_violation": "Policy violation",
+        "account_deleted": "Seller deleted their account"
       },
       "actor": {
         "seller": "Seller",

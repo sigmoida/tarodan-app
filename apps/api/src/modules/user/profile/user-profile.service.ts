@@ -51,6 +51,13 @@ import {
 } from "../../../common/helpers/public-identity";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
 import {
+  ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES,
+  deactivateListingsForAccountDeletion,
+} from "../../product/helpers/account-deletion-listings";
+import { SearchService } from "../../search/search.service";
+import { errorMessage } from "../../../common/helpers/error-message";
+import { CacheService } from "../../cache/cache.service";
+import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
   computeRetainUntil,
@@ -84,6 +91,8 @@ export class UserProfileService {
     private readonly userBlocks: UserBlockService,
     private readonly consents: ConsentService,
     private readonly newsletter: NewsletterService,
+    private readonly searchService: SearchService,
+    private readonly cache: CacheService,
   ) {}
 
   /**
@@ -582,9 +591,11 @@ export class UserProfileService {
   /**
    * Delete user account
    * Only allowed if:
-   * - All products are removed (inactive, sold, rejected, draft)
+   * - No reserved listings (bound to a sale or trade in progress)
    * - No active trades (pending, accepted, shipped, etc.)
    * - No pending orders (pending_payment, paid, preparing, shipped, delivered)
+   * Active and pending listings no longer block (S3 — Apple 5.1.1(v), Play):
+   * they are deactivated inside the deletion transaction.
    *
    * Kimlik, anonimleştirmeden ÖNCE `DeletedUserIdentity`'ye kopyalanır; arşiv
    * yazılamazsa hesap da silinmez (aylık resmî bildirim yükümlülüğü).
@@ -598,18 +609,14 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
 
-    // Check 1: Active products (active, pending, reserved)
+    // Check 1: süren satışa/takasa bağlı (rezerve) ilanlar. Aktif ve onay
+    // bekleyen ilanlar artık engel değil — silme transaction'ında pasife
+    // alınır (deactivateListingsForAccountDeletion).
     const activeProducts = await this.prisma.product.findMany({
       where: {
         ...catalogProductWhere(),
         sellerId: userId,
-        status: {
-          in: [
-            ProductStatus.active,
-            ProductStatus.pending,
-            ProductStatus.reserved,
-          ],
-        },
+        status: { in: [...ACCOUNT_DELETION_BLOCKING_LISTING_STATUSES] },
       },
       select: { id: true, title: true, status: true },
     });
@@ -712,7 +719,7 @@ export class UserProfileService {
 
     if (activeProducts.length > 0) {
       errors.push(
-        i18nMessage("server.user.deleteBlockedActiveListings", {
+        i18nMessage("server.user.deleteBlockedReservedListings", {
           count: activeProducts.length,
         }),
       );
@@ -763,6 +770,8 @@ export class UserProfileService {
         ...i18nMessage("server.user.deleteAccountBlocked"),
         errors,
         details: {
+          // Ad sözleşme gereği korunur (mobil 1.0.5/1.0.6 okur); artık yalnız
+          // silmeyi engelleyen REZERVE ilanları sayar.
           activeProducts: activeProducts.length,
           activeTrades: activeTrades.length,
           pendingOrders: pendingOrders.length,
@@ -779,6 +788,7 @@ export class UserProfileService {
     // Silinen: kimlik-doğrulama/oturum, ödeme kimlik bilgileri ve doğrudan iletişim PII'si.
     // Korunan: pazaryeri/sosyal içerik (ilan, yorum, mesaj, takas) "Silinmiş Kullanıcı"ya
     // bağlı kalır. deletedAt işaretlenir → auth artık bu hesabı reddeder.
+    let deactivatedListingIds: string[] = [];
     try {
       await this.prisma.$transaction(
         async (tx) => {
@@ -789,6 +799,14 @@ export class UserProfileService {
           // siliyor. Commit sonrasına bırakılamaz — araya giren bir çökme
           // veriyi sessizce ve kalıcı olarak kaybettirirdi.
           await this.archiveIdentity(tx, userId, options);
+
+          // 0b) Yayındaki ve onay bekleyen ilanlar pasife (neden:
+          // account_deleted). Anonimleştirmeyle AYNI transaction: silme
+          // düşerse ilanlar da açık kalır.
+          deactivatedListingIds = await deactivateListingsForAccountDeletion(
+            tx,
+            userId,
+          );
 
           // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
           await tx.refreshToken.deleteMany({ where: { userId } });
@@ -869,6 +887,39 @@ export class UserProfileService {
       throw new BadRequestException(
         i18nMessage("server.user.deleteAccountFailed"),
       );
+    }
+
+    // Commit SONRASI: hesap silindi; arama/önbellek senkronu silmeyi geri
+    // çeviremez, hata yalnız loglanır.
+    await this.syncDeactivatedListings(deactivatedListingIds);
+  }
+
+  /**
+   * Hesap silmede pasife alınan ilanları arama dizininden ve liste/detay
+   * önbelleğinden düşürür. Aksi hâlde ES dokümanı eski (active) hâliyle kalıp
+   * aramada görünür, detay 404 verirdi (satıcının ilan kaldırmasıyla aynı
+   * adımlar).
+   */
+  private async syncDeactivatedListings(productIds: string[]): Promise<void> {
+    if (productIds.length === 0) return;
+    try {
+      await this.cache.delPattern("products:list:*");
+      await Promise.all(
+        productIds.map((id) => this.cache.del(`products:detail:${id}`)),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `account-deletion listing cache invalidation failed: ${errorMessage(error)}`,
+      );
+    }
+    for (const id of productIds) {
+      this.searchService
+        .syncProduct(id)
+        .catch((error) =>
+          this.logger.warn(
+            `ES sync (account deletion) failed for ${id}: ${errorMessage(error)}`,
+          ),
+        );
     }
   }
 

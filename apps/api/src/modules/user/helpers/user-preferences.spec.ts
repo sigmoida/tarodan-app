@@ -33,6 +33,8 @@ describe("user preferences", () => {
       } as any,
       { recordMarketingChange: jest.fn() } as never, // consents
       { syncUserConsent: jest.fn() } as never, // newsletter
+      {} as never, // search
+      {} as never, // cache
     );
   });
 

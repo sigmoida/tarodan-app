@@ -31,8 +31,22 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     deletedAt: null,
   };
 
-  function makeService(overrides: { upsert?: jest.Mock } = {}) {
+  function makeService(
+    overrides: {
+      upsert?: jest.Mock;
+      listings?: Array<{ id: string; status: string }>;
+    } = {},
+  ) {
     const tx = {
+      // S3: aktif / onay bekleyen ilanlar silme transaction'ında pasife.
+      product: {
+        findMany: jest.fn().mockResolvedValue(overrides.listings ?? []),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      offer: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
         update: jest.fn().mockResolvedValue(user),
@@ -82,6 +96,11 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       $transaction: jest.fn((fn: (client: unknown) => unknown) => fn(tx)),
     };
 
+    const search = { syncProduct: jest.fn().mockResolvedValue(undefined) };
+    const cache = {
+      del: jest.fn().mockResolvedValue(undefined),
+      delPattern: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new UserProfileService(
       prisma as never,
       {} as never,
@@ -89,8 +108,10 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       {} as never,
       { recordMarketingChange: jest.fn() } as never, // consents
       { syncUserConsent: jest.fn() } as never, // newsletter
+      search as never,
+      cache as never,
     );
-    return { service, prisma, tx };
+    return { service, prisma, tx, search, cache };
   }
 
   it("arşivi, adresler silinmeden ve satır anonimleştirilmeden ÖNCE yazar", async () => {
@@ -210,5 +231,65 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     const { data } = tx.user.update.mock.calls[0][0];
     expect(data.email).toBe("deleted_user-1@deleted.local");
     expect(data.displayName).toBe(ANONYMIZED_DISPLAY_NAME);
+  });
+
+  describe("aktif ilanlar (S3 — Apple 5.1.1(v))", () => {
+    const listings = [
+      { id: "p-active", status: "active" },
+      { id: "p-pending", status: "pending" },
+    ];
+
+    it("ilanlar anonimleştirmeyle AYNI transaction'da, arşivden sonra pasife alınır", async () => {
+      const { service, tx } = makeService({ listings });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.product.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: "inactive" } }),
+      );
+      const deactivateOrder = tx.product.updateMany.mock.invocationCallOrder[0];
+      expect(
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+      ).toBeLessThan(deactivateOrder);
+      expect(deactivateOrder).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("commit sonrası arama dizini ve önbellek senkronlanır", async () => {
+      const { service, search, cache } = makeService({ listings });
+
+      await service.deleteAccount("user-1");
+
+      expect(search.syncProduct).toHaveBeenCalledWith("p-active");
+      expect(search.syncProduct).toHaveBeenCalledWith("p-pending");
+      expect(cache.delPattern).toHaveBeenCalledWith("products:list:*");
+      expect(cache.del).toHaveBeenCalledWith("products:detail:p-active");
+    });
+
+    it("ilan yoksa senkron çağrısı yapılmaz", async () => {
+      const { service, search, cache } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(search.syncProduct).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+    });
+
+    it("senkron hatası silmeyi başarısız göstermez (hesap zaten silindi)", async () => {
+      const { service, search, cache } = makeService({ listings });
+      cache.delPattern.mockRejectedValue(new Error("redis down"));
+      search.syncProduct.mockRejectedValue(new Error("es down"));
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme transaction'ı düşerse senkron yapılmaz", async () => {
+      const upsert = jest.fn().mockRejectedValue(new Error("db down"));
+      const { service, search } = makeService({ upsert, listings });
+
+      await expect(service.deleteAccount("user-1")).rejects.toBeDefined();
+      expect(search.syncProduct).not.toHaveBeenCalled();
+    });
   });
 });

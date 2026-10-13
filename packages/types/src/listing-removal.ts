@@ -10,7 +10,8 @@
  *   istek gönderebildiği için API nedeni opsiyonel kabul eder ve kaydı
  *   `not_given` olarak düşer. `not_given` hiçbir formda seçenek değildir.
  * - **system** — platformun kendi işleri (ilan ömrü, stok bitişi, teslim
- *   sonrası iade karantinası, satıcının hesabının askıya alınması).
+ *   sonrası iade karantinası, satıcının hesabının askıya alınması, satıcının
+ *   hesabını silmesi).
  * - **admin** — Tarodan'ın kural ihlali nedeniyle kaldırması (moderasyon
  *   reddi / yönetici kaldırması); ihlal kodu {@link LISTING_VIOLATION_CODES}.
  *
@@ -46,6 +47,7 @@ export const LISTING_REMOVAL_REASONS = [
   "traded",
   "return_quarantine",
   "seller_suspended",
+  "account_deleted",
   // admin
   "policy_violation",
 ] as const;
@@ -61,6 +63,7 @@ export const LISTING_REMOVAL_REASONS_BY_ACTOR = {
     "traded",
     "return_quarantine",
     "seller_suspended",
+    "account_deleted",
   ],
   admin: ["policy_violation"],
 } as const satisfies Record<

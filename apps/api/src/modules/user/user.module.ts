@@ -24,6 +24,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { UserBlockModule } from "../user-block/user-block.module";
 import { ConsentModule } from "../consent/consent.module";
 import { MarketingModule } from "../marketing/marketing.module";
+import { SearchModule } from "../search/search.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
 
 @Module({
@@ -37,6 +38,9 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     // İkisi de User'a bağlı değil, döngü yok.
     ConsentModule,
     MarketingModule,
+    // Hesap silmede pasife alınan ilanlar arama dizininden düşer (S3).
+    // SearchModule User'a bağlı değil, döngü yok.
+    SearchModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],

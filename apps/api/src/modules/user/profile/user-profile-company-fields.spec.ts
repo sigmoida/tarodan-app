@@ -39,6 +39,8 @@ describe("UserProfileService.updateProfile — şirket alanları", () => {
       } as any,
       { recordMarketingChange: jest.fn() } as never, // consents
       { syncUserConsent: jest.fn() } as never, // newsletter
+      {} as never, // search
+      {} as never, // cache
     );
     // updateProfile sonda tam profili yeniden okur — bu test yazılan ALANLARA
     // baktığı için ağır okuma zinciri stub'lanır.

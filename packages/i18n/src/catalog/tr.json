@@ -11162,7 +11162,6 @@
       "corporateApplicationNotFound": "Kurumsal başvuru bulunamadı",
       "deleteAccountBlocked": "Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:",
       "deleteAccountFailed": "Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.",
-      "deleteBlockedActiveListings": "{count} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.",
       "deleteBlockedActiveTrades": "{count} aktif takas teklifiniz bulunmaktadır. Lütfen takas işlemlerinizi tamamlayın veya iptal edin.",
       "deleteBlockedOpenRefunds": "{count} açık iade süreciniz bulunmaktadır. Lütfen iade süreçlerinin tamamlanmasını bekleyin.",
       "deleteBlockedPaymentHolds": "{count} sonuçlanmamış ödeme blokajınız bulunmaktadır. Lütfen para akışının tamamlanmasını bekleyin.",
@@ -11187,7 +11186,8 @@
       "userBlocked": "{displayName} engellendi",
       "userUnblocked": "Engel kaldırıldı",
       "usernameAlreadySet": "Kullanıcı adı daha önce belirlenmiş.",
-      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir."
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+      "deleteBlockedReservedListings": "{count} ilanınız süren bir satışa ya da takasa bağlı. Bu işlemler tamamlandığında hesabınızı silebilirsiniz."
     },
     "membership": {
       "alreadyCancelled": "Üyelik zaten iptal edilmiş",
@@ -12222,7 +12222,8 @@
         "traded": "Tarodan'da takas edildi",
         "return_quarantine": "İade kontrolü bekliyor",
         "seller_suspended": "Satıcı hesabı askıya alındı",
-        "policy_violation": "Kural ihlali"
+        "policy_violation": "Kural ihlali",
+        "account_deleted": "Satıcı hesabını sildi"
       },
       "actor": {
         "seller": "Satıcı",
