@@ -158,9 +158,12 @@ describe("UserProfileService account deletion obligations", () => {
   it("rezerve ilan engeli kendi metniyle döner; details.activeProducts onu sayar", async () => {
     const { service, prisma } = makeBlockedService(2);
 
-    const error = await service
-      .deleteAccount("user-1")
-      .catch((e: unknown) => e as { getResponse(): any });
+    const error = (await service.deleteAccount("user-1").then(
+      () => {
+        throw new Error("deleteAccount reddedilmeliydi");
+      },
+      (e: unknown) => e,
+    )) as { getResponse(): any };
 
     const body = error.getResponse();
     expect(body.i18nKey).toBe("server.user.deleteAccountBlocked");
@@ -179,9 +182,12 @@ describe("UserProfileService account deletion obligations", () => {
   it("rezerve ilan yoksa ilan engeli yazılmaz (diğer engeller sürer)", async () => {
     const { service } = makeBlockedService(0);
 
-    const error = await service
-      .deleteAccount("user-1")
-      .catch((e: unknown) => e as { getResponse(): any });
+    const error = (await service.deleteAccount("user-1").then(
+      () => {
+        throw new Error("deleteAccount reddedilmeliydi");
+      },
+      (e: unknown) => e,
+    )) as { getResponse(): any };
 
     const body = error.getResponse();
     expect(body.details.activeProducts).toBe(0);

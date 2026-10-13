@@ -373,9 +373,12 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
         ordersInTx: [{ id: "o1", status: "pending_payment" }],
       });
 
-      const error = await service
-        .deleteAccount("user-1")
-        .catch((e: unknown) => e as { getResponse(): any });
+      const error = (await service.deleteAccount("user-1").then(
+        () => {
+          throw new Error("deleteAccount reddedilmeliydi");
+        },
+        (e: unknown) => e,
+      )) as { getResponse(): any };
 
       const body = error.getResponse();
       expect(body.i18nKey).toBe("server.user.deleteAccountBlocked");
