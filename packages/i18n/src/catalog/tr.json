@@ -5578,7 +5578,7 @@
           "title": "Tıklanabilir alanlar",
           "disabled": "Önce görsel yükleyin",
           "help": "Görsel üzerinde sürükleyerek alan çizin; alanı sürükleyerek taşıyın, köşelerinden boyutlandırın, Delete tuşuyla silin. Alanlar birbiriyle çakışamaz. Görselli reklamda yalnız bu alanlar tıklanır, dışına tıklamak bir şey yapmaz.",
-          "mobileNote": "Mobil uygulama alan desteği gelene kadar görselli reklamlar mobilde tıklanmaz.",
+          "mobileNote": "Alan desteği olmayan eski mobil uygulama sürümlerinde görselli reklamlar tıklanmaz; güncel sürümde yalnız bu alanlar tıklanır.",
           "count": "{count} / {max}",
           "maxReached": "En fazla {max} alan eklenebilir.",
           "emptyWarning": "Bu görselde tıklanabilir alan yok; reklam tıklanamaz.",
@@ -5614,7 +5614,7 @@
         },
         "device": {
           "desktop": "Masaüstü",
-          "mobile": "Mobil"
+          "mobile": "Mobil (mobil web ve uygulama)"
         },
         "upload": {
           "formats": "Sadece JPG, PNG ve WebP desteklenir",
@@ -5643,7 +5643,7 @@
           "campaignEnded": "Kampanya bitti"
         },
         "linkUrl": "Bağlantı (URL)",
-        "linkUrlHelper": "https://… ile başlayan tam adres ya da /kategori/araba gibi site içi yol.",
+        "linkUrlHelper": "https://… ile başlayan tam adres ya da /listings?category=araba gibi site içi yol (web ve mobil uygulamada açılır).",
         "content": "Metin",
         "contentPlaceholder": "Görselsiz duyuru için kısa metin",
         "contentHelper": "Düz metin, en fazla 500 karakter. Yalnız metinli ya da duyuru bannerları için kullanılabilir.",
@@ -5652,11 +5652,11 @@
         "campaignHelper": "Kampanyaya bağlı reklam, kampanya bitince otomatik olarak yayından kalkar.",
         "displayOrderHelper": "Aynı yerde birden çok reklam varsa sırayla dönüşümlü gösterilir; küçük sayı önce.",
         "positionHint": {
-          "topbar": "Her sayfanın en üstünde ince bir şerit. Önerilen: 728×90 (şerit yüksekliğinde gösterilir) ya da küçük logo benzeri görsel; metin de olur.",
-          "header": "Ana sayfa ve liste sayfalarında site başlığının altındaki büyük banner. Önerilen: masaüstü 970×250 veya 1200×300, mobil 320×100.",
-          "footer": "Site altbilgisinin üstündeki banner. Önerilen: 970×250, mobil 320×100.",
-          "inline": "Liste, arama ve kategori sayfalarında ürün satırlarının arasında. Önerilen: masaüstü 728×90 veya 970×90, mobil 300×250.",
-          "popup": "Ziyaretçiye günde en çok bir kez açılan pencere. Önerilen: 600×600, mobil 320×480."
+          "topbar": "Sayfanın en üstünde ince bir şerit. Web: her sayfada; mobil uygulama: yalnız ana sayfa. Önerilen: 728×90 (şerit yüksekliğinde gösterilir) ya da küçük logo benzeri görsel; metin de olur.",
+          "header": "Başlığın altındaki büyük banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesi. Önerilen: masaüstü 970×250 veya 1200×300, mobil 320×100.",
+          "footer": "Altbilginin üstündeki banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesinin sonu. Önerilen: 970×250, mobil 320×100.",
+          "inline": "Ürün satırlarının arasında. Web: liste, arama ve kategori sayfaları; mobil uygulama: yalnız ilan listesi. Önerilen: masaüstü 728×90 veya 970×90, mobil 300×250.",
+          "popup": "Ziyaretçiye günde en çok bir kez açılan pencere. Web: tüm vitrin sayfaları; mobil uygulama: yalnız ana sayfa. Önerilen: 600×600, mobil 320×480."
         }
       },
       "discounts": {
