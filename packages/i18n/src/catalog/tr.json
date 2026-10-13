@@ -1360,7 +1360,7 @@
       "modalIntro": "Yaşadığınız sorunu seçin ve kısaca açıklayın. Tarodan ekibi en kısa sürede inceleyecek.",
       "reasonShipmentLost": "Kargo kayboldu / ulaşmadı",
       "reasonShipmentDamaged": "Ürün hasarlı geldi",
-      "reasonWrongItem": "Beklediğim ürün gelmedi",
+      "reasonWrongItem": "Yanlış ürün geldi",
       "reasonNotAsDescribed": "Ürün açıklamayla uyuşmuyor",
       "reasonOther": "Diğer",
       "descriptionLabel": "Açıklama",
