@@ -170,6 +170,13 @@ export class AppleTokenService implements OnModuleInit {
    *   kuyruğa girer — silinmiş kullanıcıda iptal edilmeyecek token kalmaz.
    * İptali istenmiş satırın üzerine ASLA yazılmaz: güncelleme yalnız
    * kullanıcının canlı (`revokeRequestedAt` boş) satırına yapılır.
+   *
+   * İkinci cihaz girişi önceki refresh token'ı İPTAL ETMEDEN ezer (bilinçli):
+   * Apple'ın revoke'u yalnız token'ı değil kullanıcının o uygulamaya verdiği
+   * yetkiyi de geçersiz kılar — eski token'ı iptal etmek, aynı kullanıcının
+   * yeni oturumunun yetkisini de düşürür. Hesap silmede en son token'ın
+   * iptali yetkinin tamamını kaldırır; ezilen token o andan sonra kullanılmaz
+   * ve saklanmaz.
    */
   private async persistToken(
     userId: string,

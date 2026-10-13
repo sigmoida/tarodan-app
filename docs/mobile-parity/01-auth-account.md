@@ -249,7 +249,10 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
   `com.tarodan.app.staging`) ile Apple'da refresh token'a çevirir ve şifreli saklar
   (`apple_sign_in_tokens`). `DELETE /users/me` iptali outbox'a yazar (`apple.token_revoke`); Apple
   çağrısı commit sonrası, yeniden denenerek yapılır, silmeyi engellemez. Kodu göndermeyen eski
-  istemci ve web aynen çalışır (iptal edilecek token yoktur). Env: `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+  istemci ve web aynen çalışır (iptal edilecek token yoktur). Kullanıcı × client id başına yalnız
+  SON girişin token'ı tutulur; yeni cihaz girişi eskisini iptal etmeden ezer — Apple'ın revoke'u
+  uygulamaya verilen yetkinin tamamını düşürdüğü için eskiyi iptal etmek yeni oturumu da bozar,
+  silmede son token'ın iptali yetkiyi bütünüyle kaldırır. Env: `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
   `APPLE_PRIVATE_KEY`, `APPLE_TOKEN_ENCRYPTION_KEY`; biri eksikse özellik loglanan bir no-op'tur.
 - Yanıt normal login ile aynı: `{ user, tokens }`.
 
