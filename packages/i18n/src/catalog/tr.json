@@ -11620,7 +11620,9 @@
       "onlyCountInStock": "Stokta sadece {count} adet var",
       "lastItems": "Son {count} ürün",
       "noLongerForSale": "\"{title}\" artık satışta değil",
-      "itemWarning": "\"{title}\": {warning}"
+      "itemWarning": "\"{title}\": {warning}",
+      "couponNotApplied": "Kupon uygulanamadı",
+      "couponApplyFailed": "Kupon uygulanırken hata oluştu"
     },
     "category": {
       "commissionCoverageIncomplete": "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",

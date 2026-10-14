@@ -612,6 +612,7 @@ export class CartService {
         cart.couponCode,
         availableItems,
         userId,
+        locale,
       );
       couponDiscountTotal = couponResult.discountAmount;
       if (couponResult.appliedDiscount) {
@@ -735,6 +736,7 @@ export class CartService {
     code: string,
     items: CartItemResponseDto[],
     userId: string,
+    locale: Locale,
   ): Promise<{
     discountAmount: number;
     appliedDiscount?: AppliedDiscountDto;
@@ -757,7 +759,9 @@ export class CartService {
       if (!validation.isValid || !validation.discount) {
         return {
           discountAmount: 0,
-          warning: validation.error ?? "Kupon uygulanamadı",
+          warning:
+            validation.error ??
+            translateMessage("server.cart.couponNotApplied", locale),
         };
       }
       const coupon = validation.discount;
@@ -802,7 +806,10 @@ export class CartService {
       };
     } catch (error) {
       this.logger.error(`Error applying coupon: ${error}`);
-      return { discountAmount: 0, warning: "Kupon uygulanırken hata oluştu" };
+      return {
+        discountAmount: 0,
+        warning: translateMessage("server.cart.couponApplyFailed", locale),
+      };
     }
   }
 

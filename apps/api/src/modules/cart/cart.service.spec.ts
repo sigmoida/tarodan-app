@@ -529,4 +529,20 @@ describe("CartService.calculateCart — unavailable items", () => {
     expect(result.items[1].stockWarning).toBeUndefined();
     expect(result.items[1].availableQuantity).toBeUndefined();
   });
+  it("kupon hata nedeni yoksa yerelleştirilmiş varsayılan uyarı döner", async () => {
+    mockValidateCoupon.mockResolvedValue({ isValid: false });
+    const result = await calculateCart([makeCartItem("c")], "KOD", {
+      locale: "en",
+    });
+
+    expect(result.warnings).toContain("The coupon could not be applied");
+  });
+
+  it("kupon doğrulaması hata fırlatırsa yerelleştirilmiş uyarı döner", async () => {
+    mockValidateCoupon.mockRejectedValue(new Error("db down"));
+    const result = await calculateCart([makeCartItem("c")], "KOD");
+
+    expect(result.couponDiscountTotal).toBe(0);
+    expect(result.warnings).toContain("Kupon uygulanırken hata oluştu");
+  });
 });
