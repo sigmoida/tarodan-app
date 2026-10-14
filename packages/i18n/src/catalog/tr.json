@@ -11615,7 +11615,12 @@
       "productNotPurchasable": "Bu ürün şu an satışa uygun değil",
       "itemNotFound": "Ürün sepette bulunamadı",
       "empty": "Sepetiniz boş",
-      "maxQuantityPerOrder": "Bu üründen maksimum {max} adet alabilirsiniz"
+      "maxQuantityPerOrder": "Bu üründen maksimum {max} adet alabilirsiniz",
+      "outOfStock": "Stokta yok",
+      "onlyCountInStock": "Stokta sadece {count} adet var",
+      "lastItems": "Son {count} ürün",
+      "noLongerForSale": "\"{title}\" artık satışta değil",
+      "itemWarning": "\"{title}\": {warning}"
     },
     "category": {
       "commissionCoverageIncomplete": "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",

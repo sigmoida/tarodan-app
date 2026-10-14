@@ -20,6 +20,8 @@ import {
 import { CartService } from './cart.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ReqLocale } from '../i18n';
+import { type Locale } from '@tarodan/i18n';
 import {
   AddToCartDto,
   UpdateCartItemDto,
@@ -45,8 +47,11 @@ export class CartController {
     description: 'Cart with calculations',
     type: CartResponseDto,
   })
-  async getCart(@CurrentUser('id') userId: string): Promise<CartResponseDto> {
-    return this.cartService.getOrCreate(userId);
+  async getCart(
+    @CurrentUser('id') userId: string,
+    @ReqLocale() locale: Locale,
+  ): Promise<CartResponseDto> {
+    return this.cartService.getOrCreate(userId, locale);
   }
 
   /**
@@ -61,8 +66,9 @@ export class CartController {
   })
   async getCalculation(
     @CurrentUser('id') userId: string,
+    @ReqLocale() locale: Locale,
   ): Promise<CartCalculationResponseDto> {
-    return this.cartService.getCartWithCalculations(userId);
+    return this.cartService.getCartWithCalculations(userId, locale);
   }
 
   /**
@@ -86,8 +92,9 @@ export class CartController {
   async addItem(
     @CurrentUser('id') userId: string,
     @Body() dto: AddToCartDto,
+    @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
-    return this.cartService.addItem(userId, dto);
+    return this.cartService.addItem(userId, dto, locale);
   }
 
   /**
@@ -109,8 +116,9 @@ export class CartController {
     @CurrentUser('id') userId: string,
     @Param('productId') productId: string,
     @Body() dto: UpdateCartItemDto,
+    @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
-    return this.cartService.updateItem(userId, productId, dto);
+    return this.cartService.updateItem(userId, productId, dto, locale);
   }
 
   /**
@@ -131,8 +139,9 @@ export class CartController {
   async removeItem(
     @CurrentUser('id') userId: string,
     @Param('productId') productId: string,
+    @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
-    return this.cartService.removeItem(userId, productId);
+    return this.cartService.removeItem(userId, productId, locale);
   }
 
   /**
@@ -153,8 +162,9 @@ export class CartController {
   async applyCoupon(
     @CurrentUser('id') userId: string,
     @Body() dto: ApplyCouponDto,
+    @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
-    return this.cartService.applyCoupon(userId, dto);
+    return this.cartService.applyCoupon(userId, dto, locale);
   }
 
   /**
@@ -169,8 +179,9 @@ export class CartController {
   })
   async removeCoupon(
     @CurrentUser('id') userId: string,
+    @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
-    return this.cartService.removeCoupon(userId);
+    return this.cartService.removeCoupon(userId, locale);
   }
 
   /**

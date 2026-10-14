@@ -8,6 +8,7 @@ import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { UserBlockService } from "../user-block/user-block.service";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
+import type { Locale } from "@tarodan/i18n";
 
 /**
  * addItem — "sepette zaten olan ürüne tekrar ekleme" davranışı.
@@ -173,6 +174,31 @@ describe("CartService.addItem — idempotent re-add", () => {
     expect(mockPrisma.cart.update).not.toHaveBeenCalled();
   });
 
+  it("stok aşımında katalog anahtarlı hata verir (gerçek adetle)", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue(
+      makeProduct({ quantity: 2 }),
+    );
+
+    await expect(
+      service.addItem("user-1", { productId, quantity: 3 } as any),
+    ).rejects.toMatchObject({
+      response: {
+        i18nKey: "server.cart.onlyCountInStock",
+        i18nParams: { count: 2 },
+      },
+    });
+  });
+
+  it("stokta olmayan ürün için server.cart.outOfStock döner", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue(
+      makeProduct({ quantity: 0 }),
+    );
+
+    await expect(
+      service.addItem("user-1", { productId, quantity: 1 } as any),
+    ).rejects.toMatchObject({ response: { i18nKey: "server.cart.outOfStock" } });
+  });
+
   it("ödeme-only ürün normal sepete eklenemez", async () => {
     mockPrisma.product.findUnique.mockResolvedValue(
       makeProduct({ kind: ProductKind.boost }),
@@ -186,6 +212,11 @@ describe("CartService.addItem — idempotent re-add", () => {
     expect(mockPrisma.cartItem.findUnique).not.toHaveBeenCalled();
   });
 });
+
+interface CalcOptions {
+  locale?: Locale;
+  expiresAt?: Date;
+}
 
 describe("CartService.calculateCart — unavailable items", () => {
   const mockCartFindUnique = jest.fn();
@@ -234,12 +265,13 @@ describe("CartService.calculateCart — unavailable items", () => {
   const calculateCart = async (
     items: ReturnType<typeof makeCartItem>[],
     couponCode: string | null = null,
+    { locale, expiresAt = new Date("2100-01-01") }: CalcOptions = {},
   ) => {
     mockCartFindUnique.mockResolvedValue({
       id: "cart-1",
       userId: "buyer-1",
       couponCode,
-      expiresAt: new Date("2100-01-01"),
+      expiresAt,
       createdAt: new Date("2026-01-01"),
       updatedAt: new Date("2026-01-01"),
       items,
@@ -259,7 +291,7 @@ describe("CartService.calculateCart — unavailable items", () => {
       userBlockServiceStub() as any,
     );
 
-    const response = await service.getOrCreate("buyer-1");
+    const response = await service.getOrCreate("buyer-1", locale);
     return response.calculation;
   };
 
@@ -409,5 +441,92 @@ describe("CartService.calculateCart — unavailable items", () => {
       appliedAmount: 0,
     });
     expect(result.grandTotal).toBeCloseTo(129.99, 2);
+  });
+  it("sepet süresizdir: expiresAt geçmiş olsa da ürünler ve kupon silinmez", async () => {
+    mockValidateCoupon.mockResolvedValue({ isValid: false, error: "x" });
+    const result = await calculateCart([makeCartItem("kept")], "KUPON10", {
+      expiresAt: new Date("2000-01-01"),
+    });
+
+    // mockPrisma'da cartItem.deleteMany / cart.update yok: silme dalı
+    // çalışsaydı test patlardı. Satır ve kupon kodu yerinde kalır.
+    expect(result.items).toHaveLength(1);
+    expect(result.appliedCouponCode).toBe("KUPON10");
+  });
+
+  it("süresi geçmiş kupon her okumada validateCoupon ile yeniden denetlenir", async () => {
+    mockValidateCoupon.mockResolvedValue({
+      isValid: false,
+      error: "Kuponun süresi dolmuş",
+    });
+    const result = await calculateCart([makeCartItem("a")], "ESKI");
+
+    expect(mockValidateCoupon).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "ESKI" }),
+      "buyer-1",
+    );
+    expect(result.couponDiscountTotal).toBe(0);
+    expect(result.appliedDiscounts).toHaveLength(0);
+    expect(result.warnings).toContain("Kuponun süresi dolmuş");
+  });
+
+  it("gerçek müsait adedi döndürür ve 'Son 1 ürün' uyarısı verir", async () => {
+    const result = await calculateCart([
+      makeCartItem("last", { quantity: 1, reservedQuantity: 0 }),
+    ]);
+
+    expect(result.items[0]).toMatchObject({
+      isAvailable: true,
+      availableQuantity: 1,
+      stockWarning: "Son 1 ürün",
+    });
+  });
+
+  it("rezervi düşerek sepetteki adetten az stokta gerçek sayıyı yazar", async () => {
+    const item = makeCartItem("short", { quantity: 5, reservedQuantity: 3 });
+    item.quantity = 3;
+    const result = await calculateCart([item]);
+
+    expect(result.items[0]).toMatchObject({
+      availableQuantity: 2,
+      stockWarning: "Stokta sadece 2 adet var",
+    });
+  });
+
+  it("stok uyarısını istek diline göre yerelleştirir (en)", async () => {
+    const result = await calculateCart(
+      [makeCartItem("en", { quantity: 3, reservedQuantity: 0 })],
+      null,
+      { locale: "en" },
+    );
+
+    expect(result.items[0].stockWarning).toBe("Only 3 left");
+  });
+
+  it("tükenen satırı satın alınamaz yapar, uyarıları yerelleştirir", async () => {
+    const result = await calculateCart(
+      [makeCartItem("gone", { title: "Model", quantity: 1, reservedQuantity: 1 })],
+      null,
+      { locale: "en" },
+    );
+
+    expect(result.items[0]).toMatchObject({
+      isAvailable: false,
+      availableQuantity: 0,
+      stockWarning: "Out of stock",
+    });
+    expect(result.warnings).toEqual(['"Model" is no longer for sale']);
+  });
+
+  it("bol stokta uyarı yok; sınırsız stokta availableQuantity tanımsız", async () => {
+    const result = await calculateCart([
+      makeCartItem("many", { quantity: 50 }),
+      makeCartItem("unlimited", { quantity: null }),
+    ]);
+
+    expect(result.items[0].stockWarning).toBeUndefined();
+    expect(result.items[0].availableQuantity).toBe(50);
+    expect(result.items[1].stockWarning).toBeUndefined();
+    expect(result.items[1].availableQuantity).toBeUndefined();
   });
 });

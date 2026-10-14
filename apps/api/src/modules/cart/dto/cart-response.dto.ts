@@ -50,6 +50,12 @@ export class CartItemResponseDto {
 
   @ApiPropertyOptional({
     description:
+      "Gerçek müsait adet (stok − rezerv). Tanımsız = sınırsız stok. İstemci kendi metnini bu sayıdan üretebilir; stockWarning eski istemciler için yerelleştirilmiş metindir.",
+  })
+  availableQuantity?: number;
+
+  @ApiPropertyOptional({
+    description:
       "Bu satırda sipariş edilebilecek maksimum adet (fiziksel stok ve sipariş-başına-maks birleşimi). Tanımsız = sınırsız stok.",
   })
   maxQuantity?: number;

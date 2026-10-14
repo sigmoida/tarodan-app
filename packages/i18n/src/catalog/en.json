@@ -11615,7 +11615,12 @@
       "productNotPurchasable": "This product is not available for purchase right now",
       "itemNotFound": "The product was not found in your cart",
       "empty": "Your cart is empty",
-      "maxQuantityPerOrder": "You can buy at most {max} of this product"
+      "maxQuantityPerOrder": "You can buy at most {max} of this product",
+      "outOfStock": "Out of stock",
+      "onlyCountInStock": "Only {count} in stock",
+      "lastItems": "Only {count} left",
+      "noLongerForSale": "\"{title}\" is no longer for sale",
+      "itemWarning": "\"{title}\": {warning}"
     },
     "category": {
       "commissionCoverageIncomplete": "The category cannot be activated: the active commission set must publish an unbroken price range from 0 TL to infinity for FREE, BASIC, PREMIUM and BUSINESS.",
