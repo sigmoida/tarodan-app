@@ -15,12 +15,13 @@ import { categoriesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import {
   PAGE_LIMIT,
-  detectBrand,
+  mergeUrlFilters,
   parseListingsFilters,
   getListingsPage,
   type Filters,
 } from "../_lib/params";
 import { fetchListingsClient } from "../_lib/data";
+import { createUrlWriteTracker, normalizeParams } from "../_lib/urlSync";
 import { type ProductLayout } from "../_components/ProductLayoutSelector";
 
 export interface Listing {
@@ -123,13 +124,6 @@ function useListingsValue(): ListingsContextValue {
 
   const searchString = searchParams.toString();
 
-  const normalizeParams = (p: URLSearchParams): string => {
-    const sorted = new URLSearchParams(
-      Array.from(p.entries()).sort((a, b) => a[0].localeCompare(b[0])),
-    );
-    return sorted.toString();
-  };
-
   const buildParamsFromFilters = (f: typeof filters, page: number) => {
     const params = new URLSearchParams();
     if (f.search) params.set("search", f.search);
@@ -175,6 +169,9 @@ function useListingsValue(): ListingsContextValue {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Durum→URL yazımlarımızı izler; URL→durum eşitlemesi bunları geri okumaz
+  // (hızlı ardışık seçimlerde eski URL yeni durumu ezmesin).
+  const urlWrites = useRef(createUrlWriteTracker());
   const hasSyncedToUrl = useRef(false);
   useEffect(() => {
     if (!hasSyncedToUrl.current) {
@@ -184,6 +181,7 @@ function useListingsValue(): ListingsContextValue {
     const nextParams = buildParamsFromFilters(filters, currentPage);
     const currentParams = new URLSearchParams(searchString);
     if (normalizeParams(nextParams) !== normalizeParams(currentParams)) {
+      urlWrites.current.recordWrite(nextParams);
       const nextStr = nextParams.toString();
       const newUrl = nextStr ? `/listings?${nextStr}` : "/listings";
       router.replace(newUrl);
@@ -191,40 +189,12 @@ function useListingsValue(): ListingsContextValue {
   }, [filters, currentPage]);
 
   useEffect(() => {
-    const newSearch = searchParams.get("search") || "";
-    const detectedBrand = detectBrand(newSearch);
-    const page = getListingsPage(new URLSearchParams(searchString));
-    setCurrentPage(page);
-
-    setFilters((prev) => {
-      const next = {
-        ...prev,
-        search: detectedBrand ? "" : newSearch,
-        tradeOnly: searchParams.get("tradeOnly") === "true",
-        discountOnly: searchParams.get("discountOnly") === "true",
-        preOrder: searchParams.get("preOrder") === "true",
-        limited: searchParams.get("limited") === "true",
-        set: searchParams.get("set") === "true",
-        brand: searchParams.get("brand") || detectedBrand || "",
-        brandId: searchParams.get("brandId") || "",
-        carModelId: searchParams.get("carModelId") || "",
-        carModel: searchParams.get("carModel") || "",
-        scale: searchParams.get("scale") || "",
-        material: searchParams.get("material") || "",
-        condition: searchParams.get("condition") || "",
-        minPrice: searchParams.get("minPrice") || "",
-        maxPrice: searchParams.get("maxPrice") || "",
-        sortBy: searchParams.get("sortBy") || prev.sortBy || "relevance",
-        category: searchParams.get("category") || "",
-        categoryId: searchParams.get("categoryId") || "",
-        manufacturer: searchParams.get("manufacturer") || "",
-        manufacturerId: searchParams.get("manufacturerId") || "",
-      };
-      const changed = (Object.keys(next) as (keyof typeof next)[]).some(
-        (k) => prev[k] !== next[k],
-      );
-      return changed ? next : prev;
-    });
+    const sp = new URLSearchParams(searchString);
+    // Bizim yazdığımız (durum zaten daha yeni) → atla; yalnızca dışarıdan gelen
+    // gezinmeler (geri/ileri, menü linki) duruma yazılır.
+    if (urlWrites.current.isOwnWrite(sp)) return;
+    setCurrentPage(getListingsPage(sp));
+    setFilters((prev) => mergeUrlFilters(prev, sp));
   }, [searchString]);
 
   const categorySlug = filters.category || searchParams.get("category") || "";
