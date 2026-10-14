@@ -123,24 +123,41 @@ export function parseListingsFilters(sp: URLSearchParams): Filters {
   };
 }
 
+/** Boş grupları atarak, anahtar sırasından bağımsız karşılaştırılabilir biçim —
+ *  URL boş grupları yazmaz, bu yüzden `{a: []}` ile `{}` aynı filtredir. */
+function customAttrsKey(attrs: Record<string, string[]>): string {
+  return JSON.stringify(
+    Object.entries(attrs)
+      .filter(([, slugs]) => slugs?.length)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+}
+
+/** İki filtre durumu aynı aramayı mı ifade ediyor? Dizi/nesne alanları değere göre. */
+function sameFilters(a: Filters, b: Filters): boolean {
+  return (Object.keys(a) as (keyof Filters)[]).every((k) => {
+    if (k === "colors") return a.colors.join(",") === b.colors.join(",");
+    if (k === "customAttributes")
+      return (
+        customAttrsKey(a.customAttributes) ===
+        customAttrsKey(b.customAttributes)
+      );
+    return a[k] === b[k];
+  });
+}
+
 /**
  * URL değişince (geri/ileri, menü linki) mevcut filtre durumunu URL'e eşitle.
- * Skaler alanlar `parseListingsFilters` ile — tek kaynak — okunur; URL'de
- * olmayan bir filtre (ör. `sortBy`, `scale`) varsayılanına döner, önceki
- * durumda kalmaz ("Çok Satanlar" → "Tüm İlanlar" popüler sıralamayı taşımaz).
- * `colors` / `customAttributes` durumdan korunur (kenar çubuğu yönetir).
- * Değişiklik yoksa aynı nesne döner, böylece gereksiz render/URL yazımı olmaz.
+ * HER alan `parseListingsFilters` ile — tek kaynak, sayfanın URL'e yazdığı
+ * biçimle (`color=a,b`, `attr.<grup>=a,b`) — okunur; URL'de olmayan bir filtre
+ * (`sortBy`, `scale`, renk, özel nitelik…) varsayılanına döner, önceki durumda
+ * kalmaz ("Çok Satanlar" → "Tüm İlanlar" popüler sıralamayı, `?color=red` →
+ * `/listings` rengi taşımaz). Değişiklik yoksa aynı nesne döner, böylece
+ * gereksiz render/URL yazımı olmaz.
  */
 export function mergeUrlFilters(prev: Filters, sp: URLSearchParams): Filters {
-  const next: Filters = {
-    ...parseListingsFilters(sp),
-    colors: prev.colors,
-    customAttributes: prev.customAttributes,
-  };
-  const changed = (Object.keys(next) as (keyof Filters)[]).some(
-    (k) => prev[k] !== next[k],
-  );
-  return changed ? next : prev;
+  const next = parseListingsFilters(sp);
+  return sameFilters(prev, next) ? prev : next;
 }
 
 /** Current page from the URL (`?page=N`), defaulting to 1. */

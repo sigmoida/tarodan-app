@@ -29,16 +29,33 @@ describe("mergeUrlFilters", () => {
     });
   });
 
-  it("keeps colors and custom attributes from state", () => {
+  it("drops colors and custom attributes once the URL no longer has them", () => {
+    const prev = parseListingsFilters(
+      sp("color=red,black&attr.hw-rarity=treasure-hunt"),
+    );
+    expect(prev.colors).toEqual(["red", "black"]);
+    expect(prev.customAttributes).toEqual({ "hw-rarity": ["treasure-hunt"] });
+    const next = mergeUrlFilters(prev, sp(""));
+    expect(next.colors).toEqual([]);
+    expect(next.customAttributes).toEqual({});
+  });
+
+  it("reads colors and custom attributes the way the page writes them", () => {
+    const prev = parseListingsFilters(sp(""));
+    expect(
+      mergeUrlFilters(prev, sp("color=blue&attr.hw-segment=mainline,premium")),
+    ).toMatchObject({
+      colors: ["blue"],
+      customAttributes: { "hw-segment": ["mainline", "premium"] },
+    });
+  });
+
+  it("treats equal colors / attributes as unchanged (empty groups and key order ignored)", () => {
     const prev = {
-      ...parseListingsFilters(sp("")),
-      colors: ["red"],
-      customAttributes: { "hw-rarity": ["treasure-hunt"] },
+      ...parseListingsFilters(sp("color=red")),
+      customAttributes: { b: ["2"], a: ["1"], empty: [] },
     };
-    const next = mergeUrlFilters(prev, sp("tradeOnly=true"));
-    expect(next.colors).toBe(prev.colors);
-    expect(next.customAttributes).toBe(prev.customAttributes);
-    expect(next.tradeOnly).toBe(true);
+    expect(mergeUrlFilters(prev, sp("color=red&attr.a=1&attr.b=2"))).toBe(prev);
   });
 
   it("returns the same object when nothing changed", () => {
