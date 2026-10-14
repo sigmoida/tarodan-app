@@ -4,6 +4,7 @@ import { getMessages, resolveLocale } from "@tarodan/i18n";
 import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
 import type { ConsentDocumentKey } from "@tarodan/types";
 import { legalIdentityFields } from "@/lib/legalIdentity";
+import { newPasswordSchema } from "@/lib/passwordSchema";
 
 /**
  * Auth form schemas — the single source of truth for validation AND types.
@@ -92,12 +93,7 @@ export const resetPasswordSchema = (locale: Locale) => {
   const t = translator(locale);
   return z
     .object({
-      password: z
-        .string()
-        .min(8, t("auth.pwReqMinLength"))
-        .regex(/[A-Z]/, t("validation.passwordUppercase"))
-        .regex(/[a-z]/, t("validation.passwordLowercase"))
-        .regex(/\d/, t("validation.passwordNumber")),
+      password: newPasswordSchema(t),
       confirmPassword: z.string().min(1, t("validation.confirmPassword")),
     })
     .refine((d) => d.password === d.confirmPassword, {
@@ -149,10 +145,7 @@ export const registerSchema = (locale: Locale) => {
         .email(t("validation.invalidEmail")),
       phone: trPhoneOptional(t("validation.trPhoneOnly")),
       birthDate: z.string().min(1, t("validation.birthDateRequired")),
-      password: z
-        .string()
-        .min(8, t("validation.passwordMin8"))
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t("auth.passwordComplexity")),
+      password: newPasswordSchema(t),
       confirmPassword: z.string(),
       agreeTerms: z.boolean(),
       // KVKK, kullanım şartlarından AYRI bir zorunlu onaydır ve ayrı kayıt olur.

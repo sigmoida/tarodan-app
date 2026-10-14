@@ -4,6 +4,7 @@ import { z } from "zod";
 import { isValidIban } from "@tarodan/ui";
 import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
 import type { Translate } from "@/types/i18n";
+import { newPasswordSchema } from "@/lib/passwordSchema";
 
 /**
  * Zod schemas for the profile dashboard forms. One source of truth for both
@@ -66,12 +67,7 @@ export const changePasswordSchema = (t: Translate) =>
       currentPassword: z
         .string()
         .min(1, t("validation.currentPasswordRequired")),
-      newPassword: z
-        .string()
-        .min(8, t("validation.min8Chars"))
-        .regex(/[A-Z]/, t("validation.passwordNeedsUppercase"))
-        .regex(/[a-z]/, t("validation.passwordNeedsLowercase"))
-        .regex(/\d/, t("validation.passwordNeedsDigit")),
+      newPassword: newPasswordSchema(t),
       confirmPassword: z.string().min(1, t("validation.repeatNewPassword")),
     })
     .refine((d) => d.newPassword === d.confirmPassword, {

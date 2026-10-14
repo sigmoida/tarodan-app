@@ -10654,6 +10654,7 @@ export type MessageKey =
   | "validation.passwordMatch"
   | "validation.passwordMin"
   | "validation.passwordMin8"
+  | "validation.passwordMax"
   | "validation.passwordNeedsDigit"
   | "validation.passwordNeedsLowercase"
   | "validation.passwordNeedsUppercase"
