@@ -74,7 +74,7 @@ export class ProductQueryService {
     // Test şeridi: ES yalnız canlı ilanları indeksler; test viewer'ı her zaman
     // Postgres yoluyla ve yalnız test satıcılarıyla listelenir.
     const lane = await this.lanes.laneOfUser(viewerId);
-    const { search, discountOnly } = query;
+    const { search } = query;
 
     // Anahtar DTO'nun tüm alanlarından türetilir (yeni filtre unutulamaz).
     const cacheKey = buildProductListCacheKey(query, {
