@@ -243,14 +243,20 @@ export class AdminStaffService {
    * Yeni admin hesabı için okunabilir geçici şifre üret.
    * `randomInt` (CSPRNG) şart: Math.random'ın iç durumu birkaç çıktıdan geri
    * hesaplanabilir; e-postayla giden bir admin şifresi tahmin edilebilir olamaz.
+   * Ortak şifre politikasına (büyük + küçük harf + rakam) her zaman uyar: her
+   * sınıftan en az bir karakter garanti edilir.
    */
   private generateTempPassword(): string {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghijkmnpqrstuvwxyz";
+    const digits = "23456789";
+    const all = upper + lower + digits;
+    const pick = (set: string) => set[randomInt(0, set.length)];
     let p = "";
     for (let i = 0; i < 10; i++) {
-      p += chars[randomInt(0, chars.length)];
+      p += pick(all);
     }
-    return p + "!9";
+    return p + pick(upper) + pick(lower) + pick(digits) + "!";
   }
 
   /** Tüm admin personeli + rol başına (aktif) sayıları döndür. */

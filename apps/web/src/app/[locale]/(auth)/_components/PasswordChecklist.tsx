@@ -2,22 +2,7 @@
 
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { useTranslations } from "next-intl";
-
-/** The password rules the marketplace enforces, computed from a raw value. */
-export function passwordChecks(password: string) {
-  return {
-    hasMinLength: password.length >= 8,
-    hasUppercase: /[A-Z]/.test(password),
-    hasLowercase: /[a-z]/.test(password),
-    hasNumber: /\d/.test(password),
-  };
-}
-
-/** True when every rule in `passwordChecks` is satisfied. */
-export function isPasswordValid(password: string): boolean {
-  const c = passwordChecks(password);
-  return c.hasMinLength && c.hasUppercase && c.hasLowercase && c.hasNumber;
-}
+import { passwordChecks } from "@tarodan/types";
 
 /** A single requirement row: green + check when met, grey dot otherwise. */
 export function PasswordRequirement({

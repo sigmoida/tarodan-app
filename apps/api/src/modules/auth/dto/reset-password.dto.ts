@@ -1,4 +1,5 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsString } from 'class-validator';
+import { IsPassword } from '../../../common/validators/password';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ResetPasswordDto {
@@ -13,7 +14,6 @@ export class ResetPasswordDto {
     example: 'NewSecurePassword123!',
     description: 'New password',
   })
-  @IsString()
-  @MinLength(8, { message: 'Şifre en az 8 karakter olmalıdır' })
+  @IsPassword()
   newPassword: string;
 }

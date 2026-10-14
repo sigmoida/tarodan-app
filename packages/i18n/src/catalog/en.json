@@ -2552,6 +2552,7 @@
     "invalidEmail": "Please enter a valid email address",
     "passwordMin": "Password must be at least 6 characters",
     "passwordMin8": "Password must be at least 8 characters",
+    "passwordMax": "Password must be at most 72 characters",
     "passwordMatch": "Passwords do not match",
     "invalidPhone": "Please enter a valid phone number",
     "trPhoneOnly": "Enter a valid Turkish mobile number (5XX XXX XX XX)",

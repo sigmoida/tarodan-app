@@ -2552,6 +2552,7 @@
     "invalidEmail": "Geçerli bir e-posta adresi girin",
     "passwordMin": "Şifre en az 6 karakter olmalıdır",
     "passwordMin8": "Şifre en az 8 karakter olmalıdır",
+    "passwordMax": "Şifre en fazla 72 karakter olabilir",
     "passwordMatch": "Şifreler eşleşmiyor",
     "invalidPhone": "Geçerli bir telefon numarası girin",
     "trPhoneOnly": "Geçerli bir Türkiye cep numarası girin (5XX XXX XX XX)",

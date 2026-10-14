@@ -7,6 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
+import { IsPassword } from "../../../common/validators/password";
 import { IsTrPhone } from "../../../common/validators/tr-phone";
 
 /** Süper-admin'in açtığı test şeridi hesabı (mağaza incelemesi / mobil QA). */
@@ -15,10 +16,8 @@ export class CreateTestAccountDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ minLength: 8 })
-  @IsString()
-  @MinLength(8)
-  @MaxLength(72)
+  @ApiProperty({ minLength: 8, description: "Ortak şifre politikası (@IsPassword)" })
+  @IsPassword()
   password!: string;
 
   @ApiProperty({ example: "App Review Alıcı" })

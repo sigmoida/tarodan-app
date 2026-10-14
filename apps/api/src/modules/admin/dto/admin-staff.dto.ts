@@ -4,11 +4,11 @@ import {
   IsOptional,
   IsBoolean,
   IsString,
-  MinLength,
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdminRole } from '@prisma/client';
+import { IsPassword } from '../../../common/validators/password';
 
 /** Bir e-postaya admin rolü ata. E-posta kayıtlı değilse hesabı sistem oluşturur. */
 export class AssignAdminStaffDto {
@@ -32,8 +32,7 @@ export class AssignAdminStaffDto {
       'Yeni hesap için başlangıç şifresi (opsiyonel). Verilmezse sistem geçici şifre üretip döndürür.',
   })
   @IsOptional()
-  @IsString()
-  @MinLength(6, { message: 'Şifre en az 6 karakter olmalı' })
+  @IsPassword()
   password?: string;
 
   @ApiPropertyOptional({ description: 'Yeni hesap için görünen ad (opsiyonel)' })
