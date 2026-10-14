@@ -34,6 +34,8 @@ describe("listing removal — serbest metin yalnız admin uçlarında", () => {
     // Admin ürün listesi/detayı/dışa aktarımı (liste seçimi serbest metin içermez).
     "modules/admin/catalog/admin-product.service.ts",
     "modules/admin/catalog/admin-product-removal.helper.ts",
+    // Hesap silme pasife alması: yalnız tx tipini (Pick) yazıcıya geçirir; okumaz.
+    "modules/product/helpers/account-deletion-listings.ts",
     // Dashboard dönem kırılımı: yalnız groupBy sayıları.
     "modules/admin/analytics/dashboard/admin-dashboard-removals.service.ts",
   ]);

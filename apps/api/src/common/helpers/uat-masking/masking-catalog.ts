@@ -144,6 +144,10 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
     "oauth_accounts",
     "Gerçek Google/Apple kimliklerine bağ; staging'de gerçek kişi sosyal girişle hesaba düşmesin.",
   ),
+  deleteRows(
+    "apple_sign_in_tokens",
+    "Apple refresh token'ları (şifreli) + iptal hataları; staging gerçek Apple hesabının erişimini iptal etmesin.",
+  ),
   deleteRows("two_factor_secrets", "2FA sırları."),
   deleteRows(
     "password_reset_tokens",
