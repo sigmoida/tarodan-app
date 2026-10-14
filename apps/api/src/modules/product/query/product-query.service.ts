@@ -13,6 +13,8 @@ import { excludeIds } from "../../user-block/user-block.helpers";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
 import { SearchService } from "../../search/search.service";
+import { onSaleWhere } from "../helpers/product-on-sale-where";
+import { withIdTiebreaker } from "../helpers/with-id-tiebreaker";
 import { DiscountService } from "../../discount/discount.service";
 import { ProductQueryDto } from "../dto";
 import { ProductStatus, Prisma } from "@prisma/client";
@@ -133,7 +135,11 @@ export class ProductQueryService {
     })}`;
 
     const hasSearch = !!(search && String(search).trim());
-    const isListAllOrPopular = !hasSearch && !discountOnly;
+    // Arama yoksa Postgres (discountOnly dahil: isOnSale WHERE'de). Arama varsa
+    // ES: alaka sırası korunur, discountOnly ES sorgusunda filtre olarak
+    // uygulanır (total/sayfa filtreden sonra) — Postgres tam-metin yolu yalnız
+    // ilk 1000 eşleşmeyle sınırlı ve alaka sırasını kaybeder.
+    const isListAllOrPopular = !hasSearch;
     if (isListAllOrPopular || lane === "test") {
       // The plain browse / popular grid is the hottest surface and was the ONLY
       // list path bypassing the cache — so every request re-ran the per-product
@@ -277,6 +283,7 @@ export class ProductQueryService {
       material: materialSlug,
       manufacturer: query.manufacturer,
       tradeOnly,
+      // ES'te `oldPrice > price` script filtresi: sorgu içinde, total doğru.
       discountOnly,
       preOrder,
       limited,
@@ -315,6 +322,12 @@ export class ProductQueryService {
               : {}),
           }),
           { id: { in: esResult.ids } },
+          // İndirim penceresi indekste yok: canlı isOnSale kuralıyla doğrula.
+          // Penceresi kapanmış bir ürün aşağıdaki stale-ID kontrolüne takılır
+          // ve istek Postgres yolunda (kanonik kural) yeniden hesaplanır.
+          ...(discountOnly
+            ? [onSaleWhere(new Date(), this.prisma.product.fields.price)]
+            : []),
         ],
       },
       include: {
@@ -360,21 +373,6 @@ export class ProductQueryService {
 
     const formattedProducts =
       await this.common.formatProductResponseMany(pageOrdered);
-
-    // Tutarlılık: Postgres path ile aynı şekilde, discountOnly=true iken sadece
-    // gerçekten indirimli ürünleri döndür.
-    if (discountOnly) {
-      const onSale = formattedProducts.filter((p: any) => p.isOnSale === true);
-      return {
-        data: onSale,
-        meta: {
-          total: onSale.length,
-          page,
-          limit,
-          totalPages: Math.max(1, Math.ceil(onSale.length / limit)),
-        },
-      };
-    }
 
     return {
       data: formattedProducts,
@@ -427,30 +425,12 @@ export class ProductQueryService {
       { fulltextIds },
     );
 
-    // discountOnly requires async DiscountService access, applied separately
+    // discountOnly: isOnSale kuralının WHERE karşılığı (tek kaynak) — sayfalama
+    // ve total filtreden SONRA hesaplanır, sıralamadan bağımsız kalır.
     if (discountOnly) {
-      const now = new Date();
-      const manualDiscountCondition = {
-        AND: [
-          { oldPrice: { not: null } },
-          { OR: [{ saleStartDate: null }, { saleStartDate: { lte: now } }] },
-          { OR: [{ saleEndDate: null }, { saleEndDate: { gte: now } }] },
-        ],
-      };
-      const criteria = await this.discountService.getActiveDiscountCriteria();
-      if (!criteria.hasGlobal) {
-        const campaignConditions: any[] = [];
-        if (criteria.sellerIds.length > 0)
-          campaignConditions.push({ sellerId: { in: criteria.sellerIds } });
-        if (criteria.categoryIds.length > 0)
-          campaignConditions.push({ categoryId: { in: criteria.categoryIds } });
-        if (criteria.productIds.length > 0)
-          campaignConditions.push({ id: { in: criteria.productIds } });
-        const combinedCondition = {
-          OR: [manualDiscountCondition, ...campaignConditions],
-        };
-        (where.AND as any[]).push(combinedCondition);
-      }
+      (where.AND as Prisma.ProductWhereInput[]).push(
+        onSaleWhere(new Date(), this.prisma.product.fields.price),
+      );
     }
 
     // DB-level sorting (replaces old in-memory scoring)
@@ -505,6 +485,9 @@ export class ProductQueryService {
           { id: "asc" },
         ];
     }
+
+    // Eşit değerlerde sayfalar arası tekrar/kayıp olmasın: her sıralama id ile biter.
+    orderBy = withIdTiebreaker(orderBy);
 
     // Stok bitenler her zaman en altta — UI'daki "STOKTA YOK" rozetiyle birebir
     // aynı tanım: stokta = aktif VE müsait adet (quantity − reserved) > 0.
@@ -579,22 +562,6 @@ export class ProductQueryService {
 
     const formattedProducts =
       await this.common.formatProductResponseMany(products);
-
-    // discountOnly: WHERE kolayca "kampanya kapsamındaki" ürünleri geçirse de,
-    // formatProductResponse kampanya fiyatını uygulayamayabilir (değer 0, tarih
-    // dışı vs.). Kullanıcıya sadece gerçekten isOnSale=true olanları döndür.
-    if (discountOnly) {
-      const onSale = formattedProducts.filter((p: any) => p.isOnSale === true);
-      return {
-        data: onSale,
-        meta: {
-          total: onSale.length,
-          page,
-          limit,
-          totalPages: Math.max(1, Math.ceil(onSale.length / limit)),
-        },
-      };
-    }
 
     return {
       data: formattedProducts,
@@ -808,7 +775,7 @@ export class ProductQueryService {
         // ürün (available=0) "alternatif ürünler"de gösterilmez.
         OR: this.inStockOrConditions(),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       take: Math.min(limit, 24),
       include: {
         images: { orderBy: { sortOrder: "asc" }, take: 1 },
@@ -920,7 +887,7 @@ export class ProductQueryService {
         // ilanların durumuna göre değil tarihe göre sıralanması istenir; satılan/
         // pasif/reddedilen ilanlar aşağıdaki adımda en alta taşınır (yine en yeni
         // önce). Öne çıkarma (boost) bu sorguya dahil değildir, dokunulmaz.
-        orderBy: [{ createdAt: "desc" }],
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         include: {
           images: { orderBy: { sortOrder: "asc" }, take: 1 },
           category: {
