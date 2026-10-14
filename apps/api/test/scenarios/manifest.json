@@ -7920,7 +7920,7 @@
       "tur": "Sınır değer | Negatif/Doğrulama",
       "pri": "P0",
       "steps": "POST /api/cart/items { \"productId\":\" \", \"quantity\":5 }.",
-      "exp": "HTTP 400 (E2E: 400/422), message=\"Bu üründen en fazla 2 adet sipariş verilebilir\".",
+      "exp": "HTTP 400 (E2E: 400/422), message=\"Stokta sadece 2 adet var\".",
       "gap": false,
       "gapRefs": []
     },
@@ -7933,7 +7933,7 @@
       "tur": "Sınır değer | Negatif/Doğrulama",
       "pri": "P1",
       "steps": "POST /api/cart/items { \"productId\":\" \", \"quantity\":1 }.",
-      "exp": "400, message=\"Ürün stokta yok\".",
+      "exp": "400, message=\"Stokta yok\".",
       "gap": false,
       "gapRefs": []
     },
@@ -8189,11 +8189,11 @@
       "code": "07",
       "prefix": "CRT",
       "domTitle": "07 — Sepet & Checkout",
-      "title": "Düşük stok rozeti (\"Son birkaç ürün!\")",
+      "title": "Düşük stok rozeti (\"Son N ürün\")",
       "tur": "Sınır değer",
       "pri": "P2",
       "steps": "GET /api/cart.",
-      "exp": "items[P].stockWarning=\"Son birkaç ürün!\", isAvailable=true.",
+      "exp": "items[P].stockWarning=\"Son N ürün\", isAvailable=true.",
       "gap": false,
       "gapRefs": []
     },
@@ -18060,7 +18060,7 @@
       "tur": "Negatif/Doğrulama / Sınır değer",
       "pri": "P1",
       "steps": "1. POST /api/cart/items { productId, quantity:3 }.",
-      "exp": "HTTP 400, mesaj 'Bu üründen en fazla 2 adet sipariş verilebilir'.",
+      "exp": "HTTP 400, mesaj 'Stokta sadece 2 adet var'.",
       "gap": false,
       "gapRefs": []
     },
@@ -18069,11 +18069,11 @@
       "code": "15",
       "prefix": "STK",
       "domTitle": "15 — Stok & Envanter Bütünlüğü",
-      "title": "quantity=0 (inactive) üründe sepete ekleme 'Ürün stokta yok' / 'satışa uygun değil'",
+      "title": "quantity=0 (inactive) üründe sepete ekleme 'Stokta yok' / 'satışa uygun değil'",
       "tur": "Negatif/Doğrulama",
       "pri": "P1",
       "steps": "1. POST /api/cart/items { productId, quantity:1 }.",
-      "exp": "HTTP 400; status active olmadığından 'Bu ürün şu an satışa uygun değil' (active ama quantity=0 ise 'Ürün stokta yok').",
+      "exp": "HTTP 400; status active olmadığından 'Bu ürün şu an satışa uygun değil' (active ama quantity=0 ise 'Stokta yok').",
       "gap": false,
       "gapRefs": []
     },
@@ -18086,7 +18086,7 @@
       "tur": "Sınır değer / i18n",
       "pri": "P2",
       "steps": "1. available=0 iken GET /api/cart → satır incele. 2. available=3, istenen 5 iken incele. 3. available=5 iken incele.",
-      "exp": "available=0 → isAvailable=false 'Stokta yok'; available<istenen → 'Stokta sadece 3 adet var'; available<=5 → 'Son birkaç ürün!'.",
+      "exp": "available=0 → isAvailable=false 'Stokta yok'; available<istenen → 'Stokta sadece 3 adet var'; available<=5 → 'Son N ürün'.",
       "gap": false,
       "gapRefs": []
     },
@@ -18281,7 +18281,7 @@
       "tur": "i18n",
       "pri": "P2",
       "steps": "1. Stokta olmayan üründe Buy Now → mesaj. 2. Fazla checkout → mesaj. 3. Sepete fazla ekleme → mesaj.",
-      "exp": "Mesajlar TR: 'Bu ürün stokta bulunmamaktadır', 'yeterli stok yok (istenen N, mevcut M)', 'Bu üründen en fazla N adet sipariş verilebilir'. Not: Mesajlar API'de hardcoded Türkçe; EN lokalizasyonunun frontend'de yapılıp yapılmadığı frontend kaynağı sağlanmadığı için doğrulanmadı (kapsam dışı).",
+      "exp": "Mesajlar TR: 'Bu ürün stokta bulunmamaktadır', 'yeterli stok yok (istenen N, mevcut M)', 'Stokta sadece N adet var'. Not: Mesajlar API'de hardcoded Türkçe; EN lokalizasyonunun frontend'de yapılıp yapılmadığı frontend kaynağı sağlanmadığı için doğrulanmadı (kapsam dışı).",
       "gap": false,
       "gapRefs": []
     },
@@ -18294,7 +18294,7 @@
       "tur": "i18n / Parite / UI",
       "pri": "P2",
       "steps": "1. Ürün detay/sepet/checkout ekranlarını available=0 ve available<=5 ile görüntüle (web, mobile, admin).",
-      "exp": "available=0 → satın al butonu pasif / 'Stokta yok'; available<=5 → 'Son birkaç ürün!'; checkout hatası → 400 mesajı kullanıcıya gösterilir. Not: Bu senaryo frontend kodu okunarak doğrulanmadı — frontend kaynağı (web/mobile/admin) bu görevde sağlanmadı. API uyarı alanları (stockWarning, isAvailable) cart.service.ts:463-499'da mevcut; UI bunları kullanıyor varsayımıyla yazıldı.",
+      "exp": "available=0 → satın al butonu pasif / 'Stokta yok'; available<=5 → 'Son N ürün'; checkout hatası → 400 mesajı kullanıcıya gösterilir. Not: Bu senaryo frontend kodu okunarak doğrulanmadı — frontend kaynağı (web/mobile/admin) bu görevde sağlanmadı. API uyarı alanları (stockWarning, isAvailable) cart.service.ts:463-499'da mevcut; UI bunları kullanıyor varsayımıyla yazıldı.",
       "gap": false,
       "gapRefs": []
     },

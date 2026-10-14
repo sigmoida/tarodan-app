@@ -19,6 +19,7 @@ import { DiscountService } from "../../discount/discount.service";
 import { ProductQueryDto } from "../dto";
 import { ProductStatus, Prisma } from "@prisma/client";
 import { buildProductWhere } from "../helpers/build-product-where";
+import { buildProductListCacheKey } from "../helpers/product-list-cache-key";
 import { catalogProductWhere } from "../helpers/catalog-product-where";
 import { fulltextProductSearch } from "../helpers/fulltext-search";
 import { ACTIVE_TRADE_STATUSES } from "../../trade/helpers/trade.constants";
@@ -73,66 +74,13 @@ export class ProductQueryService {
     // Test şeridi: ES yalnız canlı ilanları indeksler; test viewer'ı her zaman
     // Postgres yoluyla ve yalnız test satıcılarıyla listelenir.
     const lane = await this.lanes.laneOfUser(viewerId);
-    const {
-      search,
-      categoryId,
-      sellerId,
-      status,
-      condition,
-      brand,
-      scale,
-      material: materialSlug,
-      tradeOnly,
-      discountOnly,
-      preOrder,
-      limited,
-      set: setFilter,
-      minPrice,
-      maxPrice,
-      sortBy,
-      page = 1,
-      limit = 20,
-      carModelId,
-      brandId,
-      manufacturerId,
-    } = query;
+    const { search, discountOnly } = query;
 
-    const cacheKey = `products:list:${JSON.stringify({
-      search,
-      categoryId,
-      sellerId,
-      // Ham status: undefined (kapsayıcı: aktif + tükenen + satıldı) ile 'active'
-      // (yalnızca stok-içi) farklı sonuç verir → ayrı cache anahtarları olmalı.
-      status: status ?? null,
-      condition,
-      brand,
-      brandId,
-      manufacturerId,
-      scale,
-      material: materialSlug,
-      // Renk filtresi sonucu değiştirir; anahtara girmezse iki farklı renk
-      // seçimi aynı sayfayı paylaşırdı.
-      color: query.color,
-      tradeOnly,
-      discountOnly,
-      // Boost filters change the result set (home Vitrin rail vs a plain browse)
-      // yet share page/limit/status — must be part of the key or they'd collide.
-      homeShowcase: query.homeShowcase,
-      boostedOnly: query.boostedOnly,
-      preOrder,
-      limited,
-      set: query.set,
-      minPrice,
-      maxPrice,
-      sortBy,
-      page,
-      limit,
-      carModelId,
-      attributeSlugs: query.attributeSlugs,
-      attrGroups: query.attrGroups,
+    // Anahtar DTO'nun tüm alanlarından türetilir (yeni filtre unutulamaz).
+    const cacheKey = buildProductListCacheKey(query, {
       hidden: hashIds(hiddenSellerIds),
       lane,
-    })}`;
+    });
 
     const hasSearch = !!(search && String(search).trim());
     // Arama yoksa Postgres (discountOnly dahil: isOnSale WHERE'de). Arama varsa

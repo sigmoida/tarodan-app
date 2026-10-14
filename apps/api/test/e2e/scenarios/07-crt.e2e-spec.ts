@@ -13,7 +13,7 @@
  *    amountToFreeShipping, grandTotal, appliedDiscounts[], warnings[] } } (cart-response.dto.ts).
  *  - POST /api/cart/items → 201 (varsayılan POST), DTO AddToCartDto: quantity Transform(string→trunc,
  *    boş/yok→1) @Min(1)@Max(99). Sepet stok üst sınırı = product.quantity (rezervasyondan bağımsız),
- *    hata "Bu üründen en fazla N adet sipariş verilebilir" / "Ürün stokta yok".
+ *    hata "Stokta sadece N adet var" / "Stokta yok" (server.cart.* katalog anahtarları).
  *  - PATCH /api/cart/items/:productId → 200; quantity 0 = satırı kaldır; stok kontrolü product.quantity,
  *    hata "Stokta sadece N adet var".
  *  - DELETE /api/cart/items/:productId → 200 (CartResponseDto döner).
@@ -357,14 +357,12 @@ describe("07 — Sepet & Checkout (CRT)", () => {
   });
 
   scenario("CRT-007", async () => {
-    // quantity=5 istenir, stok 2 → 400 "Bu üründen en fazla 2 adet sipariş verilebilir"
+    // quantity=5 istenir, stok 2 → 400 "Stokta sadece 2 adet var"
     const buyer = await createUser(ctx.module);
     const product = await makeProduct({ quantity: 2 });
     const res = await addItem(buyer, { productId: product.id, quantity: 5 });
     expect([400, 422]).toContain(res.status);
-    expect(String(res.body.message)).toContain(
-      "Bu üründen en fazla 2 adet sipariş verilebilir",
-    );
+    expect(String(res.body.message)).toContain("Stokta sadece 2 adet var");
   });
 
   scenario("CRT-008", async () => {
@@ -374,7 +372,7 @@ describe("07 — Sepet & Checkout (CRT)", () => {
       productId: product.id,
       quantity: 1,
     }).expect(400);
-    expect(String(res.body.message)).toContain("Ürün stokta yok");
+    expect(String(res.body.message)).toContain("Stokta yok");
   });
 
   scenario("CRT-009", async () => {
@@ -681,7 +679,7 @@ describe("07 — Sepet & Checkout (CRT)", () => {
   });
 
   scenario("CRT-028", async () => {
-    // available<=5 → "Son birkaç ürün!", isAvailable=true
+    // available<=5 → gerçek adetle "Son 4 ürün", isAvailable=true
     const buyer = await createUser(ctx.module);
     const product = await makeProduct({ quantity: 4 });
     await addItem(buyer, { productId: product.id, quantity: 1 }).expect(201);
@@ -689,7 +687,7 @@ describe("07 — Sepet & Checkout (CRT)", () => {
     const line = res.body.calculation.items.find(
       (i: any) => i.productId === product.id,
     );
-    expect(line.stockWarning).toBe("Son birkaç ürün!");
+    expect(line.stockWarning).toBe("Son 4 ürün");
     expect(line.isAvailable).toBe(true);
   });
 
