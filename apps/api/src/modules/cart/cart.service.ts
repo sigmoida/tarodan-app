@@ -45,7 +45,11 @@ import {
   publicName,
 } from "../../common/helpers/public-identity";
 
-// Cart expiry time: 24 hours
+// Sepet SÜRESİZDİR (ürün kararı): ürünler ve kupon zaman aşımıyla silinmez.
+// `expiresAt` kolonu şema gereği zorunlu olduğu için yalnız oluşturmada
+// doldurulur; hiçbir akış onu okumaz/uzatmaz. Kupon geçerliliği her sepet
+// okumasında ve checkout'ta validateCoupon ile yeniden denetlenir; stok
+// rezervasyonu sepete değil checkout'a bağlıdır.
 const CART_EXPIRY_HOURS = 24;
 
 @Injectable()
@@ -87,28 +91,6 @@ export class CartService {
         data: {
           userId,
           expiresAt: this.getNewExpiryDate(),
-        },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  images: { take: 1, orderBy: { sortOrder: "asc" } },
-                  seller: { select: this.saleEligibilitySellerSelect() },
-                },
-              },
-            },
-          },
-        },
-      });
-    } else if (cart.expiresAt < new Date()) {
-      // Cart expired, clear items and reset expiry
-      await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-      cart = await this.prisma.cart.update({
-        where: { id: cart.id },
-        data: {
-          expiresAt: this.getNewExpiryDate(),
-          couponCode: null,
         },
         include: {
           items: {
@@ -244,9 +226,6 @@ export class CartService {
       });
     }
 
-    // Extend cart expiry
-    await this.extendCartExpiry(cart.id);
-
     return this.getOrCreate(userId);
   }
 
@@ -305,8 +284,6 @@ export class CartService {
         data: { quantity: dto.quantity },
       });
     }
-
-    await this.extendCartExpiry(cart.id);
 
     return this.getOrCreate(userId);
   }
@@ -471,13 +448,6 @@ export class CartService {
     const expiry = new Date();
     expiry.setHours(expiry.getHours() + CART_EXPIRY_HOURS);
     return expiry;
-  }
-
-  private async extendCartExpiry(cartId: string): Promise<void> {
-    await this.prisma.cart.update({
-      where: { id: cartId },
-      data: { expiresAt: this.getNewExpiryDate() },
-    });
   }
 
   private async buildCartResponse(

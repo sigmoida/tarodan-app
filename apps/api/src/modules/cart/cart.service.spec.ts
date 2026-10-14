@@ -71,12 +71,11 @@ describe("CartService.addItem — idempotent re-add", () => {
     }).compile();
 
     service = module.get<CartService>(CartService);
-    // getOrCreateCart / getOrCreate / extendCartExpiry servis-içi yardımcılar —
-    // addItem'ın karar mantığını izole test etmek için spy'lanır.
+    // getOrCreateCart / getOrCreate servis-içi yardımcılar — addItem'ın karar
+    // mantığını izole test etmek için spy'lanır.
     jest
       .spyOn(service as any, "getOrCreateCart")
       .mockResolvedValue({ id: cartId });
-    jest.spyOn(service as any, "extendCartExpiry").mockResolvedValue(undefined);
     jest.spyOn(service, "getOrCreate").mockResolvedValue({ id: cartId } as any);
   });
 
@@ -160,6 +159,18 @@ describe("CartService.addItem — idempotent re-add", () => {
       }),
     });
     expect(mockPrisma.cartItem.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("sepet süresizdir: ekleme sepetin expiresAt'ini uzatmaz (cart.update yok)", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue(
+      makeProduct({ quantity: 3 }),
+    );
+    mockPrisma.cartItem.findUnique.mockResolvedValue(null);
+
+    await service.addItem("user-1", { productId, quantity: 1 } as any);
+
+    expect(mockPrisma.cartItem.create).toHaveBeenCalled();
+    expect(mockPrisma.cart.update).not.toHaveBeenCalled();
   });
 
   it("ödeme-only ürün normal sepete eklenemez", async () => {

@@ -139,7 +139,11 @@ export class CartResponseDto {
   @ApiPropertyOptional()
   couponCode?: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    deprecated: true,
+    description:
+      "Eski istemciler için korunur; sepet süresizdir, bu tarih uygulanmaz",
+  })
   expiresAt: Date;
 
   @ApiProperty()
