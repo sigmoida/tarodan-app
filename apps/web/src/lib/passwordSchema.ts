@@ -21,6 +21,6 @@ export const newPasswordSchema = (t: TranslateKey) =>
     .string()
     .min(PASSWORD_MIN_LENGTH, t("validation.passwordMin8"))
     .max(PASSWORD_MAX_LENGTH, t("validation.passwordMax"))
-    .regex(/[A-Z]/, t("validation.passwordUppercase"))
-    .regex(/[a-z]/, t("validation.passwordLowercase"))
-    .regex(/\d/, t("validation.passwordNumber"));
+    .regex(/\p{Lu}/u, t("validation.passwordUppercase"))
+    .regex(/\p{Ll}/u, t("validation.passwordLowercase"))
+    .regex(/\p{Nd}/u, t("validation.passwordNumber"));

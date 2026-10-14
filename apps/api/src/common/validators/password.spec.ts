@@ -1,7 +1,7 @@
 import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { RegisterDto } from "../../modules/auth/dto/register.dto";
-import { BusinessRegisterDto } from "../../modules/auth/dto/business-register.dto";
+import { CorporateInvitationDto } from "../../modules/auth/dto/business-register.dto";
 import { ResetPasswordDto as AuthResetPasswordDto } from "../../modules/auth/dto/reset-password.dto";
 import {
   ChangePasswordDto,
@@ -13,7 +13,11 @@ import {
  * "yeni şifre" DTO'ları aynı değerleri kabul/ret etmeli. Özel karakter zorunlu
  * değil; Türkçe harf, boşluk ve sembol serbest.
  */
-const ACCEPT = ["Abcdefg1", "Tarodan2026.", "Şifre123!", "Abc 1234!"];
+const ACCEPT = ["Abcdefg1", "Tarodan2026.", "Şifre123!", "Abc 1234!",
+  "ĞÜŞİÖÇ12ab",
+  "ğüşiöç12AB",
+  "ŞİFREçok1",
+];
 const REJECT = ["abcdefg1", "ABCDEFG1", "Abcdefgh", "Ab1"];
 
 const registerBase = {
@@ -21,11 +25,7 @@ const registerBase = {
   email: "test@demo.com",
   displayName: "Test Kullanıcı",
 };
-const businessBase = {
-  companyTitle: "Tarodan Ltd",
-  username: "tarodan.kurumsal",
-  email: "kurumsal@demo.com",
-};
+const invitationBase = { token: "t", username: "tarodan.kurumsal" };
 
 const cases: Array<[string, (pw: string) => unknown, string]> = [
   [
@@ -34,9 +34,9 @@ const cases: Array<[string, (pw: string) => unknown, string]> = [
     "password",
   ],
   [
-    "BusinessRegisterDto",
+    "CorporateInvitationDto",
     (pw) =>
-      plainToInstance(BusinessRegisterDto, { ...businessBase, password: pw }),
+      plainToInstance(CorporateInvitationDto, { ...invitationBase, password: pw }),
     "password",
   ],
   [
