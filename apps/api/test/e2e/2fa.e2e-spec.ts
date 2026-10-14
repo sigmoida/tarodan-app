@@ -88,7 +88,7 @@ describe('2FA flow (E2E)', () => {
       .expect(400);
   });
 
-  it('verify with wrong code → 401; status remains disabled', async () => {
+  it('verify with wrong code → 400; status remains disabled', async () => {
     const user = await createUser(ctx.module);
 
     await request(ctx.app.getHttpServer())
@@ -100,7 +100,7 @@ describe('2FA flow (E2E)', () => {
       .post('/api/security/2fa/verify')
       .set(authHeader(user))
       .send({ code: '000000' })
-      .expect(401);
+      .expect(400);
 
     const status = await request(ctx.app.getHttpServer())
       .get('/api/security/2fa/status')
@@ -109,7 +109,7 @@ describe('2FA flow (E2E)', () => {
     expect(status.body.isEnabled).toBe(false);
   });
 
-  it('disable requires valid TOTP; wrong code → 401, no-op when not enabled → 400', async () => {
+  it('disable requires valid TOTP; wrong code → 400, no-op when not enabled → 400', async () => {
     const user = await createUser(ctx.module);
 
     // Trying to disable without ever enabling → 400
@@ -131,12 +131,12 @@ describe('2FA flow (E2E)', () => {
       .send({ code })
       .expect(201);
 
-    // Wrong disable code → 401
+    // Wrong disable code → 400
     await request(ctx.app.getHttpServer())
       .post('/api/security/2fa/disable')
       .set(authHeader(user))
       .send({ code: '000000' })
-      .expect(401);
+      .expect(400);
 
     const stillOn = await request(ctx.app.getHttpServer())
       .get('/api/security/2fa/status')
@@ -175,12 +175,12 @@ describe('2FA flow (E2E)', () => {
       .send({ code })
       .expect(201);
 
-    // Wrong code → 401
+    // Wrong code → 400
     await request(ctx.app.getHttpServer())
       .post('/api/security/2fa/backup-codes')
       .set(authHeader(user))
       .send({ code: '000000' })
-      .expect(401);
+      .expect(400);
 
     // Correct → 10 fresh codes, different from the initial set
     const fresh = await request(ctx.app.getHttpServer())

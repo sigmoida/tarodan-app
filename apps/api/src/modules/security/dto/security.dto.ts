@@ -4,6 +4,7 @@ import {
   MinLength,
   MaxLength,
 } from "class-validator";
+import { Transform } from "class-transformer";
 import { IsPassword } from "../../../common/validators/password";
 
 // =============================================================================
@@ -20,6 +21,10 @@ export class Enable2FAResponseDto {
 }
 
 export class Verify2FADto {
+  // "123 456" biçiminde girilen kodlar da kabul edilir.
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.replace(/\s+/g, "") : value,
+  )
   @IsString()
   @MinLength(6)
   @MaxLength(6)
@@ -27,6 +32,10 @@ export class Verify2FADto {
 }
 
 export class Disable2FADto {
+  // "123 456" biçiminde girilen kodlar da kabul edilir.
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.replace(/\s+/g, "") : value,
+  )
   @IsString()
   @MinLength(6)
   @MaxLength(6)
