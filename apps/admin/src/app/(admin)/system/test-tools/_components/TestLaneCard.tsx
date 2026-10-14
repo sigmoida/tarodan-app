@@ -20,6 +20,7 @@ import { SectionTitle } from "@/components/detail/SectionTitle";
 import { DataTable } from "@/components/DataTable";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { testLaneColumns } from "../_lib/columns";
+import { canCreateTestAccount } from "../_lib/testLane";
 import { type TestAccount, type TestLaneResetResult } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -107,10 +108,7 @@ export function TestLaneCard({ isProd }: { isProd: boolean }) {
       onConfirm: () => resetMut.mutateAsync(undefined),
     });
 
-  const canCreate =
-    form.email.trim().length > 3 &&
-    form.password.length >= 8 &&
-    form.displayName.trim().length >= 2;
+  const canCreate = canCreateTestAccount(form);
 
   return (
     <SectionCard

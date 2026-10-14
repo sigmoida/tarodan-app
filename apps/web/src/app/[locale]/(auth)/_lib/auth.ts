@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
-import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
+import { newPasswordSchema, trPhone, trPhoneOptional } from "@tarodan/ui/form";
 import type { ConsentDocumentKey } from "@tarodan/types";
 import { legalIdentityFields } from "@/lib/legalIdentity";
-import { newPasswordSchema } from "@/lib/passwordSchema";
 
 /**
  * Auth form schemas — the single source of truth for validation AND types.

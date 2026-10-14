@@ -7,6 +7,8 @@ import {
   ChangePasswordDto,
   ResetPasswordDto as SecurityResetPasswordDto,
 } from "../../modules/security/dto/security.dto";
+import { AssignAdminStaffDto } from "../../modules/admin/dto/admin-staff.dto";
+import { CreateTestAccountDto } from "../../modules/admin-test-tools/dto/create-test-account.dto";
 
 /**
  * Şifre politikası TEK kuraldır (`@tarodan/types` password-policy): tüm
@@ -26,6 +28,11 @@ const registerBase = {
   displayName: "Test Kullanıcı",
 };
 const invitationBase = { token: "t", username: "tarodan.kurumsal" };
+const staffBase = { email: "staff@tarodan.com", role: "moderator" };
+const testAccountBase = {
+  email: "apple-review@tarodan.com.tr",
+  displayName: "App Review",
+};
 
 const cases: Array<[string, (pw: string) => unknown, string]> = [
   [
@@ -59,6 +66,17 @@ const cases: Array<[string, (pw: string) => unknown, string]> = [
       }),
     "newPassword",
   ],
+  [
+    "AssignAdminStaffDto",
+    (pw) => plainToInstance(AssignAdminStaffDto, { ...staffBase, password: pw }),
+    "password",
+  ],
+  [
+    "CreateTestAccountDto",
+    (pw) =>
+      plainToInstance(CreateTestAccountDto, { ...testAccountBase, password: pw }),
+    "password",
+  ],
 ];
 
 const errorsFor = (instance: unknown, property: string) =>
@@ -75,5 +93,12 @@ describe.each(cases)("şifre politikası — %s", (_name, build, property) => {
 
   it("üst sınırı aşan şifreyi reddeder", () => {
     expect(errorsFor(build("Aa1" + "x".repeat(70)), property)).not.toHaveLength(0);
+  });
+});
+
+describe("AssignAdminStaffDto — opsiyonel başlangıç şifresi", () => {
+  it("şifre verilmezse geçer (sistem geçici şifre üretir)", () => {
+    const dto = plainToInstance(AssignAdminStaffDto, staffBase);
+    expect(errorsFor(dto, "password")).toHaveLength(0);
   });
 });

@@ -2,9 +2,8 @@
 
 import { z } from "zod";
 import { isValidIban } from "@tarodan/ui";
-import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
+import { newPasswordSchema, trPhone, trPhoneOptional } from "@tarodan/ui/form";
 import type { Translate } from "@/types/i18n";
-import { newPasswordSchema } from "@/lib/passwordSchema";
 
 /**
  * Zod schemas for the profile dashboard forms. One source of truth for both

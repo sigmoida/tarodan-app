@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isPasswordValid } from "@tarodan/types";
-import { newPasswordSchema } from "./passwordSchema";
+import { newPasswordOptionalSchema, newPasswordSchema } from "@tarodan/ui/form";
 
 const schema = newPasswordSchema((key) => key);
 
@@ -26,5 +26,19 @@ describe("newPasswordSchema — API ile aynı kural", () => {
     const long = "Aa1" + "x".repeat(70);
     expect(schema.safeParse(long).success).toBe(false);
     expect(isPasswordValid(long)).toBe(false);
+  });
+});
+
+describe("newPasswordOptionalSchema", () => {
+  const optional = newPasswordOptionalSchema((key) => key);
+
+  it("boş veya verilmemiş değeri kabul eder", () => {
+    expect(optional.safeParse("").success).toBe(true);
+    expect(optional.safeParse(undefined).success).toBe(true);
+  });
+
+  it("girilen değere aynı kuralı uygular", () => {
+    expect(optional.safeParse("Abcdefg1").success).toBe(true);
+    expect(optional.safeParse("abc123").success).toBe(false);
   });
 });
