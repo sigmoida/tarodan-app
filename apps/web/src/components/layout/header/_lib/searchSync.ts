@@ -16,3 +16,12 @@ export function headerSearchQueryFor(
 ): string {
   return pathname === LISTINGS_PATH ? urlSearch || "" : "";
 }
+
+/**
+ * Arama kutusundan bir adrese gidilirken kutuda kalacak metin — hedef yolun
+ * göstereceğiyle aynı (`/listings?search=x` → "x", marka/ürün adresi → "").
+ */
+export function headerSearchQueryForHref(href: string): string {
+  const url = new URL(href, "http://local");
+  return headerSearchQueryFor(url.pathname, url.searchParams.get("search"));
+}

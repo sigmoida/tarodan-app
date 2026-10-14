@@ -13,7 +13,10 @@ import { useTranslations } from "next-intl";
 import { searchApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useRecentSearchesStore } from "@/stores/recentSearchesStore";
-import { headerSearchQueryFor } from "./_lib/searchSync";
+import {
+  headerSearchQueryFor,
+  headerSearchQueryForHref,
+} from "./_lib/searchSync";
 
 const HeaderSearchDropdown = dynamic(() => import("./HeaderSearchDropdown"), {
   ssr: false,
@@ -188,14 +191,23 @@ function useNavSearch() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Aramadan bir hedefe git: kutu, hedefte göstermesi gereken metni alır (aynı
+  // sorguyu yeniden aratınca URL değişmez, effect tetiklenmez; kutu boş kalmasın).
+  const goTo = useCallback(
+    (href: string) => {
+      setSearchQuery(headerSearchQueryForHref(href));
+      setShowSearchDropdown(false);
+      router.push(href);
+    },
+    [router],
+  );
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = searchQuery.trim();
     if (trimmed) {
       addSearch(trimmed);
-      setSearchQuery("");
-      setShowSearchDropdown(false);
-      router.push(buildSmartSearchUrl(trimmed));
+      goTo(buildSmartSearchUrl(trimmed));
     }
   };
 
@@ -344,9 +356,7 @@ function useNavSearch() {
           if (item.type === "search") {
             addSearch(item.label);
           }
-          setSearchQuery("");
-          setShowSearchDropdown(false);
-          router.push(item.href);
+          goTo(item.href);
         }
       } else if (debouncedQuery.length < 2) {
         // In empty/recent mode, Enter submits the form (default behavior)
@@ -366,9 +376,7 @@ function useNavSearch() {
           e.preventDefault();
           const q = recentSearches[activeIndex];
           addSearch(q);
-          setSearchQuery("");
-          setShowSearchDropdown(false);
-          router.push(buildSmartSearchUrl(q));
+          goTo(buildSmartSearchUrl(q));
         }
       }
     },
@@ -379,15 +387,13 @@ function useNavSearch() {
       activeIndex,
       recentSearches,
       addSearch,
-      router,
+      goTo,
     ],
   );
 
   const navigateSearch = (query: string) => {
     addSearch(query);
-    setSearchQuery("");
-    setShowSearchDropdown(false);
-    router.push(buildSmartSearchUrl(query));
+    goTo(buildSmartSearchUrl(query));
   };
 
   return {
