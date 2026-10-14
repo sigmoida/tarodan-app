@@ -69,6 +69,7 @@ export default function Footer() {
         { href: "/distance-sales", label: t("footer.distanceSales") },
         { href: "/refund-policy", label: t("footer.refundPolicy") },
         { href: "/seller-agreement", label: t("footer.sellerAgreement") },
+        { href: "/account-deletion", label: t("footer.accountDeletion") },
       ],
     },
   ];

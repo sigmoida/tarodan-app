@@ -2450,7 +2450,8 @@
     "cookieSettings": "Çerez Ayarları",
     "appPromo": "Tarodan'ı cebinize taşıyın — mobil uygulamamızı indirin",
     "downloadAppStore": "App Store'dan indirin",
-    "downloadGooglePlay": "Google Play'den indirin"
+    "downloadGooglePlay": "Google Play'den indirin",
+    "accountDeletion": "Hesap Silme"
   },
   "home": {
     "hero": {
@@ -3913,6 +3914,47 @@
       "updatedIntro": "Bazı belgelerimiz güncellendi. Devam etmek için güncel metinleri okuyup onaylamanız gerekiyor.",
       "acceptRich": "<link>{document}</link> — okudum ve kabul ediyorum.",
       "submit": "Onayla ve devam et"
+    },
+    "accountDeletion": {
+      "metaTitle": "Hesap Silme · Tarodan",
+      "metaDescription": "Tarodan hesabınızı mobil uygulamadan veya web sitesinden nasıl sileceğiniz, hangi verilerin silindiği ve hangilerinin yasal yükümlülükler gereği saklandığı.",
+      "title": "Tarodan Hesap Silme",
+      "pageDescription": "Tarodan hesabınızı istediğiniz zaman, giriş yaptıktan sonra uygulamadan veya web sitesinden silebilirsiniz. Bu sayfa silme adımlarını ve verilerinize ne olduğunu açıklar.",
+      "pageFooter": "Bu metin, mevzuat ve uygulama değişikliklerine göre güncellenebilir; güncel metin Platform'da yayımlanır. Kişisel verilerinizin işlenmesine ilişkin ayrıntılar için Gizlilik Politikası'na bakın.",
+      "howTo": {
+        "title": "Hesabınızı nasıl silersiniz",
+        "appHeading": "Tarodan mobil uygulamasından",
+        "appStep1": "Tarodan uygulamasında hesabınıza giriş yapın.",
+        "appStep2": "Alt menüden Profil sekmesine gidin.",
+        "appStep3": "Hesabı Sil seçeneğine dokunun ve silme işlemini onaylayın.",
+        "webHeading": "Web sitesinden",
+        "webStep1": "tarodan.com.tr adresinde hesabınıza giriş yapın.",
+        "webStep2": "Profil sayfanıza gidin.",
+        "webStep3": "Sayfanın altındaki Tehlikeli Bölge bölümünde Hesabı Sil düğmesine tıklayın, onay kelimesini yazın ve onaylayın.",
+        "beforeHeading": "Silmeden önce",
+        "beforeText": "Açık siparişiniz, süren takasınız, açık iade talebiniz, bekleyen ödemeniz veya bir satışa ayrılmış ilanınız varsa silme işlemi reddedilir ve nedeni gösterilir; bu işlemler tamamlandıktan sonra tekrar deneyin. Yayındaki ve onay bekleyen ilanlarınız silme sırasında otomatik olarak yayından kaldırılır.",
+        "immediateNote": "Onayladığınız anda hesabınız kapatılır ve tüm oturumlarınız sonlandırılır. Silme işlemi geri alınamaz."
+      },
+      "data": {
+        "title": "Verilerinize ne olur",
+        "deletedHeading": "Silinen veya anonimleştirilen veriler",
+        "deletedProfile": "Ad, e-posta, telefon, kullanıcı adı, doğum tarihi, profil fotoğrafı ve hakkımda yazısı gibi profil bilgileriniz silinir veya anonimleştirilir; hesabınız diğer üyelere \"Silinmiş Kullanıcı\" olarak görünür.",
+        "deletedAccess": "Kayıtlı adresleriniz, kayıtlı kartlarınız, oturumlarınız, bildirim cihazlarınız ve bağlı Apple/Google girişleriniz silinir.",
+        "deletedBank": "Kayıtlı banka hesabınız (IBAN) silinir; size ödenmesi gereken bir hakediş varsa ödeme tamamlanabilsin diye saklanır.",
+        "deletedListings": "İlanlarınız yayından kaldırılır, herkese açık koleksiyonlarınız gizlenir ve verdiğiniz açık teklifler iptal edilir.",
+        "deletedMarketing": "Pazarlama e-postası izniniz geri çekilir ve bülten aboneliğiniz sonlandırılır.",
+        "retainedHeading": "Saklanan veriler",
+        "retainedOrders": "Sipariş, ödeme, iade ve fatura kayıtları vergi ve ticaret mevzuatı gereği saklanır; bu kayıtlarda adınız yerine \"Silinmiş Kullanıcı\" görünür.",
+        "retainedIdentity": "Ad-soyad, T.C. kimlik / vergi numarası, iletişim ve adres bilgilerinizi içeren kimlik kaydınız, yasal bildirim yükümlülükleri için silme tarihinden itibaren 10 yıl boyunca erişimi kısıtlı ayrı bir arşivde saklanır.",
+        "retainedSocial": "Mesajlarınız, değerlendirmeleriniz ve takas geçmişiniz karşı tarafın kayıtlarının da parçası olduğu için korunur; bu kayıtlarda adınız yerine \"Silinmiş Kullanıcı\" görünür.",
+        "retainedCorporate": "Kurumsal satıcıysanız başvurunuzdaki şirket ve yetkili bilgileri ticari kayıt olarak saklanır; başvurudaki iletişim ve banka bilgileri silinir.",
+        "reregisterNote": "Aynı e-posta adresi ve telefon numarasıyla yeniden üye olabilirsiniz; eski hesabınızın verileri yeni hesaba aktarılmaz."
+      },
+      "help": {
+        "title": "Yardım",
+        "heading": "Bize ulaşın",
+        "text": "Hesabınızı silemiyorsanız ya da silme ve verileriniz hakkında sorunuz varsa aşağıdaki kanallardan bize ulaşabilirsiniz."
+      }
     }
   },
   "information": {
