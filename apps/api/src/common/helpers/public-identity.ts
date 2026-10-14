@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { LEGAL_IDENTITY_FIELDS, type LegalIdentityField } from "@tarodan/types";
 import { isLegacyUsername } from "../../modules/auth/utils/username.util";
+import { isAnonymizedUsername } from "./deleted-user-identity";
 
 /**
  * Herkese açık kimlik: bir üyenin BAŞKA üyelere nasıl göründüğü.
@@ -10,7 +11,7 @@ import { isLegacyUsername } from "../../modules/auth/utils/username.util";
  *
  *   1. Kurumsal hesap (companyName dolu)  → firma adı
  *   2. Kullanıcı adı seçilmiş             → username
- *   3. Aksi halde (eski/legacy hesap)     → displayName
+ *   3. Aksi halde (eski/legacy ya da silinmiş hesap) → displayName
  *
  * Gerçek ad (`displayName`) yalnızca kişinin KENDİ yüzeylerinde (profil ayarları,
  * fatura, kargo etiketi, admin paneli) görünür; herkese açık yükte bu alan
@@ -49,20 +50,26 @@ export function publicName(
   if (!user) return ANONYMOUS_PUBLIC_NAME;
   const company = user.companyName?.trim();
   if (company) return company;
-  const username = user.username?.trim();
-  if (username && !isLegacyUsername(username)) return username;
-  return user.displayName?.trim() || ANONYMOUS_PUBLIC_NAME;
+  return (
+    publicUsername(user) ?? (user.displayName?.trim() || ANONYMOUS_PUBLIC_NAME)
+  );
 }
 
 /**
- * Profil bağlantısı için kullanıcı adı. Legacy yer tutucu (`legacy_########`)
- * bir kimlik değildir; bağlantı id üzerinden kurulsun diye null döner.
+ * Profil bağlantısı için kullanıcı adı. Yer tutucular bir kimlik değildir:
+ * legacy (`legacy_########`) ve silinmiş hesap sentinel'i (`deleted_<id>`)
+ * için bağlantı id üzerinden kurulsun diye null döner. Silinmiş hesap böylece
+ * her yüzeyde anonim adıyla ("Silinmiş Kullanıcı") görünür.
  */
 export function publicUsername(
   user: PublicIdentityInput | null | undefined,
 ): string | null {
   const username = user?.username?.trim();
-  return username && !isLegacyUsername(username) ? username : null;
+  return username &&
+    !isLegacyUsername(username) &&
+    !isAnonymizedUsername(username)
+    ? username
+    : null;
 }
 
 type PublicIdentityFields = {

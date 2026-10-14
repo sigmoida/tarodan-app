@@ -71,9 +71,15 @@ import { NotificationService } from "../../notification/notification.service";
 import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
+  anonymizedUsernameFor,
   computeRetainUntil,
   resolveIdentityFields,
 } from "../../../common/helpers/deleted-user-identity";
+import { hideCollectionsForAccountDeletion } from "../../collection/helpers/account-deletion-collections";
+import { purgeSellerDataForAccountDeletion } from "../helpers/account-deletion-seller-data";
+import { enqueueAvatarDeletion } from "../../media/helpers/avatar-deletion";
+import { OutboxService } from "../../outbox/outbox.service";
+import { RealtimeService } from "../../websocket/realtime.service";
 
 /**
  * Silmeyi kimin başlattığı — arşiv kaydına yazılır. Varsayılan `self`, böylece
@@ -120,6 +126,11 @@ export class UserProfileService {
     // Sign in with Apple token iptali (App Store 5.1.1(v)). UserModule
     // AppleTokenModule'ü içe aktarır; dar test kurulumlarında yok.
     @Optional() private readonly appleTokens?: AppleTokenService,
+    // Hesap silmede avatar nesnesinin silinmesi (outbox, @Global) ve açık
+    // soketlerin kapatılması (WebSocketModule). İkisi de silmenin yan
+    // etkisidir; dar test kurulumlarında yok.
+    @Optional() private readonly outbox?: OutboxService,
+    @Optional() private readonly realtime?: RealtimeService,
   ) {}
 
   /**
@@ -658,6 +669,7 @@ export class UserProfileService {
       cancelledOffers: [],
     };
     let cancelledBuyerOffers: CancelledBuyerOffer[] = [];
+    let hiddenCollectionIds: string[] = [];
     try {
       await this.prisma.$transaction(
         async (tx) => {
@@ -714,6 +726,36 @@ export class UserProfileService {
           await tx.address.deleteMany({ where: { userId } });
           await tx.notificationLog.deleteMany({ where: { userId } });
 
+          // 3a) Satıcı kalıntıları (KVKK): IBAN/TCKN/hesap sahibi ve kurumsal
+          // başvurunun iletişim/banka alanları. Arşiv (0. adım) yazıldı;
+          // ödenecek hakediş varken banka hesabı korunur.
+          const sellerData = await purgeSellerDataForAccountDeletion(
+            tx,
+            userId,
+          );
+          if (sellerData.bankAccountRetained) {
+            this.logger.warn(
+              `account-deletion bank account retained (unsettled payout) userId=${userId}`,
+            );
+          }
+
+          // 3a2) Herkese açık koleksiyonlar gizlenir; dizinden commit sonrası düşer.
+          hiddenCollectionIds = await hideCollectionsForAccountDeletion(
+            tx,
+            userId,
+          );
+
+          // 3a3) Avatar nesnesi depolamadan silinir — iş outbox'a bu
+          // transaction'la yazılır, depolama çağrısı commit SONRASI.
+          // Anahtar işlem İÇİNDE okunur (dış `user` nesnesi bayat olabilir).
+          if (this.outbox) {
+            const avatar = await tx.user.findUnique({
+              where: { id: userId },
+              select: { avatarUrl: true },
+            });
+            await enqueueAvatarDeletion(this.outbox, tx, avatar?.avatarUrl);
+          }
+
           // 3b) Pazarlama listesinden çıkar. E-posta birazdan
           // `deleted_...@deleted.local` olarak anonimleştirileceği için abone
           // satırı gerçek adresle öksüz kalır ve hesap silinmiş olmasına rağmen
@@ -744,6 +786,11 @@ export class UserProfileService {
               phone: null,
               passwordHash: "",
               displayName: ANONYMIZED_DISPLAY_NAME,
+              // Kullanıcı adı ve doğum tarihi arşive (0. adım) kopyalandı.
+              // Sentinel tekildir ve herkese açık gösterimde kimlik sayılmaz;
+              // eski kullanıcı adı da yeniden alınabilir hâle gelir.
+              username: anonymizedUsernameFor(userId),
+              birthDate: null,
               avatarUrl: null,
               bio: null,
               fcmToken: null,
@@ -785,8 +832,43 @@ export class UserProfileService {
     // Commit SONRASI: hesap silindi; arama/önbellek senkronu ve bildirimler
     // silmeyi geri çeviremez, hata yalnız loglanır.
     await this.syncDeactivatedListings(userId, deactivated.productIds);
+    await this.removeHiddenCollectionsFromSearch(hiddenCollectionIds);
     await this.notifyCancelledOfferBuyers(deactivated.cancelledOffers);
     await this.notifyCancelledOfferSellers(cancelledBuyerOffers);
+    this.disconnectRealtime(userId);
+  }
+
+  /**
+   * Silinen hesabın açık soketlerini kapatır: token süresi dolana dek kişisel
+   * odasından canlı olay almasın. Commit sonrasıdır, hata yalnız loglanır.
+   */
+  private disconnectRealtime(userId: string): void {
+    try {
+      this.realtime?.disconnectUser(userId);
+    } catch (error) {
+      this.logger.warn(
+        `account-deletion socket disconnect failed userId=${userId}: ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Gizlenen koleksiyonları arama dizininden düşürür (dizin yalnız herkese
+   * açık koleksiyonları taşır). Toplu yazım arama-senkron middleware'ini
+   * tetiklemediği için elle yapılır; commit sonrasıdır, hata yalnız loglanır.
+   */
+  private async removeHiddenCollectionsFromSearch(
+    collectionIds: string[],
+  ): Promise<void> {
+    for (const id of collectionIds) {
+      await this.searchService
+        .removeCollection(id)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `account-deletion collection search removal failed (${id}): ${errorMessage(error)}`,
+          ),
+        );
+    }
   }
 
   /**

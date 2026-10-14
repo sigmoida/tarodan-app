@@ -46,6 +46,12 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       openOffers?: Array<{ id: string; buyerId: string; productId: string }>;
       /** Silinen hesabın ALICI olarak verdiği açık teklifler. */
       buyerOffers?: Array<{ id: string; sellerId: string; productId: string }>;
+      /** Silinen hesabın herkese açık koleksiyonları. */
+      publicCollectionIds?: string[];
+      /** İşlem içinde okunan avatar anahtarı. */
+      avatarUrl?: string | null;
+      /** Tamamlanmamış payout sayısı (banka hesabı korunur mu). */
+      openPayouts?: number;
     } = {},
   ) {
     const listings = overrides.listings ?? [];
@@ -71,7 +77,12 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
         findMany: jest.fn().mockResolvedValue(overrides.ordersInTx ?? []),
       },
       refundRequest: txEmpty(),
-      payoutTransfer: txEmpty(),
+      payoutTransfer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        // Satıcı verisi temizliği: ödenecek hakediş var mı?
+        count: jest.fn().mockResolvedValue(overrides.openPayouts ?? 0),
+      },
+      tradeCashPayment: { count: jest.fn().mockResolvedValue(0) },
       paymentHold: txEmpty(),
       productRemovalEvent: {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -90,7 +101,14 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       user: {
-        findUnique: jest.fn().mockResolvedValue(user),
+        // Arşiv okuması tam satırı, avatar okuması yalnız `avatarUrl`'i ister.
+        findUnique: jest.fn(({ select }: any): Promise<unknown> =>
+          Promise.resolve(
+            select?.avatarUrl
+              ? { avatarUrl: overrides.avatarUrl ?? null }
+              : user,
+          ),
+        ),
         update: jest.fn().mockResolvedValue(user),
       },
       address: {
@@ -110,8 +128,20 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
           iban: "TR000000000000000000000000",
           accountHolder: "Ahmet Yılmaz",
         }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      corporateApplication: { findUnique: jest.fn().mockResolvedValue(null) },
+      corporateApplication: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      collection: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue(
+            (overrides.publicCollectionIds ?? []).map((id) => ({ id })),
+          ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       deletedUserIdentity: {
         upsert: overrides.upsert ?? jest.fn().mockResolvedValue({}),
       },
@@ -138,7 +168,12 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       $transaction: jest.fn((fn: (client: unknown) => unknown) => fn(tx)),
     };
 
-    const search = { syncProduct: jest.fn().mockResolvedValue(undefined) };
+    const search = {
+      syncProduct: jest.fn().mockResolvedValue(undefined),
+      removeCollection: jest.fn().mockResolvedValue(undefined),
+    };
+    const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    const realtime = { disconnectUser: jest.fn() };
     const cache = {
       del: jest.fn().mockResolvedValue(undefined),
       delPattern: jest.fn().mockResolvedValue(undefined),
@@ -159,8 +194,20 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       search as never,
       cache as never,
       notifications as never,
+      undefined, // appleTokens
+      outbox as never,
+      realtime as never,
     );
-    return { service, prisma, tx, search, cache, notifications };
+    return {
+      service,
+      prisma,
+      tx,
+      search,
+      cache,
+      notifications,
+      outbox,
+      realtime,
+    };
   }
 
   it("arşivi, adresler silinmeden ve satır anonimleştirilmeden ÖNCE yazar", async () => {
@@ -520,6 +567,131 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       expect(
         notifications.notifyOfferCancelledBuyerDeleted,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  // KVKK: anonimleştirmeden sonra canlı tablolarda kişisel veri kalmamalı.
+  describe("KVKK kalıntıları", () => {
+    it("kullanıcı adını tekil sentinel'e çeker, doğum tarihini siler", async () => {
+      const { service, tx } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      const { data } = tx.user.update.mock.calls[0][0];
+      expect(data.username).toBe("deleted_user-1");
+      expect(data.birthDate).toBeNull();
+      // Arşiv eski kullanıcı adını taşır (sentinel'den ÖNCE yazıldı).
+      expect(
+        tx.deletedUserIdentity.upsert.mock.calls[0][0].create.username,
+      ).toBe("ahmet");
+    });
+
+    it("banka hesabını ve kurumsal başvurunun iletişim alanlarını arşivden SONRA temizler", async () => {
+      const { service, tx } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.sellerBankAccount.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+      });
+      expect(tx.corporateApplication.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: "user-1" } }),
+      );
+      const archived =
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0];
+      expect(archived).toBeLessThan(
+        tx.sellerBankAccount.deleteMany.mock.invocationCallOrder[0],
+      );
+      expect(archived).toBeLessThan(
+        tx.corporateApplication.updateMany.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("ödenecek hakediş varken banka hesabını korur, silme yine tamamlanır", async () => {
+      const { service, tx } = makeService({ openPayouts: 1 });
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+
+      expect(tx.sellerBankAccount.deleteMany).not.toHaveBeenCalled();
+      expect(tx.user.update).toHaveBeenCalled();
+    });
+
+    it("herkese açık koleksiyonları gizler ve commit sonrası dizinden düşürür", async () => {
+      const { service, tx, search } = makeService({
+        publicCollectionIds: ["c1", "c2"],
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.collection.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["c1", "c2"] } },
+        data: { isPublic: false },
+      });
+      expect(search.removeCollection).toHaveBeenCalledWith("c1");
+      expect(search.removeCollection).toHaveBeenCalledWith("c2");
+    });
+
+    it("dizin hatası silmeyi başarısız göstermez", async () => {
+      const { service, search } = makeService({ publicCollectionIds: ["c1"] });
+      search.removeCollection.mockRejectedValue(new Error("es down"));
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("avatar silme işini transaction İÇİNDE outbox'a yazar", async () => {
+      const { service, tx, outbox } = makeService({
+        avatarUrl: "dev/avatars/a.jpg",
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(outbox.enqueue).toHaveBeenCalledWith(tx, {
+        type: "media.avatar_delete",
+        payload: { key: "dev/avatars/a.jpg" },
+        dedupeKey: "media.avatar_delete:dev/avatars/a.jpg",
+      });
+      expect(outbox.enqueue.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("sosyal girişten gelen avatar URL'i için iş yazmaz", async () => {
+      const { service, outbox } = makeService({
+        avatarUrl: "https://lh3.googleusercontent.com/a",
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(outbox.enqueue).not.toHaveBeenCalled();
+    });
+
+    it("commit sonrası açık soketleri kapatır", async () => {
+      const { service, realtime } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(realtime.disconnectUser).toHaveBeenCalledWith("user-1");
+    });
+
+    it("soket kapatma hatası silmeyi bozmaz", async () => {
+      const { service, realtime } = makeService();
+      realtime.disconnectUser.mockImplementation(() => {
+        throw new Error("io down");
+      });
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa soket kapatılmaz, dizin ve avatar işi yok", async () => {
+      const { service, realtime, search } = makeService({
+        publicCollectionIds: ["c1"],
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(realtime.disconnectUser).not.toHaveBeenCalled();
+      expect(search.removeCollection).not.toHaveBeenCalled();
     });
   });
 });

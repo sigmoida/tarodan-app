@@ -328,8 +328,9 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
     );
     const ruleFor = (column: string) =>
       usersRules.find((rule) => column in rule.columns);
-    // Kullanıcı adı / doğum tarihi deleteAccount'ta temizlenmez: silinmiş
-    // satırlarda da maskelenmeli — kuralları yalnız gerçek sistem hesaplarını korur.
+    // Kullanıcı adı / doğum tarihi bu temizlikten önce silinmiş (eski)
+    // satırlarda hâlâ durabilir: silinmiş satırlarda da maskelenmeli —
+    // kuralları yalnız gerçek sistem hesaplarını korur.
     for (const column of ["username", "birth_date", "phone", "bio"]) {
       expect([column, ruleFor(column)?.keepWhere]).toEqual([
         column,

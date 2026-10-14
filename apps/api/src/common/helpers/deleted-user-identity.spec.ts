@@ -1,11 +1,13 @@
 import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
+  anonymizedUsernameFor,
   archiveLegalFullName,
   archivedNationalIdIsDeclared,
   computeRetainUntil,
   IDENTITY_RETENTION_YEARS,
   isAnonymizedEmail,
+  isAnonymizedUsername,
   resolveIdentityFields,
   type IdentitySources,
 } from "./deleted-user-identity";
@@ -294,6 +296,22 @@ describe("anonim e-posta tespiti", () => {
     expect(isAnonymizedEmail(anonymizedEmailFor("abc"))).toBe(true);
     expect(isAnonymizedEmail("ahmet@example.com")).toBe(false);
     expect(isAnonymizedEmail(null)).toBe(false);
+  });
+});
+
+describe("anonim kullanıcı adı", () => {
+  const userId = "3f2b8c1e-9d4a-4b7e-8f21-0c5d6e7a8b9c";
+
+  it("sentinel kullanıcı adını tanır ve id'den tekil üretir", () => {
+    const username = anonymizedUsernameFor(userId);
+    expect(username).toBe(`deleted_${userId}`);
+    expect(isAnonymizedUsername(username)).toBe(true);
+  });
+
+  it("üyenin seçebildiği 'deleted_' önekli adı sentinel saymaz", () => {
+    expect(isAnonymizedUsername("deleted_fan")).toBe(false);
+    expect(isAnonymizedUsername("ahmet")).toBe(false);
+    expect(isAnonymizedUsername(null)).toBe(false);
   });
 });
 
