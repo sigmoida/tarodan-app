@@ -104,4 +104,40 @@ describe("MessagingService — user blocks", () => {
       notIn: ["x"],
     });
   });
+
+  describe("deleted recipient", () => {
+    const deletedRecipient = { id: "u2", deletedAt: new Date() };
+    // Engelli alıcıyla aynı tür (403), kendi metniyle.
+    const expectRecipientDeleted = (error: unknown) => {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        i18nKey: "server.messaging.recipientDeleted",
+      });
+    };
+
+    it("sendMessage → 403 when the other participant deleted the account", async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(deletedRecipient);
+      const error = await service
+        .sendMessage("t1", "u1", { content: "hi" } as any)
+        .catch((e: unknown) => e);
+      expectRecipientDeleted(error);
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: "u2" },
+        select: { deletedAt: true },
+      });
+      expect(contentFilter.moderateWithAI).not.toHaveBeenCalled();
+    });
+
+    it("createThread → 403 for a deleted recipient, no thread is opened", async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(deletedRecipient);
+      const error = await service
+        .createThread("u1", {
+          recipientId: "u2",
+          getRecipientId: () => "u2",
+        } as any)
+        .catch((e: unknown) => e);
+      expectRecipientDeleted(error);
+      expect(prisma.messageThread.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -106,6 +106,7 @@ export class MessagingService {
     if (!recipient) {
       throw new NotFoundException(i18nMessage("server.trade.receiverNotFound"));
     }
+    this.assertRecipientActive(recipient);
 
     await this.assertNotBlocked(senderId, recipientId);
 
@@ -225,6 +226,13 @@ export class MessagingService {
         ? thread.participant2Id
         : thread.participant1Id;
 
+    // Var olan konuda karşı taraf sonradan hesabını silmiş olabilir.
+    this.assertRecipientActive(
+      await this.prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { deletedAt: true },
+      }),
+    );
     await this.assertNotBlocked(senderId, receiverId);
 
     // Apply content filtering
@@ -457,6 +465,21 @@ export class MessagingService {
   /** İki yönlü engel varsa konu açma/okuma/yazma 403 (Apple: abuse stop). */
   private assertNotBlocked(a: string, b: string): Promise<void> {
     return this.userBlocks.assertNotBlocked(a, b, "server.messaging.blocked");
+  }
+
+  /**
+   * Silinmiş (anonimleşmiş) hesaba konu açılamaz, mesaj gönderilemez. Engelli
+   * alıcıyla aynı tür (403): istemciler ikisini de "mesajlaşılamaz" olarak
+   * gösterir. Geçmiş konular okunabilir kalır.
+   */
+  private assertRecipientActive(
+    recipient: { deletedAt: Date | null } | null,
+  ): void {
+    if (!recipient || recipient.deletedAt) {
+      throw new ForbiddenException(
+        i18nMessage("server.messaging.recipientDeleted"),
+      );
+    }
   }
 
   // ==========================================================================
