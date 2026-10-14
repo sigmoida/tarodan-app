@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import { searchApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useRecentSearchesStore } from "@/stores/recentSearchesStore";
+import { headerSearchQueryFor } from "./_lib/searchSync";
 
 const HeaderSearchDropdown = dynamic(() => import("./HeaderSearchDropdown"), {
   ssr: false,
@@ -214,13 +215,16 @@ function useNavSearch() {
     setActiveIndex(-1);
   }, [debouncedQuery]);
 
-  // When on /listings, keep the search input in sync with the URL ?search= param
+  // On /listings mirror the URL ?search= param; on any other page clear it so a
+  // previous search doesn't linger after navigating away (e.g. back to home).
+  // Keyed on the derived string, so other pages' param changes don't wipe typing.
+  const routeQuery = headerSearchQueryFor(
+    pathname,
+    navSearchParams.get("search"),
+  );
   useEffect(() => {
-    if (pathname === "/listings") {
-      const urlSearch = navSearchParams.get("search") || "";
-      setSearchQuery(urlSearch);
-    }
-  }, [pathname, navSearchParams]);
+    setSearchQuery(routeQuery);
+  }, [pathname, routeQuery]);
 
   // Rich autocomplete query
   const richAutoQuery = useQuery({
