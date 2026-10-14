@@ -5,6 +5,7 @@ import type { HeroSlideDto, TrustBadgeDto } from "@tarodan/types";
 import type { Product } from "@/types/product";
 
 export interface BrandMarqueeItem {
+  id: string;
   name: string;
   logoUrl: string;
   desc: string;

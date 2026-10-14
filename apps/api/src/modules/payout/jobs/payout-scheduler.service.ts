@@ -96,7 +96,8 @@ export class PayoutSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Daily at 06:00: check for returned transfers from PayTR.
+   * Daily at 06:00: check for returned transfers from PayTR, then purge the
+   * bank accounts that account deletion kept only until payouts settled.
    * Gerçek iş — Bull processor 'payout-check-returned' buradan çağırır.
    */
   async runCheckReturnedTransfers(log: (msg: string) => void = () => {}) {
@@ -115,9 +116,19 @@ export class PayoutSchedulerService implements OnModuleInit {
           `${unmatched} geri dönen transfer satırı hiçbir payout ile eşleşmedi`,
         );
       }
+
+      // KVKK: silinmiş hesapların, hakediş ödenene dek korunan banka hesapları.
+      // Geri dönen transferler YUKARIDA `returned` işaretlendi; o satırlar hâlâ
+      // borç sayılır, IBAN'ları silinmez. Tur idempotenttir.
+      const purgedBankAccounts =
+        await this.payoutService.purgeDeletedSellerBankAccounts();
+      if (purgedBankAccounts > 0) {
+        log(`${purgedBankAccounts} silinmiş hesabın banka hesabı silindi`);
+      }
+
       return {
-        summary: `${returned} iade transfer${unmatched ? ` · ${unmatched} eşleşmeyen` : ""}`,
-        stats: { returned, unmatched },
+        summary: `${returned} iade transfer${unmatched ? ` · ${unmatched} eşleşmeyen` : ""}${purgedBankAccounts ? ` · ${purgedBankAccounts} banka hesabı silindi` : ""}`,
+        stats: { returned, unmatched, purgedBankAccounts },
       };
     } catch (error: any) {
       this.logger.error(`Returned transfer check error: ${error.message}`);

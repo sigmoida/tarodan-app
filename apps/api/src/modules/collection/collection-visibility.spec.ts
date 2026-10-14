@@ -154,3 +154,74 @@ describe("CollectionCrudService — liste ve detay aynı kural", () => {
     });
   });
 });
+
+describe("CollectionCrudService — browse sayfalama", () => {
+  const build = (esResult: { ids: string[]; total: number }) => {
+    const searchService = {
+      searchCollections: jest.fn().mockResolvedValue(esResult),
+    };
+    const reindex = jest.fn().mockResolvedValue(undefined);
+    const prisma = {
+      collection: {
+        findMany: jest
+          .fn()
+          .mockImplementation(({ where }) =>
+            Promise.resolve(
+              (where.id?.in ?? []).map((id: string) => ({
+                id,
+                userId: "u",
+                name: id,
+                isPublic: true,
+                user: { id: "u" },
+                _count: { items: 0 },
+              })),
+            ),
+          ),
+        count: jest.fn().mockResolvedValue(21),
+      },
+    };
+    const service = new CollectionCrudService(
+      prisma as any,
+      {} as any,
+      searchService as any,
+      { queueReindexAllCollections: reindex } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      userBlockServiceStub() as any,
+      accountLaneServiceStub() as any,
+    );
+    return { service, prisma, reindex };
+  };
+
+  it("son kısmi sayfada (total=21, page=2, 1 id) Prisma'ya düşmez, reindex tetiklemez", async () => {
+    const { service, prisma, reindex } = build({ ids: ["c21"], total: 21 });
+
+    const res = await service.browsePublicCollections(2, 20, "popular");
+
+    expect(res.collections.map((c) => c.id)).toEqual(["c21"]);
+    expect(reindex).not.toHaveBeenCalled();
+    expect(prisma.collection.count).not.toHaveBeenCalled();
+  });
+
+  it("Prisma yolu ES ile aynı sırayı kullanır: id tiebreaker, popular'da likeCount", async () => {
+    const { service, prisma } = build({ ids: [], total: 0 });
+
+    await service.browsePublicCollections(1, 20, "popular");
+    await service.browsePublicCollections(1, 20, "recent");
+    await service.browsePublicCollections(1, 20, "name");
+
+    const orders = prisma.collection.findMany.mock.calls.map(
+      ([a]) => a.orderBy,
+    );
+    expect(orders[0]).toEqual([
+      { viewCount: "desc" },
+      { likeCount: "desc" },
+      { id: "asc" },
+    ]);
+    expect(orders[1]).toEqual([{ createdAt: "desc" }, { id: "asc" }]);
+    // name/items: bellekte sıralanır; sayfalama yok ama tiebreaker'lı sıra var.
+    expect(orders[2]).toBeUndefined();
+  });
+});

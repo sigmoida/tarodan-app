@@ -54,7 +54,14 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
       trade: txEmpty(),
       order: txEmpty(),
       refundRequest: txEmpty(),
-      payoutTransfer: txEmpty(),
+      payoutTransfer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        // Satıcı verisi temizliği: ödenecek hakediş var mı?
+        count: jest.fn().mockResolvedValue(0),
+      },
+      // Ödenmemiş hakediş denetimi (hasUnsettledPayout): hold / takas nakdi yok.
+      tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      refundAttempt: { count: jest.fn().mockResolvedValue(0) },
       paymentHold: txEmpty(),
       user: {
         findUnique: jest.fn().mockResolvedValue(user),
@@ -64,8 +71,18 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
-      sellerBankAccount: { findUnique: jest.fn().mockResolvedValue(null) },
-      corporateApplication: { findUnique: jest.fn().mockResolvedValue(null) },
+      sellerBankAccount: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      corporateApplication: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      collection: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       deletedUserIdentity: { upsert: jest.fn().mockResolvedValue({}) },
       refreshToken: { deleteMany: jest.fn() },
       passwordResetToken: { deleteMany: jest.fn() },

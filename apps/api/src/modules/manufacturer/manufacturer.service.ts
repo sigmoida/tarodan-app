@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
-import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
-import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { activeListingWhere } from "../product/helpers/active-listing-where";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -40,9 +39,18 @@ export class ManufacturerService {
     return logo;
   }
 
-  async findAll() {
+  /**
+   * `hasListings`: yalnız en az bir aktif ilanı olan üreticiler (web vitrini
+   * boş üretici göstermez). Sayaçla AYNI predikat — EXISTS alt sorgusu.
+   */
+  async findAll(options: { hasListings?: boolean } = {}) {
     const manufacturers = await this.prisma.manufacturer.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(options.hasListings
+          ? { products: { some: activeListingWhere() } }
+          : {}),
+      },
       orderBy: { sortOrder: "asc" },
       select: {
         id: true,
@@ -55,11 +63,7 @@ export class ManufacturerService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: activeListingWhere(),
             },
           },
         },
@@ -86,11 +90,7 @@ export class ManufacturerService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: activeListingWhere(),
             },
           },
         },
@@ -123,11 +123,7 @@ export class ManufacturerService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: activeListingWhere(),
             },
           },
         },

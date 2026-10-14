@@ -8,6 +8,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsTrPhone } from "../../../common/validators/tr-phone";
+import { IsPassword } from "../../../common/validators/password";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -71,9 +72,6 @@ export class CorporateInvitationDto {
   username: string;
 
   @ApiProperty()
-  @IsString()
-  @MinLength(8)
-  @MaxLength(72)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+  @IsPassword()
   password: string;
 }

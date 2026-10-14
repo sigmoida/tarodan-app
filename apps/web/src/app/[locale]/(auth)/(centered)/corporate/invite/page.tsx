@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { webKeys } from "@/lib/query/keys";
 import { AuthCard } from "../../../_components/AuthCard";
 import { PasswordChecklist } from "../../../_components/PasswordChecklist";
+import { isPasswordValid } from "@tarodan/types";
 
 export default function CorporateInvitationPage() {
   const t = useTranslations();
@@ -58,11 +59,7 @@ export default function CorporateInvitationPage() {
   }
 
   const company = invitation.data?.data;
-  const passwordValid =
-    password.length >= 8 &&
-    /[a-z]/.test(password) &&
-    /[A-Z]/.test(password) &&
-    /\d/.test(password);
+  const passwordValid = isPasswordValid(password);
 
   return (
     <AuthCard

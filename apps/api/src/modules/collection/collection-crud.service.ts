@@ -575,7 +575,12 @@ export class CollectionCrudService {
       const validIds = esResult.ids.filter(
         (id): id is string => id != null && id !== "",
       );
-      const expectedCount = Math.min(esResult.total, safePageSize);
+      // Sayfa ofsetini hesaba kat: son kısmi sayfada (ör. total=21, page=2)
+      // ES'in 1 id dönmesi bayat indeks değildir.
+      const expectedCount = Math.min(
+        Math.max(0, esResult.total - (safePage - 1) * safePageSize),
+        safePageSize,
+      );
 
       if (validIds.length < expectedCount * 0.5) {
         this.logger.warn(
@@ -730,28 +735,25 @@ export class CollectionCrudService {
       where.OR = conditions;
     }
 
-    let orderBy: Prisma.CollectionOrderByWithRelationInput;
+    // ES sıralamasıyla aynı: popular → viewCount, likeCount; her yerde id
+    // tiebreaker (sayfalar arasında kayma/tekrar olmasın).
+    let orderBy: Prisma.CollectionOrderByWithRelationInput[];
     let needsInMemorySort = false;
 
     switch (sortBy) {
-      case "popular":
-        orderBy = { viewCount: "desc" };
-        break;
       case "recent":
-        orderBy = { createdAt: "desc" };
+        orderBy = [{ createdAt: "desc" }, { id: "asc" }];
         break;
       case "name":
-        needsInMemorySort = true;
-        orderBy = { createdAt: "desc" };
-        break;
       case "items":
       case "items_asc":
       case "items_desc":
         needsInMemorySort = true;
-        orderBy = { createdAt: "desc" };
+        orderBy = [{ createdAt: "desc" }, { id: "asc" }];
         break;
+      case "popular":
       default:
-        orderBy = { viewCount: "desc" };
+        orderBy = [{ viewCount: "desc" }, { likeCount: "desc" }, { id: "asc" }];
     }
 
     let [collections, total] = await Promise.all([
@@ -780,15 +782,20 @@ export class CollectionCrudService {
           numeric: false,
         });
         collections = collections.sort((a, b) =>
-          collator.compare(a.name.toLowerCase(), b.name.toLowerCase()),
+          collator.compare(a.name.toLowerCase(), b.name.toLowerCase()) ||
+          a.id.localeCompare(b.id),
         );
       } else if (sortBy === "items" || sortBy === "items_desc") {
         collections = collections.sort(
-          (a, b) => (b._count?.items ?? 0) - (a._count?.items ?? 0),
+          (a, b) =>
+            (b._count?.items ?? 0) - (a._count?.items ?? 0) ||
+            a.id.localeCompare(b.id),
         );
       } else if (sortBy === "items_asc") {
         collections = collections.sort(
-          (a, b) => (a._count?.items ?? 0) - (b._count?.items ?? 0),
+          (a, b) =>
+            (a._count?.items ?? 0) - (b._count?.items ?? 0) ||
+            a.id.localeCompare(b.id),
         );
       }
       collections = collections.slice(

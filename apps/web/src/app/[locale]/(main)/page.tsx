@@ -4,6 +4,7 @@ import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
 import { fetchHeroSlides, fetchTrustBadges } from "@/lib/api/hero";
+import { MANUFACTURERS_WITH_LISTINGS_PATH } from "@/lib/api/catalog";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
 import type {
@@ -80,15 +81,18 @@ async function fetchDiscountedProducts(): Promise<Product[]> {
 }
 
 interface Manufacturer {
+  id: string;
   name: string;
   logo?: string | null;
   description?: string | null;
 }
 
+/** Marka şeridi: yalnız aktif ilanı olan üreticiler (API `hasListings`). */
 async function fetchManufacturers(): Promise<Manufacturer[]> {
-  const res = await fetch(`${API_BASE}/api/manufacturers`, {
-    next: { revalidate: 60 },
-  });
+  const res = await fetch(
+    `${API_BASE}/api${MANUFACTURERS_WITH_LISTINGS_PATH}`,
+    { next: { revalidate: 60 } },
+  );
   if (!res.ok) throw new Error(`manufacturers ${res.status}`);
   return unwrapList<Manufacturer>(await res.json());
 }
@@ -156,6 +160,7 @@ export default async function HomePage({
   // ve repo içi logo dosyaları kaldırıldı.
   const manufacturerItems = settledValue(manufacturers, []);
   const marqueeItems: BrandMarqueeItem[] = manufacturerItems.map((item) => ({
+    id: item.id,
     name: item.name,
     logoUrl: item.logo || "",
     desc: item.description || "",

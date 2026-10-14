@@ -430,6 +430,16 @@ export class TarodanWebSocketGateway
     this.server.to(`user:${userId}`).emit(event, payload);
   }
 
+  /**
+   * Kullanıcının açık soketlerini sunucu tarafından kapatır (hesap silme).
+   * Kişisel oda üzerinden: her soket bağlanırken `user:<id>`'ye katılır.
+   * Sunucu kaynaklı kopuşta istemci kendiliğinden yeniden bağlanmaz; yeniden
+   * denerse `handleConnection` silinmiş hesabı zaten reddeder.
+   */
+  disconnectUser(userId: string): void {
+    this.server?.in(`user:${userId}`).disconnectSockets(true);
+  }
+
   // ==================== UTILITY METHODS ====================
 
   /**

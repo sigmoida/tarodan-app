@@ -8,6 +8,7 @@ describe('RealtimeService', () => {
   const gateway = {
     emitToThread: jest.fn(),
     emitToUser: jest.fn(),
+    disconnectUser: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -34,6 +35,11 @@ describe('RealtimeService', () => {
     expect(gateway.emitToThread).toHaveBeenCalledWith('t1', 'message:read', {
       threadId: 't1', readerId: 'r1', messageIds: ['m1', 'm2'],
     });
+  });
+
+  it('disconnects every open socket of a user', () => {
+    service.disconnectUser('u1');
+    expect(gateway.disconnectUser).toHaveBeenCalledWith('u1');
   });
 
   it('emits notification:new to user', () => {

@@ -14,6 +14,7 @@ import {
 } from '@nestjs/swagger';
 import { BrandService } from './brand.service';
 import { Public } from '../auth/decorators';
+import { HasListingsQueryDto } from '../product/dto/has-listings-query.dto';
 
 @ApiTags('brands')
 @Controller('brands')
@@ -31,8 +32,8 @@ export class BrandController {
         status: 200,
         description: 'Aktif marka listesi (ürün sayılarıyla)',
     })
-    async findAll() {
-        return this.brandService.findAll();
+    async findAll(@Query() query: HasListingsQueryDto) {
+        return this.brandService.findAll({ hasListings: query.hasListings });
     }
 
     /**

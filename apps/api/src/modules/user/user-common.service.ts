@@ -47,6 +47,14 @@ export class UserCommonService {
     return null;
   }
 
+  /**
+   * Bizim public kökümüzdeki tam URL'in depolama anahtarı (ör. yükleme ucunun
+   * döndürdüğü avatar URL'i). Storage yoksa ya da URL bizim değilse null.
+   */
+  publicAssetKeyFromUrl(url: string): string | null {
+    return this.storageService?.publicAssetKeyFromUrl(url) ?? null;
+  }
+
   resolveProductImageUrl(
     imageKeyOrUrl: string | null | undefined,
   ): string | null {

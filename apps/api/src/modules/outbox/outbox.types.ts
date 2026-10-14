@@ -170,3 +170,15 @@ export const tradeCancelledPaymentRefundDedupeKey = (
  * beklenmez. Yük: `MailInternalOutboxPayload` (mail-routing modülü).
  */
 export const OUTBOX_MAIL_INTERNAL_EVENT = "mail.internal_event";
+
+/**
+ * Hesap silmede avatar nesnesini depolamadan sil (KVKK). Silme tx'iyle ATOMİK
+ * yazılır; depolama çağrısı commit SONRASI drainer'dadır ve silmeyi asla
+ * engellemez. Payload yalnız depolama anahtarını taşır (uuid dosya adı, kişisel
+ * veri değil). Tekrar silme zararsızdır: handler idempotenttir.
+ */
+export const OUTBOX_MEDIA_AVATAR_DELETE = "media.avatar_delete";
+
+export interface MediaAvatarDeletePayload {
+  key: string;
+}

@@ -33,6 +33,40 @@ describe("PayoutSchedulerService — failures reach Bull", () => {
     await expect(service.runCheckReturnedTransfers()).rejects.toThrow("boom");
   });
 
+  it("iade kontrolünden SONRA silinmiş hesapların banka hesaplarını temizler", async () => {
+    const payoutService = {
+      checkReturnedTransfers: jest
+        .fn()
+        .mockResolvedValue({ returned: 0, unmatched: 0 }),
+      purgeDeletedSellerBankAccounts: jest.fn().mockResolvedValue(2),
+    };
+    const service = makeService(payoutService);
+
+    const result = await service.runCheckReturnedTransfers();
+
+    expect(result.stats).toMatchObject({ purgedBankAccounts: 2 });
+    expect(
+      payoutService.checkReturnedTransfers.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      payoutService.purgeDeletedSellerBankAccounts.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("banka hesabı temizliği hatası da yükseltilir", async () => {
+    const service = makeService({
+      checkReturnedTransfers: jest
+        .fn()
+        .mockResolvedValue({ returned: 0, unmatched: 0 }),
+      purgeDeletedSellerBankAccounts: jest
+        .fn()
+        .mockRejectedValue(new Error("db down")),
+    });
+
+    await expect(service.runCheckReturnedTransfers()).rejects.toThrow(
+      "db down",
+    );
+  });
+
   it("başarılı tur özet döndürür (regresyon koruması)", async () => {
     const service = makeService({
       processRetryPayouts: jest.fn().mockResolvedValue(1),
