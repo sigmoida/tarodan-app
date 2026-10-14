@@ -68,23 +68,70 @@ describe("ProductQueryService — sıralama/sayfalama kararlılığı", () => {
     },
   );
 
-  it("discountOnly: arama olsa bile ES'e gitmez, WHERE'e isOnSale kuralı girer", async () => {
+  it("discountOnly + arama: ES yolunda kalır, indirim ES sorgusunda filtrelenir", async () => {
     const { service, prisma, esSearch, priceRef } = build();
-    await service.findAll({
+    esSearch.searchProductIds.mockResolvedValue({ ids: ["p2", "p1"], total: 37 });
+    prisma.product.findMany.mockResolvedValue([
+      { id: "p1", status: "active", quantity: 1, reservedQuantity: 0 },
+      { id: "p2", status: "active", quantity: 1, reservedQuantity: 0 },
+    ]);
+
+    const res = await service.findAll({
       search: "hot",
       discountOnly: true,
-      sortBy: "price_asc",
+      sortBy: "relevance",
+      page: 2,
+      limit: 2,
+    } as any);
+
+    // Filtre ES sorgusunun içinde: total ve sayfa filtreden sonra hesaplanır.
+    expect(esSearch.searchProductIds).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: "hot",
+        discountOnly: true,
+        page: 2,
+        pageSize: 2,
+      }),
+    );
+    // Postgres tam-metin yoluna (ilk 1000 id) düşülmez.
+    expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
+    expect(prisma.product.count).not.toHaveBeenCalled();
+    expect(res.meta).toEqual({ total: 37, page: 2, limit: 2, totalPages: 19 });
+    // Alaka sırası (ES sırası) korunur.
+    expect(res.data.map((p: any) => p.id)).toEqual(["p2", "p1"]);
+    // Hidrasyon canlı isOnSale kuralıyla doğrular (pencere indekste yok).
+    const json = JSON.stringify(prisma.product.findMany.mock.calls[0][0].where);
+    expect(json).toContain("saleEndDate");
+    expect(json).toContain(JSON.stringify(priceRef));
+  });
+
+  it("discountOnly + arama: penceresi kapanmış ürün (stale) Postgres'e düşer", async () => {
+    const { service, prisma, esSearch } = build(5);
+    esSearch.searchProductIds.mockResolvedValue({ ids: ["p1", "p2"], total: 2 });
+    // Biri isOnSale doğrulamasından geçmedi → kanonik Postgres yolu.
+    prisma.product.findMany
+      .mockResolvedValueOnce([
+        { id: "p1", status: "active", quantity: 1, reservedQuantity: 0 },
+      ])
+      .mockResolvedValue([]);
+
+    const res = await service.findAll({
+      search: "hot",
+      discountOnly: true,
       page: 1,
       limit: 24,
     } as any);
+
+    expect(prisma.product.count).toHaveBeenCalled();
+    const where = JSON.stringify(prisma.product.count.mock.calls[0][0].where);
+    expect(where).toContain("saleEndDate");
+    expect(res.meta.total).toBe(5);
+  });
+
+  it("discountOnly arama olmadan: Postgres yolu, ES çağrılmaz", async () => {
+    const { service, esSearch } = build();
+    await service.findAll({ discountOnly: true, page: 1, limit: 24 } as any);
     expect(esSearch.searchProductIds).not.toHaveBeenCalled();
-    const where = prisma.product.count.mock.calls[0][0].where;
-    const json = JSON.stringify(where);
-    expect(json).toContain('"oldPrice":{"gt"');
-    expect(json).toContain("saleStartDate");
-    expect(json).toContain("saleEndDate");
-    // Kolon karşılaştırması: oldPrice > price alanı
-    expect(JSON.stringify(where)).toContain(JSON.stringify(priceRef));
   });
 
   it.each(SORTS)(

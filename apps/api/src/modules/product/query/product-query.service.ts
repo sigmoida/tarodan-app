@@ -135,11 +135,11 @@ export class ProductQueryService {
     })}`;
 
     const hasSearch = !!(search && String(search).trim());
-    // discountOnly daima Postgres: isOnSale kuralı (oldPrice > price + indirim
-    // penceresi) ES dokümanında tam temsil edilmez (pencere tarihleri indekste
-    // yok) → ES'te total/sayfa sıralamaya göre değişirdi. Postgres'te filtre
-    // WHERE'de, sayfalama ve total ondan sonra hesaplanır.
-    const isListAllOrPopular = !hasSearch || !!discountOnly;
+    // Arama yoksa Postgres (discountOnly dahil: isOnSale WHERE'de). Arama varsa
+    // ES: alaka sırası korunur, discountOnly ES sorgusunda filtre olarak
+    // uygulanır (total/sayfa filtreden sonra) — Postgres tam-metin yolu yalnız
+    // ilk 1000 eşleşmeyle sınırlı ve alaka sırasını kaybeder.
+    const isListAllOrPopular = !hasSearch;
     if (isListAllOrPopular || lane === "test") {
       // The plain browse / popular grid is the hottest surface and was the ONLY
       // list path bypassing the cache — so every request re-ran the per-product
@@ -254,6 +254,7 @@ export class ProductQueryService {
       scale,
       material: materialSlug,
       tradeOnly,
+      discountOnly,
       preOrder,
       limited,
       set: setFilter,
@@ -282,6 +283,8 @@ export class ProductQueryService {
       material: materialSlug,
       manufacturer: query.manufacturer,
       tradeOnly,
+      // ES'te `oldPrice > price` script filtresi: sorgu içinde, total doğru.
+      discountOnly,
       preOrder,
       limited,
       set: setFilter,
@@ -319,6 +322,12 @@ export class ProductQueryService {
               : {}),
           }),
           { id: { in: esResult.ids } },
+          // İndirim penceresi indekste yok: canlı isOnSale kuralıyla doğrula.
+          // Penceresi kapanmış bir ürün aşağıdaki stale-ID kontrolüne takılır
+          // ve istek Postgres yolunda (kanonik kural) yeniden hesaplanır.
+          ...(discountOnly
+            ? [onSaleWhere(new Date(), this.prisma.product.fields.price)]
+            : []),
         ],
       },
       include: {
