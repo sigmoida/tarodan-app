@@ -37,6 +37,9 @@ export class SecurityService {
   private readonly SECRET_BYTES = 20;
   private readonly TOKEN_EXPIRY_HOURS = 24;
   private readonly CSRF_TOKEN_EXPIRY_MINUTES = 60;
+  // Bekleyen (doğrulanmamış) kurulum sırrı bu süre içinde yeniden kullanılır:
+  // çift dokunma / ekranı yeniden açma, kullanıcının taradığı QR'ı geçersiz kılmasın.
+  private readonly PENDING_SETUP_REUSE_MS = 10 * 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -60,10 +63,6 @@ export class SecurityService {
       throw new BadRequestException("2FA zaten etkin");
     }
 
-    // Generate secret
-    const secret = this.generateTOTPSecret();
-    const backupCodes = this.generateBackupCodes();
-
     // Get user info for QR code label
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -75,10 +74,23 @@ export class SecurityService {
       );
     }
 
+    // Yakın zamanda üretilmiş bekleyen sır varsa aynısını döndür (QR değişmez).
+    // Yedek kodların düz hali saklanmadığı için yalnız onlar yeniden üretilir;
+    // etkinleştirme öncesi kullanılamadıklarından bu güvenlidir.
+    const isPending =
+      !!existing &&
+      Date.now() - existing.updatedAt.getTime() < this.PENDING_SETUP_REUSE_MS;
+    const secret = isPending
+      ? this.decryptSecret(existing.secret)
+      : this.generateTOTPSecret();
+    const backupCodes = this.generateBackupCodes();
+
     // Sağlama URI'si (otpauth) — kimlik doğrulayıcı uygulamasına verilen
     // bağlantı. Bir GÖRSEL adresi DEĞİL: doğrudan <img src> içine konulamaz.
+    // Etiket e-posta: kullanıcıya özgü; özel karakterler (+ vb.) kodlanır.
     const issuer = "Tarodan";
-    const qrCodeUrl = `otpauth://totp/${issuer}:${user?.email}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
+    const label = encodeURIComponent(`${issuer}:${user.email}`);
+    const qrCodeUrl = `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
     // Taranabilir görsel sunucuda üretilir: her istemci (web + mobil) aynı
     // görseli alsın, her biri ayrı bir QR kütüphanesi taşımasın.
     const qrCodeImage = await QRCode.toDataURL(qrCodeUrl, {
@@ -87,8 +99,6 @@ export class SecurityService {
       width: 240,
     });
 
-    // Store encrypted secret
-    const encryptedSecret = this.encryptSecret(secret);
     const hashedBackupCodes = await Promise.all(
       backupCodes.map((code) => bcrypt.hash(code, 10)),
     );
@@ -97,7 +107,7 @@ export class SecurityService {
       await this.prisma.twoFactorSecret.update({
         where: { userId },
         data: {
-          secret: encryptedSecret,
+          ...(isPending ? {} : { secret: this.encryptSecret(secret) }),
           backupCodes: hashedBackupCodes,
           isEnabled: false, // Not enabled until verified
         },
@@ -106,7 +116,7 @@ export class SecurityService {
       await this.prisma.twoFactorSecret.create({
         data: {
           userId,
-          secret: encryptedSecret,
+          secret: this.encryptSecret(secret),
           backupCodes: hashedBackupCodes,
           isEnabled: false,
         },
@@ -139,9 +149,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     // Enable 2FA
@@ -182,9 +190,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     await this.prisma.twoFactorSecret.update({
@@ -285,9 +291,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     const newBackupCodes = this.generateBackupCodes();
@@ -710,6 +714,14 @@ export class SecurityService {
       return Buffer.from(encrypted, "base64").toString("utf8");
     }
     return decryptSecret(encrypted, this.getTwoFactorEncryptionKey());
+  }
+
+  /** Geçersiz 2FA kodu: 401 değil 400 — istemciler 401'i oturum bitti sanıp çıkış yapıyordu. */
+  private invalidCodeException(): BadRequestException {
+    return new BadRequestException({
+      ...i18nMessage("server.security.invalidCode"),
+      errorCode: "INVALID_2FA_CODE",
+    });
   }
 
   private verifyTOTP(secret: string, code: string): boolean {
