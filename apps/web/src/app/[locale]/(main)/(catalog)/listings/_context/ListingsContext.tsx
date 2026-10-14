@@ -21,6 +21,7 @@ import {
   type Filters,
 } from "../_lib/params";
 import { fetchListingsClient } from "../_lib/data";
+import { createUrlWriteTracker, normalizeParams } from "../_lib/urlSync";
 import { type ProductLayout } from "../_components/ProductLayoutSelector";
 
 export interface Listing {
@@ -123,13 +124,6 @@ function useListingsValue(): ListingsContextValue {
 
   const searchString = searchParams.toString();
 
-  const normalizeParams = (p: URLSearchParams): string => {
-    const sorted = new URLSearchParams(
-      Array.from(p.entries()).sort((a, b) => a[0].localeCompare(b[0])),
-    );
-    return sorted.toString();
-  };
-
   const buildParamsFromFilters = (f: typeof filters, page: number) => {
     const params = new URLSearchParams();
     if (f.search) params.set("search", f.search);
@@ -175,6 +169,9 @@ function useListingsValue(): ListingsContextValue {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Durum→URL yazımlarımızı izler; URL→durum eşitlemesi bunları geri okumaz
+  // (hızlı ardışık seçimlerde eski URL yeni durumu ezmesin).
+  const urlWrites = useRef(createUrlWriteTracker());
   const hasSyncedToUrl = useRef(false);
   useEffect(() => {
     if (!hasSyncedToUrl.current) {
@@ -184,6 +181,7 @@ function useListingsValue(): ListingsContextValue {
     const nextParams = buildParamsFromFilters(filters, currentPage);
     const currentParams = new URLSearchParams(searchString);
     if (normalizeParams(nextParams) !== normalizeParams(currentParams)) {
+      urlWrites.current.recordWrite(nextParams);
       const nextStr = nextParams.toString();
       const newUrl = nextStr ? `/listings?${nextStr}` : "/listings";
       router.replace(newUrl);
@@ -192,6 +190,9 @@ function useListingsValue(): ListingsContextValue {
 
   useEffect(() => {
     const sp = new URLSearchParams(searchString);
+    // Bizim yazdığımız (durum zaten daha yeni) → atla; yalnızca dışarıdan gelen
+    // gezinmeler (geri/ileri, menü linki) duruma yazılır.
+    if (urlWrites.current.isOwnWrite(sp)) return;
     setCurrentPage(getListingsPage(sp));
     setFilters((prev) => mergeUrlFilters(prev, sp));
   }, [searchString]);
