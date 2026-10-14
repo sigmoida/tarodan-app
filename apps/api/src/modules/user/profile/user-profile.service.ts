@@ -753,7 +753,12 @@ export class UserProfileService {
               where: { id: userId },
               select: { avatarUrl: true },
             });
-            await enqueueAvatarDeletion(this.outbox, tx, avatar?.avatarUrl);
+            await enqueueAvatarDeletion(
+              this.outbox,
+              tx,
+              avatar?.avatarUrl,
+              (url) => this.common.publicAssetKeyFromUrl(url),
+            );
           }
 
           // 3b) Pazarlama listesinden çıkar. E-posta birazdan

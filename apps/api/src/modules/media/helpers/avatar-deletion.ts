@@ -8,33 +8,43 @@ import {
 /** Avatar nesnelerinin depolama kökü (yükleme ucu ve URL çözümü ile aynı). */
 export const AVATAR_BUCKET = "avatars";
 
+/** Tam URL'den bizim public nesne anahtarımızı çıkarır (`StorageService`). */
+export type PublicAssetKeyResolver = (url: string) => string | null;
+
 /**
- * `User.avatarUrl` bizim depolamamızdaki bir anahtar mı? Sosyal girişten gelen
- * tam URL (Google/Apple profil resmi) bizim nesnemiz değildir, silinecek bir
- * şey yoktur.
+ * `User.avatarUrl`'in bizim depolamamızdaki anahtarı. Değer çıplak anahtar
+ * olabilir ya da yükleme ucunun döndürdüğü public tam URL (avatars public
+ * köktedir); ikincisi `resolvePublicUrl` ile anahtara çevrilir. Sosyal
+ * girişten gelen URL (Google/Apple profil resmi) bizim nesnemiz değildir:
+ * çözücü onu tanımaz, silinecek bir şey yoktur.
  */
 export function avatarStorageKey(
   avatarUrl: string | null | undefined,
+  resolvePublicUrl?: PublicAssetKeyResolver,
 ): string | null {
-  const key = avatarUrl?.trim();
-  if (!key) return null;
-  if (key.startsWith("http://") || key.startsWith("https://")) return null;
-  return key;
+  const value = avatarUrl?.trim();
+  if (!value) return null;
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return resolvePublicUrl?.(value) ?? null;
+  }
+  return value;
 }
 
 /**
  * Avatar nesnesinin silinmesini outbox'a yazar — çağıranın transaction'ı
  * İÇİNDE. Depolama çağrısı commit SONRASI drainer'dadır (MediaOutboxHandlers);
- * transaction geri alınırsa iş de geri alınır.
+ * transaction geri alınırsa iş de geri alınır. Payload yalnız depolama
+ * anahtarını taşır; URL (sosyal sağlayıcınınki dahil) outbox'a yazılmaz.
  *
- * @returns iş kuyruğa yazıldı mı (depolama anahtarı yoksa yazılmaz)
+ * @returns iş kuyruğa yazıldı mı (bizim nesnemiz yoksa yazılmaz)
  */
 export async function enqueueAvatarDeletion(
   outbox: Pick<OutboxService, "enqueue">,
   tx: Prisma.TransactionClient,
   avatarUrl: string | null | undefined,
+  resolvePublicUrl?: PublicAssetKeyResolver,
 ): Promise<boolean> {
-  const key = avatarStorageKey(avatarUrl);
+  const key = avatarStorageKey(avatarUrl, resolvePublicUrl);
   if (!key) return false;
   await outbox.enqueue(tx, {
     type: OUTBOX_MEDIA_AVATAR_DELETE,

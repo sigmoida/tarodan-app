@@ -27,7 +27,17 @@ describe("MediaOutboxHandlers — avatar silme", () => {
     expect(storage.deleteFile).toHaveBeenCalledWith(
       "avatars",
       "dev/avatars/abc.jpg",
+      { throwOnError: true },
     );
+  });
+
+  it("depolama hatasını yükseltir ki outbox yeniden denesin", async () => {
+    const { handler, storage } = makeHandler();
+    storage.deleteFile.mockRejectedValue(new Error("s3 down"));
+
+    await expect(
+      handler({ key: "dev/avatars/abc.jpg" }, {} as never),
+    ).rejects.toThrow("s3 down");
   });
 
   it("depolama anahtarı olmayan yükü no-op geçer", async () => {
@@ -71,5 +81,37 @@ describe("enqueueAvatarDeletion", () => {
   it("sosyal girişten gelen tam URL bizim nesnemiz değildir", () => {
     expect(avatarStorageKey("http://example.com/a.png")).toBeNull();
     expect(avatarStorageKey(" dev/avatars/a.png ")).toBe("dev/avatars/a.png");
+  });
+
+  it("bizim public kökümüzdeki tam URL'i çözücüyle anahtara çevirir", async () => {
+    const resolve = jest.fn((url: string) =>
+      url === "https://cdn.example.com/dev/avatars/a.png"
+        ? "dev/avatars/a.png"
+        : null,
+    );
+    const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+
+    await expect(
+      enqueueAvatarDeletion(
+        outbox,
+        tx,
+        "https://cdn.example.com/dev/avatars/a.png",
+        resolve,
+      ),
+    ).resolves.toBe(true);
+    expect(outbox.enqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ payload: { key: "dev/avatars/a.png" } }),
+    );
+    // Yabancı URL (sosyal giriş) kuyruğa yazılmaz, URL outbox'a girmez.
+    await expect(
+      enqueueAvatarDeletion(
+        outbox,
+        tx,
+        "https://lh3.googleusercontent.com/a",
+        resolve,
+      ),
+    ).resolves.toBe(false);
+    expect(outbox.enqueue).toHaveBeenCalledTimes(1);
   });
 });

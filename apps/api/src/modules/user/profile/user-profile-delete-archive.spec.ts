@@ -186,10 +186,18 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
         .mockResolvedValue(undefined),
       notifyOfferCancelledBuyerDeleted: jest.fn().mockResolvedValue(undefined),
     };
+    // Bizim public kökümüzdeki tam avatar URL'i anahtara çözülür.
+    const common = {
+      publicAssetKeyFromUrl: jest.fn((url: string) =>
+        url.startsWith("https://cdn.tarodan.test/")
+          ? url.slice("https://cdn.tarodan.test/".length)
+          : null,
+      ),
+    };
     const service = new UserProfileService(
       prisma as never,
       {} as never,
-      {} as never,
+      common as never,
       {} as never,
       { recordMarketingChange: jest.fn() } as never, // consents
       { syncUserConsent: jest.fn() } as never, // newsletter
@@ -654,6 +662,19 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       });
       expect(outbox.enqueue.mock.invocationCallOrder[0]).toBeLessThan(
         tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("yükleme ucunun döndürdüğü public tam URL'i anahtara çevirip yazar", async () => {
+      const { service, outbox } = makeService({
+        avatarUrl: "https://cdn.tarodan.test/dev/avatars/u1/a.jpg",
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(outbox.enqueue).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ payload: { key: "dev/avatars/u1/a.jpg" } }),
       );
     });
 
