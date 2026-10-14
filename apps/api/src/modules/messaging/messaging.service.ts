@@ -106,7 +106,6 @@ export class MessagingService {
     if (!recipient) {
       throw new NotFoundException(i18nMessage("server.trade.receiverNotFound"));
     }
-    this.assertRecipientActive(recipient);
 
     await this.assertNotBlocked(senderId, recipientId);
 
@@ -148,6 +147,11 @@ export class MessagingService {
       }
       return this.getThreadById(thread.id, senderId);
     }
+
+    // Silinmiş hesapla YENİ konu açılmaz. Var olan konu yukarıda döner:
+    // "satıcıya yaz" gibi mesajsız açılışlar geçmişe ulaşabilsin; mesaj
+    // gönderimini sendMessage ayrıca reddeder.
+    this.assertRecipientActive(recipient);
 
     // Create new thread
     thread = await this.prisma.messageThread.create({
@@ -468,9 +472,9 @@ export class MessagingService {
   }
 
   /**
-   * Silinmiş (anonimleşmiş) hesaba konu açılamaz, mesaj gönderilemez. Engelli
-   * alıcıyla aynı tür (403): istemciler ikisini de "mesajlaşılamaz" olarak
-   * gösterir. Geçmiş konular okunabilir kalır.
+   * Silinmiş (anonimleşmiş) hesapla yeni konu açılamaz, mesaj gönderilemez.
+   * Engelli alıcıyla aynı tür (403): istemciler ikisini de "mesajlaşılamaz"
+   * olarak gösterir. Var olan konu açılabilir ve okunabilir kalır.
    */
   private assertRecipientActive(
     recipient: { deletedAt: Date | null } | null,
