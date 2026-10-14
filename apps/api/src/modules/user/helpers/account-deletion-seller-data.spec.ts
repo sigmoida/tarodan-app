@@ -1,22 +1,21 @@
-import { PaymentStatus, PayoutStatus } from "@prisma/client";
 import { purgeSellerDataForAccountDeletion } from "./account-deletion-seller-data";
+import { hasUnsettledPayout } from "../../payout/helpers/unsettled-payout";
+
+jest.mock("../../payout/helpers/unsettled-payout", () => ({
+  hasUnsettledPayout: jest.fn(),
+}));
 
 /**
  * Hesap silme (KVKK): IBAN/TCKN/hesap sahibi ve kurumsal başvurunun iletişim
  * alanları canlı tablolarda kalmaz — ama hesaba ödenecek para varken banka
- * hesabı silinmez, aksi hâlde hakediş ödenemez.
+ * hesabı silinmez, aksi hâlde hakediş ödenemez. "Ödenecek para" kuralı payout
+ * modülünün tek yüklemidir (`hasUnsettledPayout`, kendi spec'inde).
  */
 describe("purgeSellerDataForAccountDeletion", () => {
-  const makeTx = (opts: {
-    openTransfers?: number;
-    unpaidTradeCash?: number;
-  }) => ({
-    payoutTransfer: {
-      count: jest.fn().mockResolvedValue(opts.openTransfers ?? 0),
-    },
-    tradeCashPayment: {
-      count: jest.fn().mockResolvedValue(opts.unpaidTradeCash ?? 0),
-    },
+  const unsettled = hasUnsettledPayout as jest.MockedFunction<
+    typeof hasUnsettledPayout
+  >;
+  const makeTx = () => ({
     sellerBankAccount: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
@@ -25,48 +24,34 @@ describe("purgeSellerDataForAccountDeletion", () => {
     },
   });
 
+  beforeEach(() => unsettled.mockReset());
+
   it("ödenecek para yoksa banka hesabını siler", async () => {
-    const tx = makeTx({});
+    unsettled.mockResolvedValue(false);
+    const tx = makeTx();
 
     await expect(
       purgeSellerDataForAccountDeletion(tx as never, "user-1"),
     ).resolves.toEqual({ bankAccountRetained: false });
+    expect(unsettled).toHaveBeenCalledWith(tx, "user-1");
     expect(tx.sellerBankAccount.deleteMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
     });
   });
 
-  it("tamamlanmamış payout varken banka hesabını korur", async () => {
-    const tx = makeTx({ openTransfers: 1 });
+  it("ödenecek para varken banka hesabını korur", async () => {
+    unsettled.mockResolvedValue(true);
+    const tx = makeTx();
 
     await expect(
       purgeSellerDataForAccountDeletion(tx as never, "user-1"),
     ).resolves.toEqual({ bankAccountRetained: true });
     expect(tx.sellerBankAccount.deleteMany).not.toHaveBeenCalled();
-    expect(tx.payoutTransfer.count).toHaveBeenCalledWith({
-      where: { sellerId: "user-1", status: { not: PayoutStatus.completed } },
-    });
-  });
-
-  it("transferi üretilmemiş takas nakit farkı varken banka hesabını korur", async () => {
-    const tx = makeTx({ unpaidTradeCash: 1 });
-
-    await expect(
-      purgeSellerDataForAccountDeletion(tx as never, "user-1"),
-    ).resolves.toEqual({ bankAccountRetained: true });
-    expect(tx.sellerBankAccount.deleteMany).not.toHaveBeenCalled();
-    expect(tx.tradeCashPayment.count).toHaveBeenCalledWith({
-      where: {
-        recipientId: "user-1",
-        status: PaymentStatus.completed,
-        amount: { gt: 0 },
-        payoutTransfers: { none: {} },
-      },
-    });
   });
 
   it("kurumsal başvuruyu silmez; yalnız iletişim ve banka alanlarını temizler", async () => {
-    const tx = makeTx({});
+    unsettled.mockResolvedValue(false);
+    const tx = makeTx();
 
     await purgeSellerDataForAccountDeletion(tx as never, "user-1");
 

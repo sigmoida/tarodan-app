@@ -1,14 +1,13 @@
-import { PaymentStatus, PayoutStatus, type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { anonymizedEmailFor } from "../../../common/helpers/deleted-user-identity";
+import {
+  hasUnsettledPayout,
+  type UnsettledPayoutDb,
+} from "../../payout/helpers/unsettled-payout";
 
 /** Satıcı verisi temizliğinin dokunduğu tablolar — silme transaction'ının `tx`'i. */
-export type AccountDeletionSellerDataDb = Pick<
-  Prisma.TransactionClient,
-  | "payoutTransfer"
-  | "tradeCashPayment"
-  | "sellerBankAccount"
-  | "corporateApplication"
->;
+export type AccountDeletionSellerDataDb = UnsettledPayoutDb &
+  Pick<Prisma.TransactionClient, "sellerBankAccount" | "corporateApplication">;
 
 export interface AccountDeletionSellerDataResult {
   /**
@@ -21,32 +20,6 @@ export interface AccountDeletionSellerDataResult {
 }
 
 /**
- * Hesaba ödenmesi gereken ama henüz ödenmemiş para var mı? Engel denetimi
- * bekleyen/işlenen payout'u ve açık blokajı zaten reddeder; burada kalanlar:
- * admin'in yeniden deneyebileceği `failed` / `returned` transferler ve
- * serbest kalmış ama transferi henüz üretilmemiş takas nakit farkı.
- */
-async function hasUnsettledPayout(
-  tx: AccountDeletionSellerDataDb,
-  userId: string,
-): Promise<boolean> {
-  const [openTransfers, unpaidTradeCash] = await Promise.all([
-    tx.payoutTransfer.count({
-      where: { sellerId: userId, status: { not: PayoutStatus.completed } },
-    }),
-    tx.tradeCashPayment.count({
-      where: {
-        recipientId: userId,
-        status: PaymentStatus.completed,
-        amount: { gt: 0 },
-        payoutTransfers: { none: {} },
-      },
-    }),
-  ]);
-  return openTransfers > 0 || unpaidTradeCash > 0;
-}
-
-/**
  * Hesap silmede satıcı tarafındaki kişisel veri kalıntıları (KVKK). Kimlik
  * arşive (`DeletedUserIdentity`) yazıldıktan SONRA, silme transaction'ı İÇİNDE
  * çağrılır.
@@ -54,7 +27,8 @@ async function hasUnsettledPayout(
  * - `SellerBankAccount` (IBAN, TCKN, hesap sahibi): başka tablo FK ile ona
  *   bağlı değil; payout'lar IBAN'ı kendi satırına snapshot'lar. Ödenecek para
  *   yoksa satır silinir; varsa hakediş ödenebilsin diye korunur (bkz.
- *   `bankAccountRetained`).
+ *   `bankAccountRetained`) ve para kapanınca günlük payout cron'u siler
+ *   (`purgeSettledBankAccountsOfDeletedSellers`).
  * - `CorporateApplication`: satır SİLİNMEZ — arşivin `sourceRefs`'i ona
  *   referans verir; belgeler/olaylar ona bağlıdır. Yalnız iletişim ve banka
  *   alanları temizlenir. Şirket kimliği, yetkili ve ortak kimlikleri

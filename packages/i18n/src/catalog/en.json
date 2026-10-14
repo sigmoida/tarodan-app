@@ -3940,7 +3940,7 @@
         "deletedHeading": "Data that is deleted or anonymized",
         "deletedProfile": "Your profile details such as name, email, phone, username, date of birth, profile photo and bio are deleted or anonymized; other members see your account as \"Deleted User\".",
         "deletedAccess": "Your saved addresses, saved cards, sessions, notification devices and linked Apple/Google sign-ins are deleted.",
-        "deletedBank": "Your saved bank account (IBAN) is deleted; if a payout is still owed to you, it is kept until that payment can be completed.",
+        "deletedBank": "Your saved bank account (IBAN) is deleted. If a payout is still owed to you, the IBAN is kept only until that payment is settled and is then deleted automatically.",
         "deletedListings": "Your listings are taken down, your public collections are hidden and your open offers are cancelled.",
         "deletedMarketing": "Your marketing email consent is withdrawn and your newsletter subscription is ended.",
         "retainedHeading": "Data we retain",

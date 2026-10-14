@@ -3940,7 +3940,7 @@
         "deletedHeading": "Silinen veya anonimleştirilen veriler",
         "deletedProfile": "Ad, e-posta, telefon, kullanıcı adı, doğum tarihi, profil fotoğrafı ve hakkımda yazısı gibi profil bilgileriniz silinir veya anonimleştirilir; hesabınız diğer üyelere \"Silinmiş Kullanıcı\" olarak görünür.",
         "deletedAccess": "Kayıtlı adresleriniz, kayıtlı kartlarınız, oturumlarınız, bildirim cihazlarınız ve bağlı Apple/Google girişleriniz silinir.",
-        "deletedBank": "Kayıtlı banka hesabınız (IBAN) silinir; size ödenmesi gereken bir hakediş varsa ödeme tamamlanabilsin diye saklanır.",
+        "deletedBank": "Kayıtlı banka hesabınız (IBAN) silinir. Size ödenmesi gereken bir hakediş varsa, IBAN yalnız bu ödeme sonuçlanana kadar saklanır ve ardından otomatik olarak silinir.",
         "deletedListings": "İlanlarınız yayından kaldırılır, herkese açık koleksiyonlarınız gizlenir ve verdiğiniz açık teklifler iptal edilir.",
         "deletedMarketing": "Pazarlama e-postası izniniz geri çekilir ve bülten aboneliğiniz sonlandırılır.",
         "retainedHeading": "Saklanan veriler",

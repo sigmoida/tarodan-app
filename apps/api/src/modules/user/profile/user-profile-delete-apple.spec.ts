@@ -59,7 +59,9 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
         // Satıcı verisi temizliği: ödenecek hakediş var mı?
         count: jest.fn().mockResolvedValue(0),
       },
-      tradeCashPayment: { count: jest.fn().mockResolvedValue(0) },
+      // Ödenmemiş hakediş denetimi (hasUnsettledPayout): hold / takas nakdi yok.
+      tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      refundAttempt: { count: jest.fn().mockResolvedValue(0) },
       paymentHold: txEmpty(),
       user: {
         findUnique: jest.fn().mockResolvedValue(user),

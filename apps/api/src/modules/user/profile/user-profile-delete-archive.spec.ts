@@ -82,7 +82,9 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
         // Satıcı verisi temizliği: ödenecek hakediş var mı?
         count: jest.fn().mockResolvedValue(overrides.openPayouts ?? 0),
       },
-      tradeCashPayment: { count: jest.fn().mockResolvedValue(0) },
+      // Ödenmemiş hakediş denetimi (hasUnsettledPayout): hold / takas nakdi yok.
+      tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      refundAttempt: { count: jest.fn().mockResolvedValue(0) },
       paymentHold: txEmpty(),
       productRemovalEvent: {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
