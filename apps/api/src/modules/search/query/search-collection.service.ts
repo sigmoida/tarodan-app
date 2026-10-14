@@ -284,23 +284,25 @@ export class SearchCollectionService {
     let sort: any[];
     switch (sortBy) {
       case "popular":
-        sort = [{ viewCount: "desc" }, { likeCount: "desc" }];
+        sort = [{ viewCount: "desc" }, { likeCount: "desc" }, { id: "asc" }];
         break;
       case "recent":
-        sort = [{ createdAt: "desc" }];
+        sort = [{ createdAt: "desc" }, { id: "asc" }];
         break;
       case "name":
-        sort = [{ "name.keyword": "asc" }];
+        sort = [{ "name.keyword": "asc" }, { id: "asc" }];
         break;
       case "items":
       case "items_desc":
-        sort = [{ itemCount: "desc" }];
+        sort = [{ itemCount: "desc" }, { id: "asc" }];
         break;
       case "items_asc":
-        sort = [{ itemCount: "asc" }];
+        sort = [{ itemCount: "asc" }, { id: "asc" }];
         break;
       default:
-        sort = query ? [{ _score: "desc" }] : [{ viewCount: "desc" }];
+        sort = query
+          ? [{ _score: "desc" }, { id: "asc" }]
+          : [{ viewCount: "desc" }, { id: "asc" }];
     }
 
     try {
