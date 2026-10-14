@@ -1,4 +1,6 @@
-export interface Manufacturer {
+import type { ListingCounts } from "../../_lib/listingCountColumns";
+
+export interface Manufacturer extends ListingCounts {
   id: string;
   name: string;
   slug: string;
