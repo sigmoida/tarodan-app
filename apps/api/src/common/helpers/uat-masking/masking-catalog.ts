@@ -113,10 +113,11 @@ export const USERS_SYSTEM_ACCOUNT_SQL = `"email" IN (${UAT_MASK_KEPT_SYSTEM_EMAI
  * "Silinmiş Kullanıcı" adı (`deleteAccount` ikisini birlikte yazar). İkisi de
  * kişisel değildir ve kod onlara bakar (`isAnonymizedEmail`, arşiv
  * çözümleyicisi; ekranlar silinmiş kişiyi bu adla gösterir), bu yüzden YALNIZ bu
- * iki kolon korunur. `deleteAccount` kullanıcı adını ve doğum tarihini
- * temizlemez: silinmiş hesabın diğer her kişisel kolonu canlı hesap gibi
- * maskelenir. Sentinel'i tam taşımayan (eski) silinmiş satırın e-postası ve adı
- * da maskelenir.
+ * iki kolon korunur. Silinmiş hesabın diğer her kişisel kolonu canlı hesap gibi
+ * maskelenir — `deleteAccount` kullanıcı adını sentinel'e çekip doğum tarihini
+ * silse de, bu temizlikten ÖNCE silinmiş (eski) satırlar ikisini hâlâ
+ * taşıyabilir. Sentinel'i tam taşımayan (eski) silinmiş satırın e-postası ve
+ * adı da maskelenir.
  */
 export const USERS_ANONYMIZED_SENTINEL_SQL =
   `("email" ~* ${sqlLiteral(ANONYMIZED_EMAIL_PATTERN.source)}` +

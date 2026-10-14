@@ -82,6 +82,7 @@ export const SITEMAP_SECTIONS: SitemapSection[] = [
       { href: "/distance-sales", labelKey: "footer.distanceSales" },
       { href: "/refund-policy", labelKey: "footer.refundPolicy" },
       { href: "/seller-agreement", labelKey: "footer.sellerAgreement" },
+      { href: "/account-deletion", labelKey: "footer.accountDeletion" },
     ],
   },
 ];

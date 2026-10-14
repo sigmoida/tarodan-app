@@ -5,6 +5,10 @@ import {
   publicUsername,
   toPublicIdentity,
 } from "./public-identity";
+import {
+  ANONYMIZED_DISPLAY_NAME,
+  anonymizedUsernameFor,
+} from "./deleted-user-identity";
 
 describe("public identity chain", () => {
   it("prefers the company name for corporate accounts", () => {
@@ -47,6 +51,18 @@ describe("public identity chain", () => {
   it("hides the legacy placeholder from profile links", () => {
     expect(publicUsername({ username: "legacy_00000042" })).toBeNull();
     expect(publicUsername({ username: "kaan.merakli" })).toBe("kaan.merakli");
+  });
+
+  it("shows a deleted account by its anonymized name, never its old handle", () => {
+    const deleted = {
+      companyName: null,
+      username: anonymizedUsernameFor("3f2b8c1e-9d4a-4b7e-8f21-0c5d6e7a8b9c"),
+      displayName: ANONYMIZED_DISPLAY_NAME,
+    };
+    expect(publicName(deleted)).toBe(ANONYMIZED_DISPLAY_NAME);
+    expect(publicUsername(deleted)).toBeNull();
+    // Üyenin seçtiği "deleted_" önekli ad yer tutucu sayılmaz.
+    expect(publicUsername({ username: "deleted_fan" })).toBe("deleted_fan");
   });
 
   it("keeps displayName as an alias of publicName", () => {

@@ -17,6 +17,8 @@ const PUBLIC_PAGES: { path: string; expectsText?: RegExp }[] = [
   { path: '/buyer-protection' },
   { path: '/seller-agreement' },
   { path: '/intellectual-property' },
+  // Google Play: giriş gerektirmeyen hesap silme bilgi sayfası.
+  { path: '/account-deletion', expectsText: /Tarodan/ },
   { path: '/authenticity' },
   { path: '/guvenli-takas' },
   { path: '/collectors-guide' },

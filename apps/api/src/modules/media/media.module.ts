@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { MediaService } from "./media.service";
 import { MediaController } from "./media.controller";
+import { MediaOutboxHandlers } from "./media-outbox-handlers.service";
 import { MediaCleanupService } from "./jobs/media-cleanup.service";
 import {
   MediaCleanupSchedulerService,
@@ -25,6 +26,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   controllers: [MediaController],
   providers: [
     MediaService,
+    // Hesap silmede avatar nesnesi (outbox, commit sonrası).
+    MediaOutboxHandlers,
     MediaCleanupService,
     MediaCleanupSchedulerService,
     ...scheduledProcessors(MediaScheduledProcessor),

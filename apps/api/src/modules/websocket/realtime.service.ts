@@ -32,4 +32,8 @@ export class RealtimeService {
   emitNotification(userId: string, n: NotificationNewEvent): void {
     this.gateway.emitToUser(userId, 'notification:new', n);
   }
+
+  disconnectUser(userId: string): void {
+    this.gateway.disconnectUser(userId);
+  }
 }

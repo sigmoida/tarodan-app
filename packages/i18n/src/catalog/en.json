@@ -2450,7 +2450,8 @@
     "cookieSettings": "Cookie Settings",
     "appPromo": "Take Tarodan with you — download our mobile app",
     "downloadAppStore": "Download on the App Store",
-    "downloadGooglePlay": "Get it on Google Play"
+    "downloadGooglePlay": "Get it on Google Play",
+    "accountDeletion": "Account Deletion"
   },
   "home": {
     "hero": {
@@ -2768,8 +2769,8 @@
     "dangerZone": "Danger Zone",
     "deleteAccount": "Delete Account",
     "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
-    "deleteAccountDetails": "Permanently delete your account and all of its data. This action cannot be undone.",
-    "deleteAccountWarning": "All your data, listings, and order history will be permanently deleted.",
+    "deleteAccountDetails": "Close your account; your personal details are anonymized and records we are legally required to keep are retained. This action cannot be undone.",
+    "deleteAccountWarning": "Your account will be closed, your personal details anonymized and your listings taken down. Order and invoice records are kept as required by law, and your identity details are held in a separate archive for 10 years for that purpose. This action cannot be undone.",
     "deleteAccountTypePrompt": "Type {keyword} to confirm:",
     "deleteAccountKeyword": "DELETE",
     "accountDeleted": "Your account has been deleted",
@@ -3914,6 +3915,47 @@
       "updatedIntro": "Some of our documents have been updated. To continue, please read and accept the current versions.",
       "acceptRich": "<link>{document}</link> — I have read and accept it.",
       "submit": "Accept and continue"
+    },
+    "accountDeletion": {
+      "metaTitle": "Account Deletion · Tarodan",
+      "metaDescription": "How to delete your Tarodan account from the mobile app or the website, which data is deleted and which is retained to meet legal obligations.",
+      "title": "Tarodan Account Deletion",
+      "pageDescription": "You can delete your Tarodan account at any time, after signing in, from the app or the website. This page explains the steps and what happens to your data.",
+      "pageFooter": "This text may be updated as legislation and our practices change; the current version is always published on the Platform. See the Privacy Policy for details on how your personal data is processed.",
+      "howTo": {
+        "title": "How to delete your account",
+        "appHeading": "In the Tarodan mobile app",
+        "appStep1": "Sign in to your account in the Tarodan app.",
+        "appStep2": "Open the Profile tab from the bottom menu.",
+        "appStep3": "Tap Delete Account and confirm the deletion.",
+        "webHeading": "On the website",
+        "webStep1": "Sign in to your account at tarodan.com.tr.",
+        "webStep2": "Go to your Profile page.",
+        "webStep3": "In the Danger Zone section at the bottom of the page, click Delete Account, type the confirmation word and confirm.",
+        "beforeHeading": "Before you delete",
+        "beforeText": "If you have an open order, an ongoing trade, an open refund request, a pending payout or a listing reserved for a sale, the deletion is declined and the reason is shown; try again once these are completed. Your live and pending listings are taken down automatically during deletion.",
+        "immediateNote": "Your account is closed and all your sessions are ended as soon as you confirm. Deletion cannot be undone."
+      },
+      "data": {
+        "title": "What happens to your data",
+        "deletedHeading": "Data that is deleted or anonymized",
+        "deletedProfile": "Your profile details such as name, email, phone, username, date of birth, profile photo and bio are deleted or anonymized; other members see your account as \"Deleted User\".",
+        "deletedAccess": "Your saved addresses, saved cards, sessions, notification devices and linked Apple/Google sign-ins are deleted.",
+        "deletedBank": "Your saved bank account (IBAN) is deleted. If a payout is still owed to you, the IBAN is kept only until that payment is settled and is then deleted automatically.",
+        "deletedListings": "Your listings are taken down, your public collections are hidden and your open offers are cancelled.",
+        "deletedMarketing": "Your marketing email consent is withdrawn and your newsletter subscription is ended.",
+        "retainedHeading": "Data we retain",
+        "retainedOrders": "Order, payment, refund and invoice records are kept as required by tax and commercial law; in these records you appear as \"Deleted User\".",
+        "retainedIdentity": "An identity record containing your full name, national ID / tax number, contact and address details is kept in a separate, access-restricted archive for 10 years from the deletion date to meet legal reporting obligations.",
+        "retainedSocial": "Your messages, reviews and trade history are kept because they are also part of the other party's records; in them you appear as \"Deleted User\".",
+        "retainedCorporate": "If you are a business seller, the company and authorized-person details in your application are kept as a commercial record; the contact and bank details in the application are deleted.",
+        "reregisterNote": "You can sign up again with the same email address and phone number; data from your old account is not transferred to the new one."
+      },
+      "help": {
+        "title": "Help",
+        "heading": "Contact us",
+        "text": "If you can't delete your account, or have questions about deletion or your data, contact us through the channels below."
+      }
     }
   },
   "information": {
@@ -11692,7 +11734,8 @@
       "viewForbidden": "You are not allowed to view this thread",
       "messageTooLong": "A message can be at most {max} characters. Current length: {length}",
       "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow.",
-      "contentRejected": "Your text contains content that cannot be shared (such as offensive language or contact details). Please edit it and try again."
+      "contentRejected": "Your text contains content that cannot be shared (such as offensive language or contact details). Please edit it and try again.",
+      "recipientDeleted": "This user has deleted their account, so you can't message them"
     },
     "wishlist": {
       "ownProduct": "You cannot add your own product to a wishlist",
