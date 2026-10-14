@@ -71,7 +71,11 @@ export const queryKeys = {
     all: () => ["collections"] as const,
   },
   manufacturers: {
-    /** The public manufacturers list — seeded by the server, read by the client. */
+    /**
+     * The public manufacturers list (only those with active listings —
+     * `MANUFACTURERS_WITH_LISTINGS_PATH`) — seeded by the server, read by the
+     * client, shared with the header nav and the listings sidebar.
+     */
     list: () => ["manufacturers", "list"] as const,
     /** A single manufacturer resolved by slug. */
     detail: (slug: string) => ["manufacturers", "detail", slug] as const,

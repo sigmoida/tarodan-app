@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { col, Empty } from "@/components/table";
 import { TextLink } from "@/components/TextLink";
 import { LogoNameCell } from "../../_components/LogoNameCell";
+import { listingCountColumns } from "../../_lib/listingCountColumns";
 import { manufacturerRowMenu, type ManufacturerRowActions } from "./rowActions";
 import type { Manufacturer } from "./types";
 
@@ -34,6 +35,7 @@ export function manufacturerColumns(t: T, actions: ManufacturerRowActions) {
         ),
       { sortKey: "website" },
     ),
+    ...listingCountColumns<Manufacturer>(t),
     col.badge<Manufacturer>(
       t("common.status"),
       (m) => <Badge active={m.isActive} />,

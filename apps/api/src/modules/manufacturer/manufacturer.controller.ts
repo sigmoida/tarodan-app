@@ -1,7 +1,8 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ManufacturerService } from './manufacturer.service';
 import { Public } from '../auth/decorators';
+import { HasListingsQueryDto } from '../product/dto/has-listings-query.dto';
 
 @ApiTags('manufacturers')
 @Controller('manufacturers')
@@ -12,8 +13,8 @@ export class ManufacturerController {
   @Public()
   @ApiOperation({ summary: 'Üretici listesi' })
   @ApiResponse({ status: 200, description: 'Tüm aktif üreticiler' })
-  async findAll() {
-    return this.manufacturerService.findAll();
+  async findAll(@Query() query: HasListingsQueryDto) {
+    return this.manufacturerService.findAll({ hasListings: query.hasListings });
   }
 
   @Get(':id')

@@ -5117,7 +5117,9 @@
         "selectPlaceholder": "Seçiniz",
         "views": "Görüntüleme",
         "aiModeration": "AI Denetim",
-        "allModels": "Tüm Modeller"
+        "allModels": "Tüm Modeller",
+        "listingCount": "Toplam ilan",
+        "activeListingCount": "Aktif ilan"
       },
       "categories": {
         "title": "Kategoriler",

@@ -5117,7 +5117,9 @@
         "selectPlaceholder": "Select",
         "views": "Views",
         "aiModeration": "AI Moderation",
-        "allModels": "All Models"
+        "allModels": "All Models",
+        "listingCount": "Total listings",
+        "activeListingCount": "Active listings"
       },
       "categories": {
         "title": "Categories",
