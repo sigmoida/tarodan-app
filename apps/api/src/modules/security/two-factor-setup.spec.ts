@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { SecurityService } from "./security.service";
 import { encryptSecret, deriveSecretKey } from "../../common/security/secret-cipher";
 import { generateTotpCode } from "./totp.util";
@@ -17,6 +18,8 @@ describe("SecurityService 2FA setup flow", () => {
         findUnique: jest.fn().mockResolvedValue(row),
         create: jest.fn().mockResolvedValue({}),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       user: {
         findUnique: jest
@@ -51,9 +54,9 @@ describe("SecurityService 2FA setup flow", () => {
       expect(res.secret).toBe(SECRET);
       expect(res.qrCodeUrl).toContain(`secret=${SECRET}`);
       expect(res.backupCodes).toHaveLength(10);
-      const data = prisma.twoFactorSecret.update.mock.calls[0][0].data;
-      expect(data.secret).toBeUndefined();
-      expect(data.isEnabled).toBe(false);
+      const call = prisma.twoFactorSecret.updateMany.mock.calls[0][0];
+      expect(call.where).toEqual({ userId: "u1", isEnabled: false });
+      expect(call.data.secret).toBeUndefined();
     },
     QR_TIMEOUT_MS,
   );
@@ -65,7 +68,7 @@ describe("SecurityService 2FA setup flow", () => {
       const res = await service.enable2FA("u1");
 
       expect(res.secret).not.toBe(SECRET);
-      const data = prisma.twoFactorSecret.update.mock.calls[0][0].data;
+      const data = prisma.twoFactorSecret.updateMany.mock.calls[0][0].data;
       expect(data.secret).toEqual(expect.stringMatching(/^v1:/));
     },
     QR_TIMEOUT_MS,
@@ -89,6 +92,70 @@ describe("SecurityService 2FA setup flow", () => {
       BadRequestException,
     );
   });
+
+  it(
+    "yazma anında kayıt etkinleşmişse (yarış) ezmez, 400 döner",
+    async () => {
+      const { prisma, service } = build(pendingRow(SECRET, 60_000));
+      prisma.twoFactorSecret.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.enable2FA("u1")).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(prisma.twoFactorSecret.update).not.toHaveBeenCalled();
+    },
+    QR_TIMEOUT_MS,
+  );
+
+  it(
+    "eşzamanlı ilk kurulumda (P2002) bekleyen sırrı yeniden kullanır",
+    async () => {
+      const { prisma, service } = build(null);
+      prisma.twoFactorSecret.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(pendingRow(SECRET, 100));
+      prisma.twoFactorSecret.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
+
+      const res = await service.enable2FA("u1");
+
+      expect(res.secret).toBe(SECRET);
+      expect(prisma.twoFactorSecret.updateMany).toHaveBeenCalledTimes(1);
+    },
+    QR_TIMEOUT_MS,
+  );
+
+  it(
+    "kapatma sırrı siler; yeniden etkinleştirme pencere içinde bile yeni sır üretir",
+    async () => {
+      const { prisma, service } = build(pendingRow(SECRET, 1000, true));
+      const code = generateTotpCode(SECRET, Math.floor(Date.now() / 1000 / 30));
+
+      await expect(service.disable2FA("u1", code)).resolves.toBe(true);
+      expect(prisma.twoFactorSecret.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "u1" },
+      });
+      expect(prisma.twoFactorSecret.update).not.toHaveBeenCalled();
+
+      // Satır silindi: bir sonraki kurulum kayıt bulamaz ve yeni sır yaratır.
+      prisma.twoFactorSecret.findUnique.mockResolvedValue(null);
+      const res = await service.enable2FA("u1");
+
+      expect(res.secret).not.toBe(SECRET);
+      expect(prisma.twoFactorSecret.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: "u1",
+          secret: expect.stringMatching(/^v1:/),
+          isEnabled: false,
+        }),
+      });
+    },
+    QR_TIMEOUT_MS,
+  );
 
   describe("geçersiz kod -> 400", () => {
     it("verify", async () => {

@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import * as QRCode from "qrcode";
@@ -76,7 +77,9 @@ export class SecurityService {
 
     // Yakın zamanda üretilmiş bekleyen sır varsa aynısını döndür (QR değişmez).
     // Yedek kodların düz hali saklanmadığı için yalnız onlar yeniden üretilir;
-    // etkinleştirme öncesi kullanılamadıklarından bu güvenlidir.
+    // etkinleştirme öncesi kullanılamadıklarından bu güvenlidir. Etkin olmayan
+    // satır yalnız hiç etkinleştirilmemiş bir kurulumdur: disable2FA satırı
+    // siler, eski (sızmış olabilecek) bir sır yeniden kullanılamaz.
     const isPending =
       !!existing &&
       Date.now() - existing.updatedAt.getTime() < this.PENDING_SETUP_REUSE_MS;
@@ -104,23 +107,39 @@ export class SecurityService {
     );
 
     if (existing) {
-      await this.prisma.twoFactorSecret.update({
-        where: { userId },
+      // Yalnız hâlâ etkin olmayan kurulumu yaz: arada verify2FA etkinleştirdiyse
+      // etkin kaydın sırrı/yedek kodları ezilmez.
+      const { count } = await this.prisma.twoFactorSecret.updateMany({
+        where: { userId, isEnabled: false },
         data: {
           ...(isPending ? {} : { secret: this.encryptSecret(secret) }),
           backupCodes: hashedBackupCodes,
-          isEnabled: false, // Not enabled until verified
         },
       });
+      if (count === 0) {
+        throw new BadRequestException("2FA zaten etkin");
+      }
     } else {
-      await this.prisma.twoFactorSecret.create({
-        data: {
-          userId,
-          secret: this.encryptSecret(secret),
-          backupCodes: hashedBackupCodes,
-          isEnabled: false,
-        },
-      });
+      try {
+        await this.prisma.twoFactorSecret.create({
+          data: {
+            userId,
+            secret: this.encryptSecret(secret),
+            backupCodes: hashedBackupCodes,
+            isEnabled: false,
+          },
+        });
+      } catch (e) {
+        // Eşzamanlı ilk kurulum (çift dokunma): diğer istek satırı açtı;
+        // baştan çalış — bekleyen sır yeniden kullanılır, aynı QR döner.
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          return this.enable2FA(userId);
+        }
+        throw e;
+      }
     }
 
     return {
@@ -193,10 +212,10 @@ export class SecurityService {
       throw this.invalidCodeException();
     }
 
-    await this.prisma.twoFactorSecret.update({
-      where: { userId },
-      data: { isEnabled: false },
-    });
+    // Sır ve yedek kodlar silinir: yeniden etkinleştirme her zaman yeni sır
+    // üretir (eski, sızmış olabilecek sır bekleyen kurulum gibi yeniden
+    // kullanılamaz).
+    await this.prisma.twoFactorSecret.deleteMany({ where: { userId } });
 
     await this.prisma.adminUser.updateMany({
       where: { userId },
