@@ -6,20 +6,10 @@ import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
-import { useFavorites } from "./_hooks/useFavorites";
-import FavoritesGrid from "./_components/FavoritesGrid";
-import FavoriteTileSkeleton from "./_components/FavoriteTileSkeleton";
+import { useFavorites } from "@/hooks/useFavorites";
+import FavoritesGrid from "@/components/favorites/FavoritesGrid";
+import FavoritesSkeleton from "@/components/favorites/FavoritesSkeleton";
 import ShareFavoritesButton from "./_components/ShareFavoritesButton";
-
-function FavoritesSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-      {[...Array(8)].map((_, i) => (
-        <FavoriteTileSkeleton key={i} />
-      ))}
-    </div>
-  );
-}
 
 export default function FavoritesPage() {
   const t = useTranslations();

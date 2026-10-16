@@ -13,8 +13,9 @@ import { useToggleWishlist, useWishlistPendingIds } from "@/hooks/useWishlist";
 import { useAuthStore } from "@/stores/authStore";
 import { useCart } from "@/hooks/useCart";
 import { useLocale, useTranslations } from "next-intl";
-import type { WishlistItem } from "../_lib/types";
-import { selectFavoritesView } from "../_lib/select";
+import type { WishlistItem } from "@/components/favorites/types";
+import { selectFavoritesView } from "@/components/favorites/select";
+import { MAX_SHARED_FAVORITES } from "@/lib/share";
 import { publicNameOf } from "@/lib/public-name";
 
 /**
@@ -43,7 +44,8 @@ export function useFavorites() {
   const sharedIds = useMemo(() => {
     const ids = searchParams.get("ids");
     if (!ids) return null;
-    return ids.split(",").filter(Boolean);
+    // Paylaşılan linkte en fazla MAX_SHARED_FAVORITES ürün (N istek sınırı).
+    return ids.split(",").filter(Boolean).slice(0, MAX_SHARED_FAVORITES);
   }, [searchParams]);
   const isSharedView = sharedIds !== null && sharedIds.length > 0;
 

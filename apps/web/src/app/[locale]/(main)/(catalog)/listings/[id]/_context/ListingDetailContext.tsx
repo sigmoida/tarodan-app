@@ -31,7 +31,6 @@ import { useProductFavorite } from "@/hooks/useWishlist";
 import { getCardImageUrl } from "../_lib/images";
 import { useListingData } from "../_hooks/useListingData";
 import { useProductGallery } from "../_hooks/useProductGallery";
-import { formatTL } from "@/lib/format";
 import { publicNameOf } from "@/lib/public-name";
 
 function useListingDetailValue() {
@@ -84,7 +83,6 @@ function useListingDetailValue() {
 
   // Modal / menu state
   const [showTradeModal, setShowTradeModal] = useState(false);
-  const [showShareMenu, setShowShareMenu] = useState(false);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [addingToCollection, setAddingToCollection] = useState(false);
 
@@ -265,58 +263,6 @@ function useListingDetailValue() {
     toggle: handleToggleFavorite,
   } = useProductFavorite(id, { isOwner, requireAuth });
 
-  // ---- Share ----
-  const handleShare = () => setShowShareMenu((s) => !s);
-
-  const shareToSocial = async (platform: string) => {
-    const url = encodeURIComponent(window.location.href);
-    const title = encodeURIComponent(
-      listing?.title || "Check this out on Tarodan!",
-    );
-    const text = encodeURIComponent(
-      `${listing?.title} - ${formatTL(effectivePrice)}`,
-    );
-    let shareUrl = "";
-    switch (platform) {
-      case "twitter":
-        shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
-        break;
-      case "facebook":
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
-        break;
-      case "whatsapp":
-        shareUrl = `https://wa.me/?text=${text}%20${url}`;
-        break;
-      case "telegram":
-        shareUrl = `https://t.me/share/url?url=${url}&text=${text}`;
-        break;
-      case "copy":
-        try {
-          await navigator.clipboard.writeText(window.location.href);
-          toast.success(t("common.copied"));
-        } catch {
-          toast.error(t("common.copyFailed"));
-        }
-        setShowShareMenu(false);
-        return;
-      case "native":
-        if (navigator.share) {
-          try {
-            await navigator.share({
-              title: listing?.title,
-              url: window.location.href,
-            });
-          } catch {
-            // share cancelled
-          }
-        }
-        setShowShareMenu(false);
-        return;
-    }
-    if (shareUrl) window.open(shareUrl, "_blank", "width=600,height=400");
-    setShowShareMenu(false);
-  };
-
   return {
     id,
     t,
@@ -351,13 +297,10 @@ function useListingDetailValue() {
     collections: collectionsQuery.data ?? [],
     loadingCollections: collectionsQuery.isLoading,
     addingToCollection,
-    // favorite / share / report
+    // favorite / report
     isFavorite,
     isFavoritePending,
     handleToggleFavorite,
-    handleShare,
-    shareToSocial,
-    showShareMenu,
     showReportModal,
     setShowReportModal,
     // trade

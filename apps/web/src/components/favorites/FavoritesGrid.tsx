@@ -9,7 +9,7 @@ import { EmptyStateCard } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
-import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";
+import { wishlistItemToProduct, type WishlistItem } from "./types";
 import FavoriteTileSkeleton from "./FavoriteTileSkeleton";
 
 export default function FavoritesGrid({

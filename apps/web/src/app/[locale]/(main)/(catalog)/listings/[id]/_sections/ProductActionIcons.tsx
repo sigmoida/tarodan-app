@@ -1,10 +1,13 @@
 "use client";
 
-import { FlagIcon, HeartIcon, ShareIcon } from "@heroicons/react/24/outline";
+import { FlagIcon, HeartIcon } from "@heroicons/react/24/outline";
 import UserActionsMenu from "@/components/UserActionsMenu";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
-import { Button, IconButton } from "@tarodan/ui";
+import { IconButton } from "@tarodan/ui";
+import ShareMenu from "@/components/share/ShareMenu";
 import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
+import { formatTL } from "@/lib/format";
+import { listingSharePath } from "@/lib/share";
 import { useListingDetail } from "../_context/ListingDetailContext";
 
 /**
@@ -14,17 +17,16 @@ import { useListingDetail } from "../_context/ListingDetailContext";
  */
 export default function ProductActionIcons() {
   const {
+    id,
     t,
     isFavorite,
     isFavoritePending,
     isAuthenticated,
-    showShareMenu,
     handleToggleFavorite,
-    handleShare,
-    shareToSocial,
     requireAuth,
     setShowReportModal,
     listing,
+    effectivePrice,
     isOwner,
   } = useListingDetail();
 
@@ -62,45 +64,13 @@ export default function ProductActionIcons() {
         )}
       </IconButton>
 
-      <div className="relative">
-        <IconButton
-          variant="ghost"
-          onClick={handleShare}
-          aria-label={t("product.share")}
-          title={t("product.share")}
-        >
-          <ShareIcon className="w-6 h-6" />
-        </IconButton>
-        {showShareMenu && (
-          <div className="absolute right-0 top-full mt-2 w-48 bg-surface-elevated rounded shadow-lg border border-border py-2 z-50">
-            {[
-              ["whatsapp", "📱", "WhatsApp"],
-              ["twitter", "𝕏", "Twitter / X"],
-              ["facebook", "📘", "Facebook"],
-              ["telegram", "✈️", "Telegram"],
-            ].map(([platform, icon, label]) => (
-              <Button
-                key={platform}
-                variant="secondary"
-                onClick={() => shareToSocial(platform)}
-                className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
-              >
-                <span className="text-lg">{icon}</span>
-                {label}
-              </Button>
-            ))}
-            <hr className="my-1" />
-            <Button
-              variant="secondary"
-              onClick={() => shareToSocial("copy")}
-              className="w-full px-4 py-2 text-left hover:bg-surface flex items-center gap-3"
-            >
-              <span className="text-lg">📋</span>
-              {t("product.copyLink")}
-            </Button>
-          </div>
-        )}
-      </div>
+      <ShareMenu
+        path={listingSharePath(id)}
+        title={listing?.title ?? ""}
+        text={
+          listing ? `${listing.title} - ${formatTL(effectivePrice)}` : undefined
+        }
+      />
 
       {sellerId && !isOwner ? (
         // Apple App Review: ilan detayından hem ilanı şikayet hem satıcıyı
