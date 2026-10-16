@@ -4,7 +4,7 @@
 
 import { useTranslations } from "next-intl";
 import ShareMenu from "@/components/share/ShareMenu";
-import { favoritesShareUrl } from "@/lib/share";
+import { favoritesSharePath } from "@/lib/share";
 
 export default function ShareFavoritesButton({
   productIds,
@@ -15,7 +15,7 @@ export default function ShareFavoritesButton({
 
   return (
     <ShareMenu
-      url={favoritesShareUrl(productIds)}
+      path={favoritesSharePath(productIds)}
       title={t("favorites.sharedList")}
       text={t("favorites.sharedList")}
       label={t("favorites.shareList")}

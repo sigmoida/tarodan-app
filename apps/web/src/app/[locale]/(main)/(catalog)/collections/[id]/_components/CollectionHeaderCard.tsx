@@ -8,7 +8,7 @@ import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import ShareMenu from "@/components/share/ShareMenu";
-import { collectionShareUrl } from "@/lib/share";
+import { collectionSharePath } from "@/lib/share";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
@@ -88,7 +88,7 @@ export default function CollectionHeaderCard() {
 
             <div className="flex shrink-0 items-center gap-1">
               <ShareMenu
-                url={collectionShareUrl(collectionIdOrSlug)}
+                path={collectionSharePath(collectionIdOrSlug)}
                 title={collection.name}
                 text={collection.name}
                 iconClassName="h-5 w-5"

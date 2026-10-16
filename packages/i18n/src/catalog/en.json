@@ -457,6 +457,7 @@
     "reportListing": "Report Listing",
     "reportListingTitle": "Report Listing",
     "reportListingMessage": "Please sign in to report this listing.",
+    "share": "Share",
     "addToCollection": "Add to Collection",
     "addedToCollection": "Product added to collection",
     "similarProducts": "Similar Products",
@@ -596,6 +597,7 @@
     "stock": "Stock",
     "detailsSection": "Details",
     "technicalDetails": "Technical details",
+    "copyLink": "Copy Link",
     "thisIsYourListing": "This is your listing",
     "clearFilter": "Clear filter",
     "failedToCreateListing": "Failed to create listing",
@@ -896,6 +898,7 @@
     "loginRequired": "Please sign in to view favorites",
     "loadFailed": "Failed to load favorites",
     "shareList": "Share list",
+    "linkCopied": "Link copied",
     "sharedList": "Shared list",
     "emptyDesc": "Add the products you like to your favorites and keep track of them from here."
   },
@@ -1778,6 +1781,8 @@
     }
   },
   "collection": {
+    "share": "Share",
+    "linkCopied": "Link copied",
     "collections": "Collections",
     "myCollections": "My Collections",
     "createCollection": "Create Collection",

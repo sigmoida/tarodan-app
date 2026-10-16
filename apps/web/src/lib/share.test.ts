@@ -3,18 +3,17 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// `seo.ts` next-intl routing'i çeker; yalnız kanonik origin gerekli.
-vi.mock("@/lib/seo", () => ({ SITE_URL: "https://tarodan.com.tr" }));
-
 import {
   buildShareTargets,
   canShareNatively,
-  collectionShareUrl,
+  MAX_SHARED_FAVORITES,
+  collectionSharePath,
   copyText,
-  favoritesShareUrl,
-  isShareAbort,
-  listingShareUrl,
+  favoritesSharePath,
+  listingSharePath,
   openShareWindow,
+  resolveShareUrl,
+  shouldFallbackToMenu,
 } from "./share";
 
 afterEach(() => {
@@ -61,20 +60,35 @@ describe("buildShareTargets", () => {
   });
 });
 
-describe("kanonik paylaşım URL'leri", () => {
-  it("ilan: origin + /listings/:id, locale öneki ve query yok", () => {
-    expect(listingShareUrl("abc")).toBe("https://tarodan.com.tr/listings/abc");
+describe("kanonik paylaşım yolları", () => {
+  it("ilan: /listings/:id, locale öneki ve query yok", () => {
+    expect(listingSharePath("abc")).toBe("/listings/abc");
   });
 
   it("koleksiyon: id ya da slug", () => {
-    expect(collectionShareUrl("my-slug")).toBe(
-      "https://tarodan.com.tr/collections/my-slug",
-    );
+    expect(collectionSharePath("my-slug")).toBe("/collections/my-slug");
   });
 
-  it("favoriler: ürün kimlikleri ?ids= ile", () => {
-    expect(favoritesShareUrl(["a", "b"])).toBe(
-      "https://tarodan.com.tr/profile/favorites?ids=a,b",
+  it("favoriler: herkese açık /favorites?ids=", () => {
+    expect(favoritesSharePath(["a", "b"])).toBe("/favorites?ids=a,b");
+  });
+
+  it("favoriler: ilk MAX_SHARED_FAVORITES ürünle sınırlanır", () => {
+    const ids = Array.from({ length: MAX_SHARED_FAVORITES + 20 }, (_, i) =>
+      String(i),
+    );
+    const out = favoritesSharePath(ids).split("=")[1].split(",");
+    expect(out).toHaveLength(MAX_SHARED_FAVORITES);
+    expect(out[MAX_SHARED_FAVORITES - 1]).toBe(
+      String(MAX_SHARED_FAVORITES - 1),
+    );
+  });
+});
+
+describe("resolveShareUrl", () => {
+  it("olay anındaki window.location.origin + yol", () => {
+    expect(resolveShareUrl("/listings/42")).toBe(
+      `${window.location.origin}/listings/42`,
     );
   });
 });
@@ -106,11 +120,18 @@ describe("canShareNatively", () => {
   });
 });
 
-describe("isShareAbort", () => {
-  it("yalnız AbortError iptaldir", () => {
-    expect(isShareAbort(new DOMException("x", "AbortError"))).toBe(true);
-    expect(isShareAbort(new DOMException("x", "NotAllowedError"))).toBe(false);
-    expect(isShareAbort(null)).toBe(false);
+describe("shouldFallbackToMenu", () => {
+  const err = (name: string) => new DOMException("x", name);
+
+  it("izin / geçersiz veri hatasında menüye düşer", () => {
+    expect(shouldFallbackToMenu(err("NotAllowedError"))).toBe(true);
+    expect(shouldFallbackToMenu(new TypeError("bad"))).toBe(true);
+  });
+
+  it("iptal ve zaten açık paylaşım yok sayılır", () => {
+    expect(shouldFallbackToMenu(err("AbortError"))).toBe(false);
+    expect(shouldFallbackToMenu(err("InvalidStateError"))).toBe(false);
+    expect(shouldFallbackToMenu(null)).toBe(false);
   });
 });
 

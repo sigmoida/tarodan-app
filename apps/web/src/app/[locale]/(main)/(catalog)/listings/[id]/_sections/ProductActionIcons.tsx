@@ -6,7 +6,7 @@ import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { IconButton } from "@tarodan/ui";
 import ShareMenu from "@/components/share/ShareMenu";
 import { formatTL } from "@/lib/format";
-import { listingShareUrl } from "@/lib/share";
+import { listingSharePath } from "@/lib/share";
 import { useListingDetail } from "../_context/ListingDetailContext";
 
 /**
@@ -61,7 +61,7 @@ export default function ProductActionIcons() {
       </IconButton>
 
       <ShareMenu
-        url={listingShareUrl(id)}
+        path={listingSharePath(id)}
         title={listing?.title ?? ""}
         text={
           listing ? `${listing.title} - ${formatTL(effectivePrice)}` : undefined

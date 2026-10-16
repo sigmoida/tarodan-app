@@ -8,7 +8,7 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
-import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";
+import { wishlistItemToProduct, type WishlistItem } from "./types";
 
 export default function FavoritesGrid({
   items,

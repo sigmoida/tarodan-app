@@ -1,7 +1,5 @@
 /** @format */
 
-import { SITE_URL } from "@/lib/seo";
-
 /**
  * Paylaşım için tek kaynak: sosyal ağ linkleri, kanonik paylaşım URL'leri,
  * panoya kopyalama ve pencere açma. `ShareMenu` ve çağıranlar buradan okur;
@@ -38,22 +36,31 @@ export function buildShareTargets({
   };
 }
 
-// Paylaşılan URL'ler kanonik olur: site origin'i + yol; locale öneki ve query
-// (filtre, utm, vb.) taşınmaz — alıcı kendi diliyle açılır.
+// Paylaşılan adresler kanonik YOL olarak tutulur (locale öneki ve filtre/utm
+// gibi query yok — alıcı kendi diliyle açılır). Origin build-time sabitinden
+// değil, paylaşım anında `window.location.origin`'den eklenir: staging/preview
+// ortamlarında link doğru host'u gösterir (bkz. `resolveShareUrl`).
 
-export function listingShareUrl(id: string): string {
-  return `${SITE_URL}/listings/${id}`;
+export function listingSharePath(id: string): string {
+  return `/listings/${id}`;
 }
 
-export function collectionShareUrl(idOrSlug: string): string {
-  return `${SITE_URL}/collections/${idOrSlug}`;
+export function collectionSharePath(idOrSlug: string): string {
+  return `/collections/${idOrSlug}`;
 }
 
-/** Favoriler listesi: ürün kimlikleri `?ids=` ile (salt okunur paylaşım görünümü). */
-export function favoritesShareUrl(productIds: readonly string[]): string {
-  return `${SITE_URL}/profile/favorites?ids=${productIds
-    .map(encodeURIComponent)
-    .join(",")}`;
+/** Salt okunur paylaşım görünümüne giden ürün sayısı sınırı (URL uzunluğu + N istek). */
+export const MAX_SHARED_FAVORITES = 50;
+
+/** Favoriler listesi: herkese açık `/favorites?ids=` görünümü (ilk 50 ürün). */
+export function favoritesSharePath(productIds: readonly string[]): string {
+  const ids = productIds.slice(0, MAX_SHARED_FAVORITES);
+  return `/favorites?ids=${ids.map(encodeURIComponent).join(",")}`;
+}
+
+/** Yalnız istemcide, olay anında çağrılır (SSR'da gerekmez). */
+export function resolveShareUrl(path: string): string {
+  return `${window.location.origin}${path}`;
 }
 
 /**
@@ -71,9 +78,14 @@ export function canShareNatively(): boolean {
   );
 }
 
-/** Kullanıcının iptali (paylaşım sayfasını kapatma) hata sayılmaz. */
-export function isShareAbort(error: unknown): boolean {
-  return (error as { name?: string } | null)?.name === "AbortError";
+/**
+ * `navigator.share` hatasında menüye düşülür mü? Yalnız izin/geçersiz veri
+ * hatalarında (NotAllowedError, TypeError). İptal (AbortError) ve zaten açık
+ * paylaşım (InvalidStateError) sessizce yok sayılır.
+ */
+export function shouldFallbackToMenu(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name;
+  return name === "NotAllowedError" || name === "TypeError";
 }
 
 /** Sosyal ağ penceresi: opener/referrer sızdırmadan yeni sekme. */
@@ -89,6 +101,7 @@ function legacyCopy(text: string): boolean {
   el.style.opacity = "0";
   document.body.appendChild(el);
   el.select();
+  el.setSelectionRange(0, text.length);
   try {
     return document.execCommand("copy");
   } catch {
