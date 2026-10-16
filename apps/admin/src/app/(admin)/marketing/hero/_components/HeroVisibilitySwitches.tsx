@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { Toggle } from "@tarodan/ui";
 import {
   CLIENT_PLATFORMS,
@@ -9,16 +10,22 @@ import {
 } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { useHeroHomeVisibility } from "../_hooks/useHeroHomeVisibility";
+import {
+  HERO_VISIBILITY_QUERY_KEY,
+  useHeroHomeVisibility,
+} from "../_hooks/useHeroHomeVisibility";
 
 /**
  * Ana sayfa hero'sunu platform başına açıp kapatan iki anahtar (ana sayfa
  * sekmesinde, sayfa başlığında). Kapalı platformda hero gizlenir; slaytlar
- * silinmez.
+ * silinmez. Değer gelene kadar anahtarlar kapalı + pasif çizilir ("açık"
+ * varsayılanı gösterilmez); kayıt yanıtı önbelleğe hemen yazılır, anahtar
+ * yeniden okuma beklenirken geri zıplamaz.
  */
 export function HeroVisibilitySwitches() {
   const t = useTranslations();
-  const { data, isLoading } = useHeroHomeVisibility();
+  const queryClient = useQueryClient();
+  const { data } = useHeroHomeVisibility();
   const save = useAdminMutation(
     ({ platform, enabled }: { platform: ClientPlatform; enabled: boolean }) => {
       // Yalnız değişen platform gider; öbürü sunucuda olduğu gibi kalır.
@@ -29,6 +36,11 @@ export function HeroVisibilitySwitches() {
     {
       invalidates: ["hero-slides"],
       successMessage: t("admin.marketing.hero.visibility.updated"),
+      onSuccess: (res) =>
+        queryClient.setQueryData<HeroHomeVisibilityDto>(
+          HERO_VISIBILITY_QUERY_KEY,
+          res.data,
+        ),
     },
   );
 
@@ -43,9 +55,9 @@ export function HeroVisibilitySwitches() {
               className="flex items-center gap-2 text-sm text-heading"
             >
               <Toggle
-                checked={data?.[platform] ?? true}
+                checked={data?.[platform] ?? false}
                 onChange={(enabled) => save.mutate({ platform, enabled })}
-                disabled={isLoading || !data || save.isPending}
+                disabled={!data || save.isPending}
                 label={label}
                 size="sm"
               />

@@ -10,9 +10,14 @@ import { adminKeys } from "@/lib/query/keys";
  * `hero-slides` altında: slayt ya da anahtar yazımı (`invalidates:
  * ["hero-slides"]`) liste ile birlikte bunu da tazeler.
  */
+export const HERO_VISIBILITY_QUERY_KEY = adminKeys.detail(
+  "hero-slides",
+  "visibility",
+);
+
 export function useHeroHomeVisibility() {
   return useQuery({
-    queryKey: adminKeys.detail("hero-slides", "visibility"),
+    queryKey: HERO_VISIBILITY_QUERY_KEY,
     queryFn: async (): Promise<HeroHomeVisibilityDto> =>
       (await adminApi.getHeroHomeVisibility()).data,
   });
