@@ -56,6 +56,7 @@ function createService(): {
     {} as never, // MembershipService
     storageService as never,
     {} as never, // PrismaService
+    {} as never, // MessageAttachmentAccessService
   );
   const byFilename = (suffix: "card" | "detail") =>
     uploaded[names.findIndex((name) => name.endsWith(`-${suffix}.webp`))];
@@ -137,6 +138,7 @@ describe("MediaService — kart/detay yüklemeleri paralel", () => {
       {} as never,
       storageService as never,
       {} as never,
+      {} as never, // MessageAttachmentAccessService
     );
     return { service, storageService };
   }
@@ -215,6 +217,7 @@ describe("MediaService.upload — public kök URL'i tanımsız", () => {
       {} as never,
       storageService as never,
       {} as never,
+      {} as never, // MessageAttachmentAccessService
     );
     return { service, storageService };
   }
@@ -283,6 +286,7 @@ describe("MediaService — türev ölçüleri ve depo seçenekleri", () => {
       {} as never,
       storageService as never,
       {} as never,
+      {} as never, // MessageAttachmentAccessService
     );
     const byName = (suffix: string) =>
       calls.find((call) => String(call.options.filename).endsWith(suffix))!;

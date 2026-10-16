@@ -12,6 +12,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { MembershipModule } from "../membership/membership.module";
 import { StorageModule } from "../storage/storage.module";
 import { ModerationModule } from "../moderation/moderation.module";
+import { MessageAttachmentAccessModule } from "../messaging/attachment-access/message-attachment-access.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
@@ -21,6 +22,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     MembershipModule,
     StorageModule,
     ModerationModule,
+    // Mesaj eki okuma yetkisi (mesaj alıcısı). Yaprak modül — döngü yok.
+    MessageAttachmentAccessModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [MediaController],

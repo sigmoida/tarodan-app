@@ -27,9 +27,12 @@ import {
 } from "../../common/image/sharp-safety";
 import { i18nMessage } from "../i18n";
 import {
+  isMessageAttachmentId,
   messageAttachmentIdFromUrl,
   messageAttachmentUrl,
 } from "./helpers/message-attachment-url";
+import { MessageAttachmentAccessService } from "../messaging/attachment-access/message-attachment-access.service";
+import type { RequestUser } from "../auth/interfaces/jwt-payload.interface";
 
 /**
  * sharp modülünün KENDİ tipi. `require` `any` döndürür; açıkça bağlanmazsa
@@ -135,6 +138,7 @@ export class MediaService {
     private membershipService: MembershipService,
     private storageService: StorageService,
     private prisma: PrismaService,
+    private attachmentAccess: MessageAttachmentAccessService,
   ) {}
 
   /**
@@ -210,18 +214,31 @@ export class MediaService {
 
   /**
    * Mesaj ekini presigned URL'e çözer. Yalnız `messages` kökündeki dosyalar —
-   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez. Çağıran
-   * controller JWT zorunlu kılar; uuid tahmin edilemezliği + kısa süreli
-   * presigned ile birlikte erişim modeli budur (thread-üyeliği denetimi v2).
+   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez.
+   *
+   * Erişim: yükleyen, eki taşıyan mesajın alıcısı veya admin
+   * (`MessageAttachmentAccessService`). Yetkisiz istek de 404 alır (403
+   * değil) — id yoklayarak bir ekin VARLIĞI öğrenilemesin.
    */
-  async getMessageAttachmentPresignedUrl(mediaFileId: string): Promise<string> {
+  async getMessageAttachmentPresignedUrl(
+    mediaFileId: string,
+    requester: Pick<RequestUser, "id" | "isAdmin">,
+  ): Promise<string> {
+    const notFound = () =>
+      new NotFoundException(i18nMessage("server.media.fileNotFound"));
+    if (!isMessageAttachmentId(mediaFileId)) throw notFound();
+
     const file = await this.prisma.mediaFile.findUnique({
       where: { id: mediaFileId },
-      select: { key: true, bucket: true },
+      select: { id: true, key: true, bucket: true, uploaderId: true },
     });
-    if (!file || file.bucket !== "messages") {
-      throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
-    }
+    if (!file || file.bucket !== "messages") throw notFound();
+
+    const allowed =
+      requester.isAdmin === true ||
+      (await this.attachmentAccess.canRead(file, requester.id));
+    if (!allowed) throw notFound();
+
     return this.storageService.getPresignedDownloadUrl(
       "messages",
       file.key,

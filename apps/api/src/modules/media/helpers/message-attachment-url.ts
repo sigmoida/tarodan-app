@@ -9,8 +9,17 @@
 export const MESSAGE_ATTACHMENT_PATH = "/api/media/message-attachment/";
 
 /** MediaFile id'si `@default(uuid())` — küçük harf, tireli 36 karakter. */
-const MESSAGE_ATTACHMENT_ID_RE =
-  /\/api\/media\/message-attachment\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+const MESSAGE_ATTACHMENT_ID_PATTERN =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const MESSAGE_ATTACHMENT_ID_RE = new RegExp(
+  `/api/media/message-attachment/(${MESSAGE_ATTACHMENT_ID_PATTERN})$`,
+);
+const BARE_ID_RE = new RegExp(`^${MESSAGE_ATTACHMENT_ID_PATTERN}$`);
+
+/** Servis ucunun `:id` parametresi geçerli bir ek id'si mi (biçim). */
+export function isMessageAttachmentId(id: string): boolean {
+  return BARE_ID_RE.test(id);
+}
 
 /** `${apiUrl}/api/media/message-attachment/<id>` (sondaki `/` kırpılır). */
 export function messageAttachmentUrl(
