@@ -16,6 +16,7 @@ Single source is the mobile repo, not these files by hand:
 3. Copy them here: `assetlinks.json` -> `apps/web/public/.well-known/assetlinks.json`,
    `assetlinks.staging.json` -> `apps/web/public/.well-known/assetlinks-staging.json`.
 
-Currently only the upload-key fingerprint is listed. Play-distributed builds are
-re-signed with the Play App Signing key, so App Links will not verify for store
-installs until that fingerprint is added (Play Console > App integrity).
+Production currently lists only the upload-key fingerprint (staging already carries
+the Play App Signing fingerprints). Play-distributed builds are re-signed with the
+Play App Signing key, so App Links will not verify for production store installs
+until that fingerprint is added (Play Console > App integrity).

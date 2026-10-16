@@ -47,11 +47,11 @@ edilmiyor. Sonucu:
    `assetlinks.json` yayınla.
    - **Staging** (`com.tarodan.app.staging`): `staging.tarodan.com.tr/.well-known/assetlinks.json`
      host koşullu bir yeniden yazımla `apps/web/public/.well-known/assetlinks-staging.json`
-     dosyasını sunar (`next.config.js`, AASA'daki staging kuralıyla aynı kalıp).
-     Play App Signing açılınca ikinci parmak izi bu dosyaya eklenir.
-   - **Production** (`com.tarodan.app`): `public/.well-known/assetlinks.json` bilerek
-     YOK, adres 404 döner; dosya Play App Signing parmak iziyle hazır olunca eklenir
-     (`apps/web/scripts/wellknown.test.mjs` o gün bilinçli güncellenir).
+     dosyasını sunar (`apps/web/well-known-rewrites.js`, AASA'daki staging kuralıyla aynı
+     kalıp). Play App Signing parmak izleri bu dosyada.
+   - **Production** (`com.tarodan.app`): `public/.well-known/assetlinks.json` yayında; şimdilik
+     yalnız upload-key parmak izini taşır — Play'den kurulan sürümde doğrulama, Play App
+     Signing parmak izi eklenene dek geçmez (`docs/ANDROID_APP_LINKS.md`).
 2. Custom scheme'i (`tarodan://`) yedek olarak koru.
 3. **Yol eşlemesi** tanımla — web yolu → mobil rota:
 
