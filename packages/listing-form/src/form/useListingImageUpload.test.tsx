@@ -9,7 +9,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "@tarodan/i18n";
 import { useListingImageUpload } from "./useListingImageUpload";
 import { ListingFormApiProvider, type ListingFormApi } from "./api-context";
-import type { UploadPort } from "./listing-upload-queue";
+import type { PreparePort, UploadPort } from "./listing-upload-queue";
 import { rotateImageFile } from "./rotate-image";
 
 vi.mock("react-hot-toast", () => ({
@@ -573,6 +573,109 @@ describe("useListingImageUpload — görsel çevirme", () => {
 
     expect(rotated).not.toHaveBeenCalled();
     expect(result.current.items[0].cardKey).toBe("kayitli-card");
+    unmount();
+  });
+});
+
+describe("useListingImageUpload — hazırlık (küçültme)", () => {
+  const small = (name: string) => fakeFile(`small-${name}`);
+
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn(() => "blob:preview"),
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: vi.fn(),
+      writable: true,
+    });
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  const setupWith = (upload: UploadPort, prepare: PreparePort) =>
+    renderHook(() =>
+      useListingImageUpload({
+        form: { setValue: vi.fn() } as never,
+        maxImages: 5,
+        upload,
+        prepare,
+      }),
+    );
+
+  it("yeniden deneme hazırlanmış dosyayı kullanır, tekrar küçültmez", async () => {
+    const prepare = vi.fn<PreparePort>(async (file) => small(file.name));
+    const upload = vi
+      .fn<UploadPort>()
+      .mockRejectedValueOnce(new Error("ağ"))
+      .mockResolvedValueOnce({ cardKey: "c", detailKey: "d" });
+    const { result, unmount } = setupWith(upload, prepare);
+
+    await act(async () => {
+      result.current.handleFileUpload([fakeFile("a.png")]);
+    });
+    const failed = result.current.items[0];
+    expect(failed.status).toBe("failed");
+    expect(failed.preparedFile?.name).toBe("small-a.png");
+
+    await act(async () => {
+      result.current.retryImage(failed.clientId);
+    });
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(upload.mock.calls[1][0]).toBe(failed.preparedFile);
+    expect(result.current.items[0].status).toBe("uploaded");
+    // Yüklendi: hazır kopya bellekte tutulmaz.
+    expect(result.current.items[0].preparedFile).toBeUndefined();
+    unmount();
+  });
+
+  it("küçültme sürerken kaldırılan kalemin hazırlığı iptal edilir, yüklenmez", async () => {
+    let signal: AbortSignal | undefined;
+    const prepare = vi.fn<PreparePort>(
+      (_file, options) =>
+        new Promise((_resolve, reject) => {
+          signal = options.signal;
+          options.signal.addEventListener("abort", () =>
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+          );
+        }),
+    );
+    const upload = vi.fn<UploadPort>();
+    const { result, unmount } = setupWith(upload, prepare);
+
+    await act(async () => {
+      result.current.handleFileUpload([fakeFile("a.png")]);
+    });
+    act(() => result.current.removeImage(result.current.items[0].clientId));
+    await act(async () => undefined);
+
+    expect(signal?.aborted).toBe(true);
+    expect(upload).not.toHaveBeenCalled();
+    expect(result.current.items).toHaveLength(0);
+    unmount();
+  });
+
+  it("çevrilen dosya zaten küçültülmüştür: hazırlığa girmeden yüklenir", async () => {
+    const prepare = vi.fn<PreparePort>(async (file) => file);
+    const upload = vi.fn<UploadPort>(async () => ({
+      cardKey: "c",
+      detailKey: "d",
+    }));
+    const { result, unmount } = setupWith(upload, prepare);
+    await act(async () => {
+      result.current.handleFileUpload([fakeFile("a.png")]);
+    });
+
+    const rotatedFile = fakeFile("cevrilmis.png");
+    vi.mocked(rotateImageFile).mockResolvedValueOnce(rotatedFile);
+    await act(async () => {
+      await result.current.rotateImage(result.current.items[0].clientId);
+    });
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(prepare).not.toHaveBeenCalledWith(rotatedFile, expect.anything());
+    expect(upload.mock.calls[1][0]).toBe(rotatedFile);
     unmount();
   });
 });

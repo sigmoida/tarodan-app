@@ -8,6 +8,7 @@ import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
 import {
   createUploadQueue,
+  type PreparePort,
   type QueueEvent,
   type UploadPort,
 } from "./listing-upload-queue";
@@ -28,6 +29,7 @@ import {
   type RejectedFile,
 } from "./listing-image-item";
 import { canRotateFile, rotateImageFile } from "./rotate-image";
+import { downscaleImageFile } from "./resize-image";
 import { useListingFormApi } from "./api-context";
 import { createDefaultUpload } from "./default-upload";
 
@@ -46,6 +48,8 @@ interface UseListingImageUploadParams {
   maxImages: number;
   /** Testler için değiştirilebilir yükleme portu. */
   upload?: UploadPort;
+  /** Testler için değiştirilebilir hazırlık portu (varsayılan: küçültme). */
+  prepare?: PreparePort;
 }
 
 /** Red gerekçesi → katalog anahtarı. Sıra, kullanıcıya okunacak sıradır. */
@@ -97,6 +101,7 @@ export function useListingImageUpload({
   form,
   maxImages,
   upload,
+  prepare = downscaleImageFile,
 }: UseListingImageUploadParams) {
   const t = useTranslations();
   // Varsayılan port çeviriciye VE uygulamanın API portuna bağlı olduğu için
@@ -172,6 +177,8 @@ export function useListingImageUpload({
   // ve iptal denetleyicileri kaybolurdu.
   const uploadRef = useRef(activeUpload);
   uploadRef.current = activeUpload;
+  const prepareRef = useRef(prepare);
+  prepareRef.current = prepare;
   const queueRef = useRef<ReturnType<typeof createUploadQueue> | null>(null);
   if (!queueRef.current) {
     const applyEvent = (event: QueueEvent) => {
@@ -185,11 +192,17 @@ export function useListingImageUpload({
                 detailKey: event.result.detailKey,
               }
             : {}),
-          ...(event.status === "failed" ? { error: event.error } : {}),
+          ...(event.status === "failed"
+            ? // Hazır dosya saklanır: yeniden deneme onu tekrar küçültmez.
+              { error: event.error, preparedFile: event.prepared }
+            : {}),
+          // Yüklendi: hazır kopyaya artık gerek yok, bellekte tutulmasın.
+          ...(event.status === "uploaded" ? { preparedFile: undefined } : {}),
         }),
       );
     };
     queueRef.current = createUploadQueue({
+      prepare: (file, options) => prepareRef.current(file, options),
       upload: (file, options) => uploadRef.current(file, options),
       onEvent: applyEvent,
     });
@@ -387,6 +400,9 @@ export function useListingImageUpload({
       commit(
         patchItem(itemsRef.current, clientId, {
           file: rotated,
+          // Çevirme küçültmeyi de yaptı: çıktı yüklemeye HAZIR, hazırlık
+          // adımı atlanır (boşuna canvas sırasına da girmez).
+          preparedFile: rotated,
           previewUrl: URL.createObjectURL(rotated),
           isObjectUrl: true,
           status: "queued",
@@ -398,7 +414,7 @@ export function useListingImageUpload({
           detailKey: undefined,
         }),
       );
-      queue.enqueue([{ clientId, file: rotated }]);
+      queue.enqueue([{ clientId, file: rotated, prepared: rotated }]);
     },
     [api, commit, queue, t],
   );
@@ -417,7 +433,9 @@ export function useListingImageUpload({
           error: undefined,
         }),
       );
-      queue.enqueue([{ clientId, file: target.file }]);
+      queue.enqueue([
+        { clientId, file: target.file, prepared: target.preparedFile },
+      ]);
     },
     [commit, queue],
   );

@@ -1,5 +1,6 @@
 /** @format */
 
+import { isAbortError, throwIfAborted } from "./abort";
 import type { ListingImageStatus } from "./listing-image-item";
 
 /**
@@ -10,8 +11,12 @@ import type { ListingImageStatus } from "./listing-image-item";
  * olmuyor, iptal ve tekrar deneme mümkün olmuyordu. Artık her dosya kendi
  * isteğidir; biri düşerse diğerleri tamamlanır.
  *
- * React'ten bağımsızdır: `upload` portu dışarıdan verilir, bu yüzden kısmi
- * hata, iptal, eşzamanlılık sınırı ve ilerleme davranışı doğrudan test edilir.
+ * React'ten bağımsızdır: `prepare` ve `upload` portları dışarıdan verilir, bu
+ * yüzden kısmi hata, iptal, eşzamanlılık sınırı ve ilerleme davranışı
+ * doğrudan test edilir.
+ *
+ * Hazırlık (tarayıcıda küçültme) slotun İÇİNDEDİR: eşzamanlılık sınırı onu da
+ * kapsar ve kalem kaldırılınca aynı sinyal onu da durdurur.
  */
 
 export interface UploadResult {
@@ -28,9 +33,24 @@ export type UploadPort = (
   },
 ) => Promise<UploadResult>;
 
+/**
+ * Dosyayı ağa çıkmadan önce hazırlayan port (yükleme öncesi küçültme). İptal
+ * desteklemeli: sinyal iptal olursa `AbortError` ile reddetmeli ki kalem
+ * kaldırıldığında kuyruk slotu beklemeden boşalsın.
+ */
+export type PreparePort = (
+  file: File,
+  options: { signal: AbortSignal },
+) => Promise<File>;
+
 export interface QueueItem {
   clientId: string;
   file: File;
+  /**
+   * Önceki denemede hazırlanmış (küçültülmüş) dosya. Verilirse hazırlık
+   * ATLANIR: yeniden deneme aynı fotoğrafı bir kez daha çözüp kodlamasın.
+   */
+  prepared?: File;
 }
 
 export interface QueueEvent {
@@ -39,6 +59,12 @@ export interface QueueEvent {
   progress?: number;
   result?: UploadResult;
   error?: string;
+  /**
+   * `failed` olayında: bu denemede yüklenmeye çalışılan HAZIR dosya.
+   * Çağıran onu kalemde saklayıp yeniden denemede `QueueItem.prepared` olarak
+   * geri verir.
+   */
+  prepared?: File;
 }
 
 export interface UploadQueue {
@@ -54,16 +80,18 @@ export interface UploadQueue {
 
 export const DEFAULT_CONCURRENCY = 3;
 
-const isAbortError = (error: unknown): boolean =>
-  (error as { name?: string })?.name === "AbortError" ||
-  (error as { code?: string })?.code === "ERR_CANCELED";
+/** Hazırlık portu verilmezse dosya olduğu gibi yüklenir. */
+const unprepared: PreparePort = (file) => Promise.resolve(file);
 
 export function createUploadQueue(options: {
+  /** Varsayılan: hazırlık yok (dosya olduğu gibi gider). */
+  prepare?: PreparePort;
   upload: UploadPort;
   onEvent: (event: QueueEvent) => void;
   concurrency?: number;
 }): UploadQueue {
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+  const prepare = options.prepare ?? unprepared;
   const pending: QueueItem[] = [];
   const controllers = new Map<string, AbortController>();
   /** İptal edilenler: geç gelen sonuç/hata olayları bastırılmalı. */
@@ -86,12 +114,19 @@ export function createUploadQueue(options: {
   const run = async (item: QueueItem) => {
     active += 1;
     const controller = new AbortController();
+    const { signal } = controller;
     controllers.set(item.clientId, controller);
     emit({ clientId: item.clientId, status: "uploading", progress: 0 });
 
+    let prepared = item.prepared;
     try {
-      const result = await options.upload(item.file, {
-        signal: controller.signal,
+      if (!prepared) {
+        prepared = await prepare(item.file, { signal });
+        // Hazırlık iptali dinlemese bile kaldırılan kalemin isteği başlamasın.
+        throwIfAborted(signal);
+      }
+      const result = await options.upload(prepared, {
+        signal,
         onProgress: (percent) => {
           // Baytlar bitti ama yanıt beklenirken "işleniyor": sunucu tarafında
           // moderasyon, Sharp dönüşümü ve depolama yüklemesi sürüyor. %100'ü
@@ -124,10 +159,15 @@ export function createUploadQueue(options: {
           clientId: item.clientId,
           status: "failed",
           error: uploadErrorMessage(error) ?? undefined,
+          prepared,
         });
       }
     } finally {
-      controllers.delete(item.clientId);
+      // Aynı kalem bu arada yeniden kuyruğa girmiş olabilir (çevirme/yeniden
+      // deneme): YENİ denemenin denetleyicisi silinmesin, yoksa iptal edilemez.
+      if (controllers.get(item.clientId) === controller) {
+        controllers.delete(item.clientId);
+      }
       active -= 1;
       // Bir dosyanın hatası kuyruğu durdurmaz.
       pump();

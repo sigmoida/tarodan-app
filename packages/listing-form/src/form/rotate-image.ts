@@ -1,7 +1,14 @@
 /** @format */
 
-import { canvasToBlob, decodeOrientedBitmap } from "./image-canvas";
+import {
+  browserCanvasDeps,
+  normalizeImageType,
+  ROTATABLE_TYPES,
+  runExclusive,
+  type CanvasDeps,
+} from "./image-canvas";
 import { MAX_IMAGE_BYTES } from "./listing-image-item";
+import { scaledDimensions } from "./resize-image";
 
 /**
  * Seçilen fotoğrafı 90° çevirir.
@@ -14,31 +21,25 @@ import { MAX_IMAGE_BYTES } from "./listing-image-item";
  *
  * Döndürülen dosyada EXIF BULUNMAZ; yani sunucudaki `autoOrient()` onun için
  * etkisiz kalır ve iki düzeltme birbirini çift çevirmez.
+ *
+ * Çevirme ile yükleme küçültmesi TEK canvas geçişidir: çıktı uzun kenarı
+ * `MAX_UPLOAD_DIMENSION`'a (1600) inmiş, YÜKLENMEYE HAZIR dosyadır. Eskiden
+ * tam çözünürlükte yeniden kodlanıyordu; büyük bir JPEG 10 MB'ı aşıp
+ * "çevrilemedi" diyordu, oysa yükleme adımı onu zaten 1600 px'e indirecekti.
  */
-
-/**
- * Canvas animasyonu düzleştirdiği için GIF çevrilemez — sessizce bozmaktansa
- * seçeneği hiç sunmuyoruz. (`ACCEPTED_IMAGE_TYPES` gif'i kabul ediyor.)
- */
-const ROTATABLE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 /** Karodaki çevir düğmesi yalnız bunun `true` olduğu kalemlerde çıkar. */
 export function canRotateFile(file?: File): boolean {
-  return !!file && ROTATABLE_TYPES.includes(file.type.toLowerCase());
+  return !!file && ROTATABLE_TYPES.includes(normalizeImageType(file.type));
 }
 
 /**
- * `canvas.toBlob` "image/jpg" bilmez — tanımadığı türde sessizce PNG'ye düşer
- * ve dosya adı ile içeriği ayrışırdı.
+ * Kayıplı formatlarda yeniden kodlama kalitesi; kayıpsızlarda kullanılmaz.
+ * Yükleme küçültmesinden (0.8) yüksek: aynı görsel art arda çevrildikçe her
+ * basış bir kayıplı kodlama daha demek.
  */
-export function rotatedOutputType(mimeType: string): string {
-  const normalized = mimeType.toLowerCase();
-  return normalized === "image/jpg" ? "image/jpeg" : normalized;
-}
-
-/** Kayıplı formatlarda yeniden kodlama kalitesi; kayıpsızlarda kullanılmaz. */
 export function rotatedOutputQuality(mimeType: string): number | undefined {
-  const type = rotatedOutputType(mimeType);
+  const type = normalizeImageType(mimeType);
   return type === "image/jpeg" || type === "image/webp" ? 0.92 : undefined;
 }
 
@@ -53,46 +54,64 @@ export class RotateImageError extends Error {
   }
 }
 
-export async function rotateImageFile(file: File): Promise<File> {
-  if (!canRotateFile(file)) throw new RotateImageError("unsupported");
-
+async function rotate(file: File, deps: CanvasDeps): Promise<File> {
   let bitmap: ImageBitmap;
   try {
     // Bir tarayıcı `imageOrientation` seçeneğini yok sayarsa da düğme görsel
     // geri bildirimli olduğu için kullanıcı bir kez daha basıp düzeltebilir.
-    bitmap = await decodeOrientedBitmap(file);
+    bitmap = await deps.decode(file);
   } catch {
     throw new RotateImageError("decode");
   }
 
   try {
-    const canvas = document.createElement("canvas");
-    // 90° çeviriyoruz: en ve boy yer değiştirir.
-    canvas.width = bitmap.height;
-    canvas.height = bitmap.width;
+    // Hedef, yükleme küçültmesiyle AYNI kural (görüntülenen yönde uzun kenar
+    // 1600); zaten küçükse ölçek değişmez.
+    const size = scaledDimensions(bitmap.width, bitmap.height) ?? {
+      width: bitmap.width,
+      height: bitmap.height,
+    };
+    const type = normalizeImageType(file.type);
 
-    const context = canvas.getContext("2d");
-    if (!context) throw new RotateImageError("encode");
-
-    // Saat yönünde 90°: önce sağ üst köşeye taşı, sonra döndür.
-    context.translate(canvas.width, 0);
-    context.rotate(Math.PI / 2);
-    context.drawImage(bitmap, 0, 0);
-
-    const type = rotatedOutputType(file.type);
-    const blob = await canvasToBlob(
-      canvas,
-      type,
-      rotatedOutputQuality(file.type),
-    );
+    let blob: Blob | null;
+    try {
+      // 90° çevriliyor: çıktıda en ve boy yer değiştirir.
+      blob = await deps.render(bitmap, {
+        width: size.height,
+        height: size.width,
+        type,
+        quality: rotatedOutputQuality(type),
+        quarterTurn: true,
+      });
+    } catch {
+      blob = null;
+    }
     if (!blob) throw new RotateImageError("encode");
 
-    // Yeniden kodlama JPEG'i büyütebilir. Sunucudan 400 yemektense burada
-    // yakalanır — kullanıcı ne olduğunu karonun üstünde görür.
+    // Ara dosya yok: bu dosya OLDUĞU GİBİ yüklenir, sunucu sınırına burada
+    // uymalı. 1600 px'te pratikte yalnız aşırı gürültülü bir PNG aşabilir;
+    // sunucudan 400 yemektense kullanıcı nedenini karonun üstünde görür.
     if (blob.size > MAX_IMAGE_BYTES) throw new RotateImageError("tooLarge");
 
-    return new File([blob], file.name, { type: blob.type });
+    return new File([blob], file.name, {
+      type: blob.type || type,
+      lastModified: file.lastModified,
+    });
   } finally {
-    bitmap.close();
+    bitmap.close?.();
   }
+}
+
+/**
+ * Dosyayı çevirip yükleme boyutuna indirir. Diğer canvas işleriyle (yükleme
+ * küçültmesi) AYNI sıraya girer — aynı anda iki tam çözünürlüklü bitmap yok.
+ */
+export function rotateImageFile(
+  file: File,
+  { deps = browserCanvasDeps }: { deps?: CanvasDeps } = {},
+): Promise<File> {
+  if (!canRotateFile(file)) {
+    return Promise.reject(new RotateImageError("unsupported"));
+  }
+  return runExclusive(() => rotate(file, deps));
 }

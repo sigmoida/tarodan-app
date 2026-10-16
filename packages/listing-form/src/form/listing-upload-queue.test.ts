@@ -1,9 +1,11 @@
 /** @format */
 
 import { describe, expect, it, vi } from "vitest";
+import { abortError } from "./abort";
 import {
   createUploadQueue,
   uploadErrorMessage,
+  type PreparePort,
   type QueueEvent,
   type UploadPort,
 } from "./listing-upload-queue";
@@ -269,6 +271,155 @@ describe("yükleme kuyruğu", () => {
         onProgress: expect.any(Function),
       }),
     );
+  });
+});
+
+describe("hazırlık (yükleme öncesi küçültme)", () => {
+  const small = (name: string): File =>
+    ({ name: `small-${name}` }) as unknown as File;
+
+  /** Sinyali dinleyen, elle bırakılan hazırlık portu. */
+  function deferredPrepare() {
+    const calls = new Map<
+      string,
+      { finish: () => void; signal: AbortSignal }
+    >();
+    const prepare = vi.fn<PreparePort>(
+      (file, { signal }) =>
+        new Promise((resolve, reject) => {
+          calls.set(file.name, {
+            finish: () => resolve(small(file.name)),
+            signal,
+          });
+          signal.addEventListener("abort", () => reject(abortError()));
+        }),
+    );
+    return { prepare, calls };
+  }
+
+  it("hazırlanan dosyayı yükler; hazırlık slotun içindedir", async () => {
+    const { prepare, calls: prepared } = deferredPrepare();
+    const { upload, calls } = deferredPort();
+    const queue = createUploadQueue({
+      prepare,
+      upload,
+      onEvent: collect().onEvent,
+      concurrency: 1,
+    });
+
+    queue.enqueue([item("a"), item("b")]);
+    await flush();
+
+    // Eşzamanlılık sınırı küçültmeyi de kapsar: b'nin hazırlığı beklemede.
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(queue.activeCount()).toBe(1);
+
+    prepared.get("a.jpg")!.finish();
+    await flush();
+    expect(calls.has("small-a.jpg")).toBe(true);
+    expect(calls.has("a.jpg")).toBe(false);
+  });
+
+  it("önceden hazırlanmış kalemde hazırlığı ATLAR (yeniden deneme)", async () => {
+    const prepare = vi.fn<PreparePort>(async (file) => file);
+    const upload = vi.fn<UploadPort>(async () => ({
+      cardKey: "c",
+      detailKey: "d",
+    }));
+    const queue = createUploadQueue({
+      prepare,
+      upload,
+      onEvent: collect().onEvent,
+    });
+    const ready = small("a.jpg");
+
+    queue.enqueue([{ ...item("a"), prepared: ready }]);
+    await flush();
+
+    expect(prepare).not.toHaveBeenCalled();
+    expect(upload.mock.calls[0][0]).toBe(ready);
+  });
+
+  it("başarısız olay hazırlanan dosyayı taşır", async () => {
+    const prepare = vi.fn<PreparePort>(async (file) => small(file.name));
+    const { events, onEvent } = collect();
+    const queue = createUploadQueue({
+      prepare,
+      upload: async () => {
+        throw new Error("ağ");
+      },
+      onEvent,
+    });
+
+    queue.enqueue([item("a")]);
+    await flush();
+
+    const failed = events.find((e) => e.status === "failed");
+    expect(failed?.prepared?.name).toBe("small-a.jpg");
+  });
+
+  it("hazırlık sürerken iptal: slot hemen boşalır, istek başlamaz, hata yok", async () => {
+    const { prepare, calls: prepared } = deferredPrepare();
+    const { upload, calls } = deferredPort();
+    const { events, onEvent } = collect();
+    const queue = createUploadQueue({
+      prepare,
+      upload,
+      onEvent,
+      concurrency: 1,
+    });
+
+    queue.enqueue([item("a"), item("b")]);
+    await flush();
+    queue.cancel("a");
+    await flush();
+
+    expect(prepared.get("a.jpg")!.signal.aborted).toBe(true);
+    expect(statusesFor(events, "a")).not.toContain("failed");
+    // a'nın slotu boşaldı: b'nin hazırlığı başladı.
+    expect(prepared.has("b.jpg")).toBe(true);
+    expect(calls.size).toBe(0);
+  });
+
+  it("iptali dinlemeyen hazırlıkta da kaldırılan kalemin isteği başlamaz", async () => {
+    let finish!: (file: File) => void;
+    const prepare: PreparePort = () =>
+      new Promise((resolve) => (finish = resolve));
+    const upload = vi.fn<UploadPort>();
+    const queue = createUploadQueue({
+      prepare,
+      upload,
+      onEvent: collect().onEvent,
+    });
+
+    queue.enqueue([item("a")]);
+    await flush();
+    queue.cancel("a");
+    finish(small("a.jpg"));
+    await flush();
+
+    expect(upload).not.toHaveBeenCalled();
+    expect(queue.activeCount()).toBe(0);
+  });
+
+  it("aynı kalem yeniden kuyruğa girince eski deneme yenisinin iptalini bozmaz", async () => {
+    const { prepare } = deferredPrepare();
+    const queue = createUploadQueue({
+      prepare,
+      upload: vi.fn<UploadPort>(),
+      onEvent: collect().onEvent,
+    });
+
+    queue.enqueue([item("a")]);
+    await flush();
+    // Çevirme: eski deneme iptal, aynı kimlikle yeni deneme.
+    queue.cancel("a");
+    queue.enqueue([item("a")]);
+    await flush();
+
+    const latest = prepare.mock.calls.at(-1)![1].signal;
+    queue.cancel("a");
+    expect(latest.aborted).toBe(true);
   });
 });
 
