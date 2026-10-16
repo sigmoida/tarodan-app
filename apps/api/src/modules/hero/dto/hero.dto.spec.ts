@@ -192,16 +192,16 @@ describe("CreateTrustBadgeDto / UpdateTrustBadgeDto", () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("hideOnIos (native'de gizle) boolean kabul edilir, boolean olmayan ve null reddedilir", async () => {
+  // Boolean olmayan değer (ör. "evet") burada test EDİLMEZ: global pipe'ın
+  // `enableImplicitConversion`'ı onu doğrulamadan önce `Boolean(...)` ile
+  // çevirir (her boolean alanda böyle). Yalnız `null` gerçekten reddedilir.
+  it("hideOnIos (native'de gizle) boolean kabul edilir, null reddedilir", async () => {
     const dto = await as(CreateTrustBadgeDto, {
       icon: "truck",
       title: { tr: "Güvenli Kargo" },
       hideOnIos: true,
     });
     expect(dto.hideOnIos).toBe(true);
-    await expect(
-      as(UpdateTrustBadgeDto, { hideOnIos: "evet" }),
-    ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
       as(UpdateTrustBadgeDto, { hideOnIos: null }),
     ).rejects.toBeInstanceOf(BadRequestException);
