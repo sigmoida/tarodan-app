@@ -23,6 +23,12 @@ vi.mock("../_context/ListingDetailContext", () => ({
     requireAuth: vi.fn(),
   }),
 }));
+// `@/components/ui` barrel'ı `server-only` zincirini çeker; yalnız SectionCard lazım.
+vi.mock("@/components/ui", () => ({
+  SectionCard: ({ children }: { children?: ReactNode }) => (
+    <section>{children}</section>
+  ),
+}));
 vi.mock("@/i18n/navigation", () => ({
   Link: ({
     href,

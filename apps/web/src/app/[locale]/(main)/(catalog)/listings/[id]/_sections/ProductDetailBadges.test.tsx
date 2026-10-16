@@ -87,9 +87,8 @@ describe("ProductStaticInfoView", () => {
     expect(price.nextElementSibling).toBe(row());
     expect(texts()).toEqual(["product.sold", "%25"]);
     // Başlık satırında artık rozet yok.
-    expect(container.querySelector("h1")!.parentElement!.contains(row())).toBe(
-      false,
-    );
+    expect(container.querySelector("h1")!.contains(row())).toBe(false);
+    expect(container.querySelector("h1")!.textContent).toBe("Camaro");
     expect(container.innerHTML).not.toMatch(/indirim/i);
   });
 
