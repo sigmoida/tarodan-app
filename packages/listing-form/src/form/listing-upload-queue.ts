@@ -60,9 +60,9 @@ export interface QueueEvent {
   result?: UploadResult;
   error?: string;
   /**
-   * `failed` olayında: bu denemede yüklenmeye çalışılan HAZIR dosya.
-   * Çağıran onu kalemde saklayıp yeniden denemede `QueueItem.prepared` olarak
-   * geri verir.
+   * `failed` olayında: bu denemede yüklenmeye çalışılan HAZIR dosya —
+   * yalnız yeniden kullanılabiliyorsa (`canReusePrepared`). Çağıran onu
+   * kalemde saklayıp yeniden denemede `QueueItem.prepared` olarak geri verir.
    */
   prepared?: File;
 }
@@ -159,7 +159,7 @@ export function createUploadQueue(options: {
           clientId: item.clientId,
           status: "failed",
           error: uploadErrorMessage(error) ?? undefined,
-          prepared,
+          prepared: canReusePrepared(error) ? prepared : undefined,
         });
       }
     } finally {
@@ -201,6 +201,21 @@ export function createUploadQueue(options: {
     },
     activeCount: () => active,
   };
+}
+
+/**
+ * Başarısız denemenin hazır dosyası yeniden denemede kullanılabilir mi?
+ *
+ * Ağ hatası, 5xx, 408 ve 429'da dosyanın kendisinde sorun yok: aynısı tekrar
+ * gönderilir, fotoğraf bir kez daha çözülüp kodlanmaz. Sunucu dosyayı 4xx ile
+ * REDDETTİYSE (boyut, tür, moderasyon) sorun o dosyada olabilir: yeniden
+ * deneme orijinalden yeniden hazırlar.
+ */
+export function canReusePrepared(error: unknown): boolean {
+  const status = (error as { response?: { status?: unknown } })?.response
+    ?.status;
+  if (typeof status !== "number") return true;
+  return status >= 500 || status === 408 || status === 429;
 }
 
 /**

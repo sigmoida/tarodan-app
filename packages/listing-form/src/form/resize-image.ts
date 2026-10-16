@@ -4,6 +4,7 @@ import { isAbortError, throwIfAborted } from "./abort";
 import {
   browserCanvasDeps,
   DOWNSCALABLE_TYPES,
+  fileNameForType,
   normalizeImageType,
   runExclusive,
   type CanvasDeps,
@@ -58,9 +59,7 @@ export function scaledDimensions(
 
 /** Çıktı JPEG olduğu için uzantı da öyle olmalı; ad/içerik ayrışmasın. */
 export function downscaledFileName(name: string): string {
-  const dot = name.lastIndexOf(".");
-  const base = dot > 0 ? name.slice(0, dot) : name;
-  return `${base}.jpg`;
+  return fileNameForType(name, "image/jpeg");
 }
 
 /**
@@ -166,6 +165,28 @@ export function parseJpegInfo(bytes: Uint8Array): JpegInfo | null {
 /** EXIF yönü 5-8 ise görüntülenen en/boy ham SOF boyutunun TERSİDİR. */
 const swapsAxes = (orientation: number): boolean => orientation >= 5;
 
+/** Dosyanın JPEG başlığı (boyut + yön); JPEG değilse / okunamazsa `null`. */
+export async function readJpegInfo(file: Blob): Promise<JpegInfo | null> {
+  const header = new Uint8Array(
+    await file.slice(0, JPEG_HEADER_BYTES).arrayBuffer(),
+  );
+  return parseJpegInfo(header);
+}
+
+/**
+ * Doğrudan HEDEF boyutta çözülebiliyorsa o boyut (tam çözünürlüklü bitmap hiç
+ * oluşmaz — 48 MP bir fotoğraf ~195 MB'tır). Küçültme gerekmiyorsa ya da yön
+ * 5-8 ise `undefined` (tam çöz): o yönlerde tarayıcının yönü uygulayıp
+ * uygulamadığı ancak tam çözülen bitmap'in boyutundan anlaşılır. Küçültme ve
+ * çevirme AYNI kuralı kullanır.
+ */
+export function directDecodeSize(
+  info: JpegInfo,
+): { width: number; height: number } | undefined {
+  if (swapsAxes(info.orientation)) return undefined;
+  return scaledDimensions(info.width, info.height) ?? undefined;
+}
+
 /** Tarayıcı tesisatı — testlerde değiştirilir (jsdom'da canvas yok). */
 export type DownscaleDeps = CanvasDeps;
 
@@ -183,10 +204,7 @@ async function downscale(
   deps: DownscaleDeps,
   signal?: AbortSignal,
 ): Promise<File> {
-  const header = new Uint8Array(
-    await file.slice(0, JPEG_HEADER_BYTES).arrayBuffer(),
-  );
-  const info = parseJpegInfo(header);
+  const info = await readJpegInfo(file);
   if (!info) return file;
 
   const rotated = swapsAxes(info.orientation);
@@ -201,7 +219,7 @@ async function downscale(
   // Yön 5-8'de tarayıcının yönü uyguladığı, bitmap boyutundan ayırt edilmeli;
   // bu yüzden bu durumda hedef boyutla değil TAM çözülür (uygulanmışsa bitmap
   // görüntülenen yöndedir, uygulanmamışsa ham boyuttadır).
-  const bitmap = await deps.decode(file, rotated ? undefined : size);
+  const bitmap = await deps.decode(file, directDecodeSize(info));
   try {
     // Çözme sürerken kalem kaldırıldıysa çizim/kodlama hiç yapılmaz.
     throwIfAborted(signal);

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { isAbortError } from "./abort";
 import {
   DOWNSCALABLE_TYPES,
+  fileNameForType,
   normalizeImageType,
   ROTATABLE_TYPES,
   runExclusive,
@@ -37,6 +38,22 @@ describe("normalizeImageType", () => {
     expect(normalizeImageType("image/png")).toBe("image/png");
     expect(normalizeImageType("image/webp")).toBe("image/webp");
   });
+});
+
+describe("fileNameForType", () => {
+  it("uzantıyı içeriğin türüne göre yazar", () => {
+    expect(fileNameForType("foto.webp", "image/png")).toBe("foto.png");
+    expect(fileNameForType("foto.JPEG", "image/jpg")).toBe("foto.jpg");
+    expect(fileNameForType("a.b.png", "image/webp")).toBe("a.b.webp");
+  });
+
+  it("uzantısız ve nokta-ile-başlayan adı bozmaz", () => {
+    expect(fileNameForType("foto", "image/png")).toBe("foto.png");
+    expect(fileNameForType(".gizli", "image/png")).toBe(".gizli.png");
+  });
+
+  it("bilinmeyen türde adı korur", () =>
+    expect(fileNameForType("x.gif", "image/gif")).toBe("x.gif"));
 });
 
 describe("tür listeleri", () => {

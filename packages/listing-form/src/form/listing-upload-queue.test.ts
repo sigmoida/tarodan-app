@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { abortError } from "./abort";
 import {
+  canReusePrepared,
   createUploadQueue,
   uploadErrorMessage,
   type PreparePort,
@@ -358,6 +359,27 @@ describe("hazırlık (yükleme öncesi küçültme)", () => {
     expect(failed?.prepared?.name).toBe("small-a.jpg");
   });
 
+  // Sunucu dosyayı reddettiyse sorun o dosyada olabilir: yeniden deneme
+  // orijinalden yeniden hazırlasın.
+  it("sunucu 4xx ile reddettiyse hazırlanan dosyayı geri vermez", async () => {
+    const prepare = vi.fn<PreparePort>(async (file) => small(file.name));
+    const { events, onEvent } = collect();
+    const queue = createUploadQueue({
+      prepare,
+      upload: async () => {
+        throw { response: { status: 400, data: { message: "bozuk" } } };
+      },
+      onEvent,
+    });
+
+    queue.enqueue([item("a")]);
+    await flush();
+
+    const failed = events.find((e) => e.status === "failed");
+    expect(failed?.error).toBe("bozuk");
+    expect(failed?.prepared).toBeUndefined();
+  });
+
   it("hazırlık sürerken iptal: slot hemen boşalır, istek başlamaz, hata yok", async () => {
     const { prepare, calls: prepared } = deferredPrepare();
     const { upload, calls } = deferredPort();
@@ -420,6 +442,21 @@ describe("hazırlık (yükleme öncesi küçültme)", () => {
     const latest = prepare.mock.calls.at(-1)![1].signal;
     queue.cancel("a");
     expect(latest.aborted).toBe(true);
+  });
+});
+
+describe("canReusePrepared", () => {
+  it("ağ hatası, 5xx, 408 ve 429'da aynı dosya yeniden kullanılır", () => {
+    expect(canReusePrepared(new Error("Network Error"))).toBe(true);
+    expect(canReusePrepared({ response: { status: 502 } })).toBe(true);
+    expect(canReusePrepared({ response: { status: 408 } })).toBe(true);
+    expect(canReusePrepared({ response: { status: 429 } })).toBe(true);
+  });
+
+  it("sunucu reddettiyse (4xx) yeniden hazırlanır", () => {
+    expect(canReusePrepared({ response: { status: 400 } })).toBe(false);
+    expect(canReusePrepared({ response: { status: 413 } })).toBe(false);
+    expect(canReusePrepared({ response: { status: 422 } })).toBe(false);
   });
 });
 

@@ -2,13 +2,19 @@
 
 import {
   browserCanvasDeps,
+  fileNameForType,
   normalizeImageType,
   ROTATABLE_TYPES,
   runExclusive,
   type CanvasDeps,
 } from "./image-canvas";
 import { MAX_IMAGE_BYTES } from "./listing-image-item";
-import { scaledDimensions } from "./resize-image";
+import {
+  canDownscaleFile,
+  directDecodeSize,
+  readJpegInfo,
+  scaledDimensions,
+} from "./resize-image";
 
 /**
  * Seçilen fotoğrafı 90° çevirir.
@@ -55,11 +61,18 @@ export class RotateImageError extends Error {
 }
 
 async function rotate(file: File, deps: CanvasDeps): Promise<File> {
+  // JPEG'de başlıktan hedef boyut okunur ve doğrudan o boyutta çözülür —
+  // küçültmeyle AYNI kural (`directDecodeSize`; yön 5-8'de tam çözüm). Diğer
+  // türlerde ve tarayıcı `resize` seçeneğini desteklemezse tam çözülür,
+  // aşağıdaki ölçekleme yine doğru boyutu verir.
+  const info = canDownscaleFile(file) ? await readJpegInfo(file) : null;
+  const decodeSize = info ? directDecodeSize(info) : undefined;
+
   let bitmap: ImageBitmap;
   try {
     // Bir tarayıcı `imageOrientation` seçeneğini yok sayarsa da düğme görsel
     // geri bildirimli olduğu için kullanıcı bir kez daha basıp düzeltebilir.
-    bitmap = await deps.decode(file);
+    bitmap = await deps.decode(file, decodeSize);
   } catch {
     throw new RotateImageError("decode");
   }
@@ -93,10 +106,14 @@ async function rotate(file: File, deps: CanvasDeps): Promise<File> {
     // sunucudan 400 yemektense kullanıcı nedenini karonun üstünde görür.
     if (blob.size > MAX_IMAGE_BYTES) throw new RotateImageError("tooLarge");
 
-    return new File([blob], file.name, {
-      type: blob.type || type,
-      lastModified: file.lastModified,
-    });
+    // Canvas istenen türü kodlayamazsa (eski Safari'de WebP) PNG verir: ad
+    // ve tür içeriğin GERÇEK türünü söylemeli.
+    const outputType = blob.type ? normalizeImageType(blob.type) : type;
+    return new File(
+      [blob],
+      outputType === type ? file.name : fileNameForType(file.name, outputType),
+      { type: outputType, lastModified: file.lastModified },
+    );
   } finally {
     bitmap.close?.();
   }

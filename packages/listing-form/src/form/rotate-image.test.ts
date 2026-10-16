@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasDeps } from "./image-canvas";
+import { jpegFile } from "./jpeg-fixture";
 import { MAX_IMAGE_BYTES } from "./listing-image-item";
 import { downscaleImageFile, MAX_UPLOAD_DIMENSION } from "./resize-image";
 import {
@@ -68,7 +69,8 @@ describe("rotateImageFile", () => {
 
     const result = await rotateImageFile(input, { deps });
 
-    expect(decode).toHaveBeenCalledWith(input);
+    // Başlığı okunamayan dosya: tam çözülür, ölçek çizimde verilir.
+    expect(decode).toHaveBeenCalledWith(input, undefined);
     expect(render).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledWith(bmp, {
       width: 1200,
@@ -95,6 +97,85 @@ describe("rotateImageFile", () => {
       quality: undefined,
       quarterTurn: true,
     });
+  });
+
+  /**
+   * 48 MP bir fotoğrafı tam çözmek ~195 MB bitmap demek: JPEG başlığından
+   * hedef boyut okunur ve DOĞRUDAN o boyutta çözülür (küçültmeyle aynı kural).
+   */
+  it("JPEG'i başlıktan okunan hedef boyutta çözer", async () => {
+    // Tarayıcı `resize`'ı uyguladı: bitmap zaten 1600×1200 gelir.
+    const { deps, decode, render } = depsFor({ width: 1600, height: 1200 });
+    const input = jpegFile({ width: 8000, height: 6000 });
+
+    await rotateImageFile(input, { deps });
+
+    expect(decode).toHaveBeenCalledWith(input, { width: 1600, height: 1200 });
+    expect(render).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ width: 1200, height: 1600 }),
+    );
+  });
+
+  it("tarayıcı resize'ı yok sayarsa tam bitmap yine 1600'e ölçeklenir", async () => {
+    const { deps, render } = depsFor({ width: 8000, height: 6000 });
+
+    await rotateImageFile(jpegFile({ width: 8000, height: 6000 }), { deps });
+
+    expect(render).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ width: 1200, height: 1600 }),
+    );
+  });
+
+  // Yön 5-8: uygulanıp uygulanmadığı ancak tam bitmap'ten anlaşılır.
+  it("EXIF yönü 5-8'de tam çözer", async () => {
+    const { deps, decode } = depsFor({ width: 6000, height: 8000 });
+    const input = jpegFile({ width: 8000, height: 6000, orientation: 6 });
+
+    await rotateImageFile(input, { deps });
+
+    expect(decode).toHaveBeenCalledWith(input, undefined);
+  });
+
+  it("zaten küçük JPEG'de çözme boyutu verilmez", async () => {
+    const { deps, decode } = depsFor({ width: 800, height: 600 });
+    const input = jpegFile({ width: 800, height: 600 });
+
+    await rotateImageFile(input, { deps });
+
+    expect(decode).toHaveBeenCalledWith(input, undefined);
+  });
+
+  // Eski Safari WebP kodlayamaz ve sessizce PNG verir: ad içerikle ayrışmasın.
+  it("canvas istenen türü kodlayamazsa ad ve tür gerçek türe göre olur", async () => {
+    const bmp = bitmap(800, 600);
+    const deps: CanvasDeps = {
+      decode: async () => bmp,
+      render: async () => new Blob([new Uint8Array(10)], { type: "image/png" }),
+    };
+
+    const result = await rotateImageFile(file("image/webp", "foto.webp"), {
+      deps,
+    });
+
+    expect(result.type).toBe("image/png");
+    expect(result.name).toBe("foto.png");
+  });
+
+  it("istenen tür kodlandıysa özgün ad korunur", async () => {
+    const bmp = bitmap(800, 600);
+    const deps: CanvasDeps = {
+      decode: async () => bmp,
+      render: async () =>
+        new Blob([new Uint8Array(10)], { type: "image/webp" }),
+    };
+
+    const result = await rotateImageFile(file("image/webp", "foto.webp"), {
+      deps,
+    });
+
+    expect(result.name).toBe("foto.webp");
   });
 
   // `canvas.toBlob` "image/jpg" bilmez: çıktı türü normalize edilir.
@@ -178,31 +259,8 @@ describe("rotateImageFile", () => {
     const released = new Promise<void>((resolve) => (release = resolve));
     const order: string[] = [];
 
-    // 4000×3000 JPEG başlığı (SOI + SOF0) — küçültme gerçekten çözmeye girsin.
-    const jpeg = new File(
-      [
-        new Uint8Array([
-          0xff,
-          0xd8,
-          0xff,
-          0xc0,
-          0x00,
-          0x0b,
-          8,
-          0x0b,
-          0xb8, // yükseklik 3000
-          0x0f,
-          0xa0, // genişlik 4000
-          1,
-          1,
-          0x11,
-          0,
-          ...Array(4096).fill(7),
-        ]),
-      ],
-      "a.jpg",
-      { type: "image/jpeg" },
-    );
+    // Küçültme gerçekten çözmeye girsin: 4000×3000 JPEG başlığı.
+    const jpeg = jpegFile({ width: 4000, height: 3000 }, "a.jpg");
     const downscaling = downscaleImageFile(jpeg, {
       deps: {
         decode: async () => {

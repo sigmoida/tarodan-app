@@ -327,7 +327,11 @@ export function useListingImageUpload({
       const target = itemsRef.current.find(
         (item) => item.clientId === clientId,
       );
-      if (!target) return;
+      // Yalnız YÜKLENMİŞ kalem çevrilir (grid düğmeyi de yalnız o zaman
+      // gösterir). Çevirme başlar başlamaz kalem "işleniyor"a geçtiği için
+      // süren bir çevirme sırasında ikinci basış burada düşer: aynı kalemi
+      // iki kez kuyruğa alıp ilk yüklemeyi sahipsiz bırakmazdı.
+      if (target?.status !== "uploaded") return;
 
       // KAYITLI görselde tarayıcıda dosya yoktur, yalnız depodaki anahtar
       // vardır — çevirmeyi sunucu yapar ve YENİ anahtarlar döner. Yerel
@@ -373,6 +377,15 @@ export function useListingImageUpload({
       // Kalem yüklenme ortasındaysa eski istek DURDURULUR; aksi halde çevrilen
       // görselin yanında eskisi de depoya inip çöp bırakırdı.
       queue.cancel(clientId);
+      // Çevirme canvas sırasında bekleyebilir: kalem o sürede "işleniyor"dur —
+      // gönderim engellenir (eski anahtarlar forma yazılmaz) ve düğme gizlenir.
+      commit(
+        patchItem(itemsRef.current, clientId, {
+          status: "processing",
+          progress: 0,
+          error: undefined,
+        }),
+      );
 
       let rotated: File;
       try {

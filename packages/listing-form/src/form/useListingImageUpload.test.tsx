@@ -556,6 +556,48 @@ describe("useListingImageUpload — görsel çevirme", () => {
     unmount();
   });
 
+  /**
+   * Regresyon: çevirme canvas sırasında beklerken kalem "yüklendi" kalıyordu;
+   * ikinci basış orijinali yeniden çevirip aynı kalemi ikinci kez kuyruğa
+   * alıyor, form da eski anahtarlarla gönderilebiliyordu.
+   */
+  it("çevirme sürerken kalem işleniyor olur ve ikinci basış yok sayılır", async () => {
+    const { result, upload, unmount } = await setupUploaded();
+    const clientId = result.current.items[0].clientId;
+
+    let finish: (file: File) => void = () => {};
+    rotated.mockReturnValueOnce(
+      new Promise<File>((resolve) => {
+        finish = resolve;
+      }),
+    );
+
+    let first: Promise<void> = Promise.resolve();
+    act(() => {
+      first = result.current.rotateImage(clientId);
+    });
+
+    expect(result.current.items[0].status).toBe("processing");
+    // Gönderim engellenir: eski (çevrilmemiş) anahtarlar forma yazılamaz.
+    expect(result.current.submitBlocker?.reason).toBe("pending");
+
+    await act(async () => {
+      await result.current.rotateImage(clientId);
+    });
+    expect(rotated).toHaveBeenCalledTimes(1);
+
+    const newFile = fakeFile("cevrilmis.png");
+    await act(async () => {
+      finish(newFile);
+      await first;
+    });
+
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(upload.mock.calls[1][0]).toBe(newFile);
+    expect(result.current.items[0].status).toBe("uploaded");
+    unmount();
+  });
+
   it("kayıtlı (dosyasız) görselde hiçbir şey yapmaz", async () => {
     const setValue = vi.fn();
     const { result, unmount } = renderHook(() =>
@@ -627,6 +669,31 @@ describe("useListingImageUpload — hazırlık (küçültme)", () => {
     expect(result.current.items[0].status).toBe("uploaded");
     // Yüklendi: hazır kopya bellekte tutulmaz.
     expect(result.current.items[0].preparedFile).toBeUndefined();
+    unmount();
+  });
+
+  it("sunucu 4xx ile reddettiyse yeniden deneme orijinalden yeniden hazırlar", async () => {
+    const prepare = vi.fn<PreparePort>(async (file) => small(file.name));
+    const upload = vi
+      .fn<UploadPort>()
+      .mockRejectedValueOnce({ response: { status: 400 } })
+      .mockResolvedValueOnce({ cardKey: "c", detailKey: "d" });
+    const { result, unmount } = setupWith(upload, prepare);
+
+    await act(async () => {
+      result.current.handleFileUpload([fakeFile("a.png")]);
+    });
+    const failed = result.current.items[0];
+    expect(failed.status).toBe("failed");
+    expect(failed.preparedFile).toBeUndefined();
+
+    await act(async () => {
+      result.current.retryImage(failed.clientId);
+    });
+
+    expect(prepare).toHaveBeenCalledTimes(2);
+    expect(prepare.mock.calls[1][0]).toBe(failed.file);
+    expect(result.current.items[0].status).toBe("uploaded");
     unmount();
   });
 

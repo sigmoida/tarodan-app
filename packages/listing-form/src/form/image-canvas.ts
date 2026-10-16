@@ -23,6 +23,26 @@ export function normalizeImageType(mimeType: string): string {
   return normalized === "image/jpg" ? "image/jpeg" : normalized;
 }
 
+/** Kodlanan türün dosya uzantısı. */
+const EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+/**
+ * Dosya adını İÇERİĞİN gerçek türüne göre yeniden adlandırır (uzantı). Canvas
+ * istenen türü kodlayamazsa (eski Safari'de WebP) sessizce PNG verir; ad
+ * `.webp` kalsaydı ad ile içerik ayrışırdı. Bilinmeyen türde ad korunur.
+ */
+export function fileNameForType(name: string, mimeType: string): string {
+  const extension = EXTENSIONS[normalizeImageType(mimeType)];
+  if (!extension) return name;
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  return `${base}.${extension}`;
+}
+
 /**
  * Yükleme öncesi küçültülen türler (normalize edilmiş). YALNIZ JPEG: şeffaflık
  * ve animasyon taşımadığı için canvas'tan geçirmek içerik kaybettirmez;
