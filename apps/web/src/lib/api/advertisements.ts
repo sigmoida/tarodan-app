@@ -94,9 +94,17 @@ export function trackAdEvent(
 }
 
 export const advertisementsApi = {
-  /** Yuvanın yayındaki afişi (API yuva başına en fazla bir döner). */
-  getActive: (params?: { position?: AdPosition }) =>
+  /**
+   * Yuvanın yayındaki afişi (API yuva başına en fazla bir döner). `device`
+   * geçiş dönemi içindir (bkz. `useDeviceType`): yeni API yok sayar, eski API
+   * onunla süzer.
+   */
+  getActive: (params?: { position?: AdPosition; device?: string }) =>
     api.get(`${ADS_BASE}/active`, {
-      params: { position: params?.position, platform: AD_CLIENT_PLATFORM },
+      params: {
+        position: params?.position,
+        platform: AD_CLIENT_PLATFORM,
+        device: params?.device,
+      },
     }),
 };

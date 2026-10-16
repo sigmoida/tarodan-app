@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
 import { useActiveAds } from "@/hooks/useActiveAds";
 import type { Advertisement } from "@/lib/api/advertisements";
-import { pickAd } from "@/lib/ads/pickAd";
 import {
   canShowPopupAd,
   isPopupBlockedByOverlay,
@@ -34,8 +33,9 @@ export function usePopupAd(): { ad: Advertisement | null; close: () => void } {
   const [done, setDone] = useState(false);
 
   const { ads } = useActiveAds("popup", !done);
-  // localStorage yalnız istemcide okunur; sorgu verisi de yalnız istemcide gelir.
-  const ad = useMemo(() => pickAd(ads.filter(canShowPopupAd), "popup"), [ads]);
+  // Kapatılmışlar seçimden ÖNCE elenir. API yuva başına en fazla bir afiş
+  // döner; localStorage yalnız istemcide okunur (sorgu verisi de öyle).
+  const ad = useMemo(() => ads.filter(canShowPopupAd)[0] ?? null, [ads]);
 
   const blocked = isPopupBlockedByOverlay({
     requiredStepsOutstanding: outstanding,

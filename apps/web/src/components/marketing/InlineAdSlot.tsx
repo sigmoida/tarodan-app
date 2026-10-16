@@ -3,7 +3,6 @@
 "use client";
 
 import { useActiveAds } from "@/hooks/useActiveAds";
-import { pickAd } from "@/lib/ads/pickAd";
 import AdCreative from "./AdCreative";
 
 /**
@@ -13,7 +12,8 @@ import AdCreative from "./AdCreative";
  */
 export default function InlineAdSlot() {
   const { ads } = useActiveAds("inline");
-  const ad = pickAd(ads, "inline");
+  // API yuva başına en fazla bir afiş döner.
+  const ad = ads[0] ?? null;
   if (!ad) return null;
 
   return (
