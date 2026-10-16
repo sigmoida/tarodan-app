@@ -54,7 +54,9 @@ const ad = (over: Partial<Advertisement>): Advertisement => ({
   width: 970,
   height: 250,
   position: "header",
-  deviceType: "all",
+  platform: "all",
+  popupFrequency: "until_dismissed",
+  popupVersion: 1,
   campaign: null,
   ...over,
 });

@@ -8,12 +8,12 @@ import AdCreative from "./AdCreative";
 
 /**
  * Ürün ızgarası içindeki afiş: ızgaranın tam genişliğini kaplar (`col-span-full`).
- * Afiş yoksa hiçbir şey çizilmez, ızgara akışı bozulmaz. `slot` yuvanın sırasıdır;
- * her yuva kendi anahtarıyla seçtiği için art arda farklı afişler çıkabilir.
+ * Afiş yoksa hiçbir şey çizilmez, ızgara akışı bozulmaz. Listede tek yuva
+ * vardır (`isInlineAdSlotAfter`).
  */
-export default function InlineAdSlot({ slot }: { slot: number }) {
+export default function InlineAdSlot() {
   const { ads } = useActiveAds("inline");
-  const ad = pickAd(ads, `inline-${slot}`);
+  const ad = pickAd(ads, "inline");
   if (!ad) return null;
 
   return (

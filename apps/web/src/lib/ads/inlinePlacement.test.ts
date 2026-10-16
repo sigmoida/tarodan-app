@@ -1,26 +1,24 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { inlineAdSlotAfter } from "./inlinePlacement";
+import { INLINE_AD_AFTER, isInlineAdSlotAfter } from "./inlinePlacement";
 
-describe("inlineAdSlotAfter", () => {
-  const slots = (count: number) =>
-    Array.from({ length: count }, (_, i) => inlineAdSlotAfter(i))
-      .map((slot, index) => (slot === null ? null : { after: index + 1, slot }))
-      .filter(Boolean);
+describe("isInlineAdSlotAfter", () => {
+  const slotsIn = (count: number) =>
+    Array.from({ length: count }, (_, i) => i)
+      .filter(isInlineAdSlotAfter)
+      .map((index) => index + 1);
 
-  it("ilk afiş 8. kartın ardından, sonrakiler her 16 kartta bir gelir", () => {
-    expect(slots(60)).toEqual([
-      { after: 8, slot: 0 },
-      { after: 24, slot: 1 },
-    ]);
+  it("afiş 8. kartın ardından gelir", () => {
+    expect(INLINE_AD_AFTER).toBe(8);
+    expect(isInlineAdSlotAfter(7)).toBe(true);
+  });
+
+  it("liste ne kadar uzun olursa olsun tek afiş", () => {
+    expect(slotsIn(100)).toEqual([8]);
   });
 
   it("8 kartın altında afiş girmez", () => {
-    expect(slots(7)).toEqual([]);
-  });
-
-  it("tekrar sayısı sınırlıdır (sayfada en çok 2 afiş)", () => {
-    expect(inlineAdSlotAfter(39)).toBeNull();
+    expect(slotsIn(7)).toEqual([]);
   });
 });

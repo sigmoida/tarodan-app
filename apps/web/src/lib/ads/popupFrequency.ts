@@ -1,21 +1,60 @@
 /** @format */
 
-/** Popup afişi ziyaretçi başına en fazla bu sıklıkta gösterilir. */
-export const POPUP_AD_INTERVAL_MS = 24 * 60 * 60 * 1000;
-export const POPUP_AD_STORAGE_KEY = "tarodan.popupAd.shownAt";
+import type { Advertisement } from "@/lib/api/advertisements";
 
-/** Depolama kapalı/dolu olabilir (özel pencere): hata "gösterme" demek değildir. */
-export function canShowPopupAd(now: number = Date.now()): boolean {
+/**
+ * Popup afişinin "kapatıldı" kaydı — reklam ve SÜRÜM başına:
+ * `tarodan.popupAd.dismissed.<id>:<popupVersion>`. Admin reklamı güncelleyince
+ * sürüm artar, eski kayıt artık eşleşmez ve popup yeniden açılır.
+ *
+ * - `until_dismissed`: yalnız KAPATINCA yazılır; kayıt varsa gösterilmez.
+ * - `every_visit`: hiçbir şey yazılmaz; ana sayfaya her girişte gösterilir.
+ *
+ * localStorage kapalı/dolu olabilir (özel pencere): kayıt o zaman sayfa
+ * ömrünce bellekte tutulur — aynı oturumda kapatılan popup geri gelmez.
+ */
+export const POPUP_AD_DISMISS_KEY_PREFIX = "tarodan.popupAd.dismissed.";
+
+type PopupAdIdentity = Pick<
+  Advertisement,
+  "id" | "popupFrequency" | "popupVersion"
+>;
+
+/** localStorage'a yazılamayan kayıtlar (sayfa ömrünce). */
+const memoryDismissals = new Set<string>();
+
+export function popupAdDismissKey(
+  ad: Pick<Advertisement, "id" | "popupVersion">,
+): string {
+  return `${POPUP_AD_DISMISS_KEY_PREFIX}${ad.id}:${ad.popupVersion}`;
+}
+
+function isDismissed(key: string): boolean {
+  if (memoryDismissals.has(key)) return true;
   try {
-    const raw = window.localStorage.getItem(POPUP_AD_STORAGE_KEY);
-    if (!raw) return true;
-    const shownAt = Number(raw);
-    if (!Number.isFinite(shownAt)) return true;
-    // Saat geriye alınmışsa (shownAt gelecekte) sonsuza dek kilitlenmesin.
-    if (shownAt > now) return true;
-    return now - shownAt >= POPUP_AD_INTERVAL_MS;
+    return window.localStorage.getItem(key) !== null;
   } catch {
-    return true;
+    return false;
+  }
+}
+
+/** Bu popup şimdi gösterilebilir mi (kapatma kaydı yoksa ya da her girişteyse). */
+export function canShowPopupAd(ad: PopupAdIdentity): boolean {
+  if (ad.popupFrequency === "every_visit") return true;
+  return !isDismissed(popupAdDismissKey(ad));
+}
+
+/**
+ * Ziyaretçi popup'ı kapattı. `until_dismissed` için kayıt yazar (depolama
+ * yazılamazsa bellekte); `every_visit` için hiçbir şey yazmaz.
+ */
+export function markPopupAdDismissed(ad: PopupAdIdentity): void {
+  if (ad.popupFrequency === "every_visit") return;
+  const key = popupAdDismissKey(ad);
+  try {
+    window.localStorage.setItem(key, String(Date.now()));
+  } catch {
+    memoryDismissals.add(key);
   }
 }
 
@@ -33,12 +72,4 @@ export function isPopupBlockedByOverlay(state: PopupOverlayState): boolean {
     state.cookieBannerOpen ||
     state.tourRunning
   );
-}
-
-export function markPopupAdShown(now: number = Date.now()): void {
-  try {
-    window.localStorage.setItem(POPUP_AD_STORAGE_KEY, String(now));
-  } catch {
-    // Yazılamadıysa bu görünüm yine de gösterildi; sonraki sayfada tekrar çıkabilir.
-  }
 }

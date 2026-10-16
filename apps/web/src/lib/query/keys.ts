@@ -136,6 +136,10 @@ export const queryKeys = {
     unreadCount: () => ["messages-unread-count"] as const,
     thread: (id: string | undefined) => ["messages", id] as const,
   },
+  ads: {
+    /** Yuvanın yayındaki afişleri (`GET /ads/active?position=&platform=web`). */
+    active: (position: string) => ["advertisements", position] as const,
+  },
   offers: {
     pendingCount: () => ["offers-pending-count"] as const,
   },
