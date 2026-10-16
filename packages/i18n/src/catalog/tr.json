@@ -11613,7 +11613,8 @@
       "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
       "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
       "maxLiveSlides": "Bir yerleşimde, bir platformda aynı anda en fazla {max} slayt yayında olabilir",
-      "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir"
+      "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir",
+      "useDedicatedEndpoint": "Bu ayar Pazarlama → Hero ekranından değiştirilir."
     },
     "brand": {
       "notFound": "Marka bulunamadı"

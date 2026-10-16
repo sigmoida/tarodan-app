@@ -4,7 +4,7 @@ import {
   resetAdminSessionTimeoutCache,
 } from "../../security/helpers/admin-session-timeout";
 import { MembershipTierType, SellerType } from "@prisma/client";
-import { isTimingSettingKey } from "@tarodan/types";
+import { isHeroSettingKey, isTimingSettingKey } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "../dto";
@@ -90,6 +90,14 @@ export class AdminSettingsService {
     if (isTimingSettingKey(dto.key)) {
       throw new BadRequestException(
         i18nMessage("server.admin.timingRules.useDedicatedEndpoint"),
+      );
+    }
+    // Hero anahtarları da öyle: ana sayfa anahtarı yalnız
+    // PATCH /admin/hero-slides/visibility'den (denetim + web tazelemesi),
+    // seed işareti hiç yazılmaz.
+    if (isHeroSettingKey(dto.key)) {
+      throw new BadRequestException(
+        i18nMessage("server.hero.useDedicatedEndpoint"),
       );
     }
     const existing = await this.prisma.platformSetting.findUnique({

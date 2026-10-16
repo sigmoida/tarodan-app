@@ -11613,7 +11613,8 @@
       "endBeforeStart": "The end date cannot be before the start date",
       "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
       "maxLiveSlides": "At most {max} slides can be live at the same time in a placement on one platform",
-      "reorderMixedPlacement": "Only slides of the same placement can be reordered together"
+      "reorderMixedPlacement": "Only slides of the same placement can be reordered together",
+      "useDedicatedEndpoint": "This setting is managed on Marketing → Hero."
     },
     "brand": {
       "notFound": "Brand not found"

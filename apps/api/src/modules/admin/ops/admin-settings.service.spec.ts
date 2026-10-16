@@ -158,6 +158,21 @@ describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
     expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "hero_home_enabled_web",
+    "hero_home_enabled_app",
+    "hero_seed_applied",
+  ])("hero anahtarı %s genel uçtan yazılamaz", async (key) => {
+    const { service, prisma } = makeService();
+
+    await expect(
+      service.updatePlatformSetting("user-1", { key, value: "false" }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.hero.useDedicatedEndpoint" },
+    });
+    expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+  });
+
   it("ilgisiz anahtarları eskisi gibi yazar", async () => {
     const { service, prisma } = makeService();
 
