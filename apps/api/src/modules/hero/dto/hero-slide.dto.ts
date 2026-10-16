@@ -8,7 +8,6 @@ import {
   IsUrl,
   MaxLength,
   Min,
-  ValidateIf,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { ContentPlatform, HeroImageSide, HeroPlacement } from "@prisma/client";
@@ -21,17 +20,11 @@ import {
 } from "@tarodan/types";
 import { BlankToNull } from "../../../common/transforms";
 import { IsLocalizedText } from "../../../common/validators/localized-text";
+import { IsOptionalNotNull } from "../../../common/validators/optional-not-null";
 import {
   AD_LINK_URL_MAX_LENGTH,
   IsAdLinkUrl,
 } from "../../advertisement/helpers/ad-link-url.validator";
-
-/**
- * Yalnız `undefined` iken doğrulamayı atlar: null'ı REDDETMEK için. Şemada
- * null olamayan alanlarda `@IsOptional()` null'ı geçirir ve hata Prisma'da 500
- * olarak patlardı (reklam DTO'suyla aynı desen).
- */
-const IsOptionalNotNull = () => ValidateIf((_, value) => value !== undefined);
 
 /** Swagger şeması: `LocalizedText` (`{ tr, en? }`). */
 export const LOCALIZED_TEXT_SCHEMA = {
