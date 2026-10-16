@@ -217,13 +217,14 @@ export class MediaService {
    * Mesaj ekini presigned URL'e çözer. Yalnız `messages` kökündeki dosyalar —
    * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez.
    *
-   * Erişim: yükleyen, eki taşıyan mesajın alıcısı veya admin
-   * (`MessageAttachmentAccessService`). Yetkisiz istek de 404 alır (403
+   * Erişim: yükleyen ya da eki taşıyan mesajın alıcısı
+   * (`MessageAttachmentAccessService`). Bu uç kullanıcı JWT'si ister; admin
+   * erişimi şimdilik kapsam dışı. Yetkisiz istek de 404 alır (403
    * değil) — id yoklayarak bir ekin VARLIĞI öğrenilemesin.
    */
   async getMessageAttachmentPresignedUrl(
     mediaFileId: string,
-    requester: Pick<RequestUser, "id" | "isAdmin">,
+    requester: Pick<RequestUser, "id">,
   ): Promise<string> {
     const notFound = () =>
       new NotFoundException(i18nMessage("server.media.fileNotFound"));
@@ -235,10 +236,9 @@ export class MediaService {
     });
     if (!file || file.bucket !== "messages") throw notFound();
 
-    const allowed =
-      requester.isAdmin === true ||
-      (await this.attachmentAccess.canRead(file, requester.id));
-    if (!allowed) throw notFound();
+    if (!(await this.attachmentAccess.canRead(file, requester.id))) {
+      throw notFound();
+    }
 
     return this.storageService.getPresignedDownloadUrl(
       "messages",

@@ -127,8 +127,8 @@ describe("MediaService.findInvalidMessageAttachmentTargets", () => {
 
 /**
  * IDOR: `GET /media/message-attachment/:id` eskiden her oturumlu kullanıcıya
- * her eki çözüyordu. Artık yalnız yükleyen, eki taşıyan mesajın alıcısı veya
- * admin; diğer herkes (ve biçim dışı id) VARLIĞI sızdırmayan 404 alır.
+ * her eki çözüyordu. Artık yalnız yükleyen ya da eki taşıyan mesajın alıcısı;
+ * diğer herkes (ve biçim dışı id) VARLIĞI sızdırmayan 404 alır.
  */
 describe("MediaService.getMessageAttachmentPresignedUrl — erişim", () => {
   const UPLOADER = "user-uploader";
@@ -184,16 +184,16 @@ describe("MediaService.getMessageAttachmentPresignedUrl — erişim", () => {
     );
   });
 
-  it("admin → üyelik sorgusu olmadan çözülür", async () => {
+  it("isAdmin bayrağı tek başına erişim VERMEZ (bu uçta admin yolu yok)", async () => {
     const { service, access } = createReader(file, false);
 
     await expect(
       service.getMessageAttachmentPresignedUrl(OWN_ID, {
-        id: "admin-user",
+        id: "someone",
         isAdmin: true,
-      }),
-    ).resolves.toBe("https://signed/x");
-    expect(access.canRead).not.toHaveBeenCalled();
+      } as { id: string }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(access.canRead).toHaveBeenCalled();
   });
 
   it("başka bucket'taki dosya → 404 (yetkili olsa bile)", async () => {

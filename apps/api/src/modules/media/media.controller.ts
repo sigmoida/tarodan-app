@@ -91,7 +91,7 @@ export class MediaController {
   /**
    * Faz 0: private mesaj ekini presigned URL'e yönlendirir. JWT zorunlu
    * (sınıf guard'ı); yalnız `messages` kökündeki dosyalar, yalnız yükleyene,
-   * eki taşıyan mesajın alıcısına veya admine çözülür — diğer herkese 404.
+   * eki taşıyan mesajın alıcısına çözülür — diğer herkese 404.
    */
   @Get("message-attachment/:id")
   async messageAttachment(
