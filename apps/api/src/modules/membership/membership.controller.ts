@@ -33,6 +33,7 @@ import { RequirePermission } from "../auth/decorators/require-permission.decorat
 import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminRole, MembershipTierType } from "@prisma/client";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @Controller("membership")
 export class MembershipController {
@@ -164,7 +165,7 @@ export class MembershipController {
   @Delete("cards/:id")
   async deleteSavedCard(
     @Request() req: any,
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
   ): Promise<{ deleted: boolean }> {
     return this.membershipService.deleteSavedCard(req.user.id, id);
   }

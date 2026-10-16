@@ -10,7 +10,6 @@ import {
   Get,
   Patch,
   Body,
-  Param,
   Query,
   UseGuards,
   HttpCode,
@@ -39,6 +38,7 @@ import { RequirePermission } from "../auth/decorators/require-permission.decorat
 import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminRole } from "@prisma/client";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("notifications")
 @Controller("notifications")
@@ -142,7 +142,7 @@ export class NotificationController {
   })
   async markAsRead(
     @CurrentUser("id") userId: string,
-    @Param("id") notificationId: string,
+    @UuidParam("id") notificationId: string,
   ) {
     const success = await this.notificationService.markAsRead(
       notificationId,

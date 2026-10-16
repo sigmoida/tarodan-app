@@ -35,6 +35,7 @@ import {
   ShipmentResponseDto,
   ShippingRatesResponseDto,
 } from "./dto";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("shipping")
 @Controller("shipping")
@@ -152,7 +153,7 @@ export class ShippingController {
     type: ShipmentResponseDto,
   })
   async updateTracking(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: UpdateTrackingDto,
   ): Promise<ShipmentResponseDto> {

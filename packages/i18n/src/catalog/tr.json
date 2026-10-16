@@ -10412,7 +10412,9 @@
       "recordNotFound": "Kayıt bulunamadı",
       "relatedRecordsConflict": "İşlem ilişkili kayıtlar nedeniyle tamamlanamadı",
       "internalError": "Sunucu hatası",
-      "connectionFailed": "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin."
+      "connectionFailed": "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.",
+      "invalidId": "Geçersiz kimlik (ID) biçimi",
+      "invalidRouteParam": "Geçersiz istek parametresi"
     },
     "notification": {
       "orderCreated": {

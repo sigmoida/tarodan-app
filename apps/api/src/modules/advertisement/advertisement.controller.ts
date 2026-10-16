@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Param,
   Query,
   Req,
   HttpCode,
@@ -23,6 +22,7 @@ import { Public } from "../auth/decorators/public.decorator";
 import { resolveClientIp } from "../../common/helpers/client-ip";
 // Tık/gösterim kovası istemci IP'sidir (hero slaytlarıyla ortak tanım).
 import { BEACON_TRACKING_THROTTLE } from "../../common/helpers/beacon-tracking";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("ads")
 @Controller("ads")
@@ -97,7 +97,7 @@ export class AdvertisementController {
   // `hotspot` ham bırakılır: geçersiz değer 400 değil, sessiz yok sayma —
   // kararı servis verir.
   async recordClick(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @Req() req: Request,
     @Query("hotspot") hotspot?: unknown,
   ) {
@@ -117,7 +117,7 @@ export class AdvertisementController {
   })
   @ApiParam({ name: "id", description: "Ad ID" })
   @ApiResponse({ status: 204, description: "Accepted (counted or ignored)" })
-  async recordImpression(@Param("id") id: string, @Req() req: Request) {
+  async recordImpression(@UuidParam("id") id: string, @Req() req: Request) {
     await this.tracking.recordImpression(id, resolveClientIp(req) ?? "unknown");
   }
 }

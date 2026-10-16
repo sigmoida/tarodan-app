@@ -52,6 +52,7 @@ import {
   paytrMerchantCapabilities,
   type PaymentPurpose,
 } from "../../config/paytr";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("payments")
 @Controller("payments")
@@ -485,7 +486,7 @@ export class PaymentController {
     description: "User does not have permission to retry this payment",
   })
   async retryPayment(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @CurrentUser("id") userId: string,
     @Req() req: Request,
   ): Promise<RetryPaymentResponseDto> {
@@ -508,7 +509,7 @@ export class PaymentController {
     description: "Released or already processed",
   })
   async confirmFailed(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @Req() req: Request,
   ): Promise<{ released: boolean }> {
     return this.paymentService.confirmFailedFromClient(paymentId, {
@@ -530,7 +531,7 @@ export class PaymentController {
   @ApiParam({ name: "id", description: "Payment ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Verification result" })
   async verifyPayment(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @Req() req: Request,
   ): Promise<{ completed: boolean; status: string }> {
     return this.paymentService.verifyPaymentFromClient(paymentId, {
@@ -584,7 +585,7 @@ export class PaymentController {
     description: "User does not have permission to cancel this payment",
   })
   async cancelPayment(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @CurrentUser("id") userId: string,
     @ReqLocale() locale: Locale,
   ): Promise<CancelPaymentResponseDto> {

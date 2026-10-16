@@ -4,7 +4,6 @@ import {
   Header,
   HttpCode,
   HttpStatus,
-  Param,
   Post,
   Query,
   Req,
@@ -29,6 +28,7 @@ import { HeroSlideQueryDto } from "./dto";
 import { HeroSlideService } from "./hero-slide.service";
 import { HeroTrackingService } from "./hero-tracking.service";
 import { HERO_PUBLIC_CACHE_CONTROL } from "./helpers/hero.constants";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 /**
  * Vitrin hero slaytları (web + mobil). Kaynak yalnız veritabanıdır; istemci
@@ -70,7 +70,7 @@ export class HeroSlideController {
   })
   @ApiParam({ name: "id", description: "Hero slide ID" })
   @ApiResponse({ status: 204, description: "Accepted (counted or ignored)" })
-  async recordImpression(@Param("id") id: string, @Req() req: Request) {
+  async recordImpression(@UuidParam("id") id: string, @Req() req: Request) {
     await this.tracking.recordImpression(id, resolveClientIp(req) ?? "unknown");
   }
 
@@ -93,7 +93,7 @@ export class HeroSlideController {
   // `cta` ham bırakılır: geçersiz değer 400 değil, sessiz yok sayma — kararı
   // servis verir.
   async recordClick(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @Req() req: Request,
     @Query("cta") cta?: unknown,
   ) {

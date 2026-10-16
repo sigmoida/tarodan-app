@@ -10412,7 +10412,9 @@
       "recordNotFound": "Record not found",
       "relatedRecordsConflict": "The operation could not be completed because of related records",
       "internalError": "Server error",
-      "connectionFailed": "Could not reach the server. Please check your internet connection."
+      "connectionFailed": "Could not reach the server. Please check your internet connection.",
+      "invalidId": "Invalid ID format",
+      "invalidRouteParam": "Invalid request parameter"
     },
     "notification": {
       "orderCreated": {

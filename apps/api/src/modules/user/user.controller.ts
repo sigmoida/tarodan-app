@@ -38,6 +38,7 @@ import {
 import { errorMessage } from "../../common/helpers/error-message";
 import { Throttle } from "@nestjs/throttler";
 import { BlockUserDto } from "./dto/block-user.dto";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("users")
 @Controller("users")
@@ -299,7 +300,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Adres güncellendi" })
   async updateAddress(
     @CurrentUser("id") userId: string,
-    @Param("id") addressId: string,
+    @UuidParam("id") addressId: string,
     @Body() dto: UpdateAddressDto,
   ) {
     return this.userService.updateAddress(userId, addressId, dto);
@@ -316,7 +317,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Adres silindi" })
   async deleteAddress(
     @CurrentUser("id") userId: string,
-    @Param("id") addressId: string,
+    @UuidParam("id") addressId: string,
     @ReqLocale() locale: Locale,
   ) {
     await this.userService.deleteAddress(userId, addressId);
@@ -407,7 +408,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Takip edildi" })
   async followUser(
     @CurrentUser("id") currentUserId: string,
-    @Param("id") targetUserId: string,
+    @UuidParam("id") targetUserId: string,
   ) {
     return this.userService.followUser(currentUserId, targetUserId);
   }
@@ -423,7 +424,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Takip bırakıldı" })
   async unfollowUser(
     @CurrentUser("id") currentUserId: string,
-    @Param("id") targetUserId: string,
+    @UuidParam("id") targetUserId: string,
     @ReqLocale() locale: Locale,
   ) {
     const result = await this.userService.unfollowUser(
@@ -472,7 +473,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: "Kullanıcı bulunamadı" })
   async blockUser(
     @CurrentUser("id") currentUserId: string,
-    @Param("id") targetUserId: string,
+    @UuidParam("id") targetUserId: string,
     @ReqLocale() locale: Locale,
     @Body() dto?: BlockUserDto,
   ) {
@@ -502,7 +503,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: "Engel bulunamadı" })
   async unblockUser(
     @CurrentUser("id") currentUserId: string,
-    @Param("id") targetUserId: string,
+    @UuidParam("id") targetUserId: string,
     @ReqLocale() locale: Locale,
   ) {
     const result = await this.userService.unblockUser(
