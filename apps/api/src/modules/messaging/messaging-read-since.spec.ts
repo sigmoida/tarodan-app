@@ -5,6 +5,7 @@ import { ContentFilterService } from "./content-filter.service";
 import { NotificationService } from "../notification/notification.service";
 import { RealtimeService } from "../websocket/realtime.service";
 import { StorageService } from "../storage/storage.service";
+import { MediaService } from "../media/media.service";
 import { PrismaService } from "../../prisma";
 import { UserBlockService } from "../user-block/user-block.service";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
@@ -51,6 +52,14 @@ describe("MessagingService getThreadMessages read+since", () => {
         { provide: NotificationService, useValue: {} },
         { provide: RealtimeService, useValue: realtime },
         { provide: StorageService, useValue: {} },
+        {
+          provide: MediaService,
+          useValue: {
+            findInvalidMessageAttachmentTargets: jest
+              .fn()
+              .mockResolvedValue([]),
+          },
+        },
         {
           provide: UserBlockService,
           useValue: userBlockServiceStub(),

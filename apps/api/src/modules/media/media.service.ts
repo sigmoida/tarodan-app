@@ -26,6 +26,10 @@ import {
   isBlockedSharpMimeType,
 } from "../../common/image/sharp-safety";
 import { i18nMessage } from "../i18n";
+import {
+  messageAttachmentIdFromUrl,
+  messageAttachmentUrl,
+} from "./helpers/message-attachment-url";
 
 /**
  * sharp modülünün KENDİ tipi. `require` `any` döndürür; açıkça bağlanmazsa
@@ -155,10 +159,53 @@ export class MediaService {
    * yönlendirilir (getMessageAttachmentPresignedUrl).
    */
   buildMessageAttachmentUrl(mediaFileId: string): string {
-    const apiUrl = (
-      this.configService.get<string>("API_URL") || "http://localhost:3001"
-    ).replace(/\/$/, "");
-    return `${apiUrl}/api/media/message-attachment/${mediaFileId}`;
+    return messageAttachmentUrl(
+      this.configService.get<string>("API_URL") || "http://localhost:3001",
+      mediaFileId,
+    );
+  }
+
+  /**
+   * Mesaj gövdesindeki `[IMG:…]` hedeflerinden GEÇERSİZ olanları döner (boş
+   * dizi = hepsi geçerli). Geçerli hedef: bu sunucunun `buildMessageAttachmentUrl`
+   * ile BİREBİR ürettiği URL + `messages` kökünde, GÖNDERİCİNİN yüklediği bir
+   * MediaFile. Başka her şey (harici URL, çıplak key, başka kullanıcının eki,
+   * başka bucket) reddedilir — alıcının istemcisi bu görseli kendi oturum
+   * jetonuyla yükler.
+   *
+   * Konu (thread) bağı denetlenemez: ek, mesajdan ÖNCE yüklenir ve MediaFile
+   * konu bilgisi taşımaz; sahiplik göndericiyle sınırlanır.
+   */
+  async findInvalidMessageAttachmentTargets(
+    targets: string[],
+    uploaderId: string,
+  ): Promise<string[]> {
+    const idByTarget = new Map<string, string | null>();
+    for (const target of targets) {
+      const id = messageAttachmentIdFromUrl(target);
+      idByTarget.set(
+        target,
+        id && this.buildMessageAttachmentUrl(id) === target ? id : null,
+      );
+    }
+
+    const ids = [
+      ...new Set(
+        [...idByTarget.values()].filter((id): id is string => id !== null),
+      ),
+    ];
+    const owned = ids.length
+      ? await this.prisma.mediaFile.findMany({
+          where: { id: { in: ids }, bucket: "messages", uploaderId },
+          select: { id: true },
+        })
+      : [];
+    const ownedIds = new Set(owned.map((file) => file.id));
+
+    return targets.filter((target) => {
+      const id = idByTarget.get(target);
+      return !id || !ownedIds.has(id);
+    });
   }
 
   /**
