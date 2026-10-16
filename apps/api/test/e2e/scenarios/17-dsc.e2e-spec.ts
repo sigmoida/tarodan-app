@@ -26,8 +26,9 @@
  *    DELETE @HttpCode(204). Sahibin GET /:id → başkası → 403 "Bu indirimi görüntüleme yetkiniz yok".
  *  - POST /api/admin/discounts (@Roles super_admin,admin,moderator) — varsayılan 201; isAdmin=true → sellerId=null.
  *  - POST /api/admin/commission-rules (@Roles super_admin YALNIZ) — admin/moderator → 403.
- *  - GET /api/ads/active @Public → { id,title,imageUrl,linkUrl,content,altText,width,height,position,deviceType,hotspots }
- *    (clickCount/impressionCount YOK). device=mobile → [mobile, all]; position filtrelenir; isActive=false hariç.
+ *  - GET /api/ads/active?platform=web|app @Public → yuva başına en fazla 1 reklam:
+ *    { id,title,imageUrl,linkUrl,content,altText,width,height,position,platform,deviceType(türetilmiş),popupFrequency,popupVersion,hotspots }
+ *    (clickCount/impressionCount YOK). platform=app → [app, all] (parametresiz = app); position filtrelenir; isActive=false hariç.
  *  - POST /api/ads/:id/click|impression @Public → 204 (gövdesiz, beacon dostu); yalnız yayındaki reklamda ve
  *    IP+reklam başına pencerede bir kez sayılır (tık 10 sn, gösterim 30 dk); yok/yayında değil → 204, sayılmaz.
  *    Görselli reklamda tık yalnız `?hotspot=<alanId>` ile (reklam + alan sayacı birlikte); görselsizde alansız.
@@ -246,7 +247,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     width: 728,
     height: 90,
     position: "header",
-    deviceType: "all",
+    platform: "all",
     ...over,
   });
 
@@ -260,6 +261,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
         // Görselli reklamın linkUrl'i kural gereği null; tıklama alanlardadır.
         linkUrl: null,
         position: "header" as any,
+        platform: "all" as any,
         deviceType: "all" as any,
         isActive: true,
         displayOrder: 0,
@@ -1433,53 +1435,52 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     expect(ad).toHaveProperty("imageUrl");
     expect(ad).toHaveProperty("linkUrl");
     expect(ad).toHaveProperty("position");
+    expect(ad).toHaveProperty("platform");
     expect(ad).toHaveProperty("deviceType");
+    expect(ad).toHaveProperty("popupFrequency");
+    expect(ad).toHaveProperty("popupVersion");
     expect(ad).not.toHaveProperty("clickCount");
     expect(ad).not.toHaveProperty("impressionCount");
   });
 
   scenario("DSC-053", async () => {
-    // position=header filtresi; diğer yuvalar (topbar) dışlanır; displayOrder asc.
+    // position=header filtresi; diğer yuvalar (topbar) dışlanır; yuvada tek
+    // reklam: displayOrder asc ile ilk olan (kural öncesi kalan çakışma).
     await seedAd({ title: "Header-A", position: "header", displayOrder: 1 });
     await seedAd({ title: "Header-B", position: "header", displayOrder: 0 });
     await seedAd({ title: "Topbar-X", position: "topbar", displayOrder: 0 });
     const res = await request(server())
-      .get("/api/ads/active?position=header")
+      .get("/api/ads/active?position=header&platform=web")
       .expect(200);
     const titles = res.body.map((a: any) => a.title);
-    expect(titles).toContain("Header-A");
-    expect(titles).toContain("Header-B");
-    expect(titles).not.toContain("Topbar-X");
-    // displayOrder asc → Header-B (0) önce Header-A (1).
-    expect(titles.indexOf("Header-B")).toBeLessThan(titles.indexOf("Header-A"));
+    expect(titles).toEqual(["Header-B"]);
   });
 
   scenario("DSC-054", async () => {
-    // device=mobile → mobile + all döner; desktop dışlanır.
-    await seedAd({ title: "A-mobile", deviceType: "mobile" });
-    await seedAd({ title: "B-desktop", deviceType: "desktop" });
-    await seedAd({ title: "C-all", deviceType: "all" });
+    // platform=app → app + all döner; web dışlanır. Yuvalar ayrı (yuva başına 1).
+    await seedAd({ title: "A-app", platform: "app", position: "header" });
+    await seedAd({ title: "B-web", platform: "web", position: "footer" });
+    await seedAd({ title: "C-all", platform: "all", position: "popup" });
     const res = await request(server())
-      .get("/api/ads/active?device=mobile")
+      .get("/api/ads/active?platform=app")
       .expect(200);
     const titles = res.body.map((a: any) => a.title);
-    expect(titles).toContain("A-mobile");
+    expect(titles).toContain("A-app");
     expect(titles).toContain("C-all");
-    expect(titles).not.toContain("B-desktop");
+    expect(titles).not.toContain("B-web");
   });
 
   scenario("DSC-055", async () => {
-    // device=all → tüm cihaz tipleri döner.
-    await seedAd({ title: "D-mobile", deviceType: "mobile" });
-    await seedAd({ title: "D-desktop", deviceType: "desktop" });
-    await seedAd({ title: "D-all", deviceType: "all" });
-    const res = await request(server())
-      .get("/api/ads/active?device=all")
-      .expect(200);
-    const titles = res.body.map((a: any) => a.title);
-    expect(titles).toEqual(
-      expect.arrayContaining(["D-mobile", "D-desktop", "D-all"]),
+    // Parametresiz istek eski mobil sürümdür → app; deviceType platformdan
+    // türetilir (app → mobile, all → all) — eski sürüm all|mobile ile süzer.
+    await seedAd({ title: "D-app", platform: "app", position: "header" });
+    await seedAd({ title: "D-web", platform: "web", position: "footer" });
+    await seedAd({ title: "D-all", platform: "all", position: "popup" });
+    const res = await request(server()).get("/api/ads/active").expect(200);
+    const byTitle = Object.fromEntries(
+      res.body.map((a: any) => [a.title, a.deviceType]),
     );
+    expect(byTitle).toEqual({ "D-app": "mobile", "D-all": "all" });
   });
 
   scenario("DSC-056", async () => {
@@ -1763,7 +1764,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-071", async () => {
-    // Reklam istatistikleri (CTR hesabı): impressions=0 → avgCTR=0; byPosition/byDeviceType döner.
+    // Reklam istatistikleri (CTR hesabı): impressions=0 → avgCTR=0; byPosition/byPlatform döner.
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc71@test.com",
     });
@@ -1780,7 +1781,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       .expect(200);
     expect(res.body).toHaveProperty("totalAds");
     expect(res.body).toHaveProperty("byPosition");
-    expect(res.body).toHaveProperty("byDeviceType");
+    expect(res.body).toHaveProperty("byPlatform");
     // 10/100*100 = 10.00.
     expect(res.body.avgCTR).toBeCloseTo(10, 2);
   });
@@ -2544,7 +2545,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   // DSC-102: Admin reklam sayfasının VERİ KAYNAKLARI API'den test edilir (UI render ayrı).
-  // GET /api/admin/ads (pozisyon/cihaz alanları), /api/admin/ads/statistics, /api/admin/ads/iab-sizes.
+  // GET /api/admin/ads (pozisyon/platform alanları), /api/admin/ads/statistics, /api/admin/ads/iab-sizes.
   scenario("DSC-102", async () => {
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc102@test.com",
@@ -2565,6 +2566,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const ad = list.body.find((a: any) => a.title === "Panel Reklam");
     expect(ad).toBeTruthy();
     expect(ad).toHaveProperty("position");
+    expect(ad).toHaveProperty("platform");
     expect(ad).toHaveProperty("deviceType");
     expect(ad).toHaveProperty("iabCompliant");
     expect(ad).toHaveProperty("iabSize");
@@ -2575,7 +2577,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       .expect(200);
     expect(stats.body).toHaveProperty("totalAds");
     expect(stats.body).toHaveProperty("byPosition");
-    expect(stats.body).toHaveProperty("byDeviceType");
+    expect(stats.body).toHaveProperty("byPlatform");
     // IAB boyut kaynağı (admin).
     const iab = await request(server())
       .get("/api/admin/ads/iab-sizes")

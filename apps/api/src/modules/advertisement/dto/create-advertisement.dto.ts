@@ -15,7 +15,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { AdDeviceType, AdPosition } from "@prisma/client";
+import { AdPopupFrequency, AdPosition, ContentPlatform } from "@prisma/client";
 import { BlankToNull } from "../../../common/transforms";
 import {
   AD_LINK_URL_MAX_LENGTH,
@@ -23,9 +23,9 @@ import {
 } from "../helpers/ad-link-url.validator";
 import { AdHotspotDto } from "./ad-hotspot.dto";
 
-// Pozisyon/cihaz enum'larının tek kaynağı Prisma şemasıdır; DTO'lar ve
-// servis aynı değerleri buradan okur.
-export { AdDeviceType, AdPosition };
+// Pozisyon/platform/sıklık enum'larının tek kaynağı Prisma şemasıdır; DTO'lar
+// ve servis aynı değerleri buradan okur.
+export { AdPopupFrequency, AdPosition, ContentPlatform };
 
 // IAB Standard Ad Sizes
 export const IAB_STANDARD_SIZES = [
@@ -171,14 +171,29 @@ export class CreateAdvertisementDto {
   @IsEnum(AdPosition)
   position?: AdPosition;
 
+  /**
+   * Eski `deviceType` alanı gövdeden kalktı (whitelist sessizce düşürür);
+   * kolon `platform`'dan türetilir.
+   */
   @ApiPropertyOptional({
-    description: "Device type: desktop, mobile, all",
-    enum: AdDeviceType,
-    default: AdDeviceType.all,
+    description:
+      "Client the ad is shown on: web (site), app (mobile app), all (both)",
+    enum: ContentPlatform,
+    default: ContentPlatform.all,
   })
   @IsOptionalNotNull()
-  @IsEnum(AdDeviceType)
-  deviceType?: AdDeviceType;
+  @IsEnum(ContentPlatform)
+  platform?: ContentPlatform;
+
+  @ApiPropertyOptional({
+    description:
+      "Popup slot only: until_dismissed (shown on every home visit until the visitor closes it) or every_visit (shown on every home visit)",
+    enum: AdPopupFrequency,
+    default: AdPopupFrequency.until_dismissed,
+  })
+  @IsOptionalNotNull()
+  @IsEnum(AdPopupFrequency)
+  popupFrequency?: AdPopupFrequency;
 
   @ApiPropertyOptional({
     description: "Display order (lower = first)",

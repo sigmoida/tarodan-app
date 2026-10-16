@@ -11585,6 +11585,9 @@
       "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
       "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
     },
+    "ads": {
+      "slotTaken": "Bu yuvada (aynı pozisyon ve platform) aynı tarihlerde yayında olan başka bir reklam var: “{title}”. Önce onu pasife alın ya da tarihleri ayırın."
+    },
     "hero": {
       "notFound": "Slayt bulunamadı",
       "trustBadgeNotFound": "Güven rozeti bulunamadı",

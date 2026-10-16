@@ -41,16 +41,29 @@ export class AdvertisementController {
     description: "Filter by slot: topbar, header, footer, inline, popup",
   })
   @ApiQuery({
+    name: "platform",
+    required: false,
+    description:
+      "Requesting client: web or app. Absent = app (only legacy mobile builds omit it). Returns ads targeted at that client or at all.",
+  })
+  @ApiQuery({
     name: "device",
     required: false,
-    description: "Filter by device: desktop, mobile, all",
+    deprecated: true,
+    description:
+      "Legacy web parameter. Not a filter; when platform is absent its presence means the client is web.",
   })
-  @ApiResponse({ status: 200, description: "Live ads, displayOrder ASC" })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Live ads, at most one per position (displayOrder ASC, createdAt DESC). deviceType is derived from platform for legacy clients.",
+  })
   getActive(
     @Query("position") position?: string,
-    @Query("device") deviceType?: string,
+    @Query("platform") platform?: string,
+    @Query("device") legacyDevice?: string,
   ) {
-    return this.advertisementService.getActive(position, deviceType);
+    return this.advertisementService.getActive(position, platform, legacyDevice);
   }
 
   @Get("iab-sizes")

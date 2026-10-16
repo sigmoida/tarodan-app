@@ -58,7 +58,14 @@ describe("UpdateAdvertisementDto", () => {
     },
   );
 
-  it.each(["title", "position", "deviceType", "displayOrder", "isActive"])(
+  it.each([
+    "title",
+    "position",
+    "platform",
+    "popupFrequency",
+    "displayOrder",
+    "isActive",
+  ])(
     "zorunlu alan %s: null 400'dür (Prisma 500'ü yerine)",
     async (field) => {
       await expect(update({ [field]: null })).rejects.toBeInstanceOf(
@@ -123,6 +130,36 @@ describe("CreateAdvertisementDto — alan kuralları", () => {
     await expect(create({ position: "sidebar" })).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it("platform: web / app / all kabul; bilinmeyen 400", async () => {
+    for (const platform of ["web", "app", "all"]) {
+      await expect(create({ platform })).resolves.toMatchObject({ platform });
+    }
+    await expect(create({ platform: "desktop" })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it("popupFrequency: every_visit / until_dismissed kabul; bilinmeyen 400", async () => {
+    for (const popupFrequency of ["every_visit", "until_dismissed"]) {
+      await expect(create({ popupFrequency })).resolves.toMatchObject({
+        popupFrequency,
+      });
+    }
+    await expect(
+      create({ popupFrequency: "daily" }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("eski deviceType gövdeden düşer (whitelist), hata vermez", async () => {
+    await expect(create({ deviceType: "mobile" })).resolves.not.toHaveProperty(
+      "deviceType",
+    );
+  });
+
+  it("popupVersion istemciden yazılamaz (whitelist düşürür)", async () => {
+    await expect(update({ popupVersion: 99 })).resolves.toEqual({});
   });
 
   describe("hotspots", () => {

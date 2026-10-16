@@ -11585,6 +11585,9 @@
       "hotspotInvalid": "{code, select, tooMany {An ad can have at most {max} clickable areas.} outOfBounds {Clickable area {position} extends outside the image.} tooSmall {Clickable area {position} is too small; its width and height must be at least {minPercent}% of the image.} overlap {Clickable area {position} overlaps area {other}.} labelRequired {Clickable area {position} needs a name.} labelTooLong {The name of clickable area {position} can be at most {labelMax} characters.} linkRequired {Clickable area {position} needs a link.} other {Clickable area {position} is invalid.}}",
       "hotspotsNeedImage": "Clickable areas can only be set on an ad with an image"
     },
+    "ads": {
+      "slotTaken": "Another ad is already live in this slot (same position and platform) on overlapping dates: “{title}”. Deactivate it or separate the dates first."
+    },
     "hero": {
       "notFound": "Slide not found",
       "trustBadgeNotFound": "Trust badge not found",
