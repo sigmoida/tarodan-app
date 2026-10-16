@@ -35,13 +35,19 @@ async function jpegWithOrientation(
 function createService(): {
   service: MediaService;
   uploaded: Buffer[];
+  /** Dosya adına göre yüklenen tampon — kart/detay artık paralel, SIRA garanti değil. */
+  byFilename: (suffix: "card" | "detail") => Buffer;
 } {
   const uploaded: Buffer[] = [];
+  const names: string[] = [];
   const storageService = {
-    uploadFile: jest.fn(async (buffer: Buffer) => {
-      uploaded.push(buffer);
-      return { key: `key-${uploaded.length}` };
-    }),
+    uploadFile: jest.fn(
+      async (buffer: Buffer, options: { filename: string }) => {
+        uploaded.push(buffer);
+        names.push(options.filename);
+        return { key: `key-${options.filename}` };
+      },
+    ),
     getPublicAssetUrl: jest.fn((key: string) => `https://cdn.test/${key}`),
     hasPublicAssetBaseUrl: jest.fn(() => true),
   };
@@ -51,7 +57,9 @@ function createService(): {
     storageService as never,
     {} as never, // PrismaService
   );
-  return { service, uploaded };
+  const byFilename = (suffix: "card" | "detail") =>
+    uploaded[names.findIndex((name) => name.endsWith(`-${suffix}.webp`))];
+  return { service, uploaded, byFilename };
 }
 
 function fileFrom(buffer: Buffer): Express.Multer.File {
@@ -65,26 +73,26 @@ function fileFrom(buffer: Buffer): Express.Multer.File {
 
 describe("MediaService — EXIF yönlendirmesi", () => {
   it("dikey çekilmiş ürün fotoğrafını düz üretir", async () => {
-    const { service, uploaded } = createService();
+    const { service, byFilename } = createService();
     // Sensörden 40×20 yatay çıkıyor; etiket "90° çevir" diyor, yani KULLANICI
     // bunu 20×40 dikey olarak görüyor ve öyle yüklediğini sanıyor.
     const file = fileFrom(await jpegWithOrientation(40, 20, 6));
 
     await service.uploadProductImageVariants(file, "user-1");
 
-    // İkinci yükleme detay görseli: `fit: "inside"` en-boy oranını koruduğu
-    // için yön düzeltilmişse çıktı DİKEY olmalı.
-    const detail = await sharp(uploaded[1]).metadata();
+    // Detay görseli: `fit: "inside"` en-boy oranını koruduğu için yön
+    // düzeltilmişse çıktı DİKEY olmalı.
+    const detail = await sharp(byFilename("detail")).metadata();
     expect(detail.height).toBeGreaterThan(detail.width);
   });
 
   it("etiket taşımayan fotoğrafın yönünü değiştirmez", async () => {
-    const { service, uploaded } = createService();
+    const { service, byFilename } = createService();
     const file = fileFrom(await jpegWithOrientation(40, 20, 1));
 
     await service.uploadProductImageVariants(file, "user-1");
 
-    const detail = await sharp(uploaded[1]).metadata();
+    const detail = await sharp(byFilename("detail")).metadata();
     expect(detail.width).toBeGreaterThan(detail.height);
   });
 
@@ -99,6 +107,83 @@ describe("MediaService — EXIF yönlendirmesi", () => {
 
     const avatar = await sharp(uploaded[0]).metadata();
     expect(avatar.height).toBeGreaterThan(avatar.width);
+  });
+});
+
+describe("MediaService — kart/detay türevleri paralel", () => {
+  function serviceWith(
+    uploadFile: (
+      buffer: Buffer,
+      options: { filename: string },
+    ) => Promise<{ key: string }>,
+  ) {
+    const storageService = { uploadFile: jest.fn(uploadFile) };
+    const service = new MediaService(
+      {} as never,
+      {} as never,
+      storageService as never,
+      {} as never,
+    );
+    return { service, storageService };
+  }
+
+  it("iki yükleme de birbirini beklemeden başlar ve anahtarlar doğru eşleşir", async () => {
+    // Her yükleme, İKİSİ de başlayana dek bekler. Sıralı kod ilkinde takılıp
+    // sonsuza dek (zaman aşımı) beklerdi; paralel kod ikisini de başlatır.
+    let started = 0;
+    let release!: () => void;
+    const bothStarted = new Promise<void>((resolve) => (release = resolve));
+    const { service, storageService } = serviceWith(async (_buf, options) => {
+      started += 1;
+      if (started === 2) release();
+      await bothStarted;
+      return { key: `k/${options.filename}` };
+    });
+
+    const result = await service.uploadProductImageVariants(
+      fileFrom(await jpegWithOrientation(40, 20, 1)),
+      "user-1",
+    );
+
+    expect(storageService.uploadFile).toHaveBeenCalledTimes(2);
+    expect(result.cardKey).toMatch(/-card\.webp$/);
+    expect(result.detailKey).toMatch(/-detail\.webp$/);
+    // Aynı `baseId` ikisinde de kullanılır.
+    const base = (key: string) => key.replace(/-(card|detail)\.webp$/, "");
+    expect(base(result.cardKey)).toBe(base(result.detailKey));
+  });
+
+  it("bir yükleme düşerse çağrı reddedilir (kısmi sonuç döndürülmez)", async () => {
+    const { service, storageService } = serviceWith(async (_buf, options) => {
+      if (options.filename.endsWith("-detail.webp")) {
+        throw new Error("s3 down");
+      }
+      return { key: `k/${options.filename}` };
+    });
+
+    await expect(
+      service.uploadProductImageVariants(
+        fileFrom(await jpegWithOrientation(40, 20, 1)),
+        "user-1",
+      ),
+    ).rejects.toThrow("s3 down");
+    // Kart yüklemesi denenmiştir: eskisi gibi sahipsiz kalabilir, geçici
+    // klasör temizliği toplar — ek silme çağrısı yapılmaz.
+    expect(storageService.uploadFile).toHaveBeenCalledTimes(2);
+  });
+
+  it("kart yüklemesi düşünce de reddeder", async () => {
+    const { service } = serviceWith(async (_buf, options) => {
+      if (options.filename.endsWith("-card.webp")) throw new Error("card fail");
+      return { key: `k/${options.filename}` };
+    });
+
+    await expect(
+      service.uploadProductImageVariants(
+        fileFrom(await jpegWithOrientation(40, 20, 1)),
+        "user-1",
+      ),
+    ).rejects.toThrow("card fail");
   });
 });
 
@@ -126,7 +211,7 @@ describe("MediaService.upload — public kök URL'i tanımsız", () => {
     originalname: "banner.png",
   } as Express.Multer.File;
 
-  it("public köke yüklemeden ÖNCE 503 verir (sessiz `url: \"\"` yerine)", async () => {
+  it('public köke yüklemeden ÖNCE 503 verir (sessiz `url: ""` yerine)', async () => {
     const { service, storageService } = serviceWithoutPublicBaseUrl();
 
     const upload = service.upload(png, { bucket: "products", folder: "ads" });
@@ -140,7 +225,10 @@ describe("MediaService.upload — public kök URL'i tanımsız", () => {
 
   it("private kök (presigned URL) bu ayara bağlı değildir", async () => {
     const { service, storageService } = serviceWithoutPublicBaseUrl();
-    storageService.uploadFile.mockResolvedValue({ key: "k", bucket: "messages" });
+    storageService.uploadFile.mockResolvedValue({
+      key: "k",
+      bucket: "messages",
+    });
 
     await expect(
       service.upload(png, { bucket: "messages" }),

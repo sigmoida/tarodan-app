@@ -486,35 +486,64 @@ export class MediaService {
       skipMediaFile: true,
     };
 
-    const cardBuffer = await sharp(source)
-      .autoOrient()
-      .resize(500, 500, { fit: "cover" })
-      .webp({ quality: 85 })
-      .toBuffer();
-
-    const detailBuffer = await sharp(source)
-      .autoOrient()
-      .resize(1200, 1200, { fit: "inside" })
-      .webp({ quality: 90 })
-      .toBuffer();
-
-    const cardResult = await this.storageService.uploadFile(cardBuffer, {
-      bucket: "products",
-      folder,
-      filename: `${baseId}-card.webp`,
-      mimeType: "image/webp",
-      ...cacheOpts,
-    });
-
-    const detailResult = await this.storageService.uploadFile(detailBuffer, {
-      bucket: "products",
-      folder,
-      filename: `${baseId}-detail.webp`,
-      mimeType: "image/webp",
-      ...cacheOpts,
-    });
+    // Kart ve detay türevleri birbirinden BAĞIMSIZDIR: her biri kendi
+    // encode + yükleme zincirini yürütür ve ikisi paralel koşar (eskiden dört
+    // adım art arda bekleniyordu; yükleme süresinin en büyük kısmıydı).
+    //
+    // Hata semantiği eskisiyle aynıdır: bir zincir düşerse çağrı reddedilir ve
+    // diğer zincirin yazdığı nesne depoda SAHİPSİZ kalabilir — eskiden de kart
+    // yazılıp detay düşünce kart böyle kalıyordu. Anahtarlar kullanıcının geçici
+    // klasöründedir (`productImageFolder`) ve ürüne bağlanmayanları günlük
+    // `media-temp-cleanup` işi toplar; burada ayrıca silmek, silmenin kendi
+    // hatasını yönetmek demekti.
+    const [cardResult, detailResult] = await Promise.all([
+      this.encodeAndStoreVariant(source, {
+        resize: [500, 500, { fit: "cover" }],
+        quality: 85,
+        filename: `${baseId}-card.webp`,
+        folder,
+        cacheOpts,
+      }),
+      this.encodeAndStoreVariant(source, {
+        resize: [1200, 1200, { fit: "inside" }],
+        quality: 90,
+        filename: `${baseId}-detail.webp`,
+        folder,
+        cacheOpts,
+      }),
+    ]);
 
     return { cardKey: cardResult.key, detailKey: detailResult.key };
+  }
+
+  /** Tek ürün görseli türevi: yönlendir + boyutlandır + WebP + depoya yaz. */
+  private async encodeAndStoreVariant(
+    source: Buffer,
+    variant: {
+      resize: [number, number, { fit: "cover" | "inside" }];
+      quality: number;
+      filename: string;
+      folder: string;
+      cacheOpts: {
+        contentType: "image/webp";
+        cacheControl: string;
+        skipMediaFile: boolean;
+      };
+    },
+  ): Promise<{ key: string }> {
+    const buffer = await sharp(source)
+      .autoOrient()
+      .resize(...variant.resize)
+      .webp({ quality: variant.quality })
+      .toBuffer();
+
+    return this.storageService.uploadFile(buffer, {
+      bucket: "products",
+      folder: variant.folder,
+      filename: variant.filename,
+      mimeType: "image/webp",
+      ...variant.cacheOpts,
+    });
   }
 
   /**
