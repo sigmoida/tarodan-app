@@ -50,6 +50,7 @@ export function toHeroSlideDto(slide: HeroSlide): HeroSlideDto {
     cta1: heroSlideCta(slide, 1),
     cta2: heroSlideCta(slide, 2),
     hideOnIos: slide.hideOnIos,
+    platform: slide.platform,
   };
 }
 
@@ -76,6 +77,7 @@ export function toAdminHeroSlideDto(
     cta2Label: parseLocalizedText(slide.cta2Label),
     cta2Href: slide.cta2Href,
     hideOnIos: slide.hideOnIos,
+    platform: slide.platform,
     impressionCount: slide.impressionCount,
     clickCount: slide.clickCount,
     cta1ClickCount: slide.cta1ClickCount,

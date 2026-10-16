@@ -4,7 +4,11 @@ import {
   type ArgumentMetadata,
 } from "@nestjs/common";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../../common/validators/global-validation-pipe-options";
-import { CreateHeroSlideDto, HeroSlideQueryDto, UpdateHeroSlideDto } from "./hero-slide.dto";
+import {
+  CreateHeroSlideDto,
+  HeroSlideQueryDto,
+  UpdateHeroSlideDto,
+} from "./hero-slide.dto";
 import { CreateTrustBadgeDto, UpdateTrustBadgeDto } from "./trust-badge.dto";
 
 /**
@@ -48,17 +52,27 @@ describe("CreateHeroSlideDto", () => {
     ["başlık boş", { title: { tr: "  " } }],
     ["başlık düz metin", { title: "Başlık" }],
     ["başlık 120 karakteri aşıyor", { title: { tr: "a".repeat(121) } }],
-    ["İngilizce başlık 120 karakteri aşıyor", { title: { tr: "a", en: "b".repeat(121) } }],
+    [
+      "İngilizce başlık 120 karakteri aşıyor",
+      { title: { tr: "a", en: "b".repeat(121) } },
+    ],
     ["bilinmeyen dil", { title: { tr: "a", de: "b" } }],
     ["alt başlık 240 karakteri aşıyor", { subtitle: { tr: "a".repeat(241) } }],
-    ["buton etiketi 40 karakteri aşıyor", { cta1Label: { tr: "a".repeat(41) } }],
-    ["görsel metni 160 karakteri aşıyor", { imageAlt: { tr: "a".repeat(161) } }],
+    [
+      "buton etiketi 40 karakteri aşıyor",
+      { cta1Label: { tr: "a".repeat(41) } },
+    ],
+    [
+      "görsel metni 160 karakteri aşıyor",
+      { imageAlt: { tr: "a".repeat(161) } },
+    ],
     ["javascript: hedef", { cta1Href: "javascript:alert(1)" }],
     ["protokol-göreli hedef", { cta2Href: "//evil.test" }],
     ["http görsel", { imageUrl: "http://cdn.test/hero.png" }],
     ["bilinmeyen yerleşim", { placement: "footer" }],
     ["bilinmeyen görsel tarafı", { imageSide: "top" }],
     ["yerleşim eksik", { placement: undefined }],
+    ["bilinmeyen platform", { platform: "ios" }],
   ])("%s → 400", async (_d, over) => {
     await expect(
       as(CreateHeroSlideDto, { ...validSlide, ...over }),
@@ -74,6 +88,14 @@ describe("CreateHeroSlideDto", () => {
     expect(dto.cta1Href).toBe("/listings?sort=new");
     expect(dto.cta2Href).toBe("https://example.com/kampanya");
   });
+
+  it.each(["web", "app", "all"])(
+    "platform %s kabul edilir",
+    async (platform) => {
+      const dto = await as(CreateHeroSlideDto, { ...validSlide, platform });
+      expect(dto.platform).toBe(platform);
+    },
+  );
 });
 
 describe("UpdateHeroSlideDto", () => {
@@ -98,14 +120,19 @@ describe("UpdateHeroSlideDto", () => {
     expect(dto[field]).toBeNull();
   });
 
-  it.each(["title", "placement", "imageUrl", "isActive", "hideOnIos", "imageSide"])(
-    "zorunlu alan %s: null → 400",
-    async (field) => {
-      await expect(
-        as(UpdateHeroSlideDto, { [field]: null }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    },
-  );
+  it.each([
+    "title",
+    "placement",
+    "imageUrl",
+    "isActive",
+    "hideOnIos",
+    "imageSide",
+    "platform",
+  ])("zorunlu alan %s: null → 400", async (field) => {
+    await expect(
+      as(UpdateHeroSlideDto, { [field]: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
 
 describe("HeroSlideQueryDto", () => {
@@ -120,6 +147,21 @@ describe("HeroSlideQueryDto", () => {
       as(HeroSlideQueryDto, { placement: "sidebar" }, "query"),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it("platform isteğe bağlıdır; yalnız istemci değerleri (web/app) geçer", async () => {
+    await expect(
+      as(HeroSlideQueryDto, { placement: "home", platform: "web" }, "query"),
+    ).resolves.toEqual({ placement: "home", platform: "web" });
+    await expect(
+      as(HeroSlideQueryDto, { placement: "home", platform: "app" }, "query"),
+    ).resolves.toEqual({ placement: "home", platform: "app" });
+    // `all` bir hedeftir, istemci değil.
+    for (const platform of ["all", "ios", ""]) {
+      await expect(
+        as(HeroSlideQueryDto, { placement: "home", platform }, "query"),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    }
+  });
 });
 
 describe("CreateTrustBadgeDto / UpdateTrustBadgeDto", () => {
@@ -130,7 +172,9 @@ describe("CreateTrustBadgeDto / UpdateTrustBadgeDto", () => {
       description: { tr: "{returnWindowDays} gün koşulsuz iade" },
     });
     expect(dto.icon).toBe("shield-check");
-    expect(dto.description).toEqual({ tr: "{returnWindowDays} gün koşulsuz iade" });
+    expect(dto.description).toEqual({
+      tr: "{returnWindowDays} gün koşulsuz iade",
+    });
   });
 
   it.each([

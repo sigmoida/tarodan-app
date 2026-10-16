@@ -81,7 +81,7 @@ module.exports = {
     },
     {
       // Seeds, maintenance and one-off scripts run standalone, outside Nest.
-      files: ["prisma/**/*.ts", "scripts/**/*.ts", "src/maintenance/**/*.ts"],
+      files: ["prisma/**/*.ts", "scripts/**/*.ts", "maintenance/**/*.ts", "src/maintenance/**/*.ts"],
       rules: { "@tarodan/no-raw-process-env": "off" },
     },
   ],

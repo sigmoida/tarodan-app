@@ -120,6 +120,15 @@ export function heroColumns(
       { minWidth: 80, ...noSort },
     ),
     col.badge<HeroSlide>(
+      t("admin.marketing.hero.columns.platform"),
+      (s) => (
+        <Badge variant="outline" size="sm">
+          {t(`admin.marketing.hero.platform.${s.platform}`)}
+        </Badge>
+      ),
+      noSort,
+    ),
+    col.badge<HeroSlide>(
       t("admin.marketing.hero.columns.ios"),
       (s) =>
         s.hideOnIos ? (

@@ -415,12 +415,13 @@ describe("RolesGuard — hero slaytları ve güven rozetleri izni", () => {
     ["POST", "/api/admin/hero-slides/upload"],
     ["PATCH", "/api/admin/hero-slides/reorder"],
     ["DELETE", "/api/admin/hero-slides/abc"],
+    ["PATCH", "/api/admin/hero-slides/visibility"],
     ["GET", "/api/admin/trust-badges"],
     ["PATCH", "/api/admin/trust-badges/abc"],
   ])("yalnız ads izni → %s %s izinli", async (method, url) => {
-    await expect(makeGuard(["ads"]).canActivate(ctx(method, url))).resolves.toBe(
-      true,
-    );
+    await expect(
+      makeGuard(["ads"]).canActivate(ctx(method, url)),
+    ).resolves.toBe(true);
   });
 
   it.each([

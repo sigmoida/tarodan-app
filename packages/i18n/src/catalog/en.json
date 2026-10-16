@@ -5462,14 +5462,35 @@
         "created": "Slide created",
         "updated": "Slide updated",
         "deleted": "Slide deleted",
-        "deleteConfirm": "Delete the slide \"{title}\"?",
+        "deleteConfirm": "Delete the \"{title}\" slide? If no other live slide remains in this placement, the hero is hidden there.",
         "empty": "No slides in this placement yet",
-        "maxLiveNote": "At most {max} slides live",
+        "maxLiveNote": "At most {max} live slides per platform",
         "placementLabel": "Placement",
         "placement": {
           "home": "Home page",
           "auth_default": "Sign-in (default)",
           "auth_register": "Sign-in (register)"
+        },
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Web only",
+          "app": "App only",
+          "all": "Both"
+        },
+        "clientName": {
+          "web": "web",
+          "app": "app"
+        },
+        "visibility": {
+          "web": "Show on web",
+          "app": "Show in app",
+          "updated": "Hero visibility updated",
+          "hint": "Home page hero; when off it is hidden on that platform, slides are kept."
+        },
+        "hiddenOn": {
+          "switchOff": "Hero is hidden on the {platform} home page: the switch is off.",
+          "noLiveSlide": "Hero is hidden on the {platform} home page: no live slide on this platform.",
+          "iosOnly": "Hero is hidden on the iOS app home page: every live app slide is marked \"hide in the iOS app\" (still shown on Android)."
         },
         "columns": {
           "image": "Image",
@@ -5478,6 +5499,7 @@
           "clicks": "Clicks",
           "cta1Clicks": "Button 1",
           "cta2Clicks": "Button 2",
+          "platform": "Platform",
           "ios": "iOS"
         },
         "hiddenOnIos": "Hidden on iOS",
@@ -11595,9 +11617,9 @@
       "titleRequired": "A Turkish title is required",
       "endBeforeStart": "The end date cannot be before the start date",
       "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
-      "maxLiveSlides": "At most {max} slides can be live at the same time in one placement",
-      "lastLiveHomeSlide": "The last live home page slide cannot be deleted or taken offline; put another slide live first",
-      "reorderMixedPlacement": "Only slides of the same placement can be reordered together"
+      "maxLiveSlides": "At most {max} slides can be live at the same time in a placement on one platform",
+      "reorderMixedPlacement": "Only slides of the same placement can be reordered together",
+      "useDedicatedEndpoint": "This setting is managed on Marketing → Hero."
     },
     "brand": {
       "notFound": "Brand not found"

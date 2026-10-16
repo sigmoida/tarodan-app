@@ -248,7 +248,8 @@ async function main(): Promise<void> {
   await seedPlatformSeller();
   await seedShippingTariff();
   // Vitrin hero'sunun kodda yedeği yok: ana sayfa slaytı, auth görselleri ve
-  // güven rozetleri yerleşim boşken bir kez kurulur (admin'inkini ezmez).
+  // güven rozetleri yalnız ilk kurulumda bir kez kurulur (`hero_seed_applied`
+  // işareti; admin'inkini ezmez, boşalttığını geri getirmez).
   await seedHeroContent(prisma);
   console.log("Production reference data is ready.");
 }

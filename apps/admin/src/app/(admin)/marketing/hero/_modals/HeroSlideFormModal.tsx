@@ -25,6 +25,7 @@ import {
   heroToForm,
   imageSideOptions,
   placementOptions,
+  platformOptions,
   type HeroFormValues,
   type HeroPlacement,
   type HeroSlide,
@@ -42,7 +43,9 @@ function ImageSideField() {
       name="imageSide"
       label={t("admin.marketing.hero.imageSideLabel")}
       options={imageSideOptions(t)}
-      helperText={t(`admin.marketing.hero.imageSideHint.${side as "left" | "right"}`)}
+      helperText={t(
+        `admin.marketing.hero.imageSideHint.${side as "left" | "right"}`,
+      )}
     />
   );
 }
@@ -146,11 +149,18 @@ export function HeroSlideFormModal({
       size="2xl"
     >
       <HeroPreview lang={lang} />
-      <FormSelect
-        name="placement"
-        label={t("admin.marketing.hero.placementLabel")}
-        options={placementOptions(t)}
-      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormSelect
+          name="placement"
+          label={t("admin.marketing.hero.placementLabel")}
+          options={placementOptions(t)}
+        />
+        <FormSelect
+          name="platform"
+          label={t("admin.marketing.hero.platformLabel")}
+          options={platformOptions(t)}
+        />
+      </div>
       <TextFields lang={lang} onLangChange={setLang} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormInput
