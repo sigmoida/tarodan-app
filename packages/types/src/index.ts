@@ -155,6 +155,7 @@ export * from "./uat-refresh";
 
 // Reklam tıklanabilir alanları — admin formu + API aynı kuralla denetler
 export * from "./ad-hotspot";
+export * from "./ad-popup";
 
 // Admin Excel dökümleri: kaynak başına kolon kataloğu (API yazıcısı + admin)
 export * from "./export-catalog";
@@ -163,4 +164,5 @@ export * from "./export-catalog";
 export * from "./localized-text";
 
 // Vitrin hero'su + güven rozetleri: yerleşimler, sınırlar, public/admin şekiller
+export * from "./content-platform";
 export * from "./hero";
