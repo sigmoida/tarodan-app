@@ -116,22 +116,23 @@ export class HeroSlideService {
     placement: HeroPlacement,
     platform: ClientPlatform,
   ): Promise<HeroSlideDto[]> {
-    if (
-      placement === "home" &&
-      !(await this.visibility.isHomeEnabled(platform))
-    ) {
-      return [];
-    }
     const now = new Date();
-    const slides = await this.prisma.heroSlide.findMany({
-      where: {
-        placement,
-        platform: { in: contentPlatformsFor(platform) },
-        ...heroSlideLiveWhere(now),
-      },
-      orderBy: HERO_SLIDE_ORDER_BY,
-      take: HERO_MAX_SLIDES,
-    });
+    // Anahtar ve slaytlar paralel okunur; anahtar yalnız ana sayfada sorulur.
+    const [enabled, slides] = await Promise.all([
+      placement === "home"
+        ? this.visibility.isHomeEnabled(platform)
+        : Promise.resolve(true),
+      this.prisma.heroSlide.findMany({
+        where: {
+          placement,
+          platform: { in: contentPlatformsFor(platform) },
+          ...heroSlideLiveWhere(now),
+        },
+        orderBy: HERO_SLIDE_ORDER_BY,
+        take: HERO_MAX_SLIDES,
+      }),
+    ]);
+    if (!enabled) return [];
     return slides
       .filter((slide) => isHeroSlideLive(slide, now))
       .map(toHeroSlideDto);

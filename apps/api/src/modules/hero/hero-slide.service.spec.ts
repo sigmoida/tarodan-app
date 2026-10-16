@@ -156,12 +156,27 @@ describe("HeroSlideService — vitrin okuması", () => {
     });
   });
 
-  it("ana sayfa anahtarı o istemcide kapalıysa boş döner, veritabanına gitmez", async () => {
+  it("ana sayfa anahtarı o istemcide kapalıysa yayında slayt olsa da boş döner", async () => {
     const { service, heroSlide, visibility } = makeService();
     visibility.isHomeEnabled.mockResolvedValueOnce(false);
+    heroSlide.findMany.mockResolvedValueOnce([row()]);
     await expect(service.listLive("home", "web")).resolves.toEqual([]);
     expect(visibility.isHomeEnabled).toHaveBeenCalledWith("web");
-    expect(heroSlide.findMany).not.toHaveBeenCalled();
+  });
+
+  it("anahtar ve slaytlar paralel okunur (anahtar beklenmeden sorgu başlar)", async () => {
+    const { service, heroSlide, visibility } = makeService();
+    let releaseSwitch: (on: boolean) => void = () => undefined;
+    visibility.isHomeEnabled.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => {
+        releaseSwitch = resolve;
+      }),
+    );
+    const pending = service.listLive("home", "app");
+    // Anahtar henüz çözülmedi ama slayt sorgusu çoktan atıldı.
+    expect(heroSlide.findMany).toHaveBeenCalledTimes(1);
+    releaseSwitch(true);
+    await expect(pending).resolves.toEqual([]);
   });
 
   it("ana sayfa anahtarı açıkken slaytlar okunur", async () => {
