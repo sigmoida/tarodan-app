@@ -2891,6 +2891,10 @@
     "sellerInvoicePending": "Satıcı ürün faturasını henüz yüklemedi. Yüklendiğinde e-posta ile bilgilendirileceksiniz.",
     "downloading": "İndiriliyor..."
   },
+  "bankAccount": {
+    "savedBadge": "Kayıtlı",
+    "lastUpdated": "Son güncelleme: {date}"
+  },
   "seller": {
     "sellerProfile": "Satıcı Profili",
     "allListings": "Tüm İlanlar",

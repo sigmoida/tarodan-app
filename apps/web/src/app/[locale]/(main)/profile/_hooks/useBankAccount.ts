@@ -14,6 +14,7 @@ export interface BankAccount {
   iban: string;
   tcKimlikNo?: string | null;
   taxId?: string | null;
+  updatedAt?: string | null;
 }
 
 const RESOURCE = "bank-account";

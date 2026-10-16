@@ -3,6 +3,7 @@
 "use client";
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { withReturnTo } from "@/lib/returnTo";
 import { useNewListing } from "../_context/NewListingContext";
 import { useTranslations } from "next-intl";
 
@@ -77,7 +78,9 @@ export function BankGate() {
           "page.new.listingbanners.satislarinizdanEldeEdeceginizTutarinSizeAktarilabilmesi",
         )}
       </p>
-      <ButtonLink href="/profile">
+      <ButtonLink
+        href={`${withReturnTo("/profile", "/listings/new")}#bank-account`}
+      >
         {t("page.new.listingbanners.ibanEkle")}
       </ButtonLink>
     </div>
