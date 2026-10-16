@@ -86,6 +86,20 @@ describe("MediaService — EXIF yönlendirmesi", () => {
     expect(detail.height).toBeGreaterThan(detail.width);
   });
 
+  it("kartı detay tamponundan üretir: 500×500 cover, yön yine düzgün", async () => {
+    const { service, byFilename } = createService();
+    // Kart `autoOrient`siz, detaydan türetilir; detay zaten yönlendirildiği
+    // için kart da dikey kaynağın kırpılmışı olmalı (500×500, bozulmamış).
+    const file = fileFrom(await jpegWithOrientation(80, 40, 6));
+
+    await service.uploadProductImageVariants(file, "user-1");
+
+    const card = await sharp(byFilename("card")).metadata();
+    expect(card.width).toBe(500);
+    expect(card.height).toBe(500);
+    expect(card.format).toBe("webp");
+  });
+
   it("etiket taşımayan fotoğrafın yönünü değiştirmez", async () => {
     const { service, byFilename } = createService();
     const file = fileFrom(await jpegWithOrientation(40, 20, 1));
@@ -110,7 +124,7 @@ describe("MediaService — EXIF yönlendirmesi", () => {
   });
 });
 
-describe("MediaService — kart/detay türevleri paralel", () => {
+describe("MediaService — kart/detay yüklemeleri paralel", () => {
   function serviceWith(
     uploadFile: (
       buffer: Buffer,
@@ -127,7 +141,7 @@ describe("MediaService — kart/detay türevleri paralel", () => {
     return { service, storageService };
   }
 
-  it("iki yükleme de birbirini beklemeden başlar ve anahtarlar doğru eşleşir", async () => {
+  it("iki depo yüklemesi birbirini beklemeden başlar, anahtarlar doğru eşleşir", async () => {
     // Her yükleme, İKİSİ de başlayana dek bekler. Sıralı kod ilkinde takılıp
     // sonsuza dek (zaman aşımı) beklerdi; paralel kod ikisini de başlatır.
     let started = 0;
@@ -167,8 +181,9 @@ describe("MediaService — kart/detay türevleri paralel", () => {
         "user-1",
       ),
     ).rejects.toThrow("s3 down");
-    // Kart yüklemesi denenmiştir: eskisi gibi sahipsiz kalabilir, geçici
-    // klasör temizliği toplar — ek silme çağrısı yapılmaz.
+    // İki yükleme de BAŞLATILMIŞTIR (`Promise.all` diğerini iptal etmez): kart
+    // sahipsiz kalabilir, geçici klasör temizliği toplar — ek silme çağrısı
+    // yapılmaz.
     expect(storageService.uploadFile).toHaveBeenCalledTimes(2);
   });
 
