@@ -17,6 +17,14 @@ import {
   detectAffectedApps,
 } from "./detect-affected-apps.mjs";
 import {
+  appsToVerify,
+  passedApps,
+  readPushCache,
+  recordVerifiedApps,
+  verifiedAppsForTree,
+  writePushCache,
+} from "./push-verification-cache.mjs";
+import {
   emptyCounts,
   formatMarkdownSummary,
   formatTerminalSummary,
@@ -102,6 +110,17 @@ function createRunDirectory(mode) {
   return { reportRoot, runDirectory };
 }
 
+/** Shared by every worktree of the clone (`--git-common-dir`, not `--git-dir`). */
+function pushCachePath() {
+  const commonDirectory = git("rev-parse", "--git-common-dir");
+  const absolute = isAbsolute(commonDirectory)
+    ? commonDirectory
+    : resolve(REPO_ROOT, commonDirectory);
+  const reportRoot = join(absolute, "tarodan-test-results");
+  mkdirSync(reportRoot, { recursive: true });
+  return join(reportRoot, "push-verified-trees.json");
+}
+
 function releaseMarkerPath(context) {
   return join(context.reportRoot, "release-verification.json");
 }
@@ -178,9 +197,13 @@ function playwrightStage(context, id, label, options = {}) {
 
 function buildPushStages(context, apps) {
   const stages = [];
+  // Each push stage carries its app so a passing app can be cached per tree.
+  const pushFor = (app, ...appStages) =>
+    stages.push(...appStages.map((stage) => ({ ...stage, app })));
 
   if (apps.includes("api")) {
-    stages.push(
+    pushFor(
+      "api",
       commandStage("api-types", "API Typecheck", [
         "--filter",
         "@tarodan/api",
@@ -206,7 +229,8 @@ function buildPushStages(context, apps) {
   }
 
   if (apps.includes("web")) {
-    stages.push(
+    pushFor(
+      "web",
       commandStage("web-types", "Web Typecheck", [
         "--filter",
         "@tarodan/web",
@@ -231,7 +255,8 @@ function buildPushStages(context, apps) {
   }
 
   if (apps.includes("admin")) {
-    stages.push(
+    pushFor(
+      "admin",
       commandStage("admin-types", "Admin Typecheck", [
         "--filter",
         "@tarodan/admin",
@@ -626,6 +651,7 @@ async function run() {
   let stages;
   let continueOnFailure = false;
 
+  let pushTree;
   if (options.mode === "push") {
     const base = resolveBase(options.base);
     const changes = changedFilesBetween(base, options.head);
@@ -633,7 +659,24 @@ async function run() {
       ? [...APP_ORDER]
       : detectAffectedApps(changes.files);
     console.log(`Affected applications: ${apps.join(", ") || "none"}`);
-    stages = buildPushStages(context, apps);
+    // The stages run on the working tree, so the cache is only trusted when
+    // that IS the pushed tree: clean worktree and HEAD's tree == head's tree.
+    const headTree = git("rev-parse", `${options.head}^{tree}`);
+    const testedTree = git("status", "--porcelain")
+      ? undefined
+      : git("rev-parse", "HEAD^{tree}");
+    pushTree = testedTree === headTree ? headTree : undefined;
+    const alreadyVerified = !pushTree
+      ? []
+      : verifiedAppsForTree(readPushCache(pushCachePath()), pushTree);
+    const pending = appsToVerify(apps, alreadyVerified);
+    if (pending.length < apps.length) {
+      const skipped = apps.filter((app) => !pending.includes(app));
+      console.log(
+        `Already verified for tree ${headTree.slice(0, 12)}: ${skipped.join(", ")} (skipped)`,
+      );
+    }
+    stages = buildPushStages(context, pending);
   } else if (options.mode === "release") {
     stages = buildReleaseStages(context, options.paytr);
     continueOnFailure = true;
@@ -642,6 +685,21 @@ async function run() {
   }
 
   const results = await runStages(stages, { continueOnFailure });
+  if (pushTree) {
+    const verified = passedApps(apps, results);
+    if (verified.length > 0) {
+      const cachePath = pushCachePath();
+      writePushCache(
+        cachePath,
+        recordVerifiedApps(
+          readPushCache(cachePath),
+          pushTree,
+          verified,
+          new Date().toISOString(),
+        ),
+      );
+    }
+  }
   console.log(`\n${formatTerminalSummary(results)}\n`);
   const { report, reportPath } = writeRunReport(
     context,
