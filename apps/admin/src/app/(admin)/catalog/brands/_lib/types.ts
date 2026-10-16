@@ -9,6 +9,8 @@ export interface Brand {
   foundedYear?: number | null;
   sortOrder?: number;
   isActive: boolean;
+  /** Müşterinin görebildiği ilan sayısı (public sayımla aynı kural). */
+  listingCount: number;
   createdAt: string;
   updatedAt: string;
 }

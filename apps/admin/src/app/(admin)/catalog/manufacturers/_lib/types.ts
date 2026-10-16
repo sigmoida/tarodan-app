@@ -8,6 +8,8 @@ export interface Manufacturer {
   country?: string;
   foundedYear?: number | null;
   isActive: boolean;
+  /** Müşterinin görebildiği ilan sayısı (public sayımla aynı kural). */
+  listingCount: number;
   createdAt: string;
   updatedAt: string;
 }

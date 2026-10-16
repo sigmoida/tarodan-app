@@ -15,6 +15,7 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { CatalogImportModal } from "@/components/catalog/CatalogImportModal";
 import type { Manufacturer } from "./_lib/types";
 import { manufacturerColumns } from "./_lib/columns";
+import { manufacturerFilterFields } from "./_lib/filters";
 import { ManufacturerFormModal } from "./_modals/ManufacturerFormModal";
 
 export default function ManufacturersPage() {
@@ -95,6 +96,7 @@ export default function ManufacturersPage() {
         fetcher={(params) => adminApi.getManufacturers(params)}
         getRowId={(m) => m.id}
         syncUrl
+        filters={manufacturerFilterFields(t)}
       >
         <ResourceList.Toolbar />
         <ResourceList.Table
