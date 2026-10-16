@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (
@@ -39,6 +39,7 @@ import {
   useWishlistIds,
 } from "./useWishlist";
 import { queryKeys } from "@/lib/query/keys";
+import { makeQueryClient } from "@/lib/query/client";
 import type { WishlistEntry } from "@/lib/wishlist";
 
 /** Elle çözülen istek — iyimser durumu yanıt gelmeden ölçmek için. */
@@ -107,8 +108,11 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  // Uygulamanın GERÇEK istemcisi: Sentry raporu onun MutationCache'inden gelir.
+  client = makeQueryClient();
+  client.setDefaultOptions({
+    queries: { retry: false },
+    mutations: { retry: false },
   });
   h.auth.isAuthenticated = true;
   h.auth.user = { id: "me" };
@@ -190,7 +194,8 @@ describe("useToggleWishlist", () => {
     expect(ids.has("p1")).toBe(false);
     expect(ids.has("p0")).toBe(true);
     expect(h.toast.error).toHaveBeenCalledWith("sunucu hatası");
-    // Varsayılan mutation hata raporlaması ezildiği için Sentry'ye biz yollarız.
+    // Rapor, kendi onError'ımıza rağmen MutationCache'ten bir kez gider.
+    expect(h.capture).toHaveBeenCalledTimes(1);
     expect(h.capture).toHaveBeenCalledWith(
       expect.objectContaining({ response: expect.anything() }),
       expect.objectContaining({ source: "react-query", type: "mutation" }),

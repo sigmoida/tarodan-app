@@ -17,7 +17,6 @@ import {
 } from "@/lib/wishlist";
 import { useAuthStore } from "@/stores/authStore";
 import { apiErrorMessage } from "@/hooks/useWebMutation";
-import { logger } from "@/lib/logger";
 import type { AuthGateConfig } from "@/hooks/useAuthGate";
 
 /**
@@ -80,8 +79,22 @@ export function useToggleWishlist() {
 
   const { mutate } = useMutation<unknown, unknown, ToggleVars, ToggleContext>({
     mutationKey: TOGGLE_KEY,
-    mutationFn: ({ productId, add }) =>
-      add ? wishlistApi.add(productId) : wishlistApi.remove(productId),
+    mutationFn: async ({ productId, add }) => {
+      try {
+        return await (add
+          ? wishlistApi.add(productId)
+          : wishlistApi.remove(productId));
+      } catch (error) {
+        // İstenen son durum zaten sunucuda: eklerken 409 (zaten favoride),
+        // çıkarırken 404 (zaten favoride değil) → BAŞARI. Hata olarak
+        // bırakılsaydı geri alma çalışır ve MutationCache onu Sentry'ye
+        // beklenmeyen hata diye raporlardı.
+        const status = (error as { response?: { status?: number } })?.response
+          ?.status;
+        if (status === (add ? 409 : 404)) return undefined;
+        throw error;
+      }
+    },
     onMutate: async ({ productId, add }) => {
       // Uçuştaki bir liste isteği iyimser değeri ezmesin.
       await queryClient.cancelQueries({ queryKey: LIST_KEY });
@@ -97,28 +110,14 @@ export function useToggleWishlist() {
       return { removed };
     },
     onSuccess: (_data, { add }) => successToast(add),
+    // Sentry raporunu MutationCache yapar (lib/query/client); burada yalnız
+    // geri alma ve kullanıcıya gösterilen hata var.
     onError: (error, { productId, add }, context) => {
-      // İstenen son durum zaten sunucuda: eklerken 409 (zaten favoride),
-      // çıkarırken 404 (zaten favoride değil) → başarı say, geri alma yok.
-      const status = (error as { response?: { status?: number } })?.response
-        ?.status;
-      if (status === (add ? 409 : 404)) {
-        successToast(add);
-        return;
-      }
       queryClient.setQueryData<WishlistEntry[]>(
         LIST_KEY,
         (old) =>
           old && withWishlistEntry(old, productId, !add, context?.removed),
       );
-      // Kendi onError'ımız QueryClient'ın varsayılan mutation hata
-      // raporlamasını ezer; Sentry'ye aynı biçimde biz göndeririz.
-      logger.captureException(error, {
-        source: "react-query",
-        type: "mutation",
-        mutationKey: TOGGLE_KEY,
-        context: { productId, add },
-      });
       toast.error(apiErrorMessage(error) ?? t("common.operationFailed"));
     },
     onSettled: (_data, _error, { productId }) => {

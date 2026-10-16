@@ -1,4 +1,4 @@
-import { QueryCache } from "@tanstack/react-query";
+import { MutationCache, QueryCache } from "@tanstack/react-query";
 import { createPlatformQueryClient } from "@tarodan/api-client/query";
 import { logger } from "@/lib/logger";
 
@@ -25,8 +25,43 @@ export function onQueryError(
   });
 }
 
+/**
+ * Global mutation error handler: report to Sentry.
+ *
+ * Wired on the `MutationCache`, NOT on `defaultOptions.mutations.onError`:
+ * TanStack merges a mutation's own options over the defaults shallowly
+ * (`{ ...defaults.mutations, ...options }`), so every hook that passes its own
+ * `onError` (useWebMutation's toast, the wishlist rollback, …) silently
+ * replaced the default and its errors never reached Sentry. A cache-level
+ * callback always runs, before the mutation's own `onError`.
+ *
+ * Nothing is filtered here — every failed mutation is reported, as the old
+ * default did. A mutation whose "error" is an expected outcome (e.g. the
+ * wishlist's 409/404) resolves it inside its `mutationFn` instead of failing.
+ */
+export function onMutationError(
+  error: unknown,
+  mutation: { mutationKey?: unknown; meta?: unknown; context?: unknown },
+) {
+  logger.captureException(error, {
+    source: "react-query",
+    type: "mutation",
+    mutationKey: mutation.mutationKey,
+    meta: mutation.meta,
+    context: mutation.context,
+  });
+}
+
 export function makeQueryClient() {
   return createPlatformQueryClient({
+    mutationCache: new MutationCache({
+      onError: (error, _variables, context, mutation) =>
+        onMutationError(error, {
+          mutationKey: mutation.options.mutationKey,
+          meta: mutation.meta,
+          context,
+        }),
+    }),
     queryCache: new QueryCache({
       onError: (error, query) =>
         onQueryError(error, {
@@ -51,15 +86,6 @@ export function makeQueryClient() {
           return failureCount < 1;
         },
         retryDelay: (attemptIndex) => Math.min(1500 * (attemptIndex + 1), 8000),
-      },
-      mutations: {
-        onError: (error: unknown, _variables: unknown, context: unknown) => {
-          logger.captureException(error, {
-            source: "react-query",
-            type: "mutation",
-            context,
-          });
-        },
       },
     },
   });
