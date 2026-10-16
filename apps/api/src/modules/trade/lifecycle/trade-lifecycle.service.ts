@@ -1293,9 +1293,63 @@ export class TradeLifecycleService {
       await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
 
       await this.tradeCommon.invalidateProductCachesForTrade(tradeId);
+
+      // Karşı taraf takasın iptal edildiğini yalnız ekrana bakınca görüyordu.
+      await this.notifyTradeParties(
+        [
+          current.initiatorId === userId
+            ? current.receiverId
+            : current.initiatorId,
+        ],
+        NotificationType.TRADE_CANCELLED,
+        tradeId,
+      );
     }
 
     return this.tradeQuery.getTradeById(tradeId, userId);
+  }
+
+  /**
+   * Takas olayının zil + push duyurusu (commit SONRASI). Bildirim hatası takas
+   * akışını bozmaz; tercih/kanal kararı dağıtım katmanındadır.
+   */
+  private async notifyTradeParties(
+    userIds: string[],
+    type: NotificationType,
+    tradeId: string,
+  ): Promise<void> {
+    for (const recipientId of userIds) {
+      try {
+        await this.notificationService.createInAppNotification(
+          recipientId,
+          type,
+          { tradeId },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send ${type} notification for trade ${tradeId}: ${error}`,
+        );
+      }
+    }
+  }
+
+  /** Takas tamamlandı: iki tarafa zil + push + "takasınız tamamlandı" e-postası. */
+  private async notifyTradeCompletedParties(
+    tradeId: string,
+    parties: { initiatorId: string; receiverId: string },
+  ): Promise<void> {
+    for (const recipientId of [parties.initiatorId, parties.receiverId]) {
+      try {
+        await this.notificationService.notifyTradeCompleted(
+          recipientId,
+          tradeId,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to send trade completed notification for trade ${tradeId}: ${error}`,
+        );
+      }
+    }
   }
 
   // ==========================================================================
@@ -1354,6 +1408,9 @@ export class TradeLifecycleService {
     userId: string,
     dto: ConfirmTradeReceiptDto,
   ): Promise<TradeResponseDto> {
+    // Bu onay takası TAMAMLADIYSA taraflar (commit sonrası duyuru için).
+    let completedParties: { initiatorId: string; receiverId: string } | null =
+      null;
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
@@ -1473,6 +1530,10 @@ export class TradeLifecycleService {
       });
 
       if (newStatus === TradeStatus.completed) {
+        completedParties = {
+          initiatorId: trade.initiatorId,
+          receiverId: trade.receiverId,
+        };
         // Takas tamamlandı: quantity-- + reservedQuantity-- (her iki tarafın ürünü için)
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
         // #2 (LOST-UPDATE FIX): ürün satırlarını OKUMADAN ÖNCE FOR UPDATE ile kilitle
@@ -1555,6 +1616,13 @@ export class TradeLifecycleService {
 
     await this.tradeCommon.invalidateProductCachesForTrade(tradeId);
 
+    // Atama tx kapanışında yapıldığı için TS daraltması burada `null` sanır.
+    const parties = completedParties as {
+      initiatorId: string;
+      receiverId: string;
+    } | null;
+    if (parties) await this.notifyTradeCompletedParties(tradeId, parties);
+
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
@@ -1566,8 +1634,11 @@ export class TradeLifecycleService {
     userId: string,
     dto: RaiseTradeDisputeDto,
   ): Promise<TradeResponseDto> {
+    let counterpartId = "";
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
+      counterpartId =
+        trade.initiatorId === userId ? trade.receiverId : trade.initiatorId;
 
       if (trade.initiatorId !== userId && trade.receiverId !== userId) {
         throw new ForbiddenException(
@@ -1625,6 +1696,14 @@ export class TradeLifecycleService {
       raisedById: userId,
       reason: dto.reason,
     });
+    // Karşı taraf itirazı yalnız ekrana bakınca görüyordu.
+    if (counterpartId) {
+      await this.notifyTradeParties(
+        [counterpartId],
+        NotificationType.TRADE_DISPUTE_OPENED,
+        tradeId,
+      );
+    }
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
@@ -1652,6 +1731,7 @@ export class TradeLifecycleService {
     const compensateBoth = dto.resolution === "compensate_both";
 
     let resolvedTradeInitiatorId: string;
+    let resolvedTradeReceiverId = "";
 
     if (compensationUserIdResolver || compensateBoth) {
       // MONEY-M5: İadeden ÖNCE trade'in GERÇEKTEN `disputed` olduğunu doğrula.
@@ -1716,6 +1796,7 @@ export class TradeLifecycleService {
       }
 
       resolvedTradeInitiatorId = trade.initiatorId;
+      resolvedTradeReceiverId = trade.receiverId;
 
       await tx.tradeDispute.update({
         where: { tradeId },
@@ -1828,6 +1909,13 @@ export class TradeLifecycleService {
     });
 
     await this.tradeCommon.invalidateProductCachesForTrade(tradeId);
+
+    // İki taraf da itirazın sonuçlandığını (ve takasın tamamlandığını) öğrenir.
+    await this.notifyTradeParties(
+      [resolvedTradeInitiatorId!, resolvedTradeReceiverId].filter(Boolean),
+      NotificationType.TRADE_DISPUTE_RESOLVED,
+      tradeId,
+    );
 
     return this.tradeQuery.getTradeById(tradeId, resolvedTradeInitiatorId!);
   }

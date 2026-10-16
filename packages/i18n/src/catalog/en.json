@@ -6047,7 +6047,8 @@
           "emailSubjectMax": "Email subject can be at most 240 characters",
           "emailHtmlRequired": "Email content is required",
           "emailHtmlMax": "Email content can be at most 200,000 characters",
-          "mailingTypeRequired": "Select the notification type"
+          "mailingTypeRequired": "Select the notification type",
+          "linkInvalid": "Enter an allowed in-site path only (e.g. /listings/123 or /profile/orders)."
         },
         "pushTextTitle": "Push and in-app text",
         "emailSectionTitle": "Email",
@@ -6064,6 +6065,11 @@
           "announcementHint": "A transactional, service or security notice. Reaches everyone in the audience regardless of notification preferences (push, inbox, email). Do not use it for campaigns or discounts.",
           "marketingHint": "A campaign, discount or promotion. Reaches only users who consented to marketing messages — push and inbox included; the email carries an unsubscribe link.",
           "placeholder": "Select a type"
+        },
+        "link": {
+          "label": "Target link (optional)",
+          "placeholder": "/listings/listing-id",
+          "hint": "In-app page opened when the notification is tapped: /listings/…, /collections/…, /seller/…, /profile/orders, /membership. Leave empty to open the notification list."
         }
       },
       "pages": {
@@ -10848,6 +10854,18 @@
       "tradeCancelledByPlatform": {
         "title": "Your trade was cancelled by Tarodan",
         "message": "Trade {tradeNumber} was cancelled by Tarodan. Reason: {reason}.{hasRefund, select, yes { The full {refundAmount} TL you paid will be refunded.} other {}} Your items in the trade are free again."
+      },
+      "tradeCancelled": {
+        "title": "Trade Cancelled",
+        "message": "The other party cancelled the trade."
+      },
+      "tradeDisputeOpened": {
+        "title": "Dispute Opened on Trade",
+        "message": "The other party opened a dispute on the trade. The Tarodan team will review it and let you know the outcome."
+      },
+      "tradeDisputeResolved": {
+        "title": "Trade Dispute Resolved",
+        "message": "The Tarodan team resolved the trade dispute and the trade has been completed."
       }
     },
     "auth": {
@@ -12111,6 +12129,84 @@
         "longFormat": "Each data row is a line item; the parent record's columns repeat on every line. Do not sum parent amounts on the data sheet — the totals are on this sheet.",
         "tab": "Tab",
         "subTab": "Sub-tab"
+      }
+    },
+    "pushToken": {
+      "invalid": "Invalid push notification token.",
+      "accountInactive": "This account cannot register a device for notifications."
+    },
+    "notificationEvent": {
+      "orderPaidBuyer": {
+        "title": "Payment Confirmed",
+        "message": "Payment received for your {productTitle} order"
+      },
+      "groupOrderPaidBuyer": {
+        "title": "Payment Confirmed",
+        "message": "Payment received for your order of {itemCount, plural, one {# item} other {# items}}"
+      },
+      "orderPaidSeller": {
+        "title": "New Order",
+        "message": "Your {productTitle} has sold! Get it ready for shipping."
+      },
+      "offerReceived": {
+        "title": "New Offer",
+        "message": "You received a {amount} TL offer for {productTitle}"
+      },
+      "paymentFailed": {
+        "title": "Payment Failed",
+        "message": "Payment for order {orderNumber} failed."
+      },
+      "paymentRefundedBuyer": {
+        "title": "Refund Completed",
+        "message": "{amount} TL was refunded for order {orderNumber}."
+      },
+      "paymentRefundedSeller": {
+        "title": "Refund Processed",
+        "message": "A refund was processed for order {orderNumber}."
+      },
+      "offerAutoRejected": {
+        "title": "Your Offer Was Closed",
+        "message": "{productTitle}: {reason}"
+      },
+      "tradeAutoCancelled": {
+        "title": "Trade Cancelled",
+        "message": "Your trade was cancelled automatically: {reason}"
+      },
+      "tradeReadyForShipping": {
+        "title": "Trade Ready to Ship",
+        "message": "Payment is complete. Please send your item to the Tarodan warehouse."
+      },
+      "tradeWarehouseApproved": {
+        "title": "Trade Approved",
+        "message": "The trade was approved and the items are on their way."
+      },
+      "tradeWarehouseRejected": {
+        "title": "Trade Rejected",
+        "message": "The trade was rejected: {reason}"
+      },
+      "tradeCancelLocked": {
+        "title": "Trade at the Warehouse",
+        "message": "One of the items has reached the Tarodan warehouse. The trade can no longer be cancelled; open a dispute if there is a problem."
+      },
+      "tradeReturnCompleted": {
+        "title": "Return Completed",
+        "message": "Your item has been returned to you; the trade was cancelled."
+      },
+      "tradeReturnLost": {
+        "title": "Return Shipment Lost",
+        "message": "Your return shipment was marked as lost. The Tarodan team will contact you."
+      },
+      "tradeRefundFailed": {
+        "title": "Refund Delayed",
+        "message": "Your automatic refund could not be completed. The Tarodan team is looking into it and will resolve it as soon as possible."
+      },
+      "tradeRefundCompleted": {
+        "title": "Refund Completed",
+        "message": "Your cash difference payment was refunded via PayTR."
+      },
+      "reservationExpired": {
+        "title": "Order Timed Out",
+        "message": "The payment period for your {productTitle} order expired and the order was cancelled."
       }
     }
   },

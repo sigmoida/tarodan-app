@@ -144,6 +144,7 @@ export class OfferSchedulerService implements OnModuleInit {
           expired += 1;
           await this.notificationService
             ?.notifyOfferExpired({
+              offerId: offer.id,
               buyerId: offer.buyerId,
               sellerId: offer.sellerId,
               productId: offer.productId,

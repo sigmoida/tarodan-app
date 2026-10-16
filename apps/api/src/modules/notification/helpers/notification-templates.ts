@@ -381,6 +381,21 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.boostActivated.message",
     icon: "🚀",
   },
+  [NotificationType.TRADE_CANCELLED]: {
+    titleKey: "server.notification.tradeCancelled.title",
+    messageKey: "server.notification.tradeCancelled.message",
+    icon: "❌",
+  },
+  [NotificationType.TRADE_DISPUTE_OPENED]: {
+    titleKey: "server.notification.tradeDisputeOpened.title",
+    messageKey: "server.notification.tradeDisputeOpened.message",
+    icon: "⚠️",
+  },
+  [NotificationType.TRADE_DISPUTE_RESOLVED]: {
+    titleKey: "server.notification.tradeDisputeResolved.title",
+    messageKey: "server.notification.tradeDisputeResolved.message",
+    icon: "✅",
+  },
   [NotificationType.TRADE_AUTO_CANCELLED]: {
     titleKey: "server.notification.tradeAutoCancelled.title",
     messageKey: "server.notification.tradeAutoCancelled.message",

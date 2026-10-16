@@ -6047,7 +6047,8 @@
           "emailSubjectMax": "E-posta konusu en fazla 240 karakter olabilir",
           "emailHtmlRequired": "E-posta içeriği zorunludur",
           "emailHtmlMax": "E-posta içeriği en fazla 200.000 karakter olabilir",
-          "mailingTypeRequired": "Bildirim türünü seçin"
+          "mailingTypeRequired": "Bildirim türünü seçin",
+          "linkInvalid": "Yalnız izin verilen site içi bir yol girin (ör. /listings/123 ya da /profile/orders)."
         },
         "pushTextTitle": "Push ve uygulama içi metin",
         "emailSectionTitle": "E-posta",
@@ -6064,6 +6065,11 @@
           "announcementHint": "İşlemsel, hizmet ya da güvenlik duyurusu. Bildirim tercihinden bağımsız olarak kitledeki herkese gider (push, bildirim kutusu, e-posta). Kampanya ya da indirim için kullanmayın.",
           "marketingHint": "Kampanya, indirim ya da tanıtım. Yalnızca pazarlama iletisine izin veren kullanıcılara gider — push ve bildirim kutusu dahil; e-postada abonelikten çıkış linki bulunur.",
           "placeholder": "Tür seçin"
+        },
+        "link": {
+          "label": "Hedef bağlantı (opsiyonel)",
+          "placeholder": "/listings/ilan-kimligi",
+          "hint": "Bildirime dokunulunca açılacak site içi sayfa: /listings/…, /collections/…, /seller/…, /profile/orders, /membership. Boş bırakılırsa bildirim listesi açılır."
         }
       },
       "pages": {
@@ -10848,6 +10854,18 @@
       "tradeCancelledByPlatform": {
         "title": "Takasınız Tarodan tarafından iptal edildi",
         "message": "{tradeNumber} numaralı takas Tarodan tarafından iptal edildi. Neden: {reason}.{hasRefund, select, yes { Ödediğiniz {refundAmount} TL'nin tamamı iade edilecek.} other {}} Takastaki ürünleriniz yeniden serbest."
+      },
+      "tradeCancelled": {
+        "title": "Takas İptal Edildi",
+        "message": "Karşı taraf takası iptal etti."
+      },
+      "tradeDisputeOpened": {
+        "title": "Takasta İtiraz Açıldı",
+        "message": "Karşı taraf takas için itiraz açtı. Tarodan ekibi inceleyip sonucu size bildirecek."
+      },
+      "tradeDisputeResolved": {
+        "title": "Takas İtirazı Sonuçlandı",
+        "message": "Takas itirazı Tarodan ekibi tarafından sonuçlandırıldı ve takas tamamlandı."
       }
     },
     "auth": {
@@ -12111,6 +12129,84 @@
         "longFormat": "Veri sayfasında her satır bir kalemdir; üst kaydın kolonları her kalemde tekrarlanır. Üst kayıt tutarlarını veri sayfasında toplamayın — toplamlar bu sayfadadır.",
         "tab": "Sekme",
         "subTab": "Alt sekme"
+      }
+    },
+    "pushToken": {
+      "invalid": "Geçersiz bildirim cihaz anahtarı.",
+      "accountInactive": "Bu hesap bildirim için cihaz kaydedemez."
+    },
+    "notificationEvent": {
+      "orderPaidBuyer": {
+        "title": "Ödeme Onaylandı",
+        "message": "{productTitle} siparişiniz için ödeme alındı"
+      },
+      "groupOrderPaidBuyer": {
+        "title": "Ödeme Onaylandı",
+        "message": "{itemCount} ürünlük siparişiniz için ödeme alındı"
+      },
+      "orderPaidSeller": {
+        "title": "Yeni Sipariş",
+        "message": "{productTitle} ürününüz satıldı! Kargoya hazırlayın."
+      },
+      "offerReceived": {
+        "title": "Yeni Teklif",
+        "message": "{productTitle} için {amount} TL teklif aldınız"
+      },
+      "paymentFailed": {
+        "title": "Ödeme Başarısız",
+        "message": "Sipariş {orderNumber} için ödeme başarısız oldu."
+      },
+      "paymentRefundedBuyer": {
+        "title": "İade İşlemi Tamamlandı",
+        "message": "Sipariş {orderNumber} için {amount} TL iade edildi."
+      },
+      "paymentRefundedSeller": {
+        "title": "İade İşlemi",
+        "message": "Sipariş {orderNumber} için iade işlemi gerçekleştirildi."
+      },
+      "offerAutoRejected": {
+        "title": "Teklifiniz Kapatıldı",
+        "message": "{productTitle}: {reason}"
+      },
+      "tradeAutoCancelled": {
+        "title": "Takas İptal Edildi",
+        "message": "Takasınız otomatik olarak iptal edildi: {reason}"
+      },
+      "tradeReadyForShipping": {
+        "title": "Takas Kargoya Hazır",
+        "message": "Ödeme tamamlandı. Ürününüzü Tarodan deposuna göndermeniz gerekiyor."
+      },
+      "tradeWarehouseApproved": {
+        "title": "Takas Onaylandı",
+        "message": "Takas onaylandı, ürünler yolda."
+      },
+      "tradeWarehouseRejected": {
+        "title": "Takas Reddedildi",
+        "message": "Takas reddedildi: {reason}"
+      },
+      "tradeCancelLocked": {
+        "title": "Takas Depoda",
+        "message": "Ürünlerden biri Tarodan deposuna ulaştı. Bu noktadan sonra iptal yapılamaz; sorun varsa itiraz açın."
+      },
+      "tradeReturnCompleted": {
+        "title": "İade Tamamlandı",
+        "message": "Ürününüz size geri ulaştı; takas iptal edildi."
+      },
+      "tradeReturnLost": {
+        "title": "İade Kargosu Kayıp",
+        "message": "İade gönderiniz kayıp olarak işaretlendi. Tarodan ekibi sizinle iletişime geçecek."
+      },
+      "tradeRefundFailed": {
+        "title": "İade Gecikti",
+        "message": "Otomatik iadeniz tamamlanamadı. Tarodan ekibi durumu inceliyor; en kısa sürede çözeceğiz."
+      },
+      "tradeRefundCompleted": {
+        "title": "İade Tamamlandı",
+        "message": "Nakit fark ödemeniz PayTR üzerinden iade edildi."
+      },
+      "reservationExpired": {
+        "title": "Sipariş Süresi Doldu",
+        "message": "{productTitle} siparişinizin ödeme süresi doldu ve iptal edildi."
       }
     }
   },

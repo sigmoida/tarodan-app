@@ -343,6 +343,7 @@ export class ProductSchedulerService implements OnModuleInit {
         select: {
           id: true,
           userId: true,
+          productId: true,
           autoRenew: true,
           product: {
             select: {
@@ -437,6 +438,8 @@ export class ProductSchedulerService implements OnModuleInit {
         if (b.product) {
           await this.notificationService
             .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {
+              // Kimlik: mobil dokunuş ilanın kendisini açar.
+              productId: b.productId,
               productTitle: b.product.title,
             })
             .catch(() => {});

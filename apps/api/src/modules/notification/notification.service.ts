@@ -221,6 +221,7 @@ export class NotificationService {
   }
 
   async notifyOfferExpired(params: {
+    offerId?: string;
     buyerId: string;
     sellerId: string;
     productId: string;

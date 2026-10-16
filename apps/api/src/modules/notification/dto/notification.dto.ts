@@ -5,6 +5,7 @@ import {
   IsUUID,
   IsObject,
   IsBoolean,
+  MaxLength,
   Validate,
   ValidatorConstraint,
   type ValidatorConstraintInterface,
@@ -77,6 +78,12 @@ export enum NotificationType {
   TRADE_SHIPPED = "trade_shipped",
   TRADE_COMPLETED = "trade_completed",
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
+  // Taraflardan biri takası iptal etti — KARŞI tarafa gider.
+  TRADE_CANCELLED = "trade_cancelled",
+  // Taraflardan biri itiraz açtı — KARŞI tarafa gider.
+  TRADE_DISPUTE_OPENED = "trade_dispute_opened",
+  // Admin itirazı sonuçlandırdı (takas tamamlandı) — iki tarafa da.
+  TRADE_DISPUTE_RESOLVED = "trade_dispute_resolved",
   // Takas Tarodan (admin) tarafından iptal edildi — iki tarafa da; gerekçe
   // kodun katalog etiketidir, adminin iç notu asla taşınmaz.
   TRADE_CANCELLED_BY_PLATFORM = "trade_cancelled_by_platform",
@@ -334,11 +341,22 @@ export class RegisterPushTokenDto {
 
   @ApiPropertyOptional({
     example: "device-uuid-123",
-    description: "Device unique identifier",
+    description:
+      "Stable per-install device identifier (mobile ≥ 1.0.7). Older apps sent the device model here.",
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   deviceId?: string;
+
+  @ApiPropertyOptional({
+    example: "iPhone 15",
+    description: "Device model name (diagnostics only, not an identifier)",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  deviceModel?: string;
 
   @ApiPropertyOptional({
     example: false,

@@ -784,6 +784,8 @@ export class OfferService {
           rejectedOffer.sellerId,
           NotificationType.OFFER_COUNTER_DECLINED,
           {
+            // Kimlik: mobil push/zil dokunuşu teklif detayını açar.
+            offerId: rejectedOffer.id,
             productId: rejectedOffer.productId,
             productTitle: rejectedOffer.product.title,
           },
@@ -793,6 +795,7 @@ export class OfferService {
           rejectedOffer.buyerId,
           NotificationType.OFFER_REJECTED,
           {
+            offerId: rejectedOffer.id,
             productId: rejectedOffer.productId,
             productTitle: rejectedOffer.product.title,
           },

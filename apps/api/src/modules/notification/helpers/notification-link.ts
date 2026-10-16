@@ -130,7 +130,11 @@ export const NOTIFICATION_LINKS: Record<
     "/seller/orders/{{orderId}}",
   ),
   [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: BUYER_ORDER,
-  [NotificationType.RESERVATION_EXPIRED]: pattern("/profile/orders"),
+  // Ödeme süresi dolan sipariş: kimlik varsa o siparişin ekranı, yoksa liste.
+  [NotificationType.RESERVATION_EXPIRED]: pattern(
+    "/profile/orders/{{orderId}}",
+    "/profile/orders",
+  ),
 
   // ── Sipariş (satıcı) ─────────────────────────────────────────────────────
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
@@ -209,7 +213,14 @@ export const NOTIFICATION_LINKS: Record<
   // ── Ödeme (satıcıya) ─────────────────────────────────────────────────────
   // Hedef kitle TİPTEN belli: ikisi de satıcıya gider, `orderId` varlığına
   // bakılarak alıcı ekranı seçilmez.
-  [NotificationType.PAYMENT_RECEIVED]: pattern("/profile/payments"),
+  // PAYMENT_RECEIVED satıcının "Yeni Sipariş" bildirimidir (event.service
+  // order.paid): hedef kargoya hazırlanacak SATIŞ siparişi. Sipariş kimliği
+  // yoksa ödemeler ekranına düşer. Desen `/seller/orders/` ile başladığı için
+  // tip satıcı tipleri kümesine girer → `audience: "seller"` otomatik eklenir.
+  [NotificationType.PAYMENT_RECEIVED]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/payments",
+  ),
   [NotificationType.PAYMENT_RELEASED]: pattern("/profile/payments"),
 
   // ── Takas ────────────────────────────────────────────────────────────────
@@ -218,6 +229,9 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_COUNTER]: TRADE,
   [NotificationType.TRADE_SHIPPED]: TRADE,
   [NotificationType.TRADE_COMPLETED]: TRADE,
+  [NotificationType.TRADE_CANCELLED]: TRADE,
+  [NotificationType.TRADE_DISPUTE_OPENED]: TRADE,
+  [NotificationType.TRADE_DISPUTE_RESOLVED]: TRADE,
   [NotificationType.TRADE_REJECTED]: pattern("/profile/trades"),
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
   [NotificationType.TRADE_CANCELLED_BY_PLATFORM]: TRADE,
