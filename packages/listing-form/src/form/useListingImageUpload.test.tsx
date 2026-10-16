@@ -730,8 +730,9 @@ describe("useListingImageUpload — hazırlık (küçültme)", () => {
       detailKey: "d",
     }));
     const { result, unmount } = setupWith(upload, prepare);
+    const original = fakeFile("a.png");
     await act(async () => {
-      result.current.handleFileUpload([fakeFile("a.png")]);
+      result.current.handleFileUpload([original]);
     });
 
     const rotatedFile = fakeFile("cevrilmis.png");
@@ -740,8 +741,11 @@ describe("useListingImageUpload — hazırlık (küçültme)", () => {
       await result.current.rotateImage(result.current.items[0].clientId);
     });
 
+    // Tek hazırlık ORİJİNAL dosya içindir. Kimlikle (`toBe`) bakılır:
+    // `toHaveBeenCalledWith` File'ları yapısal karşılaştırır ve aynı
+    // `lastModified`'lı iki sahte dosyayı eşit sayardı.
     expect(prepare).toHaveBeenCalledTimes(1);
-    expect(prepare).not.toHaveBeenCalledWith(rotatedFile, expect.anything());
+    expect(prepare.mock.calls[0][0]).toBe(original);
     expect(upload.mock.calls[1][0]).toBe(rotatedFile);
     unmount();
   });
