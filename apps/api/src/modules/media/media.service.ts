@@ -486,33 +486,44 @@ export class MediaService {
       skipMediaFile: true,
     };
 
-    const cardBuffer = await sharp(source)
-      .autoOrient()
-      .resize(500, 500, { fit: "cover" })
-      .webp({ quality: 85 })
-      .toBuffer();
-
+    // Kaynak TEK kez çözülür: detay (1200 inside) kaynaktan, kart (500×500
+    // cover) bu detay tamponundan üretilir. İki kez tam çözmek tepe belleği
+    // ikiye katlıyordu; detay zaten yönlendirilmiş ve 1200 px'e inmiş olduğu
+    // için kart için `autoOrient` gerekmez. Encode'lar sıralıdır; yalnız iki
+    // depo yüklemesi paralel koşar (süreyi asıl bekleyen kısım onlar).
     const detailBuffer = await sharp(source)
       .autoOrient()
       .resize(1200, 1200, { fit: "inside" })
       .webp({ quality: 90 })
       .toBuffer();
 
-    const cardResult = await this.storageService.uploadFile(cardBuffer, {
-      bucket: "products",
-      folder,
-      filename: `${baseId}-card.webp`,
-      mimeType: "image/webp",
-      ...cacheOpts,
-    });
+    const cardBuffer = await sharp(detailBuffer)
+      .resize(500, 500, { fit: "cover" })
+      .webp({ quality: 85 })
+      .toBuffer();
 
-    const detailResult = await this.storageService.uploadFile(detailBuffer, {
-      bucket: "products",
-      folder,
-      filename: `${baseId}-detail.webp`,
-      mimeType: "image/webp",
-      ...cacheOpts,
-    });
+    // Hata semantiği: bir yükleme düşerse çağrı reddedilir; ama `Promise.all`
+    // diğer yüklemeyi İPTAL ETMEZ — o tamamlanırsa nesne depoda SAHİPSİZ kalır
+    // (eskiden yalnız kart yazılıp detay düşünce kart böyle kalıyordu; artık
+    // her iki yönde de olabilir). Anahtarlar kullanıcının geçici klasöründedir
+    // (`productImageFolder`); ürüne bağlanmayanları günlük `media-temp-cleanup`
+    // işi toplar, burada ayrıca silmek silmenin kendi hatasını yönetmek demek.
+    const [cardResult, detailResult] = await Promise.all([
+      this.storageService.uploadFile(cardBuffer, {
+        bucket: "products",
+        folder,
+        filename: `${baseId}-card.webp`,
+        mimeType: "image/webp",
+        ...cacheOpts,
+      }),
+      this.storageService.uploadFile(detailBuffer, {
+        bucket: "products",
+        folder,
+        filename: `${baseId}-detail.webp`,
+        mimeType: "image/webp",
+        ...cacheOpts,
+      }),
+    ]);
 
     return { cardKey: cardResult.key, detailKey: detailResult.key };
   }

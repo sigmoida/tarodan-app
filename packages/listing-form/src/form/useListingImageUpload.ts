@@ -28,7 +28,8 @@ import {
   type RejectedFile,
 } from "./listing-image-item";
 import { canRotateFile, rotateImageFile } from "./rotate-image";
-import { useListingFormApi, type ListingFormApi } from "./api-context";
+import { useListingFormApi } from "./api-context";
+import { createDefaultUpload } from "./default-upload";
 
 export type { ListingImageItem } from "./listing-image-item";
 
@@ -46,22 +47,6 @@ interface UseListingImageUploadParams {
   /** Testler için değiştirilebilir yükleme portu. */
   upload?: UploadPort;
 }
-
-/**
- * Üretim portu: tek dosya, ilerleme ve iptal destekli.
- *
- * Hata metni karoda AYNEN gösterildiği için çeviriciyi dışarıdan alır; sabit
- * Türkçe bir mesaj `/en` kullanıcısına da Türkçe düşerdi.
- */
-const createDefaultUpload =
-  (t: Translate, api: ListingFormApi): UploadPort =>
-  async (file, { signal, onProgress }) => {
-    const result = await api.uploadProductImage(file, { signal, onProgress });
-    if (!result?.cardKey || !result?.detailKey) {
-      throw new Error(t("product.imageUpload.noServerResult"));
-    }
-    return { cardKey: result.cardKey, detailKey: result.detailKey };
-  };
 
 /** Red gerekçesi → katalog anahtarı. Sıra, kullanıcıya okunacak sıradır. */
 const REJECTION_KEYS = [
