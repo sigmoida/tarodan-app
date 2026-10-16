@@ -11,9 +11,11 @@ import { adDeviceTypeFor } from "./ad-platform.helper";
 
 /**
  * `20261016110000_ad_platform_popup`: reklama platform (web / app / all),
- * popup sıklığı ve popup sürümü gelir. Eski `device_type` değerleri birebir
- * taşınır; kolon silinmez (eski mobil sürümler türetilmiş `deviceType` okur).
- * `ContentPlatform` tipi hero göçüyle ortaktır: hangisi önce çalışırsa kurar.
+ * popup sıklığı ve popup sürümü gelir. Göç YALNIZ şemadır; eski
+ * `device_type` değerlerinin taşınması ayrı, idempotent script'tir
+ * (`maintenance/backfill-ad-platform.ts`, CLAUDE.md §13). Kolon silinmez
+ * (eski mobil sürümler türetilmiş `deviceType` okur). `ContentPlatform` tipi
+ * hero göçüyle ortaktır: hangisi önce çalışırsa kurar.
  */
 describe("ad platform + popup migration", () => {
   const root = apiAppRoot();
@@ -54,16 +56,52 @@ describe("ad platform + popup migration", () => {
     expect(sql).toMatch(/ADD COLUMN "popup_version" INTEGER NOT NULL DEFAULT 1/);
   });
 
-  it("geri doldurma desktop→web, mobile→app, diğer→all; kolon eklendikten sonra", () => {
-    const backfill = sql.search(/UPDATE "advertisements"\s+SET "platform" = CASE "device_type"/);
-    expect(backfill).toBeGreaterThan(sql.indexOf('ADD COLUMN "platform"'));
-    expect(sql).toMatch(/WHEN 'desktop' THEN 'web'::"ContentPlatform"/);
-    expect(sql).toMatch(/WHEN 'mobile' THEN 'app'::"ContentPlatform"/);
-    expect(sql).toMatch(/ELSE 'all'::"ContentPlatform"/);
+  it("göç veri yazmaz: geri doldurma ayrı script'te", () => {
+    expect(sql).not.toMatch(/^\s*UPDATE\b/im);
+    expect(sql).not.toMatch(/^\s*INSERT\b/im);
+    expect(sql).toContain("maintenance/backfill-ad-platform.ts");
+  });
+
+  describe("backfill script (maintenance/backfill-ad-platform.ts)", () => {
+    const script = readFileSync(
+      join(root, "maintenance/backfill-ad-platform.ts"),
+      "utf8",
+    );
+    const update = /UPDATE "advertisements"[\s\S]*?`/.exec(script)?.[0] ?? "";
+
+    it("desktop→web, mobile→app eşler", () => {
+      expect(update).toMatch(/WHEN 'desktop' THEN 'web'::"ContentPlatform"/);
+      expect(update).toMatch(/WHEN 'mobile' THEN 'app'::"ContentPlatform"/);
+    });
+
+    it("idempotent: yalnız göçten kalmış satırlar (platform all + eski cihaz)", () => {
+      expect(update).toMatch(/WHERE "platform" = 'all'/);
+      expect(update).toMatch(/AND "device_type" IN \('desktop', 'mobile'\)/);
+    });
+
+    it("updated_at'e dokunmaz, satır silmez; --dry-run destekler", () => {
+      expect(update).not.toMatch(/updated_at/);
+      expect(script).not.toMatch(/DELETE\s+FROM/i);
+      expect(script).toContain('process.argv.includes("--dry-run")');
+    });
+
+    it("üretim komutu tanımlı ve seed derlemesine dahil", () => {
+      const pkg = JSON.parse(
+        readFileSync(join(root, "package.json"), "utf8"),
+      ) as { scripts: Record<string, string> };
+      expect(pkg.scripts["backfill:prod:ad-platform"]).toBe(
+        "node dist-seed/maintenance/backfill-ad-platform.js",
+      );
+      const seedTsconfig = readFileSync(
+        join(root, "tsconfig.seed.json"),
+        "utf8",
+      );
+      expect(seedTsconfig).toContain('"maintenance/**/*.ts"');
+    });
   });
 
   it("geri doldurma eşlemesi, API'nin türettiği deviceType'ın tersidir", () => {
-    // Göç sonrası türetilen deviceType eski kolonla aynı kalmalı.
+    // Taşıma sonrası türetilen deviceType eski kolonla aynı kalmalı.
     expect(adDeviceTypeFor("web")).toBe("desktop");
     expect(adDeviceTypeFor("app")).toBe("mobile");
     expect(adDeviceTypeFor("all")).toBe("all");
