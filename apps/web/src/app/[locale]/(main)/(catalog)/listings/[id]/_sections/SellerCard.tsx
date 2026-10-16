@@ -63,7 +63,7 @@ export default function SellerCard() {
             {isPremium && (
               <Badge variant="warning" size="sm" className="gap-1">
                 <StarIconSolid className="w-3 h-3" />
-                Premium
+                {t("seller.premiumBadge")}
               </Badge>
             )}
           </div>
