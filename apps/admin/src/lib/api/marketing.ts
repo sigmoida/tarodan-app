@@ -1,3 +1,4 @@
+import type { HeroHomeVisibilityDto } from "@tarodan/types";
 import { api } from "./client";
 import type {
   BroadcastEmailPreviewPayload,
@@ -80,6 +81,12 @@ export const marketingApi = {
   deleteHeroSlide: (id: string) => api.delete(`/admin/hero-slides/${id}`),
   reorderHeroSlides: (ids: string[]) =>
     api.patch("/admin/hero-slides/reorder", { ids }),
+  /** Ana sayfa hero'sunun platform anahtarları; satır yoksa açık. */
+  getHeroHomeVisibility: () =>
+    api.get<HeroHomeVisibilityDto>("/admin/hero-slides/visibility"),
+  /** Gönderilmeyen platform değişmez. */
+  updateHeroHomeVisibility: (data: Partial<HeroHomeVisibilityDto>) =>
+    api.patch<HeroHomeVisibilityDto>("/admin/hero-slides/visibility", data),
   /** Hero görseli yükleme (multipart `file`); yanıt `{ url }`. */
   uploadHeroImage: (file: File) => {
     const formData = new FormData();

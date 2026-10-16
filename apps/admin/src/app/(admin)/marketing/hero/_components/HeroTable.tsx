@@ -35,7 +35,7 @@ export function HeroTable({ onEdit }: { onEdit: (slide: HeroSlide) => void }) {
       },
     },
   );
-  // Son yayındaki ana sayfa slaytını silmek 409 döner; sunucu mesajı toast olur.
+  // Son slayt da silinebilir: yerleşim boş kalırsa istemci hero'yu gizler.
   const del = useAdminMutation((id: string) => adminApi.deleteHeroSlide(id), {
     invalidates: ["hero-slides"],
     successMessage: t("admin.marketing.hero.deleted"),

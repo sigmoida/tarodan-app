@@ -14,9 +14,13 @@ import { clientListFetcher } from "@/lib/query/client-list";
 import { useTabParam } from "@/hooks/useTabParam";
 import type { HeroPlacement, HeroSlide } from "./_lib/types";
 import { HeroTable } from "./_components/HeroTable";
+import { HeroHiddenNotes } from "./_components/HeroHiddenNotes";
+import { HeroVisibilitySwitches } from "./_components/HeroVisibilitySwitches";
 import { HeroSlideFormModal } from "./_modals/HeroSlideFormModal";
 
 const DEFAULT_PLACEMENT: HeroPlacement = HERO_PLACEMENTS[0];
+/** Platform anahtarları ve "hero gizli" notu yalnız ana sayfa içindir. */
+const HOME: HeroPlacement = "home";
 
 const isPlacement = (v: string): v is HeroPlacement =>
   (HERO_PLACEMENTS as readonly string[]).includes(v);
@@ -26,6 +30,7 @@ export default function HeroSlidesPage() {
   const [tab, setTab] = useTabParam(DEFAULT_PLACEMENT, { param: "placement" });
   const placement = isPlacement(tab) ? tab : DEFAULT_PLACEMENT;
   const [modal, setModal] = useState<{ slide?: HeroSlide } | null>(null);
+  const isHome = placement === HOME;
 
   return (
     <AdminPage>
@@ -33,6 +38,7 @@ export default function HeroSlidesPage() {
         title={t("admin.marketing.hero.title")}
         description={t("admin.marketing.hero.subtitle")}
       >
+        {isHome && <HeroVisibilitySwitches />}
         <div className="flex flex-col items-end gap-1">
           <Button
             variant="primary"
@@ -69,6 +75,7 @@ export default function HeroSlidesPage() {
         limit={100}
         getRowId={(s) => s.id}
       >
+        {isHome && <HeroHiddenNotes />}
         <HeroTable onEdit={(slide) => setModal({ slide })} />
       </ResourceList>
 
