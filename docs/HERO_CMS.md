@@ -42,7 +42,9 @@ Yayında = `isActive` + tarih penceresinin içinde (sınırlar dahil; reklamla o
   `placement=home` okuması `[]` döner, slaytlara dokunulmaz. Yalnız ana sayfa içindir; auth
   yerleşimleri yalnız platformla süzülür. Admin: Pazarlama → Hero, ana sayfa sekmesinin
   başlığındaki "Web'de göster" / "Uygulamada göster"; anahtar kapalı ya da o platformda yayında
-  slayt yoksa sekmede "hero gizli" notu çıkar.
+  slayt yoksa sekmede "hero gizli" notu çıkar (uygulamada yayındaki slaytların hepsi `hideOnIos`
+  ise ayrıca "iOS'ta gizli" notu). Bu anahtarlar ve seed işareti genel
+  `PATCH /admin/settings/:key` ucundan yazılamaz (`server.hero.useDedicatedEndpoint`).
 - Lansman doğrulaması (`verify:prod:launch`) ana sayfa hero'sunu iki istemci için ayrı okur;
   boşsa **uyarır** (`REVIEW:`), düşürmez — boş hero meşru bir karardır.
 
@@ -69,7 +71,8 @@ Admin (`super_admin`/`admin`/`moderator`; izin matrisinde `hero-slides` ve `trus
 | `/admin/trust-badges` (GET, GET `:id`, POST, PATCH, DELETE, `PATCH reorder`) | Aynı desen, yükleme yok; metin ham (belirteçli) döner                                  |
 
 Her yazım admin denetim kaydına (`hero_slide_*`, `hero_visibility_update`, `trust_badge_*`,
-önce/sonra) yazılır.
+önce/sonra) yazılır. Anahtar kaydı yalnız gerçekten değişen ayar satırı için, satırın kendi
+kimliğiyle düşülür; web etiketi yalnız `web` anahtarı değişince tazelenir.
 
 ## Sayaçlar
 
@@ -96,5 +99,6 @@ auth slaytları → `auth:hero`, rozetler → `home:trust`. Yerleşim değişirs
 seed'i de çağırır): eski web sabitlerinden ana sayfa slaytı, iki auth görseli ve altı rozet —
 **yalnız ilk kurulumda bir kez**. İşaret PlatformSetting `hero_seed_applied`: varsa seed hiçbir
 şey yazmaz; yoksa ama hero/rozet satırı varsa (işaretten önceki kurulum) yalnız işareti yazar;
-ikisi de yoksa içeriği kurup işareti yazar. Sabit kimlik + `update: {}` — admin düzenlemesi
+ikisi de yoksa içeriği ve işareti tek işlemde yazar (yarıda kesilen ilk kurulum hiçbir şey
+bırakmaz, sonraki açılış baştan kurar). Sabit kimlik + `update: {}` — admin düzenlemesi
 ezilmez, bilerek boşaltılan yerleşim (ya da silinen seed slaytı) geri gelmez.
