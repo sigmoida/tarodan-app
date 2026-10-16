@@ -42,6 +42,13 @@ describe("ProductQueryService.findAll — list cache key", () => {
     expect(new Set([bruder, hotWheels, none]).size).toBe(3);
   });
 
+  it("ignores the manufacturer name once manufacturerId is present", async () => {
+    const id = "44444444-4444-4444-8444-444444444444";
+    const a = await keyFor({ manufacturerId: id, manufacturer: "Bruder" });
+    const b = await keyFor({ manufacturerId: id, manufacturer: "Siku" });
+    expect(a).toBe(b);
+  });
+
   // ProductQueryDto'daki, findAll'ın okuduğu her filtre/sıralama alanı. Yeni bir
   // filtre eklenince buraya da eklenmeli (anahtara girmezse test kırmızı olur).
   // inactiveReason / tradeEligible yalnız satıcının kendi listesinde (/products/my)

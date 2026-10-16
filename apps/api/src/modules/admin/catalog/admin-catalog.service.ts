@@ -457,9 +457,13 @@ export class AdminCatalogService {
       ];
     }
 
-    // "İlan" kolonu = public sayımla aynı kural; filtre/sıralama aynı haritadan.
-    const listingCounts = await countPublicListingsBy(this.prisma, "brandId");
-    Object.assign(where, hasListingsWhere(hasListings, listingCounts));
+    // "İlan" kolonu = public sayımla aynı kural. Tüm tablo sayımı yalnız sayıya
+    // göre sıralamada (bellekte); aksi halde yalnız sayfa satırları sayılır.
+    Object.assign(where, hasListingsWhere(hasListings));
+    const sortCounts =
+      query.sortBy === LISTING_COUNT_SORT
+        ? await countPublicListingsBy(this.prisma, "brandId")
+        : undefined;
 
     const orderBy = resolveOrderBy<Prisma.BrandOrderByWithRelationInput>(
       "Brand",
@@ -473,10 +477,18 @@ export class AdminCatalogService {
               where,
               orderBy: { name: "asc" },
             }),
-            (b) => listingCounts.get(b.id) ?? 0,
+            (b) => sortCounts?.get(b.id) ?? 0,
             { ...query, sortType: "number" },
           )
         : await paginate(this.prisma.brand, { where, orderBy }, query);
+
+    const listingCounts =
+      sortCounts ??
+      (await countPublicListingsBy(
+        this.prisma,
+        "brandId",
+        result.data.map((b: Brand) => b.id),
+      ));
 
     const data = result.data.map((b: Brand) => ({
       id: b.id,
@@ -705,12 +717,12 @@ export class AdminCatalogService {
       ];
     }
 
-    // Markalarla aynı: public sayımla aynı kural, filtre/sıralama aynı haritadan.
-    const listingCounts = await countPublicListingsBy(
-      this.prisma,
-      "manufacturerId",
-    );
-    Object.assign(where, hasListingsWhere(hasListings, listingCounts));
+    // Markalarla aynı: tüm tablo sayımı yalnız sayıya göre sıralamada.
+    Object.assign(where, hasListingsWhere(hasListings));
+    const sortCounts =
+      query.sortBy === LISTING_COUNT_SORT
+        ? await countPublicListingsBy(this.prisma, "manufacturerId")
+        : undefined;
 
     const orderBy = resolveOrderBy<Prisma.ManufacturerOrderByWithRelationInput>(
       "Manufacturer",
@@ -724,10 +736,18 @@ export class AdminCatalogService {
               where,
               orderBy: { name: "asc" },
             }),
-            (m) => listingCounts.get(m.id) ?? 0,
+            (m) => sortCounts?.get(m.id) ?? 0,
             { ...query, sortType: "number" },
           )
         : await paginate(this.prisma.manufacturer, { where, orderBy }, query);
+
+    const listingCounts =
+      sortCounts ??
+      (await countPublicListingsBy(
+        this.prisma,
+        "manufacturerId",
+        result.data.map((m) => m.id),
+      ));
 
     const data = result.data.map((m) => ({
       ...m,

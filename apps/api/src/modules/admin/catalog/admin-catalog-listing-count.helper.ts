@@ -10,26 +10,31 @@ export const LISTING_COUNT_SORT = "listingCount";
  * mağaza sayısı ayrışmaz. İlanı olmayan satırlar haritada yoktur (0 sayılır).
  *
  * Prisma `orderBy._count` ilişki filtresi alamaz (filtresiz sayıya göre sıralar),
- * bu yüzden sayılar tek `groupBy` ile alınır; sıralama/filtre bu haritadan yapılır.
+ * bu yüzden sayılar `groupBy` ile alınır. `ids` verilirse yalnız o satırlar
+ * sayılır (sayfa satırları); verilmezse tüm tablo (yalnız sayıya göre sıralamada
+ * gerekir, bellekte sıralanır).
  */
 export async function countPublicListingsBy(
   prisma: PrismaService,
   field: "brandId" | "manufacturerId",
+  ids?: string[],
 ): Promise<Map<string, number>> {
+  if (ids && ids.length === 0) return new Map();
   const where = publicListingWhere();
+  const idFilter = ids ? { in: ids } : { not: null };
   const rows =
     field === "brandId"
       ? (
           await prisma.product.groupBy({
             by: ["brandId"],
-            where: { ...where, brandId: { not: null } },
+            where: { ...where, brandId: idFilter },
             _count: { _all: true },
           })
         ).map((g) => ({ id: g.brandId, count: g._count._all }))
       : (
           await prisma.product.groupBy({
             by: ["manufacturerId"],
-            where: { ...where, manufacturerId: { not: null } },
+            where: { ...where, manufacturerId: idFilter },
             _count: { _all: true },
           })
         ).map((g) => ({ id: g.manufacturerId, count: g._count._all }));
@@ -38,12 +43,14 @@ export async function countPublicListingsBy(
   return counts;
 }
 
-/** `hasListings` filtresi: true → ilanı olanlar, false → olmayanlar, yok → filtre yok. */
-export function hasListingsWhere(
-  hasListings: boolean | undefined,
-  counts: ReadonlyMap<string, number>,
-): { id?: { in: string[] } | { notIn: string[] } } {
+/**
+ * `hasListings` filtresi: true → ilanı olanlar, false → olmayanlar, yok → filtre yok.
+ * İlişki filtresi (id listesi yok) — marka/üretici sayısından bağımsız, sınırsız IN yok.
+ */
+export function hasListingsWhere(hasListings: boolean | undefined): {
+  products?: { some: object } | { none: object };
+} {
   if (hasListings === undefined) return {};
-  const ids = [...counts.keys()];
-  return { id: hasListings ? { in: ids } : { notIn: ids } };
+  const listing = publicListingWhere();
+  return { products: hasListings ? { some: listing } : { none: listing } };
 }

@@ -306,7 +306,8 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
     isActive: true,
   });
 
-  it("counts with the public rule (active + in-stock + sale-capable seller)", async () => {
+  it("counts only the page rows with the public rule (active + in-stock + sale-capable seller)", async () => {
+    prisma.brand.findMany.mockResolvedValue([brandRow("b1", "Bruder")]);
     await service.getBrands({});
     const args = prisma.product.groupBy.mock.calls[0][0];
     expect(args.by).toEqual(["brandId"]);
@@ -314,16 +315,29 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
       expect.objectContaining({
         ...publicListingWhere(),
         seller: expect.anything(),
-        brandId: { not: null },
+        brandId: { in: ["b1"] },
       }),
     );
     expect(args.where.AND).toEqual([inStockWhere()]);
     expect(args.where.status).toBe("active");
 
+    prisma.manufacturer.findMany.mockResolvedValue([
+      { id: "m1", name: "M", slug: "m", logo: null },
+    ]);
     await service.getManufacturers({});
     expect(prisma.product.groupBy.mock.calls[1][0].by).toEqual([
       "manufacturerId",
     ]);
+    expect(
+      prisma.product.groupBy.mock.calls[1][0].where.manufacturerId,
+    ).toEqual({ in: ["m1"] });
+  });
+
+  it("skips the count query when the page is empty", async () => {
+    prisma.brand.findMany.mockResolvedValue([]);
+    const result = await service.getBrands({});
+    expect(prisma.product.groupBy).not.toHaveBeenCalled();
+    expect(result.data).toEqual([]);
   });
 
   it("adds listingCount to every brand row (0 when none)", async () => {
@@ -338,19 +352,17 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
     expect(result.data.map((b) => b.listingCount)).toEqual([7, 0]);
   });
 
-  it("filters brands with hasListings=true / false by the counted ids", async () => {
-    prisma.product.groupBy.mockResolvedValue([
-      { brandId: "b1", _count: { _all: 2 } },
-      { brandId: "b3", _count: { _all: 1 } },
-    ]);
+  it("filters brands with hasListings=true / false by a relation filter", async () => {
     await service.getBrands({ hasListings: true });
     expect(prisma.brand.findMany).toHaveBeenLastCalledWith(
-      expect.objectContaining({ where: { id: { in: ["b1", "b3"] } } }),
+      expect.objectContaining({
+        where: { products: { some: publicListingWhere() } },
+      }),
     );
     await service.getBrands({ status: "active", hasListings: false });
     expect(prisma.brand.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: { isActive: true, id: { notIn: ["b1", "b3"] } },
+        where: { isActive: true, products: { none: publicListingWhere() } },
       }),
     );
   });
@@ -395,7 +407,10 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
     });
     expect(prisma.manufacturer.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: { isActive: false, id: { in: ["m1"] } },
+        where: {
+          isActive: false,
+          products: { some: publicListingWhere() },
+        },
       }),
     );
     expect(result.data[0].listingCount).toBe(4);
