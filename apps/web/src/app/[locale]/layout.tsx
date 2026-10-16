@@ -12,6 +12,7 @@ import { zIndex } from "@tarodan/design-tokens";
 import { routing } from "@/i18n/routing";
 import DynamicCookieConsentBanner from "@/components/DynamicCookieConsentBanner";
 import GoogleAdsTag from "@/components/GoogleAdsTag";
+import HideInEmbed from "@/components/embed/HideInEmbed";
 import { GOOGLE_ADS_ID } from "@/lib/googleAds";
 import "../globals.css";
 
@@ -83,13 +84,20 @@ export default async function LocaleLayout({
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
           >
             {children}
-            <DynamicCookieConsentBanner />
             {/*
-              Pazarlama rızasına bağlı Google Ads etiketi (gtag.js). Kimlik
-              build'e hiç verilmemişse ada render edilmez — istemciye ölü bir
-              hidrasyon adası ve bundle yükü gitmez.
+              Mobil WebView'in `/app/**` yasal sayfalarında çerez bandı ve Ads
+              etiketi çizilmez (`HideInEmbed`: yola istemcide bakar, düzeni
+              dinamik yapmaz).
             */}
-            {GOOGLE_ADS_ID ? <GoogleAdsTag adsId={GOOGLE_ADS_ID} /> : null}
+            <HideInEmbed>
+              <DynamicCookieConsentBanner />
+              {/*
+                Pazarlama rızasına bağlı Google Ads etiketi (gtag.js). Kimlik
+                build'e hiç verilmemişse ada render edilmez — istemciye ölü bir
+                hidrasyon adası ve bundle yükü gitmez.
+              */}
+              {GOOGLE_ADS_ID ? <GoogleAdsTag adsId={GOOGLE_ADS_ID} /> : null}
+            </HideInEmbed>
             {/*
               Bildirimler ekranın alt kenarına yapışır; `bottom` varsayılan 16px
               yerine ana ekran çizgisinin payını da ekler, yoksa çentikli
