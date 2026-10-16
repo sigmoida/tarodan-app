@@ -8736,6 +8736,7 @@
       "validation": {
         "required": "Required",
         "invalidValueMin": "Enter a valid value (at least {min})",
+        "minAboveMax": "Minimum price cannot be greater than the maximum price",
         "invalidValue": "Enter a valid value"
       },
       "legal": {

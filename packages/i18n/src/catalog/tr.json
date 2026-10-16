@@ -8736,6 +8736,7 @@
       "validation": {
         "required": "Zorunlu",
         "invalidValueMin": "Geçerli bir değer girin (en az {min})",
+        "minAboveMax": "Minimum fiyat, maksimum fiyattan büyük olamaz",
         "invalidValue": "Geçerli bir değer girin"
       },
       "legal": {
