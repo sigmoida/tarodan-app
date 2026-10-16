@@ -1,5 +1,6 @@
 /** @format */
 
+import { canvasToBlob, decodeOrientedBitmap } from "./image-canvas";
 import { MAX_IMAGE_BYTES } from "./listing-image-item";
 
 /**
@@ -57,11 +58,9 @@ export async function rotateImageFile(file: File): Promise<File> {
 
   let bitmap: ImageBitmap;
   try {
-    // `imageOrientation` AÇIKÇA verilir: canvas'ın, kullanıcının önizlemede
-    // gördüğü hâli alması gerekir. Varsayılan tarayıcılar arasında tutarsızdı;
-    // bir tarayıcı seçeneği yok sayarsa da düğme görsel geri bildirimli olduğu
-    // için kullanıcı bir kez daha basıp düzeltebilir.
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    // Bir tarayıcı `imageOrientation` seçeneğini yok sayarsa da düğme görsel
+    // geri bildirimli olduğu için kullanıcı bir kez daha basıp düzeltebilir.
+    bitmap = await decodeOrientedBitmap(file);
   } catch {
     throw new RotateImageError("decode");
   }
@@ -81,8 +80,10 @@ export async function rotateImageFile(file: File): Promise<File> {
     context.drawImage(bitmap, 0, 0);
 
     const type = rotatedOutputType(file.type);
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, type, rotatedOutputQuality(file.type)),
+    const blob = await canvasToBlob(
+      canvas,
+      type,
+      rotatedOutputQuality(file.type),
     );
     if (!blob) throw new RotateImageError("encode");
 
