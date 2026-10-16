@@ -17,11 +17,13 @@ export default function FavoritesPage() {
 
   const {
     items,
+    pendingCount,
     isLoading,
     isSharedView,
     handleRemove,
     handleCartToggle,
     isInCart,
+    isPending,
   } = useFavorites();
 
   // Private favorites require auth; a shared (?ids=) view is public.
@@ -41,7 +43,8 @@ export default function FavoritesPage() {
         title={
           isSharedView ? t("favorites.sharedList") : t("favorites.myFavorites")
         }
-        description={`${items.length} ${t("favorites.itemsInFavorites")}`}
+        // Yükleniyor kartları da sayılır: header rozetiyle aynı sayı.
+        description={`${items.length + pendingCount} ${t("favorites.itemsInFavorites")}`}
         actions={
           !isSharedView && items.length > 0 ? (
             <ShareFavoritesButton productIds={items.map((i) => i.productId)} />
@@ -54,10 +57,12 @@ export default function FavoritesPage() {
       ) : (
         <FavoritesGrid
           items={items}
+          pendingCount={pendingCount}
           isSharedView={isSharedView}
           onRemove={handleRemove}
           onCartToggle={handleCartToggle}
           isInCart={isInCart}
+          isPending={isPending}
         />
       )}
     </PageShell>

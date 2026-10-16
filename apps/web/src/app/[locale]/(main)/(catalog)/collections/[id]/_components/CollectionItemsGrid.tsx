@@ -74,9 +74,6 @@ export default function CollectionItemsGrid() {
           index={index}
           showMeta={false}
           href={item.productId ? undefined : null}
-          // Koleksiyona sahibinin KENDİ ilanları eklenir; kendi ilanı
-          // favorilenemez — sahibe kalp çizilmez (ziyaretçi görür).
-          showFavorite={!isOwner}
           overlayStart={<ItemBadges item={item} />}
           overlay={isOwner ? <ItemRemove item={item} /> : undefined}
         />

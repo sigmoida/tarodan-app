@@ -9,6 +9,7 @@ import { IconButton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useAuthGate } from "@/hooks/useAuthGate";
 import { useProductFavorite } from "@/hooks/useWishlist";
+import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
 import { useAuthStore } from "@/stores/authStore";
 
 /**
@@ -29,7 +30,8 @@ import { useAuthStore } from "@/stores/authStore";
  * adasına geçen RSC yükü bütün ürün nesnesini taşımaz.
  *
  * Kendi ilanında kalp hiç çizilmez; misafirde favori sorgusu atılmaz, tıklama
- * giriş penceresini açar. Durum ve toggle ilan detayıyla AYNI hook'tan gelir.
+ * giriş penceresini açar. Durum ve toggle ilan detayıyla AYNI hook'tan gelir;
+ * istek sürerken kalp meşgul görünür (`aria-busy`, ikinci tıklama yok sayılır).
  */
 export default function ProductCardFavorite({
   productId,
@@ -52,10 +54,13 @@ export default function ProductCardFavorite({
 
   const isOwner =
     !!userId && sellerId != null && String(sellerId) === String(userId);
-  const { isFavorite, toggle } = useProductFavorite(String(productId), {
-    isOwner,
-    requireAuth,
-  });
+  const { isFavorite, isPending, toggle } = useProductFavorite(
+    String(productId),
+    {
+      isOwner,
+      requireAuth,
+    },
+  );
 
   if (isOwner) return null;
 
@@ -75,10 +80,11 @@ export default function ProductCardFavorite({
         onClick={onClick}
         aria-label={label}
         aria-pressed={isFavorite}
+        {...favoriteBusyProps(isPending)}
         title={label}
         // `after:-inset-1.5`: 32px + 2×6px = 44px dokunma alanı; buton
         // görselin kenarından 6px içeride, alan tam kenarda biter.
-        className="pointer-events-auto absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/80 text-heading shadow-sm after:absolute after:-inset-1.5 after:rounded-full hover:bg-surface-elevated"
+        className={`pointer-events-auto absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/80 text-heading shadow-sm after:absolute after:-inset-1.5 after:rounded-full hover:bg-surface-elevated ${FAVORITE_BUSY_CLASS}`}
       >
         {isFavorite ? (
           <HeartSolidIcon className="h-5 w-5 text-danger-500" />

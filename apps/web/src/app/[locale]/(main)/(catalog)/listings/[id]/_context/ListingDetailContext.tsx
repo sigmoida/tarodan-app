@@ -257,10 +257,11 @@ function useListingDetailValue() {
   };
 
   // ---- Favorite ---- (ürün kartlarındaki kalple aynı hook ve önbellek)
-  const { isFavorite, toggle: handleToggleFavorite } = useProductFavorite(id, {
-    isOwner,
-    requireAuth,
-  });
+  const {
+    isFavorite,
+    isPending: isFavoritePending,
+    toggle: handleToggleFavorite,
+  } = useProductFavorite(id, { isOwner, requireAuth });
 
   return {
     id,
@@ -298,6 +299,7 @@ function useListingDetailValue() {
     addingToCollection,
     // favorite / report
     isFavorite,
+    isFavoritePending,
     handleToggleFavorite,
     showReportModal,
     setShowReportModal,

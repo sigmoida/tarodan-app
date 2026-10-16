@@ -14,6 +14,7 @@ import {
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
+import { loginHref } from "@/lib/returnTo";
 import { useAuthStore } from "@/stores/authStore";
 import { ordersApi, api, userApi, tradesApi, collectionsApi } from "@/lib/api";
 import { wishlistItemsQuery } from "@/lib/wishlist";
@@ -81,8 +82,10 @@ function useProfileValue() {
   // under /profile they were headed.
   useEffect(() => {
     if (mounted && !authLoading && !isAuthenticated) {
+      // Query de taşınır (ör. `?returnTo=`): yalnız yol düşerse giriş sonrası
+      // kapı akışı kopar.
       router.push(
-        `/login?redirect=${encodeURIComponent(pathname || "/profile")}`,
+        loginHref(`${pathname || "/profile"}${window.location.search}`),
       );
     }
   }, [mounted, authLoading, isAuthenticated, pathname, router]);

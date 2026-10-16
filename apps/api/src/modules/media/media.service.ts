@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { ResizeOptions, Sharp, WebpOptions } from "sharp";
 import { v4 as uuidv4 } from "uuid";
 import { MembershipService } from "../membership/membership.service";
 import { PrismaService } from "../../prisma";
@@ -26,13 +27,19 @@ import {
 } from "../../common/image/sharp-safety";
 import { i18nMessage } from "../i18n";
 
+/**
+ * sharp modülünün KENDİ tipi. `require` `any` döndürür; açıkça bağlanmazsa
+ * boyutlandırma/kodlama seçeneklerini derleyici hiç denetlemez.
+ */
+type SharpFactory = typeof import("sharp");
+
 // Sharp is optional - image resizing will be skipped if not available.
 // Yükleme hatası SESSİZCE yutulmasın: staging'de imaj sharp'sız çıktığında tek
 // gördüğümüz 400 cevabıydı, neden bilgisi yoktu — nedeni sakla ve logla.
-let sharp: any;
+let sharp: SharpFactory | null;
 let sharpLoadError: string | null = null;
 try {
-  sharp = configureSharpSafety(require("sharp"));
+  sharp = configureSharpSafety(require("sharp") as SharpFactory);
 } catch (e: any) {
   sharp = null;
   sharpLoadError = e?.message ?? String(e);
@@ -41,18 +48,63 @@ try {
   console.error(`[MediaService] sharp failed to load: ${sharpLoadError}`);
 }
 
+/** Tek görsel türevi: boyutlandırma + WebP kodlaması (sharp'ın kendi tipleri). */
+interface ImageVariant {
+  resize: ResizeOptions;
+  webp: WebpOptions;
+}
+
+/** Ürün detay türevi: en çok 1200 px, oran korunur. */
+const PRODUCT_DETAIL_VARIANT = {
+  resize: { width: 1200, height: 1200, fit: "inside" },
+  webp: { quality: 90 },
+} satisfies ImageVariant;
+
+/** Ürün kart türevi: 500×500 kırpılmış. */
+const PRODUCT_CARD_VARIANT = {
+  resize: { width: 500, height: 500, fit: "cover" },
+  webp: { quality: 85 },
+} satisfies ImageVariant;
+
+/** Koleksiyon kapağı: 1200×600 kırpılmış. */
+const COLLECTION_COVER_VARIANT = {
+  resize: { width: 1200, height: 600, fit: "cover" },
+  webp: { quality: 85 },
+} satisfies ImageVariant;
+
+/**
+ * Uuid adlı, üzerine asla yazılmayan WebP türevlerinin depo seçenekleri — ürün
+ * kartı/detayı ve koleksiyon kapağı aynısını kullanır. Tipi depo servisinin
+ * kendi `UploadOptions`'ından gelir.
+ */
+const IMMUTABLE_WEBP_UPLOAD = {
+  mimeType: "image/webp",
+  contentType: "image/webp",
+  cacheControl: "public, max-age=31536000, immutable",
+  skipMediaFile: true,
+} satisfies Partial<StorageUploadOptions>;
+
+/** Türevi uygular: boyutlandır + WebP. Yönlendirme (autoOrient) çağıranın işidir. */
+function encodeVariant(
+  pipeline: Sharp,
+  variant: ImageVariant,
+): Promise<Buffer> {
+  return pipeline.resize(variant.resize).webp(variant.webp).toBuffer();
+}
+
 export interface UploadOptions {
   bucket?: StorageBucketType;
   folder?: string;
   maxSize?: number;
   allowedTypes?: string[];
-  resize?: {
-    width?: number;
-    height?: number;
-    fit?: "cover" | "contain" | "fill" | "inside" | "outside";
-    /** "En çok şu kadar" sınırı: küçük görsel büyütülmez (bulanıklaşmasın). */
-    withoutEnlargement?: boolean;
-  };
+  /**
+   * sharp'ın kendi `ResizeOptions` alanları. `withoutEnlargement`: "en çok şu
+   * kadar" sınırı — küçük görsel büyütülmez (bulanıklaşmasın).
+   */
+  resize?: Pick<
+    ResizeOptions,
+    "width" | "height" | "fit" | "withoutEnlargement"
+  >;
   generateThumbnail?: boolean;
   entityType?: string;
   entityId?: string;
@@ -80,6 +132,22 @@ export class MediaService {
     private storageService: StorageService,
     private prisma: PrismaService,
   ) {}
+
+  /**
+   * Yüklenmiş sharp'ı döner; yüklenemediyse nedenini loglayıp 400 verir.
+   * Görsel türevi üreten her uç bu kapıdan geçer.
+   */
+  private requireSharp(action: "upload" | "rotate"): SharpFactory {
+    if (!sharp) {
+      this.logger.error(
+        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image ${action} rejected`,
+      );
+      throw new BadRequestException(
+        "Image processing (sharp) is not available",
+      );
+    }
+    return sharp;
+  }
 
   /**
    * Faz 0: private mesaj ekinin KALICI istemci URL'si — public S3 URL yerine
@@ -148,7 +216,10 @@ export class MediaService {
     // nesne yüklenip `url: ""` dönüyor, istemci boş URL'i kaydediyordu
     // (reklam görseli kırık kalıyordu). Yüklemeden ÖNCE açık 503 ver; aşağıdaki
     // try bloğu her hatayı 400'e çevirdiği için kontrol onun dışında.
-    if (isPublicBucket(bucket) && !this.storageService.hasPublicAssetBaseUrl()) {
+    if (
+      isPublicBucket(bucket) &&
+      !this.storageService.hasPublicAssetBaseUrl()
+    ) {
       throw new ServiceUnavailableException(
         i18nMessage("server.storage.publicUrlNotConfigured"),
       );
@@ -381,14 +452,7 @@ export class MediaService {
      */
     ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
-    if (!sharp) {
-      this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image upload rejected`,
-      );
-      throw new BadRequestException(
-        "Image processing (sharp) is not available",
-      );
-    }
+    const sharpLib = this.requireSharp("upload");
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -408,7 +472,7 @@ export class MediaService {
       throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
-    return this.writeProductImageVariants(file.buffer, ownerUserId);
+    return this.writeProductImageVariants(sharpLib, file.buffer, ownerUserId);
   }
 
   /**
@@ -431,14 +495,7 @@ export class MediaService {
     detailKey: string,
     ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
-    if (!sharp) {
-      this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image rotate rejected`,
-      );
-      throw new BadRequestException(
-        "Image processing (sharp) is not available",
-      );
-    }
+    const sharpLib = this.requireSharp("rotate");
     // Sahiplik İKİ yoldan kabul edilir, çünkü depoda iki anahtar şeması var:
     //
     //  - yeni şema anahtarı kullanıcının yükleme klasöründedir
@@ -462,9 +519,9 @@ export class MediaService {
     const source = await this.storageService.downloadFileByKey(detailKey);
     // Saat yönünde 90°. Kaynak zaten yönlendirilmiş bir WebP, o yüzden
     // `autoOrient` burada etkisiz — çevirme AÇIKÇA istenir.
-    const rotated = await sharp(source).rotate(90).toBuffer();
+    const rotated = await sharpLib(source).rotate(90).toBuffer();
 
-    return this.writeProductImageVariants(rotated, ownerUserId);
+    return this.writeProductImageVariants(sharpLib, rotated, ownerUserId);
   }
 
   /**
@@ -475,32 +532,27 @@ export class MediaService {
    * yüklenenle aynı biçimde üretilmiyor olurdu.
    */
   private async writeProductImageVariants(
+    sharpLib: SharpFactory,
     source: Buffer,
     ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
     const baseId = uuidv4();
     const folder = productImageFolder(ownerUserId);
-    const cacheOpts = {
-      contentType: "image/webp" as const,
-      cacheControl: "public, max-age=31536000, immutable",
-      skipMediaFile: true,
-    };
 
     // Kaynak TEK kez çözülür: detay (1200 inside) kaynaktan, kart (500×500
     // cover) bu detay tamponundan üretilir. İki kez tam çözmek tepe belleği
     // ikiye katlıyordu; detay zaten yönlendirilmiş ve 1200 px'e inmiş olduğu
     // için kart için `autoOrient` gerekmez. Encode'lar sıralıdır; yalnız iki
     // depo yüklemesi paralel koşar (süreyi asıl bekleyen kısım onlar).
-    const detailBuffer = await sharp(source)
-      .autoOrient()
-      .resize(1200, 1200, { fit: "inside" })
-      .webp({ quality: 90 })
-      .toBuffer();
+    const detailBuffer = await encodeVariant(
+      sharpLib(source).autoOrient(),
+      PRODUCT_DETAIL_VARIANT,
+    );
 
-    const cardBuffer = await sharp(detailBuffer)
-      .resize(500, 500, { fit: "cover" })
-      .webp({ quality: 85 })
-      .toBuffer();
+    const cardBuffer = await encodeVariant(
+      sharpLib(detailBuffer),
+      PRODUCT_CARD_VARIANT,
+    );
 
     // Hata semantiği: bir yükleme düşerse çağrı reddedilir; ama `Promise.all`
     // diğer yüklemeyi İPTAL ETMEZ — o tamamlanırsa nesne depoda SAHİPSİZ kalır
@@ -513,15 +565,13 @@ export class MediaService {
         bucket: "products",
         folder,
         filename: `${baseId}-card.webp`,
-        mimeType: "image/webp",
-        ...cacheOpts,
+        ...IMMUTABLE_WEBP_UPLOAD,
       }),
       this.storageService.uploadFile(detailBuffer, {
         bucket: "products",
         folder,
         filename: `${baseId}-detail.webp`,
-        mimeType: "image/webp",
-        ...cacheOpts,
+        ...IMMUTABLE_WEBP_UPLOAD,
       }),
     ]);
 
@@ -534,14 +584,7 @@ export class MediaService {
   async uploadCollectionCover(
     file: Express.Multer.File,
   ): Promise<{ key: string }> {
-    if (!sharp) {
-      this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image upload rejected`,
-      );
-      throw new BadRequestException(
-        "Image processing (sharp) is not available",
-      );
-    }
+    const sharpLib = this.requireSharp("upload");
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -561,20 +604,16 @@ export class MediaService {
       throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
-    const buffer = await sharp(file.buffer)
-      .autoOrient()
-      .resize(1200, 600, { fit: "cover" })
-      .webp({ quality: 85 })
-      .toBuffer();
+    const buffer = await encodeVariant(
+      sharpLib(file.buffer).autoOrient(),
+      COLLECTION_COVER_VARIANT,
+    );
 
     const result = await this.storageService.uploadFile(buffer, {
       bucket: "collections",
       folder: "covers",
       filename: `${uuidv4()}.webp`,
-      mimeType: "image/webp",
-      contentType: "image/webp",
-      cacheControl: "public, max-age=31536000, immutable",
-      skipMediaFile: true,
+      ...IMMUTABLE_WEBP_UPLOAD,
     });
 
     return { key: result.key };

@@ -8,82 +8,17 @@ import {
   MAX_UPLOAD_DIMENSION,
   parseJpegInfo,
   scaledDimensions,
+  UPLOAD_JPEG_QUALITY,
   type DownscaleDeps,
 } from "./resize-image";
+import { isAbortError } from "./abort";
+import { jpegBytes, jpegFile } from "./jpeg-fixture";
 
 /**
  * Canvas kısmı tarayıcı tesisatıdır (jsdom'da canvas yok); burada KARAR
  * mantığı test edilir — ne zaman küçültülür, hangi boyuta inilir, hangi
  * durumda sessizce orijinale dönülür. Tesisat `DownscaleDeps` ile değiştirilir.
  */
-
-const u16 = (value: number) => [(value >> 8) & 0xff, value & 0xff];
-
-/** Minimal EXIF APP1 segmenti: tek girişli IFD0 (Orientation). */
-function exifSegment(orientation: number, littleEndian: boolean): number[] {
-  const short = (value: number) =>
-    littleEndian ? [value & 0xff, (value >> 8) & 0xff] : u16(value);
-  const long = (value: number) =>
-    littleEndian
-      ? [value & 0xff, (value >> 8) & 0xff, 0, 0]
-      : [0, 0, ...u16(value)];
-  const tiff = [
-    ...(littleEndian ? [0x49, 0x49] : [0x4d, 0x4d]),
-    ...short(0x002a),
-    ...long(8), // IFD0 ofseti
-    ...short(1), // giriş sayısı
-    ...short(0x0112), // tag
-    ...short(3), // tür: SHORT
-    ...long(1), // adet
-    ...short(orientation),
-    0,
-    0, // değer alanı dolgusu
-    0,
-    0,
-    0,
-    0, // sonraki IFD yok
-  ];
-  const body = [..."Exif\0\0".split("").map((c) => c.charCodeAt(0)), ...tiff];
-  return [0xff, 0xe1, ...u16(body.length + 2), ...body];
-}
-
-/** SOI + (isteğe bağlı EXIF) + SOF + dolgu. `progressive` SOF2 kullanır. */
-function jpegBytes(options: {
-  width: number;
-  height: number;
-  orientation?: number;
-  littleEndian?: boolean;
-  progressive?: boolean;
-  padding?: number;
-}): number[] {
-  const { width, height, orientation, littleEndian = false } = options;
-  return [
-    0xff,
-    0xd8,
-    ...(orientation ? exifSegment(orientation, littleEndian) : []),
-    0xff,
-    options.progressive ? 0xc2 : 0xc0,
-    ...u16(11),
-    8,
-    ...u16(height),
-    ...u16(width),
-    1,
-    1,
-    0x11,
-    0,
-    ...Array(options.padding ?? 4096).fill(7),
-  ];
-}
-
-const jpegFile = (
-  options: Parameters<typeof jpegBytes>[0],
-  name = "p.jpg",
-  type = "image/jpeg",
-) =>
-  new File([new Uint8Array(jpegBytes(options))], name, {
-    type,
-    lastModified: 42,
-  });
 
 const bitmap = (width: number, height: number) =>
   ({ width, height, close: vi.fn() }) as unknown as ImageBitmap;
@@ -195,11 +130,16 @@ describe("downscaleImageFile", () => {
     });
     const file = jpegFile({ width: 4000, height: 3000 }, "tatil.jpeg");
 
-    const result = await downscaleImageFile(file, deps);
+    const result = await downscaleImageFile(file, { deps });
 
     // Tam çözünürlüklü bitmap hiç oluşmasın: hedef boyut çözücüye verilir.
     expect(decode).toHaveBeenCalledWith(file, { width: 1600, height: 1200 });
-    expect(render).toHaveBeenCalledWith(bmp, { width: 1600, height: 1200 });
+    expect(render).toHaveBeenCalledWith(bmp, {
+      width: 1600,
+      height: 1200,
+      type: "image/jpeg",
+      quality: UPLOAD_JPEG_QUALITY,
+    });
     expect(result).not.toBe(file);
     expect(result.type).toBe("image/jpeg");
     expect(result.name).toBe("tatil.jpg");
@@ -213,7 +153,7 @@ describe("downscaleImageFile", () => {
 
     await downscaleImageFile(
       jpegFile({ width: 4000, height: 3000, orientation: 3 }),
-      deps,
+      { deps },
     );
 
     expect(decode).toHaveBeenCalledWith(expect.anything(), {
@@ -228,15 +168,15 @@ describe("downscaleImageFile", () => {
       const { deps, decode, render } = depsFor({ width: 3000, height: 4000 });
       const file = jpegFile({ width: 4000, height: 3000, orientation: 6 });
 
-      const result = await downscaleImageFile(file, deps);
+      const result = await downscaleImageFile(file, { deps });
 
       // Uygulanıp uygulanmadığını bitmap boyutundan ayırt edebilmek için
       // hedef boyutla DEĞİL tam çözülür.
       expect(decode).toHaveBeenCalledWith(file, undefined);
-      expect(render).toHaveBeenCalledWith(expect.anything(), {
-        width: 1200,
-        height: 1600,
-      });
+      expect(render).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ width: 1200, height: 1600 }),
+      );
       expect(result).not.toBe(file);
     });
 
@@ -244,7 +184,7 @@ describe("downscaleImageFile", () => {
       const { deps, render, bmp } = depsFor({ width: 4000, height: 3000 });
       const file = jpegFile({ width: 4000, height: 3000, orientation: 6 });
 
-      expect(await downscaleImageFile(file, deps)).toBe(file);
+      expect(await downscaleImageFile(file, { deps })).toBe(file);
       // Yan çizilmiş görsel üretilmez; sunucu autoOrient ile düzeltir.
       expect(render).not.toHaveBeenCalled();
       expect(bmp.close).toHaveBeenCalled();
@@ -256,7 +196,7 @@ describe("downscaleImageFile", () => {
         const { deps, render } = depsFor({ width: 4000, height: 3000 });
         const file = jpegFile({ width: 4000, height: 3000, orientation });
 
-        expect(await downscaleImageFile(file, deps)).toBe(file);
+        expect(await downscaleImageFile(file, { deps })).toBe(file);
         expect(render).not.toHaveBeenCalled();
       },
     );
@@ -265,7 +205,7 @@ describe("downscaleImageFile", () => {
       const { deps, render } = depsFor({ width: 3000, height: 3000 });
       const file = jpegFile({ width: 3000, height: 3000, orientation: 6 });
 
-      expect(await downscaleImageFile(file, deps)).not.toBe(file);
+      expect(await downscaleImageFile(file, { deps })).not.toBe(file);
       expect(render).toHaveBeenCalled();
     });
   });
@@ -274,7 +214,7 @@ describe("downscaleImageFile", () => {
     const { deps, decode } = depsFor({ width: 1200, height: 800 });
     const file = jpegFile({ width: 1200, height: 800 });
 
-    expect(await downscaleImageFile(file, deps)).toBe(file);
+    expect(await downscaleImageFile(file, { deps })).toBe(file);
     expect(decode).not.toHaveBeenCalled();
   });
 
@@ -283,7 +223,7 @@ describe("downscaleImageFile", () => {
     const { deps, decode } = depsFor({ width: 1000, height: 1500 });
     const file = jpegFile({ width: 1500, height: 1000, orientation: 6 });
 
-    expect(await downscaleImageFile(file, deps)).toBe(file);
+    expect(await downscaleImageFile(file, { deps })).toBe(file);
     expect(decode).not.toHaveBeenCalled();
   });
 
@@ -293,9 +233,9 @@ describe("downscaleImageFile", () => {
       const decode = vi.fn();
       const file = new File([new Uint8Array(4096)], "x", { type });
 
-      expect(await downscaleImageFile(file, { decode, render: vi.fn() })).toBe(
-        file,
-      );
+      expect(
+        await downscaleImageFile(file, { deps: { decode, render: vi.fn() } }),
+      ).toBe(file);
       expect(decode).not.toHaveBeenCalled();
     },
   );
@@ -306,7 +246,7 @@ describe("downscaleImageFile", () => {
       type: "image/jpeg",
     });
 
-    expect(await downscaleImageFile(file, deps)).toBe(file);
+    expect(await downscaleImageFile(file, { deps })).toBe(file);
     expect(decode).not.toHaveBeenCalled();
   });
 
@@ -320,7 +260,7 @@ describe("downscaleImageFile", () => {
         render: vi.fn(),
       };
 
-      expect(await downscaleImageFile(file, deps)).toBe(file);
+      expect(await downscaleImageFile(file, { deps })).toBe(file);
     });
 
     it("canvas kodlayamazsa (null blob)", async () => {
@@ -331,7 +271,7 @@ describe("downscaleImageFile", () => {
         render: async () => null,
       };
 
-      expect(await downscaleImageFile(file, deps)).toBe(file);
+      expect(await downscaleImageFile(file, { deps })).toBe(file);
       expect(bmp.close).toHaveBeenCalled();
     });
 
@@ -345,7 +285,7 @@ describe("downscaleImageFile", () => {
         },
       };
 
-      expect(await downscaleImageFile(file, deps)).toBe(file);
+      expect(await downscaleImageFile(file, { deps })).toBe(file);
       expect(bmp.close).toHaveBeenCalled();
     });
 
@@ -353,7 +293,7 @@ describe("downscaleImageFile", () => {
       const { deps } = depsFor({ width: 1600, height: 1200 }, 50_000);
       const file = jpegFile({ width: 4000, height: 3000 });
 
-      expect(await downscaleImageFile(file, deps)).toBe(file);
+      expect(await downscaleImageFile(file, { deps })).toBe(file);
     });
 
     it("ortam createImageBitmap'i sunmuyorsa (varsayılan tesisat)", async () => {
@@ -385,11 +325,11 @@ describe("downscaleImageFile", () => {
 
       const first = downscaleImageFile(
         jpegFile({ width: 4000, height: 3000 }, "a.jpg"),
-        make("a", firstDone),
+        { deps: make("a", firstDone) },
       );
       const second = downscaleImageFile(
         jpegFile({ width: 4000, height: 3000 }, "b.jpg"),
-        make("b"),
+        { deps: make("b") },
       );
 
       // Birincinin çözmesi askıdayken ikinci hiç başlamamış olmalı.
@@ -411,12 +351,90 @@ describe("downscaleImageFile", () => {
       const { deps } = depsFor({ width: 1600, height: 1200 });
 
       const [a, b] = await Promise.all([
-        downscaleImageFile(jpegFile({ width: 4000, height: 3000 }), failing),
-        downscaleImageFile(jpegFile({ width: 4000, height: 3000 }), deps),
+        downscaleImageFile(jpegFile({ width: 4000, height: 3000 }), {
+          deps: failing,
+        }),
+        downscaleImageFile(jpegFile({ width: 4000, height: 3000 }), { deps }),
       ]);
 
       expect(a.type).toBe("image/jpeg");
       expect(b.size).toBe(100);
+    });
+  });
+
+  /**
+   * Kalem kaldırıldığında küçültme kuyruk slotunu tutmamalı ve orijinal
+   * dosyaya "düşmemeli" — düşseydi kaldırılan kalemin yüklemesi başlardı.
+   */
+  describe("iptal", () => {
+    it("çözme ile çizim arasında iptal edilirse çizmez, AbortError verir", async () => {
+      const controller = new AbortController();
+      const bmp = bitmap(1600, 1200);
+      const render = vi.fn();
+      const deps: DownscaleDeps = {
+        decode: async () => {
+          controller.abort();
+          return bmp;
+        },
+        render,
+      };
+
+      const error = await downscaleImageFile(
+        jpegFile({ width: 4000, height: 3000 }),
+        { deps, signal: controller.signal },
+      ).catch((e: unknown) => e);
+
+      expect(isAbortError(error)).toBe(true);
+      // Çağıran iptal anında serbest kalır; iş kendi adımında durup bitmap'i
+      // bırakır — bir tur bekleyip sonucu ölçeriz.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(render).not.toHaveBeenCalled();
+      expect(bmp.close).toHaveBeenCalled();
+    });
+
+    it("sırada beklerken iptal edilirse hemen bırakır ve hiç çözmez", async () => {
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      const blocking = downscaleImageFile(
+        jpegFile({ width: 4000, height: 3000 }, "a.jpg"),
+        {
+          deps: {
+            decode: async () => {
+              await released;
+              return bitmap(1600, 1200);
+            },
+            render: async () => new Blob([new Uint8Array(10)]),
+          },
+        },
+      );
+
+      const controller = new AbortController();
+      const { deps, decode } = depsFor({ width: 1600, height: 1200 });
+      const waiting = downscaleImageFile(
+        jpegFile({ width: 4000, height: 3000 }, "b.jpg"),
+        { deps, signal: controller.signal },
+      );
+      controller.abort();
+
+      // Öndeki iş hâlâ sürüyor ama bekleyen çağıran serbest kaldı.
+      expect(isAbortError(await waiting.catch((e: unknown) => e))).toBe(true);
+
+      release();
+      await blocking;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(decode).not.toHaveBeenCalled();
+    });
+
+    it("küçültülmeyen türde sinyal yok sayılır (canvas'a hiç girmez)", async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const file = new File([new Uint8Array(4096)], "x.png", {
+        type: "image/png",
+      });
+
+      expect(
+        await downscaleImageFile(file, { signal: controller.signal }),
+      ).toBe(file);
     });
   });
 });

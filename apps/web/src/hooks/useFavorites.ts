@@ -8,30 +8,26 @@ import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { wishlistItemsQuery, type WishlistEntry } from "@/lib/wishlist";
-import { useToggleWishlist } from "@/hooks/useWishlist";
+import { wishlistItemsQuery } from "@/lib/wishlist";
+import { useToggleWishlist, useWishlistPendingIds } from "@/hooks/useWishlist";
 import { useAuthStore } from "@/stores/authStore";
 import { useCart } from "@/hooks/useCart";
 import { useLocale, useTranslations } from "next-intl";
 import type { WishlistItem } from "@/components/favorites/types";
+import { selectFavoritesView } from "@/components/favorites/select";
 import { MAX_SHARED_FAVORITES } from "@/lib/share";
 import { publicNameOf } from "@/lib/public-name";
-
-/**
- * Favorilerim yalnız tam satırları çizer: kartta favorilenen ürünün iyimser
- * (yalnız `productId`'li) satırı, gerçek satır gelene kadar burada görünmez.
- */
-const selectWishlistItems = (items: readonly WishlistEntry[]): WishlistItem[] =>
-  items.filter(
-    (item): item is WishlistEntry & WishlistItem =>
-      typeof item.productTitle === "string" && !!item.productTitle,
-  );
 
 /**
  * Favorites data: the user's wishlist OR a shared read-only list (`?ids=`), plus
  * the remove action and add-to-cart handler. The list is the shared
  * `wishlistItemsQuery` (same cache as the header badge and the card hearts) and
  * removal goes through the shared `useToggleWishlist` (optimistic + rollback).
+ *
+ * `pendingCount` = optimistic adds whose real row hasn't arrived yet; the page
+ * shows them as loading tiles so its count matches the header badge.
+ * `isPending(productId)` = a favorite request for that product is in flight;
+ * the remove button shows busy and a second click is ignored.
  */
 export function useFavorites() {
   const searchParams = useSearchParams();
@@ -55,7 +51,7 @@ export function useFavorites() {
 
   const wishlistQuery = useQuery({
     ...wishlistItemsQuery,
-    select: selectWishlistItems,
+    select: selectFavoritesView,
     enabled: !authLoading && isAuthenticated && !isSharedView,
     meta: { page: "favorites" },
   });
@@ -99,12 +95,16 @@ export function useFavorites() {
 
   const items = isSharedView
     ? (sharedProductsQuery.data ?? [])
-    : (wishlistQuery.data ?? []);
+    : (wishlistQuery.data?.items ?? []);
+  const pendingCount = isSharedView
+    ? 0
+    : (wishlistQuery.data?.pendingCount ?? 0);
   const isLoading = isSharedView
     ? sharedProductsQuery.isLoading
     : wishlistQuery.isLoading;
 
   const toggleWishlist = useToggleWishlist();
+  const pendingIds = useWishlistPendingIds();
 
   const inCartIds = useMemo(
     () =>
@@ -142,13 +142,14 @@ export function useFavorites() {
 
   return {
     items,
+    pendingCount,
     isLoading,
     isSharedView,
     isAuthenticated,
     authLoading,
-    handleRemove: (productId: string) => {
-      toggleWishlist(productId, true);
-    },
+    isPending: (productId: string) => pendingIds.has(productId),
+    /** `false` = aynı ürün için istek sürüyor, tıklama yok sayıldı. */
+    handleRemove: (productId: string) => toggleWishlist(productId, true),
     handleCartToggle,
     isInCart,
   };

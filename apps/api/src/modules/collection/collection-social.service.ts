@@ -380,6 +380,7 @@ export class CollectionSocialService {
                     product: {
                       select: {
                         id: true,
+                        sellerId: true,
                         kind: true,
                         title: true,
                         status: true,
