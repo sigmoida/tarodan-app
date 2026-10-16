@@ -217,6 +217,40 @@ describe("ProductUpdateService — düzenlemede fiyat sınırı", () => {
     });
   });
 
+  describe("yazılacak değerler denetlenir (ham alanlar değil)", () => {
+    it("originalPrice ile yazılacak çizili fiyat üst sınırı aşamaz", async () => {
+      const { service, tx } = makeService({
+        product: { price: 100 },
+        limits: { max_product_price: "5000" },
+      });
+
+      const error: any = await update(service, {
+        price: 1000,
+        originalPrice: 5_000_000,
+        salePrice: 800,
+      }).catch((e) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error.response).toMatchObject({
+        i18nKey: "server.product.priceAboveMaximum",
+        i18nParams: { maxPrice: 5000 },
+      });
+      expect(tx.product.update).not.toHaveBeenCalled();
+    });
+
+    it("originalPrice gönderilmezse çizili fiyat kayıtlı fiyattır (muaf)", async () => {
+      const { service, tx } = makeService({
+        product: { price: 100 },
+        limits: { min_product_price: "250" },
+      });
+
+      // Yeni indirimli fiyat 260 (sınır üstü); çizili fiyat = kayıtlı 100 (muaf).
+      await update(service, { price: 100, salePrice: 260 });
+
+      expect(tx.product.update).toHaveBeenCalled();
+    });
+  });
+
   describe("üst sınır", () => {
     it("değişen fiyat üst sınırı aşarsa reddedilir", async () => {
       const { service } = makeService({

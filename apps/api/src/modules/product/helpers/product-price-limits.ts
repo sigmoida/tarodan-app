@@ -7,27 +7,38 @@ export interface ProductPriceLimits {
   maxPrice: number | null;
 }
 
+/** Ayar anahtarları — okuma ve yazma kapıları aynı adı kullanır. */
+export const MIN_PRODUCT_PRICE_SETTING = "min_product_price";
+export const MAX_PRODUCT_PRICE_SETTING = "max_product_price";
+
+/**
+ * Ham ayar değeri → sınır. Boş / boşluk / sayısal olmayan değer null (kural
+ * yok). Yükleyici ve herkese açık ayar yanıtı AYNI ayrıştırmayı kullanır.
+ */
+export function parseProductPriceLimit(
+  raw: string | null | undefined,
+): number | null {
+  if (!raw?.trim()) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
 export async function loadProductPriceLimits(
   prisma: Pick<PrismaService, "platformSetting">,
 ): Promise<ProductPriceLimits> {
   const [minSetting, maxSetting] = await Promise.all([
     prisma.platformSetting.findUnique({
-      where: { settingKey: "min_product_price" },
+      where: { settingKey: MIN_PRODUCT_PRICE_SETTING },
       select: { settingValue: true },
     }),
     prisma.platformSetting.findUnique({
-      where: { settingKey: "max_product_price" },
+      where: { settingKey: MAX_PRODUCT_PRICE_SETTING },
       select: { settingValue: true },
     }),
   ]);
-  const parse = (raw: string | null | undefined) => {
-    if (!raw?.trim()) return null;
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : null;
-  };
   return {
-    minPrice: parse(minSetting?.settingValue),
-    maxPrice: parse(maxSetting?.settingValue),
+    minPrice: parseProductPriceLimit(minSetting?.settingValue),
+    maxPrice: parseProductPriceLimit(maxSetting?.settingValue),
   };
 }
 

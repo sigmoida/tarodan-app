@@ -95,6 +95,17 @@ describe("buildProductEditProjection", () => {
     expect(edit.salePrice).toBeNull();
   });
 
+  it("eski originalPrice alanını da taşır (fiyat sınırı muafiyet listesi)", () => {
+    const withOriginal = buildProductEditProjection(
+      product({ originalPrice: "120.00" }),
+      { imageUrl },
+    );
+    const without = buildProductEditProjection(product(), { imageUrl });
+
+    expect(withOriginal.originalPrice).toBe(120);
+    expect(without.originalPrice).toBeNull();
+  });
+
   it("ürünün KENDİ indirimini olduğu gibi taşır", () => {
     const edit = buildProductEditProjection(
       product({

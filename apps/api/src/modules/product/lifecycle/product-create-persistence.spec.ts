@@ -224,14 +224,19 @@ describe("ProductCreateService required listing details", () => {
   });
 
   describe("platform price floor", () => {
-    const withMinimum = (min: string) =>
+    const withLimits = (limits: {
+      min_product_price?: string;
+      max_product_price?: string;
+    }) =>
       prisma.platformSetting.findUnique.mockImplementation(({ where }: any) =>
         Promise.resolve(
-          where.settingKey === "min_product_price"
-            ? { settingValue: min }
-            : null,
+          (limits as Record<string, string | undefined>)[where.settingKey] ===
+            undefined
+            ? null
+            : { settingValue: (limits as any)[where.settingKey] },
         ),
       );
+    const withMinimum = (min: string) => withLimits({ min_product_price: min });
     afterEach(() => {
       prisma.platformSetting.findUnique.mockReset();
       prisma.platformSetting.findUnique.mockResolvedValue(null);
@@ -253,6 +258,32 @@ describe("ProductCreateService required listing details", () => {
         },
       });
       expect(prisma.product.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a stored original price above the maximum (originalPrice cannot bypass it)", async () => {
+      withLimits({ max_product_price: "5000" });
+
+      await expect(
+        service.create(sellerId, {
+          ...dto,
+          originalPrice: 5_000_000,
+          salePrice: 800,
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          i18nKey: "server.product.priceAboveMaximum",
+          i18nParams: { maxPrice: 5000 },
+        },
+      });
+      expect(prisma.product.create).not.toHaveBeenCalled();
+    });
+
+    it("ignores a sale price that is not below the original (no misleading error)", async () => {
+      withLimits({ min_product_price: "250", max_product_price: "5000" });
+
+      await service.create(sellerId, { ...dto, salePrice: 9_000_000 });
+
+      expect(prisma.product.create).toHaveBeenCalled();
     });
 
     it("accepts a discounted price at or above the minimum", async () => {

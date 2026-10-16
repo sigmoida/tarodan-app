@@ -362,36 +362,6 @@ export class ProductUpdateService {
       });
     }
 
-    // Platform min/max fiyat limiti düzenlemede de geçerli (create ile aynı
-    // kaynak) — ama GERİYE DÖNÜK DEĞİL: yalnız fiyat gerçekten DEĞİŞİYORSA ya
-    // da yeni bir indirim giriliyorsa denetlenir. Sınırın altında kalmış mevcut
-    // ilan yayında kalır ve fiyatına dokunmadan düzenlenebilir; formlar
-    // kayıtlı fiyatı olduğu gibi geri gönderir. Admin düzenlemesi muaf (ürün
-    // kararı): destek ekibi istisnai fiyat girebilir; toplu içe aktarma muaf değil.
-    if (!isAdmin && (dto.price !== undefined || dto.salePrice != null)) {
-      const storedPrices = [
-        product.price,
-        product.oldPrice,
-        product.originalPrice,
-        product.salePrice,
-      ];
-      const candidates = [
-        dto.price !== undefined ? Number(dto.price) : null,
-        dto.salePrice != null && Number(dto.salePrice) > 0
-          ? Number(dto.salePrice)
-          : null,
-      ].filter(
-        (candidate): candidate is number =>
-          candidate != null && !isStoredProductPrice(candidate, storedPrices),
-      );
-      if (candidates.length > 0) {
-        const priceLimits = await loadProductPriceLimits(this.prisma);
-        for (const candidate of candidates) {
-          assertProductPriceWithinLimits(candidate, priceLimits);
-        }
-      }
-    }
-
     // Check membership for trade feature
     let canEnableTrade = false;
     if (dto.isTradeEnabled === true) {
@@ -474,6 +444,39 @@ export class ProductUpdateService {
         : priceUpdate !== undefined
           ? priceUpdate
           : dto.price;
+
+    // Platform min/max fiyat limiti düzenlemede de geçerli (create ile aynı
+    // kaynak) — ama GERİYE DÖNÜK DEĞİL: yalnız fiyat gerçekten DEĞİŞİYORSA ya
+    // da yeni bir indirim giriliyorsa denetlenir. Sınırın altında kalmış mevcut
+    // ilan yayında kalır ve fiyatına dokunmadan düzenlenebilir; formlar
+    // kayıtlı fiyatı olduğu gibi geri gönderir. Admin düzenlemesi muaf (ürün
+    // kararı): destek ekibi istisnai fiyat girebilir; toplu içe aktarma muaf değil.
+    //
+    // Denetlenen, istekteki ham alanlar değil YAZILACAK değerlerdir (yukarıdaki
+    // çözümleme): `originalPrice` ile yazılacak çizili fiyat da üst sınırı
+    // aşamaz, yok sayılan bir alan ise yanıltıcı hata vermez.
+    if (!isAdmin) {
+      const storedPrices = [
+        product.price,
+        product.oldPrice,
+        product.originalPrice,
+        product.salePrice,
+      ];
+      const candidates = [effectivePrice, oldPriceUpdate]
+        .map((value) => (value == null ? null : Number(value)))
+        .filter(
+          (candidate): candidate is number =>
+            candidate != null &&
+            Number.isFinite(candidate) &&
+            !isStoredProductPrice(candidate, storedPrices),
+        );
+      if (candidates.length > 0) {
+        const priceLimits = await loadProductPriceLimits(this.prisma);
+        for (const candidate of candidates) {
+          assertProductPriceWithinLimits(candidate, priceLimits);
+        }
+      }
+    }
 
     const resolvedStatus = resolveUpdatedStatus(product, dto, actor);
     // Bu düzenleme ilanı vitrinden düşürüyorsa NEDENİ: satıcının pasife alması
