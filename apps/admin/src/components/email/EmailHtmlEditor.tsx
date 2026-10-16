@@ -150,7 +150,7 @@ export function EmailHtmlEditor({
         autoCorrect="off"
         autoCapitalize="off"
         placeholder={placeholder}
-        className={`${className} flex-1 resize-none rounded-lg border border-border bg-surface-alt p-3 font-mono text-xs leading-relaxed text-heading placeholder:text-subtle focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20`}
+        className={`${className} flex-1 resize-none bg-surface-alt p-3 font-mono text-xs leading-relaxed text-heading sm:text-xs`}
       />
       {error && <p className="mt-1 text-xs text-danger-500">{error}</p>}
     </div>

@@ -191,295 +191,296 @@ export function SendNotificationForm({
         size="wide"
         closeOnBackdrop={false}
       >
-        {/* xl altında önizleme push metin alanlarının hemen altına düşer; xl'de
-            sağ sütunda sticky kalır (iki satıra yayılır). */}
-        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
-          <div className="xl:col-span-3 xl:col-start-1 xl:row-start-1">
-            <SectionCard
-              title={t("admin.marketing.notifications.pushTextTitle")}
-              bodyClassName="space-y-5"
-            >
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-sm font-medium text-body">
-                    {t("common.title")}
-                  </span>
-                  <span
-                    className={clsx(
-                      "text-xs",
-                      values.title.length > 65
-                        ? "font-medium text-danger-500"
-                        : "text-muted",
-                    )}
-                  >
-                    {values.title.length}/65
-                  </span>
-                </div>
-                <FormInput
-                  name="title"
-                  placeholder={t(
-                    "admin.marketing.notifications.titlePlaceholder",
-                  )}
-                />
-              </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-sm font-medium text-body">
-                    {t("admin.marketing.notifications.content")}
-                  </span>
-                  <span
-                    className={clsx(
-                      "text-xs",
-                      values.body.length > 240
-                        ? "font-medium text-danger-500"
-                        : "text-muted",
-                    )}
-                  >
-                    {values.body.length}/240
-                  </span>
-                </div>
-                <FormTextarea
-                  name="body"
-                  rows={4}
-                  placeholder={t(
-                    "admin.marketing.notifications.bodyPlaceholder",
-                  )}
-                />
-              </div>
-            </SectionCard>
-          </div>
-
-          <div className="xl:col-span-2 xl:col-start-4 xl:row-span-2 xl:row-start-1">
-            <SectionCard
-              title={t("admin.marketing.notifications.livePreview")}
-              className="xl:sticky xl:top-6"
-              bodyClassName="space-y-5"
-            >
-              {values.channels.includes("push") && (
-                <PushPreview title={values.title} body={values.body} />
-              )}
-
-              {values.channels.length === 0 && (
-                <EmptyState
-                  size="compact"
-                  icon={<BellIcon className="h-6 w-6" />}
-                  title={t(
-                    "admin.marketing.notifications.selectPreviewChannel",
-                  )}
-                />
-              )}
-
-              <DataList
-                columns={1}
-                className="gap-y-2 border-t border-border pt-2"
-              >
-                <Field label={t("admin.marketing.notifications.targetLabel")}>
-                  {
-                    targets.find((target) => target.key === values.targetType)
-                      ?.label
-                  }
-                </Field>
-                <Field label={t("admin.marketing.notifications.channels")}>
-                  {values.channels.length === 0
-                    ? "—"
-                    : values.channels
-                        .map(
-                          (channel) =>
-                            channels.find((item) => item.key === channel)
-                              ?.label,
-                        )
-                        .join(", ")}
-                </Field>
-                <Field label={t("common.status")}>
-                  <span
-                    className={clsx(
-                      canSend ? "text-success-600" : "text-warning-600",
-                    )}
-                  >
-                    {canSend
-                      ? t("admin.marketing.notifications.ready")
-                      : t("admin.marketing.notifications.missingFields")}
-                  </span>
-                </Field>
-              </DataList>
-            </SectionCard>
-          </div>
-
-          <div className="space-y-5 xl:col-span-3 xl:col-start-1 xl:row-start-2">
-            <SectionCard
-              title={t("admin.marketing.notifications.deliveryChannel")}
-              bodyClassName="space-y-4"
-            >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {channels.map((channel) => (
-                  <Tile
-                    key={channel.key}
-                    active={values.channels.includes(channel.key)}
-                    icon={channel.icon}
-                    label={channel.label}
-                    desc={channel.desc}
-                    onClick={() => toggleChannel(channel.key)}
-                  />
-                ))}
-              </div>
-              {form.formState.errors.channels?.message && (
-                <p className="text-xs text-danger-500">
-                  {form.formState.errors.channels.message}
-                </p>
-              )}
-            </SectionCard>
-
-            {emailSelected && (
+        {/* Üstte iki sütun (form | sticky önizleme+özet), altta tam genişlikte
+            e-posta kartı: editör ve önizleme yan yana yeterli genişlik alır. */}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
+            <div className="space-y-5 xl:col-span-3">
               <SectionCard
-                title={t("admin.marketing.notifications.emailSectionTitle")}
+                title={t("admin.marketing.notifications.pushTextTitle")}
                 bodyClassName="space-y-5"
               >
-                <FormInput
-                  name="emailSubject"
-                  label={t("admin.marketing.emailTemplates.emailSubject")}
-                  placeholder={t(
-                    "admin.marketing.notifications.emailSubjectPlaceholder",
-                  )}
-                />
-                <div className="space-y-2">
-                  <FormSelect
-                    name="mailingType"
-                    label={t("admin.marketing.notifications.mailingType.label")}
-                    options={mailingTypes}
-                  />
-                  <p className="text-xs text-muted">
-                    {values.mailingType === "marketing"
-                      ? t(
-                          "admin.marketing.notifications.mailingType.marketingHint",
-                        )
-                      : t(
-                          "admin.marketing.notifications.mailingType.announcementHint",
-                        )}
-                  </p>
-                  {audienceCounts && (
-                    <p className="text-xs font-medium text-body">
-                      {t("admin.marketing.notifications.recipientCount", {
-                        count:
-                          values.mailingType === "marketing"
-                            ? audienceCounts.marketing
-                            : audienceCounts.total,
-                        total: audienceCounts.total,
-                      })}
-                    </p>
-                  )}
-                </div>
-                {/* Editör ve önizleme yan yana (lg+), küçükte alt alta ve bitişik:
-                    şablon düzenleyicisiyle aynı desen. */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <EmailHtmlEditor
-                    name="emailHtml"
-                    placeholder={t(
-                      "admin.marketing.notifications.emailHtmlPlaceholder",
-                    )}
-                    className="min-h-[360px]"
-                    onUploadImage={uploadEmailImage}
-                  />
-                  {values.emailHtml.trim() ? (
-                    <EmailPreviewPane
-                      className="min-h-[360px]"
-                      preview={emailPreview.preview}
-                      isPending={emailPreview.isPending}
-                      error={emailPreview.error}
-                      onRetry={emailPreview.refetch}
-                    />
-                  ) : (
-                    <EmptyState
-                      size="compact"
-                      icon={false}
-                      title={t(
-                        "admin.marketing.notifications.emailPreviewEmpty",
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-sm font-medium text-body">
+                      {t("common.title")}
+                    </span>
+                    <span
+                      className={clsx(
+                        "text-xs",
+                        values.title.length > 65
+                          ? "font-medium text-danger-500"
+                          : "text-muted",
                       )}
-                    />
-                  )}
+                    >
+                      {values.title.length}/65
+                    </span>
+                  </div>
+                  <FormInput
+                    name="title"
+                    placeholder={t(
+                      "admin.marketing.notifications.titlePlaceholder",
+                    )}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-sm font-medium text-body">
+                      {t("admin.marketing.notifications.content")}
+                    </span>
+                    <span
+                      className={clsx(
+                        "text-xs",
+                        values.body.length > 240
+                          ? "font-medium text-danger-500"
+                          : "text-muted",
+                      )}
+                    >
+                      {values.body.length}/240
+                    </span>
+                  </div>
+                  <FormTextarea
+                    name="body"
+                    rows={4}
+                    placeholder={t(
+                      "admin.marketing.notifications.bodyPlaceholder",
+                    )}
+                  />
                 </div>
               </SectionCard>
-            )}
 
-            <SectionCard
-              title={t("admin.marketing.notifications.audience")}
-              bodyClassName="space-y-4"
-            >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {targets.map((target) => (
-                  <Tile
-                    key={target.key}
-                    active={values.targetType === target.key}
-                    icon={target.icon}
-                    label={target.label}
-                    desc={target.desc}
-                    onClick={() =>
-                      form.setValue(
-                        "targetType",
-                        target.key as SendForm["targetType"],
+              <SectionCard
+                title={t("admin.marketing.notifications.deliveryChannel")}
+                bodyClassName="space-y-4"
+              >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {channels.map((channel) => (
+                    <Tile
+                      key={channel.key}
+                      active={values.channels.includes(channel.key)}
+                      icon={channel.icon}
+                      label={channel.label}
+                      desc={channel.desc}
+                      onClick={() => toggleChannel(channel.key)}
+                    />
+                  ))}
+                </div>
+                {form.formState.errors.channels?.message && (
+                  <p className="text-xs text-danger-500">
+                    {form.formState.errors.channels.message}
+                  </p>
+                )}
+              </SectionCard>
+
+              <SectionCard
+                title={t("admin.marketing.notifications.audience")}
+                bodyClassName="space-y-4"
+              >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {targets.map((target) => (
+                    <Tile
+                      key={target.key}
+                      active={values.targetType === target.key}
+                      icon={target.icon}
+                      label={target.label}
+                      desc={target.desc}
+                      onClick={() =>
+                        form.setValue(
+                          "targetType",
+                          target.key as SendForm["targetType"],
+                          {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          },
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+
+                {values.targetType === "user_ids" && <UserPicker />}
+
+                {values.targetType === "segment" && (
+                  <Panel
+                    tone="muted"
+                    className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                  >
+                    <FormSelect
+                      name="isSeller"
+                      label={t("admin.marketing.notifications.sellerStatus")}
+                      options={[
                         {
-                          shouldDirty: true,
-                          shouldValidate: true,
+                          value: "",
+                          label: t("admin.marketing.notifications.allOption"),
                         },
-                      )
-                    }
+                        {
+                          value: "true",
+                          label: t("admin.marketing.notifications.onlySellers"),
+                        },
+                        {
+                          value: "false",
+                          label: t("admin.marketing.notifications.onlyBuyers"),
+                        },
+                      ]}
+                    />
+                    <FormSelect
+                      name="membershipTier"
+                      label={t("admin.marketing.notifications.membershipType")}
+                      options={[
+                        {
+                          value: "",
+                          label: t("admin.marketing.notifications.allOption"),
+                        },
+                        { value: "free", label: "Free" },
+                        { value: "basic", label: "Basic" },
+                        { value: "premium", label: "Premium" },
+                        { value: "business", label: "Business" },
+                      ]}
+                    />
+                  </Panel>
+                )}
+              </SectionCard>
+
+              <Button
+                type="button"
+                variant="secondary"
+                leftIcon={<ClockIcon className="h-4 w-4" />}
+                onClick={openSchedule}
+                disabled={!canSend}
+                className="w-full justify-center"
+              >
+                {t("admin.marketing.notifications.schedule")}
+              </Button>
+            </div>
+
+            <div className="xl:sticky xl:top-6 xl:col-span-2 xl:self-start">
+              <SectionCard
+                title={
+                  values.channels.includes("push")
+                    ? t("admin.marketing.notifications.livePreview")
+                    : t("admin.marketing.notifications.summary")
+                }
+                bodyClassName="space-y-5"
+              >
+                {values.channels.includes("push") && (
+                  <PushPreview title={values.title} body={values.body} />
+                )}
+
+                {values.channels.length === 0 && (
+                  <EmptyState
+                    size="compact"
+                    icon={<BellIcon className="h-6 w-6" />}
+                    title={t(
+                      "admin.marketing.notifications.selectPreviewChannel",
+                    )}
                   />
-                ))}
-              </div>
+                )}
 
-              {values.targetType === "user_ids" && <UserPicker />}
-
-              {values.targetType === "segment" && (
-                <Panel
-                  tone="muted"
-                  className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                <DataList
+                  columns={1}
+                  className="gap-y-2 border-t border-border pt-2"
                 >
-                  <FormSelect
-                    name="isSeller"
-                    label={t("admin.marketing.notifications.sellerStatus")}
-                    options={[
-                      {
-                        value: "",
-                        label: t("admin.marketing.notifications.allOption"),
-                      },
-                      {
-                        value: "true",
-                        label: t("admin.marketing.notifications.onlySellers"),
-                      },
-                      {
-                        value: "false",
-                        label: t("admin.marketing.notifications.onlyBuyers"),
-                      },
-                    ]}
-                  />
-                  <FormSelect
-                    name="membershipTier"
-                    label={t("admin.marketing.notifications.membershipType")}
-                    options={[
-                      {
-                        value: "",
-                        label: t("admin.marketing.notifications.allOption"),
-                      },
-                      { value: "free", label: "Free" },
-                      { value: "basic", label: "Basic" },
-                      { value: "premium", label: "Premium" },
-                      { value: "business", label: "Business" },
-                    ]}
-                  />
-                </Panel>
-              )}
-            </SectionCard>
-
-            <Button
-              type="button"
-              variant="secondary"
-              leftIcon={<ClockIcon className="h-4 w-4" />}
-              onClick={openSchedule}
-              disabled={!canSend}
-              className="w-full justify-center"
-            >
-              {t("admin.marketing.notifications.schedule")}
-            </Button>
+                  <Field label={t("admin.marketing.notifications.targetLabel")}>
+                    {
+                      targets.find((target) => target.key === values.targetType)
+                        ?.label
+                    }
+                  </Field>
+                  <Field label={t("admin.marketing.notifications.channels")}>
+                    {values.channels.length === 0
+                      ? "—"
+                      : values.channels
+                          .map(
+                            (channel) =>
+                              channels.find((item) => item.key === channel)
+                                ?.label,
+                          )
+                          .join(", ")}
+                  </Field>
+                  <Field label={t("common.status")}>
+                    <span
+                      className={clsx(
+                        canSend ? "text-success-600" : "text-warning-600",
+                      )}
+                    >
+                      {canSend
+                        ? t("admin.marketing.notifications.ready")
+                        : t("admin.marketing.notifications.missingFields")}
+                    </span>
+                  </Field>
+                </DataList>
+              </SectionCard>
+            </div>
           </div>
+
+          {emailSelected && (
+            <SectionCard
+              title={t("admin.marketing.notifications.emailSectionTitle")}
+              bodyClassName="space-y-5"
+            >
+              <FormInput
+                name="emailSubject"
+                label={t("admin.marketing.emailTemplates.emailSubject")}
+                placeholder={t(
+                  "admin.marketing.notifications.emailSubjectPlaceholder",
+                )}
+              />
+              <div className="space-y-2">
+                <FormSelect
+                  name="mailingType"
+                  label={t("admin.marketing.notifications.mailingType.label")}
+                  options={mailingTypes}
+                />
+                <p className="text-xs text-muted">
+                  {values.mailingType === "marketing"
+                    ? t(
+                        "admin.marketing.notifications.mailingType.marketingHint",
+                      )
+                    : t(
+                        "admin.marketing.notifications.mailingType.announcementHint",
+                      )}
+                </p>
+                {audienceCounts && (
+                  <p className="text-xs font-medium text-body">
+                    {t("admin.marketing.notifications.recipientCount", {
+                      count:
+                        values.mailingType === "marketing"
+                          ? audienceCounts.marketing
+                          : audienceCounts.total,
+                      total: audienceCounts.total,
+                    })}
+                  </p>
+                )}
+              </div>
+              {/* Editör ve önizleme yan yana (lg+), küçükte alt alta ve bitişik:
+              şablon düzenleyicisiyle aynı desen. */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <EmailHtmlEditor
+                  name="emailHtml"
+                  placeholder={t(
+                    "admin.marketing.notifications.emailHtmlPlaceholder",
+                  )}
+                  className="h-[460px]"
+                  onUploadImage={uploadEmailImage}
+                />
+                {values.emailHtml.trim() ? (
+                  <EmailPreviewPane
+                    className="h-[460px]"
+                    preview={emailPreview.preview}
+                    isPending={emailPreview.isPending}
+                    error={emailPreview.error}
+                    onRetry={emailPreview.refetch}
+                  />
+                ) : (
+                  <EmptyState
+                    size="compact"
+                    icon={false}
+                    title={t("admin.marketing.notifications.emailPreviewEmpty")}
+                  />
+                )}
+              </div>
+            </SectionCard>
+          )}
         </div>
       </FormModal>
 
