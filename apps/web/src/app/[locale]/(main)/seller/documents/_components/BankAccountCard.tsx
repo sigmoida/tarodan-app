@@ -10,6 +10,7 @@ import { Button, isValidIban } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
 import { bankAccountApi } from "@/lib/api";
+import { BankAccountSummary } from "@/components/bank/BankAccountSummary";
 import { queryKeys } from "@/lib/query/keys";
 import { useTranslations } from "next-intl";
 
@@ -70,6 +71,13 @@ export function BankAccountCard() {
 
   return (
     <SectionCard title={t("seller.documents.ibanTitle")}>
+      {data && (
+        <BankAccountSummary
+          accountHolder={data.accountHolder ?? ""}
+          iban={data.iban ?? ""}
+          updatedAt={data.updatedAt}
+        />
+      )}
       <Form form={form} onSubmit={(v) => save.mutate(v)} className="space-y-3">
         <FormInput
           name="accountHolder"

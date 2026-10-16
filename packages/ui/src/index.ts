@@ -25,6 +25,7 @@ export {
   isExpiryValid,
   parseExpiry,
   isValidIban,
+  maskIban,
 } from "./components/PaymentInputs";
 export { Slider, type SliderProps } from "./components/Slider";
 export {
