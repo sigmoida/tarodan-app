@@ -195,7 +195,11 @@ function playwrightStage(context, id, label, options = {}) {
   );
 }
 
-function buildPushStages(context, apps) {
+function buildPushStages(context, apps, base) {
+  // Push gate = typecheck + contract + unit tests only. Production builds
+  // (api/web/admin) are left to CI and the deploy pipeline: running three
+  // builds on every push froze 16 GB dev machines. The seed build stays —
+  // it is seconds long and catches the prod crash-loop described below.
   const stages = [];
   // Each push stage carries its app so a passing app can be cached per tree.
   const pushFor = (app, ...appStages) =>
@@ -209,12 +213,15 @@ function buildPushStages(context, apps) {
         "@tarodan/api",
         "typecheck",
       ]),
-      jestStage(context, "api-unit", "API Unit", []),
-      commandStage("api-build", "API Build", [
-        "--filter",
-        "@tarodan/api...",
-        "build",
-      ]),
+      // Push gate: only the tests related to files changed since the pushed
+      // base (jest --changedSince). The full suite runs in CI / release.
+      // Without a base (first push of a branch, no upstream) run everything.
+      jestStage(
+        context,
+        "api-unit",
+        "API Unit",
+        base ? [`--changedSince=${base}`, "--passWithNoTests"] : [],
+      ),
       // Ayrı bir tsconfig, ayrı bir çıktı ağacı: `nest build` bunu KAPSAMAZ.
       // Üretim boot'u derlenmiş seed'leri sabit yollardan çağırdığı için
       // (seed:prod, bootstrap:prod:admin, …) buradaki bir kayma konteyneri
@@ -246,11 +253,6 @@ function buildPushStages(context, apps) {
         "@tarodan/web",
         "test",
       ]),
-      commandStage("web-build", "Web Build", [
-        "--filter",
-        "@tarodan/web...",
-        "build",
-      ]),
     );
   }
 
@@ -271,11 +273,6 @@ function buildPushStages(context, apps) {
         "--filter",
         "@tarodan/admin",
         "test",
-      ]),
-      commandStage("admin-build", "Admin Build", [
-        "--filter",
-        "@tarodan/admin...",
-        "build",
       ]),
     );
   }
@@ -676,7 +673,11 @@ async function run() {
         `Already verified for tree ${headTree.slice(0, 12)}: ${skipped.join(", ")} (skipped)`,
       );
     }
-    stages = buildPushStages(context, pending);
+    stages = buildPushStages(
+      context,
+      pending,
+      changes.fallbackAll ? undefined : base,
+    );
   } else if (options.mode === "release") {
     stages = buildReleaseStages(context, options.paytr);
     continueOnFailure = true;
