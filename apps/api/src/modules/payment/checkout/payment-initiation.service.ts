@@ -1577,8 +1577,12 @@ export class PaymentInitiationService {
     // SEC-H1: Bypass ASLA production'da çalışmaz — PAYMENT_BYPASS yanlışlıkla "true"
     // olsa bile. Bir config hatasının prod'da PARASIZ ödeme tamamlamasını engelleyen
     // SERT güvenlik ağı (endpoint ayrıca JWT auth + ownership ister).
+    // 404: production'da uç VAR GİBİ bile görünmez — config/DB bayrağına,
+    // ödemenin varlığına ya da sahipliğine bakılmadan, hiçbir okuma yapılmadan
+    // döner. `isProduction()` staging'i de kapsar (aynı optimize build,
+    // NODE_ENV=production) — kasıtlı: kapalı-başarısız, bugünkü davranış.
     if (isProduction()) {
-      throw new ForbiddenException("Payment bypass is disabled in production");
+      throw new NotFoundException(i18nMessage("server.common.recordNotFound"));
     }
     const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
     if (!bypassEnabled) {
