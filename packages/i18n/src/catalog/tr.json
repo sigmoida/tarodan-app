@@ -46,6 +46,9 @@
     "removing": "Çıkarılıyor",
     "copied": "Link kopyalandı!",
     "copyFailed": "Link kopyalanamadı",
+    "share": "Paylaş",
+    "shareOptions": "Paylaşım seçenekleri",
+    "copyLink": "Linki kopyala",
     "operationFailed": "İşlem başarısız",
     "comingSoon": "Bu özellik yakında eklenecek",
     "selectCity": "İl Seçin",
@@ -454,7 +457,6 @@
     "reportListing": "İlanı Şikayet Et",
     "reportListingTitle": "İlanı Raporla",
     "reportListingMessage": "İlanı raporlamak için giriş yapmanız gerekiyor.",
-    "share": "Paylaş",
     "addToCollection": "Koleksiyona Ekle",
     "addedToCollection": "Ürün koleksiyona eklendi",
     "similarProducts": "Benzer Ürünler",
@@ -594,7 +596,6 @@
     "stock": "Stok",
     "detailsSection": "Özellikler",
     "technicalDetails": "Teknik özellikler",
-    "copyLink": "Linki Kopyala",
     "thisIsYourListing": "Bu sizin ilanınız",
     "clearFilter": "Filtreyi temizle",
     "failedToCreateListing": "İlan oluşturulamadı",
@@ -895,7 +896,6 @@
     "loginRequired": "Favorileri görüntülemek için giriş yapın",
     "loadFailed": "Favoriler yüklenemedi",
     "shareList": "Listeyi paylaş",
-    "linkCopied": "Link kopyalandı",
     "sharedList": "Paylaşılan liste",
     "emptyDesc": "Beğendiğin ürünleri favorilerine ekle, buradan kolayca takip et."
   },
@@ -1778,8 +1778,6 @@
     }
   },
   "collection": {
-    "share": "Paylaş",
-    "linkCopied": "Link kopyalandı",
     "collections": "Koleksiyonlar",
     "myCollections": "Koleksiyonlarım",
     "createCollection": "Koleksiyon Oluştur",

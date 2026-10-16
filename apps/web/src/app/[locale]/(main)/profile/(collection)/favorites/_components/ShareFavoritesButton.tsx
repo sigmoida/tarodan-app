@@ -2,10 +2,9 @@
 
 "use client";
 
-import { ShareIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
-import toast from "react-hot-toast";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
+import ShareMenu from "@/components/share/ShareMenu";
+import { favoritesShareUrl } from "@/lib/share";
 
 export default function ShareFavoritesButton({
   productIds,
@@ -14,23 +13,12 @@ export default function ShareFavoritesButton({
 }) {
   const t = useTranslations();
 
-  const share = () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/favorites?ids=${productIds.join(",")}`;
-    navigator.clipboard.writeText(url).then(
-      () => toast.success(t("favorites.linkCopied")),
-      () => toast.error(t("common.operationFailed")),
-    );
-  };
-
   return (
-    <Button
-      variant="secondary"
-      type="button"
-      onClick={share}
-      leftIcon={<ShareIcon className="w-5 h-5" />}
-    >
-      {t("favorites.shareList")}
-    </Button>
+    <ShareMenu
+      url={favoritesShareUrl(productIds)}
+      title={t("favorites.sharedList")}
+      text={t("favorites.sharedList")}
+      label={t("favorites.shareList")}
+    />
   );
 }

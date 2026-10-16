@@ -158,25 +158,6 @@ function useCollectionDetailValue() {
     setShowReportModal(true);
   };
 
-  const handleShare = async () => {
-    if (!collection) return;
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: collection.name, url });
-        return;
-      } catch {
-        // cancelled / unsupported → fall through to copy
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success(t("collection.linkCopied"));
-    } catch {
-      toast.error(t("common.copyFailed"));
-    }
-  };
-
   const handleRemoveItem = async (itemId: string) => {
     if (!collection) return;
     if (
@@ -208,7 +189,6 @@ function useCollectionDetailValue() {
     setShowAddModal,
     authModal,
     handleLike,
-    handleShare,
     handleReport,
     showReportModal,
     setShowReportModal,
