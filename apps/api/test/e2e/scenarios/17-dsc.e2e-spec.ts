@@ -1786,6 +1786,173 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     expect(res.body.avgCTR).toBeCloseTo(10, 2);
   });
 
+  // ════════════════════════ Reklamlar — yuvada tek reklam ════════════════════════
+
+  const DAY_MS = 24 * 3_600_000;
+
+  scenario("DSC-107", async () => {
+    // Aynı yuva + çakışan platform + çakışan pencere → 409 slotTaken (başlıkla).
+    // web ile app çakışmaz; all ikisiyle de çakışır.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc107@test.com",
+    });
+    await seedAd({ title: "Dolu Popup", position: "popup", platform: "web" });
+
+    const res = await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Yeni", position: "popup", platform: "all" }))
+      .expect(409);
+    expect(res.body.i18nKey).toBe("server.ads.slotTaken");
+    expect(res.body.message).toContain("Dolu Popup");
+
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Uygulama", position: "popup", platform: "app" }))
+      .expect(201);
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Başka yuva", position: "footer", platform: "web" }))
+      .expect(201);
+  });
+
+  scenario("DSC-108", async () => {
+    // Güncelleme: pasif reklam yuvaya takılmadan oluşur; açılınca 409.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc108@test.com",
+    });
+    await seedAd({ title: "Canlı", position: "header", platform: "all" });
+    const draft = await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Taslak", isActive: false }))
+      .expect(201);
+    const res = await request(server())
+      .patch(`/api/admin/ads/${draft.body.id}`)
+      .set(authHeader(admin))
+      .send({ isActive: true })
+      .expect(409);
+    expect(res.body.i18nKey).toBe("server.ads.slotTaken");
+    // Yuvayı ilgilendirmeyen düzenleme serbest.
+    await request(server())
+      .patch(`/api/admin/ads/${draft.body.id}`)
+      .set(authHeader(admin))
+      .send({ title: "Taslak 2" })
+      .expect(200);
+  });
+
+  scenario("DSC-109", async () => {
+    // Pasif ve süresi geçmiş reklamlar yuvayı tutmaz; ayrık gelecek pencere serbest.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc109@test.com",
+    });
+    const now = Date.now();
+    await seedAd({ title: "Pasif", position: "popup", isActive: false });
+    await seedAd({
+      title: "Geçmiş",
+      position: "popup",
+      startDate: new Date(now - 30 * DAY_MS),
+      endDate: new Date(now - 2 * DAY_MS),
+    });
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Şimdi", position: "popup" }))
+      .expect(201);
+  });
+
+  scenario("DSC-110", async () => {
+    // Null tarih = sınırsız: tarihsiz canlı reklam gelecekteki her pencereyi engeller;
+    // pencereli reklamla ayrık pencere çakışmaz.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc110@test.com",
+    });
+    const now = Date.now();
+    await seedAd({
+      title: "Sınırsız",
+      position: "header",
+      startDate: null,
+      endDate: null,
+    });
+    const future = {
+      startDate: new Date(now + 60 * DAY_MS).toISOString(),
+      endDate: new Date(now + 70 * DAY_MS).toISOString(),
+    };
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Gelecek", position: "header", ...future }))
+      .expect(409);
+
+    await seedAd({
+      title: "Kasım",
+      position: "footer",
+      startDate: new Date(now + 10 * DAY_MS),
+      endDate: new Date(now + 20 * DAY_MS),
+    });
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Ayrık", position: "footer", ...future }))
+      .expect(201);
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Bitişsiz", position: "footer", endDate: null }))
+      .expect(409);
+  });
+
+  scenario("DSC-111", async () => {
+    // Eski web istemcisi: platform yok ama device var → web sayılır (device süzmez).
+    await seedAd({ title: "W-web", platform: "web", position: "header" });
+    await seedAd({ title: "W-app", platform: "app", position: "footer" });
+    await seedAd({ title: "W-all", platform: "all", position: "popup" });
+    const res = await request(server())
+      .get("/api/ads/active?device=mobile")
+      .expect(200);
+    const titles = res.body.map((a: any) => a.title);
+    expect(titles).toEqual(expect.arrayContaining(["W-web", "W-all"]));
+    expect(titles).not.toContain("W-app");
+  });
+
+  scenario("DSC-112", async () => {
+    // popupVersion yalnız kreatif değişince artar; anahtar/sıra/tarih artırmaz.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc112@test.com",
+    });
+    const created = await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Popup", position: "popup" }))
+      .expect(201);
+    expect(created.body.popupVersion).toBe(1);
+    const patch = (body: Record<string, unknown>) =>
+      request(server())
+        .patch(`/api/admin/ads/${created.body.id}`)
+        .set(authHeader(admin))
+        .send(body)
+        .expect(200);
+
+    expect((await patch({ isActive: false })).body.popupVersion).toBe(1);
+    expect((await patch({ isActive: true, displayOrder: 4 })).body.popupVersion).toBe(1);
+    expect((await patch({ title: "Popup" })).body.popupVersion).toBe(1);
+    expect((await patch({ title: "Yeni Popup" })).body.popupVersion).toBe(2);
+    expect(
+      (await patch({ popupFrequency: "every_visit" })).body.popupVersion,
+    ).toBe(3);
+
+    // Tık/gösterim sayaçları da artırmaz.
+    await request(server())
+      .post(`/api/ads/${created.body.id}/impression`)
+      .expect(204);
+    const row = await (getPrisma() as any).advertisement.findUnique({
+      where: { id: created.body.id },
+    });
+    expect(row.popupVersion).toBe(3);
+  });
+
   // ════════════════════════════ Bülten (newsletter) ════════════════════════════
 
   scenario("DSC-072", async () => {

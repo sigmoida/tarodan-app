@@ -1,13 +1,13 @@
 {
   "meta": {
-    "total": 2290,
+    "total": 2296,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
       "P0": 700,
-      "P1": 984,
-      "P2": 606
+      "P1": 988,
+      "P2": 608
     }
   },
   "domains": [
@@ -111,7 +111,7 @@
       "code": "17",
       "prefix": "DSC",
       "title": "17 — İndirim & Pazarlama",
-      "count": 106
+      "count": 112
     },
     {
       "code": "18",
@@ -20973,6 +20973,84 @@
       "pri": "P2",
       "steps": "1. POST /api/discounts/validate body { \"code\":\"yaz10\" }.",
       "exp": "HTTP 200, isValid:true (büyük harfe çevrilip eşleşir).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-107",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Tek reklam kuralı: aynı yuva + çakışan platform/pencere → 409 slotTaken",
+      "tur": "İş kuralı",
+      "pri": "P1",
+      "steps": "1. Canlı web popup varken POST /api/admin/ads (popup, all). 2. Aynı yuvaya app, başka yuvaya web reklamı oluştur.",
+      "exp": "1: HTTP 409, i18nKey server.ads.slotTaken, mesajda çakışan reklamın başlığı. 2: HTTP 201 (web–app çakışmaz).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-108",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Tek reklam kuralı: güncellemede pasif → aktif çakışma 409",
+      "tur": "İş kuralı",
+      "pri": "P1",
+      "steps": "1. Canlı header varken pasif header oluştur. 2. PATCH isActive=true. 3. PATCH yalnız başlık.",
+      "exp": "1: 201. 2: 409 slotTaken. 3: 200 (yuvayı ilgilendirmeyen düzenleme serbest).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-109",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Tek reklam kuralı: pasif ve süresi geçmiş reklam yuvayı tutmaz",
+      "tur": "Sınır değer",
+      "pri": "P2",
+      "steps": "1. Aynı yuvada pasif ve süresi geçmiş reklam varken yeni canlı reklam oluştur.",
+      "exp": "HTTP 201.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-110",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Tek reklam kuralı: null tarih sınırsızdır",
+      "tur": "Sınır değer (tarih)",
+      "pri": "P2",
+      "steps": "1. Tarihsiz canlı reklam varken gelecekteki pencereyle oluştur. 2. Pencereli reklamla ayrık pencere / bitişsiz pencere oluştur.",
+      "exp": "1: 409. 2: ayrık pencere 201, bitişsiz (çakışan) 409.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-111",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Eski web istemcisi: `?device=` (platform yok) web sayılır",
+      "tur": "Geriye uyum",
+      "pri": "P1",
+      "steps": "1. GET /api/ads/active?device=mobile.",
+      "exp": "web + all reklamları döner; app dışlanır (device süzmez).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-112",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "popupVersion yalnız kreatif değişince artar",
+      "tur": "İş kuralı",
+      "pri": "P1",
+      "steps": "1. Popup oluştur. 2. PATCH isActive / displayOrder / aynı başlık. 3. PATCH yeni başlık, sonra popupFrequency. 4. Gösterim kaydı.",
+      "exp": "1: popupVersion 1. 2: 1 kalır. 3: 2, sonra 3. 4: sayaç artışı sürümü değiştirmez.",
       "gap": false,
       "gapRefs": []
     },

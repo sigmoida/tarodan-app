@@ -1,4 +1,5 @@
 import type { AdDeviceType, AdPosition, Prisma } from "@prisma/client";
+import { trCalendarDate } from "../../../common/helpers/tr-calendar";
 import {
   CLIENT_PLATFORMS,
   clientPlatformsOf,
@@ -68,6 +69,40 @@ export interface AdSlotCandidate {
   endDate: Date | null;
 }
 
+/** İki yayın ucu aynı İstanbul gününde mi (ikisi de null = aynı). */
+function sameIstanbulDay(a: Date | null, b: Date | null): boolean {
+  if (!a || !b) return a === b;
+  return trCalendarDate(a) === trCalendarDate(b);
+}
+
+/**
+ * Güncelleme yuvayı (pozisyon, platform, anahtar, takvim) değiştiriyor mu?
+ * Tarihler İstanbul GÜNÜ olarak karşılaştırılır: admin formu tarihi gün
+ * sınırına (00:00 / 23:59:59.999) yuvarlayıp gönderir; gün sınırında olmayan
+ * eski bir değer her düzenlemede "değişti" sayılmasın.
+ */
+export function adSlotChanged(
+  existing: AdSlotCandidate,
+  next: AdSlotCandidate,
+): boolean {
+  return (
+    existing.position !== next.position ||
+    existing.platform !== next.platform ||
+    existing.isActive !== next.isActive ||
+    !sameIstanbulDay(existing.startDate, next.startDate) ||
+    !sameIstanbulDay(existing.endDate, next.endDate)
+  );
+}
+
+/**
+ * Tek-reklam kuralının kilit anahtarı: aynı pozisyona yazan eşzamanlı iki
+ * işlem `pg_advisory_xact_lock(hashtext(<anahtar>))` ile sıraya girer, böylece
+ * ikisi birden "yuva boş" görüp yazamaz.
+ */
+export function adSlotLockKey(position: AdPosition): string {
+  return `ad-slot:${position}`;
+}
+
 /**
  * "Bu yuvayı başka bir reklam tutuyor mu" sorgusu; sorulacak bir şey yoksa
  * `null`. Bir yuvada (pozisyon × platform) aynı anda tek reklam yayında
@@ -120,4 +155,38 @@ export function firstAdPerPosition<T extends { position: AdPosition }>(
     seen.add(ad.position);
     return true;
   });
+}
+
+/** Gölge hesabı için gereken alanlar (yayında mı + yuva + sıra). */
+export interface AdShadowFields {
+  id: string;
+  position: AdPosition;
+  platform: ContentPlatform;
+}
+
+/**
+ * Admin listesi: YAYINDA olduğu halde vitrinde görünmeyen reklamlar —
+ * `firstAdPerPosition` aynı yuvada önce gelen başka bir reklamı seçtiği için.
+ * Reklam id'si → gizlendiği istemciler (yalnız gizlendiği yerler; hiç
+ * gizlenmeyen reklam haritada yoktur). `liveAds` yalnız YAYINDAKİ reklamlar,
+ * vitrinle aynı sırada (`displayOrder ASC, createdAt DESC`) olmalı — seçim
+ * vitrinle birebir aynı kuralla yapılır.
+ */
+export function adShadowedPlatforms(
+  liveAds: readonly AdShadowFields[],
+): Map<string, ClientPlatform[]> {
+  const shadowed = new Map<string, ClientPlatform[]>();
+  for (const client of CLIENT_PLATFORMS) {
+    const visible = contentPlatformsFor(client);
+    const shown = new Set(
+      firstAdPerPosition(
+        liveAds.filter((ad) => visible.includes(ad.platform)),
+      ).map((ad) => ad.id),
+    );
+    for (const ad of liveAds) {
+      if (!visible.includes(ad.platform) || shown.has(ad.id)) continue;
+      shadowed.set(ad.id, [...(shadowed.get(ad.id) ?? []), client]);
+    }
+  }
+  return shadowed;
 }

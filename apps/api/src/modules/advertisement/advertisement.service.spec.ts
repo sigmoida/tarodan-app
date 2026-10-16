@@ -64,7 +64,14 @@ function makeService(existing: Record<string, unknown> | null = row()) {
     update: jest.fn().mockResolvedValue({}),
     createMany: jest.fn().mockResolvedValue({ count: 0 }),
   };
-  const mock: Record<string, unknown> = { advertisement, discount, adHotspot };
+  // Yuva kilidi (`pg_advisory_xact_lock`) etiketli şablonla çağrılır.
+  const $executeRaw = jest.fn().mockResolvedValue(0);
+  const mock: Record<string, unknown> = {
+    advertisement,
+    discount,
+    adHotspot,
+    $executeRaw,
+  };
   // İnteraktif işlem aynı istemciyle çalışır: tx üzerindeki çağrılar aynı
   // mock'lara düşer.
   const $transaction = jest.fn(
@@ -81,6 +88,7 @@ function makeService(existing: Record<string, unknown> | null = row()) {
     discount,
     adHotspot,
     $transaction,
+    $executeRaw,
     media,
   };
 }
@@ -268,6 +276,7 @@ describe("AdvertisementService — admin yanıtında kampanya özeti", () => {
           isActive: true,
           startDate: true,
           endDate: true,
+          budgetStoppedAt: true,
         },
       },
       hotspots: {
@@ -289,6 +298,57 @@ describe("AdvertisementService — admin yanıtında kampanya özeti", () => {
     expect(linked.discount).toEqual(campaign);
     expect(plain.discountId).toBeNull();
     expect(plain.discount).toBeNull();
+  });
+
+  it("findAll: yayında olup aynı yuvada önce gelen reklam yüzünden görünmeyenleri işaretler", async () => {
+    jest.useFakeTimers().setSystemTime(NOW);
+    try {
+      const { service, advertisement } = makeService();
+      advertisement.findMany.mockResolvedValue([
+        // Sıra vitrinle aynı: ilk gelen yuvayı alır.
+        row({ id: "web-1", position: "popup", platform: "web" }),
+        row({ id: "all-1", position: "popup", platform: "all" }),
+        row({ id: "app-1", position: "popup", platform: "app" }),
+        row({ id: "off", position: "popup", platform: "all", isActive: false }),
+        row({ id: "hdr", position: "header", platform: "all" }),
+      ]);
+
+      const list = await service.findAll();
+      const byId = Object.fromEntries(list.map((a) => [a.id, a.shadowedOn]));
+      // web'de web-1 kazanır; app'te all-1 kazanır → all-1 yalnız web'de gizli.
+      expect(byId).toEqual({
+        "web-1": [],
+        "all-1": ["web"],
+        "app-1": ["app"],
+        off: [],
+        hdr: [],
+      });
+      // Süzülmemiş liste ikinci sorgu yapmaz.
+      expect(advertisement.findMany).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("findAll süzülmüşse gölge yine TÜM yayındaki reklamlardan hesaplanır", async () => {
+    jest.useFakeTimers().setSystemTime(NOW);
+    try {
+      const { service, advertisement } = makeService();
+      advertisement.findMany
+        .mockResolvedValueOnce([
+          row({ id: "app-1", position: "popup", platform: "app" }),
+        ])
+        .mockResolvedValueOnce([
+          row({ id: "all-1", position: "popup", platform: "all" }),
+          row({ id: "app-1", position: "popup", platform: "app" }),
+        ]);
+
+      const [ad] = await service.findAll(undefined, "app");
+      expect(ad.shadowedOn).toEqual(["app"]);
+      expect(advertisement.findMany).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("findOne, create ve update de aynı özeti taşır", async () => {
@@ -752,6 +812,35 @@ describe("AdvertisementService — yuvada tek reklam (slotTaken)", () => {
     expect(advertisement.create).not.toHaveBeenCalled();
   });
 
+  it("kontrol ve yazım tek işlemde, pozisyon kilidi kontrolden ÖNCE alınır", async () => {
+    const { service, advertisement, $transaction, $executeRaw } =
+      makeService(row({ position: "header" }));
+    await service.create({ title: "X", position: "popup", platform: "web" });
+    expect($transaction).toHaveBeenCalledTimes(1);
+    const [strings, key] = $executeRaw.mock.calls[0];
+    expect((strings as string[]).join("?")).toContain("pg_advisory_xact_lock");
+    expect(key).toBe("ad-slot:popup");
+    expect($executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      advertisement.findFirst.mock.invocationCallOrder[0],
+    );
+    expect(advertisement.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      advertisement.create.mock.invocationCallOrder[0],
+    );
+
+    $executeRaw.mockClear();
+    await service.update("ad-1", { position: "footer" });
+    expect($executeRaw.mock.calls[0][1]).toBe("ad-slot:footer");
+    expect($executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      advertisement.update.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("sorulacak bir şey yoksa (pasif) kilit de alınmaz", async () => {
+    const { service, $executeRaw } = makeService();
+    await service.create({ title: "Taslak", isActive: false });
+    expect($executeRaw).not.toHaveBeenCalled();
+  });
+
   it("oluşturma: sorgu yuvayı, çakışan platformları ve pencereyi taşır", async () => {
     const { service, advertisement } = makeService();
     await service.create({
@@ -850,6 +939,37 @@ describe("AdvertisementService — yuvada tek reklam (slotTaken)", () => {
     expect(advertisement.update).toHaveBeenCalled();
   });
 
+  it("güncelleme: gün sınırında olmayan eski tarih, aynı İstanbul gününe yuvarlanınca değişmiş sayılmaz", async () => {
+    // Eski kayıt: 1 Kasım 14:30 İstanbul; form aynı günü 00:00 olarak yollar.
+    const { service, advertisement } = makeService(
+      row({
+        startDate: new Date("2026-11-01T11:30:00.000Z"),
+        endDate: new Date("2026-11-30T09:00:00.000Z"),
+      }),
+    );
+    advertisement.findFirst.mockResolvedValue({ title: "Dolu" });
+    await service.update("ad-1", {
+      title: "Y",
+      startDate: "2026-11-01T00:00:00.000+03:00",
+      endDate: "2026-11-30T23:59:59.999+03:00",
+    });
+    expect(advertisement.findFirst).not.toHaveBeenCalled();
+    expect(advertisement.update).toHaveBeenCalled();
+  });
+
+  it("güncelleme: farklı İstanbul gününe taşınan tarih sorulur", async () => {
+    const { service, advertisement } = makeService(
+      row({
+        startDate: new Date("2026-11-01T11:30:00.000Z"),
+        endDate: new Date("2026-11-30T09:00:00.000Z"),
+      }),
+    );
+    await service.update("ad-1", {
+      startDate: "2026-11-02T00:00:00.000+03:00",
+    });
+    expect(advertisement.findFirst).toHaveBeenCalled();
+  });
+
   it("güncelleme: pasife alınan reklam sorulmaz", async () => {
     const { service, advertisement } = makeService();
     advertisement.findFirst.mockResolvedValue({ title: "Dolu" });
@@ -888,10 +1008,78 @@ describe("AdvertisementService — platform ve popup sürümü yazımı", () => 
     });
   });
 
-  it("her admin güncellemesi popupVersion'ı +1 artırır", async () => {
-    const { service, advertisement } = makeService();
-    await service.update("ad-1", { title: "Y" });
-    expect(updateData(advertisement).popupVersion).toEqual({ increment: 1 });
+  it.each([
+    ["başlık", { title: "Y" }],
+    ["görsel", { imageUrl: "https://cdn.test/b.png" }],
+    ["metin", { content: "yeni metin" }],
+    ["alt metin", { altText: "yeni alt" }],
+    ["sıklık", { popupFrequency: "every_visit" }],
+  ] as const)(
+    "kreatif değişince (%s) popupVersion +1",
+    async (_d, patch) => {
+      const { service, advertisement } = makeService();
+      await service.update("ad-1", patch as UpdateAdvertisementDto);
+      expect(updateData(advertisement).popupVersion).toEqual({ increment: 1 });
+    },
+  );
+
+  it.each([
+    ["anahtar", { isActive: false }],
+    ["sıra", { displayOrder: 3 }],
+    ["tarih", { endDate: "2026-12-31T23:59:59.999+03:00" }],
+    ["platform", { platform: "web" }],
+    ["yuva", { position: "footer" }],
+    ["kampanya", { discountId: null }],
+  ] as const)(
+    "kreatif dışı değişiklik (%s) popupVersion'a dokunmaz",
+    async (_d, patch) => {
+      const { service, advertisement } = makeService();
+      await service.update("ad-1", patch as UpdateAdvertisementDto);
+      expect(updateData(advertisement).popupVersion).toBeUndefined();
+    },
+  );
+
+  it("aynı değerleri yeniden yazmak (formun tam gönderimi) artırmaz", async () => {
+    // Görselli reklam: bağlantı daima null (admin de null gönderir).
+    const { service, advertisement } = makeService(row({ linkUrl: null }));
+    await service.update("ad-1", {
+      title: "Banner",
+      imageUrl: "https://cdn.test/a.png",
+      linkUrl: null,
+      content: "metin",
+      altText: "alt",
+      popupFrequency: "until_dismissed",
+      hotspots: [],
+      isActive: true,
+      displayOrder: 0,
+    });
+    expect(updateData(advertisement).popupVersion).toBeUndefined();
+  });
+
+  it("aynı alan kümesi (id + geometri + etiket + bağlantı) artırmaz; farklı geometri artırır", async () => {
+    const payload = {
+      id: "11111111-1111-4111-8111-111111111111",
+      x: 0,
+      y: 0,
+      width: 0.5,
+      height: 1,
+      label: "Sol",
+      linkUrl: "/sol",
+    };
+    const stored = { ...payload, sortOrder: 0 };
+    const same = makeService(row({ linkUrl: null, hotspots: [stored] }));
+    await same.service.update("ad-1", {
+      hotspots: [{ ...payload, label: " Sol " }],
+    });
+    expect(updateData(same.advertisement).popupVersion).toBeUndefined();
+
+    const moved = makeService(row({ linkUrl: null, hotspots: [stored] }));
+    await moved.service.update("ad-1", {
+      hotspots: [{ ...payload, x: 0.5 }],
+    });
+    expect(updateData(moved.advertisement).popupVersion).toEqual({
+      increment: 1,
+    });
   });
 
   it("oluşturma popupVersion yazmaz (şema varsayılanı 1)", async () => {
