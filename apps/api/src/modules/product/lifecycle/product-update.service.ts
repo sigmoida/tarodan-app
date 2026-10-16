@@ -366,8 +366,9 @@ export class ProductUpdateService {
     // kaynak) — ama GERİYE DÖNÜK DEĞİL: yalnız fiyat gerçekten DEĞİŞİYORSA ya
     // da yeni bir indirim giriliyorsa denetlenir. Sınırın altında kalmış mevcut
     // ilan yayında kalır ve fiyatına dokunmadan düzenlenebilir; formlar
-    // kayıtlı fiyatı olduğu gibi geri gönderir.
-    if (dto.price !== undefined || dto.salePrice != null) {
+    // kayıtlı fiyatı olduğu gibi geri gönderir. Admin düzenlemesi muaf (ürün
+    // kararı): destek ekibi istisnai fiyat girebilir; toplu içe aktarma muaf değil.
+    if (!isAdmin && (dto.price !== undefined || dto.salePrice != null)) {
       const storedPrices = [
         product.price,
         product.oldPrice,

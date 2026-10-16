@@ -142,6 +142,18 @@ describe("ProductUpdateService — düzenlemede fiyat sınırı", () => {
       expect(tx.product.update).not.toHaveBeenCalled();
     });
 
+    it("admin düzenlemesi sınırdan muaf (sınır altı yeni fiyat kabul edilir)", async () => {
+      const { service, prisma, tx } = makeService({
+        product: grandfathered,
+        limits,
+      });
+
+      await service.updateAsAdmin(productId, "admin-1", { price: 220 } as any);
+
+      expect(prisma.platformSetting.findUnique).not.toHaveBeenCalled();
+      expect(tx.product.update).toHaveBeenCalled();
+    });
+
     it("fiyat sınırın üstüne çıkarılabilir", async () => {
       const { service, tx } = makeService({ product: grandfathered, limits });
 
