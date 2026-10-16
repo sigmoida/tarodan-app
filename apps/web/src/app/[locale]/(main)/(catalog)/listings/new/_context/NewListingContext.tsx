@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import { listingsApi } from "@/lib/api";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
+import { usePriceLimits } from "@/hooks/usePublicSettings";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -39,7 +40,10 @@ import {
 import { useListingImageUpload } from "@tarodan/listing-form";
 import {
   createEmptySaleData,
+  priceLimitMessages,
   saleDataToPayload,
+  salePriceLimitMessage,
+  type ListingPriceRules,
   type SaleData,
 } from "@tarodan/listing-form";
 
@@ -59,8 +63,18 @@ function useNewListingValue() {
   // Zorunlu genel özel gruplar sorgudan gelir; şema onları doğrulama anında
   // ref üzerinden okur (form kurulduğunda liste henüz yok).
   const requiredGroupSlugsRef = useRef<readonly string[]>([]);
+  // Platform fiyat sınırları sorgudan gelir; şema onları aynı şekilde
+  // doğrulama anında okur. Yüklenemezse sınır yok — sunucu yetkili kalır.
+  const priceLimits = usePriceLimits();
+  const priceRulesRef = useRef<ListingPriceRules>({ limits: priceLimits });
+  priceRulesRef.current = { limits: priceLimits };
   const schema = useMemo(
-    () => newListingSchema(locale, () => requiredGroupSlugsRef.current),
+    () =>
+      newListingSchema(
+        locale,
+        () => requiredGroupSlugsRef.current,
+        () => priceRulesRef.current,
+      ),
     [locale],
   );
   const form = useZodForm(schema, {
@@ -112,6 +126,15 @@ function useNewListingValue() {
     (saleStartsAt == null || now >= saleStartsAt) &&
     (saleEndsAt == null || now <= saleEndsAt);
   const commissionPreviewPrice = saleIsActive ? salePayload.salePrice! : price;
+  // İndirimli fiyat da alt sınırın altına inemez (form alanı olmadığı için
+  // şemada değil burada denetlenir; ekran satır içi gösterir, gönderim durur).
+  const priceMessages = useMemo(() => priceLimitMessages(locale), [locale]);
+  const salePriceError = salePriceLimitMessage(
+    saleData,
+    formPrice,
+    { limits: priceLimits },
+    priceMessages,
+  );
 
   // ---- Server data (shared catalog queries) ----
   const queryEnabled = !authLoading && isAuthenticated;
@@ -205,6 +228,11 @@ function useNewListingValue() {
     // ekranda gördüğünden eksik görselle yayınlanıyordu.
     if (imageSubmitBlocker) {
       toast.error(imageSubmitBlocker.message);
+      return;
+    }
+    if (salePriceError) {
+      setShowDiscountSection(true);
+      toast.error(salePriceError);
       return;
     }
     if (listingLimits && !listingLimits.canCreateListing) {
@@ -315,6 +343,8 @@ function useNewListingValue() {
     attrGroupsStatus,
     saleData,
     setSaleData,
+    salePriceError,
+    priceLimits,
     showDiscountSection,
     setShowDiscountSection,
     listingLimits,

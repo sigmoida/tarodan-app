@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { messagesApi, listingsApi, api, mediaApi } from "@/lib/api";
+import { messagesApi, listingsApi, mediaApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLocale, useTranslations } from "next-intl";
 import { useMessagingSocket } from "@/hooks/useMessagingSocket";
+import { usePublicSettings } from "@/hooks/usePublicSettings";
 import {
   checkContentFilter,
   type Message,
@@ -71,17 +72,8 @@ export function useMessaging(enabled: boolean) {
       ? (checkContentFilter(currentDraft.text, locale).warning ?? null)
       : null;
 
-  const messageSettingsQuery = useQuery({
-    queryKey: queryKeys.messages.settings(),
-    queryFn: async () => {
-      const response = await api.get("/admin/settings/public");
-      return response.data || {};
-    },
-    enabled,
-    meta: { page: "message-settings" },
-  });
-  const maxMessageLength =
-    messageSettingsQuery.data?.max_message_length ?? 1000;
+  const publicSettingsQuery = usePublicSettings({ enabled });
+  const maxMessageLength = publicSettingsQuery.data?.max_message_length ?? 1000;
 
   const threadsQuery = useQuery({
     queryKey: queryKeys.messages.threads(),

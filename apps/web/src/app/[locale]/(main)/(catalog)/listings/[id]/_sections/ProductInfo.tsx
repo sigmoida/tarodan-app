@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { Button, QuantityStepper } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import SellerCard from "./SellerCard";
 
@@ -13,6 +14,7 @@ export default function ProductInfo() {
     t,
     router,
     listing,
+    effectivePrice,
     isOwner,
     isAuthenticated,
     limits,
@@ -30,8 +32,13 @@ export default function ProductInfo() {
     requireAuth,
     setShowTradeModal,
   } = useListingDetail();
+  const offerFloor = useOfferFloor(effectivePrice);
 
   if (!listing) return null;
+
+  // İlan fiyatı tam alt sınırdaysa taban fiyata eşittir: teklif ilan fiyatının
+  // ALTINDA olmak zorunda olduğundan geçerli hiçbir teklif yoktur — giriş gizlenir.
+  const offerImpossible = offerFloor != null && offerFloor >= effectivePrice;
 
   const available = listing.availableQuantity ?? listing.quantity;
   const hasStock = available == null || available > 0;
@@ -137,14 +144,16 @@ export default function ProductInfo() {
                 {t("product.trade")}
               </Button>
             )}
-            <Button
-              variant="outline"
-              onClick={handleMakeOffer}
-              disabled={listing.status !== "active"}
-              className="w-full"
-            >
-              {t("product.makeOffer")}
-            </Button>
+            {!offerImpossible && (
+              <Button
+                variant="outline"
+                onClick={handleMakeOffer}
+                disabled={listing.status !== "active"}
+                className="w-full"
+              >
+                {t("product.makeOffer")}
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleCartToggle}

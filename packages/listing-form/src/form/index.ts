@@ -20,6 +20,7 @@ export { default as PricingCard } from "./cards/PricingCard";
 export { default as ImagesCard } from "./cards/ImagesCard";
 export { default as DiscountCard, type SaleData } from "./cards/DiscountCard";
 export * from "./sale-data";
+export * from "./price-limits";
 export { default as ManufacturerAttributesCard } from "./cards/ManufacturerAttributesCard";
 export { default as GlobalAttributesCard } from "./cards/GlobalAttributesCard";
 

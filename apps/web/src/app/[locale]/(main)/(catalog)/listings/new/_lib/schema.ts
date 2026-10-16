@@ -9,7 +9,11 @@ import {
   emptyBaseListingValues,
   listingFieldMessages,
   listingImageSchema,
+  NO_PRICE_LIMITS,
+  priceLimitMessages,
+  priceLimitsRefine,
   requiredAttributeGroupsRefine,
+  type PriceRulesSource,
   type RequiredGroupSlugsSource,
 } from "@tarodan/listing-form";
 
@@ -17,11 +21,13 @@ import {
  * New-listing form schema — shared base fields plus new-only extras (at least
  * three photos, custom attribute groups). Locale-aware messages. Required
  * global custom groups come from a getter because the group list is fetched
- * after the form is created (see `RequiredGroupSlugsSource`).
+ * after the form is created (see `RequiredGroupSlugsSource`). Platform price
+ * limits come the same way (`PriceRulesSource`); none → no rule.
  */
 export const newListingSchema = (
   locale: string,
   getRequiredGroupSlugs: RequiredGroupSlugsSource = () => [],
+  getPriceRules: PriceRulesSource = () => ({ limits: NO_PRICE_LIMITS }),
 ) => {
   const msg = listingFieldMessages(locale);
   return z
@@ -34,7 +40,8 @@ export const newListingSchema = (
     .superRefine(colorsRefine(msg.required))
     .superRefine(
       requiredAttributeGroupsRefine(getRequiredGroupSlugs, msg.required),
-    );
+    )
+    .superRefine(priceLimitsRefine(getPriceRules, priceLimitMessages(locale)));
 };
 
 export type NewListingValues = z.infer<ReturnType<typeof newListingSchema>>;

@@ -23,5 +23,6 @@ export * from "./seller";
 export * from "./consents";
 export * from "./legal-identity";
 export * from "./timing-rules";
+export * from "./settings";
 import api from "./client";
 export default api;

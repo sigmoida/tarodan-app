@@ -12,6 +12,7 @@ import {
 } from "@tarodan/ui/form";
 import { offersApi } from "@/lib/api";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
+import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { offerSchema, type OfferValues } from "./offerSchema";
 import { formatTL } from "@/lib/format";
@@ -33,9 +34,13 @@ export default function OfferModal() {
   const modalLabels = useFormModalLabels();
 
   const minOffer = Math.round(effectivePrice * 0.5);
-  const form = useZodForm(offerSchema(minOffer, effectivePrice, locale), {
-    defaultValues: { amount: "", message: "" },
-  });
+  const floor = useOfferFloor(effectivePrice);
+  const form = useZodForm(
+    offerSchema(minOffer, effectivePrice, locale, floor),
+    {
+      defaultValues: { amount: "", message: "" },
+    },
+  );
   const message = form.watch("message") ?? "";
 
   const create = useMutation({
@@ -87,6 +92,11 @@ export default function OfferModal() {
         placeholder={t("product.offerAmountPlaceholder")}
         min={minOffer}
         max={Math.max(0, Math.round(effectivePrice) - 1)}
+        helperText={
+          floor != null
+            ? t("listing.priceMinHint", { minPrice: formatTL(floor) })
+            : undefined
+        }
       />
 
       <div>

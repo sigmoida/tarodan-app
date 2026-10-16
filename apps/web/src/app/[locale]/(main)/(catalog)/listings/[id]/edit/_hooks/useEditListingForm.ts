@@ -6,11 +6,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { usePriceLimits } from "@/hooks/usePublicSettings";
 import {
   toEditListingValues,
   buildListingUpdatePayload,
   createEmptySaleData,
+  priceLimitMessages,
   saleDataToPayload,
+  salePriceLimitMessage,
+  type ListingPriceRules,
   type SaleData,
 } from "@tarodan/listing-form";
 import {
@@ -26,6 +30,9 @@ import type {
   EditListingFormData,
   ListingEditPayload,
 } from "@tarodan/listing-form";
+
+/** Düzenleme ekranı Türkçe iletilerle çalışır (bkz. `editListingSchema`). */
+const PRICE_MESSAGES = priceLimitMessages("tr");
 
 interface UseEditListingFormParams {
   id: string;
@@ -48,8 +55,17 @@ export function useEditListingForm({
   // doğrulama anında ref üzerinden okur. Ref'i ekran, grup sorgusundan sonra
   // doldurur (bkz. EditListingClient).
   const requiredGroupSlugsRef = useRef<readonly string[]>([]);
+  // Platform fiyat sınırı yalnız fiyat DEĞİŞİRSE uygulanır: sınırın altında
+  // kalmış ilan, kayıtlı fiyatına dokunulmadan düzenlenebilir. Kayıtlı fiyatlar
+  // ilan kaydı yüklenince ref'e yazılır (aşağıda).
+  const priceLimits = usePriceLimits();
+  const priceRulesRef = useRef<ListingPriceRules>({ limits: priceLimits });
   const schema = useMemo(
-    () => buildEditListingSchema(() => requiredGroupSlugsRef.current),
+    () =>
+      buildEditListingSchema(
+        () => requiredGroupSlugsRef.current,
+        () => priceRulesRef.current,
+      ),
     [],
   );
   const form = useZodForm(schema, {
@@ -181,6 +197,25 @@ export function useEditListingForm({
       listingQuery.isPending ||
       (!!listingQuery.data?.edit && readyFormId !== id);
 
+  priceRulesRef.current = {
+    limits: priceLimits,
+    storedPrices: listingQuery.data
+      ? [
+          listingQuery.data.edit.price,
+          listingQuery.data.edit.oldPrice,
+          listingQuery.data.edit.salePrice,
+        ]
+      : [],
+  };
+  // İndirimli fiyat da alt sınırın altına inemez; form alanı olmadığı için
+  // şemada değil burada denetlenir (ekran satır içi gösterir, gönderim durur).
+  const salePriceError = salePriceLimitMessage(
+    saleData,
+    Number(form.watch("price")),
+    priceRulesRef.current,
+    PRICE_MESSAGES,
+  );
+
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       listingsApi.update(id, payload as any),
@@ -204,6 +239,11 @@ export function useEditListingForm({
       toast.error(imageSubmitBlockerRef.current.message);
       return;
     }
+    if (salePriceError) {
+      setShowDiscountSection(true);
+      toast.error(salePriceError);
+      return;
+    }
     updateMutation.mutate(buildListingUpdatePayload(values, saleData));
   };
 
@@ -214,6 +254,8 @@ export function useEditListingForm({
     record: listingQuery.data?.edit ?? null,
     saleData,
     setSaleData,
+    salePriceError,
+    priceLimits,
     seedExistingImagesRef,
     imageSubmitBlockerRef,
     hasUserImageEditsRef,
