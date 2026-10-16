@@ -17,7 +17,9 @@ import {
   HttpStatus,
   ParseIntPipe,
   DefaultValuePipe,
+  UnauthorizedException,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import {
   ApiTags,
   ApiOperation,
@@ -28,6 +30,8 @@ import {
 import { NotificationService } from "./notification.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { i18nMessage } from "../i18n";
 import { RegisterPushTokenDto } from "./dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
@@ -48,9 +52,18 @@ export class NotificationController {
   /**
    * POST /notifications/push-token - Register push token
    * Requirement: Push notifications (project.md)
+   *
+   * KAYIT oturum ister (401 → istemci yeniler). İPTAL (`revoke: true`)
+   * istemez: mobil çıkışta bu çağrı erişim jetonu süresi dolmuşken de gider
+   * (çıkış sırasında yenileme yapılmaz; zorunlu çıkışta oturum zaten
+   * düşmüştür) ve eskiden 401 alıp sessizce kayboluyordu — cihaz çıkıştan
+   * sonra da bildirim almaya devam ediyordu. Token cihazın kendi sırrıdır;
+   * onu bilen cihaz kendini kapatabilir.
    */
   @Post("push-token")
+  @Public()
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Register device push token for notifications" })
@@ -59,9 +72,12 @@ export class NotificationController {
     description: "Push token registered",
   })
   async registerPushToken(
-    @CurrentUser("id") userId: string,
+    @CurrentUser("id") userId: string | null,
     @Body() dto: RegisterPushTokenDto,
   ) {
+    if (!dto.revoke && !userId) {
+      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
+    }
     return this.notificationService.registerPushToken(userId, dto);
   }
 

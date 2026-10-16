@@ -39,6 +39,7 @@ import {
 import { tradeCancelledData } from "../../trade/helpers/trade-cancellation";
 import { randomInt } from "crypto";
 import { i18nMessage } from "../../i18n";
+import { PushTokenRevocationService } from "../../notification/push-token/push-token-revocation.service";
 
 /**
  * Admin personel/rol yönetimi (+ banner aralığındaki banUser) — AdminService'in
@@ -55,6 +56,7 @@ export class AdminStaffService {
     private readonly paymentService: PaymentService,
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
+    private readonly pushTokens: PushTokenRevocationService,
   ) {}
 
   /** Acting kullanıcının (User.id) AdminUser.id'sini çöz (audit/createdBy için). */
@@ -666,7 +668,12 @@ export class AdminStaffService {
         },
       });
 
-      // 6. Audit log oluştur
+      // 6. Push token'larını pasifleştir — yasaklı hesabın cihazları bildirim
+      //    almasın. Yasak kalkıp kullanıcı uygulamayı açınca istemci token'ı
+      //    yeniden kaydeder (upsert → aktif).
+      await this.pushTokens.deactivateAllForUser(userId, tx);
+
+      // 7. Audit log oluştur
       await this.audit.createAuditLog(
         adminId,
         "user_ban",

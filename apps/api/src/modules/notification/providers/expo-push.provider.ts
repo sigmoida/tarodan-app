@@ -4,26 +4,26 @@
  *
  * Requirement: Push notifications for iOS & Android (project.md)
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../prisma';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../../prisma";
 
 export interface ExpoPushMessage {
   to: string | string[]; // Expo push token(s)
   title: string;
   body: string;
   data?: Record<string, any>;
-  sound?: 'default' | null;
+  sound?: "default" | null;
   badge?: number;
   channelId?: string;
-  priority?: 'default' | 'normal' | 'high';
+  priority?: "default" | "normal" | "high";
   ttl?: number; // Time to live in seconds
   subtitle?: string; // iOS only
 }
 
 export interface ExpoPushTicket {
   id?: string;
-  status: 'ok' | 'error';
+  status: "ok" | "error";
   message?: string;
   details?: {
     error?: string;
@@ -32,7 +32,7 @@ export interface ExpoPushTicket {
 }
 
 export interface ExpoPushReceipt {
-  status: 'ok' | 'error';
+  status: "ok" | "error";
   message?: string;
   details?: {
     error?: string;
@@ -48,8 +48,9 @@ export interface PushNotificationResult {
 @Injectable()
 export class ExpoPushProvider {
   private readonly logger = new Logger(ExpoPushProvider.name);
-  private readonly expoApiUrl = 'https://exp.host/--/api/v2/push/send';
-  private readonly expoReceiptsUrl = 'https://exp.host/--/api/v2/push/getReceipts';
+  private readonly expoApiUrl = "https://exp.host/--/api/v2/push/send";
+  private readonly expoReceiptsUrl =
+    "https://exp.host/--/api/v2/push/getReceipts";
   private readonly accessToken: string;
   private readonly enabled: boolean;
 
@@ -57,11 +58,13 @@ export class ExpoPushProvider {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.accessToken = this.configService.get<string>('EXPO_ACCESS_TOKEN', '');
+    this.accessToken = this.configService.get<string>("EXPO_ACCESS_TOKEN", "");
     this.enabled = !!this.accessToken;
 
     if (!this.enabled) {
-      this.logger.warn('Expo Push is not configured. Push notifications will be logged only.');
+      this.logger.warn(
+        "Expo Push is not configured. Push notifications will be logged only.",
+      );
     }
   }
 
@@ -69,20 +72,25 @@ export class ExpoPushProvider {
    * Validate Expo push token format
    */
   isValidExpoToken(token: string): boolean {
-    return /^ExponentPushToken\[.+\]$/.test(token) || /^ExpoPushToken\[.+\]$/.test(token);
+    return (
+      /^ExponentPushToken\[.+\]$/.test(token) ||
+      /^ExpoPushToken\[.+\]$/.test(token)
+    );
   }
 
   /**
    * Send push notification to a single device
    */
-  async sendPushNotification(message: ExpoPushMessage): Promise<PushNotificationResult> {
+  async sendPushNotification(
+    message: ExpoPushMessage,
+  ): Promise<PushNotificationResult> {
     // Validate token
     const tokens = Array.isArray(message.to) ? message.to : [message.to];
     const validTokens = tokens.filter((t) => this.isValidExpoToken(t));
 
     if (validTokens.length === 0) {
       this.logger.warn(`No valid Expo push tokens provided`);
-      return { success: false, error: 'No valid Expo push tokens' };
+      return { success: false, error: "No valid Expo push tokens" };
     }
 
     // Not: Expo Push endpoint'i access-token OLMADAN da çalışır (token yalnızca
@@ -97,25 +105,25 @@ export class ExpoPushProvider {
         title: message.title,
         body: message.body,
         data: message.data,
-        sound: message.sound ?? 'default',
+        sound: message.sound ?? "default",
         badge: message.badge,
-        channelId: message.channelId ?? 'default',
-        priority: message.priority ?? 'high',
+        channelId: message.channelId ?? "default",
+        priority: message.priority ?? "high",
         ttl: message.ttl ?? 86400, // 24 hours default
         subtitle: message.subtitle,
       };
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
+        "Content-Type": "application/json",
+        Accept: "application/json",
       };
 
       if (this.accessToken) {
-        headers['Authorization'] = `Bearer ${this.accessToken}`;
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
 
       const response = await fetch(this.expoApiUrl, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify(payload),
       });
@@ -129,7 +137,7 @@ export class ExpoPushProvider {
       const result = await response.json();
       const ticket = result.data as ExpoPushTicket;
 
-      if (ticket.status === 'error') {
+      if (ticket.status === "error") {
         this.logger.error(`Expo Push error: ${ticket.message}`);
         return { success: false, error: ticket.message };
       }
@@ -137,8 +145,11 @@ export class ExpoPushProvider {
       this.logger.log(`Push notification sent via Expo, ticket: ${ticket.id}`);
       return { success: true, ticketId: ticket.id };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to send push notification via Expo: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      this.logger.error(
+        `Failed to send push notification via Expo: ${errorMessage}`,
+      );
       return { success: false, error: errorMessage };
     }
   }
@@ -158,16 +169,16 @@ export class ExpoPushProvider {
       // Access-token olmadan da gerçek gönderiyoruz (bkz. sendPushNotification notu).
       try {
         const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+          "Content-Type": "application/json",
+          Accept: "application/json",
         };
 
         if (this.accessToken) {
-          headers['Authorization'] = `Bearer ${this.accessToken}`;
+          headers["Authorization"] = `Bearer ${this.accessToken}`;
         }
 
         const response = await fetch(this.expoApiUrl, {
-          method: 'POST',
+          method: "POST",
           headers,
           body: JSON.stringify(batch),
         });
@@ -183,15 +194,18 @@ export class ExpoPushProvider {
         const tickets = result.data as ExpoPushTicket[];
 
         for (const ticket of tickets) {
-          if (ticket.status === 'error') {
+          if (ticket.status === "error") {
             results.push({ success: false, error: ticket.message });
           } else {
             results.push({ success: true, ticketId: ticket.id });
           }
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        batch.forEach(() => results.push({ success: false, error: errorMessage }));
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        batch.forEach(() =>
+          results.push({ success: false, error: errorMessage }),
+        );
       }
     }
 
@@ -201,23 +215,25 @@ export class ExpoPushProvider {
   /**
    * Get push notification receipts (to check delivery status)
    */
-  async getReceipts(ticketIds: string[]): Promise<Record<string, ExpoPushReceipt>> {
+  async getReceipts(
+    ticketIds: string[],
+  ): Promise<Record<string, ExpoPushReceipt>> {
     if (!this.enabled || ticketIds.length === 0) {
       return {};
     }
 
     try {
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
+        "Content-Type": "application/json",
+        Accept: "application/json",
       };
 
       if (this.accessToken) {
-        headers['Authorization'] = `Bearer ${this.accessToken}`;
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
 
       const response = await fetch(this.expoReceiptsUrl, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({ ids: ticketIds }),
       });
@@ -252,7 +268,7 @@ export class ExpoPushProvider {
 
     if (tokens.length === 0) {
       this.logger.warn(`No push tokens found for user ${userId}`);
-      return [{ success: false, error: 'No push tokens found for user' }];
+      return [{ success: false, error: "No push tokens found for user" }];
     }
 
     const validTokens = tokens
@@ -260,7 +276,7 @@ export class ExpoPushProvider {
       .filter((t) => this.isValidExpoToken(t));
 
     if (validTokens.length === 0) {
-      return [{ success: false, error: 'No valid Expo tokens for user' }];
+      return [{ success: false, error: "No valid Expo tokens for user" }];
     }
 
     const results: PushNotificationResult[] = [];
@@ -284,42 +300,66 @@ export class ExpoPushProvider {
   async registerToken(
     userId: string,
     token: string,
-    platform: 'ios' | 'android',
+    platform: "ios" | "android",
     deviceId?: string,
   ): Promise<void> {
     if (!this.isValidExpoToken(token)) {
-      throw new Error('Invalid Expo push token format');
+      throw new Error("Invalid Expo push token format");
     }
 
-    // Upsert the token
-    await this.prisma.pushToken.upsert({
-      where: {
-        userId_token: { userId, token },
-      },
-      update: {
-        platform,
-        deviceId,
-        isActive: true,
-        updatedAt: new Date(),
-      },
-      create: {
-        userId,
-        token,
-        platform,
-        deviceId,
-        isActive: true,
-      },
+    // Kayıt rotası (çıkışta jetonsuz iptal için) public olduğundan yasaklı
+    // kullanıcı guard'ına takılmaz: yasaklı / silinmiş hesap cihaz kaydedemez —
+    // yoksa yasaklamada pasifleştirilen token bir sonraki açılışta geri gelir.
+    const owner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isBanned: true, deletedAt: true },
     });
+    if (!owner || owner.isBanned || owner.deletedAt) {
+      throw new Error("Push token registration requires an active account");
+    }
 
-    this.logger.log(`Push token registered for user ${userId}, platform: ${platform}`);
+    // Bir Expo token'ı bir CİHAZDIR: aynı cihazda başka bir hesap oturum
+    // açtıysa önceki hesabın satırı pasifleşir — yoksa önceki hesabın
+    // bildirimleri (mesaj önizlemesi dahil) yeni kullanıcının ekranına düşer
+    // (önceki hesap çıkış yapmadan, ör. oturum süresi dolarak ayrıldıysa).
+    await this.prisma.$transaction([
+      this.prisma.pushToken.updateMany({
+        where: { token, userId: { not: userId }, isActive: true },
+        data: { isActive: false },
+      }),
+      this.prisma.pushToken.upsert({
+        where: {
+          userId_token: { userId, token },
+        },
+        update: {
+          platform,
+          deviceId,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+        create: {
+          userId,
+          token,
+          platform,
+          deviceId,
+          isActive: true,
+        },
+      }),
+    ]);
+
+    this.logger.log(
+      `Push token registered for user ${userId}, platform: ${platform}`,
+    );
   }
 
   /**
    * Deactivate a push token
    */
-  async deactivateToken(token: string): Promise<void> {
+  async deactivateToken(token: string, userId?: string): Promise<void> {
+    // userId verilirse yalnız o hesabın satırı; verilmezse (oturumsuz çıkış)
+    // cihazın tüm satırları.
     await this.prisma.pushToken.updateMany({
-      where: { token },
+      where: userId ? { token, userId } : { token },
       data: { isActive: false },
     });
 

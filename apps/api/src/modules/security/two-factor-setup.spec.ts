@@ -37,7 +37,7 @@ describe("SecurityService 2FA setup flow", () => {
     };
     return {
       prisma,
-      service: new SecurityService(prisma as any, config as any),
+      service: new SecurityService(prisma as any, config as any, {} as any),
     };
   };
 

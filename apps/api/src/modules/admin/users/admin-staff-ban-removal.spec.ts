@@ -45,6 +45,7 @@ describe("AdminStaffService.banUser — ilan kaldırma nedenleri", () => {
       anyMock(),
       anyMock(),
       anyMock(),
+      anyMock(),
     );
     return { service, tx };
   };

@@ -63,6 +63,7 @@ describe("AdminStaffService.assignAdminStaff — personel/müşteri ayrımı", (
       undefined as any,
       undefined as any,
       undefined as any,
+      undefined as any,
     );
     // Yetki kontrolü ve rol matrisi bu testin konusu değil.
     (service as any).assertCanManage = jest.fn().mockResolvedValue(undefined);

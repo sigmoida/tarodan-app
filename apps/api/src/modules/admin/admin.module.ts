@@ -149,6 +149,7 @@ import { RatingModule } from "../rating/rating.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { RefundModule } from "../refund/refund.module";
 import { NotificationModule } from "../notification/notification.module";
+import { PushTokenModule } from "../notification/push-token/push-token.module";
 import { OrderModule } from "../order/order.module";
 import { OfferModule } from "../offer/offer.module";
 import { InvoicingModule } from "../invoicing/invoicing.module";
@@ -183,6 +184,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     SuratCargoModule,
     RefundModule,
     NotificationModule,
+    // Yasaklamada push token'ları pasifleştirme (AdminStaffService.banUser).
+    PushTokenModule,
     OrderModule,
     // extend_once kuralı (teklifin görünen durumu) — OfferExtensionPolicy.
     OfferModule,
