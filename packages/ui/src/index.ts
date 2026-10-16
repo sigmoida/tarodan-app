@@ -105,7 +105,12 @@ export {
 } from "./components/ProductBadge";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Alert, type AlertProps } from "./components/Alert";
-export { Modal, type ModalProps, type ModalSize } from "./components/Modal";
+export {
+  Modal,
+  type ModalProps,
+  type ModalSize,
+  type ModalVariant,
+} from "./components/Modal";
 export { Drawer, type DrawerProps, type DrawerSide } from "./components/Drawer";
 export {
   Dialog,

@@ -5592,8 +5592,18 @@
         "preview": "Preview",
         "size": "Size",
         "positionLabel": "Position",
-        "deviceLabel": "Device",
-        "deviceType": "Device Type",
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Web only",
+          "app": "App only",
+          "all": "Both (web and app)"
+        },
+        "popupFrequencyLabel": "Display frequency",
+        "popupFrequency": {
+          "until_dismissed": "Show until the visitor closes it",
+          "every_visit": "Show on every home page visit"
+        },
+        "popupFrequencyHelper": "Every time you update the ad, it is shown again even to visitors who closed it before.",
         "displayOrder": "Display Order",
         "startDate": "Start Date",
         "endDate": "End Date",
@@ -5634,17 +5644,13 @@
         "iabCompliant": "IAB Compliant",
         "iabWarning": "Size ({width}x{height}) is not an IAB standard — select one of the recommended sizes.",
         "allPositions": "All Positions",
-        "allDevices": "All Devices",
+        "allPlatforms": "All platforms",
         "position": {
           "header": "Top Banner",
           "footer": "Bottom Banner",
           "inline": "Inline",
           "popup": "Popup",
           "topbar": "Top Bar"
-        },
-        "device": {
-          "desktop": "Desktop",
-          "mobile": "Mobile"
         },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
@@ -5670,7 +5676,8 @@
           "live": "Live",
           "expired": "Expired",
           "inactive": "Off",
-          "campaignEnded": "Campaign ended"
+          "campaignEnded": "Campaign ended",
+          "shadowed": "{scope, select, web {Another ad is live in this slot — not shown on the site} app {Another ad is live in this slot — not shown in the app} other {Another ad is live in this slot — not shown}}"
         },
         "linkUrl": "Link URL",
         "linkUrlHelper": "A full address starting with https://… or a site path such as /category/cars.",
@@ -5686,7 +5693,7 @@
           "header": "Large banner under the site header on the home and listing pages. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
           "footer": "Banner above the site footer. Suggested: 970×250, 320×100 on mobile.",
           "inline": "Between product rows on listing, search and category pages. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
-          "popup": "A window shown to a visitor at most once a day. Suggested: 600×600, 320×480 on mobile."
+          "popup": "A window that opens when a visitor enters the home page; how often is set by Display frequency. Suggested: 600×600, 320×480 on mobile."
         }
       },
       "discounts": {
@@ -9721,7 +9728,7 @@
           "provider": "Provider",
           "documentType": "Document type",
           "position": "Position",
-          "device": "Device",
+          "platform": "Platform",
           "scope": "Scope",
           "active": "Active",
           "membershipTier": "Membership tier",
@@ -11610,6 +11617,9 @@
       "endBeforeStart": "The end date cannot be before the start date",
       "hotspotInvalid": "{code, select, tooMany {An ad can have at most {max} clickable areas.} outOfBounds {Clickable area {position} extends outside the image.} tooSmall {Clickable area {position} is too small; its width and height must be at least {minPercent}% of the image.} overlap {Clickable area {position} overlaps area {other}.} labelRequired {Clickable area {position} needs a name.} labelTooLong {The name of clickable area {position} can be at most {labelMax} characters.} linkRequired {Clickable area {position} needs a link.} other {Clickable area {position} is invalid.}}",
       "hotspotsNeedImage": "Clickable areas can only be set on an ad with an image"
+    },
+    "ads": {
+      "slotTaken": "Another ad is already live in this slot (same position and platform) on overlapping dates: “{title}”. Deactivate it or separate the dates first."
     },
     "hero": {
       "notFound": "Slide not found",

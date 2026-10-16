@@ -10,6 +10,14 @@ import { IconButton } from "./IconButton";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl" | "wide" | "full";
 
+/**
+ * - `default`: başlık satırı (kenarlıklı) + dolgulu gövde + yüzey arka planı.
+ * - `media`: yalnız içerik (ör. popup afişi): başlık satırı, kenarlık, dolgu
+ *   ve arka plan yok; kapatma düğmesi içeriğin sağ üstüne biner. Başlık ekran
+ *   okuyucu için `sr-only` kalır; odak tuzağı / Esc / kaydırma kilidi aynıdır.
+ */
+export type ModalVariant = "default" | "media";
+
 const modalSizeClasses: Record<ModalSize, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
@@ -32,6 +40,8 @@ export interface ModalProps {
   ariaLabel?: string;
   /** Semantic dialog width. Every size remains constrained to the viewport. */
   size?: ModalSize;
+  /** Visual frame (default: `default`). See `ModalVariant`. */
+  variant?: ModalVariant;
   /** Max width class (default: max-w-md) */
   maxWidth?: "max-w-sm" | "max-w-md" | "max-w-lg" | "max-w-xl" | "max-w-2xl";
   /** Fixed action area rendered below the scrollable body. */
@@ -66,6 +76,7 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
       description,
       ariaLabel,
       size = "md",
+      variant = "default",
       maxWidth,
       footer,
       closeOnBackdrop = true,
@@ -80,6 +91,27 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     ref,
   ) => {
     const descriptionId = React.useId();
+    const isMedia = variant === "media";
+
+    const closeButton = showCloseButton && (
+      <DialogPrimitive.Close asChild>
+        <IconButton
+          aria-label={closeLabel}
+          variant="ghost"
+          size="sm"
+          disabled={closeButtonDisabled || dismissDisabled}
+          className={
+            isMedia
+              ? // İçeriğin üstüne biner: her görselde okunsun diye koyu,
+                // yuvarlak zemin.
+                "absolute right-2 top-2 z-10 rounded-full bg-heading/70 text-inverted shadow-elevated hover:bg-heading/90 hover:text-inverted"
+              : "-mr-2 shrink-0 bg-transparent"
+          }
+        >
+          <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+        </IconButton>
+      </DialogPrimitive.Close>
+    );
 
     return (
       <DialogPrimitive.Root
@@ -114,38 +146,39 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 // Genişlik, 1rem'lik kenar boşluğunun YANI SIRA yatay güvenli
                 // alanı da düşer: yatay kullanımda pencere ortalanmış olsa bile
                 // kenarı çentiğin altına girebiliyordu.
-                "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem-env(safe-area-inset-left)-env(safe-area-inset-right))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface-elevated shadow-elevated focus:outline-none",
+                "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem-env(safe-area-inset-left)-env(safe-area-inset-right))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl focus:outline-none",
+                isMedia
+                  ? "bg-transparent"
+                  : "bg-surface-elevated shadow-elevated",
                 maxWidth ?? modalSizeClasses[size],
                 className,
               )}
             >
-              <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4">
-                {title ? (
-                  <DialogPrimitive.Title className="min-w-0 text-lg font-semibold leading-tight text-heading">
-                    {title}
-                  </DialogPrimitive.Title>
-                ) : (
+              {isMedia ? (
+                <>
                   <DialogPrimitive.Title className="sr-only">
-                    {ariaLabel ?? "Dialog"}
+                    {title ?? ariaLabel ?? "Dialog"}
                   </DialogPrimitive.Title>
-                )}
-                {showCloseButton && (
-                  <DialogPrimitive.Close asChild>
-                    <IconButton
-                      aria-label={closeLabel}
-                      variant="ghost"
-                      size="sm"
-                      disabled={closeButtonDisabled || dismissDisabled}
-                      className="-mr-2 shrink-0 bg-transparent"
-                    >
-                      <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-                    </IconButton>
-                  </DialogPrimitive.Close>
-                )}
-              </div>
+                  {closeButton}
+                </>
+              ) : (
+                <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4">
+                  {title ? (
+                    <DialogPrimitive.Title className="min-w-0 text-lg font-semibold leading-tight text-heading">
+                      {title}
+                    </DialogPrimitive.Title>
+                  ) : (
+                    <DialogPrimitive.Title className="sr-only">
+                      {ariaLabel ?? "Dialog"}
+                    </DialogPrimitive.Title>
+                  )}
+                  {closeButton}
+                </div>
+              )}
               <div
                 className={cn(
-                  "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5",
+                  "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                  !isMedia && "px-6 py-5",
                   bodyClassName,
                 )}
               >

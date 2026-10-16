@@ -5592,8 +5592,18 @@
         "preview": "Önizleme",
         "size": "Boyut",
         "positionLabel": "Pozisyon",
-        "deviceLabel": "Cihaz",
-        "deviceType": "Cihaz Türü",
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Yalnız web",
+          "app": "Yalnız uygulama",
+          "all": "İkisi (web ve uygulama)"
+        },
+        "popupFrequencyLabel": "Gösterim sıklığı",
+        "popupFrequency": {
+          "until_dismissed": "Kullanıcı kapatana kadar göster",
+          "every_visit": "Ana sayfaya her girişte göster"
+        },
+        "popupFrequencyHelper": "Reklamı her güncellediğinizde, daha önce kapatan ziyaretçilere de yeniden gösterilir.",
         "displayOrder": "Görüntüleme Sırası",
         "startDate": "Başlangıç Tarihi",
         "endDate": "Bitiş Tarihi",
@@ -5634,17 +5644,13 @@
         "iabCompliant": "IAB Uyumlu",
         "iabWarning": "Boyut ({width}x{height}) IAB standardı değil — önerilen boyutlardan birini seçin.",
         "allPositions": "Tüm Pozisyonlar",
-        "allDevices": "Tüm Cihazlar",
+        "allPlatforms": "Tüm platformlar",
         "position": {
           "header": "Üst Banner",
           "footer": "Alt Banner",
           "inline": "İçerik Arası",
           "popup": "Popup",
           "topbar": "Üst Şerit"
-        },
-        "device": {
-          "desktop": "Masaüstü",
-          "mobile": "Mobil"
         },
         "upload": {
           "formats": "Sadece JPG, PNG ve WebP desteklenir",
@@ -5670,7 +5676,8 @@
           "live": "Yayında",
           "expired": "Süresi doldu",
           "inactive": "Kapalı",
-          "campaignEnded": "Kampanya bitti"
+          "campaignEnded": "Kampanya bitti",
+          "shadowed": "{scope, select, web {Aynı yuvada başka reklam yayında — sitede gösterilmiyor} app {Aynı yuvada başka reklam yayında — uygulamada gösterilmiyor} other {Aynı yuvada başka reklam yayında — gösterilmiyor}}"
         },
         "linkUrl": "Bağlantı (URL)",
         "linkUrlHelper": "https://… ile başlayan tam adres ya da /kategori/araba gibi site içi yol.",
@@ -5686,7 +5693,7 @@
           "header": "Ana sayfa ve liste sayfalarında site başlığının altındaki büyük banner. Önerilen: masaüstü 970×250 veya 1200×300, mobil 320×100.",
           "footer": "Site altbilgisinin üstündeki banner. Önerilen: 970×250, mobil 320×100.",
           "inline": "Liste, arama ve kategori sayfalarında ürün satırlarının arasında. Önerilen: masaüstü 728×90 veya 970×90, mobil 300×250.",
-          "popup": "Ziyaretçiye günde en çok bir kez açılan pencere. Önerilen: 600×600, mobil 320×480."
+          "popup": "Ana sayfaya girişte açılan pencere; ne sıklıkla açılacağını gösterim sıklığı belirler. Önerilen: 600×600, mobil 320×480."
         }
       },
       "discounts": {
@@ -9721,7 +9728,7 @@
           "provider": "Sağlayıcı",
           "documentType": "Belge türü",
           "position": "Konum",
-          "device": "Cihaz",
+          "platform": "Platform",
           "scope": "Kapsam",
           "active": "Aktiflik",
           "membershipTier": "Üyelik katmanı",
@@ -11610,6 +11617,9 @@
       "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
       "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
       "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
+    },
+    "ads": {
+      "slotTaken": "Bu yuvada (aynı pozisyon ve platform) aynı tarihlerde yayında olan başka bir reklam var: “{title}”. Önce onu pasife alın ya da tarihleri ayırın."
     },
     "hero": {
       "notFound": "Slayt bulunamadı",

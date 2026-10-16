@@ -13,7 +13,9 @@ import type { AdHotspot, Advertisement } from "@/lib/api/advertisements";
 const track = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api/advertisements", () => ({ trackAdEvent: track }));
-vi.mock("@/hooks/useAdImpression", () => ({ useAdImpression: () => undefined }));
+vi.mock("@/hooks/useAdImpression", () => ({
+  useAdImpression: () => undefined,
+}));
 vi.mock("@/components/OptimizedImage", () => ({
   default: ({ alt }: { alt: string }) => <span data-testid="img">{alt}</span>,
 }));
@@ -22,7 +24,10 @@ vi.mock("@/i18n/navigation", () => ({
     href,
     children,
     ...rest
-  }: { href: string; children?: React.ReactNode } & Record<string, unknown>) => (
+  }: { href: string; children?: React.ReactNode } & Record<
+    string,
+    unknown
+  >) => (
     <a href={href} {...rest}>
       {children}
     </a>
@@ -54,7 +59,9 @@ const ad = (over: Partial<Advertisement>): Advertisement => ({
   width: 970,
   height: 250,
   position: "header",
-  deviceType: "all",
+  platform: "all",
+  popupFrequency: "until_dismissed",
+  popupVersion: 1,
   campaign: null,
   ...over,
 });
@@ -97,7 +104,11 @@ describe("AdCreative hotspots", () => {
 
     const anchors = host.querySelectorAll("a");
     expect(anchors).toHaveLength(2);
-    anchors.forEach((a) => expect(a.contains(host.querySelector("img, [data-testid=img]"))).toBe(false));
+    anchors.forEach((a) =>
+      expect(a.contains(host.querySelector("img, [data-testid=img]"))).toBe(
+        false,
+      ),
+    );
   });
 
   it("bölgeyi yüzde olarak konumlar ve dış bağlantıyı yeni sekmede açar", () => {

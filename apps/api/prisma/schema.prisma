@@ -3590,7 +3590,17 @@ model Advertisement {
   height          Int?
   /// Render yuvası — yerleşim anlamları `AdPosition` enum'unda.
   position        AdPosition   @default(header)
+  /// Reklamın gösterildiği istemci (`GET /ads/active?platform=web|app`).
+  platform        ContentPlatform @default(all)
+  /// DEPRECATED: `platform`'un öncülü. Kolon eski mobil sürümler için kalır;
+  /// değeri her yazımda `platform`'dan türetilir (`adDeviceTypeFor`), admin
+  /// formu artık göndermez.
   deviceType      AdDeviceType @default(all) @map("device_type")
+  /// Yalnız `popup` yuvasında anlamlı: kapatılınca bir daha açılmasın mı.
+  popupFrequency  AdPopupFrequency @default(until_dismissed) @map("popup_frequency")
+  /// Admin her güncellediğinde +1 (sayaç artışları dokunmaz — bu yüzden
+  /// `updatedAt` kullanılamaz). Kapatılan popup, yeni sürümde yeniden açılır.
+  popupVersion    Int          @default(1) @map("popup_version")
   /// Aynı yuvadaki canlı reklamların sırası (küçük önce); rotasyonu web yapar.
   displayOrder    Int          @default(0) @map("display_order")
   /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresi ve bağlı
@@ -3616,7 +3626,7 @@ model Advertisement {
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
   @@index([discountId])
-  @@index([position, deviceType, isActive])
+  @@index([position, platform, isActive])
   @@index([startDate, endDate])
   @@map("advertisements")
 }
@@ -4415,6 +4425,7 @@ enum TaxRuleScope {
   product
 }
 
+/// DEPRECATED — yerini `ContentPlatform` aldı (Advertisement.deviceType).
 enum AdDeviceType {
   desktop
   mobile
@@ -4434,8 +4445,19 @@ enum AdPosition {
   footer
   /// İlan/arama/kategori ızgarasında ürün satırları arasındaki banner.
   inline
-  /// Ziyaretçi başına günde en fazla bir kez açılan modal.
+  /// Ana sayfaya girişte açılan modal; ne sıklıkla açılacağı reklamın
+  /// `popupFrequency` alanında.
   popup
+}
+
+/// Popup reklamın ne sıklıkla açıldığı. İstemci "kapatıldı" bilgisini reklam
+/// başına `<id>:<popupVersion>` anahtarıyla saklar.
+enum AdPopupFrequency {
+  /// Ana sayfaya her girişte açılır; kapatmak bir şey saklamaz.
+  every_visit
+  /// Kullanıcı kapatana kadar her girişte açılır; kapatınca o sürüm bir daha
+  /// açılmaz (admin reklamı güncelleyince `popupVersion` artar, yeniden açılır).
+  until_dismissed
 }
 
 /// Hero slaytının gösterildiği yer (`HERO_PLACEMENTS`, @tarodan/types).

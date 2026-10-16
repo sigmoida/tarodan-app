@@ -121,9 +121,9 @@ export class AdminAdvertisementController {
     description: "Filter by position",
   })
   @ApiQuery({
-    name: "deviceType",
+    name: "platform",
     required: false,
-    description: "Filter by device type",
+    description: "Filter by platform: web, app, all",
   })
   @ApiQuery({
     name: "isActive",
@@ -133,12 +133,12 @@ export class AdminAdvertisementController {
   @ApiResponse({ status: HttpStatus.OK, description: "List of ads" })
   async getAds(
     @Query("position") position?: string,
-    @Query("deviceType") deviceType?: string,
+    @Query("platform") platform?: string,
     @Query("isActive") isActive?: string,
   ) {
     const active =
       isActive === "true" ? true : isActive === "false" ? false : undefined;
-    return this.advertisementService.findAll(position, deviceType, active);
+    return this.advertisementService.findAll(position, platform, active);
   }
 
   @Get("ads/statistics")
@@ -170,6 +170,11 @@ export class AdminAdvertisementController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Create advertisement" })
   @ApiResponse({ status: HttpStatus.CREATED, description: "Ad created" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Another active ad already holds this position on an overlapping platform and date window (server.ads.slotTaken)",
+  })
   async createAd(@Body() dto: CreateAdvertisementDto) {
     return this.advertisementService.create(dto);
   }
@@ -185,9 +190,16 @@ export class AdminAdvertisementController {
 
   @Patch("ads/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Update advertisement" })
+  @ApiOperation({
+    summary: "Update advertisement (every update bumps popupVersion)",
+  })
   @ApiParam({ name: "id", description: "Ad ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Ad updated" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Another active ad already holds this position on an overlapping platform and date window (server.ads.slotTaken)",
+  })
   async updateAd(@Param("id") id: string, @Body() dto: UpdateAdvertisementDto) {
     return this.advertisementService.update(id, dto);
   }

@@ -3,9 +3,30 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./client", () => ({ api: {}, GATEWAY_BASE: "/gateway" }));
+const get = vi.hoisted(() => vi.fn());
+vi.mock("./client", () => ({ api: { get }, GATEWAY_BASE: "/gateway" }));
 
-import { adEventUrl, trackAdEvent } from "./advertisements";
+import { advertisementsApi, adEventUrl, trackAdEvent } from "./advertisements";
+
+describe("advertisementsApi.getActive", () => {
+  afterEach(() => get.mockReset());
+
+  it("platform=web gönderir; geçiş dönemi için eski device'ı da taşır", () => {
+    advertisementsApi.getActive({ position: "popup", device: "mobile" });
+    expect(get).toHaveBeenCalledWith("/ads/active", {
+      params: { position: "popup", platform: "web", device: "mobile" },
+    });
+  });
+
+  it("cihaz verilmezse yalnız platform gider", () => {
+    advertisementsApi.getActive({ position: "header" });
+    expect(get.mock.calls[0][1].params).toMatchObject({
+      position: "header",
+      platform: "web",
+      device: undefined,
+    });
+  });
+});
 
 describe("ad event tracking", () => {
   afterEach(() => {
@@ -15,9 +36,7 @@ describe("ad event tracking", () => {
 
   it("sayaç adresini vekil kökünden kurar", () => {
     expect(adEventUrl("ad 1", "click")).toBe("/gateway/ads/ad%201/click");
-    expect(adEventUrl("abc", "impression")).toBe(
-      "/gateway/ads/abc/impression",
-    );
+    expect(adEventUrl("abc", "impression")).toBe("/gateway/ads/abc/impression");
   });
 
   it("hotspot kimliğini kodlayarak sorguya ekler", () => {

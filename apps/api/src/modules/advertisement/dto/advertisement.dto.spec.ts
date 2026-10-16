@@ -45,10 +45,13 @@ describe("UpdateAdvertisementDto", () => {
     "startDate",
     "endDate",
     "discountId",
-  ])("temizlenebilir alan %s: null kabul edilir ve null kalır", async (field) => {
-    const dto = await update({ [field]: null });
-    expect(dto[field]).toBeNull();
-  });
+  ])(
+    "temizlenebilir alan %s: null kabul edilir ve null kalır",
+    async (field) => {
+      const dto = await update({ [field]: null });
+      expect(dto[field]).toBeNull();
+    },
+  );
 
   it.each(["imageUrl", "linkUrl", "content", "startDate", "width"])(
     "temizlenebilir alan %s: boş dize null'a çevrilir",
@@ -58,26 +61,29 @@ describe("UpdateAdvertisementDto", () => {
     },
   );
 
-  it.each(["title", "position", "deviceType", "displayOrder", "isActive"])(
-    "zorunlu alan %s: null 400'dür (Prisma 500'ü yerine)",
-    async (field) => {
-      await expect(update({ [field]: null })).rejects.toBeInstanceOf(
+  it.each([
+    "title",
+    "position",
+    "platform",
+    "popupFrequency",
+    "displayOrder",
+    "isActive",
+  ])("zorunlu alan %s: null 400'dür (Prisma 500'ü yerine)", async (field) => {
+    await expect(update({ [field]: null })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+});
+
+describe("CreateAdvertisementDto — alan kuralları", () => {
+  it.each(["javascript:alert(1)", "data:text/html,x", "//evil.com"])(
+    "linkUrl %s → 400",
+    async (linkUrl) => {
+      await expect(create({ linkUrl })).rejects.toBeInstanceOf(
         BadRequestException,
       );
     },
   );
-});
-
-describe("CreateAdvertisementDto — alan kuralları", () => {
-  it.each([
-    "javascript:alert(1)",
-    "data:text/html,x",
-    "//evil.com",
-  ])("linkUrl %s → 400", async (linkUrl) => {
-    await expect(create({ linkUrl })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-  });
 
   it.each(["/kategori/x", "https://x.com"])(
     "linkUrl %s kabul",
@@ -99,9 +105,10 @@ describe("CreateAdvertisementDto — alan kuralları", () => {
   });
 
   it("genişlik/yükseklik tavanı 4000", async () => {
-    await expect(create({ width: 4000, height: 4000 })).resolves.toMatchObject(
-      { width: 4000, height: 4000 },
-    );
+    await expect(create({ width: 4000, height: 4000 })).resolves.toMatchObject({
+      width: 4000,
+      height: 4000,
+    });
     await expect(create({ width: 4001 })).rejects.toBeInstanceOf(
       BadRequestException,
     );
@@ -123,6 +130,36 @@ describe("CreateAdvertisementDto — alan kuralları", () => {
     await expect(create({ position: "sidebar" })).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it("platform: web / app / all kabul; bilinmeyen 400", async () => {
+    for (const platform of ["web", "app", "all"]) {
+      await expect(create({ platform })).resolves.toMatchObject({ platform });
+    }
+    await expect(create({ platform: "desktop" })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it("popupFrequency: every_visit / until_dismissed kabul; bilinmeyen 400", async () => {
+    for (const popupFrequency of ["every_visit", "until_dismissed"]) {
+      await expect(create({ popupFrequency })).resolves.toMatchObject({
+        popupFrequency,
+      });
+    }
+    await expect(create({ popupFrequency: "daily" })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it("eski deviceType gövdeden düşer (whitelist), hata vermez", async () => {
+    await expect(create({ deviceType: "mobile" })).resolves.not.toHaveProperty(
+      "deviceType",
+    );
+  });
+
+  it("popupVersion istemciden yazılamaz (whitelist düşürür)", async () => {
+    await expect(update({ popupVersion: 99 })).resolves.toEqual({});
   });
 
   describe("hotspots", () => {
@@ -155,9 +192,9 @@ describe("CreateAdvertisementDto — alan kuralları", () => {
       ["sonsuz en", { width: Infinity }],
       ["uuid olmayan id", { id: "abc" }],
     ])("%s → 400", async (_d, over) => {
-      await expect(
-        create({ hotspots: [spot(over)] }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(create({ hotspots: [spot(over)] })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it("dizi değilse 400", async () => {

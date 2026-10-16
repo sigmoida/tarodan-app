@@ -1,6 +1,11 @@
 /** @format */
 
-import type { AdHotspotInput } from "@tarodan/types";
+import type {
+  AdHotspotInput,
+  AdPopupFrequency,
+  ClientPlatform,
+  ContentPlatform,
+} from "@tarodan/types";
 import { sendTrackingBeacon } from "./beacon";
 import { api, GATEWAY_BASE } from "./client";
 
@@ -36,7 +41,16 @@ export interface Advertisement {
   width: number | null;
   height: number | null;
   position: AdPosition;
-  deviceType: "desktop" | "mobile" | "all";
+  /** Hedef istemci; web yalnız `web` ve `all` olanları alır (API süzer). */
+  platform: ContentPlatform;
+  /**
+   * Yalnız popup'ta: `until_dismissed` kapatılınca o sürüm bir daha açılmaz,
+   * `every_visit` ana sayfaya her girişte açılır (bkz. `lib/ads/popupFrequency`).
+   * Eski API yanıtında yoksa `until_dismissed` say (bkz. `useActiveAds`).
+   */
+  popupFrequency: AdPopupFrequency;
+  /** Admin her güncellediğinde artar; kapatma kaydı bu sürüme bağlıdır. */
+  popupVersion: number;
   /** Duyurulan kampanya — varsa şerit kodu ve adıyla gösterilir. */
   campaign: {
     id: string;
@@ -51,6 +65,9 @@ export interface Advertisement {
 
 /** API'deki reklam denetleyicisinin kökü (`@Controller('ads')`). */
 const ADS_BASE = "/ads";
+
+/** Bu istemcinin `?platform=` değeri: site. */
+export const AD_CLIENT_PLATFORM: ClientPlatform = "web";
 
 export type AdEvent = "impression" | "click";
 
@@ -77,9 +94,17 @@ export function trackAdEvent(
 }
 
 export const advertisementsApi = {
-  getActive: (params?: { position?: AdPosition; deviceType?: string }) =>
+  /**
+   * Yuvanın yayındaki afişi (API yuva başına en fazla bir döner). `device`
+   * geçiş dönemi içindir (bkz. `useDeviceType`): yeni API yok sayar, eski API
+   * onunla süzer.
+   */
+  getActive: (params?: { position?: AdPosition; device?: string }) =>
     api.get(`${ADS_BASE}/active`, {
-      // API sorgu adı `device`; istemci tarafındaki ad değişmesin.
-      params: { position: params?.position, device: params?.deviceType },
+      params: {
+        position: params?.position,
+        platform: AD_CLIENT_PLATFORM,
+        device: params?.device,
+      },
     }),
 };

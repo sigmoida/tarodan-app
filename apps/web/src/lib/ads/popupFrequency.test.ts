@@ -2,53 +2,96 @@
 /** @format */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  POPUP_AD_INTERVAL_MS,
-  POPUP_AD_STORAGE_KEY,
-  canShowPopupAd,
-  isPopupBlockedByOverlay,
-  markPopupAdShown,
-} from "./popupFrequency";
+import type { AdPopupFrequency } from "@tarodan/types";
 
-const NOW = 1_800_000_000_000;
+type PopupFrequencyModule = typeof import("./popupFrequency");
 
-describe("popup frequency cap", () => {
+/** Bellek içi yedek modül düzeyinde tutulur: her test temiz modülle başlar. */
+async function load(): Promise<PopupFrequencyModule> {
+  vi.resetModules();
+  return import("./popupFrequency");
+}
+
+const ad = (
+  over: Partial<{
+    id: string;
+    popupFrequency: AdPopupFrequency;
+    popupVersion: number;
+  }> = {},
+) => ({
+  id: "ad-1",
+  popupFrequency: "until_dismissed" as AdPopupFrequency,
+  popupVersion: 1,
+  ...over,
+});
+
+describe("popup dismissal (reklam + sürüm başına)", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.restoreAllMocks();
   });
 
-  it("hiç gösterilmediyse gösterir", () => {
-    expect(canShowPopupAd(NOW)).toBe(true);
+  it("anahtar reklam kimliği ve sürümünden oluşur", async () => {
+    const { popupAdDismissKey } = await load();
+    expect(popupAdDismissKey(ad({ id: "x", popupVersion: 3 }))).toBe(
+      "tarodan.popupAd.dismissed.x:3",
+    );
   });
 
-  it("gösterimden sonra 24 saat dolmadan göstermez", () => {
-    markPopupAdShown(NOW);
-    expect(window.localStorage.getItem(POPUP_AD_STORAGE_KEY)).toBe(String(NOW));
-    expect(canShowPopupAd(NOW + POPUP_AD_INTERVAL_MS - 1)).toBe(false);
+  it("until_dismissed: kapatılana kadar gösterilir; gösterim kayıt yazmaz", async () => {
+    const { canShowPopupAd } = await load();
+    expect(canShowPopupAd(ad())).toBe(true);
+    // Yalnız okumak hiçbir şey yazmaz.
+    expect(window.localStorage.length).toBe(0);
   });
 
-  it("24 saat dolunca yeniden gösterir", () => {
-    markPopupAdShown(NOW);
-    expect(canShowPopupAd(NOW + POPUP_AD_INTERVAL_MS)).toBe(true);
+  it("until_dismissed: kapatınca o sürüm bir daha gösterilmez", async () => {
+    const { canShowPopupAd, markPopupAdDismissed } = await load();
+    markPopupAdDismissed(ad());
+    expect(
+      window.localStorage.getItem("tarodan.popupAd.dismissed.ad-1:1"),
+    ).not.toBeNull();
+    expect(canShowPopupAd(ad())).toBe(false);
   });
 
-  it("bozuk değer ya da geleceğe yazılmış damga kilitlemez", () => {
-    window.localStorage.setItem(POPUP_AD_STORAGE_KEY, "abc");
-    expect(canShowPopupAd(NOW)).toBe(true);
-    window.localStorage.setItem(POPUP_AD_STORAGE_KEY, String(NOW + 10_000));
-    expect(canShowPopupAd(NOW)).toBe(true);
+  it("admin güncelleyince (yeni sürüm) yeniden gösterilir", async () => {
+    const { canShowPopupAd, markPopupAdDismissed } = await load();
+    markPopupAdDismissed(ad({ popupVersion: 1 }));
+    expect(canShowPopupAd(ad({ popupVersion: 2 }))).toBe(true);
   });
 
-  it("depolama hata verirse okuma 'göster', yazma sessiz geçer", () => {
+  it("kapatma kaydı reklam başınadır, başka reklamı etkilemez", async () => {
+    const { canShowPopupAd, markPopupAdDismissed } = await load();
+    markPopupAdDismissed(ad({ id: "a" }));
+    expect(canShowPopupAd(ad({ id: "b" }))).toBe(true);
+  });
+
+  it("every_visit: hiçbir şey yazılmaz, her seferinde gösterilir", async () => {
+    const { canShowPopupAd, markPopupAdDismissed } = await load();
+    const everyVisit = ad({ popupFrequency: "every_visit" });
+    markPopupAdDismissed(everyVisit);
+    expect(window.localStorage.length).toBe(0);
+    expect(canShowPopupAd(everyVisit)).toBe(true);
+  });
+
+  it("every_visit: eski bir kapatma kaydı olsa da gösterilir", async () => {
+    const { canShowPopupAd, markPopupAdDismissed } = await load();
+    markPopupAdDismissed(ad());
+    expect(canShowPopupAd(ad({ popupFrequency: "every_visit" }))).toBe(true);
+  });
+
+  it("localStorage yoksa kayıt bellekte tutulur (sayfa ömrünce)", async () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    expect(canShowPopupAd(NOW)).toBe(true);
-    expect(() => markPopupAdShown(NOW)).not.toThrow();
+    const { canShowPopupAd, markPopupAdDismissed } = await load();
+    expect(canShowPopupAd(ad())).toBe(true);
+    expect(() => markPopupAdDismissed(ad())).not.toThrow();
+    expect(canShowPopupAd(ad())).toBe(false);
+    expect(canShowPopupAd(ad({ popupVersion: 2 }))).toBe(true);
   });
 });
 
@@ -59,14 +102,17 @@ describe("isPopupBlockedByOverlay", () => {
     tourRunning: false,
   };
 
-  it("hiçbir katman açık değilse engellemez", () => {
+  it("hiçbir katman açık değilse engellemez", async () => {
+    const { isPopupBlockedByOverlay } = await load();
     expect(isPopupBlockedByOverlay(clear)).toBe(false);
   });
 
-  it.each(["requiredStepsOutstanding", "cookieBannerOpen", "tourRunning"] as const)(
-    "%s engeller",
-    (key) => {
-      expect(isPopupBlockedByOverlay({ ...clear, [key]: true })).toBe(true);
-    },
-  );
+  it.each([
+    "requiredStepsOutstanding",
+    "cookieBannerOpen",
+    "tourRunning",
+  ] as const)("%s engeller", async (key) => {
+    const { isPopupBlockedByOverlay } = await load();
+    expect(isPopupBlockedByOverlay({ ...clear, [key]: true })).toBe(true);
+  });
 });

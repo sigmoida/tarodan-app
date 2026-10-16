@@ -1,9 +1,15 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import {
+  AD_POPUP_FREQUENCIES,
+  AD_POPUP_FREQUENCY_DEFAULT,
+  CONTENT_PLATFORMS,
   validateAdHotspots,
   type AdHotspotError,
   type AdHotspotInput,
+  type AdPopupFrequency,
+  type ClientPlatform,
+  type ContentPlatform,
 } from "@tarodan/types";
 import {
   endOfIstanbulDayIso,
@@ -49,7 +55,17 @@ export interface Ad {
   discountId: string | null;
   /** Bağlı kampanya (API ilişkiyi döndürürse); "Kampanya bitti" durumunu besler. */
   discount?: AdCampaign | null;
-  deviceType: string;
+  /** Gösterildiği istemci: web (site), app (mobil uygulama), all (ikisi). */
+  platform: ContentPlatform;
+  /** Yalnız popup yuvasında anlamlı. */
+  popupFrequency: AdPopupFrequency;
+  /** Kreatif değişince artar; kapatılmış popup yeni sürümde yeniden açılır. */
+  popupVersion: number;
+  /**
+   * Yalnız liste yanıtında: yayında olduğu halde gösterilmediği istemciler
+   * (aynı yuvada önce gelen başka reklam yayında). Boş = sorun yok.
+   */
+  shadowedOn?: ClientPlatform[];
   displayOrder: number;
   isActive: boolean;
   startDate: string | null;
@@ -103,21 +119,28 @@ export const positionHint = (t: T, position: string): string | undefined =>
     ? t(`admin.marketing.ads.positionHint.${position}`)
     : undefined;
 
-export const deviceLabels = (t: T): Record<string, string> => ({
-  desktop: t("admin.marketing.ads.device.desktop"),
-  mobile: t("admin.marketing.ads.device.mobile"),
-  all: t("common.all"),
-});
+/** Platform etiketleri; değerlerin tek kaynağı `CONTENT_PLATFORMS` (@tarodan/types). */
+export const platformLabels = (t: T): Record<string, string> =>
+  Object.fromEntries(
+    CONTENT_PLATFORMS.map((p) => [p, t(`admin.marketing.ads.platform.${p}`)]),
+  );
+
+/** Popup gösterim sıklığı etiketleri (sıra = seçici sırası, varsayılan önce). */
+export const popupFrequencyOptions = (t: T) =>
+  AD_POPUP_FREQUENCIES.map((value) => ({
+    value,
+    label: t(`admin.marketing.ads.popupFrequency.${value}`),
+  }));
 
 /**
  * Filtre listelerinde "hepsi" seçeneğinin değeri BOŞ dizedir, `"all"` değil.
  *
- * `deviceLabels` içinde gerçek bir `all` cihaz hedefi var ("tüm cihazlarda
- * gösterilsin"). Filtrenin kendi "hepsi" seçeneği de `"all"` değerini
- * kullandığında iki sonuç doğuyordu: aynı `value` ile iki seçenek (React
- * tekrarlanan anahtar uyarısı) ve daha kötüsü, gerçekten "tüm cihazlar"
- * hedefli reklamları SÜZMENİN yolu kalmıyordu — o değer "filtre yok" anlamına
- * geliyordu.
+ * `platformLabels` içinde gerçek bir `all` platform hedefi var ("web ve
+ * uygulamada gösterilsin"). Filtrenin kendi "hepsi" seçeneği de `"all"`
+ * değerini kullandığında iki sonuç doğuyordu: aynı `value` ile iki seçenek
+ * (React tekrarlanan anahtar uyarısı) ve daha kötüsü, gerçekten "ikisi"
+ * hedefli reklamları SÜZMENİN yolu kalmıyordu — o değer "filtre yok"
+ * anlamına geliyordu.
  */
 export const FILTER_ALL = "";
 
@@ -129,9 +152,9 @@ export const positionFilterOptions = (t: T) => [
   })),
 ];
 
-export const deviceFilterOptions = (t: T) => [
-  { value: FILTER_ALL, label: t("admin.marketing.ads.allDevices") },
-  ...Object.entries(deviceLabels(t)).map(([value, label]) => ({
+export const platformFilterOptions = (t: T) => [
+  { value: FILTER_ALL, label: t("admin.marketing.ads.allPlatforms") },
+  ...Object.entries(platformLabels(t)).map(([value, label]) => ({
     value,
     label,
   })),
@@ -142,8 +165,8 @@ export const positionOptions = (t: T) =>
     value,
     label,
   }));
-export const deviceOptions = (t: T) =>
-  Object.entries(deviceLabels(t)).map(([value, label]) => ({
+export const platformOptions = (t: T) =>
+  Object.entries(platformLabels(t)).map(([value, label]) => ({
     value,
     label,
   }));
@@ -247,7 +270,10 @@ export const adSchema = (t: T) =>
         .optional()
         .default(0),
       position: z.string().default("header"),
-      deviceType: z.string().default("all"),
+      platform: z.enum(CONTENT_PLATFORMS).default("all"),
+      popupFrequency: z
+        .enum(AD_POPUP_FREQUENCIES)
+        .default(AD_POPUP_FREQUENCY_DEFAULT),
       displayOrder: z.string().optional().default("0"),
       isActive: z.boolean().default(true),
       startDate: z.string().optional().default(""),
@@ -285,7 +311,8 @@ export const emptyAdForm: AdFormValues = {
   width: 0,
   height: 0,
   position: "header",
-  deviceType: "all",
+  platform: "all",
+  popupFrequency: AD_POPUP_FREQUENCY_DEFAULT,
   displayOrder: "0",
   isActive: true,
   startDate: "",
@@ -304,7 +331,8 @@ export function adToForm(ad: Ad): AdFormValues {
     width: ad.width ?? 0,
     height: ad.height ?? 0,
     position: ad.position,
-    deviceType: ad.deviceType ?? "all",
+    platform: ad.platform ?? "all",
+    popupFrequency: ad.popupFrequency ?? AD_POPUP_FREQUENCY_DEFAULT,
     displayOrder: String(ad.displayOrder ?? 0),
     isActive: ad.isActive,
     startDate: istanbulDateOf(ad.startDate),
@@ -362,7 +390,9 @@ export function adFormToPayload(v: AdFormValues, mode: AdPayloadMode) {
     width: num(v.width),
     height: num(v.height),
     position: v.position,
-    deviceType: v.deviceType,
+    platform: v.platform,
+    // Yalnız popup'ta okunur; yuva değişince seçim kaybolmasın diye hep gider.
+    popupFrequency: v.popupFrequency,
     displayOrder: Number(v.displayOrder) || 0,
     isActive: v.isActive,
     startDate: v.startDate ? startOfIstanbulDayIso(v.startDate) : empty,

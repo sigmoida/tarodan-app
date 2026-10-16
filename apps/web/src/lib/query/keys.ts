@@ -140,6 +140,14 @@ export const queryKeys = {
     unreadCount: () => ["messages-unread-count"] as const,
     thread: (id: string | undefined) => ["messages", id] as const,
   },
+  ads: {
+    /**
+     * Yuvanın yayındaki afişi (`GET /ads/active?position=&platform=web`).
+     * `device` geçiş dönemi parametresidir (bkz. `useDeviceType`).
+     */
+    active: (position: string, device: string | null) =>
+      ["advertisements", position, device] as const,
+  },
   offers: {
     pendingCount: () => ["offers-pending-count"] as const,
   },

@@ -34,7 +34,8 @@ import {
   positionOptions,
   positionHint,
   AD_CONTENT_MAX,
-  deviceOptions,
+  platformOptions,
+  popupFrequencyOptions,
   IAB_SIZES,
   isIabSize,
   hotspotIssues,
@@ -266,7 +267,8 @@ function LinkOrHotspotsField() {
   const t = useTranslations();
   const { setValue, formState } = useFormContext<AdFormValues>();
   const imageUrl = useWatch({ name: "imageUrl" }) as string;
-  const hotspots = (useWatch({ name: "hotspots" }) ?? []) as AdFormValues["hotspots"];
+  const hotspots = (useWatch({ name: "hotspots" }) ??
+    []) as AdFormValues["hotspots"];
 
   if (!imageUrl) {
     return (
@@ -298,6 +300,21 @@ function PositionField() {
       label={t("admin.marketing.ads.positionLabel")}
       options={positionOptions(t)}
       helperText={positionHint(t, position)}
+    />
+  );
+}
+
+/** Yalnız popup yuvasında: kapatılana kadar mı, her girişte mi açılsın. */
+function PopupFrequencyField() {
+  const t = useTranslations();
+  const position = useWatch({ name: "position" }) as string;
+  if (position !== "popup") return null;
+  return (
+    <FormSelect
+      name="popupFrequency"
+      label={t("admin.marketing.ads.popupFrequencyLabel")}
+      options={popupFrequencyOptions(t)}
+      helperText={t("admin.marketing.ads.popupFrequencyHelper")}
     />
   );
 }
@@ -391,11 +408,12 @@ export function AdFormModal({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <PositionField />
         <FormSelect
-          name="deviceType"
-          label={t("admin.marketing.ads.deviceType")}
-          options={deviceOptions(t)}
+          name="platform"
+          label={t("admin.marketing.ads.platformLabel")}
+          options={platformOptions(t)}
         />
       </div>
+      <PopupFrequencyField />
       <FormInput
         name="displayOrder"
         label={t("admin.marketing.ads.displayOrder")}
