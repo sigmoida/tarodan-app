@@ -92,4 +92,31 @@ describe("ProductStaticInfoView", () => {
     );
     expect(container.innerHTML).not.toMatch(/indirim/i);
   });
+
+  it("durum uyarısı rozet satırının hemen altında, görüntülenme satırından önce", () => {
+    act(() =>
+      root.render(
+        <ProductStaticInfoView
+          listing={{ ...listing, status: "sold" }}
+          t={t}
+        />,
+      ),
+    );
+    const after = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const alertEl = Array.from(container.querySelectorAll("*")).find(
+      (el) =>
+        el.children.length === 0 && el.textContent === "product.statusSold",
+    )!;
+    const views = Array.from(container.querySelectorAll("span")).find((el) =>
+      el.textContent?.includes("product.views"),
+    )!;
+    const description = Array.from(container.querySelectorAll("*")).find(
+      (el) => el.children.length === 0 && el.textContent === "Açıklama",
+    )!;
+    expect(alertEl).toBeTruthy();
+    expect(after(row()!, alertEl)).toBe(true);
+    expect(after(alertEl, views)).toBe(true);
+    expect(after(alertEl, description)).toBe(true);
+  });
 });

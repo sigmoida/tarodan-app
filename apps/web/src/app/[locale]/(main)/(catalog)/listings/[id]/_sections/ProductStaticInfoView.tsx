@@ -111,23 +111,6 @@ export default function ProductStaticInfoView({
         <ProductDetailBadges listing={listing} t={t} />
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-body mb-6">
-        <span className="flex items-center gap-1">
-          <EyeIcon className="w-4 h-4 text-primary-500" />
-          {listing.viewCount || 0} {t("product.views")}
-        </span>
-        <span className="flex items-center gap-1">
-          <HeartIcon className="w-4 h-4 text-danger-500" />
-          {listing.likeCount || 0} {t("product.likes")}
-        </span>
-      </div>
-
-      <SectionCard title={t("product.description")} className="mb-6">
-        <div className="prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed">
-          {listing.description || t("product.noDescription")}
-        </div>
-      </SectionCard>
-
       {notice && (
         <Alert
           variant={notice.variant}
@@ -146,6 +129,23 @@ export default function ProductStaticInfoView({
           {notice.subtitle}
         </Alert>
       )}
+
+      <div className="flex items-center gap-4 text-sm text-body mb-6">
+        <span className="flex items-center gap-1">
+          <EyeIcon className="w-4 h-4 text-primary-500" />
+          {listing.viewCount || 0} {t("product.views")}
+        </span>
+        <span className="flex items-center gap-1">
+          <HeartIcon className="w-4 h-4 text-danger-500" />
+          {listing.likeCount || 0} {t("product.likes")}
+        </span>
+      </div>
+
+      <SectionCard title={t("product.description")} className="mb-6">
+        <div className="prose prose-sm max-w-none text-muted whitespace-pre-line leading-relaxed">
+          {listing.description || t("product.noDescription")}
+        </div>
+      </SectionCard>
     </>
   );
 }

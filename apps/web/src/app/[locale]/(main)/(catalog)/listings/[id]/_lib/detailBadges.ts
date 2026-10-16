@@ -37,8 +37,9 @@ export function getDetailBadges(listing: Listing): DetailBadge[] {
   if (listing.status === "sold") badges.push({ kind: "sold" });
 
   if (isProductOnSaleDisplay(listing)) {
+    // Kartla aynı kural: yuvarlanmış yüzde 1'in altındaysa rozet yok.
     const percent = getProductDiscountPercent(listing);
-    if (percent > 0) badges.push({ kind: "sale", percent });
+    if (percent >= 1) badges.push({ kind: "sale", percent });
   }
 
   const purchasable = !isProductOutOfStock({

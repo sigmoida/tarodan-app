@@ -33,6 +33,8 @@ describe("getDetailBadges", () => {
         discountPercent: 30,
       }),
     ).toEqual([{ kind: "sale", percent: 30 }]);
+    // Yüzde 1'in altına yuvarlanıyorsa rozet yok (%0 asla çizilmez).
+    expect(kinds({ oldPrice: 1000, price: 996 })).toEqual([]);
     // %0 ise rozet yok.
     expect(kinds({ isOnSale: true })).toEqual([]);
     expect(kinds({ oldPrice: 200, price: 150, discountPercent: 0 })).toEqual(

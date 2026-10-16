@@ -221,7 +221,7 @@ Web is a storefront: its lists are **card grids and rails**, not data tables
 them from the shared pieces so every grid in the app behaves the same:
 
 - **Item** → `ProductCard` (or the feature's card in `components/<feature>/`).
-- **Favorite** → the card's built-in heart (`ProductCardFavorite`, bottom-right of
+- **Favorite** → the card's built-in heart (`ProductCardFavorite`, top-right of
   the image, outside the card `<Link>`). Its state and toggle come from
   `hooks/useWishlist` — the same hooks the listing detail uses, over the one
   `GET /wishlist` query (`lib/wishlist.ts`). Never add a second favorite query or
