@@ -11,6 +11,7 @@ import {
 import { ProductBadge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
+import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
 import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
@@ -34,6 +35,10 @@ import { IMAGE_SIZES } from "@/lib/imageSizes";
  * views/likes, condition) — pass `false` for lean rails, dense grids or
  * reduced-shape items. `overlay` / `footer` are click-isolated slots for actions
  * (remove, add-to-cart, SOLD badges) rendered OUTSIDE the card's `<Link>`.
+ *
+ * Listing cards carry the favorite heart at the image's bottom-right
+ * (`ProductCardFavorite`, also outside the `<Link>`); it is skipped for
+ * non-navigating cards and where the caller opts out with `showFavorite={false}`.
  */
 
 /**
@@ -84,6 +89,12 @@ export interface ProductCardProps {
    * non-navigating card (e.g. a collection's custom item that has no listing).
    */
   href?: string | null;
+  /**
+   * Show the favorite heart on the image (default `true`). Pass `false` where the
+   * card already has its own wishlist control (e.g. Favorites' remove button).
+   * Never shown on non-navigating cards (`href={null}`).
+   */
+  showFavorite?: boolean;
 }
 
 /** Wraps the card body in a `Link` — or a plain `div` when `href` is null. */
@@ -116,6 +127,7 @@ export default function ProductCard({
   overlayStart,
   footer,
   href,
+  showFavorite = true,
 }: ProductCardProps) {
   const t = useTranslations();
 
@@ -129,6 +141,10 @@ export default function ProductCard({
           }).catch(() => undefined);
         }
       : undefined;
+  // Kalp yalnız gerçek ilan kartında: özel (ilansız) koleksiyon öğesi
+  // favorilenemez.
+  const favorite = showFavorite && linkHref !== null;
+  const sellerId = product.seller?.id ?? product.sellerId;
 
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
@@ -164,79 +180,99 @@ export default function ProductCard({
   if (layout === "list") {
     return (
       <div className="relative">
-        <CardLink href={linkHref} onClick={trackClick}>
-          {/*
-            Dar ekranda satır sarar: `xs` altında fiyat bloğu `w-full` ile kendi
-            satırına iner. Üç sütun yan yana kaldığında (112px görsel + sarmayan
-            fiyat) başlığa 25px kalıyordu — kart okunamaz hâle geliyordu. Görsel
-            ve yazı ölçüleri de aynı gerekçeyle kademeli.
-          */}
-          <div className="bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex flex-wrap items-center gap-3 p-3 sm:gap-4">
-            <div className="relative w-20 h-20 xs:w-28 xs:h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
-              <OptimizedImage
-                src={imageUrl}
-                alt={product.title}
-                fill
-                sizes="(min-width: 640px) 128px, (min-width: 400px) 112px, 80px"
-                className={`object-cover${outOfStock ? " opacity-50" : ""}`}
-                fallbackSrc={PRODUCT_PLACEHOLDER}
-                logContext={{ listingId: product.id, page: "product-card" }}
-                priority={priority}
+        {/*
+          Dar ekranda satır sarar: `xs` altında fiyat bloğu `w-full` ile kendi
+          satırına iner. Üç sütun yan yana kaldığında (112px görsel + sarmayan
+          fiyat) başlığa 25px kalıyordu — kart okunamaz hâle geliyordu. Görsel
+          ve yazı ölçüleri de aynı gerekçeyle kademeli.
+
+          Link "gerilmiş" bir başlık linkidir: `after:inset-0` bütün kartı
+          tıklanır yapar, ama satır `<a>`'nın İÇİNDE değildir — böylece favori
+          kalbi görselin kendi hücresinde (kenar/padding'den bağımsız, köşede)
+          durabilir ve link içinde buton olmaz.
+        */}
+        <div className="relative bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex flex-wrap items-center gap-3 p-3 sm:gap-4">
+          <div className="relative w-20 h-20 xs:w-28 xs:h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
+            <OptimizedImage
+              src={imageUrl}
+              alt={product.title}
+              fill
+              sizes="(min-width: 640px) 128px, (min-width: 400px) 112px, 80px"
+              className={`object-cover${outOfStock ? " opacity-50" : ""}`}
+              fallbackSrc={PRODUCT_PLACEHOLDER}
+              logContext={{ listingId: product.id, page: "product-card" }}
+              priority={priority}
+            />
+            {outOfStock && <OutOfStockOverlay />}
+            {isTrade && (
+              <ProductBadge
+                variant="trade"
+                className="absolute top-1 right-1 p-1"
+                icon={<ArrowsRightLeftIcon className="w-3 h-3" />}
               />
-              {outOfStock && <OutOfStockOverlay />}
-              {isTrade && (
-                <ProductBadge
-                  variant="trade"
-                  className="absolute top-1 right-1 p-1"
-                  icon={<ArrowsRightLeftIcon className="w-3 h-3" />}
-                />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-heading line-clamp-2 text-base xs:text-xl sm:text-2xl leading-tight">
-                {product.title}
-              </h3>
-              {showMeta && (
-                <div className="flex items-center gap-3 mt-2 text-xs xs:text-sm sm:text-base text-subtle xs:gap-4">
-                  <span className="flex items-center gap-1">
-                    <EyeIcon className="w-4 h-4 text-primary-500" />
-                    {product.viewCount ?? 0}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <HeartSolidIcon className="w-4 h-4 text-danger-500" />
-                    {product.likeCount ?? 0}
-                  </span>
-                  {ratingBlock("w-4 h-4")}
-                </div>
-              )}
-              {showMeta && product.description && (
-                <p className="mt-2 line-clamp-2 text-sm text-muted sm:text-base">
-                  {product.description}
-                </p>
-              )}
-            </div>
-            {/*
-              `xs` altında tam genişlikte, sağa yaslı TEK satır (eski fiyat ·
-              fiyat · indirim rozeti yan yana); `xs` üstünde eski hâli — sağda
-              dikey sütun. Tek render, iki düzen.
-            */}
-            <div className="flex w-full flex-shrink-0 flex-row items-baseline justify-end gap-2 text-right xs:ml-4 xs:w-auto xs:flex-col xs:items-end xs:gap-0">
-              {onSale && (
-                <span className="text-sm text-subtle line-through">
-                  {fmtTL(originalPrice)}
-                </span>
-              )}
-              <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
-                {fmtTL(effectivePrice)}
-              </p>
-              {onSale && (
-                <ProductBadge variant="sale" className="xs:mt-1">
-                  %{product.discountPercent ?? 0}
-                </ProductBadge>
-              )}
-            </div>
+            )}
+            {favorite && (
+              <ProductCardFavorite
+                productId={product.id}
+                sellerId={sellerId}
+                frameClassName="inset-0"
+              />
+            )}
           </div>
-        </CardLink>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-heading line-clamp-2 text-base xs:text-xl sm:text-2xl leading-tight">
+              {linkHref ? (
+                <Link
+                  href={linkHref}
+                  onClick={trackClick}
+                  className="after:absolute after:inset-0"
+                >
+                  {product.title}
+                </Link>
+              ) : (
+                product.title
+              )}
+            </h3>
+            {showMeta && (
+              <div className="flex items-center gap-3 mt-2 text-xs xs:text-sm sm:text-base text-subtle xs:gap-4">
+                <span className="flex items-center gap-1">
+                  <EyeIcon className="w-4 h-4 text-primary-500" />
+                  {product.viewCount ?? 0}
+                </span>
+                <span className="flex items-center gap-1">
+                  <HeartSolidIcon className="w-4 h-4 text-danger-500" />
+                  {product.likeCount ?? 0}
+                </span>
+                {ratingBlock("w-4 h-4")}
+              </div>
+            )}
+            {showMeta && product.description && (
+              <p className="mt-2 line-clamp-2 text-sm text-muted sm:text-base">
+                {product.description}
+              </p>
+            )}
+          </div>
+          {/*
+            `xs` altında tam genişlikte, sağa yaslı TEK satır (eski fiyat ·
+            fiyat · indirim rozeti yan yana); `xs` üstünde eski hâli — sağda
+            dikey sütun. Tek render, iki düzen.
+          */}
+          <div className="flex w-full flex-shrink-0 flex-row items-baseline justify-end gap-2 text-right xs:ml-4 xs:w-auto xs:flex-col xs:items-end xs:gap-0">
+            {onSale && (
+              <span className="text-sm text-subtle line-through">
+                {fmtTL(originalPrice)}
+              </span>
+            )}
+            <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
+              {fmtTL(effectivePrice)}
+            </p>
+            {onSale && (
+              <ProductBadge variant="sale" className="xs:mt-1">
+                %{product.discountPercent ?? 0}
+              </ProductBadge>
+            )}
+          </div>
+        </div>
         {overlay && (
           <div className="absolute top-2 right-2 z-10">{overlay}</div>
         )}
@@ -336,6 +372,9 @@ export default function ProductCard({
           </div>
         </div>
       </CardLink>
+      {favorite && (
+        <ProductCardFavorite productId={product.id} sellerId={sellerId} />
+      )}
       {footer && <div className="px-2.5 pb-2.5">{footer}</div>}
       {overlay && (
         <div className="absolute top-1.5 right-1.5 z-10">{overlay}</div>

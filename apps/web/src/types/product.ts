@@ -66,6 +66,8 @@ export interface Product {
   rating?: { average: number | null; count: number };
   viewCount?: number;
   likeCount?: number;
+  /** Satıcının id'si — `seller` nesnesi gelmeyen yanıtlarda sahiplik kontrolü için. */
+  sellerId?: string;
   seller?: {
     id: string | number;
     /** Herkese açık ad (API çözer): firma adı → kullanıcı adı → isim. */

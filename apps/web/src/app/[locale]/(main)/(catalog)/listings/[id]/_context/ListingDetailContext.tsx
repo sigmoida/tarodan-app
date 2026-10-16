@@ -11,7 +11,7 @@ import {
 } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   BoltIcon,
@@ -19,15 +19,15 @@ import {
   UserIcon,
   ChatBubbleLeftRightIcon,
   ArrowsRightLeftIcon,
-  HeartIcon as HeartOutlineIcon,
 } from "@heroicons/react/24/outline";
 import { useLocale, useTranslations } from "next-intl";
-import { collectionsApi, wishlistApi } from "@/lib/api";
+import { collectionsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useCart } from "@/hooks/useCart";
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useAuthGate } from "@/hooks/useAuthGate";
+import { useProductFavorite } from "@/hooks/useWishlist";
 import { getCardImageUrl } from "../_lib/images";
 import { useListingData } from "../_hooks/useListingData";
 import { useProductGallery } from "../_hooks/useProductGallery";
@@ -37,7 +37,6 @@ import { publicNameOf } from "@/lib/public-name";
 function useListingDetailValue() {
   const params = useParams();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const id = params.id as string;
   const t = useTranslations();
   const locale = useLocale();
@@ -56,7 +55,7 @@ function useListingDetailValue() {
   const setBuyNowProductId = useCartStore((s) => s.setBuyNowProductId);
   const { requireAuth, authModal } = useAuthGate();
 
-  const data = useListingData(id, isAuthenticated);
+  const data = useListingData(id);
   const { listing, effectivePrice, images } = data;
   const gallery = useProductGallery(images, locale);
 
@@ -259,66 +258,11 @@ function useListingDetailValue() {
     }
   };
 
-  // ---- Favorite ----
-  const handleToggleFavorite = async () => {
-    if (!isAuthenticated) {
-      requireAuth({
-        title: t("product.addToFavorites"),
-        message: t("auth.memberBenefits"),
-        icon: <HeartOutlineIcon className="w-10 h-10 text-danger-500" />,
-      });
-      return;
-    }
-    if (isOwner) {
-      toast.error(t("product.cannotFavoriteOwn"));
-      return;
-    }
-    try {
-      if (data.isFavorite) {
-        await wishlistApi.remove(id);
-        toast.success(t("product.removedFromFavorites"));
-      } else {
-        const response = await wishlistApi.add(id);
-        if (
-          response?.data ||
-          response?.status === 200 ||
-          response?.status === 201
-        ) {
-          toast.success(t("product.addToFavorites"));
-        } else {
-          throw new Error("Unexpected response format");
-        }
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.wishlist.check(id),
-        }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all() }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.product.detail(id),
-        }),
-      ]);
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Toggle favorite error:", error);
-      // 409 (Conflict) — already in favorites → treat as success
-      if (error?.response?.status === 409) {
-        toast.success(t("product.addToFavorites"));
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.wishlist.check(id),
-          }),
-          queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all() }),
-        ]);
-        return;
-      }
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          t("common.operationFailed"),
-      );
-    }
-  };
+  // ---- Favorite ---- (ürün kartlarındaki kalple aynı hook ve önbellek)
+  const { isFavorite, toggle: handleToggleFavorite } = useProductFavorite(id, {
+    isOwner,
+    requireAuth,
+  });
 
   // ---- Share ----
   const handleShare = () => setShowShareMenu((s) => !s);
@@ -407,6 +351,7 @@ function useListingDetailValue() {
     loadingCollections: collectionsQuery.isLoading,
     addingToCollection,
     // favorite / share / report
+    isFavorite,
     handleToggleFavorite,
     handleShare,
     shareToSocial,

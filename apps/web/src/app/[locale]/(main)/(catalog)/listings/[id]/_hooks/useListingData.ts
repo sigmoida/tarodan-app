@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
-import { listingsApi, wishlistApi, userApi, api } from "@/lib/api";
+import { listingsApi, userApi, api } from "@/lib/api";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import type { Product } from "@/types/product";
 import { buildImages } from "../_lib/images";
@@ -13,12 +13,13 @@ import type { Listing } from "../_lib/types";
 
 /**
  * The listing detail's data layer: the listing itself (public → owner fallback),
- * a one-shot view count, the wishlist flag, and the reviews list/stats with their
- * sort + score filters. The queryFn is a pure fetch so the server prefetch
+ * a one-shot view count, and the reviews list/stats with their sort + score
+ * filters. (The favorite flag comes from the shared `useProductFavorite`, the
+ * same cache the product cards read.) The queryFn is a pure fetch so the server prefetch
  * hydrates without a refetch flash; the view count is a separate effect so
  * SSR-hydrated loads still count exactly once and the server never double-counts.
  */
-export function useListingData(id: string, isAuthenticated: boolean) {
+export function useListingData(id: string) {
   const queryClient = useQueryClient();
   const viewCountedRef = useRef(false);
 
@@ -83,17 +84,6 @@ export function useListingData(id: string, isAuthenticated: boolean) {
 
   const images = useMemo(() => buildImages(listing?.images), [listing]);
 
-  const wishlistQuery = useQuery({
-    queryKey: queryKeys.wishlist.check(id),
-    queryFn: async () => {
-      const response = await wishlistApi.check(id);
-      return response.data?.inWishlist ?? false;
-    },
-    enabled: !!id && !!isAuthenticated,
-    meta: { page: "listing-detail-wishlist" },
-  });
-  const isFavorite = wishlistQuery.data ?? false;
-
   const reviewsQuery = useQuery({
     queryKey: queryKeys.product.reviews(id, reviewSortBy, reviewFilterScore),
     queryFn: async () => {
@@ -141,7 +131,6 @@ export function useListingData(id: string, isAuthenticated: boolean) {
     effectivePrice,
     isTradeAvailable,
     images,
-    isFavorite,
     reviews: reviewsQuery.data?.reviews ?? [],
     reviewStats: reviewsQuery.data?.stats ?? null,
     reviewsLoading: reviewsQuery.isLoading,

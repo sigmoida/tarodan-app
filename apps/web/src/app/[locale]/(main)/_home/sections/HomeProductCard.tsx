@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { Link } from "@/i18n/navigation";
+import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
 import {
   getProductEffectivePrice,
   getProductOriginalPriceForDisplay,
@@ -16,7 +17,11 @@ import { formatTL } from "@/lib/format";
 // detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
 const formatPrice = formatTL;
 
-/** Server-rendered home card; only the image itself uses Next's built-in loader. */
+/**
+ * Server-rendered home card; only the image itself uses Next's built-in loader.
+ * The favorite heart is the one client island (`ProductCardFavorite`, shared with
+ * `ProductCard`), rendered as the link's sibling so the card HTML stays valid.
+ */
 export default function HomeProductCard({
   product,
   index,
@@ -46,10 +51,12 @@ export default function HomeProductCard({
   return (
     <div
       data-tour={index === 0 ? "home-product" : undefined}
-      className="group relative flex h-full flex-col"
+      // Çerçeve (kenarlık) dış kapta: favori kalbinin çerçevesi
+      // (`inset-x-0 top-0 aspect-square`) görselle piksel piksel çakışsın.
+      className="group relative flex h-full flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md"
     >
       <Link href={`/listings/${product.id}`} className="flex-1">
-        <div className="flex h-full flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
+        <div className="flex h-full flex-col">
           <div className="relative aspect-square bg-surface-alt">
             <Image
               src={imageUrl}
@@ -104,6 +111,10 @@ export default function HomeProductCard({
           </div>
         </div>
       </Link>
+      <ProductCardFavorite
+        productId={product.id}
+        sellerId={product.seller?.id ?? product.sellerId}
+      />
     </div>
   );
 }

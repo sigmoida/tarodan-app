@@ -38,14 +38,18 @@ export default function ProductActionIcons() {
     }
   };
   const sellerId = listing?.seller?.id || listing?.sellerId;
+  // Sabit etiket + aria-pressed (kart kalbiyle aynı): durum etiketle değil
+  // basılı/değil bilgisiyle okunur.
+  const favoriteLabel = t("product.favorite");
 
   return (
     <div className="flex justify-end gap-2">
       <IconButton
         variant={isFavorite ? "danger" : "ghost"}
         onClick={handleToggleFavorite}
-        aria-label={t("product.addToFavorites")}
-        title={t("product.addToFavorites")}
+        aria-label={favoriteLabel}
+        aria-pressed={isFavorite}
+        title={favoriteLabel}
       >
         {isFavorite ? (
           <HeartSolidIcon className="w-6 h-6" />
