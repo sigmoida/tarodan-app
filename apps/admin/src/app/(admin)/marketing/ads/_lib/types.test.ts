@@ -8,7 +8,12 @@ import {
   emptyAdForm,
   hotspotIssues,
   isValidAdLink,
+  platformFilterOptions,
+  platformLabels,
+  popupFrequencyOptions,
+  positionHint,
   positionLabels,
+  FILTER_ALL,
   type Ad,
 } from "./types";
 
@@ -98,7 +103,8 @@ describe("adToForm", () => {
     const ad = {
       title: "a",
       position: "topbar",
-      deviceType: "all",
+      platform: "web",
+      popupFrequency: "every_visit",
       displayOrder: 0,
       isActive: true,
       startDate: "2026-06-30T21:00:00.000Z",
@@ -109,7 +115,84 @@ describe("adToForm", () => {
       startDate: "2026-07-01",
       endDate: "2026-07-31",
       discountId: "",
+      platform: "web",
+      popupFrequency: "every_visit",
     });
+  });
+
+  it("falls back to all / until_dismissed for a response without the new fields", () => {
+    const ad = {
+      title: "a",
+      position: "popup",
+      displayOrder: 0,
+      isActive: true,
+      startDate: null,
+      endDate: null,
+      discountId: null,
+    } as unknown as Ad;
+    expect(adToForm(ad)).toMatchObject({
+      platform: "all",
+      popupFrequency: "until_dismissed",
+    });
+  });
+});
+
+describe("platform + popup frequency", () => {
+  it("platform options are web / app / all (device targeting is gone)", () => {
+    expect(Object.keys(platformLabels(t))).toEqual(["web", "app", "all"]);
+    expect(platformLabels(t).app).toBe("admin.marketing.ads.platform.app");
+  });
+
+  it("platform filter's 'all' option is the empty value, distinct from the real `all` target", () => {
+    const values = platformFilterOptions(t).map((o) => o.value);
+    expect(values).toEqual([FILTER_ALL, "web", "app", "all"]);
+  });
+
+  it("popup frequency offers until_dismissed first (the default), then every_visit", () => {
+    expect(popupFrequencyOptions(t)).toEqual([
+      {
+        value: "until_dismissed",
+        label: "admin.marketing.ads.popupFrequency.until_dismissed",
+      },
+      {
+        value: "every_visit",
+        label: "admin.marketing.ads.popupFrequency.every_visit",
+      },
+    ]);
+  });
+
+  it("new ads default to all + until_dismissed", () => {
+    expect(emptyAdForm).toMatchObject({
+      platform: "all",
+      popupFrequency: "until_dismissed",
+    });
+  });
+
+  it("payload carries platform + popupFrequency and no legacy deviceType", () => {
+    for (const mode of ["create", "update"] as const) {
+      const p = adFormToPayload(
+        { ...filled, platform: "app", popupFrequency: "every_visit" },
+        mode,
+      );
+      expect(p).toMatchObject({ platform: "app", popupFrequency: "every_visit" });
+      expect(p).not.toHaveProperty("deviceType");
+    }
+  });
+
+  it("schema rejects an unknown platform or frequency", () => {
+    const schema = adSchema(t);
+    expect(schema.safeParse({ ...filled, platform: "desktop" }).success).toBe(
+      false,
+    );
+    expect(
+      schema.safeParse({ ...filled, popupFrequency: "daily" }).success,
+    ).toBe(false);
+  });
+
+  it("popup position hint uses the popup key", () => {
+    expect(positionHint(t, "popup")).toBe(
+      "admin.marketing.ads.positionHint.popup",
+    );
   });
 });
 

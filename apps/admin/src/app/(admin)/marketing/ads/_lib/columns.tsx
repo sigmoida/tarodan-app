@@ -7,17 +7,18 @@ import {
   DevicePhoneMobileIcon,
   DeviceTabletIcon,
 } from "@heroicons/react/24/outline";
+import type { ContentPlatform } from "@tarodan/types";
 import { col, type RowActionItem } from "@/components/table";
 import { fmtDate, fmtPercent } from "@/lib/format";
-import { type Ad, positionLabels, deviceLabels } from "./types";
+import { type Ad, positionLabels, platformLabels } from "./types";
 import { AD_STATUS_VARIANT, adLiveStatus } from "./status";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-function DeviceIcon({ type }: { type: string }) {
-  if (type === "desktop") return <ComputerDesktopIcon className="h-4 w-4" />;
-  if (type === "mobile") return <DevicePhoneMobileIcon className="h-4 w-4" />;
+function PlatformIcon({ platform }: { platform: ContentPlatform }) {
+  if (platform === "web") return <ComputerDesktopIcon className="h-4 w-4" />;
+  if (platform === "app") return <DevicePhoneMobileIcon className="h-4 w-4" />;
   return <DeviceTabletIcon className="h-4 w-4" />;
 }
 
@@ -32,7 +33,7 @@ export function adColumns(
   t: T,
 ) {
   const positions = positionLabels(t);
-  const devices = deviceLabels(t);
+  const platforms = platformLabels(t);
   const now = new Date();
   return [
     col.custom<Ad>(
@@ -90,14 +91,14 @@ export function adColumns(
       { sortKey: "position", sortType: "text" },
     ),
     col.custom<Ad>(
-      t("admin.marketing.ads.deviceLabel"),
+      t("admin.marketing.ads.platformLabel"),
       (ad) => (
         <span className="flex items-center gap-1 text-sm text-muted">
-          <DeviceIcon type={ad.deviceType} />
-          {devices[ad.deviceType] || ad.deviceType}
+          <PlatformIcon platform={ad.platform} />
+          {platforms[ad.platform] || ad.platform}
         </span>
       ),
-      { sortKey: "deviceType", sortType: "text" },
+      { sortKey: "platform", sortType: "text" },
     ),
     col.muted<Ad>(
       t("admin.marketing.ads.schedule"),

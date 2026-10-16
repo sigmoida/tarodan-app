@@ -5567,8 +5567,18 @@
         "preview": "Preview",
         "size": "Size",
         "positionLabel": "Position",
-        "deviceLabel": "Device",
-        "deviceType": "Device Type",
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Web only",
+          "app": "App only",
+          "all": "Both (web and app)"
+        },
+        "popupFrequencyLabel": "Display frequency",
+        "popupFrequency": {
+          "until_dismissed": "Show until the visitor closes it",
+          "every_visit": "Show on every home page visit"
+        },
+        "popupFrequencyHelper": "Every time you update the ad, it is shown again even to visitors who closed it before.",
         "displayOrder": "Display Order",
         "startDate": "Start Date",
         "endDate": "End Date",
@@ -5609,17 +5619,13 @@
         "iabCompliant": "IAB Compliant",
         "iabWarning": "Size ({width}x{height}) is not an IAB standard — select one of the recommended sizes.",
         "allPositions": "All Positions",
-        "allDevices": "All Devices",
+        "allPlatforms": "All platforms",
         "position": {
           "header": "Top Banner",
           "footer": "Bottom Banner",
           "inline": "Inline",
           "popup": "Popup",
           "topbar": "Top Bar"
-        },
-        "device": {
-          "desktop": "Desktop",
-          "mobile": "Mobile"
         },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
@@ -5661,7 +5667,7 @@
           "header": "Large banner under the site header on the home and listing pages. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
           "footer": "Banner above the site footer. Suggested: 970×250, 320×100 on mobile.",
           "inline": "Between product rows on listing, search and category pages. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
-          "popup": "A window shown to a visitor at most once a day. Suggested: 600×600, 320×480 on mobile."
+          "popup": "A window that opens when a visitor enters the home page; how often is set by Display frequency. Suggested: 600×600, 320×480 on mobile."
         }
       },
       "discounts": {
@@ -9695,7 +9701,7 @@
           "provider": "Provider",
           "documentType": "Document type",
           "position": "Position",
-          "device": "Device",
+          "platform": "Platform",
           "scope": "Scope",
           "active": "Active",
           "membershipTier": "Membership tier",
