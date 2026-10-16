@@ -53,7 +53,22 @@ import { buildTradeCommissionRuleSnapshot } from "../helpers/trade-commission-sn
 import { PaymentService } from "../../payment/payment.service";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { TradeShipmentService } from "./trade-shipment.service";
+import { TradePartyNoticeService } from "./trade-party-notice.service";
+import type {
+  TradePartyNoticeKind,
+  TradePartyNoticePayload,
+} from "../../outbox/outbox.types";
 import { TradeCommonService } from "../trade-common.service";
+
+/** Outbox'sız (dar test kurulumu) doğrudan gönderimde olay → bildirim tipi. */
+const TRADE_PARTY_NOTICE_TYPES: Record<
+  Exclude<TradePartyNoticeKind, "completed">,
+  NotificationType
+> = {
+  cancelled: NotificationType.TRADE_CANCELLED,
+  dispute_opened: NotificationType.TRADE_DISPUTE_OPENED,
+  dispute_resolved: NotificationType.TRADE_DISPUTE_RESOLVED,
+};
 import { TradeQueryService } from "../trade-query.service";
 import { DiscountService } from "../../discount/discount.service";
 import {
@@ -123,6 +138,9 @@ export class TradeLifecycleService {
     // filtresinden geçer (Apple 1.2). TradeModule MessagingModule'ü içe
     // aktarır; dar test kurulumlarında yok.
     @Optional() private readonly contentFilter?: ContentFilterService,
+    // Taraf duyuruları outbox üzerinden (CLAUDE.md §10). Dar test kurulumlarında
+    // yoksa duyuru commit sonrası doğrudan gönderilir.
+    @Optional() private readonly partyNotices?: TradePartyNoticeService,
   ) {}
 
   /**
@@ -1232,6 +1250,7 @@ export class TradeLifecycleService {
       tradeId,
     );
     let alreadyCancelled = false;
+    let cancelNotices: TradePartyNoticePayload[] = [];
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
       if ((await this.cancelGate(tx, trade, userId)) === "already_cancelled") {
@@ -1279,6 +1298,11 @@ export class TradeLifecycleService {
         where: { tradeId, payerId: otherPartyId },
         data: { fullRefundEntitled: true },
       });
+
+      // Karşı taraf takasın iptal edildiğini yalnız ekrana bakınca görüyordu.
+      // Duyuru iptalle AYNI tx'te outbox'a yazılır (CLAUDE.md §10).
+      cancelNotices = [{ tradeId, userId: otherPartyId, kind: "cancelled" }];
+      await this.enqueuePartyNotices(tx, cancelNotices);
     });
 
     if (!alreadyCancelled) {
@@ -1294,59 +1318,52 @@ export class TradeLifecycleService {
 
       await this.tradeCommon.invalidateProductCachesForTrade(tradeId);
 
-      // Karşı taraf takasın iptal edildiğini yalnız ekrana bakınca görüyordu.
-      await this.notifyTradeParties(
-        [
-          current.initiatorId === userId
-            ? current.receiverId
-            : current.initiatorId,
-        ],
-        NotificationType.TRADE_CANCELLED,
-        tradeId,
-      );
+      await this.flushPartyNotices(cancelNotices);
     }
 
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
   /**
-   * Takas olayının zil + push duyurusu (commit SONRASI). Bildirim hatası takas
-   * akışını bozmaz; tercih/kanal kararı dağıtım katmanındadır.
+   * Takas taraf duyurusunu olayın tx'inde outbox'a yazar (CLAUDE.md §10: kaybı
+   * kullanıcıya görünen yan etki). Outbox servisi yoksa (dar test kurulumu)
+   * duyuru commit sonrası `flushPartyNotices` ile doğrudan gider.
    */
-  private async notifyTradeParties(
-    userIds: string[],
-    type: NotificationType,
-    tradeId: string,
+  private async enqueuePartyNotices(
+    tx: Prisma.TransactionClient,
+    notices: TradePartyNoticePayload[],
   ): Promise<void> {
-    for (const recipientId of userIds) {
-      try {
-        await this.notificationService.createInAppNotification(
-          recipientId,
-          type,
-          { tradeId },
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Failed to send ${type} notification for trade ${tradeId}: ${error}`,
-        );
-      }
+    if (this.partyNotices && notices.length > 0) {
+      await this.partyNotices.enqueue(tx, notices);
     }
   }
 
-  /** Takas tamamlandı: iki tarafa zil + push + "takasınız tamamlandı" e-postası. */
-  private async notifyTradeCompletedParties(
-    tradeId: string,
-    parties: { initiatorId: string; receiverId: string },
+  /** Commit sonrası anlık gönderim; hata takas akışını bozmaz (outbox yeniden dener). */
+  private async flushPartyNotices(
+    notices: TradePartyNoticePayload[],
   ): Promise<void> {
-    for (const recipientId of [parties.initiatorId, parties.receiverId]) {
+    if (notices.length === 0) return;
+    if (this.partyNotices) {
+      await this.partyNotices.flush(notices);
+      return;
+    }
+    for (const notice of notices) {
       try {
-        await this.notificationService.notifyTradeCompleted(
-          recipientId,
-          tradeId,
-        );
+        if (notice.kind === "completed") {
+          await this.notificationService.notifyTradeCompleted(
+            notice.userId,
+            notice.tradeId,
+          );
+        } else {
+          await this.notificationService.createInAppNotification(
+            notice.userId,
+            TRADE_PARTY_NOTICE_TYPES[notice.kind],
+            { tradeId: notice.tradeId },
+          );
+        }
       } catch (error) {
         this.logger.warn(
-          `Failed to send trade completed notification for trade ${tradeId}: ${error}`,
+          `Failed to send trade ${notice.kind} notification for trade ${notice.tradeId}: ${error}`,
         );
       }
     }
@@ -1408,9 +1425,8 @@ export class TradeLifecycleService {
     userId: string,
     dto: ConfirmTradeReceiptDto,
   ): Promise<TradeResponseDto> {
-    // Bu onay takası TAMAMLADIYSA taraflar (commit sonrası duyuru için).
-    let completedParties: { initiatorId: string; receiverId: string } | null =
-      null;
+    // Bu onay takası TAMAMLADIYSA iki tarafa duyuru (tx'te outbox, commit sonrası anlık).
+    let completedNotices: TradePartyNoticePayload[] = [];
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
 
@@ -1530,10 +1546,14 @@ export class TradeLifecycleService {
       });
 
       if (newStatus === TradeStatus.completed) {
-        completedParties = {
-          initiatorId: trade.initiatorId,
-          receiverId: trade.receiverId,
-        };
+        completedNotices = [trade.initiatorId, trade.receiverId].map(
+          (partyId) => ({
+            tradeId,
+            userId: partyId,
+            kind: "completed" as const,
+          }),
+        );
+        await this.enqueuePartyNotices(tx, completedNotices);
         // Takas tamamlandı: quantity-- + reservedQuantity-- (her iki tarafın ürünü için)
         const allItems = await tx.tradeItem.findMany({ where: { tradeId } });
         // #2 (LOST-UPDATE FIX): ürün satırlarını OKUMADAN ÖNCE FOR UPDATE ile kilitle
@@ -1616,12 +1636,7 @@ export class TradeLifecycleService {
 
     await this.tradeCommon.invalidateProductCachesForTrade(tradeId);
 
-    // Atama tx kapanışında yapıldığı için TS daraltması burada `null` sanır.
-    const parties = completedParties as {
-      initiatorId: string;
-      receiverId: string;
-    } | null;
-    if (parties) await this.notifyTradeCompletedParties(tradeId, parties);
+    await this.flushPartyNotices(completedNotices);
 
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
@@ -1634,11 +1649,9 @@ export class TradeLifecycleService {
     userId: string,
     dto: RaiseTradeDisputeDto,
   ): Promise<TradeResponseDto> {
-    let counterpartId = "";
+    let disputeNotices: TradePartyNoticePayload[] = [];
     await this.prisma.$transaction(async (tx) => {
       const trade = await this.getTradeWithLock(tradeId, tx);
-      counterpartId =
-        trade.initiatorId === userId ? trade.receiverId : trade.initiatorId;
 
       if (trade.initiatorId !== userId && trade.receiverId !== userId) {
         throw new ForbiddenException(
@@ -1690,20 +1703,24 @@ export class TradeLifecycleService {
           version: { increment: 1 },
         },
       });
+
+      // Karşı taraf itirazı yalnız ekrana bakınca görüyordu — itirazla AYNI tx'te outbox.
+      disputeNotices = [
+        {
+          tradeId,
+          userId:
+            trade.initiatorId === userId ? trade.receiverId : trade.initiatorId,
+          kind: "dispute_opened",
+        },
+      ];
+      await this.enqueuePartyNotices(tx, disputeNotices);
     });
 
     void this.notifyStaffTrade("trade.disputed", tradeId, {
       raisedById: userId,
       reason: dto.reason,
     });
-    // Karşı taraf itirazı yalnız ekrana bakınca görüyordu.
-    if (counterpartId) {
-      await this.notifyTradeParties(
-        [counterpartId],
-        NotificationType.TRADE_DISPUTE_OPENED,
-        tradeId,
-      );
-    }
+    await this.flushPartyNotices(disputeNotices);
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
@@ -1731,7 +1748,7 @@ export class TradeLifecycleService {
     const compensateBoth = dto.resolution === "compensate_both";
 
     let resolvedTradeInitiatorId: string;
-    let resolvedTradeReceiverId = "";
+    let resolvedNotices: TradePartyNoticePayload[] = [];
 
     if (compensationUserIdResolver || compensateBoth) {
       // MONEY-M5: İadeden ÖNCE trade'in GERÇEKTEN `disputed` olduğunu doğrula.
@@ -1796,7 +1813,17 @@ export class TradeLifecycleService {
       }
 
       resolvedTradeInitiatorId = trade.initiatorId;
-      resolvedTradeReceiverId = trade.receiverId;
+
+      // İki taraf da itirazın sonuçlandığını (takas tamamlandı) öğrenir — çözümle
+      // AYNI tx'te outbox (çözüm geri alınırsa duyuru da yazılmaz).
+      resolvedNotices = [trade.initiatorId, trade.receiverId].map(
+        (partyId) => ({
+          tradeId,
+          userId: partyId,
+          kind: "dispute_resolved" as const,
+        }),
+      );
+      await this.enqueuePartyNotices(tx, resolvedNotices);
 
       await tx.tradeDispute.update({
         where: { tradeId },
@@ -1910,12 +1937,7 @@ export class TradeLifecycleService {
 
     await this.tradeCommon.invalidateProductCachesForTrade(tradeId);
 
-    // İki taraf da itirazın sonuçlandığını (ve takasın tamamlandığını) öğrenir.
-    await this.notifyTradeParties(
-      [resolvedTradeInitiatorId!, resolvedTradeReceiverId].filter(Boolean),
-      NotificationType.TRADE_DISPUTE_RESOLVED,
-      tradeId,
-    );
+    await this.flushPartyNotices(resolvedNotices);
 
     return this.tradeQuery.getTradeById(tradeId, resolvedTradeInitiatorId!);
   }

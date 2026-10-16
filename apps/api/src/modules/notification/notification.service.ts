@@ -41,8 +41,11 @@ export class NotificationService {
     userId: string,
     type: NotificationType,
     data?: Record<string, any>,
+    opts?: { pushRequiresRecord?: boolean },
   ): Promise<boolean> {
-    return this.dispatch.createInAppNotification(userId, type, data);
+    return opts
+      ? this.dispatch.createInAppNotification(userId, type, data, opts)
+      : this.dispatch.createInAppNotification(userId, type, data);
   }
 
   async notifyAllAdmins(

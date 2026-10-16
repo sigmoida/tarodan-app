@@ -36,6 +36,20 @@ import {
   tradeStageExtendedAt,
 } from "../helpers/trade-deadline-extension";
 import { TradeDeadlineExtensionService } from "./trade-deadline-extension.service";
+import { TradePartyNoticeService } from "./trade-party-notice.service";
+import type { TradePartyNoticePayload } from "../../outbox/outbox.types";
+
+/** Otomatik tamamlanan takasın iki tarafına "tamamlandı" duyurusu. */
+const completedNotices = (trade: {
+  id: string;
+  initiatorId: string;
+  receiverId: string;
+}): TradePartyNoticePayload[] =>
+  [trade.initiatorId, trade.receiverId].map((userId) => ({
+    tradeId: trade.id,
+    userId,
+    kind: "completed" as const,
+  }));
 
 /**
  * Zamanlanmış (cron) takas mutabakat işleri — TradeService'ten birebir taşındı.
@@ -57,6 +71,9 @@ export class TradeReconciliationService {
     private readonly tradeCommon: TradeCommonService,
     // Yanıt / ödeme süresi için extend_once kararı (iptal mantığı bu serviste kalır).
     private readonly tradeExtension: TradeDeadlineExtensionService,
+    // Otomatik tamamlanma duyurusu outbox üzerinden (CLAUDE.md §10). Dar test
+    // kurulumlarında yoksa commit sonrası doğrudan gönderilir.
+    @Optional() private readonly partyNotices?: TradePartyNoticeService,
   ) {}
 
   // ==========================================================================
@@ -840,6 +857,8 @@ export class TradeReconciliationService {
             },
           });
           completedNow = true;
+          // İki tarafa "takas tamamlandı" — tamamlanmayla AYNI tx'te outbox.
+          await this.partyNotices?.enqueue(tx, completedNotices(trade));
 
           // Decrement product quantities (same as confirmReceipt)
           const allItems = await tx.tradeItem.findMany({
@@ -923,15 +942,20 @@ export class TradeReconciliationService {
 
         // Atama tx kapanışında yapıldığı için TS daraltması burada `false` sanır.
         if ((completedNow as boolean) === true) {
-          // Takas otomatik tamamlandı: iki tarafa zil + push + e-posta.
-          for (const recipientId of [trade.initiatorId, trade.receiverId]) {
-            await this.notificationService
-              .notifyTradeCompleted(recipientId, trade.id)
-              .catch((err: unknown) =>
-                this.logger.warn(
-                  `trade completed notify failed for ${trade.id}: ${err instanceof Error ? err.message : String(err)}`,
-                ),
-              );
+          // Takas otomatik tamamlandı: iki tarafa zil + push + e-posta. Outbox
+          // satırının sahibi olarak anlık; hata drainer'a kalır.
+          if (this.partyNotices) {
+            await this.partyNotices.flush(completedNotices(trade));
+          } else {
+            for (const recipientId of [trade.initiatorId, trade.receiverId]) {
+              await this.notificationService
+                .notifyTradeCompleted(recipientId, trade.id)
+                .catch((err: unknown) =>
+                  this.logger.warn(
+                    `trade completed notify failed for ${trade.id}: ${err instanceof Error ? err.message : String(err)}`,
+                  ),
+                );
+            }
           }
         }
       } catch (error: any) {
