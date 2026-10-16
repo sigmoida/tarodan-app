@@ -53,7 +53,10 @@ describe("DiscountService coupon pricing base", () => {
     priority: 1,
   };
 
-  function makeService(overrides: Record<string, unknown> = {}) {
+  function makeService(
+    overrides: Record<string, unknown> = {},
+    productRow: Record<string, unknown> = product,
+  ) {
     const prisma = {
       discount: {
         findUnique: jest.fn().mockResolvedValue({ ...coupon, ...overrides }),
@@ -69,7 +72,7 @@ describe("DiscountService coupon pricing base", () => {
         count: jest.fn().mockResolvedValue(0),
       },
       product: {
-        findMany: jest.fn().mockResolvedValue([product]),
+        findMany: jest.fn().mockResolvedValue([productRow]),
       },
     } as any;
     const cache = { delPattern: jest.fn() } as any;
@@ -183,5 +186,47 @@ describe("DiscountService coupon pricing base", () => {
       expect(result.isValid).toBe(true);
       expect(result.discount?.eligibleProductIds).toEqual([product.id]);
     });
+  });
+  // Satış penceresi KAPANMIŞ ilan: checkout indirim öncesi fiyatı (100) tahsil
+  // eder (resolveSalePrice); kupon tabanı da aynısı olmalı. Eskiden ham
+  // `price` (60, bayat indirimli) kullanılıyordu — yüzde kupon tahsil
+  // edilenden düşük tabana uygulanıyor, minimum sepet yanlış reddediliyordu.
+  const expiredSale = {
+    ...product,
+    price: 60,
+    oldPrice: 100,
+    saleStartDate: new Date(now.getTime() - 7 * 86_400_000),
+    saleEndDate: new Date(now.getTime() - 86_400_000),
+  };
+
+  it("satış penceresi bitmiş ilanda kupon tabanı tahsil edilen fiyattır (indirim öncesi)", async () => {
+    const result = await makeService(
+      { type: DiscountType.percentage, value: 10 },
+      expiredSale,
+    ).validateCoupon(
+      {
+        code: coupon.code,
+        cartItems: [{ productId: product.id, quantity: 1 }],
+      },
+      "buyer-1",
+    );
+
+    expect(result.isValid).toBe(true);
+    expect(result.discount?.estimatedDiscount).toBe(10);
+  });
+
+  it("satış penceresi bitmiş ilanda minimum sepet tahsil edilen fiyattan denetlenir", async () => {
+    const result = await makeService(
+      { minCartValue: 80 },
+      expiredSale,
+    ).validateCoupon(
+      {
+        code: coupon.code,
+        cartItems: [{ productId: product.id, quantity: 1 }],
+      },
+      "buyer-1",
+    );
+
+    expect(result.isValid).toBe(true);
   });
 });
