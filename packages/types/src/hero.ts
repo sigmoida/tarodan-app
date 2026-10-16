@@ -41,6 +41,24 @@ export const HERO_HOME_ENABLED_SETTING: Readonly<
   app: "hero_home_enabled_app",
 };
 
+/**
+ * Hero referans seed'inin (`prisma/seed-hero-content.ts`) bir kez uygulandığı
+ * işareti (PlatformSetting). Varsa seed içerik eklemez.
+ */
+export const HERO_SEED_APPLIED_SETTING = "hero_seed_applied";
+
+/**
+ * Genel ayar ucunun (`PATCH /admin/settings/:key`) yazamayacağı hero
+ * anahtarları: ana sayfa anahtarları yalnız kendi ucundan (doğrulama + denetim
+ * + web tazelemesi), seed işareti hiç yazılmaz.
+ */
+export function isHeroSettingKey(settingKey: string): boolean {
+  return (
+    settingKey === HERO_SEED_APPLIED_SETTING ||
+    Object.values(HERO_HOME_ENABLED_SETTING).includes(settingKey)
+  );
+}
+
 /** Yalnız `"false"` kapalı sayılır; satır yoksa (ya da başka değerde) açık. */
 export function parseHeroHomeEnabled(
   value: string | null | undefined,

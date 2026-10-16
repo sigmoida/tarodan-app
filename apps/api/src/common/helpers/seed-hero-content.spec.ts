@@ -2,13 +2,13 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import {
   HERO_PLACEMENTS,
+  HERO_SEED_APPLIED_SETTING,
   HERO_TEXT_LIMITS,
   TRUST_BADGE_ICONS,
   TRUST_BADGE_LIMITS,
   validateLocalizedText,
 } from "@tarodan/types";
 import {
-  HERO_SEED_APPLIED_SETTING,
   HERO_SEED_SLIDES,
   TRUST_BADGE_SEED,
   seedHeroContent,
@@ -28,21 +28,23 @@ import { apiAppRoot } from "./app-root";
 function makeClient(
   existing: { slides?: number; badges?: number; applied?: boolean } = {},
 ) {
+  // Upsert'ler işlem dizisine girdiği için tanınabilir işaretler döner.
   const heroSlide = {
     count: jest.fn().mockResolvedValue(existing.slides ?? 0),
-    upsert: jest.fn().mockResolvedValue({}),
+    upsert: jest.fn().mockReturnValue("slide-op"),
   };
   const trustBadge = {
     count: jest.fn().mockResolvedValue(existing.badges ?? 0),
-    upsert: jest.fn().mockResolvedValue({}),
+    upsert: jest.fn().mockReturnValue("badge-op"),
   };
   const platformSetting = {
     findUnique: jest
       .fn()
       .mockResolvedValue(existing.applied ? { id: "setting-1" } : null),
-    upsert: jest.fn().mockResolvedValue({}),
+    upsert: jest.fn().mockReturnValue("marker-op"),
   };
-  return { heroSlide, trustBadge, platformSetting } as const;
+  const $transaction = jest.fn().mockResolvedValue([]);
+  return { heroSlide, trustBadge, platformSetting, $transaction } as const;
 }
 
 describe("seedHeroContent", () => {
@@ -62,15 +64,14 @@ describe("seedHeroContent", () => {
         update: {},
       }),
     );
-    // İşaret içerikten SONRA yazılır: yarıda kalan kurulum bir sonraki
-    // açılışta tamamlanır.
-    const markOrder = client.platformSetting.upsert.mock.invocationCallOrder[0];
-    for (const order of [
-      ...client.heroSlide.upsert.mock.invocationCallOrder,
-      ...client.trustBadge.upsert.mock.invocationCallOrder,
-    ]) {
-      expect(order).toBeLessThan(markOrder);
-    }
+    // İçerik + işaret TEK işlemde: yarıda kesilen ilk kurulum yarım içerik
+    // bırakıp "işaretten önceki kurulum" sanılmasın.
+    expect(client.$transaction).toHaveBeenCalledTimes(1);
+    expect(client.$transaction).toHaveBeenCalledWith([
+      ...Array(3).fill("slide-op"),
+      ...Array(6).fill("badge-op"),
+      "marker-op",
+    ]);
   });
 
   it("işaret varsa hiçbir şey yazmaz — boşaltılmış yerleşim boş kalır", async () => {
@@ -85,6 +86,7 @@ describe("seedHeroContent", () => {
     expect(client.heroSlide.upsert).not.toHaveBeenCalled();
     expect(client.trustBadge.upsert).not.toHaveBeenCalled();
     expect(client.platformSetting.upsert).not.toHaveBeenCalled();
+    expect(client.$transaction).not.toHaveBeenCalled();
   });
 
   it("idempotent: sabit kimlikle upsert eder ve var olan satıra dokunmaz", async () => {
@@ -112,6 +114,7 @@ describe("seedHeroContent", () => {
       expect(client.heroSlide.upsert).not.toHaveBeenCalled();
       expect(client.trustBadge.upsert).not.toHaveBeenCalled();
       expect(client.platformSetting.upsert).toHaveBeenCalledTimes(1);
+      expect(client.$transaction).not.toHaveBeenCalled();
     },
   );
 });

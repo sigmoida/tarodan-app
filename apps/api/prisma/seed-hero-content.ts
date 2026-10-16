@@ -10,13 +10,21 @@
  *  - `hero_seed_applied` işareti (PlatformSetting) varsa hiçbir şey yazılmaz,
  *  - işaret yoksa ama hero/rozet satırı varsa (işaretten önceki kurulum)
  *    yalnız işaret yazılır,
- *  - ikisi de yoksa içerik kurulur, sonra işaret yazılır.
+ *  - ikisi de yoksa içerik + işaret TEK işlemde yazılır: yarıda kesilen ilk
+ *    kurulum hiçbir şey bırakmaz, sonraki açılış baştan kurar (yarım içerik
+ *    "işaretten önceki kurulum" sanılıp kalıcı eksik kalmaz).
  * `update: {}` — eşzamanlı iki açılışta bile var olan satıra dokunulmaz.
+ *
+ * İşaretten önceki kurulumlarda ana sayfa yerleşimi boş olamaz: bu kural
+ * gelmeden önce API yayındaki son ana sayfa slaytını silmeyi/kapatmayı 409
+ * ile reddediyordu. O yüzden "içerik var → yalnız işaretle" dalı eksik ana
+ * sayfa bırakmaz; ek göç/düzeltme gerekmez.
  *
  * Görseller S3'teki yönetilen `seed-assets/hero/` önekindedir (web'in
  * `heroImageUrl` varsayılan kökü); mutlak URL saklanır.
  */
 import type { HeroPlacement, Prisma, PrismaClient } from "@prisma/client";
+import { HERO_SEED_APPLIED_SETTING } from "@tarodan/types";
 import { HERO_SEED_IDS, TRUST_BADGE_SEED_IDS } from "./seed-ids";
 
 const HERO_ASSET_BASE =
@@ -147,12 +155,9 @@ export const TRUST_BADGE_SEED: ReadonlyArray<
   },
 ];
 
-/** Hero içeriğinin bir kez kurulduğunun işareti (PlatformSetting anahtarı). */
-export const HERO_SEED_APPLIED_SETTING = "hero_seed_applied";
-
 type HeroSeedClient = Pick<
   PrismaClient,
-  "heroSlide" | "trustBadge" | "platformSetting"
+  "heroSlide" | "trustBadge" | "platformSetting" | "$transaction"
 >;
 
 export async function seedHeroContent(prisma: HeroSeedClient): Promise<void> {
@@ -162,37 +167,45 @@ export async function seedHeroContent(prisma: HeroSeedClient): Promise<void> {
   });
   if (applied) return;
 
+  const markApplied = () =>
+    prisma.platformSetting.upsert({
+      where: { settingKey: HERO_SEED_APPLIED_SETTING },
+      create: {
+        settingKey: HERO_SEED_APPLIED_SETTING,
+        settingValue: "true",
+        settingType: "boolean",
+        description:
+          "Hero slaytları + güven rozetleri referans seed'i uygulandı; seed içeriği bir daha eklemez",
+      },
+      update: {},
+    });
+
   // İşaretten önceki kurulum: içerik zaten bir kez kurulmuş (admin sonradan
   // silmiş olabilir) — geri getirme, yalnız işaretle.
   const hasContent =
     (await prisma.heroSlide.count()) > 0 ||
     (await prisma.trustBadge.count()) > 0;
-  if (!hasContent) {
-    for (const slide of HERO_SEED_SLIDES) {
-      await prisma.heroSlide.upsert({
+  if (hasContent) {
+    await markApplied();
+    return;
+  }
+
+  // İlk kurulum: içerik ve işaret birlikte ya da hiç.
+  await prisma.$transaction([
+    ...HERO_SEED_SLIDES.map((slide) =>
+      prisma.heroSlide.upsert({
         where: { id: slide.id },
         create: slide,
         update: {},
-      });
-    }
-    for (const badge of TRUST_BADGE_SEED) {
-      await prisma.trustBadge.upsert({
+      }),
+    ),
+    ...TRUST_BADGE_SEED.map((badge) =>
+      prisma.trustBadge.upsert({
         where: { id: badge.id },
         create: badge,
         update: {},
-      });
-    }
-  }
-
-  await prisma.platformSetting.upsert({
-    where: { settingKey: HERO_SEED_APPLIED_SETTING },
-    create: {
-      settingKey: HERO_SEED_APPLIED_SETTING,
-      settingValue: "true",
-      settingType: "boolean",
-      description:
-        "Hero slaytları + güven rozetleri referans seed'i uygulandı; seed içeriği bir daha eklemez",
-    },
-    update: {},
-  });
+      }),
+    ),
+    markApplied(),
+  ]);
 }
