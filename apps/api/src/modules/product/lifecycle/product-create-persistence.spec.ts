@@ -222,4 +222,49 @@ describe("ProductCreateService required listing details", () => {
     );
     expect(prisma.product.create).not.toHaveBeenCalled();
   });
+
+  describe("platform price floor", () => {
+    const withMinimum = (min: string) =>
+      prisma.platformSetting.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          where.settingKey === "min_product_price"
+            ? { settingValue: min }
+            : null,
+        ),
+      );
+    afterEach(() => {
+      prisma.platformSetting.findUnique.mockReset();
+      prisma.platformSetting.findUnique.mockResolvedValue(null);
+    });
+
+    it("rejects a discounted price below the minimum", async () => {
+      withMinimum("250");
+
+      await expect(
+        service.create(sellerId, {
+          ...dto,
+          originalPrice: 1000,
+          salePrice: 200,
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          i18nKey: "server.product.priceBelowMinimum",
+          i18nParams: { minPrice: 250 },
+        },
+      });
+      expect(prisma.product.create).not.toHaveBeenCalled();
+    });
+
+    it("accepts a discounted price at or above the minimum", async () => {
+      withMinimum("250");
+
+      await service.create(sellerId, {
+        ...dto,
+        originalPrice: 1000,
+        salePrice: 250,
+      });
+
+      expect(prisma.product.create).toHaveBeenCalled();
+    });
+  });
 });

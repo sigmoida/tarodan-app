@@ -932,6 +932,17 @@ export class AdminProductBulkImportService {
             "indirimli_fiyat sıfırdan büyük ve fiyat alanından küçük olmalıdır",
           );
         }
+        // İndirimli fiyat da alt sınırın altına inemez (üst sınır zaten fiyatla
+        // sınırlı: indirimli < fiyat).
+        if (
+          salePrice != null &&
+          priceLimits.minPrice != null &&
+          salePrice < priceLimits.minPrice
+        ) {
+          throw new Error(
+            `indirimli_fiyat platform alt sınırı olan ${priceLimits.minPrice} TL'den düşük`,
+          );
+        }
         const originalPrice = salePrice != null ? price : null;
         const saleStartDate = optionalDate(get("indirim_baslangic"));
         const saleEndDate = optionalDate(get("indirim_bitis"));

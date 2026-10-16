@@ -9,6 +9,7 @@ import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "../dto";
 import { i18nMessage } from "../../i18n";
+import { loadProductPriceLimits } from "../../product/helpers/product-price-limits";
 
 /**
  * Platform ayarları yönetimi — AdminService'in PLATFORM SETTINGS bölümünden
@@ -31,7 +32,8 @@ export class AdminSettingsService {
   }
 
   /**
-   * Get public platform settings (message settings and membership prices)
+   * Get public platform settings (message settings, membership prices and the
+   * listing price limits)
    */
   async getPublicSettings() {
     const settings = await this.prisma.platformSetting.findMany({
@@ -61,6 +63,13 @@ export class AdminSettingsService {
         result[setting.settingKey] = value;
       }
     });
+
+    // İlan fiyat sınırları: istemci formları aynı kuralı sunucudan ÖNCE
+    // uygulasın diye açılır. Ayar boş/sayısal değilse anahtar HİÇ dönmez
+    // (kural yok) — ayrıştırma create/update kapısıyla aynı kaynaktan gelir.
+    const { minPrice, maxPrice } = await loadProductPriceLimits(this.prisma);
+    if (minPrice != null) result.min_product_price = minPrice;
+    if (maxPrice != null) result.max_product_price = maxPrice;
 
     // Calculate yearly prices from monthly prices and discount
     const discountPercentage = result.yearly_discount_percentage ?? 20;

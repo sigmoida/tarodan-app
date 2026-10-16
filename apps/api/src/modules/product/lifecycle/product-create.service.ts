@@ -23,8 +23,8 @@ import { CreateProductDto } from "../dto";
 import { ProductStatus } from "@prisma/client";
 import { initialProductRanking } from "../helpers/product-initial-ranking";
 import {
+  assertProductPriceWithinLimits,
   loadProductPriceLimits,
-  productPriceLimitViolation,
 } from "../helpers/product-price-limits";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
@@ -229,20 +229,11 @@ export class ProductCreateService {
     // PRICE VALIDATION FROM PLATFORM SETTINGS (Not retroactive - only new listings)
     // ========================================================================
     const priceLimits = await loadProductPriceLimits(this.prisma);
-    const priceViolation = productPriceLimitViolation(dto.price, priceLimits);
-    if (priceViolation?.type === "minimum") {
-      throw new BadRequestException(
-        i18nMessage("server.product.priceBelowMinimum", {
-          minPrice: priceViolation.limit,
-        }),
-      );
-    }
-    if (priceViolation?.type === "maximum") {
-      throw new BadRequestException(
-        i18nMessage("server.product.priceAboveMaximum", {
-          maxPrice: priceViolation.limit,
-        }),
-      );
+    assertProductPriceWithinLimits(dto.price, priceLimits);
+    // İndirimli fiyat da aynı sınıra tabidir: alt sınırın altına "indirimle"
+    // inilemez.
+    if (dto.salePrice != null && Number(dto.salePrice) > 0) {
+      assertProductPriceWithinLimits(Number(dto.salePrice), priceLimits);
     }
 
     // Create product with images
