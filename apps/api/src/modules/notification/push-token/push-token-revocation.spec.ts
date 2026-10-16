@@ -2,6 +2,7 @@ import { UnauthorizedException } from "@nestjs/common";
 import { PushTokenRevocationService } from "./push-token-revocation.service";
 import { ExpoPushProvider } from "../providers/expo-push.provider";
 import { NotificationController } from "../notification.controller";
+import { NotificationDispatchService } from "../notification-dispatch.service";
 import { SecurityService } from "../../security/security.service";
 
 /**
@@ -137,29 +138,11 @@ describe("POST /notifications/push-token", () => {
   });
 });
 
-describe("ExpoPushProvider.deactivateToken — kapsam", () => {
-  function createProvider() {
+describe("Cihaz çıkışı (revoke) — token'ın TÜM satırları", () => {
+  it("provider: o token'ın tüm satırlarını pasifleştirir", async () => {
     const prisma = { pushToken: { updateMany: jest.fn() } };
     const config = { get: jest.fn().mockReturnValue("") };
-    return {
-      provider: new ExpoPushProvider(config as never, prisma as never),
-      prisma,
-    };
-  }
-
-  it("oturumlu iptal yalnız çağıranın satırını kapatır", async () => {
-    const { provider, prisma } = createProvider();
-
-    await provider.deactivateToken(TOKEN, "u1");
-
-    expect(prisma.pushToken.updateMany).toHaveBeenCalledWith({
-      where: { token: TOKEN, userId: "u1" },
-      data: { isActive: false },
-    });
-  });
-
-  it("oturumsuz iptal cihazın tüm satırlarını kapatır", async () => {
-    const { provider, prisma } = createProvider();
+    const provider = new ExpoPushProvider(config as never, prisma as never);
 
     await provider.deactivateToken(TOKEN);
 
@@ -168,4 +151,28 @@ describe("ExpoPushProvider.deactivateToken — kapsam", () => {
       data: { isActive: false },
     });
   });
+
+  it.each([
+    ["oturumlu", "u1"],
+    ["oturumsuz", null],
+  ])(
+    "%s iptal çağıranla sınırlanmaz — başka hesabın eski satırı da kapanır",
+    async (_label, userId) => {
+      const expo = { deactivateToken: jest.fn(), registerToken: jest.fn() };
+      const dispatch = new NotificationDispatchService(
+        {} as never,
+        expo as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+      );
+
+      await expect(
+        dispatch.registerPushToken(userId, { token: TOKEN, revoke: true }),
+      ).resolves.toMatchObject({ success: true, revoked: true });
+      expect(expo.deactivateToken).toHaveBeenCalledWith(TOKEN);
+      expect(expo.registerToken).not.toHaveBeenCalled();
+    },
+  );
 });

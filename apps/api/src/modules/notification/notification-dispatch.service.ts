@@ -691,16 +691,11 @@ export class NotificationDispatchService {
       // Logout path: the device asks us to deactivate its token instead of
       // registering it, so the user stops receiving push on a signed-out device.
       // May arrive without a session (expired access token at logout).
-      // With a session the revoke is scoped to the caller's own row (another
-      // account's row for the same token is not theirs to touch); without one
-      // the device signs itself out for every account, since a signed-out
-      // device should receive nobody's push (registerToken keeps at most one
-      // active row per token anyway).
+      // The DEVICE is logging out, so every active row for its token is
+      // deactivated — with or without a session. Scoping to the caller's row
+      // would let an older row of another account on this device survive.
       if (dto.revoke) {
-        await this.expoPushProvider.deactivateToken(
-          dto.token,
-          userId ?? undefined,
-        );
+        await this.expoPushProvider.deactivateToken(dto.token);
         return { success: true, userId, revoked: true };
       }
       if (!userId) {

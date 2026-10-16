@@ -355,11 +355,10 @@ export class ExpoPushProvider {
   /**
    * Deactivate a push token
    */
-  async deactivateToken(token: string, userId?: string): Promise<void> {
-    // userId verilirse yalnız o hesabın satırı; verilmezse (oturumsuz çıkış)
-    // cihazın tüm satırları.
+  async deactivateToken(token: string): Promise<void> {
+    // Cihaz çıkışı: o token'ın TÜM satırları (hangi hesaba ait olursa olsun).
     await this.prisma.pushToken.updateMany({
-      where: userId ? { token, userId } : { token },
+      where: { token },
       data: { isActive: false },
     });
 
