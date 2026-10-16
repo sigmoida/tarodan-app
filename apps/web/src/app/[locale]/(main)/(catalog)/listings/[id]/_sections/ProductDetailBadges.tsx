@@ -1,11 +1,11 @@
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
-import { Badge, ProductBadge } from "@tarodan/ui";
+import { ProductBadge } from "@tarodan/ui/product-badge";
 import { getDetailBadges } from "../_lib/detailBadges";
 import type { Listing } from "../_lib/types";
 
 type Translator = (key: any) => string;
 
-/** Başlık + fiyatın altındaki tek satır: Satıldı → %İndirim → Takas. */
+/** Başlık + fiyatın altındaki tek satır: %İndirim → Takas (Satıldı yok; durum uyarısı söylüyor). */
 export default function ProductDetailBadges({
   listing,
   t,
@@ -23,12 +23,6 @@ export default function ProductDetailBadges({
     >
       {badges.map((badge) => {
         switch (badge.kind) {
-          case "sold":
-            return (
-              <Badge key="sold" variant="danger" size="sm">
-                {t("product.sold")}
-              </Badge>
-            );
           case "sale":
             return (
               <ProductBadge key="sale" variant="sale">

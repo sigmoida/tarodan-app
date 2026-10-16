@@ -79,6 +79,14 @@ export const itemToProduct = (item: CollectionItem): Product => ({
 });
 
 /**
+ * Kartın sol-üst `overlayStart` yuvasına konacak durum rozeti var mı (özel
+ * öğe / satıldı). Yoksa yuva HİÇ verilmez — verilirse kartın kendi rozet
+ * yığını (indirim, takas, sponsorlu…) çizilmez.
+ */
+export const hasItemBadges = (item: CollectionItem): boolean =>
+  item.isCustom || item.productStatus === "sold";
+
+/**
  * Visible + ordered items. Hidden/deleted listings are dropped, but sold/reserved
  * ones stay (shown with a SOLD badge) so a collection never looks empty after a
  * product sells. Featured items float to the top, then `sortOrder`.

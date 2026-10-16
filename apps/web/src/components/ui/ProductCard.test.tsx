@@ -193,11 +193,21 @@ describe("ProductCard rozet düzeni", () => {
     const stack = badges()!;
     expect(stack.className).toContain("left-1.5");
     expect(stack.className).toContain("top-1.5");
-    expect(stack.children).toHaveLength(2);
-    expect(stack.children[0].textContent).toBe("%38");
-    expect(stack.children[1].textContent).toBe("product.sponsored");
-    // Sağ üstte ayrı indirim rozeti kalmadı.
-    expect(container.textContent?.match(/%38/g)).toHaveLength(1);
+    const visual = Array.from(stack.children).filter(
+      (c) => !c.classList.contains("sr-only"),
+    );
+    expect(visual).toHaveLength(2);
+    expect(visual[0].textContent).toBe("%38");
+    expect(visual[1].textContent).toBe("product.sponsored");
+    // Görsel rozetler aria-hidden; okuyucu tek özet metni okur.
+    expect(visual.every((c) => c.getAttribute("aria-hidden") === "true")).toBe(
+      true,
+    );
+    expect(stack.querySelector(".sr-only")!.textContent).toBe(
+      "%38 product.discount, product.sponsored",
+    );
+    // Sağ üstte ayrı indirim rozeti kalmadı (görsel + okuyucu metni).
+    expect(container.textContent?.match(/%38/g)).toHaveLength(2);
   });
 
   it("grid: takas metni her genişlikte görünür (hidden sm:inline yok)", () => {
@@ -277,9 +287,39 @@ describe("ProductCard rozet düzeni", () => {
     // 500 → 250 = %50
     expect(container.textContent).toContain("%50");
     expect(container.querySelector("a")!.textContent).toContain(
-      "%50, faq.trade",
+      "%50 product.discount, faq.trade",
     );
+    // Görünen indirim rozeti okuyucudan gizlidir.
+    const saleBadge = Array.from(
+      container.querySelectorAll<HTMLElement>("[aria-hidden]"),
+    ).find((el) => el.textContent === "%50");
+    expect(saleBadge).toBeTruthy();
   });
+
+  it.each(["grid", "list"] as const)(
+    "%s: satılmış/rezerve/stoksuz ilanda takas rozeti çizilmez",
+    (layout) => {
+      for (const extra of [
+        { status: "sold" },
+        { status: "reserved" },
+        { availableQuantity: 0 },
+      ]) {
+        act(() =>
+          root.render(
+            <ProductCard
+              product={{ ...product, tradeAvailable: true, ...extra }}
+              layout={layout}
+            />,
+          ),
+        );
+        expect(badges()).toBeNull();
+        expect(container.querySelector(".absolute.top-1.left-1")).toBeNull();
+        expect(container.querySelector("a")!.textContent).not.toContain(
+          "faq.trade",
+        );
+      }
+    },
+  );
 
   it("liste: takas ikonu görselin sol üstünde, kalp sağ üstte, yalnız ikon", () => {
     act(() => root.render(<ProductCard product={rich} layout="list" />));

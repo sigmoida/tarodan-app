@@ -8,12 +8,15 @@ import {
   StarIcon as StarIconSolid,
   HeartIcon as HeartSolidIcon,
 } from "@heroicons/react/24/solid";
-import { ProductBadge } from "@tarodan/ui";
+import { ProductBadge } from "@tarodan/ui/product-badge";
 import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
 import ProductCardBadges from "@/components/ui/ProductCardBadges";
 import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
-import { isProductTradeEnabled } from "@/lib/productCardBadges";
+import {
+  describeProductBadges,
+  selectProductCardBadges,
+} from "@/lib/productCardBadges";
 import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
@@ -158,7 +161,12 @@ export default function ProductCard({
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
-  const isTrade = isProductTradeEnabled(product);
+  // Liste kartı yalnız indirim + takas gösterir; seçim/koşul grid yığınıyla aynı
+  // tek kaynaktan (`selectProductCardBadges`) gelir.
+  const listBadges = selectProductCardBadges(product, Infinity).filter(
+    (badge) => badge.kind === "sale" || badge.kind === "trade",
+  );
+  const isTrade = listBadges.some((badge) => badge.kind === "trade");
   const salePercent = getProductDiscountPercent(product);
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
@@ -234,15 +242,14 @@ export default function ProductCard({
                 >
                   {product.title}
                   {/* Rozetler linkin dışında: erişilebilir ad onları da taşısın. */}
-                  {(salePercent >= 1 || isTrade) && (
+                  {listBadges.length > 0 && (
                     <span className="sr-only">
                       {" "}
-                      {[
-                        salePercent >= 1 && `%${salePercent}`,
-                        isTrade && t("faq.trade"),
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
+                      {describeProductBadges(listBadges, {
+                        discount: t("product.discount"),
+                        sponsored: t("product.sponsored"),
+                        trade: t("faq.trade"),
+                      })}
                     </span>
                   )}
                 </Link>
@@ -284,7 +291,11 @@ export default function ProductCard({
               {fmtTL(effectivePrice)}
             </p>
             {salePercent >= 1 && (
-              <ProductBadge variant="sale" className="xs:mt-1">
+              <ProductBadge
+                variant="sale"
+                className="xs:mt-1"
+                aria-hidden="true"
+              >
                 %{salePercent}
               </ProductBadge>
             )}
@@ -323,6 +334,7 @@ export default function ProductCard({
               product={product}
               sponsoredLabel={t("product.sponsored")}
               tradeLabel={t("faq.trade")}
+              discountLabel={t("product.discount")}
             />
           )}
         </div>

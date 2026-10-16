@@ -51,13 +51,14 @@ describe("ProductDetailBadges", () => {
     expect(row()!.querySelector("svg")).not.toBeNull();
   });
 
-  it("satıldı ilanda Satıldı + indirim gösterir, takas yok", () => {
+  it("satıldı ilanda 'Satıldı' rozeti yok; yalnız indirim, takas yok", () => {
     act(() =>
       root.render(
         <ProductDetailBadges listing={{ ...listing, status: "sold" }} t={t} />,
       ),
     );
-    expect(texts()).toEqual(["product.sold", "%25"]);
+    expect(texts()).toEqual(["%25"]);
+    expect(row()!.textContent).not.toContain("product.sold");
   });
 
   it("reserved ilanda takas rozeti yok", () => {
@@ -74,7 +75,7 @@ describe("ProductDetailBadges", () => {
 });
 
 describe("ProductStaticInfoView", () => {
-  it("rozet satırı fiyatın altındadır; satıldı tek yerde (başlıkta değil) çizilir", () => {
+  it("rozet satırı fiyatın altındadır; satıldı ilanda 'Satıldı' rozeti yok, başlıkta rozet yok", () => {
     act(() =>
       root.render(
         <ProductStaticInfoView
@@ -85,7 +86,7 @@ describe("ProductStaticInfoView", () => {
     );
     const price = container.querySelector("p.text-primary-500")!;
     expect(price.nextElementSibling).toBe(row());
-    expect(texts()).toEqual(["product.sold", "%25"]);
+    expect(texts()).toEqual(["%25"]);
     // Başlık satırında artık rozet yok.
     expect(container.querySelector("h1")!.contains(row())).toBe(false);
     expect(container.querySelector("h1")!.textContent).toBe("Camaro");

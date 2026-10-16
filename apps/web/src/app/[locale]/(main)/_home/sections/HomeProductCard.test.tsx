@@ -26,6 +26,7 @@ const render = (product: Product) =>
       priority={false}
       sponsoredLabel="Sponsorlu"
       tradeLabel="Takas"
+      discountLabel="indirim"
       outOfStockLabel="Tükendi"
     />,
   );
@@ -49,8 +50,9 @@ describe("HomeProductCard rozetleri", () => {
     expect(html).toContain("Sponsorlu");
     expect(html).not.toContain("Takas");
     expect(html).not.toContain("Komisyonsuz");
-    // Sağ üstte ayrı indirim rozeti yok.
-    expect(html.match(/%38/g)).toHaveLength(1);
+    // Sağ üstte ayrı indirim rozeti yok: görsel rozet + ekran okuyucu metni.
+    expect(html.match(/%38/g)).toHaveLength(2);
+    expect(html).toContain("%38 indirim, Sponsorlu");
   });
 
   it("takas metni her genişlikte görünür (hidden sm:inline yok)", () => {

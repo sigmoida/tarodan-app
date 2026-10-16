@@ -3,6 +3,8 @@
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/types/product";
 import {
+  describeProductBadges,
+  isProductTradeBadgeVisible,
   isProductTradeEnabled,
   selectProductCardBadges,
 } from "./productCardBadges";
@@ -47,14 +49,24 @@ describe("selectProductCardBadges", () => {
     });
   });
 
-  it("discountPercent > 0 ise hesaplanan değere baskındır", () => {
+  it("eski ve yeni fiyat varsa yüzde HER ZAMAN fiyatlardan hesaplanır", () => {
     expect(
       selectProductCardBadges({
         ...base,
         oldPrice: 150,
         discountPercent: 40,
       })[0],
-    ).toEqual({ kind: "sale", percent: 40 });
+    ).toEqual({ kind: "sale", percent: 33 });
+  });
+
+  it("fiyatlardan hesaplanamıyorsa discountPercent'e düşer", () => {
+    expect(
+      selectProductCardBadges({
+        ...base,
+        isOnSale: true,
+        discountPercent: 20,
+      })[0],
+    ).toEqual({ kind: "sale", percent: 20 });
   });
 
   it("yüzde 1'in altındaysa indirim rozeti hiç yoktur (asla %0)", () => {
@@ -114,5 +126,56 @@ describe("isProductTradeEnabled", () => {
     ).toBe(false);
     expect(isProductTradeEnabled({ trade_available: true })).toBe(true);
     expect(isProductTradeEnabled({})).toBe(false);
+  });
+});
+
+describe("isProductTradeBadgeVisible", () => {
+  const trade = { tradeAvailable: true };
+
+  it("takas açık VE ilan satın alınabilirken true", () => {
+    expect(isProductTradeBadgeVisible({ ...trade, status: "active" })).toBe(
+      true,
+    );
+    expect(isProductTradeBadgeVisible(trade)).toBe(true);
+    expect(isProductTradeBadgeVisible({ ...trade, availableQuantity: 2 })).toBe(
+      true,
+    );
+  });
+
+  it("takas kapalıysa false", () => {
+    expect(isProductTradeBadgeVisible({ status: "active" })).toBe(false);
+  });
+
+  it("sold / reserved / stok 0 ilanda false (quantity yedeği dahil)", () => {
+    expect(isProductTradeBadgeVisible({ ...trade, status: "sold" })).toBe(
+      false,
+    );
+    expect(isProductTradeBadgeVisible({ ...trade, status: "reserved" })).toBe(
+      false,
+    );
+    expect(isProductTradeBadgeVisible({ ...trade, availableQuantity: 0 })).toBe(
+      false,
+    );
+    expect(isProductTradeBadgeVisible({ ...trade, quantity: 0 })).toBe(false);
+  });
+
+  it("kart yığını da aynı kuralı kullanır", () => {
+    expect(kinds({ ...base, ...trade, status: "sold" })).toEqual([]);
+  });
+});
+
+describe("describeProductBadges", () => {
+  it("rozetleri 'yüzde indirim, etiket' biçiminde birleştirir", () => {
+    expect(
+      describeProductBadges(
+        [
+          { kind: "sale", percent: 38 },
+          { kind: "sponsored" },
+          { kind: "trade" },
+          { kind: "campaign", label: "Komisyonsuz" },
+        ],
+        { discount: "indirim", sponsored: "Sponsorlu", trade: "Takas" },
+      ),
+    ).toBe("%38 indirim, Sponsorlu, Takas, Komisyonsuz");
   });
 });

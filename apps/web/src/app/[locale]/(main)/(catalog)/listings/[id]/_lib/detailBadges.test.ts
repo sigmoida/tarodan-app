@@ -1,7 +1,7 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { getDetailBadges, resolveTradeFlag } from "./detailBadges";
+import { getDetailBadges } from "./detailBadges";
 import type { Listing } from "./types";
 
 const base: Listing = {
@@ -21,10 +21,11 @@ describe("getDetailBadges", () => {
     expect(kinds({})).toEqual([]);
   });
 
-  it("indirim: discountPercent ?? hesaplanan yüzde, N>0", () => {
+  it("indirim: fiyatlardan hesaplanır, yoksa discountPercent; yuvarlanmış ≥ 1", () => {
     expect(getDetailBadges({ ...base, oldPrice: 200, price: 150 })).toEqual([
       { kind: "sale", percent: 25 },
     ]);
+    // Fiyatlar varken API yüzdesi değil fiyatlar esastır.
     expect(
       getDetailBadges({
         ...base,
@@ -32,20 +33,14 @@ describe("getDetailBadges", () => {
         price: 150,
         discountPercent: 30,
       }),
-    ).toEqual([{ kind: "sale", percent: 30 }]);
-    // Yüzde 1'in altına yuvarlanıyorsa rozet yok (%0 asla çizilmez).
-    expect(kinds({ oldPrice: 1000, price: 996 })).toEqual([]);
-    // discountPercent 0 ise fiyatlardan hesaplanır (kart kuralı).
-    expect(
-      getDetailBadges({
-        ...base,
-        oldPrice: 200,
-        price: 150,
-        discountPercent: 0,
-      }),
     ).toEqual([{ kind: "sale", percent: 25 }]);
-    // Hesaplanacak fiyat farkı yoksa rozet yok.
+    // Fiyatlardan hesaplanamıyorsa discountPercent.
+    expect(
+      getDetailBadges({ ...base, isOnSale: true, discountPercent: 15 }),
+    ).toEqual([{ kind: "sale", percent: 15 }]);
+    // Hiç yüzde yok ya da yüzde 1'in altına yuvarlanıyor → rozet yok.
     expect(kinds({ isOnSale: true })).toEqual([]);
+    expect(kinds({ oldPrice: 1000, price: 996 })).toEqual([]);
   });
 
   it("takas: ilan aktifken görünür, eski alanlara düşer", () => {
@@ -55,8 +50,11 @@ describe("getDetailBadges", () => {
     expect(kinds({ tradeAvailable: false, trade_available: true })).toEqual([]);
   });
 
-  it("sıra: Satıldı → %İndirim → Takas", () => {
-    // Satıldı + takas birlikte olamaz (takas gizlenir); sıra ayrı ayrı doğrulanır.
+  it("sıra: %İndirim → Takas; Satıldı rozeti hiç yok", () => {
+    expect(kinds({ oldPrice: 200, price: 150, tradeAvailable: true })).toEqual([
+      "sale",
+      "trade",
+    ]);
     expect(
       kinds({
         status: "sold",
@@ -64,15 +62,12 @@ describe("getDetailBadges", () => {
         price: 150,
         tradeAvailable: true,
       }),
-    ).toEqual(["sold", "sale"]);
-    expect(kinds({ oldPrice: 200, price: 150, tradeAvailable: true })).toEqual([
-      "sale",
-      "trade",
-    ]);
+    ).toEqual(["sale"]);
+    expect(kinds({ status: "sold" })).toEqual([]);
   });
 
   it("sold / reserved / stok 0 ilanda takas rozeti yok", () => {
-    expect(kinds({ status: "sold", tradeAvailable: true })).toEqual(["sold"]);
+    expect(kinds({ status: "sold", tradeAvailable: true })).toEqual([]);
     expect(kinds({ status: "reserved", tradeAvailable: true })).toEqual([]);
     expect(kinds({ availableQuantity: 0, tradeAvailable: true })).toEqual([]);
     expect(
@@ -81,14 +76,5 @@ describe("getDetailBadges", () => {
     expect(kinds({ availableQuantity: 2, tradeAvailable: true })).toEqual([
       "trade",
     ]);
-  });
-});
-
-describe("resolveTradeFlag", () => {
-  it("tradeAvailable varsa eski alanlara bakmaz", () => {
-    expect(
-      resolveTradeFlag({ tradeAvailable: false, isTradeEnabled: true }),
-    ).toBe(false);
-    expect(resolveTradeFlag(null)).toBe(false);
   });
 });

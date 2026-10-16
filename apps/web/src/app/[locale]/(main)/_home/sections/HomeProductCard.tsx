@@ -30,6 +30,7 @@ export default function HomeProductCard({
   priority,
   sponsoredLabel,
   tradeLabel,
+  discountLabel,
   outOfStockLabel,
 }: {
   product: Product;
@@ -37,6 +38,7 @@ export default function HomeProductCard({
   priority: boolean;
   sponsoredLabel: string;
   tradeLabel: string;
+  discountLabel: string;
   outOfStockLabel: string;
 }) {
   const firstImage = Array.isArray(product.images)
@@ -76,6 +78,7 @@ export default function HomeProductCard({
               product={product}
               sponsoredLabel={sponsoredLabel}
               tradeLabel={tradeLabel}
+              discountLabel={discountLabel}
             />
           </div>
 

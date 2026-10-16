@@ -43,21 +43,21 @@ export function getProductOriginalPriceForDisplay(
 }
 
 /**
- * Kartlarda gösterilecek indirim yüzdesi (yuvarlanmış tam sayı). İndirimde
- * değilse 0. API'nin `discountPercent`'i > 0 ise o esastır; yoksa/0 ise eski
- * ve güncel fiyattan hesaplanır. Sonuç 1'in altındaysa rozet çizilmez
- * (çağıran `percent >= 1` kontrol eder) — asla "%0" gösterilmez.
+ * Kart ve detayda gösterilecek indirim yüzdesi (yuvarlanmış tam sayı) — TEK
+ * kaynak. İndirimde değilse 0. Eski fiyat güncelden yüksekse yüzde HER ZAMAN
+ * fiyatlardan hesaplanır (üstü çizili fiyatla tutarlı kalsın); fiyatlardan
+ * hesaplanamıyorsa API'nin `discountPercent`'ine düşülür. Sonuç 1'in altındaysa
+ * rozet çizilmez (çağıran `percent >= 1` kontrol eder) — asla "%0" gösterilmez.
  */
 export function getProductDiscountPercent(
   p: ProductPriceFields & { discountPercent?: number | null },
 ): number {
   if (!isProductOnSaleDisplay(p)) return 0;
-  const declared = Number(p.discountPercent);
-  if (declared > 0) return Math.round(declared);
   const old = getProductOriginalPriceForDisplay(p);
-  if (!(old > 0)) return 0;
-  const computed = ((old - getProductEffectivePrice(p)) / old) * 100;
-  return computed > 0 ? Math.round(computed) : 0;
+  const price = getProductEffectivePrice(p);
+  if (old > price) return Math.round(((old - price) / old) * 100);
+  const declared = Number(p.discountPercent);
+  return declared > 0 ? Math.round(declared) : 0;
 }
 
 /**

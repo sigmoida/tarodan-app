@@ -1,51 +1,25 @@
 /** @format */
 
-import {
-  getProductDiscountPercent,
-  isProductOnSaleDisplay,
-  isProductOutOfStock,
-} from "@/lib/productPrice";
+import { isProductTradeBadgeVisible } from "@/lib/productCardBadges";
+import { getProductDiscountPercent } from "@/lib/productPrice";
 import type { Listing } from "./types";
 
-/** Detay badge satırındaki rozetler — sıra: Satıldı → %İndirim → Takas. */
-export type DetailBadge =
-  { kind: "sold" } | { kind: "sale"; percent: number } | { kind: "trade" };
-
-type TradeFields = Pick<
-  Listing,
-  "tradeAvailable" | "trade_available" | "isTradeEnabled"
->;
-
 /**
- * İlan takasa açık mı (niyet VE yetki). `tradeAvailable` API'nin türettiği
- * efektif değerdir; yoksa eski alanlara düşülür. Takas butonu ve rozet aynı
- * kaynağı kullanır.
+ * Detay badge satırındaki rozetler — sıra: %İndirim → Takas. "Satıldı" burada
+ * YOK: hemen altındaki durum uyarısı (Alert) zaten söylüyor.
  */
-export function resolveTradeFlag(listing: TradeFields | null | undefined) {
-  return (
-    listing?.tradeAvailable ??
-    (listing?.trade_available || listing?.isTradeEnabled || false)
-  );
-}
+export type DetailBadge = { kind: "sale"; percent: number } | { kind: "trade" };
 
 /**
- * Başlık + fiyat bloğunun altındaki badge satırı. Takas rozeti yalnız ilan
- * satın alınabilirken görünür (sold / reserved / stok 0 değil); sahip de görür.
+ * Başlık + fiyat bloğunun altındaki badge satırı. Kural kartlarla aynıdır:
+ * yüzde `getProductDiscountPercent` (yalnız yuvarlanmış yüzde ≥ 1 iken rozet),
+ * takas `isProductTradeBadgeVisible` (takas açık VE ilan satın alınabilir —
+ * sold / reserved / stok 0 değil). Sahip de görür.
  */
 export function getDetailBadges(listing: Listing): DetailBadge[] {
   const badges: DetailBadge[] = [];
-  if (listing.status === "sold") badges.push({ kind: "sold" });
-
-  if (isProductOnSaleDisplay(listing)) {
-    // Kartla aynı kural: yuvarlanmış yüzde 1'in altındaysa rozet yok.
-    const percent = getProductDiscountPercent(listing);
-    if (percent >= 1) badges.push({ kind: "sale", percent });
-  }
-
-  const purchasable = !isProductOutOfStock({
-    status: listing.status,
-    availableQuantity: listing.availableQuantity ?? listing.quantity,
-  });
-  if (resolveTradeFlag(listing) && purchasable) badges.push({ kind: "trade" });
+  const percent = getProductDiscountPercent(listing);
+  if (percent >= 1) badges.push({ kind: "sale", percent });
+  if (isProductTradeBadgeVisible(listing)) badges.push({ kind: "trade" });
   return badges;
 }
