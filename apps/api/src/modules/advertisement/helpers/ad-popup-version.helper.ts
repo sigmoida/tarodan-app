@@ -1,5 +1,6 @@
 import type { AdPopupFrequency } from "@prisma/client";
 import {
+  adHasImage,
   adHotspotRowData,
   type AdHotspotChange,
   type AdHotspotRowData,
@@ -12,8 +13,8 @@ import {
  * değişikliği — tablodaki "aktif/pasif" düğmesi dahil — popup'ı kapatmış
  * herkese yeniden göstermemeli.
  *
- * Kreatif: başlık, görsel, metin, alt metin, bağlantı, tıklanabilir alanlar
- * ve gösterim sıklığı.
+ * Kreatif: başlık, görsel, metin, alt metin, (görselsiz reklamın) bağlantısı,
+ * tıklanabilir alanlar ve gösterim sıklığı.
  */
 
 /** Saklı reklamın kreatif alanları; `hotspots` `sortOrder` sırasıyla. */
@@ -44,11 +45,34 @@ export interface AdCreativePatch {
 const SCALAR_FIELDS = [
   "title",
   "imageUrl",
-  "linkUrl",
   "content",
   "altText",
   "popupFrequency",
 ] as const;
+
+/**
+ * Ziyaretçinin gördüğü bağlantı: görselli reklamda YOK (tıklama alanlardadır,
+ * istemciler `linkUrl`'i okumaz). Ham kolon karşılaştırılsaydı, görselli
+ * reklamın eski kayıtta kalmış `linkUrl`'i (hotspot kuralı öncesi veri)
+ * `resolveAdClickTargets`'ın zorla yazdığı `null` ile her PATCH'te "değişti"
+ * sayılır, popup kapatan herkese yeniden açılırdı.
+ */
+function effectiveLink(
+  imageUrl: string | null,
+  linkUrl: string | null,
+): string | null {
+  return adHasImage(imageUrl) ? null : linkUrl;
+}
+
+function linkChanged(stored: AdCreativeSnapshot, patch: AdCreativePatch) {
+  const nextImage =
+    patch.imageUrl === undefined ? stored.imageUrl : patch.imageUrl;
+  const nextLink = patch.linkUrl === undefined ? stored.linkUrl : patch.linkUrl;
+  return (
+    effectiveLink(nextImage, nextLink) !==
+    effectiveLink(stored.imageUrl, stored.linkUrl)
+  );
+}
 
 function hotspotsChanged(
   stored: AdCreativeSnapshot["hotspots"],
@@ -79,5 +103,9 @@ export function adCreativeChanged(
   const scalarChanged = SCALAR_FIELDS.some(
     (field) => patch[field] !== undefined && patch[field] !== stored[field],
   );
-  return scalarChanged || hotspotsChanged(stored.hotspots, patch.hotspots);
+  return (
+    scalarChanged ||
+    linkChanged(stored, patch) ||
+    hotspotsChanged(stored.hotspots, patch.hotspots)
+  );
 }
