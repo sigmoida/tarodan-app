@@ -37,6 +37,7 @@ import {
   useProductFavorite,
   useToggleWishlist,
   useWishlistIds,
+  useWishlistPendingIds,
 } from "./useWishlist";
 import { queryKeys } from "@/lib/query/keys";
 import { makeQueryClient } from "@/lib/query/client";
@@ -63,6 +64,7 @@ let container: HTMLDivElement;
 let root: Root;
 let client: QueryClient;
 let ids: ReadonlySet<string>;
+let pendingIds: ReadonlySet<string>;
 let toggle: ReturnType<typeof useToggleWishlist>;
 let favorite: ReturnType<typeof useProductFavorite>;
 const requireAuth = vi.fn();
@@ -70,6 +72,7 @@ let isOwner = false;
 
 function Harness({ productId = "p1" }: { productId?: string }) {
   ids = useWishlistIds();
+  pendingIds = useWishlistPendingIds();
   toggle = useToggleWishlist();
   favorite = useProductFavorite(productId, { isOwner, requireAuth });
   return null;
@@ -214,6 +217,38 @@ describe("useToggleWishlist", () => {
     expect(h.toast.error).toHaveBeenCalledWith("common.operationFailed");
   });
 
+  it("çıkarma başarısızsa satır başa değil ESKİ yerine döner", async () => {
+    h.api.get.mockResolvedValue({
+      data: { items: [row("p0"), row("p1"), row("p2")] },
+    });
+    h.api.remove.mockRejectedValue(new Error("ağ"));
+    await render();
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", true);
+    });
+    await flush();
+
+    // Kart sırası zıplamaz: ortadaki favori yine ortada.
+    expect(cached()).toEqual([row("p0"), row("p1"), row("p2")]);
+  });
+
+  it("iyimser satır geçici olarak işaretlenir (rozet sayar, sayfa yükleniyor kartı çizer)", async () => {
+    const req = deferred();
+    h.api.add.mockReturnValue(req.promise);
+    await render();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+    expect(cached()?.[0]).toEqual({ productId: "p1", pending: true });
+
+    await act(async () => req.resolve({ status: 201 }));
+    await flush();
+  });
+
   it("409 (zaten favoride) başarı sayılır, geri alınmaz", async () => {
     const req = deferred();
     h.api.add.mockReturnValue(req.promise);
@@ -267,6 +302,38 @@ describe("useToggleWishlist", () => {
 
     await act(async () => req.resolve({ status: 201 }));
     await flush();
+  });
+
+  it("istek sürerken ürün meşgul görünür, bitince bırakılır", async () => {
+    const req = deferred();
+    h.api.add.mockReturnValue(req.promise);
+    await render();
+    expect(favorite.isPending).toBe(false);
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+    // Tıklama sessizce düşmesin: kalp ve Favorilerim düğmesi bunu okur.
+    expect(pendingIds.has("p1")).toBe(true);
+    expect(favorite.isPending).toBe(true);
+
+    await act(async () => req.resolve({ status: 201 }));
+    await flush();
+    expect(pendingIds.has("p1")).toBe(false);
+    expect(favorite.isPending).toBe(false);
+  });
+
+  it("hata sonrası da meşguliyet kalkar", async () => {
+    h.api.add.mockRejectedValue(new Error("ağ"));
+    await render();
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+    expect(favorite.isPending).toBe(false);
   });
 
   it("farklı ürünler aynı anda favorilenebilir", async () => {

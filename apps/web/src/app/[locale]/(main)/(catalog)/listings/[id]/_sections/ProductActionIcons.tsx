@@ -4,6 +4,7 @@ import { FlagIcon, HeartIcon, ShareIcon } from "@heroicons/react/24/outline";
 import UserActionsMenu from "@/components/UserActionsMenu";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
+import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
 import { useListingDetail } from "../_context/ListingDetailContext";
 
 /**
@@ -15,6 +16,7 @@ export default function ProductActionIcons() {
   const {
     t,
     isFavorite,
+    isFavoritePending,
     isAuthenticated,
     showShareMenu,
     handleToggleFavorite,
@@ -49,7 +51,9 @@ export default function ProductActionIcons() {
         onClick={handleToggleFavorite}
         aria-label={favoriteLabel}
         aria-pressed={isFavorite}
+        {...favoriteBusyProps(isFavoritePending)}
         title={favoriteLabel}
+        className={FAVORITE_BUSY_CLASS}
       >
         {isFavorite ? (
           <HeartSolidIcon className="w-6 h-6" />

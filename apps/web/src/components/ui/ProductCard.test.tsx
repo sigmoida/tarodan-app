@@ -19,10 +19,15 @@ import type { Product } from "@/types/product";
 const h = vi.hoisted(() => ({
   toggle: vi.fn(),
   linkClick: vi.fn(),
+  isPending: false,
 }));
 
 vi.mock("@/hooks/useWishlist", () => ({
-  useProductFavorite: () => ({ isFavorite: false, toggle: h.toggle }),
+  useProductFavorite: () => ({
+    isFavorite: false,
+    isPending: h.isPending,
+    toggle: h.toggle,
+  }),
 }));
 vi.mock("@/hooks/useAuthGate", () => ({
   useAuthGate: () => ({ requireAuth: () => true, authModal: null }),
@@ -82,6 +87,7 @@ beforeEach(() => {
   root = createRoot(container);
   h.toggle.mockReset();
   h.linkClick.mockReset();
+  h.isPending = false;
   fetchSpy.mockClear();
   vi.stubGlobal("fetch", fetchSpy);
 });
@@ -112,6 +118,26 @@ describe.each(["grid", "list"] as const)("ProductCard (%s)", (layout) => {
     act(() => link.click());
     expect(h.linkClick).toHaveBeenCalledWith("/listings/p1");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("istek sürerken kalp meşgul görünür ama tıklama karta düşmez", () => {
+    h.isPending = true;
+    act(() => root.render(<ProductCard product={product} layout={layout} />));
+    const button = heart()!;
+
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    // Native `disabled` YOK: IconButton onu pointer-events-none yapar ve
+    // tıklama alttaki ilan linkine düşerdi.
+    expect(button.disabled).toBe(false);
+
+    act(() => button.click());
+    expect(h.linkClick).not.toHaveBeenCalled();
+  });
+
+  it("istek yokken meşguliyet özniteliği taşımaz", () => {
+    act(() => root.render(<ProductCard product={product} layout={layout} />));
+    expect(heart()!.hasAttribute("aria-busy")).toBe(false);
   });
 
   it("showFavorite={false} ile kalp çizilmez", () => {

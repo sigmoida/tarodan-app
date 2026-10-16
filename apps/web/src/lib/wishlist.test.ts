@@ -8,6 +8,7 @@ vi.mock("@/lib/api", () => ({ wishlistApi: {} }));
 import { queryKeys } from "@/lib/query/keys";
 import {
   forgetWishlistOnUserChange,
+  isPendingWishlistEntry,
   unwrapWishlistItems,
   wishlistIdSet,
   withWishlistEntry,
@@ -51,18 +52,32 @@ describe("wishlistIdSet", () => {
 });
 
 describe("withWishlistEntry", () => {
-  it("eklerken ürünü başa geçici bir satırla koyar", () => {
-    expect(withWishlistEntry([row("a")], "b", true)).toEqual([
-      { productId: "b" },
-      row("a"),
-    ]);
+  it("eklerken ürünü başa geçici (pending) bir satırla koyar", () => {
+    const next = withWishlistEntry([row("a")], "b", true);
+    expect(next).toEqual([{ productId: "b", pending: true }, row("a")]);
+    expect(isPendingWishlistEntry(next[0])).toBe(true);
+    expect(isPendingWishlistEntry(next[1])).toBe(false);
   });
 
-  it("geri alırken verilen asıl satırı geri koyar", () => {
-    expect(withWishlistEntry([row("a")], "b", true, row("b"))).toEqual([
-      row("b"),
-      row("a"),
-    ]);
+  it("geri alırken asıl satırı ESKİ yerine koyar (başa değil)", () => {
+    expect(
+      withWishlistEntry([row("a"), row("c")], "b", true, {
+        entry: row("b"),
+        index: 1,
+      }),
+    ).toEqual([row("a"), row("b"), row("c")]);
+  });
+
+  it("liste arada kısaldıysa geri konan satır sona taşmaz", () => {
+    expect(
+      withWishlistEntry([row("a")], "c", true, { entry: row("c"), index: 5 }),
+    ).toEqual([row("a"), row("c")]);
+  });
+
+  it("ilk sıradaki satır yine başa döner", () => {
+    expect(
+      withWishlistEntry([row("b")], "a", true, { entry: row("a"), index: 0 }),
+    ).toEqual([row("a"), row("b")]);
   });
 
   it("çıkarırken yalnız o ürünü siler", () => {

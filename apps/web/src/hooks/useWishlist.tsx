@@ -2,8 +2,13 @@
 
 "use client";
 
-import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { HeartIcon } from "@heroicons/react/24/outline";
@@ -14,6 +19,7 @@ import {
   wishlistItemsQuery,
   withWishlistEntry,
   type WishlistEntry,
+  type WishlistRestore,
 } from "@/lib/wishlist";
 import { useAuthStore } from "@/stores/authStore";
 import { apiErrorMessage } from "@/hooks/useWebMutation";
@@ -26,6 +32,9 @@ import type { AuthGateConfig } from "@/hooks/useAuthGate";
  * - `useWishlistIds`   → kullanıcının favori ürün id'leri (tek sorgu, `Set`).
  * - `useToggleWishlist` → iyimser ekle/çıkar + geri alma + toast.
  * - `useProductFavorite` → bir ürün için misafir / sahip / toggle akışı.
+ *
+ * İsteği süren ürünler `useWishlistPendingIds` ile okunur; düğmeler o sürede
+ * `favoriteBusyProps` (`lib/favorite-busy`) ile meşgul görünür.
  */
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
@@ -56,8 +65,28 @@ interface ToggleVars {
 }
 
 interface ToggleContext {
-  /** Çıkarılan asıl satır — hata olursa yerine geri konur. */
-  removed?: WishlistEntry;
+  /** Çıkarılan asıl satır ve eski yeri — hata olursa oraya geri konur. */
+  removed?: WishlistRestore;
+}
+
+/** Toggle mutation'ının ürünü (yapısal tip: hem filtre hem `select` alır). */
+const toggledProductId = (mutation: { state: { variables?: unknown } }) =>
+  (mutation.state.variables as ToggleVars | undefined)?.productId;
+
+/**
+ * İsteği hâlâ süren (pending) favori ürünlerinin id'leri. Aynı ürün için ikinci
+ * tıklama `toggle` tarafından yok sayılır; düğmeler bu kümeyle o sürede meşgul
+ * görünür ki tıklama SESSİZCE düşmüş gibi durmasın.
+ */
+export function useWishlistPendingIds(): ReadonlySet<string> {
+  const pending = useMutationState({
+    filters: { mutationKey: TOGGLE_KEY, status: "pending" },
+    select: toggledProductId,
+  });
+  return useMemo(
+    () => new Set(pending.filter((id): id is string => !!id)),
+    [pending],
+  );
 }
 
 /**
@@ -65,7 +94,8 @@ interface ToggleContext {
  *
  * - Önbellekteki listeyi HEMEN günceller (kalp anında dolar/boşalır); hata
  *   olursa yalnız o ürünü geri alır — eşzamanlı başka bir toggle'ı ezmez.
- * - Aynı ürün için bir istek sürerken ikinci tıklamayı yok sayar (`false` döner).
+ * - Aynı ürün için bir istek sürerken ikinci tıklamayı yok sayar (`false`
+ *   döner); düğme o sürede `useWishlistPendingIds` ile meşgul görünür.
  * - Yalnız favori listesini (+ açıksa o ürünün detayını) tazeler; ürün
  *   listelerine ve kartlardaki `likeCount`'a dokunmaz.
  */
@@ -98,11 +128,12 @@ export function useToggleWishlist() {
     onMutate: async ({ productId, add }) => {
       // Uçuştaki bir liste isteği iyimser değeri ezmesin.
       await queryClient.cancelQueries({ queryKey: LIST_KEY });
-      const removed = add
-        ? undefined
-        : queryClient
-            .getQueryData<WishlistEntry[]>(LIST_KEY)
-            ?.find((item) => item.productId === productId);
+      const list = queryClient.getQueryData<WishlistEntry[]>(LIST_KEY);
+      const index = add
+        ? -1
+        : (list?.findIndex((item) => item.productId === productId) ?? -1);
+      const removed =
+        list && index >= 0 ? { entry: list[index], index } : undefined;
       queryClient.setQueryData<WishlistEntry[]>(
         LIST_KEY,
         (old) => old && withWishlistEntry(old, productId, add),
@@ -135,11 +166,11 @@ export function useToggleWishlist() {
 
   return useCallback(
     (productId: string, isFavorite: boolean): boolean => {
+      // Önbellekten EŞZAMANLI okunur: aynı tick'teki çift tıklama henüz
+      // render olmamış `useWishlistPendingIds`'i göremez.
       const inFlight = queryClient.isMutating({
         mutationKey: TOGGLE_KEY,
-        predicate: (mutation) =>
-          (mutation.state.variables as ToggleVars | undefined)?.productId ===
-          productId,
+        predicate: (mutation) => toggledProductId(mutation) === productId,
       });
       if (inFlight > 0) return false;
       mutate({ productId, add: !isFavorite });
@@ -159,7 +190,8 @@ export interface ProductFavoriteOptions {
 /**
  * Tek bir ürünün favori durumu ve kalp tıklaması. Misafire giriş penceresi,
  * sahibine "kendi ürününüzü favorilere ekleyemezsiniz" uyarısı, diğerlerine
- * iyimser toggle. Kart ve ilan detayı aynı akışı buradan alır.
+ * iyimser toggle. Kart ve ilan detayı aynı akışı buradan alır; `isPending`
+ * istek sürerken kalbi meşgul gösterir (`favoriteBusyProps`).
  */
 export function useProductFavorite(
   productId: string,
@@ -167,6 +199,7 @@ export function useProductFavorite(
 ) {
   const t = useTranslations();
   const isFavorite = useWishlistIds().has(productId);
+  const isPending = useWishlistPendingIds().has(productId);
   const toggleWishlist = useToggleWishlist();
 
   const toggle = useCallback(() => {
@@ -185,5 +218,5 @@ export function useProductFavorite(
     toggleWishlist(productId, isFavorite);
   }, [requireAuth, isOwner, toggleWishlist, productId, isFavorite, t]);
 
-  return { isFavorite, toggle };
+  return { isFavorite, isPending, toggle };
 }

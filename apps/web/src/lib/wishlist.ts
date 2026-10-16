@@ -17,7 +17,25 @@ import { queryKeys } from "@/lib/query/keys";
 export interface WishlistEntry {
   id?: string;
   productId: string;
+  /**
+   * İyimser eklemenin geçici satırı: yalnız `productId` taşır, gerçek satır bir
+   * sonraki tazelemede gelir. Header / profil rozetleri onu SAYAR (kullanıcı
+   * favoriledi); Favorilerim onu yükleniyor kartı olarak gösterir — sayı ile
+   * kart adedi her yerde aynı kalır.
+   */
+  pending?: true;
   [key: string]: unknown;
+}
+
+/** Satır iyimser eklemenin geçici satırı mı? (bkz. `WishlistEntry.pending`) */
+export function isPendingWishlistEntry(entry: WishlistEntry): boolean {
+  return entry.pending === true;
+}
+
+/** Geri alınacak satır ve listedeki ESKİ yeri. */
+export interface WishlistRestore {
+  entry: WishlistEntry;
+  index: number;
 }
 
 /** `{ items }` / `{ data }` / çıplak dizi zarflarını tek diziye indirger. */
@@ -56,22 +74,24 @@ export function wishlistIdSet(
 
 /**
  * İyimser güncelleme ve geri alma için listeyi tek ürün bazında değiştirir.
- * `add` = true: ürün yoksa başa eklenir (`restore` verilmişse o satır, yoksa
- * yalnız `productId` taşıyan geçici bir satır — gerçek satır bir sonraki
- * tazelemede gelir). `add` = false: ürün listeden çıkarılır. Değişiklik
- * yoksa AYNI dizi döner.
+ * `add` = true: ürün yoksa eklenir — `restore` verilmişse o satır ESKİ
+ * yerine (başarısız çıkarmanın geri alınması; kart sırası zıplamasın), yoksa
+ * başa geçici bir satır (`pending`). `add` = false: ürün listeden çıkarılır.
+ * Değişiklik yoksa AYNI dizi döner.
  */
 export function withWishlistEntry(
   items: readonly WishlistEntry[],
   productId: string,
   add: boolean,
-  restore?: WishlistEntry,
+  restore?: WishlistRestore,
 ): WishlistEntry[] {
   const present = items.some((item) => item.productId === productId);
   if (add) {
-    return present
-      ? (items as WishlistEntry[])
-      : [restore ?? { productId }, ...items];
+    if (present) return items as WishlistEntry[];
+    if (!restore) return [{ productId, pending: true }, ...items];
+    // Arada liste kısalmış olabilir (başka bir ürün çıkarıldı): sona taşmaz.
+    const at = Math.max(0, Math.min(restore.index, items.length));
+    return [...items.slice(0, at), restore.entry, ...items.slice(at)];
   }
   return present
     ? items.filter((item) => item.productId !== productId)
