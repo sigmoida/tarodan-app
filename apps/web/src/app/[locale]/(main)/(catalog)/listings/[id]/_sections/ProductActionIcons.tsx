@@ -38,9 +38,9 @@ export default function ProductActionIcons() {
     }
   };
   const sellerId = listing?.seller?.id || listing?.sellerId;
-  const favoriteLabel = isFavorite
-    ? t("product.removeFromFavorites")
-    : t("product.addToFavorites");
+  // Sabit etiket + aria-pressed (kart kalbiyle aynı): durum etiketle değil
+  // basılı/değil bilgisiyle okunur.
+  const favoriteLabel = t("product.favorite");
 
   return (
     <div className="flex justify-end gap-2">

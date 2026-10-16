@@ -37,6 +37,7 @@ vi.mock("@/hooks/useAuthGate", () => ({
   }),
 }));
 vi.mock("react-hot-toast", () => ({ default: h.toast }));
+vi.mock("@/lib/logger", () => ({ logger: { captureException: vi.fn() } }));
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
@@ -110,7 +111,7 @@ describe("ProductCardFavorite", () => {
     h.auth.user = null;
     await render();
     expect(heart()?.getAttribute("aria-pressed")).toBe("false");
-    expect(heart()?.getAttribute("aria-label")).toBe("product.addToFavorites");
+    expect(heart()?.getAttribute("aria-label")).toBe("product.favorite");
     expect(h.api.get).not.toHaveBeenCalled();
 
     await click();
@@ -123,13 +124,13 @@ describe("ProductCardFavorite", () => {
     expect(heart()).toBeNull();
   });
 
-  it("favorideki ürünü dolu kalp ve 'çıkar' etiketiyle gösterir", async () => {
+  it("favorideki ürünü basılı gösterir; etiket durumla değişmez", async () => {
     h.api.get.mockResolvedValue({ data: { items: [{ productId: "p1" }] } });
     await render();
     expect(heart()?.getAttribute("aria-pressed")).toBe("true");
-    expect(heart()?.getAttribute("aria-label")).toBe(
-      "product.removeFromFavorites",
-    );
+    // Durumu aria-pressed söyler; değişen etiket "çıkar, basılı" diye
+    // çelişik okunurdu.
+    expect(heart()?.getAttribute("aria-label")).toBe("product.favorite");
   });
 
   it("tıklama iyimser doldurur ve kartın tıklamasını tetiklemez", async () => {

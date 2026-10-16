@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
     remove: vi.fn(),
   },
   toast: { success: vi.fn(), error: vi.fn() },
+  capture: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({ wishlistApi: h.api }));
@@ -25,6 +26,9 @@ vi.mock("@/stores/authStore", () => ({
   useAuthStore: (selector: (s: typeof h.auth) => unknown) => selector(h.auth),
 }));
 vi.mock("react-hot-toast", () => ({ default: h.toast }));
+vi.mock("@/lib/logger", () => ({
+  logger: { captureException: h.capture },
+}));
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
@@ -113,6 +117,7 @@ beforeEach(() => {
   h.api.remove.mockReset().mockResolvedValue({ status: 200 });
   h.toast.success.mockReset();
   h.toast.error.mockReset();
+  h.capture.mockReset();
   requireAuth.mockReset().mockReturnValue(true);
   isOwner = false;
 });
@@ -129,6 +134,15 @@ describe("useWishlistIds", () => {
     await render();
     expect(h.api.get).not.toHaveBeenCalled();
     expect(ids.size).toBe(0);
+  });
+
+  it("çıkış sonrası önbellekte kalan listeyi göstermez", async () => {
+    // Önceki oturumdan kalan liste; sorgu misafirde kapalı olsa da önbellekte.
+    client.setQueryData(queryKeys.wishlist.all(), [row("p0")]);
+    h.auth.isAuthenticated = false;
+    await render();
+    expect(ids.size).toBe(0);
+    expect(favorite.isFavorite).toBe(false);
   });
 
   it("GET /wishlist yanıtından id kümesi türetir", async () => {
@@ -176,6 +190,11 @@ describe("useToggleWishlist", () => {
     expect(ids.has("p1")).toBe(false);
     expect(ids.has("p0")).toBe(true);
     expect(h.toast.error).toHaveBeenCalledWith("sunucu hatası");
+    // Varsayılan mutation hata raporlaması ezildiği için Sentry'ye biz yollarız.
+    expect(h.capture).toHaveBeenCalledWith(
+      expect.objectContaining({ response: expect.anything() }),
+      expect.objectContaining({ source: "react-query", type: "mutation" }),
+    );
   });
 
   it("çıkarma başarısızsa asıl satırı geri koyar", async () => {
@@ -202,8 +221,25 @@ describe("useToggleWishlist", () => {
     await act(async () => req.reject({ response: { status: 409 } }));
     await flush();
     expect(h.toast.error).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
     expect(h.toast.success).toHaveBeenCalledWith("product.addedToFavorites");
     expect(ids.has("p1")).toBe(true);
+  });
+
+  it("çıkarırken 404 (zaten favoride değil) başarı sayılır, geri alınmaz", async () => {
+    h.api.remove.mockRejectedValue({ response: { status: 404 } });
+    await render();
+    hangRefetch();
+    act(() => {
+      toggle("p0", true);
+    });
+    await flush();
+    expect(ids.has("p0")).toBe(false);
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
+    expect(h.toast.success).toHaveBeenCalledWith(
+      "product.removedFromFavorites",
+    );
   });
 
   it("aynı ürün için istek sürerken ikinci tıklamayı yok sayar", async () => {

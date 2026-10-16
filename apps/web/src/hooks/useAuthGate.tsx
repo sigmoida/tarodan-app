@@ -35,7 +35,9 @@ export interface AuthGateConfig {
  * cookie. Server-enforced routes use middleware / `getSession()` instead.
  */
 export function useAuthGate() {
-	const { isAuthenticated } = useAuthStore();
+	// Selector: her ürün kartının kalbi bu hook'u kullanır; store'un ilgisiz
+	// yazımları (limits, user alanları) bütün kalpleri yeniden çizmesin.
+	const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 	const [config, setConfig] = useState<AuthGateConfig | null>(null);
 
 	const close = useCallback(() => setConfig(null), []);

@@ -17,8 +17,13 @@ import { useAuthStore } from "@/stores/authStore";
  * indirim rozetiyle çakışmaz — ve hover'a bağlı değildir (dokunmatikte de görünür).
  *
  * Kartın `<Link>`'inin İÇİNE konmaz (link içinde buton geçersiz HTML): kart
- * bunu linkin kardeşi olarak, görsel alanını kaplayan `frameClassName`
+ * bunu linkin dışında, görsel alanını birebir kaplayan `frameClassName`
  * çerçevesiyle konumlar. Çerçeve tıklamayı geçirir; yalnız buton yakalar.
+ * Görünür daire 32px; dokunma alanı bir `::after` ile 44px'e genişler ve
+ * görselin kenarında biter (karta taşmaz).
+ *
+ * Etiket sabittir ("Favori"); durumu `aria-pressed` söyler — ikisi birden
+ * değişirse ekran okuyucu "Favorilerden çıkar, basılı" gibi çelişik okur.
  *
  * Prop'lar bilinçli olarak ilkel: sunucu kartından (`HomeProductCard`) bu istemci
  * adasına geçen RSC yükü bütün ürün nesnesini taşımaz.
@@ -36,7 +41,8 @@ export default function ProductCardFavorite({
   sellerId?: string | number | null;
   /**
    * Görsel alanını kaplayan mutlak konumlu çerçeve. Varsayılan: kartın üstünde
-   * tam genişlikte kare görsel (grid kartları); liste düzeni kendi ölçüsünü verir.
+   * tam genişlikte kare görsel (grid kartları); liste düzeni kalbi görselin
+   * kendi hücresine koyar ve `inset-0` verir.
    */
   frameClassName?: string;
 }) {
@@ -53,9 +59,7 @@ export default function ProductCardFavorite({
 
   if (isOwner) return null;
 
-  const label = isFavorite
-    ? t("product.removeFromFavorites")
-    : t("product.addToFavorites");
+  const label = t("product.favorite");
 
   const onClick = (event: MouseEvent<HTMLButtonElement>) => {
     // Kartın linki (ve tıklama sayacı) tetiklenmesin.
@@ -72,7 +76,9 @@ export default function ProductCardFavorite({
         aria-label={label}
         aria-pressed={isFavorite}
         title={label}
-        className="pointer-events-auto absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/80 text-heading shadow-sm hover:bg-surface-elevated"
+        // `after:-inset-1.5`: 32px + 2×6px = 44px dokunma alanı; buton
+        // görselin kenarından 6px içeride, alan tam kenarda biter.
+        className="pointer-events-auto absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/80 text-heading shadow-sm after:absolute after:-inset-1.5 after:rounded-full hover:bg-surface-elevated"
       >
         {isFavorite ? (
           <HeartSolidIcon className="h-5 w-5 text-danger-500" />

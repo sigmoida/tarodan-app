@@ -17,6 +17,7 @@ import {
 } from "@/lib/wishlist";
 import { useAuthStore } from "@/stores/authStore";
 import { apiErrorMessage } from "@/hooks/useWebMutation";
+import { logger } from "@/lib/logger";
 import type { AuthGateConfig } from "@/hooks/useAuthGate";
 
 /**
@@ -33,7 +34,8 @@ const LIST_KEY = queryKeys.wishlist.all();
 const TOGGLE_KEY = queryKeys.wishlist.toggle();
 
 /**
- * Favori ürün id'leri. Misafirde sorgu HİÇ atılmaz (boş küme döner). Liste
+ * Favori ürün id'leri. Misafirde sorgu HİÇ atılmaz ve boş küme döner — sorgu
+ * kapalıyken önbellekte önceki oturumdan kalan bir liste olsa bile. Liste
  * `wishlistItemsQuery` ile header rozetiyle aynı önbellek girdisidir; `select`
  * yalnız kümeyi türetir.
  */
@@ -45,7 +47,7 @@ export function useWishlistIds(): ReadonlySet<string> {
     select: wishlistIdSet,
     meta: { page: "wishlist-ids" },
   });
-  return data ?? EMPTY_IDS;
+  return isAuthenticated ? (data ?? EMPTY_IDS) : EMPTY_IDS;
 }
 
 interface ToggleVars {
@@ -71,6 +73,10 @@ interface ToggleContext {
 export function useToggleWishlist() {
   const t = useTranslations();
   const queryClient = useQueryClient();
+  const successToast = (add: boolean) =>
+    toast.success(
+      add ? t("product.addedToFavorites") : t("product.removedFromFavorites"),
+    );
 
   const { mutate } = useMutation<unknown, unknown, ToggleVars, ToggleContext>({
     mutationKey: TOGGLE_KEY,
@@ -90,18 +96,14 @@ export function useToggleWishlist() {
       );
       return { removed };
     },
-    onSuccess: (_data, { add }) => {
-      toast.success(
-        add ? t("product.addedToFavorites") : t("product.removedFromFavorites"),
-      );
-    },
+    onSuccess: (_data, { add }) => successToast(add),
     onError: (error, { productId, add }, context) => {
-      // 409 = zaten favoride → istenen son durum bu, başarı say.
-      if (
-        add &&
-        (error as { response?: { status?: number } })?.response?.status === 409
-      ) {
-        toast.success(t("product.addedToFavorites"));
+      // İstenen son durum zaten sunucuda: eklerken 409 (zaten favoride),
+      // çıkarırken 404 (zaten favoride değil) → başarı say, geri alma yok.
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === (add ? 409 : 404)) {
+        successToast(add);
         return;
       }
       queryClient.setQueryData<WishlistEntry[]>(
@@ -109,6 +111,14 @@ export function useToggleWishlist() {
         (old) =>
           old && withWishlistEntry(old, productId, !add, context?.removed),
       );
+      // Kendi onError'ımız QueryClient'ın varsayılan mutation hata
+      // raporlamasını ezer; Sentry'ye aynı biçimde biz göndeririz.
+      logger.captureException(error, {
+        source: "react-query",
+        type: "mutation",
+        mutationKey: TOGGLE_KEY,
+        context: { productId, add },
+      });
       toast.error(apiErrorMessage(error) ?? t("common.operationFailed"));
     },
     onSettled: (_data, _error, { productId }) => {

@@ -8,6 +8,8 @@ import {
   logoutAction,
 } from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
+import { getQueryClient } from "@/lib/query/getQueryClient";
+import { forgetWishlistOnUserChange } from "@/lib/wishlist";
 
 // Membership tier types
 export type MembershipTier = "free" | "basic" | "premium" | "business";
@@ -544,5 +546,11 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// Kullanıcıya özel önbellek: çıkışta / kullanıcı değişince önceki
+// kullanıcının favori listesi QueryClient'ta kalmasın (bkz. lib/wishlist).
+if (typeof window !== "undefined") {
+  useAuthStore.subscribe(forgetWishlistOnUserChange(getQueryClient));
+}
 
 export default useAuthStore;
