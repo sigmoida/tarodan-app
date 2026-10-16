@@ -196,6 +196,10 @@ function playwrightStage(context, id, label, options = {}) {
 }
 
 function buildPushStages(context, apps, base) {
+  // Push gate = typecheck + contract + unit tests only. Production builds
+  // (api/web/admin) are left to CI and the deploy pipeline: running three
+  // builds on every push froze 16 GB dev machines. The seed build stays —
+  // it is seconds long and catches the prod crash-loop described below.
   const stages = [];
   // Each push stage carries its app so a passing app can be cached per tree.
   const pushFor = (app, ...appStages) =>
@@ -218,11 +222,6 @@ function buildPushStages(context, apps, base) {
         "API Unit",
         base ? [`--changedSince=${base}`, "--passWithNoTests"] : [],
       ),
-      commandStage("api-build", "API Build", [
-        "--filter",
-        "@tarodan/api...",
-        "build",
-      ]),
       // Ayrı bir tsconfig, ayrı bir çıktı ağacı: `nest build` bunu KAPSAMAZ.
       // Üretim boot'u derlenmiş seed'leri sabit yollardan çağırdığı için
       // (seed:prod, bootstrap:prod:admin, …) buradaki bir kayma konteyneri
@@ -254,11 +253,6 @@ function buildPushStages(context, apps, base) {
         "@tarodan/web",
         "test",
       ]),
-      commandStage("web-build", "Web Build", [
-        "--filter",
-        "@tarodan/web...",
-        "build",
-      ]),
     );
   }
 
@@ -279,11 +273,6 @@ function buildPushStages(context, apps, base) {
         "--filter",
         "@tarodan/admin",
         "test",
-      ]),
-      commandStage("admin-build", "Admin Build", [
-        "--filter",
-        "@tarodan/admin...",
-        "build",
       ]),
     );
   }
