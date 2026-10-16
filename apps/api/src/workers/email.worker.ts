@@ -27,6 +27,7 @@ import {
 import { withEmailTimingData } from "../common/timing-rules";
 import { frontendUrlForEnvironment } from "../config/app-urls";
 import { NotificationDispatchService } from "../modules/notification/notification-dispatch.service";
+import { markBroadcastLogRows } from "../modules/notification/helpers/broadcast-delivery";
 
 export interface EmailJobData {
   to: string;
@@ -57,6 +58,11 @@ export interface EmailJobData {
    * mevcut sipariş mailleri etkilenmez.
    */
   notificationLog?: { userId: string; type: string; title: string };
+  /**
+   * Yönetici yayını: admin servisinin yazdığı "pending" e-posta satırı
+   * (`data.broadcastId`) gönderim SONUCUNDAN güncellenir.
+   */
+  broadcastLog?: { userId: string; broadcastId: string };
   /**
    * `templateData`'yı `EmailLog.metadata`'ya YAZMA. Yük bir sır taşıyorsa
    * (token'lı aktivasyon linki gibi) metadata onu kalıcı olarak düz metin
@@ -92,6 +98,7 @@ export class EmailWorker {
       template,
       templateData,
       notificationLog,
+      broadcastLog,
       redactTemplateData,
     } = job.data;
     if (!html) throw new Error("Email HTML content is required");
@@ -124,9 +131,24 @@ export class EmailWorker {
     // Senkron gönderim yolları her denemede DEĞİL, her mantıksal gönderimde bir
     // notification_log satırı yazıyor. Bull 3 kez deneyeceği için başarısızlıkta
     // yalnız SON denemede yazılır; aksi halde tek mail üç satır üretirdi.
+    const isLastAttempt =
+      (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+    if (broadcastLog && (result.success || isLastAttempt)) {
+      await markBroadcastLogRows(this.prisma, {
+        broadcastId: broadcastLog.broadcastId,
+        userIds: [broadcastLog.userId],
+        channels: ["email"],
+        delivered: result.success,
+        error: result.error,
+      }).catch((err: unknown) =>
+        this.logger.warn(
+          `Broadcast email log update failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }
+
     if (notificationLog) {
-      const isFinalAttempt =
-        (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+      const isFinalAttempt = isLastAttempt;
       if (result.success || isFinalAttempt) {
         await this.dispatch.logNotification(
           notificationLog.userId,

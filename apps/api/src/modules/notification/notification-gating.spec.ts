@@ -261,7 +261,14 @@ describe("Notification preference gating (wiring)", () => {
         json: async () => ({ data: [{ status: "ok" }] }),
       });
       (global as any).fetch = fetchMock;
-      worker = new PushWorker({ get: () => "" } as any, mockPrisma as any);
+      // Gerçek gönderim çekirdeği (ExpoPushProvider.sendMessages) — fetch mock'lu.
+      worker = new PushWorker(
+        mockPrisma as any,
+        new ExpoPushProvider({ get: () => "" } as any, mockPrisma as any),
+        {} as any,
+        { getUnreadCount: jest.fn().mockResolvedValue(0) } as any,
+        {} as any,
+      );
     });
 
     it("messageAlerts=false → in-app KAYDEDİLMEZ, Expo fetch çağrılmaz, pushSent=false", async () => {

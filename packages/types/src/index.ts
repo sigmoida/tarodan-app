@@ -128,6 +128,9 @@ export * from "./refund-totals";
 // Admin broadcast e-mail: mailing type (announcement | marketing) + limits
 export * from "./mailing-type";
 
+// Free notification link (admin broadcast `data.link`) safety rule
+export * from "./notification-link";
+
 // Durations & rules registry: every business duration, its bounds and expiry
 // actions (API resolution + validation, admin screen, public policy endpoint)
 export * from "./timing-rules";

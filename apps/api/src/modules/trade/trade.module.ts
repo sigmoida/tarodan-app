@@ -12,6 +12,7 @@ import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
 import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
 import { TradeDeadlineExtensionService } from "./lifecycle/trade-deadline-extension.service";
 import { TradePlatformCancelService } from "./lifecycle/trade-platform-cancel.service";
+import { TradePartyNoticeService } from "./lifecycle/trade-party-notice.service";
 import { TradeSchedulerService } from "./jobs/trade-scheduler.service";
 import { TradeScheduledProcessor } from "./jobs/trade-scheduled.processor";
 import { TradeCashClearedListener } from "./lifecycle/trade-cash-cleared.listener";
@@ -70,6 +71,8 @@ import { MessagingModule } from "../messaging/messaging.module";
     TradeDeadlineExtensionService,
     // Platform (admin) iptali: süre dolumu taramasının kargo öncesi çekirdeği.
     TradePlatformCancelService,
+    // Takas taraf duyuruları (iptal / itiraz / tamamlanma) — outbox üzerinden.
+    TradePartyNoticeService,
     TradeSchedulerService,
     ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,

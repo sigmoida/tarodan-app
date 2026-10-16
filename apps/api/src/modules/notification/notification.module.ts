@@ -6,6 +6,8 @@
  */
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { BullModule } from "@nestjs/bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { NotificationController } from "./notification.controller";
 import { NotificationService } from "./notification.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
@@ -29,6 +31,9 @@ import { MailModule } from "../mail/mail.module";
     StorageModule,
     WebSocketModule,
     MailModule,
+    // ExpoPushProvider makbuz (receipt) kontrolünü gecikmeli `push` işi olarak
+    // planlar; kök bağlantı BullRootModule'dedir (her rolde yüklenir).
+    BullModule.registerQueue({ name: QUEUE_NAMES.PUSH }),
   ],
   controllers: [NotificationController],
   providers: [

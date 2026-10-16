@@ -69,9 +69,11 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
     });
     const inApp = rows(prisma).filter((r: any) => r.channel === "in_app");
     expect(inApp.map((r: any) => r.userId)).toEqual(["u1"]);
-    expect(eventService.emitAdminBroadcast.mock.calls[0][0].userIds).toEqual([
-      "u1",
-    ]);
+    // Dağıtım aynı izin kapısını worker'da uygular (isMarketing + hedef kuralı).
+    expect(eventService.emitAdminBroadcast.mock.calls[0][0]).toMatchObject({
+      isMarketing: true,
+      target: { targetType: "user_ids", userIds: ["u1", "u2"] },
+    });
   });
 
   it("pazarlama + tüm kullanıcılar: kitle filtresine izin kapısı eklenir", async () => {
@@ -130,10 +132,10 @@ describe("AdminNotificationService — pazarlama türü kitlesi", () => {
     expect(prisma.user.findMany).not.toHaveBeenCalled();
     const inApp = rows(prisma).filter((r: any) => r.channel === "in_app");
     expect(inApp.map((r: any) => r.userId)).toEqual(["u1", "u2"]);
-    expect(eventService.emitAdminBroadcast.mock.calls[0][0].userIds).toEqual([
-      "u1",
-      "u2",
-    ]);
+    expect(eventService.emitAdminBroadcast.mock.calls[0][0]).toMatchObject({
+      isMarketing: false,
+      target: { targetType: "user_ids", userIds: ["u1", "u2"] },
+    });
   });
 
   it("duyuru + tüm kullanıcılar: izin kapısı EKLENMEZ", async () => {

@@ -104,8 +104,13 @@ describe("AdminNotificationService — HTML e-posta", () => {
         newsletter.resolveMarketingUnsubscribeTokens,
       ).not.toHaveBeenCalled();
       const emitted = eventService.emitAdminBroadcast.mock.calls[0][0];
-      expect(emitted.marketingUnsubscribeTokens).toBeUndefined();
-      expect(emitted.userIds).toEqual(["u1", "u2"]);
+      // İş verisi hedefleme kuralı taşır: liste/token yok (Redis'e yazılmaz).
+      expect(emitted.isMarketing).toBe(false);
+      expect(emitted.target).toEqual({
+        targetType: "user_ids",
+        userIds: ["u1", "u2"],
+      });
+      expect(emitted).not.toHaveProperty("marketingUnsubscribeTokens");
       expect(result.emailRecipientCount).toBe(2);
     });
 
@@ -115,8 +120,8 @@ describe("AdminNotificationService — HTML e-posta", () => {
       await service.sendNotification("admin-1", dto());
 
       const emitted = eventService.emitAdminBroadcast.mock.calls[0][0];
-      expect(emitted.emailHtml).toBeUndefined();
-      expect(emitted.emailSubject).toBeUndefined();
+      expect(emitted.emailHtml).toBeNull();
+      expect(emitted.emailSubject).toBeNull();
       expect(emailRows(prisma)).toHaveLength(2);
     });
 
@@ -150,8 +155,10 @@ describe("AdminNotificationService — HTML e-posta", () => {
       expect(newsletter.resolveMarketingUnsubscribeTokens).toHaveBeenCalledWith(
         ["u1", "u2"],
       );
+      // Çıkış token'ları iş verisine YAZILMAZ; worker dağıtım anında çözer.
       const emitted = eventService.emitAdminBroadcast.mock.calls[0][0];
-      expect([...emitted.marketingUnsubscribeTokens.keys()]).toEqual(["u1"]);
+      expect(emitted.isMarketing).toBe(true);
+      expect(emitted).not.toHaveProperty("marketingUnsubscribeTokens");
 
       const rows = emailRows(prisma);
       expect(rows.map((row: any) => row.userId)).toEqual(["u1"]);

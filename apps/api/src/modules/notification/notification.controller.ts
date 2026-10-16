@@ -71,6 +71,14 @@ export class NotificationController {
     status: HttpStatus.OK,
     description: "Push token registered",
   })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Invalid Expo push token",
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: "Account cannot register devices (banned/deleted)",
+  })
   async registerPushToken(
     @CurrentUser("id") userId: string | null,
     @Body() dto: RegisterPushTokenDto,

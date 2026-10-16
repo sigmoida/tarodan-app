@@ -10,9 +10,10 @@ describe("ScheduledNotificationScheduler — e-posta içeriği", () => {
       scheduledNotification: {
         findMany: jest.fn().mockResolvedValue([row]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      user: {
-        findMany: jest.fn().mockResolvedValue([{ id: "u1" }, { id: "u2" }]),
+      notificationLog: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
     const adminService = {
@@ -51,8 +52,13 @@ describe("ScheduledNotificationScheduler — e-posta içeriği", () => {
         emailSubject: "Konu",
         emailHtml: "<p>Selam</p>",
         mailingType: "marketing",
-        userIds: ["u1", "u2"],
+        // Hedefleme KURALI aynen geçer; kullanıcı listesine çözülmez (iş verisine
+        // liste yazılmasın — alıcılar dağıtım anında çözülür).
+        targetType: "all",
       }),
+    );
+    expect(adminService.sendNotification.mock.calls[0][1]).not.toHaveProperty(
+      "userIds",
     );
   });
 
@@ -69,44 +75,100 @@ describe("ScheduledNotificationScheduler — e-posta içeriği", () => {
     expect(dto.mailingType).toBe("announcement");
   });
 
-  it("segment hedefi anlık gönderimle aynı kullanıcı filtresini kullanır", async () => {
-    const { scheduler, prisma } = makeScheduler(
+  it("segment hedefi kuralıyla geçer (anlık gönderimle aynı filtre orada uygulanır)", async () => {
+    const { scheduler, adminService } = makeScheduler(
       row({ targetType: "segment", targetData: { isSeller: true } }),
     );
 
     await scheduler.runProcessScheduledNotifications();
 
-    expect(prisma.user.findMany).toHaveBeenCalledWith(
+    expect(adminService.sendNotification).toHaveBeenCalledWith(
+      "admin-1",
       expect.objectContaining({
-        where: { isBanned: false, isSeller: true },
+        targetType: "segment",
+        segmentCriteria: { isSeller: true },
       }),
     );
   });
 
-  it("yalnız e-posta + pazarlama: sentCount gerçek e-posta alıcı sayısıdır", async () => {
+  it("user_ids hedefi yöneticinin seçtiği kimliklerle geçer", async () => {
+    const { scheduler, adminService } = makeScheduler(
+      row({ targetType: "user_ids", targetData: ["a", "b"] }),
+    );
+
+    await scheduler.runProcessScheduledNotifications();
+
+    expect(adminService.sendNotification).toHaveBeenCalledWith(
+      "admin-1",
+      expect.objectContaining({ targetType: "user_ids", userIds: ["a", "b"] }),
+    );
+  });
+
+  it("kurtarma: uzun süredir 'processing' kalan satırlar 'failed' olur", async () => {
+    const { scheduler, prisma } = makeScheduler(row());
+
+    await scheduler.runProcessScheduledNotifications();
+
+    expect(prisma.scheduledNotification.updateMany).toHaveBeenCalledWith({
+      where: { status: "processing", updatedAt: { lt: expect.any(Date) } },
+      data: expect.objectContaining({ status: "failed" }),
+    });
+    // Hiç denenmemiş yayın teslim satırları da kapanır (saatte bir).
+    expect(prisma.notificationLog.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: "admin_broadcast",
+          status: "pending",
+        }),
+        data: expect.objectContaining({ status: "failed" }),
+      }),
+    );
+  });
+
+  it("satırı atomik sahiplenir; başka süreç aldıysa göndermez (çoklu worker)", async () => {
     const { scheduler, prisma, adminService } = makeScheduler(row());
-    adminService.sendNotification.mockResolvedValue({ emailRecipientCount: 1 });
+    prisma.scheduledNotification.updateMany.mockResolvedValue({ count: 0 });
 
     await scheduler.runProcessScheduledNotifications();
 
-    expect(prisma.scheduledNotification.update).toHaveBeenCalledWith(
+    expect(prisma.scheduledNotification.updateMany).toHaveBeenCalledWith({
+      where: { id: "sch-1", status: "pending" },
+      data: { status: "processing" },
+    });
+    expect(adminService.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("saklanan data (hedef link) ve satır kimliği gönderime taşınır; 'sent' worker'a kalır", async () => {
+    const { scheduler, prisma, adminService } = makeScheduler(
+      row({ channels: ["push"], data: { link: "/listings/p1" } }),
+    );
+
+    await scheduler.runProcessScheduledNotifications();
+
+    expect(adminService.sendNotification).toHaveBeenCalledWith(
+      "admin-1",
       expect.objectContaining({
-        data: expect.objectContaining({ status: "sent", sentCount: 1 }),
+        data: { link: "/listings/p1" },
+        scheduledNotificationId: "sch-1",
+      }),
+    );
+    // İyimser "sent" yazılmaz: dağıtımı yapan worker sonucu yazar.
+    expect(prisma.scheduledNotification.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "sent" }),
       }),
     );
   });
 
-  it("push içeren kanalda sentCount tüm hedef kitledir", async () => {
-    const { scheduler, prisma, adminService } = makeScheduler(
-      row({ channels: ["push", "email"] }),
-    );
-    adminService.sendNotification.mockResolvedValue({ emailRecipientCount: 1 });
+  it("gönderim başlatılamazsa satır 'failed' olur", async () => {
+    const { scheduler, prisma, adminService } = makeScheduler(row());
+    adminService.sendNotification.mockRejectedValue(new Error("x"));
 
     await scheduler.runProcessScheduledNotifications();
 
     expect(prisma.scheduledNotification.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: "sent", sentCount: 2 }),
+        data: expect.objectContaining({ status: "failed" }),
       }),
     );
   });

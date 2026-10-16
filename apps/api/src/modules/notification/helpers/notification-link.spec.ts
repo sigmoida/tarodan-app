@@ -507,6 +507,8 @@ describe("withDefaultAudience", () => {
     NotificationType.SELLER_ADDRESS_REQUIRED,
     NotificationType.CARGO_CODE_READY,
     NotificationType.OFFER_COUNTER_ACCEPTED,
+    // Satıcının "Yeni Sipariş" bildirimi (order.paid): satış siparişine gider.
+    NotificationType.PAYMENT_RECEIVED,
   ];
 
   it.each(SELLER_ORDER_TYPES)("%s — audience=seller eklenir", (type) => {

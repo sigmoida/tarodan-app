@@ -257,6 +257,8 @@ describe("OfferSchedulerService — süre dolumu bildirimi", () => {
     await service.runHandleExpiredOffers();
 
     expect(notificationService.notifyOfferExpired).toHaveBeenCalledWith({
+      // Kimlik: mobil push/zil dokunuşu teklif detayını açar.
+      offerId: "offer-1",
       buyerId: "buyer-1",
       sellerId: "seller-1",
       productId: "product-1",

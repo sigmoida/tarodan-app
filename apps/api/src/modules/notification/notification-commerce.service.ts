@@ -38,6 +38,17 @@ const ORDER_BUYER_SELECT = {
   buyer: { select: { email: true, displayName: true } },
 } as const satisfies Prisma.OrderSelect;
 
+/**
+ * Siparişi kapanan/iptal edilen alıcıya: bugünkü varsayılan kanallar (e-posta
+ * + zil) korunur, push eklenir. Yalnız zil + e-postayla bildirilen bu olaylar
+ * uygulamada hiç push üretmiyordu.
+ */
+const COMMERCE_ALERT_CHANNELS = [
+  NotificationChannel.EMAIL,
+  NotificationChannel.IN_APP,
+  NotificationChannel.PUSH,
+];
+
 @Injectable()
 export class NotificationCommerceService {
   private readonly logger = new Logger(NotificationCommerceService.name);
@@ -327,12 +338,15 @@ export class NotificationCommerceService {
 
   /** Süresi dolan teklif → iki tarafa da (alıcı: kendi teklifi, satıcı: gelen teklif). */
   async notifyOfferExpired(params: {
+    /** Mobil dokunuş teklif detayını açar; eski çağıranlar için opsiyonel. */
+    offerId?: string;
     buyerId: string;
     sellerId: string;
     productId: string;
     productTitle: string;
   }) {
     const data = {
+      ...(params.offerId ? { offerId: params.offerId } : {}),
       productId: params.productId,
       productTitle: params.productTitle,
     };
@@ -342,10 +356,12 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data,
     });
+    // Satıcı da push alır: yanıtlamadığı teklifin kapandığını ancak zilde
+    // görüyordu (web niyeti: satıcıya da duyurulur).
     await this.dispatch.send({
       userId: params.sellerId,
       type: NotificationType.OFFER_EXPIRED_SELLER,
-      channels: [NotificationChannel.IN_APP],
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data,
     });
   }
@@ -430,6 +446,9 @@ export class NotificationCommerceService {
     return this.dispatch.send({
       userId: buyerId,
       type: NotificationType.ORDER_CANCELLED_OUT_OF_STOCK,
+      // Eskiden yalnız varsayılan kanallar (e-posta + zil): siparişi iptal
+      // olan alıcı uygulamada push almıyordu.
+      channels: COMMERCE_ALERT_CHANNELS,
       data,
     });
   }
@@ -523,11 +542,15 @@ export class NotificationCommerceService {
     productTitle: string,
     fromOffer = false,
   ) {
+    // Ödenmemiş siparişte genel ORDER_CANCELLED metni ("ödediğiniz tutar iade
+    // edilecek") yanlıştı — hiç ödeme yoktu. RESERVATION_EXPIRED doğru metni
+    // taşır ("ödeme süresi dolduğu için iptal edildi"). Artık push da gider.
     return this.dispatch.send({
       userId: buyerId,
       type: fromOffer
         ? NotificationType.OFFER_PAYMENT_EXPIRED
-        : NotificationType.ORDER_CANCELLED,
+        : NotificationType.RESERVATION_EXPIRED,
+      channels: COMMERCE_ALERT_CHANNELS,
       data: { orderId, productTitle },
     });
   }
@@ -826,9 +849,13 @@ export class NotificationCommerceService {
     // bell can render a thumbnail and the click-through can land on the
     // unavailable-page back-in-stock variant without an extra fetch.
     const data = await this.buildStockoutData(productId);
+    // Zil + push; e-posta aşağıdaki MARKALI şablondur. Varsayılan kanallar
+    // (e-posta + zil) push göndermiyor, üstelik ikinci, düz bir e-posta
+    // üretiyordu.
     const result = await this.dispatch.send({
       userId,
       type: NotificationType.BACK_IN_STOCK,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
       data,
     });
     // "Stoğa geri geldi" e-postası — in-app/push'un yanında markalı mail.

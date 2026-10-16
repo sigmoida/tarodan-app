@@ -138,6 +138,28 @@ export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
   `${OUTBOX_TRADE_CANCEL_SETTLE}:${tradeId}`;
 
 /**
+ * Takas tarafına duyuru (zil + push; tamamlanmada e-posta da): kullanıcı iptali
+ * (karşı tarafa), itiraz açıldı (karşı tarafa), itiraz sonuçlandı ve takas
+ * tamamlandı (iki tarafa). Olayın tx'iyle AYNI tx'te yazılır — olay commit olduysa
+ * duyuru kesin gider (CLAUDE.md §10: kaybı kullanıcıya görünen yan etki).
+ * Satır = TEK alıcı × TEK olay; `dedupeKey` aynı olayın ikinci kez duyurulmasını
+ * engeller.
+ */
+export const OUTBOX_TRADE_PARTY_NOTICE = "trade.party_notice";
+
+export type TradePartyNoticeKind =
+  "cancelled" | "dispute_opened" | "dispute_resolved" | "completed";
+
+export interface TradePartyNoticePayload {
+  tradeId: string;
+  userId: string;
+  kind: TradePartyNoticeKind;
+}
+
+export const tradePartyNoticeDedupeKey = (p: TradePartyNoticePayload): string =>
+  `${OUTBOX_TRADE_PARTY_NOTICE}:${p.kind}:${p.tradeId}:${p.userId}`;
+
+/**
  * İPTAL EDİLMİŞ takasa sonradan tamamlanan ödemenin iadesi. İptal yolları
  * iadeyi iptal anında tamamlanmış satırlara yapar; ödemesi o an yolda olan
  * tarafın (PayTR callback'i iptalden sonra gelir) parası aksi halde hiçbir

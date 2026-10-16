@@ -252,6 +252,16 @@ export function SendNotificationForm({
                     )}
                   />
                 </div>
+                {/* Dokununca açılacak sayfa: push payload'ına ve zil satırına
+                    `data.link` olarak gider (anında ve zamanlanmış gönderim). */}
+                <FormInput
+                  name="link"
+                  label={t("admin.marketing.notifications.link.label")}
+                  placeholder={t(
+                    "admin.marketing.notifications.link.placeholder",
+                  )}
+                  helperText={t("admin.marketing.notifications.link.hint")}
+                />
               </SectionCard>
 
               {/* Tür her kanalı belirler (push + bildirim kutusu + e-posta);

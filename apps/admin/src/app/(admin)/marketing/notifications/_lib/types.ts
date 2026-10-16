@@ -10,6 +10,7 @@ import {
   BROADCAST_EMAIL_HTML_MAX,
   BROADCAST_EMAIL_SUBJECT_MAX,
   MAILING_TYPES,
+  isInternalNotificationPath,
   type MailingType,
 } from "@tarodan/types";
 import type { useTranslations } from "next-intl";
@@ -152,6 +153,15 @@ export const sendNotificationSchema = (t: T) =>
       // pazarlama yalnız izinlilere gider. Başta seçilmemiştir ("") — yönetici
       // türü her gönderimde açıkça seçer (Apple 4.5.4 / İYS).
       mailingType: z.union([z.literal(""), z.enum(MAILING_TYPES)]),
+      // Bildirime dokununca açılacak site içi yol (opsiyonel). İzin listesi
+      // API ile ORTAK (`@tarodan/types`); mobil aynı yolu kendi ekranına çevirir.
+      link: z
+        .string()
+        .trim()
+        .refine(
+          (v) => v === "" || isInternalNotificationPath(v),
+          t("admin.marketing.notifications.validation.linkInvalid"),
+        ),
       targetType: z.enum(["all", "segment", "user_ids"]),
       // Seçimler {value: userId, label: görünen ad} olarak taşınır — çipler
       // arama sonuçları değişse de etiketini korur (SearchableMultiSelect).
@@ -226,6 +236,7 @@ export const emptySendForm: SendForm = {
   emailHtml: "",
   // Varsayılan YOK: tür açıkça seçilmeden gönderilemez.
   mailingType: "",
+  link: "",
   targetType: "all",
   users: [],
   isSeller: "",
@@ -270,7 +281,17 @@ export function sendFormToPayload(f: SendForm) {
     mailingType: mailingTypeFromForm(f),
     ...audienceFromForm(f),
     ...emailFieldsFromForm(f),
+    ...linkDataFromForm(f),
   };
+}
+
+/**
+ * Hedef link verildiyse `data.link` (push payload'ı + zil satırı; mobil ve web
+ * aynı yolu çözer). Boşsa `data` hiç gönderilmez — eski davranış.
+ */
+export function linkDataFromForm(f: SendForm) {
+  const link = f.link.trim();
+  return link ? { data: { link } } : {};
 }
 
 export const mailingTypeOptions = (t: T) =>
