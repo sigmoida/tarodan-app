@@ -43,13 +43,13 @@ describe("heroHiddenNotes", () => {
     ]);
   });
 
-  it("app: every live app/all slide hidden on iOS → iOS-only note", () => {
+  it("app: every live app/all slide hidden in the native app → hidden-in-app note", () => {
     expect(
       heroHiddenNotes([live("all", true, true), live("app", true, true)], ON),
-    ).toEqual([{ platform: "app", reason: "iosOnly" }]);
+    ).toEqual([{ platform: "app", reason: "hiddenInApp" }]);
   });
 
-  it("app: one iOS-visible slide is enough; web ignores hideOnIos", () => {
+  it("app: one app-visible slide is enough; web ignores hideOnIos", () => {
     expect(heroHiddenNotes([live("all", true, true), live("app")], ON)).toEqual(
       [],
     );

@@ -49,7 +49,7 @@ Yayında = `isActive` + tarih penceresinin içinde (sınırlar dahil; reklamla o
   yerleşimleri yalnız platformla süzülür. Admin: Pazarlama → Hero, ana sayfa sekmesinin
   başlığındaki "Web'de göster" / "Uygulamada göster"; anahtar kapalı ya da o platformda yayında
   slayt yoksa sekmede "hero gizli" notu çıkar (uygulamada yayındaki slaytların hepsi `hideOnIos`
-  ise ayrıca "iOS'ta gizli" notu). Bu anahtarlar ve seed işareti genel
+  ise ayrıca "uygulamada gizli" notu — bayrak iOS ve Android'de gizler). Bu anahtarlar ve seed işareti genel
   `PATCH /admin/settings/:key` ucundan yazılamaz (`server.hero.useDedicatedEndpoint`).
 - Lansman doğrulaması (`verify:prod:launch`) ana sayfa hero'sunu iki istemci için ayrı okur;
   boşsa **uyarır** (`REVIEW:`), düşürmez — boş hero meşru bir karardır.

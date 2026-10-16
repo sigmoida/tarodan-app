@@ -5552,7 +5552,7 @@
         "hiddenOn": {
           "switchOff": "Hero is hidden on the {platform} home page: the switch is off.",
           "noLiveSlide": "Hero is hidden on the {platform} home page: no live slide on this platform.",
-          "iosOnly": "Hero is hidden on the iOS app home page: every live app slide is marked \"hide in the iOS app\" (still shown on Android)."
+          "hiddenInApp": "Hero is hidden on the app home page: every live app slide is marked \"Hide in the mobile app\" (iOS and Android)."
         },
         "columns": {
           "image": "Image",

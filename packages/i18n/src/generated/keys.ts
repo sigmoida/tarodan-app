@@ -2383,7 +2383,7 @@ export type MessageKey =
   | "admin.marketing.hero.fields.imageAlt"
   | "admin.marketing.hero.fields.subtitle"
   | "admin.marketing.hero.fields.title"
-  | "admin.marketing.hero.hiddenOn.iosOnly"
+  | "admin.marketing.hero.hiddenOn.hiddenInApp"
   | "admin.marketing.hero.hiddenOn.noLiveSlide"
   | "admin.marketing.hero.hiddenOn.switchOff"
   | "admin.marketing.hero.hiddenOnIos"

@@ -5552,7 +5552,7 @@
         "hiddenOn": {
           "switchOff": "{platform} ana sayfasında hero gizli: anahtar kapalı.",
           "noLiveSlide": "{platform} ana sayfasında hero gizli: bu platformda yayında slayt yok.",
-          "iosOnly": "Uygulama ana sayfasında hero iOS'ta gizli: yayındaki uygulama slaytlarının hepsi \"iOS uygulamasında gösterme\" işaretli (Android'de görünür)."
+          "hiddenInApp": "Uygulama ana sayfasında hero gizli: yayındaki uygulama slaytlarının hepsi \"Mobil uygulamada gösterme\" işaretli (iOS ve Android)."
         },
         "columns": {
           "image": "Görsel",
