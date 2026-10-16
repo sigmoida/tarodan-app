@@ -103,7 +103,7 @@ describe("ProductUpdateService — düzenlemede fiyat sınırı", () => {
   ) => service.update(productId, sellerId, dto as any);
 
   const expectBelowMinimum = async (promise: Promise<unknown>) => {
-    const error = await promise.catch((e) => e);
+    const error: any = await promise.catch((e) => e);
     expect(error).toBeInstanceOf(BadRequestException);
     expect(error.response).toMatchObject({
       i18nKey: "server.product.priceBelowMinimum",
@@ -212,7 +212,7 @@ describe("ProductUpdateService — düzenlemede fiyat sınırı", () => {
         limits: { max_product_price: "5000" },
       });
 
-      const error = await update(service, { price: 6000 }).catch((e) => e);
+      const error: any = await update(service, { price: 6000 }).catch((e) => e);
 
       expect(error).toBeInstanceOf(BadRequestException);
       expect(error.response).toMatchObject({
