@@ -98,22 +98,27 @@ export class AdminHeroService {
     return slides;
   }
 
-  /** Ana sayfa hero'sunun istemci başına anahtarı — iki anahtar tek satırda. */
+  /**
+   * Ana sayfa hero'sunun istemci başına anahtarı. Denetim kaydı yalnız
+   * gerçekten değişen satır için, satırın kendi kimliğiyle yazılır; değer
+   * zaten aynıysa (ya da gövde boşsa) kayıt düşülmez.
+   */
   async updateHomeVisibility(
     adminId: string,
     dto: UpdateHeroHomeVisibilityDto,
   ): Promise<HeroHomeVisibilityDto> {
-    const before = await this.visibility.getHome();
-    const after = await this.visibility.updateHome(dto);
-    await this.audit.createAuditLog(
-      adminId,
-      "hero_visibility_update",
-      "PlatformSetting",
-      "hero_home_enabled",
-      before,
-      after,
-    );
-    return after;
+    const { visibility, changes } = await this.visibility.updateHome(dto);
+    for (const change of changes) {
+      await this.audit.createAuditLog(
+        adminId,
+        "hero_visibility_update",
+        "PlatformSetting",
+        change.settingId,
+        { settingKey: change.settingKey, enabled: change.before },
+        { settingKey: change.settingKey, enabled: change.after },
+      );
+    }
+    return visibility;
   }
 
   // ==================== TRUST BADGES ====================

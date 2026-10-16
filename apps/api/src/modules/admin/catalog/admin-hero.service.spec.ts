@@ -40,7 +40,9 @@ function makeService() {
   };
   const visibility = {
     getHome: jest.fn().mockResolvedValue({ web: true, app: true }),
-    updateHome: jest.fn().mockResolvedValue({ web: true, app: false }),
+    updateHome: jest
+      .fn()
+      .mockResolvedValue({ visibility: { web: true, app: true }, changes: [] }),
   };
   const audit = { createAuditLog: jest.fn().mockResolvedValue(undefined) };
   const service = new AdminHeroService(
@@ -119,20 +121,61 @@ describe("AdminHeroService — hero slaytları", () => {
 });
 
 describe("AdminHeroService — ana sayfa hero anahtarları", () => {
-  it("domain'e yazar, önce/sonra çiftini tek satırda denetler", async () => {
+  it("değişen her satırı kendi kimliğiyle, önce/sonra değeriyle denetler", async () => {
     const { service, visibility, audit } = makeService();
+    visibility.updateHome.mockResolvedValueOnce({
+      visibility: { web: false, app: false },
+      changes: [
+        {
+          platform: "web",
+          settingId: "setting-web",
+          settingKey: "hero_home_enabled_web",
+          before: true,
+          after: false,
+        },
+        {
+          platform: "app",
+          settingId: "setting-app",
+          settingKey: "hero_home_enabled_app",
+          before: true,
+          after: false,
+        },
+      ],
+    });
     await expect(
-      service.updateHomeVisibility("admin-1", { app: false }),
-    ).resolves.toEqual({ web: true, app: false });
-    expect(visibility.updateHome).toHaveBeenCalledWith({ app: false });
-    expect(audit.createAuditLog).toHaveBeenCalledWith(
-      "admin-1",
-      "hero_visibility_update",
-      "PlatformSetting",
-      "hero_home_enabled",
-      { web: true, app: true },
-      { web: true, app: false },
-    );
+      service.updateHomeVisibility("admin-1", { web: false, app: false }),
+    ).resolves.toEqual({ web: false, app: false });
+    expect(visibility.updateHome).toHaveBeenCalledWith({
+      web: false,
+      app: false,
+    });
+    expect(audit.createAuditLog.mock.calls).toEqual([
+      [
+        "admin-1",
+        "hero_visibility_update",
+        "PlatformSetting",
+        "setting-web",
+        { settingKey: "hero_home_enabled_web", enabled: true },
+        { settingKey: "hero_home_enabled_web", enabled: false },
+      ],
+      [
+        "admin-1",
+        "hero_visibility_update",
+        "PlatformSetting",
+        "setting-app",
+        { settingKey: "hero_home_enabled_app", enabled: true },
+        { settingKey: "hero_home_enabled_app", enabled: false },
+      ],
+    ]);
+  });
+
+  it("değer değişmediyse (ya da gövde boşsa) denetim yazılmaz", async () => {
+    const { service, audit } = makeService();
+    await expect(
+      service.updateHomeVisibility("admin-1", { web: true }),
+    ).resolves.toEqual({ web: true, app: true });
+    await service.updateHomeVisibility("admin-1", {});
+    expect(audit.createAuditLog).not.toHaveBeenCalled();
   });
 
   it("domain yazamazsa denetim yazılmaz", async () => {
