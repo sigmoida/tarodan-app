@@ -11,7 +11,9 @@ import {
 import { ProductBadge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
+import ProductCardBadges from "@/components/ui/ProductCardBadges";
 import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
+import { isProductTradeEnabled } from "@/lib/productCardBadges";
 import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
@@ -36,9 +38,14 @@ import { IMAGE_SIZES } from "@/lib/imageSizes";
  * reduced-shape items. `overlay` / `footer` are click-isolated slots for actions
  * (remove, add-to-cart, SOLD badges) rendered OUTSIDE the card's `<Link>`.
  *
- * Listing cards carry the favorite heart at the image's bottom-right
+ * Listing cards carry the favorite heart at the image's top-right
  * (`ProductCardFavorite`, also outside the `<Link>`); it is skipped for
- * non-navigating cards and where the caller opts out with `showFavorite={false}`.
+ * non-navigating cards, where the caller opts out with `showFavorite={false}`,
+ * and on grid cards that fill the top-right slot with their own `overlay`.
+ * The grid image's top-left holds the badge stack (max 2: %discount → sponsored
+ * → trade → campaign, see `selectProductCardBadges`); it is not drawn when the
+ * caller fills the top-left slot with `overlayStart`. The list layout shows only
+ * the trade icon (top-left of the image) — the discount stays beside the price.
  */
 
 /**
@@ -150,12 +157,7 @@ export default function ProductCard({
   const onSale = isProductOnSaleDisplay(product);
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
-  // `tradeAvailable` API'nin türettiği efektif değerdir (satıcının üyeliği
-  // takas hakkını kaybettiyse false). Yoksa eski alanlara düşülür.
-  const isTrade = Boolean(
-    product.tradeAvailable ??
-    (product.trade_available || product.isTradeEnabled),
-  );
+  const isTrade = isProductTradeEnabled(product);
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
     : undefined;
@@ -207,7 +209,7 @@ export default function ProductCard({
             {isTrade && (
               <ProductBadge
                 variant="trade"
-                className="absolute top-1 right-1 p-1"
+                className="absolute top-1 left-1 p-1"
                 icon={<ArrowsRightLeftIcon className="w-3 h-3" />}
               />
             )}
@@ -300,43 +302,13 @@ export default function ProductCard({
             priority={priority}
           />
           {outOfStock && <OutOfStockOverlay />}
-          <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1">
-            {product.isBoosted && (
-              <ProductBadge
-                variant="sponsored"
-                className="text-sm px-1.5 py-0.5"
-              >
-                {t("product.sponsored")}
-              </ProductBadge>
-            )}
-            {isTrade && (
-              <ProductBadge
-                variant="trade"
-                className="text-sm px-1.5 py-0.5"
-                icon={<ArrowsRightLeftIcon className="w-2.5 h-2.5" />}
-              >
-                <span className="hidden sm:inline">{t("faq.trade")}</span>
-              </ProductBadge>
-            )}
-            {/* Bedel kampanyaları fiyatı DEĞİŞTİRMEZ (komisyonu/kargoyu indirir),
-                bu yüzden vitrinde ancak rozetle görünürler. Yalnız herkese açık
-                kampanyalar duyurulur — üyeliğe özel avantaj burada vaat edilmez. */}
-            {(product.feeCampaigns ?? []).slice(0, 1).map((campaign) => (
-              <ProductBadge
-                key={campaign}
-                variant="rare"
-                className="text-sm px-1.5 py-0.5"
-              >
-                {campaign}
-              </ProductBadge>
-            ))}
-          </div>
-          {onSale && (
-            <div className="absolute top-1.5 right-1.5">
-              <ProductBadge variant="sale" className="text-sm px-1.5 py-0.5">
-                %{product.discountPercent ?? 0}
-              </ProductBadge>
-            </div>
+          {/* Sol üst yuva `overlayStart`'ındır; doluysa rozet yığını çizilmez. */}
+          {!overlayStart && (
+            <ProductCardBadges
+              product={product}
+              sponsoredLabel={t("product.sponsored")}
+              tradeLabel={t("faq.trade")}
+            />
           )}
         </div>
         <div className="p-2.5 flex-1 flex flex-col">
@@ -372,7 +344,8 @@ export default function ProductCard({
           </div>
         </div>
       </CardLink>
-      {favorite && (
+      {/* Sağ üst yuva `overlay`'indir; doluysa kalp çizilmez. */}
+      {favorite && !overlay && (
         <ProductCardFavorite productId={product.id} sellerId={sellerId} />
       )}
       {footer && <div className="px-2.5 pb-2.5">{footer}</div>}

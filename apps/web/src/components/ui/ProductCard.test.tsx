@@ -170,3 +170,83 @@ describe.each(["grid", "list"] as const)("ProductCard (%s)", (layout) => {
     expect(heart()).toBeNull();
   });
 });
+
+describe("ProductCard rozet düzeni", () => {
+  const rich: Product = {
+    ...product,
+    oldPrice: 400,
+    price: 250,
+    discountPercent: 38,
+    isBoosted: true,
+    tradeAvailable: true,
+    feeCampaigns: ["Komisyonsuz"],
+  };
+  const badges = () =>
+    container.querySelector<HTMLElement>('[data-testid="product-card-badges"]');
+
+  it("grid: kalp sağ üstte, rozetler sol üstte (en fazla 2, indirim ilk)", () => {
+    act(() => root.render(<ProductCard product={rich} />));
+    expect(heart()!.className).toContain("top-1.5");
+    expect(heart()!.className).toContain("right-1.5");
+    expect(heart()!.className).not.toContain("bottom-");
+
+    const stack = badges()!;
+    expect(stack.className).toContain("left-1.5");
+    expect(stack.className).toContain("top-1.5");
+    expect(stack.children).toHaveLength(2);
+    expect(stack.children[0].textContent).toBe("%38");
+    expect(stack.children[1].textContent).toBe("product.sponsored");
+    // Sağ üstte ayrı indirim rozeti kalmadı.
+    expect(container.textContent?.match(/%38/g)).toHaveLength(1);
+  });
+
+  it("grid: takas metni her genişlikte görünür (hidden sm:inline yok)", () => {
+    act(() =>
+      root.render(
+        <ProductCard product={{ ...product, tradeAvailable: true }} />,
+      ),
+    );
+    const label = badges()!.querySelector("span.truncate")!;
+    expect(label.textContent).toBe("faq.trade");
+    expect(label.className).not.toContain("hidden");
+  });
+
+  it("grid: overlayStart doluysa rozet yığını çizilmez", () => {
+    act(() =>
+      root.render(
+        <ProductCard
+          product={rich}
+          overlayStart={<span data-start>SOLD</span>}
+        />,
+      ),
+    );
+    expect(badges()).toBeNull();
+    expect(container.querySelector("[data-start]")).not.toBeNull();
+  });
+
+  it("grid: overlay (sağ üst) doluysa kalp çizilmez", () => {
+    act(() =>
+      root.render(
+        <ProductCard product={rich} overlay={<span data-end>X</span>} />,
+      ),
+    );
+    expect(heart()).toBeNull();
+    expect(container.querySelector("[data-end]")).not.toBeNull();
+  });
+
+  it("liste: takas ikonu görselin sol üstünde, kalp sağ üstte, yalnız ikon", () => {
+    act(() => root.render(<ProductCard product={rich} layout="list" />));
+    const trade = container.querySelector<HTMLElement>(
+      ".absolute.top-1.left-1",
+    )!;
+    expect(trade).not.toBeNull();
+    expect(trade.className).not.toContain("right-1");
+    expect(trade.textContent).toBe("");
+    expect(heart()!.className).toContain("top-1.5");
+    expect(heart()!.className).toContain("right-1.5");
+    // Rozet yığını yok; indirim fiyatın yanında kalır.
+    expect(badges()).toBeNull();
+    expect(container.textContent).toContain("%38");
+    expect(container.textContent).not.toContain("product.sponsored");
+  });
+});

@@ -119,6 +119,14 @@ describe("ProductCardFavorite", () => {
     expect(h.api.add).not.toHaveBeenCalled();
   });
 
+  it("kalp görselin sağ üst köşesine oturur", async () => {
+    await render();
+    const cls = heart()!.className;
+    expect(cls).toContain("top-1.5");
+    expect(cls).toContain("right-1.5");
+    expect(cls).not.toContain("bottom-1.5");
+  });
+
   it("kendi ilanında kalp hiç çizilmez", async () => {
     await render("me");
     expect(heart()).toBeNull();
