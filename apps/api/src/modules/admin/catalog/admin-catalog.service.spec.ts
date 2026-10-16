@@ -1,3 +1,7 @@
+import {
+  inStockWhere,
+  publicListingWhere,
+} from "../../product/helpers/catalog-product-where";
 import { AdminCatalogService } from "./admin-catalog.service";
 
 type CatalogMocks = {
@@ -25,6 +29,7 @@ function buildCatalogService(): CatalogMocks {
     attributeGroup: model(),
     attribute: model(),
     commissionRuleSet: model(),
+    product: { groupBy: jest.fn().mockResolvedValue([]) },
   };
   const cache = {
     del: jest.fn().mockResolvedValue(undefined),
@@ -282,6 +287,133 @@ describe("AdminCatalogService list sorting", () => {
     await service.deleteCategory("admin-1", "category-1");
 
     expect(cache.del).toHaveBeenCalledWith("categories:all");
+  });
+});
+
+describe("AdminCatalogService brand/manufacturer listing counts", () => {
+  let prisma: any;
+  let service: AdminCatalogService;
+
+  beforeEach(() => {
+    ({ prisma, service } = buildCatalogService());
+  });
+
+  const brandRow = (id: string, name: string) => ({
+    id,
+    name,
+    slug: name.toLowerCase(),
+    logo: null,
+    isActive: true,
+  });
+
+  it("counts with the public rule (active + in-stock + sale-capable seller)", async () => {
+    await service.getBrands({});
+    const args = prisma.product.groupBy.mock.calls[0][0];
+    expect(args.by).toEqual(["brandId"]);
+    expect(args.where).toEqual(
+      expect.objectContaining({
+        ...publicListingWhere(),
+        seller: expect.anything(),
+        brandId: { not: null },
+      }),
+    );
+    expect(args.where.AND).toEqual([inStockWhere()]);
+    expect(args.where.status).toBe("active");
+
+    await service.getManufacturers({});
+    expect(prisma.product.groupBy.mock.calls[1][0].by).toEqual([
+      "manufacturerId",
+    ]);
+  });
+
+  it("adds listingCount to every brand row (0 when none)", async () => {
+    prisma.brand.findMany.mockResolvedValue([
+      brandRow("b1", "Bruder"),
+      brandRow("b2", "Siku"),
+    ]);
+    prisma.product.groupBy.mockResolvedValue([
+      { brandId: "b1", _count: { _all: 7 } },
+    ]);
+    const result = await service.getBrands({});
+    expect(result.data.map((b) => b.listingCount)).toEqual([7, 0]);
+  });
+
+  it("filters brands with hasListings=true / false by the counted ids", async () => {
+    prisma.product.groupBy.mockResolvedValue([
+      { brandId: "b1", _count: { _all: 2 } },
+      { brandId: "b3", _count: { _all: 1 } },
+    ]);
+    await service.getBrands({ hasListings: true });
+    expect(prisma.brand.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { id: { in: ["b1", "b3"] } } }),
+    );
+    await service.getBrands({ status: "active", hasListings: false });
+    expect(prisma.brand.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { isActive: true, id: { notIn: ["b1", "b3"] } },
+      }),
+    );
+  });
+
+  it("sorts brands by listingCount using the public count, not Prisma _count", async () => {
+    prisma.brand.findMany.mockResolvedValue([
+      brandRow("b1", "A"),
+      brandRow("b2", "B"),
+      brandRow("b3", "C"),
+    ]);
+    prisma.brand.count.mockResolvedValue(3);
+    prisma.product.groupBy.mockResolvedValue([
+      { brandId: "b1", _count: { _all: 2 } },
+      { brandId: "b3", _count: { _all: 9 } },
+    ]);
+
+    const desc = await service.getBrands({
+      sortBy: "listingCount",
+      sortOrder: "desc",
+      limit: 2,
+    });
+    expect(desc.data.map((b) => b.id)).toEqual(["b3", "b1"]);
+    expect(desc.meta).toEqual({ total: 3, page: 1, limit: 2, totalPages: 2 });
+
+    const asc = await service.getBrands({
+      sortBy: "listingCount",
+      sortOrder: "asc",
+    });
+    expect(asc.data.map((b) => b.id)).toEqual(["b2", "b1", "b3"]);
+  });
+
+  it("filters manufacturers by status and listing presence and adds listingCount", async () => {
+    prisma.manufacturer.findMany.mockResolvedValue([
+      { id: "m1", name: "Maker", slug: "maker", logo: null },
+    ]);
+    prisma.product.groupBy.mockResolvedValue([
+      { manufacturerId: "m1", _count: { _all: 4 } },
+    ]);
+    const result = await service.getManufacturers({
+      status: "inactive",
+      hasListings: true,
+    });
+    expect(prisma.manufacturer.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { isActive: false, id: { in: ["m1"] } },
+      }),
+    );
+    expect(result.data[0].listingCount).toBe(4);
+  });
+
+  it("sorts manufacturers by listingCount", async () => {
+    prisma.manufacturer.findMany.mockResolvedValue([
+      { id: "m1", name: "A", slug: "a", logo: null },
+      { id: "m2", name: "B", slug: "b", logo: null },
+    ]);
+    prisma.product.groupBy.mockResolvedValue([
+      { manufacturerId: "m2", _count: { _all: 5 } },
+    ]);
+    const result = await service.getManufacturers({
+      sortBy: "listingCount",
+      sortOrder: "desc",
+    });
+    expect(result.data.map((m) => m.id)).toEqual(["m2", "m1"]);
   });
 });
 

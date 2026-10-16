@@ -1,7 +1,8 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString } from "class-validator";
 
 import { AdminListQueryDto } from "../../../common/list";
+import { QueryBoolean } from "../../../common/transforms";
 
 export class AdminCategoryQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional()
@@ -10,14 +11,26 @@ export class AdminCategoryQueryDto extends AdminListQueryDto {
   search?: string;
 }
 
-export class AdminBrandQueryDto extends AdminCategoryQueryDto {
+/** Marka ve üretici listelerinin ortak filtreleri (durum + ilan var/yok). */
+export class AdminBrandManufacturerQueryDto extends AdminCategoryQueryDto {
   @ApiPropertyOptional({ enum: ["active", "inactive"] })
   @IsOptional()
   @IsIn(["active", "inactive"])
   status?: "active" | "inactive";
+
+  @ApiPropertyOptional({
+    description:
+      "true: yalnız müşterinin görebildiği (public sayımla aynı kural) ilanı olanlar; false: ilanı olmayanlar",
+  })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  hasListings?: boolean;
 }
 
-export class AdminManufacturerQueryDto extends AdminCategoryQueryDto {}
+export class AdminBrandQueryDto extends AdminBrandManufacturerQueryDto {}
+
+export class AdminManufacturerQueryDto extends AdminBrandManufacturerQueryDto {}
 
 export class AdminCarModelQueryDto extends AdminCategoryQueryDto {
   @ApiPropertyOptional()
