@@ -5910,6 +5910,7 @@
         "scheduleTitle": "Bildirimi Zamanla",
         "scheduleDateTime": "Gönderim Tarihi ve Saati",
         "livePreview": "Canlı Önizleme",
+        "summary": "Özet",
         "notificationSuffix": "bildirimi",
         "enterTitle": "Başlık girin…",
         "enterContent": "İçerik girin…",

@@ -5910,6 +5910,7 @@
         "scheduleTitle": "Schedule Notification",
         "scheduleDateTime": "Delivery Date and Time",
         "livePreview": "Live Preview",
+        "summary": "Summary",
         "notificationSuffix": "notification",
         "enterTitle": "Enter a title…",
         "enterContent": "Enter content…",
