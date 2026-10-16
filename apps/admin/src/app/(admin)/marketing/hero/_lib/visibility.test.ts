@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { heroHiddenNotes } from "./visibility";
 
 const ON = { web: true, app: true };
-const live = (platform: "web" | "app" | "all", isLive = true) => ({
-  platform,
-  isLive,
-});
+const live = (
+  platform: "web" | "app" | "all",
+  isLive = true,
+  hideOnIos = false,
+) => ({ platform, isLive, hideOnIos });
 
 describe("heroHiddenNotes", () => {
   it("both switches on and an `all` slide live → hero shows everywhere", () => {
@@ -39,6 +40,21 @@ describe("heroHiddenNotes", () => {
     expect(heroHiddenNotes([], { web: true, app: false })).toEqual([
       { platform: "web", reason: "noLiveSlide" },
       { platform: "app", reason: "switchOff" },
+    ]);
+  });
+
+  it("app: every live app/all slide hidden on iOS → iOS-only note", () => {
+    expect(
+      heroHiddenNotes([live("all", true, true), live("app", true, true)], ON),
+    ).toEqual([{ platform: "app", reason: "iosOnly" }]);
+  });
+
+  it("app: one iOS-visible slide is enough; web ignores hideOnIos", () => {
+    expect(heroHiddenNotes([live("all", true, true), live("app")], ON)).toEqual(
+      [],
+    );
+    expect(heroHiddenNotes([live("web", true, true)], ON)).toEqual([
+      { platform: "app", reason: "noLiveSlide" },
     ]);
   });
 });

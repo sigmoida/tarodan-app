@@ -7,7 +7,7 @@ import {
 import type { HeroSlide } from "./types";
 
 /** Ana sayfa hero'sunun bir platformda neden gizli olduğu. */
-export type HeroHiddenReason = "switchOff" | "noLiveSlide";
+export type HeroHiddenReason = "switchOff" | "noLiveSlide" | "iosOnly";
 
 export interface HeroHiddenNote {
   platform: ClientPlatform;
@@ -18,10 +18,12 @@ export interface HeroHiddenNote {
  * Ana sayfa hero'sunun gizli olduğu platformlar — API'nin public okumasıyla
  * aynı kural: anahtar kapalıysa gizli; açıksa o platformda (kendi hedefi ya da
  * `all`) yayında slayt yoksa gizli. Anahtar önce gelir: kapalı platformda
- * slayt durumu önemsizdir.
+ * slayt durumu önemsizdir. Uygulamada yayındaki slaytların HEPSİ `hideOnIos`
+ * ise hero yalnız iOS'ta gizlidir (`iosOnly`; Android'de görünür) — süzme
+ * istemcidedir, API listesi boş dönmez.
  */
 export function heroHiddenNotes(
-  slides: readonly Pick<HeroSlide, "isLive" | "platform">[],
+  slides: readonly Pick<HeroSlide, "isLive" | "platform" | "hideOnIos">[],
   visibility: HeroHomeVisibilityDto,
 ): HeroHiddenNote[] {
   const notes: HeroHiddenNote[] = [];
@@ -31,8 +33,11 @@ export function heroHiddenNotes(
       continue;
     }
     const targets = contentPlatformsFor(platform);
-    if (!slides.some((s) => s.isLive && targets.includes(s.platform))) {
+    const live = slides.filter((s) => s.isLive && targets.includes(s.platform));
+    if (live.length === 0) {
       notes.push({ platform, reason: "noLiveSlide" });
+    } else if (platform === "app" && live.every((s) => s.hideOnIos)) {
+      notes.push({ platform, reason: "iosOnly" });
     }
   }
   return notes;

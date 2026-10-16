@@ -117,7 +117,11 @@ describe("production reference-data bootstrap", () => {
     const hero = source.slice(
       source.indexOf("async function reportHomeHeroForReview"),
     );
-    expect(hero.slice(0, hero.indexOf("\n}\n"))).not.toContain("throw ");
+    const body = hero.slice(0, hero.indexOf("\n}\n"));
+    expect(body).not.toContain("throw ");
+    // Uygulama hideOnIos slaytlarını iOS'ta süzer: hepsi öyleyse ayrı uyarı.
+    expect(body).toContain("hideOnIos !== true");
+    expect(body).toContain('platform === "app" && iosVisible === 0');
   });
 
   it("keeps launch shipping prices out of the seed, where migrations already win", () => {

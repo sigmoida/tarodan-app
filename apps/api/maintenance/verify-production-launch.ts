@@ -105,7 +105,8 @@ async function reportPackageTiersForReview(baseUrl: string): Promise<void> {
  * Ana sayfa hero'su istemci başına (`?platform=web|app`) sayılır. Boş hero
  * meşru bir karardır (admin anahtarı kapatmış ya da yerleşimi bilerek
  * boşaltmış; istemci slider'ı gizler) — bu yüzden ASSERT DEĞİL, operatöre
- * gözden geçirme uyarısı.
+ * gözden geçirme uyarısı. Uygulama `hideOnIos` slaytları iOS'ta kendisi
+ * süzer: uygulama listesinin hepsi `hideOnIos` ise hero iOS'ta boştur.
  */
 async function reportHomeHeroForReview(baseUrl: string): Promise<void> {
   for (const platform of ["web", "app"] as const) {
@@ -117,6 +118,14 @@ async function reportHomeHeroForReview(baseUrl: string): Promise<void> {
       );
     } else {
       console.log(`home hero slides (${platform}): ${slides.length} live`);
+      const iosVisible = slides.filter(
+        (slide) => (slide as JsonRecord).hideOnIos !== true,
+      ).length;
+      if (platform === "app" && iosVisible === 0) {
+        console.warn(
+          `REVIEW: every live app home slide has hideOnIos — the hero is hidden on iOS (still shown on Android). Fine if intended; otherwise add an iOS-visible slide in admin > Marketing > Hero.`,
+        );
+      }
     }
   }
 }
