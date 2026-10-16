@@ -18,6 +18,7 @@ import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
+  getProductDiscountPercent,
   getProductOriginalPriceForDisplay,
   isProductOutOfStock,
 } from "@/lib/productPrice";
@@ -158,6 +159,7 @@ export default function ProductCard({
   const effectivePrice = getProductEffectivePrice(product);
   const originalPrice = getProductOriginalPriceForDisplay(product);
   const isTrade = isProductTradeEnabled(product);
+  const salePercent = getProductDiscountPercent(product);
   const firstImage = Array.isArray(product.images)
     ? product.images[0]
     : undefined;
@@ -211,6 +213,7 @@ export default function ProductCard({
                 variant="trade"
                 className="absolute top-1 left-1 p-1"
                 icon={<ArrowsRightLeftIcon className="w-3 h-3" />}
+                aria-hidden="true"
               />
             )}
             {favorite && (
@@ -230,6 +233,18 @@ export default function ProductCard({
                   className="after:absolute after:inset-0"
                 >
                   {product.title}
+                  {/* Rozetler linkin dışında: erişilebilir ad onları da taşısın. */}
+                  {(salePercent >= 1 || isTrade) && (
+                    <span className="sr-only">
+                      {" "}
+                      {[
+                        salePercent >= 1 && `%${salePercent}`,
+                        isTrade && t("faq.trade"),
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  )}
                 </Link>
               ) : (
                 product.title
@@ -268,9 +283,9 @@ export default function ProductCard({
             <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
               {fmtTL(effectivePrice)}
             </p>
-            {onSale && (
+            {salePercent >= 1 && (
               <ProductBadge variant="sale" className="xs:mt-1">
-                %{product.discountPercent ?? 0}
+                %{salePercent}
               </ProductBadge>
             )}
           </div>

@@ -32,11 +32,50 @@ describe("selectProductCardBadges", () => {
     });
   });
 
-  it("indirim yüzdesi yoksa %0 yazar (eski davranış)", () => {
+  it("discountPercent 0/yoksa yüzde fiyatlardan hesaplanır (yuvarlanmış)", () => {
+    // 150 → 100: %33,33 → 33
+    expect(
+      selectProductCardBadges({
+        ...base,
+        oldPrice: 150,
+        discountPercent: 0,
+      })[0],
+    ).toEqual({ kind: "sale", percent: 33 });
     expect(selectProductCardBadges({ ...base, oldPrice: 150 })[0]).toEqual({
       kind: "sale",
-      percent: 0,
+      percent: 33,
     });
+  });
+
+  it("discountPercent > 0 ise hesaplanan değere baskındır", () => {
+    expect(
+      selectProductCardBadges({
+        ...base,
+        oldPrice: 150,
+        discountPercent: 40,
+      })[0],
+    ).toEqual({ kind: "sale", percent: 40 });
+  });
+
+  it("yüzde 1'in altındaysa indirim rozeti hiç yoktur (asla %0)", () => {
+    // 1000 → 996: %0,4
+    expect(
+      selectProductCardBadges({ ...base, price: 996, oldPrice: 1000 }),
+    ).toEqual([]);
+    // isOnSale bayrağı var ama eski fiyat yok → hesaplanacak yüzde yok.
+    expect(
+      selectProductCardBadges({ ...base, isOnSale: true, discountPercent: 0 }),
+    ).toEqual([]);
+  });
+
+  it("indirimde olmayan ürün discountPercent taşısa da rozet almaz", () => {
+    expect(selectProductCardBadges({ ...base, discountPercent: 20 })).toEqual(
+      [],
+    );
+  });
+
+  it("sponsorlu yalnız isBoosted === true iken", () => {
+    expect(kinds({ ...base, isBoosted: 1 as unknown as boolean })).toEqual([]);
   });
 
   it("sıra: indirim → sponsorlu → takas → kampanya; ilk 2 ile sınırlı", () => {
@@ -68,7 +107,8 @@ describe("selectProductCardBadges", () => {
 });
 
 describe("isProductTradeEnabled", () => {
-  it("tradeAvailable eski alanlara baskındır", () => {
+  it("tradeAvailable eski alanlara baskındır; yoksa legacy alanlara düşer", () => {
+    expect(isProductTradeEnabled({ isTradeEnabled: true })).toBe(true);
     expect(
       isProductTradeEnabled({ tradeAvailable: false, isTradeEnabled: true }),
     ).toBe(false);

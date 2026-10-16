@@ -234,6 +234,53 @@ describe("ProductCard rozet düzeni", () => {
     expect(container.querySelector("[data-end]")).not.toBeNull();
   });
 
+  it("grid: rozet metinleri kartın linkinin içindedir (erişilebilir ad)", () => {
+    act(() => root.render(<ProductCard product={rich} />));
+    const link = container.querySelector("a")!;
+    expect(link.contains(badges())).toBe(true);
+    expect(link.textContent).toContain("%38");
+    expect(link.textContent).toContain("product.sponsored");
+  });
+
+  it("grid: yüzde 1'in altındaysa indirim rozeti çizilmez", () => {
+    act(() =>
+      root.render(
+        <ProductCard product={{ ...product, price: 996, oldPrice: 1000 }} />,
+      ),
+    );
+    expect(badges()).toBeNull();
+    expect(container.textContent).not.toContain("%0");
+  });
+
+  it("liste: overlay kalbi gizlemez", () => {
+    act(() =>
+      root.render(
+        <ProductCard
+          product={rich}
+          layout="list"
+          overlay={<span data-end>X</span>}
+        />,
+      ),
+    );
+    expect(heart()).not.toBeNull();
+  });
+
+  it("liste: yüzde hesaplanır ve rozet metinleri linkin adına eklenir", () => {
+    act(() =>
+      root.render(
+        <ProductCard
+          product={{ ...rich, discountPercent: 0, oldPrice: 500 }}
+          layout="list"
+        />,
+      ),
+    );
+    // 500 → 250 = %50
+    expect(container.textContent).toContain("%50");
+    expect(container.querySelector("a")!.textContent).toContain(
+      "%50, faq.trade",
+    );
+  });
+
   it("liste: takas ikonu görselin sol üstünde, kalp sağ üstte, yalnız ikon", () => {
     act(() => root.render(<ProductCard product={rich} layout="list" />));
     const trade = container.querySelector<HTMLElement>(

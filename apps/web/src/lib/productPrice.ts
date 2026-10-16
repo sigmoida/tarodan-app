@@ -43,6 +43,24 @@ export function getProductOriginalPriceForDisplay(
 }
 
 /**
+ * Kartlarda gösterilecek indirim yüzdesi (yuvarlanmış tam sayı). İndirimde
+ * değilse 0. API'nin `discountPercent`'i > 0 ise o esastır; yoksa/0 ise eski
+ * ve güncel fiyattan hesaplanır. Sonuç 1'in altındaysa rozet çizilmez
+ * (çağıran `percent >= 1` kontrol eder) — asla "%0" gösterilmez.
+ */
+export function getProductDiscountPercent(
+  p: ProductPriceFields & { discountPercent?: number | null },
+): number {
+  if (!isProductOnSaleDisplay(p)) return 0;
+  const declared = Number(p.discountPercent);
+  if (declared > 0) return Math.round(declared);
+  const old = getProductOriginalPriceForDisplay(p);
+  if (!(old > 0)) return 0;
+  const computed = ((old - getProductEffectivePrice(p)) / old) * 100;
+  return computed > 0 ? Math.round(computed) : 0;
+}
+
+/**
  * Gerçek indirim var mı: eski fiyat, güncel fiyattan kesin olarak yüksek.
  * API bazen %0 / hatalı fiyat döndürebildiği için ana sayfa "İndirimdekiler"
  * rail'i ve server prefetch'i bu tek kaynağı kullanır.
