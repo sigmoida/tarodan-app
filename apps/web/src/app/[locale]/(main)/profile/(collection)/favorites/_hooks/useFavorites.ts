@@ -4,10 +4,12 @@
 
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { wishlistApi, listingsApi } from "@/lib/api";
+import { listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { wishlistItemsQuery, type WishlistEntry } from "@/lib/wishlist";
+import { useToggleWishlist } from "@/hooks/useWishlist";
 import { useAuthStore } from "@/stores/authStore";
 import { useCart } from "@/hooks/useCart";
 import { useLocale, useTranslations } from "next-intl";
@@ -15,13 +17,23 @@ import type { WishlistItem } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
 
 /**
+ * Favorilerim yalnız tam satırları çizer: kartta favorilenen ürünün iyimser
+ * (yalnız `productId`'li) satırı, gerçek satır gelene kadar burada görünmez.
+ */
+const selectWishlistItems = (items: readonly WishlistEntry[]): WishlistItem[] =>
+  items.filter(
+    (item): item is WishlistEntry & WishlistItem =>
+      typeof item.productTitle === "string" && !!item.productTitle,
+  );
+
+/**
  * Favorites data: the user's wishlist OR a shared read-only list (`?ids=`), plus
- * the remove mutation and add-to-cart handler. Replaces the page's inline
- * queries + hand-rolled `wishlistApi.remove` call.
+ * the remove action and add-to-cart handler. The list is the shared
+ * `wishlistItemsQuery` (same cache as the header badge and the card hearts) and
+ * removal goes through the shared `useToggleWishlist` (optimistic + rollback).
  */
 export function useFavorites() {
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const {
     addToCart,
@@ -40,15 +52,8 @@ export function useFavorites() {
   const isSharedView = sharedIds !== null && sharedIds.length > 0;
 
   const wishlistQuery = useQuery({
-    queryKey: queryKeys.wishlist.all(),
-    queryFn: async (): Promise<WishlistItem[]> => {
-      const response = await wishlistApi.get();
-      const list =
-        response.data?.items || response.data?.data || response.data || [];
-      return (Array.isArray(list) ? list : []).filter(
-        (item: any) => item && item.productId && item.productTitle,
-      );
-    },
+    ...wishlistItemsQuery,
+    select: selectWishlistItems,
     enabled: !authLoading && isAuthenticated && !isSharedView,
     meta: { page: "favorites" },
   });
@@ -97,25 +102,7 @@ export function useFavorites() {
     ? sharedProductsQuery.isLoading
     : wishlistQuery.isLoading;
 
-  const removeMutation = useMutation({
-    mutationFn: (productId: string) => wishlistApi.remove(productId),
-    onSuccess: async (_data, productId) => {
-      toast.success(t("product.removedFromFavorites"));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all() }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.wishlist.check(productId),
-        }),
-      ]);
-    },
-    onError: (error: any) => {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to remove from favorites:", error);
-      toast.error(
-        error?.response?.data?.message || t("common.operationFailed"),
-      );
-    },
-  });
+  const toggleWishlist = useToggleWishlist();
 
   const inCartIds = useMemo(
     () =>
@@ -157,7 +144,9 @@ export function useFavorites() {
     isSharedView,
     isAuthenticated,
     authLoading,
-    handleRemove: (productId: string) => removeMutation.mutate(productId),
+    handleRemove: (productId: string) => {
+      toggleWishlist(productId, true);
+    },
     handleCartToggle,
     isInCart,
   };

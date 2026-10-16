@@ -6,8 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { hasAuthMarker } from "@/lib/authMarker";
 import { useCart } from "@/hooks/useCart";
-import { wishlistApi } from "@/lib/api";
-import { queryKeys } from "@/lib/query/keys";
+import { wishlistItemsQuery } from "@/lib/wishlist";
 import { useHeaderBadgeCounts } from "@/hooks/useHeaderBadgeCounts";
 
 /**
@@ -78,14 +77,7 @@ export function useHeaderData() {
   const badgeCounts = useHeaderBadgeCounts(showAuthUI);
 
   const wishlistQuery = useQuery({
-    queryKey: queryKeys.wishlist.all(),
-    queryFn: async () => {
-      const res = await wishlistApi.get();
-      const data = res.data;
-      const items =
-        data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
-      return Array.isArray(items) ? items : [];
-    },
+    ...wishlistItemsQuery,
     enabled: showAuthUI,
     meta: { page: "navbar-wishlist-count" },
   });

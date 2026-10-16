@@ -117,7 +117,11 @@ export const queryKeys = {
   wishlist: {
     /** The full wishlist list (invalidated after any favorite toggle). */
     all: () => ["wishlist"] as const,
-    check: (id: string | number) => ["wishlist-check", String(id)] as const,
+    /**
+     * Favori ekle/çıkar MUTATION anahtarı (sorgu değil). Aynı ürün için ikinci
+     * isteği ve eşzamanlı isteklerde liste tazelemesini bununla sayarız.
+     */
+    toggle: () => ["wishlist-toggle"] as const,
     /** Shared wishlist by comma-joined ids (undefined preserved for parity). */
     shared: (ids: string | undefined) => ["favorites-shared", ids] as const,
   },
