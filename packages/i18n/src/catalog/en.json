@@ -1531,7 +1531,15 @@
     "commissionLine": "Marketplace commission",
     "tradeNumberLabel": "Trade No:"
   },
+  "listing": {
+    "priceMinHint": "At least {minPrice}",
+    "priceMaxHint": "At most {maxPrice}",
+    "priceRangeHint": "Between {minPrice} and {maxPrice}",
+    "salePriceBelowMinimum": "The discounted price must be at least {minPrice} TL."
+  },
   "offer": {
+    "minimumOfferFloorError": "The offer must be at least {amount}.",
+    "counterBelowFloor": "The counter-offer must be at least {amount}.",
     "makeOffer": "Make Offer",
     "yourOffer": "Your Offer",
     "offerAmount": "Offer Amount",
@@ -8706,11 +8714,11 @@
       "fields": {
         "minProductPrice": {
           "label": "Minimum Product Price (₺)",
-          "helper": "Minimum price for new listings (existing listings unaffected)"
+          "helper": "Listing and discounted prices cannot go below this amount, and offers cannot be made below it either. Existing listings are unaffected until their price changes. Leave blank for no minimum."
         },
         "maxProductPrice": {
           "label": "Maximum Product Price (₺)",
-          "helper": "Maximum price for new listings (existing listings unaffected)"
+          "helper": "Listing prices cannot go above this amount (offers are unaffected). Existing listings are unaffected until their price changes. Leave blank for no maximum."
         },
         "maxMessageLength": {
           "label": "Maximum Message Length",
@@ -10861,6 +10869,7 @@
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",
       "alreadyPendingOffer": "You already have a pending offer on this product. Cancel your existing offer first.",
+      "amountBelowMinimum": "Offer amount must be at least {minPrice} TL.",
       "awaitingBuyerResponse": "Waiting for the buyer to respond to the current counter-offer; a new counter-offer cannot be made right now",
       "belowMinimumBuyerCounter": "Offer amount is too low. Product price: {productPrice} TL. Minimum: {minOffer} TL ({minOfferPercentage}% of the price).",
       "belowMinimumOffer": "Offer amount is too low. Product price: {productPrice} TL. Minimum offer: {minOffer} TL ({minOfferPercentage}% of the price). Your offer: {offerAmount} TL",
