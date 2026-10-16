@@ -12,6 +12,7 @@ import {
   isProductOnSaleDisplay,
 } from "@/lib/productPrice";
 import type { Listing } from "../_lib/types";
+import ProductDetailBadges from "./ProductDetailBadges";
 import { formatTL } from "@/lib/format";
 
 type Translator = (key: any) => string;
@@ -88,16 +89,9 @@ export default function ProductStaticInfoView({
 
   return (
     <>
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        <h1 className="text-2xl lg:text-3xl font-bold text-heading">
-          {listing.title}
-        </h1>
-        {listing.status === "sold" && (
-          <span className="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-semibold text-danger-700">
-            {t("product.sold")}
-          </span>
-        )}
-      </div>
+      <h1 className="text-2xl lg:text-3xl font-bold text-heading mb-4">
+        {listing.title}
+      </h1>
 
       <div className="mb-4">
         {isProductOnSaleDisplay(listing) && (
@@ -109,22 +103,12 @@ export default function ProductStaticInfoView({
               )}{" "}
               TL
             </span>
-            <span className="rounded-full bg-danger-500 px-2 py-0.5 text-xs font-semibold text-inverted">
-              %
-              {listing.discountPercent ??
-                (listing.oldPrice != null && listing.price
-                  ? Math.round(
-                      (1 - Number(listing.price) / Number(listing.oldPrice)) *
-                        100,
-                    )
-                  : 0)}{" "}
-              indirim
-            </span>
           </div>
         )}
         <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-500">
           {formatTL(effectivePrice)}
         </p>
+        <ProductDetailBadges listing={listing} t={t} />
       </div>
 
       <div className="flex items-center gap-4 text-sm text-body mb-6">

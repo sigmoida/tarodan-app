@@ -2,13 +2,9 @@
 
 "use client";
 
-import {
-  ArrowsRightLeftIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useRef } from "react";
-import { Badge, Button } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useSwipe } from "@/hooks/useSwipe";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
@@ -56,7 +52,6 @@ export default function ProductGallery() {
     listing,
     t,
     images,
-    isTradeAvailable,
     activeImageIndex,
     setActiveImageIndex,
     openLightbox,
@@ -151,17 +146,6 @@ export default function ProductGallery() {
               borderRadius: "4px",
             }}
           />
-        )}
-
-        {isTradeAvailable && (
-          <div className="absolute top-4 left-4 z-10">
-            <Badge
-              variant="success"
-              icon={<ArrowsRightLeftIcon className="w-4 h-4" />}
-            >
-              {t("product.tradeAvailable")}
-            </Badge>
-          </div>
         )}
 
         {images.length > 1 && (
