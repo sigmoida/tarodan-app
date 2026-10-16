@@ -86,8 +86,10 @@ function NewTradeContent() {
     );
 
   const submit = () => {
-    if (selectedIds.length === 0 && !cash)
-      return toast.error(t("trade.selectAtLeastOne"));
+    // API en az 1 teklif edilen ürün ister (CreateTradeDto initiatorItems ArrayMinSize(1));
+    // yalnız nakitle teklif sunucuda reddedilirdi.
+    if (selectedIds.length === 0)
+      return toast.error(t("trade.selectAtLeastOneOffer"));
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
       return toast.error(t("page.new.page.lutfenBirTeslimatAdresiSecinVeya"));
@@ -280,7 +282,7 @@ function NewTradeContent() {
         <Button
           className="flex-1 gap-2"
           onClick={submit}
-          disabled={selectedIds.length === 0 && !cash}
+          disabled={selectedIds.length === 0}
           isLoading={createTrade.isPending}
         >
           <ArrowsRightLeftIcon className="h-5 w-5" />
