@@ -172,6 +172,7 @@ const workflows = [
       "Arama, filtre ve koleksiyonlar",
       "Ürün detayı, satıcı profili ve benzer ürünler",
       "Reklam gösterim/tıklama ölçümü",
+      "Vitrin hero'su (GET /hero-slides?placement=&platform=app — boş dizi = hero gizli) ve güven rozetleri",
     ],
     routes: [
       "GET /app-config",
