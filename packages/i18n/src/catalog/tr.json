@@ -5459,14 +5459,34 @@
         "created": "Slayt oluşturuldu",
         "updated": "Slayt güncellendi",
         "deleted": "Slayt silindi",
-        "deleteConfirm": "\"{title}\" slaytı silinsin mi?",
+        "deleteConfirm": "\"{title}\" slaytı silinsin mi? Yerleşimde yayında başka slayt kalmazsa hero bu alanda gizlenir.",
         "empty": "Bu yerleşimde henüz slayt yok",
-        "maxLiveNote": "Yayında en fazla {max} slayt",
+        "maxLiveNote": "Platform başına yayında en fazla {max} slayt",
         "placementLabel": "Yerleşim",
         "placement": {
           "home": "Ana sayfa",
           "auth_default": "Giriş (varsayılan)",
           "auth_register": "Giriş (kayıt)"
+        },
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Yalnız web",
+          "app": "Yalnız uygulama",
+          "all": "İkisi"
+        },
+        "clientName": {
+          "web": "Web",
+          "app": "Uygulama"
+        },
+        "visibility": {
+          "web": "Web'de göster",
+          "app": "Uygulamada göster",
+          "updated": "Hero görünürlüğü güncellendi",
+          "hint": "Ana sayfa hero'su; kapalıyken o platformda gizlenir, slaytlar silinmez."
+        },
+        "hiddenOn": {
+          "switchOff": "{platform} ana sayfasında hero gizli: anahtar kapalı.",
+          "noLiveSlide": "{platform} ana sayfasında hero gizli: bu platformda yayında slayt yok."
         },
         "columns": {
           "image": "Görsel",
@@ -5475,6 +5495,7 @@
           "clicks": "Tık",
           "cta1Clicks": "Düğme 1",
           "cta2Clicks": "Düğme 2",
+          "platform": "Platform",
           "ios": "iOS"
         },
         "hiddenOnIos": "iOS'ta gizli",
@@ -11591,8 +11612,7 @@
       "titleRequired": "Türkçe başlık zorunludur",
       "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
       "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
-      "maxLiveSlides": "Bir yerleşimde aynı anda en fazla {max} slayt yayında olabilir",
-      "lastLiveHomeSlide": "Ana sayfada yayındaki son slayt silinemez veya yayından kaldırılamaz; önce başka bir slaytı yayına alın",
+      "maxLiveSlides": "Bir yerleşimde, bir platformda aynı anda en fazla {max} slayt yayında olabilir",
       "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir"
     },
     "brand": {

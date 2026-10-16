@@ -1,4 +1,4 @@
-import type { HeroPlacement, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
   scheduleWindowWhere,
   withinScheduleWindow,
@@ -6,8 +6,8 @@ import {
 
 /**
  * "Hero slaytı şu an yayında mı" — TEK kural. Vitrin okuması
- * (`GET /hero-slides`), tık/gösterim sayımı, "son yayındaki ana sayfa
- * slaytı" guard'ı ve admin listesindeki `isLive` bunu kullanır.
+ * (`GET /hero-slides`), tık/gösterim sayımı ve admin listesindeki `isLive`
+ * bunu kullanır.
  *
  * Yayında = admin anahtarı açık + tarih penceresinin içinde (sınırlar dahil;
  * reklamla aynı pencere kuralı).
@@ -32,13 +32,6 @@ export function isHeroSlideLive(
 export function heroSlideLiveWhere(now: Date): Prisma.HeroSlideWhereInput {
   return { isActive: true, AND: scheduleWindowWhere(now) };
 }
-
-/**
- * En az bir yayında slaytı ZORUNLU olan yerleşimler: kodda yedek slayt yok,
- * ana sayfa slider'ı boş kalamaz. Auth görseli boş kalabilir (panel gizlenir).
- */
-export const HERO_PLACEMENTS_REQUIRING_LIVE_SLIDE: ReadonlySet<HeroPlacement> =
-  new Set<HeroPlacement>(["home"]);
 
 export interface HeroWindow {
   startDate: Date | null;

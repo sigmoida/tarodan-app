@@ -8,6 +8,7 @@ import { HeroSlideService } from "./hero-slide.service";
 import { HERO_IMAGE_UPLOAD } from "./helpers/hero.constants";
 import type { PrismaService } from "../../prisma";
 import type { MediaService } from "../media/media.service";
+import type { HeroVisibilityService } from "./hero-visibility.service";
 import { notifyWebRevalidate } from "../../common/helpers/revalidate";
 
 jest.mock("../../common/helpers/revalidate", () => ({
@@ -15,10 +16,11 @@ jest.mock("../../common/helpers/revalidate", () => ({
 }));
 
 /**
- * Hero slaytları: yayın kuralı + sıra, aynı anda en çok 5 yayında slayt,
- * yayındaki son ana sayfa slaytının korunması, iki dilli metin normalizasyonu,
- * buton çifti kuralı ve her yazımdan sonra web'in ilgili etiketinin
- * tazelenmesi.
+ * Hero slaytları: yayın kuralı + sıra, istemci (platform) süzmesi ve ana
+ * sayfa anahtarı, istemci başına aynı anda en çok 5 yayında slayt, iki dilli
+ * metin normalizasyonu, buton çifti kuralı ve her yazımdan sonra web'in ilgili
+ * etiketinin tazelenmesi. Yerleşim boş kalabilir: son slayt da silinir ya da
+ * kapatılır.
  */
 
 const NOW = new Date("2026-10-12T12:00:00Z");
@@ -42,6 +44,7 @@ const row = (over: Partial<HeroSlide> = {}): HeroSlide => ({
   cta2Label: null,
   cta2Href: null,
   hideOnIos: false,
+  platform: "all",
   impressionCount: 10,
   clickCount: 3,
   cta1ClickCount: 2,
@@ -51,7 +54,7 @@ const row = (over: Partial<HeroSlide> = {}): HeroSlide => ({
   ...over,
 });
 
-const OPEN = { startDate: null, endDate: null };
+const OPEN = { startDate: null, endDate: null, platform: "all" };
 
 function makeService() {
   const heroSlide = {
@@ -64,18 +67,19 @@ function makeService() {
       .fn()
       .mockImplementation(({ data }) => Promise.resolve(row({ ...data }))),
     delete: jest.fn().mockResolvedValue(row()),
-    count: jest.fn().mockResolvedValue(1),
     aggregate: jest.fn().mockResolvedValue({ _max: { displayOrder: 2 } }),
   };
   const $transaction = jest.fn().mockResolvedValue([]);
   const media = {
     upload: jest.fn().mockResolvedValue({ url: "https://cdn.test/hero/x.png" }),
   };
+  const visibility = { isHomeEnabled: jest.fn().mockResolvedValue(true) };
   const service = new HeroSlideService(
     { heroSlide, $transaction } as unknown as PrismaService,
     media as unknown as MediaService,
+    visibility as unknown as HeroVisibilityService,
   );
-  return { service, heroSlide, $transaction, media };
+  return { service, heroSlide, $transaction, media, visibility };
 }
 
 const createDto = (over: Record<string, unknown> = {}) =>
@@ -90,12 +94,13 @@ describe("HeroSlideService — vitrin okuması", () => {
   beforeEach(() => jest.useFakeTimers().setSystemTime(NOW));
   afterEach(() => jest.useRealTimers());
 
-  it("yerleşimin yayındaki slaytlarını sırasıyla, en çok 5 tane okur", async () => {
+  it("yerleşimin bu istemcideki yayındaki slaytlarını sırasıyla, en çok 5 tane okur", async () => {
     const { service, heroSlide } = makeService();
-    await service.listLive("home");
+    await service.listLive("home", "web");
     expect(heroSlide.findMany).toHaveBeenCalledWith({
       where: {
         placement: "home",
+        platform: { in: ["web", "all"] },
         isActive: true,
         AND: [
           { OR: [{ startDate: null }, { startDate: { lte: NOW } }] },
@@ -113,7 +118,7 @@ describe("HeroSlideService — vitrin okuması", () => {
       row({ cta2Label: { tr: "Yarım" }, cta2Href: null }),
     ]);
 
-    const [slide] = await service.listLive("home");
+    const [slide] = await service.listLive("home", "app");
 
     expect(slide).toEqual({
       id: "slide-1",
@@ -128,6 +133,7 @@ describe("HeroSlideService — vitrin okuması", () => {
       // Etiketi var ama hedefi yok: gösterilmez.
       cta2: null,
       hideOnIos: false,
+      platform: "all",
     });
   });
 
@@ -137,9 +143,49 @@ describe("HeroSlideService — vitrin okuması", () => {
       row({ id: "a" }),
       row({ id: "b", endDate: day(-1) }),
     ]);
-    const slides = await service.listLive("home");
+    const slides = await service.listLive("home", "web");
     expect(slides.map((s) => s.id)).toEqual(["a"]);
   });
+
+  it("uygulama kendi hedefini ve all'ı görür, web hedefini görmez", async () => {
+    const { service, heroSlide } = makeService();
+    await service.listLive("auth_default", "app");
+    expect(heroSlide.findMany.mock.calls[0][0].where).toMatchObject({
+      placement: "auth_default",
+      platform: { in: ["app", "all"] },
+    });
+  });
+
+  it("ana sayfa anahtarı o istemcide kapalıysa boş döner, veritabanına gitmez", async () => {
+    const { service, heroSlide, visibility } = makeService();
+    visibility.isHomeEnabled.mockResolvedValueOnce(false);
+    await expect(service.listLive("home", "web")).resolves.toEqual([]);
+    expect(visibility.isHomeEnabled).toHaveBeenCalledWith("web");
+    expect(heroSlide.findMany).not.toHaveBeenCalled();
+  });
+
+  it("ana sayfa anahtarı açıkken slaytlar okunur", async () => {
+    const { service, heroSlide, visibility } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([row()]);
+    const slides = await service.listLive("home", "app");
+    expect(visibility.isHomeEnabled).toHaveBeenCalledWith("app");
+    expect(slides).toHaveLength(1);
+  });
+
+  it.each(["auth_default", "auth_register"] as const)(
+    "anahtar yalnız ana sayfa içindir: %s anahtara bakmadan platformla süzülür",
+    async (placement) => {
+      const { service, heroSlide, visibility } = makeService();
+      visibility.isHomeEnabled.mockResolvedValue(false);
+      heroSlide.findMany.mockResolvedValueOnce([row({ placement })]);
+      const slides = await service.listLive(placement, "web");
+      expect(visibility.isHomeEnabled).not.toHaveBeenCalled();
+      expect(slides).toHaveLength(1);
+      expect(heroSlide.findMany.mock.calls[0][0].where.platform).toEqual({
+        in: ["web", "all"],
+      });
+    },
+  );
 });
 
 describe("HeroSlideService.create", () => {
@@ -170,8 +216,15 @@ describe("HeroSlideService.create", () => {
       cta2Label: Prisma.DbNull,
       cta2Href: null,
       hideOnIos: false,
+      platform: "all",
     });
     expect(notifyWebRevalidate).toHaveBeenCalledWith(["home:hero"]);
+  });
+
+  it("platform verilirse yazılır", async () => {
+    const { service, heroSlide } = makeService();
+    await service.create(createDto({ platform: "app" }));
+    expect(heroSlide.create.mock.calls[0][0].data.platform).toBe("app");
   });
 
   it("auth yerleşimi auth etiketini tazeler", async () => {
@@ -185,7 +238,10 @@ describe("HeroSlideService.create", () => {
     await expect(
       service.create(createDto({ cta2Label: { tr: "Git" } })),
     ).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.ctaIncomplete", i18nParams: { slot: 2 } },
+      response: {
+        i18nKey: "server.hero.ctaIncomplete",
+        i18nParams: { slot: 2 },
+      },
     });
     expect(heroSlide.create).not.toHaveBeenCalled();
   });
@@ -218,22 +274,70 @@ describe("HeroSlideService.create", () => {
     heroSlide.findMany.mockResolvedValueOnce(Array(5).fill(OPEN));
 
     await expect(service.create(createDto())).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.maxLiveSlides", i18nParams: { max: 5 } },
+      response: {
+        i18nKey: "server.hero.maxLiveSlides",
+        i18nParams: { max: 5 },
+      },
     });
     expect(heroSlide.create).not.toHaveBeenCalled();
     // Sınır, bitmemiş açık slaytlar üzerinden yoklanır.
     expect(heroSlide.findMany.mock.calls[0][0].where).toEqual({
       placement: "home",
       isActive: true,
+      platform: { in: ["web", "all", "app"] },
       OR: [{ endDate: null }, { endDate: { gte: NOW } }],
     });
+  });
+
+  it("sınır istemci başınadır: 5 web slaytı varken uygulama slaytı kabul edilir", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([]);
+    await service.create(createDto({ platform: "app" }));
+    // Yalnız uygulamada görünebilecek slaytlar sayılır.
+    expect(heroSlide.findMany.mock.calls[0][0].where.platform).toEqual({
+      in: ["app", "all"],
+    });
+    expect(heroSlide.create).toHaveBeenCalled();
+  });
+
+  it("web'de 5 slayt (all dahil) varken yeni web slaytı → 409", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      ...Array(3).fill({ ...OPEN, platform: "web" }),
+      ...Array(2).fill(OPEN),
+    ]);
+    await expect(
+      service.create(createDto({ platform: "web" })),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("all slaytı iki istemcide de sayılır: uygulamada 5 slayt varken → 409", async () => {
+    const { service, heroSlide } = makeService();
+    heroSlide.findMany.mockResolvedValueOnce([
+      ...Array(2).fill({ ...OPEN, platform: "web" }),
+      ...Array(5).fill({ ...OPEN, platform: "app" }),
+    ]);
+    await expect(service.create(createDto())).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it("all slaytı: istemcilerin her biri sınırın altındaysa kabul edilir", async () => {
+    const { service, heroSlide } = makeService();
+    // Toplam 8 ama web'de 4, uygulamada 4 görünür.
+    heroSlide.findMany.mockResolvedValueOnce([
+      ...Array(4).fill({ ...OPEN, platform: "web" }),
+      ...Array(4).fill({ ...OPEN, platform: "app" }),
+    ]);
+    await service.create(createDto());
+    expect(heroSlide.create).toHaveBeenCalled();
   });
 
   it("başka bir slaytın bitişinden sonraya zamanlanan altıncı kabul edilir", async () => {
     const { service, heroSlide } = makeService();
     heroSlide.findMany.mockResolvedValueOnce([
       ...Array(4).fill(OPEN),
-      { startDate: null, endDate: day(3) },
+      { ...OPEN, endDate: day(3) },
     ]);
     await service.create(createDto({ startDate: day(4).toISOString() }));
     expect(heroSlide.create).toHaveBeenCalled();
@@ -281,7 +385,10 @@ describe("HeroSlideService.update", () => {
     await expect(
       service.update("slide-1", { cta1Href: null } as never),
     ).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.ctaIncomplete", i18nParams: { slot: 1 } },
+      response: {
+        i18nKey: "server.hero.ctaIncomplete",
+        i18nParams: { slot: 1 },
+      },
     });
     expect(heroSlide.update).not.toHaveBeenCalled();
   });
@@ -301,38 +408,37 @@ describe("HeroSlideService.update", () => {
     ["başlangıcı ileri atma", { startDate: "2026-11-01T00:00:00.000Z" }],
     ["auth yerleşimine taşıma", { placement: "auth_default" }],
   ])(
-    "yayındaki SON ana sayfa slaytında %s → 409",
+    "yayındaki SON ana sayfa slaytında %s serbesttir (yerleşim boş kalabilir)",
     async (_d, dto) => {
       const { service, heroSlide } = makeService();
-      heroSlide.count.mockResolvedValueOnce(0);
-      await expect(
-        service.update("slide-1", dto as never),
-      ).rejects.toMatchObject({
-        response: { i18nKey: "server.hero.lastLiveHomeSlide" },
-      });
-      expect(heroSlide.update).not.toHaveBeenCalled();
-      expect(heroSlide.count.mock.calls[0][0].where).toMatchObject({
-        placement: "home",
-        id: { not: "slide-1" },
-        isActive: true,
-      });
+      heroSlide.findMany.mockResolvedValue([]);
+      await service.update("slide-1", dto as never);
+      expect(heroSlide.update).toHaveBeenCalled();
     },
   );
 
-  it("yayında başka ana sayfa slaytı varken kapatılabilir", async () => {
+  it("platform değişince sınır yeni hedefin istemcilerinde yoklanır", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.count.mockResolvedValueOnce(1);
-    await service.update("slide-1", { isActive: false });
-    expect(heroSlide.update).toHaveBeenCalled();
+    heroSlide.findUnique.mockResolvedValueOnce(row({ platform: "web" }));
+    heroSlide.findMany.mockResolvedValueOnce(
+      Array(5).fill({ ...OPEN, platform: "app" }),
+    );
+    await expect(
+      service.update("slide-1", { platform: "app" } as never),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(heroSlide.findMany.mock.calls[0][0].where).toMatchObject({
+      platform: { in: ["app", "all"] },
+      id: { not: "slide-1" },
+    });
   });
 
-  it("auth slaytı son da olsa kapatılabilir (guard yalnız ana sayfa)", async () => {
+  it("platform yazılır; gönderilmezse dokunulmaz", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.findUnique.mockResolvedValueOnce(row({ placement: "auth_default" }));
-    await service.update("slide-1", { isActive: false });
-    expect(heroSlide.count).not.toHaveBeenCalled();
-    expect(heroSlide.update).toHaveBeenCalled();
-    expect(notifyWebRevalidate).toHaveBeenCalledWith(["auth:hero"]);
+    heroSlide.findMany.mockResolvedValue([]);
+    await service.update("slide-1", { platform: "web" } as never);
+    expect(heroSlide.update.mock.calls[0][0].data.platform).toBe("web");
+    await service.update("slide-1", { title: { tr: "Yeni" } } as never);
+    expect(heroSlide.update.mock.calls[1][0].data.platform).toBeUndefined();
   });
 
   it("açık slaytın metnini düzeltmek sınırı yoklamaz", async () => {
@@ -383,38 +489,36 @@ describe("HeroSlideService.update", () => {
 
   it("yerleşim değişince iki yüzey de tazelenir", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.findUnique.mockResolvedValueOnce(row({ placement: "auth_default" }));
+    heroSlide.findUnique.mockResolvedValueOnce(
+      row({ placement: "auth_default" }),
+    );
     await service.update("slide-1", { placement: "home" } as never);
-    expect(notifyWebRevalidate).toHaveBeenCalledWith(["auth:hero", "home:hero"]);
+    expect(notifyWebRevalidate).toHaveBeenCalledWith([
+      "auth:hero",
+      "home:hero",
+    ]);
   });
 });
 
 describe("HeroSlideService.remove", () => {
-  beforeEach(() => jest.useFakeTimers().setSystemTime(NOW));
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(NOW);
+    (notifyWebRevalidate as jest.Mock).mockClear();
+  });
   afterEach(() => jest.useRealTimers());
 
-  it("yayındaki son ana sayfa slaytı silinemez → 409", async () => {
+  it("yayındaki son ana sayfa slaytı da silinir (yerleşim boş kalabilir)", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.count.mockResolvedValueOnce(0);
-    await expect(service.remove("slide-1")).rejects.toMatchObject({
-      response: { i18nKey: "server.hero.lastLiveHomeSlide" },
-    });
-    expect(heroSlide.delete).not.toHaveBeenCalled();
-  });
-
-  it("yayında olmayan ana sayfa slaytı serbestçe silinir", async () => {
-    const { service, heroSlide } = makeService();
-    heroSlide.findUnique.mockResolvedValueOnce(row({ isActive: false }));
     await service.remove("slide-1");
-    expect(heroSlide.count).not.toHaveBeenCalled();
     expect(heroSlide.delete).toHaveBeenCalledWith({ where: { id: "slide-1" } });
+    expect(notifyWebRevalidate).toHaveBeenCalledWith(["home:hero"]);
   });
 
-  it("başka yayında ana sayfa slaytı varsa silinir", async () => {
+  it("bilinmeyen slayt → 404", async () => {
     const { service, heroSlide } = makeService();
-    heroSlide.count.mockResolvedValueOnce(2);
-    await service.remove("slide-1");
-    expect(heroSlide.delete).toHaveBeenCalled();
+    heroSlide.findUnique.mockResolvedValueOnce(null);
+    await expect(service.remove("x")).rejects.toBeInstanceOf(NotFoundException);
+    expect(heroSlide.delete).not.toHaveBeenCalled();
   });
 });
 

@@ -4,6 +4,7 @@ import { MediaModule } from "../media/media.module";
 import { HeroSlideController } from "./hero-slide.controller";
 import { HeroSlideService } from "./hero-slide.service";
 import { HeroTrackingService } from "./hero-tracking.service";
+import { HeroVisibilityService } from "./hero-visibility.service";
 import { TrustBadgeController } from "./trust-badge.controller";
 import { TrustBadgeService } from "./trust-badge.service";
 
@@ -19,7 +20,12 @@ import { TrustBadgeService } from "./trust-badge.service";
 @Module({
   imports: [PrismaModule, MediaModule],
   controllers: [HeroSlideController, TrustBadgeController],
-  providers: [HeroSlideService, HeroTrackingService, TrustBadgeService],
-  exports: [HeroSlideService, TrustBadgeService],
+  providers: [
+    HeroSlideService,
+    HeroTrackingService,
+    HeroVisibilityService,
+    TrustBadgeService,
+  ],
+  exports: [HeroSlideService, HeroVisibilityService, TrustBadgeService],
 })
 export class HeroModule {}

@@ -2,12 +2,15 @@ import { Injectable } from "@nestjs/common";
 import type {
   AdminHeroSlideDto,
   AdminTrustBadgeDto,
+  HeroHomeVisibilityDto,
 } from "@tarodan/types";
 import { HeroSlideService } from "../../hero/hero-slide.service";
+import { HeroVisibilityService } from "../../hero/hero-visibility.service";
 import { TrustBadgeService } from "../../hero/trust-badge.service";
 import {
   CreateHeroSlideDto,
   CreateTrustBadgeDto,
+  UpdateHeroHomeVisibilityDto,
   UpdateHeroSlideDto,
   UpdateTrustBadgeDto,
 } from "../../hero/dto";
@@ -25,6 +28,7 @@ export class AdminHeroService {
   constructor(
     private readonly heroSlides: HeroSlideService,
     private readonly trustBadges: TrustBadgeService,
+    private readonly visibility: HeroVisibilityService,
     private readonly audit: AdminAuditService,
   ) {}
 
@@ -92,6 +96,24 @@ export class AdminHeroService {
       { ids },
     );
     return slides;
+  }
+
+  /** Ana sayfa hero'sunun istemci başına anahtarı — iki anahtar tek satırda. */
+  async updateHomeVisibility(
+    adminId: string,
+    dto: UpdateHeroHomeVisibilityDto,
+  ): Promise<HeroHomeVisibilityDto> {
+    const before = await this.visibility.getHome();
+    const after = await this.visibility.updateHome(dto);
+    await this.audit.createAuditLog(
+      adminId,
+      "hero_visibility_update",
+      "PlatformSetting",
+      "hero_home_enabled",
+      before,
+      after,
+    );
+    return after;
   }
 
   // ==================== TRUST BADGES ====================
