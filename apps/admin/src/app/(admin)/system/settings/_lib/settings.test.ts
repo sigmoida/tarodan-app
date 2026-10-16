@@ -103,4 +103,32 @@ describe("ilan fiyat sınırı ayarları — boş = kural yok", () => {
       "250.5",
     );
   });
+
+  it("alt sınır üst sınırdan büyükse alt sınır alanında hata verir", () => {
+    const result = settingsSchema(t).safeParse(
+      validForm({ minProductPrice: "500", maxProductPrice: "100" }),
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({
+          path: ["minProductPrice"],
+          message: "admin.settings.validation.minAboveMax",
+        }),
+      ]);
+    }
+  });
+
+  it("alt = üst ya da biri boşsa tutarlılık hatası yok", () => {
+    const equal = settingsSchema(t).safeParse(
+      validForm({ minProductPrice: "100", maxProductPrice: "100" }),
+    );
+    const onlyMin = settingsSchema(t).safeParse(
+      validForm({ minProductPrice: "999999", maxProductPrice: "" }),
+    );
+
+    expect(equal.success).toBe(true);
+    expect(onlyMin.success).toBe(true);
+  });
 });

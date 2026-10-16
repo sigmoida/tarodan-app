@@ -210,17 +210,34 @@ const numField = (t: T, min?: number, optional?: boolean) => {
 
 /** Zod schema for the whole settings form, derived from `FIELD_DEFS` (one source of truth). */
 export const settingsSchema = (t: T) =>
-  z.object(
-    Object.values(FIELD_DEFS)
-      .flat()
-      .reduce(
-        (shape, f) => {
-          shape[f.key] = numField(t, f.min, f.optional);
-          return shape;
-        },
-        {} as Record<keyof Settings, ReturnType<typeof numField>>,
-      ),
-  );
+  z
+    .object(
+      Object.values(FIELD_DEFS)
+        .flat()
+        .reduce(
+          (shape, f) => {
+            shape[f.key] = numField(t, f.min, f.optional);
+            return shape;
+          },
+          {} as Record<keyof Settings, ReturnType<typeof numField>>,
+        ),
+    )
+    // Alt sınır üst sınırdan büyükse hiçbir fiyat geçerli olmaz: ikisi de
+    // doluyken tutarlılık burada denetlenir. Alanlar ayrı PATCH'lerle yazıldığı
+    // için bu kural sunucuda tek anahtar bazında uygulanamaz (ikisi birden
+    // değişirken ara durum geçersiz görünürdü).
+    .superRefine((values, ctx) => {
+      const min = values.minProductPrice.trim();
+      const max = values.maxProductPrice.trim();
+      if (min === "" || max === "") return;
+      if (Number(min) > Number(max)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["minProductPrice"],
+          message: t("admin.settings.validation.minAboveMax"),
+        });
+      }
+    });
 
 export type SettingsFormValues = z.infer<ReturnType<typeof settingsSchema>>;
 
