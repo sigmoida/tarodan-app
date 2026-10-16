@@ -11550,6 +11550,9 @@
         "restoreRemovedOnly": "Only removed products can be restored",
         "rejectReasonRequired": "A rejection reason is required"
       },
+      "settings": {
+        "priceLimitInvalid": "The price limit must be blank (no limit) or a number that is 0 or greater"
+      },
       "membership": {
         "monthlyPriceRange": "The monthly membership price must be between 0 and 1,000,000",
         "yearlyDiscountRange": "The yearly discount rate must be between 0 and 90",

@@ -11550,6 +11550,9 @@
         "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir",
         "rejectReasonRequired": "Red sebebi zorunludur"
       },
+      "settings": {
+        "priceLimitInvalid": "Fiyat sınırı boş (kural yok) ya da 0 veya daha büyük bir sayı olmalıdır"
+      },
       "membership": {
         "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
         "yearlyDiscountRange": "Yıllık indirim oranı 0 ile 90 arasında olmalıdır",
