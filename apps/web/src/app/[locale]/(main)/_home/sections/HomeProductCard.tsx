@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { Link } from "@/i18n/navigation";
+import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
 import {
   getProductEffectivePrice,
   getProductOriginalPriceForDisplay,
@@ -16,7 +17,11 @@ import { formatTL } from "@/lib/format";
 // detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
 const formatPrice = formatTL;
 
-/** Server-rendered home card; only the image itself uses Next's built-in loader. */
+/**
+ * Server-rendered home card; only the image itself uses Next's built-in loader.
+ * The favorite heart is the one client island (`ProductCardFavorite`, shared with
+ * `ProductCard`), rendered as the link's sibling so the card HTML stays valid.
+ */
 export default function HomeProductCard({
   product,
   index,
@@ -104,6 +109,10 @@ export default function HomeProductCard({
           </div>
         </div>
       </Link>
+      <ProductCardFavorite
+        productId={product.id}
+        sellerId={product.seller?.id ?? product.sellerId}
+      />
     </div>
   );
 }

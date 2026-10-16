@@ -11,6 +11,7 @@ import {
 import { ProductBadge } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import OutOfStockOverlay from "@/components/ui/OutOfStockOverlay";
+import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
 import { useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
@@ -34,6 +35,10 @@ import { IMAGE_SIZES } from "@/lib/imageSizes";
  * views/likes, condition) — pass `false` for lean rails, dense grids or
  * reduced-shape items. `overlay` / `footer` are click-isolated slots for actions
  * (remove, add-to-cart, SOLD badges) rendered OUTSIDE the card's `<Link>`.
+ *
+ * Listing cards carry the favorite heart at the image's bottom-right
+ * (`ProductCardFavorite`, also outside the `<Link>`); it is skipped for
+ * non-navigating cards and where the caller opts out with `showFavorite={false}`.
  */
 
 /**
@@ -61,6 +66,10 @@ function cardImageUrl(image: ProductImage | string | undefined): string {
 // detayda "468,19 TL" görünüyor ve kart biçimi kuruşu YUVARLIYORDU.
 const fmtTL = formatTL;
 
+// Liste düzenindeki görselin ölçüsü — favori kalbinin çerçevesi de AYNI ölçüyü
+// kullanır, iki yerde ayrı yazılırsa kalp görselin köşesinden kayar.
+const LIST_THUMB_SIZE = "w-20 h-20 xs:w-28 xs:h-28 sm:w-32 sm:h-32";
+
 export interface ProductCardProps {
   product: Product;
   layout?: "grid" | "list";
@@ -84,6 +93,12 @@ export interface ProductCardProps {
    * non-navigating card (e.g. a collection's custom item that has no listing).
    */
   href?: string | null;
+  /**
+   * Show the favorite heart on the image (default `true`). Pass `false` where the
+   * card already has its own wishlist control (e.g. Favorites' remove button).
+   * Never shown on non-navigating cards (`href={null}`).
+   */
+  showFavorite?: boolean;
 }
 
 /** Wraps the card body in a `Link` — or a plain `div` when `href` is null. */
@@ -116,6 +131,7 @@ export default function ProductCard({
   overlayStart,
   footer,
   href,
+  showFavorite = true,
 }: ProductCardProps) {
   const t = useTranslations();
 
@@ -129,6 +145,10 @@ export default function ProductCard({
           }).catch(() => undefined);
         }
       : undefined;
+  // Kalp yalnız gerçek ilan kartında: özel (ilansız) koleksiyon öğesi
+  // favorilenemez.
+  const favorite = showFavorite && linkHref !== null;
+  const sellerId = product.seller?.id ?? product.sellerId;
 
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
@@ -172,7 +192,11 @@ export default function ProductCard({
             ve yazı ölçüleri de aynı gerekçeyle kademeli.
           */}
           <div className="bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex flex-wrap items-center gap-3 p-3 sm:gap-4">
-            <div className="relative w-20 h-20 xs:w-28 xs:h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
+            {/* `self-start`: görsel hep kartın sol üst köşesinde durur; favori
+                kalbinin çerçevesi (linkin dışında) bu konuma göre çizilir. */}
+            <div
+              className={`relative ${LIST_THUMB_SIZE} flex-shrink-0 self-start bg-surface-alt rounded-lg overflow-hidden`}
+            >
               <OptimizedImage
                 src={imageUrl}
                 alt={product.title}
@@ -237,6 +261,13 @@ export default function ProductCard({
             </div>
           </div>
         </CardLink>
+        {favorite && (
+          <ProductCardFavorite
+            productId={product.id}
+            sellerId={sellerId}
+            frameClassName={`left-3 top-3 ${LIST_THUMB_SIZE}`}
+          />
+        )}
         {overlay && (
           <div className="absolute top-2 right-2 z-10">{overlay}</div>
         )}
@@ -336,6 +367,9 @@ export default function ProductCard({
           </div>
         </div>
       </CardLink>
+      {favorite && (
+        <ProductCardFavorite productId={product.id} sellerId={sellerId} />
+      )}
       {footer && <div className="px-2.5 pb-2.5">{footer}</div>}
       {overlay && (
         <div className="absolute top-1.5 right-1.5 z-10">{overlay}</div>

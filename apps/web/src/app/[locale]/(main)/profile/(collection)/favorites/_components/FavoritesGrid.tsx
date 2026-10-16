@@ -49,6 +49,8 @@ export default function FavoritesGrid({
             product={wishlistItemToProduct(item)}
             index={index}
             showMeta={false}
+            // Kartın kendi "kaldır" düğmesi var — ikinci bir kalp çizilmez.
+            showFavorite={false}
             overlay={
               !isSharedView ? (
                 <IconButton
