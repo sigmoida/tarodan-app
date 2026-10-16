@@ -11,7 +11,7 @@ import type { ContentPlatform } from "@tarodan/types";
 import { col, type RowActionItem } from "@/components/table";
 import { fmtDate, fmtPercent } from "@/lib/format";
 import { type Ad, positionLabels, platformLabels } from "./types";
-import { AD_STATUS_VARIANT, adLiveStatus } from "./status";
+import { AD_STATUS_VARIANT, adLiveStatus, adShadowScope } from "./status";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -114,7 +114,9 @@ export function adColumns(
         const status = adLiveStatus(ad, now);
         return (
           <Badge variant={AD_STATUS_VARIANT[status]} size="sm">
-            {t(`admin.marketing.ads.liveStatus.${status}`)}
+            {t(`admin.marketing.ads.liveStatus.${status}`, {
+              scope: adShadowScope(ad),
+            })}
           </Badge>
         );
       },

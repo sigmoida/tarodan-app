@@ -5651,7 +5651,8 @@
           "live": "Live",
           "expired": "Expired",
           "inactive": "Off",
-          "campaignEnded": "Campaign ended"
+          "campaignEnded": "Campaign ended",
+          "shadowed": "{scope, select, web {Another ad is live in this slot — not shown on the site} app {Another ad is live in this slot — not shown in the app} other {Another ad is live in this slot — not shown}}"
         },
         "linkUrl": "Link URL",
         "linkUrlHelper": "A full address starting with https://… or a site path such as /category/cars.",

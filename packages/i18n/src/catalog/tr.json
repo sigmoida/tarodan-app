@@ -5651,7 +5651,8 @@
           "live": "Yayında",
           "expired": "Süresi doldu",
           "inactive": "Kapalı",
-          "campaignEnded": "Kampanya bitti"
+          "campaignEnded": "Kampanya bitti",
+          "shadowed": "{scope, select, web {Aynı yuvada başka reklam yayında — sitede gösterilmiyor} app {Aynı yuvada başka reklam yayında — uygulamada gösterilmiyor} other {Aynı yuvada başka reklam yayında — gösterilmiyor}}"
         },
         "linkUrl": "Bağlantı (URL)",
         "linkUrlHelper": "https://… ile başlayan tam adres ya da /kategori/araba gibi site içi yol.",

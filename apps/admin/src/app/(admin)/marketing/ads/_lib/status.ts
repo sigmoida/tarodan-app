@@ -1,7 +1,12 @@
+import { clientPlatformsOf } from "@tarodan/types";
 import { LIVE_STATUS_VARIANT, scheduleLiveStatus, type LiveStatus } from "@/lib/live-status";
 import type { Ad } from "./types";
 
-export type AdLiveStatus = LiveStatus | "campaignEnded";
+/**
+ * `shadowed`: yayında ama vitrinde görünmüyor — aynı yuvada (pozisyon +
+ * platform) önce gelen başka bir reklam yayında (API `shadowedOn`).
+ */
+export type AdLiveStatus = LiveStatus | "campaignEnded" | "shadowed";
 
 /** Rozet varyantları (yalnız Badge'in mevcut beş varyantı). */
 export const AD_STATUS_VARIANT: Record<
@@ -10,15 +15,17 @@ export const AD_STATUS_VARIANT: Record<
 > = {
   ...LIVE_STATUS_VARIANT,
   campaignEnded: "warning",
+  shadowed: "warning",
 };
 
 /**
  * Reklamın şu an gerçekten yayında olup olmadığı. Öncelik: kapalı > kampanya
  * bitti > süresi doldu > planlandı > yayında. Kampanya bağlı reklam kampanyayla
- * birlikte biter (kampanya kapalıysa ya da bitiş tarihi geçtiyse).
+ * birlikte biter (kampanya kapalıysa ya da bitiş tarihi geçtiyse). Yayında
+ * olup aynı yuvada başka reklam yüzünden görünmeyen reklam `shadowed`.
  */
 export function adLiveStatus(
-  ad: Pick<Ad, "isActive" | "startDate" | "endDate" | "discount">,
+  ad: Pick<Ad, "isActive" | "startDate" | "endDate" | "discount" | "shadowedOn">,
   now: Date,
 ): AdLiveStatus {
   if (!ad.isActive) return "inactive";
@@ -27,5 +34,20 @@ export function adLiveStatus(
     if (!ad.discount.isActive || campaignEnd < now.getTime())
       return "campaignEnded";
   }
-  return scheduleLiveStatus(ad, now);
+  const schedule = scheduleLiveStatus(ad, now);
+  return schedule === "live" && ad.shadowedOn?.length ? "shadowed" : schedule;
+}
+
+/**
+ * Gölgenin kapsamı (rozet metni): reklam hedeflediği her istemcide gizliyse
+ * `all`, yalnız birinde gizliyse o istemci (`web` / `app`).
+ */
+export function adShadowScope(
+  ad: Pick<Ad, "platform" | "shadowedOn">,
+): "all" | "web" | "app" {
+  const hidden = ad.shadowedOn ?? [];
+  const targets = clientPlatformsOf(ad.platform);
+  if (hidden.length === 0 || targets.every((p) => hidden.includes(p)))
+    return "all";
+  return hidden[0];
 }

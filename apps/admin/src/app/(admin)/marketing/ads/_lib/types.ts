@@ -8,6 +8,7 @@ import {
   type AdHotspotError,
   type AdHotspotInput,
   type AdPopupFrequency,
+  type ClientPlatform,
   type ContentPlatform,
 } from "@tarodan/types";
 import {
@@ -58,8 +59,13 @@ export interface Ad {
   platform: ContentPlatform;
   /** Yalnız popup yuvasında anlamlı. */
   popupFrequency: AdPopupFrequency;
-  /** Her güncellemede artar; kapatılmış popup yeni sürümde yeniden açılır. */
+  /** Kreatif değişince artar; kapatılmış popup yeni sürümde yeniden açılır. */
   popupVersion: number;
+  /**
+   * Yalnız liste yanıtında: yayında olduğu halde gösterilmediği istemciler
+   * (aynı yuvada önce gelen başka reklam yayında). Boş = sorun yok.
+   */
+  shadowedOn?: ClientPlatform[];
   displayOrder: number;
   isActive: boolean;
   startDate: string | null;
