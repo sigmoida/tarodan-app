@@ -5,8 +5,10 @@ import { DEFAULT_PSP_FEE_RATE, settingsToMap } from "@/lib/settings";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Settings {
-  minProductPrice: number;
-  maxProductPrice: number;
+  /** İlan/teklif fiyat alt sınırı (₺); `null` = kural yok. */
+  minProductPrice: number | null;
+  /** İlan fiyat üst sınırı (₺); `null` = kural yok. */
+  maxProductPrice: number | null;
   maxMessageLength: number;
   /** PSP (PayTR) kesinti oranı (%) — hak ediş ekranlarındaki tahmini maliyet. */
   pspFeeRate: number;
@@ -43,6 +45,8 @@ export interface FieldDef {
   helper?: string;
   min?: number;
   step?: number;
+  /** Boş bırakılabilir: boş kaydetmek kuralı kapatır (API'de boş değer = kural yok). */
+  optional?: boolean;
 }
 
 type FieldMeta = Omit<FieldDef, "label" | "helper">;
@@ -60,12 +64,14 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
       backendKey: "min_product_price",
       min: 0,
       step: 0.01,
+      optional: true,
     },
     {
       key: "maxProductPrice",
       backendKey: "max_product_price",
       min: 0,
       step: 0.01,
+      optional: true,
     },
   ],
   message: [
@@ -149,8 +155,10 @@ export function tabFields(t: T): Record<SettingsTab, FieldDef[]> {
 }
 
 const DEFAULTS: Settings = {
-  minProductPrice: 10,
-  maxProductPrice: 100000,
+  // Fiyat sınırı satırı yokken kural yoktur (API ile aynı): uydurma bir
+  // varsayılan göstermek, kaydedildiğinde gerçekte olmayan bir sınır yazardı.
+  minProductPrice: null,
+  maxProductPrice: null,
   maxMessageLength: 1000,
   // Ayar satırı yokken gösterimde kullanılan oran — kırılım ekranlarıyla TEK kaynak.
   pspFeeRate: DEFAULT_PSP_FEE_RATE,
@@ -167,7 +175,13 @@ export function parseSettings(raw: unknown): Settings {
   for (const fields of Object.values(FIELD_DEFS)) {
     for (const f of fields) {
       const v = obj[f.backendKey];
-      if (v != null && v !== "") result[f.key] = Number(v);
+      if (v != null && v.trim() !== "") {
+        const n = Number(v);
+        // Opsiyonel alanda sayısal olmayan değer de "kural yok"tur (API ile aynı).
+        if (Number.isFinite(n) || !f.optional) result[f.key] = n;
+      } else if (f.optional) {
+        result[f.key] = null;
+      }
     }
   }
   return result;
@@ -178,20 +192,21 @@ export function parseSettings(raw: unknown): Settings {
  * strings) and validated for "is a number ≥ min". Payload shaping to a number
  * stays in the mutationFn (CLAUDE.md §11).
  */
-const numField = (t: T, min?: number) =>
-  z
-    .string()
-    .trim()
-    .min(1, t("admin.settings.validation.required"))
-    .refine(
-      (v) => {
-        const n = Number(v);
-        return !Number.isNaN(n) && (min == null || n >= min);
-      },
-      min != null
-        ? t("admin.settings.validation.invalidValueMin", { min })
-        : t("admin.settings.validation.invalidValue"),
-    );
+const numField = (t: T, min?: number, optional?: boolean) => {
+  const trimmed = z.string().trim();
+  return (
+    optional ? trimmed : trimmed.min(1, t("admin.settings.validation.required"))
+  ).refine(
+    (v) => {
+      if (optional && v === "") return true;
+      const n = Number(v);
+      return !Number.isNaN(n) && (min == null || n >= min);
+    },
+    min != null
+      ? t("admin.settings.validation.invalidValueMin", { min })
+      : t("admin.settings.validation.invalidValue"),
+  );
+};
 
 /** Zod schema for the whole settings form, derived from `FIELD_DEFS` (one source of truth). */
 export const settingsSchema = (t: T) =>
@@ -200,7 +215,7 @@ export const settingsSchema = (t: T) =>
       .flat()
       .reduce(
         (shape, f) => {
-          shape[f.key] = numField(t, f.min);
+          shape[f.key] = numField(t, f.min, f.optional);
           return shape;
         },
         {} as Record<keyof Settings, ReturnType<typeof numField>>,
@@ -212,6 +227,18 @@ export type SettingsFormValues = z.infer<ReturnType<typeof settingsSchema>>;
 /** Server `Settings` (numbers) → form values (strings) for `useZodForm`'s `values`. */
 export function toFormValues(s: Settings): SettingsFormValues {
   return Object.fromEntries(
-    (Object.keys(s) as (keyof Settings)[]).map((k) => [k, String(s[k])]),
+    (Object.keys(s) as (keyof Settings)[]).map((k) => [
+      k,
+      s[k] == null ? "" : String(s[k]),
+    ]),
   ) as SettingsFormValues;
+}
+
+/**
+ * Form değeri (string) → API'ye giden ayar değeri. Opsiyonel alan boşsa BOŞ
+ * gider: `Number("")` 0'dır ve "0" yazmak sınırı kapatmak yerine 0'a çekerdi.
+ */
+export function settingPayloadValue(field: FieldMeta, raw: string): string {
+  if (field.optional && raw.trim() === "") return "";
+  return String(Number(raw));
 }
