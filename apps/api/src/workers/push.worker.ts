@@ -1,6 +1,10 @@
 /**
  * Push Notification Worker
  * Processes push notifications via Expo Push API
+ *
+ * Gönderim, ölü token temizliği ve makbuz (receipt) planlaması TEK çekirdekten
+ * geçer: `ExpoPushProvider.sendMessages`. Bu worker yalnız kuyruk işlerini
+ * (kişi başı bildirim, yönetici yayını dağıtımı, makbuz kontrolü) yönetir.
  */
 import {
   Processor,
@@ -10,18 +14,39 @@ import {
 } from "@nestjs/bull";
 import { Logger } from "@nestjs/common";
 import { Job } from "bull";
-import { ConfigService } from "@nestjs/config";
+import { defaultLocale, isLocale, type Locale } from "@tarodan/i18n";
 import { PrismaService } from "../prisma";
 import {
   preferenceTypeFor,
   resolveSettings,
   shouldDeliver,
 } from "../modules/notification/helpers/notification-preferences";
-import { NotificationType } from "../modules/notification/dto";
 import {
   isKnownNotificationType,
   resolveWebNotificationLink,
+  withDefaultAudience,
 } from "../modules/notification/helpers/notification-link";
+import {
+  ExpoPushProvider,
+  type ExpoPushMessage,
+  type PushSendOutcome,
+} from "../modules/notification/providers/expo-push.provider";
+import {
+  PUSH_RECEIPT_JOB,
+  isExpoPushToken,
+  pushChannelFor,
+  type PushReceiptJobData,
+} from "../modules/notification/helpers/push-delivery";
+import {
+  renderQueuedNotificationText,
+  type QueuedNotificationCopy,
+} from "../modules/notification/helpers/notification-event-copy";
+import { markBroadcastLogRows } from "../modules/notification/helpers/broadcast-delivery";
+import {
+  ADMIN_BROADCAST_JOB,
+  EventService,
+  type AdminBroadcastJobData,
+} from "../modules/events/event.service";
 
 export interface PushJobData {
   userId: string;
@@ -49,67 +74,36 @@ export type OrderNotificationType =
 
 export interface PushNotificationJobData {
   userId: string;
-  title: string;
-  body: string;
+  /**
+   * Varsayılan dilde (tr) düz metin. `copy` varsa worker metni ALICININ
+   * dilinde katalogdan render eder; bu alanlar yalnız eski işler (deploy
+   * anında kuyrukta kalanlar) ve yönetici yayını içindir.
+   */
+  title?: string;
+  body?: string;
+  copy?: QueuedNotificationCopy;
   data?: {
     type: OrderNotificationType | string;
     orderId?: string;
     orderNumber?: string;
     [key: string]: any;
   };
+  /** Yönetici yayını: push teslim izleme satırını sonuçtan günceller. */
+  broadcastId?: string;
 }
 
-interface ExpoPushMessage {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, any>;
-  badge?: number;
-  sound?: "default" | null;
-  channelId?: string;
-  priority?: "default" | "normal" | "high";
-  ttl?: number;
-}
-
-interface ExpoPushTicket {
-  status: "ok" | "error";
-  id?: string;
-  message?: string;
-  details?: Record<string, any>;
-}
+/** Zil kaydının sonucu — mükerrerde push da GİTMEZ. */
+type InAppSaveResult = "created" | "duplicate";
 
 @Processor("push")
 export class PushWorker {
   private readonly logger = new Logger(PushWorker.name);
-  private readonly expoPushUrl = "https://exp.host/--/api/v2/push/send";
-  private readonly expoAccessToken: string;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-  ) {
-    this.expoAccessToken = this.configService.get<string>(
-      "EXPO_ACCESS_TOKEN",
-      "",
-    );
-  }
-
-  /**
-   * Build headers for the Expo Push API. Adds the bearer token when
-   * EXPO_ACCESS_TOKEN is configured (required once "Enhanced Security for
-   * Push Notifications" is enabled in the Expo dashboard).
-   */
-  private buildExpoHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip, deflate",
-      "Content-Type": "application/json",
-    };
-    if (this.expoAccessToken) {
-      headers["Authorization"] = `Bearer ${this.expoAccessToken}`;
-    }
-    return headers;
-  }
+    private readonly expoPush: ExpoPushProvider,
+    private readonly events: EventService,
+  ) {}
 
   @Process("send")
   async handleSend(job: Job<PushJobData>) {
@@ -134,9 +128,8 @@ export class PushWorker {
       return { success: false, reason: "No push tokens" };
     }
 
-    // Build Expo push messages
     const messages: ExpoPushMessage[] = pushTokens
-      .filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token))
+      .filter((token) => isExpoPushToken(token))
       .map((token) => ({
         to: token,
         title,
@@ -144,7 +137,7 @@ export class PushWorker {
         data,
         badge,
         sound: sound ?? "default",
-        channelId: channelId ?? "default",
+        channelId: channelId ?? pushChannelFor(data?.type),
         priority: priority ?? "high",
         ttl: ttl ?? 86400,
       }));
@@ -154,43 +147,17 @@ export class PushWorker {
       return { success: false, reason: "No valid Expo tokens" };
     }
 
-    try {
-      // Send to Expo Push API in chunks of 100
-      const chunks = this.chunkArray(messages, 100);
-      const results: ExpoPushTicket[] = [];
-
-      for (const chunk of chunks) {
-        const response = await fetch(this.expoPushUrl, {
-          method: "POST",
-          headers: this.buildExpoHeaders(),
-          body: JSON.stringify(chunk),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Expo Push API error: ${response.status}`);
-        }
-
-        const responseData = await response.json();
-        results.push(...(responseData.data || []));
-      }
-
-      const successCount = results.filter((r) => r.status === "ok").length;
-      const failCount = results.filter((r) => r.status === "error").length;
-
-      this.logger.log(
-        `Push notification sent: ${successCount} success, ${failCount} failed`,
-      );
-
-      return {
-        success: true,
-        sent: successCount,
-        failed: failCount,
-        tickets: results,
-      };
-    } catch (error: any) {
-      this.logger.error(`Failed to send push notification: ${error.message}`);
-      throw error;
-    }
+    // HTTP hatası fırlatılır → Bull yeniden dener.
+    const outcome = await this.expoPush.sendMessages(messages);
+    this.logger.log(
+      `Push notification sent: ${outcome.sent} success, ${outcome.failed} failed`,
+    );
+    return {
+      success: true,
+      sent: outcome.sent,
+      failed: outcome.failed,
+      tickets: outcome.tickets,
+    };
   }
 
   /**
@@ -204,7 +171,14 @@ export class PushWorker {
       `Processing send-notification job ${job.id} for user ${job.data.userId}`,
     );
 
-    const { userId, title, body, data } = job.data;
+    const { userId, broadcastId } = job.data;
+    const rawType = job.data.data?.type;
+    // Satıcıya giden tiplerde hedef kitle tipten eklenir (dispatch yoluyla
+    // aynı kural): push dokunuşu satıcı ekranını açsın.
+    const data = isKnownNotificationType(rawType)
+      ? (withDefaultAudience(rawType, job.data.data) as
+          PushNotificationJobData["data"] | undefined)
+      : job.data.data;
     // Tercih kararı tipi: pazarlama türündeki admin duyurusu ALWAYS_SEND'den
     // yararlanmaz (S1) — `data.type` istemciye aynen gider.
     const notificationType = preferenceTypeFor(data);
@@ -213,27 +187,63 @@ export class PushWorker {
     // tercihe uymalı. Kategori kapalıysa zil + push birlikte atlanır; kategori
     // açık ama push master kapalıysa zil kalır, push atlanır.
     // Kampanya düğmesinin tek kaynağı e-posta izni kolonudur (resolveSettings).
+    // Dil tercihi: metin alıcının dilinde render edilir.
     const prefs = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notificationSettings: true, acceptsMarketingEmails: true },
+      select: {
+        notificationSettings: true,
+        acceptsMarketingEmails: true,
+        preferredLanguage: true,
+      },
     });
     const settings = resolveSettings(
       prefs?.notificationSettings,
       prefs?.acceptsMarketingEmails,
     );
+    const locale: Locale = isLocale(prefs?.preferredLanguage)
+      ? prefs.preferredLanguage
+      : defaultLocale;
+    const { title, body } = renderQueuedNotificationText(job.data, locale);
     const inAppAllowed = shouldDeliver(settings, notificationType, "in_app");
+
+    const finishBroadcast = async (delivered: boolean, error?: string) => {
+      if (!broadcastId) return;
+      await markBroadcastLogRows(this.prisma, {
+        broadcastId,
+        userIds: [userId],
+        channels: ["push"],
+        delivered,
+        error,
+      }).catch((err: unknown) =>
+        this.logger.warn(
+          `Broadcast log update failed (${broadcastId}): ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    };
 
     // 1. Store as in-app notification — skip for admin_broadcast because
     // admin.service.ts already creates the in_app log before queuing this job.
     if (data?.type !== "admin_broadcast") {
       if (inAppAllowed) {
+        let saved: InAppSaveResult | null = null;
         try {
-          await this.saveInAppNotification(userId, title, body, data);
+          saved = await this.saveInAppNotification(userId, title, body, data);
           this.logger.log(`In-app notification stored for user ${userId}`);
         } catch (error: any) {
           this.logger.error(
             `Failed to store in-app notification: ${error.message}`,
           );
+        }
+        // Aynı olay dispatch yolundan (ya da önceki bir denemeden) zaten
+        // bildirildiyse push da TEKRARLANMAZ — eskiden zil satırı elenip push
+        // yine gidiyordu ("teklif kabul edildi" iki kez geliyordu).
+        if (saved === "duplicate") {
+          return {
+            success: true,
+            inAppStored: false,
+            pushSent: false,
+            reason: "Duplicate notification",
+          };
         }
       } else {
         this.logger.log(
@@ -247,6 +257,7 @@ export class PushWorker {
       this.logger.log(
         `Push suppressed by user preference: user=${userId} type=${notificationType}`,
       );
+      await finishBroadcast(false, "Suppressed by user preference");
       return {
         success: true,
         inAppStored: inAppAllowed,
@@ -265,12 +276,13 @@ export class PushWorker {
         where: { userId, isActive: true },
         select: { token: true },
       });
-
-      // Get push tokens
-      const pushTokens: string[] = tokens.map((t) => t.token);
+      const pushTokens = tokens
+        .map((t) => t.token)
+        .filter((token) => isExpoPushToken(token));
 
       if (pushTokens.length === 0) {
-        this.logger.warn(`No push tokens for user ${userId}`);
+        this.logger.warn(`No valid push tokens for user ${userId}`);
+        await finishBroadcast(false, "No active device");
         return {
           success: true,
           inAppStored: true,
@@ -279,89 +291,41 @@ export class PushWorker {
         };
       }
 
-      // Determine channel based on notification type
-      let channelId = "default";
-      if (data?.type) {
-        if (data.type.includes("order") || data.type.includes("payment")) {
-          channelId = "orders";
-        } else if (data.type.includes("trade")) {
-          channelId = "trades";
-        } else if (data.type.includes("message")) {
-          channelId = "messages";
-        }
-      }
+      // iOS rozeti: okunmamış zil sayısı (yeni satır yukarıda yazıldı).
+      const badge = await this.expoPush.unreadBadgeCount(userId);
+      // Android kanalı tipten (mobil istemcinin kanallarıyla aynı kimlikler).
+      const channelId = pushChannelFor(data?.type);
 
-      // Build Expo push messages directly
-      const messages: ExpoPushMessage[] = pushTokens
-        .filter((token) => /^Expo(nent)?PushToken\[.+\]$/.test(token))
-        .map((token) => ({
+      const outcome: PushSendOutcome = await this.expoPush.sendMessages(
+        pushTokens.map((token) => ({
           to: token,
           title,
           body,
           data,
-          sound: "default",
+          badge,
+          sound: "default" as const,
           channelId,
           priority: "high" as const,
           ttl: 86400,
-        }));
-
-      if (messages.length === 0) {
-        this.logger.warn(`No valid Expo push tokens for user ${userId}`);
-        return {
-          success: true,
-          inAppStored: true,
-          pushSent: false,
-          reason: "No valid Expo tokens",
-        };
-      }
-
-      // Send to Expo Push API
-      const response = await fetch(this.expoPushUrl, {
-        method: "POST",
-        headers: this.buildExpoHeaders(),
-        body: JSON.stringify(messages),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Expo Push API error: ${response.status}`);
-      }
-
-      const responseData = await response.json();
-      const results: ExpoPushTicket[] = responseData.data || [];
-      const successCount = results.filter((r) => r.status === "ok").length;
-
-      // Ölü token temizliği: Expo bir cihaz için 'DeviceNotRegistered' dönerse
-      // (uygulama silinmiş / token geçersiz) o token'ı deaktive et ki bir daha
-      // denenmesin ve push_tokens şişmesin. results, messages ile aynı sıradadır.
-      const deadTokens = results
-        .map((ticket, i) =>
-          ticket.status === "error" &&
-          ticket.details?.error === "DeviceNotRegistered"
-            ? messages[i]?.to
-            : null,
-        )
-        .filter((t): t is string => !!t);
-      if (deadTokens.length > 0) {
-        await this.prisma.pushToken.updateMany({
-          where: { token: { in: deadTokens } },
-          data: { isActive: false },
-        });
-        this.logger.log(
-          `Deactivated ${deadTokens.length} dead push token(s) for user ${userId}`,
-        );
-      }
+        })),
+      );
+      await finishBroadcast(
+        outcome.sent > 0,
+        outcome.sent > 0 ? undefined : "Rejected by Expo",
+      );
 
       return {
         success: true,
         inAppStored: true,
-        pushSent: successCount > 0,
-        sent: successCount,
-        tickets: results,
+        pushSent: outcome.sent > 0,
+        sent: outcome.sent,
+        tickets: outcome.tickets,
       };
     } catch (error: any) {
       this.logger.error(
         `Failed to process push notification: ${error.message}`,
       );
+      await finishBroadcast(false, error?.message);
       // Return success because in-app notification was stored
       return {
         success: true,
@@ -380,7 +344,7 @@ export class PushWorker {
     title: string,
     body: string,
     data?: Record<string, any>,
-  ): Promise<void> {
+  ): Promise<InAppSaveResult> {
     const notificationType = data?.type || "general";
 
     // Hedef MERKEZÎ çözümleyiciden gelir. Burada `data` alanlarına bakarak
@@ -432,7 +396,7 @@ export class PushWorker {
         this.logger.log(
           `Skipping duplicate in-app notification (${notificationType}/${dedupField}=${dedupValue}) for user ${userId}`,
         );
-        return;
+        return "duplicate";
       }
     }
 
@@ -452,6 +416,7 @@ export class PushWorker {
         sentAt: new Date(),
       },
     });
+    return "created";
   }
 
   /**
@@ -515,6 +480,71 @@ export class PushWorker {
     return { results };
   }
 
+  /**
+   * Yönetici yayınının dağıtımı (EventService.emitAdminBroadcast kuyruğa
+   * yazar). İlerleme `job.progress` ile parça parça kaydedilir: yeniden
+   * denemede tamamlanmış parçalar atlanır, kullanıcı aynı duyuruyu iki kez
+   * almaz. Zamanlanmış gönderimin durumu (sent/failed) burada, dağıtım
+   * SONUCUNDAN yazılır.
+   */
+  @Process(ADMIN_BROADCAST_JOB)
+  async handleBroadcast(job: Job<AdminBroadcastJobData>) {
+    const progress = Number(job.progress());
+    const startChunk = Number.isFinite(progress) && progress > 0 ? progress : 0;
+    try {
+      const stats = await this.events.runAdminBroadcastFanout(job.data, {
+        startChunk,
+        onChunkDone: async (done) => {
+          await job.progress(done);
+        },
+      });
+      if (job.data.scheduledNotificationId) {
+        const channels = job.data.channels;
+        // Yalnız e-posta seçildiyse ulaşanlar e-posta alıcılarıdır (pazarlamada
+        // izinsiz/çıkmış kullanıcılar elenir); aksi halde dağıtılan kullanıcılar.
+        const reached =
+          channels.length > 0 && channels.every((c) => c === "email")
+            ? stats.emailsQueued
+            : stats.users;
+        await this.prisma.scheduledNotification.updateMany({
+          where: { id: job.data.scheduledNotificationId, status: "processing" },
+          data: { status: "sent", sentAt: new Date(), sentCount: reached },
+        });
+      }
+      return stats;
+    } catch (error) {
+      const finalAttempt =
+        (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+      if (finalAttempt && job.data.scheduledNotificationId) {
+        await this.prisma.scheduledNotification
+          .updateMany({
+            where: {
+              id: job.data.scheduledNotificationId,
+              status: "processing",
+            },
+            data: { status: "failed", sentAt: new Date(), errorCount: 1 },
+          })
+          .catch(() => undefined);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Gecikmeli makbuz kontrolü (ExpoPushProvider.sendMessages planlar).
+   * HTTP hatasında fırlatır → Bull yeniden dener (makbuzlar 24 saat durur).
+   */
+  @Process(PUSH_RECEIPT_JOB)
+  async handleCheckReceipts(job: Job<PushReceiptJobData>) {
+    const outcome = await this.expoPush.checkReceipts(job.data.tickets ?? []);
+    if (outcome.failed > 0) {
+      this.logger.log(
+        `Push receipts: ${outcome.checked} checked, ${outcome.failed} failed, ${outcome.deactivated} token row(s) deactivated`,
+      );
+    }
+    return outcome;
+  }
+
   @OnQueueCompleted()
   onCompleted(job: Job) {
     this.logger.log(`Push notification job ${job.id} completed`);
@@ -525,13 +555,5 @@ export class PushWorker {
     this.logger.error(
       `Push notification job ${job.id} failed: ${error.message}`,
     );
-  }
-
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
   }
 }

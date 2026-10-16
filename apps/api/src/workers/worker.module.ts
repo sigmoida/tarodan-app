@@ -21,6 +21,7 @@ import { SuratCargoModule } from "../modules/surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../modules/notification/notification.module";
 import { ModerationModule } from "../modules/moderation/moderation.module";
 import { CommissionModule } from "../modules/commission/commission.module";
+import { EventModule } from "../modules/events/event.module";
 import { QUEUE_NAMES } from "./constants";
 
 @Module({
@@ -35,6 +36,9 @@ import { QUEUE_NAMES } from "./constants";
     // Oto-onay, admin onayıyla AYNI komisyon guard'ını uygular (İlan-Teknik
     // invaryant 3): kural silinmişse ilan yayına giremez.
     CommissionModule,
+    // Yönetici yayını dağıtımı (`send-broadcast`) EventService'in fan-out
+    // mantığını worker'da çalıştırır.
+    EventModule,
     // Faz 7.2: Bull KÖK bağlantısı (forRootAsync) BullRootModule'e taşındı — bu modül
     // gated (PROCESS_ROLE=web'de yüklenmez); bağlantı her rolde gerekli olduğundan ayrı.
     // Burada yalnız kuyruk kayıtları + processor'lar (job tüketicileri) kalır.

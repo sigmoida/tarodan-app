@@ -15,6 +15,12 @@ import type { MailingType } from "@tarodan/types";
 @Injectable()
 export class ScheduledNotificationScheduler implements OnModuleInit {
   private readonly logger = new Logger(ScheduledNotificationScheduler.name);
+  /**
+   * Aynı süreç içinde üst üste binen turu atlar. Çoklu worker güvenliği bu
+   * bayraktan DEĞİL, satır başına atomik sahiplenmeden (`pending →
+   * processing`, `updateMany` sayısı) gelir: iki süreç aynı satırı görse de
+   * yalnız biri sahiplenir.
+   */
   private isProcessing = false;
 
   constructor(
@@ -35,11 +41,15 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
   /**
    * Runs every minute to check for due scheduled notifications.
    * Gerçek iş — Bull processor 'process-scheduled-notifications' buradan çağırır.
+   *
+   * Satırın son durumu (sent/failed) burada değil, dağıtımı yapan push
+   * worker'ında (`send-broadcast`) SONUÇTAN yazılır; burada yalnız sahiplenme
+   * ve dağıtımın başlatılamadığı durumlar (hedef yok, hata) işlenir.
    */
   async runProcessScheduledNotifications(
     log: (msg: string) => void = () => {},
   ): Promise<{ summary: string; stats: Record<string, number> }> {
-    // Prevent concurrent execution
+    // Prevent concurrent execution (same process)
     if (this.isProcessing) {
       this.logger.debug(
         "Already processing scheduled notifications, skipping...",
@@ -48,7 +58,7 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
     }
 
     this.isProcessing = true;
-    let sent = 0;
+    let queued = 0;
     let failed = 0;
 
     try {
@@ -69,10 +79,9 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
       if (dueNotifications.length === 0) {
         this.logger.debug("No scheduled notifications due");
         log("0 bekleyen bildirim bulundu");
-        this.isProcessing = false;
         return {
           summary: "0 bekleyen bildirim",
-          stats: { due: 0, sent: 0, failed: 0 },
+          stats: { due: 0, queued: 0, failed: 0 },
         };
       }
 
@@ -82,13 +91,18 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
       );
 
       for (const notification of dueNotifications) {
-        try {
-          // Mark as processing to prevent duplicate processing
-          await this.prisma.scheduledNotification.update({
-            where: { id: notification.id },
-            data: { status: "processing" },
-          });
+        // Atomik sahiplenme: yalnız hâlâ "pending" ise "processing" yap.
+        // Başka bir worker süreci aynı satırı önce aldıysa sayı 0 döner.
+        const claim = await this.prisma.scheduledNotification.updateMany({
+          where: { id: notification.id, status: "pending" },
+          data: { status: "processing" },
+        });
+        if (claim.count !== 1) {
+          log(`bildirim ${notification.id} → başka süreç aldı, atlandı`);
+          continue;
+        }
 
+        try {
           // Extract target user IDs based on targetType
           let userIds: string[] = [];
 
@@ -125,48 +139,33 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             continue;
           }
 
-          // Send the notification using AdminService
-          const result = await this.adminService.sendNotification(
-            notification.createdBy,
-            {
-              title: notification.title,
-              body: notification.body,
-              channels: notification.channels as string[],
-              targetType: "user_ids",
-              userIds,
-              data: undefined,
-              // Zamanlanırken saklanan e-posta içeriği ve tür aynen taşınır.
-              emailSubject: notification.emailSubject ?? undefined,
-              emailHtml: notification.emailHtml ?? undefined,
-              mailingType: notification.mailingType as MailingType,
-            },
-          );
-
-          // Yalnız e-posta kanalı seçildiyse gerçekten ulaşanlar e-posta alıcılarıdır
-          // (pazarlamada izinsiz/çıkmış kullanıcılar elenir); push/uygulama içi
-          // kanalda tüm hedef bildirilmiş sayılır.
-          const channels = notification.channels as string[];
-          const reached =
-            channels.length > 0 && channels.every((c) => c === "email")
-              ? (result?.emailRecipientCount ?? userIds.length)
-              : userIds.length;
-
-          // Mark as sent
-          await this.prisma.scheduledNotification.update({
-            where: { id: notification.id },
-            data: {
-              status: "sent",
-              sentAt: new Date(),
-              sentCount: reached,
-            },
+          // Dağıtımı başlat (tek `send-broadcast` işi). Satır "processing"
+          // kalır; worker dağıtım bitince "sent" (+ ulaşılan sayı) ya da
+          // "failed" yazar.
+          await this.adminService.sendNotification(notification.createdBy, {
+            title: notification.title,
+            body: notification.body,
+            channels: notification.channels as string[],
+            targetType: "user_ids",
+            userIds,
+            // Zamanlanırken saklanan hedef link vb. — anında gönderimle aynı.
+            data:
+              notification.data && typeof notification.data === "object"
+                ? (notification.data as Record<string, unknown>)
+                : undefined,
+            // Zamanlanırken saklanan e-posta içeriği ve tür aynen taşınır.
+            emailSubject: notification.emailSubject ?? undefined,
+            emailHtml: notification.emailHtml ?? undefined,
+            mailingType: notification.mailingType as MailingType,
+            scheduledNotificationId: notification.id,
           });
 
-          sent++;
+          queued++;
           log(
-            `bildirim ${notification.id} → ${reached} kullanıcıya gönderildi`,
+            `bildirim ${notification.id} → ${userIds.length} kullanıcı için dağıtım kuyruğa alındı`,
           );
           this.logger.log(
-            `Scheduled notification ${notification.id} sent to ${userIds.length} users`,
+            `Scheduled notification ${notification.id} queued for ${userIds.length} users`,
           );
         } catch (error) {
           this.logger.error(
@@ -186,13 +185,16 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
         }
       }
 
-      const summary = `${dueNotifications.length} bekleyen · ${sent} gönderildi · ${failed} başarısız`;
-      return { summary, stats: { due: dueNotifications.length, sent, failed } };
+      const summary = `${dueNotifications.length} bekleyen · ${queued} kuyruğa alındı · ${failed} başarısız`;
+      return {
+        summary,
+        stats: { due: dueNotifications.length, queued, failed },
+      };
     } catch (error) {
       this.logger.error("Error in scheduled notification processor:", error);
       return {
-        summary: `İşleme hatası (${sent} gönderildi)`,
-        stats: { sent, failed },
+        summary: `İşleme hatası (${queued} kuyruğa alındı)`,
+        stats: { queued, failed },
       };
     } finally {
       this.isProcessing = false;

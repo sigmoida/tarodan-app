@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   Injectable,
   NotFoundException,
@@ -54,6 +55,11 @@ export interface AdminBroadcastInput {
   emailSubject?: string;
   emailHtml?: string;
   mailingType?: MailingType;
+  /**
+   * Zamanlanmış gönderimden geliyorsa satırın kimliği: dağıtımı yapan worker
+   * satırın durumunu (sent/failed) SONUÇTAN yazar.
+   */
+  scheduledNotificationId?: string;
 }
 
 export interface PreviewBroadcastEmailInput {
@@ -364,9 +370,13 @@ export class AdminNotificationService {
       const emailRecipientCount = sendsEmail
         ? (marketingTokens?.size ?? targetUserIds.length)
         : 0;
+      // Teslim izleme: push/e-posta satırları bu kimlikle eşlenir ve durumları
+      // worker SONUCUNDAN yazılır (eskiden kuyruğa yazılır yazılmaz "sent").
+      const broadcastId = randomUUID();
+      const trackedRowData = { ...data, broadcastId };
       // Geçmiş listesinde "HTML e-postası" rozeti için e-posta satırlarının işareti.
       const emailRowData = {
-        ...data,
+        ...trackedRowData,
         ...(emailContent.emailHtml && { hasHtmlEmail: true }),
       };
 
@@ -377,9 +387,10 @@ export class AdminNotificationService {
         type: string;
         title: string;
         body: string;
-        data: any;
+        data: Prisma.InputJsonValue;
         status: string;
         sentAt?: Date;
+        errorMessage?: string;
       }> = [];
 
       for (const userId of targetUserIds) {
@@ -404,12 +415,25 @@ export class AdminNotificationService {
               userId,
               channel,
               type: "admin_broadcast",
-              // Başlık push ile aynı kalır: aşağıdaki "sent" güncellemesi
-              // satırları (title, body) ile eşler.
               title: dto.title,
               body: dto.body,
               data: emailRowData,
               status: "pending",
+            });
+            continue;
+          }
+          if (channel !== "push") {
+            // Yayın dağıtımı yalnız push + e-posta gönderir (SMS altyapısı
+            // yok). Bu satır asla gönderilmeyecek: "pending"de kalmasın.
+            notificationLogs.push({
+              userId,
+              channel,
+              type: "admin_broadcast",
+              title: dto.title,
+              body: dto.body,
+              data: trackedRowData,
+              status: "failed",
+              errorMessage: "Channel not supported for broadcasts",
             });
             continue;
           }
@@ -419,7 +443,7 @@ export class AdminNotificationService {
             type: "admin_broadcast",
             title: dto.title,
             body: dto.body,
-            data,
+            data: trackedRowData,
             status: "pending",
           });
         }
@@ -434,9 +458,9 @@ export class AdminNotificationService {
         });
       }
 
-      // Trigger broadcast events (handles queues for Email/Push and creates In-App logs)
-      // Note: emitAdminBroadcast handles its own In-App log creation to ensure consistency,
-      // but we created logs above for consistency with the audit log and historical tracking.
+      // Dağıtım worker'da: tek `send-broadcast` işi kuyruğa yazılır. Push ve
+      // e-posta satırları "pending" kalır; kişi başı işler sonuçlandıkça
+      // "sent"/"failed" olur (iyimser toplu "sent" güncellemesi kaldırıldı).
       await this.eventService.emitAdminBroadcast({
         userIds: targetUserIds,
         title: dto.title,
@@ -447,21 +471,8 @@ export class AdminNotificationService {
         emailSubject: emailContent.emailSubject,
         emailHtml: emailContent.emailHtml,
         marketingUnsubscribeTokens: marketingTokens,
-      });
-
-      // Update the logs we created to 'sent' status since we just emitted them
-      await this.prisma.notificationLog.updateMany({
-        where: {
-          userId: { in: targetUserIds },
-          channel: { in: dto.channels },
-          title: dto.title,
-          body: dto.body,
-          status: "pending",
-        },
-        data: {
-          status: "sent",
-          sentAt: new Date(),
-        },
+        broadcastId,
+        scheduledNotificationId: dto.scheduledNotificationId,
       });
 
       // Log the action
@@ -535,6 +546,12 @@ export class AdminNotificationService {
           dto.targetType === "user_ids"
             ? (dto.userIds as any)
             : (dto.segmentCriteria as any) || Prisma.JsonNull,
+        // Hedef link vb. — gönderim anında aynı süzgeçten (sendNotification)
+        // yeniden geçer. Eskiden saklanmıyordu: zamanlanmış push linksiz gidiyordu.
+        data:
+          dto.data && Object.keys(dto.data).length > 0
+            ? (dto.data as Prisma.InputJsonObject)
+            : Prisma.JsonNull,
         scheduledFor: scheduledDate,
         createdBy: adminId,
         status: "pending",

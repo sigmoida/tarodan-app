@@ -9,6 +9,11 @@ import {
   newsletterUnsubscribeUrl,
   renderBroadcastEmail,
 } from "../../common/helpers/broadcast-email";
+import { notificationEventCopy } from "../notification/helpers/notification-event-copy";
+import { markBroadcastLogRows } from "../notification/helpers/broadcast-delivery";
+
+/** `push` kuyruğundaki yönetici yayını dağıtım işinin adı. */
+export const ADMIN_BROADCAST_JOB = "send-broadcast";
 
 /** In-process (EventEmitter2) event adları — modüller-arası döngüsüz decoupling. */
 export const PAYMENT_TRADE_CASH_CLEARED = "payment.trade-cash-cleared";
@@ -234,6 +239,28 @@ export interface AdminBroadcastPayload {
    * herkese gider.
    */
   marketingUnsubscribeTokens?: Map<string, string>;
+  /**
+   * Yayının teslim izleme satırlarını (`data.broadcastId`) eşler; push/e-posta
+   * işleri kendi satırını SONUÇTAN günceller.
+   */
+  broadcastId?: string;
+  /** Zamanlanmış gönderimse satırın kimliği: dağıtım bitince durumu yazılır. */
+  scheduledNotificationId?: string;
+}
+
+/** `send-broadcast` iş verisi — JSON'a dönüşebilir (Map yerine kayıt). */
+export interface AdminBroadcastJobData {
+  userIds: string[];
+  title: string;
+  body: string;
+  channels: string[];
+  data?: Record<string, unknown>;
+  emailSubject?: string | null;
+  emailHtml?: string | null;
+  /** `userId → unsubscribeToken`; null = duyuru (herkese e-posta). */
+  marketingUnsubscribeTokens?: Record<string, string> | null;
+  broadcastId?: string;
+  scheduledNotificationId?: string;
 }
 
 export interface InAppNotificationPayload {
@@ -399,8 +426,9 @@ export class EventService {
         "send-notification",
         {
           userId: payload.buyerId,
-          title: "Ödeme Onaylandı",
-          body: `${payload.productTitle} siparişiniz için ödeme alındı`,
+          ...notificationEventCopy("orderPaidBuyer", {
+            productTitle: payload.productTitle,
+          }),
           data: {
             type: "payment_confirmed",
             orderId: payload.orderId,
@@ -419,10 +447,14 @@ export class EventService {
       "send-notification",
       {
         userId: payload.sellerId,
-        title: "Yeni Sipariş",
-        body: `${payload.productTitle} ürününüz satıldı! Kargoya hazırlayın.`,
+        ...notificationEventCopy("orderPaidSeller", {
+          productTitle: payload.productTitle,
+        }),
         data: {
           type: "payment_received",
+          // SATICI ekranı (satış detayı). Eksikken mobil push dokunuşu alıcının
+          // sipariş ekranını açıyordu.
+          audience: "seller",
           orderId: payload.orderId,
           orderNumber: payload.orderNumber,
         },
@@ -509,8 +541,9 @@ export class EventService {
       "send-notification",
       {
         userId: payload.buyerId,
-        title: "Ödeme Onaylandı",
-        body: `${payload.items.length} ürünlük siparişiniz için ödeme alındı`,
+        ...notificationEventCopy("groupOrderPaidBuyer", {
+          itemCount: payload.items.length,
+        }),
         data: {
           type: "payment_confirmed",
           checkoutGroupId: payload.checkoutGroupId,
@@ -644,8 +677,10 @@ export class EventService {
       "send-notification",
       {
         userId: payload.sellerId,
-        title: "Yeni Teklif",
-        body: `${payload.productTitle} için ${payload.offerAmount.toFixed(2)} TL teklif aldınız`,
+        ...notificationEventCopy("offerReceived", {
+          productTitle: payload.productTitle,
+          amount: payload.offerAmount.toFixed(2),
+        }),
         data: {
           type: "offer_received",
           offerId: payload.offerId,
@@ -712,24 +747,10 @@ export class EventService {
       },
     );
 
-    // Queue push notification to buyer - Offer accepted, proceed to payment
-    await this.pushQueue.add(
-      "send-notification",
-      {
-        userId: payload.buyerId,
-        title: "Teklif Kabul Edildi!",
-        body: `${payload.productTitle} için teklifiniz kabul edildi. Ödeme yaparak siparişinizi tamamlayın.`,
-        data: {
-          type: "offer_accepted",
-          offerId: payload.offerId,
-          orderId: payload.orderId,
-          orderNumber: payload.orderNumber,
-        },
-      },
-      {
-        priority: 1,
-      },
-    );
+    // Push + zil BURADAN gitmez: teklif kabulünü `OfferService.accept`
+    // commit sonrası `notifyOfferAccepted` ile (alıcının dilinde, tek push)
+    // duyurur. Burada da kuyruğa yazılınca alıcı İKİ push alıyordu (worker'ın
+    // mükerrer filtresi yalnız zil satırını eliyordu).
 
     // Queue analytics event
     // DISABLED — analytics 'track-event' (handler/tablo yok, boşa fail ediyordu).
@@ -792,8 +813,9 @@ export class EventService {
       "send-notification",
       {
         userId: payload.buyerId,
-        title: "Ödeme Başarısız",
-        body: `Sipariş ${payload.orderNumber} için ödeme başarısız oldu.`,
+        ...notificationEventCopy("paymentFailed", {
+          orderNumber: payload.orderNumber,
+        }),
         data: {
           type: "payment_failed",
           orderId: payload.orderId,
@@ -870,8 +892,10 @@ export class EventService {
       "send-notification",
       {
         userId: payload.buyerId,
-        title: "İade İşlemi Tamamlandı",
-        body: `Sipariş ${payload.orderNumber} için ${payload.refundAmount.toFixed(2)} TL iade edildi.`,
+        ...notificationEventCopy("paymentRefundedBuyer", {
+          orderNumber: payload.orderNumber,
+          amount: payload.refundAmount.toFixed(2),
+        }),
         data: {
           type: "payment_refunded",
           // Alıcının kendi sipariş ekranı.
@@ -890,8 +914,9 @@ export class EventService {
       "send-notification",
       {
         userId: payload.sellerId,
-        title: "İade İşlemi",
-        body: `Sipariş ${payload.orderNumber} için iade işlemi gerçekleştirildi.`,
+        ...notificationEventCopy("paymentRefundedSeller", {
+          orderNumber: payload.orderNumber,
+        }),
         data: {
           type: "payment_refunded",
           // Aynı sipariş, SATICI ekranı.
@@ -929,8 +954,10 @@ export class EventService {
       "send-notification",
       {
         userId: payload.buyerId,
-        title: "Teklifiniz Kapatıldı",
-        body: `${payload.productTitle}: ${payload.reason}`,
+        ...notificationEventCopy("offerAutoRejected", {
+          productTitle: payload.productTitle,
+          reason: payload.reason,
+        }),
         data: {
           type: "offer_auto_rejected",
           offerId: payload.offerId,
@@ -960,8 +987,9 @@ export class EventService {
         "send-notification",
         {
           userId,
-          title: "Takas İptal Edildi",
-          body: `Takasınız otomatik olarak iptal edildi: ${payload.reason}`,
+          ...notificationEventCopy("tradeAutoCancelled", {
+            reason: payload.reason,
+          }),
           data: {
             type: "trade_auto_cancelled",
             tradeId: payload.tradeId,
@@ -992,8 +1020,7 @@ export class EventService {
         "send-notification",
         {
           userId,
-          title: "Takas Kargoya Hazır",
-          body: "Ödeme tamamlandı. Ürününüzü Tarodan deposuna göndermeniz gerekiyor.",
+          ...notificationEventCopy("tradeReadyForShipping"),
           data: {
             type: "trade_ready_for_shipping",
             tradeId: payload.tradeId,
@@ -1024,8 +1051,7 @@ export class EventService {
         "send-notification",
         {
           userId,
-          title: "Takas Onaylandı",
-          body: "Takas onaylandı, ürünler yolda.",
+          ...notificationEventCopy("tradeWarehouseApproved"),
           data: {
             type: "trade_warehouse_approved",
             tradeId: payload.tradeId,
@@ -1056,8 +1082,9 @@ export class EventService {
         "send-notification",
         {
           userId,
-          title: "Takas Reddedildi",
-          body: `Takas reddedildi: ${payload.reason}`,
+          ...notificationEventCopy("tradeWarehouseRejected", {
+            reason: payload.reason,
+          }),
           data: {
             type: "trade_warehouse_rejected",
             tradeId: payload.tradeId,
@@ -1088,8 +1115,7 @@ export class EventService {
         "send-notification",
         {
           userId,
-          title: "Takas Depoda",
-          body: "Ürünlerden biri Tarodan deposuna ulaştı. Bu noktadan sonra iptal yapılamaz; sorun varsa itiraz açın.",
+          ...notificationEventCopy("tradeCancelLocked"),
           data: {
             type: "trade_cancel_locked",
             tradeId: payload.tradeId,
@@ -1118,8 +1144,7 @@ export class EventService {
         "send-notification",
         {
           userId,
-          title: "İade Tamamlandı",
-          body: "Ürününüz size geri ulaştı; takas iptal edildi.",
+          ...notificationEventCopy("tradeReturnCompleted"),
           data: {
             type: "trade_return_completed",
             tradeId: payload.tradeId,
@@ -1146,8 +1171,7 @@ export class EventService {
       "send-notification",
       {
         userId: payload.compensationUserId,
-        title: "İade Kargosu Kayıp",
-        body: `İade gönderiniz kayıp olarak işaretlendi. Tarodan ekibi sizinle iletişime geçecek.`,
+        ...notificationEventCopy("tradeReturnLost"),
         data: {
           type: "trade_return_lost",
           tradeId: payload.tradeId,
@@ -1176,8 +1200,7 @@ export class EventService {
         "send-notification",
         {
           userId: payload.cashPayerId,
-          title: "İade Gecikti",
-          body: "Otomatik iadeniz tamamlanamadı. Tarodan ekibi durumu inceliyor; en kısa sürede çözeceğiz.",
+          ...notificationEventCopy("tradeRefundFailed"),
           data: {
             type: "trade_refund_failed",
             tradeId: payload.tradeId,
@@ -1205,8 +1228,7 @@ export class EventService {
         "send-notification",
         {
           userId: payload.cashPayerId,
-          title: "İade Tamamlandı",
-          body: "Nakit fark ödemeniz PayTR üzerinden iade edildi.",
+          ...notificationEventCopy("tradeRefundCompleted"),
           data: {
             type: "trade_refund_completed",
             tradeId: payload.tradeId,
@@ -1234,8 +1256,9 @@ export class EventService {
       "send-notification",
       {
         userId: payload.buyerId,
-        title: "Sipariş Süresi Doldu",
-        body: `${payload.productTitle} siparişinizin ödeme süresi doldu ve iptal edildi.`,
+        ...notificationEventCopy("reservationExpired", {
+          productTitle: payload.productTitle,
+        }),
         data: {
           type: "reservation_expired",
           orderId: payload.orderId,
@@ -1276,22 +1299,85 @@ export class EventService {
   }
 
   /**
-   * Emit admin broadcast notification
+   * Yönetici yayını: dağıtım (fan-out) HTTP isteğinde DEĞİL, worker'da yapılır.
+   *
+   * Eskiden bu metot her kullanıcı için ayrı sorgu + kuyruk yazımını istek
+   * içinde yapıyordu; 10 bin kişilik bir duyuru yönetici isteğini dakikalarca
+   * bekletiyor ve zaman aşımında yarım kalıyordu. Artık TEK bir `send-broadcast`
+   * işi kuyruğa yazılır; worker `runAdminBroadcastFanout` ile dağıtır.
+   * Worker çalışmıyorsa (`PROCESS_ROLE=web` tek başına) iş Redis'te bekler —
+   * eskiden de kişi başı push/e-posta işleri worker'ı bekliyordu, yeni bir
+   * bağımlılık eklenmez.
    */
   async emitAdminBroadcast(payload: AdminBroadcastPayload): Promise<void> {
     this.logger.log(
-      `Emitting admin broadcast to ${payload.userIds.length} users`,
+      `Queueing admin broadcast to ${payload.userIds.length} users`,
     );
+    const job: AdminBroadcastJobData = {
+      userIds: payload.userIds,
+      title: payload.title,
+      body: payload.body,
+      channels: payload.channels,
+      data: payload.data,
+      emailSubject: payload.emailSubject ?? null,
+      emailHtml: payload.emailHtml ?? null,
+      marketingUnsubscribeTokens: payload.marketingUnsubscribeTokens
+        ? Object.fromEntries(payload.marketingUnsubscribeTokens)
+        : null,
+      broadcastId: payload.broadcastId,
+      scheduledNotificationId: payload.scheduledNotificationId,
+    };
+    await this.pushQueue.add(ADMIN_BROADCAST_JOB, job, {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 30_000 },
+      removeOnComplete: true,
+    });
+  }
+
+  /**
+   * Yayının kişi başı dağıtımı (worker'da çalışır). Parça (100 kullanıcı)
+   * sırasıyla ilerler; `startChunk` yeniden denemede tamamlanmış parçaları
+   * atlar (mükerrer push/e-posta olmasın), `onChunkDone` ilerlemeyi kaydeder.
+   *
+   * Teslim izleme: kişi başı push/e-posta işleri `broadcastId` taşır ve kendi
+   * satırını sonuçtan günceller. Burada elenenler (yasaklı, cihazı olmayan)
+   * satırı hemen "failed" olur — hiçbir satır sonsuza dek "pending" kalmaz.
+   */
+  async runAdminBroadcastFanout(
+    payload: AdminBroadcastJobData,
+    opts: {
+      startChunk?: number;
+      onChunkDone?: (chunkIndex: number) => Promise<void>;
+    } = {},
+  ): Promise<{ users: number; pushQueued: number; emailsQueued: number }> {
+    const sendsEmail = payload.channels.includes("email");
+    const sendsPush = payload.channels.includes("push");
+    const tokens = payload.marketingUnsubscribeTokens ?? null;
+    const broadcastId = payload.broadcastId;
 
     // Alıcıdan bağımsız e-posta içeriği (HTML süzme dahil) BİR kez hazırlanır.
-    const emailContent = payload.channels.includes("email")
-      ? prepareBroadcastEmailContent(payload)
+    const emailContent = sendsEmail
+      ? prepareBroadcastEmailContent({
+          title: payload.title,
+          body: payload.body,
+          emailSubject: payload.emailSubject,
+          emailHtml: payload.emailHtml,
+        })
       : undefined;
 
-    // Fetch user details in chunks
+    const stats = { users: 0, pushQueued: 0, emailsQueued: 0 };
     const chunkSize = 100;
-    for (let i = 0; i < payload.userIds.length; i += chunkSize) {
-      const chunkIds = payload.userIds.slice(i, i + chunkSize);
+    const startChunk = opts.startChunk ?? 0;
+
+    for (
+      let index = startChunk;
+      index * chunkSize < payload.userIds.length;
+      index++
+    ) {
+      const chunkIds = payload.userIds.slice(
+        index * chunkSize,
+        (index + 1) * chunkSize,
+      );
 
       const users = await this.prisma.user.findMany({
         where: { id: { in: chunkIds }, isBanned: false },
@@ -1307,18 +1393,15 @@ export class EventService {
           },
         },
       });
+      stats.users += users.length;
+      const noDevice: string[] = [];
 
       for (const user of users) {
         // Send email if requested
-        if (payload.channels.includes("email")) {
-          const unsubscribeToken = payload.marketingUnsubscribeTokens?.get(
-            user.id,
-          );
+        if (sendsEmail) {
+          const unsubscribeToken = tokens?.[user.id];
           // Pazarlama: izni olmayan/çıkmış kullanıcıya e-posta GİTMEZ.
-          if (
-            emailContent &&
-            (!payload.marketingUnsubscribeTokens || unsubscribeToken)
-          ) {
+          if (emailContent && (!tokens || unsubscribeToken)) {
             const unsubscribeUrl = unsubscribeToken
               ? newsletterUnsubscribeUrl(unsubscribeToken)
               : undefined;
@@ -1338,12 +1421,20 @@ export class EventService {
                   "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
                 },
               }),
+              ...(broadcastId && {
+                broadcastLog: { userId: user.id, broadcastId },
+              }),
             });
+            stats.emailsQueued++;
           }
         }
 
         // Send push if requested and the user has at least one active device token
-        if (payload.channels.includes("push") && user.pushTokens.length > 0) {
+        if (sendsPush) {
+          if (user.pushTokens.length === 0) {
+            noDevice.push(user.id);
+            continue;
+          }
           await this.pushQueue.add("send-notification", {
             userId: user.id,
             title: payload.title,
@@ -1352,9 +1443,36 @@ export class EventService {
               ...payload.data,
               type: "admin_broadcast",
             },
+            ...(broadcastId && { broadcastId }),
           });
+          stats.pushQueued++;
         }
       }
+
+      if (broadcastId) {
+        // Yasaklı / bulunamayan kullanıcıların satırları ve cihazı olmayanların
+        // push satırı: gönderim yapılmayacak, "pending"de kalmasın.
+        const found = new Set(users.map((u) => u.id));
+        const skipped = chunkIds.filter((id) => !found.has(id));
+        await markBroadcastLogRows(this.prisma, {
+          broadcastId,
+          userIds: skipped,
+          channels: ["push", "email"],
+          delivered: false,
+          error: "Recipient inactive",
+        });
+        await markBroadcastLogRows(this.prisma, {
+          broadcastId,
+          userIds: noDevice,
+          channels: ["push"],
+          delivered: false,
+          error: "No active device",
+        });
+      }
+
+      await opts.onChunkDone?.(index + 1);
     }
+
+    return stats;
   }
 }

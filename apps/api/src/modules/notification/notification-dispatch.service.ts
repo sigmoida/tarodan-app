@@ -8,10 +8,13 @@
  * to this single engine.
  */
 import {
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
   Optional,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
@@ -47,6 +50,7 @@ import {
   resolveWebNotificationLink,
   withDefaultAudience,
 } from "./helpers/notification-link";
+import { pushChannelFor } from "./helpers/push-delivery";
 import {
   type Locale,
   type MessageValues,
@@ -65,9 +69,18 @@ import {
   frontendUrlForEnvironment,
 } from "../../config/app-urls";
 
+/** Kapanışta yarım kalan push'lar için en fazla bekleme. */
+const PUSH_DRAIN_TIMEOUT_MS = 5_000;
+
 @Injectable()
-export class NotificationDispatchService {
+export class NotificationDispatchService implements OnModuleDestroy {
   private readonly logger = new Logger(NotificationDispatchService.name);
+  /**
+   * Arka planda süren push gönderimleri. İş isteği push'u BEKLEMEZ (Expo
+   * yavaşsa ödeme/teklif isteği de yavaşlıyordu); süreç kapanırken bunlar
+   * sınırlı süre beklenir. Testler `drainPendingPushes` ile bekler.
+   */
+  private readonly pendingPushes = new Set<Promise<unknown>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -80,6 +93,75 @@ export class NotificationDispatchService {
     // ve o zaman tekilleştirme yapılmadan her çağrı bildirim üretir.
     @Optional() private readonly cache?: CacheService,
   ) {}
+
+  /** Süreç kapanırken yarım kalan push'ları sınırlı süre bekle. */
+  async onModuleDestroy(): Promise<void> {
+    await this.drainPendingPushes(PUSH_DRAIN_TIMEOUT_MS);
+  }
+
+  /** Arka plandaki push gönderimlerinin bitmesini bekler (kapanış + testler). */
+  async drainPendingPushes(timeoutMs = PUSH_DRAIN_TIMEOUT_MS): Promise<void> {
+    if (this.pendingPushes.size === 0) return;
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      Promise.allSettled([...this.pendingPushes]),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+    if (timer) clearTimeout(timer);
+  }
+
+  /**
+   * Push'u ARKA PLANDA gönderir — çağıran iş isteği Expo'yu beklemez.
+   *
+   * Neden kuyruk değil: bu yol (createInAppNotification / send) bugün tüm
+   * ticari bildirimlerin push'unu taşıyor; `PROCESS_ROLE=web` ile worker'sız
+   * çalışan bir dağıtımda kuyruğa yazılan push hiç gitmezdi. Süreç içi
+   * ateşle-unut + Expo isteğinde zaman aşımı (EXPO_REQUEST_TIMEOUT_MS) worker'a
+   * bağımlılık eklemeden isteği hızlandırır. Push kaybı kabul edilebilir bir
+   * yan etkidir (CLAUDE.md §10); zil kaydı zaten yazılmıştır.
+   *
+   * Android kanalı tipten, iOS rozeti okunmamış zil sayısından gelir.
+   * Sonuç `onSettled` ile bildirilir (ör. teslim izleme satırı).
+   */
+  private firePush(
+    userId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    data: Record<string, any>,
+    onSettled?: (delivered: boolean) => Promise<void> | void,
+  ): void {
+    let started: ReturnType<ExpoPushProvider["sendToUser"]>;
+    try {
+      started = this.expoPushProvider.sendToUser(userId, title, body, data, {
+        channelId: pushChannelFor(type),
+        badge: "unread",
+      });
+    } catch (error) {
+      // Eşzamanlı hata da çağıranı (iş isteğini) bozmaz.
+      started = Promise.reject(error);
+    }
+    const task = started
+      .then((results) => results.some((r) => r.success))
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Failed to send push to user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return false;
+      })
+      .then(async (delivered) => {
+        try {
+          await onSettled?.(delivered);
+        } catch (error) {
+          this.logger.warn(`[firePush] onSettled failed: ${error}`);
+        }
+      });
+    this.pendingPushes.add(task);
+    void task.finally(() => this.pendingPushes.delete(task));
+  }
 
   /**
    * Cron alarmlarının TEK tekilleştirme noktası. Aynı `key` için `ttlSeconds`
@@ -250,6 +332,7 @@ export class NotificationDispatchService {
     ];
 
     const results: Record<string, boolean> = {};
+    let pushRequested = false;
 
     // Send to each channel using REAL providers
     for (const channel of channels) {
@@ -285,21 +368,11 @@ export class NotificationDispatchService {
           break;
 
         case NotificationChannel.PUSH:
-          // `type`'ı push payload'ına ekle: mobil deep-link routing (push.ts
-          // routeFromNotification) önce type'a bakıyor; yoksa tüm push'lar genel
-          // bildirim sekmesine düşüyordu. data zaten ilgili id'leri içeriyor.
-          results.push = await this.sendPushReal(dto.userId, title, message, {
-            ...data,
-            type: dto.type,
-          });
-          await this.logNotification(
-            dto.userId,
-            "push",
-            dto.type,
-            title,
-            message,
-            results.push,
-          );
+          // Push döngüden SONRA, arka planda gider (aşağıda): zil kaydı önce
+          // yazılsın ki iOS rozeti yeni bildirimi de saysın. `true` = gönderim
+          // başlatıldı; teslim sonucu "push" izleme satırına yazılır.
+          pushRequested = true;
+          results.push = true;
           break;
 
         case NotificationChannel.IN_APP:
@@ -332,6 +405,28 @@ export class NotificationDispatchService {
           }
           break;
       }
+    }
+
+    if (pushRequested) {
+      // `type`'ı push payload'ına ekle: mobil deep-link routing (push.ts
+      // routeFromNotification) önce type'a bakıyor; yoksa tüm push'lar genel
+      // bildirim sekmesine düşüyordu. data zaten ilgili id'leri içeriyor.
+      this.firePush(
+        dto.userId,
+        dto.type,
+        title,
+        message,
+        { ...data, type: dto.type },
+        (delivered) =>
+          this.logNotification(
+            dto.userId,
+            "push",
+            dto.type,
+            title,
+            message,
+            delivered,
+          ),
+      );
     }
 
     this.logger.log(`Notification sent to ${user.email}: ${dto.type}`);
@@ -369,29 +464,6 @@ export class NotificationDispatchService {
       return result.success;
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Send push notification using Expo provider
-   */
-  private async sendPushReal(
-    userId: string,
-    title: string,
-    body: string,
-    data?: Record<string, any>,
-  ): Promise<boolean> {
-    try {
-      const results = await this.expoPushProvider.sendToUser(
-        userId,
-        title,
-        body,
-        data,
-      );
-      return results.some((r) => r.success);
-    } catch (error) {
-      this.logger.error(`Failed to send push to user ${userId}:`, error);
       return false;
     }
   }
@@ -629,18 +701,18 @@ export class NotificationDispatchService {
     // teklif, takas, sipariş, rating, takip, beğeni, wishlist, iade...) push kazanır.
     // event.service ayrı pushQueue yolunu kullandığından çift-push olmaz.
     // type'ı data'ya ekliyoruz → mobil deep-link routing doğru ekrana gider.
-    // Best-effort: push hatası in-app bildirimi etkilemez.
+    // Best-effort ve ARKA PLANDA (firePush): push hatası/gecikmesi in-app
+    // bildirimi ve çağıran iş isteğini etkilemez.
     // Push master anahtarı kapalıysa zil kalır ama cihaza push gönderilmez.
     if (opts?.pushRequiresRecord && !notificationId) {
       this.logger.warn(
         `[createInAppNotification] record not saved; push withheld for retry: user=${userId} type=${type}`,
       );
     } else if (shouldDeliver(settings, type, "push")) {
-      try {
-        await this.sendPushReal(userId, title, message, { ...payload, type });
-      } catch (e) {
-        this.logger.warn(`[createInAppNotification] push failed: ${e}`);
-      }
+      this.firePush(userId, type, title, message, {
+        ...(payload ?? {}),
+        type,
+      });
     } else {
       this.logger.log(
         `[createInAppNotification] push suppressed by user preference: user=${userId} type=${type}`,
@@ -686,35 +758,45 @@ export class NotificationDispatchService {
   /**
    * Register push token for a user
    */
+  /**
+   * Hatalar artık YUTULMAZ: geçersiz token 400, aktif olmayan hesap 403 döner.
+   * Eskiden her hata 200 `{ success: false }` oluyordu ve istemci kaydın
+   * başarısız olduğunu hiç öğrenmiyordu (yeniden deneme / teşhis yoktu).
+   * Yayındaki mobil sürümler gövdeyi okumaz, hatayı `.catch` ile yutar —
+   * 4xx onlar için davranış değişikliği değildir.
+   */
   async registerPushToken(userId: string | null, dto: RegisterPushTokenDto) {
-    try {
-      // Logout path: the device asks us to deactivate its token instead of
-      // registering it, so the user stops receiving push on a signed-out device.
-      // May arrive without a session (expired access token at logout).
-      // The DEVICE is logging out, so every active row for its token is
-      // deactivated — with or without a session. Scoping to the caller's row
-      // would let an older row of another account on this device survive.
-      if (dto.revoke) {
-        await this.expoPushProvider.deactivateToken(dto.token);
-        return { success: true, userId, revoked: true };
-      }
-      if (!userId) {
-        return { success: false, error: "Authentication required" };
-      }
+    // Logout path: the device asks us to deactivate its token instead of
+    // registering it, so the user stops receiving push on a signed-out device.
+    // May arrive without a session (expired access token at logout).
+    // The DEVICE is logging out, so every active row for its token is
+    // deactivated — with or without a session. Scoping to the caller's row
+    // would let an older row of another account on this device survive.
+    if (dto.revoke) {
+      await this.expoPushProvider.deactivateToken(dto.token);
+      return { success: true, userId, revoked: true };
+    }
+    if (!userId) {
+      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
+    }
 
+    try {
       await this.expoPushProvider.registerToken(
         userId,
         dto.token,
         dto.platform as "ios" | "android",
         dto.deviceId,
+        dto.deviceModel,
       );
-
-      return { success: true, userId, platform: dto.platform };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return { success: false, error: errorMessage };
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `Push token registration failed for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
     }
+
+    return { success: true, userId, platform: dto.platform };
   }
 
   /**

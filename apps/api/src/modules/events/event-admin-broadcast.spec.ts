@@ -1,6 +1,15 @@
-import { EventService } from "./event.service";
+import {
+  ADMIN_BROADCAST_JOB,
+  EventService,
+  type AdminBroadcastPayload,
+} from "./event.service";
 import * as sanitizer from "../../common/helpers/email-html-sanitizer";
 
+/**
+ * Yayın iki adımdır: istek `emitAdminBroadcast` ile TEK `send-broadcast` işi
+ * yazar, worker `runAdminBroadcastFanout` ile dağıtır. Testler iki adımı da
+ * gerçek iş verisiyle (Redis'e yazılan JSON hâliyle) çalıştırır.
+ */
 describe("EventService.emitAdminBroadcast — e-posta", () => {
   const makeService = (users: Array<{ id: string; email: string }>) => {
     const emailQueue = { add: jest.fn().mockResolvedValue(undefined) };
@@ -11,6 +20,9 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
           .fn()
           .mockResolvedValue(users.map((u) => ({ ...u, pushTokens: [] }))),
       },
+      notificationLog: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const service = new EventService(
       emailQueue as never,
@@ -19,7 +31,16 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
       prisma as never,
       {} as never,
     );
-    return { service, emailQueue };
+    const emit = async (payload: AdminBroadcastPayload) => {
+      await service.emitAdminBroadcast(payload);
+      const call = pushQueue.add.mock.calls.find(
+        ([name]) => name === ADMIN_BROADCAST_JOB,
+      );
+      // Redis'e yazılan hâl: JSON gidiş-dönüşü (Map taşınamazdı).
+      const job = JSON.parse(JSON.stringify(call?.[1]));
+      return service.runAdminBroadcastFanout(job);
+    };
+    return { service, emailQueue, pushQueue, prisma, emit };
   };
 
   const users = [
@@ -35,9 +56,9 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
   };
 
   it("duyuru: herkese gider, çıkış linki/başlığı yoktur (eski davranış)", async () => {
-    const { service, emailQueue } = makeService(users);
+    const { emit, emailQueue } = makeService(users);
 
-    await service.emitAdminBroadcast({ ...base });
+    await emit({ ...base });
 
     expect(emailQueue.add).toHaveBeenCalledTimes(2);
     for (const [, job] of emailQueue.add.mock.calls) {
@@ -49,9 +70,9 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
   });
 
   it("HTML verilince e-posta özel konu + süzülmüş HTML ile gider", async () => {
-    const { service, emailQueue } = makeService(users);
+    const { emit, emailQueue } = makeService(users);
 
-    await service.emitAdminBroadcast({
+    await emit({
       ...base,
       emailSubject: "Kampanya",
       emailHtml: "<h1>Selam</h1><script>alert(1)</script>",
@@ -64,9 +85,9 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
   });
 
   it("pazarlama: yalnız haritadaki üyelere gider; her mail kendi çıkış linkini taşır", async () => {
-    const { service, emailQueue } = makeService(users);
+    const { emit, emailQueue } = makeService(users);
 
-    await service.emitAdminBroadcast({
+    await emit({
       ...base,
       emailHtml: "<p>x</p>",
       marketingUnsubscribeTokens: new Map([["u1", "tok-1"]]),
@@ -87,9 +108,9 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
   });
 
   it("pazarlama + boş harita: kimseye e-posta gitmez", async () => {
-    const { service, emailQueue } = makeService(users);
+    const { emit, emailQueue } = makeService(users);
 
-    await service.emitAdminBroadcast({
+    await emit({
       ...base,
       marketingUnsubscribeTokens: new Map(),
     });
@@ -102,10 +123,10 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
       id: `u${n}`,
       email: `u${n}@example.com`,
     }));
-    const { service, emailQueue } = makeService(many);
+    const { emit, emailQueue } = makeService(many);
     const spy = jest.spyOn(sanitizer, "sanitizeEmailHtml");
 
-    await service.emitAdminBroadcast({
+    await emit({
       ...base,
       userIds: many.map((u) => u.id),
       emailHtml: "<p>Selam</p><script>alert(1)</script>",
@@ -118,5 +139,36 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
       expect(job.html).not.toContain("<script");
     }
     spy.mockRestore();
+  });
+
+  it("istek içinde dağıtım YAPILMAZ: yalnız tek send-broadcast işi yazılır", async () => {
+    const { service, emailQueue, pushQueue } = makeService(users);
+
+    await service.emitAdminBroadcast({ ...base, channels: ["email", "push"] });
+
+    expect(emailQueue.add).not.toHaveBeenCalled();
+    expect(pushQueue.add).toHaveBeenCalledTimes(1);
+    expect(pushQueue.add.mock.calls[0][0]).toBe(ADMIN_BROADCAST_JOB);
+  });
+
+  it("cihazı olmayan kullanıcının push satırı 'failed' olur, iş yazılmaz", async () => {
+    const { emit, pushQueue, prisma } = makeService(users);
+
+    await emit({ ...base, channels: ["push"], broadcastId: "b-1" });
+
+    // Yalnız send-broadcast işi; kullanıcıların token'ı yok → kişi başı iş yok.
+    expect(
+      pushQueue.add.mock.calls.filter(([n]) => n === "send-notification"),
+    ).toHaveLength(0);
+    expect(prisma.notificationLog.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: { in: ["u1", "u2"] },
+          channel: { in: ["push"] },
+          data: { path: ["broadcastId"], equals: "b-1" },
+        }),
+        data: expect.objectContaining({ status: "failed" }),
+      }),
+    );
   });
 });
