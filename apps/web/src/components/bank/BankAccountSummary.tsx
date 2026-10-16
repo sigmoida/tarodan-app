@@ -2,9 +2,8 @@
 
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Badge, maskIban } from "@tarodan/ui";
-import { formatDate } from "@/lib/format";
 
 export interface BankAccountSummaryProps {
   accountHolder: string;
@@ -22,7 +21,13 @@ export function BankAccountSummary({
   updatedAt,
 }: BankAccountSummaryProps) {
   const t = useTranslations();
-  const updated = formatDate(updatedAt);
+  const format = useFormatter();
+  const date = updatedAt ? new Date(updatedAt) : null;
+  // Aktif locale'e göre biçimlenir (formatDate sabit tr-TR).
+  const updated =
+    date && !isNaN(date.getTime())
+      ? format.dateTime(date, { dateStyle: "medium" })
+      : "";
 
   return (
     <div

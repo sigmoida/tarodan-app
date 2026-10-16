@@ -4,6 +4,8 @@
 
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
+import { finishBankSave } from "../_lib/bankSave";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
@@ -32,6 +34,7 @@ export default function BankAccountSection() {
   const { isAuthenticated } = useAuthStore();
   const confirm = useConfirm();
   const router = useRouter();
+  const qc = useQueryClient();
   const { account } = useBankAccount(isAuthenticated);
   const save = useSaveBankAccount();
   const remove = useDeleteBankAccount();
@@ -52,10 +55,7 @@ export default function BankAccountSection() {
   // Kayıt başarılıysa ve güvenli bir `returnTo` varsa (ör. ilan formu) oraya dön.
   const submit = (v: BankAccountValues) =>
     save.mutate(v, {
-      onSuccess: () => {
-        const returnTo = readReturnTo();
-        if (returnTo) router.push(returnTo);
-      },
+      onSuccess: () => finishBankSave(qc, readReturnTo(), router.push),
     });
 
   const onDelete = async () => {

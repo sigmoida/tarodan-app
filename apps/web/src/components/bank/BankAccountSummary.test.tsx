@@ -11,6 +11,10 @@ import { BankAccountSummary } from "./BankAccountSummary";
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("next-intl", () => ({
+  useFormatter: () => ({
+    dateTime: (d: Date, o: unknown) =>
+      `fmt:${d.toISOString()}:${JSON.stringify(o)}`,
+  }),
   useTranslations: () => (key: string, values?: { date?: string }) =>
     values?.date ? `${key}|${values.date}` : key,
 }));
@@ -45,7 +49,7 @@ describe("BankAccountSummary", () => {
   it("maskeli IBAN, hesap sahibi ve Kayıtlı rozetini gösterir", () => {
     renderSummary();
     const text = host.textContent ?? "";
-    expect(text).toContain("TR33 **** **** **** **** **13 26");
+    expect(text).toContain("TR33 **** 1326");
     expect(text).not.toContain(IBAN);
     expect(text).toContain("Ali Veli");
     expect(text).toContain("bankAccount.savedBadge");
@@ -53,7 +57,9 @@ describe("BankAccountSummary", () => {
 
   it("updatedAt varsa son güncelleme satırını gösterir", () => {
     renderSummary("2026-10-14T10:00:00.000Z");
-    expect(host.textContent).toContain("bankAccount.lastUpdated|14.10.2026");
+    expect(host.textContent).toContain(
+      "bankAccount.lastUpdated|fmt:2026-10-14T10:00:00.000Z",
+    );
   });
 
   it("updatedAt yoksa son güncelleme satırı çıkmaz", () => {
