@@ -17,7 +17,7 @@ import { emailImageTag, insertAtCursor } from "./imageSnippet";
 /**
  * HTML e-posta gövdesi editörü (RHF alanı). E-posta şablonu düzenleyicisi ve
  * toplu bildirim formu aynı editörü kullanır: Tab girintisi, karakter sayacı,
- * koyu monospace alan. Bir `FormModal`/`Form` bağlamı içinde render edilir.
+ * açık temalı monospace alan. Bir `FormModal`/`Form` bağlamı içinde render edilir.
  */
 export function EmailHtmlEditor({
   name,
@@ -50,8 +50,7 @@ export function EmailHtmlEditor({
     async (file: File) => {
       const url = await onUploadImage!(file);
       const tag = emailImageTag(url);
-      if (!tag)
-        throw new Error("upload returned a non-http(s) url");
+      if (!tag) throw new Error("upload returned a non-http(s) url");
       return tag;
     },
     {
@@ -151,7 +150,7 @@ export function EmailHtmlEditor({
         autoCorrect="off"
         autoCapitalize="off"
         placeholder={placeholder}
-        className={`${className} flex-1 resize-none rounded-lg border border-border bg-heading p-3 font-mono text-xs leading-relaxed text-inverted`}
+        className={`${className} flex-1 resize-none rounded-lg border border-border bg-surface-alt p-3 font-mono text-xs leading-relaxed text-heading placeholder:text-subtle focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20`}
       />
       {error && <p className="mt-1 text-xs text-danger-500">{error}</p>}
     </div>

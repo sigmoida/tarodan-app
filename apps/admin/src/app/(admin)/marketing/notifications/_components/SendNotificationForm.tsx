@@ -14,8 +14,6 @@ import {
 import {
   BellIcon,
   ClockIcon,
-  DevicePhoneMobileIcon,
-  EnvelopeIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -41,6 +39,7 @@ import {
   useAudienceCounts,
   useBroadcastEmailPreview,
 } from "../_lib/useBroadcastEmailPreview";
+import { PushPreview } from "./PushPreview";
 import { UserPicker } from "./UserPicker";
 
 /** datetime-local için YEREL "şimdi" (yyyy-mm-ddTHH:mm). */
@@ -192,8 +191,10 @@ export function SendNotificationForm({
         size="wide"
         closeOnBackdrop={false}
       >
+        {/* xl altında önizleme push metin alanlarının hemen altına düşer; xl'de
+            sağ sütunda sticky kalır (iki satıra yayılır). */}
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
-          <div className="space-y-5 xl:col-span-3">
+          <div className="xl:col-span-3 xl:col-start-1 xl:row-start-1">
             <SectionCard
               title={t("admin.marketing.notifications.pushTextTitle")}
               bodyClassName="space-y-5"
@@ -246,7 +247,65 @@ export function SendNotificationForm({
                 />
               </div>
             </SectionCard>
+          </div>
 
+          <div className="xl:col-span-2 xl:col-start-4 xl:row-span-2 xl:row-start-1">
+            <SectionCard
+              title={t("admin.marketing.notifications.livePreview")}
+              className="xl:sticky xl:top-6"
+              bodyClassName="space-y-5"
+            >
+              {values.channels.includes("push") && (
+                <PushPreview title={values.title} body={values.body} />
+              )}
+
+              {values.channels.length === 0 && (
+                <EmptyState
+                  size="compact"
+                  icon={<BellIcon className="h-6 w-6" />}
+                  title={t(
+                    "admin.marketing.notifications.selectPreviewChannel",
+                  )}
+                />
+              )}
+
+              <DataList
+                columns={1}
+                className="gap-y-2 border-t border-border pt-2"
+              >
+                <Field label={t("admin.marketing.notifications.targetLabel")}>
+                  {
+                    targets.find((target) => target.key === values.targetType)
+                      ?.label
+                  }
+                </Field>
+                <Field label={t("admin.marketing.notifications.channels")}>
+                  {values.channels.length === 0
+                    ? "—"
+                    : values.channels
+                        .map(
+                          (channel) =>
+                            channels.find((item) => item.key === channel)
+                              ?.label,
+                        )
+                        .join(", ")}
+                </Field>
+                <Field label={t("common.status")}>
+                  <span
+                    className={clsx(
+                      canSend ? "text-success-600" : "text-warning-600",
+                    )}
+                  >
+                    {canSend
+                      ? t("admin.marketing.notifications.ready")
+                      : t("admin.marketing.notifications.missingFields")}
+                  </span>
+                </Field>
+              </DataList>
+            </SectionCard>
+          </div>
+
+          <div className="space-y-5 xl:col-span-3 xl:col-start-1 xl:row-start-2">
             <SectionCard
               title={t("admin.marketing.notifications.deliveryChannel")}
               bodyClassName="space-y-4"
@@ -309,14 +368,35 @@ export function SendNotificationForm({
                     </p>
                   )}
                 </div>
-                <EmailHtmlEditor
-                  name="emailHtml"
-                  placeholder={t(
-                    "admin.marketing.notifications.emailHtmlPlaceholder",
+                {/* Editör ve önizleme yan yana (lg+), küçükte alt alta ve bitişik:
+                    şablon düzenleyicisiyle aynı desen. */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <EmailHtmlEditor
+                    name="emailHtml"
+                    placeholder={t(
+                      "admin.marketing.notifications.emailHtmlPlaceholder",
+                    )}
+                    className="min-h-[360px]"
+                    onUploadImage={uploadEmailImage}
+                  />
+                  {values.emailHtml.trim() ? (
+                    <EmailPreviewPane
+                      className="min-h-[360px]"
+                      preview={emailPreview.preview}
+                      isPending={emailPreview.isPending}
+                      error={emailPreview.error}
+                      onRetry={emailPreview.refetch}
+                    />
+                  ) : (
+                    <EmptyState
+                      size="compact"
+                      icon={false}
+                      title={t(
+                        "admin.marketing.notifications.emailPreviewEmpty",
+                      )}
+                    />
                   )}
-                  className="min-h-[260px]"
-                  onUploadImage={uploadEmailImage}
-                />
+                </div>
               </SectionCard>
             )}
 
@@ -399,119 +479,6 @@ export function SendNotificationForm({
             >
               {t("admin.marketing.notifications.schedule")}
             </Button>
-          </div>
-
-          <div className="xl:col-span-2">
-            <SectionCard
-              title={t("admin.marketing.notifications.livePreview")}
-              className="sticky top-6"
-              bodyClassName="space-y-5"
-            >
-              {values.channels.includes("push") && (
-                <div>
-                  <p className="mb-2 flex items-center gap-1 text-xs text-muted">
-                    <DevicePhoneMobileIcon className="h-3.5 w-3.5" /> Push
-                    {t("admin.marketing.notifications.notificationSuffix")}
-                  </p>
-                  <div className="rounded-2xl bg-heading p-4 shadow-lg">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500">
-                        <BellIcon className="h-5 w-5 text-inverted" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-inverted">
-                          {values.title || (
-                            <span className="font-normal italic text-inverted/50">
-                              {t("admin.marketing.notifications.enterTitle")}
-                            </span>
-                          )}
-                        </p>
-                        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-inverted/70">
-                          {values.body || (
-                            <span className="italic">
-                              {t("admin.marketing.notifications.enterContent")}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs text-inverted/50">
-                        {t("admin.marketing.notifications.now")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {values.channels.includes("email") && (
-                <div>
-                  <p className="mb-2 flex items-center gap-1 text-xs text-muted">
-                    <EnvelopeIcon className="h-3.5 w-3.5" />{" "}
-                    {t("admin.marketing.notifications.channel.email")}
-                  </p>
-                  {values.emailHtml.trim() ? (
-                    <EmailPreviewPane
-                      className="h-[460px]"
-                      preview={emailPreview.preview}
-                      isPending={emailPreview.isPending}
-                      error={emailPreview.error}
-                      onRetry={emailPreview.refetch}
-                    />
-                  ) : (
-                    <EmptyState
-                      size="compact"
-                      icon={false}
-                      title={t(
-                        "admin.marketing.notifications.emailPreviewEmpty",
-                      )}
-                    />
-                  )}
-                </div>
-              )}
-
-              {values.channels.length === 0 && (
-                <EmptyState
-                  size="compact"
-                  icon={<BellIcon className="h-6 w-6" />}
-                  title={t(
-                    "admin.marketing.notifications.selectPreviewChannel",
-                  )}
-                />
-              )}
-
-              <DataList
-                columns={1}
-                className="gap-y-2 border-t border-border pt-2"
-              >
-                <Field label={t("admin.marketing.notifications.targetLabel")}>
-                  {
-                    targets.find((target) => target.key === values.targetType)
-                      ?.label
-                  }
-                </Field>
-                <Field label={t("admin.marketing.notifications.channels")}>
-                  {values.channels.length === 0
-                    ? "—"
-                    : values.channels
-                        .map(
-                          (channel) =>
-                            channels.find((item) => item.key === channel)
-                              ?.label,
-                        )
-                        .join(", ")}
-                </Field>
-                <Field label={t("common.status")}>
-                  <span
-                    className={clsx(
-                      canSend ? "text-success-600" : "text-warning-600",
-                    )}
-                  >
-                    {canSend
-                      ? t("admin.marketing.notifications.ready")
-                      : t("admin.marketing.notifications.missingFields")}
-                  </span>
-                </Field>
-              </DataList>
-            </SectionCard>
           </div>
         </div>
       </FormModal>
