@@ -114,7 +114,16 @@ const BROWSER_GUIDES = [
 const SUPPORT_EMAIL = "destek@tarodan.com.tr";
 const SUPPORT_PHONE = "0850 XXX XX XX";
 
-export default async function CookiesClient() {
+/**
+ * `embed` (mobil WebView): yalnız politika metni. Tercih paneli (anahtarlar,
+ * "Tümünü kabul et") gösterilmez — WebView'in localStorage'ına yazan bir panel
+ * uygulamanın kendi tercihleriyle çelişir.
+ */
+export default async function CookiesDocument({
+  embed = false,
+}: {
+  embed?: boolean;
+}) {
   const t = await getTranslations();
 
   return (
@@ -134,12 +143,14 @@ export default async function CookiesClient() {
         </div>
       </SectionCard>
 
-      <SectionCard title={t("legal.cookies.page.s2Title")}>
-        <CookiePreferencesPanel
-          saveLabel={t("legal.savePreferences")}
-          acceptAllLabel={t("legal.acceptAll")}
-        />
-      </SectionCard>
+      {!embed && (
+        <SectionCard title={t("legal.cookies.page.s2Title")}>
+          <CookiePreferencesPanel
+            saveLabel={t("legal.savePreferences")}
+            acceptAllLabel={t("legal.acceptAll")}
+          />
+        </SectionCard>
+      )}
 
       <SectionCard title={t("legal.cookies.page.s3Title")}>
         <p className="mb-4 text-sm text-muted">

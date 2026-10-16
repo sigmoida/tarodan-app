@@ -330,3 +330,23 @@ export const termsParts = (t: Translate): LegalPart[] => [
     ],
   },
 ];
+
+/**
+ * Apple App Review 1.2 (kullanıcı içeriği) eki: koşullar uygunsuz içeriğe ve
+ * kötü niyetli kullanıcılara sıfır tolerans olduğunu, bildir/engelle yolunu ve
+ * 24 saatlik inceleme taahhüdünü açıkça söylemeli. Metin mobilin yayımlanmış
+ * koşullar maddesidir (yeniden yazılmadı) ve YALNIZ mobil WebView `/app/terms`
+ * sayfasına, ayrı başlıklı bir ek olarak eklenir (`TermsDocument` `embed`).
+ * Normal web `/terms` sayfasında yoktur: koşullar versiyonlu belgedir. Bağlayıcı
+ * metin Türkçedir; `en` katalogda da aynı Türkçe metin durur.
+ */
+export const termsUgcAddendum = (t: Translate): LegalPart => ({
+  title: t("legal.terms.ugcAddendumTitle"),
+  sections: [
+    {
+      number: "1",
+      heading: t("legal.terms.ugcAddendumHeading"),
+      blocks: [{ type: "note", text: t("legal.terms.ugcAddendumText") }],
+    },
+  ],
+});

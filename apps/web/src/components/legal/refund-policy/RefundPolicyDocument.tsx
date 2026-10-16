@@ -3,11 +3,7 @@
 import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
-import {
-  returnPolicy,
-  cancellationPolicy,
-  type PolicyEntry,
-} from "../_lib/policy";
+import { returnPolicy, cancellationPolicy, type PolicyEntry } from "./policy";
 
 /** Tek bir soru-cevap bloğu: başlık, açıklama, madde listesi. */
 function PolicyBlock({ entry }: { entry: PolicyEntry }) {
@@ -42,7 +38,7 @@ function PolicyBlock({ entry }: { entry: PolicyEntry }) {
   );
 }
 
-export default async function RefundPolicyClient() {
+export default async function RefundPolicyDocument() {
   const t = await getTranslations();
   return (
     <DocPage

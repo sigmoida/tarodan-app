@@ -4,6 +4,7 @@ import {
   type ConsentDocumentKey,
   type PendingConsent,
 } from "@tarodan/types";
+import { isEmbedPath } from "./embed";
 
 /**
  * Yeniden-onay kapısının saf kuralları (bileşen yalnız çizer).
@@ -20,9 +21,18 @@ export const CONSENT_GATE_EXEMPT_PATHS: readonly string[] = [
   ),
 ];
 
+/**
+ * `/app/**` (mobil WebView'in yasal metin sayfaları) de muaftır: oturum çerezi
+ * WebView ile paylaşılsa bile üye metni okurken onay/kimlik penceresi çıkmaz.
+ * Embed düzeni kapıyı zaten bağlamaz; bu, kuralın tek yerde de doğru kalması
+ * içindir.
+ */
 export function isConsentGateExempt(pathname: string): boolean {
-  return CONSENT_GATE_EXEMPT_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  return (
+    isEmbedPath(pathname) ||
+    CONSENT_GATE_EXEMPT_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    )
   );
 }
 

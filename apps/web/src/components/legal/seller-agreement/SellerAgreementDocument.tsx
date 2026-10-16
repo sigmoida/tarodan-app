@@ -11,7 +11,7 @@ import {
   corporateIntro,
   corporateAgreement,
   type AgreementSection,
-} from "../_lib/agreement";
+} from "./agreement";
 
 function FeeTable({ t }: { t: Translate }) {
   return (
@@ -90,7 +90,7 @@ function Section({ section, t }: { section: AgreementSection; t: Translate }) {
   );
 }
 
-export default async function SellerAgreementClient() {
+export default async function SellerAgreementDocument() {
   const t = await getTranslations();
   return (
     <DocPage

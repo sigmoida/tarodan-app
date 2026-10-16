@@ -1,9 +1,8 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { LegalDocContent, legalDocMeta } from "@/components/legal/documents";
 import { localizedCanonical } from "@/lib/seo";
-import RefundPolicyClient from "./_components/RefundPolicyClient";
-import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -11,14 +10,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale });
   return {
-    title: t("page.refundPolicy.page.iadePolitikasiTarodan"),
-    description: t("page.refundPolicy.page.tarodanIadeVeIptalKosullariTalep"),
+    ...(await legalDocMeta("refund-policy", locale)),
     alternates: localizedCanonical(locale, "/refund-policy"),
   };
 }
 
 export default function RefundPolicyPage() {
-  return <RefundPolicyClient />;
+  return <LegalDocContent doc="refund-policy" />;
 }
