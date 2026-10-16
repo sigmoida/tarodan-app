@@ -16,10 +16,9 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@/i18n/navigation", () => ({ Link: () => null }));
-vi.mock(
-  "@/app/[locale]/(main)/(legal)/cookies/_components/CookiePreferencesPanel",
-  () => ({ default: () => "cookie-preferences-panel" }),
-);
+vi.mock("@/components/legal/cookies/CookiePreferencesPanel", () => ({
+  default: () => "cookie-preferences-panel",
+}));
 
 import EmbedDocPage, {
   dynamicParams,
@@ -60,9 +59,24 @@ describe("(embed)/app/[doc] sayfası", () => {
     expect(all).toContainEqual({ locale: "en", doc: "refund-policy" });
   });
 
-  it("metadata: başlık var, indekslenmez", async () => {
+  it("/app/terms embed kipinde çizilir: UGC eki var", async () => {
+    const text = await serverTreeText(
+      await EmbedDocPage({ params: params("tr", "terms") }),
+    );
+    expect(text).toContain("legal.terms.ugcAddendumText");
+  });
+
+  it("/app/cookies tercih panelini göstermez", async () => {
+    const text = await serverTreeText(
+      await EmbedDocPage({ params: params("tr", "cookies") }),
+    );
+    expect(text).toContain("legal.cookies.page.s1Title");
+    expect(text).not.toContain("cookie-preferences-panel");
+  });
+
+  it("metadata: belge başlığı (noindex layout'ta, burada tekrarlanmaz)", async () => {
     const meta = await generateMetadata({ params: params("tr", "privacy") });
     expect(meta.title).toBe("legal.privacy.metaTitle");
-    expect(meta.robots).toEqual({ index: false, follow: false });
+    expect(meta.robots).toBeUndefined();
   });
 });

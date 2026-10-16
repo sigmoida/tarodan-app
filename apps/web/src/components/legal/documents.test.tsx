@@ -16,10 +16,9 @@ vi.mock("next-intl/server", () => {
 });
 vi.mock("@/i18n/navigation", () => ({ Link: () => null }));
 // Kanca kullanan istemci adası: ağaç çözümünde yalnız yer tutucu.
-vi.mock(
-  "@/app/[locale]/(main)/(legal)/cookies/_components/CookiePreferencesPanel",
-  () => ({ default: () => "cookie-preferences-panel" }),
-);
+vi.mock("@/components/legal/cookies/CookiePreferencesPanel", () => ({
+  default: () => "cookie-preferences-panel",
+}));
 
 import { LEGAL_DOCS, LegalDocContent, legalDocMeta } from "./documents";
 
@@ -61,18 +60,48 @@ describe("LEGAL_DOCS", () => {
   });
 });
 
-describe("Kullanım Koşulları — Apple 1.2 kullanıcı içeriği eki", () => {
-  it("sıfır tolerans / bildir-engelle eki koşullarla birlikte çizilir", async () => {
-    const text = await serverTreeText(await LegalDocContent({ doc: "terms" }));
+describe("Kullanım Koşulları — Apple 1.2 kullanıcı içeriği eki yalnız embed'de", () => {
+  it("embed: sıfır tolerans / bildir-engelle eki koşullarla birlikte çizilir", async () => {
+    const text = await serverTreeText(
+      await LegalDocContent({ doc: "terms", embed: true }),
+    );
+    expect(text).toContain("legal.termsTitle");
     expect(text).toContain("legal.terms.ugcAddendumTitle");
     expect(text).toContain("legal.terms.ugcAddendumHeading");
     expect(text).toContain("legal.terms.ugcAddendumText");
   });
 
-  it("ek yalnız koşullarda vardır", async () => {
-    const text = await serverTreeText(
-      await LegalDocContent({ doc: "privacy" }),
-    );
+  it("web /terms: versiyonlu metin değişmez, ek YOK", async () => {
+    const text = await serverTreeText(await LegalDocContent({ doc: "terms" }));
+    expect(text).toContain("legal.termsTitle");
+    expect(text).not.toContain("legal.terms.ugcAddendumTitle");
     expect(text).not.toContain("legal.terms.ugcAddendumText");
+  });
+
+  it("ek diğer belgelerde yoktur", async () => {
+    const text = await serverTreeText(
+      await LegalDocContent({ doc: "privacy", embed: true }),
+    );
+    expect(text).toContain("legal.privacyTitle");
+    expect(text).not.toContain("legal.terms.ugcAddendumText");
+  });
+});
+
+describe("Çerez politikası — tercih paneli yalnız web'de", () => {
+  it("web: panel çizilir", async () => {
+    const text = await serverTreeText(
+      await LegalDocContent({ doc: "cookies" }),
+    );
+    expect(text).toContain("cookie-preferences-panel");
+    expect(text).toContain("legal.cookies.page.s2Title");
+  });
+
+  it("embed: yalnız politika metni, panel ve başlığı yok", async () => {
+    const text = await serverTreeText(
+      await LegalDocContent({ doc: "cookies", embed: true }),
+    );
+    expect(text).toContain("legal.cookies.page.s1Title");
+    expect(text).not.toContain("cookie-preferences-panel");
+    expect(text).not.toContain("legal.cookies.page.s2Title");
   });
 });

@@ -14,9 +14,24 @@ export async function serverTreeText(node: ReactNode): Promise<string> {
     return (await Promise.all(node.map(serverTreeText))).join(" ");
   }
   const element = node as ReactElement<{ children?: ReactNode }>;
-  if (typeof element.type === "function") {
-    const render = element.type as (props: unknown) => ReactNode;
+  const { type } = element;
+  if (typeof type === "function") {
+    // Sınıf bileşeni çağrılamaz; sessizce geçmek metni (ve "yok" iddialarını)
+    // boşa çıkarırdı.
+    if (type.prototype?.isReactComponent) {
+      throw new Error(
+        `serverTreeText: sınıf bileşeni çözülemez (${type.name})`,
+      );
+    }
+    const render = type as (props: unknown) => ReactNode;
     return serverTreeText(await render(element.props));
   }
-  return serverTreeText(element.props?.children);
+  // Ana bilgisayar öğesi ("div") ya da Fragment (symbol) → çocuklara in.
+  if (typeof type === "string" || typeof type === "symbol") {
+    return serverTreeText(element.props?.children);
+  }
+  // memo / forwardRef / lazy / context nesneleri: çözemeyiz — sessiz geçme.
+  throw new Error(
+    "serverTreeText: çözülemeyen öğe türü (memo/forwardRef/lazy)",
+  );
 }

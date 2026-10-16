@@ -2,28 +2,26 @@
 
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
-import { LegalDocument } from "@/components/legal/LegalDocument";
 import type { EmbedDoc } from "@/lib/embed";
 import type { Translate } from "@/types/i18n";
-import CookiesClient from "@/app/[locale]/(main)/(legal)/cookies/_components/CookiesClient";
-import { distanceSalesParts } from "@/app/[locale]/(main)/(legal)/distance-sales/_lib/contract";
-import { privacyParts } from "@/app/[locale]/(main)/(legal)/privacy/_lib/privacy";
-import RefundPolicyClient from "@/app/[locale]/(main)/(legal)/refund-policy/_components/RefundPolicyClient";
-import SellerAgreementClient from "@/app/[locale]/(main)/(legal)/seller-agreement/_components/SellerAgreementClient";
-import {
-  termsParts,
-  termsUgcAddendum,
-} from "@/app/[locale]/(main)/(legal)/terms/_lib/terms";
 
 /**
  * Yasal belgelerin TEK kaydı: hem normal site sayfaları (`(main)/(legal)/*`) hem
  * mobil WebView sayfaları (`(embed)/app/[doc]`) içeriği ve meta metnini buradan
  * alır — iki yüzey birbirinden kayamaz. Yeni bir embed belgesi `EmbedDoc`a
  * eklenince burada karşılığı yazılmadan derleme geçmez (`Record`).
+ *
+ * İçerik modülleri `load` içinde tembel import edilir: bir sayfa yalnız kendi
+ * belgesinin modül grafiğini çeker, diğer 5 belgeninkini değil.
  */
+type LegalDocComponent = (props: {
+  embed?: boolean;
+}) => ReactNode | Promise<ReactNode>;
+
 interface LegalDocDef {
   meta: (t: Translate) => { title: string; description: string };
-  render: (t: Translate) => ReactNode;
+  /** Belge bileşeni (sunucu). `embed`: mobil WebView kipi. */
+  load: () => Promise<{ default: LegalDocComponent }>;
 }
 
 export const LEGAL_DOCS: Record<EmbedDoc, LegalDocDef> = {
@@ -32,42 +30,21 @@ export const LEGAL_DOCS: Record<EmbedDoc, LegalDocDef> = {
       title: t("legal.terms.metaTitle"),
       description: t("legal.terms.metaDescription"),
     }),
-    render: (t) => (
-      <LegalDocument
-        title={t("legal.termsTitle")}
-        description={t("legal.terms.pageDescription")}
-        parts={[...termsParts(t), termsUgcAddendum(t)]}
-        footer={t("legal.terms.pageFooter")}
-      />
-    ),
+    load: () => import("./terms/TermsDocument"),
   },
   privacy: {
     meta: (t) => ({
       title: t("legal.privacy.metaTitle"),
       description: t("legal.privacy.metaDescription"),
     }),
-    render: (t) => (
-      <LegalDocument
-        title={t("legal.privacyTitle")}
-        description={t("legal.privacy.pageDescription")}
-        parts={privacyParts(t)}
-        footer={t("legal.privacy.pageFooter")}
-      />
-    ),
+    load: () => import("./privacy/PrivacyDocument"),
   },
   "distance-sales": {
     meta: (t) => ({
       title: t("legal.distanceSales.metaTitle"),
       description: t("legal.distanceSales.metaDescription"),
     }),
-    render: (t) => (
-      <LegalDocument
-        title={t("legal.distanceSalesTitle")}
-        description={t("legal.distanceSales.pageDescription")}
-        parts={distanceSalesParts(t)}
-        footer={t("legal.distanceSales.pageFooter")}
-      />
-    ),
+    load: () => import("./distance-sales/DistanceSalesDocument"),
   },
   cookies: {
     meta: (t) => ({
@@ -76,7 +53,7 @@ export const LEGAL_DOCS: Record<EmbedDoc, LegalDocDef> = {
         "page.cookies.page.tarodanCerezPolitikasiHangiCerezleriNeden",
       ),
     }),
-    render: () => <CookiesClient />,
+    load: () => import("./cookies/CookiesDocument"),
   },
   "seller-agreement": {
     meta: (t) => ({
@@ -85,14 +62,14 @@ export const LEGAL_DOCS: Record<EmbedDoc, LegalDocDef> = {
         "page.sellerAgreement.page.tarodanBireyselVeKurumsalSaticiUyelik",
       ),
     }),
-    render: () => <SellerAgreementClient />,
+    load: () => import("./seller-agreement/SellerAgreementDocument"),
   },
   "refund-policy": {
     meta: (t) => ({
       title: t("page.refundPolicy.page.iadePolitikasiTarodan"),
       description: t("page.refundPolicy.page.tarodanIadeVeIptalKosullariTalep"),
     }),
-    render: () => <RefundPolicyClient />,
+    load: () => import("./refund-policy/RefundPolicyDocument"),
   },
 };
 
@@ -103,7 +80,16 @@ export async function legalDocMeta(doc: EmbedDoc, locale: string) {
 }
 
 /** Belgenin gövdesi — site sayfası da embed sayfası da bunu çizer. */
-export async function LegalDocContent({ doc }: { doc: EmbedDoc }) {
-  const t = await getTranslations();
-  return <>{LEGAL_DOCS[doc].render(t)}</>;
+export async function LegalDocContent({
+  doc,
+  embed = false,
+}: {
+  doc: EmbedDoc;
+  /** Mobil WebView kipi (`/app/<doc>`): web'den farklı yalnız ek/panel kuralları. */
+  embed?: boolean;
+}) {
+  const { default: Document } = await LEGAL_DOCS[doc].load();
+  // Async sunucu bileşeni: doğrudan çağrılıp await'lenir (`ComponentType` async
+  // dönüşü kabul etmez).
+  return <>{await Document({ embed })}</>;
 }

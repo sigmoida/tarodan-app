@@ -26,10 +26,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale, doc } = await params;
   if (!isEmbedDoc(doc)) return {};
-  return {
-    ...(await legalDocMeta(doc, locale)),
-    robots: { index: false, follow: false },
-  };
+  // noindex yalnız (embed)/layout.tsx'te (tek yer).
+  return legalDocMeta(doc, locale);
 }
 
 /**
@@ -40,5 +38,5 @@ export default async function EmbedDocPage({ params }: { params: Params }) {
   const { locale, doc } = await params;
   if (!isEmbedDoc(doc)) notFound();
   setRequestLocale(locale);
-  return <LegalDocContent doc={doc} />;
+  return <LegalDocContent doc={doc} embed />;
 }

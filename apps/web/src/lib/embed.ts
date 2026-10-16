@@ -30,15 +30,3 @@ export function isEmbedDoc(value: string): value is EmbedDoc {
 export function isEmbedPath(pathname: string): boolean {
   return pathname === EMBED_PREFIX || pathname.startsWith(`${EMBED_PREFIX}/`);
 }
-
-/**
- * Normal sitedeki bir yasal belge yolunu embed karşılığına çevirir
- * (`/privacy#x` → `/app/privacy#x`). Embed listesinde olmayan yollar (ör.
- * `/listings`, `/contact`, `/intellectual-property`) AYNEN döner: mobil WebView
- * bunları dış tarayıcıda açar. Locale öneki eklenmez — `Link` kendi ekler.
- */
-export function embedHref(href: string): string {
-  const match = /^\/([^/?#]+)([?#].*)?$/.exec(href);
-  if (!match || !isEmbedDoc(match[1])) return href;
-  return `${EMBED_PREFIX}${href}`;
-}
