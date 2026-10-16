@@ -2,10 +2,10 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { bankAccountApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { useWebItem } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 
 export interface BankAccount {
@@ -24,18 +24,19 @@ export interface BankAccountInput {
 }
 
 /** `useWebMutation.invalidates` kaynak adı = tek anahtarın kökü. */
-const RESOURCE = queryKeys.bankAccount.detail()[0];
+const RESOURCE = queryKeys.bankAccount.resource;
 
 /**
  * Satıcının banka hesabı — profil, satıcı belgeleri ve ilan formu kapısı bu TEK
- * sorguyu paylaşır (tek key, tek queryFn). Kayıt yoksa `account` `null`'dır.
+ * sorguyu paylaşır (`useWebItem`: tek key, tek fetcher). Kayıt yoksa `account` `null`'dır.
  */
 export function useBankAccount(enabled = true) {
-  const query = useQuery<BankAccount | null>({
-    queryKey: queryKeys.bankAccount.detail(),
-    queryFn: async () => (await bankAccountApi.get()).data || null,
+  const query = useWebItem<BankAccount | null>({
+    resource: RESOURCE,
+    id: queryKeys.bankAccount.id,
+    fetcher: async () => (await bankAccountApi.get()).data || null,
     enabled,
-    meta: { page: "bank-account" },
+    query: { meta: { page: "bank-account" } },
   });
   return { account: query.data ?? null, isLoading: query.isLoading };
 }

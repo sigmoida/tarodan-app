@@ -86,6 +86,12 @@ describe("useBankAccount", () => {
     );
     expect(h.get).toHaveBeenCalledTimes(1);
     expect(qc.getQueryData(queryKeys.bankAccount.detail())).toEqual(account);
+    // useWebItem anahtarı: [resource, "detail", id]
+    expect(queryKeys.bankAccount.detail()).toEqual([
+      "bank-account",
+      "detail",
+      "me",
+    ]);
     expect(seen.at(-1)?.account).toEqual(account);
   });
 

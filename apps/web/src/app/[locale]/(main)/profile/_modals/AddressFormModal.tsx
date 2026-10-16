@@ -14,7 +14,6 @@ import { useTranslations } from "next-intl";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { useReturnAfterSave } from "@/hooks/useReturnAfterSave";
-import { queryKeys } from "@/lib/query/keys";
 import { addressSchema, type AddressValues } from "../_lib/schemas";
 import { useSaveAddress, type Address } from "../_hooks/useAddresses";
 
@@ -44,8 +43,8 @@ export default function AddressFormModal({
 }: AddressFormModalProps) {
   const t = useTranslations();
   const save = useSaveAddress();
-  // Kapıdan (ilan formu) gelindiyse kayıttan sonra oraya dön.
-  const finish = useReturnAfterSave(queryKeys.addresses.all());
+  // Adres kapısından (ilan formu) gelindiyse ve kapı açıldıysa oraya dön.
+  const finish = useReturnAfterSave("address");
   const modalLabels = useFormModalLabels();
   const form = useZodForm(addressSchema(t), { defaultValues: EMPTY });
   const { register, setValue, watch, formState } = form;

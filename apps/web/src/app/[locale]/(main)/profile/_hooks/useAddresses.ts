@@ -15,9 +15,14 @@ export interface Address extends AddressValues {
 }
 
 const RESOURCE = "profile-addresses";
-// İlan formu kapısı (`useDispatchAddress`) adresleri ayrı bir anahtarla okur;
-// yazma onu da bayatlatmalı yoksa 1 dk boyunca eski "adres yok" görünür.
-const INVALIDATES = [RESOURCE, queryKeys.addresses.all()[0]];
+// Aynı adresler başka anahtarlarla da okunuyor: ilan formu kapısı
+// (`useDispatchAddress`) ve ödeme adım listesi. Yazma onları da bayatlatmalı,
+// yoksa 1 dk boyunca eski liste / "adres yok" görünür.
+const INVALIDATES = [
+  RESOURCE,
+  queryKeys.addresses.all()[0],
+  queryKeys.checkout.addresses()[0],
+];
 
 export function useAddresses(enabled: boolean) {
   const query = useWebList<Address[]>({

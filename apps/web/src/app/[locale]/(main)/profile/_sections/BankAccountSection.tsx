@@ -11,8 +11,7 @@ import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { BankAccountSummary } from "@/components/bank/BankAccountSummary";
 import { useReturnAfterSave } from "@/hooks/useReturnAfterSave";
-import { queryKeys } from "@/lib/query/keys";
-import { PROFILE_GATE_SECTION } from "@/lib/profileGate";
+import { PROFILE_GATE } from "@/lib/profileGate";
 import { useAuthStore } from "@/stores/authStore";
 import { bankAccountSchema, type BankAccountValues } from "../_lib/schemas";
 import {
@@ -35,7 +34,7 @@ export default function BankAccountSection() {
   const { account } = useBankAccount(isAuthenticated);
   const save = useSaveBankAccount();
   const remove = useDeleteBankAccount();
-  const finish = useReturnAfterSave(queryKeys.bankAccount.detail());
+  const finish = useReturnAfterSave("bank");
 
   const form = useZodForm(bankAccountSchema(t), { defaultValues: EMPTY });
 
@@ -65,7 +64,7 @@ export default function BankAccountSection() {
   };
 
   return (
-    <div id={PROFILE_GATE_SECTION.bank} className="scroll-mt-24">
+    <div id={PROFILE_GATE.bank.anchor} className="scroll-mt-24">
       <SectionCard
         title={t("profile.bank.title")}
         action={

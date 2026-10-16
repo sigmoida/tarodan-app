@@ -13,7 +13,8 @@ import {
 import { Badge, Button, IconButton } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { PROFILE_GATE_SECTION } from "@/lib/profileGate";
+import { PROFILE_GATE } from "@/lib/profileGate";
+import { useReturnAfterSave } from "@/hooks/useReturnAfterSave";
 import { useAuthStore } from "@/stores/authStore";
 import {
   useAddresses,
@@ -32,6 +33,8 @@ export default function AddressesSection() {
   const { addresses, isLoading } = useAddresses(isAuthenticated);
   const removeAddress = useDeleteAddress();
   const setDefault = useSetDefaultAddress();
+  // Varsayılan değişimi çıkış adresi kapısını açıyorsa (kapıdan gelindiyse) dön.
+  const finish = useReturnAfterSave("address");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Address | null>(null);
@@ -56,7 +59,7 @@ export default function AddressesSection() {
   };
 
   return (
-    <div id={PROFILE_GATE_SECTION.address} className="scroll-mt-24">
+    <div id={PROFILE_GATE.address.anchor} className="scroll-mt-24">
       <SectionCard
         title={t("address.myAddresses")}
         badge={
@@ -124,7 +127,9 @@ export default function AddressesSection() {
                       aria-label={t("address.makeDefault")}
                       variant="ghost"
                       size="sm"
-                      onClick={() => setDefault.mutate(address.id)}
+                      onClick={() =>
+                        setDefault.mutate(address.id, { onSuccess: finish })
+                      }
                     >
                       <CheckIcon className="h-5 w-5 text-primary-500" />
                     </IconButton>

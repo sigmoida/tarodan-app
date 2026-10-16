@@ -1,7 +1,12 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { loginHref, safeReturnTo, withReturnTo } from "./returnTo";
+import {
+  loginHref,
+  readsReturnToHeader,
+  safeReturnTo,
+  withReturnTo,
+} from "./returnTo";
 
 describe("safeReturnTo", () => {
   it("kabul eder: site içi yollar", () => {
@@ -84,5 +89,15 @@ describe("loginHref", () => {
     expect(loginHref("https://evil.com")).toBe("/login");
     expect(loginHref(null)).toBe("/login");
     expect(loginHref(undefined)).toBe("/login");
+  });
+});
+
+describe("readsReturnToHeader", () => {
+  it("yalnız profil yollarında", () => {
+    expect(readsReturnToHeader("/profile")).toBe(true);
+    expect(readsReturnToHeader("/profile/orders/1")).toBe(true);
+    expect(readsReturnToHeader("/profiles")).toBe(false);
+    expect(readsReturnToHeader("/listings/new")).toBe(false);
+    expect(readsReturnToHeader("/")).toBe(false);
   });
 });

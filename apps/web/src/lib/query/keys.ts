@@ -1,3 +1,7 @@
+// Banka hesabı hesap alanında tek öğedir (`useWebItem` kaynağı + sabit id).
+const BANK_ACCOUNT_RESOURCE = "bank-account";
+const BANK_ACCOUNT_ID = "me";
+
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
  * and the **client `useQuery`** for a given resource use the exact same key, so
@@ -202,8 +206,13 @@ export const queryKeys = {
     pricing: () => ["boost-pricing"] as const,
     options: (productId: string) => ["boost-options", productId] as const,
   },
+  // Hesap alanındaki tek öğe: `useWebItem` anahtarıyla BİREBİR aynı
+  // (`webKeys.detail(resource, id)`), böylece `invalidates: ['bank-account']`
+  // ve `refetchQueries` aynı kayda ulaşır.
   bankAccount: {
-    detail: () => ["bank-account"] as const,
+    resource: BANK_ACCOUNT_RESOURCE,
+    id: BANK_ACCOUNT_ID,
+    detail: () => webKeys.detail(BANK_ACCOUNT_RESOURCE, BANK_ACCOUNT_ID),
   },
   sellerDocuments: {
     all: () => ["seller-documents"] as const,

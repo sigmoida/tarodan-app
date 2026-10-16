@@ -9,6 +9,14 @@ import { locales } from "@tarodan/i18n";
  */
 export const RETURN_TO_HEADER = "x-return-to";
 
+/**
+ * Başlığı OKUYAN yollar (locale'siz): şimdilik yalnız profil layout'u. Başlık
+ * yalnız burada yazılır; yeni bir layout okumaya başlarsa buraya eklenmeli.
+ */
+export function readsReturnToHeader(path: string): boolean {
+  return /^\/profile(\/|$)/.test(path);
+}
+
 /** Başta `/en`, `/tr` … gibi bir locale segmenti (ardından `/`, `?`, `#` ya da son). */
 const LOCALE_PREFIX = new RegExp(`^/(?:${locales.join("|")})(?=[/?#]|$)`);
 
@@ -47,14 +55,6 @@ export function safeReturnTo(value: string | null | undefined): string | null {
 export function withReturnTo(href: string, returnTo: string): string {
   const sep = href.includes("?") ? "&" : "?";
   return `${href}${sep}returnTo=${encodeURIComponent(returnTo)}`;
-}
-
-/** Geçerli URL'deki güvenli `returnTo` (yalnız istemcide; yoksa/güvensizse null). */
-export function readReturnTo(): string | null {
-  if (typeof window === "undefined") return null;
-  return safeReturnTo(
-    new URLSearchParams(window.location.search).get("returnTo"),
-  );
 }
 
 /**
