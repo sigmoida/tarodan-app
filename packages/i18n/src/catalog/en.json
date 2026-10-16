@@ -5085,7 +5085,12 @@
         "selectPlaceholder": "Select",
         "views": "Views",
         "aiModeration": "AI Moderation",
-        "allModels": "All Models"
+        "allModels": "All Models",
+        "listing": "Listings",
+        "listingFilter": "Listings",
+        "allListings": "All",
+        "withListings": "With listings",
+        "withoutListings": "Without listings"
       },
       "categories": {
         "title": "Categories",
@@ -5216,7 +5221,8 @@
         "nameRequired": "Manufacturer name is required",
         "countryPlaceholder": "e.g. USA",
         "foundedYearPlaceholder": "e.g. 1968",
-        "descriptionPlaceholder": "Short description about the manufacturer"
+        "descriptionPlaceholder": "Short description about the manufacturer",
+        "allManufacturers": "All Manufacturers"
       },
       "collections": {
         "title": "Collections",
