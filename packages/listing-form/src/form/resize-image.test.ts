@@ -6,6 +6,7 @@ import {
   downscaledFileName,
   downscaleImageFile,
   MAX_UPLOAD_DIMENSION,
+  parseJpegInfo,
   scaledDimensions,
   type DownscaleDeps,
 } from "./resize-image";
@@ -16,34 +17,82 @@ import {
  * durumda sessizce orijinale dönülür. Tesisat `DownscaleDeps` ile değiştirilir.
  */
 
-const fileOf = (
-  type: string,
-  bytes: number[] | number = 4096,
-  name = "p.png",
+const u16 = (value: number) => [(value >> 8) & 0xff, value & 0xff];
+
+/** Minimal EXIF APP1 segmenti: tek girişli IFD0 (Orientation). */
+function exifSegment(orientation: number, littleEndian: boolean): number[] {
+  const short = (value: number) =>
+    littleEndian ? [value & 0xff, (value >> 8) & 0xff] : u16(value);
+  const long = (value: number) =>
+    littleEndian
+      ? [value & 0xff, (value >> 8) & 0xff, 0, 0]
+      : [0, 0, ...u16(value)];
+  const tiff = [
+    ...(littleEndian ? [0x49, 0x49] : [0x4d, 0x4d]),
+    ...short(0x002a),
+    ...long(8), // IFD0 ofseti
+    ...short(1), // giriş sayısı
+    ...short(0x0112), // tag
+    ...short(3), // tür: SHORT
+    ...long(1), // adet
+    ...short(orientation),
+    0,
+    0, // değer alanı dolgusu
+    0,
+    0,
+    0,
+    0, // sonraki IFD yok
+  ];
+  const body = [..."Exif\0\0".split("").map((c) => c.charCodeAt(0)), ...tiff];
+  return [0xff, 0xe1, ...u16(body.length + 2), ...body];
+}
+
+/** SOI + (isteğe bağlı EXIF) + SOF + dolgu. `progressive` SOF2 kullanır. */
+function jpegBytes(options: {
+  width: number;
+  height: number;
+  orientation?: number;
+  littleEndian?: boolean;
+  progressive?: boolean;
+  padding?: number;
+}): number[] {
+  const { width, height, orientation, littleEndian = false } = options;
+  return [
+    0xff,
+    0xd8,
+    ...(orientation ? exifSegment(orientation, littleEndian) : []),
+    0xff,
+    options.progressive ? 0xc2 : 0xc0,
+    ...u16(11),
+    8,
+    ...u16(height),
+    ...u16(width),
+    1,
+    1,
+    0x11,
+    0,
+    ...Array(options.padding ?? 4096).fill(7),
+  ];
+}
+
+const jpegFile = (
+  options: Parameters<typeof jpegBytes>[0],
+  name = "p.jpg",
+  type = "image/jpeg",
 ) =>
-  new File(
-    [typeof bytes === "number" ? new Uint8Array(bytes) : new Uint8Array(bytes)],
-    name,
-    {
-      type,
-      lastModified: 42,
-    },
-  );
+  new File([new Uint8Array(jpegBytes(options))], name, {
+    type,
+    lastModified: 42,
+  });
 
 const bitmap = (width: number, height: number) =>
   ({ width, height, close: vi.fn() }) as unknown as ImageBitmap;
 
-function depsFor(
-  size: { width: number; height: number },
-  blobBytes = 100,
-): { deps: DownscaleDeps; render: ReturnType<typeof vi.fn>; bmp: ImageBitmap } {
-  const bmp = bitmap(size.width, size.height);
+function depsFor(decoded: { width: number; height: number }, blobBytes = 100) {
+  const bmp = bitmap(decoded.width, decoded.height);
+  const decode = vi.fn(async () => bmp);
   const render = vi.fn(async () => new Blob([new Uint8Array(blobBytes)]));
-  return {
-    bmp,
-    render,
-    deps: { decode: async () => bmp, render },
-  };
+  return { deps: { decode, render } as DownscaleDeps, decode, render, bmp };
 }
 
 describe("scaledDimensions", () => {
@@ -74,19 +123,21 @@ describe("scaledDimensions", () => {
 });
 
 describe("canDownscaleFile", () => {
-  it.each(["image/jpeg", "image/jpg", "image/png", "image/webp", "IMAGE/JPEG"])(
+  it.each(["image/jpeg", "image/jpg", "IMAGE/JPEG"])(
     "%s küçültülebilir",
     (type) => expect(canDownscaleFile({ type })).toBe(true),
   );
 
-  it("GIF'e dokunulmaz", () =>
-    expect(canDownscaleFile({ type: "image/gif" })).toBe(false));
+  // Alfa / animasyon kaybolmasın: JPEG dışı olduğu gibi gider.
+  it.each(["image/png", "image/webp", "image/gif"])("%s'e dokunulmaz", (type) =>
+    expect(canDownscaleFile({ type })).toBe(false),
+  );
 });
 
 describe("downscaledFileName", () => {
   it("uzantıyı .jpg yapar", () => {
-    expect(downscaledFileName("foto.PNG")).toBe("foto.jpg");
-    expect(downscaledFileName("a.b.webp")).toBe("a.b.jpg");
+    expect(downscaledFileName("foto.JPEG")).toBe("foto.jpg");
+    expect(downscaledFileName("a.b.jpg")).toBe("a.b.jpg");
   });
 
   it("uzantısız ve nokta-ile-başlayan adı bozmaz", () => {
@@ -95,95 +146,173 @@ describe("downscaledFileName", () => {
   });
 });
 
+describe("parseJpegInfo", () => {
+  const parse = (options: Parameters<typeof jpegBytes>[0]) =>
+    parseJpegInfo(new Uint8Array(jpegBytes(options)));
+
+  it("EXIF yoksa yön 1, SOF boyutunu okur", () =>
+    expect(parse({ width: 4000, height: 3000 })).toEqual({
+      width: 4000,
+      height: 3000,
+      orientation: 1,
+    }));
+
+  it.each([false, true])("EXIF yönünü okur (littleEndian=%s)", (little) =>
+    expect(
+      parse({
+        width: 4000,
+        height: 3000,
+        orientation: 6,
+        littleEndian: little,
+      }),
+    ).toEqual({ width: 4000, height: 3000, orientation: 6 }),
+  );
+
+  it("progressive (SOF2) JPEG'i de okur", () =>
+    expect(parse({ width: 3000, height: 2000, progressive: true })).toEqual({
+      width: 3000,
+      height: 2000,
+      orientation: 1,
+    }));
+
+  it("JPEG değilse null", () =>
+    expect(parseJpegInfo(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBeNull());
+
+  it("SOF'a ulaşmadan biterse null", () =>
+    expect(parseJpegInfo(new Uint8Array([0xff, 0xd8, 0xff, 0xe1]))).toBeNull());
+
+  it("geçersiz yön değerini yok sayar (1'de kalır)", () =>
+    expect(parse({ width: 4000, height: 3000, orientation: 9 })).toMatchObject({
+      orientation: 1,
+    }));
+});
+
 describe("downscaleImageFile", () => {
-  it("büyük görseli küçültür: JPEG, yeni ad, hesaplanan boyutla çizer", async () => {
-    const { deps, render, bmp } = depsFor({ width: 4000, height: 3000 }, 100);
-    const file = fileOf("image/png", 4096, "tatil.png");
+  it("büyük JPEG'i hedef boyutta çözer ve küçültür", async () => {
+    const { deps, decode, render, bmp } = depsFor({
+      width: 1600,
+      height: 1200,
+    });
+    const file = jpegFile({ width: 4000, height: 3000 }, "tatil.jpeg");
 
     const result = await downscaleImageFile(file, deps);
 
+    // Tam çözünürlüklü bitmap hiç oluşmasın: hedef boyut çözücüye verilir.
+    expect(decode).toHaveBeenCalledWith(file, { width: 1600, height: 1200 });
     expect(render).toHaveBeenCalledWith(bmp, { width: 1600, height: 1200 });
     expect(result).not.toBe(file);
     expect(result.type).toBe("image/jpeg");
     expect(result.name).toBe("tatil.jpg");
     expect(result.size).toBe(100);
     expect(result.lastModified).toBe(42);
-    // Bitmap belleği bırakılır.
     expect(bmp.close).toHaveBeenCalled();
   });
 
-  it("zaten küçük görseli yeniden kodlamaz", async () => {
-    const { deps, render, bmp } = depsFor({ width: 1200, height: 800 });
-    const file = fileOf("image/jpeg");
+  it("yön 1-4'te (eksen değişmez) hedef boyutla çözer", async () => {
+    const { deps, decode } = depsFor({ width: 1600, height: 1200 });
+
+    await downscaleImageFile(
+      jpegFile({ width: 4000, height: 3000, orientation: 3 }),
+      deps,
+    );
+
+    expect(decode).toHaveBeenCalledWith(expect.anything(), {
+      width: 1600,
+      height: 1200,
+    });
+  });
+
+  describe("EXIF yönü 5-8", () => {
+    it("tarayıcı yönü uyguladıysa (bitmap dikey) küçültür; hedef görüntülenen yönde", async () => {
+      // Ham 4000×3000, yön 6 → görüntülenen 3000×4000; bitmap yönlü geldi.
+      const { deps, decode, render } = depsFor({ width: 3000, height: 4000 });
+      const file = jpegFile({ width: 4000, height: 3000, orientation: 6 });
+
+      const result = await downscaleImageFile(file, deps);
+
+      // Uygulanıp uygulanmadığını bitmap boyutundan ayırt edebilmek için
+      // hedef boyutla DEĞİL tam çözülür.
+      expect(decode).toHaveBeenCalledWith(file, undefined);
+      expect(render).toHaveBeenCalledWith(expect.anything(), {
+        width: 1200,
+        height: 1600,
+      });
+      expect(result).not.toBe(file);
+    });
+
+    it("tarayıcı yönü UYGULAMADIYSA (bitmap ham boyutta) orijinali gönderir", async () => {
+      const { deps, render, bmp } = depsFor({ width: 4000, height: 3000 });
+      const file = jpegFile({ width: 4000, height: 3000, orientation: 6 });
+
+      expect(await downscaleImageFile(file, deps)).toBe(file);
+      // Yan çizilmiş görsel üretilmez; sunucu autoOrient ile düzeltir.
+      expect(render).not.toHaveBeenCalled();
+      expect(bmp.close).toHaveBeenCalled();
+    });
+
+    it.each([5, 7, 8])(
+      "yön %i için de aynı korumayı uygular",
+      async (orientation) => {
+        const { deps, render } = depsFor({ width: 4000, height: 3000 });
+        const file = jpegFile({ width: 4000, height: 3000, orientation });
+
+        expect(await downscaleImageFile(file, deps)).toBe(file);
+        expect(render).not.toHaveBeenCalled();
+      },
+    );
+
+    it("kare görselde (ayırt edilemez, zararsız) koruma devreye girmez", async () => {
+      const { deps, render } = depsFor({ width: 3000, height: 3000 });
+      const file = jpegFile({ width: 3000, height: 3000, orientation: 6 });
+
+      expect(await downscaleImageFile(file, deps)).not.toBe(file);
+      expect(render).toHaveBeenCalled();
+    });
+  });
+
+  it("zaten küçük JPEG'i çözmeden bırakır", async () => {
+    const { deps, decode } = depsFor({ width: 1200, height: 800 });
+    const file = jpegFile({ width: 1200, height: 800 });
 
     expect(await downscaleImageFile(file, deps)).toBe(file);
-    expect(render).not.toHaveBeenCalled();
-    expect(bmp.close).toHaveBeenCalled();
-  });
-
-  it("GIF'i çözmeye bile çalışmaz", async () => {
-    const decode = vi.fn();
-    const file = fileOf("image/gif");
-
-    expect(await downscaleImageFile(file, { decode, render: vi.fn() })).toBe(
-      file,
-    );
     expect(decode).not.toHaveBeenCalled();
   });
 
-  it("animasyonlu WebP'ye dokunmaz", async () => {
-    // RIFF....WEBPVP8X + (4 bayt boyut) + bayrak baytı (20) animasyon biti.
-    const header = Array.from({ length: 32 }, () => 0);
-    "RIFF".split("").forEach((c, i) => (header[i] = c.charCodeAt(0)));
-    "WEBPVP8X".split("").forEach((c, i) => (header[8 + i] = c.charCodeAt(0)));
-    header[20] = 0x02;
-    const { deps, render } = depsFor({ width: 4000, height: 3000 });
-    const file = fileOf("image/webp", header, "anim.webp");
+  it("yön 6'da KÜÇÜK ham boyut da görüntülenen yöne göre değerlendirilir", async () => {
+    // Ham 1500×1000 → görüntülenen 1000×1500: sınırın altında, dokunulmaz.
+    const { deps, decode } = depsFor({ width: 1000, height: 1500 });
+    const file = jpegFile({ width: 1500, height: 1000, orientation: 6 });
 
     expect(await downscaleImageFile(file, deps)).toBe(file);
-    expect(render).not.toHaveBeenCalled();
+    expect(decode).not.toHaveBeenCalled();
   });
 
-  it("animasyonsuz WebP küçültülür", async () => {
-    const header = Array.from({ length: 32 }, () => 0);
-    "RIFF".split("").forEach((c, i) => (header[i] = c.charCodeAt(0)));
-    "WEBPVP8X".split("").forEach((c, i) => (header[8 + i] = c.charCodeAt(0)));
-    const { deps } = depsFor({ width: 4000, height: 3000 }, 1);
-    const file = fileOf(
-      "image/webp",
-      [...header, ...Array(4000).fill(1)],
-      "s.webp",
-    );
+  it.each(["image/png", "image/webp", "image/gif"])(
+    "%s dosyasını okumaz/çözmez bile (alfa ve animasyon korunur)",
+    async (type) => {
+      const decode = vi.fn();
+      const file = new File([new Uint8Array(4096)], "x", { type });
 
-    const result = await downscaleImageFile(file, deps);
+      expect(await downscaleImageFile(file, { decode, render: vi.fn() })).toBe(
+        file,
+      );
+      expect(decode).not.toHaveBeenCalled();
+    },
+  );
 
-    expect(result).not.toBe(file);
-    expect(result.name).toBe("s.jpg");
-  });
-
-  it("APNG'ye (acTL parçası) dokunmaz", async () => {
-    const bytes = [
-      0x89,
-      0x50,
-      0x4e,
-      0x47,
-      0x0d,
-      0x0a,
-      0x1a,
-      0x0a,
-      ...Array.from("acTL").map((c) => c.charCodeAt(0)),
-      ...Array(64).fill(0),
-    ];
-    const { deps, render } = depsFor({ width: 4000, height: 3000 });
-    const file = fileOf("image/png", bytes);
+  it("başlığı çözülemeyen JPEG'i olduğu gibi bırakır", async () => {
+    const { deps, decode } = depsFor({ width: 4000, height: 3000 });
+    const file = new File([new Uint8Array(4096)], "bozuk.jpg", {
+      type: "image/jpeg",
+    });
 
     expect(await downscaleImageFile(file, deps)).toBe(file);
-    expect(render).not.toHaveBeenCalled();
+    expect(decode).not.toHaveBeenCalled();
   });
 
   describe("sessizce orijinale döner", () => {
-    it("çözme başarısızsa (HEIC / eski tarayıcı)", async () => {
-      const file = fileOf("image/jpeg");
+    it("çözme başarısızsa (eski tarayıcı)", async () => {
+      const file = jpegFile({ width: 4000, height: 3000 });
       const deps: DownscaleDeps = {
         decode: async () => {
           throw new Error("cannot decode");
@@ -195,8 +324,8 @@ describe("downscaleImageFile", () => {
     });
 
     it("canvas kodlayamazsa (null blob)", async () => {
-      const { bmp } = depsFor({ width: 4000, height: 3000 });
-      const file = fileOf("image/jpeg");
+      const { bmp } = depsFor({ width: 1600, height: 1200 });
+      const file = jpegFile({ width: 4000, height: 3000 });
       const deps: DownscaleDeps = {
         decode: async () => bmp,
         render: async () => null,
@@ -207,8 +336,8 @@ describe("downscaleImageFile", () => {
     });
 
     it("çizim fırlatırsa", async () => {
-      const { bmp } = depsFor({ width: 4000, height: 3000 });
-      const file = fileOf("image/jpeg");
+      const { bmp } = depsFor({ width: 1600, height: 1200 });
+      const file = jpegFile({ width: 4000, height: 3000 });
       const deps: DownscaleDeps = {
         decode: async () => bmp,
         render: async () => {
@@ -221,18 +350,73 @@ describe("downscaleImageFile", () => {
     });
 
     it("sonuç orijinalden küçük değilse", async () => {
-      const { deps } = depsFor({ width: 4000, height: 3000 }, 5000);
-      const file = fileOf("image/jpeg", 4096);
+      const { deps } = depsFor({ width: 1600, height: 1200 }, 50_000);
+      const file = jpegFile({ width: 4000, height: 3000 });
 
       expect(await downscaleImageFile(file, deps)).toBe(file);
     });
 
-    it("ortam createImageBitmap'i hiç sunmuyorsa (varsayılan tesisat)", async () => {
-      // Düğüm ortamında `createImageBitmap` yok: varsayılan çözücü fırlatır,
-      // yardımcı yine de orijinali döner.
-      const file = fileOf("image/jpeg");
+    it("ortam createImageBitmap'i sunmuyorsa (varsayılan tesisat)", async () => {
+      const file = jpegFile({ width: 4000, height: 3000 });
 
       expect(await downscaleImageFile(file)).toBe(file);
+    });
+  });
+
+  describe("tek seferde bir dosya", () => {
+    it("ikinci dosyanın çözmesi birincisi bitmeden başlamaz", async () => {
+      let releaseFirst!: () => void;
+      const firstDone = new Promise<void>(
+        (resolve) => (releaseFirst = resolve),
+      );
+      const order: string[] = [];
+
+      const make = (label: string, gate?: Promise<void>): DownscaleDeps => ({
+        decode: async () => {
+          order.push(`decode:${label}`);
+          await gate;
+          return bitmap(1600, 1200);
+        },
+        render: async () => {
+          order.push(`render:${label}`);
+          return new Blob([new Uint8Array(10)]);
+        },
+      });
+
+      const first = downscaleImageFile(
+        jpegFile({ width: 4000, height: 3000 }, "a.jpg"),
+        make("a", firstDone),
+      );
+      const second = downscaleImageFile(
+        jpegFile({ width: 4000, height: 3000 }, "b.jpg"),
+        make("b"),
+      );
+
+      // Birincinin çözmesi askıdayken ikinci hiç başlamamış olmalı.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(order).toEqual(["decode:a"]);
+
+      releaseFirst();
+      await Promise.all([first, second]);
+      expect(order).toEqual(["decode:a", "render:a", "decode:b", "render:b"]);
+    });
+
+    it("birinin hatası sıradakini engellemez", async () => {
+      const failing: DownscaleDeps = {
+        decode: async () => {
+          throw new Error("boom");
+        },
+        render: vi.fn(),
+      };
+      const { deps } = depsFor({ width: 1600, height: 1200 });
+
+      const [a, b] = await Promise.all([
+        downscaleImageFile(jpegFile({ width: 4000, height: 3000 }), failing),
+        downscaleImageFile(jpegFile({ width: 4000, height: 3000 }), deps),
+      ]);
+
+      expect(a.type).toBe("image/jpeg");
+      expect(b.size).toBe(100);
     });
   });
 });
