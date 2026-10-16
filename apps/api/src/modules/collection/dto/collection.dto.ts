@@ -142,6 +142,8 @@ export class CollectionItemResponseDto {
   productImage?: string;
   productPrice?: number;
   productStatus?: string;
+  // Ürünün satıcısı (özel öğede null) — istemci "kendi ilanında kalp yok" kuralı için.
+  sellerId?: string | null;
   sortOrder: number;
   isFeatured: boolean;
   // Ürünün KENDİ ilan öne çıkarması (boost) aktif mi — koleksiyon içi öne çıkarma değil.

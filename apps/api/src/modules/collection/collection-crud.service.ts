@@ -183,6 +183,7 @@ export class CollectionCrudService {
             product: {
               select: {
                 id: true,
+                sellerId: true,
                 kind: true,
                 title: true,
                 price: true,
@@ -300,6 +301,7 @@ export class CollectionCrudService {
             product: {
               select: {
                 id: true,
+                sellerId: true,
                 kind: true,
                 title: true,
                 price: true,
