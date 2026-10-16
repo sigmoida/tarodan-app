@@ -35,6 +35,7 @@ import {
   ActiveCampaignDto,
 } from "./dto";
 import { i18nMessage } from "../i18n";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("discounts")
 @Controller("discounts")
@@ -207,7 +208,7 @@ export class DiscountController {
     description: "Not authorized to update this discount",
   })
   async update(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: UpdateDiscountDto,
   ): Promise<DiscountResponseDto> {
@@ -238,7 +239,7 @@ export class DiscountController {
     description: "Not authorized to delete this discount",
   })
   async delete(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<void> {
     // Satıcı ucu; admin işlemleri `/admin/discounts` üzerindedir.

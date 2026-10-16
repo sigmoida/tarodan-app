@@ -30,6 +30,7 @@ describe("MediaService — görsel çevirmede sahiplik", () => {
       {} as never, // membershipService
       storageService as never,
       prisma as never,
+      {} as never, // MessageAttachmentAccessService
     );
     return { service, prisma, storageService };
   };

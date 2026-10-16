@@ -44,6 +44,7 @@ describe("AdminStaffService.banUser — bekleyen teklifler", () => {
       anyMock(),
       anyMock(),
       anyMock(),
+      anyMock(),
     );
     return { service, tx };
   };

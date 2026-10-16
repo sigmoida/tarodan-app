@@ -9,27 +9,28 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-} from '@nestjs/swagger';
-import { OfferService } from './offer.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+} from "@nestjs/swagger";
+import { OfferService } from "./offer.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import {
   CreateOfferDto,
   CounterOfferDto,
   OfferQueryDto,
   OfferResponseDto,
   PaginatedOffersDto,
-} from './dto';
+} from "./dto";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
-@ApiTags('offers')
-@Controller('offers')
+@ApiTags("offers")
+@Controller("offers")
 export class OfferController {
   private readonly logger = new Logger(OfferController.name);
 
@@ -42,22 +43,22 @@ export class OfferController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new offer on a product' })
+  @ApiOperation({ summary: "Create a new offer on a product" })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Offer created successfully',
+    description: "Offer created successfully",
     type: OfferResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid data or offer not allowed',
+    description: "Invalid data or offer not allowed",
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Product not found',
+    description: "Product not found",
   })
   async create(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() dto: CreateOfferDto,
   ): Promise<OfferResponseDto> {
     return this.offerService.create(userId, dto);
@@ -66,23 +67,23 @@ export class OfferController {
   /**
    * GET /offers/pending-count - Get pending offers count for badge
    */
-  @Get('pending-count')
+  @Get("pending-count")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get count of pending offers (received)' })
+  @ApiOperation({ summary: "Get count of pending offers (received)" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Pending offers count',
+    description: "Pending offers count",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        received: { type: 'number', description: 'Pending offers received' },
-        sent: { type: 'number', description: 'Pending offers sent' },
-        total: { type: 'number', description: 'Total pending offers' },
+        received: { type: "number", description: "Pending offers received" },
+        sent: { type: "number", description: "Pending offers sent" },
+        total: { type: "number", description: "Total pending offers" },
       },
     },
   })
-  async getPendingCount(@CurrentUser('id') userId: string) {
+  async getPendingCount(@CurrentUser("id") userId: string) {
     try {
       return await this.offerService.getPendingCount(userId);
     } catch (e: any) {
@@ -97,14 +98,14 @@ export class OfferController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user\'s offers (sent and received)' })
+  @ApiOperation({ summary: "Get current user's offers (sent and received)" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of offers',
+    description: "List of offers",
     type: PaginatedOffersDto,
   })
   async findUserOffers(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Query() query: OfferQueryDto,
   ): Promise<PaginatedOffersDto> {
     return this.offerService.findUserOffers(userId, query);
@@ -113,23 +114,23 @@ export class OfferController {
   /**
    * GET /offers/:id - Get single offer
    */
-  @Get(':id')
+  @Get(":id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a specific offer by ID' })
-  @ApiParam({ name: 'id', description: 'Offer ID' })
+  @ApiOperation({ summary: "Get a specific offer by ID" })
+  @ApiParam({ name: "id", description: "Offer ID" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Offer details',
+    description: "Offer details",
     type: OfferResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Offer not found',
+    description: "Offer not found",
   })
   async findOne(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") userId: string,
   ): Promise<OfferResponseDto> {
     return this.offerService.findOne(id, userId);
   }
@@ -138,28 +139,28 @@ export class OfferController {
    * POST /offers/:id/accept - Accept offer
    * Requirement: Accept/reject offer (project.md)
    */
-  @Post(':id/accept')
+  @Post(":id/accept")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Accept an offer (seller only)' })
-  @ApiParam({ name: 'id', description: 'Offer ID' })
+  @ApiOperation({ summary: "Accept an offer (seller only)" })
+  @ApiParam({ name: "id", description: "Offer ID" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Offer accepted',
+    description: "Offer accepted",
     type: OfferResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Offer cannot be accepted',
+    description: "Offer cannot be accepted",
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Not authorized to accept this offer',
+    description: "Not authorized to accept this offer",
   })
   async accept(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @UuidParam("id") id: string,
+    @CurrentUser("id") userId: string,
   ): Promise<OfferResponseDto> {
     return this.offerService.accept(id, userId);
   }
@@ -168,28 +169,28 @@ export class OfferController {
    * POST /offers/:id/reject - Reject offer
    * Requirement: Accept/reject offer (project.md)
    */
-  @Post(':id/reject')
+  @Post(":id/reject")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reject an offer (seller only)' })
-  @ApiParam({ name: 'id', description: 'Offer ID' })
+  @ApiOperation({ summary: "Reject an offer (seller only)" })
+  @ApiParam({ name: "id", description: "Offer ID" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Offer rejected',
+    description: "Offer rejected",
     type: OfferResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Offer cannot be rejected',
+    description: "Offer cannot be rejected",
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Not authorized to reject this offer',
+    description: "Not authorized to reject this offer",
   })
   async reject(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @UuidParam("id") id: string,
+    @CurrentUser("id") userId: string,
   ): Promise<OfferResponseDto> {
     return this.offerService.reject(id, userId);
   }
@@ -198,28 +199,28 @@ export class OfferController {
    * POST /offers/:id/counter - Counter-offer
    * Requirement: Counter-offer (project.md)
    */
-  @Post(':id/counter')
+  @Post(":id/counter")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Make a counter-offer (seller only)' })
-  @ApiParam({ name: 'id', description: 'Offer ID' })
+  @ApiOperation({ summary: "Make a counter-offer (seller only)" })
+  @ApiParam({ name: "id", description: "Offer ID" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Counter-offer created',
+    description: "Counter-offer created",
     type: OfferResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Counter-offer not allowed',
+    description: "Counter-offer not allowed",
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Not authorized to counter this offer',
+    description: "Not authorized to counter this offer",
   })
   async counter(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @UuidParam("id") id: string,
+    @CurrentUser("id") userId: string,
     @Body() dto: CounterOfferDto,
   ): Promise<OfferResponseDto> {
     return this.offerService.counter(id, userId, dto);
@@ -228,16 +229,23 @@ export class OfferController {
   /**
    * POST /offers/:id/buyer-counter — Satıcının karşı teklifine alıcı tutar önerir (ping-pong)
    */
-  @Post(':id/buyer-counter')
+  @Post(":id/buyer-counter")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Buyer counter-offer after seller counter (lower amount, min % rules)' })
-  @ApiParam({ name: 'id', description: 'Offer ID (pending, buyerMustAccept)' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Buyer counter created', type: OfferResponseDto })
+  @ApiOperation({
+    summary:
+      "Buyer counter-offer after seller counter (lower amount, min % rules)",
+  })
+  @ApiParam({ name: "id", description: "Offer ID (pending, buyerMustAccept)" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Buyer counter created",
+    type: OfferResponseDto,
+  })
   async buyerCounter(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @UuidParam("id") id: string,
+    @CurrentUser("id") userId: string,
     @Body() dto: CounterOfferDto,
   ): Promise<OfferResponseDto> {
     return this.offerService.buyerCounter(id, userId, dto);
@@ -246,28 +254,28 @@ export class OfferController {
   /**
    * POST /offers/:id/cancel - Cancel offer (buyer only)
    */
-  @Post(':id/cancel')
+  @Post(":id/cancel")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cancel an offer (buyer only)' })
-  @ApiParam({ name: 'id', description: 'Offer ID' })
+  @ApiOperation({ summary: "Cancel an offer (buyer only)" })
+  @ApiParam({ name: "id", description: "Offer ID" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Offer cancelled',
+    description: "Offer cancelled",
     type: OfferResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Offer cannot be cancelled',
+    description: "Offer cannot be cancelled",
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Not authorized to cancel this offer',
+    description: "Not authorized to cancel this offer",
   })
   async cancel(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @UuidParam("id") id: string,
+    @CurrentUser("id") userId: string,
   ): Promise<OfferResponseDto> {
     return this.offerService.cancel(id, userId);
   }
@@ -275,23 +283,25 @@ export class OfferController {
   /**
    * GET /offers/product/:productId - Get offers for a product
    */
-  @Get('product/:productId')
+  @Get("product/:productId")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all offers for a specific product (seller only)' })
-  @ApiParam({ name: 'productId', description: 'Product ID' })
+  @ApiOperation({
+    summary: "Get all offers for a specific product (seller only)",
+  })
+  @ApiParam({ name: "productId", description: "Product ID" })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of offers for the product',
+    description: "List of offers for the product",
     type: PaginatedOffersDto,
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
-    description: 'Not authorized to view these offers',
+    description: "Not authorized to view these offers",
   })
   async findProductOffers(
-    @Param('productId') productId: string,
-    @CurrentUser('id') userId: string,
+    @Param("productId") productId: string,
+    @CurrentUser("id") userId: string,
     @Query() query: OfferQueryDto,
   ): Promise<PaginatedOffersDto> {
     return this.offerService.findProductOffers(productId, userId, query);

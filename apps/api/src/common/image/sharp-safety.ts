@@ -18,3 +18,23 @@ export function isBlockedSharpMimeType(mimeType: string): boolean {
     mimeType.toLowerCase(),
   );
 }
+
+type SharpFactory = typeof import("sharp");
+
+let cachedSharp: SharpFactory | null | undefined;
+
+/**
+ * Güvenlik ayarlı sharp (bir kez yüklenir); native modül yüklenemezse `null`.
+ * Kendi sharp örneği olmayan servisler (ör. satıcı belgeleri) bunu kullanır.
+ */
+export function loadSafeSharp(): SharpFactory | null {
+  if (cachedSharp === undefined) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      cachedSharp = configureSharpSafety(require("sharp") as SharpFactory);
+    } catch {
+      cachedSharp = null;
+    }
+  }
+  return cachedSharp;
+}

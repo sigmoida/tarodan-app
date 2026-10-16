@@ -26,6 +26,8 @@ import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
 import { resolveUploadTarget } from "./helpers/upload-target";
 import { RotateProductImageDto } from "./dto/media.dto";
 import { i18nMessage } from "../i18n";
+import type { Response } from "express";
+import type { RequestUser } from "../auth/interfaces/jwt-payload.interface";
 
 @Controller("media")
 @UseGuards(JwtAuthGuard)
@@ -88,11 +90,19 @@ export class MediaController {
 
   /**
    * Faz 0: private mesaj ekini presigned URL'e yönlendirir. JWT zorunlu
-   * (sınıf guard'ı); yalnız `messages` kökündeki dosyalar çözülür.
+   * (sınıf guard'ı); yalnız `messages` kökündeki dosyalar, yalnız yükleyene,
+   * eki taşıyan mesajın alıcısına çözülür — diğer herkese 404.
    */
   @Get("message-attachment/:id")
-  async messageAttachment(@Param("id") id: string, @Res() res: any) {
-    const url = await this.mediaService.getMessageAttachmentPresignedUrl(id);
+  async messageAttachment(
+    @Request() req: { user: RequestUser },
+    @Param("id") id: string,
+    @Res() res: Response,
+  ) {
+    const url = await this.mediaService.getMessageAttachmentPresignedUrl(
+      id,
+      req.user,
+    );
     return res.redirect(url);
   }
 

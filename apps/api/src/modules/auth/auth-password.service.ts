@@ -3,6 +3,7 @@ import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
+import { SecurityService } from "../security/security.service";
 import { i18nMessage } from "../i18n";
 import { DUMMY_BCRYPT_HASH } from "./utils/timing-pad";
 
@@ -23,6 +24,7 @@ export class AuthPasswordService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    private readonly securityService: SecurityService,
   ) {}
 
   /**
@@ -144,10 +146,9 @@ export class AuthPasswordService {
     // Parola değişti → mevcut tüm refresh token'ları (session'ları) iptal et.
     // Bir hesap kurtarma/ele geçirme savunmasının parçasıysa, eski oturumlar
     // (ör. saldırgan) anında düşer; kullanıcı yeniden giriş yapar.
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: resetToken.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    // Push token'ları da aynı anda düşer: kapanan oturumların cihazları
+    // bildirim almaya devam etmesin (tek kaynak: SecurityService).
+    await this.securityService.revokeAllUserTokens(resetToken.userId);
 
     // #224: başarı mesajı AuthController.resetPassword() tarafından locale'e göre
     // kuruluyor (server.auth.passwordResetSuccess).

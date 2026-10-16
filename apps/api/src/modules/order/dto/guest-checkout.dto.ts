@@ -94,7 +94,8 @@ export class GuestCheckoutDto {
   billingAddress?: GuestAddressDto;
 
   @ApiPropertyOptional({
-    description: "Offer ID if purchasing with an accepted offer",
+    description:
+      "Not supported: offers need an account and their order is created on accept. Sending it returns 400 (kept for backward compatibility).",
   })
   @IsUUID()
   @IsOptional()

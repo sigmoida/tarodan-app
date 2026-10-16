@@ -43,6 +43,7 @@ import {
   CheckoutDto,
   GuestCheckoutGroupDto,
 } from "./dto";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("orders")
 @Controller("orders")
@@ -425,7 +426,7 @@ export class OrderController {
   })
   @ApiParam({ name: "id", description: "Checkout group ID" })
   async cancelGroup(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: CancelOrderDto,
   ) {
@@ -491,7 +492,7 @@ export class OrderController {
     type: OrderResponseDto,
   })
   async setShippingAddress(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: SetShippingAddressDto,
   ): Promise<OrderResponseDto> {
@@ -522,7 +523,7 @@ export class OrderController {
     description: "Not authorized to cancel this order",
   })
   async cancel(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: CancelOrderDto,
   ): Promise<OrderResponseDto> {
@@ -548,7 +549,7 @@ export class OrderController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: "Yetki yok" })
   async confirmReceipt(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<{ completed: boolean }> {
     return this.orderService.confirmReceipt(id, userId);
@@ -574,7 +575,7 @@ export class OrderController {
   })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: "Not authorized" })
   async reactivate(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<OrderResponseDto> {
     return this.orderService.reactivate(id, userId);
@@ -604,7 +605,7 @@ export class OrderController {
     description: "Not authorized",
   })
   async markAsPreparing(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<OrderResponseDto> {
     return this.orderService.markAsPreparing(id, userId);
@@ -634,7 +635,7 @@ export class OrderController {
     description: "Not authorized",
   })
   async confirmDelivery(
-    @Param("id") id: string,
+    @UuidParam("id") id: string,
     @CurrentUser("id") userId: string,
   ): Promise<OrderResponseDto> {
     return this.orderService.confirmDelivery(id, userId);

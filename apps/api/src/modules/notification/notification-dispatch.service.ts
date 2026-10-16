@@ -686,13 +686,20 @@ export class NotificationDispatchService {
   /**
    * Register push token for a user
    */
-  async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
+  async registerPushToken(userId: string | null, dto: RegisterPushTokenDto) {
     try {
       // Logout path: the device asks us to deactivate its token instead of
       // registering it, so the user stops receiving push on a signed-out device.
+      // May arrive without a session (expired access token at logout).
+      // The DEVICE is logging out, so every active row for its token is
+      // deactivated — with or without a session. Scoping to the caller's row
+      // would let an older row of another account on this device survive.
       if (dto.revoke) {
         await this.expoPushProvider.deactivateToken(dto.token);
         return { success: true, userId, revoked: true };
+      }
+      if (!userId) {
+        return { success: false, error: "Authentication required" };
       }
 
       await this.expoPushProvider.registerToken(

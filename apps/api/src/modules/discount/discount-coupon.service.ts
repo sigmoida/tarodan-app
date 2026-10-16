@@ -12,6 +12,7 @@ import { audienceMatches } from "./helpers/discount-authorization";
 import { isProductInDiscountScope } from "./helpers/discount-scope";
 import { resolveUserTier } from "./helpers/user-tier";
 import { DiscountPricingService } from "./discount-pricing.service";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 
 /**
  * Bir kupon kodunun bu sepette geçerli olup olmadığı ve geçerliyse ne kadar
@@ -240,15 +241,19 @@ export class DiscountCouponService {
           productId: product.id,
           sellerId: product.sellerId,
           categoryId: product.categoryId ?? "",
-          currentDisplayPrice: Number(product.price),
+          currentDisplayPrice: resolveSalePrice(product).price,
         })),
       );
 
       for (const item of dto.cartItems) {
         const product = products.find((p) => p.id === item.productId);
         if (product) {
+          // Taban, checkout'un tahsil ettiği fiyatla AYNI kaynaktan: satış
+          // penceresi kapandıysa indirim öncesi fiyat (resolveSalePrice). Ham
+          // `price` kolonu bayat indirimli fiyatı tutabilir; kupon yüzdesi ve
+          // minimum sepet tutarı o zaman tahsil edilenden düşük tabana bakardı.
           const unitPrice =
-            effectivePrices.get(product.id) ?? Number(product.price);
+            effectivePrices.get(product.id) ?? resolveSalePrice(product).price;
           const itemPrice = unitPrice * item.quantity;
           cartTotal += itemPrice;
           if (isProductInDiscountScope(product, discount)) {

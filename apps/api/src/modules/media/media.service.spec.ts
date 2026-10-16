@@ -56,6 +56,7 @@ function createService(): {
     {} as never, // MembershipService
     storageService as never,
     {} as never, // PrismaService
+    {} as never, // MessageAttachmentAccessService
   );
   const byFilename = (suffix: "card" | "detail") =>
     uploaded[names.findIndex((name) => name.endsWith(`-${suffix}.webp`))];
@@ -137,6 +138,7 @@ describe("MediaService — kart/detay yüklemeleri paralel", () => {
       {} as never,
       storageService as never,
       {} as never,
+      {} as never, // MessageAttachmentAccessService
     );
     return { service, storageService };
   }
@@ -215,16 +217,26 @@ describe("MediaService.upload — public kök URL'i tanımsız", () => {
       {} as never,
       storageService as never,
       {} as never,
+      {} as never, // MessageAttachmentAccessService
     );
     return { service, storageService };
   }
 
+  // Gerçek bir PNG: görseller artık her yolda sharp'tan geçiyor (EXIF silme),
+  // çözülemeyen tampon yüklenmez.
   const png = {
-    buffer: Buffer.from("x"),
+    buffer: Buffer.alloc(0),
     size: 1,
     mimetype: "image/png",
     originalname: "banner.png",
   } as Express.Multer.File;
+  beforeAll(async () => {
+    png.buffer = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#fff" },
+    })
+      .png()
+      .toBuffer();
+  });
 
   it('public köke yüklemeden ÖNCE 503 verir (sessiz `url: ""` yerine)', async () => {
     const { service, storageService } = serviceWithoutPublicBaseUrl();
@@ -283,6 +295,7 @@ describe("MediaService — türev ölçüleri ve depo seçenekleri", () => {
       {} as never,
       storageService as never,
       {} as never,
+      {} as never, // MessageAttachmentAccessService
     );
     const byName = (suffix: string) =>
       calls.find((call) => String(call.options.filename).endsWith(suffix))!;

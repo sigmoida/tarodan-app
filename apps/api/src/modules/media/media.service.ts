@@ -25,11 +25,18 @@ import {
   configureSharpSafety,
   isBlockedSharpMimeType,
 } from "../../common/image/sharp-safety";
+import {
+  stripImageMetadata,
+  UnsupportedImageError,
+} from "../../common/image/strip-image-metadata";
 import { i18nMessage } from "../i18n";
 import {
+  isMessageAttachmentId,
   messageAttachmentIdFromUrl,
   messageAttachmentUrl,
 } from "./helpers/message-attachment-url";
+import { MessageAttachmentAccessService } from "../messaging/attachment-access/message-attachment-access.service";
+import type { RequestUser } from "../auth/interfaces/jwt-payload.interface";
 
 /**
  * sharp modülünün KENDİ tipi. `require` `any` döndürür; açıkça bağlanmazsa
@@ -135,6 +142,7 @@ export class MediaService {
     private membershipService: MembershipService,
     private storageService: StorageService,
     private prisma: PrismaService,
+    private attachmentAccess: MessageAttachmentAccessService,
   ) {}
 
   /**
@@ -210,18 +218,31 @@ export class MediaService {
 
   /**
    * Mesaj ekini presigned URL'e çözer. Yalnız `messages` kökündeki dosyalar —
-   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez. Çağıran
-   * controller JWT zorunlu kılar; uuid tahmin edilemezliği + kısa süreli
-   * presigned ile birlikte erişim modeli budur (thread-üyeliği denetimi v2).
+   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez.
+   *
+   * Erişim: yükleyen ya da eki taşıyan mesajın alıcısı
+   * (`MessageAttachmentAccessService`). Bu uç kullanıcı JWT'si ister; admin
+   * erişimi şimdilik kapsam dışı. Yetkisiz istek de 404 alır (403
+   * değil) — id yoklayarak bir ekin VARLIĞI öğrenilemesin.
    */
-  async getMessageAttachmentPresignedUrl(mediaFileId: string): Promise<string> {
+  async getMessageAttachmentPresignedUrl(
+    mediaFileId: string,
+    requester: Pick<RequestUser, "id">,
+  ): Promise<string> {
+    const notFound = () =>
+      new NotFoundException(i18nMessage("server.media.fileNotFound"));
+    if (!isMessageAttachmentId(mediaFileId)) throw notFound();
+
     const file = await this.prisma.mediaFile.findUnique({
       where: { id: mediaFileId },
-      select: { key: true, bucket: true },
+      select: { id: true, key: true, bucket: true, uploaderId: true },
     });
-    if (!file || file.bucket !== "messages") {
-      throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
+    if (!file || file.bucket !== "messages") throw notFound();
+
+    if (!(await this.attachmentAccess.canRead(file, requester.id))) {
+      throw notFound();
     }
+
     return this.storageService.getPresignedDownloadUrl(
       "messages",
       file.key,
@@ -272,23 +293,32 @@ export class MediaService {
       );
     }
 
-    // Generate unique filename
-    const ext = file.originalname.split(".").pop();
-    const filename = `${uuidv4()}.${ext}`;
+    // Görsel her yolda sharp'tan geçer (meta veri silme dahil); sharp yoksa
+    // ham dosyayı (GPS'iyle) yüklemek yerine açık hata — ürün görseli yolu
+    // da aynı kapıyı kullanır. Try'ın dışında: nedeni 400'e gömülmesin.
+    const sharpLib = file.mimetype.startsWith("image/")
+      ? this.requireSharp("upload")
+      : null;
 
     try {
       let buffer = file.buffer;
+      let mimeType = file.mimetype;
+      let ext = file.originalname.split(".").pop();
 
-      // Process image if resize options provided and sharp is available
-      if (resize && file.mimetype.startsWith("image/") && sharp) {
-        buffer = await sharp(buffer)
-          .autoOrient()
-          .resize(resize.width, resize.height, {
-            fit: resize.fit || "cover",
-            withoutEnlargement: resize.withoutEnlargement,
-          })
-          .toBuffer();
+      if (sharpLib) {
+        // EXIF/GPS silinir, yön uygulanır, istenirse boyutlandırılır. Biçim
+        // İÇERİKTEN belirlenir (istemci MIME'ı keyfi): JPEG/PNG/WebP kalır,
+        // başka raster JPEG olur → depodaki tür/uzantı gerçeğe göre yazılır.
+        const prepared = await stripImageMetadata(sharpLib, buffer, {
+          resize,
+        });
+        buffer = prepared.buffer;
+        mimeType = prepared.mimeType;
+        ext = prepared.extension;
       }
+
+      // Generate unique filename
+      const filename = `${uuidv4()}.${ext}`;
 
       // Upload main file using StorageService
       const uploadResult = await this.storageService.uploadFile(
@@ -297,7 +327,7 @@ export class MediaService {
           bucket,
           folder,
           filename,
-          mimeType: file.mimetype,
+          mimeType,
           entityType,
           entityId,
         },
@@ -334,9 +364,9 @@ export class MediaService {
       }
 
       // Generate thumbnail if requested and sharp is available
-      if (generateThumbnail && file.mimetype.startsWith("image/") && sharp) {
-        const thumbBuffer = await sharp(file.buffer)
-          .autoOrient()
+      if (generateThumbnail && sharpLib) {
+        // Kaynak, meta verisi silinmiş ve yönü uygulanmış tampondur.
+        const thumbBuffer = await sharpLib(buffer)
           .resize(200, 200, { fit: "cover" })
           .toBuffer();
 
@@ -347,7 +377,7 @@ export class MediaService {
             bucket,
             folder: `${folder}/thumbnails`,
             filename: thumbFilename,
-            mimeType: file.mimetype,
+            mimeType,
             entityType,
             entityId,
           },
@@ -361,6 +391,11 @@ export class MediaService {
       return result;
     } catch (error: any) {
       this.logger.error(`Upload failed: ${error.message}`);
+      if (error instanceof UnsupportedImageError) {
+        throw new BadRequestException(
+          i18nMessage("server.media.unsupportedTypeWithGif"),
+        );
+      }
       throw new BadRequestException("File upload failed");
     }
   }

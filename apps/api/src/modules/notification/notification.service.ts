@@ -62,7 +62,7 @@ export class NotificationService {
     return this.dispatch.notifyAllAdminsOnce(key, ttlSeconds, type, data);
   }
 
-  async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
+  async registerPushToken(userId: string | null, dto: RegisterPushTokenDto) {
     return this.dispatch.registerPushToken(userId, dto);
   }
 

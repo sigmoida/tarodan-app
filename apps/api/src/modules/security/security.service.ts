@@ -27,6 +27,7 @@ import {
   isEncryptedSecret,
 } from "../../common/security/secret-cipher";
 import { i18nMessage } from "../i18n";
+import { PushTokenRevocationService } from "../notification/push-token/push-token-revocation.service";
 import {
   adminSessionExpiryFrom,
   resolveAdminSessionTimeoutMinutes,
@@ -45,6 +46,7 @@ export class SecurityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly pushTokens: PushTokenRevocationService,
   ) {}
 
   // ==========================================================================
@@ -410,11 +412,8 @@ export class SecurityService {
       data: { usedAt: new Date() },
     });
 
-    // Revoke all refresh tokens
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: resetToken.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    // Revoke all refresh tokens — and the push tokens of those sessions
+    await this.revokeAllUserTokens(resetToken.userId);
   }
 
   /**
@@ -509,9 +508,15 @@ export class SecurityService {
    * Revoke all user's refresh tokens
    */
   async revokeAllUserTokens(userId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
+    // Oturumlarla birlikte push token'ları da düşer: "tüm cihazlardan çıkış"
+    // sonrası çıkışı yapılan cihazlar bildirim almaya devam etmesin. İkisi aynı
+    // transaction'da — biri kalıp diğeri düşmesin.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.pushTokens.deactivateAllForUser(userId, tx);
     });
   }
 

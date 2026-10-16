@@ -10412,7 +10412,9 @@
       "recordNotFound": "Kayıt bulunamadı",
       "relatedRecordsConflict": "İşlem ilişkili kayıtlar nedeniyle tamamlanamadı",
       "internalError": "Sunucu hatası",
-      "connectionFailed": "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin."
+      "connectionFailed": "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.",
+      "invalidId": "Geçersiz kimlik (ID) biçimi",
+      "invalidRouteParam": "Geçersiz istek parametresi"
     },
     "notification": {
       "orderCreated": {
@@ -11765,7 +11767,8 @@
       "invalidUploadTarget": "Geçersiz yükleme hedefi: {folder}. İzinli hedefler: messages, reviews, collections",
       "actionForbidden": "Bu işlem için yetkiniz yok.",
       "fileMissing": "Dosya bulunamadı.",
-      "fileForbidden": "Bu dosya üzerinde yetkiniz yok."
+      "fileForbidden": "Bu dosya üzerinde yetkiniz yok.",
+      "processingUnavailable": "Görsel işleme şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
     },
     "search": {
       "reindexFailed": "Reindex başarısız"

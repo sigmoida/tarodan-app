@@ -5,7 +5,6 @@ import {
   Patch,
   Delete,
   Body,
-  Param,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -29,6 +28,7 @@ import {
   CartResponseDto,
   CartCalculationResponseDto,
 } from "./dto";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("cart")
 @Controller("cart")
@@ -114,7 +114,7 @@ export class CartController {
   })
   async updateItem(
     @CurrentUser("id") userId: string,
-    @Param("productId") productId: string,
+    @UuidParam("productId") productId: string,
     @Body() dto: UpdateCartItemDto,
     @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
@@ -138,7 +138,7 @@ export class CartController {
   })
   async removeItem(
     @CurrentUser("id") userId: string,
-    @Param("productId") productId: string,
+    @UuidParam("productId") productId: string,
     @ReqLocale() locale: Locale,
   ): Promise<CartResponseDto> {
     return this.cartService.removeItem(userId, productId, locale);

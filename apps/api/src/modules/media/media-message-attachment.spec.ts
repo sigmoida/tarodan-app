@@ -1,3 +1,4 @@
+import { NotFoundException } from "@nestjs/common";
 import { MediaService } from "./media.service";
 import {
   messageAttachmentIdFromUrl,
@@ -31,6 +32,7 @@ function createService(ownedIds: string[] = [OWN_ID]) {
     {} as never, // MembershipService
     {} as never, // StorageService
     prisma as never,
+    {} as never, // MessageAttachmentAccessService
   );
   return { service, prisma };
 }
@@ -120,5 +122,108 @@ describe("MediaService.findInvalidMessageAttachmentTargets", () => {
         where: expect.objectContaining({ id: { in: [OWN_ID] } }),
       }),
     ]);
+  });
+});
+
+/**
+ * IDOR: `GET /media/message-attachment/:id` eskiden her oturumlu kullanıcıya
+ * her eki çözüyordu. Artık yalnız yükleyen ya da eki taşıyan mesajın alıcısı;
+ * diğer herkes (ve biçim dışı id) VARLIĞI sızdırmayan 404 alır.
+ */
+describe("MediaService.getMessageAttachmentPresignedUrl — erişim", () => {
+  const UPLOADER = "user-uploader";
+  const STRANGER = "user-stranger";
+  const file = {
+    id: OWN_ID,
+    key: "dev/messages/user-uploader/a.jpg",
+    bucket: "messages",
+    uploaderId: UPLOADER,
+  };
+
+  function createReader(found: typeof file | null = file, canRead = false) {
+    const prisma = {
+      mediaFile: { findUnique: jest.fn().mockResolvedValue(found) },
+    };
+    const storage = {
+      getPresignedDownloadUrl: jest.fn().mockResolvedValue("https://signed/x"),
+    };
+    const access = { canRead: jest.fn().mockResolvedValue(canRead) };
+    const service = new MediaService(
+      { get: jest.fn() } as never,
+      {} as never,
+      storage as never,
+      prisma as never,
+      access as never,
+    );
+    return { service, prisma, storage, access };
+  }
+
+  it("yetkisiz kullanıcı → 404 (403 değil), presigned üretilmez", async () => {
+    const { service, storage, access } = createReader(file, false);
+
+    await expect(
+      service.getMessageAttachmentPresignedUrl(OWN_ID, { id: STRANGER }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(access.canRead).toHaveBeenCalledWith(
+      expect.objectContaining({ id: OWN_ID, uploaderId: UPLOADER }),
+      STRANGER,
+    );
+    expect(storage.getPresignedDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("erişimi olan (yükleyen/alıcı) → messages kökünden presigned", async () => {
+    const { service, storage } = createReader(file, true);
+
+    await expect(
+      service.getMessageAttachmentPresignedUrl(OWN_ID, { id: UPLOADER }),
+    ).resolves.toBe("https://signed/x");
+    expect(storage.getPresignedDownloadUrl).toHaveBeenCalledWith(
+      "messages",
+      file.key,
+      600,
+    );
+  });
+
+  it("isAdmin bayrağı tek başına erişim VERMEZ (bu uçta admin yolu yok)", async () => {
+    const { service, access } = createReader(file, false);
+
+    await expect(
+      service.getMessageAttachmentPresignedUrl(OWN_ID, {
+        id: "someone",
+        isAdmin: true,
+      } as { id: string }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(access.canRead).toHaveBeenCalled();
+  });
+
+  it("başka bucket'taki dosya → 404 (yetkili olsa bile)", async () => {
+    const { service, access } = createReader(
+      { ...file, bucket: "documents" },
+      true,
+    );
+
+    await expect(
+      service.getMessageAttachmentPresignedUrl(OWN_ID, { id: UPLOADER }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(access.canRead).not.toHaveBeenCalled();
+  });
+
+  it("biçim dışı id → veritabanına gitmeden 404", async () => {
+    const { service, prisma } = createReader();
+
+    for (const id of ["not-a-uuid", "../x", `${OWN_ID}\u0000`, ""]) {
+      await expect(
+        service.getMessageAttachmentPresignedUrl(id, { id: UPLOADER }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    }
+    expect(prisma.mediaFile.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("kayıt yok → 404", async () => {
+    const { service } = createReader(null, true);
+
+    await expect(
+      service.getMessageAttachmentPresignedUrl(FOREIGN_ID, { id: UPLOADER }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

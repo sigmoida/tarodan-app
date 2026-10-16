@@ -47,6 +47,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 
 // Sepet SÜRESİZDİR (ürün kararı): ürünler ve kupon zaman aşımıyla silinmez.
 // `expiresAt` kolonu şema gereği zorunlu olduğu için yalnız oluşturmada
@@ -504,7 +505,9 @@ export class CartService {
     // Calculate effective prices with campaign discounts
     for (const item of cart.items || []) {
       const product = item.product;
-      const basePrice = Number(product.price);
+      // Checkout'un tahsil ettiği taban (satış penceresi dahil) — sepet aynı
+      // rakamı göstersin.
+      const basePrice = resolveSalePrice(product).price;
 
       // Get campaign discount price from DiscountService
       const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
