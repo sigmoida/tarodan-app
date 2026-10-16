@@ -20,7 +20,13 @@ describe("PushWorker — teklif bildirimi mükerrer filtresi", () => {
         create: jest.fn().mockResolvedValue({ id: "log-1" }),
       },
     };
-    const worker = new PushWorker(prisma as never, {} as never, {} as never);
+    const worker = new PushWorker(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
     return { worker, prisma };
   };
 
@@ -110,7 +116,11 @@ describe("PushWorker.handleSendNotification — kuyruk yolu", () => {
           preferredLanguage: opts.preferredLanguage ?? "tr",
         }),
       },
-      pushToken: { findMany: jest.fn().mockResolvedValue([{ token: TOKEN }]) },
+      pushToken: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ token: TOKEN, deviceModel: "iPhone 15" }]),
+      },
       notificationLog: {
         findFirst: jest.fn().mockResolvedValue(opts.existingRow ?? null),
         create: jest.fn().mockResolvedValue({ id: "log-1" }),
@@ -118,7 +128,6 @@ describe("PushWorker.handleSendNotification — kuyruk yolu", () => {
       },
     };
     const expoPush = {
-      unreadBadgeCount: jest.fn().mockResolvedValue(3),
       sendMessages: jest.fn().mockResolvedValue({
         sent: 1,
         failed: 0,
@@ -126,12 +135,16 @@ describe("PushWorker.handleSendNotification — kuyruk yolu", () => {
         tickets: [{ status: "ok", id: "t1" }],
       }),
     };
+    // Rozet sayısının TEK tanımı: NotificationDispatchService.getUnreadCount.
+    const dispatch = { getUnreadCount: jest.fn().mockResolvedValue(3) };
     const worker = new PushWorker(
       prisma as never,
       expoPush as never,
       {} as never,
+      dispatch as never,
+      {} as never,
     );
-    return { worker, prisma, expoPush };
+    return { worker, prisma, expoPush, dispatch };
   };
 
   const job = (data: Record<string, unknown>) => ({ id: "j1", data }) as never;
@@ -200,8 +213,27 @@ describe("PushWorker.handleSendNotification — kuyruk yolu", () => {
     );
   });
 
-  it("yönetici yayınında push satırı SONUÇTAN güncellenir (B13)", async () => {
-    const { worker, prisma } = makeWorker({});
+  it("eski istemci (deviceModel yok) rozet almaz; sayım da yapılmaz", async () => {
+    const { worker, prisma, expoPush, dispatch } = makeWorker({});
+    prisma.pushToken.findMany.mockResolvedValueOnce([
+      { token: TOKEN, deviceModel: null },
+    ]);
+
+    await worker.handleSendNotification(
+      job({
+        userId: "u1",
+        title: "x",
+        body: "y",
+        data: { type: "payment_failed", orderId: "o1" },
+      }),
+    );
+
+    expect(dispatch.getUnreadCount).not.toHaveBeenCalled();
+    expect(expoPush.sendMessages.mock.calls[0][0][0].badge).toBeUndefined();
+  });
+
+  it("yönetici yayınında push satırı SONUÇTAN güncellenir, kişi başı COUNT yok (B13)", async () => {
+    const { worker, prisma, dispatch } = makeWorker({});
 
     await worker.handleSendNotification(
       job({
@@ -224,46 +256,121 @@ describe("PushWorker.handleSendNotification — kuyruk yolu", () => {
         data: expect.objectContaining({ status: "sent" }),
       }),
     );
+    expect(dispatch.getUnreadCount).not.toHaveBeenCalled();
   });
 });
 
 describe("PushWorker.handleBroadcast — zamanlanmış satır sonuçtan yazılır", () => {
-  it("dağıtım bitince satır 'sent' olur ve ilerleme kaldığı yerden sürer", async () => {
+  const jobData = {
+    broadcastId: "b-1",
+    title: "t",
+    body: "b",
+    channels: ["push"],
+    isMarketing: false,
+    target: { targetType: "all" },
+    scheduledNotificationId: "s-1",
+  };
+
+  it("kayıtlı ilerlemeden (son kullanıcı + birikmiş sayaçlar) sürer; satır 'sent' + toplam sayı", async () => {
     const prisma = {
       scheduledNotification: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
-    const events = {
-      runAdminBroadcastFanout: jest
-        .fn()
-        .mockResolvedValue({ users: 5, pushQueued: 4, emailsQueued: 0 }),
+    const saved = {
+      lastUserId: "u5",
+      users: 5,
+      pushQueued: 4,
+      emailsQueued: 0,
     };
+    const events = {
+      runAdminBroadcastFanout: jest.fn().mockResolvedValue({
+        lastUserId: "u9",
+        users: 9,
+        pushQueued: 8,
+        emailsQueued: 0,
+      }),
+    };
+    const newsletter = { resolveMarketingUnsubscribeTokens: jest.fn() };
     const worker = new PushWorker(
       prisma as never,
       {} as never,
       events as never,
+      {} as never,
+      newsletter as never,
     );
-    const progress = jest.fn().mockReturnValue(2);
 
     await worker.handleBroadcast({
       id: "j",
-      progress,
-      attemptsMade: 0,
+      progress: jest.fn().mockReturnValue(saved),
+      attemptsMade: 1,
       opts: { attempts: 3 },
-      data: {
-        userIds: ["a"],
-        title: "t",
-        body: "b",
-        channels: ["push"],
-        scheduledNotificationId: "s-1",
-      },
+      data: jobData,
     } as never);
 
-    expect(events.runAdminBroadcastFanout.mock.calls[0][1].startChunk).toBe(2);
+    expect(events.runAdminBroadcastFanout.mock.calls[0][1].resume).toEqual(
+      saved,
+    );
     expect(prisma.scheduledNotification.updateMany).toHaveBeenCalledWith({
       where: { id: "s-1", status: "processing" },
-      data: expect.objectContaining({ status: "sent", sentCount: 5 }),
+      data: expect.objectContaining({ status: "sent", sentCount: 9 }),
     });
+  });
+
+  it("iş kesin düşünce (stalled dahil) 'failed' olayı satırı processing'te bırakmaz", async () => {
+    const prisma = {
+      scheduledNotification: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const worker = new PushWorker(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await worker.onFailed(
+      {
+        id: "j",
+        name: "send-broadcast",
+        attemptsMade: 3,
+        opts: { attempts: 3 },
+        data: jobData,
+      } as never,
+      new Error("job stalled more than allowable limit"),
+    );
+
+    expect(prisma.scheduledNotification.updateMany).toHaveBeenCalledWith({
+      where: { id: "s-1", status: "processing" },
+      data: expect.objectContaining({ status: "failed" }),
+    });
+  });
+
+  it("ara deneme düşünce satıra dokunulmaz (yeniden denenecek)", async () => {
+    const prisma = {
+      scheduledNotification: { updateMany: jest.fn() },
+    };
+    const worker = new PushWorker(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await worker.onFailed(
+      {
+        id: "j",
+        name: "send-broadcast",
+        attemptsMade: 1,
+        opts: { attempts: 3 },
+        data: jobData,
+      } as never,
+      new Error("x"),
+    );
+
+    expect(prisma.scheduledNotification.updateMany).not.toHaveBeenCalled();
   });
 });

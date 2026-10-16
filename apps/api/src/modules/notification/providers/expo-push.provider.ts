@@ -94,8 +94,34 @@ export interface PushReceiptOutcome {
 export interface SendToUserOptions {
   /** Android kanal kimliği (`pushChannelFor`). */
   channelId?: string;
-  /** iOS uygulama rozeti: `"unread"` → okunmamış zil bildirimi sayısı. */
-  badge?: number | "unread";
+  /**
+   * iOS uygulama rozeti. Fonksiyon verilirse YALNIZ rozet alabilecek bir token
+   * varsa çağrılır (gereksiz COUNT sorgusu yapılmaz).
+   */
+  badge?: number | (() => Promise<number | undefined>);
+}
+
+/**
+ * Rozeti yöneten istemci mi? Yalnız mobil ≥ 1.0.7 rozeti okunmamış sayıyla
+ * senkronlar (okunduğunda düşürür); eski sürüm push'taki rozeti hiç
+ * düşürmediği için ona rozet gönderilmez. Yeni sürüm kayıtta `deviceModel`
+ * gönderir — eski sürüm göndermez; ayırt edici bu kolondur.
+ */
+export function badgeCapableToken(row: {
+  deviceModel?: string | null;
+}): boolean {
+  return typeof row.deviceModel === "string" && row.deviceModel.length > 0;
+}
+
+async function resolveBadge(
+  badge: SendToUserOptions["badge"],
+): Promise<number | undefined> {
+  if (typeof badge !== "function") return badge;
+  try {
+    return await badge();
+  } catch {
+    return undefined;
+  }
 }
 
 @Injectable()
@@ -352,23 +378,12 @@ export class ExpoPushProvider {
   }
 
   /**
-   * iOS uygulama rozeti: okunmamış zil bildirimi sayısı (zil sayacıyla aynı
-   * tanım — `NotificationDispatchService.getUnreadCount`). Okunamazsa rozet
-   * gönderilmez (cihazdaki değer korunur).
-   */
-  async unreadBadgeCount(userId: string): Promise<number | undefined> {
-    try {
-      return await this.prisma.notificationLog.count({
-        where: { userId, channel: "in_app", status: "sent" },
-      });
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
    * Send push notification to a user by user ID — tüm aktif cihazlarına TEK
    * istekte.
+   *
+   * Rozet yalnız rozeti yöneten (yeni) istemcilerin token'larına konur — bkz.
+   * `badgeCapableToken`. Rozet sayısı çağırandan (tek tanım:
+   * `NotificationDispatchService.getUnreadCount`) ve yalnız gerekirse istenir.
    */
   async sendToUser(
     userId: string,
@@ -379,30 +394,27 @@ export class ExpoPushProvider {
   ): Promise<PushNotificationResult[]> {
     const tokens = await this.prisma.pushToken.findMany({
       where: { userId, isActive: true },
-      select: { token: true },
+      select: { token: true, deviceModel: true },
     });
-    const validTokens = tokens
-      .map((t) => t.token)
-      .filter((t) => isExpoPushToken(t));
+    const validTokens = tokens.filter((t) => isExpoPushToken(t.token));
 
     if (validTokens.length === 0) {
       this.logger.debug(`No valid push tokens for user ${userId}`);
       return [{ success: false, error: "No push tokens found for user" }];
     }
 
-    const badge =
-      options.badge === "unread"
-        ? await this.unreadBadgeCount(userId)
-        : options.badge;
+    const badge = validTokens.some(badgeCapableToken)
+      ? await resolveBadge(options.badge)
+      : undefined;
 
     try {
       const outcome = await this.sendMessages(
-        validTokens.map((to) => ({
-          to,
+        validTokens.map((t) => ({
+          to: t.token,
           title,
           body,
           data,
-          badge,
+          badge: badgeCapableToken(t) ? badge : undefined,
           channelId: options.channelId,
         })),
       );

@@ -9,7 +9,6 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PrismaService } from "../../../prisma";
 import { AdminService } from "../admin.service";
-import { audienceUserWhere } from "../ops/notification-audience";
 import type { MailingType } from "@tarodan/types";
 
 @Injectable()
@@ -22,6 +21,8 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
    * yalnız biri sahiplenir.
    */
   private isProcessing = false;
+  /** Teslim satırı taraması en son ne zaman çalıştı (süreç içi; saatte bir). */
+  private lastDeliverySweepAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -63,6 +64,7 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
 
     try {
       const now = new Date();
+      await this.sweepStuckBroadcasts(now, log);
 
       // Find all pending notifications that are due
       const dueNotifications = await this.prisma.scheduledNotification.findMany(
@@ -103,41 +105,11 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
         }
 
         try {
-          // Extract target user IDs based on targetType
-          let userIds: string[] = [];
-
-          if (notification.targetType === "user_ids") {
-            userIds = (notification.targetData as string[]) || [];
-          } else if (
-            notification.targetType === "all" ||
-            notification.targetType === "segment"
-          ) {
-            const users = await this.prisma.user.findMany({
-              where: audienceUserWhere(
-                notification.targetType,
-                notification.targetData as Record<string, any> | null,
-              ),
-              select: { id: true },
-            });
-            userIds = users.map((u) => u.id);
-          }
-
-          if (userIds.length === 0) {
-            this.logger.warn(
-              `No target users found for scheduled notification ${notification.id}`,
-            );
-            failed++;
-            log(`bildirim ${notification.id} → hedef kullanıcı yok, atlandı`);
-            await this.prisma.scheduledNotification.update({
-              where: { id: notification.id },
-              data: {
-                status: "failed",
-                sentAt: new Date(),
-                errorCount: 1,
-              },
-            });
-            continue;
-          }
+          // Hedefleme KURALI aynen geçer (kullanıcı listesine çözülmez): alıcılar
+          // gönderim anında çözülür ve iş verisine liste yazılmaz. Hedef boşsa
+          // sendNotification hata verir → satır "failed" (aşağıdaki catch).
+          const targetType = notification.targetType as
+            "all" | "segment" | "user_ids";
 
           // Dağıtımı başlat (tek `send-broadcast` işi). Satır "processing"
           // kalır; worker dağıtım bitince "sent" (+ ulaşılan sayı) ya da
@@ -146,8 +118,16 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             title: notification.title,
             body: notification.body,
             channels: notification.channels as string[],
-            targetType: "user_ids",
-            userIds,
+            targetType,
+            ...(targetType === "user_ids"
+              ? { userIds: (notification.targetData as string[] | null) ?? [] }
+              : {
+                  segmentCriteria:
+                    (notification.targetData as Record<
+                      string,
+                      unknown
+                    > | null) ?? undefined,
+                }),
             // Zamanlanırken saklanan hedef link vb. — anında gönderimle aynı.
             data:
               notification.data && typeof notification.data === "object"
@@ -161,11 +141,9 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
           });
 
           queued++;
-          log(
-            `bildirim ${notification.id} → ${userIds.length} kullanıcı için dağıtım kuyruğa alındı`,
-          );
+          log(`bildirim ${notification.id} → dağıtım kuyruğa alındı`);
           this.logger.log(
-            `Scheduled notification ${notification.id} queued for ${userIds.length} users`,
+            `Scheduled notification ${notification.id} queued (${targetType})`,
           );
         } catch (error) {
           this.logger.error(
@@ -200,4 +178,61 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
       this.isProcessing = false;
     }
   }
+
+  /**
+   * Takılı kalan yayınları kapatır (kurtarma):
+   * - `processing`te `STUCK_PROCESSING_MS`'den uzun kalan zamanlanmış satır
+   *   (dağıtım işi kaybolduysa / worker hiç almadıysa) "failed" olur;
+   * - gönderimi hiç denenmeyen (`pending`) yayın teslim satırları
+   *   `STALE_DELIVERY_MS` sonra "failed" olur (alıcı arada yasaklandı vb.).
+   *   Bu tarama saatte en çok bir kez çalışır (büyük tablo).
+   */
+  private async sweepStuckBroadcasts(
+    now: Date,
+    log: (msg: string) => void,
+  ): Promise<void> {
+    try {
+      const stuck = await this.prisma.scheduledNotification.updateMany({
+        where: {
+          status: "processing",
+          updatedAt: { lt: new Date(now.getTime() - STUCK_PROCESSING_MS) },
+        },
+        data: { status: "failed", sentAt: now, errorCount: 1 },
+      });
+      if (stuck.count > 0) {
+        log(`${stuck.count} takılı zamanlanmış yayın "failed" yapıldı`);
+        this.logger.warn(
+          `Marked ${stuck.count} scheduled notification(s) stuck in processing as failed`,
+        );
+      }
+
+      if (
+        now.getTime() - this.lastDeliverySweepAt <
+        DELIVERY_SWEEP_INTERVAL_MS
+      ) {
+        return;
+      }
+      this.lastDeliverySweepAt = now.getTime();
+      const stale = await this.prisma.notificationLog.updateMany({
+        where: {
+          type: "admin_broadcast",
+          channel: { in: ["push", "email"] },
+          status: "pending",
+          createdAt: { lt: new Date(now.getTime() - STALE_DELIVERY_MS) },
+        },
+        data: { status: "failed", errorMessage: "Delivery not attempted" },
+      });
+      if (stale.count > 0) {
+        log(`${stale.count} denenmemiş yayın teslim satırı "failed" yapıldı`);
+      }
+    } catch (error) {
+      this.logger.warn(`Broadcast recovery sweep failed: ${String(error)}`);
+    }
+  }
 }
+
+/** Dağıtımı bu süreden uzun süren zamanlanmış satır takılmış sayılır. */
+const STUCK_PROCESSING_MS = 6 * 60 * 60 * 1000;
+/** Bu süre sonra hâlâ "pending" olan yayın teslim satırı hiç denenmemiştir. */
+const STALE_DELIVERY_MS = 24 * 60 * 60 * 1000;
+const DELIVERY_SWEEP_INTERVAL_MS = 60 * 60 * 1000;

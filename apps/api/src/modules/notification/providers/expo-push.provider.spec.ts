@@ -18,9 +18,12 @@ describe("ExpoPushProvider — bilet ve makbuz", () => {
     const prisma = {
       pushToken: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        findMany: jest.fn().mockResolvedValue([{ token: T1 }, { token: T2 }]),
+        // T1: yeni istemci (deviceModel var, rozeti yönetir); T2: eski sürüm.
+        findMany: jest.fn().mockResolvedValue([
+          { token: T1, deviceModel: "iPhone 15" },
+          { token: T2, deviceModel: null },
+        ]),
       },
-      notificationLog: { count: jest.fn().mockResolvedValue(4) },
     };
     const queue = { add: jest.fn().mockResolvedValue(undefined) };
     const provider = new ExpoPushProvider(
@@ -150,29 +153,43 @@ describe("ExpoPushProvider — bilet ve makbuz", () => {
     );
   });
 
-  it("sendToUser: tüm cihazlara TEK istek, rozet okunmamış zil sayısı", async () => {
+  it("sendToUser: tüm cihazlara TEK istek; rozet YALNIZ rozeti yöneten (yeni) istemciye", async () => {
     const { provider } = makeProvider();
     const fetchMock = mockFetch([
       { status: "ok", id: "a" },
       { status: "ok", id: "b" },
     ]);
+    const badge = jest.fn().mockResolvedValue(4);
 
     const results = await provider.sendToUser(
       "u1",
       "t",
       "b",
       { type: "x" },
-      {
-        channelId: "trades",
-        badge: "unread",
-      },
+      { channelId: "trades", badge },
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(sent).toHaveLength(2);
-    expect(sent[0]).toMatchObject({ badge: 4, channelId: "trades" });
+    expect(sent[0]).toMatchObject({ to: T1, badge: 4, channelId: "trades" });
+    // Eski sürüm (1.0.6) rozeti hiç düşürmez: ona rozet gönderilmez.
+    expect(sent[1].badge).toBeUndefined();
+    expect(badge).toHaveBeenCalledTimes(1);
     expect(results.every((r) => r.success)).toBe(true);
+  });
+
+  it("yalnız eski istemci varsa rozet sayılmaz bile (gereksiz COUNT yok)", async () => {
+    const { provider, prisma } = makeProvider();
+    prisma.pushToken.findMany.mockResolvedValueOnce([
+      { token: T2, deviceModel: null },
+    ]);
+    mockFetch([{ status: "ok", id: "a" }]);
+    const badge = jest.fn().mockResolvedValue(4);
+
+    await provider.sendToUser("u1", "t", "b", undefined, { badge });
+
+    expect(badge).not.toHaveBeenCalled();
   });
 
   it("kuyruk yoksa (kısmi kurulum) gönderim yine yapılır", async () => {

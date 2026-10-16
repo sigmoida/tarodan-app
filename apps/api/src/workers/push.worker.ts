@@ -28,9 +28,12 @@ import {
 } from "../modules/notification/helpers/notification-link";
 import {
   ExpoPushProvider,
+  badgeCapableToken,
   type ExpoPushMessage,
   type PushSendOutcome,
 } from "../modules/notification/providers/expo-push.provider";
+import { NotificationDispatchService } from "../modules/notification/notification-dispatch.service";
+import { NewsletterService } from "../modules/marketing/newsletter.service";
 import {
   PUSH_RECEIPT_JOB,
   isExpoPushToken,
@@ -46,6 +49,7 @@ import {
   ADMIN_BROADCAST_JOB,
   EventService,
   type AdminBroadcastJobData,
+  type AdminBroadcastProgress,
 } from "../modules/events/event.service";
 
 export interface PushJobData {
@@ -103,6 +107,9 @@ export class PushWorker {
     private readonly prisma: PrismaService,
     private readonly expoPush: ExpoPushProvider,
     private readonly events: EventService,
+    private readonly dispatch: NotificationDispatchService,
+    // Pazarlama yayınında çıkış token'ları dağıtım anında çözülür (Redis'e yazılmaz).
+    private readonly newsletter: NewsletterService,
   ) {}
 
   @Process("send")
@@ -274,11 +281,9 @@ export class PushWorker {
       // have multiple devices, so we send to every active token.
       const tokens = await this.prisma.pushToken.findMany({
         where: { userId, isActive: true },
-        select: { token: true },
+        select: { token: true, deviceModel: true },
       });
-      const pushTokens = tokens
-        .map((t) => t.token)
-        .filter((token) => isExpoPushToken(token));
+      const pushTokens = tokens.filter((t) => isExpoPushToken(t.token));
 
       if (pushTokens.length === 0) {
         this.logger.warn(`No valid push tokens for user ${userId}`);
@@ -291,18 +296,25 @@ export class PushWorker {
         };
       }
 
-      // iOS rozeti: okunmamış zil sayısı (yeni satır yukarıda yazıldı).
-      const badge = await this.expoPush.unreadBadgeCount(userId);
+      // iOS rozeti: okunmamış zil sayısı (tek tanım: dispatch.getUnreadCount; yeni
+      // satır yukarıda yazıldı). Yalnız rozeti yöneten istemcilere (eski sürüm
+      // rozeti hiç düşürmez). Yönetici yayınında sayılmaz: binlerce alıcıda kişi
+      // başı COUNT sorgusu olurdu.
+      const wantsBadge =
+        data?.type !== "admin_broadcast" && pushTokens.some(badgeCapableToken);
+      const badge = wantsBadge
+        ? await this.dispatch.getUnreadCount(userId).catch(() => undefined)
+        : undefined;
       // Android kanalı tipten (mobil istemcinin kanallarıyla aynı kimlikler).
       const channelId = pushChannelFor(data?.type);
 
       const outcome: PushSendOutcome = await this.expoPush.sendMessages(
-        pushTokens.map((token) => ({
-          to: token,
+        pushTokens.map((t) => ({
+          to: t.token,
           title,
           body,
           data,
-          badge,
+          badge: badgeCapableToken(t) ? badge : undefined,
           sound: "default" as const,
           channelId,
           priority: "high" as const,
@@ -482,21 +494,22 @@ export class PushWorker {
 
   /**
    * Yönetici yayınının dağıtımı (EventService.emitAdminBroadcast kuyruğa
-   * yazar). İlerleme `job.progress` ile parça parça kaydedilir: yeniden
-   * denemede tamamlanmış parçalar atlanır, kullanıcı aynı duyuruyu iki kez
-   * almaz. Zamanlanmış gönderimin durumu (sent/failed) burada, dağıtım
-   * SONUCUNDAN yazılır.
+   * yazar). İlerleme (son kullanıcı + birikmiş sayaçlar) `job.progress` ile
+   * parça parça kaydedilir: yeniden denemede kalınan yerden ve sayaçlarla
+   * sürer; kişi başı işlerin kimliği deterministik olduğundan aynı kişiye ikinci
+   * iş yazılmaz. Zamanlanmış gönderimin durumu (sent/failed) burada, dağıtım
+   * SONUCUNDAN yazılır; iş yine de düşerse (`stalled`) `onFailed` yazar.
    */
   @Process(ADMIN_BROADCAST_JOB)
   async handleBroadcast(job: Job<AdminBroadcastJobData>) {
-    const progress = Number(job.progress());
-    const startChunk = Number.isFinite(progress) && progress > 0 ? progress : 0;
     try {
       const stats = await this.events.runAdminBroadcastFanout(job.data, {
-        startChunk,
-        onChunkDone: async (done) => {
-          await job.progress(done);
+        resume: readBroadcastProgress(job.progress()),
+        onChunkDone: async (progress) => {
+          await job.progress(progress);
         },
+        resolveUnsubscribeTokens: (userIds) =>
+          this.newsletter.resolveMarketingUnsubscribeTokens(userIds),
       });
       if (job.data.scheduledNotificationId) {
         const channels = job.data.channels;
@@ -513,21 +526,22 @@ export class PushWorker {
       }
       return stats;
     } catch (error) {
-      const finalAttempt =
-        (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
-      if (finalAttempt && job.data.scheduledNotificationId) {
-        await this.prisma.scheduledNotification
-          .updateMany({
-            where: {
-              id: job.data.scheduledNotificationId,
-              status: "processing",
-            },
-            data: { status: "failed", sentAt: new Date(), errorCount: 1 },
-          })
-          .catch(() => undefined);
+      if (isFinalAttempt(job)) {
+        await this.failScheduledBroadcast(job.data.scheduledNotificationId);
       }
       throw error;
     }
+  }
+
+  /** Zamanlanmış yayın satırını "failed" yapar (yalnız hâlâ processing ise). */
+  private async failScheduledBroadcast(id: string | undefined): Promise<void> {
+    if (!id) return;
+    await this.prisma.scheduledNotification
+      .updateMany({
+        where: { id, status: "processing" },
+        data: { status: "failed", sentAt: new Date(), errorCount: 1 },
+      })
+      .catch(() => undefined);
   }
 
   /**
@@ -550,10 +564,42 @@ export class PushWorker {
     this.logger.log(`Push notification job ${job.id} completed`);
   }
 
+  /**
+   * İş kesin düştüyse (son deneme ya da `stalled` sınırı aşıldı — işleyicinin
+   * kendi catch'ine hiç düşmeyebilir) zamanlanmış yayın satırı "processing"te
+   * kalmasın.
+   */
   @OnQueueFailed()
-  onFailed(job: Job, error: Error) {
+  async onFailed(job: Job, error: Error) {
     this.logger.error(
       `Push notification job ${job.id} failed: ${error.message}`,
     );
+    if (job.name === ADMIN_BROADCAST_JOB && isFinalAttempt(job, true)) {
+      await this.failScheduledBroadcast(
+        (job.data as AdminBroadcastJobData | undefined)
+          ?.scheduledNotificationId,
+      );
+    }
   }
+}
+
+/**
+ * Bu deneme son mu? `afterFailure`: Bull 'failed' olayında `attemptsMade`
+ * düşen denemeyi zaten saymıştır.
+ */
+function isFinalAttempt(job: Job, afterFailure = false): boolean {
+  const made = (job.attemptsMade ?? 0) + (afterFailure ? 0 : 1);
+  return made >= (job.opts?.attempts ?? 1);
+}
+
+/** `job.progress()` → kaydedilmiş dağıtım ilerlemesi (yoksa null). */
+function readBroadcastProgress(raw: unknown): AdminBroadcastProgress | null {
+  if (!raw || typeof raw !== "object") return null;
+  const p = raw as Partial<AdminBroadcastProgress>;
+  return {
+    lastUserId: typeof p.lastUserId === "string" ? p.lastUserId : null,
+    users: Number(p.users) || 0,
+    pushQueued: Number(p.pushQueued) || 0,
+    emailsQueued: Number(p.emailsQueued) || 0,
+  };
 }

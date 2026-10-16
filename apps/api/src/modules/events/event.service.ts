@@ -11,6 +11,11 @@ import {
 } from "../../common/helpers/broadcast-email";
 import { notificationEventCopy } from "../notification/helpers/notification-event-copy";
 import { markBroadcastLogRows } from "../notification/helpers/broadcast-delivery";
+import type { Prisma } from "@prisma/client";
+import {
+  audienceUserWhere,
+  MARKETING_CONSENT_WHERE,
+} from "../admin/ops/notification-audience";
 
 /** `push` kuyruğundaki yönetici yayını dağıtım işinin adı. */
 export const ADMIN_BROADCAST_JOB = "send-broadcast";
@@ -223,45 +228,55 @@ export interface PaymentRefundedPayload {
   providerRefundId?: string;
 }
 
-export interface AdminBroadcastPayload {
-  userIds: string[];
-  title: string;
-  body: string;
-  channels: string[];
-  data?: Record<string, any>;
-  /** E-postaya özel konu / HTML (opsiyonel); yoksa e-posta push metninden üretilir. */
-  emailSubject?: string | null;
-  emailHtml?: string | null;
-  /**
-   * Doluysa PAZARLAMA e-postasıdır: yalnız bu haritadaki kullanıcılara gider
-   * (`userId → unsubscribeToken`, izni açık ve çıkmamış üyeler) ve her mail
-   * kendi çıkış linkini + `List-Unsubscribe` başlığını taşır. Boşsa duyurudur:
-   * herkese gider.
-   */
-  marketingUnsubscribeTokens?: Map<string, string>;
-  /**
-   * Yayının teslim izleme satırlarını (`data.broadcastId`) eşler; push/e-posta
-   * işleri kendi satırını SONUÇTAN günceller.
-   */
-  broadcastId?: string;
-  /** Zamanlanmış gönderimse satırın kimliği: dağıtım bitince durumu yazılır. */
-  scheduledNotificationId?: string;
+/**
+ * Yayının hedefi — kullanıcı LİSTESİ değil, hedefleme kuralı. Alıcılar dağıtım
+ * anında worker'da çözülür; `user_ids` yalnız yöneticinin açıkça seçtiği
+ * kimliklerdir.
+ */
+export interface AdminBroadcastTarget {
+  targetType: "all" | "segment" | "user_ids";
+  userIds?: string[];
+  segmentCriteria?: Record<string, unknown> | null;
 }
 
-/** `send-broadcast` iş verisi — JSON'a dönüşebilir (Map yerine kayıt). */
+/**
+ * `send-broadcast` iş verisi (Redis'e yazılır). Hassas veri TAŞIMAZ: tam
+ * kullanıcı listesi ve abonelikten çıkış token'ları yoktur — ikisi de dağıtım
+ * anında veritabanından çözülür.
+ */
 export interface AdminBroadcastJobData {
-  userIds: string[];
+  /** Teslim izleme satırlarını (`data.broadcastId`) eşler; kişi başı iş kimliği. */
+  broadcastId: string;
   title: string;
   body: string;
   channels: string[];
   data?: Record<string, unknown>;
+  /** E-postaya özel konu / HTML (opsiyonel); yoksa e-posta push metninden üretilir. */
   emailSubject?: string | null;
   emailHtml?: string | null;
-  /** `userId → unsubscribeToken`; null = duyuru (herkese e-posta). */
-  marketingUnsubscribeTokens?: Record<string, string> | null;
-  broadcastId?: string;
+  /**
+   * Pazarlama yayını: yalnız izinli kullanıcılara gider; e-posta yalnız çıkış
+   * token'ı olan (çıkmamış) üyelere, kendi çıkış linki + `List-Unsubscribe` ile.
+   */
+  isMarketing: boolean;
+  target: AdminBroadcastTarget;
+  /** Zamanlanmış gönderimse satırın kimliği: dağıtım bitince durumu yazılır. */
   scheduledNotificationId?: string;
 }
+
+/** İstekten gelen yayın — iş verisiyle aynı (alıcılar worker'da çözülür). */
+export type AdminBroadcastPayload = AdminBroadcastJobData;
+
+/** Dağıtımın kaldığı yer + o ana dek birikmiş sayaçlar (`job.progress`). */
+export interface AdminBroadcastProgress {
+  lastUserId: string | null;
+  users: number;
+  pushQueued: number;
+  emailsQueued: number;
+}
+
+/** Kişi başı yayın işlerinin kimlik ömrü: yeniden denenen parça çift gönderemez. */
+const BROADCAST_JOB_DEDUPE_RETENTION_S = 6 * 60 * 60;
 
 export interface InAppNotificationPayload {
   userId: string;
@@ -1305,55 +1320,78 @@ export class EventService {
    * içinde yapıyordu; 10 bin kişilik bir duyuru yönetici isteğini dakikalarca
    * bekletiyor ve zaman aşımında yarım kalıyordu. Artık TEK bir `send-broadcast`
    * işi kuyruğa yazılır; worker `runAdminBroadcastFanout` ile dağıtır.
-   * Worker çalışmıyorsa (`PROCESS_ROLE=web` tek başına) iş Redis'te bekler —
-   * eskiden de kişi başı push/e-posta işleri worker'ı bekliyordu, yeni bir
-   * bağımlılık eklenmez.
+   * İş verisi yalnız hedefleme kuralını taşır (kullanıcı listesi ve çıkış
+   * token'ları Redis'e yazılmaz). Worker çalışmıyorsa (`PROCESS_ROLE=web` tek
+   * başına) iş Redis'te bekler — eskiden de kişi başı push/e-posta işleri
+   * worker'ı bekliyordu, yeni bir bağımlılık eklenmez.
    */
   async emitAdminBroadcast(payload: AdminBroadcastPayload): Promise<void> {
     this.logger.log(
-      `Queueing admin broadcast to ${payload.userIds.length} users`,
+      `Queueing admin broadcast ${payload.broadcastId} (${payload.target.targetType})`,
     );
     const job: AdminBroadcastJobData = {
-      userIds: payload.userIds,
+      broadcastId: payload.broadcastId,
       title: payload.title,
       body: payload.body,
       channels: payload.channels,
       data: payload.data,
       emailSubject: payload.emailSubject ?? null,
       emailHtml: payload.emailHtml ?? null,
-      marketingUnsubscribeTokens: payload.marketingUnsubscribeTokens
-        ? Object.fromEntries(payload.marketingUnsubscribeTokens)
-        : null,
-      broadcastId: payload.broadcastId,
+      isMarketing: payload.isMarketing,
+      target: payload.target,
       scheduledNotificationId: payload.scheduledNotificationId,
     };
     await this.pushQueue.add(ADMIN_BROADCAST_JOB, job, {
       attempts: 3,
       backoff: { type: "exponential", delay: 30_000 },
       removeOnComplete: true,
+      // Başarısız iş sınırlı süre kalır (teşhis için), sonra silinir.
+      removeOnFail: { age: 7 * 24 * 60 * 60 },
     });
   }
 
+  /** Yayın alıcılarının filtresi (istekteki hedef çözümüyle aynı kural). */
+  private broadcastRecipientWhere(
+    payload: AdminBroadcastJobData,
+  ): Prisma.UserWhereInput {
+    const consent = payload.isMarketing ? MARKETING_CONSENT_WHERE : {};
+    const { target } = payload;
+    if (target.targetType === "user_ids") {
+      return { id: { in: target.userIds ?? [] }, isBanned: false, ...consent };
+    }
+    return {
+      ...audienceUserWhere(target.targetType, target.segmentCriteria ?? null),
+      ...consent,
+    };
+  }
+
   /**
-   * Yayının kişi başı dağıtımı (worker'da çalışır). Parça (100 kullanıcı)
-   * sırasıyla ilerler; `startChunk` yeniden denemede tamamlanmış parçaları
-   * atlar (mükerrer push/e-posta olmasın), `onChunkDone` ilerlemeyi kaydeder.
+   * Yayının kişi başı dağıtımı (worker'da çalışır). Alıcılar kimlik sırasıyla
+   * 100'lük parçalarla VERİTABANINDAN okunur; `resume` yeniden denemede
+   * kalınan yerden ve birikmiş sayaçlarla sürer, `onChunkDone` ilerlemeyi
+   * kaydeder. Kişi başı işlerin kimliği deterministiktir
+   * (`<broadcastId>:<userId>:push|email`): yarıda kesilip yeniden denenen
+   * parça aynı kişiye ikinci iş YAZAMAZ.
+   *
+   * Pazarlama e-postasının çıkış token'ları parça başına burada çözülür
+   * (`resolveUnsubscribeTokens`) — iş verisinde tutulmaz.
    *
    * Teslim izleme: kişi başı push/e-posta işleri `broadcastId` taşır ve kendi
-   * satırını sonuçtan günceller. Burada elenenler (yasaklı, cihazı olmayan)
-   * satırı hemen "failed" olur — hiçbir satır sonsuza dek "pending" kalmaz.
+   * satırını sonuçtan günceller; cihazı olmayanın push satırı hemen "failed".
    */
   async runAdminBroadcastFanout(
     payload: AdminBroadcastJobData,
     opts: {
-      startChunk?: number;
-      onChunkDone?: (chunkIndex: number) => Promise<void>;
+      resume?: AdminBroadcastProgress | null;
+      onChunkDone?: (progress: AdminBroadcastProgress) => Promise<void>;
+      resolveUnsubscribeTokens?: (
+        userIds: string[],
+      ) => Promise<Map<string, string>>;
     } = {},
-  ): Promise<{ users: number; pushQueued: number; emailsQueued: number }> {
+  ): Promise<AdminBroadcastProgress> {
     const sendsEmail = payload.channels.includes("email");
     const sendsPush = payload.channels.includes("push");
-    const tokens = payload.marketingUnsubscribeTokens ?? null;
-    const broadcastId = payload.broadcastId;
+    const { broadcastId } = payload;
 
     // Alıcıdan bağımsız e-posta içeriği (HTML süzme dahil) BİR kez hazırlanır.
     const emailContent = sendsEmail
@@ -1365,22 +1403,26 @@ export class EventService {
         })
       : undefined;
 
-    const stats = { users: 0, pushQueued: 0, emailsQueued: 0 };
+    const progress: AdminBroadcastProgress = {
+      lastUserId: opts.resume?.lastUserId ?? null,
+      users: opts.resume?.users ?? 0,
+      pushQueued: opts.resume?.pushQueued ?? 0,
+      emailsQueued: opts.resume?.emailsQueued ?? 0,
+    };
+    const where = this.broadcastRecipientWhere(payload);
     const chunkSize = 100;
-    const startChunk = opts.startChunk ?? 0;
+    const perUserJob = (userId: string, channel: "push" | "email") => ({
+      jobId: `${broadcastId}:${userId}:${channel}`,
+      removeOnComplete: { age: BROADCAST_JOB_DEDUPE_RETENTION_S },
+    });
 
-    for (
-      let index = startChunk;
-      index * chunkSize < payload.userIds.length;
-      index++
-    ) {
-      const chunkIds = payload.userIds.slice(
-        index * chunkSize,
-        (index + 1) * chunkSize,
-      );
-
+    for (;;) {
       const users = await this.prisma.user.findMany({
-        where: { id: { in: chunkIds }, isBanned: false },
+        where: progress.lastUserId
+          ? { AND: [where, { id: { gt: progress.lastUserId } }] }
+          : where,
+        orderBy: { id: "asc" },
+        take: chunkSize,
         select: {
           id: true,
           email: true,
@@ -1393,15 +1435,21 @@ export class EventService {
           },
         },
       });
-      stats.users += users.length;
+      if (users.length === 0) break;
+
+      // Pazarlama: yalnız izni açık, çıkmamış üyelere e-posta (+ kendi çıkış linki).
+      const tokens =
+        sendsEmail && payload.isMarketing
+          ? ((await opts.resolveUnsubscribeTokens?.(users.map((u) => u.id))) ??
+            new Map<string, string>())
+          : null;
       const noDevice: string[] = [];
 
       for (const user of users) {
-        // Send email if requested
-        if (sendsEmail) {
-          const unsubscribeToken = tokens?.[user.id];
+        if (sendsEmail && emailContent) {
+          const unsubscribeToken = tokens?.get(user.id);
           // Pazarlama: izni olmayan/çıkmış kullanıcıya e-posta GİTMEZ.
-          if (emailContent && (!tokens || unsubscribeToken)) {
+          if (!tokens || unsubscribeToken) {
             const unsubscribeUrl = unsubscribeToken
               ? newsletterUnsubscribeUrl(unsubscribeToken)
               : undefined;
@@ -1409,23 +1457,25 @@ export class EventService {
               to: user.email,
               unsubscribeUrl,
             });
-            await this.emailQueue.add("send", {
-              to: user.email,
-              subject: email.subject,
-              html: email.html,
-              // Toplu duyuru/pazarlama: Mail Yönlendirme'de pazarlama kutusu.
-              area: "marketing",
-              ...(unsubscribeUrl && {
-                headers: {
-                  "List-Unsubscribe": `<${unsubscribeUrl}>`,
-                  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                },
-              }),
-              ...(broadcastId && {
+            await this.emailQueue.add(
+              "send",
+              {
+                to: user.email,
+                subject: email.subject,
+                html: email.html,
+                // Toplu duyuru/pazarlama: Mail Yönlendirme'de pazarlama kutusu.
+                area: "marketing",
+                ...(unsubscribeUrl && {
+                  headers: {
+                    "List-Unsubscribe": `<${unsubscribeUrl}>`,
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                  },
+                }),
                 broadcastLog: { userId: user.id, broadcastId },
-              }),
-            });
-            stats.emailsQueued++;
+              },
+              perUserJob(user.id, "email"),
+            );
+            progress.emailsQueued++;
           }
         }
 
@@ -1435,44 +1485,38 @@ export class EventService {
             noDevice.push(user.id);
             continue;
           }
-          await this.pushQueue.add("send-notification", {
-            userId: user.id,
-            title: payload.title,
-            body: payload.body,
-            data: {
-              ...payload.data,
-              type: "admin_broadcast",
+          await this.pushQueue.add(
+            "send-notification",
+            {
+              userId: user.id,
+              title: payload.title,
+              body: payload.body,
+              data: {
+                ...payload.data,
+                type: "admin_broadcast",
+              },
+              broadcastId,
             },
-            ...(broadcastId && { broadcastId }),
-          });
-          stats.pushQueued++;
+            perUserJob(user.id, "push"),
+          );
+          progress.pushQueued++;
         }
       }
 
-      if (broadcastId) {
-        // Yasaklı / bulunamayan kullanıcıların satırları ve cihazı olmayanların
-        // push satırı: gönderim yapılmayacak, "pending"de kalmasın.
-        const found = new Set(users.map((u) => u.id));
-        const skipped = chunkIds.filter((id) => !found.has(id));
-        await markBroadcastLogRows(this.prisma, {
-          broadcastId,
-          userIds: skipped,
-          channels: ["push", "email"],
-          delivered: false,
-          error: "Recipient inactive",
-        });
-        await markBroadcastLogRows(this.prisma, {
-          broadcastId,
-          userIds: noDevice,
-          channels: ["push"],
-          delivered: false,
-          error: "No active device",
-        });
-      }
+      // Cihazı olmayanın push satırı: gönderim yapılmayacak, "pending"de kalmasın.
+      await markBroadcastLogRows(this.prisma, {
+        broadcastId,
+        userIds: noDevice,
+        channels: ["push"],
+        delivered: false,
+        error: "No active device",
+      });
 
-      await opts.onChunkDone?.(index + 1);
+      progress.users += users.length;
+      progress.lastUserId = users[users.length - 1]!.id;
+      await opts.onChunkDone?.({ ...progress });
     }
 
-    return stats;
+    return progress;
   }
 }

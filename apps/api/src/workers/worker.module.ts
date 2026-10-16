@@ -22,6 +22,7 @@ import { NotificationModule } from "../modules/notification/notification.module"
 import { ModerationModule } from "../modules/moderation/moderation.module";
 import { CommissionModule } from "../modules/commission/commission.module";
 import { EventModule } from "../modules/events/event.module";
+import { MarketingModule } from "../modules/marketing/marketing.module";
 import { QUEUE_NAMES } from "./constants";
 
 @Module({
@@ -39,6 +40,9 @@ import { QUEUE_NAMES } from "./constants";
     // Yönetici yayını dağıtımı (`send-broadcast`) EventService'in fan-out
     // mantığını worker'da çalıştırır.
     EventModule,
+    // Pazarlama yayınının çıkış token'ları dağıtım anında çözülür (iş verisine
+    // yazılmaz) — NewsletterService.
+    MarketingModule,
     // Faz 7.2: Bull KÖK bağlantısı (forRootAsync) BullRootModule'e taşındı — bu modül
     // gated (PROCESS_ROLE=web'de yüklenmez); bağlantı her rolde gerekli olduğundan ayrı.
     // Burada yalnız kuyruk kayıtları + processor'lar (job tüketicileri) kalır.

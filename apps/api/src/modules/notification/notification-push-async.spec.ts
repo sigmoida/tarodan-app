@@ -70,10 +70,17 @@ describe("NotificationDispatchService — arka plan push", () => {
 
     // Push başlatıldı ama hâlâ sürüyor — çağıran zaten döndü.
     expect(sendToUser).toHaveBeenCalledTimes(1);
-    expect(sendToUser.mock.calls[0][4]).toEqual({
-      channelId: "trades",
-      badge: "unread",
-    });
+    const options = sendToUser.mock.calls[0][4] as {
+      channelId: string;
+      badge: () => Promise<number>;
+    };
+    expect(options.channelId).toBe("trades");
+    // Rozet tek tanımdan (getUnreadCount) ve yalnız gerekince hesaplanır.
+    const countSpy = jest
+      .spyOn(dispatch, "getUnreadCount")
+      .mockResolvedValue(7);
+    await expect(options.badge()).resolves.toBe(7);
+    expect(countSpy).toHaveBeenCalledWith("u1");
     release([{ success: true }]);
     await dispatch.drainPendingPushes();
   });

@@ -1,24 +1,29 @@
 import {
   ADMIN_BROADCAST_JOB,
   EventService,
-  type AdminBroadcastPayload,
+  type AdminBroadcastJobData,
+  type AdminBroadcastProgress,
 } from "./event.service";
 import * as sanitizer from "../../common/helpers/email-html-sanitizer";
 
 /**
  * Yayın iki adımdır: istek `emitAdminBroadcast` ile TEK `send-broadcast` işi
- * yazar, worker `runAdminBroadcastFanout` ile dağıtır. Testler iki adımı da
- * gerçek iş verisiyle (Redis'e yazılan JSON hâliyle) çalıştırır.
+ * yazar (yalnız hedefleme kuralı — kullanıcı listesi / çıkış token'ı YOK),
+ * worker `runAdminBroadcastFanout` ile alıcıları veritabanından parça parça
+ * çözüp dağıtır.
  */
-describe("EventService.emitAdminBroadcast — e-posta", () => {
-  const makeService = (users: Array<{ id: string; email: string }>) => {
+describe("EventService admin yayını", () => {
+  const makeService = (
+    users: Array<{ id: string; email: string; pushTokens?: { id: string }[] }>,
+  ) => {
     const emailQueue = { add: jest.fn().mockResolvedValue(undefined) };
     const pushQueue = { add: jest.fn().mockResolvedValue(undefined) };
     const prisma = {
       user: {
         findMany: jest
           .fn()
-          .mockResolvedValue(users.map((u) => ({ ...u, pushTokens: [] }))),
+          .mockResolvedValueOnce(users.map((u) => ({ pushTokens: [], ...u })))
+          .mockResolvedValue([]),
       },
       notificationLog: {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -31,14 +36,17 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
       prisma as never,
       {} as never,
     );
-    const emit = async (payload: AdminBroadcastPayload) => {
+    const emit = async (
+      payload: AdminBroadcastJobData,
+      opts: Parameters<EventService["runAdminBroadcastFanout"]>[1] = {},
+    ) => {
       await service.emitAdminBroadcast(payload);
       const call = pushQueue.add.mock.calls.find(
         ([name]) => name === ADMIN_BROADCAST_JOB,
       );
-      // Redis'e yazılan hâl: JSON gidiş-dönüşü (Map taşınamazdı).
+      // Redis'e yazılan hâl: JSON gidiş-dönüşü.
       const job = JSON.parse(JSON.stringify(call?.[1]));
-      return service.runAdminBroadcastFanout(job);
+      return service.runAdminBroadcastFanout(job, opts);
     };
     return { service, emailQueue, pushQueue, prisma, emit };
   };
@@ -48,12 +56,28 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
     { id: "u2", email: "izinsiz@example.com" },
   ];
 
-  const base = {
-    userIds: ["u1", "u2"],
+  const base: AdminBroadcastJobData = {
+    broadcastId: "b-1",
     title: "Duyuru",
     body: "Gövde",
     channels: ["email"],
+    isMarketing: false,
+    target: { targetType: "all" },
   };
+
+  it("iş verisi kullanıcı listesi ve çıkış token'ı TAŞIMAZ; dağıtım istekte yapılmaz", async () => {
+    const { service, emailQueue, pushQueue } = makeService(users);
+
+    await service.emitAdminBroadcast({ ...base, channels: ["email", "push"] });
+
+    expect(emailQueue.add).not.toHaveBeenCalled();
+    expect(pushQueue.add).toHaveBeenCalledTimes(1);
+    const [name, job, opts] = pushQueue.add.mock.calls[0];
+    expect(name).toBe(ADMIN_BROADCAST_JOB);
+    expect(job).not.toHaveProperty("userIds");
+    expect(job).not.toHaveProperty("marketingUnsubscribeTokens");
+    expect(opts.removeOnFail).toEqual({ age: expect.any(Number) });
+  });
 
   it("duyuru: herkese gider, çıkış linki/başlığı yoktur (eski davranış)", async () => {
     const { emit, emailQueue } = makeService(users);
@@ -84,15 +108,22 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
     expect(job.html).not.toContain("<script");
   });
 
-  it("pazarlama: yalnız haritadaki üyelere gider; her mail kendi çıkış linkini taşır", async () => {
-    const { emit, emailQueue } = makeService(users);
+  it("pazarlama: çıkış token'ları dağıtım anında çözülür; yalnız token'ı olana gider", async () => {
+    const { emit, emailQueue, prisma } = makeService(users);
+    const resolveUnsubscribeTokens = jest
+      .fn()
+      .mockResolvedValue(new Map([["u1", "tok-1"]]));
 
-    await emit({
-      ...base,
-      emailHtml: "<p>x</p>",
-      marketingUnsubscribeTokens: new Map([["u1", "tok-1"]]),
+    await emit(
+      { ...base, isMarketing: true, emailHtml: "<p>x</p>" },
+      { resolveUnsubscribeTokens },
+    );
+
+    expect(resolveUnsubscribeTokens).toHaveBeenCalledWith(["u1", "u2"]);
+    // Alıcı filtresi pazarlama iznini içerir.
+    expect(prisma.user.findMany.mock.calls[0][0].where).toMatchObject({
+      acceptsMarketingEmails: true,
     });
-
     expect(emailQueue.add).toHaveBeenCalledTimes(1);
     const [, job] = emailQueue.add.mock.calls[0];
     expect(job.to).toBe("izinli@example.com");
@@ -107,13 +138,13 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
     expect(job.area).toBe("marketing");
   });
 
-  it("pazarlama + boş harita: kimseye e-posta gitmez", async () => {
+  it("pazarlama + token yok: kimseye e-posta gitmez", async () => {
     const { emit, emailQueue } = makeService(users);
 
-    await emit({
-      ...base,
-      marketingUnsubscribeTokens: new Map(),
-    });
+    await emit(
+      { ...base, isMarketing: true },
+      { resolveUnsubscribeTokens: jest.fn().mockResolvedValue(new Map()) },
+    );
 
     expect(emailQueue.add).not.toHaveBeenCalled();
   });
@@ -128,7 +159,6 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
 
     await emit({
       ...base,
-      userIds: many.map((u) => u.id),
       emailHtml: "<p>Selam</p><script>alert(1)</script>",
     });
 
@@ -141,22 +171,51 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
     spy.mockRestore();
   });
 
-  it("istek içinde dağıtım YAPILMAZ: yalnız tek send-broadcast işi yazılır", async () => {
-    const { service, emailQueue, pushQueue } = makeService(users);
+  it("kişi başı işler deterministik kimlik taşır (yeniden denenen parça çift göndermez)", async () => {
+    const { emit, emailQueue, pushQueue } = makeService([
+      { id: "u1", email: "a@x", pushTokens: [{ id: "t" }] },
+    ]);
 
-    await service.emitAdminBroadcast({ ...base, channels: ["email", "push"] });
+    await emit({ ...base, channels: ["email", "push"] });
 
-    expect(emailQueue.add).not.toHaveBeenCalled();
-    expect(pushQueue.add).toHaveBeenCalledTimes(1);
-    expect(pushQueue.add.mock.calls[0][0]).toBe(ADMIN_BROADCAST_JOB);
+    expect(emailQueue.add.mock.calls[0][2]).toMatchObject({
+      jobId: "b-1:u1:email",
+    });
+    const pushCall = pushQueue.add.mock.calls.find(
+      ([n]) => n === "send-notification",
+    );
+    expect(pushCall?.[2]).toMatchObject({ jobId: "b-1:u1:push" });
+  });
+
+  it("yeniden denemede kaldığı yerden ve BİRİKMİŞ sayaçlarla sürer", async () => {
+    const { emit, prisma } = makeService([{ id: "u9", email: "z@x" }]);
+    const resume: AdminBroadcastProgress = {
+      lastUserId: "u5",
+      users: 5,
+      pushQueued: 0,
+      emailsQueued: 5,
+    };
+    const onChunkDone = jest.fn();
+
+    const stats = await emit({ ...base }, { resume, onChunkDone });
+
+    expect(prisma.user.findMany.mock.calls[0][0].where).toMatchObject({
+      AND: [expect.anything(), { id: { gt: "u5" } }],
+    });
+    expect(stats).toEqual({
+      lastUserId: "u9",
+      users: 6,
+      pushQueued: 0,
+      emailsQueued: 6,
+    });
+    expect(onChunkDone).toHaveBeenCalledWith(stats);
   });
 
   it("cihazı olmayan kullanıcının push satırı 'failed' olur, iş yazılmaz", async () => {
     const { emit, pushQueue, prisma } = makeService(users);
 
-    await emit({ ...base, channels: ["push"], broadcastId: "b-1" });
+    await emit({ ...base, channels: ["push"] });
 
-    // Yalnız send-broadcast işi; kullanıcıların token'ı yok → kişi başı iş yok.
     expect(
       pushQueue.add.mock.calls.filter(([n]) => n === "send-notification"),
     ).toHaveLength(0);

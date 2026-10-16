@@ -138,7 +138,9 @@ export class NotificationDispatchService implements OnModuleDestroy {
     try {
       started = this.expoPushProvider.sendToUser(userId, title, body, data, {
         channelId: pushChannelFor(type),
-        badge: "unread",
+        // Rozet = okunmamış zil sayısı (tek tanım: getUnreadCount); yalnız rozeti
+        // yöneten istemci varsa sayılır.
+        badge: () => this.getUnreadCount(userId),
       });
     } catch (error) {
       // Eşzamanlı hata da çağıranı (iş isteğini) bozmaz.

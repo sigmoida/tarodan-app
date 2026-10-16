@@ -461,17 +461,27 @@ export class AdminNotificationService {
       // Dağıtım worker'da: tek `send-broadcast` işi kuyruğa yazılır. Push ve
       // e-posta satırları "pending" kalır; kişi başı işler sonuçlandıkça
       // "sent"/"failed" olur (iyimser toplu "sent" güncellemesi kaldırıldı).
+      // İş verisi yalnız HEDEFLEME kuralını taşır: kullanıcı listesi ve çıkış
+      // token'ları Redis'e yazılmaz, worker dağıtım anında çözer.
       await this.eventService.emitAdminBroadcast({
-        userIds: targetUserIds,
+        broadcastId,
         title: dto.title,
         body: dto.body,
         channels: dto.channels,
         // Süzülmüş data: push payload'ına da ham link sızmasın.
         data,
-        emailSubject: emailContent.emailSubject,
-        emailHtml: emailContent.emailHtml,
-        marketingUnsubscribeTokens: marketingTokens,
-        broadcastId,
+        emailSubject: emailContent.emailSubject ?? null,
+        emailHtml: emailContent.emailHtml ?? null,
+        isMarketing,
+        target: {
+          targetType: dto.targetType,
+          ...(dto.targetType === "user_ids"
+            ? { userIds: dto.userIds ?? [] }
+            : {}),
+          ...(dto.targetType === "segment"
+            ? { segmentCriteria: dto.segmentCriteria ?? null }
+            : {}),
+        },
         scheduledNotificationId: dto.scheduledNotificationId,
       });
 

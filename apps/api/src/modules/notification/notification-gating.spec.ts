@@ -266,6 +266,8 @@ describe("Notification preference gating (wiring)", () => {
         mockPrisma as any,
         new ExpoPushProvider({ get: () => "" } as any, mockPrisma as any),
         {} as any,
+        { getUnreadCount: jest.fn().mockResolvedValue(0) } as any,
+        {} as any,
       );
     });
 
