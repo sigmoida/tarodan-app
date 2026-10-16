@@ -67,36 +67,31 @@ import { scenario } from "../../test-utils/scenario";
 //
 // İKİ TÜR içerik üretici var; hangisinin kullanılacağı testin sharp'a DOKUNUP dokunmamasına
 // bağlıdır (sharp CI'da KURULUDUR — bkz. üstteki HARNESS notu, madde 2):
-//   • jpegBuffer/pngBuffer → SAHTE imza + sıfır dolgu. Yalnız `file.size`/`file.mimetype`
-//     kontrol edilen (sharp'a girmeyen) uçlar için: guard/limit/tip/boyut/çoklu-sayı/
-//     public-url/silme senaryoları. sharp bu tamponları DECODE EDEMEZ.
-//   • realPngBuffer → GERÇEK, decode edilebilir 2x2 PNG. resize/thumbnail/avatar gibi
-//     media.service.upload'ın sharp'a soktuğu (koşul `&& sharp` TRUE) uçlar için ZORUNLU;
-//     aksi hâlde sharp toBuffer() reddeder → upload try/catch'i "File upload failed" 400'e
-//     çevirir (media.service.ts:88-92,128-131,152-154). Gerçek PNG ile resize BAŞARILI → 201.
-const jpegBuffer = (bytes = 200 * 1024): Buffer => {
-  const buf = Buffer.alloc(bytes, 0x00);
-  // JPEG SOI/APP0 imzası (bu tampon sharp'a girmez; yalnız size/mimetype için).
-  buf[0] = 0xff;
-  buf[1] = 0xd8;
-  buf[2] = 0xff;
-  buf[bytes - 2] = 0xff;
-  buf[bytes - 1] = 0xd9;
-  return buf;
-};
-const pngBuffer = (bytes = 50 * 1024): Buffer => {
-  const buf = Buffer.alloc(bytes, 0x00);
-  // PNG imzası (bu tampon sharp'a girmez; yalnız size/mimetype için).
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buf);
-  return buf;
-};
+//   • jpegBuffer/pngBuffer → GERÇEK 2x2 görsel + sıfır dolgu (istenen boyuta). Genel upload
+//     artık HER görseli sharp'tan geçirir (EXIF/GPS silme), sahte imza decode edilemeyip 400
+//     olurdu; sharp/libvips görsel sonundaki dolguyu yok sayar. size/mimetype senaryoları
+//     (guard/limit/tip/boyut/çoklu-sayı/public-url/silme) aynı kalır.
+//   • realPngBuffer → dolgusuz GERÇEK 2x2 PNG. resize/thumbnail/avatar gibi
+//     media.service.upload'ın sharp'a soktuğu uçlar için; resize BAŞARILI → 201.
+const padTo = (image: Buffer, bytes: number): Buffer =>
+  bytes <= image.length
+    ? image
+    : Buffer.concat([image, Buffer.alloc(bytes - image.length, 0x00)]);
+// GERÇEK 2x2 kırmızı JPEG (sharp ile üretildi).
+const REAL_JPEG_B64 =
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgj/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABykX//Z";
+const jpegBuffer = (bytes = 200 * 1024): Buffer =>
+  padTo(Buffer.from(REAL_JPEG_B64, "base64"), bytes);
+const pngBuffer = (bytes = 50 * 1024): Buffer => padTo(realPngBuffer(), bytes);
 // GERÇEK 2x2 kırmızı RGB PNG (73 bayt). sharp bunu decode + resize edebilir → sharp'a giren
 // (resize=…, thumbnail=true, avatar zorunlu 300x300) uçlarda 201 alınır. Storage STUB olduğu
 // için üretilen objenin gerçek boyutu gözlemlenemez; yalnız isteğin sharp'ta patlamadan 201
 // ile tamamlandığı doğrulanır.
 const REAL_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==";
-const realPngBuffer = (): Buffer => Buffer.from(REAL_PNG_B64, "base64");
+function realPngBuffer(): Buffer {
+  return Buffer.from(REAL_PNG_B64, "base64");
+}
 
 describe("21 — Medya & Dosya Yükleme (MED)", () => {
   let ctx: E2ETestApp;
@@ -450,8 +445,8 @@ describe("21 — Medya & Dosya Yükleme (MED)", () => {
     });
 
     scenario("MED-087", async () => {
-      // 0-byte jpeg: size(0) < 10MB geçer, tip geçer, sharp yok → ham stub upload → 201.
-      // (validateProductImage'ın 1024 alt sınırı bu uçta KULLANILMAZ.)
+      // 0-byte jpeg: size/tip geçer ama görsel sharp'ta çözülemez (EXIF silme her görselde
+      // çalışır) → ham dosya yüklenmez, 400.
       const user = await createUser(ctx.module, { email: "up-zero@test.com" });
       await request(server())
         .post("/api/media/upload?folder=messages")
@@ -460,7 +455,7 @@ describe("21 — Medya & Dosya Yükleme (MED)", () => {
           filename: "empty.jpg",
           contentType: "image/jpeg",
         })
-        .expect(201);
+        .expect(400);
     });
 
     scenario("MED-088", async () => {

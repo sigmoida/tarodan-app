@@ -222,12 +222,21 @@ describe("MediaService.upload — public kök URL'i tanımsız", () => {
     return { service, storageService };
   }
 
+  // Gerçek bir PNG: görseller artık her yolda sharp'tan geçiyor (EXIF silme),
+  // çözülemeyen tampon yüklenmez.
   const png = {
-    buffer: Buffer.from("x"),
+    buffer: Buffer.alloc(0),
     size: 1,
     mimetype: "image/png",
     originalname: "banner.png",
   } as Express.Multer.File;
+  beforeAll(async () => {
+    png.buffer = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#fff" },
+    })
+      .png()
+      .toBuffer();
+  });
 
   it('public köke yüklemeden ÖNCE 503 verir (sessiz `url: ""` yerine)', async () => {
     const { service, storageService } = serviceWithoutPublicBaseUrl();

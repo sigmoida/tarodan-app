@@ -25,6 +25,7 @@ import {
   configureSharpSafety,
   isBlockedSharpMimeType,
 } from "../../common/image/sharp-safety";
+import { stripImageMetadata } from "../../common/image/strip-image-metadata";
 import { i18nMessage } from "../i18n";
 import {
   isMessageAttachmentId,
@@ -293,18 +294,29 @@ export class MediaService {
     const ext = file.originalname.split(".").pop();
     const filename = `${uuidv4()}.${ext}`;
 
+    // Görsel her yolda sharp'tan geçer (meta veri silme dahil); sharp yoksa
+    // ham dosyayı (GPS'iyle) yüklemek yerine açık hata — ürün görseli yolu
+    // da aynı kapıyı kullanır. Try'ın dışında: nedeni 400'e gömülmesin.
+    const sharpLib = file.mimetype.startsWith("image/")
+      ? this.requireSharp("upload")
+      : null;
+
     try {
       let buffer = file.buffer;
 
-      // Process image if resize options provided and sharp is available
-      if (resize && file.mimetype.startsWith("image/") && sharp) {
-        buffer = await sharp(buffer)
-          .autoOrient()
-          .resize(resize.width, resize.height, {
-            fit: resize.fit || "cover",
-            withoutEnlargement: resize.withoutEnlargement,
-          })
-          .toBuffer();
+      if (sharpLib) {
+        // Boyutlandırmalı yolda da sharp çıktısı meta veriyi taşımaz;
+        // boyutlandırmasız yolda (mesaj eki, iade kanıtı, yorum/koleksiyon
+        // görseli) EXIF/GPS ayrıca silinir. İkisinde de yön önce uygulanır.
+        buffer = resize
+          ? await sharpLib(buffer)
+              .autoOrient()
+              .resize(resize.width, resize.height, {
+                fit: resize.fit || "cover",
+                withoutEnlargement: resize.withoutEnlargement,
+              })
+              .toBuffer()
+          : await stripImageMetadata(sharpLib, buffer);
       }
 
       // Upload main file using StorageService
