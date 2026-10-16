@@ -20,7 +20,7 @@ export async function serverTreeText(node: ReactNode): Promise<string> {
     // boşa çıkarırdı.
     if (type.prototype?.isReactComponent) {
       throw new Error(
-        `serverTreeText: sınıf bileşeni çözülemez (${type.name})`,
+        `serverTreeText: cannot resolve class component (${type.name})`,
       );
     }
     const render = type as (props: unknown) => ReactNode;
@@ -32,6 +32,6 @@ export async function serverTreeText(node: ReactNode): Promise<string> {
   }
   // memo / forwardRef / lazy / context nesneleri: çözemeyiz — sessiz geçme.
   throw new Error(
-    "serverTreeText: çözülemeyen öğe türü (memo/forwardRef/lazy)",
+    "serverTreeText: unresolvable element type (memo/forwardRef/lazy)",
   );
 }
