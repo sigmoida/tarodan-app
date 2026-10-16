@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { staffSchema } from "./schema";
 
 /** Anahtarı döndürür: hangi kuralın konuştuğu testte görünür. */
-const t = ((key: string) => key) as unknown as Parameters<typeof staffSchema>[0];
+const t = ((key: string) => key) as unknown as Parameters<
+  typeof staffSchema
+>[0];
 
 const base = { email: "staff@tarodan.com", role: "moderator" as const };
 

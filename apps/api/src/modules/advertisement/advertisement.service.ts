@@ -2,9 +2,16 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
-import { AdDeviceType, AdPosition, Prisma } from "@prisma/client";
+import {
+  AdPopupFrequency,
+  AdPosition,
+  ContentPlatform,
+  Prisma,
+} from "@prisma/client";
+import { contentPlatformsFor } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { MediaService, type UploadResult } from "../media/media.service";
 import {
@@ -16,8 +23,21 @@ import {
   AD_LIVE_CAMPAIGN_SELECT,
   adLiveWhere,
   isAdLive,
+  type AdLiveFields,
 } from "./helpers/ad-live.helper";
 import { AD_IMAGE_UPLOAD } from "./helpers/ad-image-upload.constants";
+import {
+  adDeviceTypeFor,
+  adShadowedPlatforms,
+  adSlotChanged,
+  adSlotConflictWhere,
+  adSlotLockKey,
+  firstAdPerPosition,
+  resolveAdClientPlatform,
+  type AdShadowFields,
+  type AdSlotCandidate,
+} from "./helpers/ad-platform.helper";
+import { adCreativeChanged } from "./helpers/ad-popup-version.helper";
 import {
   AD_HOTSPOT_ADMIN_SELECT,
   AD_HOTSPOT_ORDER_BY,
@@ -29,19 +49,19 @@ import {
 } from "./helpers/ad-hotspot.helper";
 import { i18nMessage } from "../i18n";
 
-/** Pozisyon / cihaz başına sayaç özeti (istatistik ekranı). */
+/** Pozisyon / platform başına sayaç özeti (istatistik ekranı). */
 type AdCounterBucket = { count: number; clicks: number; impressions: number };
 
 /**
  * Admin yanıtındaki kampanya özeti: liste "kampanya bitti" durumunu bundan
- * gösterir (afiş açık ama bağlı kampanya bittiği için yayında değil).
+ * gösterir (afiş açık ama bağlı kampanya bittiği için yayında değil). Yanıta
+ * yalnız özet alanları çıkar; `budgetStoppedAt` "yayında mı" (`isAdLive`)
+ * kuralı için seçilir — listedeki gölge hesabı vitrinle aynı kuralı kullanır.
  */
 const ADMIN_CAMPAIGN_SELECT = {
+  ...AD_LIVE_CAMPAIGN_SELECT,
   id: true,
   name: true,
-  isActive: true,
-  startDate: true,
-  endDate: true,
 } as const satisfies Prisma.DiscountSelect;
 
 const ADMIN_AD_INCLUDE = {
@@ -55,10 +75,12 @@ type AdminAdRow = Prisma.AdvertisementGetPayload<{
 }>;
 
 const AD_POSITIONS = new Set<string>(Object.values(AdPosition));
-const AD_DEVICE_TYPES = new Set<string>(Object.values(AdDeviceType));
+const CONTENT_PLATFORMS = new Set<string>(Object.values(ContentPlatform));
 
 /** Güncelleme alanı: `undefined` = dokunma, `null` = temizle, değer = yaz. */
-function toDateField(value: string | null | undefined): Date | null | undefined {
+function toDateField(
+  value: string | null | undefined,
+): Date | null | undefined {
   if (value === undefined) return undefined;
   return value === null ? null : new Date(value);
 }
@@ -112,29 +134,33 @@ export class AdvertisementService {
   }
 
   /**
-   * Yuvadaki TÜM yayında reklamlar (public), `displayOrder ASC, createdAt
-   * DESC` sırasıyla — rotasyonu web yapar. "Yayında" kuralı `isAdLive`'dır;
-   * veritabanı süzmesi (`adLiveWhere`) yalnız daraltır.
+   * İstemcinin yayındaki reklamları (public): yuva başına EN FAZLA BİR,
+   * `displayOrder ASC, createdAt DESC` sırasıyla ilk olan. Bir yuvada tek
+   * reklam kuralı yazımda uygulanır (`assertSlotFree`); bu süzme kural
+   * öncesinden kalan veriye karşı güvenlik ağıdır. "Yayında" kuralı
+   * `isAdLive`'dır; veritabanı süzmesi (`adLiveWhere`) yalnız daraltır.
+   *
+   * İstemci `platform` (web | app) ile seçilir; parametre yoksa eski mobil
+   * sürüm sayılır (`resolveAdClientPlatform`). Eski `device` yalnız bu
+   * çözümlemede ipucudur, süzmez.
    */
-  async getActive(position?: string, deviceType?: string) {
-    // Bilinmeyen yuva/cihaz (ör. kaldırılan `sidebar`) hiçbir reklamla
+  async getActive(position?: string, platform?: string, legacyDevice?: string) {
+    // Bilinmeyen yuva/platform (ör. kaldırılan `sidebar`) hiçbir reklamla
     // eşleşmez; sorguyu Prisma'nın enum hatasına bırakmayız.
     if (position && !AD_POSITIONS.has(position)) return [];
-    if (deviceType && !AD_DEVICE_TYPES.has(deviceType)) return [];
+    const client = resolveAdClientPlatform(platform, legacyDevice);
+    if (!client) return [];
 
     try {
       const now = new Date();
-      const where: Prisma.AdvertisementWhereInput = adLiveWhere(now);
+      const where: Prisma.AdvertisementWhereInput = {
+        ...adLiveWhere(now),
+        // İstemcinin kendisi + `all` hedefli reklamlar.
+        platform: { in: contentPlatformsFor(client) },
+      };
 
       if (position) {
         where.position = position as AdPosition;
-      }
-
-      // Filter by device type - include 'all' type as well
-      if (deviceType && deviceType !== AdDeviceType.all) {
-        where.deviceType = {
-          in: [deviceType as AdDeviceType, AdDeviceType.all],
-        };
       }
 
       const ads = await this.adRepo.findMany({
@@ -158,9 +184,8 @@ export class AdvertisementService {
         },
       });
 
-      return ads
-        .filter((a) => isAdLive(a, now))
-        .map((a) => ({
+      return firstAdPerPosition(ads.filter((a) => isAdLive(a, now))).map(
+        (a) => ({
           id: a.id,
           title: a.title,
           imageUrl: a.imageUrl,
@@ -170,7 +195,14 @@ export class AdvertisementService {
           width: a.width,
           height: a.height,
           position: a.position,
-          deviceType: a.deviceType,
+          platform: a.platform,
+          // Eski mobil sürümler bununla süzüyor (`all | mobile`): kolondan
+          // değil platformdan türetilir, ikisi ayrışamaz.
+          deviceType: adDeviceTypeFor(a.platform),
+          // Popup sıklığı; istemci "kapatıldı" bilgisini
+          // `<id>:<popupVersion>` ile saklar (admin güncelleyince yeniden açılır).
+          popupFrequency: a.popupFrequency,
+          popupVersion: a.popupVersion,
           // Görselli reklamda tıklama YALNIZ bu alanlarda olur (`linkUrl` null);
           // istemci tıkı `POST /ads/:id/click?hotspot=<id>` ile bildirir.
           hotspots: a.hotspots,
@@ -186,7 +218,8 @@ export class AdvertisementService {
                 endsAt: a.discount.endDate,
               }
             : null,
-        }));
+        }),
+      );
     } catch (err) {
       this.logger.warn(`getActive failed: ${err}`);
       return [];
@@ -197,7 +230,9 @@ export class AdvertisementService {
    * Reklam görseli yükle (admin). `products/ads` public köküne gider; dönen
    * `url` doğrudan `imageUrl` olarak kaydedilir.
    */
-  async uploadImage(file: Express.Multer.File | undefined): Promise<UploadResult> {
+  async uploadImage(
+    file: Express.Multer.File | undefined,
+  ): Promise<UploadResult> {
     if (!file) {
       throw new BadRequestException(i18nMessage("server.admin.fileMissing"));
     }
@@ -214,19 +249,56 @@ export class AdvertisementService {
   /**
    * List all ads (admin).
    */
-  async findAll(position?: string, deviceType?: string, isActive?: boolean) {
+  async findAll(position?: string, platform?: string, isActive?: boolean) {
     const where: Prisma.AdvertisementWhereInput = {};
-    if (position) where.position = position as AdPosition;
-    if (deviceType) where.deviceType = deviceType as AdDeviceType;
+    if (position) {
+      if (!AD_POSITIONS.has(position)) return [];
+      where.position = position as AdPosition;
+    }
+    if (platform) {
+      if (!CONTENT_PLATFORMS.has(platform)) return [];
+      where.platform = platform as ContentPlatform;
+    }
     if (typeof isActive === "boolean") where.isActive = isActive;
 
+    const orderBy: Prisma.AdvertisementOrderByWithRelationInput[] = [
+      { displayOrder: "asc" },
+      { createdAt: "desc" },
+    ];
     const ads = await this.adRepo.findMany({
       where,
-      orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
+      orderBy,
       include: ADMIN_AD_INCLUDE,
     });
 
-    return ads.map((a) => this.toResponse(a));
+    // Yayında ama vitrinde görünmeyen reklamlar (yuvada önce gelen başka
+    // reklam var). Süzülmüş listede rakip dışarıda kalabilir: gölge her zaman
+    // TÜM yayındaki reklamlar üzerinden, vitrinle aynı sırayla hesaplanır.
+    const now = new Date();
+    const filtered = Object.keys(where).length > 0;
+    const pool: Array<AdShadowFields & AdLiveFields> = filtered
+      ? await this.adRepo.findMany({
+          where: adLiveWhere(now),
+          orderBy,
+          select: {
+            id: true,
+            position: true,
+            platform: true,
+            isActive: true,
+            startDate: true,
+            endDate: true,
+            discount: { select: AD_LIVE_CAMPAIGN_SELECT },
+          },
+        })
+      : ads;
+    const shadowed = adShadowedPlatforms(pool.filter((a) => isAdLive(a, now)));
+
+    return ads.map((a) => ({
+      ...this.toResponse(a),
+      // Yalnız liste yanıtında: hangi istemcide yayında olduğu halde
+      // gösterilmiyor (boş = her hedefinde görünüyor ya da yayında değil).
+      shadowedOn: shadowed.get(a.id) ?? [],
+    }));
   }
 
   /**
@@ -257,13 +329,14 @@ export class AdvertisementService {
       return acc;
     }, {});
 
-    // Group by device type
-    const byDeviceType = ads.reduce<Record<string, AdCounterBucket>>((acc, a) => {
-      const device = a.deviceType || "all";
-      if (!acc[device]) acc[device] = { count: 0, clicks: 0, impressions: 0 };
-      acc[device].count++;
-      acc[device].clicks += a.clickCount || 0;
-      acc[device].impressions += a.impressionCount || 0;
+    // Group by platform
+    const byPlatform = ads.reduce<Record<string, AdCounterBucket>>((acc, a) => {
+      const platform = a.platform || ContentPlatform.all;
+      if (!acc[platform])
+        acc[platform] = { count: 0, clicks: 0, impressions: 0 };
+      acc[platform].count++;
+      acc[platform].clicks += a.clickCount || 0;
+      acc[platform].impressions += a.impressionCount || 0;
       return acc;
     }, {});
 
@@ -275,7 +348,7 @@ export class AdvertisementService {
       totalImpressions,
       avgCTR: parseFloat(avgCTR),
       byPosition,
-      byDeviceType,
+      byPlatform,
     };
   }
 
@@ -309,40 +382,56 @@ export class AdvertisementService {
     // Yeni reklamın "kayıtlı hali" görselsizdir; kurallar güncellemeyle aynı.
     const targets = resolveAdClickTargets({ imageUrl: null }, dto);
     await this.assertDiscountExists(dto.discountId);
+    // Varsayılanların tek yeri burası (DTO'da alan başlangıç değeri yok —
+    // bkz. CreateAdvertisementDto).
+    const position = dto.position ?? AdPosition.header;
+    const platform = dto.platform ?? ContentPlatform.all;
+    const isActive = dto.isActive ?? true;
 
     const hotspots =
       targets.hotspots.kind === "replace" ? targets.hotspots.hotspots : [];
-    const ad = await this.adRepo.create({
-      data: {
-        title: dto.title,
-        imageUrl: dto.imageUrl ?? null,
-        linkUrl: targets.linkUrl ?? null,
-        content: dto.content ?? null,
-        altText: dto.altText ?? null,
-        width: dto.width ?? null,
-        height: dto.height ?? null,
-        // Varsayılanların tek yeri burası (DTO'da alan başlangıç değeri yok —
-        // bkz. CreateAdvertisementDto).
-        position: dto.position ?? AdPosition.header,
-        deviceType: dto.deviceType ?? AdDeviceType.all,
-        displayOrder: dto.displayOrder ?? 0,
-        isActive: dto.isActive ?? true,
+    // Yuva kontrolü ve yazım tek işlemde, pozisyon kilidi altında.
+    const ad = await this.prisma.$transaction(async (tx) => {
+      await this.assertSlotFree(tx, {
+        position,
+        platform,
+        isActive,
         startDate,
         endDate,
-        // Kampanya bağı: şeritteki kupon kodu + flaş geri sayım ve "kampanya
-        // bitince afiş düşer" süzmesi bu kolondan okunur. Alan DTO'da vardı
-        // ama persist edilmiyordu — bağ hiç kurulamıyordu.
-        discountId: dto.discountId || null,
-        // İç içe oluşturma reklamla tek işlemdedir.
-        hotspots: hotspots.length
-          ? {
-              create: hotspots.map((hotspot, index) =>
-                adHotspotRowData(hotspot, index),
-              ),
-            }
-          : undefined,
-      },
-      include: ADMIN_AD_INCLUDE,
+      });
+      return tx.advertisement.create({
+        data: {
+          title: dto.title,
+          imageUrl: dto.imageUrl ?? null,
+          linkUrl: targets.linkUrl ?? null,
+          content: dto.content ?? null,
+          altText: dto.altText ?? null,
+          width: dto.width ?? null,
+          height: dto.height ?? null,
+          position,
+          platform,
+          deviceType: adDeviceTypeFor(platform),
+          popupFrequency:
+            dto.popupFrequency ?? AdPopupFrequency.until_dismissed,
+          displayOrder: dto.displayOrder ?? 0,
+          isActive,
+          startDate,
+          endDate,
+          // Kampanya bağı: şeritteki kupon kodu + flaş geri sayım ve "kampanya
+          // bitince afiş düşer" süzmesi bu kolondan okunur. Alan DTO'da vardı
+          // ama persist edilmiyordu — bağ hiç kurulamıyordu.
+          discountId: dto.discountId || null,
+          // İç içe oluşturma reklamla tek işlemdedir.
+          hotspots: hotspots.length
+            ? {
+                create: hotspots.map((hotspot, index) =>
+                  adHotspotRowData(hotspot, index),
+                ),
+              }
+            : undefined,
+        },
+        include: ADMIN_AD_INCLUDE,
+      });
     });
     return this.toResponse(ad);
   }
@@ -354,7 +443,13 @@ export class AdvertisementService {
   async update(id: string, dto: UpdateAdvertisementDto) {
     const existing = await this.adRepo.findUnique({
       where: { id },
-      include: { hotspots: { select: { id: true } } },
+      // Kreatif karşılaştırması (popupVersion) saklı alanları sırasıyla ister.
+      include: {
+        hotspots: {
+          select: AD_HOTSPOT_PUBLIC_SELECT,
+          orderBy: AD_HOTSPOT_ORDER_BY,
+        },
+      },
     });
     if (!existing)
       throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
@@ -376,21 +471,43 @@ export class AdvertisementService {
     // Tek uç değişse de sıra, saklı öbür uçla birlikte doğrulanır.
     const startDate = toDateField(dto.startDate);
     const endDate = toDateField(dto.endDate);
-    this.assertWindowOrder(
-      startDate === undefined ? existing.startDate : startDate,
-      endDate === undefined ? existing.endDate : endDate,
-    );
+    const slot: AdSlotCandidate = {
+      position: dto.position ?? existing.position,
+      platform: dto.platform ?? existing.platform,
+      isActive: dto.isActive ?? existing.isActive,
+      startDate: startDate === undefined ? existing.startDate : startDate,
+      endDate: endDate === undefined ? existing.endDate : endDate,
+    };
+    this.assertWindowOrder(slot.startDate, slot.endDate);
 
     // Görsel/bağlantı/alan kuralları SONUÇ reklam üzerinde (saklı + yama).
     const targets = resolveAdClickTargets(existing, dto);
+    // Sürüm yalnız kreatif gerçekten değişince artar (bkz. helper).
+    const bumpPopupVersion = adCreativeChanged(existing, {
+      title: dto.title,
+      imageUrl: dto.imageUrl,
+      content: dto.content,
+      altText: dto.altText,
+      popupFrequency: dto.popupFrequency,
+      linkUrl: targets.linkUrl,
+      hotspots: targets.hotspots,
+    });
 
     if (dto.discountId) {
       await this.assertDiscountExists(dto.discountId);
     }
 
-    // Alan kümesi ile reklam satırı tek işlemde: yarım kalan değişim görselle
-    // uyuşmayan alanlar bırakmasın.
+    // Yuva kontrolü, alan kümesi ve reklam satırı tek işlemde: yarım kalan
+    // değişim görselle uyuşmayan alanlar bırakmasın, eşzamanlı iki yazım
+    // aynı yuvayı birlikte tutamasın.
     const ad = await this.prisma.$transaction(async (tx) => {
+      // Yuvayı ilgilendiren alan değişmediyse kural sorulmaz: kural
+      // öncesinden kalan çakışmalı bir reklamın yalnız başlığı/görseli
+      // düzeltilebilsin (vitrinde zaten `firstAdPerPosition` tek reklam
+      // gösterir, admin listesi gölgeyi `shadowedOn` ile işaretler).
+      if (adSlotChanged(existing, slot)) {
+        await this.assertSlotFree(tx, slot, id);
+      }
       await this.applyHotspotChange(
         tx,
         id,
@@ -411,7 +528,12 @@ export class AdvertisementService {
           width: dto.width,
           height: dto.height,
           position: dto.position,
-          deviceType: dto.deviceType,
+          platform: dto.platform,
+          deviceType: dto.platform ? adDeviceTypeFor(dto.platform) : undefined,
+          popupFrequency: dto.popupFrequency,
+          // Kreatif değişti → yeni sürüm: kapatılmış popup yeniden açılır.
+          // Anahtar/sıra/tarih ve tık/gösterim sayaçları artırmaz.
+          popupVersion: bumpPopupVersion ? { increment: 1 } : undefined,
           displayOrder: dto.displayOrder,
           isActive: dto.isActive,
           startDate,
@@ -453,6 +575,33 @@ export class AdvertisementService {
       await tx.adHotspot.createMany({
         data: plan.create.map((row) => ({ ...row, advertisementId })),
       });
+    }
+  }
+
+  /**
+   * Bir yuvada (pozisyon × platform) aynı anda tek aktif reklam: çakışan
+   * varsa 409, mesaj çakışan reklamın başlığını verir. Kural
+   * `adSlotConflictWhere`'dadır. Yazımla AYNI işlemde çağrılır: pozisyon
+   * kilidi (`pg_advisory_xact_lock`) işlem bitene dek tutulur, eşzamanlı iki
+   * yazım sırayla kontrol edilir.
+   */
+  private async assertSlotFree(
+    tx: Prisma.TransactionClient,
+    candidate: AdSlotCandidate,
+    excludeId?: string,
+  ) {
+    const where = adSlotConflictWhere(candidate, new Date(), excludeId);
+    if (!where) return;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${adSlotLockKey(candidate.position)}))`;
+    const taken = await tx.advertisement.findFirst({
+      where,
+      select: { title: true },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
+    });
+    if (taken) {
+      throw new ConflictException(
+        i18nMessage("server.ads.slotTaken", { title: taken.title }),
+      );
     }
   }
 
@@ -525,7 +674,10 @@ export class AdvertisementService {
       width: ad.width,
       height: ad.height,
       position: ad.position,
-      deviceType: ad.deviceType,
+      platform: ad.platform,
+      deviceType: adDeviceTypeFor(ad.platform),
+      popupFrequency: ad.popupFrequency,
+      popupVersion: ad.popupVersion,
       displayOrder: ad.displayOrder,
       isActive: ad.isActive,
       startDate: ad.startDate,

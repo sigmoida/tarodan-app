@@ -4,7 +4,11 @@ import { newPasswordOptionalSchema, newPasswordSchema } from "@tarodan/ui/form";
 
 const schema = newPasswordSchema((key) => key);
 
-const ACCEPT = ["Abcdefg1", "Tarodan2026.", "Şifre123!", "Abc 1234!",
+const ACCEPT = [
+  "Abcdefg1",
+  "Tarodan2026.",
+  "Şifre123!",
+  "Abc 1234!",
   "ĞÜŞİÖÇ12ab",
   "ğüşiöç12AB",
   "ŞİFREçok1",

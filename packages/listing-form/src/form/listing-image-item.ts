@@ -23,6 +23,12 @@ export interface ListingImageItem {
   clientId: string;
   /** Yüklenecek dosya; mevcut (kayıtlı) görsellerde yoktur. */
   file?: File;
+  /**
+   * `file`'ın yüklemeye HAZIR hâli (küçültülmüş ya da çevrilmiş). Başarısız
+   * denemeden kalır; yeniden deneme onu kullanır ve fotoğraf bir kez daha
+   * çözülüp kodlanmaz. Yükleme başarılı olunca bırakılır (bellek).
+   */
+  preparedFile?: File;
   /** Gösterilecek önizleme: object URL ya da sunucudan gelen URL. */
   previewUrl: string;
   /** Önizleme `URL.createObjectURL` ile üretildiyse serbest bırakılmalı. */

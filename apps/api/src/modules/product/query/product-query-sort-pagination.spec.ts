@@ -70,7 +70,10 @@ describe("ProductQueryService — sıralama/sayfalama kararlılığı", () => {
 
   it("discountOnly + arama: ES yolunda kalır, indirim ES sorgusunda filtrelenir", async () => {
     const { service, prisma, esSearch, priceRef } = build();
-    esSearch.searchProductIds.mockResolvedValue({ ids: ["p2", "p1"], total: 37 });
+    esSearch.searchProductIds.mockResolvedValue({
+      ids: ["p2", "p1"],
+      total: 37,
+    });
     prisma.product.findMany.mockResolvedValue([
       { id: "p1", status: "active", quantity: 1, reservedQuantity: 0 },
       { id: "p2", status: "active", quantity: 1, reservedQuantity: 0 },
@@ -107,7 +110,10 @@ describe("ProductQueryService — sıralama/sayfalama kararlılığı", () => {
 
   it("discountOnly + arama: penceresi kapanmış ürün (stale) Postgres'e düşer", async () => {
     const { service, prisma, esSearch } = build(5);
-    esSearch.searchProductIds.mockResolvedValue({ ids: ["p1", "p2"], total: 2 });
+    esSearch.searchProductIds.mockResolvedValue({
+      ids: ["p1", "p2"],
+      total: 2,
+    });
     // Biri isOnSale doğrulamasından geçmedi → kanonik Postgres yolu.
     prisma.product.findMany
       .mockResolvedValueOnce([

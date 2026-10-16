@@ -1,7 +1,7 @@
-import { z } from 'zod';
-import { useTranslations } from 'next-intl';
-import { newPasswordOptionalSchema } from '@tarodan/ui/form';
-import { ROLES } from './constants';
+import { z } from "zod";
+import { useTranslations } from "next-intl";
+import { newPasswordOptionalSchema } from "@tarodan/ui/form";
+import { ROLES } from "./constants";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -12,7 +12,7 @@ type T = ReturnType<typeof useTranslations<never>>;
  */
 export const staffSchema = (t: T) =>
   z.object({
-    email: z.string().email(t('admin.roles.emailInvalid')),
+    email: z.string().email(t("admin.roles.emailInvalid")),
     role: z.enum(ROLES),
     password: newPasswordOptionalSchema(t),
     displayName: z.string().optional(),

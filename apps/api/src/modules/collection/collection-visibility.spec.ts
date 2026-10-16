@@ -163,20 +163,18 @@ describe("CollectionCrudService — browse sayfalama", () => {
     const reindex = jest.fn().mockResolvedValue(undefined);
     const prisma = {
       collection: {
-        findMany: jest
-          .fn()
-          .mockImplementation(({ where }) =>
-            Promise.resolve(
-              (where.id?.in ?? []).map((id: string) => ({
-                id,
-                userId: "u",
-                name: id,
-                isPublic: true,
-                user: { id: "u" },
-                _count: { items: 0 },
-              })),
-            ),
+        findMany: jest.fn().mockImplementation(({ where }) =>
+          Promise.resolve(
+            (where.id?.in ?? []).map((id: string) => ({
+              id,
+              userId: "u",
+              name: id,
+              isPublic: true,
+              user: { id: "u" },
+              _count: { items: 0 },
+            })),
           ),
+        ),
         count: jest.fn().mockResolvedValue(21),
       },
     };

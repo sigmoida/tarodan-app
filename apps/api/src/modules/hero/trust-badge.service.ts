@@ -141,7 +141,9 @@ export class TrustBadgeService {
       where: { id: { in: unique } },
     });
     if (found !== unique.length) {
-      throw new NotFoundException(i18nMessage("server.hero.trustBadgeNotFound"));
+      throw new NotFoundException(
+        i18nMessage("server.hero.trustBadgeNotFound"),
+      );
     }
     await this.prisma.$transaction(
       unique.map((id, index) =>
@@ -158,7 +160,9 @@ export class TrustBadgeService {
   private async findOrThrow(id: string): Promise<TrustBadge> {
     const badge = await this.prisma.trustBadge.findUnique({ where: { id } });
     if (!badge) {
-      throw new NotFoundException(i18nMessage("server.hero.trustBadgeNotFound"));
+      throw new NotFoundException(
+        i18nMessage("server.hero.trustBadgeNotFound"),
+      );
     }
     return badge;
   }

@@ -1,5 +1,5 @@
 import type { FilterField, TranslateFn } from "@/components/list/filters/types";
-import { positionFilterOptions, deviceFilterOptions } from "./types";
+import { positionFilterOptions, platformFilterOptions } from "./types";
 
 export const adFilterFields = (t: TranslateFn): FilterField[] => [
   {
@@ -10,8 +10,8 @@ export const adFilterFields = (t: TranslateFn): FilterField[] => [
   },
   {
     type: "select",
-    name: "device",
-    label: t("admin.shared.filterDialog.labels.device"),
-    options: deviceFilterOptions(t),
+    name: "platform",
+    label: t("admin.shared.filterDialog.labels.platform"),
+    options: platformFilterOptions(t),
   },
 ];

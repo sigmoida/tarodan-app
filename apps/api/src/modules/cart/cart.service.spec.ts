@@ -196,7 +196,9 @@ describe("CartService.addItem — idempotent re-add", () => {
 
     await expect(
       service.addItem("user-1", { productId, quantity: 1 } as any),
-    ).rejects.toMatchObject({ response: { i18nKey: "server.cart.outOfStock" } });
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.cart.outOfStock" },
+    });
   });
 
   it("ödeme-only ürün normal sepete eklenemez", async () => {
@@ -505,7 +507,13 @@ describe("CartService.calculateCart — unavailable items", () => {
 
   it("tükenen satırı satın alınamaz yapar, uyarıları yerelleştirir", async () => {
     const result = await calculateCart(
-      [makeCartItem("gone", { title: "Model", quantity: 1, reservedQuantity: 1 })],
+      [
+        makeCartItem("gone", {
+          title: "Model",
+          quantity: 1,
+          reservedQuantity: 1,
+        }),
+      ],
       null,
       { locale: "en" },
     );

@@ -16,7 +16,10 @@ export class CreateTestAccountDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ minLength: 8, description: "Ortak şifre politikası (@IsPassword)" })
+  @ApiProperty({
+    minLength: 8,
+    description: "Ortak şifre politikası (@IsPassword)",
+  })
   @IsPassword()
   password!: string;
 

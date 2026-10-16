@@ -50,7 +50,6 @@ describe("sendNotificationSchema — e-posta alanları", () => {
     );
     expect(result.success).toBe(false);
   });
-
 });
 
 // S1 — Apple 4.5.4 / İYS: tür her gönderimde açıkça seçilir ve kanaldan

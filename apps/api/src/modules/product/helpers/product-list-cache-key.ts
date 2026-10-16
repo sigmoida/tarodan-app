@@ -18,6 +18,9 @@ export const PRODUCT_LIST_CACHE_PREFIX = "products:list:";
  * - Varsayılanlar (page=1, limit=20) normalize edilir → `?page=1` ile parametresiz
  *   istek aynı girdiyi paylaşır. Ham `status` korunur: undefined (kapsayıcı:
  *   aktif + tükenen + satıldı) ile 'active' farklı sonuç verir → `null` ile ayrılır.
+ * - `manufacturerId` varken ad (`manufacturer`) iki yolda da (Postgres
+ *   `buildProductWhere`, ES `search-product`) yok sayılır → anahtara girmez;
+ *   aynı üreticinin farklı adla gelen istekleri tek girdiyi paylaşır.
  * - `hidden` (engelli satıcı özeti) yalnız doluysa, `lane` her zaman girer.
  */
 export function buildProductListCacheKey(
@@ -27,6 +30,7 @@ export function buildProductListCacheKey(
   const normalized: Record<string, unknown> = {
     ...query,
     status: query.status ?? null,
+    manufacturer: query.manufacturerId ? undefined : query.manufacturer,
     page: query.page ?? 1,
     limit: query.limit ?? 20,
     hidden: ctx.hidden,

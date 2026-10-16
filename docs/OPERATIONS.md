@@ -311,6 +311,32 @@ yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte
 yeniden-onay penceresini görür. Belge metni değiştiğinde
 `packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
 
+### Bir kerelik: reklam platformu (web / uygulama) geçişi
+
+`20261016110000_ad_platform_popup` migration'ı reklamlara `platform`
+(`web` / `app` / `all`), popup gösterim sıklığı ve popup sürümü ekler. Göç
+yalnız şemadır: deploy'da kendiliğinden koşar ve TÜM reklamlar `platform =
+all` ile başlar. Eski "Cihaz" hedefini (`device_type`: masaüstü → web, mobil
+→ uygulama) taşıyan backfill KENDİLİĞİNDEN KOŞMAZ — **deploy'dan hemen sonra**
+elle çalıştırılır; çalışana dek yalnız masaüstüne hedeflenmiş eski bir reklam
+uygulamada da görünür:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-ad-platform.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-ad-platform.js'
+```
+
+Yerelde: `pnpm --filter @tarodan/api backfill:prod:ad-platform` (önce
+`build:seed`). İdempotent; admin'in sonradan seçtiği platformu ezmez (API her
+yazımda `device_type`'ı platformdan türetir, script yalnız `platform = all`
+iken `device_type` hâlâ masaüstü / mobil olan satırlara dokunur).
+
+Ardından panelde **Pazarlama → Reklamlar** listesine bakın: aynı yuvada
+(pozisyon + platform) yayında birden çok reklam varsa vitrin yalnız ilkini
+gösterir, ötekiler "Aynı yuvada başka reklam yayında" rozetiyle işaretlidir.
+Yeni kayıtlarda bu durum oluşamaz (API `409 server.ads.slotTaken`); eskileri
+admin pasife alır ya da tarihlerini ayırır.
+
 ### Bir kerelik: Süreler ve Kurallar geçişi
 
 İş süreleri artık **Sistem → Süreler ve Kurallar** ekranından yönetilir

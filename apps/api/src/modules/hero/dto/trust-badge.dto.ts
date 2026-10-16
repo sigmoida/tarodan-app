@@ -1,11 +1,4 @@
-import {
-  IsBoolean,
-  IsIn,
-  IsInt,
-  IsOptional,
-  Min,
-  ValidateIf,
-} from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsOptional, Min } from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import {
   TRUST_BADGE_ICONS,
@@ -14,10 +7,8 @@ import {
   type TrustBadgeIcon,
 } from "@tarodan/types";
 import { IsLocalizedText } from "../../../common/validators/localized-text";
+import { IsOptionalNotNull } from "../../../common/validators/optional-not-null";
 import { LOCALIZED_TEXT_SCHEMA } from "./hero-slide.dto";
-
-/** Yalnız `undefined` iken doğrulamayı atlar: null'ı REDDETMEK için. */
-const IsOptionalNotNull = () => ValidateIf((_, value) => value !== undefined);
 
 /**
  * Güven rozeti oluşturma gövdesi; güncelleme kısmi halidir (`null` yalnız

@@ -51,6 +51,8 @@ export interface ListingEditPayload {
   description: string | null;
   price: number | null;
   oldPrice: number | null;
+  /** Eski alan; sunucunun "kayıtlı fiyat" listesinde yer alır (fiyat sınırı muafiyeti). */
+  originalPrice?: number | null;
   salePrice: number | null;
   saleStartDate: string | null;
   saleEndDate: string | null;

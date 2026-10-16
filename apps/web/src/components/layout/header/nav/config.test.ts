@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   groupManufacturers,
+  manufacturersWithListings,
   NAV_MANUFACTURER_LIMIT,
   type ManufacturerRef,
 } from "./config";
@@ -67,5 +68,21 @@ describe("groupManufacturers", () => {
     );
 
     expect(names(groups)).toEqual(["Ebbro", "Kyosho"]);
+  });
+});
+
+describe("manufacturersWithListings", () => {
+  it("ilanı olmayanları eler, sırayı korur", () => {
+    expect(
+      manufacturersWithListings([
+        mfr("Zed", 1),
+        mfr("Alfa", 0),
+        mfr("Bravo", 2),
+      ]),
+    ).toEqual([mfr("Zed", 1), mfr("Bravo", 2)]);
+  });
+
+  it("sayaç hiç gelmemişse hepsini döndürür", () => {
+    expect(manufacturersWithListings([mfr("A"), mfr("B")])).toHaveLength(2);
   });
 });

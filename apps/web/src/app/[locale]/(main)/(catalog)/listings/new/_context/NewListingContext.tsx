@@ -12,13 +12,13 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useQuery } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import { useZodForm } from "@tarodan/ui/form";
 import toast from "react-hot-toast";
-import { listingsApi, bankAccountApi } from "@/lib/api";
+import { listingsApi } from "@/lib/api";
+import { useBankAccount } from "@/hooks/useBankAccount";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
-import { queryKeys } from "@/lib/query/keys";
+import { usePriceLimits } from "@/hooks/usePublicSettings";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -40,7 +40,10 @@ import {
 import { useListingImageUpload } from "@tarodan/listing-form";
 import {
   createEmptySaleData,
+  priceLimitMessages,
   saleDataToPayload,
+  salePriceLimitMessage,
+  type ListingPriceRules,
   type SaleData,
 } from "@tarodan/listing-form";
 
@@ -60,8 +63,18 @@ function useNewListingValue() {
   // Zorunlu genel özel gruplar sorgudan gelir; şema onları doğrulama anında
   // ref üzerinden okur (form kurulduğunda liste henüz yok).
   const requiredGroupSlugsRef = useRef<readonly string[]>([]);
+  // Platform fiyat sınırları sorgudan gelir; şema onları aynı şekilde
+  // doğrulama anında okur. Yüklenemezse sınır yok — sunucu yetkili kalır.
+  const priceLimits = usePriceLimits();
+  const priceRulesRef = useRef<ListingPriceRules>({ limits: priceLimits });
+  priceRulesRef.current = { limits: priceLimits };
   const schema = useMemo(
-    () => newListingSchema(locale, () => requiredGroupSlugsRef.current),
+    () =>
+      newListingSchema(
+        locale,
+        () => requiredGroupSlugsRef.current,
+        () => priceRulesRef.current,
+      ),
     [locale],
   );
   const form = useZodForm(schema, {
@@ -76,13 +89,10 @@ function useNewListingValue() {
   const categoryId = watch("categoryId");
   const shippingPackageTier = watch("shippingPackageTier");
 
-  const bankAccountQuery = useQuery({
-    queryKey: queryKeys.bankAccount.detail(),
-    queryFn: async () => (await bankAccountApi.get()).data || null,
-    enabled: isAuthenticated,
-  });
-  const hasBankAccount = !!bankAccountQuery.data;
-  const bankAccountLoading = bankAccountQuery.isLoading;
+  // Profil ve satıcı belgeleriyle AYNI sorgu: orada kaydedilen IBAN kapıyı anında açar.
+  const { account: bankAccount, isLoading: bankAccountLoading } =
+    useBankAccount(isAuthenticated);
+  const hasBankAccount = !!bankAccount;
 
   // Çıkış adresi kapısı — kural ve seçim mantığı `useDispatchAddress`'te tek
   // kaynakta duruyor; giriş sonrası hatırlatma popup'ı da aynısını kullanıyor.
@@ -116,6 +126,15 @@ function useNewListingValue() {
     (saleStartsAt == null || now >= saleStartsAt) &&
     (saleEndsAt == null || now <= saleEndsAt);
   const commissionPreviewPrice = saleIsActive ? salePayload.salePrice! : price;
+  // İndirimli fiyat da alt sınırın altına inemez (form alanı olmadığı için
+  // şemada değil burada denetlenir; ekran satır içi gösterir, gönderim durur).
+  const priceMessages = useMemo(() => priceLimitMessages(locale), [locale]);
+  const salePriceError = salePriceLimitMessage(
+    saleData,
+    formPrice,
+    { limits: priceLimits },
+    priceMessages,
+  );
 
   // ---- Server data (shared catalog queries) ----
   const queryEnabled = !authLoading && isAuthenticated;
@@ -209,6 +228,11 @@ function useNewListingValue() {
     // ekranda gördüğünden eksik görselle yayınlanıyordu.
     if (imageSubmitBlocker) {
       toast.error(imageSubmitBlocker.message);
+      return;
+    }
+    if (salePriceError) {
+      setShowDiscountSection(true);
+      toast.error(salePriceError);
       return;
     }
     if (listingLimits && !listingLimits.canCreateListing) {
@@ -319,6 +343,8 @@ function useNewListingValue() {
     attrGroupsStatus,
     saleData,
     setSaleData,
+    salePriceError,
+    priceLimits,
     showDiscountSection,
     setShowDiscountSection,
     listingLimits,

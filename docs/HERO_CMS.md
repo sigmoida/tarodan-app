@@ -7,10 +7,10 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
 
 ## Model
 
-| Tablo          | Ne taşır                                                                                                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hero_slides`  | `placement` (`home` · `auth_default` · `auth_register`), `isActive`, `displayOrder`, `startDate?`/`endDate?`, `imageUrl`, `mobileImageUrl?`, `imageSide` (`left`/`right`), metinler, 2 buton, `hideOnIos`, sayaçlar |
-| `trust_badges` | `icon` (`TRUST_BADGE_ICONS`), `title`, `description?`, `hideOnIos`, `isActive`, `displayOrder`                                                                                                                      |
+| Tablo          | Ne taşır                                                                                                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hero_slides`  | `placement` (`home` · `auth_default` · `auth_register`), `platform` (`web` · `app` · `all`), `isActive`, `displayOrder`, `startDate?`/`endDate?`, `imageUrl`, `mobileImageUrl?`, `imageSide` (`left`/`right`), metinler, 2 buton, `hideOnIos`, sayaçlar |
+| `trust_badges` | `icon` (`TRUST_BADGE_ICONS`), `title`, `description?`, `hideOnIos`, `isActive`, `displayOrder`                                                                                                                                                          |
 
 - **Metinler `LocalizedText` JSON'udur**: `{ tr, en? }`. Türkçe zorunlu; İngilizce boşsa
   istemci Türkçeye düşer (`pickLocalized`). Kural tek yerde: `validateLocalizedText` (admin
@@ -22,57 +22,63 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
   iOS'ta da Android'de de göstermez; web yok sayar. Dijital satış native'de artık iki mağazada da
   kapalı olduğundan bayrak platformdan bağımsızdır. API alan adı `hideOnIos` KALDI (mobil
   sözleşmesi: 1.0.5/1.0.6 bu adı okur); yalnız anlam ve admin metni genişledi. Süzmeyi istemci yapar,
-  sunucu liste döndürürken bayraklıları çıkarmaz (web de aynı listeyi okur). Ana sayfa "boş kalmasın"
-  koruması bayraklı slaytları saymaz (aşağıda).
+  sunucu liste döndürürken bayraklıları çıkarmaz (web de aynı listeyi okur).
+- **`platform`** (`ContentPlatform`, reklamla ortak enum): `web` yalnız sitede, `app` yalnız
+  mobil uygulamada, `all` (varsayılan; göç öncesi slaytlar da) ikisinde. İstemci kendini
+  `?platform=web|app` ile tanıtır ve kendi hedefini + `all`'ı görür.
 
 ## Yayın kuralı
 
 Yayında = `isActive` + tarih penceresinin içinde (sınırlar dahil; reklamla ortak
-`withinScheduleWindow`). Tek tanım `isHeroSlideLive` — vitrin okuması, sayaçlar, admin
-`isLive` ve guard'lar bunu kullanır.
+`withinScheduleWindow`). Tek tanım `isHeroSlideLive` — vitrin okuması, sayaçlar ve admin
+`isLive` bunu kullanır.
 
-- **En çok 5 yayında slayt** (`HERO_MAX_SLIDES`, yerleşim başına): pencereler şimdiden itibaren
-  kesiştirilir — aynı anda 5'ten fazlası açık olacaksa oluşturma/açma `409
-server.hero.maxLiveSlides`. Başka bir slaytın bitişinden sonraya zamanlanan slayt kabul edilir.
-- **Ana sayfa slider'ı hiçbir an boş kalamaz** (`409 server.hero.lastLiveHomeSlide`): silmek,
-  kapatmak, penceresini kısaltmak/dışarı almak, başka yerleşime taşımak ya da native'de gizlemek,
-  slider'ın ŞİMDİDEN itibaren kesintisiz dolu kalacağı anı erkene çekemez. Hesap iki şeyi sayar:
-  - **Bitiş tarihi**: diğer slaytlar yarın bitiyorsa kalıcı slaytı silmek (ya da tek slayta bitiş
-    vermek) slider'ı yarın boş bırakır → reddedilir. Başka bir slayt bitişi tam devralıyorsa
-    (biri bittiği an öbürü başlar; sınırlar dahil) kabul edilir. Admin formu bitişi gün sonu
-    (`23:59:59.999`), başlangıcı gün başı (`00:00:00.000`) gönderdiği için ardışık günlük devirdeki
-    1 ms'lik fark kesinti SAYILMAZ; ardışık iki pencere arasında en çok 1 dakikalık boşluk tolere edilir, daha uzunu kesintidir. Tolerans "şimdi" anına uygulanmaz: şu an açık bir slayt şarttır (50 sn sonra başlayacak slayt şu an canlı sayılmaz).
-  - **`hideOnIos`** (native uygulamada gizle): kural İKİ görünüm için ayrı uygulanır. Web
-    bayrağı yok sayar: web listesi için her canlı slayt sayılır (son canlı slaytı `hideOnIos=true`
-    olsa bile silmek/kapatmak web ana sayfasını boşaltır → 409). Native liste için yalnız
-    `hideOnIos=false` slaytlar sayılır (son görünür slaytı gizlemek mobili boşaltır → 409).
-    Kıyas "önce / sonra"dır, mutlak değil: zaten kesintili bir slider'ın metnini düzeltmek engellenmez,
-    yalnız durumu kötüleştiren değişiklik reddedilir. Auth yerleşimleri boş kalabilir (web paneli
-    gizler). Not: tarihi kendiliğinden biten son slaytı koruma engelleyemez (yalnız YENİ değişikliği
-    denetler) — admin listesinde `isLive` uyarısı ve lansman doğrulaması (`verify:prod:launch`) bunu yakalar.
+- **En çok 5 yayında slayt** (`HERO_MAX_SLIDES`, yerleşim ve istemci başına): `web` ile `app`
+  slaytları birbirinin sınırını tüketmez, `all` ikisinde de sayılır. Pencereler şimdiden itibaren
+  kesiştirilir — bir istemcide aynı anda 5'ten fazlası açık olacaksa oluşturma/açma/platform
+  değiştirme `409 server.hero.maxLiveSlides`. Başka bir slaytın bitişinden sonraya zamanlanan
+  slayt kabul edilir.
+- **Her yerleşim boş kalabilir** — son slayt da silinir, kapatılır, taşınır. İstemci boş listede
+  bölümü hiç çizmez (web `HeroSlider` → `null`, auth paneli gizlenir). Eski "son yayındaki ana
+  sayfa slaytı korunur" kuralı (`server.hero.lastLiveHomeSlide`; bitiş tarihi + `hideOnIos`
+  hesaplı "kesintisiz örtü" sürümü dahil) kaldırıldı: boş liste artık hata değil, istemcinin
+  gizlediği meşru bir durumdur.
+- **Ana sayfa anahtarı** (istemci başına, PlatformSetting `hero_home_enabled_web` /
+  `hero_home_enabled_app`, `'true'`/`'false'`; satır yoksa açık): kapalıyken o istemcinin
+  `placement=home` okuması `[]` döner, slaytlara dokunulmaz. Yalnız ana sayfa içindir; auth
+  yerleşimleri yalnız platformla süzülür. Admin: Pazarlama → Hero, ana sayfa sekmesinin
+  başlığındaki "Web'de göster" / "Uygulamada göster"; anahtar kapalı ya da o platformda yayında
+  slayt yoksa sekmede "hero gizli" notu çıkar (uygulamada yayındaki slaytların hepsi `hideOnIos`
+  ise ayrıca "uygulamada gizli" notu — bayrak iOS ve Android'de gizler). Bu anahtarlar ve seed işareti genel
+  `PATCH /admin/settings/:key` ucundan yazılamaz (`server.hero.useDedicatedEndpoint`).
+- Lansman doğrulaması (`verify:prod:launch`) ana sayfa hero'sunu iki istemci için ayrı okur;
+  boşsa **uyarır** (`REVIEW:`), düşürmez — boş hero meşru bir karardır.
 
 ## Uçlar
 
 Public (`@Public`, `Cache-Control: public, max-age=60`):
 
-| Uç                                     | Açıklama                                                                                 |
-| -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `GET /hero-slides?placement=`          | `HeroSlideDto[]` — yayındakiler, `displayOrder` sırasıyla, en çok 5; iki dil birden      |
-| `GET /trust-badges`                    | `TrustBadgeDto[]` — açık rozetler; `{returnWindowDays}` gibi süre belirteçleri dolu      |
-| `POST /hero-slides/:id/impression`     | 204, beacon dostu                                                                        |
-| `POST /hero-slides/:id/click?cta=1\|2` | 204; `cta` yoksa görsele tık, varsa butona (slayt toplamı + buton sayacı birlikte artar) |
+| Uç                                      | Açıklama                                                                                                                                                                                                                                                         |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /hero-slides?placement=&platform=` | `HeroSlideDto[]` — bu istemcide yayındakiler (`platform` ∈ {istemci, `all`}), `displayOrder` sırasıyla, en çok 5; iki dil birden. `platform` = `web`\|`app`, yoksa `app` (parametresiz istemci eski mobil sürümlerdir). `placement=home` + anahtar kapalı → `[]` |
+| `GET /trust-badges`                     | `TrustBadgeDto[]` — açık rozetler; `{returnWindowDays}` gibi süre belirteçleri dolu                                                                                                                                                                              |
+| `POST /hero-slides/:id/impression`      | 204, beacon dostu                                                                                                                                                                                                                                                |
+| `POST /hero-slides/:id/click?cta=1\|2`  | 204; `cta` yoksa görsele tık, varsa butona (slayt toplamı + buton sayacı birlikte artar)                                                                                                                                                                         |
 
 Admin (`super_admin`/`admin`/`moderator`; izin matrisinde `hero-slides` ve `trust-badges` → `ads`):
 
-| Uç                                                                           | Açıklama                                                             |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `GET /admin/hero-slides?placement=` · `GET /admin/hero-slides/:id`           | `AdminHeroSlideDto` — pasif/zamanlanmış dahil, sayaçlarıyla          |
-| `POST` · `PATCH /:id` · `DELETE /:id` (204)                                  | PATCH'te alan yok = dokunma, `null` = temizle                        |
-| `PATCH /admin/hero-slides/reorder { ids }`                                   | Tek yerleşim; dizi sırası = `displayOrder`                           |
-| `POST /admin/hero-slides/upload` (multipart `file`)                          | jpeg/png/webp, 5 MB, `products/hero/`, en çok 2400 px en → `{ url }` |
-| `/admin/trust-badges` (GET, GET `:id`, POST, PATCH, DELETE, `PATCH reorder`) | Aynı desen, yükleme yok; metin ham (belirteçli) döner                |
+| Uç                                                                           | Açıklama                                                                               |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /admin/hero-slides?placement=` · `GET /admin/hero-slides/:id`           | `AdminHeroSlideDto` — pasif/zamanlanmış dahil, sayaçlarıyla                            |
+| `POST` · `PATCH /:id` · `DELETE /:id` (204)                                  | PATCH'te alan yok = dokunma, `null` = temizle                                          |
+| `PATCH /admin/hero-slides/reorder { ids }`                                   | Tek yerleşim; dizi sırası = `displayOrder`                                             |
+| `GET` · `PATCH /admin/hero-slides/visibility { web?, app? }`                 | Ana sayfa anahtarları `{ web, app }`; alan yok = dokunma. Yazım `home:hero`'yu tazeler |
+| `POST /admin/hero-slides/upload` (multipart `file`)                          | jpeg/png/webp, 5 MB, `products/hero/`, en çok 2400 px en → `{ url }`                   |
+| `/admin/trust-badges` (GET, GET `:id`, POST, PATCH, DELETE, `PATCH reorder`) | Aynı desen, yükleme yok; metin ham (belirteçli) döner                                  |
 
-Her yazım admin denetim kaydına (`hero_slide_*`, `trust_badge_*`, önce/sonra) yazılır.
+Her yazım admin denetim kaydına (`hero_slide_*`, `hero_visibility_update`, `trust_badge_*`,
+önce/sonra) yazılır. Anahtar kaydı yalnız gerçekten değişen ayar satırı için, satırın kendi
+kimliğiyle düşülür; web etiketi yalnız `web` anahtarı değişince tazelenir.
 
 ## Sayaçlar
 
@@ -90,12 +96,15 @@ varsayılanı kullanılır.
 
 ## Önbellek tazeleme
 
-Her yazımdan sonra `notifyWebRevalidate`: ana sayfa slaytı → `home:hero`, auth slaytları →
-`auth:hero`, rozetler → `home:trust`. Yerleşim değişirse iki etiket birden.
+Her yazımdan sonra `notifyWebRevalidate`: ana sayfa slaytı ve ana sayfa anahtarı → `home:hero`,
+auth slaytları → `auth:hero`, rozetler → `home:trust`. Yerleşim değişirse iki etiket birden.
 
 ## Seed
 
 `prisma/seed-hero-content.ts` (referans katmanı; `seed-production.ts` her açılışta, yerel demo
-seed'i de çağırır): eski web sabitlerinden ana sayfa slaytı, iki auth görseli ve altı rozet.
-Sabit kimlik + `update: {}`; yerleşim (rozetlerde tablo) **boşken** yazar — admin düzenlemesi
-ezilmez, silinen seed slaytı geri gelmez.
+seed'i de çağırır): eski web sabitlerinden ana sayfa slaytı, iki auth görseli ve altı rozet —
+**yalnız ilk kurulumda bir kez**. İşaret PlatformSetting `hero_seed_applied`: varsa seed hiçbir
+şey yazmaz; yoksa ama hero/rozet satırı varsa (işaretten önceki kurulum) yalnız işareti yazar;
+ikisi de yoksa içeriği ve işareti tek işlemde yazar (yarıda kesilen ilk kurulum hiçbir şey
+bırakmaz, sonraki açılış baştan kurar). Sabit kimlik + `update: {}` — admin düzenlemesi
+ezilmez, bilerek boşaltılan yerleşim (ya da silinen seed slaytı) geri gelmez.

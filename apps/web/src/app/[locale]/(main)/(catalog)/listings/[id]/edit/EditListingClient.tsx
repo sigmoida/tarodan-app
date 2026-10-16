@@ -49,6 +49,8 @@ export default function EditListingClient() {
     onSubmit,
     saleData,
     setSaleData,
+    salePriceError,
+    priceLimits,
     seedExistingImagesRef,
     imageSubmitBlockerRef,
     hasUserImageEditsRef,
@@ -307,6 +309,7 @@ export default function EditListingClient() {
           commissionPreviewEnabled={commissionPreviewEnabled}
           quantityPlaceholder={t("membership.unlimited")}
           quantityHelper={t("product.leaveEmptyUnlimitedStock")}
+          priceLimits={priceLimits}
         />
         <DiscountCard
           saleData={saleData}
@@ -314,6 +317,7 @@ export default function EditListingClient() {
           showDiscountSection={showDiscountSection}
           setShowDiscountSection={setShowDiscountSection}
           productDiscounts={productDiscounts}
+          salePriceError={salePriceError}
         />
         <ImagesCard
           maxImages={limits?.maxImagesPerListing || 3}

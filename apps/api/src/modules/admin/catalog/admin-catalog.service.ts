@@ -38,6 +38,7 @@ import {
   isProtectedAttributeGroup,
 } from "../../../common/helpers/attribute-groups";
 import {
+  hasListingsWhere,
   listingCountInclude,
   listingCountSortMap,
   paginateWithListingCounts,
@@ -440,7 +441,7 @@ export class AdminCatalogService {
    * Get all brands
    */
   async getBrands(query: AdminBrandQueryDto = new AdminBrandQueryDto()) {
-    const { search, status } = query;
+    const { search, status, hasListings } = query;
     const where: Prisma.BrandWhereInput = {};
     if (status === "active") where.isActive = true;
     else if (status === "inactive") where.isActive = false;
@@ -451,6 +452,9 @@ export class AdminCatalogService {
         { description: { contains: search, mode: "insensitive" } },
       ];
     }
+
+    // "İlan var/yok" filtresi = "Aktif ilan" kolonuyla aynı (vitrin) kural.
+    Object.assign(where, hasListingsWhere(hasListings));
 
     const orderBy = resolveOrderBy<Prisma.BrandOrderByWithRelationInput>(
       "Brand",
@@ -686,8 +690,10 @@ export class AdminCatalogService {
   async getManufacturers(
     query: AdminManufacturerQueryDto = new AdminManufacturerQueryDto(),
   ) {
-    const { search } = query;
+    const { search, status, hasListings } = query;
     const where: Prisma.ManufacturerWhereInput = {};
+    if (status === "active") where.isActive = true;
+    else if (status === "inactive") where.isActive = false;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -697,6 +703,9 @@ export class AdminCatalogService {
         { description: { contains: search, mode: "insensitive" } },
       ];
     }
+
+    // Markalarla aynı "İlan var/yok" filtresi.
+    Object.assign(where, hasListingsWhere(hasListings));
 
     const orderBy = resolveOrderBy<Prisma.ManufacturerOrderByWithRelationInput>(
       "Manufacturer",

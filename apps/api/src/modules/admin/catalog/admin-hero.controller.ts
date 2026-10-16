@@ -22,7 +22,11 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AdminRole } from "@prisma/client";
-import type { AdminHeroSlideDto, AdminTrustBadgeDto } from "@tarodan/types";
+import type {
+  AdminHeroSlideDto,
+  AdminTrustBadgeDto,
+  HeroHomeVisibilityDto,
+} from "@tarodan/types";
 import { UPLOAD_MULTER_OPTIONS } from "../../../common/upload/multer-options";
 import { AdminJwtAuthGuard } from "../../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
@@ -30,12 +34,14 @@ import { Roles } from "../../auth/decorators/roles.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { HeroSlideService } from "../../hero/hero-slide.service";
+import { HeroVisibilityService } from "../../hero/hero-visibility.service";
 import { TrustBadgeService } from "../../hero/trust-badge.service";
 import {
   AdminHeroSlideQueryDto,
   CreateHeroSlideDto,
   CreateTrustBadgeDto,
   ReorderHeroItemsDto,
+  UpdateHeroHomeVisibilityDto,
   UpdateHeroSlideDto,
   UpdateTrustBadgeDto,
 } from "../../hero/dto";
@@ -47,7 +53,8 @@ import { AdminHeroService } from "./admin-hero.service";
  * `ads` iznine bağlıdır (PERMISSION_MAP). Okuma domain servisinden, yazma
  * denetim kaydıyla `AdminHeroService`'ten.
  *
- * Literal yollar (`reorder`, `upload`) `:id` yollarından ÖNCE tanımlıdır:
+ * Literal yollar (`reorder`, `upload`, `visibility`) `:id` yollarından ÖNCE
+ * tanımlıdır:
  * Nest kayıt sırasıyla eşler.
  */
 @ApiTags("admin")
@@ -59,6 +66,7 @@ export class AdminHeroController {
   constructor(
     private readonly heroSlides: HeroSlideService,
     private readonly trustBadges: TrustBadgeService,
+    private readonly visibility: HeroVisibilityService,
     private readonly admin: AdminHeroService,
   ) {}
 
@@ -83,8 +91,14 @@ export class AdminHeroController {
   @ApiOperation({
     summary: "Reorder the slides of ONE placement (array order = displayOrder)",
   })
-  @ApiResponse({ status: HttpStatus.OK, description: "AdminHeroSlideDto[] of the placement" })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: "Mixed placements" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "AdminHeroSlideDto[] of the placement",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Mixed placements",
+  })
   reorderSlides(
     @CurrentUser("id") adminId: string,
     @Body() dto: ReorderHeroItemsDto,
@@ -115,6 +129,32 @@ export class AdminHeroController {
     return this.heroSlides.uploadImage(file);
   }
 
+  @Get("hero-slides/visibility")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Home hero switch per client ({ web, app }); a missing setting row counts as on",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "HeroHomeVisibilityDto" })
+  getHomeVisibility(): Promise<HeroHomeVisibilityDto> {
+    return this.visibility.getHome();
+  }
+
+  @Patch("hero-slides/visibility")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Turn the home hero on/off per client (absent = keep). Off = GET /hero-slides?placement=home returns [] for that client; auth placements are unaffected",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "HeroHomeVisibilityDto" })
+  updateHomeVisibility(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: UpdateHeroHomeVisibilityDto,
+  ): Promise<HeroHomeVisibilityDto> {
+    return this.admin.updateHomeVisibility(adminId, dto);
+  }
+
   @Get("hero-slides/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Get a hero slide" })
@@ -142,14 +182,14 @@ export class AdminHeroController {
   @Patch("hero-slides/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
-    summary: "Update a hero slide (absent = keep, null = clear nullable fields)",
+    summary:
+      "Update a hero slide (absent = keep, null = clear nullable fields)",
   })
   @ApiParam({ name: "id", description: "Hero slide ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "AdminHeroSlideDto" })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description:
-      "Would take the last live home slide offline, or exceed the live limit",
+    description: "More than HERO_MAX_SLIDES would be live at once on a client",
   })
   updateSlide(
     @CurrentUser("id") adminId: string,
@@ -165,10 +205,6 @@ export class AdminHeroController {
   @ApiOperation({ summary: "Delete a hero slide" })
   @ApiParam({ name: "id", description: "Hero slide ID" })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: "Deleted" })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: "It is the last live home slide",
-  })
   removeSlide(
     @CurrentUser("id") adminId: string,
     @Param("id") id: string,
@@ -191,7 +227,9 @@ export class AdminHeroController {
   @Patch("trust-badges/reorder")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Reorder trust badges (array order = displayOrder)" })
+  @ApiOperation({
+    summary: "Reorder trust badges (array order = displayOrder)",
+  })
   @ApiResponse({ status: HttpStatus.OK, description: "AdminTrustBadgeDto[]" })
   reorderBadges(
     @CurrentUser("id") adminId: string,
@@ -212,7 +250,10 @@ export class AdminHeroController {
   @Post("trust-badges")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Create a trust badge" })
-  @ApiResponse({ status: HttpStatus.CREATED, description: "AdminTrustBadgeDto" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "AdminTrustBadgeDto",
+  })
   createBadge(
     @CurrentUser("id") adminId: string,
     @Body() dto: CreateTrustBadgeDto,

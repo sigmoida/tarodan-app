@@ -2,15 +2,14 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
 import { useActiveAds } from "@/hooks/useActiveAds";
 import type { Advertisement } from "@/lib/api/advertisements";
-import { pickAd } from "@/lib/ads/pickAd";
 import {
   canShowPopupAd,
   isPopupBlockedByOverlay,
-  markPopupAdShown,
+  markPopupAdDismissed,
 } from "@/lib/ads/popupFrequency";
 import { useOnboardingTourStore } from "@/stores/onboardingTourStore";
 import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
@@ -19,27 +18,24 @@ import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 export const POPUP_AD_DELAY_MS = 3000;
 
 /**
- * Popup afişi: ziyaretçi başına 24 saatte en çok bir kez, yalnız başka hiçbir
- * katman (zorunlu adım, çerez bandı, tanıtım turu) açık değilken, ~3 sn sonra.
- * Bir katman gecikme süresinde açılırsa sayaç iptal olur; kapanınca yeniden
- * başlar. Gösterim anında damga atılır — kapatılmasa da sayfa yenilemede
- * tekrar çıkmaz.
+ * Popup afişi — yalnız ana sayfada bağlanır (`PopupAd`), her girişte yeniden
+ * değerlendirilir. Sıklık reklamın kendisinde (`popupFrequency`): kapatılmış
+ * `until_dismissed` reklamlar seçimden ÖNCE elenir (`canShowPopupAd`).
+ * Yalnız başka hiçbir katman (zorunlu adım, çerez bandı, tanıtım turu) açık
+ * değilken, ~3 sn sonra açılır; bir katman gecikmede açılırsa sayaç iptal
+ * olur, kapanınca yeniden başlar. Kapatma kaydı yalnız kapatınca yazılır.
  */
 export function usePopupAd(): { ad: Advertisement | null; close: () => void } {
   const outstanding = useRequiredStepsStore((s) => s.outstanding);
   const tourRunning = useOnboardingTourStore((s) => s.running);
   const { needsConsent: cookieBannerOpen } = useCookieConsent();
-  const [capAllows, setCapAllows] = useState(false);
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
 
-  // localStorage yalnız istemcide okunur; kapalıysa hiç istek atılmaz.
-  useEffect(() => {
-    setCapAllows(canShowPopupAd());
-  }, []);
-
-  const { ads } = useActiveAds("popup", capAllows && !done);
-  const ad = pickAd(ads, "popup");
+  const { ads } = useActiveAds("popup", !done);
+  // Kapatılmışlar seçimden ÖNCE elenir. API yuva başına en fazla bir afiş
+  // döner; localStorage yalnız istemcide okunur (sorgu verisi de öyle).
+  const ad = useMemo(() => ads.filter(canShowPopupAd)[0] ?? null, [ads]);
 
   const blocked = isPopupBlockedByOverlay({
     requiredStepsOutstanding: outstanding,
@@ -48,22 +44,24 @@ export function usePopupAd(): { ad: Advertisement | null; close: () => void } {
   });
 
   useEffect(() => {
-    if (!ad || !capAllows || done || open || blocked) return;
+    if (!ad || done || open || blocked) return;
     const timer = window.setTimeout(() => {
-      if (!canShowPopupAd()) {
+      // Gecikmede başka sekmede kapatılmış olabilir.
+      if (!canShowPopupAd(ad)) {
         setDone(true);
         return;
       }
-      markPopupAdShown();
       setOpen(true);
     }, POPUP_AD_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [ad, capAllows, done, open, blocked]);
+  }, [ad, done, open, blocked]);
 
+  // X, Esc, arka plan ve afişe tıklayıp gitmek — hepsi kapatmadır.
   const close = useCallback(() => {
+    if (ad) markPopupAdDismissed(ad);
     setOpen(false);
     setDone(true);
-  }, []);
+  }, [ad]);
 
   return { ad: open ? ad : null, close };
 }

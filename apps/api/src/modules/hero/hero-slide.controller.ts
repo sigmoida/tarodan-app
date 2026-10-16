@@ -18,7 +18,10 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import type { Request } from "express";
-import type { HeroSlideDto } from "@tarodan/types";
+import {
+  HERO_DEFAULT_CLIENT_PLATFORM,
+  type HeroSlideDto,
+} from "@tarodan/types";
 import { Public } from "../auth/decorators/public.decorator";
 import { resolveClientIp } from "../../common/helpers/client-ip";
 import { BEACON_TRACKING_THROTTLE } from "../../common/helpers/beacon-tracking";
@@ -29,7 +32,8 @@ import { HERO_PUBLIC_CACHE_CONTROL } from "./helpers/hero.constants";
 
 /**
  * Vitrin hero slaytları (web + mobil). Kaynak yalnız veritabanıdır; istemci
- * dili kendisi seçer (`pickLocalized`) — iki dil birden döner.
+ * dili kendisi seçer (`pickLocalized`) — iki dil birden döner. İstemci
+ * kendini `?platform=web|app` ile tanıtır.
  */
 @ApiTags("hero")
 @Controller("hero-slides")
@@ -44,11 +48,15 @@ export class HeroSlideController {
   @Header("Cache-Control", HERO_PUBLIC_CACHE_CONTROL)
   @ApiOperation({
     summary:
-      "Live hero slides of a placement (public; active + within schedule, displayOrder ASC, both locales)",
+      "Live hero slides of a placement for one client (public; active + within schedule, platform ∈ {platform, all}, displayOrder ASC, both locales). placement=home returns [] while that client's hero_home_enabled_* switch is off.",
   })
   @ApiResponse({ status: 200, description: "HeroSlideDto[]" })
   list(@Query() query: HeroSlideQueryDto): Promise<HeroSlideDto[]> {
-    return this.heroSlides.listLive(query.placement);
+    // Parametresiz istek yalnız eski mobil sürümlerden gelir.
+    return this.heroSlides.listLive(
+      query.placement,
+      query.platform ?? HERO_DEFAULT_CLIENT_PLATFORM,
+    );
   }
 
   // Gövde okunmaz: `navigator.sendBeacon` text/plain ya da boş gövdeyle
@@ -89,10 +97,6 @@ export class HeroSlideController {
     @Req() req: Request,
     @Query("cta") cta?: unknown,
   ) {
-    await this.tracking.recordClick(
-      id,
-      resolveClientIp(req) ?? "unknown",
-      cta,
-    );
+    await this.tracking.recordClick(id, resolveClientIp(req) ?? "unknown", cta);
   }
 }

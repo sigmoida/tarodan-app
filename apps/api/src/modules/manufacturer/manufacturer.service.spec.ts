@@ -1,4 +1,4 @@
-import { activeListingWhere } from "../product/helpers/active-listing-where";
+import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import { ManufacturerService } from "./manufacturer.service";
 
 describe("ManufacturerService.findAll", () => {
@@ -45,10 +45,10 @@ describe("ManufacturerService.findAll", () => {
     const args = prisma.manufacturer.findMany.mock.calls[0][0];
     expect(args.where).toEqual({
       isActive: true,
-      products: { some: activeListingWhere() },
+      products: { some: publicListingWhere() },
     });
     expect(args.select._count.select.products.where).toEqual(
-      activeListingWhere(),
+      publicListingWhere(),
     );
   });
 });

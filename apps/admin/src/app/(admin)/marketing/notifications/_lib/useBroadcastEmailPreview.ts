@@ -6,11 +6,7 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { EmailPreviewData } from "@/components/email/EmailPreviewPane";
-import {
-  audienceFromForm,
-  mailingTypeFromForm,
-  type SendForm,
-} from "./types";
+import { audienceFromForm, mailingTypeFromForm, type SendForm } from "./types";
 
 const PREVIEW_DEBOUNCE_MS = 800;
 const AUDIENCE_DEBOUNCE_MS = 500;

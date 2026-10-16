@@ -1,7 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { SecurityService } from "./security.service";
-import { encryptSecret, deriveSecretKey } from "../../common/security/secret-cipher";
+import {
+  encryptSecret,
+  deriveSecretKey,
+} from "../../common/security/secret-cipher";
 import { generateTotpCode } from "./totp.util";
 
 /**
@@ -32,7 +35,10 @@ describe("SecurityService 2FA setup flow", () => {
       get: jest.fn().mockReturnValue(KEY),
       getOrThrow: jest.fn().mockReturnValue(KEY),
     };
-    return { prisma, service: new SecurityService(prisma as any, config as any) };
+    return {
+      prisma,
+      service: new SecurityService(prisma as any, config as any),
+    };
   };
 
   const pendingRow = (secret: string, ageMs: number, isEnabled = false) => ({

@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./package.json": "./package.json",
     "./constants": "./src/form/constants.ts",
+    "./price-limits": "./src/form/price-limits.ts",
     "./image-preview-grid": "./src/form/ImagePreviewGrid.tsx"
   },
   "scripts": {

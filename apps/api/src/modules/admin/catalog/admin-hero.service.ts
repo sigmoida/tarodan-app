@@ -2,12 +2,15 @@ import { Injectable } from "@nestjs/common";
 import type {
   AdminHeroSlideDto,
   AdminTrustBadgeDto,
+  HeroHomeVisibilityDto,
 } from "@tarodan/types";
 import { HeroSlideService } from "../../hero/hero-slide.service";
+import { HeroVisibilityService } from "../../hero/hero-visibility.service";
 import { TrustBadgeService } from "../../hero/trust-badge.service";
 import {
   CreateHeroSlideDto,
   CreateTrustBadgeDto,
+  UpdateHeroHomeVisibilityDto,
   UpdateHeroSlideDto,
   UpdateTrustBadgeDto,
 } from "../../hero/dto";
@@ -25,6 +28,7 @@ export class AdminHeroService {
   constructor(
     private readonly heroSlides: HeroSlideService,
     private readonly trustBadges: TrustBadgeService,
+    private readonly visibility: HeroVisibilityService,
     private readonly audit: AdminAuditService,
   ) {}
 
@@ -92,6 +96,29 @@ export class AdminHeroService {
       { ids },
     );
     return slides;
+  }
+
+  /**
+   * Ana sayfa hero'sunun istemci başına anahtarı. Denetim kaydı yalnız
+   * gerçekten değişen satır için, satırın kendi kimliğiyle yazılır; değer
+   * zaten aynıysa (ya da gövde boşsa) kayıt düşülmez.
+   */
+  async updateHomeVisibility(
+    adminId: string,
+    dto: UpdateHeroHomeVisibilityDto,
+  ): Promise<HeroHomeVisibilityDto> {
+    const { visibility, changes } = await this.visibility.updateHome(dto);
+    for (const change of changes) {
+      await this.audit.createAuditLog(
+        adminId,
+        "hero_visibility_update",
+        "PlatformSetting",
+        change.settingId,
+        { settingKey: change.settingKey, enabled: change.before },
+        { settingKey: change.settingKey, enabled: change.after },
+      );
+    }
+    return visibility;
   }
 
   // ==================== TRUST BADGES ====================

@@ -6,16 +6,18 @@ import {
   type PaginatedResult,
   type SortDirection,
 } from "../../../common/list";
-import { activeListingWhere } from "../../product/helpers/active-listing-where";
-import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
+import {
+  catalogProductWhere,
+  publicListingWhere,
+} from "../../product/helpers/catalog-product-where";
 
 /**
  * Admin marka/üretici listelerindeki ilan sayaçları.
  *
  * - `listingCount`: toplam ilan (her statü) — Prisma `_count` ile gelir,
  *   `products._count` üzerinden DB'de sıralanır.
- * - `activeListingCount`: vitrinin saydığı aktif ilan (`activeListingWhere`,
- *   mağazadaki sayaçla AYNI predikat). Prisma `orderBy._count` ilişkiye filtre
+ * - `activeListingCount`: müşterinin GÖRECEĞİ ilan (`publicListingWhere`:
+ *   aktif + stoklu + satış yapabilen satıcı — mağazadaki sayaçla AYNI predikat). Prisma `orderBy._count` ilişkiye filtre
  *   uygulayamadığından bu kolonla sıralama tüm satırlar üzerinde bellekte
  *   yapılır (`paginateComputedRows`) — katalog taksonomisi küçük bir tablo.
  */
@@ -50,6 +52,20 @@ export function listingCountSortMap<TOrderBy>(): Record<
   };
 }
 
+/**
+ * `hasListings` filtresi (`activeListingCount` ile aynı kural): true → vitrinde
+ * ilanı olanlar, false → olmayanlar, yok → filtre yok. İlişki filtresidir (id
+ * listesi yok) — tablo büyüse de sınırsız bir IN üretmez.
+ */
+export function hasListingsWhere(hasListings: boolean | undefined): {
+  products?:
+    { some: Prisma.ProductWhereInput } | { none: Prisma.ProductWhereInput };
+} {
+  if (hasListings === undefined) return {};
+  const listing = publicListingWhere();
+  return { products: hasListings ? { some: listing } : { none: listing } };
+}
+
 /** Verilen sahiplerin aktif ilan sayıları — tek `groupBy`. */
 export async function activeListingCounts(
   prisma: Pick<PrismaService, "product">,
@@ -63,7 +79,7 @@ export async function activeListingCounts(
       : { manufacturerId: { in: [...ids] } };
   const groups = await prisma.product.groupBy({
     by: [owner],
-    where: { ...activeListingWhere(), ...ownerWhere },
+    where: { ...publicListingWhere(), ...ownerWhere },
     _count: { _all: true },
   });
   const counts = new Map<string, number>();

@@ -23,8 +23,8 @@ import { CreateProductDto } from "../dto";
 import { ProductStatus } from "@prisma/client";
 import { initialProductRanking } from "../helpers/product-initial-ranking";
 import {
+  assertProductPriceWithinLimits,
   loadProductPriceLimits,
-  productPriceLimitViolation,
 } from "../helpers/product-price-limits";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
@@ -228,21 +228,21 @@ export class ProductCreateService {
     // ========================================================================
     // PRICE VALIDATION FROM PLATFORM SETTINGS (Not retroactive - only new listings)
     // ========================================================================
+    // Denetlenen, istekteki ham alanlar değil YAZILACAK değerlerdir: indirim
+    // çözümlemesinin çıktısı (güncel fiyat + çizili fiyat). Böylece
+    // `originalPrice` ile yazılan çizili fiyat üst sınırı aşamaz, uygulanmayan
+    // (orijinalden büyük/eşit) bir `salePrice` ise yanıltıcı hata vermez.
+    const salePricing = resolveCreateSalePricing({
+      price: dto.price,
+      originalPrice: dto.originalPrice,
+      salePrice: dto.salePrice,
+      saleStartDate: dto.saleStartDate,
+      saleEndDate: dto.saleEndDate,
+    });
     const priceLimits = await loadProductPriceLimits(this.prisma);
-    const priceViolation = productPriceLimitViolation(dto.price, priceLimits);
-    if (priceViolation?.type === "minimum") {
-      throw new BadRequestException(
-        i18nMessage("server.product.priceBelowMinimum", {
-          minPrice: priceViolation.limit,
-        }),
-      );
-    }
-    if (priceViolation?.type === "maximum") {
-      throw new BadRequestException(
-        i18nMessage("server.product.priceAboveMaximum", {
-          maxPrice: priceViolation.limit,
-        }),
-      );
+    assertProductPriceWithinLimits(salePricing.price, priceLimits);
+    if (salePricing.oldPrice != null) {
+      assertProductPriceWithinLimits(salePricing.oldPrice, priceLimits);
     }
 
     // Create product with images
@@ -278,14 +278,6 @@ export class ProductCreateService {
       sellerMembership,
       sellerMembership?.user,
     );
-
-    const salePricing = resolveCreateSalePricing({
-      price: dto.price,
-      originalPrice: dto.originalPrice,
-      salePrice: dto.salePrice,
-      saleStartDate: dto.saleStartDate,
-      saleEndDate: dto.saleEndDate,
-    });
 
     // İlanın hem normal hem de varsa indirimli fiyatı ACTIVE sette tam olarak
     // bir kurala düşmeli. İndirim penceresi açılıp kapandığında ürün farklı

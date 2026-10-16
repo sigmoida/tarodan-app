@@ -2,6 +2,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
 const { env } = require('./env.config');
+const { wellKnownStagingRewrites } = require('./well-known-rewrites');
 
 // next-intl plugin — points at the request config (locale + messages per request).
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
@@ -119,10 +120,13 @@ const nextConfig = {
       // SILENTLY unless it is served as JSON — no error, the association just
       // never works. The filename has no extension (Apple requires exactly
       // `apple-app-site-association`), so Next cannot infer the type from it.
-      // `assetlinks.json` needs no rule: its extension already resolves (the
-      // staging copy is rewritten onto it by host, see `rewrites()`).
       {
         source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
+      // Android App Links: uzantısı JSON'a çözülür ama tip açıkça sabitlenir.
+      {
+        source: '/.well-known/assetlinks.json',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
       },
     ];
@@ -159,30 +163,7 @@ const nextConfig = {
     const apiUrl = env.API_INTERNAL_URL || env.NEXT_PUBLIC_API_URL;
     return {
       beforeFiles: [
-        {
-          // Staging iOS'ta hiçbir uygulamayı sahiplenmez. Prod uygulaması
-          // (`com.tarodan.app`) `applinks:staging.tarodan.com.tr` taşıyor;
-          // staging de aynı AASA'yı yayınlayınca staging maillerindeki
-          // doğrulama/şifre sıfırlama linkleri PROD uygulamasında açılıyor ve
-          // staging token'ı prod API'ye gidip düşüyordu. Boş `details` ile bu
-          // linkler Safari'de, staging web'inde açılır. Host'a bağlı: aynı build
-          // iki ortamda da koşuyor, env'e değil isteğe bakmak en az sürprizli.
-          source: '/.well-known/apple-app-site-association',
-          has: [{ type: 'host', value: 'staging.tarodan.com.tr' }],
-          destination: '/.well-known/apple-app-site-association-staging.json',
-        },
-        {
-          // Android App Links (staging). Staging uygulaması `com.tarodan.app.staging`
-          // `staging.tarodan.com.tr` için `autoVerify` ister; Google bu dosyayı
-          // host'tan okur. Yalnız staging host'una yayınlanır: production'da
-          // `/.well-known/assetlinks.json` dosyası (public/.well-known) Play App
-          // Signing parmak izi hazır olunca eklenecek — o zamana dek 404 kalır,
-          // staging'in paket adı canlı alan adında yayınlanmaz. AASA ile aynı
-          // host koşulu; yukarıdaki iOS kuralı gibi env'e değil isteğe bakar.
-          source: '/.well-known/assetlinks.json',
-          has: [{ type: 'host', value: 'staging.tarodan.com.tr' }],
-          destination: '/.well-known/assetlinks-staging.json',
-        },
+        ...wellKnownStagingRewrites,
         {
           // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
           source: '/favicon.ico',

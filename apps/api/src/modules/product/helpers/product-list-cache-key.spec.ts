@@ -70,6 +70,12 @@ describe("buildProductListCacheKey", () => {
     );
   });
 
+  it("ignores the manufacturer name once manufacturerId is present", () => {
+    expect(key({ manufacturerId: "m1", manufacturer: "Bruder" })).toBe(
+      key({ manufacturerId: "m1", manufacturer: "Siku" }),
+    );
+  });
+
   it.each(dtoProperties)(
     "makes every DTO property part of the key: %s",
     (prop) => {

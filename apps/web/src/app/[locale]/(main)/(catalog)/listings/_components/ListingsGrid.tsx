@@ -8,7 +8,7 @@ import { useTranslations } from "next-intl";
 import { Fragment } from "react";
 import InlineAdSlot from "@/components/marketing/InlineAdSlot";
 import { ProductCard } from "@/components/ui";
-import { inlineAdSlotAfter } from "@/lib/ads/inlinePlacement";
+import { isInlineAdSlotAfter } from "@/lib/ads/inlinePlacement";
 import { useListings } from "../_context/ListingsContext";
 
 // Two views only: a responsive grid (up to 4 columns) or a stacked list. The
@@ -116,8 +116,7 @@ export default function ListingsGrid() {
   );
 }
 
-/** Admin'in "inline" afişi: 8. karttan sonra, sonra her 16 kartta (en çok 2 tekrar). */
+/** Admin'in "inline" afişi: 8. karttan sonra, listede tek kez. */
 function AdAfterCard({ index }: { index: number }) {
-  const slot = inlineAdSlotAfter(index);
-  return slot === null ? null : <InlineAdSlot slot={slot} />;
+  return isInlineAdSlotAfter(index) ? <InlineAdSlot /> : null;
 }

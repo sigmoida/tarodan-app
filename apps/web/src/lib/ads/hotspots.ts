@@ -36,3 +36,16 @@ export function renderableHotspots(
   }
   return result;
 }
+
+/**
+ * Popup: TEK bölgeli görselli afişte görselin tamamı o bölgenin bağlantısıdır
+ * (küçük bir alanı aramak gerekmesin); tık yine o bölgenin kimliğiyle sayılır.
+ * Birden çok bölgede (ya da hiç yoksa) afiş olduğu gibi kalır.
+ */
+export function withSoleHotspotExpanded<
+  T extends Pick<Advertisement, "imageUrl" | "hotspots">,
+>(ad: T): T {
+  if (!ad.imageUrl || ad.hotspots?.length !== 1) return ad;
+  const [only] = ad.hotspots;
+  return { ...ad, hotspots: [{ ...only, x: 0, y: 0, width: 1, height: 1 }] };
+}

@@ -155,12 +155,16 @@ export * from "./uat-refresh";
 
 // Reklam tıklanabilir alanları — admin formu + API aynı kuralla denetler
 export * from "./ad-hotspot";
+export * from "./ad-popup";
 
 // Admin Excel dökümleri: kaynak başına kolon kataloğu (API yazıcısı + admin)
 export * from "./export-catalog";
 
 // Admin'in iki dilde yazdığı içerik metni (tr zorunlu, en → tr düşer)
 export * from "./localized-text";
+
+// İçeriğin hedef istemcisi (web / app / all): hero slaytı ve reklam ortak
+export * from "./content-platform";
 
 // Vitrin hero'su + güven rozetleri: yerleşimler, sınırlar, public/admin şekiller
 export * from "./hero";

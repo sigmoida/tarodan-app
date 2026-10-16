@@ -5,6 +5,7 @@ import {
   heroFormToPayload,
   heroSchema,
   heroToForm,
+  platformOptions,
   type HeroFormValues,
   type HeroSlide,
 } from "./types";
@@ -78,6 +79,15 @@ describe("heroSchema", () => {
     ).toEqual([]);
   });
 
+  it("accepts the three platform targets and rejects anything else", () => {
+    for (const platform of ["web", "app", "all"] as const) {
+      expect(issues({ platform })).toEqual([]);
+    }
+    expect(issues({ platform: "ios" as never }).map(([f]) => f)).toEqual([
+      "platform",
+    ]);
+  });
+
   it("rejects an end date before the start date", () => {
     expect(issues({ startDate: "2026-07-10", endDate: "2026-07-01" })).toEqual([
       ["endDate", "admin.marketing.hero.validation.endBeforeStart"],
@@ -94,6 +104,14 @@ describe("heroFormToPayload", () => {
     expect(p.mobileImageUrl).toBeUndefined();
     expect(p.startDate).toBeUndefined();
     expect(p.title).toEqual({ tr: "Başlık", en: null });
+  });
+
+  it("a new slide targets both platforms by default; the choice is sent as-is", () => {
+    expect(emptyHeroForm("home").platform).toBe("all");
+    expect(heroFormToPayload(valid, "create").platform).toBe("all");
+    expect(
+      heroFormToPayload({ ...valid, platform: "app" }, "update").platform,
+    ).toBe("app");
   });
 
   it("update sends null to clear emptied fields", () => {
@@ -150,6 +168,7 @@ describe("heroToForm", () => {
     cta2Label: null,
     cta2Href: null,
     hideOnIos: true,
+    platform: "web",
   } as unknown as HeroSlide;
 
   it("seeds the form from a stored slide (Istanbul calendar day)", () => {
@@ -164,9 +183,20 @@ describe("heroToForm", () => {
       cta1Href: "/x",
       mobileImageUrl: "",
       hideOnIos: true,
+      platform: "web",
       isActive: false,
       startDate: "2026-07-01",
       endDate: "",
     });
+  });
+});
+
+describe("platformOptions", () => {
+  it("lists web only / app only / both from the shared contract", () => {
+    expect(platformOptions(t)).toEqual([
+      { value: "web", label: "admin.marketing.hero.platform.web" },
+      { value: "app", label: "admin.marketing.hero.platform.app" },
+      { value: "all", label: "admin.marketing.hero.platform.all" },
+    ]);
   });
 });

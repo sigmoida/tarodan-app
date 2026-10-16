@@ -216,6 +216,7 @@ export class CollectionCrudService {
             product: {
               select: {
                 id: true,
+                sellerId: true,
                 kind: true,
                 title: true,
                 price: true,
@@ -333,6 +334,7 @@ export class CollectionCrudService {
             product: {
               select: {
                 id: true,
+                sellerId: true,
                 kind: true,
                 title: true,
                 price: true,
@@ -781,9 +783,10 @@ export class CollectionCrudService {
           sensitivity: "base",
           numeric: false,
         });
-        collections = collections.sort((a, b) =>
-          collator.compare(a.name.toLowerCase(), b.name.toLowerCase()) ||
-          a.id.localeCompare(b.id),
+        collections = collections.sort(
+          (a, b) =>
+            collator.compare(a.name.toLowerCase(), b.name.toLowerCase()) ||
+            a.id.localeCompare(b.id),
         );
       } else if (sortBy === "items" || sortBy === "items_desc") {
         collections = collections.sort(

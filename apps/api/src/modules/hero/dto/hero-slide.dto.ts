@@ -2,44 +2,57 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsUrl,
   MaxLength,
   Min,
-  ValidateIf,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
-import { HeroImageSide, HeroPlacement } from "@prisma/client";
-import { HERO_TEXT_LIMITS, type LocalizedText } from "@tarodan/types";
+import { ContentPlatform, HeroImageSide, HeroPlacement } from "@prisma/client";
+import {
+  CLIENT_PLATFORMS,
+  HERO_DEFAULT_CLIENT_PLATFORM,
+  HERO_TEXT_LIMITS,
+  type ClientPlatform,
+  type LocalizedText,
+} from "@tarodan/types";
 import { BlankToNull } from "../../../common/transforms";
 import { IsLocalizedText } from "../../../common/validators/localized-text";
+import { IsOptionalNotNull } from "../../../common/validators/optional-not-null";
 import {
   AD_LINK_URL_MAX_LENGTH,
   IsAdLinkUrl,
 } from "../../advertisement/helpers/ad-link-url.validator";
 
-/**
- * Yalnız `undefined` iken doğrulamayı atlar: null'ı REDDETMEK için. Şemada
- * null olamayan alanlarda `@IsOptional()` null'ı geçirir ve hata Prisma'da 500
- * olarak patlardı (reklam DTO'suyla aynı desen).
- */
-const IsOptionalNotNull = () => ValidateIf((_, value) => value !== undefined);
-
 /** Swagger şeması: `LocalizedText` (`{ tr, en? }`). */
 export const LOCALIZED_TEXT_SCHEMA = {
   type: "object",
-  properties: { tr: { type: "string" }, en: { type: "string", nullable: true } },
+  properties: {
+    tr: { type: "string" },
+    en: { type: "string", nullable: true },
+  },
 };
 
 // Yerleşim değerlerinin tek kaynağı Prisma enum'u; `HERO_PLACEMENTS`
 // (@tarodan/types) aynı listedir — göç spec'i ikisini eşitler.
 
-/** `GET /hero-slides?placement=` (public). */
+/** `GET /hero-slides?placement=&platform=` (public). */
 export class HeroSlideQueryDto {
   @ApiProperty({ enum: HeroPlacement })
   @IsEnum(HeroPlacement)
   placement: HeroPlacement;
+
+  @ApiPropertyOptional({
+    enum: CLIENT_PLATFORMS,
+    default: HERO_DEFAULT_CLIENT_PLATFORM,
+    description:
+      "Requesting client; sees slides targeted at it or at `all`. Absent = app (old mobile builds send no parameter)",
+  })
+  @IsOptional()
+  @IsIn(CLIENT_PLATFORMS)
+  platform?: ClientPlatform;
 }
 
 /** `GET /admin/hero-slides?placement=` — verilmezse tüm yerleşimler. */
@@ -82,7 +95,10 @@ export class CreateHeroSlideDto {
   @IsEnum(HeroImageSide)
   imageSide?: HeroImageSide;
 
-  @ApiProperty({ ...LOCALIZED_TEXT_SCHEMA, description: "{ tr, en? } — tr required" })
+  @ApiProperty({
+    ...LOCALIZED_TEXT_SCHEMA,
+    description: "{ tr, en? } — tr required",
+  })
   @IsLocalizedText({ maxLength: HERO_TEXT_LIMITS.title, required: true })
   title: LocalizedText;
 
@@ -106,7 +122,8 @@ export class CreateHeroSlideDto {
   cta1Label?: LocalizedText | null;
 
   @ApiPropertyOptional({
-    description: 'Button 1 target: http(s) URL or a site path starting with a single "/"',
+    description:
+      'Button 1 target: http(s) URL or a site path starting with a single "/"',
     nullable: true,
   })
   @IsOptional()
@@ -124,7 +141,8 @@ export class CreateHeroSlideDto {
   cta2Label?: LocalizedText | null;
 
   @ApiPropertyOptional({
-    description: 'Button 2 target: http(s) URL or a site path starting with a single "/"',
+    description:
+      'Button 2 target: http(s) URL or a site path starting with a single "/"',
     nullable: true,
   })
   @IsOptional()
@@ -140,6 +158,15 @@ export class CreateHeroSlideDto {
   @IsOptionalNotNull()
   @IsBoolean()
   hideOnIos?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ContentPlatform,
+    default: ContentPlatform.all,
+    description: "Target client: web (site), app (mobile app), all (both)",
+  })
+  @IsOptionalNotNull()
+  @IsEnum(ContentPlatform)
+  platform?: ContentPlatform;
 
   @ApiPropertyOptional({ description: "Is active", default: true })
   @IsOptionalNotNull()

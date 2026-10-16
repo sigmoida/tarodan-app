@@ -1233,7 +1233,10 @@ export class PayoutService {
       // Kapanmış siparişin kalıntısı da (kusur satıcıda değilse) ödenir.
       if (
         !order ||
-        (await this.orderPayoutBlock({ id: hold.orderId, status: order.status }))
+        (await this.orderPayoutBlock({
+          id: hold.orderId,
+          status: order.status,
+        }))
       ) {
         continue;
       }

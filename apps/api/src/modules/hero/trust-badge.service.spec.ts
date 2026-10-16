@@ -67,10 +67,13 @@ function makeService(badges: TrustBadge[] = [row()]) {
 describe("fillTimingTokens", () => {
   it("herkese açık süreyi doldurur, iç ve bilinmeyen belirteci olduğu gibi bırakır", () => {
     expect(
-      fillTimingTokens("{returnWindowDays} gün · {paymentReservationMinutes} · {x}", {
-        returnWindowDays: 14,
-        paymentReservationMinutes: 30,
-      }),
+      fillTimingTokens(
+        "{returnWindowDays} gün · {paymentReservationMinutes} · {x}",
+        {
+          returnWindowDays: 14,
+          paymentReservationMinutes: 30,
+        },
+      ),
     ).toBe("14 gün · {paymentReservationMinutes} · {x}");
   });
 });

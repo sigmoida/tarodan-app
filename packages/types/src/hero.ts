@@ -1,3 +1,4 @@
+import type { ClientPlatform, ContentPlatform } from "./content-platform";
 import type { LocalizedText } from "./localized-text";
 
 /**
@@ -19,8 +20,54 @@ export type HeroPlacement = (typeof HERO_PLACEMENTS)[number];
 export const HERO_IMAGE_SIDES = ["left", "right"] as const;
 export type HeroImageSide = (typeof HERO_IMAGE_SIDES)[number];
 
-/** Bir yerleşimde AYNI ANDA yayında olabilecek en çok slayt. */
+/** Bir yerleşimde, bir istemcide AYNI ANDA yayında olabilecek en çok slayt. */
 export const HERO_MAX_SLIDES = 5;
+
+/**
+ * `GET /hero-slides` `platform` verilmezse: parametre göndermeyen tek istemci
+ * eski mobil sürümlerdir.
+ */
+export const HERO_DEFAULT_CLIENT_PLATFORM: ClientPlatform = "app";
+
+/**
+ * Ana sayfa hero'sunun istemci başına anahtarı (PlatformSetting, `'true'` /
+ * `'false'`). Kapalıyken o istemcinin ana sayfa okuması boş döner; auth
+ * yerleşimlerini etkilemez.
+ */
+export const HERO_HOME_ENABLED_SETTING: Readonly<
+  Record<ClientPlatform, string>
+> = {
+  web: "hero_home_enabled_web",
+  app: "hero_home_enabled_app",
+};
+
+/**
+ * Hero referans seed'inin (`prisma/seed-hero-content.ts`) bir kez uygulandığı
+ * işareti (PlatformSetting). Varsa seed içerik eklemez.
+ */
+export const HERO_SEED_APPLIED_SETTING = "hero_seed_applied";
+
+/**
+ * Genel ayar ucunun (`PATCH /admin/settings/:key`) yazamayacağı hero
+ * anahtarları: ana sayfa anahtarları yalnız kendi ucundan (doğrulama + denetim
+ * + web tazelemesi), seed işareti hiç yazılmaz.
+ */
+export function isHeroSettingKey(settingKey: string): boolean {
+  return (
+    settingKey === HERO_SEED_APPLIED_SETTING ||
+    Object.values(HERO_HOME_ENABLED_SETTING).includes(settingKey)
+  );
+}
+
+/** Yalnız `"false"` kapalı sayılır; satır yoksa (ya da başka değerde) açık. */
+export function parseHeroHomeEnabled(
+  value: string | null | undefined,
+): boolean {
+  return value?.trim().toLowerCase() !== "false";
+}
+
+/** `GET` · `PATCH /admin/hero-slides/visibility` — istemci başına ana sayfa anahtarı. */
+export type HeroHomeVisibilityDto = Record<ClientPlatform, boolean>;
 
 /** Metin alanlarının dil başına en çok uzunluğu. */
 export const HERO_TEXT_LIMITS = {
@@ -40,7 +87,7 @@ export interface HeroCtaDto {
   href: string;
 }
 
-/** `GET /hero-slides?placement=` öğesi — iki dil birden döner. */
+/** `GET /hero-slides?placement=&platform=` öğesi — iki dil birden döner. */
 export interface HeroSlideDto {
   id: string;
   placement: HeroPlacement;
@@ -58,6 +105,8 @@ export interface HeroSlideDto {
    * gereği "iOS" kaldı (mobil sözleşmesi) — anlam "native uygulamada gizle".
    */
   hideOnIos: boolean;
+  /** Hedef istemci: `web` site, `app` mobil uygulama, `all` ikisi. */
+  platform: ContentPlatform;
 }
 
 /**
@@ -84,6 +133,7 @@ export interface AdminHeroSlideDto {
   cta2Label: LocalizedText | null;
   cta2Href: string | null;
   hideOnIos: boolean;
+  platform: ContentPlatform;
   impressionCount: number;
   /** Slayta yapılan tüm tıklar (görsel + iki buton). */
   clickCount: number;

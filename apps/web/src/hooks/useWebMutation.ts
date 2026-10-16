@@ -72,6 +72,9 @@ export function useWebMutation<TData, TVars = void>(
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, vars);
     },
+    // Sentry raporu burada DEĞİL: `MutationCache` (lib/query/client) her
+    // mutation hatasını, kendi `onError`'ı olsa bile raporlar. Burada yalnız
+    // kullanıcıya gösterilen toast var; `silentError` raporu bastırmaz.
     onError: (error) => {
       if (silentError) return;
       toast.error(

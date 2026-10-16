@@ -1,4 +1,4 @@
-import { activeListingWhere } from "../product/helpers/active-listing-where";
+import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import {
   BRANDS_ALL_CACHE_KEY,
   BRANDS_CACHE_PATTERN,
@@ -66,10 +66,10 @@ describe("BrandService.findAll", () => {
     const args = prisma.brand.findMany.mock.calls[0][0];
     expect(args.where).toEqual({
       isActive: true,
-      products: { some: activeListingWhere() },
+      products: { some: publicListingWhere() },
     });
     expect(args.include._count.select.products.where).toEqual(
-      activeListingWhere(),
+      publicListingWhere(),
     );
     expect(result).toEqual([
       expect.objectContaining({ id: "b1", productCount: 3 }),

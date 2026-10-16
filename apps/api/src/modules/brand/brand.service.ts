@@ -8,7 +8,7 @@ import {
   brandSlugCacheKey,
 } from "./brand-cache";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
-import { activeListingWhere } from "../product/helpers/active-listing-where";
+import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -43,7 +43,7 @@ export class BrandService {
           where: {
             isActive: true,
             ...(options.hasListings
-              ? { products: { some: activeListingWhere() } }
+              ? { products: { some: publicListingWhere() } }
               : {}),
           },
           orderBy: { sortOrder: "asc" },
@@ -51,7 +51,7 @@ export class BrandService {
             _count: {
               select: {
                 products: {
-                  where: activeListingWhere(),
+                  where: publicListingWhere(),
                 },
               },
             },
@@ -88,7 +88,7 @@ export class BrandService {
             _count: {
               select: {
                 products: {
-                  where: activeListingWhere(),
+                  where: publicListingWhere(),
                 },
               },
             },
@@ -125,7 +125,7 @@ export class BrandService {
         _count: {
           select: {
             products: {
-              where: activeListingWhere(),
+              where: publicListingWhere(),
             },
           },
         },

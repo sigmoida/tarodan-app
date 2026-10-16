@@ -15,10 +15,7 @@ describe("PLATFORM_ENTITY contact facts", () => {
 
 describe("cookie policy contact section", () => {
   const source = readFileSync(
-    join(
-      process.cwd(),
-      "src/app/[locale]/(main)/(legal)/cookies/_components/CookiesClient.tsx",
-    ),
+    join(process.cwd(), "src/components/legal/cookies/CookiesDocument.tsx"),
     "utf8",
   );
 

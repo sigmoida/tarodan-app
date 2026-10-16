@@ -46,6 +46,9 @@
     "removing": "Çıkarılıyor",
     "copied": "Link kopyalandı!",
     "copyFailed": "Link kopyalanamadı",
+    "share": "Paylaş",
+    "shareOptions": "Paylaşım seçenekleri",
+    "copyLink": "Linki kopyala",
     "operationFailed": "İşlem başarısız",
     "comingSoon": "Bu özellik yakında eklenecek",
     "selectCity": "İl Seçin",
@@ -426,6 +429,7 @@
     "removeFromFavorites": "Favorilerden Çıkar",
     "removedFromFavorites": "Favorilerden çıkarıldı",
     "addedToFavorites": "Favorilere eklendi",
+    "favorite": "Favori",
     "seller": "Satıcı",
     "condition": "Durum",
     "price": "Fiyat",
@@ -1088,7 +1092,7 @@
     "order": "Sipariş",
     "product": "Ürün",
     "carrier": "Firma",
-    "filterCancelled": "İptal edilenler",
+    "filterCancelled": "İptal Edilenler",
     "filterRefunds": "İadeler",
     "unitTimes": "adet ×",
     "unitOnly": "adet",
@@ -1527,7 +1531,15 @@
     "commissionLine": "Aracılık komisyonu",
     "tradeNumberLabel": "Takas No:"
   },
+  "listing": {
+    "priceMinHint": "En az {minPrice}",
+    "priceMaxHint": "En fazla {maxPrice}",
+    "priceRangeHint": "{minPrice} ile {maxPrice} arasında",
+    "salePriceBelowMinimum": "İndirimli fiyat en az {minPrice} TL olmalıdır."
+  },
   "offer": {
+    "minimumOfferFloorError": "Teklif en az {amount} olmalıdır.",
+    "counterBelowFloor": "Karşı teklif en az {amount} olmalıdır.",
     "makeOffer": "Teklif Ver",
     "yourOffer": "Teklifiniz",
     "offerAmount": "Teklif Tutarı",
@@ -2893,6 +2905,10 @@
     "sellerInvoicePending": "Satıcı ürün faturasını henüz yüklemedi. Yüklendiğinde e-posta ile bilgilendirileceksiniz.",
     "downloading": "İndiriliyor..."
   },
+  "bankAccount": {
+    "savedBadge": "Kayıtlı",
+    "lastUpdated": "Son güncelleme: {date}"
+  },
   "seller": {
     "sellerProfile": "Satıcı Profili",
     "allListings": "Tüm İlanlar",
@@ -2911,6 +2927,7 @@
     "report": "Raporla",
     "noActiveListings": "Bu satıcının henüz aktif ilanı yok.",
     "viewProfile": "Profili Gör",
+    "premiumBadge": "Premium",
     "trust": "Güven",
     "noReviewsDesc": "Bu satıcının henüz değerlendirmesi yok.",
     "totalReviews": "değerlendirme",
@@ -3563,7 +3580,10 @@
       "metaTitle": "Kullanım Koşulları · Tarodan",
       "metaDescription": "Tarodan üyelik, ilan, satış, satın alma, teklif, takas, ödeme, komisyon, içerik ve hesap kullanım koşulları.",
       "pageDescription": "Tarodan pazar yerini ziyaret ederken, üyelik oluştururken, ilan verirken, satın alırken veya takas yaparken geçerli genel kurallar.",
-      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır."
+      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır.",
+      "ugcAddendumTitle": "Uygulama İçi İçerik Kuralları",
+      "ugcAddendumHeading": "Uygunsuz içerik ve kötü niyetli kullanıcılar",
+      "ugcAddendumText": "Tarodan, uygunsuz içeriğe (hakaret, nefret söylemi, taciz, tehdit, müstehcenlik, şiddet) ve kötü niyetli kullanıcılara karşı sıfır tolerans politikası uygular. Uygunsuz bir ilanı, profili, koleksiyonu veya mesajı ilgili ekrandaki \"Şikayet Et\" seçeneğiyle bildirebilir, sizi rahatsız eden bir kullanıcıyı \"Engelle\" seçeneğiyle engelleyebilirsiniz; engellediğiniz kullanıcının içerikleri akışınızdan anında kaldırılır. Bildirimler ekibimizce 24 saat içinde incelenir; kurallara aykırı içerik kaldırılır ve içeriği paylaşan hesap askıya alınır veya kalıcı olarak kapatılır."
     },
     "refundPolicy": {
       "hangiKosullardaIadeTalebiOlusturulabilir": "Hangi koşullarda iade talebi oluşturulabilir?",
@@ -5118,6 +5138,10 @@
         "views": "Görüntüleme",
         "aiModeration": "AI Denetim",
         "allModels": "Tüm Modeller",
+        "listingFilter": "İlan Durumu",
+        "allListings": "Tümü",
+        "withListings": "İlanı olanlar",
+        "withoutListings": "İlanı olmayanlar",
         "listingCount": "Toplam ilan",
         "activeListingCount": "Aktif ilan"
       },
@@ -5250,7 +5274,8 @@
         "nameRequired": "Üretici adı zorunlu",
         "countryPlaceholder": "Örn: ABD",
         "foundedYearPlaceholder": "Örn: 1968",
-        "descriptionPlaceholder": "Üretici hakkında kısa açıklama"
+        "descriptionPlaceholder": "Üretici hakkında kısa açıklama",
+        "allManufacturers": "Tüm Üreticiler"
       },
       "collections": {
         "title": "Koleksiyonlar",
@@ -5499,14 +5524,35 @@
         "created": "Slayt oluşturuldu",
         "updated": "Slayt güncellendi",
         "deleted": "Slayt silindi",
-        "deleteConfirm": "\"{title}\" slaytı silinsin mi?",
+        "deleteConfirm": "\"{title}\" slaytı silinsin mi? Yerleşimde yayında başka slayt kalmazsa hero bu alanda gizlenir.",
         "empty": "Bu yerleşimde henüz slayt yok",
-        "maxLiveNote": "Yayında en fazla {max} slayt",
+        "maxLiveNote": "Platform başına yayında en fazla {max} slayt",
         "placementLabel": "Yerleşim",
         "placement": {
           "home": "Ana sayfa",
           "auth_default": "Giriş (varsayılan)",
           "auth_register": "Giriş (kayıt)"
+        },
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Yalnız web",
+          "app": "Yalnız uygulama",
+          "all": "İkisi"
+        },
+        "clientName": {
+          "web": "Web",
+          "app": "Uygulama"
+        },
+        "visibility": {
+          "web": "Web'de göster",
+          "app": "Uygulamada göster",
+          "updated": "Hero görünürlüğü güncellendi",
+          "hint": "Ana sayfa hero'su; kapalıyken o platformda gizlenir, slaytlar silinmez."
+        },
+        "hiddenOn": {
+          "switchOff": "{platform} ana sayfasında hero gizli: anahtar kapalı.",
+          "noLiveSlide": "{platform} ana sayfasında hero gizli: bu platformda yayında slayt yok.",
+          "hiddenInApp": "Uygulama ana sayfasında hero gizli: yayındaki uygulama slaytlarının hepsi \"Mobil uygulamada gösterme\" işaretli (iOS ve Android)."
         },
         "columns": {
           "image": "Görsel",
@@ -5515,6 +5561,7 @@
           "clicks": "Tık",
           "cta1Clicks": "Düğme 1",
           "cta2Clicks": "Düğme 2",
+          "platform": "Platform",
           "ios": "Mobil"
         },
         "hiddenOnIos": "Mobilde gizli",
@@ -5607,8 +5654,18 @@
         "preview": "Önizleme",
         "size": "Boyut",
         "positionLabel": "Pozisyon",
-        "deviceLabel": "Cihaz",
-        "deviceType": "Cihaz Türü",
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Yalnız web",
+          "app": "Yalnız uygulama",
+          "all": "İkisi (web ve uygulama)"
+        },
+        "popupFrequencyLabel": "Gösterim sıklığı",
+        "popupFrequency": {
+          "until_dismissed": "Kullanıcı kapatana kadar göster",
+          "every_visit": "Ana sayfaya her girişte göster"
+        },
+        "popupFrequencyHelper": "Reklamı her güncellediğinizde, daha önce kapatan ziyaretçilere de yeniden gösterilir.",
         "displayOrder": "Görüntüleme Sırası",
         "startDate": "Başlangıç Tarihi",
         "endDate": "Bitiş Tarihi",
@@ -5649,17 +5706,13 @@
         "iabCompliant": "IAB Uyumlu",
         "iabWarning": "Boyut ({width}x{height}) IAB standardı değil — önerilen boyutlardan birini seçin.",
         "allPositions": "Tüm Pozisyonlar",
-        "allDevices": "Tüm Cihazlar",
+        "allPlatforms": "Tüm platformlar",
         "position": {
           "header": "Üst Banner",
           "footer": "Alt Banner",
           "inline": "İçerik Arası",
           "popup": "Popup",
           "topbar": "Üst Şerit"
-        },
-        "device": {
-          "desktop": "Masaüstü",
-          "mobile": "Mobil (mobil web ve uygulama)"
         },
         "upload": {
           "formats": "Sadece JPG, PNG ve WebP desteklenir",
@@ -5685,7 +5738,8 @@
           "live": "Yayında",
           "expired": "Süresi doldu",
           "inactive": "Kapalı",
-          "campaignEnded": "Kampanya bitti"
+          "campaignEnded": "Kampanya bitti",
+          "shadowed": "{scope, select, web {Aynı yuvada başka reklam yayında — sitede gösterilmiyor} app {Aynı yuvada başka reklam yayında — uygulamada gösterilmiyor} other {Aynı yuvada başka reklam yayında — gösterilmiyor}}"
         },
         "linkUrl": "Bağlantı (URL)",
         "linkUrlHelper": "https://… ile başlayan tam adres ya da /listings?category=araba gibi site içi yol (web ve mobil uygulamada açılır).",
@@ -5701,7 +5755,7 @@
           "header": "Başlığın altındaki büyük banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesi. Önerilen: masaüstü 970×250 veya 1200×300, mobil 320×100.",
           "footer": "Altbilginin üstündeki banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesinin sonu. Önerilen: 970×250, mobil 320×100.",
           "inline": "Ürün satırlarının arasında. Web: liste, arama ve kategori sayfaları; mobil uygulama: yalnız ilan listesi. Önerilen: masaüstü 728×90 veya 970×90, mobil 300×250.",
-          "popup": "Ziyaretçiye günde en çok bir kez açılan pencere. Web: tüm vitrin sayfaları; mobil uygulama: yalnız ana sayfa. Önerilen: 600×600, mobil 320×480."
+          "popup": "Ana sayfaya girişte açılan pencere. Web ve mobil uygulama: yalnız ana sayfa; ne sıklıkla açılacağını gösterim sıklığı belirler. Önerilen: 600×600, mobil 320×480."
         }
       },
       "discounts": {
@@ -5950,6 +6004,7 @@
         "scheduleTitle": "Bildirimi Zamanla",
         "scheduleDateTime": "Gönderim Tarihi ve Saati",
         "livePreview": "Canlı Önizleme",
+        "summary": "Özet",
         "notificationSuffix": "bildirimi",
         "enterTitle": "Başlık girin…",
         "enterContent": "İçerik girin…",
@@ -8713,11 +8768,11 @@
       "fields": {
         "minProductPrice": {
           "label": "Minimum Ürün Fiyatı (₺)",
-          "helper": "Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)"
+          "helper": "İlan fiyatı ve indirimli fiyat bunun altına inemez; teklifler de bu tutarın altında verilemez. Mevcut ilanlar fiyatı değişmedikçe etkilenmez. Boş bırakılırsa alt sınır uygulanmaz."
         },
         "maxProductPrice": {
           "label": "Maksimum Ürün Fiyatı (₺)",
-          "helper": "Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)"
+          "helper": "İlan fiyatı bunun üstüne çıkamaz (teklifler etkilenmez). Mevcut ilanlar fiyatı değişmedikçe etkilenmez. Boş bırakılırsa üst sınır uygulanmaz."
         },
         "maxMessageLength": {
           "label": "Maksimum Mesaj Uzunluğu",
@@ -8735,6 +8790,7 @@
       "validation": {
         "required": "Zorunlu",
         "invalidValueMin": "Geçerli bir değer girin (en az {min})",
+        "minAboveMax": "Minimum fiyat, maksimum fiyattan büyük olamaz",
         "invalidValue": "Geçerli bir değer girin"
       },
       "legal": {
@@ -9745,7 +9801,7 @@
           "provider": "Sağlayıcı",
           "documentType": "Belge türü",
           "position": "Konum",
-          "device": "Cihaz",
+          "platform": "Platform",
           "scope": "Kapsam",
           "active": "Aktiflik",
           "membershipTier": "Üyelik katmanı",
@@ -10872,6 +10928,7 @@
     "offer": {
       "alreadyInStatus": "Bu teklif zaten {status} durumunda",
       "alreadyPendingOffer": "Bu ürüne zaten bekleyen bir teklifiniz var. Önce mevcut teklifi iptal edin.",
+      "amountBelowMinimum": "Teklif tutarı minimum {minPrice} TL olmalıdır.",
       "awaitingBuyerResponse": "Alıcının mevcut karşı teklife yanıt vermesi bekleniyor; şu an yeni karşı teklif verilemez",
       "belowMinimumBuyerCounter": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum: {minOffer} TL (fiyatın %{minOfferPercentage}'i).",
       "belowMinimumOffer": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum teklif: {minOffer} TL (fiyatın %{minOfferPercentage}'i). Teklifiniz: {offerAmount} TL",
@@ -11552,6 +11609,9 @@
         "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir",
         "rejectReasonRequired": "Red sebebi zorunludur"
       },
+      "settings": {
+        "priceLimitInvalid": "Fiyat sınırı boş (kural yok) ya da 0 veya daha büyük bir sayı olmalıdır"
+      },
       "membership": {
         "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
         "yearlyDiscountRange": "Yıllık indirim oranı 0 ile 90 arasında olmalıdır",
@@ -11640,15 +11700,18 @@
       "hotspotInvalid": "{code, select, tooMany {Bir reklamda en fazla {max} tıklanabilir alan olabilir.} outOfBounds {{position}. tıklanabilir alan görselin dışına taşıyor.} tooSmall {{position}. tıklanabilir alan çok küçük; eni ve boyu görselin en az %{minPercent} kadarı olmalı.} overlap {{position}. tıklanabilir alan {other}. alanla çakışıyor.} labelRequired {{position}. tıklanabilir alanın adı boş olamaz.} labelTooLong {{position}. tıklanabilir alanın adı en fazla {labelMax} karakter olabilir.} linkRequired {{position}. tıklanabilir alanın bağlantısı boş olamaz.} other {{position}. tıklanabilir alan geçersiz.}}",
       "hotspotsNeedImage": "Tıklanabilir alanlar yalnız görselli reklamda tanımlanabilir"
     },
+    "ads": {
+      "slotTaken": "Bu yuvada (aynı pozisyon ve platform) aynı tarihlerde yayında olan başka bir reklam var: “{title}”. Önce onu pasife alın ya da tarihleri ayırın."
+    },
     "hero": {
       "notFound": "Slayt bulunamadı",
       "trustBadgeNotFound": "Güven rozeti bulunamadı",
       "titleRequired": "Türkçe başlık zorunludur",
       "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz",
       "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
-      "maxLiveSlides": "Bir yerleşimde aynı anda en fazla {max} slayt yayında olabilir",
-      "lastLiveHomeSlide": "Ana sayfa slider'ı hiçbir an boş kalamaz: bu değişiklik, ana sayfada mobilde de görünen bir slaytın bulunmadığı bir an bırakıyor. Önce kesintisiz devralacak başka bir slaytı yayına alın ya da bitiş tarihini gözden geçirin",
-      "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir"
+      "maxLiveSlides": "Bir yerleşimde, bir platformda aynı anda en fazla {max} slayt yayında olabilir",
+      "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir",
+      "useDedicatedEndpoint": "Bu ayar Pazarlama → Hero ekranından değiştirilir."
     },
     "brand": {
       "notFound": "Marka bulunamadı"

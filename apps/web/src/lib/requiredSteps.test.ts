@@ -64,6 +64,7 @@ describe("isRequiredStepExemptPath", () => {
   it("yasal metin sayfaları her zorunlu adımdan muaftır (okunabilsin)", () => {
     expect(isRequiredStepExemptPath("/terms")).toBe(true);
     expect(isRequiredStepExemptPath("/privacy")).toBe(true);
+    expect(isRequiredStepExemptPath("/app/privacy")).toBe(true);
     expect(isRequiredStepExemptPath("/profile")).toBe(false);
   });
 });

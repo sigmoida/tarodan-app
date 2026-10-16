@@ -7,8 +7,8 @@ import { fetchHeroSlides, fetchTrustBadges } from "@/lib/api/hero";
 import { MANUFACTURERS_WITH_LISTINGS_PATH } from "@/lib/api/catalog";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
+import { toMarqueeItems, type MarqueeManufacturer } from "./_home/lib/helpers";
 import type {
-  BrandMarqueeItem,
   FeaturedBusiness,
   FeaturedCollector,
   HomePageData,
@@ -80,21 +80,14 @@ async function fetchDiscountedProducts(): Promise<Product[]> {
   return products.filter(hasRealDiscount);
 }
 
-interface Manufacturer {
-  id: string;
-  name: string;
-  logo?: string | null;
-  description?: string | null;
-}
-
 /** Marka şeridi: yalnız aktif ilanı olan üreticiler (API `hasListings`). */
-async function fetchManufacturers(): Promise<Manufacturer[]> {
+async function fetchManufacturers(): Promise<MarqueeManufacturer[]> {
   const res = await fetch(
     `${API_BASE}/api${MANUFACTURERS_WITH_LISTINGS_PATH}`,
     { next: { revalidate: 60 } },
   );
   if (!res.ok) throw new Error(`manufacturers ${res.status}`);
-  return unwrapList<Manufacturer>(await res.json());
+  return unwrapList<MarqueeManufacturer>(await res.json());
 }
 
 async function fetchTopCollections(): Promise<FeaturedCollector[]> {
@@ -158,13 +151,7 @@ export default async function HomePage({
   // Faz 1: marka şeridi tamamen API'den — logolar S3'ten mutlak URL olarak
   // gelir (manufacturer.logo key → getPublicAssetUrl). Statik fallback listesi
   // ve repo içi logo dosyaları kaldırıldı.
-  const manufacturerItems = settledValue(manufacturers, []);
-  const marqueeItems: BrandMarqueeItem[] = manufacturerItems.map((item) => ({
-    id: item.id,
-    name: item.name,
-    logoUrl: item.logo || "",
-    desc: item.description || "",
-  }));
+  const marqueeItems = toMarqueeItems(settledValue(manufacturers, []));
 
   const data: HomePageData = {
     featured: settledValue(featured, []),

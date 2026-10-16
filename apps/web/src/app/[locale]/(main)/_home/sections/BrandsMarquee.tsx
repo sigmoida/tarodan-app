@@ -3,9 +3,9 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { navHref } from "@/components/layout/header/nav/config";
 import Image from "next/image";
 import { useState } from "react";
-import { navHref } from "@/components/layout/header/nav/config";
 import type { BrandMarqueeItem } from "../lib/types";
 
 function BrandMark({ brand }: { brand: BrandMarqueeItem }) {

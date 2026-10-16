@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import {
+  CONTENT_PLATFORMS,
   HERO_IMAGE_SIDES,
   HERO_PLACEMENTS,
   HERO_TEXT_LIMITS,
   type AdminHeroSlideDto,
+  type ContentPlatform,
   type HeroImageSide,
   type HeroPlacement,
 } from "@tarodan/types";
@@ -23,7 +25,7 @@ import {
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export type { HeroImageSide, HeroPlacement };
+export type { ContentPlatform, HeroImageSide, HeroPlacement };
 
 /** API satırı (`GET /admin/hero-slides`) — sözleşme `@tarodan/types`ta. */
 export type HeroSlide = AdminHeroSlideDto;
@@ -68,6 +70,7 @@ export const heroSchema = (t: T) =>
   z
     .object({
       placement: z.enum(HERO_PLACEMENTS),
+      platform: z.enum(CONTENT_PLATFORMS),
       imageSide: z.enum(HERO_IMAGE_SIDES),
       imageUrl: z.string().optional().default(""),
       mobileImageUrl: z.string().optional().default(""),
@@ -136,6 +139,7 @@ export type HeroFormValues = z.infer<ReturnType<typeof heroSchema>>;
 
 export const emptyHeroForm = (placement: HeroPlacement): HeroFormValues => ({
   placement,
+  platform: "all",
   imageSide: "right",
   imageUrl: "",
   mobileImageUrl: "",
@@ -155,6 +159,7 @@ export const emptyHeroForm = (placement: HeroPlacement): HeroFormValues => ({
 export function heroToForm(slide: HeroSlide): HeroFormValues {
   return {
     placement: slide.placement,
+    platform: slide.platform,
     imageSide: slide.imageSide,
     imageUrl: slide.imageUrl ?? "",
     mobileImageUrl: slide.mobileImageUrl ?? "",
@@ -186,6 +191,7 @@ export function heroFormToPayload(v: HeroFormValues, mode: HeroPayloadMode) {
   const text = (s?: string) => s?.trim() || empty;
   return {
     placement: v.placement,
+    platform: v.platform,
     imageSide: v.imageSide,
     imageUrl: v.imageUrl.trim(),
     mobileImageUrl: text(v.mobileImageUrl),
@@ -207,6 +213,12 @@ export const placementOptions = (t: T) =>
   HERO_PLACEMENTS.map((value) => ({
     value,
     label: t(`admin.marketing.hero.placement.${value}`),
+  }));
+
+export const platformOptions = (t: T) =>
+  CONTENT_PLATFORMS.map((value) => ({
+    value,
+    label: t(`admin.marketing.hero.platform.${value}`),
   }));
 
 export const imageSideOptions = (t: T) =>

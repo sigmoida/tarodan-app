@@ -11,6 +11,7 @@ import TradeRail from "../sections/TradeRail";
 import TrustBadges from "../sections/TrustBadges";
 import HomeOnboardingTour from "./HomeOnboardingTour";
 import BannerSlot from "@/components/marketing/BannerSlot";
+import PopupAd from "@/components/marketing/PopupAd";
 
 export default function HomeContent({
   data,
@@ -31,10 +32,13 @@ export default function HomeContent({
   return (
     <PageShell>
       <HomeOnboardingTour hasProducts={hasProducts} />
+      {/* Reklam popup'ı YALNIZ ana sayfada: her girişte yeniden değerlendirilir
+          (sıklık reklamın kendisinde), tüm katmanlar kapalıyken. */}
+      <PopupAd />
+      {/* Admin'in tanımladığı afiş ve platform kampanya duyurusu — hero'nun
+          ÜSTÜNDE. Yuva boşsa hiçbir şey çizilmez (yer ayrılmaz). */}
+      <BannerSlot position="header" className="mb-4 space-y-3" />
       <HeroSlider slides={data.heroSlides} />
-      {/* Admin'in tanımladığı afişler ve platform kampanya duyuruları. Yuva
-          boşsa hiçbir şey çizilmez. */}
-      <BannerSlot position="header" className="mt-4 space-y-3" />
       <BrandsMarquee items={data.marqueeItems} />
       <FeaturedRail items={data.featured} />
       <OnSaleRail items={data.discounted} />

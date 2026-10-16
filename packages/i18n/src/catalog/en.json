@@ -46,6 +46,9 @@
     "removing": "Removing",
     "copied": "Link copied!",
     "copyFailed": "Failed to copy link",
+    "share": "Share",
+    "shareOptions": "Share options",
+    "copyLink": "Copy link",
     "operationFailed": "Operation failed",
     "comingSoon": "Feature coming soon",
     "selectCity": "Select City",
@@ -426,6 +429,7 @@
     "removeFromFavorites": "Remove from Favorites",
     "removedFromFavorites": "Removed from favorites",
     "addedToFavorites": "Added to favorites",
+    "favorite": "Favorite",
     "seller": "Seller",
     "condition": "Condition",
     "price": "Price",
@@ -1527,7 +1531,15 @@
     "commissionLine": "Marketplace commission",
     "tradeNumberLabel": "Trade No:"
   },
+  "listing": {
+    "priceMinHint": "At least {minPrice}",
+    "priceMaxHint": "At most {maxPrice}",
+    "priceRangeHint": "Between {minPrice} and {maxPrice}",
+    "salePriceBelowMinimum": "The discounted price must be at least {minPrice} TL."
+  },
   "offer": {
+    "minimumOfferFloorError": "The offer must be at least {amount}.",
+    "counterBelowFloor": "The counter-offer must be at least {amount}.",
     "makeOffer": "Make Offer",
     "yourOffer": "Your Offer",
     "offerAmount": "Offer Amount",
@@ -2893,6 +2905,10 @@
     "sellerInvoicePending": "The seller has not uploaded the product invoice yet. You will be notified by email once they do.",
     "downloading": "Downloading..."
   },
+  "bankAccount": {
+    "savedBadge": "Saved",
+    "lastUpdated": "Last updated: {date}"
+  },
   "seller": {
     "sellerProfile": "Seller Profile",
     "allListings": "All Listings",
@@ -2911,6 +2927,7 @@
     "report": "Report",
     "noActiveListings": "This seller has no active listings yet.",
     "viewProfile": "View Profile",
+    "premiumBadge": "Premium",
     "trust": "Trust",
     "noReviewsDesc": "This seller has no reviews yet.",
     "totalReviews": "reviews",
@@ -3563,7 +3580,10 @@
       "metaTitle": "Kullanım Koşulları · Tarodan",
       "metaDescription": "Tarodan üyelik, ilan, satış, satın alma, teklif, takas, ödeme, komisyon, içerik ve hesap kullanım koşulları.",
       "pageDescription": "Tarodan pazar yerini ziyaret ederken, üyelik oluştururken, ilan verirken, satın alırken veya takas yaparken geçerli genel kurallar.",
-      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır."
+      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır.",
+      "ugcAddendumTitle": "Uygulama İçi İçerik Kuralları",
+      "ugcAddendumHeading": "Uygunsuz içerik ve kötü niyetli kullanıcılar",
+      "ugcAddendumText": "Tarodan, uygunsuz içeriğe (hakaret, nefret söylemi, taciz, tehdit, müstehcenlik, şiddet) ve kötü niyetli kullanıcılara karşı sıfır tolerans politikası uygular. Uygunsuz bir ilanı, profili, koleksiyonu veya mesajı ilgili ekrandaki \"Şikayet Et\" seçeneğiyle bildirebilir, sizi rahatsız eden bir kullanıcıyı \"Engelle\" seçeneğiyle engelleyebilirsiniz; engellediğiniz kullanıcının içerikleri akışınızdan anında kaldırılır. Bildirimler ekibimizce 24 saat içinde incelenir; kurallara aykırı içerik kaldırılır ve içeriği paylaşan hesap askıya alınır veya kalıcı olarak kapatılır."
     },
     "refundPolicy": {
       "hangiKosullardaIadeTalebiOlusturulabilir": "Hangi koşullarda iade talebi oluşturulabilir?",
@@ -5118,6 +5138,10 @@
         "views": "Views",
         "aiModeration": "AI Moderation",
         "allModels": "All Models",
+        "listingFilter": "Listings",
+        "allListings": "All",
+        "withListings": "With listings",
+        "withoutListings": "Without listings",
         "listingCount": "Total listings",
         "activeListingCount": "Active listings"
       },
@@ -5250,7 +5274,8 @@
         "nameRequired": "Manufacturer name is required",
         "countryPlaceholder": "e.g. USA",
         "foundedYearPlaceholder": "e.g. 1968",
-        "descriptionPlaceholder": "Short description about the manufacturer"
+        "descriptionPlaceholder": "Short description about the manufacturer",
+        "allManufacturers": "All Manufacturers"
       },
       "collections": {
         "title": "Collections",
@@ -5499,14 +5524,35 @@
         "created": "Slide created",
         "updated": "Slide updated",
         "deleted": "Slide deleted",
-        "deleteConfirm": "Delete the slide \"{title}\"?",
+        "deleteConfirm": "Delete the \"{title}\" slide? If no other live slide remains in this placement, the hero is hidden there.",
         "empty": "No slides in this placement yet",
-        "maxLiveNote": "At most {max} slides live",
+        "maxLiveNote": "At most {max} live slides per platform",
         "placementLabel": "Placement",
         "placement": {
           "home": "Home page",
           "auth_default": "Sign-in (default)",
           "auth_register": "Sign-in (register)"
+        },
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Web only",
+          "app": "App only",
+          "all": "Both"
+        },
+        "clientName": {
+          "web": "web",
+          "app": "app"
+        },
+        "visibility": {
+          "web": "Show on web",
+          "app": "Show in app",
+          "updated": "Hero visibility updated",
+          "hint": "Home page hero; when off it is hidden on that platform, slides are kept."
+        },
+        "hiddenOn": {
+          "switchOff": "Hero is hidden on the {platform} home page: the switch is off.",
+          "noLiveSlide": "Hero is hidden on the {platform} home page: no live slide on this platform.",
+          "hiddenInApp": "Hero is hidden on the app home page: every live app slide is marked \"Hide in the mobile app\" (iOS and Android)."
         },
         "columns": {
           "image": "Image",
@@ -5515,6 +5561,7 @@
           "clicks": "Clicks",
           "cta1Clicks": "Button 1",
           "cta2Clicks": "Button 2",
+          "platform": "Platform",
           "ios": "Mobile"
         },
         "hiddenOnIos": "Hidden in the app",
@@ -5607,8 +5654,18 @@
         "preview": "Preview",
         "size": "Size",
         "positionLabel": "Position",
-        "deviceLabel": "Device",
-        "deviceType": "Device Type",
+        "platformLabel": "Platform",
+        "platform": {
+          "web": "Web only",
+          "app": "App only",
+          "all": "Both (web and app)"
+        },
+        "popupFrequencyLabel": "Display frequency",
+        "popupFrequency": {
+          "until_dismissed": "Show until the visitor closes it",
+          "every_visit": "Show on every home page visit"
+        },
+        "popupFrequencyHelper": "Every time you update the ad, it is shown again even to visitors who closed it before.",
         "displayOrder": "Display Order",
         "startDate": "Start Date",
         "endDate": "End Date",
@@ -5649,17 +5706,13 @@
         "iabCompliant": "IAB Compliant",
         "iabWarning": "Size ({width}x{height}) is not an IAB standard — select one of the recommended sizes.",
         "allPositions": "All Positions",
-        "allDevices": "All Devices",
+        "allPlatforms": "All platforms",
         "position": {
           "header": "Top Banner",
           "footer": "Bottom Banner",
           "inline": "Inline",
           "popup": "Popup",
           "topbar": "Top Bar"
-        },
-        "device": {
-          "desktop": "Desktop",
-          "mobile": "Mobile (mobile web and app)"
         },
         "upload": {
           "formats": "Only JPG, PNG, and WebP are supported",
@@ -5685,7 +5738,8 @@
           "live": "Live",
           "expired": "Expired",
           "inactive": "Off",
-          "campaignEnded": "Campaign ended"
+          "campaignEnded": "Campaign ended",
+          "shadowed": "{scope, select, web {Another ad is live in this slot — not shown on the site} app {Another ad is live in this slot — not shown in the app} other {Another ad is live in this slot — not shown}}"
         },
         "linkUrl": "Link URL",
         "linkUrlHelper": "A full address starting with https://… or a site path such as /listings?category=cars (opens on the web and in the mobile app).",
@@ -5701,7 +5755,7 @@
           "header": "Large banner under the header. Web: home and listing pages; mobile app: home screen and the listings screen. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
           "footer": "Banner above the footer. Web: home and listing pages; mobile app: home screen and the end of the listings screen. Suggested: 970×250, 320×100 on mobile.",
           "inline": "Between product rows. Web: listing, search and category pages; mobile app: the listings screen only. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
-          "popup": "A window shown to a visitor at most once a day. Web: every storefront page; mobile app: home screen only. Suggested: 600×600, 320×480 on mobile."
+          "popup": "A window that opens when a visitor enters the home page. Web and mobile app: home page only; how often is set by Display frequency. Suggested: 600×600, 320×480 on mobile."
         }
       },
       "discounts": {
@@ -5950,6 +6004,7 @@
         "scheduleTitle": "Schedule Notification",
         "scheduleDateTime": "Delivery Date and Time",
         "livePreview": "Live Preview",
+        "summary": "Summary",
         "notificationSuffix": "notification",
         "enterTitle": "Enter a title…",
         "enterContent": "Enter content…",
@@ -8713,11 +8768,11 @@
       "fields": {
         "minProductPrice": {
           "label": "Minimum Product Price (₺)",
-          "helper": "Minimum price for new listings (existing listings unaffected)"
+          "helper": "Listing and discounted prices cannot go below this amount, and offers cannot be made below it either. Existing listings are unaffected until their price changes. Leave blank for no minimum."
         },
         "maxProductPrice": {
           "label": "Maximum Product Price (₺)",
-          "helper": "Maximum price for new listings (existing listings unaffected)"
+          "helper": "Listing prices cannot go above this amount (offers are unaffected). Existing listings are unaffected until their price changes. Leave blank for no maximum."
         },
         "maxMessageLength": {
           "label": "Maximum Message Length",
@@ -8735,6 +8790,7 @@
       "validation": {
         "required": "Required",
         "invalidValueMin": "Enter a valid value (at least {min})",
+        "minAboveMax": "Minimum price cannot be greater than the maximum price",
         "invalidValue": "Enter a valid value"
       },
       "legal": {
@@ -9745,7 +9801,7 @@
           "provider": "Provider",
           "documentType": "Document type",
           "position": "Position",
-          "device": "Device",
+          "platform": "Platform",
           "scope": "Scope",
           "active": "Active",
           "membershipTier": "Membership tier",
@@ -10872,6 +10928,7 @@
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",
       "alreadyPendingOffer": "You already have a pending offer on this product. Cancel your existing offer first.",
+      "amountBelowMinimum": "Offer amount must be at least {minPrice} TL.",
       "awaitingBuyerResponse": "Waiting for the buyer to respond to the current counter-offer; a new counter-offer cannot be made right now",
       "belowMinimumBuyerCounter": "Offer amount is too low. Product price: {productPrice} TL. Minimum: {minOffer} TL ({minOfferPercentage}% of the price).",
       "belowMinimumOffer": "Offer amount is too low. Product price: {productPrice} TL. Minimum offer: {minOffer} TL ({minOfferPercentage}% of the price). Your offer: {offerAmount} TL",
@@ -11552,6 +11609,9 @@
         "restoreRemovedOnly": "Only removed products can be restored",
         "rejectReasonRequired": "A rejection reason is required"
       },
+      "settings": {
+        "priceLimitInvalid": "The price limit must be blank (no limit) or a number that is 0 or greater"
+      },
       "membership": {
         "monthlyPriceRange": "The monthly membership price must be between 0 and 1,000,000",
         "yearlyDiscountRange": "The yearly discount rate must be between 0 and 90",
@@ -11640,15 +11700,18 @@
       "hotspotInvalid": "{code, select, tooMany {An ad can have at most {max} clickable areas.} outOfBounds {Clickable area {position} extends outside the image.} tooSmall {Clickable area {position} is too small; its width and height must be at least {minPercent}% of the image.} overlap {Clickable area {position} overlaps area {other}.} labelRequired {Clickable area {position} needs a name.} labelTooLong {The name of clickable area {position} can be at most {labelMax} characters.} linkRequired {Clickable area {position} needs a link.} other {Clickable area {position} is invalid.}}",
       "hotspotsNeedImage": "Clickable areas can only be set on an ad with an image"
     },
+    "ads": {
+      "slotTaken": "Another ad is already live in this slot (same position and platform) on overlapping dates: “{title}”. Deactivate it or separate the dates first."
+    },
     "hero": {
       "notFound": "Slide not found",
       "trustBadgeNotFound": "Trust badge not found",
       "titleRequired": "A Turkish title is required",
       "endBeforeStart": "The end date cannot be before the start date",
       "ctaIncomplete": "Button {slot} needs both a label and a link (or neither)",
-      "maxLiveSlides": "At most {max} slides can be live at the same time in one placement",
-      "lastLiveHomeSlide": "The home slider can never be empty: this change would leave a moment with no live slide that is also visible in the mobile app. Publish another slide that takes over without a gap first, or review the end date",
-      "reorderMixedPlacement": "Only slides of the same placement can be reordered together"
+      "maxLiveSlides": "At most {max} slides can be live at the same time in a placement on one platform",
+      "reorderMixedPlacement": "Only slides of the same placement can be reordered together",
+      "useDedicatedEndpoint": "This setting is managed on Marketing → Hero."
     },
     "brand": {
       "notFound": "Brand not found"

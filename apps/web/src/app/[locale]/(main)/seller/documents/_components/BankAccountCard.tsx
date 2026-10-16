@@ -4,13 +4,11 @@
 
 import { useEffect } from "react";
 import { z } from "zod";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import { Button, isValidIban } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
-import { bankAccountApi } from "@/lib/api";
-import { queryKeys } from "@/lib/query/keys";
+import { BankAccountSummary } from "@/components/bank/BankAccountSummary";
+import { useBankAccount, useSaveBankAccount } from "@/hooks/useBankAccount";
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -30,12 +28,7 @@ type Values = z.infer<ReturnType<typeof schema>>;
 /** Corporate IBAN captured with the application; admin sees it on the detail. */
 export function BankAccountCard() {
   const t = useTranslations();
-  const qc = useQueryClient();
-  const { data } = useQuery({
-    queryKey: queryKeys.bankAccount.detail(),
-    queryFn: async () => (await bankAccountApi.get()).data,
-    staleTime: 30_000,
-  });
+  const { account: data } = useBankAccount();
 
   const form = useZodForm(schema(t), {
     defaultValues: { accountHolder: "", iban: "", taxId: "" },
@@ -51,25 +44,20 @@ export function BankAccountCard() {
     }
   }, [data, reset]);
 
-  const save = useMutation({
-    mutationFn: (v: Values) =>
-      bankAccountApi.upsert({
-        accountHolder: v.accountHolder.trim(),
-        iban: v.iban.replace(/\s/g, "").toUpperCase(),
-        taxId: v.taxId?.trim() || undefined,
-      }),
-    onSuccess: () => {
-      toast.success(t("seller.documents.ibanSaved"));
-      qc.invalidateQueries({ queryKey: queryKeys.bankAccount.detail() });
-    },
-    onError: (e: any) =>
-      toast.error(
-        e?.response?.data?.message || t("seller.documents.ibanSaveFailed"),
-      ),
+  const save = useSaveBankAccount({
+    successMessage: t("seller.documents.ibanSaved"),
+    errorMessage: t("seller.documents.ibanSaveFailed"),
   });
 
   return (
     <SectionCard title={t("seller.documents.ibanTitle")}>
+      {data && (
+        <BankAccountSummary
+          accountHolder={data.accountHolder ?? ""}
+          iban={data.iban ?? ""}
+          updatedAt={data.updatedAt}
+        />
+      )}
       <Form form={form} onSubmit={(v) => save.mutate(v)} className="space-y-3">
         <FormInput
           name="accountHolder"

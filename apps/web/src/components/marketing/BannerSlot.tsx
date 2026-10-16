@@ -4,15 +4,14 @@
 
 import { useActiveAds } from "@/hooks/useActiveAds";
 import type { AdPosition } from "@/lib/api/advertisements";
-import { pickAd } from "@/lib/ads/pickAd";
 import AdCreative from "./AdCreative";
 
 /**
  * Banner yuvası — admin'in tanımladığı afişlerin sayfadaki karşılığı
  * (header: başlık altı, footer: alt bilgi üstü).
  *
- * Konumdaki afişlerden TEK biri gösterilir; dönüşüm `pickAd` ile sayfa
- * yüklemesi başına değişir. Afiş yoksa hiçbir şey çizilmez (yer ayrılmaz).
+ * Yuvada tek afiş vardır (API yuva başına en fazla birini döner). Afiş
+ * yoksa hiçbir şey çizilmez (yer ayrılmaz).
  *
  * Aynı yuva platformun KENDİ kampanya duyurusunu da taşır: afiş bir kampanyaya
  * bağlıysa (ör. "komisyonsuz alışveriş") başlığın yanında kupon kodu görünür ve
@@ -29,7 +28,7 @@ export default function BannerSlot({
   className?: string;
 }) {
   const { ads } = useActiveAds(position);
-  const ad = pickAd(ads, position);
+  const ad = ads[0] ?? null;
   if (!ad) return null;
 
   return (

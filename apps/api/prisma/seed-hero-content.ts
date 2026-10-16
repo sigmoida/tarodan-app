@@ -3,18 +3,28 @@
  *
  * Kodda yedek slayt yok: web ve mobil yalnız veritabanından okur. Bu dosya
  * bugünkü vitrini (web'deki eski sabit tanımlar: ana sayfa 1. slaytı, auth
- * görselleri, altı rozet) bir kez kurar; sonrası admin'in işidir.
+ * görselleri, altı rozet) YALNIZ İLK KURULUMDA bir kez kurar; sonrası
+ * admin'in işidir — yerleşimi bilerek boşaltan admin'in kararı ezilmez.
  *
- * İki koruma, ikisi de "admin'in kararını ezme" kuralı için:
- *  - `update: {}` — var olan satıra dokunulmaz (admin düzenlemesi kalıcı),
- *  - yerleşim (rozetler için tablo) BOŞSA yazılır — admin seed slaytını silip
- *    yerine kendisininkini koyduysa, her açılışta koşan seed onu geri
- *    getirmez.
+ * Seed her açılışta koşar (`seed-production.ts`); "bir kez" şöyle sağlanır:
+ *  - `hero_seed_applied` işareti (PlatformSetting) varsa hiçbir şey yazılmaz,
+ *  - işaret yoksa ama hero/rozet satırı varsa (işaretten önceki kurulum)
+ *    yalnız işaret yazılır,
+ *  - ikisi de yoksa içerik + işaret TEK işlemde yazılır: yarıda kesilen ilk
+ *    kurulum hiçbir şey bırakmaz, sonraki açılış baştan kurar (yarım içerik
+ *    "işaretten önceki kurulum" sanılıp kalıcı eksik kalmaz).
+ * `update: {}` — eşzamanlı iki açılışta bile var olan satıra dokunulmaz.
+ *
+ * İşaretten önceki kurulumlarda ana sayfa yerleşimi boş olamaz: bu kural
+ * gelmeden önce API yayındaki son ana sayfa slaytını silmeyi/kapatmayı 409
+ * ile reddediyordu. O yüzden "içerik var → yalnız işaretle" dalı eksik ana
+ * sayfa bırakmaz; ek göç/düzeltme gerekmez.
  *
  * Görseller S3'teki yönetilen `seed-assets/hero/` önekindedir (web'in
  * `heroImageUrl` varsayılan kökü); mutlak URL saklanır.
  */
 import type { HeroPlacement, Prisma, PrismaClient } from "@prisma/client";
+import { HERO_SEED_APPLIED_SETTING } from "@tarodan/types";
 import { HERO_SEED_IDS, TRUST_BADGE_SEED_IDS } from "./seed-ids";
 
 const HERO_ASSET_BASE =
@@ -145,29 +155,57 @@ export const TRUST_BADGE_SEED: ReadonlyArray<
   },
 ];
 
-type HeroSeedClient = Pick<PrismaClient, "heroSlide" | "trustBadge">;
+type HeroSeedClient = Pick<
+  PrismaClient,
+  "heroSlide" | "trustBadge" | "platformSetting" | "$transaction"
+>;
 
 export async function seedHeroContent(prisma: HeroSeedClient): Promise<void> {
-  for (const slide of HERO_SEED_SLIDES) {
-    // Yerleşimde (silinmiş seed dahil) admin'in slaytı varsa dokunma.
-    const existing = await prisma.heroSlide.count({
-      where: { placement: slide.placement },
-    });
-    if (existing > 0) continue;
-    await prisma.heroSlide.upsert({
-      where: { id: slide.id },
-      create: slide,
+  const applied = await prisma.platformSetting.findUnique({
+    where: { settingKey: HERO_SEED_APPLIED_SETTING },
+    select: { id: true },
+  });
+  if (applied) return;
+
+  const markApplied = () =>
+    prisma.platformSetting.upsert({
+      where: { settingKey: HERO_SEED_APPLIED_SETTING },
+      create: {
+        settingKey: HERO_SEED_APPLIED_SETTING,
+        settingValue: "true",
+        settingType: "boolean",
+        description:
+          "Hero slaytları + güven rozetleri referans seed'i uygulandı; seed içeriği bir daha eklemez",
+      },
       update: {},
     });
+
+  // İşaretten önceki kurulum: içerik zaten bir kez kurulmuş (admin sonradan
+  // silmiş olabilir) — geri getirme, yalnız işaretle.
+  const hasContent =
+    (await prisma.heroSlide.count()) > 0 ||
+    (await prisma.trustBadge.count()) > 0;
+  if (hasContent) {
+    await markApplied();
+    return;
   }
 
-  if ((await prisma.trustBadge.count()) === 0) {
-    for (const badge of TRUST_BADGE_SEED) {
-      await prisma.trustBadge.upsert({
+  // İlk kurulum: içerik ve işaret birlikte ya da hiç.
+  await prisma.$transaction([
+    ...HERO_SEED_SLIDES.map((slide) =>
+      prisma.heroSlide.upsert({
+        where: { id: slide.id },
+        create: slide,
+        update: {},
+      }),
+    ),
+    ...TRUST_BADGE_SEED.map((badge) =>
+      prisma.trustBadge.upsert({
         where: { id: badge.id },
         create: badge,
         update: {},
-      });
-    }
-  }
+      }),
+    ),
+    markApplied(),
+  ]);
 }

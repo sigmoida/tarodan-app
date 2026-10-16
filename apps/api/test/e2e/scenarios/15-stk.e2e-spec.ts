@@ -1437,9 +1437,7 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({ sellerId: seller.id, quantity: 2 });
     const res = await addToCart(buyer, product.id, 3).expect(400);
-    expect(JSON.stringify(res.body)).toContain(
-      "Stokta sadece 2 adet var",
-    );
+    expect(JSON.stringify(res.body)).toContain("Stokta sadece 2 adet var");
   });
 
   scenario("STK-102", async () => {
@@ -1849,9 +1847,7 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
 
     // 3) Sepete fazla ekleme.
     const cartRes = await addToCart(buyer, product.id, 3).expect(400);
-    expect(JSON.stringify(cartRes.body)).toContain(
-      "Stokta sadece 2 adet var",
-    );
+    expect(JSON.stringify(cartRes.body)).toContain("Stokta sadece 2 adet var");
   });
 
   scenario.skip(

@@ -3627,7 +3627,17 @@ model Advertisement {
   height          Int?
   /// Render yuvası — yerleşim anlamları `AdPosition` enum'unda.
   position        AdPosition   @default(header)
+  /// Reklamın gösterildiği istemci (`GET /ads/active?platform=web|app`).
+  platform        ContentPlatform @default(all)
+  /// DEPRECATED: `platform`'un öncülü. Kolon eski mobil sürümler için kalır;
+  /// değeri her yazımda `platform`'dan türetilir (`adDeviceTypeFor`), admin
+  /// formu artık göndermez.
   deviceType      AdDeviceType @default(all) @map("device_type")
+  /// Yalnız `popup` yuvasında anlamlı: kapatılınca bir daha açılmasın mı.
+  popupFrequency  AdPopupFrequency @default(until_dismissed) @map("popup_frequency")
+  /// Admin her güncellediğinde +1 (sayaç artışları dokunmaz — bu yüzden
+  /// `updatedAt` kullanılamaz). Kapatılan popup, yeni sürümde yeniden açılır.
+  popupVersion    Int          @default(1) @map("popup_version")
   /// Aynı yuvadaki canlı reklamların sırası (küçük önce); rotasyonu web yapar.
   displayOrder    Int          @default(0) @map("display_order")
   /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresi ve bağlı
@@ -3653,7 +3663,7 @@ model Advertisement {
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
   @@index([discountId])
-  @@index([position, deviceType, isActive])
+  @@index([position, platform, isActive])
   @@index([startDate, endDate])
   @@map("advertisements")
 }
@@ -3693,52 +3703,56 @@ model AdHotspot {
 }
 
 /// Vitrin hero slaytı (ana sayfa slider'ı, giriş/kayıt ekranı görseli). Kodda
-/// yedek slayt YOK: web ve mobil yalnız bu tablodan okur. Referans seed bir
-/// ana sayfa slaytı kurar; API yayındaki son ana sayfa slaytının silinmesini /
-/// kapatılmasını reddeder. Kurallar ve sözleşme: docs/HERO_CMS.md.
+/// yedek slayt YOK: web ve mobil yalnız bu tablodan okur. Referans seed ilk
+/// kurulumda bir ana sayfa slaytı kurar; sonrası admin'indir — yerleşim boş
+/// kalabilir (istemci slider'ı gizler). Kurallar ve sözleşme: docs/HERO_CMS.md.
 model HeroSlide {
-  id              String        @id @default(uuid())
+  id              String          @id @default(uuid())
   placement       HeroPlacement
   /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresinin de içinde
   /// olmalı (`isHeroSlideLive`, hero/helpers).
-  isActive        Boolean       @default(true) @map("is_active")
+  isActive        Boolean         @default(true) @map("is_active")
   /// Aynı yerleşimdeki slaytların sırası (küçük önce).
-  displayOrder    Int           @default(0) @map("display_order")
+  displayOrder    Int             @default(0) @map("display_order")
   /// Yayın penceresi; null = sınırsız. Reklamla aynı kural
   /// (`withinScheduleWindow`): sınırlar dahil.
-  startDate       DateTime?     @map("start_date")
-  endDate         DateTime?     @map("end_date")
+  startDate       DateTime?       @map("start_date")
+  endDate         DateTime?       @map("end_date")
   /// Geniş ekran görseli (public S3 URL, `hero/` klasörü).
-  imageUrl        String        @map("image_url")
+  imageUrl        String          @map("image_url")
   /// Dar ekran/mobil uygulama görseli; null = `imageUrl` kullanılır.
-  mobileImageUrl  String?       @map("mobile_image_url")
-  imageSide       HeroImageSide @default(right) @map("image_side")
+  mobileImageUrl  String?         @map("mobile_image_url")
+  imageSide       HeroImageSide   @default(right) @map("image_side")
   /// Metinler `LocalizedText` JSON'u: `{ tr, en? }` — tr zorunlu, en boşsa
   /// istemci tr'ye düşer (`pickLocalized`, @tarodan/types). Ayrı dil kolonları
   /// yerine JSON: üçüncü dil şema değişikliği istemesin.
   title           Json
   subtitle        Json?
-  imageAlt        Json?         @map("image_alt")
+  imageAlt        Json?           @map("image_alt")
   /// Buton etiketi + hedefi çift olarak var ya da yok; hedef reklam
   /// bağlantısıyla aynı kural (`@IsAdLinkUrl`: http(s) ya da `/yol`).
-  cta1Label       Json?         @map("cta1_label")
-  cta1Href        String?       @map("cta1_href")
-  cta2Label       Json?         @map("cta2_label")
-  cta2Href        String?       @map("cta2_href")
+  cta1Label       Json?           @map("cta1_label")
+  cta1Href        String?         @map("cta1_href")
+  cta2Label       Json?           @map("cta2_label")
+  cta2Href        String?         @map("cta2_href")
   /// Mobil uygulama (iOS VE Android) bu slaytı göstermez — dijital satış
   /// native'de kapalı (mağaza kuralları), ör. ödeme/üyelik çağrısı. Web yok
   /// sayar. Ad tarihçe gereği "iOS" kaldı; API sözleşmesi (mobil) bu adı bekler.
-  hideOnIos       Boolean       @default(false) @map("hide_on_ios")
+  hideOnIos       Boolean         @default(false) @map("hide_on_ios")
+  /// Slaytın gösterildiği istemci (`?platform=web|app`): istemci kendi
+  /// değerini ve `all`'ı görür. Ana sayfa hero'su istemci başına ayrıca
+  /// PlatformSetting anahtarıyla (`hero_home_enabled_web|app`) kapatılabilir.
+  platform        ContentPlatform @default(all)
   /// Yalnız yayındaki slaytta, IP+slayt(+buton) başına tekilleştirilerek artar
   /// (gösterim 30 dk, tık 10 sn) — reklam sayaçlarıyla aynı pencere.
-  impressionCount Int           @default(0) @map("impression_count")
+  impressionCount Int             @default(0) @map("impression_count")
   /// Slayta yapılan TÜM tıklar (görsel + butonlar); buton sayaçları bunun
   /// alt kırılımıdır ve aynı işlemde artar.
-  clickCount      Int           @default(0) @map("click_count")
-  cta1ClickCount  Int           @default(0) @map("cta1_click_count")
-  cta2ClickCount  Int           @default(0) @map("cta2_click_count")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  clickCount      Int             @default(0) @map("click_count")
+  cta1ClickCount  Int             @default(0) @map("cta1_click_count")
+  cta2ClickCount  Int             @default(0) @map("cta2_click_count")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
 
   @@index([placement, isActive, displayOrder])
   @@map("hero_slides")
@@ -4455,6 +4469,7 @@ enum TaxRuleScope {
   product
 }
 
+/// DEPRECATED — yerini `ContentPlatform` aldı (Advertisement.deviceType).
 enum AdDeviceType {
   desktop
   mobile
@@ -4474,13 +4489,24 @@ enum AdPosition {
   footer
   /// İlan/arama/kategori ızgarasında ürün satırları arasındaki banner.
   inline
-  /// Ziyaretçi başına günde en fazla bir kez açılan modal.
+  /// Ana sayfaya girişte açılan modal; ne sıklıkla açılacağı reklamın
+  /// `popupFrequency` alanında.
   popup
+}
+
+/// Popup reklamın ne sıklıkla açıldığı. İstemci "kapatıldı" bilgisini reklam
+/// başına `<id>:<popupVersion>` anahtarıyla saklar.
+enum AdPopupFrequency {
+  /// Ana sayfaya her girişte açılır; kapatmak bir şey saklamaz.
+  every_visit
+  /// Kullanıcı kapatana kadar her girişte açılır; kapatınca o sürüm bir daha
+  /// açılmaz (admin reklamı güncelleyince `popupVersion` artar, yeniden açılır).
+  until_dismissed
 }
 
 /// Hero slaytının gösterildiği yer (`HERO_PLACEMENTS`, @tarodan/types).
 enum HeroPlacement {
-  /// Ana sayfa slider'ı — en az bir yayında slayt zorunlu (API guard'ı).
+  /// Ana sayfa slider'ı — boş kalabilir (istemci gizler).
   home
   /// Giriş, şifre sıfırlama vb. auth ekranlarının görsel paneli.
   auth_default
@@ -4492,6 +4518,14 @@ enum HeroPlacement {
 enum HeroImageSide {
   left
   right
+}
+
+/// İçeriğin gösterildiği istemci: `web` = site, `app` = mobil uygulama,
+/// `all` = ikisi. Hero slaytı ve reklam ortak kullanır.
+enum ContentPlatform {
+  web
+  app
+  all
 }
 
 enum CommissionLedgerStatus {

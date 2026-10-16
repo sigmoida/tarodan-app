@@ -5,9 +5,17 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import type { HeroPlacement, HeroSlide, Prisma } from "@prisma/client";
+import type {
+  ContentPlatform,
+  HeroPlacement,
+  HeroSlide,
+  Prisma,
+} from "@prisma/client";
 import {
   HERO_MAX_SLIDES,
+  clientPlatformsOf,
+  contentPlatformsFor,
+  type ClientPlatform,
   normalizeLocalizedText,
   parseLocalizedText,
   type AdminHeroSlideDto,
@@ -21,8 +29,6 @@ import { notifyWebRevalidate } from "../../common/helpers/revalidate";
 import { i18nMessage } from "../i18n";
 import { CreateHeroSlideDto, UpdateHeroSlideDto } from "./dto";
 import {
-  HERO_PLACEMENTS_REQUIRING_LIVE_SLIDE,
-  guaranteedCoverageUntil,
   heroSlideLiveWhere,
   isHeroSlideLive,
   peakConcurrentWindows,
@@ -39,6 +45,7 @@ import {
   HERO_IMAGE_UPLOAD,
   heroRevalidateTags,
 } from "./helpers/hero.constants";
+import { HeroVisibilityService } from "./hero-visibility.service";
 
 /** Yerleşim içi sıra; eşitlikte önce eklenen önce. */
 const HERO_SLIDE_ORDER_BY: Prisma.HeroSlideOrderByWithRelationInput[] = [
@@ -71,30 +78,15 @@ interface CtaPair {
   href: string | null;
 }
 
-/**
- * "Slider boş kalmasın" korumasının gördüğü slayt hali: yerleşim + anahtar +
- * pencere + native gizleme bayrağı.
- */
+/** Yayın kuralının gördüğü slayt hali (yerleşim + hedef + anahtar + pencere). */
 type HeroLiveState = HeroLiveFields & {
   placement: HeroPlacement;
-  hideOnIos: boolean;
+  platform: ContentPlatform;
 };
 
-/**
- * Slayt ana sayfa listesini DOLDURABİLİR mi: açık ve bitmemiş. `native` iken
- * ayrıca native'de gizlenmemiş olmalı (mobil `hideOnIos` slaytları süzer); web
- * bayrağı yok sayar.
- */
-function fillsHomeList(
-  slide: HeroLiveFields & { hideOnIos?: boolean },
-  now: Date,
-  scope: "web" | "native",
-): boolean {
-  return (
-    slide.isActive &&
-    (scope === "web" || slide.hideOnIos !== true) &&
-    (slide.endDate === null || slide.endDate.getTime() >= now.getTime())
-  );
+/** Bu hedefteki slaytla aynı istemcide görünebilecek hedefler. */
+function platformsSharingClients(platform: ContentPlatform): ContentPlatform[] {
+  return [...new Set(clientPlatformsOf(platform).flatMap(contentPlatformsFor))];
 }
 
 /**
@@ -102,27 +94,45 @@ function fillsHomeList(
  * denetim kaydını ekler, `AdminHeroService`). Her yazımdan sonra web'in ilgili
  * ISR etiketi tazelenir.
  *
- * İki iş kuralı burada:
- *  - bir yerleşimde AYNI ANDA en çok `HERO_MAX_SLIDES` yayında slayt (409),
- *  - ana sayfa slider'ı hiçbir an boş kalamaz (409): kodda yedek slayt yok.
- *    Son yayındaki slayt silinemez/kapatılamaz, bitiş tarihi verilerek ileride
- *    boşluk bırakılamaz, native'de gizlenerek mobil listesi boşaltılamaz.
+ * İş kuralı: bir yerleşimde, bir istemcide AYNI ANDA en çok `HERO_MAX_SLIDES`
+ * yayında slayt (409). Yerleşim boş kalabilir — istemci slider'ı gizler; ana
+ * sayfa hero'su istemci başına anahtarla da kapatılabilir
+ * (`HeroVisibilityService`).
  */
 @Injectable()
 export class HeroSlideService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly media: MediaService,
+    private readonly visibility: HeroVisibilityService,
   ) {}
 
-  /** Yerleşimin yayındaki slaytları (public), sırasıyla. */
-  async listLive(placement: HeroPlacement): Promise<HeroSlideDto[]> {
+  /**
+   * Yerleşimin bu istemcide yayındaki slaytları (public), sırasıyla. İstemci
+   * kendi hedefini ve `all`'ı görür. Ana sayfa anahtarı o istemcide kapalıysa
+   * boş döner; auth yerleşimleri anahtardan etkilenmez.
+   */
+  async listLive(
+    placement: HeroPlacement,
+    platform: ClientPlatform,
+  ): Promise<HeroSlideDto[]> {
     const now = new Date();
-    const slides = await this.prisma.heroSlide.findMany({
-      where: { placement, ...heroSlideLiveWhere(now) },
-      orderBy: HERO_SLIDE_ORDER_BY,
-      take: HERO_MAX_SLIDES,
-    });
+    // Anahtar ve slaytlar paralel okunur; anahtar yalnız ana sayfada sorulur.
+    const [enabled, slides] = await Promise.all([
+      placement === "home"
+        ? this.visibility.isHomeEnabled(platform)
+        : Promise.resolve(true),
+      this.prisma.heroSlide.findMany({
+        where: {
+          placement,
+          platform: { in: contentPlatformsFor(platform) },
+          ...heroSlideLiveWhere(now),
+        },
+        orderBy: HERO_SLIDE_ORDER_BY,
+        take: HERO_MAX_SLIDES,
+      }),
+    ]);
+    if (!enabled) return [];
     return slides
       .filter((slide) => isHeroSlideLive(slide, now))
       .map(toHeroSlideDto);
@@ -162,8 +172,14 @@ export class HeroSlideService {
     });
 
     const isActive = dto.isActive ?? true;
+    const platform = dto.platform ?? "all";
     if (isActive) {
-      await this.assertLiveCapacity(dto.placement, { startDate, endDate }, now);
+      await this.assertLiveCapacity(
+        dto.placement,
+        platform,
+        { startDate, endDate },
+        now,
+      );
     }
 
     const slide = await this.prisma.heroSlide.create({
@@ -186,6 +202,7 @@ export class HeroSlideService {
         cta2Label: nullableLocalizedJson(cta2Label),
         cta2Href: dto.cta2Href ?? null,
         hideOnIos: dto.hideOnIos ?? false,
+        platform,
       },
     });
     this.revalidate([slide.placement]);
@@ -205,10 +222,10 @@ export class HeroSlideService {
     const endDate = toDateField(dto.endDate);
     const next: HeroLiveState = {
       placement: dto.placement ?? existing.placement,
+      platform: dto.platform ?? existing.platform,
       isActive: dto.isActive ?? existing.isActive,
       startDate: startDate === undefined ? existing.startDate : startDate,
       endDate: endDate === undefined ? existing.endDate : endDate,
-      hideOnIos: dto.hideOnIos ?? existing.hideOnIos,
     };
     this.assertWindowOrder(next.startDate, next.endDate);
 
@@ -235,7 +252,6 @@ export class HeroSlideService {
       },
     });
 
-    await this.assertKeepsRequiredLiveSlide(existing, next, now);
     // Yalnız yayın kümesini büyütebilecek değişiklik sınırı yoklar: açık bir
     // slaytın metnini düzeltmek, sınır zaten aşılmışsa bile engellenmez. Admin
     // formu her PATCH'te anahtar/pencere/yerleşimi de gönderir; "alan geldi"
@@ -244,10 +260,17 @@ export class HeroSlideService {
       next.isActive &&
       (!existing.isActive ||
         next.placement !== existing.placement ||
+        next.platform !== existing.platform ||
         !sameInstant(next.startDate, existing.startDate) ||
         !sameInstant(next.endDate, existing.endDate));
     if (mayGrowLiveSet) {
-      await this.assertLiveCapacity(next.placement, next, now, id);
+      await this.assertLiveCapacity(
+        next.placement,
+        next.platform,
+        next,
+        now,
+        id,
+      );
     }
 
     // Prisma'da `undefined` alanı yazmaz; `null` temizler.
@@ -270,6 +293,7 @@ export class HeroSlideService {
         cta2Label: nullableLocalizedJson(cta2Label),
         cta2Href: dto.cta2Href,
         hideOnIos: dto.hideOnIos,
+        platform: dto.platform,
       },
     });
     this.revalidate([existing.placement, slide.placement]);
@@ -278,7 +302,6 @@ export class HeroSlideService {
 
   async remove(id: string): Promise<void> {
     const existing = await this.findOrThrow(id);
-    await this.assertKeepsRequiredLiveSlide(existing, null, new Date());
     await this.prisma.heroSlide.delete({ where: { id } });
     this.revalidate([existing.placement]);
   }
@@ -365,12 +388,15 @@ export class HeroSlideService {
   }
 
   /**
-   * Yerleşimde aynı anda yayında olacak slayt sayısı sınırı aşmamalı.
-   * Pencereler şimdiden itibaren kesiştirilir (`peakConcurrentWindows`):
-   * başka bir slaytın bitişinden sonraya zamanlanan slayt kabul edilir.
+   * Yerleşimde, slaytın göründüğü HER istemcide aynı anda yayında olacak
+   * slayt sayısı sınırı aşmamalı (`web` ile `app` slaytları birbirinin
+   * sınırını tüketmez; `all` ikisinde de sayılır). Pencereler şimdiden
+   * itibaren kesiştirilir (`peakConcurrentWindows`): başka bir slaytın
+   * bitişinden sonraya zamanlanan slayt kabul edilir.
    */
   private async assertLiveCapacity(
     placement: HeroPlacement,
+    platform: ContentPlatform,
     window: HeroWindow,
     now: Date,
     excludeId?: string,
@@ -379,80 +405,18 @@ export class HeroSlideService {
       where: {
         placement,
         isActive: true,
+        platform: { in: platformsSharingClients(platform) },
         ...(excludeId ? { id: { not: excludeId } } : {}),
         OR: [{ endDate: null }, { endDate: { gte: now } }],
       },
-      select: { startDate: true, endDate: true },
+      select: { startDate: true, endDate: true, platform: true },
     });
-    if (peakConcurrentWindows([...others, window], now) > HERO_MAX_SLIDES) {
-      throw new ConflictException(
-        i18nMessage("server.hero.maxLiveSlides", { max: HERO_MAX_SLIDES }),
-      );
-    }
-  }
-
-  /**
-   * Ana sayfa slider'ı hiçbir an boş kalamaz (kodda yedek slayt yok): silme,
-   * kapatma, pencere değişikliği, yerleşim taşıma ve native'de gizleme, slider'ın
-   * ŞİMDİDEN itibaren kesintisiz dolu kalacağı anı ERKENE çekemez. `next` null =
-   * silme.
-   *
-   * Bu kural İKİ görünüm için ayrı ayrı uygulanır:
-   *  - web: `hideOnIos`'a bakmaz (web bayrağı yok sayar) — son canlı slaytı
-   *    `hideOnIos=true` olsa bile silmek/kapatmak web ana sayfasını boşaltır;
-   *  - native: yalnız `hideOnIos=false` slaytlar mobil listeyi doldurur.
-   * Bitiş tarihleri de hesaba katılır: diğer slayt yarın bitiyorsa kalıcı
-   * slaytı silmek ya da tek slayta bitiş vermek slider'ı yarın boş bırakır.
-   *
-   * Kıyas "önce / sonra" yapılır, mutlak değil: zaten kesintili olan bir slider'ın
-   * metnini düzeltmek engellenmez; yalnız durumu KÖTÜLEŞTİREN değişiklik 409.
-   */
-  private async assertKeepsRequiredLiveSlide(
-    existing: HeroSlide,
-    next: HeroLiveState | null,
-    now: Date,
-  ): Promise<void> {
-    if (!HERO_PLACEMENTS_REQUIRING_LIVE_SLIDE.has(existing.placement)) return;
-    // Zaten listeyi (hiçbir görünümde) doldurmayan slaytın değişikliği kapsamı
-    // azaltamaz.
-    if (!fillsHomeList(existing, now, "web")) return;
-    // Kapsamı etkileyen hiçbir alan değişmediyse (metin, buton, sıra, görsel)
-    // sorgu atılmaz.
-    if (
-      next &&
-      next.placement === existing.placement &&
-      next.isActive === existing.isActive &&
-      next.hideOnIos === existing.hideOnIos &&
-      sameInstant(next.startDate, existing.startDate) &&
-      sameInstant(next.endDate, existing.endDate)
-    ) {
-      return;
-    }
-
-    const others = await this.prisma.heroSlide.findMany({
-      where: {
-        placement: existing.placement,
-        id: { not: existing.id },
-        isActive: true,
-      },
-      select: { startDate: true, endDate: true, hideOnIos: true },
-    });
-    const active = others.map((slide) => ({ ...slide, isActive: true }));
-    const stays =
-      next !== null && next.placement === existing.placement ? next : null;
-    for (const scope of ["web", "native"] as const) {
-      const rest = active.filter((slide) => fillsHomeList(slide, now, scope));
-      const before = guaranteedCoverageUntil(
-        fillsHomeList(existing, now, scope) ? [...rest, existing] : rest,
-        now,
-      );
-      const after = guaranteedCoverageUntil(
-        stays && fillsHomeList(stays, now, scope) ? [...rest, stays] : rest,
-        now,
-      );
-      if (after < before) {
+    for (const client of clientPlatformsOf(platform)) {
+      const visible = contentPlatformsFor(client);
+      const windows = others.filter((o) => visible.includes(o.platform));
+      if (peakConcurrentWindows([...windows, window], now) > HERO_MAX_SLIDES) {
         throw new ConflictException(
-          i18nMessage("server.hero.lastLiveHomeSlide"),
+          i18nMessage("server.hero.maxLiveSlides", { max: HERO_MAX_SLIDES }),
         );
       }
     }

@@ -2,7 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { AdHotspot } from "@/lib/api/advertisements";
-import { hotspotStyle, renderableHotspots } from "./hotspots";
+import {
+  hotspotStyle,
+  renderableHotspots,
+  withSoleHotspotExpanded,
+} from "./hotspots";
 
 const spot = (over: Partial<AdHotspot> = {}): AdHotspot => ({
   id: "h1",
@@ -48,5 +52,33 @@ describe("renderableHotspots", () => {
     expect(
       renderableHotspots({ imageUrl: "x", hotspots: undefined as never }),
     ).toEqual([]);
+  });
+});
+
+describe("withSoleHotspotExpanded (popup)", () => {
+  const image = "https://cdn/x.png";
+
+  it("tek bölge tüm görseli kaplar; kimlik, etiket ve bağlantı korunur", () => {
+    const ad = { imageUrl: image, hotspots: [spot({ id: "only" })] };
+    expect(withSoleHotspotExpanded(ad).hotspots).toEqual([
+      spot({ id: "only", x: 0, y: 0, width: 1, height: 1 }),
+    ]);
+    // Girdi değişmez.
+    expect(ad.hotspots[0].x).toBe(0.1);
+  });
+
+  it("birden çok bölgede afiş olduğu gibi kalır", () => {
+    const ad = {
+      imageUrl: image,
+      hotspots: [spot({ id: "a" }), spot({ id: "b", x: 0.6 })],
+    };
+    expect(withSoleHotspotExpanded(ad)).toBe(ad);
+  });
+
+  it("bölgesiz ya da görselsiz afiş olduğu gibi kalır", () => {
+    const none = { imageUrl: image, hotspots: [] };
+    expect(withSoleHotspotExpanded(none)).toBe(none);
+    const text = { imageUrl: null, hotspots: [spot()] };
+    expect(withSoleHotspotExpanded(text)).toBe(text);
   });
 });

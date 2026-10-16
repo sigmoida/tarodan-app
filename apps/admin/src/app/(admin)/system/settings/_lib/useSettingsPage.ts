@@ -11,6 +11,7 @@ import {
   type SettingsTab,
   isSettingsTab,
   parseSettings,
+  settingPayloadValue,
   settingsSchema,
   settingsTabs,
   tabFields,
@@ -47,7 +48,7 @@ export function useSettingsPage() {
         fieldsByTab[payload.tab].map((field) =>
           adminApi.updateSetting(
             field.backendKey,
-            String(Number(payload.values[field.key])),
+            settingPayloadValue(field, payload.values[field.key]),
           ),
         ),
       ),

@@ -22,11 +22,13 @@ export default function FeaturedRailClient({
   initialItems,
   sponsoredLabel,
   tradeLabel,
+  discountLabel,
   outOfStockLabel,
 }: {
   initialItems: Product[];
   sponsoredLabel: string;
   tradeLabel: string;
+  discountLabel: string;
   outOfStockLabel: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,6 +94,7 @@ export default function FeaturedRailClient({
             priority={index < 4}
             sponsoredLabel={sponsoredLabel}
             tradeLabel={tradeLabel}
+            discountLabel={discountLabel}
             outOfStockLabel={outOfStockLabel}
           />
         </div>

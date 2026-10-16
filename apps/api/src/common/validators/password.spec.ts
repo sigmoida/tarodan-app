@@ -15,7 +15,11 @@ import { CreateTestAccountDto } from "../../modules/admin-test-tools/dto/create-
  * "yeni şifre" DTO'ları aynı değerleri kabul/ret etmeli. Özel karakter zorunlu
  * değil; Türkçe harf, boşluk ve sembol serbest.
  */
-const ACCEPT = ["Abcdefg1", "Tarodan2026.", "Şifre123!", "Abc 1234!",
+const ACCEPT = [
+  "Abcdefg1",
+  "Tarodan2026.",
+  "Şifre123!",
+  "Abc 1234!",
   "ĞÜŞİÖÇ12ab",
   "ğüşiöç12AB",
   "ŞİFREçok1",
@@ -43,18 +47,25 @@ const cases: Array<[string, (pw: string) => unknown, string]> = [
   [
     "CorporateInvitationDto",
     (pw) =>
-      plainToInstance(CorporateInvitationDto, { ...invitationBase, password: pw }),
+      plainToInstance(CorporateInvitationDto, {
+        ...invitationBase,
+        password: pw,
+      }),
     "password",
   ],
   [
     "auth ResetPasswordDto",
-    (pw) => plainToInstance(AuthResetPasswordDto, { token: "t", newPassword: pw }),
+    (pw) =>
+      plainToInstance(AuthResetPasswordDto, { token: "t", newPassword: pw }),
     "newPassword",
   ],
   [
     "security ResetPasswordDto",
     (pw) =>
-      plainToInstance(SecurityResetPasswordDto, { token: "t", newPassword: pw }),
+      plainToInstance(SecurityResetPasswordDto, {
+        token: "t",
+        newPassword: pw,
+      }),
     "newPassword",
   ],
   [
@@ -68,13 +79,17 @@ const cases: Array<[string, (pw: string) => unknown, string]> = [
   ],
   [
     "AssignAdminStaffDto",
-    (pw) => plainToInstance(AssignAdminStaffDto, { ...staffBase, password: pw }),
+    (pw) =>
+      plainToInstance(AssignAdminStaffDto, { ...staffBase, password: pw }),
     "password",
   ],
   [
     "CreateTestAccountDto",
     (pw) =>
-      plainToInstance(CreateTestAccountDto, { ...testAccountBase, password: pw }),
+      plainToInstance(CreateTestAccountDto, {
+        ...testAccountBase,
+        password: pw,
+      }),
     "password",
   ],
 ];
@@ -92,7 +107,9 @@ describe.each(cases)("şifre politikası — %s", (_name, build, property) => {
   });
 
   it("üst sınırı aşan şifreyi reddeder", () => {
-    expect(errorsFor(build("Aa1" + "x".repeat(70)), property)).not.toHaveLength(0);
+    expect(errorsFor(build("Aa1" + "x".repeat(70)), property)).not.toHaveLength(
+      0,
+    );
   });
 });
 

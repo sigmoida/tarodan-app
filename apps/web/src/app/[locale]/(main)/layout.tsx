@@ -6,7 +6,6 @@ import { ConfirmProvider } from "@/components/ConfirmProvider";
 import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
 import SellerAddressPrompt from "@/components/SellerAddressPrompt";
 import RequiredStepsGate from "@/components/required-steps/RequiredStepsGate";
-import PopupAd from "@/components/marketing/PopupAd";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Container } from "@/components/layout/Container";
@@ -32,8 +31,6 @@ export default function MainLayout({
             tek montaj noktası, aynı anda tek pencere. Üyelik kapısından
             bağımsız, her storefront sayfasında. */}
         <RequiredStepsGate />
-        {/* Reklam popup'ı: tüm katmanlar kapalıyken, 24 saatte bir. */}
-        <PopupAd />
         <BusinessMembershipGuard>
           <SellerAddressPrompt />
           <Header />

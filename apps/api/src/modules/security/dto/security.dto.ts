@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsEmail,
-  MinLength,
-  MaxLength,
-} from "class-validator";
+import { IsString, IsEmail, MinLength, MaxLength } from "class-validator";
 import { Transform } from "class-transformer";
 import { IsPassword } from "../../../common/validators/password";
 

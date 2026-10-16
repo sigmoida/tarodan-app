@@ -29,29 +29,31 @@ test("staging assetlinks declares only the staging package with valid fingerprin
   }
 });
 
-test("the staging host serves the staging file at the canonical path", () => {
-  const config = read("next.config.js");
-  const start = config.indexOf("source: '/.well-known/assetlinks.json'");
-  assert.notEqual(start, -1, "missing assetlinks rewrite");
-  const rule = config.slice(start, config.indexOf("},", start));
+test("production assetlinks declares only the production package with valid fingerprints", () => {
+  const statements = JSON.parse(read(wellKnown("assetlinks.json")));
 
-  assert.match(rule, /type: 'host', value: 'staging\.tarodan\.com\.tr'/);
-  assert.match(rule, /destination: '\/\.well-known\/assetlinks-staging\.json'/);
-  assert.ok(existsSync(new URL(wellKnown("assetlinks-staging.json"), root)));
+  assert.equal(statements.length, 1);
+  const [statement] = statements;
+  assert.equal(statement.target.namespace, "android_app");
+  // Canlı dosya staging paketini ASLA taşımaz (ve tersi, yukarıda).
+  assert.equal(statement.target.package_name, PROD_PACKAGE);
+  assert.ok(statement.target.sha256_cert_fingerprints.length >= 1);
+  for (const fingerprint of statement.target.sha256_cert_fingerprints) {
+    assert.match(fingerprint, SHA256);
+  }
 });
 
-test("the rewrite is host-scoped, so production keeps answering 404", () => {
-  // Production dosyası Play App Signing parmak iziyle hazır olunca
-  // public/.well-known/assetlinks.json olarak EKLENİR; o zamana dek eklenmemeli
-  // (eksik parmak izi Android doğrulamasını kesin düşürür). Bu test o gün
-  // bilinçli olarak güncellenir.
-  assert.equal(
-    existsSync(new URL(wellKnown("assetlinks.json"), root)),
-    false,
-    "assetlinks.json must not ship until the Play App Signing fingerprint is known",
-  );
-  const config = read("next.config.js");
-  const start = config.indexOf("source: '/.well-known/assetlinks.json'");
-  const rule = config.slice(start, config.indexOf("},", start));
-  assert.match(rule, /has: \[/, "rewrite must be conditional on the host");
+test("only the staging host is rewritten onto the staging file", () => {
+  // Kural `well-known-rewrites.js`te tek kaynak (next.config.js onu yayar);
+  // host koşulu sayesinde production kendi assetlinks.json'ını sunar.
+  const rules = read("well-known-rewrites.js");
+  const start = rules.indexOf("source: '/.well-known/assetlinks.json'");
+  assert.notEqual(start, -1, "missing assetlinks rewrite");
+  const rule = rules.slice(start, rules.indexOf("},", start));
+
+  assert.match(rule, /type: 'host', value: STAGING_HOST/);
+  assert.match(rules, /const STAGING_HOST = 'staging\.tarodan\.com\.tr';/);
+  assert.match(rule, /destination: '\/\.well-known\/assetlinks-staging\.json'/);
+  assert.ok(existsSync(new URL(wellKnown("assetlinks-staging.json"), root)));
+  assert.match(read("next.config.js"), /\.\.\.wellKnownStagingRewrites/);
 });

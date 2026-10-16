@@ -1,9 +1,10 @@
-import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAuthMiddleware } from "@tarodan/auth/middleware";
 import { defaultLocale, locales } from "@tarodan/i18n";
 import { webAuthConfig } from "@/lib/auth.config";
-import { routing } from "@/i18n/routing";
+import { isEmbedPath } from "@/lib/embed";
+import { localeMiddleware } from "@/lib/localeMiddleware";
+import { RETURN_TO_HEADER, readsReturnToHeader } from "@/lib/returnTo";
 import { SITE_UNLOCK_COOKIE } from "@/lib/siteLock";
 import { internalComingSoonPath, isSiteLocked } from "@/lib/siteLockPolicy.mjs";
 import { verifyUnlockCookie } from "@/lib/siteUnlockCookie.mjs";
@@ -38,6 +39,10 @@ import {
  * in English. For allowed requests we run the i18n middleware and copy over any
  * cookies the auth gate rotated (fresh access/refresh + the JS indicator).
  *
+ * `/app/**` (mobil WebView'in yasal sayfaları) auth-relevant DEĞİLDİR
+ * (`isAuthRelevant` hiçbir kuralıyla eşleşmez) ve locale tespiti kapalı kipte
+ * çalışır — bkz. `lib/localeMiddleware.ts`.
+ *
  * Known tradeoff: on the rare "access expired, refresh valid" navigation the auth
  * gate rotates the token onto BOTH the response (browser — preserved here) and
  * the in-flight request headers (so the same request's RSC sees it). We keep the
@@ -45,8 +50,6 @@ import {
  * Effect is a single stale-token render that self-heals next navigation — the
  * session stays valid. (Admin composes no i18n, so it keeps both.)
  */
-
-const intlMiddleware = createIntlMiddleware(routing);
 
 const authMiddleware = createAuthMiddleware(webAuthConfig, {
   publicPaths: [],
@@ -145,6 +148,14 @@ export async function middleware(request: NextRequest) {
   const { locale, rest } = splitLocale(original);
   const prefix = locale === defaultLocale ? "" : `/${locale}`;
 
+  // Server layout'lar `searchParams` göremez; oturum yoksa kullanıcının geldiği
+  // tam adresle (locale'siz yol + query) login'e göndermek için başlığa yazılır.
+  // Yalnız başlığı okuyan yollarda yazılır; orada EZİLİR (istemciden gelen değer
+  // güvenilmez) ve tüketen yer yine `safeReturnTo`'dan geçirir.
+  if (readsReturnToHeader(rest)) {
+    request.headers.set(RETURN_TO_HEADER, `${rest}${request.nextUrl.search}`);
+  }
+
   // Kart alanları BİZİM sayfamızda toplanıp doğrudan PayTR'ye POST edildiği için
   // ödeme rotası PCI DSS 6.4.3/11.6.1 kapsamındadır: orada politika ZORLAYICI,
   // sitenin geri kalanında salt-rapor (ihlal envanteri gerçek trafikle toplanır).
@@ -160,11 +171,14 @@ export async function middleware(request: NextRequest) {
   // Pre-launch storefront gate (#398). Runs BEFORE the i18n/auth flow so we
   // can short-circuit every page for locked deployments. The API/proxy/static
   // matchers already filter out `/api/unlock` and asset paths, so we only need
-  // to allowlist `/coming-soon` here to avoid a rewrite loop.
+  // to allowlist `/coming-soon` here to avoid a rewrite loop. `/app/**` (mobil
+  // WebView'in yasal sayfaları) da kilitten MUAFTIR: uygulama ve mağaza
+  // incelemesi kilitli ortamda bile yasal metinleri görebilmeli.
   if (
     isSiteLocked(process.env.SITE_LOCKED) &&
     rest !== "/coming-soon" &&
-    !rest.startsWith("/coming-soon/")
+    !rest.startsWith("/coming-soon/") &&
+    !isEmbedPath(rest)
   ) {
     const secret = process.env.SITE_UNLOCK_SECRET;
     const cookieValue = request.cookies.get(SITE_UNLOCK_COOKIE)?.value;
@@ -208,7 +222,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const response = intlMiddleware(request);
+  const response = localeMiddleware(request, rest);
   if (authResponse) {
     for (const cookie of authResponse.cookies.getAll()) {
       response.cookies.set(cookie);

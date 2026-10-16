@@ -40,6 +40,8 @@ import {
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
 import { offerExpiresAt } from "./helpers/offer-expiry";
+import { assertOfferAmountAboveFloor } from "./helpers/offer-price-floor";
+import { loadProductPriceLimits } from "../product/helpers/product-price-limits";
 import { resolveMinOfferPercentage } from "../../config/offer";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
@@ -183,6 +185,8 @@ export class OfferService {
     // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
     // bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
+    // Platform fiyat sınırı da işlem açılmadan okunur (aynı havuz gerekçesi).
+    const priceLimits = await loadProductPriceLimits(this.prisma);
     const { message, recordFlag } = await this.screenNewOfferMessage(
       dto.message,
       buyerId,
@@ -238,6 +242,7 @@ export class OfferService {
       // `oldPrice`tan satılıyor). Tek kaynak `resolveSalePrice`; aksi halde alıcı
       // gerçek fiyatın %50'sinin altında teklif verebiliyordu.
       const productPrice = resolveSalePrice(product).price;
+      assertOfferAmountAboveFloor(dto.amount, priceLimits, productPrice);
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       if (dto.amount < minOffer) {
         throw new BadRequestException(
@@ -809,6 +814,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
+    const priceLimits = await loadProductPriceLimits(this.prisma);
     const message = await this.screenMessage(dto.message, sellerId, offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
@@ -860,11 +866,14 @@ export class OfferService {
       }
 
       // Tavan da ilan fiyatının TEK kaynağından (`resolveSalePrice`) gelir.
-      if (dto.amount > resolveSalePrice(offer.product).price) {
+      const listingPrice = resolveSalePrice(offer.product).price;
+      if (dto.amount > listingPrice) {
         throw new BadRequestException(
           i18nMessage("server.offer.counterCannotExceedPrice"),
         );
       }
+      // Karşı teklif de platform alt sınırının altına inemez.
+      assertOfferAmountAboveFloor(dto.amount, priceLimits, listingPrice);
 
       // Önceki tur kapanır — "reddedildi" değil, "karşı teklifle devam etti".
       await tx.offer.update({
@@ -943,6 +952,7 @@ export class OfferService {
     // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
     const extendable = await this.readExtendable(offerId);
+    const priceLimits = await loadProductPriceLimits(this.prisma);
     const message = await this.screenMessage(dto.message, buyerId, offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
@@ -991,6 +1001,8 @@ export class OfferService {
           i18nMessage("server.offer.buyerCounterMustBeLower"),
         );
       }
+
+      assertOfferAmountAboveFloor(dto.amount, priceLimits, productPrice);
 
       if (dto.amount < minOffer) {
         throw new BadRequestException(

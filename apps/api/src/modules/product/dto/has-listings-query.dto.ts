@@ -5,7 +5,7 @@ import { QueryBoolean } from "../../../common/transforms";
 /**
  * Katalog taksonomisi listeleri (marka, üretici) için ortak filtre:
  * `?hasListings=true` yalnız vitrinde en az bir aktif ilanı olan kayıtları
- * döndürür (`activeListingWhere`). Gönderilmezse davranış değişmez.
+ * döndürür (`publicListingWhere`). Gönderilmezse davranış değişmez.
  */
 export class HasListingsQueryDto {
   @ApiPropertyOptional({
