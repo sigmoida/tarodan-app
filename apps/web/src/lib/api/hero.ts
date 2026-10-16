@@ -1,6 +1,7 @@
 /** @format */
 
 import type {
+  ClientPlatform,
   HeroPlacement,
   HeroSlideDto,
   TrustBadgeDto,
@@ -24,6 +25,17 @@ export const HERO_CACHE_TAGS = {
 
 const REVALIDATE_SECONDS = 300;
 
+/**
+ * Site kendini `web` olarak tanıtır: API yalnız web'e ve ikisine (`all`)
+ * hedeflenen slaytları döner; ana sayfa anahtarı web'de kapalıysa `[]`.
+ * Parametresiz istek API'de mobil sayılır — site onu asla göndermemeli.
+ */
+const HERO_CLIENT_PLATFORM: ClientPlatform = "web";
+
+export function heroSlidesPath(placement: HeroPlacement): string {
+  return `/hero-slides?placement=${placement}&platform=${HERO_CLIENT_PLATFORM}`;
+}
+
 export function heroCacheTag(placement: HeroPlacement): string {
   return placement === "home" ? HERO_CACHE_TAGS.home : HERO_CACHE_TAGS.auth;
 }
@@ -45,7 +57,7 @@ export function fetchHeroSlides(
   placement: HeroPlacement,
 ): Promise<HeroSlideDto[]> {
   return fetchList<HeroSlideDto>(
-    `/hero-slides?placement=${placement}`,
+    heroSlidesPath(placement),
     heroCacheTag(placement),
   );
 }
