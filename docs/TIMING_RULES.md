@@ -482,6 +482,8 @@ Dikkat: satıcı sözleşmesi "iş günü" der, kural takvim günüdür (pazar s
 | Gizlilik / KVKK | `legal.cookies.page.retentionEtkPeriod` — 3819                                                                                       | 3 yıl                                    | mevzuat (ETK)                           |
 | Gizlilik / KVKK | `legal.cookies.page.retentionMembershipPeriod` — 3823                                                                                | 10 yıl                                   | saklama süresi                          |
 | Gizlilik / KVKK | `legal.cookies.page.retentionConsentPeriod` — 3827                                                                                   | 1 yıl                                    | saklama süresi                          |
+| Hesap silme     | `legal.accountDeletion.data.retainedIdentity` — 3948                                                                                 | kimlik arşivi 10 yıl                     | `IDENTITY_RETENTION_YEARS` (API sabiti) |
+| Hesap silme     | `settings.deleteAccountWarning` — 2772                                                                                               | kimlik arşivi 10 yıl                     | `IDENTITY_RETENTION_YEARS` (API sabiti) |
 | Çerezler        | `legal.cookies.duration.*` — 3753–3762 (9 anahtar: 15 dk/7 gün, 7, 10, 1 yıl, 179 gün/oturum, 2 yıl/24 saat, 90 gün, 13 ay, 1/13 ay) | çerez ömürleri                           | teknik, çerez tanımında                 |
 
 Kullanım Koşulları (`legal.terms.*`), fikri mülkiyet ve alıcı koruma metinleri

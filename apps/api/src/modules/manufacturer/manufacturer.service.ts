@@ -39,9 +39,18 @@ export class ManufacturerService {
     return logo;
   }
 
-  async findAll() {
+  /**
+   * `hasListings`: yalnız en az bir aktif ilanı olan üreticiler (web vitrini
+   * boş üretici göstermez). Sayaçla AYNI predikat — EXISTS alt sorgusu.
+   */
+  async findAll(options: { hasListings?: boolean } = {}) {
     const manufacturers = await this.prisma.manufacturer.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(options.hasListings
+          ? { products: { some: publicListingWhere() } }
+          : {}),
+      },
       orderBy: { sortOrder: "asc" },
       select: {
         id: true,

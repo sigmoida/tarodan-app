@@ -99,6 +99,23 @@ describe("useBroadcastEmailPreview", () => {
     expect(previewBroadcastEmail).not.toHaveBeenCalled();
   });
 
+  it("yalnız push'ta da alıcı sayısı istenir (tür push + bildirim kutusunu da süzer)", async () => {
+    render({ ...typed, channels: ["push"], emailHtml: "" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(countNotificationAudience).toHaveBeenCalledTimes(1);
+    expect(previewBroadcastEmail).not.toHaveBeenCalled();
+  });
+
+  it("seçilmemiş tür önizleme isteğine boş dize olarak gitmez", async () => {
+    render({ ...typed, mailingType: "" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(previewBroadcastEmail.mock.calls[0][0].mailingType).toBeUndefined();
+  });
+
   it("boştaki form sürekli yeniden render olmaz", async () => {
     render(typed);
     await act(async () => {

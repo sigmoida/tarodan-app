@@ -39,6 +39,28 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
 
 - **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
   audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
+- **Sözleşme onayı ve kimlik:** yeni hesap zorunlu sözleşmeleri (şartlar, gizlilik,
+  KVKK) yürürlükteki sürümle onaylı açılır; yoksa mobil 1.0.6 girişte kapatılamaz
+  onay ekranı açar. Yasal kimlik (ad, soyad, TCKN) istenmez: test şeridi kimlik
+  kapısından muaftır (`required: false`). Bu değişiklikten ÖNCE açılmış hesaplar ve
+  belge sürümü her değiştiğinde (CONSENTS.md) tamamlama:
+  `docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-test-account-consents.js'`
+  — VARSAYILAN dry-run'dır: hedef veritabanını (host/db, şifresiz), etkilenecek
+  hesap / satır sayısını ve atlananları yazar, hiçbir şey yazmaz. Yazmak için aynı
+  komuta `--apply --db=<veritabanı adı>` eklenir; ad, çıktıdaki hedef veritabanıyla
+  birebir eşleşmezse (ya da hedef doğrulanamazsa: boş host / Unix socket URL'si)
+  betik yazmaz. Eski `--confirm` artık kabul edilmez. Tablo ekleme-yalnızdır, geri
+  alınamaz. Yazma sonunda "yazılan N / planlanan M" yazılır (fark uyarı verir);
+  bağlantı hatasında o ana kadar yazılan raporlanır ve tekrar koşmak güvenlidir.
+  İdempotent; yalnız eksik / eski sürümdeki belgeye satır ekler. En son kaydı
+  `withdrawn` olan belge ATLANIR (bilinçli geri çekme yeniden onaylanmaz) ve
+  raporlanır. Yeni açılan hesapların onay satırlarında IP ve kullanıcı ajanı boştur
+  (yöneticinin isteği kanıt olarak damgalanmaz).
+  Staging'de elle `docker exec` yerine GitHub Actions → **Staging Run UAT Accounts**
+  kullanılabilir: `backfill=dry-run` (varsayılan) yazmadan raporlar, `backfill=apply` +
+  `db_name=<ad>` yazar (workflow önce dry-run çıktısını da basar; ad yine betik
+  tarafından hedef DB ile doğrulanır). Aynı koşu UAT hesaplarını da uygular
+  (`seed-uat.js --accounts-only`).
 - **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1` — pazaryeri VE üyelik
   mağazasında; oto-yenileme de test modunda çekilir), PayTR iadesi (aşağıda),
   Sürat gönderisi (`TEST…` takip kodu), eLogo belgesi (üyelik faturası dahil),
@@ -523,6 +545,37 @@ hold aday kümesinden düşer, ikinci koşu hiçbir şey kapatmaz; `failed` sat�
 varsa yeniden çalıştırmak güvenlidir. Tek hold için panel ucu:
 `POST /admin/payouts/holds/:id/settle-residual` (sebep zorunlu, denetim
 kaydı yazılır).
+
+### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
+
+Hesap silme, Sign in with Apple refresh token'ının Apple'da iptalini outbox'a
+yazar (`apple.token_revoke`; App Store 5.1.1(v)). Silme bu işe bağlı değildir;
+iş yeniden denenir. DLQ'ya (`outbox_events.status = 'dead'`, log:
+`OUTBOX_DEAD type=apple.token_revoke`) şu durumlarda düşer:
+
+- `invalid_grant`, `unauthorized_client`, `invalid_request` vb. kalıcı Apple
+  reddi; `invalid_client` ise 3 denemeden sonra. Apple `invalid_grant`ı
+  geçersiz token kadar yanlış/uyuşmayan client id için de döndürür; şifreli
+  token bu yüzden **silinmez** (`apple_sign_in_tokens.last_revoke_error`
+  teşhistir).
+- `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` /
+  `APPLE_TOKEN_ENCRYPTION_KEY` eksik ya da anahtar okunamıyor: iş ~1 gün
+  (30 deneme) yeniden denenir, sonra düşer. **Kendiliğinden toparlanmaz** —
+  düşmüş işi aşağıdaki script geri getirir.
+
+Önce nedeni düzeltin (Apple anahtarının `com.tarodan.app` ana App ID'ye
+bağlanması, env değerleri), sonra yeniden kuyruğa alın. Dedupe upsert'i ölü
+işe dokunmadığı için başka yol yoktur. Varsayılan kuru koşudur (yalnız sayar):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/redrive-apple-token-revocations.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/redrive-apple-token-revocations.js --apply'
+```
+
+Yerelde: `pnpm --filter @tarodan/api redrive:prod:apple-token-revocations`.
+Yalnız şifreli token'ı duran ve `revoked_at` boş satırların işleri alınır;
+yapılandırma hâlâ eksikse `--apply` reddedilir. Yeniden kuyruğa alınan iş taze
+deneme hakkıyla bir sonraki drain turunda (en geç 1 dk) koşar. İdempotenttir.
 
 ### Her ay: silinen hesap bildirimi
 

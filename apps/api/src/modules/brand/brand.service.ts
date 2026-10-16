@@ -2,7 +2,11 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
-import { BRANDS_ALL_CACHE_KEY, brandSlugCacheKey } from "./brand-cache";
+import {
+  BRANDS_ALL_CACHE_KEY,
+  BRANDS_WITH_LISTINGS_CACHE_KEY,
+  brandSlugCacheKey,
+} from "./brand-cache";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
 import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
@@ -23,16 +27,25 @@ export class BrandService {
   }
 
   /**
-   * Get all active brands with product counts
+   * Get all active brands with product counts.
+   * `hasListings`: yalnız en az bir aktif ilanı olan markalar (sayaçla aynı
+   * predikat, EXISTS alt sorgusu) — ayrı cache anahtarında tutulur.
    */
-  async findAll() {
-    const cacheKey = BRANDS_ALL_CACHE_KEY;
+  async findAll(options: { hasListings?: boolean } = {}) {
+    const cacheKey = options.hasListings
+      ? BRANDS_WITH_LISTINGS_CACHE_KEY
+      : BRANDS_ALL_CACHE_KEY;
 
     return this.cache.getOrSet(
       cacheKey,
       async () => {
         const brands = await this.prisma.brand.findMany({
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            ...(options.hasListings
+              ? { products: { some: publicListingWhere() } }
+              : {}),
+          },
           orderBy: { sortOrder: "asc" },
           include: {
             _count: {

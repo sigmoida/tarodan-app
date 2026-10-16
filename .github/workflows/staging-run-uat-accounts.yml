@@ -1,0 +1,187 @@
+# Staging: re-apply the fixed UAT accounts and (optionally) back-fill the
+# consent records of test-lane accounts, inside the running Coolify api
+# container. Run it after a deploy that changed apps/api/prisma/data/uat/
+# accounts.json or the consent documents, instead of a full staging reset.
+#
+#   1. UAT accounts  node dist-seed/prisma/seed-uat.js --accounts-only
+#        Creates the missing members, staff and gate-scenario fixtures
+#        (uat-consent-pending / uat-identity-missing) and applies their consent
+#        gates. Existing accounts keep their passwords (no
+#        UAT_SEED_RESET_PASSWORDS), no reference data and no listings are
+#        written. Idempotent. Password = the UAT_SEED_PASSWORD secret.
+#   2. Consent backfill (input `backfill`)
+#        node dist-seed/maintenance/backfill-test-account-consents.js
+#        none     skip
+#        dry-run  (default) print the target DB, the accounts/rows it would
+#                 write and the withdrawn documents it would skip; writes nothing
+#        apply    dry-run first, then write with `--apply --db=<db_name>`; the
+#                 script refuses unless `db_name` equals the database of the
+#                 container's DATABASE_URL. The table is append-only.
+#
+# Same SSH + container-discovery + staging-fingerprint pattern as
+# staging-run-reference-seed.yml: it dies before touching anything unless the
+# api container is a staging one. Both scripts also refuse APP_ENV=production
+# on their own.
+name: Staging Run UAT Accounts
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type STAGING (all caps) to run on staging"
+        required: true
+        type: string
+      backfill:
+        description: "Test-lane consent backfill: none | dry-run | apply"
+        required: false
+        default: dry-run
+        type: choice
+        options:
+          - none
+          - dry-run
+          - apply
+      db_name:
+        description: "Database name — required for backfill=apply, must equal the target database printed by a dry run"
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: staging-reset
+  cancel-in-progress: false
+
+jobs:
+  uat-accounts:
+    name: UAT accounts + consent backfill on staging (Coolify)
+    runs-on: ubuntu-latest
+    environment: staging
+    if: inputs.confirm == 'STAGING'
+    steps:
+      - name: Validate inputs
+        env:
+          BACKFILL: ${{ inputs.backfill }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          case "$BACKFILL" in none|dry-run|apply) ;; *) echo "::error::backfill must be none, dry-run or apply."; exit 1 ;; esac
+          if [ "$BACKFILL" = "apply" ]; then
+            [ -n "$DB_NAME" ] || { echo "::error::db_name is required for backfill=apply (run backfill=dry-run first to see the target database)."; exit 1; }
+          fi
+          if [ -n "$DB_NAME" ] && ! printf '%s' "$DB_NAME" | grep -Eq '^[A-Za-z0-9_-]+$'; then
+            echo "::error::db_name may contain only letters, digits, underscore and hyphen."
+            exit 1
+          fi
+
+      - name: Resolve api app UUID (first field of COOLIFY_STAGING_UUIDS)
+        id: uuid
+        env:
+          UUIDS: ${{ secrets.COOLIFY_STAGING_UUIDS }}
+        run: |
+          set -euo pipefail
+          api="$(printf '%s' "$UUIDS" | cut -d, -f1 | xargs)"
+          [ -n "$api" ] || { echo "::error::COOLIFY_STAGING_UUIDS is empty."; exit 1; }
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+      - name: Verify SSH and UAT secrets are configured
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USERNAME: ${{ secrets.SERVER_USERNAME }}
+          PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          UAT_PASSWORD: ${{ secrets.UAT_SEED_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
+          [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          [ -n "${UAT_PASSWORD:-}" ] || missing="$missing UAT_SEED_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
+
+      - name: Run UAT accounts + consent backfill over SSH (Coolify api container)
+        uses: appleboy/ssh-action@v1
+        env:
+          API_UUID: ${{ steps.uuid.outputs.api }}
+          BACKFILL: ${{ inputs.backfill }}
+          DB_NAME: ${{ inputs.db_name }}
+          UAT_SEED_PASSWORD: ${{ secrets.UAT_SEED_PASSWORD }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 15m
+          envs: API_UUID,BACKFILL,DB_NAME,UAT_SEED_PASSWORD
+          script: |
+            set -euo pipefail
+            log() { echo "[staging-uat] $*"; }
+            die() { echo "[staging-uat] REFUSED: $*" >&2; exit 1; }
+
+            [ -n "${API_UUID:-}" ] || die "API_UUID not set (first field of COOLIFY_STAGING_UUIDS)."
+            [ -n "${UAT_SEED_PASSWORD:-}" ] || die "UAT_SEED_PASSWORD not set."
+            case "${BACKFILL:-}" in none|dry-run|apply) ;; *) die "BACKFILL must be none, dry-run or apply." ;; esac
+            if [ "$BACKFILL" = "apply" ]; then
+              [ -n "${DB_NAME:-}" ] || die "DB_NAME is required for backfill=apply."
+            fi
+            if [ -n "${DB_NAME:-}" ]; then
+              printf '%s' "$DB_NAME" | grep -Eq '^[A-Za-z0-9_-]+$' || die "DB_NAME has unexpected characters."
+            fi
+
+            # --- Discover the Coolify api application container -----------------
+            API_CID="$(docker ps --filter "label=coolify.applicationId=$API_UUID" --format '{{.ID}}' | head -1)"
+            if [ -z "$API_CID" ]; then
+              API_CID="$(docker ps --filter "name=$API_UUID" --format '{{.ID}}' | head -1)"
+            fi
+            [ -n "$API_CID" ] || die "no running api container for UUID '$API_UUID'."
+            log "api container: $API_CID"
+
+            # --- Guard: staging fingerprint (never touch production) -----------
+            FRONTEND_URL="$(docker exec "$API_CID" printenv FRONTEND_URL 2>/dev/null || true)"
+            API_URL="$(docker exec "$API_CID" printenv API_URL 2>/dev/null || true)"
+            APP_ENV="$(docker exec "$API_CID" printenv APP_ENV 2>/dev/null || true)"
+            log "FRONTEND_URL=$FRONTEND_URL | API_URL=$API_URL | APP_ENV=${APP_ENV:-<unset>}"
+            case "$FRONTEND_URL $API_URL" in
+              *staging.tarodan.com.tr*|*staging.tarodan.shop*) : ;;
+              *) die "api FRONTEND_URL/API_URL is not a staging host — refusing." ;;
+            esac
+            case "$FRONTEND_URL" in
+              https://tarodan.com.tr*|https://www.tarodan.com.tr*|https://tarodan.shop*|https://www.tarodan.shop*)
+                die "production domain fingerprint on api — refusing." ;;
+            esac
+            [ "${APP_ENV:-}" != "production" ] || die "APP_ENV=production on the api container — refusing."
+            [ "${APP_ENV:-}" = "staging" ] || die "api APP_ENV is '${APP_ENV:-unset}', not staging — refusing (the UAT seed is for staging only)."
+
+            # --- Both compiled scripts ship in the image (Dockerfile copies dist-seed to /app/dist-seed)
+            docker exec "$API_CID" test -f dist-seed/prisma/seed-uat.js \
+              || die "dist-seed/prisma/seed-uat.js missing in the api image (build:seed not run?)."
+            if [ "$BACKFILL" != "none" ]; then
+              docker exec "$API_CID" test -f dist-seed/maintenance/backfill-test-account-consents.js \
+                || die "dist-seed/maintenance/backfill-test-account-consents.js missing in the api image (is staging deployed from a commit that includes it?)."
+            fi
+
+            # --- 1. UAT accounts: guard + data files first, then the accounts ----
+            # `docker exec -e NAME` (no value) copies the variable from this
+            # shell, so the password stays off the docker command line.
+            log "UAT seed pre-flight (--check)..."
+            docker exec -e UAT_SEED_PASSWORD "$API_CID" node dist-seed/prisma/seed-uat.js --check \
+              || die "UAT seed pre-flight failed (is UAT_SEED_PASSWORD 16+ chars?)."
+            log "running: node dist-seed/prisma/seed-uat.js --accounts-only"
+            docker exec -e UAT_SEED_PASSWORD "$API_CID" node dist-seed/prisma/seed-uat.js --accounts-only
+            log "UAT accounts ready."
+
+            # --- 2. Test-lane consent backfill ----------------------------------
+            BACKFILL_JS=dist-seed/maintenance/backfill-test-account-consents.js
+            case "$BACKFILL" in
+              none)
+                log "backfill=none — skipped." ;;
+              dry-run)
+                log "backfill dry run (writes nothing)..."
+                docker exec "$API_CID" node "$BACKFILL_JS" ;;
+              apply)
+                log "backfill dry run first (writes nothing)..."
+                docker exec "$API_CID" node "$BACKFILL_JS"
+                log "backfill apply on database '$DB_NAME' (the script refuses if it differs from DATABASE_URL)..."
+                docker exec "$API_CID" node "$BACKFILL_JS" --apply "--db=$DB_NAME" ;;
+            esac
+            log "done."

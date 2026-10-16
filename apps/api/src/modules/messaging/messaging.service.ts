@@ -148,6 +148,11 @@ export class MessagingService {
       return this.getThreadById(thread.id, senderId);
     }
 
+    // Silinmiş hesapla YENİ konu açılmaz. Var olan konu yukarıda döner:
+    // "satıcıya yaz" gibi mesajsız açılışlar geçmişe ulaşabilsin; mesaj
+    // gönderimini sendMessage ayrıca reddeder.
+    this.assertRecipientActive(recipient);
+
     // Create new thread
     thread = await this.prisma.messageThread.create({
       data: {
@@ -225,6 +230,13 @@ export class MessagingService {
         ? thread.participant2Id
         : thread.participant1Id;
 
+    // Var olan konuda karşı taraf sonradan hesabını silmiş olabilir.
+    this.assertRecipientActive(
+      await this.prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { deletedAt: true },
+      }),
+    );
     await this.assertNotBlocked(senderId, receiverId);
 
     // Apply content filtering
@@ -457,6 +469,21 @@ export class MessagingService {
   /** İki yönlü engel varsa konu açma/okuma/yazma 403 (Apple: abuse stop). */
   private assertNotBlocked(a: string, b: string): Promise<void> {
     return this.userBlocks.assertNotBlocked(a, b, "server.messaging.blocked");
+  }
+
+  /**
+   * Silinmiş (anonimleşmiş) hesapla yeni konu açılamaz, mesaj gönderilemez.
+   * Engelli alıcıyla aynı tür (403): istemciler ikisini de "mesajlaşılamaz"
+   * olarak gösterir. Var olan konu açılabilir ve okunabilir kalır.
+   */
+  private assertRecipientActive(
+    recipient: { deletedAt: Date | null } | null,
+  ): void {
+    if (!recipient || recipient.deletedAt) {
+      throw new ForbiddenException(
+        i18nMessage("server.messaging.recipientDeleted"),
+      );
+    }
   }
 
   // ==========================================================================

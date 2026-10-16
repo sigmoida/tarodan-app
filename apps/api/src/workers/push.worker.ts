@@ -13,6 +13,7 @@ import { Job } from "bull";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma";
 import {
+  preferenceTypeFor,
   resolveSettings,
   shouldDeliver,
 } from "../modules/notification/helpers/notification-preferences";
@@ -204,18 +205,21 @@ export class PushWorker {
     );
 
     const { userId, title, body, data } = job.data;
-    const notificationType = data?.type || "general";
+    // Tercih kararı tipi: pazarlama türündeki admin duyurusu ALWAYS_SEND'den
+    // yararlanmaz (S1) — `data.type` istemciye aynen gider.
+    const notificationType = preferenceTypeFor(data);
 
     // Kullanıcı bildirim tercihleri (Bulgu #9): event.service → pushQueue yolu da
     // tercihe uymalı. Kategori kapalıysa zil + push birlikte atlanır; kategori
     // açık ama push master kapalıysa zil kalır, push atlanır.
+    // Kampanya düğmesinin tek kaynağı e-posta izni kolonudur (resolveSettings).
+    const prefs = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationSettings: true, acceptsMarketingEmails: true },
+    });
     const settings = resolveSettings(
-      (
-        await this.prisma.user.findUnique({
-          where: { id: userId },
-          select: { notificationSettings: true },
-        })
-      )?.notificationSettings,
+      prefs?.notificationSettings,
+      prefs?.acceptsMarketingEmails,
     );
     const inAppAllowed = shouldDeliver(settings, notificationType, "in_app");
 

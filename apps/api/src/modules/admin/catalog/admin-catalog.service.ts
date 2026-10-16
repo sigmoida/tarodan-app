@@ -16,18 +16,8 @@ import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
 } from "../../../common/helpers/fulltext-search";
-import { Brand, Prisma, ProductKind } from "@prisma/client";
-import {
-  dateRangeWhere,
-  paginate,
-  paginateComputedRows,
-  resolveOrderBy,
-} from "../../../common/list";
-import {
-  LISTING_COUNT_SORT,
-  countPublicListingsBy,
-  hasListingsWhere,
-} from "./admin-catalog-listing-count.helper";
+import { Prisma, ProductKind } from "@prisma/client";
+import { dateRangeWhere, paginate, resolveOrderBy } from "../../../common/list";
 import {
   AdminAttributeGroupQueryDto,
   AdminAttributeQueryDto,
@@ -47,6 +37,12 @@ import {
   SCALE_GROUP_SLUG,
   isProtectedAttributeGroup,
 } from "../../../common/helpers/attribute-groups";
+import {
+  hasListingsWhere,
+  listingCountInclude,
+  listingCountSortMap,
+  paginateWithListingCounts,
+} from "./catalog-listing-counts";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -457,40 +453,30 @@ export class AdminCatalogService {
       ];
     }
 
-    // "İlan" kolonu = public sayımla aynı kural. Tüm tablo sayımı yalnız sayıya
-    // göre sıralamada (bellekte); aksi halde yalnız sayfa satırları sayılır.
+    // "İlan var/yok" filtresi = "Aktif ilan" kolonuyla aynı (vitrin) kural.
     Object.assign(where, hasListingsWhere(hasListings));
-    const sortCounts =
-      query.sortBy === LISTING_COUNT_SORT
-        ? await countPublicListingsBy(this.prisma, "brandId")
-        : undefined;
 
     const orderBy = resolveOrderBy<Prisma.BrandOrderByWithRelationInput>(
       "Brand",
       query,
-      { defaultSort: { name: "asc" } },
+      {
+        defaultSort: { name: "asc" },
+        sortMap: listingCountSortMap<Prisma.BrandOrderByWithRelationInput>(),
+      },
     );
-    const result =
-      query.sortBy === LISTING_COUNT_SORT
-        ? paginateComputedRows(
-            await this.prisma.brand.findMany({
-              where,
-              orderBy: { name: "asc" },
-            }),
-            (b) => sortCounts?.get(b.id) ?? 0,
-            { ...query, sortType: "number" },
-          )
-        : await paginate(this.prisma.brand, { where, orderBy }, query);
+    const include = listingCountInclude();
+    const result = await paginateWithListingCounts(
+      this.prisma,
+      "brandId",
+      query,
+      {
+        page: () =>
+          paginate(this.prisma.brand, { where, orderBy, include }, query),
+        all: () => this.prisma.brand.findMany({ where, orderBy, include }),
+      },
+    );
 
-    const listingCounts =
-      sortCounts ??
-      (await countPublicListingsBy(
-        this.prisma,
-        "brandId",
-        result.data.map((b: Brand) => b.id),
-      ));
-
-    const data = result.data.map((b: Brand) => ({
+    const data = result.data.map((b) => ({
       id: b.id,
       name: b.name,
       slug: b.slug,
@@ -502,7 +488,8 @@ export class AdminCatalogService {
       foundedYear: b.foundedYear,
       sortOrder: b.sortOrder,
       isActive: b.isActive,
-      listingCount: listingCounts.get(b.id) ?? 0,
+      listingCount: b.listingCount,
+      activeListingCount: b.activeListingCount,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
     }));
@@ -717,42 +704,39 @@ export class AdminCatalogService {
       ];
     }
 
-    // Markalarla aynı: tüm tablo sayımı yalnız sayıya göre sıralamada.
+    // Markalarla aynı "İlan var/yok" filtresi.
     Object.assign(where, hasListingsWhere(hasListings));
-    const sortCounts =
-      query.sortBy === LISTING_COUNT_SORT
-        ? await countPublicListingsBy(this.prisma, "manufacturerId")
-        : undefined;
 
     const orderBy = resolveOrderBy<Prisma.ManufacturerOrderByWithRelationInput>(
       "Manufacturer",
       query,
-      { defaultSort: { name: "asc" } },
+      {
+        defaultSort: { name: "asc" },
+        sortMap:
+          listingCountSortMap<Prisma.ManufacturerOrderByWithRelationInput>(),
+      },
     );
-    const result =
-      query.sortBy === LISTING_COUNT_SORT
-        ? paginateComputedRows(
-            await this.prisma.manufacturer.findMany({
-              where,
-              orderBy: { name: "asc" },
-            }),
-            (m) => sortCounts?.get(m.id) ?? 0,
-            { ...query, sortType: "number" },
-          )
-        : await paginate(this.prisma.manufacturer, { where, orderBy }, query);
+    const include = listingCountInclude();
+    const result = await paginateWithListingCounts(
+      this.prisma,
+      "manufacturerId",
+      query,
+      {
+        page: () =>
+          paginate(
+            this.prisma.manufacturer,
+            { where, orderBy, include },
+            query,
+          ),
+        all: () =>
+          this.prisma.manufacturer.findMany({ where, orderBy, include }),
+      },
+    );
 
-    const listingCounts =
-      sortCounts ??
-      (await countPublicListingsBy(
-        this.prisma,
-        "manufacturerId",
-        result.data.map((m) => m.id),
-      ));
-
-    const data = result.data.map((m) => ({
+    // `_count` iç sayaçtır; yanıta listingCount/activeListingCount olarak çıkar.
+    const data = result.data.map(({ _count, ...m }) => ({
       ...m,
       logo: this.resolveProductImageUrl(m.logo),
-      listingCount: listingCounts.get(m.id) ?? 0,
     }));
 
     return { ...result, data };

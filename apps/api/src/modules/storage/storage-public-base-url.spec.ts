@@ -33,4 +33,30 @@ describe("StorageService — public kök URL'i", () => {
   it("okuma yolu tanımsızken boş URL döner (yedek görsele düşmek için)", () => {
     expect(makeService("").getPublicAssetUrl("k")).toBe("");
   });
+
+  it("kendi public URL'imizden nesne anahtarını geri çıkarır", () => {
+    const svc = makeService("https://cdn.example.com/");
+    expect(
+      svc.publicAssetKeyFromUrl(
+        "https://cdn.example.com/dev/avatars/u1/a.webp?v=2",
+      ),
+    ).toBe("dev/avatars/u1/a.webp");
+  });
+
+  it.each([
+    ["yabancı adres", "https://lh3.googleusercontent.com/dev/avatars/a.webp"],
+    ["public olmayan kök", "https://cdn.example.com/dev/messages/a.webp"],
+  ])("%s için null döner", (_d, url) => {
+    expect(
+      makeService("https://cdn.example.com").publicAssetKeyFromUrl(url),
+    ).toBeNull();
+  });
+
+  it("kök tanımsızken hiçbir URL'i tanımaz", () => {
+    expect(
+      makeService("").publicAssetKeyFromUrl(
+        "https://cdn.example.com/dev/avatars/a.webp",
+      ),
+    ).toBeNull();
+  });
 });

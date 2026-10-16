@@ -75,7 +75,11 @@ export const queryKeys = {
     all: () => ["collections"] as const,
   },
   manufacturers: {
-    /** The public manufacturers list — seeded by the server, read by the client. */
+    /**
+     * The public manufacturers list (only those with active listings —
+     * `MANUFACTURERS_WITH_LISTINGS_PATH`) — seeded by the server, read by the
+     * client, shared with the header nav and the listings sidebar.
+     */
     list: () => ["manufacturers", "list"] as const,
     /** A single manufacturer resolved by slug. */
     detail: (slug: string) => ["manufacturers", "detail", slug] as const,
@@ -100,6 +104,8 @@ export const queryKeys = {
     tiers: () => ["membership", "tiers"] as const,
     /** The current user's membership (tier + status + period). */
     me: () => ["membership", "me"] as const,
+    /** The current user's permissions/limits, incl. the tier's `isAdFree` flag. */
+    limits: () => ["membership", "limits"] as const,
   },
   // NOTE: every factory below returns the SAME array a call site used inline
   // before the registry existed — do NOT change the string values, or an

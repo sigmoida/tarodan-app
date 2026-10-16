@@ -424,6 +424,37 @@ describe("OrderService checkout group (batch checkout)", () => {
     expect(distanceSalesStub.recordAtCheckout).not.toHaveBeenCalled();
   });
 
+  // Hesap silme ile serileşme (TOCTOU): üye alıcının kullanıcı satırı, ürün
+  // kilitlerinden ÖNCE FOR SHARE kilitlenir; silinmiş hesap sipariş açamaz.
+  it("üye checkout'u alıcının kullanıcı satırını ilk iş FOR SHARE kilitler", async () => {
+    await service.checkout(buyerId, baseDto() as any);
+
+    const first = mockTx.$queryRaw.mock.calls[0];
+    const sql = (first[0] as string[]).join("?").replace(/\s+/g, " ");
+    expect(sql).toContain("FROM users");
+    expect(sql).toContain("FOR SHARE");
+    expect(first[1].values).toEqual([buyerId]);
+    const productLock = (mockTx.$queryRaw.mock.calls[1][0] as string[]).join(
+      "?",
+    );
+    expect(productLock).toContain("FROM products");
+  });
+
+  it("alıcı hesabı silinmişse checkout reddedilir, sipariş açılmaz", async () => {
+    mockTx.$queryRaw.mockResolvedValueOnce([
+      { id: buyerId, deleted_at: new Date() },
+    ]);
+
+    await expect(
+      service.checkout(buyerId, baseDto() as any),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.auth.accountDeleted" },
+    });
+
+    expect(mockTx.order.create).not.toHaveBeenCalled();
+    expect(mockTx.checkoutGroup.create).not.toHaveBeenCalled();
+  });
+
   // Faz 1: satıcı-bazlı kargo + OrderPackage (çatı) senaryoları.
   const sellerId2 = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 

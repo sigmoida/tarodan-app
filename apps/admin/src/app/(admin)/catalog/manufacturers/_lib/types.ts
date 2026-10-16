@@ -1,4 +1,6 @@
-export interface Manufacturer {
+import type { ListingCounts } from "../../_lib/listingCountColumns";
+
+export interface Manufacturer extends ListingCounts {
   id: string;
   name: string;
   slug: string;
@@ -8,8 +10,6 @@ export interface Manufacturer {
   country?: string;
   foundedYear?: number | null;
   isActive: boolean;
-  /** Müşterinin görebildiği ilan sayısı (public sayımla aynı kural). */
-  listingCount: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -185,6 +185,12 @@ Sunucu hata mesajlarının dili `Accept-Language` başlığından gelir → terc
 `errors` dizisini **liste olarak** göster; `details` ile "önce şunları kapat" ekranı kurabilirsin.
 Başarıda oturumu kapat ve anasayfaya dön.
 
+**Aktif ilan engel değildir (2026-10, Apple 5.1.1(v)):** yayındaki ve onay bekleyen ilanlar silme
+anında pasife alınır (kaldırma nedeni `account_deleted`), bu ilanlardaki açık teklifler kapanır.
+`details.activeProducts` adı korunur ama artık yalnız **rezerve** (süren satışa/takasa bağlı) ilanları
+sayar; o engelin metni `server.user.deleteBlockedReservedListings`. Sipariş, takas, iade, ödeme ve
+blokaj engelleri aynen sürer.
+
 ---
 
 ## 12. Satıcı paneli / istatistikler

@@ -113,10 +113,11 @@ export const USERS_SYSTEM_ACCOUNT_SQL = `"email" IN (${UAT_MASK_KEPT_SYSTEM_EMAI
  * "Silinmiş Kullanıcı" adı (`deleteAccount` ikisini birlikte yazar). İkisi de
  * kişisel değildir ve kod onlara bakar (`isAnonymizedEmail`, arşiv
  * çözümleyicisi; ekranlar silinmiş kişiyi bu adla gösterir), bu yüzden YALNIZ bu
- * iki kolon korunur. `deleteAccount` kullanıcı adını ve doğum tarihini
- * temizlemez: silinmiş hesabın diğer her kişisel kolonu canlı hesap gibi
- * maskelenir. Sentinel'i tam taşımayan (eski) silinmiş satırın e-postası ve adı
- * da maskelenir.
+ * iki kolon korunur. Silinmiş hesabın diğer her kişisel kolonu canlı hesap gibi
+ * maskelenir — `deleteAccount` kullanıcı adını sentinel'e çekip doğum tarihini
+ * silse de, bu temizlikten ÖNCE silinmiş (eski) satırlar ikisini hâlâ
+ * taşıyabilir. Sentinel'i tam taşımayan (eski) silinmiş satırın e-postası ve
+ * adı da maskelenir.
  */
 export const USERS_ANONYMIZED_SENTINEL_SQL =
   `("email" ~* ${sqlLiteral(ANONYMIZED_EMAIL_PATTERN.source)}` +
@@ -142,6 +143,10 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
   deleteRows(
     "oauth_accounts",
     "Gerçek Google/Apple kimliklerine bağ; staging'de gerçek kişi sosyal girişle hesaba düşmesin.",
+  ),
+  deleteRows(
+    "apple_sign_in_tokens",
+    "Apple refresh token'ları (şifreli) + iptal hataları; staging gerçek Apple hesabının erişimini iptal etmesin.",
   ),
   deleteRows("two_factor_secrets", "2FA sırları."),
   deleteRows(

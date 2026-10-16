@@ -1,3 +1,4 @@
+import { Badge } from "@tarodan/ui";
 import { StatusToggle } from "@/components/ActiveBadge";
 import { col, type RowActionItem } from "@/components/table";
 import type { useTranslations } from "next-intl";
@@ -38,6 +39,16 @@ export function trustBadgeColumns(
       t("common.description"),
       (b) => previewText(b.description, "tr") || null,
       { grow: 4, minWidth: 220, ...noSort },
+    ),
+    col.badge<TrustBadge>(
+      t("admin.marketing.hero.columns.ios"),
+      (b) =>
+        b.hideOnIos ? (
+          <Badge variant="outline" size="sm">
+            {t("admin.marketing.hero.hiddenOnIos")}
+          </Badge>
+        ) : null,
+      noSort,
     ),
     col.custom<TrustBadge>(
       t("common.status"),

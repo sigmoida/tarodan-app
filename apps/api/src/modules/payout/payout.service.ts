@@ -34,6 +34,12 @@ import {
   trCalendarDate,
   trCalendarDateTime,
 } from "../../common/helpers/tr-calendar";
+import {
+  entitledNetFromHold,
+  PAYOUT_FAILURE_FULLY_REFUNDED,
+  PAYOUT_MIN_NET,
+} from "./helpers/payout-entitlement";
+import { purgeSettledBankAccountsOfDeletedSellers } from "./helpers/unsettled-payout";
 import type { PaytrReturnedTransfer } from "../payment-providers/paytr/paytr-transfer.service";
 import type { HoldReleaseBlockedReason } from "@tarodan/types";
 import {
@@ -64,9 +70,6 @@ const RETURNABLE_PAYOUT_STATUSES: PayoutStatus[] = [
  */
 const PAYOUT_CALLBACK_OVERDUE_MS = 3 * 24 * 60 * 60 * 1000;
 
-/** Tutar eşiği: bu değerin altındaki net ödeme "sıfır" kabul edilir (kuruş artıkları). */
-const PAYOUT_MIN_NET = 0.01;
-
 /** Henüz sonuçlanmamış (parayı bağlayan) iade denemesi durumları. */
 const UNRESOLVED_REFUND_ATTEMPT_STATUSES: RefundAttemptStatus[] = [
   RefundAttemptStatus.prepared,
@@ -74,19 +77,6 @@ const UNRESOLVED_REFUND_ATTEMPT_STATUSES: RefundAttemptStatus[] = [
   RefundAttemptStatus.succeeded,
   RefundAttemptStatus.manual_review,
 ];
-
-/**
- * Satıcının bir hold üzerinden hak ettiği GÜNCEL net tutar: escrow'a giren
- * tutar eksi o hold'dan iade edilmiş kısım. Payout oluşturma ve transfer
- * öncesi yeniden doğrulama AYNI bu formülü kullanır (tek kaynak) — aksi halde
- * kısmi iade sonrası satırda kalan bayat `netAmount` transfer edilebilir.
- */
-function entitledNetFromHold(hold: {
-  amount: unknown;
-  refundedAmount?: unknown;
-}): number {
-  return Number(hold.amount) - Number(hold.refundedAmount ?? 0);
-}
 
 /**
  * P2002 (unique ihlali) = payout'u eşzamanlı İKİNCİ üretici çoktan oluşturdu.
@@ -765,7 +755,7 @@ export class PayoutService {
             where: { id: payout.id, status: PayoutStatus.pending },
             data: {
               status: PayoutStatus.failed,
-              failureReason: "fully_refunded",
+              failureReason: PAYOUT_FAILURE_FULLY_REFUNDED,
             },
           });
           this.logger.warn(
@@ -1243,7 +1233,10 @@ export class PayoutService {
       // Kapanmış siparişin kalıntısı da (kusur satıcıda değilse) ödenir.
       if (
         !order ||
-        (await this.orderPayoutBlock({ id: hold.orderId, status: order.status }))
+        (await this.orderPayoutBlock({
+          id: hold.orderId,
+          status: order.status,
+        }))
       ) {
         continue;
       }
@@ -1365,6 +1358,15 @@ export class PayoutService {
     }
 
     return stuck.length + overdue.length;
+  }
+
+  /**
+   * Hesap silmede ödenecek hakediş yüzünden korunan banka hesaplarını, para
+   * kapanınca siler (KVKK). Kural `hasUnsettledPayout`'tadır — bu servisin
+   * üretici/işlemci kurallarıyla hizalı tek yüklem.
+   */
+  purgeDeletedSellerBankAccounts(): Promise<number> {
+    return purgeSettledBankAccountsOfDeletedSellers(this.prisma);
   }
 
   /**

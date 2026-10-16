@@ -2,8 +2,9 @@ import type { FilterField, TranslateFn } from "@/components/list/filters/types";
 
 /**
  * Marka ve üretici listelerinin ortak filtre alanları: Durum + "İlanı
- * olanlar/olmayanlar". `hasListings` API'de müşterinin görebildiği ilan sayımıyla
- * aynı kuralla çalışır; bu yüzden iki liste de TEK tanımı paylaşır.
+ * olanlar/olmayanlar". `hasListings` API'de "Aktif ilan" kolonuyla
+ * (`activeListingCount`, mağaza sayacı) aynı kuralla çalışır; bu yüzden iki
+ * liste de TEK tanımı paylaşır.
  */
 export const taxonomyFilterFields = (
   t: TranslateFn,

@@ -104,4 +104,67 @@ describe("MessagingService — user blocks", () => {
       notIn: ["x"],
     });
   });
+
+  describe("deleted recipient", () => {
+    const deletedRecipient = { id: "u2", deletedAt: new Date() };
+    // Engelli alıcıyla aynı tür (403), kendi metniyle.
+    const expectRecipientDeleted = (error: unknown) => {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        i18nKey: "server.messaging.recipientDeleted",
+      });
+    };
+
+    it("sendMessage → 403 when the other participant deleted the account", async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(deletedRecipient);
+      const error = await service
+        .sendMessage("t1", "u1", { content: "hi" } as any)
+        .catch((e: unknown) => e);
+      expectRecipientDeleted(error);
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: "u2" },
+        select: { deletedAt: true },
+      });
+      expect(contentFilter.moderateWithAI).not.toHaveBeenCalled();
+    });
+
+    const openChat = (message?: string) =>
+      service.createThread("u1", {
+        recipientId: "u2",
+        getRecipientId: () => "u2",
+        ...(message ? { message } : {}),
+      } as any);
+
+    it("createThread → 403 for a deleted recipient when no thread exists yet", async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(deletedRecipient);
+      prisma.messageThread.findFirst.mockResolvedValueOnce(null);
+      const create = jest.fn();
+      (prisma.messageThread as any).create = create;
+
+      expectRecipientDeleted(await openChat().catch((e: unknown) => e));
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("createThread without a message opens the existing thread (history stays reachable)", async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(deletedRecipient);
+      prisma.messageThread.findFirst.mockResolvedValueOnce(thread);
+      const opened = { id: "t1" } as any;
+      const getThread = jest
+        .spyOn(service, "getThreadById")
+        .mockResolvedValueOnce(opened);
+
+      await expect(openChat()).resolves.toBe(opened);
+      expect(getThread).toHaveBeenCalledWith("t1", "u1");
+    });
+
+    it("createThread with a message into an existing thread → 403", async () => {
+      prisma.user.findUnique
+        .mockResolvedValueOnce(deletedRecipient) // createThread alıcı okuması
+        .mockResolvedValueOnce(deletedRecipient); // sendMessage alıcı denetimi
+      prisma.messageThread.findFirst.mockResolvedValueOnce(thread);
+
+      expectRecipientDeleted(await openChat("selam").catch((e: unknown) => e));
+      expect(contentFilter.moderateWithAI).not.toHaveBeenCalled();
+    });
+  });
 });

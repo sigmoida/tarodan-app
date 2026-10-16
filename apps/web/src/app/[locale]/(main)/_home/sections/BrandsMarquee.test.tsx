@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("next/image", () => ({
-  default: ({ alt }: { alt: string }) => <span>{alt}</span>,
+  default: ({ alt }: { alt: string }) => <span data-testid="img">{alt}</span>,
 }));
 vi.mock("@/i18n/navigation", () => ({
   Link: ({
@@ -30,41 +30,41 @@ vi.mock("@/i18n/navigation", () => ({
 import BrandsMarquee from "./BrandsMarquee";
 
 describe("BrandsMarquee", () => {
+  let container: HTMLDivElement;
   let root: Root;
-  let host: HTMLElement;
 
   beforeEach(() => {
-    host = document.createElement("div");
-    document.body.appendChild(host);
-    root = createRoot(host);
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
   });
 
   afterEach(() => {
     act(() => root.unmount());
-    host.remove();
+    container.remove();
   });
 
-  it("üreticiye ad + manufacturerId ile bağlanır (nav menüsüyle aynı adres)", () => {
+  it("bağlantı üretici adını VE kimliğini taşır", () => {
     act(() =>
       root.render(
         <BrandsMarquee
-          items={[{ id: "m-1", name: "Hot Wheels", logoUrl: "", desc: "" }]}
+          items={[{ id: "m-1", name: "Mini GT", logoUrl: "", desc: "" }]}
         />,
       ),
     );
 
-    const hrefs = Array.from(host.querySelectorAll("a")).map((a) =>
+    const hrefs = [...container.querySelectorAll("a")].map((a) =>
       a.getAttribute("href"),
     );
-    // Şerit kesintisiz kayması için liste iki kez çizilir.
+    // Sonsuz kayan şerit listeyi iki kez basar.
     expect(hrefs).toEqual([
-      "/listings?manufacturer=Hot%20Wheels&manufacturerId=m-1",
-      "/listings?manufacturer=Hot%20Wheels&manufacturerId=m-1",
+      "/listings?manufacturer=Mini%20GT&manufacturerId=m-1",
+      "/listings?manufacturer=Mini%20GT&manufacturerId=m-1",
     ]);
   });
 
-  it("öğe yoksa hiçbir şey çizmez", () => {
+  it("liste boşsa hiçbir şey çizmez", () => {
     act(() => root.render(<BrandsMarquee items={[]} />));
-    expect(host.innerHTML).toBe("");
+    expect(container.innerHTML).toBe("");
   });
 });

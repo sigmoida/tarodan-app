@@ -21,6 +21,7 @@ import {
   CONSENT_DOCUMENT_KEYS,
 } from "@tarodan/types";
 import { IsTrPhone } from "../../../common/validators/tr-phone";
+import { IsPassword } from "../../../common/validators/password";
 import {
   IsLegalName,
   IsTckn,
@@ -97,13 +98,7 @@ export class RegisterDto {
     example: "SecurePass123!",
     description: "Password (min 8 chars, 1 uppercase, 1 lowercase, 1 number)",
   })
-  @IsString()
-  @MinLength(8, { message: "Şifre en az 8 karakter olmalıdır" })
-  @MaxLength(50, { message: "Şifre en fazla 50 karakter olabilir" })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message:
-      "Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir",
-  })
+  @IsPassword()
   password: string;
 
   @ApiProperty({

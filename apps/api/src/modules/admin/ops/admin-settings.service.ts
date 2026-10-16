@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ADMIN_SESSION_TIMEOUT_SETTING,
   resetAdminSessionTimeoutCache,
@@ -14,6 +15,7 @@ import {
   MIN_PRODUCT_PRICE_SETTING,
   parseProductPriceLimit,
 } from "../../product/helpers/product-price-limits";
+import { resolveMinOfferPercentage } from "../../../config/offer";
 
 /**
  * Platform ayarları yönetimi — AdminService'in PLATFORM SETTINGS bölümünden
@@ -24,6 +26,7 @@ export class AdminSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -37,7 +40,11 @@ export class AdminSettingsService {
 
   /**
    * Get public platform settings (message settings, membership prices and the
-   * listing price limits)
+   * listing price limits).
+   *
+   * `min_offer_percentage`: teklifin alt sınırı (ilan fiyatının yüzdesi). DB
+   * ayarı değil, sunucunun teklif doğrulamasında UYGULADIĞI değerdir
+   * (`config/offer.ts`); istemci formu ve ipuçları bunu okur, %50 varsaymaz.
    */
   async getPublicSettings() {
     const settings = await this.prisma.platformSetting.findMany({
@@ -102,6 +109,8 @@ export class AdminSettingsService {
       result.business_yearly_price =
         result.business_monthly_price * 12 * (1 - discountPercentage / 100);
     }
+
+    result.min_offer_percentage = resolveMinOfferPercentage(this.config);
 
     return result;
   }

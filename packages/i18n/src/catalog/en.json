@@ -2462,7 +2462,8 @@
     "cookieSettings": "Cookie Settings",
     "appPromo": "Take Tarodan with you — download our mobile app",
     "downloadAppStore": "Download on the App Store",
-    "downloadGooglePlay": "Get it on Google Play"
+    "downloadGooglePlay": "Get it on Google Play",
+    "accountDeletion": "Account Deletion"
   },
   "home": {
     "hero": {
@@ -2564,6 +2565,7 @@
     "invalidEmail": "Please enter a valid email address",
     "passwordMin": "Password must be at least 6 characters",
     "passwordMin8": "Password must be at least 8 characters",
+    "passwordMax": "Password must be at most 72 characters",
     "passwordMatch": "Passwords do not match",
     "invalidPhone": "Please enter a valid phone number",
     "trPhoneOnly": "Enter a valid Turkish mobile number (5XX XXX XX XX)",
@@ -2779,8 +2781,8 @@
     "dangerZone": "Danger Zone",
     "deleteAccount": "Delete Account",
     "deleteAccountConfirm": "Are you sure you want to delete your account? This action cannot be undone.",
-    "deleteAccountDetails": "Permanently delete your account and all of its data. This action cannot be undone.",
-    "deleteAccountWarning": "All your data, listings, and order history will be permanently deleted.",
+    "deleteAccountDetails": "Close your account; your personal details are anonymized and records we are legally required to keep are retained. This action cannot be undone.",
+    "deleteAccountWarning": "Your account will be closed, your personal details anonymized and your listings taken down. Order and invoice records are kept as required by law, and your identity details are held in a separate archive for 10 years for that purpose. This action cannot be undone.",
     "deleteAccountTypePrompt": "Type {keyword} to confirm:",
     "deleteAccountKeyword": "DELETE",
     "accountDeleted": "Your account has been deleted",
@@ -3933,6 +3935,47 @@
       "updatedIntro": "Some of our documents have been updated. To continue, please read and accept the current versions.",
       "acceptRich": "<link>{document}</link> — I have read and accept it.",
       "submit": "Accept and continue"
+    },
+    "accountDeletion": {
+      "metaTitle": "Account Deletion · Tarodan",
+      "metaDescription": "How to delete your Tarodan account from the mobile app or the website, which data is deleted and which is retained to meet legal obligations.",
+      "title": "Tarodan Account Deletion",
+      "pageDescription": "You can delete your Tarodan account at any time, after signing in, from the app or the website. This page explains the steps and what happens to your data.",
+      "pageFooter": "This text may be updated as legislation and our practices change; the current version is always published on the Platform. See the Privacy Policy for details on how your personal data is processed.",
+      "howTo": {
+        "title": "How to delete your account",
+        "appHeading": "In the Tarodan mobile app",
+        "appStep1": "Sign in to your account in the Tarodan app.",
+        "appStep2": "Open the Profile tab from the bottom menu.",
+        "appStep3": "Tap Delete Account and confirm the deletion.",
+        "webHeading": "On the website",
+        "webStep1": "Sign in to your account at tarodan.com.tr.",
+        "webStep2": "Go to your Profile page.",
+        "webStep3": "In the Danger Zone section at the bottom of the page, click Delete Account, type the confirmation word and confirm.",
+        "beforeHeading": "Before you delete",
+        "beforeText": "If you have an open order, an ongoing trade, an open refund request, a pending payout or a listing reserved for a sale, the deletion is declined and the reason is shown; try again once these are completed. Your live and pending listings are taken down automatically during deletion.",
+        "immediateNote": "Your account is closed and all your sessions are ended as soon as you confirm. Deletion cannot be undone."
+      },
+      "data": {
+        "title": "What happens to your data",
+        "deletedHeading": "Data that is deleted or anonymized",
+        "deletedProfile": "Your profile details such as name, email, phone, username, date of birth, profile photo and bio are deleted or anonymized; other members see your account as \"Deleted User\".",
+        "deletedAccess": "Your saved addresses, saved cards, sessions, notification devices and linked Apple/Google sign-ins are deleted.",
+        "deletedBank": "Your saved bank account (IBAN) is deleted. If a payout is still owed to you, the IBAN is kept only until that payment is settled and is then deleted automatically.",
+        "deletedListings": "Your listings are taken down, your public collections are hidden and your open offers are cancelled.",
+        "deletedMarketing": "Your marketing email consent is withdrawn and your newsletter subscription is ended.",
+        "retainedHeading": "Data we retain",
+        "retainedOrders": "Order, payment, refund and invoice records are kept as required by tax and commercial law; in these records you appear as \"Deleted User\".",
+        "retainedIdentity": "An identity record containing your full name, national ID / tax number, contact and address details is kept in a separate, access-restricted archive for 10 years from the deletion date to meet legal reporting obligations.",
+        "retainedSocial": "Your messages, reviews and trade history are kept because they are also part of the other party's records; in them you appear as \"Deleted User\".",
+        "retainedCorporate": "If you are a business seller, the company and authorized-person details in your application are kept as a commercial record; the contact and bank details in the application are deleted.",
+        "reregisterNote": "You can sign up again with the same email address and phone number; data from your old account is not transferred to the new one."
+      },
+      "help": {
+        "title": "Help",
+        "heading": "Contact us",
+        "text": "If you can't delete your account, or have questions about deletion or your data, contact us through the channels below."
+      }
     }
   },
   "information": {
@@ -5095,11 +5138,12 @@
         "views": "Views",
         "aiModeration": "AI Moderation",
         "allModels": "All Models",
-        "listing": "Listings",
         "listingFilter": "Listings",
         "allListings": "All",
         "withListings": "With listings",
-        "withoutListings": "Without listings"
+        "withoutListings": "Without listings",
+        "listingCount": "Total listings",
+        "activeListingCount": "Active listings"
       },
       "categories": {
         "title": "Categories",
@@ -5518,11 +5562,11 @@
           "cta1Clicks": "Button 1",
           "cta2Clicks": "Button 2",
           "platform": "Platform",
-          "ios": "iOS"
+          "ios": "Mobile"
         },
-        "hiddenOnIos": "Hidden on iOS",
-        "hideOnIos": "Hide in the iOS app",
-        "hideOnIosHint": "Not shown in the iOS app (e.g. collection creation)",
+        "hiddenOnIos": "Hidden in the app",
+        "hideOnIos": "Hide in the mobile app",
+        "hideOnIosHint": "Not shown in the mobile app (iOS and Android); still shown on the web (e.g. collection creation)",
         "desktopImage": "Desktop image",
         "mobileImage": "Mobile image (optional)",
         "mobileImageHint": "When empty, the desktop image is used on every device.",
@@ -5636,7 +5680,7 @@
           "title": "Clickable areas",
           "disabled": "Upload an image first",
           "help": "Drag on the image to draw an area; drag an area to move it, use its corners to resize it, press Delete to remove it. Areas cannot overlap. On an image ad only these areas are clickable; clicking elsewhere does nothing.",
-          "mobileNote": "Image ads are not clickable on mobile until the mobile app supports areas.",
+          "mobileNote": "Image ads are not clickable in older mobile app versions that lack area support; in current versions only these areas are clickable.",
           "count": "{count} / {max}",
           "maxReached": "You can add at most {max} areas.",
           "emptyWarning": "This image has no clickable area; the ad cannot be clicked.",
@@ -5698,7 +5742,7 @@
           "shadowed": "{scope, select, web {Another ad is live in this slot — not shown on the site} app {Another ad is live in this slot — not shown in the app} other {Another ad is live in this slot — not shown}}"
         },
         "linkUrl": "Link URL",
-        "linkUrlHelper": "A full address starting with https://… or a site path such as /category/cars.",
+        "linkUrlHelper": "A full address starting with https://… or a site path such as /listings?category=cars (opens on the web and in the mobile app).",
         "content": "Text",
         "contentPlaceholder": "Short text for an image-free announcement",
         "contentHelper": "Plain text, up to 500 characters. Use it for text-only or announcement banners.",
@@ -5707,11 +5751,11 @@
         "campaignHelper": "An ad linked to a campaign stops running automatically when the campaign ends.",
         "displayOrderHelper": "When several ads share a spot they rotate in turn; the smaller number comes first.",
         "positionHint": {
-          "topbar": "A thin strip at the very top of every page. Suggested: 728×90 (shown at strip height) or a small logo-like image; text works too.",
-          "header": "Large banner under the site header on the home and listing pages. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
-          "footer": "Banner above the site footer. Suggested: 970×250, 320×100 on mobile.",
-          "inline": "Between product rows on listing, search and category pages. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
-          "popup": "A window that opens when a visitor enters the home page; how often is set by Display frequency. Suggested: 600×600, 320×480 on mobile."
+          "topbar": "A thin strip at the very top of the page. Web: every page; mobile app: home screen only. Suggested: 728×90 (shown at strip height) or a small logo-like image; text works too.",
+          "header": "Large banner under the header. Web: home and listing pages; mobile app: home screen and the listings screen. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
+          "footer": "Banner above the footer. Web: home and listing pages; mobile app: home screen and the end of the listings screen. Suggested: 970×250, 320×100 on mobile.",
+          "inline": "Between product rows. Web: listing, search and category pages; mobile app: the listings screen only. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
+          "popup": "A window that opens when a visitor enters the home page. Web and mobile app: home page only; how often is set by Display frequency. Suggested: 600×600, 320×480 on mobile."
         }
       },
       "discounts": {
@@ -6002,7 +6046,8 @@
           "emailSubjectRequired": "Email subject is required",
           "emailSubjectMax": "Email subject can be at most 240 characters",
           "emailHtmlRequired": "Email content is required",
-          "emailHtmlMax": "Email content can be at most 200,000 characters"
+          "emailHtmlMax": "Email content can be at most 200,000 characters",
+          "mailingTypeRequired": "Select the notification type"
         },
         "pushTextTitle": "Push and in-app text",
         "emailSectionTitle": "Email",
@@ -6013,11 +6058,12 @@
         "contentColumn": "Email",
         "recipientCount": "Reaches {count} of {total} users",
         "mailingType": {
-          "label": "Mailing type",
+          "label": "Notification type",
           "announcement": "Announcement",
           "marketing": "Marketing",
-          "announcementHint": "Sent to every audience member, regardless of marketing consent.",
-          "marketingHint": "Sent only to users who agreed to marketing emails, with an unsubscribe link."
+          "announcementHint": "A transactional, service or security notice. Reaches everyone in the audience regardless of notification preferences (push, inbox, email). Do not use it for campaigns or discounts.",
+          "marketingHint": "A campaign, discount or promotion. Reaches only users who consented to marketing messages — push and inbox included; the email carries an unsubscribe link.",
+          "placeholder": "Select a type"
         }
       },
       "pages": {
@@ -8531,7 +8577,7 @@
     },
     "reports": {
       "title": "Requests, Suggestions & Complaints",
-      "description": "Complaints submitted by users for products, users, collections, and messages",
+      "description": "Complaints submitted by users for products, users, collections, messages, and reviews",
       "loadError": "Failed to load complaints",
       "empty": "No complaints yet",
       "allTypes": "All Types",
@@ -8545,7 +8591,8 @@
       "type": {
         "product": "Product",
         "collection": "Collection",
-        "message": "Message"
+        "message": "Message",
+        "review": "Review"
       },
       "reason": {
         "spam": "Spam",
@@ -8588,7 +8635,14 @@
         "openTarget": "Open content",
         "reporterTitle": "Reported By",
         "adminNote": "Explanation sent to the user",
-        "listingStatus": "Listing status"
+        "listingStatus": "Listing status",
+        "reviewAuthor": "Author",
+        "reviewSubject": "Reviewed",
+        "reviewKind": "Review type",
+        "reviewKindProduct": "Product review",
+        "reviewKindSeller": "Seller rating",
+        "reviewContent": "Review text",
+        "reviewNoText": "Score only, no text"
       },
       "statusModal": {
         "noteHelp": "When you close the report as \"Resolved\" or \"Dismissed\", this text is sent to the reporter as a notification and an email.",
@@ -10469,6 +10523,10 @@
         "title": "Your offer was cancelled: listing removed",
         "message": "Your offer for {productTitle} was cancelled because the seller removed the listing."
       },
+      "offerCancelledBuyerDeleted": {
+        "title": "Offer closed: the buyer deleted their account",
+        "message": "The offer on {productTitle} was closed because the buyer deleted their account."
+      },
       "productApproved": {
         "title": "Your Listing Is Live! 🎉",
         "message": "Your listing {productTitle} has been approved and published."
@@ -10527,7 +10585,7 @@
       },
       "userReportedAdmin": {
         "title": "New Report",
-        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
+        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
       },
       "wishlistItemSold": {
         "title": "You Missed It! 😢",
@@ -10750,7 +10808,7 @@
         "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
       },
       "reportResolved": {
-        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
+        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} review {a review} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
         "title": "Your Report Has Been Reviewed"
       },
       "orderPreparingExtended": {
@@ -11218,7 +11276,6 @@
       "corporateApplicationNotFound": "Corporate application not found",
       "deleteAccountBlocked": "To delete your account, you must first complete the following:",
       "deleteAccountFailed": "An error occurred while deleting your account. Please contact support.",
-      "deleteBlockedActiveListings": "You have {count} active listings. Please remove all of your listings first.",
       "deleteBlockedActiveTrades": "You have {count} active trade offers. Please complete or cancel your trades.",
       "deleteBlockedOpenRefunds": "You have {count} open refund processes. Please wait for the refunds to finish.",
       "deleteBlockedPaymentHolds": "You have {count} unsettled payment holds. Please wait for the money flow to finish.",
@@ -11243,7 +11300,8 @@
       "userBlocked": "{displayName} has been blocked",
       "userUnblocked": "Block removed",
       "usernameAlreadySet": "The username has already been set.",
-      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores."
+      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores.",
+      "deleteBlockedReservedListings": "{count} of your listings are tied to a sale or trade in progress. You can delete your account once those are complete."
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",
@@ -11524,7 +11582,8 @@
         "sendFailed": "The notification could not be sent",
         "scheduleInFuture": "The scheduled time must be in the future",
         "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
-        "scheduledNotFound": "Scheduled notification not found"
+        "scheduledNotFound": "Scheduled notification not found",
+        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages"
       },
       "payment": {
         "partialAmountRequired": "A valid refund amount is required for a partial refund",
@@ -11664,7 +11723,14 @@
       "productNotPurchasable": "This product is not available for purchase right now",
       "itemNotFound": "The product was not found in your cart",
       "empty": "Your cart is empty",
-      "maxQuantityPerOrder": "You can buy at most {max} of this product"
+      "maxQuantityPerOrder": "You can buy at most {max} of this product",
+      "outOfStock": "Out of stock",
+      "onlyCountInStock": "Only {count} in stock",
+      "lastItems": "Only {count} left",
+      "noLongerForSale": "\"{title}\" is no longer for sale",
+      "itemWarning": "\"{title}\": {warning}",
+      "couponNotApplied": "The coupon could not be applied",
+      "couponApplyFailed": "An error occurred while applying the coupon"
     },
     "category": {
       "commissionCoverageIncomplete": "The category cannot be activated: the active commission set must publish an unbroken price range from 0 TL to infinity for FREE, BASIC, PREMIUM and BUSINESS.",
@@ -11739,7 +11805,9 @@
       "sendForbidden": "You are not allowed to send messages in this thread",
       "viewForbidden": "You are not allowed to view this thread",
       "messageTooLong": "A message can be at most {max} characters. Current length: {length}",
-      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow."
+      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow.",
+      "contentRejected": "Your text contains content that cannot be shared (such as offensive language or contact details). Please edit it and try again.",
+      "recipientDeleted": "This user has deleted their account, so you can't message them"
     },
     "wishlist": {
       "ownProduct": "You cannot add your own product to a wishlist",
@@ -12283,7 +12351,8 @@
         "traded": "Traded on Tarodan",
         "return_quarantine": "Awaiting return check",
         "seller_suspended": "Seller account suspended",
-        "policy_violation": "Policy violation"
+        "policy_violation": "Policy violation",
+        "account_deleted": "Seller deleted their account"
       },
       "actor": {
         "seller": "Seller",

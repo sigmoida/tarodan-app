@@ -272,7 +272,8 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
   {
     key: "payout-check-returned",
     label: "Dönen havale kontrolü",
-    description: "Bankadan geri dönen havaleleri tespit eder",
+    description:
+      "Bankadan geri dönen havaleleri tespit eder; ödemesi kapanan silinmiş hesapların IBAN'ını siler",
     triggerable: false,
   },
 

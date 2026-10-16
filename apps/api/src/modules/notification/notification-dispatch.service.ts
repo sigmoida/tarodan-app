@@ -45,6 +45,7 @@ import {
 import {
   normalizeLegacyNotificationLink,
   resolveWebNotificationLink,
+  withDefaultAudience,
 } from "./helpers/notification-link";
 import {
   type Locale,
@@ -126,10 +127,18 @@ export class NotificationDispatchService {
   ): Promise<{ settings: NotificationSettings; locale: Locale }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notificationSettings: true, preferredLanguage: true },
+      select: {
+        notificationSettings: true,
+        acceptsMarketingEmails: true,
+        preferredLanguage: true,
+      },
     });
     return {
-      settings: resolveSettings(user?.notificationSettings),
+      // Pazarlama düğmesinin tek kaynağı izin kolonudur (resolveSettings).
+      settings: resolveSettings(
+        user?.notificationSettings,
+        user?.acceptsMarketingEmails,
+      ),
       locale: isLocale(user?.preferredLanguage)
         ? user.preferredLanguage
         : defaultLocale,
@@ -223,11 +232,15 @@ export class NotificationDispatchService {
     // Kullanıcı bildirim tercihleri (Bulgu #9) + dil tercihi (#224).
     const { settings, locale } = await this.loadRecipientPrefs(dto.userId);
 
+    // Satıcıya giden tiplerde hedef kitle (`audience`) tipten eklenir; push
+    // payload'ı ve zil kaydı aynı veriyi taşır.
+    const data = withDefaultAudience(dto.type, dto.data);
+
     // Render the catalog template in the recipient's locale (#224).
     const { title, message } = await this.renderTemplate(
       template,
       locale,
-      dto.data,
+      data,
     );
 
     // Determine channels (default to email + in_app)
@@ -259,7 +272,7 @@ export class NotificationDispatchService {
             user.email,
             title,
             message,
-            dto.data,
+            data,
           );
           await this.logNotification(
             dto.userId,
@@ -274,9 +287,9 @@ export class NotificationDispatchService {
         case NotificationChannel.PUSH:
           // `type`'ı push payload'ına ekle: mobil deep-link routing (push.ts
           // routeFromNotification) önce type'a bakıyor; yoksa tüm push'lar genel
-          // bildirim sekmesine düşüyordu. dto.data zaten ilgili id'leri içeriyor.
+          // bildirim sekmesine düşüyordu. data zaten ilgili id'leri içeriyor.
           results.push = await this.sendPushReal(dto.userId, title, message, {
-            ...dto.data,
+            ...data,
             type: dto.type,
           });
           await this.logNotification(
@@ -301,7 +314,7 @@ export class NotificationDispatchService {
             dto.type,
             title,
             message,
-            dto.data,
+            data,
           ));
           break;
 
@@ -571,11 +584,14 @@ export class NotificationDispatchService {
       return false;
     }
 
+    // Satıcıya giden tiplerde hedef kitle tipten eklenir (zil + realtime + push).
+    const payload = withDefaultAudience(type, data);
+
     // Şablonu alıcının dilinde render et (#224).
     const { title, message } = await this.renderTemplate(
       template,
       locale,
-      data,
+      payload,
     );
 
     this.logger.log(
@@ -587,7 +603,7 @@ export class NotificationDispatchService {
       type,
       title,
       message,
-      data,
+      payload,
     );
     this.logger.log(`[createInAppNotification] Result: ${notificationId}`);
 
@@ -598,7 +614,7 @@ export class NotificationDispatchService {
           type,
           title,
           message,
-          data,
+          data: payload,
           createdAt: new Date().toISOString(),
         });
       } catch (e) {
@@ -621,7 +637,7 @@ export class NotificationDispatchService {
       );
     } else if (shouldDeliver(settings, type, "push")) {
       try {
-        await this.sendPushReal(userId, title, message, { ...data, type });
+        await this.sendPushReal(userId, title, message, { ...payload, type });
       } catch (e) {
         this.logger.warn(`[createInAppNotification] push failed: ${e}`);
       }

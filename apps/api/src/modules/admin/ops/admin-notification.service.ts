@@ -28,7 +28,10 @@ import {
 } from "../../../common/helpers/error-message";
 import { i18nMessage } from "../../i18n";
 import { NewsletterService } from "../../marketing/newsletter.service";
-import { audienceUserWhere } from "./notification-audience";
+import {
+  audienceUserWhere,
+  MARKETING_CONSENT_WHERE,
+} from "./notification-audience";
 import { sanitizeEmailHtml } from "../../../common/helpers/email-html-sanitizer";
 import {
   buildBroadcastEmail,
@@ -107,9 +110,11 @@ export class AdminNotificationService {
   }
 
   /**
-   * E-posta alanlarını normalleştirir. HTML SUNUCUDA süzülür (istemciye
-   * güvenilmez); verilmişse ama süzülünce boş kalıyorsa (yalnız script vb.)
-   * sessizce düz metne düşmek yerine istek reddedilir.
+   * E-posta alanlarını ve duyuru türünü normalleştirir. Tür yoksa duyurudur
+   * (eski çağıranlar için güvenli varsayılan); tür push ve zili de belirler.
+   * HTML SUNUCUDA süzülür (istemciye güvenilmez); verilmişse ama süzülünce
+   * boş kalıyorsa (yalnız script vb.) sessizce düz metne düşmek yerine istek
+   * reddedilir.
    */
   private normalizeEmailContent(dto: {
     emailSubject?: string;
@@ -162,7 +167,7 @@ export class AdminNotificationService {
     const [total, marketing] = await Promise.all([
       this.prisma.user.count({ where }),
       this.prisma.user.count({
-        where: { ...where, acceptsMarketingEmails: true },
+        where: { ...where, ...MARKETING_CONSENT_WHERE },
       }),
     ]);
     return { total, marketing };
@@ -267,6 +272,45 @@ export class AdminNotificationService {
   }
 
   /**
+   * Yayının alıcıları. Pazarlama türünde (S1 — Apple 4.5.4, İYS) kitle
+   * pazarlama iznine göre süzülür: izni olmayan kullanıcıya ne push ne zil
+   * satırı ne e-posta gider. Duyuru türünde davranış değişmez — `user_ids`
+   * listesi olduğu gibi kullanılır.
+   */
+  private async resolveTargetUserIds(
+    dto: AdminBroadcastInput,
+    isMarketing: boolean,
+  ): Promise<string[]> {
+    if (dto.targetType === "user_ids") {
+      const userIds = dto.userIds || [];
+      if (!isMarketing || userIds.length === 0) return userIds;
+      const users = await this.prisma.user.findMany({
+        where: {
+          id: { in: userIds },
+          isBanned: false,
+          ...MARKETING_CONSENT_WHERE,
+        },
+        select: { id: true },
+      });
+      return users.map((u) => u.id);
+    }
+    if (
+      dto.targetType === "all" ||
+      (dto.targetType === "segment" && dto.segmentCriteria)
+    ) {
+      const users = await this.prisma.user.findMany({
+        where: {
+          ...audienceUserWhere(dto.targetType, dto.segmentCriteria),
+          ...(isMarketing ? MARKETING_CONSENT_WHERE : {}),
+        },
+        select: { id: true },
+      });
+      return users.map((u) => u.id);
+    }
+    return [];
+  }
+
+  /**
    * Send notification to users
    */
   async sendNotification(adminId: string, dto: AdminBroadcastInput) {
@@ -290,24 +334,21 @@ export class AdminNotificationService {
       );
       delete data.link;
     }
+    // Tür her satırda ve push payload'ında taşınır: push kuyruğu pazarlama
+    // duyurusunu ALWAYS_SEND dışında değerlendirir (preferenceTypeFor),
+    // istemci de duyuruyu kampanyadan ayırabilir. Dışarıdan gelen değer ezilir.
+    data.mailingType = emailContent.mailingType;
 
     try {
-      if (dto.targetType === "user_ids") {
-        targetUserIds = dto.userIds || [];
-      } else if (
-        dto.targetType === "all" ||
-        (dto.targetType === "segment" && dto.segmentCriteria)
-      ) {
-        const users = await this.prisma.user.findMany({
-          where: audienceUserWhere(dto.targetType, dto.segmentCriteria),
-          select: { id: true },
-        });
-        targetUserIds = users.map((u) => u.id);
-      }
+      targetUserIds = await this.resolveTargetUserIds(dto, isMarketing);
 
       if (targetUserIds.length === 0) {
         throw new BadRequestException(
-          i18nMessage("server.admin.notification.targetUserNotFound"),
+          i18nMessage(
+            isMarketing
+              ? "server.admin.notification.noMarketingConsentAudience"
+              : "server.admin.notification.targetUserNotFound",
+          ),
         );
       }
 
@@ -326,7 +367,6 @@ export class AdminNotificationService {
       // Geçmiş listesinde "HTML e-postası" rozeti için e-posta satırlarının işareti.
       const emailRowData = {
         ...data,
-        mailingType: emailContent.mailingType,
         ...(emailContent.emailHtml && { hasHtmlEmail: true }),
       };
 

@@ -76,7 +76,9 @@ export default function CollectionHeaderCard() {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-heading md:text-3xl">
+              {/* 360px'de sağdaki 3 düğme (128px) başlığa ~150px bırakır; uzun tek
+                  kelimelik ad satırı taşıp düğmelerin altına girmesin diye kırılır. */}
+              <h1 className="break-words text-2xl font-bold tracking-tight text-heading md:text-3xl">
                 {collection.name}
               </h1>
               {collection.description && (

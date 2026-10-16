@@ -11,6 +11,14 @@ import {
   publicName,
 } from "../../../common/helpers/public-identity";
 import { errorMessage } from "../../../common/helpers/error-message";
+import { LIVE_LANE, laneUserWhere } from "../../account-lane/account-lane";
+
+/**
+ * Koleksiyon indeksi yalnız CANLI şeritteki sahiplerin koleksiyonlarını taşır
+ * (ürün indeksiyle aynı kural): test şeridi viewer'ı keşfi Postgres'ten,
+ * kendi şeridiyle listeler (CollectionCrudService.browsePublicCollections).
+ */
+const INDEXED_COLLECTION_WHERE = { user: laneUserWhere(LIVE_LANE) };
 
 /**
  * Koleksiyon indeksleme + arama alt servisi (search.service.ts'ten birebir
@@ -54,7 +62,8 @@ export class SearchCollectionService {
   }
 
   private readonly collectionInclude = {
-    user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+    // isTestAccount yalnız indeks kararı içindir; dokümana yazılmaz.
+    user: { select: { id: true, isTestAccount: true, ...PUBLIC_NAME_SELECT } },
     category: { select: { id: true, name: true, slug: true } },
     _count: { select: { items: true } },
   };
@@ -66,6 +75,11 @@ export class SearchCollectionService {
       include: this.collectionInclude,
     });
     if (!collection) return;
+    // Test şeridi sahibi: indekste yeri yok (önceden girmişse çıkar).
+    if (collection.user?.isTestAccount) {
+      await this.removeCollection(collectionId);
+      return;
+    }
     try {
       await this.common.client.index({
         index: this.common.collectionsIndex,
@@ -107,7 +121,10 @@ export class SearchCollectionService {
         },
       });
 
+      // Test şeridi koleksiyonları indekslenmez; daha önce girmiş olanları
+      // aşağıdaki yetim temizliği siler.
       const collections = await this.prisma.collection.findMany({
+        where: INDEXED_COLLECTION_WHERE,
         include: this.collectionInclude,
       });
 
@@ -267,23 +284,25 @@ export class SearchCollectionService {
     let sort: any[];
     switch (sortBy) {
       case "popular":
-        sort = [{ viewCount: "desc" }, { likeCount: "desc" }];
+        sort = [{ viewCount: "desc" }, { likeCount: "desc" }, { id: "asc" }];
         break;
       case "recent":
-        sort = [{ createdAt: "desc" }];
+        sort = [{ createdAt: "desc" }, { id: "asc" }];
         break;
       case "name":
-        sort = [{ "name.keyword": "asc" }];
+        sort = [{ "name.keyword": "asc" }, { id: "asc" }];
         break;
       case "items":
       case "items_desc":
-        sort = [{ itemCount: "desc" }];
+        sort = [{ itemCount: "desc" }, { id: "asc" }];
         break;
       case "items_asc":
-        sort = [{ itemCount: "asc" }];
+        sort = [{ itemCount: "asc" }, { id: "asc" }];
         break;
       default:
-        sort = query ? [{ _score: "desc" }] : [{ viewCount: "desc" }];
+        sort = query
+          ? [{ _score: "desc" }, { id: "asc" }]
+          : [{ viewCount: "desc" }, { id: "asc" }];
     }
 
     try {
@@ -324,7 +343,9 @@ export class SearchCollectionService {
         this.common.client
           .count({ index: this.common.collectionsIndex })
           .catch(() => ({ count: 0 })),
-        this.prisma.collection.count({ where: { isPublic: true } }),
+        this.prisma.collection.count({
+          where: { isPublic: true, ...INDEXED_COLLECTION_WHERE },
+        }),
       ]);
       const esCount = esRes?.count ?? 0;
       if (dbCount > 0 && (esCount === 0 || esCount < dbCount * 0.5)) {

@@ -422,6 +422,7 @@ describe("HeroSlideService.update", () => {
     ["bitişi geçmişe çekme", { endDate: "2026-10-01T00:00:00.000Z" }],
     ["başlangıcı ileri atma", { startDate: "2026-11-01T00:00:00.000Z" }],
     ["auth yerleşimine taşıma", { placement: "auth_default" }],
+    ["native'de gizleme", { hideOnIos: true }],
   ])(
     "yayındaki SON ana sayfa slaytında %s serbesttir (yerleşim boş kalabilir)",
     async (_d, dto) => {
@@ -487,7 +488,13 @@ describe("HeroSlideService.update", () => {
     await service.update("slide-1", {
       startDate: "2026-10-01T00:00:00.000Z",
     } as never);
+    // Yalnız 5'lik yayın sınırı (yerleşim boş kalabilir; boşluk koruması yok).
     expect(heroSlide.findMany).toHaveBeenCalledTimes(1);
+    expect(heroSlide.findMany.mock.calls[0][0].where).toMatchObject({
+      placement: "home",
+      isActive: true,
+      OR: [{ endDate: null }, { endDate: { gte: NOW } }],
+    });
   });
 
   it("pasif slaytı açmak sınırı kendisi hariç yoklar", async () => {

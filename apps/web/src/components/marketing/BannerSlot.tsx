@@ -17,7 +17,8 @@ import AdCreative from "./AdCreative";
  * bağlıysa (ör. "komisyonsuz alışveriş") başlığın yanında kupon kodu görünür ve
  * kampanya bitince API afişi zaten döndürmez.
  *
- * Banner herkese gösterilir; üyeliğe bağlı bir gizleme kuralı YOKTUR.
+ * Reklamsız katmandaki üyeye çizilmez; karar `useActiveAds` içinde
+ * (`useBannerVisibility`), tüm yuvalar için ortak.
  */
 export default function BannerSlot({
   position,

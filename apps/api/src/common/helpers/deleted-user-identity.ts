@@ -33,6 +33,29 @@ export function anonymizedEmailFor(userId: string): string {
 export const ANONYMIZED_EMAIL_PATTERN = /^deleted_.+@deleted\.local$/i;
 
 /**
+ * Anonimleştirmede kullanıcı adının yerine yazılan sentinel. `User.id` uuid
+ * olduğu için tekildir (`users_username_key` çakışmaz) ve kullanıcı adı deseni
+ * (≤30 karakter, tiresiz) onu üretemez: hiçbir üye bu değeri seçemez.
+ */
+export function anonymizedUsernameFor(userId: string): string {
+  return `deleted_${userId}`;
+}
+
+const ANONYMIZED_USERNAME_PATTERN =
+  /^deleted_[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/**
+ * Silinmiş hesabın kullanıcı adı sentinel'i mi? Herkese açık gösterim bunu
+ * kimlik saymaz (public-identity). Desen uuid'e bağlıdır: üyenin seçebildiği
+ * `deleted_fan` gibi bir ad sentinel sayılıp gerçek ada düşmesin.
+ */
+export function isAnonymizedUsername(
+  username: string | null | undefined,
+): boolean {
+  return !!username && ANONYMIZED_USERNAME_PATTERN.test(username);
+}
+
+/**
  * Anonimleştirilmiş `users` satırı, kimlik alanları için kaynak DEĞİLDİR.
  * Backfill anonim satırı okuduğu için sentinel değerler ("Silinmiş Kullanıcı",
  * `deleted_...@deleted.local`) arşive gerçek kimlikmiş gibi yazılabilirdi;

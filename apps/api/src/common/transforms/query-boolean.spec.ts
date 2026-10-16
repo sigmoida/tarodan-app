@@ -24,6 +24,7 @@ import { PspStatementLinesQueryDto } from "../../modules/admin/finance/dto/psp-r
 import { ProductQueryDto } from "../../modules/product/dto/product-query.dto";
 import { DiscountQueryDto } from "../../modules/discount/dto/discount-query.dto";
 import { AdminBrandManufacturerQueryDto } from "../../modules/admin/dto/catalog-query.dto";
+import { HasListingsQueryDto } from "../../modules/product/dto/has-listings-query.dto";
 import { QueryBoolean } from "./query-boolean";
 
 /**
@@ -105,6 +106,7 @@ const DTOS: Record<
   ProductQueryDto: { metatype: ProductQueryDto },
   DiscountQueryDto: { metatype: DiscountQueryDto },
   AdminBrandManufacturerQueryDto: { metatype: AdminBrandManufacturerQueryDto },
+  HasListingsQueryDto: { metatype: HasListingsQueryDto },
 };
 
 const sourceFiles = (dir: string): string[] =>

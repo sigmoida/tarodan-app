@@ -5,3 +5,4 @@ export * from "./product-response.dto";
 export * from "./boost.dto";
 export * from "./renew-products.dto";
 export * from "./listing-removal.dto";
+export * from "./has-listings-query.dto";

@@ -114,6 +114,9 @@ export class MembershipService {
         canUseFreeSlot: membership.remainingFreeListings > 0,
         canTrade: membership.tier.canTrade,
         canCreateCollection: membership.tier.canCreateCollections,
+        // Katmanın "reklamsız" kutusu (admin → Üyelik Katmanları): banner'ı
+        // gizleyip gizlemeyeceğini istemci buradan okur.
+        isAdFree: membership.tier.isAdFree === true,
         maxImages: membership.tier.maxImagesPerListing,
         maxFreeListings,
         maxTotalListings,

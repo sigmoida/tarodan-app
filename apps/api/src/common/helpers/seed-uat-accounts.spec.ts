@@ -1,12 +1,14 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { apiAppRoot } from "./app-root";
+import { ACCOUNT_REQUIRED_CONSENTS } from "@tarodan/types";
 import {
   assertUatSeedAllowed,
   parseUatAccounts,
   parseUatListings,
   parseUatSeedMode,
   planUatAccountSync,
+  planUatFixtureGates,
   planUatSeedSteps,
   resolveUatPassword,
   shouldResetPasswords,
@@ -198,6 +200,81 @@ describe("parseUatAccounts", () => {
       }),
     ).toThrow(/platform service account/);
   });
+
+  it("treats fixtures as optional so older files keep working", () => {
+    expect(parseUatAccounts(valid).fixtures).toEqual([]);
+  });
+
+  it("parses scenario fixtures and normalizes their emails", () => {
+    const parsed = parseUatAccounts({
+      ...valid,
+      fixtures: [
+        {
+          email: " UAT-Consent@Example.com ",
+          displayName: "UAT",
+          scenario: "consent_pending",
+        },
+      ],
+    });
+    expect(parsed.fixtures).toEqual([
+      {
+        email: "uat-consent@example.com",
+        displayName: "UAT",
+        scenario: "consent_pending",
+      },
+    ]);
+  });
+
+  it("rejects an unknown fixture scenario", () => {
+    expect(() =>
+      parseUatAccounts({
+        ...valid,
+        fixtures: [{ email: "f@example.com", scenario: "everything_ok" }],
+      }),
+    ).toThrow(/fixtures\[0\]: unknown scenario/);
+  });
+
+  it("keeps fixtures separate from members and staff", () => {
+    expect(() =>
+      parseUatAccounts({
+        ...valid,
+        fixtures: [
+          { email: "nur@tarodan.com.tr", scenario: "consent_pending" },
+        ],
+      }),
+    ).toThrow(/duplicate email/);
+  });
+
+  it("rejects fixtures that are not an array", () => {
+    expect(() =>
+      parseUatAccounts({ members: [], staff: [], fixtures: {} }),
+    ).toThrow(/arrays/);
+  });
+});
+
+describe("planUatFixtureGates", () => {
+  it("no scenario carries a legal-identity step (no identity is ever seeded)", () => {
+    for (const scenario of ["consent_pending", "identity_missing"] as const) {
+      expect(Object.keys(planUatFixtureGates(scenario))).toEqual([
+        "consentDocuments",
+      ]);
+    }
+  });
+
+  it("consent_pending leaves exactly one required document unaccepted", () => {
+    const gates = planUatFixtureGates("consent_pending");
+    const left = ACCOUNT_REQUIRED_CONSENTS.filter(
+      (doc) => !gates.consentDocuments.includes(doc),
+    );
+    expect(left).toEqual(["kvkk"]);
+  });
+
+  it("identity_missing accepts every required document", () => {
+    const gates = planUatFixtureGates("identity_missing");
+    expect([...gates.consentDocuments].sort()).toEqual(
+      [...ACCOUNT_REQUIRED_CONSENTS].sort(),
+    );
+  });
 });
 
 describe("parseUatListings", () => {
@@ -253,6 +330,16 @@ describe("shipped UAT data files", () => {
       ["tarodan@tarodan.com.tr", "super_admin"],
       ["developers@tarodan.com.tr", "super_admin"],
     ]);
+  });
+
+  it("ships one fixture per gate scenario on addresses that never receive mail", () => {
+    expect(accounts.fixtures.map((f) => f.scenario).sort()).toEqual([
+      "consent_pending",
+      "identity_missing",
+    ]);
+    for (const fixture of accounts.fixtures) {
+      expect(fixture.email.endsWith("@example.com")).toBe(true);
+    }
   });
 
   it("keeps every member's starter listings within the free-tier quota", () => {

@@ -22,7 +22,7 @@ describe("listing removal reasons migration", () => {
     .filter((line) => !line.trim().startsWith("--"))
     .join("\n");
 
-  it("enum değerleri katalogla aynı sırada (takip göçünün eklediği `traded` hariç)", () => {
+  it("enum değerleri katalogla aynı sırada (takip göçlerinin eklediği değerler hariç)", () => {
     const match = statements.match(
       /CREATE TYPE "ListingRemovalReason" AS ENUM \(([^)]*)\)/,
     );
@@ -30,9 +30,11 @@ describe("listing removal reasons migration", () => {
     const values = (match?.[1] ?? "")
       .split(",")
       .map((value) => value.trim().replace(/'/g, ""));
-    // `traded` sonradan 20261005220000 göçüyle eklendi (bu göç düzenlenmez).
+    // `traded` (20261005220000) ve `account_deleted` (20261013110000) sonradan
+    // eklendi (bu göç düzenlenmez).
+    const addedLater: readonly string[] = ["traded", "account_deleted"];
     expect(values).toEqual(
-      LISTING_REMOVAL_REASONS.filter((reason) => reason !== "traded"),
+      LISTING_REMOVAL_REASONS.filter((reason) => !addedLater.includes(reason)),
     );
   });
 
@@ -122,5 +124,51 @@ describe("listing removal follow-ups migration", () => {
       /lateSoldElsewhere\s+Boolean\s+@default\(false\)\s+@map\("late_sold_elsewhere"\)/,
     );
     expect(schema).toMatch(/out_of_stock\n\s+traded\n\s+return_quarantine/);
+  });
+});
+
+/**
+ * `20261013110000_listing_removal_account_deleted` (S3): hesap silme aktif
+ * ilan yüzünden reddedilmez, ilanlar `account_deleted` nedeniyle pasife
+ * alınır. Yalnız bir enum değeri ekler; hiçbir satıra dokunmaz.
+ */
+describe("listing removal account_deleted migration", () => {
+  const sql = readFileSync(
+    join(
+      apiAppRoot(),
+      "prisma/migrations/20261013110000_listing_removal_account_deleted/migration.sql",
+    ),
+    "utf8",
+  );
+  const statements = sql
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n");
+
+  it("`account_deleted` değerini katalogdaki yerine (seller_suspended'dan sonra) ekler", () => {
+    expect(statements).toMatch(
+      /ALTER TYPE "ListingRemovalReason" ADD VALUE IF NOT EXISTS 'account_deleted' AFTER 'seller_suspended';/,
+    );
+    const order = [...LISTING_REMOVAL_REASONS];
+    expect(order[order.indexOf("account_deleted") - 1]).toBe(
+      "seller_suspended",
+    );
+  });
+
+  it("yalnız enum değeri ekler: satır güncellemez, bir şey silmez", () => {
+    expect(statements).not.toMatch(/UPDATE\s+/i);
+    expect(statements).not.toMatch(/INSERT\s+INTO/i);
+    expect(statements).not.toMatch(/DROP\s+/i);
+    expect(statements).not.toMatch(/ALTER TABLE/i);
+  });
+
+  it("şema aynı enum değerini taşır", () => {
+    const schema = readFileSync(
+      join(apiAppRoot(), "prisma/schema.prisma"),
+      "utf8",
+    );
+    expect(schema).toMatch(
+      /seller_suspended\n(\s*\/\/\/[^\n]*\n)*\s+account_deleted\n\s+policy_violation/,
+    );
   });
 });

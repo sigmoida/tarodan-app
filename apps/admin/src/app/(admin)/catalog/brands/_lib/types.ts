@@ -1,4 +1,6 @@
-export interface Brand {
+import type { ListingCounts } from "../../_lib/listingCountColumns";
+
+export interface Brand extends ListingCounts {
   id: string;
   name: string;
   slug: string;
@@ -9,8 +11,6 @@ export interface Brand {
   foundedYear?: number | null;
   sortOrder?: number;
   isActive: boolean;
-  /** Müşterinin görebildiği ilan sayısı (public sayımla aynı kural). */
-  listingCount: number;
   createdAt: string;
   updatedAt: string;
 }

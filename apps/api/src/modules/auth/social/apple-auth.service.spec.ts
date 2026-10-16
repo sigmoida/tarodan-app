@@ -34,6 +34,7 @@ describe("AppleAuthService", () => {
   it("returns normalized profile for a valid token (real email)", async () => {
     verify.mockResolvedValue({
       sub: "a-1",
+      aud: "com.tarodan.app",
       email: "a@b.com",
       email_verified: "true",
       is_private_email: "false",
@@ -45,12 +46,18 @@ describe("AppleAuthService", () => {
         audience: ["com.tarodan.app", "shop.tarodan.web"],
       }),
     );
-    expect(r).toEqual({ sub: "a-1", email: "a@b.com", isPrivateEmail: false });
+    expect(r).toEqual({
+      sub: "a-1",
+      email: "a@b.com",
+      isPrivateEmail: false,
+      audience: "com.tarodan.app",
+    });
   });
 
   it("accepts relay (private) email", async () => {
     verify.mockResolvedValue({
       sub: "a-2",
+      aud: "shop.tarodan.web",
       email: "xyz@privaterelay.appleid.com",
       email_verified: true,
       is_private_email: true,
@@ -60,6 +67,7 @@ describe("AppleAuthService", () => {
       sub: "a-2",
       email: "xyz@privaterelay.appleid.com",
       isPrivateEmail: true,
+      audience: "shop.tarodan.web",
     });
   });
 
@@ -103,5 +111,18 @@ describe("AppleAuthService", () => {
       }),
     );
     expect(r.sub).toBe("w-1");
+  });
+
+  // Apple token iptali (5.1.1(v)): kod, girişin yapıldığı client id ile
+  // çevrilir; staging uygulaması kendi bundle id'sini taşır.
+  it("exposes the token audience (the client id the user signed in with)", async () => {
+    verify.mockResolvedValue({
+      sub: "a-5",
+      aud: "com.tarodan.app.staging",
+      email: "a@b.com",
+      email_verified: true,
+    });
+    const r = await service.verifyIdentityToken("tok");
+    expect(r.audience).toBe("com.tarodan.app.staging");
   });
 });

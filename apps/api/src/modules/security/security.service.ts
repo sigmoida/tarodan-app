@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import * as QRCode from "qrcode";
@@ -37,6 +38,9 @@ export class SecurityService {
   private readonly SECRET_BYTES = 20;
   private readonly TOKEN_EXPIRY_HOURS = 24;
   private readonly CSRF_TOKEN_EXPIRY_MINUTES = 60;
+  // Bekleyen (doğrulanmamış) kurulum sırrı bu süre içinde yeniden kullanılır:
+  // çift dokunma / ekranı yeniden açma, kullanıcının taradığı QR'ı geçersiz kılmasın.
+  private readonly PENDING_SETUP_REUSE_MS = 10 * 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -60,10 +64,6 @@ export class SecurityService {
       throw new BadRequestException("2FA zaten etkin");
     }
 
-    // Generate secret
-    const secret = this.generateTOTPSecret();
-    const backupCodes = this.generateBackupCodes();
-
     // Get user info for QR code label
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -75,10 +75,25 @@ export class SecurityService {
       );
     }
 
+    // Yakın zamanda üretilmiş bekleyen sır varsa aynısını döndür (QR değişmez).
+    // Yedek kodların düz hali saklanmadığı için yalnız onlar yeniden üretilir;
+    // etkinleştirme öncesi kullanılamadıklarından bu güvenlidir. Etkin olmayan
+    // satır yalnız hiç etkinleştirilmemiş bir kurulumdur: disable2FA satırı
+    // siler, eski (sızmış olabilecek) bir sır yeniden kullanılamaz.
+    const isPending =
+      !!existing &&
+      Date.now() - existing.updatedAt.getTime() < this.PENDING_SETUP_REUSE_MS;
+    const secret = isPending
+      ? this.decryptSecret(existing.secret)
+      : this.generateTOTPSecret();
+    const backupCodes = this.generateBackupCodes();
+
     // Sağlama URI'si (otpauth) — kimlik doğrulayıcı uygulamasına verilen
     // bağlantı. Bir GÖRSEL adresi DEĞİL: doğrudan <img src> içine konulamaz.
+    // Etiket e-posta: kullanıcıya özgü; özel karakterler (+ vb.) kodlanır.
     const issuer = "Tarodan";
-    const qrCodeUrl = `otpauth://totp/${issuer}:${user?.email}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
+    const label = encodeURIComponent(`${issuer}:${user.email}`);
+    const qrCodeUrl = `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
     // Taranabilir görsel sunucuda üretilir: her istemci (web + mobil) aynı
     // görseli alsın, her biri ayrı bir QR kütüphanesi taşımasın.
     const qrCodeImage = await QRCode.toDataURL(qrCodeUrl, {
@@ -87,30 +102,44 @@ export class SecurityService {
       width: 240,
     });
 
-    // Store encrypted secret
-    const encryptedSecret = this.encryptSecret(secret);
     const hashedBackupCodes = await Promise.all(
       backupCodes.map((code) => bcrypt.hash(code, 10)),
     );
 
     if (existing) {
-      await this.prisma.twoFactorSecret.update({
-        where: { userId },
+      // Yalnız hâlâ etkin olmayan kurulumu yaz: arada verify2FA etkinleştirdiyse
+      // etkin kaydın sırrı/yedek kodları ezilmez.
+      const { count } = await this.prisma.twoFactorSecret.updateMany({
+        where: { userId, isEnabled: false },
         data: {
-          secret: encryptedSecret,
+          ...(isPending ? {} : { secret: this.encryptSecret(secret) }),
           backupCodes: hashedBackupCodes,
-          isEnabled: false, // Not enabled until verified
         },
       });
+      if (count === 0) {
+        throw new BadRequestException("2FA zaten etkin");
+      }
     } else {
-      await this.prisma.twoFactorSecret.create({
-        data: {
-          userId,
-          secret: encryptedSecret,
-          backupCodes: hashedBackupCodes,
-          isEnabled: false,
-        },
-      });
+      try {
+        await this.prisma.twoFactorSecret.create({
+          data: {
+            userId,
+            secret: this.encryptSecret(secret),
+            backupCodes: hashedBackupCodes,
+            isEnabled: false,
+          },
+        });
+      } catch (e) {
+        // Eşzamanlı ilk kurulum (çift dokunma): diğer istek satırı açtı;
+        // baştan çalış — bekleyen sır yeniden kullanılır, aynı QR döner.
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          return this.enable2FA(userId);
+        }
+        throw e;
+      }
     }
 
     return {
@@ -139,9 +168,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     // Enable 2FA
@@ -182,15 +209,13 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
-    await this.prisma.twoFactorSecret.update({
-      where: { userId },
-      data: { isEnabled: false },
-    });
+    // Sır ve yedek kodlar silinir: yeniden etkinleştirme her zaman yeni sır
+    // üretir (eski, sızmış olabilecek sır bekleyen kurulum gibi yeniden
+    // kullanılamaz).
+    await this.prisma.twoFactorSecret.deleteMany({ where: { userId } });
 
     await this.prisma.adminUser.updateMany({
       where: { userId },
@@ -285,9 +310,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     const newBackupCodes = this.generateBackupCodes();
@@ -710,6 +733,14 @@ export class SecurityService {
       return Buffer.from(encrypted, "base64").toString("utf8");
     }
     return decryptSecret(encrypted, this.getTwoFactorEncryptionKey());
+  }
+
+  /** Geçersiz 2FA kodu: 401 değil 400 — istemciler 401'i oturum bitti sanıp çıkış yapıyordu. */
+  private invalidCodeException(): BadRequestException {
+    return new BadRequestException({
+      ...i18nMessage("server.security.invalidCode"),
+      errorCode: "INVALID_2FA_CODE",
+    });
   }
 
   private verifyTOTP(secret: string, code: string): boolean {

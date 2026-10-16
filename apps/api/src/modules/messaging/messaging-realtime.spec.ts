@@ -26,6 +26,8 @@ describe("MessagingService realtime emit", () => {
   };
   const mockPrisma = {
     platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    // Alıcı hesabı silinmemiş.
+    user: { findUnique: jest.fn().mockResolvedValue({ deletedAt: null }) },
     messageThread: {
       findUnique: jest.fn().mockResolvedValue({
         id: "t1",

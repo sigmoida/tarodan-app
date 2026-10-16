@@ -1,10 +1,14 @@
 /**
- * Admin duyuru e-postasının türü — API doğrulayıcısı ile admin formunun tek kaynağı.
+ * Admin duyurusunun türü — API doğrulayıcısı ile admin formunun tek kaynağı.
+ * Tür e-postayla sınırlı değildir; push ve uygulama içi (zil) satırını da
+ * belirler (Apple 4.5.4, İYS).
  *
- * - `announcement`: hizmet/duyuru; pazarlama iznine bakılmaksızın herkese gider
- *   (eski davranış, varsayılan).
- * - `marketing`: yalnız `acceptsMarketingEmails = true` kullanıcılara gider ve
- *   abonelikten çıkış linki + `List-Unsubscribe` başlığı taşır.
+ * - `announcement`: işlemsel/hizmet/güvenlik duyurusu; pazarlama iznine ve
+ *   bildirim tercihine bakılmaksızın herkese gider (API varsayılanı: eski
+ *   çağıranlar böyle davranırdı). Admin formu türü açıkça seçtirir.
+ * - `marketing`: yalnız `acceptsMarketingEmails = true` kullanıcılara gider —
+ *   push ve zil dahil; push master anahtarına uyar; e-posta abonelikten çıkış
+ *   linki + `List-Unsubscribe` başlığı taşır.
  */
 export const MAILING_TYPES = ["announcement", "marketing"] as const;
 

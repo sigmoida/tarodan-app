@@ -803,7 +803,7 @@ Europe/Istanbul):
 | `payment-expired`       | */5 dk    | süresi dolan ödemeleri iptal, rezervasyonları bırak |
 | `payment-release-holds` | saatlik   | escrow release                                      |
 | `payout-process`        | */15 dk   | payout oluştur + işle                               |
-| `payout-check-returned` | 06:00     | dönen transferler                                   |
+| `payout-check-returned` | 06:00     | dönen transferler + silinmiş hesap IBAN temizliği   |
 | `paytr-statement-sync`  | 05:00     | PayTR ekstresi                                      |
 | `paytr-settlement-sync` | 05:30     | PayTR settlement                                    |
 | `ledger-reconcile`      | 04:00     | sapma invariantları                                 |

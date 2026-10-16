@@ -16,6 +16,9 @@ import {
 import { getFreeTierCanTrade } from "../../membership/helpers/free-tier-trade.helper";
 import { tradeOnlyEsFilters } from "../helpers/trade-only-es-filter";
 import { saleCapableEsFilters } from "../helpers/sale-capable-es-filter";
+import { withEsIdTiebreaker } from "../helpers/es-id-tiebreaker";
+import { onSaleWhere } from "../../product/helpers/product-on-sale-where";
+import { withIdTiebreaker } from "../../product/helpers/with-id-tiebreaker";
 import {
   SearchCommonService,
   SearchOptions,
@@ -270,7 +273,18 @@ export class SearchProductService {
     if (preOrder) filter.push({ term: { isPreorder: true } });
     if (limited) filter.push({ term: { isLimited: true } });
     if (setFilter) filter.push({ term: { isSet: true } });
-    if (discountOnly) filter.push({ exists: { field: "oldPrice" } });
+    // Pencere tarihleri indekste yok; kesin isOnSale kuralı Postgres yolunda
+    // (onSaleWhere). Burada en azından çizili > satış fiyatı şartı aranır.
+    if (discountOnly) {
+      filter.push({
+        script: {
+          script: {
+            source:
+              "doc['oldPrice'].size() > 0 && doc['oldPrice'].value > doc['price'].value",
+          },
+        },
+      });
+    }
 
     // Text-based fallback filters (when ID is not available)
     if (brand && !brandId) {
@@ -338,7 +352,10 @@ export class SearchProductService {
     // ürünler hangi sıralama seçilirse seçilsin en alta iner. Tek-statülü
     // sorgularda (örn. status=active) zaten çoğunlukla no-op'tur. Eski indeks
     // dokümanlarında alan bulunmayabilir → missing '_first' ile stok-içi sayılır.
-    sort = [{ inStock: { order: "desc", missing: "_first" } }, ...sort];
+    sort = withEsIdTiebreaker([
+      { inStock: { order: "desc", missing: "_first" } },
+      ...sort,
+    ]);
 
     try {
       const searchBody: any = {
@@ -803,7 +820,9 @@ export class SearchProductService {
     );
 
     if (discountOnly) {
-      (where.AND as any[]).push({ oldPrice: { not: null } });
+      (where.AND as any[]).push(
+        onSaleWhere(new Date(), this.prisma.product.fields.price),
+      );
     }
 
     let orderBy: any;
@@ -824,6 +843,7 @@ export class SearchProductService {
       default:
         orderBy = { createdAt: "desc" };
     }
+    const orderByWithTiebreaker = withIdTiebreaker([orderBy]);
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -835,7 +855,7 @@ export class SearchProductService {
           seller: { select: PUBLIC_NAME_SELECT },
           images: { take: 1, select: { cardKey: true } },
         },
-        orderBy,
+        orderBy: orderByWithTiebreaker,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

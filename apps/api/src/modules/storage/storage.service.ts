@@ -545,7 +545,16 @@ export class StorageService implements OnModuleInit {
     );
   }
 
-  async deleteFile(bucket: string, key: string): Promise<void> {
+  /**
+   * MediaFile kaydını ve nesneyi siler. S3 hatası varsayılan olarak yalnız
+   * loglanır (best-effort çağıranlar); `throwOnError` ile yükseltilir —
+   * outbox handler'ı gibi yeniden deneyen çağıranlar hatayı görmeli.
+   */
+  async deleteFile(
+    bucket: string,
+    key: string,
+    options: { throwOnError?: boolean } = {},
+  ): Promise<void> {
     // Database'den sil
     await this.prisma.mediaFile.deleteMany({
       where: { bucket, key },
@@ -569,6 +578,7 @@ export class StorageService implements OnModuleInit {
         this.logger.log(`✅ File deleted: ${fullKey}`);
       } catch (error: any) {
         this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
+        if (options.throwOnError) throw error;
       }
     }
   }
@@ -612,6 +622,18 @@ export class StorageService implements OnModuleInit {
     }
     const normalizedKey = key.startsWith("/") ? key.slice(1) : key;
     return `${baseUrl.replace(/\/$/, "")}/${normalizedKey}`;
+  }
+
+  /**
+   * `getPublicAssetUrl`'in tersi: bizim public kökümüzdeki tam URL'den nesne
+   * anahtarını çıkarır. Kök tanımsızsa, URL başka bir adresteyse (ör. sosyal
+   * girişin profil resmi) ya da yol bir public nesne anahtarı değilse null.
+   */
+  publicAssetKeyFromUrl(url: string): string | null {
+    const base = this.publicBaseUrl().trim().replace(/\/$/, "");
+    if (!base || !url.startsWith(`${base}/`)) return null;
+    const key = url.slice(base.length + 1).split(/[?#]/)[0];
+    return isPublicStorageKey(key) ? key : null;
   }
 
   /**

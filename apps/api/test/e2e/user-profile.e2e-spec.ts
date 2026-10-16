@@ -82,19 +82,50 @@ describe("User profile + addresses + follow + block (E2E)", () => {
   // ============================================================================
 
   describe("DELETE /api/users/me", () => {
-    it("rejects deletion when user has active products (400)", async () => {
+    // S3 — Apple 5.1.1(v), Play: aktif ilan silmeyi engellemez; pasife alınır.
+    it("deletes the account and deactivates its active products", async () => {
       const user = await createUser(ctx.module, { isSeller: true });
-      await createProduct({
+      const product = await createProduct({
         sellerId: user.id,
         categoryId: baseline.categoryId,
         price: 100,
         quantity: 1,
       });
 
+      await request(ctx.app.getHttpServer())
+        .delete("/api/users/me")
+        .set(authHeader(user))
+        .expect(200);
+
+      const row = await getPrisma().product.findUnique({
+        where: { id: product.id },
+        select: { status: true, removalReason: true },
+      });
+      expect(row?.status).toBe("inactive");
+      expect(row?.removalReason).toBe("account_deleted");
+    });
+
+    it("still rejects deletion while a listing is reserved for a sale or trade (400)", async () => {
+      const user = await createUser(ctx.module, { isSeller: true });
+      const product = await createProduct({
+        sellerId: user.id,
+        categoryId: baseline.categoryId,
+        price: 100,
+        quantity: 1,
+      });
+      await getPrisma().product.update({
+        where: { id: product.id },
+        data: { status: "reserved" },
+      });
+
       const res = await request(ctx.app.getHttpServer())
         .delete("/api/users/me")
-        .set(authHeader(user));
-      expect([400, 403]).toContain(res.status);
+        .set(authHeader(user))
+        .expect(400);
+      expect(res.body.details.activeProducts).toBe(1);
+      expect(JSON.stringify(res.body.errors)).toContain(
+        "süren bir satışa ya da takasa bağlı",
+      );
     });
 
     it("rejects unauthenticated (401)", async () => {

@@ -1,4 +1,5 @@
 import {
+  catalogProductWhere,
   inStockWhere,
   publicListingWhere,
 } from "../../product/helpers/catalog-product-where";
@@ -131,7 +132,13 @@ describe("AdminCatalogService list sorting", () => {
 
   it("paginates manufacturers and preserves response mapping", async () => {
     prisma.manufacturer.findMany.mockResolvedValue([
-      { id: "m1", name: "Maker", slug: "maker", logo: null },
+      {
+        id: "m1",
+        name: "Maker",
+        slug: "maker",
+        logo: null,
+        _count: { products: 0 },
+      },
     ]);
     prisma.manufacturer.count.mockResolvedValue(1);
 
@@ -145,6 +152,134 @@ describe("AdminCatalogService list sorting", () => {
     );
     expect(result.data[0].logo).toBeNull();
     expect(result.meta.total).toBe(1);
+  });
+
+  describe("marka/üretici ilan sayaçları", () => {
+    beforeAll(() => {
+      jest.useFakeTimers({ now: new Date("2026-10-14T10:00:00Z") });
+    });
+    afterAll(() => {
+      jest.useRealTimers();
+    });
+
+    const makers = [
+      { id: "m1", name: "A", slug: "a", logo: null, _count: { products: 5 } },
+      { id: "m2", name: "B", slug: "b", logo: null, _count: { products: 2 } },
+      { id: "m3", name: "C", slug: "c", logo: null, _count: { products: 0 } },
+    ];
+
+    it("toplam ve aktif ilan sayısını vitrinle AYNI predikatla döndürür", async () => {
+      prisma.manufacturer.findMany.mockResolvedValue(makers);
+      prisma.manufacturer.count.mockResolvedValue(3);
+      prisma.product.groupBy.mockResolvedValue([
+        { manufacturerId: "m1", _count: { _all: 1 } },
+        { manufacturerId: "m2", _count: { _all: 2 } },
+      ]);
+
+      const result = await service.getManufacturers({});
+
+      expect(prisma.manufacturer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: {
+            _count: { select: { products: { where: catalogProductWhere() } } },
+          },
+        }),
+      );
+      expect(prisma.product.groupBy).toHaveBeenCalledWith({
+        by: ["manufacturerId"],
+        where: {
+          ...publicListingWhere(),
+          manufacturerId: { in: ["m1", "m2", "m3"] },
+        },
+        _count: { _all: true },
+      });
+      expect(
+        result.data.map((m: any) => [
+          m.id,
+          m.listingCount,
+          m.activeListingCount,
+        ]),
+      ).toEqual([
+        ["m1", 5, 1],
+        ["m2", 2, 2],
+        ["m3", 0, 0],
+      ]);
+      // İç Prisma sayacı yanıta sızmaz.
+      expect(result.data[0]).not.toHaveProperty("_count");
+    });
+
+    it("listingCount sıralaması DB'de products._count ile yapılır", async () => {
+      await service.getManufacturers({
+        sortBy: "listingCount",
+        sortOrder: "desc",
+      });
+      expect(prisma.manufacturer.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orderBy: { products: { _count: "desc" } } }),
+      );
+
+      await service.getBrands({ sortBy: "listingCount", sortOrder: "asc" });
+      expect(prisma.brand.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orderBy: { products: { _count: "asc" } } }),
+      );
+    });
+
+    it("activeListingCount sıralaması tüm satırlarda hesaplanıp sayfalanır", async () => {
+      prisma.manufacturer.findMany.mockResolvedValue(makers);
+      prisma.product.groupBy.mockResolvedValue([
+        { manufacturerId: "m1", _count: { _all: 1 } },
+        { manufacturerId: "m3", _count: { _all: 4 } },
+      ]);
+
+      const result = await service.getManufacturers({
+        sortBy: "activeListingCount",
+        sortOrder: "desc",
+        page: 1,
+        limit: 2,
+      });
+
+      const findArgs = prisma.manufacturer.findMany.mock.calls[0][0];
+      expect(findArgs).not.toHaveProperty("skip");
+      expect(findArgs).not.toHaveProperty("take");
+      expect(prisma.manufacturer.count).not.toHaveBeenCalled();
+      expect(result.data.map((m: any) => m.id)).toEqual(["m3", "m1"]);
+      expect(result.meta).toEqual({
+        total: 3,
+        page: 1,
+        limit: 2,
+        totalPages: 2,
+      });
+    });
+
+    it("markalarda da sayaçları döndürür; boş sayfada groupBy atlanır", async () => {
+      await service.getBrands({});
+      expect(prisma.product.groupBy).not.toHaveBeenCalled();
+
+      prisma.brand.findMany.mockResolvedValue([
+        {
+          id: "b1",
+          name: "Ferrari",
+          slug: "ferrari",
+          logo: null,
+          isActive: true,
+          _count: { products: 7 },
+        },
+      ]);
+      prisma.product.groupBy.mockResolvedValue([
+        { brandId: "b1", _count: { _all: 3 } },
+      ]);
+
+      const result = await service.getBrands({});
+
+      expect(prisma.product.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ["brandId"],
+          where: { ...publicListingWhere(), brandId: { in: ["b1"] } },
+        }),
+      );
+      expect(result.data[0]).toEqual(
+        expect.objectContaining({ listingCount: 7, activeListingCount: 3 }),
+      );
+    });
   });
 
   it("keeps the compound car-model default and maps brand.name sorting", async () => {
@@ -290,20 +425,29 @@ describe("AdminCatalogService list sorting", () => {
   });
 });
 
-describe("AdminCatalogService brand/manufacturer listing counts", () => {
+describe("AdminCatalogService brand/manufacturer listing filters", () => {
   let prisma: any;
   let service: AdminCatalogService;
+
+  // `publicListingWhere()` saati gömer; beklenen ile gerçek predikat aynı anı görsün.
+  beforeAll(() => {
+    jest.useFakeTimers({ now: new Date("2026-10-16T10:00:00Z") });
+  });
+  afterAll(() => {
+    jest.useRealTimers();
+  });
 
   beforeEach(() => {
     ({ prisma, service } = buildCatalogService());
   });
 
-  const brandRow = (id: string, name: string) => ({
+  const brandRow = (id: string, name: string, total = 0) => ({
     id,
     name,
     slug: name.toLowerCase(),
     logo: null,
     isActive: true,
+    _count: { products: total },
   });
 
   it("counts only the page rows with the public rule (active + in-stock + sale-capable seller)", async () => {
@@ -320,36 +464,23 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
     );
     expect(args.where.AND).toEqual([inStockWhere()]);
     expect(args.where.status).toBe("active");
-
-    prisma.manufacturer.findMany.mockResolvedValue([
-      { id: "m1", name: "M", slug: "m", logo: null },
-    ]);
-    await service.getManufacturers({});
-    expect(prisma.product.groupBy.mock.calls[1][0].by).toEqual([
-      "manufacturerId",
-    ]);
-    expect(
-      prisma.product.groupBy.mock.calls[1][0].where.manufacturerId,
-    ).toEqual({ in: ["m1"] });
   });
 
-  it("skips the count query when the page is empty", async () => {
-    prisma.brand.findMany.mockResolvedValue([]);
-    const result = await service.getBrands({});
-    expect(prisma.product.groupBy).not.toHaveBeenCalled();
-    expect(result.data).toEqual([]);
-  });
-
-  it("adds listingCount to every brand row (0 when none)", async () => {
+  it("adds activeListingCount to every brand row (0 when none)", async () => {
     prisma.brand.findMany.mockResolvedValue([
-      brandRow("b1", "Bruder"),
-      brandRow("b2", "Siku"),
+      brandRow("b1", "Bruder", 9),
+      brandRow("b2", "Siku", 1),
     ]);
     prisma.product.groupBy.mockResolvedValue([
       { brandId: "b1", _count: { _all: 7 } },
     ]);
     const result = await service.getBrands({});
-    expect(result.data.map((b) => b.listingCount)).toEqual([7, 0]);
+    expect(
+      result.data.map((b) => [b.listingCount, b.activeListingCount]),
+    ).toEqual([
+      [9, 7],
+      [1, 0],
+    ]);
   });
 
   it("filters brands with hasListings=true / false by a relation filter", async () => {
@@ -367,20 +498,19 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
     );
   });
 
-  it("sorts brands by listingCount using the public count, not Prisma _count", async () => {
+  it("sorts brands by activeListingCount using the public count, not Prisma _count", async () => {
     prisma.brand.findMany.mockResolvedValue([
-      brandRow("b1", "A"),
-      brandRow("b2", "B"),
-      brandRow("b3", "C"),
+      brandRow("b1", "A", 5),
+      brandRow("b2", "B", 8),
+      brandRow("b3", "C", 9),
     ]);
-    prisma.brand.count.mockResolvedValue(3);
     prisma.product.groupBy.mockResolvedValue([
       { brandId: "b1", _count: { _all: 2 } },
       { brandId: "b3", _count: { _all: 9 } },
     ]);
 
     const desc = await service.getBrands({
-      sortBy: "listingCount",
+      sortBy: "activeListingCount",
       sortOrder: "desc",
       limit: 2,
     });
@@ -388,15 +518,21 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
     expect(desc.meta).toEqual({ total: 3, page: 1, limit: 2, totalPages: 2 });
 
     const asc = await service.getBrands({
-      sortBy: "listingCount",
+      sortBy: "activeListingCount",
       sortOrder: "asc",
     });
     expect(asc.data.map((b) => b.id)).toEqual(["b2", "b1", "b3"]);
   });
 
-  it("filters manufacturers by status and listing presence and adds listingCount", async () => {
+  it("filters manufacturers by status and listing presence", async () => {
     prisma.manufacturer.findMany.mockResolvedValue([
-      { id: "m1", name: "Maker", slug: "maker", logo: null },
+      {
+        id: "m1",
+        name: "Maker",
+        slug: "maker",
+        logo: null,
+        _count: { products: 6 },
+      },
     ]);
     prisma.product.groupBy.mockResolvedValue([
       { manufacturerId: "m1", _count: { _all: 4 } },
@@ -413,22 +549,9 @@ describe("AdminCatalogService brand/manufacturer listing counts", () => {
         },
       }),
     );
-    expect(result.data[0].listingCount).toBe(4);
-  });
-
-  it("sorts manufacturers by listingCount", async () => {
-    prisma.manufacturer.findMany.mockResolvedValue([
-      { id: "m1", name: "A", slug: "a", logo: null },
-      { id: "m2", name: "B", slug: "b", logo: null },
-    ]);
-    prisma.product.groupBy.mockResolvedValue([
-      { manufacturerId: "m2", _count: { _all: 5 } },
-    ]);
-    const result = await service.getManufacturers({
-      sortBy: "listingCount",
-      sortOrder: "desc",
-    });
-    expect(result.data.map((m) => m.id)).toEqual(["m2", "m1"]);
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({ listingCount: 6, activeListingCount: 4 }),
+    );
   });
 });
 

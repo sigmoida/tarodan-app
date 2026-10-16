@@ -35,6 +35,15 @@ export class CreateTrustBadgeDto {
   })
   description?: LocalizedText | null;
 
+  @ApiPropertyOptional({
+    description:
+      "Mobile app (iOS and Android) hides this badge; web ignores it",
+    default: false,
+  })
+  @IsOptionalNotNull()
+  @IsBoolean()
+  hideOnIos?: boolean;
+
   @ApiPropertyOptional({ description: "Is active", default: true })
   @IsOptionalNotNull()
   @IsBoolean()

@@ -7,6 +7,7 @@ import { AdminNotificationService } from "./admin-notification.service";
  * Kurallar: HTML sunucuda süzülür; varsayılan tür duyurudur (eski davranış:
  * herkese); pazarlama yalnız izinli üyelere gider; zamanlanmış gönderim aynı
  * içeriği taşır; HTML göndermeyen çağıran (mobil/eski) etkilenmez.
+ * Türün push + zil kitlesine etkisi: admin-notification-marketing-audience.spec.
  */
 describe("AdminNotificationService — HTML e-posta", () => {
   const makeService = () => {
@@ -23,7 +24,8 @@ describe("AdminNotificationService — HTML e-posta", () => {
       },
       user: {
         count: jest.fn().mockResolvedValue(0),
-        findMany: jest.fn().mockResolvedValue([]),
+        // Pazarlama kitlesi sorgusu: varsayılan olarak iki alıcı da izinli.
+        findMany: jest.fn().mockResolvedValue([{ id: "u1" }, { id: "u2" }]),
       },
     };
     const eventService = {
@@ -162,8 +164,9 @@ describe("AdminNotificationService — HTML e-posta", () => {
       expect(result.emailRecipientCount).toBe(1);
     });
 
-    it("push satırları pazarlama süzgecinden etkilenmez", async () => {
+    it("push satırları da yalnız izinli üyelere yazılır (S1)", async () => {
       const { service, prisma } = makeService();
+      prisma.user.findMany.mockResolvedValueOnce([{ id: "u1" }]);
 
       await service.sendNotification(
         "admin-1",
@@ -173,7 +176,7 @@ describe("AdminNotificationService — HTML e-posta", () => {
       const pushRows = prisma.notificationLog.createMany.mock.calls
         .flatMap((call: any[]) => call[0].data)
         .filter((row: any) => row.channel === "push");
-      expect(pushRows.map((row: any) => row.userId)).toEqual(["u1", "u2"]);
+      expect(pushRows.map((row: any) => row.userId)).toEqual(["u1"]);
     });
   });
 

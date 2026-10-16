@@ -4,6 +4,7 @@ import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
 import { fetchHeroSlides, fetchTrustBadges } from "@/lib/api/hero";
+import { MANUFACTURERS_WITH_LISTINGS_PATH } from "@/lib/api/catalog";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
 import { toMarqueeItems, type MarqueeManufacturer } from "./_home/lib/helpers";
@@ -79,10 +80,12 @@ async function fetchDiscountedProducts(): Promise<Product[]> {
   return products.filter(hasRealDiscount);
 }
 
+/** Marka şeridi: yalnız aktif ilanı olan üreticiler (API `hasListings`). */
 async function fetchManufacturers(): Promise<MarqueeManufacturer[]> {
-  const res = await fetch(`${API_BASE}/api/manufacturers`, {
-    next: { revalidate: 60 },
-  });
+  const res = await fetch(
+    `${API_BASE}/api${MANUFACTURERS_WITH_LISTINGS_PATH}`,
+    { next: { revalidate: 60 } },
+  );
   if (!res.ok) throw new Error(`manufacturers ${res.status}`);
   return unwrapList<MarqueeManufacturer>(await res.json());
 }

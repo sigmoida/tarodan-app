@@ -1,3 +1,6 @@
+import { OrderStatus } from "@prisma/client";
+import { OFFER_ADMIN_CANCEL_PREFIX } from "../../trade/helpers/trade-cancel-reasons";
+
 /**
  * Sipariş iptal gerekçeleri için TEK kaynak. `Order.cancelReason` serbest
  * metin kolondur; otomatik yollar buradaki sabitleri yazar ki müşteri
@@ -45,4 +48,50 @@ export function isOrderExpiryCancelReason(
   reason: string | null | undefined,
 ): boolean {
   return reason != null && ORDER_EXPIRY_CANCEL_REASONS.includes(reason);
+}
+
+/** "Yönetici tarafından iptal edildi[: <etiket>]" — `adminCancelReasonText`in yazdığı metin. */
+function hasAdminCancelPrefix(reason: string): boolean {
+  return (
+    reason === OFFER_ADMIN_CANCEL_PREFIX ||
+    reason.startsWith(`${OFFER_ADMIN_CANCEL_PREFIX}:`)
+  );
+}
+
+/**
+ * Ham `cancelReason`'ı stabil bir kategoriye eşler; istemciler (web, mobil) bu
+ * kategoriye göre kullanıcı dostu mesaj gösterir. Tanınmayan serbest metinler
+ * `other` kalır ve ham haliyle gösterilir. Yalnız iptal edilmiş siparişler için
+ * anlamlıdır; aksi halde null.
+ *
+ * Yönetici iptali iki biçimde yazılmıştır: güncel "Yönetici tarafından iptal
+ * edildi: <etiket>" (admin-cancel-reason.ts) ve eski "Admin tarafından iptal
+ * edildi" / "Admin force-cancel …". Çıktı sözlüğü `coupon-restore-policy.ts`
+ * ile paylaşılır (alıcı kusuru kategorileri).
+ */
+export function deriveOrderCancelCategory(order: {
+  status: OrderStatus;
+  cancelReason?: string | null;
+}): string | null {
+  if (order.status !== OrderStatus.cancelled) return null;
+  const reason = (order.cancelReason ?? "").trim();
+  if (!reason) return "buyer_cancelled";
+  if (reason === ORDER_CANCEL_REASON.paymentWindowExpired)
+    return "payment_timeout";
+  if (reason === ORDER_CANCEL_REASON.sellerShipDeadlineExpired)
+    return "seller_no_ship";
+  // Serbest metin eşleşmelerinden ÖNCE: etiket "stok" ya da "takas" geçebilir
+  // ve sabit önek, o kelimelerden daha güçlü bir kanıttır.
+  if (hasAdminCancelPrefix(reason)) return "admin";
+  if (reason.includes("Stok tüken")) return "stockout";
+  if (reason.includes("takas")) return "trade_reserved";
+  if (reason === ORDER_CANCEL_REASON.replacedByNewCheckout)
+    return "bulk_replaced";
+  if (reason === "Alıcı lehine iptal edildi") return "admin_buyer_favor";
+  if (
+    reason === "Admin tarafından iptal edildi" ||
+    reason.startsWith("Admin force-cancel")
+  )
+    return "admin";
+  return "other";
 }

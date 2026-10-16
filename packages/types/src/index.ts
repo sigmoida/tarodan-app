@@ -168,3 +168,6 @@ export * from "./content-platform";
 
 // Vitrin hero'su + güven rozetleri: yerleşimler, sınırlar, public/admin şekiller
 export * from "./hero";
+
+// Password policy (API validators, web schemas and the live requirement list)
+export * from "./password-policy";

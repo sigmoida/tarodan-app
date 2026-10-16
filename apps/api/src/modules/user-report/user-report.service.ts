@@ -1,6 +1,7 @@
 /**
  * User Report Service
- * Handles user-generated reports for products, users, collections, and messages
+ * Handles user-generated reports for products, users, collections, messages
+ * and reviews (product reviews and seller ratings)
  */
 import {
   Injectable,
@@ -469,6 +470,13 @@ export class UserReportService {
           );
         break;
 
+      case ReportType.REVIEW:
+        if (!(await this.getReviewTarget(targetId)))
+          throw new NotFoundException(
+            i18nMessage("server.rating.reviewNotFound"),
+          );
+        break;
+
       default:
         throw new BadRequestException(
           i18nMessage("server.userReport.invalidType"),
@@ -518,9 +526,77 @@ export class UserReportService {
           },
         });
 
+      case ReportType.REVIEW:
+        return this.getReviewTarget(targetId);
+
       default:
         return null;
     }
+  }
+
+  /**
+   * Şikayet edilen yorum — ürün yorumu (`ProductRating`) ya da satıcı
+   * değerlendirmesi (`Rating`). İstemci hangisi olduğunu göndermez (mobil ve
+   * web aynı "yorumu şikayet et" eylemini kullanır); kimlik iki tabloda
+   * aranır ve admin paneli için tek bir şekle çevrilir. Bulunamazsa null.
+   */
+  private async getReviewTarget(targetId: string): Promise<{
+    id: string;
+    reviewKind: "product" | "seller";
+    score: number;
+    /** Ürün yorumunun başlığı (satıcı değerlendirmesinde yok). */
+    title?: string | null;
+    comment: string | null;
+    status: string;
+    author: { id: string; displayName: string } | null;
+    product?: { id: string; title: string } | null;
+    receiver?: { id: string; displayName: string } | null;
+  } | null> {
+    const productReview = await this.prisma.productRating.findUnique({
+      where: { id: targetId },
+      select: {
+        id: true,
+        score: true,
+        title: true,
+        review: true,
+        status: true,
+        user: { select: { id: true, displayName: true } },
+        product: { select: { id: true, title: true } },
+      },
+    });
+    if (productReview) {
+      return {
+        id: productReview.id,
+        reviewKind: "product",
+        score: productReview.score,
+        title: productReview.title,
+        comment: productReview.review,
+        status: productReview.status,
+        author: productReview.user,
+        product: productReview.product,
+      };
+    }
+    const sellerReview = await this.prisma.rating.findUnique({
+      where: { id: targetId },
+      select: {
+        id: true,
+        score: true,
+        comment: true,
+        status: true,
+        giver: { select: { id: true, displayName: true } },
+        receiver: { select: { id: true, displayName: true } },
+      },
+    });
+    if (!sellerReview) return null;
+    return {
+      id: sellerReview.id,
+      reviewKind: "seller",
+      score: sellerReview.score,
+      comment: sellerReview.comment,
+      status: sellerReview.status,
+      author: sellerReview.giver,
+      receiver: sellerReview.receiver,
+    };
   }
 
   private mapToResponse(report: {
