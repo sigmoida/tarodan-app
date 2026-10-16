@@ -9,6 +9,7 @@ export interface ProductPriceFields {
   originalPrice?: number | null;
   salePrice?: number | null;
   isOnSale?: boolean;
+  discountPercent?: number | null;
 }
 
 /** Güncel satış fiyatı (A) – API her zaman price döndürüyor */
@@ -40,6 +41,20 @@ export function getProductOriginalPriceForDisplay(
         ? Number(p.originalPrice)
         : null;
   return old ?? Number(p.price);
+}
+
+/**
+ * Gösterilecek indirim yüzdesi: API'nin `discountPercent`'i, yoksa eski/güncel
+ * fiyattan hesaplanır. Kart ve detay rozetinin tek kaynağı.
+ */
+export function getProductDiscountPercent(p: ProductPriceFields): number {
+  if (p.discountPercent != null) return p.discountPercent;
+  const original = getProductOriginalPriceForDisplay(p);
+  if (!(original > 0)) return 0;
+  return Math.max(
+    0,
+    Math.round((1 - getProductEffectivePrice(p) / original) * 100),
+  );
 }
 
 /**
