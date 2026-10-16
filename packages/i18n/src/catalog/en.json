@@ -11767,7 +11767,8 @@
       "invalidUploadTarget": "Invalid upload target: {folder}. Allowed targets: messages, reviews, collections",
       "actionForbidden": "You are not allowed to perform this action.",
       "fileMissing": "File not found.",
-      "fileForbidden": "You are not allowed to access this file."
+      "fileForbidden": "You are not allowed to access this file.",
+      "processingUnavailable": "Image processing is currently unavailable. Please try again later."
     },
     "search": {
       "reindexFailed": "Reindex failed"

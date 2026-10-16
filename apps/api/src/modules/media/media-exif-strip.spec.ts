@@ -40,17 +40,21 @@ function fileFrom(buffer: Buffer, mimetype = "image/jpeg") {
 
 function createService() {
   const uploaded: Buffer[] = [];
+  const options: Array<{ filename: string; mimeType: string }> = [];
   const storageService = {
-    uploadFile: jest.fn(async (buffer: Buffer) => {
-      uploaded.push(buffer);
-      return {
-        key: "k",
-        bucket: "messages",
-        size: buffer.length,
-        mimeType: "image/jpeg",
-        mediaFileId: "m1",
-      };
-    }),
+    uploadFile: jest.fn(
+      async (buffer: Buffer, opts: { filename: string; mimeType: string }) => {
+        uploaded.push(buffer);
+        options.push(opts);
+        return {
+          key: "k",
+          bucket: "messages",
+          size: buffer.length,
+          mimeType: "image/jpeg",
+          mediaFileId: "m1",
+        };
+      },
+    ),
     getPublicAssetUrl: jest.fn(() => "https://cdn.test/k"),
     hasPublicAssetBaseUrl: jest.fn(() => true),
     getPresignedDownloadUrl: jest.fn(async () => "https://signed.test/k"),
@@ -62,7 +66,7 @@ function createService() {
     {} as never,
     {} as never,
   );
-  return { service, uploaded };
+  return { service, uploaded, options };
 }
 
 describe("MediaService.upload — EXIF/GPS silme", () => {
@@ -101,5 +105,55 @@ describe("MediaService.upload — EXIF/GPS silme", () => {
       service.upload(fileFrom(Buffer.from("garbage")), { bucket: "messages" }),
     ).rejects.toThrow();
     expect(uploaded).toHaveLength(0);
+  });
+  it("JPEG diye gelen AVIF: JPEG olarak, gerçek tür ve uzantıyla yazılır", async () => {
+    const { service, uploaded, options } = createService();
+    const avif = await sharp({
+      create: { width: 40, height: 20, channels: 3, background: "#c86432" },
+    })
+      .withExif({ IFD0: { Make: MARKER } })
+      .avif()
+      .toBuffer();
+
+    const result = await service.upload(
+      fileFrom(avif, "image/jpeg"),
+      { bucket: "messages" },
+      "u1",
+    );
+
+    const meta = await sharp(uploaded[0]).metadata();
+    expect(meta.format).toBe("jpeg");
+    expect(uploaded[0].includes(MARKER)).toBe(false);
+    expect(options[0].mimeType).toBe("image/jpeg");
+    expect(options[0].filename).toMatch(/\.jpg$/);
+    expect(result.key).toBeTruthy();
+  });
+
+  it("SVG (görsel MIME'ıyla) 400 ile reddedilir, depoya gitmez", async () => {
+    const { service, uploaded } = createService();
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+    );
+
+    await expect(
+      service.upload(fileFrom(svg, "image/png"), { bucket: "messages" }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { i18nKey: "server.media.unsupportedTypeWithGif" },
+    });
+    expect(uploaded).toHaveLength(0);
+  });
+
+  it("meta verisiz dik JPEG yeniden kodlanmadan aynen yazılır", async () => {
+    const { service, uploaded } = createService();
+    const clean = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: "#fff" },
+    })
+      .jpeg()
+      .toBuffer();
+
+    await service.upload(fileFrom(clean), { bucket: "messages" }, "u1");
+
+    expect(uploaded[0].equals(clean)).toBe(true);
   });
 });

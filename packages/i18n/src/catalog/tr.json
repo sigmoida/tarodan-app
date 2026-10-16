@@ -11767,7 +11767,8 @@
       "invalidUploadTarget": "Geçersiz yükleme hedefi: {folder}. İzinli hedefler: messages, reviews, collections",
       "actionForbidden": "Bu işlem için yetkiniz yok.",
       "fileMissing": "Dosya bulunamadı.",
-      "fileForbidden": "Bu dosya üzerinde yetkiniz yok."
+      "fileForbidden": "Bu dosya üzerinde yetkiniz yok.",
+      "processingUnavailable": "Görsel işleme şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
     },
     "search": {
       "reindexFailed": "Reindex başarısız"

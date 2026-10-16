@@ -25,7 +25,10 @@ import {
   configureSharpSafety,
   isBlockedSharpMimeType,
 } from "../../common/image/sharp-safety";
-import { stripImageMetadata } from "../../common/image/strip-image-metadata";
+import {
+  stripImageMetadata,
+  UnsupportedImageError,
+} from "../../common/image/strip-image-metadata";
 import { i18nMessage } from "../i18n";
 import {
   isMessageAttachmentId,
@@ -290,10 +293,6 @@ export class MediaService {
       );
     }
 
-    // Generate unique filename
-    const ext = file.originalname.split(".").pop();
-    const filename = `${uuidv4()}.${ext}`;
-
     // Görsel her yolda sharp'tan geçer (meta veri silme dahil); sharp yoksa
     // ham dosyayı (GPS'iyle) yüklemek yerine açık hata — ürün görseli yolu
     // da aynı kapıyı kullanır. Try'ın dışında: nedeni 400'e gömülmesin.
@@ -303,21 +302,23 @@ export class MediaService {
 
     try {
       let buffer = file.buffer;
+      let mimeType = file.mimetype;
+      let ext = file.originalname.split(".").pop();
 
       if (sharpLib) {
-        // Boyutlandırmalı yolda da sharp çıktısı meta veriyi taşımaz;
-        // boyutlandırmasız yolda (mesaj eki, iade kanıtı, yorum/koleksiyon
-        // görseli) EXIF/GPS ayrıca silinir. İkisinde de yön önce uygulanır.
-        buffer = resize
-          ? await sharpLib(buffer)
-              .autoOrient()
-              .resize(resize.width, resize.height, {
-                fit: resize.fit || "cover",
-                withoutEnlargement: resize.withoutEnlargement,
-              })
-              .toBuffer()
-          : await stripImageMetadata(sharpLib, buffer);
+        // EXIF/GPS silinir, yön uygulanır, istenirse boyutlandırılır. Biçim
+        // İÇERİKTEN belirlenir (istemci MIME'ı keyfi): JPEG/PNG/WebP kalır,
+        // başka raster JPEG olur → depodaki tür/uzantı gerçeğe göre yazılır.
+        const prepared = await stripImageMetadata(sharpLib, buffer, {
+          resize,
+        });
+        buffer = prepared.buffer;
+        mimeType = prepared.mimeType;
+        ext = prepared.extension;
       }
+
+      // Generate unique filename
+      const filename = `${uuidv4()}.${ext}`;
 
       // Upload main file using StorageService
       const uploadResult = await this.storageService.uploadFile(
@@ -326,7 +327,7 @@ export class MediaService {
           bucket,
           folder,
           filename,
-          mimeType: file.mimetype,
+          mimeType,
           entityType,
           entityId,
         },
@@ -363,9 +364,9 @@ export class MediaService {
       }
 
       // Generate thumbnail if requested and sharp is available
-      if (generateThumbnail && file.mimetype.startsWith("image/") && sharp) {
-        const thumbBuffer = await sharp(file.buffer)
-          .autoOrient()
+      if (generateThumbnail && sharpLib) {
+        // Kaynak, meta verisi silinmiş ve yönü uygulanmış tampondur.
+        const thumbBuffer = await sharpLib(buffer)
           .resize(200, 200, { fit: "cover" })
           .toBuffer();
 
@@ -376,7 +377,7 @@ export class MediaService {
             bucket,
             folder: `${folder}/thumbnails`,
             filename: thumbFilename,
-            mimeType: file.mimetype,
+            mimeType,
             entityType,
             entityId,
           },
@@ -390,6 +391,11 @@ export class MediaService {
       return result;
     } catch (error: any) {
       this.logger.error(`Upload failed: ${error.message}`);
+      if (error instanceof UnsupportedImageError) {
+        throw new BadRequestException(
+          i18nMessage("server.media.unsupportedTypeWithGif"),
+        );
+      }
       throw new BadRequestException("File upload failed");
     }
   }
