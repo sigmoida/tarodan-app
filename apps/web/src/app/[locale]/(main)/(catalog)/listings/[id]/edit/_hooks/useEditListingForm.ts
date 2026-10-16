@@ -203,6 +203,7 @@ export function useEditListingForm({
       ? [
           listingQuery.data.edit.price,
           listingQuery.data.edit.oldPrice,
+          listingQuery.data.edit.originalPrice,
           listingQuery.data.edit.salePrice,
         ]
       : [],

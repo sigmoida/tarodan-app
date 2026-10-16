@@ -115,6 +115,27 @@ export const priceLimitMessages = (locale: string) => {
 
 export type PriceLimitMessages = ReturnType<typeof priceLimitMessages>;
 
+/**
+ * Teklif giriş alanının tavanı: ilan fiyatının hemen altındaki tam tutar.
+ * Teklif ekranı (`OfferModal`) alanın `max`'ını ve "teklif imkânsız" kararını
+ * AYNI yerden alır.
+ */
+export function maxOfferAmount(effectivePrice: number): number {
+  return Math.max(0, Math.round(effectivePrice) - 1);
+}
+
+/**
+ * Hiçbir geçerli teklif yok mu? Taban, teklif alanının tavanını aşıyorsa (ör.
+ * ilan tam alt sınırda: taban fiyata eşit, teklif ise fiyatın ALTINDA olmak
+ * zorunda) teklif girişi gösterilmez.
+ */
+export function isOfferImpossible(
+  floor: number | null,
+  effectivePrice: number,
+): boolean {
+  return floor != null && floor > maxOfferAmount(effectivePrice);
+}
+
 /** Sınırlar + (düzenlemede) ilanın kayıtlı fiyatları. */
 export interface ListingPriceRules {
   limits: PriceLimits;

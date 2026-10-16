@@ -3,7 +3,9 @@ import { buildEditListingSchema, emptyEditValues } from "../edit/schema";
 import {
   NO_PRICE_LIMITS,
   checkListingPrice,
+  isOfferImpossible,
   isStoredPrice,
+  maxOfferAmount,
   offerPriceFloor,
   parsePriceLimits,
   priceLimitMessages,
@@ -202,5 +204,31 @@ describe("salePriceLimitMessage", () => {
     expect(
       salePriceLimitMessage(sale("1"), 1000, { limits: NO_PRICE_LIMITS }, msg),
     ).toBeNull();
+  });
+});
+
+describe("maxOfferAmount / isOfferImpossible", () => {
+  it("tavan, ilan fiyatının hemen altındaki tam tutardır", () => {
+    expect(maxOfferAmount(1000)).toBe(999);
+    expect(maxOfferAmount(250.4)).toBe(249);
+    expect(maxOfferAmount(0)).toBe(0);
+  });
+
+  it("taban tavanı aşıyorsa teklif imkânsızdır", () => {
+    // İlan tam alt sınırda: taban fiyata eşit, teklif fiyatın altında olmalı.
+    expect(isOfferImpossible(250, 250)).toBe(true);
+    // Fiyat tam sayıya yuvarlanınca tavan 249 olur.
+    expect(isOfferImpossible(250, 250.4)).toBe(true);
+  });
+
+  it("taban tavanı aşmıyorsa teklif mümkündür", () => {
+    expect(isOfferImpossible(250, 251)).toBe(false);
+    expect(isOfferImpossible(250, 1000)).toBe(false);
+    // Tavan yuvarlama sınırı: 250,5 → 251 → tavan 250 (taban 250 geçerli).
+    expect(isOfferImpossible(250, 250.5)).toBe(false);
+  });
+
+  it("taban yoksa (kural yok / eski ilan) teklif engellenmez", () => {
+    expect(isOfferImpossible(null, 250)).toBe(false);
   });
 });

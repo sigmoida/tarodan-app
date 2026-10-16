@@ -12,6 +12,7 @@ import {
 } from "@tarodan/ui/form";
 import { offersApi } from "@/lib/api";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
+import { maxOfferAmount } from "@tarodan/listing-form/price-limits";
 import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { offerSchema, type OfferValues } from "./offerSchema";
@@ -91,7 +92,7 @@ export default function OfferModal() {
         label={t("offer.yourOfferAmount")}
         placeholder={t("product.offerAmountPlaceholder")}
         min={minOffer}
-        max={Math.max(0, Math.round(effectivePrice) - 1)}
+        max={maxOfferAmount(effectivePrice)}
         helperText={
           floor != null
             ? t("listing.priceMinHint", { minPrice: formatTL(floor) })

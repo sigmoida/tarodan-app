@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { Button, QuantityStepper } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { isOfferImpossible } from "@tarodan/listing-form/price-limits";
 import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import SellerCard from "./SellerCard";
@@ -36,9 +37,9 @@ export default function ProductInfo() {
 
   if (!listing) return null;
 
-  // İlan fiyatı tam alt sınırdaysa taban fiyata eşittir: teklif ilan fiyatının
-  // ALTINDA olmak zorunda olduğundan geçerli hiçbir teklif yoktur — giriş gizlenir.
-  const offerImpossible = offerFloor != null && offerFloor >= effectivePrice;
+  // Taban teklif alanının tavanını aşıyorsa (ör. ilan tam alt sınırda) geçerli
+  // hiçbir teklif yoktur — giriş gizlenir (OfferModal ile aynı kural).
+  const offerImpossible = isOfferImpossible(offerFloor, effectivePrice);
 
   const available = listing.availableQuantity ?? listing.quantity;
   const hasStock = available == null || available > 0;
