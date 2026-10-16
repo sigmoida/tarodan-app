@@ -195,7 +195,7 @@ function playwrightStage(context, id, label, options = {}) {
   );
 }
 
-function buildPushStages(context, apps) {
+function buildPushStages(context, apps, base) {
   const stages = [];
   // Each push stage carries its app so a passing app can be cached per tree.
   const pushFor = (app, ...appStages) =>
@@ -209,7 +209,15 @@ function buildPushStages(context, apps) {
         "@tarodan/api",
         "typecheck",
       ]),
-      jestStage(context, "api-unit", "API Unit", []),
+      // Push gate: only the tests related to files changed since the pushed
+      // base (jest --changedSince). The full suite runs in CI / release.
+      // Without a base (first push of a branch, no upstream) run everything.
+      jestStage(
+        context,
+        "api-unit",
+        "API Unit",
+        base ? [`--changedSince=${base}`, "--passWithNoTests"] : [],
+      ),
       commandStage("api-build", "API Build", [
         "--filter",
         "@tarodan/api...",
@@ -676,7 +684,11 @@ async function run() {
         `Already verified for tree ${headTree.slice(0, 12)}: ${skipped.join(", ")} (skipped)`,
       );
     }
-    stages = buildPushStages(context, pending);
+    stages = buildPushStages(
+      context,
+      pending,
+      changes.fallbackAll ? undefined : base,
+    );
   } else if (options.mode === "release") {
     stages = buildReleaseStages(context, options.paytr);
     continueOnFailure = true;
