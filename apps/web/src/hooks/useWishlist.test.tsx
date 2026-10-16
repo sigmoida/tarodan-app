@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (
@@ -37,8 +37,10 @@ import {
   useProductFavorite,
   useToggleWishlist,
   useWishlistIds,
+  useWishlistPendingIds,
 } from "./useWishlist";
 import { queryKeys } from "@/lib/query/keys";
+import { makeQueryClient } from "@/lib/query/client";
 import type { WishlistEntry } from "@/lib/wishlist";
 
 /** Elle çözülen istek — iyimser durumu yanıt gelmeden ölçmek için. */
@@ -62,6 +64,7 @@ let container: HTMLDivElement;
 let root: Root;
 let client: QueryClient;
 let ids: ReadonlySet<string>;
+let pendingIds: ReadonlySet<string>;
 let toggle: ReturnType<typeof useToggleWishlist>;
 let favorite: ReturnType<typeof useProductFavorite>;
 const requireAuth = vi.fn();
@@ -69,6 +72,7 @@ let isOwner = false;
 
 function Harness({ productId = "p1" }: { productId?: string }) {
   ids = useWishlistIds();
+  pendingIds = useWishlistPendingIds();
   toggle = useToggleWishlist();
   favorite = useProductFavorite(productId, { isOwner, requireAuth });
   return null;
@@ -107,8 +111,11 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  // Uygulamanın GERÇEK istemcisi: Sentry raporu onun MutationCache'inden gelir.
+  client = makeQueryClient();
+  client.setDefaultOptions({
+    queries: { retry: false },
+    mutations: { retry: false },
   });
   h.auth.isAuthenticated = true;
   h.auth.user = { id: "me" };
@@ -190,7 +197,8 @@ describe("useToggleWishlist", () => {
     expect(ids.has("p1")).toBe(false);
     expect(ids.has("p0")).toBe(true);
     expect(h.toast.error).toHaveBeenCalledWith("sunucu hatası");
-    // Varsayılan mutation hata raporlaması ezildiği için Sentry'ye biz yollarız.
+    // Rapor, kendi onError'ımıza rağmen MutationCache'ten bir kez gider.
+    expect(h.capture).toHaveBeenCalledTimes(1);
     expect(h.capture).toHaveBeenCalledWith(
       expect.objectContaining({ response: expect.anything() }),
       expect.objectContaining({ source: "react-query", type: "mutation" }),
@@ -207,6 +215,65 @@ describe("useToggleWishlist", () => {
     await flush();
     expect(cached()).toEqual([row("p0")]);
     expect(h.toast.error).toHaveBeenCalledWith("common.operationFailed");
+  });
+
+  it("çıkarma başarısızsa satır başa değil ESKİ yerine döner", async () => {
+    h.api.get.mockResolvedValue({
+      data: { items: [row("p0"), row("p1"), row("p2")] },
+    });
+    h.api.remove.mockRejectedValue(new Error("ağ"));
+    await render();
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", true);
+    });
+    await flush();
+
+    // Kart sırası zıplamaz: ortadaki favori yine ortada.
+    expect(cached()).toEqual([row("p0"), row("p1"), row("p2")]);
+  });
+
+  it("iyimser satır geçici olarak işaretlenir (rozet sayar, sayfa yükleniyor kartı çizer)", async () => {
+    const req = deferred();
+    h.api.add.mockReturnValue(req.promise);
+    await render();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+    expect(cached()?.[0]).toEqual({ productId: "p1", pending: true });
+
+    await act(async () => req.resolve({ status: 201 }));
+    await flush();
+  });
+
+  it("ekleme bitince geçici satır sunucunun satırıyla değişir (tazeleme düşse de)", async () => {
+    h.api.add.mockResolvedValue({ status: 201, data: row("p1") });
+    await render();
+    // Tazeleme hiç dönmez: geçici satır yine de kalıcı skeleton kalmamalı.
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+
+    expect(cached()).toEqual([row("p1"), row("p0")]);
+  });
+
+  it("yanıt satır taşımıyorsa geçici bayrak yine kalkar", async () => {
+    h.api.add.mockResolvedValue({ status: 201 });
+    await render();
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+
+    expect(cached()?.[0]).toEqual({ productId: "p1" });
   });
 
   it("409 (zaten favoride) başarı sayılır, geri alınmaz", async () => {
@@ -262,6 +329,38 @@ describe("useToggleWishlist", () => {
 
     await act(async () => req.resolve({ status: 201 }));
     await flush();
+  });
+
+  it("istek sürerken ürün meşgul görünür, bitince bırakılır", async () => {
+    const req = deferred();
+    h.api.add.mockReturnValue(req.promise);
+    await render();
+    expect(favorite.isPending).toBe(false);
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+    // Tıklama sessizce düşmesin: kalp ve Favorilerim düğmesi bunu okur.
+    expect(pendingIds.has("p1")).toBe(true);
+    expect(favorite.isPending).toBe(true);
+
+    await act(async () => req.resolve({ status: 201 }));
+    await flush();
+    expect(pendingIds.has("p1")).toBe(false);
+    expect(favorite.isPending).toBe(false);
+  });
+
+  it("hata sonrası da meşguliyet kalkar", async () => {
+    h.api.add.mockRejectedValue(new Error("ağ"));
+    await render();
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+    expect(favorite.isPending).toBe(false);
   });
 
   it("farklı ürünler aynı anda favorilenebilir", async () => {

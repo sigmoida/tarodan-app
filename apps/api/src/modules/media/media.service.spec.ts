@@ -250,3 +250,114 @@ describe("MediaService.upload — public kök URL'i tanımsız", () => {
     ).resolves.toMatchObject({ url: "https://signed.test/k" });
   });
 });
+
+/**
+ * Ölçü, kalite ve depo seçenekleri sharp'ın / depo servisinin kendi tiplerine
+ * bağlı sabitlerden gelir (eskiden `sharp: any` yüzünden hiçbiri derleyicide
+ * denetlenmiyordu). Burada ÇIKTI sabitlenir: tip düzeltmesi davranışı
+ * değiştirmemeli.
+ */
+describe("MediaService — türev ölçüleri ve depo seçenekleri", () => {
+  const IMMUTABLE_WEBP = {
+    mimeType: "image/webp",
+    contentType: "image/webp",
+    cacheControl: "public, max-age=31536000, immutable",
+    skipMediaFile: true,
+  };
+
+  function recordingService() {
+    const calls: Array<{ buffer: Buffer; options: Record<string, unknown> }> =
+      [];
+    const storageService = {
+      uploadFile: jest.fn(
+        async (buffer: Buffer, options: Record<string, unknown>) => {
+          calls.push({ buffer, options });
+          return { key: `k/${String(options.filename)}`, bucket: "x" };
+        },
+      ),
+      getPublicAssetUrl: jest.fn((key: string) => `https://cdn.test/${key}`),
+      hasPublicAssetBaseUrl: jest.fn(() => true),
+    };
+    const service = new MediaService(
+      {} as never,
+      {} as never,
+      storageService as never,
+      {} as never,
+    );
+    const byName = (suffix: string) =>
+      calls.find((call) => String(call.options.filename).endsWith(suffix))!;
+    return { service, calls, byName };
+  }
+
+  it("ürün türevleri: detay en çok 1200 (oran korunur), kart 500×500, değişmez WebP", async () => {
+    const { service, calls, byName } = recordingService();
+
+    await service.uploadProductImageVariants(
+      fileFrom(await jpegWithOrientation(3000, 1500, 1)),
+      "user-1",
+    );
+
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.options).toMatchObject({
+        bucket: "products",
+        ...IMMUTABLE_WEBP,
+      });
+    }
+    const detail = await sharp(byName("-detail.webp").buffer).metadata();
+    expect([detail.width, detail.height, detail.format]).toEqual([
+      1200,
+      600,
+      "webp",
+    ]);
+    const card = await sharp(byName("-card.webp").buffer).metadata();
+    expect([card.width, card.height, card.format]).toEqual([500, 500, "webp"]);
+  });
+
+  it("küçük kaynak detayda 1200'e büyütülür (eski davranış korunur)", async () => {
+    // `fit: "inside"` withoutEnlargement OLMADAN büyütür: 600×300 → 1200×600.
+    // Tip düzeltmesi bunu değiştirmemeli.
+    const { service, byName } = recordingService();
+
+    await service.uploadProductImageVariants(
+      fileFrom(await jpegWithOrientation(600, 300, 1)),
+      "user-1",
+    );
+
+    const detail = await sharp(byName("-detail.webp").buffer).metadata();
+    expect([detail.width, detail.height]).toEqual([1200, 600]);
+  });
+
+  it("koleksiyon kapağı: 1200×600 WebP, aynı değişmez depo seçenekleri", async () => {
+    const { service, calls } = recordingService();
+
+    await service.uploadCollectionCover(
+      fileFrom(await jpegWithOrientation(900, 900, 1)),
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].options).toMatchObject({
+      bucket: "collections",
+      folder: "covers",
+      ...IMMUTABLE_WEBP,
+    });
+    const cover = await sharp(calls[0].buffer).metadata();
+    expect([cover.width, cover.height, cover.format]).toEqual([
+      1200,
+      600,
+      "webp",
+    ]);
+  });
+
+  it("upload: `withoutEnlargement` sharp'a aynen geçer (küçük görsel büyümez)", async () => {
+    const { service, calls } = recordingService();
+
+    await service.upload(fileFrom(await jpegWithOrientation(100, 50, 1)), {
+      bucket: "avatars",
+      resize: { width: 2400, fit: "inside", withoutEnlargement: true },
+    });
+
+    const out = await sharp(calls[0].buffer).metadata();
+    expect([out.width, out.height]).toEqual([100, 50]);
+  });
+});

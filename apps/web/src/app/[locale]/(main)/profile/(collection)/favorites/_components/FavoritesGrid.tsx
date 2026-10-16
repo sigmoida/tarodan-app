@@ -8,24 +8,32 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
 import { wishlistItemToProduct, type WishlistItem } from "../_lib/types";
+import FavoriteTileSkeleton from "./FavoriteTileSkeleton";
 
 export default function FavoritesGrid({
   items,
+  pendingCount,
   isSharedView,
   onRemove,
   onCartToggle,
   isInCart,
+  isPending,
 }: {
   items: WishlistItem[];
+  /** Gerçek satırı henüz gelmemiş iyimser eklemeler — yükleniyor kartı. */
+  pendingCount: number;
   isSharedView: boolean;
   onRemove: (productId: string) => void;
   onCartToggle: (item: WishlistItem) => void;
   isInCart: (productId: string) => boolean;
+  /** Bu ürün için favori isteği sürüyor mu? (kaldır düğmesi meşgul) */
+  isPending: (productId: string) => boolean;
 }) {
   const t = useTranslations();
 
-  if (items.length === 0) {
+  if (items.length === 0 && pendingCount === 0) {
     return (
       <EmptyStateCard
         title={t("favorites.empty")}
@@ -41,6 +49,10 @@ export default function FavoritesGrid({
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+      {/* İyimser satırlar listenin başına eklenir; kartları da başta durur. */}
+      {Array.from({ length: pendingCount }, (_, i) => (
+        <FavoriteTileSkeleton key={`pending-${i}`} />
+      ))}
       {items.map((item, index) => {
         const inCart = isInCart(item.productId);
         return (
@@ -56,7 +68,8 @@ export default function FavoritesGrid({
                 <IconButton
                   variant="secondary"
                   onClick={() => onRemove(item.productId)}
-                  className="rounded-full bg-surface-elevated shadow-md hover:bg-danger-50"
+                  {...favoriteBusyProps(isPending(item.productId))}
+                  className={`rounded-full bg-surface-elevated shadow-md hover:bg-danger-50 ${FAVORITE_BUSY_CLASS}`}
                   title={t("favorites.removeFromFavorites")}
                   aria-label={t("favorites.removeFromFavorites")}
                 >

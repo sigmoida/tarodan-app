@@ -1,6 +1,14 @@
 /** @format */
 
-import { canvasToBlob, decodeOrientedBitmap } from "./image-canvas";
+import { isAbortError, throwIfAborted } from "./abort";
+import {
+  browserCanvasDeps,
+  DOWNSCALABLE_TYPES,
+  fileNameForType,
+  normalizeImageType,
+  runExclusive,
+  type CanvasDeps,
+} from "./image-canvas";
 
 /**
  * Yüklemeden ÖNCE JPEG fotoğrafı tarayıcıda küçültür.
@@ -11,14 +19,13 @@ import { canvasToBlob, decodeOrientedBitmap } from "./image-canvas";
  * Sunucunun detay ölçüsünün biraz üstünde (1600 px) kalıyoruz ki sunucudaki
  * son küçültme yine kaliteli bir kaynaktan yapılsın.
  *
- * YALNIZ JPEG: PNG/WebP/GIF olduğu gibi gider. JPEG şeffaflık ve animasyon
- * taşımaz, bu yüzden canvas'tan geçirmek içerik kaybettirmez; diğerlerinde alfa
- * ya da animasyon kaybolurdu.
+ * YALNIZ JPEG (`DOWNSCALABLE_TYPES`): PNG/WebP/GIF olduğu gibi gider.
  *
  * Bu adım bir İYİLEŞTİRMEDİR, kapı değil: hangi nedenle olursa olsun
  * küçültülemeyen dosya (başlık okunamadı, HEIC'i çözemeyen tarayıcı, canvas
- * kodlayamadı, sonuç büyüdü, yön belirsiz) SESSİZCE orijinal haliyle devam eder
- * ve `downscaleImageFile` asla fırlatmaz.
+ * kodlayamadı, sonuç büyüdü, yön belirsiz) SESSİZCE orijinal haliyle devam eder.
+ * `downscaleImageFile` yalnız İPTALDE fırlatır (`AbortError`): kaldırılan
+ * kalemin yüklemesi orijinal dosyayla da başlamamalı.
  */
 
 /** Uzun kenar bunu aşarsa küçültülür; aşmayan dosyaya dokunulmaz. */
@@ -27,10 +34,8 @@ export const MAX_UPLOAD_DIMENSION = 1600;
 /** Çıktı JPEG kalitesi. Sunucu zaten WebP'ye çevirir; bu ara format. */
 export const UPLOAD_JPEG_QUALITY = 0.8;
 
-const JPEG_TYPES = ["image/jpeg", "image/jpg"];
-
 export function canDownscaleFile(file: Pick<File, "type">): boolean {
-  return JPEG_TYPES.includes(file.type.toLowerCase());
+  return DOWNSCALABLE_TYPES.includes(normalizeImageType(file.type));
 }
 
 /**
@@ -54,9 +59,7 @@ export function scaledDimensions(
 
 /** Çıktı JPEG olduğu için uzantı da öyle olmalı; ad/içerik ayrışmasın. */
 export function downscaledFileName(name: string): string {
-  const dot = name.lastIndexOf(".");
-  const base = dot > 0 ? name.slice(0, dot) : name;
-  return `${base}.jpg`;
+  return fileNameForType(name, "image/jpeg");
 }
 
 /**
@@ -162,58 +165,46 @@ export function parseJpegInfo(bytes: Uint8Array): JpegInfo | null {
 /** EXIF yönü 5-8 ise görüntülenen en/boy ham SOF boyutunun TERSİDİR. */
 const swapsAxes = (orientation: number): boolean => orientation >= 5;
 
-/** Tarayıcı tesisatı — testlerde değiştirilir (jsdom'da canvas yok). */
-export interface DownscaleDeps {
-  /** `resize` verilirse tarayıcı destekliyorsa doğrudan o boyutta çözer. */
-  decode(
-    file: Blob,
-    resize?: { width: number; height: number },
-  ): Promise<ImageBitmap>;
-  render(
-    bitmap: ImageBitmap,
-    size: { width: number; height: number },
-  ): Promise<Blob | null>;
-}
-
-const browserDeps: DownscaleDeps = {
-  decode: decodeOrientedBitmap,
-  async render(bitmap, { width, height }) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    try {
-      const context = canvas.getContext("2d");
-      if (!context) return null;
-      context.imageSmoothingQuality = "high";
-      context.drawImage(bitmap, 0, 0, width, height);
-      return await canvasToBlob(canvas, "image/jpeg", UPLOAD_JPEG_QUALITY);
-    } finally {
-      // Canvas arka belleğini hemen bırak (iOS Safari toplam canvas belleğini
-      // sınırlar; GC'yi beklemek sonraki dosyaları çökertebilir).
-      canvas.width = 0;
-      canvas.height = 0;
-    }
-  },
-};
-
-/**
- * Küçültme adımları TEK SEFERDE BİR dosya çalışır. Kuyruk 3 yüklemeyi paralel
- * yürütür; üç tam çözünürlüklü bitmap'i aynı anda tutmak iOS Safari'de sekmeyi
- * öldürebiliyor (form kaybolur). Yüklemeler paralel kalır, yalnız
- * decode/encode burada sıraya girer.
- */
-let exclusiveTail: Promise<unknown> = Promise.resolve();
-function runExclusive<T>(task: () => Promise<T>): Promise<T> {
-  const run = exclusiveTail.then(task, task);
-  exclusiveTail = run.catch(() => undefined);
-  return run;
-}
-
-async function downscale(file: File, deps: DownscaleDeps): Promise<File> {
+/** Dosyanın JPEG başlığı (boyut + yön); JPEG değilse / okunamazsa `null`. */
+export async function readJpegInfo(file: Blob): Promise<JpegInfo | null> {
   const header = new Uint8Array(
     await file.slice(0, JPEG_HEADER_BYTES).arrayBuffer(),
   );
-  const info = parseJpegInfo(header);
+  return parseJpegInfo(header);
+}
+
+/**
+ * Doğrudan HEDEF boyutta çözülebiliyorsa o boyut (tam çözünürlüklü bitmap hiç
+ * oluşmaz — 48 MP bir fotoğraf ~195 MB'tır). Küçültme gerekmiyorsa ya da yön
+ * 5-8 ise `undefined` (tam çöz): o yönlerde tarayıcının yönü uygulayıp
+ * uygulamadığı ancak tam çözülen bitmap'in boyutundan anlaşılır. Küçültme ve
+ * çevirme AYNI kuralı kullanır.
+ */
+export function directDecodeSize(
+  info: JpegInfo,
+): { width: number; height: number } | undefined {
+  if (swapsAxes(info.orientation)) return undefined;
+  return scaledDimensions(info.width, info.height) ?? undefined;
+}
+
+/** Tarayıcı tesisatı — testlerde değiştirilir (jsdom'da canvas yok). */
+export type DownscaleDeps = CanvasDeps;
+
+export interface DownscaleOptions {
+  deps?: DownscaleDeps;
+  /**
+   * Kalem kaldırıldıysa iş bırakılır: sırada bekliyorsa hemen, çalışıyorsa
+   * çözme ile çizim arasında. Sonuç `AbortError` ile reddedilir.
+   */
+  signal?: AbortSignal;
+}
+
+async function downscale(
+  file: File,
+  deps: DownscaleDeps,
+  signal?: AbortSignal,
+): Promise<File> {
+  const info = await readJpegInfo(file);
   if (!info) return file;
 
   const rotated = swapsAxes(info.orientation);
@@ -228,8 +219,11 @@ async function downscale(file: File, deps: DownscaleDeps): Promise<File> {
   // Yön 5-8'de tarayıcının yönü uyguladığı, bitmap boyutundan ayırt edilmeli;
   // bu yüzden bu durumda hedef boyutla değil TAM çözülür (uygulanmışsa bitmap
   // görüntülenen yöndedir, uygulanmamışsa ham boyuttadır).
-  const bitmap = await deps.decode(file, rotated ? undefined : size);
+  const bitmap = await deps.decode(file, directDecodeSize(info));
   try {
+    // Çözme sürerken kalem kaldırıldıysa çizim/kodlama hiç yapılmaz.
+    throwIfAborted(signal);
+
     // Tarayıcı `imageOrientation`'ı yok saymış: canvas'a yan çizilir ve
     // sunucunun EXIF'e güvenen `autoOrient`i de artık işe yaramaz (JPEG'i
     // yeniden kodlayınca EXIF düşer). Orijinal gitsin, sunucu yönlendirsin.
@@ -242,7 +236,11 @@ async function downscale(file: File, deps: DownscaleDeps): Promise<File> {
       return file;
     }
 
-    const blob = await deps.render(bitmap, size);
+    const blob = await deps.render(bitmap, {
+      ...size,
+      type: "image/jpeg",
+      quality: UPLOAD_JPEG_QUALITY,
+    });
     // Küçülmeyen sonuç (zaten sıkıştırılmış JPEG) kazanç değil.
     if (!blob || blob.size >= file.size) return file;
 
@@ -257,12 +255,22 @@ async function downscale(file: File, deps: DownscaleDeps): Promise<File> {
 
 /**
  * Gerekirse küçültülmüş dosyayı döner; gerekmiyorsa ya da başarısızsa ORİJİNAL
- * dosyayı. Asla fırlatmaz.
+ * dosyayı. Yalnız iptalde reddeder (`AbortError`).
+ *
+ * İmzası kuyruğun hazırlık portuyla (`PreparePort`) uyumludur; kuyruk onu
+ * doğrudan kullanır.
  */
 export function downscaleImageFile(
   file: File,
-  deps: DownscaleDeps = browserDeps,
+  { deps = browserCanvasDeps, signal }: DownscaleOptions = {},
 ): Promise<File> {
   if (!canDownscaleFile(file)) return Promise.resolve(file);
-  return runExclusive(() => downscale(file, deps)).catch(() => file);
+  return runExclusive(() => downscale(file, deps, signal), signal).catch(
+    (error: unknown) => {
+      // İptal "küçültülemedi" DEĞİLDİR: orijinale dönülseydi kaldırılan
+      // kalemin yüklemesi yine başlardı.
+      if (isAbortError(error)) throw error;
+      return file;
+    },
+  );
 }
