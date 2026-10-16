@@ -1,0 +1,15 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tarodan.app.staging",
+      "sha256_cert_fingerprints": [
+        "82:0F:83:4A:64:EA:39:3B:E3:D2:D3:20:23:68:A1:A7:57:6F:A1:6D:26:40:98:B8:FF:28:9B:07:33:48:C2:81",
+        "4C:BB:3F:B6:3F:41:DE:13:6C:CB:CC:EF:1D:46:B5:52:6F:42:E1:67:1E:EE:0D:96:06:DA:6E:98:37:36:F6:15",
+        "3F:83:D3:41:E3:74:78:E9:EA:19:36:ED:CC:60:03:56:55:78:64:66:A6:FC:E5:58:D9:3C:87:7B:FC:FD:BE:6F",
+        "BD:8A:F0:61:26:3E:64:16:72:9F:E3:91:43:A5:3C:1F:F3:FA:F5:DC:96:AB:77:34:21:42:8A:69:37:7D:0C:BC"
+      ]
+    }
+  }
+]
