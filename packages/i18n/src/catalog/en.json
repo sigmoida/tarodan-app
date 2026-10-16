@@ -3569,7 +3569,10 @@
       "metaTitle": "Kullanım Koşulları · Tarodan",
       "metaDescription": "Tarodan üyelik, ilan, satış, satın alma, teklif, takas, ödeme, komisyon, içerik ve hesap kullanım koşulları.",
       "pageDescription": "Tarodan pazar yerini ziyaret ederken, üyelik oluştururken, ilan verirken, satın alırken veya takas yaparken geçerli genel kurallar.",
-      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır."
+      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır.",
+      "ugcAddendumTitle": "In-App Content Rules",
+      "ugcAddendumHeading": "Objectionable content and abusive users",
+      "ugcAddendumText": "Tarodan has zero tolerance for objectionable content (insults, hate speech, harassment, threats, sexual content, violence) and for abusive users. You can report a listing, profile, collection or message with the \"Report\" option on that screen, and block a user who bothers you with the \"Block\" option; the blocked user's content is removed from your feed immediately. Our team reviews reports within 24 hours; content that breaks these rules is removed and the account that posted it is suspended or permanently closed."
     },
     "refundPolicy": {
       "hangiKosullardaIadeTalebiOlusturulabilir": "Hangi koşullarda iade talebi oluşturulabilir?",
