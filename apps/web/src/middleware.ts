@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAuthMiddleware } from "@tarodan/auth/middleware";
 import { defaultLocale, locales } from "@tarodan/i18n";
 import { webAuthConfig } from "@/lib/auth.config";
+import { isEmbedPath } from "@/lib/embed";
 import { localeMiddleware } from "@/lib/localeMiddleware";
 import { RETURN_TO_HEADER, readsReturnToHeader } from "@/lib/returnTo";
 import { SITE_UNLOCK_COOKIE } from "@/lib/siteLock";
@@ -170,11 +171,14 @@ export async function middleware(request: NextRequest) {
   // Pre-launch storefront gate (#398). Runs BEFORE the i18n/auth flow so we
   // can short-circuit every page for locked deployments. The API/proxy/static
   // matchers already filter out `/api/unlock` and asset paths, so we only need
-  // to allowlist `/coming-soon` here to avoid a rewrite loop.
+  // to allowlist `/coming-soon` here to avoid a rewrite loop. `/app/**` (mobil
+  // WebView'in yasal sayfaları) da kilitten MUAFTIR: uygulama ve mağaza
+  // incelemesi kilitli ortamda bile yasal metinleri görebilmeli.
   if (
     isSiteLocked(process.env.SITE_LOCKED) &&
     rest !== "/coming-soon" &&
-    !rest.startsWith("/coming-soon/")
+    !rest.startsWith("/coming-soon/") &&
+    !isEmbedPath(rest)
   ) {
     const secret = process.env.SITE_UNLOCK_SECRET;
     const cookieValue = request.cookies.get(SITE_UNLOCK_COOKIE)?.value;
