@@ -135,7 +135,6 @@ export const queryKeys = {
     bell: () => ["notifications-bell"] as const,
   },
   messages: {
-    settings: () => ["message-settings"] as const,
     threads: () => ["message-threads"] as const,
     unreadCount: () => ["messages-unread-count"] as const,
     thread: (id: string | undefined) => ["messages", id] as const,
@@ -230,6 +229,10 @@ export const queryKeys = {
   },
   timingPolicy: {
     all: () => ["timing-policy"] as const,
+  },
+  /** Herkese açık platform ayarları (mesaj uzunluğu, ilan fiyat sınırları…). */
+  publicSettings: {
+    all: () => ["public-settings"] as const,
   },
 } as const;
 

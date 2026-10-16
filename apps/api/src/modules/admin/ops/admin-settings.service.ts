@@ -9,6 +9,11 @@ import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "../dto";
 import { i18nMessage } from "../../i18n";
+import {
+  MAX_PRODUCT_PRICE_SETTING,
+  MIN_PRODUCT_PRICE_SETTING,
+  parseProductPriceLimit,
+} from "../../product/helpers/product-price-limits";
 
 /**
  * Platform ayarları yönetimi — AdminService'in PLATFORM SETTINGS bölümünden
@@ -31,7 +36,8 @@ export class AdminSettingsService {
   }
 
   /**
-   * Get public platform settings (message settings and membership prices)
+   * Get public platform settings (message settings, membership prices and the
+   * listing price limits)
    */
   async getPublicSettings() {
     const settings = await this.prisma.platformSetting.findMany({
@@ -43,6 +49,8 @@ export class AdminSettingsService {
             "premium_monthly_price",
             "business_monthly_price",
             "yearly_discount_percentage",
+            MIN_PRODUCT_PRICE_SETTING,
+            MAX_PRODUCT_PRICE_SETTING,
           ],
         },
       },
@@ -50,6 +58,14 @@ export class AdminSettingsService {
 
     const result: Record<string, number> = {};
     settings.forEach((setting) => {
+      // Fiyat sınırları aşağıda, yükleyiciyle AYNI ayrıştırmayla okunur
+      // (`parseFloat("250abc")` 250 sızdırırdı).
+      if (
+        setting.settingKey === MIN_PRODUCT_PRICE_SETTING ||
+        setting.settingKey === MAX_PRODUCT_PRICE_SETTING
+      ) {
+        return;
+      }
       // For prices and percentages, use parseFloat; for limits, use parseInt
       const isPriceOrPercentage =
         setting.settingKey.includes("_price") ||
@@ -61,6 +77,16 @@ export class AdminSettingsService {
         result[setting.settingKey] = value;
       }
     });
+
+    // İlan fiyat sınırları: istemci formları aynı kuralı sunucudan ÖNCE
+    // uygulasın diye açılır. Ayar boş/sayısal değilse anahtar HİÇ dönmez
+    // (kural yok) — ayrıştırma create/update kapısıyla aynı kaynaktan gelir.
+    for (const key of [MIN_PRODUCT_PRICE_SETTING, MAX_PRODUCT_PRICE_SETTING]) {
+      const limit = parseProductPriceLimit(
+        settings.find((setting) => setting.settingKey === key)?.settingValue,
+      );
+      if (limit != null) result[key] = limit;
+    }
 
     // Calculate yearly prices from monthly prices and discount
     const discountPercentage = result.yearly_discount_percentage ?? 20;
@@ -98,6 +124,20 @@ export class AdminSettingsService {
     if (isHeroSettingKey(dto.key)) {
       throw new BadRequestException(
         i18nMessage("server.hero.useDedicatedEndpoint"),
+      );
+    }
+    // İlan fiyat sınırı: boş (kural yok) ya da 0'dan küçük olmayan sayı. Aksi
+    // halde yükleyici değeri sessizce "kural yok" sayar ve yönetici sınırı
+    // koyduğunu sanırdı. (min > max denetimi burada YOK: iki anahtar ayrı
+    // PATCH'lerle yazıldığından ara durum geçersiz görünürdü; form denetler.)
+    if (
+      (dto.key === MIN_PRODUCT_PRICE_SETTING ||
+        dto.key === MAX_PRODUCT_PRICE_SETTING) &&
+      String(dto.value ?? "").trim() !== "" &&
+      !(Number.isFinite(Number(dto.value)) && Number(dto.value) >= 0)
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.settings.priceLimitInvalid"),
       );
     }
     const existing = await this.prisma.platformSetting.findUnique({

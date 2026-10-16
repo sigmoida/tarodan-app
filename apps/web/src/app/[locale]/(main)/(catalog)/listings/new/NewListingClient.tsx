@@ -65,6 +65,8 @@ function NewListingLayout() {
     attrGroupsStatus,
     saleData,
     setSaleData,
+    salePriceError,
+    priceLimits,
     showDiscountSection,
     setShowDiscountSection,
   } = useNewListing();
@@ -139,6 +141,7 @@ function NewListingLayout() {
               commissionPreviewEnabled={commissionPreviewEnabled}
               quantityPlaceholder="1"
               quantityHelper={t("product.quantityDefaultHint")}
+              priceLimits={priceLimits}
             />
           </div>
           {/* İndirim: düzenleme ekranıyla AYNI bölüm — satıcı ilanı indirimli
@@ -149,6 +152,7 @@ function NewListingLayout() {
             setSaleData={setSaleData}
             showDiscountSection={showDiscountSection}
             setShowDiscountSection={setShowDiscountSection}
+            salePriceError={salePriceError}
           />
           <div data-tour="listing-images">
             <ImagesCard

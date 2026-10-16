@@ -46,8 +46,9 @@ import { CommissionRuleGuardService } from "../../commission/commission-rule-gua
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import {
+  assertProductPriceWithinLimits,
+  isStoredProductPrice,
   loadProductPriceLimits,
-  productPriceLimitViolation,
 } from "../helpers/product-price-limits";
 import { frontendUrl as resolveFrontendUrl } from "../../../config/app-urls";
 import {
@@ -361,35 +362,6 @@ export class ProductUpdateService {
       });
     }
 
-    // Platform min/max fiyat limiti düzenlemede de geçerli — onaylı ilan
-    // sonradan limit dışı fiyata çekilemesin (create ile aynı kaynak).
-    if (dto.price !== undefined || dto.salePrice != null) {
-      const priceLimits = await loadProductPriceLimits(this.prisma);
-      for (const candidate of [
-        dto.price !== undefined ? Number(dto.price) : null,
-        dto.salePrice != null && Number(dto.salePrice) > 0
-          ? Number(dto.salePrice)
-          : null,
-      ]) {
-        if (candidate == null) continue;
-        const violation = productPriceLimitViolation(candidate, priceLimits);
-        if (violation?.type === "minimum") {
-          throw new BadRequestException(
-            i18nMessage("server.product.priceBelowMinimum", {
-              minPrice: violation.limit,
-            }),
-          );
-        }
-        if (violation?.type === "maximum") {
-          throw new BadRequestException(
-            i18nMessage("server.product.priceAboveMaximum", {
-              maxPrice: violation.limit,
-            }),
-          );
-        }
-      }
-    }
-
     // Check membership for trade feature
     let canEnableTrade = false;
     if (dto.isTradeEnabled === true) {
@@ -472,6 +444,39 @@ export class ProductUpdateService {
         : priceUpdate !== undefined
           ? priceUpdate
           : dto.price;
+
+    // Platform min/max fiyat limiti düzenlemede de geçerli (create ile aynı
+    // kaynak) — ama GERİYE DÖNÜK DEĞİL: yalnız fiyat gerçekten DEĞİŞİYORSA ya
+    // da yeni bir indirim giriliyorsa denetlenir. Sınırın altında kalmış mevcut
+    // ilan yayında kalır ve fiyatına dokunmadan düzenlenebilir; formlar
+    // kayıtlı fiyatı olduğu gibi geri gönderir. Admin düzenlemesi muaf (ürün
+    // kararı): destek ekibi istisnai fiyat girebilir; toplu içe aktarma muaf değil.
+    //
+    // Denetlenen, istekteki ham alanlar değil YAZILACAK değerlerdir (yukarıdaki
+    // çözümleme): `originalPrice` ile yazılacak çizili fiyat da üst sınırı
+    // aşamaz, yok sayılan bir alan ise yanıltıcı hata vermez.
+    if (!isAdmin) {
+      const storedPrices = [
+        product.price,
+        product.oldPrice,
+        product.originalPrice,
+        product.salePrice,
+      ];
+      const candidates = [effectivePrice, oldPriceUpdate]
+        .map((value) => (value == null ? null : Number(value)))
+        .filter(
+          (candidate): candidate is number =>
+            candidate != null &&
+            Number.isFinite(candidate) &&
+            !isStoredProductPrice(candidate, storedPrices),
+        );
+      if (candidates.length > 0) {
+        const priceLimits = await loadProductPriceLimits(this.prisma);
+        for (const candidate of candidates) {
+          assertProductPriceWithinLimits(candidate, priceLimits);
+        }
+      }
+    }
 
     const resolvedStatus = resolveUpdatedStatus(product, dto, actor);
     // Bu düzenleme ilanı vitrinden düşürüyorsa NEDENİ: satıcının pasife alması

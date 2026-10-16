@@ -50,6 +50,8 @@ export interface ProductEditProjection {
   price: number | null;
   /** Ürünün KENDİ indiriminden önceki fiyatı (çizili). */
   oldPrice: number | null;
+  /** Eski alan; fiyat sınırı muafiyeti kayıtlı fiyatlar arasında sayar. */
+  originalPrice: number | null;
   salePrice: number | null;
   saleStartDate: string | null;
   saleEndDate: string | null;
@@ -121,6 +123,7 @@ export function buildProductEditProjection(
     description: product.description ?? null,
     price: num(product.price),
     oldPrice: num(product.oldPrice),
+    originalPrice: num(product.originalPrice),
     salePrice: num(product.salePrice),
     saleStartDate: iso(product.saleStartDate),
     saleEndDate: iso(product.saleEndDate),

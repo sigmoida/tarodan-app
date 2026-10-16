@@ -9,6 +9,8 @@ import { useTranslations } from "next-intl";
 import { useCounterOffer } from "../_hooks/useOffers";
 import type { Offer } from "../_lib/types";
 import { formatTL } from "@/lib/format";
+import { getProductEffectivePrice } from "@/lib/productPrice";
+import { useOfferFloor } from "@/hooks/usePublicSettings";
 
 interface CounterOfferModalProps {
   open: boolean;
@@ -27,6 +29,10 @@ export default function CounterOfferModal({
   const t = useTranslations();
   const counter = useCounterOffer();
   const [amount, setAmount] = useState("");
+  // Hook koşulsuz çağrılır (offer null iken de): erken dönüşten ÖNCE.
+  const floor = useOfferFloor(
+    offer ? getProductEffectivePrice(offer.product) : 0,
+  );
 
   useEffect(() => {
     if (open) setAmount("");
@@ -58,6 +64,10 @@ export default function CounterOfferModal({
           { baseLabel },
         ),
       );
+      return;
+    }
+    if (floor != null && value < floor) {
+      toast.error(t("offer.counterBelowFloor", { amount: formatTL(floor) }));
       return;
     }
     counter.mutate(
@@ -104,6 +114,11 @@ export default function CounterOfferModal({
         placeholder={t("offer.counterModal.tutar")}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
+        helperText={
+          floor != null
+            ? t("listing.priceMinHint", { minPrice: formatTL(floor) })
+            : undefined
+        }
       />
     </Modal>
   );

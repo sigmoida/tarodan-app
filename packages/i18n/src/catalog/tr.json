@@ -1531,7 +1531,15 @@
     "commissionLine": "Aracılık komisyonu",
     "tradeNumberLabel": "Takas No:"
   },
+  "listing": {
+    "priceMinHint": "En az {minPrice}",
+    "priceMaxHint": "En fazla {maxPrice}",
+    "priceRangeHint": "{minPrice} ile {maxPrice} arasında",
+    "salePriceBelowMinimum": "İndirimli fiyat en az {minPrice} TL olmalıdır."
+  },
   "offer": {
+    "minimumOfferFloorError": "Teklif en az {amount} olmalıdır.",
+    "counterBelowFloor": "Karşı teklif en az {amount} olmalıdır.",
     "makeOffer": "Teklif Ver",
     "yourOffer": "Teklifiniz",
     "offerAmount": "Teklif Tutarı",
@@ -8706,11 +8714,11 @@
       "fields": {
         "minProductPrice": {
           "label": "Minimum Ürün Fiyatı (₺)",
-          "helper": "Yeni ilanlar için minimum fiyat (mevcut ilanlar etkilenmez)"
+          "helper": "İlan fiyatı ve indirimli fiyat bunun altına inemez; teklifler de bu tutarın altında verilemez. Mevcut ilanlar fiyatı değişmedikçe etkilenmez. Boş bırakılırsa alt sınır uygulanmaz."
         },
         "maxProductPrice": {
           "label": "Maksimum Ürün Fiyatı (₺)",
-          "helper": "Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)"
+          "helper": "İlan fiyatı bunun üstüne çıkamaz (teklifler etkilenmez). Mevcut ilanlar fiyatı değişmedikçe etkilenmez. Boş bırakılırsa üst sınır uygulanmaz."
         },
         "maxMessageLength": {
           "label": "Maksimum Mesaj Uzunluğu",
@@ -8728,6 +8736,7 @@
       "validation": {
         "required": "Zorunlu",
         "invalidValueMin": "Geçerli bir değer girin (en az {min})",
+        "minAboveMax": "Minimum fiyat, maksimum fiyattan büyük olamaz",
         "invalidValue": "Geçerli bir değer girin"
       },
       "legal": {
@@ -10861,6 +10870,7 @@
     "offer": {
       "alreadyInStatus": "Bu teklif zaten {status} durumunda",
       "alreadyPendingOffer": "Bu ürüne zaten bekleyen bir teklifiniz var. Önce mevcut teklifi iptal edin.",
+      "amountBelowMinimum": "Teklif tutarı minimum {minPrice} TL olmalıdır.",
       "awaitingBuyerResponse": "Alıcının mevcut karşı teklife yanıt vermesi bekleniyor; şu an yeni karşı teklif verilemez",
       "belowMinimumBuyerCounter": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum: {minOffer} TL (fiyatın %{minOfferPercentage}'i).",
       "belowMinimumOffer": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum teklif: {minOffer} TL (fiyatın %{minOfferPercentage}'i). Teklifiniz: {offerAmount} TL",
@@ -11539,6 +11549,9 @@
         "boostedNotHardDeletable": "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
         "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir",
         "rejectReasonRequired": "Red sebebi zorunludur"
+      },
+      "settings": {
+        "priceLimitInvalid": "Fiyat sınırı boş (kural yok) ya da 0 veya daha büyük bir sayı olmalıdır"
       },
       "membership": {
         "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",

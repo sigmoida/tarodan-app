@@ -184,3 +184,170 @@ describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
     expect(prisma.platformSetting.upsert).toHaveBeenCalled();
   });
 });
+
+/**
+ * `GET /admin/settings/public` ilan fiyat sınırlarını da taşır: istemci
+ * formları kuralı sunucudan önce uygular. Boş / sayısal olmayan ayar
+ * "kural yok" demektir — anahtar yanıtta HİÇ bulunmaz (NaN / 0 sızmaz).
+ */
+describe("AdminSettingsService — public price limits", () => {
+  const makeService = (limits: Record<string, string | undefined>) => {
+    const prisma: any = {
+      platformSetting: {
+        // Genel ayarlar TEK sorguda gelir; sınır satırları da bu listededir.
+        findMany: jest.fn().mockResolvedValue([
+          { settingKey: "max_message_length", settingValue: "800" },
+          ...Object.entries(limits)
+            .filter(([, value]) => value !== undefined)
+            .map(([settingKey, settingValue]) => ({
+              settingKey,
+              settingValue: settingValue as string,
+            })),
+        ]),
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({ id: "s1" }),
+      },
+      adminUser: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
+    return {
+      service: new AdminSettingsService(
+        prisma as any,
+        {
+          createAuditLog: jest.fn(),
+        } as any,
+      ),
+      prisma,
+    };
+  };
+
+  it("min ve max'i sayı olarak döndürür", async () => {
+    const { service } = makeService({
+      min_product_price: "250",
+      max_product_price: "100000.50",
+    });
+
+    await expect(service.getPublicSettings()).resolves.toEqual({
+      max_message_length: 800,
+      min_product_price: 250,
+      max_product_price: 100000.5,
+    });
+  });
+
+  it("ayar satırı yoksa anahtarlar yanıtta bulunmaz", async () => {
+    const { service } = makeService({});
+
+    const result = await service.getPublicSettings();
+
+    expect(result).toEqual({ max_message_length: 800 });
+    expect(result).not.toHaveProperty("min_product_price");
+    expect(result).not.toHaveProperty("max_product_price");
+  });
+
+  it.each(["", "   ", "abc"])(
+    "boş / boşluk / sayısal olmayan değer (%j) anahtarı düşürür",
+    async (value) => {
+      const { service } = makeService({
+        min_product_price: value,
+        max_product_price: value,
+      });
+
+      const result = await service.getPublicSettings();
+
+      expect(result).not.toHaveProperty("min_product_price");
+      expect(result).not.toHaveProperty("max_product_price");
+    },
+  );
+
+  it("yalnız min doluysa max anahtarı yoktur", async () => {
+    const { service } = makeService({
+      min_product_price: "250",
+      max_product_price: "",
+    });
+
+    const result = await service.getPublicSettings();
+
+    expect(result.min_product_price).toBe(250);
+    expect(result).not.toHaveProperty("max_product_price");
+  });
+
+  it("yönetici min ve max'i BOŞ kaydedebilir (kural kapanır)", async () => {
+    const { service, prisma } = makeService({});
+
+    await service.updatePlatformSetting("user-1", {
+      key: "min_product_price",
+      value: "",
+    });
+
+    expect(prisma.platformSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { settingKey: "min_product_price" },
+        update: expect.objectContaining({ settingValue: "" }),
+      }),
+    );
+  });
+
+  it("sınırlar ek sorgu olmadan tek findMany ile okunur", async () => {
+    const { service, prisma } = makeService({ min_product_price: "250" });
+
+    await service.getPublicSettings();
+
+    expect(prisma.platformSetting.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.platformSetting.findUnique).not.toHaveBeenCalled();
+    expect(
+      prisma.platformSetting.findMany.mock.calls[0][0].where.settingKey.in,
+    ).toEqual(
+      expect.arrayContaining(["min_product_price", "max_product_price"]),
+    );
+  });
+
+  it("kısmen sayısal değer ('250abc') sızmaz", async () => {
+    const { service } = makeService({ min_product_price: "250abc" });
+
+    await expect(service.getPublicSettings()).resolves.not.toHaveProperty(
+      "min_product_price",
+    );
+  });
+
+  it.each(["abc", "-1", "NaN", "Infinity"])(
+    "geçersiz fiyat sınırı yazımı (%j) reddedilir ve yazılmaz",
+    async (value) => {
+      const { service, prisma } = makeService({});
+
+      await expect(
+        service.updatePlatformSetting("user-1", {
+          key: "max_product_price",
+          value,
+        }),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.settings.priceLimitInvalid" },
+      });
+      expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["0", "250.5", "", "  "])(
+    "geçerli fiyat sınırı yazımı (%j) kabul edilir",
+    async (value) => {
+      const { service, prisma } = makeService({});
+
+      await service.updatePlatformSetting("user-1", {
+        key: "min_product_price",
+        value,
+      });
+
+      expect(prisma.platformSetting.upsert).toHaveBeenCalled();
+    },
+  );
+
+  it("sınır anahtarı dışındaki ayarlar bu denetimden etkilenmez", async () => {
+    const { service, prisma } = makeService({});
+
+    await service.updatePlatformSetting("user-1", {
+      key: "max_message_length",
+      value: "abc",
+    });
+
+    expect(prisma.platformSetting.upsert).toHaveBeenCalled();
+  });
+});
