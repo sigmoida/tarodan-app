@@ -452,6 +452,9 @@ describe("downscaleImageFile", () => {
       ).catch((e: unknown) => e);
 
       expect(isAbortError(error)).toBe(true);
+      // Çağıran iptal anında serbest kalır; iş kendi adımında durup bitmap'i
+      // bırakır — bir tur bekleyip sonucu ölçeriz.
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(render).not.toHaveBeenCalled();
       expect(bmp.close).toHaveBeenCalled();
     });
