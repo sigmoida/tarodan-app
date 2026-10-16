@@ -8,6 +8,7 @@ import {
   validateLocalizedText,
 } from "@tarodan/types";
 import {
+  HERO_SEED_APPLIED_SETTING,
   HERO_SEED_SLIDES,
   TRUST_BADGE_SEED,
   seedHeroContent,
@@ -17,13 +18,16 @@ import { apiAppRoot } from "./app-root";
 
 /**
  * Vitrin hero'sunun referans seed'i: kodda yedek slayt olmadığı için ana
- * sayfa slaytı canlıda bu seed'den gelir. Seed her API açılışında koşar —
- * idempotent olmalı, admin'in düzenlediğini ya da sildiğini geri getirmemeli,
- * ve kurduğu içerik API'nin kendi kurallarından geçmeli (yoksa admin seed
- * slaytını kaydedemezdi).
+ * sayfa slaytı ilk kurulumda bu seed'den gelir. Seed her API açılışında koşar
+ * — YALNIZ BİR KEZ içerik yazmalı (`hero_seed_applied` işareti): admin'in
+ * düzenlediğini ezmemeli, sildiğini (yerleşimi bilerek boşaltmış olabilir)
+ * geri getirmemeli; kurduğu içerik API'nin kendi kurallarından geçmeli (yoksa
+ * admin seed slaytını kaydedemezdi).
  */
 
-function makeClient(existing: { slides?: number; badges?: number } = {}) {
+function makeClient(
+  existing: { slides?: number; badges?: number; applied?: boolean } = {},
+) {
   const heroSlide = {
     count: jest.fn().mockResolvedValue(existing.slides ?? 0),
     upsert: jest.fn().mockResolvedValue({}),
@@ -32,16 +36,55 @@ function makeClient(existing: { slides?: number; badges?: number } = {}) {
     count: jest.fn().mockResolvedValue(existing.badges ?? 0),
     upsert: jest.fn().mockResolvedValue({}),
   };
-  return { heroSlide, trustBadge } as const;
+  const platformSetting = {
+    findUnique: jest
+      .fn()
+      .mockResolvedValue(existing.applied ? { id: "setting-1" } : null),
+    upsert: jest.fn().mockResolvedValue({}),
+  };
+  return { heroSlide, trustBadge, platformSetting } as const;
 }
 
 describe("seedHeroContent", () => {
-  it("boş veritabanına her yerleşime bir slayt ve altı rozet kurar", async () => {
+  it("ilk kurulum: her yerleşime bir slayt ve altı rozet kurar, sonra işaretler", async () => {
     const client = makeClient();
     await seedHeroContent(client as never);
 
     expect(client.heroSlide.upsert).toHaveBeenCalledTimes(3);
     expect(client.trustBadge.upsert).toHaveBeenCalledTimes(6);
+    expect(client.platformSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { settingKey: HERO_SEED_APPLIED_SETTING },
+        create: expect.objectContaining({
+          settingKey: "hero_seed_applied",
+          settingValue: "true",
+        }),
+        update: {},
+      }),
+    );
+    // İşaret içerikten SONRA yazılır: yarıda kalan kurulum bir sonraki
+    // açılışta tamamlanır.
+    const markOrder = client.platformSetting.upsert.mock.invocationCallOrder[0];
+    for (const order of [
+      ...client.heroSlide.upsert.mock.invocationCallOrder,
+      ...client.trustBadge.upsert.mock.invocationCallOrder,
+    ]) {
+      expect(order).toBeLessThan(markOrder);
+    }
+  });
+
+  it("işaret varsa hiçbir şey yazmaz — boşaltılmış yerleşim boş kalır", async () => {
+    const client = makeClient({ applied: true });
+    await seedHeroContent(client as never);
+
+    expect(client.platformSetting.findUnique).toHaveBeenCalledWith({
+      where: { settingKey: HERO_SEED_APPLIED_SETTING },
+      select: { id: true },
+    });
+    expect(client.heroSlide.count).not.toHaveBeenCalled();
+    expect(client.heroSlide.upsert).not.toHaveBeenCalled();
+    expect(client.trustBadge.upsert).not.toHaveBeenCalled();
+    expect(client.platformSetting.upsert).not.toHaveBeenCalled();
   });
 
   it("idempotent: sabit kimlikle upsert eder ve var olan satıra dokunmaz", async () => {
@@ -57,16 +100,20 @@ describe("seedHeroContent", () => {
     }
   });
 
-  it("yerleşimde admin'in slaytı varsa (seed silinmiş olsa da) yazmaz", async () => {
-    const client = makeClient({ slides: 1, badges: 4 });
-    await seedHeroContent(client as never);
+  it.each([
+    ["slayt var", { slides: 1, badges: 0 }],
+    ["yalnız rozet var (ana sayfa boşaltılmış)", { slides: 0, badges: 4 }],
+  ])(
+    "işaretten önceki kurulum (%s): içerik eklemez, yalnız işaretler",
+    async (_d, existing) => {
+      const client = makeClient(existing);
+      await seedHeroContent(client as never);
 
-    expect(client.heroSlide.upsert).not.toHaveBeenCalled();
-    expect(client.trustBadge.upsert).not.toHaveBeenCalled();
-    expect(client.heroSlide.count.mock.calls.map(([a]) => a.where)).toEqual(
-      HERO_PLACEMENTS.map((placement) => ({ placement })),
-    );
-  });
+      expect(client.heroSlide.upsert).not.toHaveBeenCalled();
+      expect(client.trustBadge.upsert).not.toHaveBeenCalled();
+      expect(client.platformSetting.upsert).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe("hero seed içeriği", () => {
@@ -102,7 +149,9 @@ describe("hero seed içeriği", () => {
         [slide.cta1Label, HERO_TEXT_LIMITS.ctaLabel],
         [slide.cta2Label, HERO_TEXT_LIMITS.ctaLabel],
       ] as const) {
-        expect(validateLocalizedText(value, { maxLength, required: false })).toBeNull();
+        expect(
+          validateLocalizedText(value, { maxLength, required: false }),
+        ).toBeNull();
       }
       for (const href of [slide.cta1Href, slide.cta2Href]) {
         if (href) expect(isAdLinkUrl(href)).toBe(true);

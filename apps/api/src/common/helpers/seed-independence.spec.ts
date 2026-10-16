@@ -79,19 +79,23 @@ describe("production seeds are independent of the demo seed", () => {
 
   it("never overwrites or resurrects admin-managed storefront content", () => {
     // Her açılışta koşar: admin'in düzenlediği slayt/rozet ezilmemeli, sildiği
-    // seed slaytı geri gelmemeli — yazım yalnız boş yerleşimde, boş update ile.
+    // seed slaytı geri gelmemeli (yerleşimi bilerek boşaltmış olabilir) —
+    // içerik yalnız ilk kurulumda, boş update ile; sonrasını işaret keser.
     const source = read("seed-hero-content.ts");
     const upserts = source.split("prisma.").slice(1);
     const contentWrites = upserts.filter((chunk) =>
-      /^(heroSlide|trustBadge)\.upsert/.test(chunk),
+      /^(heroSlide|trustBadge|platformSetting)\.upsert/.test(chunk),
     );
-    expect(contentWrites).toHaveLength(2);
+    expect(contentWrites).toHaveLength(3);
     for (const chunk of contentWrites) {
       expect(chunk).toContain("update: {}");
     }
-    expect(source).toContain("prisma.heroSlide.count({");
+    expect(source).toContain("settingKey: HERO_SEED_APPLIED_SETTING");
+    expect(source).toContain("prisma.heroSlide.count()");
     expect(source).toContain("prisma.trustBadge.count()");
-    expect(source).not.toMatch(/prisma\.(heroSlide|trustBadge)\.(update|delete)/);
+    expect(source).not.toMatch(
+      /prisma\.(heroSlide|trustBadge|platformSetting)\.(update|delete)/,
+    );
   });
 
   it("sources every launch business value from the data files", () => {

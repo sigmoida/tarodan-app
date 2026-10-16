@@ -3,13 +3,15 @@
  *
  * Kodda yedek slayt yok: web ve mobil yalnız veritabanından okur. Bu dosya
  * bugünkü vitrini (web'deki eski sabit tanımlar: ana sayfa 1. slaytı, auth
- * görselleri, altı rozet) bir kez kurar; sonrası admin'in işidir.
+ * görselleri, altı rozet) YALNIZ İLK KURULUMDA bir kez kurar; sonrası
+ * admin'in işidir — yerleşimi bilerek boşaltan admin'in kararı ezilmez.
  *
- * İki koruma, ikisi de "admin'in kararını ezme" kuralı için:
- *  - `update: {}` — var olan satıra dokunulmaz (admin düzenlemesi kalıcı),
- *  - yerleşim (rozetler için tablo) BOŞSA yazılır — admin seed slaytını silip
- *    yerine kendisininkini koyduysa, her açılışta koşan seed onu geri
- *    getirmez.
+ * Seed her açılışta koşar (`seed-production.ts`); "bir kez" şöyle sağlanır:
+ *  - `hero_seed_applied` işareti (PlatformSetting) varsa hiçbir şey yazılmaz,
+ *  - işaret yoksa ama hero/rozet satırı varsa (işaretten önceki kurulum)
+ *    yalnız işaret yazılır,
+ *  - ikisi de yoksa içerik kurulur, sonra işaret yazılır.
+ * `update: {}` — eşzamanlı iki açılışta bile var olan satıra dokunulmaz.
  *
  * Görseller S3'teki yönetilen `seed-assets/hero/` önekindedir (web'in
  * `heroImageUrl` varsayılan kökü); mutlak URL saklanır.
@@ -145,23 +147,34 @@ export const TRUST_BADGE_SEED: ReadonlyArray<
   },
 ];
 
-type HeroSeedClient = Pick<PrismaClient, "heroSlide" | "trustBadge">;
+/** Hero içeriğinin bir kez kurulduğunun işareti (PlatformSetting anahtarı). */
+export const HERO_SEED_APPLIED_SETTING = "hero_seed_applied";
+
+type HeroSeedClient = Pick<
+  PrismaClient,
+  "heroSlide" | "trustBadge" | "platformSetting"
+>;
 
 export async function seedHeroContent(prisma: HeroSeedClient): Promise<void> {
-  for (const slide of HERO_SEED_SLIDES) {
-    // Yerleşimde (silinmiş seed dahil) admin'in slaytı varsa dokunma.
-    const existing = await prisma.heroSlide.count({
-      where: { placement: slide.placement },
-    });
-    if (existing > 0) continue;
-    await prisma.heroSlide.upsert({
-      where: { id: slide.id },
-      create: slide,
-      update: {},
-    });
-  }
+  const applied = await prisma.platformSetting.findUnique({
+    where: { settingKey: HERO_SEED_APPLIED_SETTING },
+    select: { id: true },
+  });
+  if (applied) return;
 
-  if ((await prisma.trustBadge.count()) === 0) {
+  // İşaretten önceki kurulum: içerik zaten bir kez kurulmuş (admin sonradan
+  // silmiş olabilir) — geri getirme, yalnız işaretle.
+  const hasContent =
+    (await prisma.heroSlide.count()) > 0 ||
+    (await prisma.trustBadge.count()) > 0;
+  if (!hasContent) {
+    for (const slide of HERO_SEED_SLIDES) {
+      await prisma.heroSlide.upsert({
+        where: { id: slide.id },
+        create: slide,
+        update: {},
+      });
+    }
     for (const badge of TRUST_BADGE_SEED) {
       await prisma.trustBadge.upsert({
         where: { id: badge.id },
@@ -170,4 +183,16 @@ export async function seedHeroContent(prisma: HeroSeedClient): Promise<void> {
       });
     }
   }
+
+  await prisma.platformSetting.upsert({
+    where: { settingKey: HERO_SEED_APPLIED_SETTING },
+    create: {
+      settingKey: HERO_SEED_APPLIED_SETTING,
+      settingValue: "true",
+      settingType: "boolean",
+      description:
+        "Hero slaytları + güven rozetleri referans seed'i uygulandı; seed içeriği bir daha eklemez",
+    },
+    update: {},
+  });
 }
