@@ -1,7 +1,7 @@
 import { Prisma, ProductStatus } from "@prisma/client";
 import { saleCapableSellerWhere } from "../../membership/helpers/membership.util";
 import type { AccountLane } from "../../account-lane/account-lane";
-import { catalogProductWhere } from "./catalog-product-where";
+import { catalogProductWhere, inStockWhere } from "./catalog-product-where";
 import {
   SCALE_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
@@ -149,7 +149,7 @@ export function buildProductWhere(
     // (qty > 0 veya null = sınırsız). Bu yol öne çıkan/promosyon carousel'leri için.
     where.status = status;
     if (status === ProductStatus.active) {
-      andConditions.push({ OR: [{ quantity: { gt: 0 } }, { quantity: null }] });
+      andConditions.push(inStockWhere());
     }
   } else {
     // Statü verilmedi (genel gözatma): aktif (stoklu) + otomatik tükenen + satıldı.

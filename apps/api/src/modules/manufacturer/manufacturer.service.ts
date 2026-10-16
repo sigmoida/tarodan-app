@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
-import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
-import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -55,11 +54,7 @@ export class ManufacturerService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: publicListingWhere(),
             },
           },
         },
@@ -86,11 +81,7 @@ export class ManufacturerService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: publicListingWhere(),
             },
           },
         },
@@ -123,11 +114,7 @@ export class ManufacturerService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: publicListingWhere(),
             },
           },
         },

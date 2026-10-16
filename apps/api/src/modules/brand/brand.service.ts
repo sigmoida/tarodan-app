@@ -4,8 +4,7 @@ import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { BRANDS_ALL_CACHE_KEY, brandSlugCacheKey } from "./brand-cache";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
-import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
-import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
 
 @Injectable()
@@ -39,11 +38,7 @@ export class BrandService {
             _count: {
               select: {
                 products: {
-                  where: {
-                    ...catalogProductWhere(),
-                    status: "active",
-                    seller: saleCapableSellerWhere(),
-                  },
+                  where: publicListingWhere(),
                 },
               },
             },
@@ -80,11 +75,7 @@ export class BrandService {
             _count: {
               select: {
                 products: {
-                  where: {
-                    ...catalogProductWhere(),
-                    status: "active",
-                    seller: saleCapableSellerWhere(),
-                  },
+                  where: publicListingWhere(),
                 },
               },
             },
@@ -121,11 +112,7 @@ export class BrandService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: publicListingWhere(),
             },
           },
         },
