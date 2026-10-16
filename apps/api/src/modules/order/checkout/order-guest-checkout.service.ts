@@ -24,7 +24,6 @@ import {
 import {
   OrderOrigin,
   OrderStatus,
-  OfferStatus,
   ProductKind,
   ProductStatus,
   Prisma,
@@ -214,6 +213,14 @@ export class OrderGuestCheckoutService {
    * Requirement: Guest checkout (requirements.txt)
    */
   async guestCheckout(dto: GuestCheckoutDto) {
+    // Teklif fiyatıyla misafir satın alma YOK: teklifi yalnız kayıtlı bir alıcı
+    // verebilir ve kabulde siparişi zaten o alıcıya oluşur (`Order.offerId`
+    // tekil). Eskiden yalnız "kabul edilmiş + aynı ürün" bakılıyordu; siparişi
+    // olmayan eski kabul edilmiş bir teklifin id'sini bilen herkes misafir
+    // olarak teklif fiyatından alabiliyordu. OTP tüketilmeden reddedilir.
+    if (dto.offerId) {
+      throw new BadRequestException(i18nMessage("server.order.invalidOffer"));
+    }
     const normEmail = this.normalizeGuestCheckoutEmail(dto.email);
     const shippingTariff =
       await this.orderPricing.resolveShippingTariffSnapshot(
@@ -287,8 +294,8 @@ export class OrderGuestCheckoutService {
       // Price is ALWAYS derived server-side — NEVER from the client. A guest was
       // previously able to submit `dto.price: 1` on this public route and pay ~1 TL
       // for any item (the PayTR amount-check validates against this same tampered
-      // total). Direct buy -> the product's own (sale) price; accepted offer -> the
-      // offer amount (set below).
+      // total). Guest checkout is direct buy only -> the product's own (sale)
+      // price (an offer id is rejected below).
       //
       // F1.4 misafirde de geçerli: tahsil edilen taban = EFEKTİF fiyat, yani ürün
       // kartında/sepette görünen. Bu yol ikisini de atlıyordu — ham `salePrice ??
@@ -301,27 +308,7 @@ export class OrderGuestCheckoutService {
         product.categoryId ?? "",
         listedPrice,
       );
-      let finalPrice = campaignPrice ?? listedPrice;
-
-      if (dto.offerId) {
-        const offer = await tx.offer.findUnique({
-          where: { id: dto.offerId },
-        });
-
-        if (!offer || offer.productId !== dto.productId) {
-          throw new BadRequestException(
-            i18nMessage("server.order.invalidOffer"),
-          );
-        }
-
-        if (offer.status !== OfferStatus.accepted) {
-          throw new BadRequestException(
-            i18nMessage("server.order.offerNotAcceptedYet"),
-          );
-        }
-
-        finalPrice = Number(offer.amount);
-      }
+      const finalPrice = campaignPrice ?? listedPrice;
 
       this.orderPricing.assertPricingUnchanged(dto.expectedPricingHash, [
         {
