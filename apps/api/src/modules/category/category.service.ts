@@ -7,8 +7,7 @@ import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
 import { generateSlug } from "../../common/helpers/slug";
-import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
-import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import {
   assertCategoryHasPublishedCommissionCoverage,
   assertNoActiveCategoryDescendants,
@@ -45,11 +44,7 @@ export class CategoryService {
             _count: {
               select: {
                 products: {
-                  where: {
-                    ...catalogProductWhere(),
-                    status: "active",
-                    seller: saleCapableSellerWhere(),
-                  },
+                  where: publicListingWhere(),
                 },
               },
             },
@@ -97,11 +92,7 @@ export class CategoryService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: publicListingWhere(),
             },
           },
         },
@@ -142,11 +133,7 @@ export class CategoryService {
         _count: {
           select: {
             products: {
-              where: {
-                ...catalogProductWhere(),
-                status: "active",
-                seller: saleCapableSellerWhere(),
-              },
+              where: publicListingWhere(),
             },
           },
         },

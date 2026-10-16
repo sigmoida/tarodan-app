@@ -43,8 +43,7 @@ export const catalogApi = {
     api.delete(`/admin/products/${id}`, { data: payload }),
   restoreProduct: (id: string) => api.post(`/admin/products/${id}/restore`),
   /** Süresi dolan ilanı yeniden yayına al (yönetici kararı onay sayılır). */
-  renewExpiredProduct: (id: string) =>
-    api.post(`/admin/products/${id}/renew`),
+  renewExpiredProduct: (id: string) => api.post(`/admin/products/${id}/renew`),
   bulkRenewExpiredProducts: (productIds: string[]) =>
     api.post("/admin/products/bulk-renew", { productIds }),
   getProductImportSellers: (search?: string) =>
@@ -130,6 +129,7 @@ export const catalogApi = {
     params?: CatalogListParams & {
       search?: string;
       status?: string;
+      hasListings?: string;
     },
   ) => api.get("/admin/brands", { params: params ?? {} }),
   createBrand: (data: any) => api.post("/admin/brands", data),
@@ -141,6 +141,8 @@ export const catalogApi = {
   getManufacturers: (
     params?: CatalogListParams & {
       search?: string;
+      status?: string;
+      hasListings?: string;
     },
   ) => api.get("/admin/manufacturers", { params: params ?? {} }),
   createManufacturer: (data: any) => api.post("/admin/manufacturers", data),

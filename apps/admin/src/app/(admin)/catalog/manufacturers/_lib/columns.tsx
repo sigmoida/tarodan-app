@@ -34,6 +34,11 @@ export function manufacturerColumns(t: T, actions: ManufacturerRowActions) {
         ),
       { sortKey: "website" },
     ),
+    col.number<Manufacturer>(
+      t("admin.catalog.common.listing"),
+      (m) => m.listingCount,
+      { sortKey: "listingCount" },
+    ),
     col.badge<Manufacturer>(
       t("common.status"),
       (m) => <Badge active={m.isActive} />,

@@ -106,6 +106,10 @@ export class ProductQueryService {
       brand,
       brandId,
       manufacturerId,
+      // Ad ile üretici filtresi (?manufacturer=Bruder) sonucu değiştirir; anahtara
+      // girmezse yalnız adla yapılan iki farklı istek aynı sayfayı paylaşırdı.
+      // manufacturerId varken ad yok sayılır (buildProductWhere) → anahtara girmez.
+      manufacturer: manufacturerId ? undefined : query.manufacturer,
       scale,
       material: materialSlug,
       // Renk filtresi sonucu değiştirir; anahtara girmezse iki farklı renk

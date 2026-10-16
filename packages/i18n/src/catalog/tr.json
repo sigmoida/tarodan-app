@@ -5086,7 +5086,12 @@
         "selectPlaceholder": "Seçiniz",
         "views": "Görüntüleme",
         "aiModeration": "AI Denetim",
-        "allModels": "Tüm Modeller"
+        "allModels": "Tüm Modeller",
+        "listing": "İlan",
+        "listingFilter": "İlan Durumu",
+        "allListings": "Tümü",
+        "withListings": "İlanı olanlar",
+        "withoutListings": "İlanı olmayanlar"
       },
       "categories": {
         "title": "Kategoriler",
@@ -5217,7 +5222,8 @@
         "nameRequired": "Üretici adı zorunlu",
         "countryPlaceholder": "Örn: ABD",
         "foundedYearPlaceholder": "Örn: 1968",
-        "descriptionPlaceholder": "Üretici hakkında kısa açıklama"
+        "descriptionPlaceholder": "Üretici hakkında kısa açıklama",
+        "allManufacturers": "Tüm Üreticiler"
       },
       "collections": {
         "title": "Koleksiyonlar",

@@ -44,6 +44,11 @@ export function brandColumns(t: T, actions: BrandRowActions) {
       (b) => <LogoNameCell name={b.name} slug={b.slug} logo={b.logo} />,
       { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
+    col.number<Brand>(
+      t("admin.catalog.common.listing"),
+      (b) => b.listingCount,
+      { sortKey: "listingCount" },
+    ),
     col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />, {
       sortKey: "isActive",
     }),

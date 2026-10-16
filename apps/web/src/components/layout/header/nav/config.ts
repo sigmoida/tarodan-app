@@ -77,23 +77,31 @@ const RANGES: Array<{ range: string; min: string; max: string }> = [
 export const NAV_MANUFACTURER_LIMIT = 40;
 
 /**
- * Menüde gösterilecek üreticiler: önce İLANI OLANLAR, ilan sayısına göre azalan
- * sırada ilk `limit` tanesi.
+ * İlanı olan üreticiler. Menü ve ana sayfa marka şeridi aynı kuralı kullanır —
+ * ilanı olmayan bir üreticiye tıklayınca boş liste açılmasın.
  *
  * Sayaç hiç gelmemişse (eski/başka bir yanıt biçimi) süzme yapılmaz — aksi
- * halde tek bir alan değişikliği menüyü sessizce boşaltırdı. Sayaçlar gelmiş ve
- * hepsi sıfırsa liste gerçekten boştur; olmayan seçeneği menüde reklam etmeyiz.
+ * halde tek bir alan değişikliği listeyi sessizce boşaltırdı. Sayaçlar gelmiş ve
+ * hepsi sıfırsa liste gerçekten boştur; olmayan seçeneği reklam etmeyiz.
+ */
+export function manufacturersWithListings<T extends ManufacturerRef>(
+  manufacturers: T[],
+): T[] {
+  const hasCounts = manufacturers.some((m) => m._count?.products != null);
+  return hasCounts
+    ? manufacturers.filter((m) => manufacturerListingCount(m) > 0)
+    : manufacturers;
+}
+
+/**
+ * Menüde gösterilecek üreticiler: önce İLANI OLANLAR, ilan sayısına göre azalan
+ * sırada ilk `limit` tanesi.
  */
 function popularManufacturers(
   manufacturers: ManufacturerRef[],
   limit: number,
 ): ManufacturerRef[] {
-  const hasCounts = manufacturers.some((m) => m._count?.products != null);
-  const pool = hasCounts
-    ? manufacturers.filter((m) => manufacturerListingCount(m) > 0)
-    : manufacturers;
-
-  return [...pool]
+  return [...manufacturersWithListings(manufacturers)]
     .sort(
       (a, b) =>
         manufacturerListingCount(b) - manufacturerListingCount(a) ||

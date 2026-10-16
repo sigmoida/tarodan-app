@@ -3,6 +3,7 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
+import { navHref } from "@/components/layout/header/nav/config";
 import Image from "next/image";
 import { useState } from "react";
 import type { BrandMarqueeItem } from "../lib/types";
@@ -59,8 +60,8 @@ export default function BrandsMarquee({
         <div className="brands-marquee-track flex flex-nowrap items-center gap-6 px-2 sm:px-3">
           {[...items, ...items].map((brand, i) => (
             <Link
-              key={`${brand.name}-${i}`}
-              href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
+              key={`${brand.id}-${i}`}
+              href={navHref.manufacturer(brand)}
               className="flex-shrink-0 group"
             >
               <div className="w-24 h-14 sm:w-28 sm:h-16 bg-surface-elevated border border-border hover:border-primary-300 flex items-center justify-center p-2.5 transition-all hover:shadow-sm relative rounded">
