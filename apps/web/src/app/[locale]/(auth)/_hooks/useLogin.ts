@@ -7,28 +7,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
-
-/** Resolve the post-login target: sessionStorage hint → ?redirect → home. */
-function resolveRedirect(): string {
-  let redirect: string | null = null;
-  try {
-    redirect = sessionStorage.getItem("login_redirect");
-    if (redirect) sessionStorage.removeItem("login_redirect");
-  } catch {
-    /* sessionStorage unavailable */
-  }
-  if (!redirect)
-    redirect = new URLSearchParams(window.location.search).get("redirect");
-  // Must be a same-origin ABSOLUTE PATH. `startsWith('/')` alone is bypassable by
-  // a protocol-relative URL (`//evil.com`) or `/\evil.com`, which resolve
-  // off-origin — an open redirect. Reject those; fall back to home.
-  const isSafe =
-    !!redirect &&
-    redirect.startsWith("/") &&
-    !redirect.startsWith("//") &&
-    !redirect.startsWith("/\\");
-  return isSafe ? (redirect as string) : "/";
-}
+import { resolveLoginRedirect } from "../_lib/redirect";
 
 /**
  * Login flow. Signs in via the auth store (which sets the httpOnly session
@@ -76,7 +55,7 @@ export function useLogin() {
     onSuccess: ({ needsMembership }) => {
       const target = needsMembership
         ? "/membership?required=true"
-        : resolveRedirect();
+        : resolveLoginRedirect();
       // Navigate immediately (same recipe as admin's useLogin). A client
       // router.replace keeps the current UI up and shows the root loading
       // spinner while the target renders — instead of leaving the user on
@@ -144,7 +123,7 @@ export function useLogin() {
 
   /** Redirect after a successful Google sign-in (store already updated). */
   const redirectAfterGoogle = () => {
-    router.replace(resolveRedirect());
+    router.replace(resolveLoginRedirect());
     router.refresh();
   };
 
