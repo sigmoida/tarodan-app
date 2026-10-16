@@ -118,3 +118,35 @@ describe("sendFormToPayload", () => {
     });
   });
 });
+
+describe("hedef link (data.link)", () => {
+  it("boşsa payload'a data girmez", () => {
+    expect(sendFormToPayload(form({ link: "" }))).not.toHaveProperty("data");
+  });
+
+  it("site içi yol data.link olarak gider", () => {
+    expect(sendFormToPayload(form({ link: " /listings/abc " }))).toMatchObject({
+      data: { link: "/listings/abc" },
+    });
+  });
+
+  it.each([
+    "/listings/abc",
+    "/profile/orders",
+    "/membership",
+    "/collections/c1",
+  ])("%s geçerli", (link) => {
+    expect(schema.safeParse(form({ link })).success).toBe(true);
+  });
+
+  it.each([
+    "https://evil.example/x",
+    "//evil.example",
+    "/\\evil.example",
+    "/olmayan-sayfa",
+    "javascript:alert(1)",
+  ])("%s reddedilir", (link) => {
+    const result = schema.safeParse(form({ link }));
+    expect(result.success).toBe(false);
+  });
+});
