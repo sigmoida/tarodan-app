@@ -4,23 +4,21 @@
 
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { useQueryClient } from "@tanstack/react-query";
-import { finishBankSave } from "../_lib/bankSave";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { BankAccountSummary } from "@/components/bank/BankAccountSummary";
-import { useRouter } from "@/i18n/navigation";
-import { readReturnTo } from "@/lib/returnTo";
+import { useReturnAfterSave } from "@/hooks/useReturnAfterSave";
+import { PROFILE_GATE } from "@/lib/profileGate";
 import { useAuthStore } from "@/stores/authStore";
 import { bankAccountSchema, type BankAccountValues } from "../_lib/schemas";
 import {
   useBankAccount,
   useSaveBankAccount,
   useDeleteBankAccount,
-} from "../_hooks/useBankAccount";
+} from "@/hooks/useBankAccount";
 
 const EMPTY: BankAccountValues = {
   accountHolder: "",
@@ -28,16 +26,15 @@ const EMPTY: BankAccountValues = {
   taxId: "",
 };
 
-/** Seller IBAN — independent query + upsert/delete, RHF+zod form. */
+/** Seller IBAN — shared `useBankAccount` query + upsert/delete, RHF+zod form. */
 export default function BankAccountSection() {
   const t = useTranslations();
   const { isAuthenticated } = useAuthStore();
   const confirm = useConfirm();
-  const router = useRouter();
-  const qc = useQueryClient();
   const { account } = useBankAccount(isAuthenticated);
   const save = useSaveBankAccount();
   const remove = useDeleteBankAccount();
+  const finish = useReturnAfterSave("bank");
 
   const form = useZodForm(bankAccountSchema(t), { defaultValues: EMPTY });
 
@@ -54,9 +51,7 @@ export default function BankAccountSection() {
 
   // Kayıt başarılıysa ve güvenli bir `returnTo` varsa (ör. ilan formu) oraya dön.
   const submit = (v: BankAccountValues) =>
-    save.mutate(v, {
-      onSuccess: () => finishBankSave(qc, readReturnTo(), router.push),
-    });
+    save.mutate(v, { onSuccess: finish });
 
   const onDelete = async () => {
     const ok = await confirm({
@@ -69,7 +64,7 @@ export default function BankAccountSection() {
   };
 
   return (
-    <div id="bank-account" className="scroll-mt-24">
+    <div id={PROFILE_GATE.bank.anchor} className="scroll-mt-24">
       <SectionCard
         title={t("profile.bank.title")}
         action={

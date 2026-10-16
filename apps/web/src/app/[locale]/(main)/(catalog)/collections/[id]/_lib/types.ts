@@ -16,6 +16,8 @@ export interface CollectionItem {
   productImage?: string;
   productPrice?: number;
   productStatus?: string;
+  /** Ürünün satıcısı; özel öğede null. Kart kalbi kendi ilanında gizlenir. */
+  sellerId?: string | null;
   sortOrder: number;
   isFeatured: boolean;
   isBoosted?: boolean;
@@ -69,6 +71,7 @@ export const itemToProduct = (item: CollectionItem): Product => ({
     item.customImageUrl || item.productImage
       ? [{ url: (item.customImageUrl || item.productImage) as string }]
       : [],
+  sellerId: item.sellerId ?? undefined,
   brand: item.customBrand,
   scale: item.customScale,
   year: item.customYear,

@@ -12,13 +12,12 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useQuery } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import { useZodForm } from "@tarodan/ui/form";
 import toast from "react-hot-toast";
-import { listingsApi, bankAccountApi } from "@/lib/api";
+import { listingsApi } from "@/lib/api";
+import { useBankAccount } from "@/hooks/useBankAccount";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
-import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -76,13 +75,10 @@ function useNewListingValue() {
   const categoryId = watch("categoryId");
   const shippingPackageTier = watch("shippingPackageTier");
 
-  const bankAccountQuery = useQuery({
-    queryKey: queryKeys.bankAccount.detail(),
-    queryFn: async () => (await bankAccountApi.get()).data || null,
-    enabled: isAuthenticated,
-  });
-  const hasBankAccount = !!bankAccountQuery.data;
-  const bankAccountLoading = bankAccountQuery.isLoading;
+  // Profil ve satıcı belgeleriyle AYNI sorgu: orada kaydedilen IBAN kapıyı anında açar.
+  const { account: bankAccount, isLoading: bankAccountLoading } =
+    useBankAccount(isAuthenticated);
+  const hasBankAccount = !!bankAccount;
 
   // Çıkış adresi kapısı — kural ve seçim mantığı `useDispatchAddress`'te tek
   // kaynakta duruyor; giriş sonrası hatırlatma popup'ı da aynısını kullanıyor.

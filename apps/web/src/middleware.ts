@@ -4,6 +4,7 @@ import { createAuthMiddleware } from "@tarodan/auth/middleware";
 import { defaultLocale, locales } from "@tarodan/i18n";
 import { webAuthConfig } from "@/lib/auth.config";
 import { routing } from "@/i18n/routing";
+import { RETURN_TO_HEADER, readsReturnToHeader } from "@/lib/returnTo";
 import { SITE_UNLOCK_COOKIE } from "@/lib/siteLock";
 import { internalComingSoonPath, isSiteLocked } from "@/lib/siteLockPolicy.mjs";
 import { verifyUnlockCookie } from "@/lib/siteUnlockCookie.mjs";
@@ -144,6 +145,14 @@ export async function middleware(request: NextRequest) {
   const original = request.nextUrl.pathname;
   const { locale, rest } = splitLocale(original);
   const prefix = locale === defaultLocale ? "" : `/${locale}`;
+
+  // Server layout'lar `searchParams` göremez; oturum yoksa kullanıcının geldiği
+  // tam adresle (locale'siz yol + query) login'e göndermek için başlığa yazılır.
+  // Yalnız başlığı okuyan yollarda yazılır; orada EZİLİR (istemciden gelen değer
+  // güvenilmez) ve tüketen yer yine `safeReturnTo`'dan geçirir.
+  if (readsReturnToHeader(rest)) {
+    request.headers.set(RETURN_TO_HEADER, `${rest}${request.nextUrl.search}`);
+  }
 
   // Kart alanları BİZİM sayfamızda toplanıp doğrudan PayTR'ye POST edildiği için
   // ödeme rotası PCI DSS 6.4.3/11.6.1 kapsamındadır: orada politika ZORLAYICI,

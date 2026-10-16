@@ -2,10 +2,12 @@
 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import { redirect } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { getSession } from "@/lib/server/session";
+import { RETURN_TO_HEADER, loginHref } from "@/lib/returnTo";
 import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
 import ProfileShell from "./_components/ProfileShell";
@@ -36,8 +38,11 @@ export default async function ProfileLayout({
   children: ReactNode;
 }) {
   const session = await getSession();
-  if (!session)
-    redirect({ href: "/login?redirect=/profile", locale: await getLocale() });
+  if (!session) {
+    // Geldiği adres (alt sayfa + `?returnTo=` gibi query) korunarak login'e gidilir.
+    const target = (await headers()).get(RETURN_TO_HEADER) ?? "/profile";
+    redirect({ href: loginHref(target), locale: await getLocale() });
+  }
   // `redirect` throws, so `session` is non-null past here — but next-intl's
   // redirect return type doesn't let TS's control flow infer that (unlike
   // next/navigation's), so narrow it explicitly.
