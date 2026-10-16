@@ -14,8 +14,9 @@ import { useAuthStore } from "@/stores/authStore";
 
 /**
  * Ürün kartlarındaki favori kalbi (`ProductCard` grid + liste, `HomeProductCard`).
- * Kartın görsel alanının SAĞ ALT köşesine oturur — sol üst rozetler ve sağ üst
- * indirim rozetiyle çakışmaz — ve hover'a bağlı değildir (dokunmatikte de görünür).
+ * Kartın görsel alanının SAĞ ÜST köşesine oturur — sol üst rozet yığınıyla
+ * çakışmaz (yığın kalp payı bırakır; kartta sağ üst `overlay` varsa kalp hiç
+ * çizilmez) — ve hover'a bağlı değildir (dokunmatikte de görünür).
  *
  * Kartın `<Link>`'inin İÇİNE konmaz (link içinde buton geçersiz HTML): kart
  * bunu linkin dışında, görsel alanını birebir kaplayan `frameClassName`
@@ -84,7 +85,7 @@ export default function ProductCardFavorite({
         title={label}
         // `after:-inset-1.5`: 32px + 2×6px = 44px dokunma alanı; buton
         // görselin kenarından 6px içeride, alan tam kenarda biter.
-        className={`pointer-events-auto absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/80 text-heading shadow-sm after:absolute after:-inset-1.5 after:rounded-full hover:bg-surface-elevated ${FAVORITE_BUSY_CLASS}`}
+        className={`pointer-events-auto absolute top-1.5 right-1.5 rounded-full bg-surface-elevated/80 text-heading shadow-sm after:absolute after:-inset-1.5 after:rounded-full hover:bg-surface-elevated ${FAVORITE_BUSY_CLASS}`}
       >
         {isFavorite ? (
           <HeartSolidIcon className="h-5 w-5 text-danger-500" />

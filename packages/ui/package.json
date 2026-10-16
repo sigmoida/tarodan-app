@@ -13,6 +13,8 @@
     "./spinner": "./src/components/Spinner.tsx",
     "./alert": "./src/components/Alert.tsx",
     "./button": "./src/components/Button.tsx",
+    "./badge": "./src/components/Badge.tsx",
+    "./product-badge": "./src/components/ProductBadge.tsx",
     "./section-card": "./src/components/SectionCard.tsx"
   },
   "scripts": {

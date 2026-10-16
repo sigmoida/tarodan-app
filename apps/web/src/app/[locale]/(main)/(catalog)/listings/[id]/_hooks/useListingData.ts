@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import { listingsApi, userApi, api } from "@/lib/api";
+import { isProductTradeEnabled } from "@/lib/productCardBadges";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import type { Product } from "@/types/product";
 import { buildImages } from "../_lib/images";
@@ -78,9 +79,7 @@ export function useListingData(id: string) {
 
   const listing = listingQuery.data ?? null;
   const effectivePrice = listing ? getProductEffectivePrice(listing) : 0;
-  const isTradeAvailable =
-    listing?.tradeAvailable ??
-    (listing?.trade_available || listing?.isTradeEnabled || false);
+  const isTradeAvailable = listing ? isProductTradeEnabled(listing) : false;
 
   const images = useMemo(() => buildImages(listing?.images), [listing]);
 

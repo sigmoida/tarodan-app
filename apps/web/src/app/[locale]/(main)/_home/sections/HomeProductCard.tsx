@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { Link } from "@/i18n/navigation";
+import ProductCardBadges from "@/components/ui/ProductCardBadges";
 import ProductCardFavorite from "@/components/ui/ProductCardFavorite";
 import {
   getProductEffectivePrice,
@@ -21,6 +21,8 @@ const formatPrice = formatTL;
  * Server-rendered home card; only the image itself uses Next's built-in loader.
  * The favorite heart is the one client island (`ProductCardFavorite`, shared with
  * `ProductCard`), rendered as the link's sibling so the card HTML stays valid.
+ * Badge stack (top-left) and heart (top-right) follow `ProductCard`'s grid rule
+ * via the shared `ProductCardBadges`.
  */
 export default function HomeProductCard({
   product,
@@ -28,6 +30,7 @@ export default function HomeProductCard({
   priority,
   sponsoredLabel,
   tradeLabel,
+  discountLabel,
   outOfStockLabel,
 }: {
   product: Product;
@@ -35,6 +38,7 @@ export default function HomeProductCard({
   priority: boolean;
   sponsoredLabel: string;
   tradeLabel: string;
+  discountLabel: string;
   outOfStockLabel: string;
 }) {
   const firstImage = Array.isArray(product.images)
@@ -43,10 +47,6 @@ export default function HomeProductCard({
   const imageUrl = getImageUrl(firstImage, index, product.title);
   const outOfStock = isProductOutOfStock(product);
   const onSale = isProductOnSaleDisplay(product);
-  const isTrade = Boolean(
-    product.tradeAvailable ??
-    (product.trade_available || product.isTradeEnabled),
-  );
 
   return (
     <div
@@ -74,24 +74,12 @@ export default function HomeProductCard({
                 </span>
               </div>
             )}
-            <div className="absolute left-1.5 top-1.5 flex flex-col items-start gap-1">
-              {product.isBoosted && (
-                <span className="rounded bg-warning-100 px-1.5 py-0.5 text-xs font-semibold text-warning-800">
-                  {sponsoredLabel}
-                </span>
-              )}
-              {isTrade && (
-                <span className="inline-flex items-center gap-1 rounded bg-success-100 px-1.5 py-0.5 text-xs font-semibold text-success-800">
-                  <ArrowsRightLeftIcon className="h-3 w-3" />
-                  <span className="hidden sm:inline">{tradeLabel}</span>
-                </span>
-              )}
-            </div>
-            {onSale && (
-              <span className="absolute right-1.5 top-1.5 rounded bg-danger-500 px-1.5 py-0.5 text-xs font-semibold text-inverted">
-                %{product.discountPercent ?? 0}
-              </span>
-            )}
+            <ProductCardBadges
+              product={product}
+              sponsoredLabel={sponsoredLabel}
+              tradeLabel={tradeLabel}
+              discountLabel={discountLabel}
+            />
           </div>
 
           <div className="flex flex-1 flex-col p-2.5">
