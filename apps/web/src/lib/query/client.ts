@@ -25,6 +25,43 @@ export function onQueryError(
   });
 }
 
+interface ReportableError {
+  name?: string;
+  code?: string;
+  message?: unknown;
+  response?: { status?: unknown };
+  config?: { url?: unknown; method?: unknown };
+}
+
+/** HTTP status of an axios-style error; `undefined` for network/runtime errors. */
+function httpStatusOf(error: unknown): number | undefined {
+  const status = (error as ReportableError)?.response?.status;
+  return typeof status === "number" ? status : undefined;
+}
+
+/**
+ * Should this mutation failure go to Sentry?
+ *
+ * - `meta: { reportError: false }` opts a mutation out entirely.
+ * - Cancellations (`AbortError`, axios `ERR_CANCELED`) are not failures.
+ * - A 4xx is the API answering the user's input (wrong password, OTP, coupon
+ *   or stock rejection, 409 conflict, …) — expected, shown as a toast, and
+ *   reporting it would burn the Sentry quota. 429 is the exception: being
+ *   rate-limited is worth seeing.
+ * - Network errors (no status) and 5xx are reported.
+ */
+export function shouldReportMutationError(
+  error: unknown,
+  meta?: Record<string, unknown>,
+): boolean {
+  if (meta?.reportError === false) return false;
+  const err = error as ReportableError;
+  if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return false;
+  const status = httpStatusOf(error);
+  if (status !== undefined && status < 500 && status !== 429) return false;
+  return true;
+}
+
 /**
  * Global mutation error handler: report to Sentry.
  *
@@ -35,31 +72,38 @@ export function onQueryError(
  * replaced the default and its errors never reached Sentry. A cache-level
  * callback always runs, before the mutation's own `onError`.
  *
- * Nothing is filtered here — every failed mutation is reported, as the old
- * default did. A mutation whose "error" is an expected outcome (e.g. the
- * wishlist's 409/404) resolves it inside its `mutationFn` instead of failing.
+ * Only SAFE fields go into the event: the mutation key, HTTP status, method
+ * and endpoint path (query string stripped). The mutation's variables, its
+ * `onMutate` snapshot (`context`) and `meta` are never sent — they can carry
+ * personal data (addresses, cart contents, form input).
  */
 export function onMutationError(
   error: unknown,
-  mutation: { mutationKey?: unknown; meta?: unknown; context?: unknown },
+  mutation: { mutationKey?: unknown; meta?: Record<string, unknown> },
 ) {
+  if (!shouldReportMutationError(error, mutation.meta)) return;
+  const config = (error as ReportableError)?.config;
+  const url = typeof config?.url === "string" ? config.url : undefined;
   logger.captureException(error, {
     source: "react-query",
     type: "mutation",
     mutationKey: mutation.mutationKey,
-    meta: mutation.meta,
-    context: mutation.context,
+    status: httpStatusOf(error),
+    method:
+      typeof config?.method === "string"
+        ? config.method.toUpperCase()
+        : undefined,
+    endpoint: url?.split("?")[0],
   });
 }
 
 export function makeQueryClient() {
   return createPlatformQueryClient({
     mutationCache: new MutationCache({
-      onError: (error, _variables, context, mutation) =>
+      onError: (error, _variables, _context, mutation) =>
         onMutationError(error, {
           mutationKey: mutation.options.mutationKey,
           meta: mutation.meta,
-          context,
         }),
     }),
     queryCache: new QueryCache({

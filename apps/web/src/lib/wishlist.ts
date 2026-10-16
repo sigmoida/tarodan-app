@@ -32,6 +32,43 @@ export function isPendingWishlistEntry(entry: WishlistEntry): boolean {
   return entry.pending === true;
 }
 
+/**
+ * Sunucunun tek satırlık yanıtı (`POST /wishlist`) → satır. Çıplak nesne ya da
+ * `{ data }` zarfı kabul edilir; `productId` taşımıyorsa `undefined`.
+ */
+export function wishlistEntryFrom(raw: unknown): WishlistEntry | undefined {
+  for (const candidate of [raw, (raw as { data?: unknown } | null)?.data]) {
+    if (
+      candidate &&
+      typeof (candidate as WishlistEntry).productId === "string"
+    ) {
+      return candidate as WishlistEntry;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Ekleme TAMAMLANDI: ürünün geçici satırı sunucunun döndürdüğü satırla, o
+ * yoksa bayraksız `{ productId }` ile değişir. Liste tazelemesi atlanır ya da
+ * düşerse de kalıcı bir yükleniyor kartı kalmaz. Değişiklik yoksa AYNI dizi.
+ */
+export function settleWishlistEntry(
+  items: readonly WishlistEntry[],
+  productId: string,
+  entry?: WishlistEntry,
+): WishlistEntry[] {
+  let changed = false;
+  const next = items.map((item) => {
+    if (item.productId !== productId || !isPendingWishlistEntry(item)) {
+      return item;
+    }
+    changed = true;
+    return entry?.productId === productId ? entry : { productId };
+  });
+  return changed ? next : (items as WishlistEntry[]);
+}
+
 /** Geri alınacak satır ve listedeki ESKİ yeri. */
 export interface WishlistRestore {
   entry: WishlistEntry;

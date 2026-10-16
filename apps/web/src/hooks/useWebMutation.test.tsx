@@ -79,22 +79,41 @@ afterEach(() => {
 });
 
 describe("useWebMutation — hata", () => {
-  const apiError = { response: { status: 422, data: { message: "geçersiz" } } };
+  const serverError = {
+    response: { status: 500, data: { message: "sunucu hatası" } },
+  };
+  const validationError = {
+    response: { status: 422, data: { message: "geçersiz" } },
+  };
 
-  it("hatayı hem toast'lar hem Sentry'ye raporlar", async () => {
-    render(() => Promise.reject(apiError));
+  it("sunucu hatasını hem toast'lar hem Sentry'ye raporlar", async () => {
+    render(() => Promise.reject(serverError));
     await run();
 
-    expect(h.toast.error).toHaveBeenCalledWith("geçersiz");
+    expect(h.toast.error).toHaveBeenCalledWith("sunucu hatası");
     expect(h.capture).toHaveBeenCalledTimes(1);
     expect(h.capture).toHaveBeenCalledWith(
-      apiError,
-      expect.objectContaining({ source: "react-query", type: "mutation" }),
+      serverError,
+      expect.objectContaining({
+        source: "react-query",
+        type: "mutation",
+        status: 500,
+      }),
     );
   });
 
+  // Doğrulama hatası kullanıcının girdisine verilen cevaptır: toast evet,
+  // Sentry hayır (kota/gürültü).
+  it("4xx iş hatasını toast'lar ama raporlamaz", async () => {
+    render(() => Promise.reject(validationError));
+    await run();
+
+    expect(h.toast.error).toHaveBeenCalledWith("geçersiz");
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+
   it("silentError toast'u bastırır ama raporu bastırmaz", async () => {
-    render(() => Promise.reject(apiError), { silentError: true });
+    render(() => Promise.reject(serverError), { silentError: true });
     await run();
 
     expect(h.toast.error).not.toHaveBeenCalled();

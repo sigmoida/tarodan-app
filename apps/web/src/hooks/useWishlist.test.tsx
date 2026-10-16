@@ -249,6 +249,33 @@ describe("useToggleWishlist", () => {
     await flush();
   });
 
+  it("ekleme bitince geçici satır sunucunun satırıyla değişir (tazeleme düşse de)", async () => {
+    h.api.add.mockResolvedValue({ status: 201, data: row("p1") });
+    await render();
+    // Tazeleme hiç dönmez: geçici satır yine de kalıcı skeleton kalmamalı.
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+
+    expect(cached()).toEqual([row("p1"), row("p0")]);
+  });
+
+  it("yanıt satır taşımıyorsa geçici bayrak yine kalkar", async () => {
+    h.api.add.mockResolvedValue({ status: 201 });
+    await render();
+    hangRefetch();
+
+    act(() => {
+      toggle("p1", false);
+    });
+    await flush();
+
+    expect(cached()?.[0]).toEqual({ productId: "p1" });
+  });
+
   it("409 (zaten favoride) başarı sayılır, geri alınmaz", async () => {
     const req = deferred();
     h.api.add.mockReturnValue(req.promise);

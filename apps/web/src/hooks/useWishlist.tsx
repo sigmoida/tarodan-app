@@ -4,6 +4,7 @@
 
 import { useCallback, useMemo } from "react";
 import {
+  useIsMutating,
   useMutation,
   useMutationState,
   useQuery,
@@ -17,6 +18,8 @@ import { queryKeys } from "@/lib/query/keys";
 import {
   wishlistIdSet,
   wishlistItemsQuery,
+  settleWishlistEntry,
+  wishlistEntryFrom,
   withWishlistEntry,
   type WishlistEntry,
   type WishlistRestore,
@@ -73,10 +76,25 @@ interface ToggleContext {
 const toggledProductId = (mutation: { state: { variables?: unknown } }) =>
   (mutation.state.variables as ToggleVars | undefined)?.productId;
 
+/** Tek ürünün toggle mutation'larını seçen filtre — kalp ve çift tık koruması. */
+const toggleFilterFor = (productId: string) => ({
+  mutationKey: TOGGLE_KEY,
+  predicate: (mutation: { state: { variables?: unknown } }) =>
+    toggledProductId(mutation) === productId,
+});
+
 /**
- * İsteği hâlâ süren (pending) favori ürünlerinin id'leri. Aynı ürün için ikinci
- * tıklama `toggle` tarafından yok sayılır; düğmeler bu kümeyle o sürede meşgul
- * görünür ki tıklama SESSİZCE düşmüş gibi durmasın.
+ * Bu ürün için favori isteği sürüyor mu? Aynı ürün için ikinci tıklama
+ * `toggle` tarafından yok sayılır; kalp bu sürede meşgul görünür ki tıklama
+ * SESSİZCE düşmüş gibi durmasın. Kart başına yalnız bir sayı okunur (küme yok).
+ */
+export function useIsWishlistPending(productId: string): boolean {
+  return useIsMutating(toggleFilterFor(productId)) > 0;
+}
+
+/**
+ * İsteği süren TÜM favori ürünleri — liste ekranı (Favorilerim) için, sayfa
+ * başına tek abonelik. Tek ürün için `useIsWishlistPending` kullanılır.
  */
 export function useWishlistPendingIds(): ReadonlySet<string> {
   const pending = useMutationState({
@@ -95,7 +113,9 @@ export function useWishlistPendingIds(): ReadonlySet<string> {
  * - Önbellekteki listeyi HEMEN günceller (kalp anında dolar/boşalır); hata
  *   olursa yalnız o ürünü geri alır — eşzamanlı başka bir toggle'ı ezmez.
  * - Aynı ürün için bir istek sürerken ikinci tıklamayı yok sayar (`false`
- *   döner); düğme o sürede `useWishlistPendingIds` ile meşgul görünür.
+ *   döner); düğme o sürede `useIsWishlistPending` ile meşgul görünür.
+ * - Ekleme bitince geçici satırı sunucunun satırıyla değiştirir; tazeleme
+ *   düşse de kalıcı bir yükleniyor kartı kalmaz.
  * - Yalnız favori listesini (+ açıksa o ürünün detayını) tazeler; ürün
  *   listelerine ve kartlardaki `likeCount`'a dokunmaz.
  */
@@ -107,18 +127,25 @@ export function useToggleWishlist() {
       add ? t("product.addedToFavorites") : t("product.removedFromFavorites"),
     );
 
-  const { mutate } = useMutation<unknown, unknown, ToggleVars, ToggleContext>({
+  const { mutate } = useMutation<
+    WishlistEntry | undefined,
+    unknown,
+    ToggleVars,
+    ToggleContext
+  >({
     mutationKey: TOGGLE_KEY,
     mutationFn: async ({ productId, add }) => {
       try {
-        return await (add
-          ? wishlistApi.add(productId)
-          : wishlistApi.remove(productId));
+        if (!add) {
+          await wishlistApi.remove(productId);
+          return undefined;
+        }
+        // Eklenen satır (varsa) geçici satırın yerine konur.
+        return wishlistEntryFrom((await wishlistApi.add(productId)).data);
       } catch (error) {
         // İstenen son durum zaten sunucuda: eklerken 409 (zaten favoride),
-        // çıkarırken 404 (zaten favoride değil) → BAŞARI. Hata olarak
-        // bırakılsaydı geri alma çalışır ve MutationCache onu Sentry'ye
-        // beklenmeyen hata diye raporlardı.
+        // çıkarırken 404 (zaten favoride değil) → BAŞARI: kalp geri
+        // alınmaz, kullanıcı başarı mesajını görür.
         const status = (error as { response?: { status?: number } })?.response
           ?.status;
         if (status === (add ? 409 : 404)) return undefined;
@@ -140,7 +167,15 @@ export function useToggleWishlist() {
       );
       return { removed };
     },
-    onSuccess: (_data, { add }) => successToast(add),
+    onSuccess: (entry, { productId, add }) => {
+      if (add) {
+        queryClient.setQueryData<WishlistEntry[]>(
+          LIST_KEY,
+          (old) => old && settleWishlistEntry(old, productId, entry),
+        );
+      }
+      successToast(add);
+    },
     // Sentry raporunu MutationCache yapar (lib/query/client); burada yalnız
     // geri alma ve kullanıcıya gösterilen hata var.
     onError: (error, { productId, add }, context) => {
@@ -167,12 +202,8 @@ export function useToggleWishlist() {
   return useCallback(
     (productId: string, isFavorite: boolean): boolean => {
       // Önbellekten EŞZAMANLI okunur: aynı tick'teki çift tıklama henüz
-      // render olmamış `useWishlistPendingIds`'i göremez.
-      const inFlight = queryClient.isMutating({
-        mutationKey: TOGGLE_KEY,
-        predicate: (mutation) => toggledProductId(mutation) === productId,
-      });
-      if (inFlight > 0) return false;
+      // render olmamış `useIsWishlistPending`'i göremez.
+      if (queryClient.isMutating(toggleFilterFor(productId)) > 0) return false;
       mutate({ productId, add: !isFavorite });
       return true;
     },
@@ -199,7 +230,7 @@ export function useProductFavorite(
 ) {
   const t = useTranslations();
   const isFavorite = useWishlistIds().has(productId);
-  const isPending = useWishlistPendingIds().has(productId);
+  const isPending = useIsWishlistPending(productId);
   const toggleWishlist = useToggleWishlist();
 
   const toggle = useCallback(() => {
