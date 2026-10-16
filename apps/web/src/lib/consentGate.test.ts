@@ -19,6 +19,12 @@ describe("isConsentGateExempt", () => {
     expect(isConsentGateExempt("/privacy")).toBe(true);
   });
 
+  it("/app/** (WebView yasal sayfaları) muaftır", () => {
+    expect(isConsentGateExempt("/app/terms")).toBe(true);
+    expect(isConsentGateExempt("/app/refund-policy")).toBe(true);
+    expect(isConsentGateExempt("/apple")).toBe(false);
+  });
+
   it("diğer sayfalar kapının arkasındadır", () => {
     expect(isConsentGateExempt("/")).toBe(false);
     expect(isConsentGateExempt("/checkout")).toBe(false);
