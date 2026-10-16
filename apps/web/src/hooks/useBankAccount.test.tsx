@@ -49,10 +49,20 @@ function Writers() {
   return null;
 }
 
+// React Query bildirimleri zamanlayıcıyla toplar: tek bir act tüm sorgu
+// sonuçlarını işlemeye yetmez, istekler bitene kadar bekle.
+async function settle() {
+  await act(async () => {
+    await vi.waitFor(() => expect(qc.isFetching()).toBe(0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 async function render(node: ReactNode) {
   await act(async () => {
     root.render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
   });
+  await settle();
 }
 
 const account = {
@@ -127,6 +137,7 @@ describe("useSaveBankAccount / useDeleteBankAccount", () => {
         taxId: " ",
       });
     });
+    await settle();
 
     expect(h.upsert).toHaveBeenCalledWith({
       accountHolder: "Ali Veli",
@@ -164,6 +175,7 @@ describe("useSaveBankAccount / useDeleteBankAccount", () => {
     await act(async () => {
       await del.mutateAsync();
     });
+    await settle();
 
     expect(h.remove).toHaveBeenCalledTimes(1);
     expect(seen.at(-1)?.account).toBeNull();
