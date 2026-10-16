@@ -62,9 +62,36 @@ describe("adCreativeChanged", () => {
     ["content", { content: null }],
     ["altText", { altText: "yeni" }],
     ["popupFrequency", { popupFrequency: "every_visit" as const }],
-    ["linkUrl", { linkUrl: "/yeni" }],
   ])("%s farklıysa değişmiştir", (_f, over) => {
     expect(adCreativeChanged(stored, patch(over))).toBe(true);
+  });
+
+  describe("bağlantı (yalnız görselsiz reklamda görünür)", () => {
+    const text: AdCreativeSnapshot = {
+      ...stored,
+      imageUrl: null,
+      linkUrl: "/eski",
+      hotspots: [],
+    };
+
+    it("görselsiz reklamda bağlantı değişimi değişikliktir", () => {
+      expect(adCreativeChanged(text, patch({ linkUrl: "/yeni" }))).toBe(true);
+      expect(adCreativeChanged(text, patch({ linkUrl: "/eski" }))).toBe(false);
+    });
+
+    it("görselli reklamın eski kayıtta kalmış linkUrl'i zorla null'a çekilince değişiklik SAYILMAZ", () => {
+      // Kök neden (entegrasyon): resolveAdClickTargets görselli reklamda her
+      // PATCH'te linkUrl: null döner; ham karşılaştırma her güncellemede
+      // popupVersion'ı artırıyordu.
+      const legacy = { ...stored, linkUrl: "/kategori/x" };
+      expect(adCreativeChanged(legacy, patch({ linkUrl: null }))).toBe(false);
+    });
+
+    it("görsel kaldırılıp bağlantılı metin reklama dönünce değişmiştir", () => {
+      expect(
+        adCreativeChanged(stored, patch({ imageUrl: null, linkUrl: "/x" })),
+      ).toBe(true);
+    });
   });
 
   it("alanlar: temizleme yalnız alan varken değişikliktir", () => {
