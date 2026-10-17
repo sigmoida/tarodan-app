@@ -5720,8 +5720,25 @@
             "linkRequired": "Link is required."
           }
         },
-        "iabCompliant": "IAB Compliant",
-        "iabWarning": "Size ({width}x{height}) is not an IAB standard — select one of the recommended sizes.",
+        "sizeRecommended": "Recommended sizes",
+        "sizeCustom": "Custom: {width}×{height}",
+        "sizeSplitHint": "A wide web image becomes very thin on phones; we recommend separate ads for web and the app.",
+        "sizeRatioWarning": "Image is {width}×{height} — recommended for {position}: {sizes}; {direction, select, tall {the image will look tall} other {the image will look flat and very thin}}.",
+        "sizeGroup": {
+          "web": "Web",
+          "app": "App"
+        },
+        "sizeImageMismatch": "The selected size {width}×{height} does not match the image ratio ({imageWidth}×{imageHeight}); the reserved space differs while loading, and the image's own ratio wins once loaded.",
+        "sizePreset": {
+          "strip": "Strip",
+          "billboard": "Billboard",
+          "leaderboard": "Leaderboard",
+          "mobileBanner": "Mobile Banner",
+          "mobileLeaderboard": "Mobile Leaderboard",
+          "mediumRectangle": "Medium Rectangle",
+          "square": "Square",
+          "largeMobileBanner": "Large Mobile Banner"
+        },
         "allPositions": "All Positions",
         "allPlatforms": "All platforms",
         "position": {
@@ -5768,11 +5785,11 @@
         "campaignHelper": "An ad linked to a campaign stops running automatically when the campaign ends.",
         "displayOrderHelper": "When several ads share a spot they rotate in turn; the smaller number comes first.",
         "positionHint": {
-          "topbar": "A thin strip at the very top of the page. Web: every page; mobile app: home screen only. Suggested: 728×90 (shown at strip height) or a small logo-like image; text works too.",
-          "header": "Large banner under the header. Web: home and listing pages; mobile app: home screen and the listings screen. Suggested: 970×250 or 1200×300 on desktop, 320×100 on mobile.",
-          "footer": "Banner above the footer. Web: home and listing pages; mobile app: home screen and the end of the listings screen. Suggested: 970×250, 320×100 on mobile.",
-          "inline": "Between product rows. Web: listing, search and category pages; mobile app: the listings screen only. Suggested: 728×90 or 970×90 on desktop, 300×250 on mobile.",
-          "popup": "A window that opens when a visitor enters the home page. Web and mobile app: home page only; how often is set by Display frequency. Suggested: 600×600, 320×480 on mobile."
+          "topbar": "A thin strip at the very top of the page. Web: every page; mobile app: home screen only. Suggested: 970×90 (shown at strip height); text works too.",
+          "header": "Large banner under the header. Web: home and listing pages; mobile app: home screen and the listings screen. Suggested: web 970×250 or 728×90, app 320×100 or 320×50.",
+          "footer": "Banner above the footer. Web: home and listing pages; mobile app: home screen and the end of the listings screen. Suggested: web 970×250 or 728×90, app 320×100 or 320×50.",
+          "inline": "Between product rows. Web: listing, search and category pages; mobile app: the listings screen only. Suggested: web 970×250 or 728×90, app 320×100 or 320×50.",
+          "popup": "A window that opens when a visitor enters the home page. Web and mobile app: home page only; how often is set by Display frequency. Suggested: web 300×250 or 250×250, app 320×480 or 300×250."
         }
       },
       "discounts": {

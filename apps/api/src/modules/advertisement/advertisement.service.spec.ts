@@ -224,6 +224,17 @@ describe("AdvertisementService — yayın penceresi sırası", () => {
   });
 });
 
+describe("AdvertisementService.checkIABCompliance", () => {
+  it("topbar şeridi 970×90 (Large Leaderboard) IAB uyumlu sayılır", () => {
+    const { service } = makeService();
+    expect(service.checkIABCompliance(970, 90)).toEqual({
+      isCompliant: true,
+      matchedSize: "Large Leaderboard",
+      suggestions: [],
+    });
+  });
+});
+
 describe("AdvertisementService.create — varsayılanlar", () => {
   it("yuva/platform/sıklık/sıra/anahtar gönderilmezse header/all/until_dismissed/0/true", async () => {
     const { service, advertisement } = makeService();

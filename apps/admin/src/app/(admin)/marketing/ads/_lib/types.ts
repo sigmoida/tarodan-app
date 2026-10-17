@@ -81,20 +81,6 @@ export interface Ad {
   updatedAt: string;
 }
 
-/** IAB standard ad sizes. */
-export const IAB_SIZES = [
-  { name: "Leaderboard", width: 728, height: 90, device: "desktop" },
-  { name: "Medium Rectangle", width: 300, height: 250, device: "all" },
-  { name: "Wide Skyscraper", width: 160, height: 600, device: "desktop" },
-  { name: "Half Page", width: 300, height: 600, device: "desktop" },
-  { name: "Billboard", width: 970, height: 250, device: "desktop" },
-  { name: "Mobile Leaderboard", width: 320, height: 50, device: "mobile" },
-  { name: "Mobile Banner", width: 320, height: 100, device: "mobile" },
-  { name: "Large Mobile Banner", width: 320, height: 480, device: "mobile" },
-  { name: "Square", width: 250, height: 250, device: "all" },
-  { name: "Small Square", width: 200, height: 200, device: "all" },
-];
-
 /** API ile birebir: yan panel (sidebar) kaldırıldı, topbar eklendi. */
 export const AD_POSITIONS = [
   "topbar",
@@ -170,11 +156,6 @@ export const platformOptions = (t: T) =>
     value,
     label,
   }));
-
-export const isIabSize = (width?: number | null, height?: number | null) =>
-  !!width &&
-  !!height &&
-  IAB_SIZES.some((s) => s.width === width && s.height === height);
 
 /** Reklam bağlantısı kuralı (`@/lib/links` ile tek kaynak). */
 export const isValidAdLink = isValidLink;

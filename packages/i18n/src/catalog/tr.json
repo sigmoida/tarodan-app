@@ -5720,8 +5720,25 @@
             "linkRequired": "Bağlantı gerekli."
           }
         },
-        "iabCompliant": "IAB Uyumlu",
-        "iabWarning": "Boyut ({width}x{height}) IAB standardı değil — önerilen boyutlardan birini seçin.",
+        "sizeRecommended": "Önerilen boyutlar",
+        "sizeCustom": "Özel: {width}×{height}",
+        "sizeSplitHint": "Geniş bir web görseli telefonda çok ince kalır; web ve uygulama için ayrı reklamlar öneririz.",
+        "sizeRatioWarning": "Görsel {width}×{height} — {position} için önerilen {sizes}; {direction, select, tall {görsel uzun görünecek} other {görsel yassı ve çok ince görünecek}}.",
+        "sizeGroup": {
+          "web": "Web",
+          "app": "Uygulama"
+        },
+        "sizeImageMismatch": "Seçilen boyut {width}×{height} görselin oranıyla ({imageWidth}×{imageHeight}) uyuşmuyor; görsel yüklenirken ayrılan yer farklı olur, yüklenince görselin kendi oranı geçerlidir.",
+        "sizePreset": {
+          "strip": "Şerit",
+          "billboard": "Billboard",
+          "leaderboard": "Leaderboard",
+          "mobileBanner": "Mobil Banner",
+          "mobileLeaderboard": "Mobil Leaderboard",
+          "mediumRectangle": "Orta Dikdörtgen",
+          "square": "Kare",
+          "largeMobileBanner": "Büyük Mobil Banner"
+        },
         "allPositions": "Tüm Pozisyonlar",
         "allPlatforms": "Tüm platformlar",
         "position": {
@@ -5768,11 +5785,11 @@
         "campaignHelper": "Kampanyaya bağlı reklam, kampanya bitince otomatik olarak yayından kalkar.",
         "displayOrderHelper": "Aynı yerde birden çok reklam varsa sırayla dönüşümlü gösterilir; küçük sayı önce.",
         "positionHint": {
-          "topbar": "Sayfanın en üstünde ince bir şerit. Web: her sayfada; mobil uygulama: yalnız ana sayfa. Önerilen: 728×90 (şerit yüksekliğinde gösterilir) ya da küçük logo benzeri görsel; metin de olur.",
-          "header": "Başlığın altındaki büyük banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesi. Önerilen: masaüstü 970×250 veya 1200×300, mobil 320×100.",
-          "footer": "Altbilginin üstündeki banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesinin sonu. Önerilen: 970×250, mobil 320×100.",
-          "inline": "Ürün satırlarının arasında. Web: liste, arama ve kategori sayfaları; mobil uygulama: yalnız ilan listesi. Önerilen: masaüstü 728×90 veya 970×90, mobil 300×250.",
-          "popup": "Ana sayfaya girişte açılan pencere. Web ve mobil uygulama: yalnız ana sayfa; ne sıklıkla açılacağını gösterim sıklığı belirler. Önerilen: 600×600, mobil 320×480."
+          "topbar": "Sayfanın en üstünde ince bir şerit. Web: her sayfada; mobil uygulama: yalnız ana sayfa. Önerilen: 970×90 (şerit yüksekliğinde gösterilir); metin de olur.",
+          "header": "Başlığın altındaki büyük banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesi. Önerilen: web 970×250 veya 728×90, uygulama 320×100 veya 320×50.",
+          "footer": "Altbilginin üstündeki banner. Web: ana sayfa ve liste sayfaları; mobil uygulama: ana sayfa ve ilan listesinin sonu. Önerilen: web 970×250 veya 728×90, uygulama 320×100 veya 320×50.",
+          "inline": "Ürün satırlarının arasında. Web: liste, arama ve kategori sayfaları; mobil uygulama: yalnız ilan listesi. Önerilen: web 970×250 veya 728×90, uygulama 320×100 veya 320×50.",
+          "popup": "Ana sayfaya girişte açılan pencere. Web ve mobil uygulama: yalnız ana sayfa; ne sıklıkla açılacağını gösterim sıklığı belirler. Önerilen: web 300×250 veya 250×250, uygulama 320×480 veya 300×250."
         }
       },
       "discounts": {
