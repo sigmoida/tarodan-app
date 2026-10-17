@@ -8,14 +8,13 @@ import { scrubSentryEvent, scrubSentryTransaction } from "@tarodan/logger";
 import {
   sentryEnvironment,
   sentryRelease,
+  sentryServerDsn,
   sentryTracesSampleRate,
 } from "./sentry.release";
 
-const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
-
 Sentry.init({
-  dsn,
-  enabled: !!dsn,
+  dsn: sentryServerDsn,
+  enabled: !!sentryServerDsn,
   environment: sentryEnvironment,
   release: sentryRelease,
   initialScope: { tags: { app: "admin" } },

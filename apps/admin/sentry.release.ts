@@ -9,6 +9,16 @@
  */
 
 /**
+ * DSN for the server and edge runtimes. A runtime `SENTRY_DSN` wins over the
+ * build-time public one, so the server side can be repointed without a
+ * rebuild. Undefined means no Sentry at all (see `src/instrumentation.ts`).
+ */
+export const sentryServerDsn =
+  process.env.SENTRY_DSN?.trim() ||
+  process.env.NEXT_PUBLIC_SENTRY_DSN?.trim() ||
+  undefined;
+
+/**
  * The deploy release. Without it "which deploy brought this error" has no
  * answer and Sentry's regression tracking does not work. The Docker image has
  * no `.git`, so the SDK cannot guess it.
