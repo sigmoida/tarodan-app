@@ -29,10 +29,15 @@ expected-commit check, wait for the result).
 - **development is light:** the staging deploy waits only for typecheck + lint;
   unit tests are advisory. **master is complete:** the PR runs the full gate
   and Release Production repeats it.
-- The `master` ruleset (manual GitHub setting) requires `Verify / Typecheck &
-lint`, `Verify / Unit tests`, `Verify / Build & audit`, later `Master source
-guard` and `API e2e`. **Never rename these jobs** without updating the
-  ruleset, or master PRs wait forever. No path filters on required checks.
+- The `master` ruleset (manual GitHub setting) requires these checks:
+  - `Verify / Typecheck & lint`
+  - `Verify / Unit tests`
+  - `Verify / Build & audit`
+  - later `Master source guard` and `API e2e`
+
+  **Never rename these jobs** without updating the ruleset, or master PRs wait
+  forever. No path filters on required checks.
+
 - Caller job names differ on purpose (`Staging gate`, `Release gate`, ...) so a
   development-level run never satisfies a master check.
 - turbo caching is on in development gates and off in the full gate.

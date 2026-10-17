@@ -104,9 +104,11 @@ money, so behaviour-pinning tests are mandatory. Read
 Full rules: tarodan-ops: `docs/commit-and-branch-rules.md` (enforced by
 `commitlint.config.js` and the pre-push hook).
 
-- Conventional Commits, English, ASCII header. Types `feat fix refactor perf
-docs test chore build ci`; scopes `api web admin ui types i18n design-tokens
-auth shared infra ci deps release scripts`, comma-joined across areas.
+- Conventional Commits, English, ASCII header.
+  Types: `feat fix refactor perf docs test chore build ci`.
+  Scopes: `api`, `web`, `admin`, `ui`, `types`, `i18n`, `design-tokens`,
+  `auth`, `shared`, `infra`, `ci`, `deps`, `release`, `scripts`; comma-joined
+  across areas (`fix(api,i18n): ...`).
 - Subject imperative, lower case, at most 72 characters, no period; the body
   explains why. No `Co-Authored-By` trailer, no "Generated with" footer.
 - Focused commits, never `git add -A` blindly, never `--no-verify`, never
