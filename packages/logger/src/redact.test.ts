@@ -28,6 +28,13 @@ describe("isSensitiveKey", () => {
       "newPassword",
       "client_secret",
       "cardNumber",
+      "suggestedNationalId",
+      "nationalIdMasked",
+      "shippingAddress",
+      "billingAddress",
+      "guestPhone",
+      "contactEmail",
+      "ipAddress",
     ]) {
       expect(isSensitiveKey(key)).toBe(true);
     }
@@ -39,6 +46,8 @@ describe("isSensitiveKey", () => {
       "userId",
       "orderId",
       "addressId",
+      "shippingAddressId",
+      "phoneIds",
       "orderNumber",
       "status",
       "amount",
@@ -87,6 +96,13 @@ describe("redactString", () => {
   it("removes TR mobile numbers in the canonical and local forms", () => {
     expect(redactString("call +905321234567")).toBe(`call ${REDACTED}`);
     expect(redactString("call 0532 123 45 67")).toBe(`call ${REDACTED}`);
+  });
+
+  it("removes a checksum-valid TCKN but keeps other 11-digit numbers", () => {
+    expect(redactString("nationalId 10000000146 already registered")).toBe(
+      `nationalId ${REDACTED} already registered`,
+    );
+    expect(redactString("order 12345678901")).toBe("order 12345678901");
   });
 
   it("removes e-mail addresses", () => {

@@ -7,6 +7,7 @@ export type { SentryLike } from "./sentry-sink";
 export {
   REDACTED,
   isSensitiveKey,
+  isSensitiveQueryKey,
   redactSensitive,
   redactString,
   redactUrlQuery,

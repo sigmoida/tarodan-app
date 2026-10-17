@@ -59,6 +59,31 @@ describe("scrubSentryEvent", () => {
     expect(out.request?.query_string).toBe(`token=${REDACTED}&page=2`);
   });
 
+  it("masks credentials in the record and pair forms of the query string", () => {
+    const pairs = scrubSentryEvent({
+      request: {
+        query_string: [
+          ["token", "t1"],
+          ["code", "c1"],
+          ["page", "2"],
+        ],
+      },
+    });
+    expect(pairs.request?.query_string).toEqual([
+      ["token", REDACTED],
+      ["code", REDACTED],
+      ["page", "2"],
+    ]);
+
+    const record = scrubSentryEvent({
+      request: { query_string: { state: "s1", page: "2" } },
+    });
+    expect(record.request?.query_string).toEqual({
+      state: REDACTED,
+      page: "2",
+    });
+  });
+
   it("keeps only the user id", () => {
     const out = scrubSentryEvent({
       user: { id: "u1", email: "a@b.co", ip_address: "1.2.3.4" } as {

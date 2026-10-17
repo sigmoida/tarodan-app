@@ -1,4 +1,4 @@
-import { LEGAL_IDENTITY_FIELDS } from "@tarodan/types";
+import { LEGAL_IDENTITY_FIELDS, isValidTckn } from "@tarodan/types";
 
 /**
  * Redaction for logs and telemetry on the client apps (web, admin). The rule
@@ -75,8 +75,9 @@ const SENSITIVE_KEYS = new Set<string>([
 ]);
 
 /**
- * Substrings that make any key sensitive: `accessToken`, `refreshToken`,
- * `x-api-secret`, `set-cookie`, `newPassword`, ...
+ * Substrings that make any key sensitive, whatever it is combined with:
+ * `accessToken`, `x-api-secret`, `set-cookie`, `newPassword`,
+ * `suggestedNationalId`, `nationalIdMasked`, `bankIban`, ...
  */
 const SENSITIVE_KEY_PARTS = [
   "password",
@@ -84,7 +85,23 @@ const SENSITIVE_KEY_PARTS = [
   "secret",
   "cookie",
   "authorization",
+  "nationalid",
+  "kimlik",
+  "tckn",
+  "identitynumber",
+  "taxid",
+  "iban",
+  "cardnumber",
+  "cvv",
 ];
+
+/**
+ * Contact-data substrings: `shippingAddress`, `guestPhone`, `ipAddress`,
+ * `contactEmail`, ... A key that ends in an id (`addressId`, `phoneIds`)
+ * names a record, not the value, and stays readable.
+ */
+const CONTACT_KEY_PARTS = ["address", "phone", "email", "gsm"];
+const ID_SUFFIX = /ids?$/;
 
 /** Query parameters that carry credentials even though the name is generic. */
 const SENSITIVE_QUERY_KEYS = new Set<string>([
@@ -98,10 +115,16 @@ const SENSITIVE_QUERY_KEYS = new Set<string>([
 export function isSensitiveKey(key: string): boolean {
   const normalized = normalizeKey(key);
   if (SENSITIVE_KEYS.has(normalized)) return true;
-  return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
+  if (SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part))) {
+    return true;
+  }
+  return (
+    !ID_SUFFIX.test(normalized) &&
+    CONTACT_KEY_PARTS.some((part) => normalized.includes(part))
+  );
 }
 
-function isSensitiveQueryKey(key: string): boolean {
+export function isSensitiveQueryKey(key: string): boolean {
   return isSensitiveKey(key) || SENSITIVE_QUERY_KEYS.has(normalizeKey(key));
 }
 
@@ -129,6 +152,8 @@ const TR_MOBILE_PATTERN =
   /(?:\+90[\s-]?|\b0)5\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b/g;
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const CARD_CANDIDATE_PATTERN = /\d(?:[ -]?\d){12,18}/g;
+/** An 11-digit run on its own; masked only when the TCKN checksum holds. */
+const TCKN_CANDIDATE_PATTERN = /(?<!\d)\d{11}(?!\d)/g;
 
 /**
  * Masks sensitive query parameters in a URL, or in any text that embeds one
@@ -143,7 +168,7 @@ export function redactUrlQuery(value: string): string {
   );
 }
 
-/** Removes self-identifying values (card, IBAN, phone, e-mail) from free text. */
+/** Removes self-identifying values (TCKN, card, IBAN, phone, e-mail) from free text. */
 export function redactString(value: string): string {
   // IBAN first: its 24 digits can contain a Luhn-valid run that the card
   // pass would otherwise cut out of the middle, leaving the rest readable.
@@ -153,6 +178,9 @@ export function redactString(value: string): string {
       passesLuhn(candidate) ? REDACTED : candidate,
     )
     .replace(TR_MOBILE_PATTERN, REDACTED)
+    .replace(TCKN_CANDIDATE_PATTERN, (candidate) =>
+      isValidTckn(candidate) ? REDACTED : candidate,
+    )
     .replace(EMAIL_PATTERN, REDACTED);
 }
 

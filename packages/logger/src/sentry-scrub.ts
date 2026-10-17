@@ -1,6 +1,7 @@
 import {
   REDACTED,
   isSensitiveKey,
+  isSensitiveQueryKey,
   redactSensitive,
   redactString,
   redactUrlQuery,
@@ -19,8 +20,9 @@ import {
  *  - `user`: only the id survives ("ids only"); e-mail, username and IP go.
  *  - `extra`, `contexts`, `tags`, breadcrumbs, exception and log messages:
  *    redacted by key and by value shape (see `redact.ts`).
- *  - transactions: span descriptions and data carry full URLs (fetch spans),
- *    so they are redacted like any other value; trace and span ids are not.
+ *  - transactions: span descriptions and data carry full URLs (fetch spans):
+ *    sensitive keys and URL query parameters are masked; trace and span ids
+ *    are not touched.
  */
 
 interface ScrubbableRequest {
@@ -68,15 +70,37 @@ function redactBody(data: unknown): unknown {
   }
 }
 
+/**
+ * Sentry's `query_string` is a string, a `{ key: value }` record or a list of
+ * `[key, value]` pairs. In the pair form the parameter name is a value, so a
+ * key-based redactor never sees it: each pair is checked by its name here.
+ */
+function redactQueryString(query: unknown): unknown {
+  if (typeof query === "string") return redactUrlQuery(`?${query}`).slice(1);
+  if (Array.isArray(query)) {
+    return query.map((pair) =>
+      Array.isArray(pair) && typeof pair[0] === "string"
+        ? [pair[0], isSensitiveQueryKey(pair[0]) ? REDACTED : pair[1]]
+        : redactSensitive(pair),
+    );
+  }
+  if (query && typeof query === "object") {
+    return Object.fromEntries(
+      Object.entries(query).map(([key, value]) => [
+        key,
+        isSensitiveQueryKey(key) ? REDACTED : redactSensitive(value),
+      ]),
+    );
+  }
+  return query;
+}
+
 function scrubRequest(request: ScrubbableRequest): ScrubbableRequest {
   const out: ScrubbableRequest = { ...request };
   if (typeof out.url === "string") out.url = redactUrlQuery(out.url);
   if (out.data !== undefined) out.data = redactBody(out.data);
   if (out.query_string !== undefined) {
-    out.query_string =
-      typeof out.query_string === "string"
-        ? redactUrlQuery(`?${out.query_string}`).slice(1)
-        : redactSensitive(out.query_string);
+    out.query_string = redactQueryString(out.query_string);
   }
   if (out.headers) {
     out.headers = Object.fromEntries(
@@ -150,6 +174,25 @@ export function scrubSentryEvent<T extends ScrubbableEvent>(event: T): T {
 }
 
 /**
+ * Span data on a hot path (a page load has hundreds of spans): sensitive keys
+ * are replaced and string values get only the URL query mask, which is what
+ * fetch and resource spans actually carry. The full value-shape pass is left
+ * to the event fields above.
+ */
+function scrubSpanData(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [
+      key,
+      isSensitiveKey(key)
+        ? REDACTED
+        : typeof value === "string"
+          ? redactUrlQuery(value)
+          : value,
+    ]),
+  );
+}
+
+/**
  * `beforeSendTransaction`: the event gate plus the name and every span's
  * description and data (fetch spans carry full URLs). Span and trace ids are
  * top-level span fields and are left alone.
@@ -163,9 +206,9 @@ export function scrubSentryTransaction<T extends ScrubbableEvent>(event: T): T {
     out.spans = out.spans.map((span) => ({
       ...span,
       ...(typeof span.description === "string"
-        ? { description: redactString(span.description) }
+        ? { description: redactUrlQuery(span.description) }
         : {}),
-      ...(span.data ? { data: redactRecord(span.data) } : {}),
+      ...(span.data ? { data: scrubSpanData(span.data) } : {}),
     }));
   }
   return out as T;
