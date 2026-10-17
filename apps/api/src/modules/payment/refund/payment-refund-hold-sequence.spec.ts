@@ -933,6 +933,57 @@ describe("refund -> hold consumption -> release -> payout (stateful, through the
       expect(w.state.payouts).toHaveLength(0);
     });
 
+    it("three units, seller fault in the middle, buyer fault last: no share, the buyer is not charged it", async () => {
+      const w = makeWorld(3);
+
+      const first = await w.returnUnitsV2(1, "buyer");
+      expect(money(w.state.hold.refundedAmount)).toBe("277.33");
+      const middle = await w.returnUnitsV2(1, "seller");
+      expect(money(w.state.hold.refundedAmount)).toBe("554.66");
+      // The middle unit does not complete the line: no outbound legs yet.
+      expect(middle.retained).toBe(0);
+      const last = await w.returnUnitsV2(1, "buyer");
+
+      // 333.33 + 20 commission - 36 return label, buyer fault, both times:
+      // the completing buyer-fault refund carries no buyer_charge of the
+      // forfeited share, so it is the same as the first one.
+      expect([first.cash, middle.cash, last.cash]).toEqual([
+        317.33, 363.33, 317.33,
+      ]);
+      expect(w.cashRefunded()).toBeCloseTo(997.99, 2);
+      expect(last.retained).toBe(0);
+      expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
+      expect(money(w.state.hold.refundedAmount)).toBe("832.00");
+      expect(w.state.order.status).toBe(OrderStatus.delivered);
+      expect(w.residualSettleable()).toBe(false);
+
+      const run = await w.releaseAndPay();
+
+      expect(run).toEqual({ released: 0, payoutsCreated: 0 });
+      expect(w.state.payouts).toHaveLength(0);
+    });
+
+    it("three units, seller fault in the middle, carrier fault last: no share, buyer gets the outbound back", async () => {
+      const w = makeWorld(3);
+
+      await w.returnUnitsV2(1, "buyer");
+      await w.returnUnitsV2(1, "seller");
+      const last = await w.returnUnitsV2(1, "carrier");
+
+      // Carrier on the completing unit: the third + fees + the 60 outbound.
+      expect(last.cash).toBe(423.33);
+      expect(w.cashRefunded()).toBeCloseTo(1103.99, 2);
+      expect(last.retained).toBe(0);
+      expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
+      expect(money(w.state.hold.refundedAmount)).toBe("832.00");
+      expect(w.state.order.status).toBe(OrderStatus.delivered);
+
+      const run = await w.releaseAndPay();
+
+      expect(run).toEqual({ released: 0, payoutsCreated: 0 });
+      expect(w.state.payouts).toHaveLength(0);
+    });
+
     it("no seller fault on any unit: the share is still paid (the rule does not over-reach)", async () => {
       const w = makeWorld(2);
 

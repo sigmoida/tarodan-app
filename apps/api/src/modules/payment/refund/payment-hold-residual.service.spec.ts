@@ -448,6 +448,151 @@ describe("PaymentHoldResidualService.settleSellerFaultResiduals", () => {
     expect(ledger.record).not.toHaveBeenCalled();
   });
 
+  it("dry run lists a legacy 'in doubt' residual for a person and writes nothing (D20)", async () => {
+    const { service, prisma, ledger } = makeService({
+      holds: {
+        "hold-legacy": heldHold({ id: "hold-legacy", orderId: "o-legacy" }),
+      },
+      orders: {
+        "o-legacy": {
+          status: OrderStatus.refunded,
+          refundRequests: [finalized(null, "legacy")],
+        },
+      },
+      candidatePages: [[candidate("hold-legacy")]],
+    });
+
+    const report = await service.settleSellerFaultResiduals({
+      ...run,
+      dryRun: true,
+    });
+
+    expect(report).toEqual({
+      dryRun: true,
+      scanned: 1,
+      totalAmount: 0,
+      manualDecisionAmount: 40,
+      rows: [
+        {
+          holdId: "hold-legacy",
+          orderId: "o-legacy",
+          sellerId: "seller-1",
+          residualAmount: 40,
+          faultBasis: "unknown",
+          outcome: "manual_decision",
+        },
+      ],
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
+    expect(ledger.record).not.toHaveBeenCalled();
+  });
+
+  it("apply on a legacy row writes no hold and counts it as manual, not settled (D20)", async () => {
+    const { service, prisma } = makeService({
+      holds: {
+        "hold-legacy": heldHold({ id: "hold-legacy", orderId: "o-legacy" }),
+      },
+      orders: {
+        "o-legacy": {
+          status: OrderStatus.refunded,
+          refundRequests: [finalized(null, "legacy")],
+        },
+      },
+      candidatePages: [[candidate("hold-legacy")]],
+    });
+
+    const report = await service.settleSellerFaultResiduals({
+      ...run,
+      dryRun: false,
+    });
+
+    expect(report.manualDecisionAmount).toBe(40);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("a legacy refund next to a NAMED seller fault is a seller row and is settled", async () => {
+    const { service, prisma, ledger } = makeService({
+      holds: {
+        "hold-mixed": heldHold({ id: "hold-mixed", orderId: "o-mixed" }),
+      },
+      orders: {
+        "o-mixed": {
+          status: OrderStatus.cancelled,
+          refundRequests: [finalized(null, "legacy"), finalized("seller")],
+        },
+      },
+      candidatePages: [[candidate("hold-mixed")]],
+    });
+
+    const report = await service.settleSellerFaultResiduals({
+      ...run,
+      dryRun: false,
+    });
+
+    expect(report.rows).toEqual([
+      expect.objectContaining({
+        holdId: "hold-mixed",
+        residualAmount: 40,
+        faultBasis: "seller",
+        outcome: "settled",
+      }),
+    ]);
+    expect(report.totalAmount).toBe(40);
+    expect(report.manualDecisionAmount).toBe(0);
+    expect(prisma.paymentHold.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "hold-mixed" }),
+        data: {
+          status: PaymentHoldStatus.cancelled,
+          refundedAmount: new Prisma.Decimal(860),
+        },
+      }),
+    );
+    expect(
+      ledger.record.mock.calls.map(([, input]) => input.idempotencyKey),
+    ).toEqual(["hold-residual-settle:hold-mixed"]);
+  });
+
+  it("a re-run after apply lists the unknown row again and still settles nothing for it", async () => {
+    // First run: the seller row is settled and leaves the candidate set; the
+    // unknown row stays held, so the second run reads it again.
+    const { service, prisma, ledger } = makeService({
+      ...backlog(),
+      candidatePages: [
+        [candidate("hold-seller"), candidate("hold-unknown")],
+        [],
+        [candidate("hold-unknown")],
+      ],
+    });
+
+    await service.settleSellerFaultResiduals({ ...run, dryRun: false });
+    const again = await service.settleSellerFaultResiduals({
+      ...run,
+      dryRun: false,
+    });
+
+    expect(again).toEqual({
+      dryRun: false,
+      scanned: 1,
+      totalAmount: 0,
+      manualDecisionAmount: 40,
+      rows: [
+        expect.objectContaining({
+          holdId: "hold-unknown",
+          faultBasis: "unknown",
+          outcome: "manual_decision",
+        }),
+      ],
+    });
+    // Across both runs: one settlement, for the seller row only.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(
+      ledger.record.mock.calls.map(([, input]) => input.idempotencyKey),
+    ).toEqual(["hold-residual-settle:hold-seller"]);
+  });
+
   it("pages the candidates with a keyset cursor until the set is exhausted", async () => {
     const { service, prisma } = makeService(backlog());
 
