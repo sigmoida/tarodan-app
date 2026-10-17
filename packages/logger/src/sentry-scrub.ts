@@ -20,7 +20,7 @@ import {
  *  - `extra`, `contexts`, `tags`, breadcrumbs, exception and log messages:
  *    redacted by key and by value shape (see `redact.ts`).
  *  - transactions: span descriptions and data carry full URLs (fetch spans),
- *    so every string there goes through the URL query mask.
+ *    so they are redacted like any other value; trace and span ids are not.
  */
 
 interface ScrubbableRequest {
@@ -103,6 +103,23 @@ function scrubBreadcrumb(
 }
 
 /**
+ * The trace context links an event to its trace. Its ids are random hex, and
+ * a long digit run in one can pass the Luhn check of the card pass, so the
+ * ids stay as they are; only the active span's `data` (URLs) is redacted.
+ */
+function scrubContexts(
+  contexts: Record<string, unknown>,
+): Record<string, unknown> {
+  const { trace, ...rest } = contexts;
+  const out = redactRecord(rest);
+  if (trace && typeof trace === "object") {
+    const { data } = trace as { data?: Record<string, unknown> };
+    out.trace = data ? { ...trace, data: redactRecord(data) } : trace;
+  }
+  return out;
+}
+
+/**
  * `beforeSend` for every web/admin runtime. Returns a scrubbed copy of the
  * top-level fields it touches; everything else is passed through untouched
  * (stack frames, release, environment, sdk metadata).
@@ -116,7 +133,7 @@ export function scrubSentryEvent<T extends ScrubbableEvent>(event: T): T {
     out.user = out.user.id === undefined ? {} : { id: out.user.id };
   }
   if (out.extra) out.extra = redactRecord(out.extra);
-  if (out.contexts) out.contexts = redactRecord(out.contexts);
+  if (out.contexts) out.contexts = scrubContexts(out.contexts);
   if (out.tags) out.tags = redactRecord(out.tags);
   if (out.breadcrumbs) out.breadcrumbs = out.breadcrumbs.map(scrubBreadcrumb);
   if (out.exception?.values) {
@@ -132,32 +149,23 @@ export function scrubSentryEvent<T extends ScrubbableEvent>(event: T): T {
   return out as T;
 }
 
-/** Every string in a span's data goes through the URL query mask. */
-function scrubSpanData(
-  data: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (!data) return data;
-  return Object.fromEntries(
-    Object.entries(data).map(([key, value]) => [
-      key,
-      typeof value === "string" ? redactUrlQuery(value) : value,
-    ]),
-  );
-}
-
-/** `beforeSendTransaction`: the event gate plus span URLs and the name. */
+/**
+ * `beforeSendTransaction`: the event gate plus the name and every span's
+ * description and data (fetch spans carry full URLs). Span and trace ids are
+ * top-level span fields and are left alone.
+ */
 export function scrubSentryTransaction<T extends ScrubbableEvent>(event: T): T {
   const out: ScrubbableEvent = scrubSentryEvent(event);
   if (typeof out.transaction === "string") {
-    out.transaction = redactUrlQuery(out.transaction);
+    out.transaction = redactString(out.transaction);
   }
   if (out.spans) {
     out.spans = out.spans.map((span) => ({
       ...span,
       ...(typeof span.description === "string"
-        ? { description: redactUrlQuery(span.description) }
+        ? { description: redactString(span.description) }
         : {}),
-      ...(span.data ? { data: scrubSpanData(span.data) } : {}),
+      ...(span.data ? { data: redactRecord(span.data) } : {}),
     }));
   }
   return out as T;

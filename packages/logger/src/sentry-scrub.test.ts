@@ -97,6 +97,25 @@ describe("scrubSentryEvent", () => {
     expect(out.exception?.values?.[0]?.value).toBe(`IBAN ${REDACTED} bad`);
   });
 
+  it("keeps the trace ids intact so the event stays linked to its trace", () => {
+    // 13+ consecutive digits that pass Luhn: the card pass would cut them.
+    const traceId = "4111111111111111aaaaaaaaaaaaaaaa";
+    const out = scrubSentryEvent({
+      contexts: {
+        trace: {
+          trace_id: traceId,
+          span_id: "4111111111111111",
+          data: { "http.url": "/verify?token=t1" },
+        },
+      },
+    });
+    expect(out.contexts?.trace).toEqual({
+      trace_id: traceId,
+      span_id: "4111111111111111",
+      data: { "http.url": `/verify?token=${REDACTED}` },
+    });
+  });
+
   it("does not mutate the original event", () => {
     const event = { request: { cookies: { web_at: "jwt" } } };
     scrubSentryEvent(event);
