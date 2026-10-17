@@ -18,10 +18,12 @@ name: Release Production
 # the deploy refuses to trigger once master has moved past the verified commit
 # (expected-commit); the newer commit's queued run deploys after its own gate.
 #
-# After a successful rollout the deployed commit gets the annotated tag
-# `app-YYYY.MM.DD-N` (Europe/Istanbul date, N counts the releases of that
-# day). A run that deployed nothing creates no tag. A commit that already has
-# an `app-*` tag keeps it (re-runs, manual redeploys).
+# After a successful rollout the `tag` job puts the annotated tag
+# `app-YYYY.MM.DD-N` on the deployed commit (Europe/Istanbul date, N counts
+# the releases of that day). A run that deployed nothing creates no tag. A
+# commit that already has an `app-*` tag keeps it (re-runs, manual
+# redeploys). The tag ruleset on `app-*` allows creation only: a tag is never
+# moved, deleted or recreated, here or by hand.
 
 on:
   push:
@@ -51,11 +53,10 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    # contents: write only to push the release tag; actions: read for
-    # deploy-targets (job permissions replace the workflow defaults).
-    permissions:
-      contents: write
-      actions: read
+    outputs:
+      apps: ${{ steps.affected.outputs.apps }}
+      tag: ${{ steps.release.outputs.tag }}
+      existing: ${{ steps.release.outputs.existing }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -108,14 +109,32 @@ jobs:
           branch: master
           wait-for-result: "true"
 
-      # Runs only after every deployment finished (default success()). A
-      # failure here fails the run, so the next release also redeploys these
-      # apps: the rollout itself already succeeded.
-      - name: Tag the release
-        if: ${{ steps.affected.outputs.apps != '' && steps.release.outputs.existing != 'true' }}
+      - name: Skip deployment
+        if: ${{ steps.affected.outputs.apps == '' }}
+        run: echo "No deployable application changed."
+
+  # A job of its own so only it holds contents: write, and so a tagging
+  # failure can be re-run ("Re-run failed jobs") without redeploying
+  # production: the deploy job's outputs are kept for the re-run. Until it
+  # passes the run stays failed, and deploy-targets then also redeploys these
+  # apps with the next release.
+  tag:
+    name: Tag the release
+    needs: deploy
+    if: ${{ needs.deploy.outputs.apps != '' && needs.deploy.outputs.existing != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Push the release tag
         env:
-          TAG: ${{ steps.release.outputs.tag }}
-          APPS: ${{ steps.affected.outputs.apps }}
+          TAG: ${{ needs.deploy.outputs.tag }}
+          APPS: ${{ needs.deploy.outputs.apps }}
           RELEASE_SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -145,7 +164,3 @@ jobs:
           MSG
           git push origin "refs/tags/$TAG"
           echo "::notice::Tagged $RELEASE_SHA as $TAG."
-
-      - name: Skip deployment
-        if: ${{ steps.affected.outputs.apps == '' }}
-        run: echo "No deployable application changed."
