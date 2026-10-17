@@ -2,6 +2,18 @@ name: Deploy Staging
 
 # Coolify Auto Deploy must be disabled for the staging API, web and admin
 # resources. This workflow is the only deployment trigger for development.
+#
+# development = staging, so the gate is the QUICK one (verify.yml, full:
+# false): typecheck + lint + the full API unit suite + every vitest suite,
+# ~4-5 min wall-clock with the jobs in parallel. A failing gate means nothing
+# is deployed; fix forward or re-run the failed job. The production build is
+# not part of it — Coolify builds the images anyway, and the full gate runs on
+# the development -> master PR.
+#
+# A newer push cancels an older run that is still verifying (concurrency
+# below). The deploy job therefore diffs against the last SUCCESSFUL run, not
+# against `github.event.before`, so a cancelled run's apps still ship
+# (.github/actions/deploy-targets).
 
 on:
   push:
@@ -10,14 +22,22 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-staging
   cancel-in-progress: true
 
 jobs:
+  verify:
+    name: Staging gate
+    uses: ./.github/workflows/verify.yml
+    with:
+      full: false
+
   deploy:
     name: Deploy affected staging apps
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -26,23 +46,11 @@ jobs:
           fetch-depth: 0
 
       - id: affected
-        name: Detect affected applications
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            apps="api,web,admin"
-          else
-            apps="$(node scripts/detect-affected-apps.mjs \
-              --base "$BEFORE_SHA" \
-              --head "$AFTER_SHA" \
-              --format csv)"
-          fi
-          echo "apps=$apps" >> "$GITHUB_OUTPUT"
-          echo "Affected applications: ${apps:-none}"
+        name: Detect applications changed since the last successful deploy
+        uses: ./.github/actions/deploy-targets
+        with:
+          workflow: deploy-staging.yml
+          github-token: ${{ github.token }}
 
       - name: Trigger affected Coolify deployments
         if: ${{ steps.affected.outputs.apps != '' }}

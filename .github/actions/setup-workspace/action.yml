@@ -11,7 +11,7 @@ inputs:
     required: false
     default: 'true'
   turbo-cache:
-    description: 'Whether to restore/save the .turbo cache'
+    description: 'Whether to restore/save the turbo task cache (off for the full master gate)'
     required: false
     default: 'true'
 
@@ -27,17 +27,20 @@ runs:
         node-version-file: .nvmrc
         cache: pnpm
 
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+
+    # turbo 1.x keeps its local cache in node_modules/.cache/turbo (NOT .turbo,
+    # which this step used to cache — every run was a full miss). Restored
+    # after the install so pnpm starts from an empty node_modules.
     - name: Cache Turbo
       if: inputs.turbo-cache == 'true'
       uses: actions/cache@v4
       with:
-        path: .turbo
+        path: node_modules/.cache/turbo
         key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
         restore-keys: |
           turbo-${{ runner.os }}-${{ github.job }}-
-
-    - run: pnpm install --frozen-lockfile
-      shell: bash
 
     - uses: ./.github/actions/prisma-generate
       if: inputs.prisma == 'true'

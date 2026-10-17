@@ -1,11 +1,17 @@
 name: PR Checks
 
-# There is currently no CI gate on pull requests — this is the first one.
-# Deliberately scoped to typecheck + lint + admin's unit tests: all fast,
-# none need DB services or repo secrets. The heavier `pnpm verify:ci` (api
-# unit tests, prod build, dependency audit) already exists as a script but
-# needs Postgres/Redis services and DATABASE_URL configured as a follow-up
-# before it can run here.
+# PRs to development run the quick gate (Typecheck & lint + Unit tests, the
+# full API suite included). PRs to master — the development -> master release
+# PR and hotfix/* PRs — run the FULL gate, adding the production build and the
+# dependency audit. The jobs live in the reusable verify.yml.
+#
+# The master ruleset requires these check names (docs/OPERATIONS.md §4):
+#   Verify / Typecheck & lint
+#   Verify / Unit tests
+#   Verify / Build & audit
+# Do not rename the "Verify" job or the jobs in verify.yml without updating the
+# ruleset, or master PRs will wait forever for a check that never reports.
+# No path filters for the same reason: a required check must always run.
 
 on:
   pull_request:
@@ -20,47 +26,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, Lint & Unit Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # next.config.js env validation requires these at build/typegen time even
-    # though nothing here ever calls the API — plain public placeholder URLs,
-    # not secrets.
-    env:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: https://api.tarodan.example
-      NEXT_PUBLIC_APP_URL: https://admin.tarodan.example
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/setup-workspace
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      # @tarodan/web is excluded: a pre-existing ESLint parsing error in
-      # apps/web/src/lib/userExperiencePolicy.d.mts (ambient .d.mts export
-      # syntax the lint parser mis-handles) currently makes `next lint` exit
-      # non-zero there regardless of what a PR changes. Unrelated to this
-      # gate — tracked separately, not fixed here.
-      - name: Lint
-        run: pnpm exec turbo run lint --filter='!@tarodan/web'
-
-      # Both apps' vitest suites plus @tarodan/listing-form, which owns the
-      # listing form's specs since the form moved out of apps/web. A spec that
-      # silently stops running is worse than no spec, so the package is named
-      # here explicitly.
-      #
-      # Web's ran nowhere until now — not here and
-      # not in the pre-push gate — so its specs, including the regression that
-      # pins the phone field's editing behaviour, were decorative. Web's
-      # "test" script also runs the node:test scripts under apps/web/scripts.
-      #
-      # NODE_ENV is overridden back to "test" for this step alone. The job sets
-      # it to "production" for Next's typegen, and under that value the bundler
-      # resolves react to its production build, where `act()` throws outright —
-      # every component spec in web fails before asserting anything.
-      - name: Unit tests
-        env:
-          NODE_ENV: test
-        run: pnpm --filter @tarodan/admin --filter @tarodan/web --filter @tarodan/listing-form test
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+    with:
+      full: ${{ github.base_ref == 'master' }}
