@@ -3,10 +3,7 @@ import { validateSync } from "class-validator";
 import { RegisterDto } from "../../modules/auth/dto/register.dto";
 import { CorporateInvitationDto } from "../../modules/auth/dto/business-register.dto";
 import { ResetPasswordDto as AuthResetPasswordDto } from "../../modules/auth/dto/reset-password.dto";
-import {
-  ChangePasswordDto,
-  ResetPasswordDto as SecurityResetPasswordDto,
-} from "../../modules/security/dto/security.dto";
+import { ChangePasswordDto } from "../../modules/security/dto/security.dto";
 import { AssignAdminStaffDto } from "../../modules/admin/dto/admin-staff.dto";
 import { CreateTestAccountDto } from "../../modules/admin-test-tools/dto/create-test-account.dto";
 
@@ -57,15 +54,6 @@ const cases: Array<[string, (pw: string) => unknown, string]> = [
     "auth ResetPasswordDto",
     (pw) =>
       plainToInstance(AuthResetPasswordDto, { token: "t", newPassword: pw }),
-    "newPassword",
-  ],
-  [
-    "security ResetPasswordDto",
-    (pw) =>
-      plainToInstance(SecurityResetPasswordDto, {
-        token: "t",
-        newPassword: pw,
-      }),
     "newPassword",
   ],
   [

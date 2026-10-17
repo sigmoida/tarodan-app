@@ -1,4 +1,4 @@
-import { IsString, IsEmail, MinLength, MaxLength } from "class-validator";
+import { IsString, MinLength, MaxLength } from "class-validator";
 import { Transform } from "class-transformer";
 import { IsPassword } from "../../../common/validators/password";
 
@@ -43,21 +43,9 @@ export class TwoFactorStatusDto {
 }
 
 // =============================================================================
-// PASSWORD RESET (GAP-005)
+// PASSWORD CHANGE (GAP-005)
 // =============================================================================
-
-export class RequestPasswordResetDto {
-  @IsEmail()
-  email: string;
-}
-
-export class ResetPasswordDto {
-  @IsString()
-  token: string;
-
-  @IsPassword()
-  newPassword: string;
-}
+// Şifre sıfırlama DTO'ları auth modülündedir (`auth/dto/reset-password.dto`).
 
 export class ChangePasswordDto {
   @IsString()
