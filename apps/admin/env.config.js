@@ -1,9 +1,12 @@
 const { z } = require("zod");
 
-const optionalUrl = z.preprocess(
-  (value) => (value === "" ? undefined : value),
-  z.string().url().optional(),
-);
+/** Coolify/CI pass an empty variable as ""; for an optional field that means unset. */
+const emptyToUndefined = (schema) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema);
+
+const optionalUrl = emptyToUndefined(z.string().url().optional());
+
+const optionalString = emptyToUndefined(z.string().trim().optional());
 
 function createSchema(isProduction) {
   return z.object({
@@ -17,11 +20,17 @@ function createSchema(isProduction) {
       ? z.string().url("NEXT_PUBLIC_APP_URL must be a valid URL")
       : z.string().url().default("http://localhost:3002"),
     API_INTERNAL_URL: optionalUrl,
+    // Sentry. NEXT_PUBLIC_* are inlined at build time (Coolify build
+    // variables); SENTRY_AUTH_TOKEN is build-only and must reach the build as
+    // a BuildKit secret, never a build arg (see apps/admin/Dockerfile).
     NEXT_PUBLIC_SENTRY_DSN: optionalUrl,
+    NEXT_PUBLIC_SENTRY_ENVIRONMENT: optionalString,
+    NEXT_PUBLIC_SENTRY_RELEASE: optionalString,
+    SOURCE_COMMIT: optionalString,
     SENTRY_DSN: optionalUrl,
-    SENTRY_AUTH_TOKEN: z.string().optional(),
-    SENTRY_ORG: z.string().default("tarodan"),
-    SENTRY_PROJECT: z.string().default("admin"),
+    SENTRY_AUTH_TOKEN: optionalString,
+    SENTRY_ORG: emptyToUndefined(z.string().default("tarodan")),
+    SENTRY_PROJECT: emptyToUndefined(z.string().default("tarodan-admin")),
   });
 }
 

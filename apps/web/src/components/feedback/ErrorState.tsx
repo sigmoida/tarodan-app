@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
+import { logger } from "@/lib/logger";
 
 /**
  * The single error-boundary UI, shared by every `error.tsx` / `global-error.tsx`
@@ -11,6 +12,11 @@ import { Button } from "@tarodan/ui";
  * a home link is always offered. Use `fullScreen` for root/global boundaries
  * (no chrome around them) and the default padded block for segment boundaries
  * that render inside a layout (header/footer or the profile shell stay put).
+ *
+ * It is also the one place a caught render error is reported: an error a
+ * boundary catches never reaches the global handlers, so without this it would
+ * not reach Sentry (server-side errors are reported by `onRequestError` too;
+ * the client event adds the browser context and the digest that links them).
  */
 export default function ErrorState({
   error,
@@ -28,7 +34,12 @@ export default function ErrorState({
   const t = useTranslations();
 
   useEffect(() => {
-    if (error && process.env.NODE_ENV === "development") console.error(error);
+    if (error) {
+      logger.error("Error boundary caught error", {
+        error,
+        digest: error.digest,
+      });
+    }
   }, [error]);
 
   return (

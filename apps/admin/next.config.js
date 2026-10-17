@@ -1,7 +1,7 @@
-const { withSentryConfig } = require("@sentry/nextjs");
 const createNextIntlPlugin = require("next-intl/plugin");
 const path = require("path");
 const { env } = require("./env.config");
+const { withSentry } = require("./sentry.build");
 
 // next-intl plugin — points at the request config (locale + messages per request).
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
@@ -78,27 +78,6 @@ const nextConfig = {
   // (which injects the Bearer token server-side) — no next.config rewrite.
 };
 
-// Sentry configuration options
-const sentryWebpackPluginOptions = {
-  silent: true,
-  org: env.SENTRY_ORG,
-  project: env.SENTRY_PROJECT,
-  authToken: env.SENTRY_AUTH_TOKEN,
-  dryRun: env.NODE_ENV !== "production",
-  // Kaynak harita yükleme / release HATALARI prod build'ini ASLA düşürmesin.
-  // Sentry CLI başarısızlığı (token yok/yanlış, "project not found", ağ) deploy'u
-  // patlatmamalı — sadece uyar, build devam etsin.
-  errorHandler: (err) => {
-    // eslint-disable-next-line no-console
-    console.warn("[sentry] kaynak harita yükleme atlandı:", err && err.message);
-  },
-};
-
-// Sentry'yi YALNIZ DSN *ve* auth token birlikte varken devreye al. Token yoksa
-// source-map upload zaten yapılamaz → gereksiz yere prod build'ini riske atma.
-const configWithIntl = withNextIntl(nextConfig);
-
-module.exports =
-  env.NEXT_PUBLIC_SENTRY_DSN && env.SENTRY_AUTH_TOKEN
-    ? withSentryConfig(configWithIntl, sentryWebpackPluginOptions)
-    : configWithIntl;
+// Sentry is compiled in only when a DSN is configured; source maps are
+// uploaded only when an auth token reaches the build (see sentry.build.js).
+module.exports = withSentry(withNextIntl(nextConfig), env);

@@ -31,23 +31,37 @@ COPY apps/web ./apps/web
 # Switch to production for Next.js build
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# Public env vars are inlined at build time — must be present before `next build`.
+# Public env vars are inlined at build time, so they must reach `next build`.
+# They are declared as ARG only: an ARG is in the environment of every RUN in
+# its stage, so no `ENV X=$X` re-export is needed. Do not add one: with
+# Coolify's "Build secrets: Docker BuildKit secrets" the values arrive as
+# secret mounts on each RUN instead of build args; an ENV built from the then
+# empty ARG would compete with (and could shadow) the mounted value.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+# Blank Apple ids are safe and intentional: the sign-in buttons render nothing
+# when their provider is unconfigured, so a build without them ships without
+# Apple.
 ARG NEXT_PUBLIC_APPLE_SERVICES_ID
 ARG NEXT_PUBLIC_APPLE_REDIRECT_URI
-ARG NEXT_PUBLIC_GOOGLE_ADS_ID
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
-# Blank here is safe and intentional: the sign-in buttons render nothing when
-# their provider is unconfigured, so a build without these ships without Apple.
-ENV NEXT_PUBLIC_APPLE_SERVICES_ID=$NEXT_PUBLIC_APPLE_SERVICES_ID
-ENV NEXT_PUBLIC_APPLE_REDIRECT_URI=$NEXT_PUBLIC_APPLE_REDIRECT_URI
 # Blank skips the Google Ads tag; when set, it still loads only after the
 # visitor grants the marketing cookie category.
-ENV NEXT_PUBLIC_GOOGLE_ADS_ID=$NEXT_PUBLIC_GOOGLE_ADS_ID
+ARG NEXT_PUBLIC_GOOGLE_ADS_ID
+# Sentry (all optional; blank DSN = no Sentry in the bundle). The release
+# defaults to the short SOURCE_COMMIT, which Coolify passes only with
+# "Source commit availability: Available during build".
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT
+ARG NEXT_PUBLIC_SENTRY_RELEASE
+ARG SOURCE_COMMIT
+# SENTRY_AUTH_TOKEN (source map upload) is deliberately NOT an ARG: build args
+# are recorded in the image history. Set it in Coolify only after switching the
+# app to "Build secrets: Docker BuildKit secrets" (Coolify then mounts it into
+# this RUN with `--mount=type=secret`, which leaves no trace in the image).
+# Without the token the build still succeeds and skips the upload. Never add
+# a `--mount` of your own to this RUN: Coolify skips RUN lines that already
+# mount a secret, and the public vars above would then be missing.
 RUN pnpm --filter @tarodan/web... build
 
 # Production stage

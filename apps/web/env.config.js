@@ -10,6 +10,8 @@ const emptyToUndefined = (schema) =>
 
 const optionalUrl = emptyToUndefined(z.string().url().optional());
 
+const optionalString = emptyToUndefined(z.string().trim().optional());
+
 const boolFromEnv = z.preprocess((value) => {
   if (typeof value === "boolean") return value;
   if (typeof value !== "string") return false;
@@ -46,11 +48,17 @@ function createSchema(isProduction) {
       API_INTERNAL_URL: optionalUrl,
       NEXT_PUBLIC_WS_URL: optionalUrl,
       NEXT_PUBLIC_GOOGLE_ADS_ID: optionalGoogleAdsId,
+      // Sentry. NEXT_PUBLIC_* are inlined at build time (Coolify build
+      // variables); SENTRY_AUTH_TOKEN is build-only and must reach the build
+      // as a BuildKit secret, never a build arg (see apps/web/Dockerfile).
       NEXT_PUBLIC_SENTRY_DSN: optionalUrl,
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: optionalString,
+      NEXT_PUBLIC_SENTRY_RELEASE: optionalString,
+      SOURCE_COMMIT: optionalString,
       SENTRY_DSN: optionalUrl,
-      SENTRY_AUTH_TOKEN: z.string().optional(),
-      SENTRY_ORG: z.string().default("tarodan"),
-      SENTRY_PROJECT: z.string().default("web"),
+      SENTRY_AUTH_TOKEN: optionalString,
+      SENTRY_ORG: emptyToUndefined(z.string().default("tarodan")),
+      SENTRY_PROJECT: emptyToUndefined(z.string().default("tarodan-web")),
       // Pre-launch storefront gate (#398): flip SITE_LOCKED=true on the prod
       // Coolify web app to route every visitor to /coming-soon. Admin-managed
       // invite codes (verified via the API) let restricted users through by
