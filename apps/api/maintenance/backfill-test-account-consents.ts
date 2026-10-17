@@ -1,13 +1,14 @@
 /**
- * Test şeridi hesaplarının (`isTestAccount=true`: App Review / mobil QA) zorunlu
- * sözleşme onaylarını YÜRÜRLÜKTEKİ sürümle tamamlar.
+ * Completes the mandatory consents of test-lane accounts (`isTestAccount=true`:
+ * App Review / mobile QA) with the CURRENT document version.
  *
- * Neden: mobil 1.0.6 girişte `GET /consents/me/pending` boş değilse kapatılamaz
- * bir onay ekranı açar; incelemeci ya da otomasyon (Maestro) o ekranı geçemez.
- * Admin → Test Araçları ile AÇILAN yeni hesaplar onaylı gelir; bu script daha
- * önce açılmış hesaplar içindir ve belge sürümü değiştikçe (ör. şartlar
- * güncellendi) yeniden koşulur — yalnız eksik / eski sürümdeki belge için satır
- * ekler, güncel olana dokunmaz.
+ * Why: mobile 1.1.0 opens an undismissable consent screen at login when
+ * `GET /consents/me/pending` is not empty; a reviewer or automation (Maestro)
+ * cannot get past it.
+ * New accounts OPENED through Admin → Test Tools come with consents; this
+ * script is for accounts opened earlier and is re-run whenever a document
+ * version changes (e.g. the terms were updated). It adds rows only for a
+ * missing or outdated document and leaves current ones alone.
  *
  * `consent_records` ekleme-yalnızdır; yazılan satır geri alınamaz. Bu yüzden:
  *  - VARSAYILAN dry-run'dır. Yazmak için `--apply --db=<veritabanı adı>`; ad,

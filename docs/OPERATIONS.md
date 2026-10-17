@@ -40,11 +40,12 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
 
 - **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
   audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
-- **Sözleşme onayı ve kimlik:** yeni hesap zorunlu sözleşmeleri (şartlar, gizlilik,
-  KVKK) yürürlükteki sürümle onaylı açılır; yoksa mobil 1.0.6 girişte kapatılamaz
-  onay ekranı açar. Yasal kimlik (ad, soyad, TCKN) istenmez: test şeridi kimlik
-  kapısından muaftır (`required: false`). Bu değişiklikten ÖNCE açılmış hesaplar ve
-  belge sürümü her değiştiğinde (CONSENTS.md) tamamlama:
+- **Consents and identity:** a new account opens with the mandatory agreements
+  (terms, privacy, KVKK) accepted at the current version; otherwise mobile 1.1.0
+  shows an undismissable consent screen at login. No legal identity (first name,
+  last name, TCKN) is asked for: the test lane is exempt from the identity gate
+  (`required: false`). To complete accounts opened BEFORE this change, and every
+  time a document version changes (CONSENTS.md):
   `docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-test-account-consents.js'`
   — VARSAYILAN dry-run'dır: hedef veritabanını (host/db, şifresiz), etkilenecek
   hesap / satır sayısını ve atlananları yazar, hiçbir şey yazmaz. Yazmak için aynı

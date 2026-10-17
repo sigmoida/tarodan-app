@@ -222,8 +222,9 @@ describe("AuthService.loginWithApple", () => {
     );
   });
 
-  // App Store 5.1.1(v): mobil 1.0.6 authorizationCode gönderir; sunucu girişin
-  // yapıldığı client id ile refresh token'a çevirip saklar (hesap silmede iptal).
+  // App Store 5.1.1(v): mobile 1.1.0 sends authorizationCode; the server exchanges
+  // it for a refresh token with the client id used at login and stores it
+  // (revoked on account deletion).
   describe("authorizationCode", () => {
     beforeEach(() => {
       apple.verifyIdentityToken.mockResolvedValue({

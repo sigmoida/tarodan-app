@@ -173,7 +173,7 @@ describe("ExpoPushProvider — bilet ve makbuz", () => {
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(sent).toHaveLength(2);
     expect(sent[0]).toMatchObject({ to: T1, badge: 4, channelId: "trades" });
-    // Eski sürüm (1.0.6) rozeti hiç düşürmez: ona rozet gönderilmez.
+    // Older versions (1.0.5) never lower the badge: no badge is sent to them.
     expect(sent[1].badge).toBeUndefined();
     expect(badge).toHaveBeenCalledTimes(1);
     expect(results.every((r) => r.success)).toBe(true);

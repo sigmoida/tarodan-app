@@ -10,9 +10,10 @@ export class AppleAuthDto {
   fullName?: string;
 
   /**
-   * Apple'ın verdiği tek kullanımlık yetkilendirme kodu (mobil 1.0.6+). Sunucu
-   * refresh token'a çevirip şifreli saklar; hesap silmede Apple'a iptal edilir
-   * (App Store 5.1.1(v)). Göndermeyen eski istemci aynen çalışır.
+   * One-time authorization code issued by Apple (mobile 1.1.0+). The server
+   * exchanges it for a refresh token and stores it encrypted; it is revoked at
+   * Apple on account deletion (App Store 5.1.1(v)). Older clients that do not
+   * send it keep working unchanged.
    */
   @IsOptional()
   @IsString()

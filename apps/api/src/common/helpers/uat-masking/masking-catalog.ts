@@ -412,6 +412,7 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
       ["carrier_cancellation_tasks", "metadata"],
       ["ledger_entries", "metadata"],
       ["scheduled_notifications", "target_data"],
+      ["scheduled_notifications", "data"],
     ] as const
   ).map(([table, column]): MaskColumnsRule => ({
     table,

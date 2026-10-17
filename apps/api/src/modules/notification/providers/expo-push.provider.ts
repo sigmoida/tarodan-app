@@ -102,10 +102,11 @@ export interface SendToUserOptions {
 }
 
 /**
- * Rozeti yöneten istemci mi? Yalnız mobil ≥ 1.0.7 rozeti okunmamış sayıyla
- * senkronlar (okunduğunda düşürür); eski sürüm push'taki rozeti hiç
- * düşürmediği için ona rozet gönderilmez. Yeni sürüm kayıtta `deviceModel`
- * gönderir — eski sürüm göndermez; ayırt edici bu kolondur.
+ * Is this a badge-managing client? Only mobile >= 1.1.0 syncs the badge with
+ * the unread count (it lowers it on read); older versions never lower the
+ * badge set by a push, so they get no badge. The new version sends
+ * `deviceModel` at registration and older ones do not; that column is the
+ * discriminator.
  */
 export function badgeCapableToken(row: {
   deviceModel?: string | null;
@@ -436,8 +437,8 @@ export class ExpoPushProvider {
   /**
    * Register push token for a user.
    *
-   * `deviceId` kurulum başına SABİT kimliktir (mobil ≥ 1.0.7); eski sürümler
-   * buraya cihaz modelini yazıyordu. `deviceModel` ayrı alandır.
+   * `deviceId` is a STABLE per-install identifier (mobile >= 1.1.0); older
+   * versions wrote the device model here. `deviceModel` is a separate field.
    */
   async registerToken(
     userId: string,

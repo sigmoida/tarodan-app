@@ -244,7 +244,7 @@ formu) · `no-token` (bilgi + yeniden gönderme formu).
   App Store için **zorunludur** → mobilde de uygulanmalı.
 - Apple'ın web akışında **client secret gerekmiyor**: `id_token` JWKS ile doğrulanıyor, Apple'ın token
   endpoint'i hiç çağrılmıyor. `.p8` yalnızca mobilde hesap silme (token iptali) için gerekiyor.
-- **Token iptali (App Store 5.1.1(v), 2026-10):** mobil (1.0.6+) `authorizationCode` da gönderir.
+- **Token revocation (App Store 5.1.1(v), 2026-10):** mobile (1.1.0+) also sends `authorizationCode`.
   Sunucu kodu girişin yapıldığı client id (identity token `aud`: `com.tarodan.app` / staging
   `com.tarodan.app.staging`) ile Apple'da refresh token'a çevirir ve şifreli saklar
   (`apple_sign_in_tokens`). `DELETE /users/me` iptali outbox'a yazar (`apple.token_revoke`); Apple

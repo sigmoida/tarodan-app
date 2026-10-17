@@ -6261,12 +6261,13 @@ async function main() {
     });
   }
 
-  // --- 28c'. Demo üyelerin sözleşme onayı ---
-  // Mobil 1.0.6 girişte `GET /consents/me/pending` boş değilse kapatılamaz onay
-  // ekranı açar; auto-login'li Maestro akışları (zeynep, ahmet, ali, …) orada
-  // takılırdı. Banlı ve "yeni" hesap bilerek dışarıda: ilki girişe hiç ulaşmaz,
-  // ikincisi yeni-üye durumunu temsil eder. İdempotent: güncel onayı olana satır
-  // eklenmez, sürüm değişince yalnız yenisi eklenir.
+  // --- 28c'. Consent records of the demo members ---
+  // Mobile 1.1.0 opens an undismissable consent screen at login when
+  // `GET /consents/me/pending` is not empty; the auto-login Maestro flows
+  // (zeynep, ahmet, ali, ...) would get stuck there. The banned and the "new"
+  // account are left out on purpose: the first never reaches login, the second
+  // stands for the new-member state. Idempotent: a member with a current
+  // consent gets no row; when the version changes only the new one is added.
   //
   // Yasal kimlik (ad, soyad, TCKN) BİLİNÇLİ yazılmaz: seed'e gömülü numaralar
   // public repoda kalıcı olurdu ve gerçek bir kişiye ait olmadıkları garanti

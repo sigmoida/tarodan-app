@@ -345,7 +345,7 @@ export class RegisterPushTokenDto {
   @ApiPropertyOptional({
     example: "device-uuid-123",
     description:
-      "Stable per-install device identifier (mobile ≥ 1.0.7). Older apps sent the device model here.",
+      "Stable per-install device identifier (mobile >= 1.1.0). Older apps sent the device model here.",
   })
   @IsOptional()
   @IsString()
