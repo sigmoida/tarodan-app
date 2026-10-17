@@ -68,7 +68,8 @@ export class AdminSendNotificationDto extends BroadcastEmailContentDto {
 
   @ApiProperty({
     type: [String],
-    description: 'Gönderim kanalları: "push", "email", "in_app" (zil).',
+    description:
+      'Teslim kanalları: "push", "email". Zil `inApp` ile seçilir; geriye uyum için "in_app" kabul edilir ama sınırda ayıklanır.',
   })
   @IsArray()
   @IsString({ each: true })
@@ -77,7 +78,7 @@ export class AdminSendNotificationDto extends BroadcastEmailContentDto {
   @ApiPropertyOptional({
     default: true,
     description:
-      'Zil (uygulama içi bildirim kutusu) satırı yazılsın mı. Verilmezse true — eski çağıranlar her zaman zil satırı yazıyordu. `channels` içinde "in_app" varsa yine true sayılır. false + yalnız "email" = yalnız e-posta.',
+      'Zil (uygulama içi bildirim kutusu) satırı yazılsın mı — zilin TEK sinyali (resolveBroadcastInApp). Verilirse kazanır (`channels` içindeki "in_app" ile çelişse bile); verilmezse true (eski çağıranlar her zaman zil satırı yazıyordu). false + yalnız "email" = yalnız e-posta.',
   })
   @IsOptional()
   @IsBoolean()

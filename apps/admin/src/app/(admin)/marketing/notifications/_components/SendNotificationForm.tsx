@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { FormModal, useZodForm } from "@tarodan/ui/form";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
@@ -11,7 +12,10 @@ import {
   sendFormToPayload,
   sendNotificationSchema,
 } from "../_lib/types";
-import { useAudienceCounts } from "../_lib/useBroadcastEmailPreview";
+import {
+  useAudienceCounts,
+  useDebouncedObject,
+} from "../_lib/useBroadcastEmailPreview";
 import {
   AudienceStep,
   ChannelStep,
@@ -20,6 +24,8 @@ import {
   TimingStep,
 } from "./compose/ComposeSections";
 import { ComposePreview } from "./compose/ComposePreview";
+
+const READY_DEBOUNCE_MS = 300;
 
 /**
  * "Bildirim Oluştur" modalı. Sayfa açılışında KENDİLİĞİNDEN açılmaz — sayfa
@@ -37,12 +43,17 @@ export function SendNotificationForm({
   onScheduled: () => void;
 }) {
   const t = useTranslations();
-  const schema = sendNotificationSchema(t);
+  const schema = useMemo(() => sendNotificationSchema(t), [t]);
   const form = useZodForm(schema, { defaultValues: emptySendForm });
   const values = form.watch();
   const audienceCounts = useAudienceCounts(values);
-  // Önizlemedeki "hazır" durumu gönderimle AYNI şemadan gelir (tek kaynak).
-  const canSend = schema.safeParse(values).success;
+  // Önizlemedeki "hazır" durumu gönderimle AYNI şemadan gelir (tek kaynak);
+  // tam şema her tuşta değil, debounce sonrası çalışır.
+  const settled = useDebouncedObject(values, READY_DEBOUNCE_MS);
+  const canSend = useMemo(
+    () => schema.safeParse(settled).success,
+    [schema, settled],
+  );
 
   const send = useAdminMutation(
     (formValues: SendForm) =>

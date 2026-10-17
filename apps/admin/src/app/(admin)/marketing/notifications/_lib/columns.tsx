@@ -7,7 +7,11 @@ import {
 import type { MailingType } from "@tarodan/types";
 import { col } from "@/components/table";
 import { scheduledRowMenu } from "./rowActions";
-import { type NotificationLog, type ScheduledNotification } from "./types";
+import {
+  scheduledChannelKeys,
+  type NotificationLog,
+  type ScheduledNotification,
+} from "./types";
 import type { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -91,8 +95,8 @@ export function scheduledColumns(onCancel: (id: string) => void, t: T) {
     col.muted<ScheduledNotification>(
       t("admin.marketing.notifications.channels"),
       (n) =>
-        n.channels
-          ?.map((c) => enumLabel(statusConfig(notificationChannelConfig, t), c))
+        scheduledChannelKeys(n)
+          .map((c) => enumLabel(statusConfig(notificationChannelConfig, t), c))
           .join(", "),
       { sortKey: "channels", sortType: "text" },
     ),

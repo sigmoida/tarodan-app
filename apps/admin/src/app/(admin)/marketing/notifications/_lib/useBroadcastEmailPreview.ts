@@ -35,19 +35,31 @@ export function useDebouncedObject<T>(value: T, delayMs: number): T {
  * her tuşta istek atmamak için girdi debounce edilir.
  */
 export function useBroadcastEmailPreview(values: SendForm) {
-  // Push/zil kartı kapalıysa onun (gizli) metni gönderilmez — gönderimle aynı
-  // kural (`notificationTextFromForm`); önizleme DTO sınırına kırpılır.
-  const text = notificationTextFromForm(values);
-  const draft = useDebouncedObject(
+  // Önce HAM değerler debounce edilir; HTML'in düz metne çevrilmesi ve
+  // türetme her tuşta değil, yalnız debounce sonrası çalışır.
+  const raw = useDebouncedObject(
     {
-      title: text.title.slice(0, PUSH_TITLE_MAX),
-      body: text.body.slice(0, PUSH_BODY_MAX),
+      channels: values.channels,
+      title: values.title,
+      body: values.body,
       emailSubject: values.emailSubject,
       emailHtml: values.emailHtml,
-      mailingType: mailingTypeFromForm(values),
+      mailingType: values.mailingType,
     },
     PREVIEW_DEBOUNCE_MS,
   );
+  // Push/zil kartı kapalıysa onun (gizli) metni gönderilmez — gönderimle aynı
+  // kural (`notificationTextFromForm`); önizleme DTO sınırına kırpılır.
+  const draft = useMemo(() => {
+    const text = notificationTextFromForm(raw);
+    return {
+      title: text.title.slice(0, PUSH_TITLE_MAX),
+      body: text.body.slice(0, PUSH_BODY_MAX),
+      emailSubject: raw.emailSubject,
+      emailHtml: raw.emailHtml,
+      mailingType: mailingTypeFromForm(raw),
+    };
+  }, [raw]);
   // Debounce edilmiş taslağa bakılır: yazılan HTML henüz taslağa girmediyse
   // eski (boş) taslakla istek atılmaz.
   const enabled =

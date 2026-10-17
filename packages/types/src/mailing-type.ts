@@ -21,3 +21,28 @@ export const BROADCAST_EMAIL_HTML_MAX = 200_000;
 
 /** Konu üst sınırı (karakter). */
 export const BROADCAST_EMAIL_SUBJECT_MAX = 240;
+
+/**
+ * Yönetici yayınının zil (uygulama içi bildirim kutusu) satırı yazıp
+ * yazmayacağı — API, zamanlayıcı ve admin listesi için TEK kural:
+ *
+ * 1. `inApp` verildiyse o kazanır — `channels` içindeki `"in_app"` ile
+ *    çelişse bile (admin formu yalnız `inApp` gönderir);
+ * 2. verilmediyse true — eski çağıranlar ve `in_app` kolonundan önceki
+ *    zamanlanmış satırlar her yayında zil satırı yazıyordu (`"in_app"`
+ *    kanalı olsun olmasın). Bu yüzden `channels` yalnız TESLİM kanallarını
+ *    (push, email) taşır; `"in_app"` sınırda ayıklanır (`broadcastDeliveryChannels`).
+ */
+export function resolveBroadcastInApp(input: {
+  inApp?: boolean | null;
+}): boolean {
+  if (typeof input.inApp === "boolean") return input.inApp;
+  return true;
+}
+
+/** Yayının `channels` listesinden zil işaretini ayıklar; kalanlar teslim kanallarıdır. */
+export function broadcastDeliveryChannels(
+  channels: readonly string[],
+): string[] {
+  return channels.filter((c) => c !== "in_app");
+}

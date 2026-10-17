@@ -14,7 +14,9 @@ import {
   BROADCAST_EMAIL_HTML_MAX,
   BROADCAST_EMAIL_SUBJECT_MAX,
   MAILING_TYPES,
+  broadcastDeliveryChannels,
   isInternalNotificationPath,
+  resolveBroadcastInApp,
   type MailingType,
 } from "@tarodan/types";
 import type { useTranslations } from "next-intl";
@@ -47,9 +49,23 @@ export interface ScheduledNotification {
   /** API gövdeyi liste yanıtına koymaz; yalnız "HTML e-postası var" bilgisi gelir. */
   hasEmailHtml?: boolean;
   mailingType?: MailingType;
+  /** Zil satırı yazılacak mı; kolon öncesi satırlarda yok → API kuralıyla true. */
+  inApp?: boolean;
 }
 
 export type TabType = "scheduled" | "history";
+
+/**
+ * Zamanlanmış satırın gerçek kanalları: teslim kanalları + zil. Zil API ile
+ * AYNI kuraldan (`resolveBroadcastInApp`) türetilir — kolon öncesi satırlar
+ * (inApp yok) zil yazar.
+ */
+export function scheduledChannelKeys(
+  row: Pick<ScheduledNotification, "channels" | "inApp">,
+): string[] {
+  const channels = broadcastDeliveryChannels(row.channels ?? []);
+  return resolveBroadcastInApp(row) ? [...channels, "in_app"] : channels;
+}
 
 // "Oluştur" artık sekme değil: sayfa başlığındaki buton modalı açar.
 export const notificationTabs = (t: T) => [
@@ -161,43 +177,20 @@ export type SendMode = (typeof SEND_MODES)[number];
 export const sendNotificationSchema = (t: T) =>
   z
     .object({
-      channels: z
-        .array(z.enum(NOTIFICATION_CHANNELS))
-        .min(1, t("admin.marketing.notifications.validation.channelRequired")),
+      // Sınırlar (min/max) aşağıda superRefine'da: alan düzeyinde kalsalardı
+      // gizli bir kartın eski değeri gönderimi sessizce engellerdi.
+      channels: z.array(z.enum(NOTIFICATION_CHANNELS)),
       // Duyuru türü TÜM kanalları belirler (push + zil + e-posta): pazarlama
       // yalnız izinlilere gider. Başta seçilmemiştir ("") — yönetici türü her
       // gönderimde açıkça seçer (Apple 4.5.4 / İYS).
       mailingType: z.union([z.literal(""), z.enum(MAILING_TYPES)]),
-      title: z
-        .string()
-        .trim()
-        .max(
-          PUSH_TITLE_MAX,
-          t("admin.marketing.notifications.validation.titleMax"),
-        ),
-      body: z
-        .string()
-        .trim()
-        .max(
-          PUSH_BODY_MAX,
-          t("admin.marketing.notifications.validation.bodyMax"),
-        ),
+      title: z.string().trim(),
+      body: z.string().trim(),
       // Bildirime dokununca açılacak site içi yol (opsiyonel). İzin listesi
       // API ile ORTAK (`@tarodan/types`); mobil aynı yolu kendi ekranına çevirir.
       link: z.string().trim(),
-      emailSubject: z
-        .string()
-        .trim()
-        .max(
-          BROADCAST_EMAIL_SUBJECT_MAX,
-          t("admin.marketing.notifications.validation.emailSubjectMax"),
-        ),
-      emailHtml: z
-        .string()
-        .max(
-          BROADCAST_EMAIL_HTML_MAX,
-          t("admin.marketing.notifications.validation.emailHtmlMax"),
-        ),
+      emailSubject: z.string().trim(),
+      emailHtml: z.string(),
       targetType: z.enum(["all", "segment", "user_ids"]),
       // Seçimler {value: userId, label: görünen ad} olarak taşınır — çipler
       // arama sonuçları değişse de etiketini korur (SearchableMultiSelect).
@@ -212,6 +205,12 @@ export const sendNotificationSchema = (t: T) =>
       const issue = (path: keyof typeof values, message: string) =>
         ctx.addIssue({ code: "custom", path: [path], message });
 
+      if (values.channels.length === 0) {
+        issue(
+          "channels",
+          t("admin.marketing.notifications.validation.channelRequired"),
+        );
+      }
       if (!values.mailingType) {
         issue(
           "mailingType",
@@ -224,12 +223,19 @@ export const sendNotificationSchema = (t: T) =>
             "title",
             t("admin.marketing.notifications.validation.titleRequired"),
           );
+        } else if (values.title.length > PUSH_TITLE_MAX) {
+          issue(
+            "title",
+            t("admin.marketing.notifications.validation.titleMax"),
+          );
         }
         if (!values.body) {
           issue(
             "body",
             t("admin.marketing.notifications.validation.bodyRequired"),
           );
+        } else if (values.body.length > PUSH_BODY_MAX) {
+          issue("body", t("admin.marketing.notifications.validation.bodyMax"));
         }
         if (values.link && !isInternalNotificationPath(values.link)) {
           issue(
@@ -244,11 +250,21 @@ export const sendNotificationSchema = (t: T) =>
             "emailSubject",
             t("admin.marketing.notifications.validation.emailSubjectRequired"),
           );
+        } else if (values.emailSubject.length > BROADCAST_EMAIL_SUBJECT_MAX) {
+          issue(
+            "emailSubject",
+            t("admin.marketing.notifications.validation.emailSubjectMax"),
+          );
         }
         if (!values.emailHtml.trim()) {
           issue(
             "emailHtml",
             t("admin.marketing.notifications.validation.emailHtmlRequired"),
+          );
+        } else if (values.emailHtml.length > BROADCAST_EMAIL_HTML_MAX) {
+          issue(
+            "emailHtml",
+            t("admin.marketing.notifications.validation.emailHtmlMax"),
           );
         }
       }
@@ -310,7 +326,9 @@ export function audienceFromForm(f: SendForm) {
 }
 
 /** Seçili tür; seçilmemişse (`""`) alan hiç gönderilmez. */
-export function mailingTypeFromForm(f: SendForm): MailingType | undefined {
+export function mailingTypeFromForm(
+  f: Pick<SendForm, "mailingType">,
+): MailingType | undefined {
   return f.mailingType || undefined;
 }
 
@@ -349,10 +367,18 @@ export function htmlToPlainText(html: string): string {
   return html
     .replace(/<(style|script|head)[^>]*>[\s\S]*?<\/\1>/gi, " ")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&(#\d+|[a-z]+);/gi, (match, entity: string) => {
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
       if (entity.startsWith("#")) {
-        const code = Number(entity.slice(1));
-        return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+        const hex = entity[1] === "x" || entity[1] === "X";
+        const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
+        // Geçersiz kod noktası (vekil aralığı, > U+10FFFF) render sırasında
+        // fromCodePoint'i fırlatırdı: olduğu gibi bırakılır.
+        const valid =
+          Number.isInteger(code) &&
+          code > 0 &&
+          code <= 0x10ffff &&
+          (code < 0xd800 || code > 0xdfff);
+        return valid ? String.fromCodePoint(code) : match;
       }
       return HTML_ENTITIES[entity.toLowerCase()] ?? match;
     })
@@ -369,13 +395,21 @@ const clip = (value: string, max: number) =>
  * e-posta konusu ve HTML'in düz metni gider (geçmiş satırının başlığı/özeti;
  * HTML verildiği için e-posta gövdesinde kullanılmaz).
  */
-export function notificationTextFromForm(f: SendForm) {
+export function notificationTextFromForm(
+  f: Pick<
+    SendForm,
+    "channels" | "title" | "body" | "emailSubject" | "emailHtml"
+  >,
+) {
   if (usesNotificationText(f.channels)) {
     return { title: f.title.trim(), body: f.body.trim() };
   }
+  const subject = f.emailSubject.trim();
+  // Yalnız görselden oluşan HTML'in düz metni boştur: özet konuya düşer.
+  const text = htmlToPlainText(f.emailHtml) || subject;
   return {
-    title: clip(f.emailSubject.trim(), PUSH_TITLE_MAX),
-    body: clip(htmlToPlainText(f.emailHtml), PUSH_BODY_MAX),
+    title: clip(subject, PUSH_TITLE_MAX),
+    body: clip(text, PUSH_BODY_MAX),
   };
 }
 
@@ -383,8 +417,11 @@ export function notificationTextFromForm(f: SendForm) {
 export function sendFormToPayload(f: SendForm) {
   return {
     ...notificationTextFromForm(f),
-    channels: NOTIFICATION_CHANNELS.filter((c) => f.channels.includes(c)),
-    // Zil açıkça: false iken API zil satırı yazmaz (yalnız e-posta vb.).
+    // Yalnız TESLİM kanalları; zilin tek sinyali `inApp` (API kuralı
+    // `resolveBroadcastInApp`, `@tarodan/types`). false iken zil satırı yazılmaz.
+    channels: NOTIFICATION_CHANNELS.filter(
+      (c) => c !== "in_app" && f.channels.includes(c),
+    ),
     inApp: f.channels.includes("in_app"),
     // Tür kanaldan bağımsız gider: yalnız push'ta da pazarlama süzgeci çalışır.
     mailingType: mailingTypeFromForm(f),

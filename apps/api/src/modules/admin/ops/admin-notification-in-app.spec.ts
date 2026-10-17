@@ -3,7 +3,7 @@ import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import {
   AdminNotificationService,
-  writesInAppRow,
+  normalizeBroadcastChannels,
 } from "./admin-notification.service";
 import { AdminSendNotificationDto } from "../dto/admin-notification.dto";
 import { ScheduledNotificationScheduler } from "../jobs/scheduled-notification.scheduler";
@@ -23,6 +23,7 @@ describe("AdminNotificationService — uygulama içi (zil) kanalı", () => {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       scheduledNotification: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(
           async ({ data }: { data: Record<string, unknown> }) => ({
             id: "sch-1",
@@ -57,22 +58,41 @@ describe("AdminNotificationService — uygulama içi (zil) kanalı", () => {
   });
 
   const rowChannels = (prisma: ReturnType<typeof makeService>["prisma"]) =>
-    prisma.notificationLog.createMany.mock.calls.flatMap((call: any[]) =>
-      call[0].data.map((row: { channel: string }) => row.channel),
-    );
+    (
+      prisma.notificationLog.createMany.mock.calls as Array<
+        [{ data: Array<{ channel: string }> }]
+      >
+    ).flatMap(([arg]) => arg.data.map((row) => row.channel));
 
-  describe("writesInAppRow", () => {
+  describe("normalizeBroadcastChannels — zilin tek kuralı", () => {
     it("inApp verilmezse true (eski çağıranlar)", () => {
-      expect(writesInAppRow({ channels: ["email"] })).toBe(true);
-      expect(writesInAppRow({ channels: ["push"] })).toBe(true);
+      expect(normalizeBroadcastChannels({ channels: ["email"] }).inApp).toBe(
+        true,
+      );
+      expect(normalizeBroadcastChannels({ channels: ["push"] }).inApp).toBe(
+        true,
+      );
     });
 
-    it('"in_app" kanalı seçiliyse bayraktan bağımsız true', () => {
-      expect(writesInAppRow({ channels: ["in_app"], inApp: false })).toBe(true);
+    it('çelişki: inApp false, channels "in_app" içeriyor → inApp kazanır', () => {
+      expect(
+        normalizeBroadcastChannels({
+          channels: ["email", "in_app"],
+          inApp: false,
+        }),
+      ).toEqual({ channels: ["email"], inApp: false, fanOut: true });
     });
 
-    it("inApp: false + kanal yok → false", () => {
-      expect(writesInAppRow({ channels: ["email"], inApp: false })).toBe(false);
+    it('"in_app" teslim kanallarından ayıklanır', () => {
+      expect(
+        normalizeBroadcastChannels({ channels: ["in_app"], inApp: true }),
+      ).toEqual({ channels: [], inApp: true, fanOut: false });
+    });
+
+    it("zil kapalı ve teslim kanalı yoksa reddedilir", () => {
+      expect(() =>
+        normalizeBroadcastChannels({ channels: ["in_app"], inApp: false }),
+      ).toThrow(BadRequestException);
     });
   });
 
@@ -101,8 +121,43 @@ describe("AdminNotificationService — uygulama içi (zil) kanalı", () => {
     );
 
     expect(rowChannels(prisma)).toEqual(["in_app"]);
-    // Dağıtım işi yine kuyruğa gider (zamanlanmış satırın durumunu worker yazar).
+    // Teslim edilecek push/e-posta yok: dağıtım işi kuyruğa YAZILMAZ.
+    expect(eventService.emitAdminBroadcast).not.toHaveBeenCalled();
+    expect(prisma.scheduledNotification.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("zamanlanmış yalnız zil: satır worker beklenmeden 'sent' olur (ulaşılan = alıcı)", async () => {
+    const { service, prisma, eventService } = makeService();
+
+    await service.sendNotification(
+      "admin-1",
+      dto({
+        channels: [],
+        inApp: true,
+        userIds: ["user-1", "user-2"],
+        scheduledNotificationId: "sch-9",
+      }),
+    );
+
+    expect(eventService.emitAdminBroadcast).not.toHaveBeenCalled();
+    expect(prisma.scheduledNotification.updateMany).toHaveBeenCalledWith({
+      where: { id: "sch-9", status: "processing" },
+      data: expect.objectContaining({ status: "sent", sentCount: 2 }),
+    });
+  });
+
+  it('push/e-posta varsa dağıtım işi kuyruğa gider, "in_app" iş verisine girmez', async () => {
+    const { service, eventService } = makeService();
+
+    await service.sendNotification(
+      "admin-1",
+      dto({ channels: ["email", "in_app"] }),
+    );
+
     expect(eventService.emitAdminBroadcast).toHaveBeenCalledTimes(1);
+    expect(eventService.emitAdminBroadcast.mock.calls[0][0].channels).toEqual([
+      "email",
+    ]);
   });
 
   it("hiçbir kanal teslim etmiyorsa reddedilir", async () => {

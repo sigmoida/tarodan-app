@@ -39,7 +39,12 @@ import {
   isMarketingMailing,
   newsletterUnsubscribeUrl,
 } from "../../../common/helpers/broadcast-email";
-import { DEFAULT_MAILING_TYPE, type MailingType } from "@tarodan/types";
+import {
+  DEFAULT_MAILING_TYPE,
+  broadcastDeliveryChannels,
+  resolveBroadcastInApp,
+  type MailingType,
+} from "@tarodan/types";
 import { MediaService, type UploadResult } from "../../media/media.service";
 import { NOTIFICATION_IMAGE_UPLOAD } from "./notification-image-upload.constants";
 
@@ -49,7 +54,7 @@ export interface AdminBroadcastInput {
   body: string;
   channels: string[];
   /**
-   * Zil satırı yazılsın mı (bkz. `writesInAppRow`). Verilmezse true — eski
+   * Zil satırı yazılsın mı (bkz. `normalizeBroadcastChannels`). Verilmezse true — eski
    * çağıranlar ve kolondan önceki zamanlanmış satırlar her zaman yazıyordu.
    */
   inApp?: boolean;
@@ -82,38 +87,28 @@ export interface AudienceCountInput {
 }
 
 /** Yayının gerçekten gönderdiği (worker'ın dağıttığı) kanallar. */
-const DELIVERY_CHANNELS = ["push", "email"] as const;
+const DELIVERY_CHANNELS: readonly string[] = ["push", "email"];
 
 /**
- * Yayın zil (uygulama içi bildirim kutusu) satırı yazar mı? "in_app" kanalı
- * açıkça seçildiyse evet; değilse `inApp` bayrağı, o da yoksa true (geriye
- * uyum: eskiden her yayın, yalnız e-posta olsa bile, zil satırı yazıyordu).
- */
-export function writesInAppRow(dto: {
-  channels: string[];
-  inApp?: boolean;
-}): boolean {
-  return dto.channels.includes("in_app") || (dto.inApp ?? true);
-}
-
-/**
+ * Kanal seçimini sınırda TEK biçime getirir: zil kararı `resolveBroadcastInApp`
+ * (`@tarodan/types`; `inApp` verildiyse o kazanır, yoksa true) ve `channels`
+ * yalnız teslim kanalları ("in_app" ayıklanır — zilin tek kaynağı `inApp`).
  * Hiçbir kanal bir şey teslim etmeyecekse (zil kapalı, push/e-posta yok) yayın
- * anlamsız: sessizce "gönderildi" demek yerine reddedilir. Zil kararını döner.
+ * anlamsız: sessizce "gönderildi" demek yerine reddedilir.
  */
-function assertDeliversSomething(dto: {
+export function normalizeBroadcastChannels(dto: {
   channels: string[];
   inApp?: boolean;
-}): boolean {
-  const writesInApp = writesInAppRow(dto);
-  const delivers = dto.channels.some((c) =>
-    (DELIVERY_CHANNELS as readonly string[]).includes(c),
-  );
-  if (!writesInApp && !delivers) {
+}): { channels: string[]; inApp: boolean; fanOut: boolean } {
+  const inApp = resolveBroadcastInApp(dto);
+  const channels = broadcastDeliveryChannels(dto.channels);
+  const fanOut = channels.some((c) => DELIVERY_CHANNELS.includes(c));
+  if (!inApp && !fanOut) {
     throw new BadRequestException(
       i18nMessage("server.admin.notification.noChannel"),
     );
   }
-  return writesInApp;
+  return { channels, inApp, fanOut };
 }
 
 /**
@@ -362,9 +357,13 @@ export class AdminNotificationService {
   async sendNotification(adminId: string, dto: AdminBroadcastInput) {
     let targetUserIds: string[] = [];
     const emailContent = this.normalizeEmailContent(dto);
-    const sendsEmail = dto.channels.includes("email");
+    const {
+      channels,
+      inApp: writesInApp,
+      fanOut,
+    } = normalizeBroadcastChannels(dto);
+    const sendsEmail = channels.includes("email");
     const isMarketing = isMarketingMailing(emailContent.mailingType);
-    const writesInApp = assertDeliversSomething(dto);
 
     // ADMIN_BROADCAST serbest link taşır (harita: free("link")). DTO kapısına
     // (SafeNotificationLinkData) ek olarak burada da süzülür: bu servis iç
@@ -449,7 +448,7 @@ export class AdminNotificationService {
         }
 
         // Create entries for other selected channels (for tracking/audit)
-        for (const channel of dto.channels) {
+        for (const channel of channels) {
           if (channel === "in_app") continue;
           if (channel === "email") {
             if (marketingTokens && !marketingTokens.has(userId)) continue;
@@ -505,27 +504,41 @@ export class AdminNotificationService {
       // "sent"/"failed" olur (iyimser toplu "sent" güncellemesi kaldırıldı).
       // İş verisi yalnız HEDEFLEME kuralını taşır: kullanıcı listesi ve çıkış
       // token'ları Redis'e yazılmaz, worker dağıtım anında çözer.
-      await this.eventService.emitAdminBroadcast({
-        broadcastId,
-        title: dto.title,
-        body: dto.body,
-        channels: dto.channels,
-        // Süzülmüş data: push payload'ına da ham link sızmasın.
-        data,
-        emailSubject: emailContent.emailSubject ?? null,
-        emailHtml: emailContent.emailHtml ?? null,
-        isMarketing,
-        target: {
-          targetType: dto.targetType,
-          ...(dto.targetType === "user_ids"
-            ? { userIds: dto.userIds ?? [] }
-            : {}),
-          ...(dto.targetType === "segment"
-            ? { segmentCriteria: dto.segmentCriteria ?? null }
-            : {}),
-        },
-        scheduledNotificationId: dto.scheduledNotificationId,
-      });
+      if (fanOut) {
+        await this.eventService.emitAdminBroadcast({
+          broadcastId,
+          title: dto.title,
+          body: dto.body,
+          channels,
+          // Süzülmüş data: push payload'ına da ham link sızmasın.
+          data,
+          emailSubject: emailContent.emailSubject ?? null,
+          emailHtml: emailContent.emailHtml ?? null,
+          isMarketing,
+          target: {
+            targetType: dto.targetType,
+            ...(dto.targetType === "user_ids"
+              ? { userIds: dto.userIds ?? [] }
+              : {}),
+            ...(dto.targetType === "segment"
+              ? { segmentCriteria: dto.segmentCriteria ?? null }
+              : {}),
+          },
+          scheduledNotificationId: dto.scheduledNotificationId,
+        });
+      } else if (dto.scheduledNotificationId) {
+        // Yalnız zil: teslim edilecek push/e-posta yok, dağıtım işi kuyruğa
+        // yazılmaz. Zil satırları yukarıda "sent" yazıldı; zamanlanmış satır
+        // da burada (worker yerine) sonuçlanır — ulaşılan = zil alıcıları.
+        await this.prisma.scheduledNotification.updateMany({
+          where: { id: dto.scheduledNotificationId, status: "processing" },
+          data: {
+            status: "sent",
+            sentAt: new Date(),
+            sentCount: targetUserIds.length,
+          },
+        });
+      }
 
       // Log the action
       await this.audit.createAuditLog(
@@ -536,7 +549,7 @@ export class AdminNotificationService {
         null,
         {
           targetCount: targetUserIds.length,
-          channels: dto.channels,
+          channels,
           inApp: writesInApp,
           title: dto.title,
           targetType: dto.targetType,
@@ -547,13 +560,14 @@ export class AdminNotificationService {
       );
 
       this.logger.log(
-        `Admin ${adminId} sent notification to ${targetUserIds.length} users via ${dto.channels.join(", ")}`,
+        `Admin ${adminId} sent notification to ${targetUserIds.length} users via ${[...channels, ...(writesInApp ? ["in_app"] : [])].join(", ")}`,
       );
 
       return {
         success: true,
         targetCount: targetUserIds.length,
-        channels: dto.channels,
+        channels,
+        inApp: writesInApp,
         emailRecipientCount,
         message: `Bildirim ${targetUserIds.length} kullanıcıya gönderildi`,
       };
@@ -582,7 +596,7 @@ export class AdminNotificationService {
         i18nMessage("server.admin.notification.scheduleInFuture"),
       );
     }
-    const writesInApp = assertDeliversSomething(dto);
+    const { channels, inApp } = normalizeBroadcastChannels(dto);
     // Süzülmüş HTML saklanır: zamanlanmış gönderim, anındakiyle aynı içeriği
     // taşır ve gönderim anında bir daha ham girdiye güvenilmez.
     const emailContent = this.normalizeEmailContent(dto);
@@ -594,8 +608,8 @@ export class AdminNotificationService {
         emailSubject: emailContent.emailSubject,
         emailHtml: emailContent.emailHtml,
         mailingType: emailContent.mailingType,
-        channels: dto.channels,
-        inApp: writesInApp,
+        channels,
+        inApp,
         targetType: dto.targetType,
         targetData:
           dto.targetType === "user_ids"

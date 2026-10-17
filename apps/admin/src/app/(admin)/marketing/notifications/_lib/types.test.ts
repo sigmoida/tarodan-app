@@ -3,6 +3,7 @@ import {
   emptySendForm,
   htmlToPlainText,
   scheduleFormToPayload,
+  scheduledChannelKeys,
   sendFormToPayload,
   sendNotificationSchema,
   type SendForm,
@@ -269,8 +270,9 @@ describe("sendFormToPayload — seçilmeyen kanallar gönderilmez", () => {
         emailHtml: "<p>x</p>",
       }),
     );
+    // Zilin tek sinyali inApp: "in_app" channels'a girmez.
     expect(payload).toMatchObject({
-      channels: ["in_app"],
+      channels: [],
       inApp: true,
       title: "Başlık",
       body: "Gövde",
@@ -282,7 +284,7 @@ describe("sendFormToPayload — seçilmeyen kanallar gönderilmez", () => {
     expect(sendFormToPayload(form({ channels: ["push"] })).inApp).toBe(false);
   });
 
-  it("kanal sırası sabittir (push, in_app, email)", () => {
+  it("kanal sırası sabittir; zil channels'a değil inApp'e gider", () => {
     expect(
       sendFormToPayload(
         form({
@@ -291,7 +293,7 @@ describe("sendFormToPayload — seçilmeyen kanallar gönderilmez", () => {
           emailHtml: "<p>x</p>",
         }),
       ).channels,
-    ).toEqual(["push", "in_app", "email"]);
+    ).toEqual(["push", "email"]);
   });
 
   it("yalnız e-postada uzun konu ve gövde API sınırına kırpılır", () => {
@@ -314,5 +316,81 @@ describe("htmlToPlainText", () => {
         "<style>p{color:red}</style><p>Merhaba&nbsp;<b>dünya</b></p><script>x()</script>&#33;",
       ),
     ).toBe("Merhaba dünya !");
+  });
+});
+
+describe("gizli kart gönderimi engellemez", () => {
+  it("yalnız e-posta: gizli push başlığı/gövdesi sınırı aşsa da geçerli", () => {
+    expect(
+      issuePaths(
+        form({
+          channels: ["email"],
+          title: "x".repeat(200),
+          body: "y".repeat(500),
+          emailSubject: "Konu",
+          emailHtml: "<p>x</p>",
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("yalnız push: gizli e-posta konusu sınırı aşsa da geçerli", () => {
+    expect(
+      issuePaths(form({ channels: ["push"], emailSubject: "k".repeat(500) })),
+    ).toEqual([]);
+  });
+
+  it("görünen kartta sınır aşımı yine hata verir", () => {
+    expect(
+      issuePaths(form({ channels: ["push"], title: "x".repeat(66) })),
+    ).toContain("title");
+  });
+
+  it("diğer hatalar (tür, tarih, kanal) aynı anda görünür", () => {
+    expect(
+      issuePaths(form({ channels: [], mailingType: "", sendMode: "schedule" })),
+    ).toEqual(
+      expect.arrayContaining(["channels", "mailingType", "scheduledFor"]),
+    );
+  });
+});
+
+describe("e-posta özeti ve varlıklar", () => {
+  it("yalnız görselden oluşan HTML'de özet konuya düşer", () => {
+    const payload = sendFormToPayload(
+      form({
+        channels: ["email"],
+        emailSubject: "Görsel kampanya",
+        emailHtml: '<p><img src="https://x/y.png" alt=""></p>',
+      }),
+    );
+    expect(payload.body).toBe("Görsel kampanya");
+  });
+
+  it("onaltılık varlıklar çözülür, geçersiz kod noktası fırlatmaz", () => {
+    expect(htmlToPlainText("&#x41;&#X42;&#65;")).toBe("ABA");
+    expect(() => htmlToPlainText("&#xD800;&#99999999;&#0;")).not.toThrow();
+    expect(htmlToPlainText("&#xD800; &#99999999;")).toBe(
+      "&#xD800; &#99999999;",
+    );
+  });
+});
+
+describe("scheduledChannelKeys — zamanlanmış listede zil", () => {
+  it("inApp true / yok (eski satır) → zil gösterilir", () => {
+    expect(scheduledChannelKeys({ channels: ["email"], inApp: true })).toEqual([
+      "email",
+      "in_app",
+    ]);
+    expect(scheduledChannelKeys({ channels: ["push"] })).toEqual([
+      "push",
+      "in_app",
+    ]);
+  });
+
+  it('inApp false → zil yok; channels\'taki eski "in_app" çiftlenmez', () => {
+    expect(
+      scheduledChannelKeys({ channels: ["email", "in_app"], inApp: false }),
+    ).toEqual(["email"]);
   });
 });
