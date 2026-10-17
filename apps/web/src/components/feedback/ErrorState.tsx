@@ -13,10 +13,11 @@ import { logger } from "@/lib/logger";
  * (no chrome around them) and the default padded block for segment boundaries
  * that render inside a layout (header/footer or the profile shell stay put).
  *
- * It is also the one place a caught render error is reported: an error a
- * boundary catches never reaches the global handlers, so without this it would
- * not reach Sentry (server-side errors are reported by `onRequestError` too;
- * the client event adds the browser context and the digest that links them).
+ * It is also the one place a caught client render error is reported: an
+ * error a boundary catches never reaches the global handlers, so without this
+ * it would not reach Sentry. An error with a `digest` came from the server,
+ * where `onRequestError` already reported it with its real message; in the
+ * browser it is only a generic placeholder, so it is not sent again.
  */
 export default function ErrorState({
   error,
@@ -34,11 +35,8 @@ export default function ErrorState({
   const t = useTranslations();
 
   useEffect(() => {
-    if (error) {
-      logger.error("Error boundary caught error", {
-        error,
-        digest: error.digest,
-      });
+    if (error && !error.digest) {
+      logger.error("Error boundary caught error", { error });
     }
   }, [error]);
 

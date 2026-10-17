@@ -27,6 +27,7 @@ function createSchema(isProduction) {
     NEXT_PUBLIC_SENTRY_ENVIRONMENT: optionalString,
     NEXT_PUBLIC_SENTRY_RELEASE: optionalString,
     SOURCE_COMMIT: optionalString,
+    GIT_COMMIT_SHA: optionalString,
     SENTRY_DSN: optionalUrl,
     SENTRY_AUTH_TOKEN: optionalString,
     SENTRY_ORG: emptyToUndefined(z.string().default("tarodan")),

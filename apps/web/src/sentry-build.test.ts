@@ -28,6 +28,12 @@ describe("resolveSentryRelease", () => {
     );
   });
 
+  it("accepts a generic GIT_COMMIT_SHA, as the API does", () => {
+    expect(resolveSentryRelease({ GIT_COMMIT_SHA: "1234567abcdef" })).toBe(
+      "1234567",
+    );
+  });
+
   it("ignores Coolify's placeholder commits", () => {
     expect(resolveSentryRelease({ SOURCE_COMMIT: "unknown" })).toBeUndefined();
     expect(resolveSentryRelease({ SOURCE_COMMIT: "HEAD" })).toBeUndefined();
@@ -55,10 +61,11 @@ describe("sentryBuildOptions", () => {
       disable: false,
       deleteSourcemapsAfterUpload: true,
     });
+    // Finalising belongs after the deploy, not in next build.
     expect(options.release).toEqual({
       name: "abcdef1",
       create: true,
-      finalize: true,
+      finalize: false,
     });
   });
 

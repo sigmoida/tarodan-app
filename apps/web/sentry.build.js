@@ -16,14 +16,15 @@ const PLACEHOLDER_COMMITS = new Set(["unknown", "head"]);
 /**
  * The release every bundle (client, server, edge) is tagged with. In order:
  * an explicit `NEXT_PUBLIC_SENTRY_RELEASE`, then Coolify's `SOURCE_COMMIT`
- * cut to the short sha (the API tags its events the same way, so one deploy
- * has one release across api, web and admin). Undefined when neither is
- * there: the SDK then falls back to the Next build id.
+ * or a generic `GIT_COMMIT_SHA`, cut to the short sha. The API
+ * (`resolveSentryRelease` in apps/api sentry-event.ts) uses the same order,
+ * so one deploy has one release across api, web and admin. Undefined when
+ * none is there: the SDK then falls back to the Next build id.
  */
 function resolveSentryRelease(env) {
   const explicit = env.NEXT_PUBLIC_SENTRY_RELEASE?.trim();
   if (explicit) return explicit;
-  const sha = env.SOURCE_COMMIT?.trim();
+  const sha = (env.SOURCE_COMMIT ?? env.GIT_COMMIT_SHA)?.trim();
   if (!sha || PLACEHOLDER_COMMITS.has(sha.toLowerCase())) return undefined;
   return sha.slice(0, SHORT_SHA_LENGTH);
 }
@@ -46,7 +47,9 @@ function sentryBuildOptions(env) {
     release: {
       name: release,
       create: uploadSourceMaps && Boolean(release),
-      finalize: uploadSourceMaps && Boolean(release),
+      // Never at build time: a build that is not deployed, or is rolled
+      // back, would leave a "released" version that never went live.
+      finalize: false,
     },
     sourcemaps: {
       disable: !uploadSourceMaps,
