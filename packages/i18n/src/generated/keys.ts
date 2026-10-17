@@ -5716,7 +5716,7 @@ export type MessageKey =
   | "home.appPromo.eyebrow"
   | "home.appPromo.imageAlt"
   | "home.appPromo.openOnMobile"
-  | "home.appPromo.storeLinkLabel"
+  | "home.appPromo.opensInNewTab"
   | "home.appPromo.title"
   | "home.banner"
   | "home.beTheFirst"

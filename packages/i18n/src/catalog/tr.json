@@ -2517,7 +2517,7 @@
       "title": "Koleksiyonun artık <accent>cebinde.</accent>",
       "description": "İlanların, takasların ve garajın her an yanında. Türkiye'nin ilk diecast uygulamasını mobilde aç.",
       "openOnMobile": "Mobilde aç",
-      "storeLinkLabel": "Tarodan uygulamasını {store} üzerinden aç (yeni sekmede açılır)",
+      "opensInNewTab": "(yeni sekmede açılır)",
       "imageAlt": "Tarodan mobil uygulamasını gösteren iki telefon ekranı ve önünde beyaz bir diecast model araba"
     }
   },

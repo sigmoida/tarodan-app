@@ -1,6 +1,14 @@
 /** @format */
 
 /**
+ * Ana sayfa hero'sundaki mobil uygulama tanıtım slaytı açık mı. Varsayılan
+ * KAPALI: mağaza sayfaları herkese açık olana kadar prod'da kapalı kalır,
+ * staging'de `"true"`. Derleme anında gömülür (değişince yeniden build).
+ */
+export const APP_PROMO_ENABLED =
+  process.env.NEXT_PUBLIC_APP_PROMO_ENABLED === "true";
+
+/**
  * Tarodan mobil uygulamasının mağaza sayfaları — sitede tek kaynak.
  *
  * - iOS: App Store Connect'teki prod uygulamanın Apple ID'si

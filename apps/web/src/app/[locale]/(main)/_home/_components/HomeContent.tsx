@@ -13,6 +13,7 @@ import TrustBadges from "../sections/TrustBadges";
 import HomeOnboardingTour from "./HomeOnboardingTour";
 import BannerSlot from "@/components/marketing/BannerSlot";
 import PopupAd from "@/components/marketing/PopupAd";
+import { APP_PROMO_ENABLED } from "@/lib/appStoreLinks";
 
 export default function HomeContent({
   data,
@@ -39,9 +40,13 @@ export default function HomeContent({
       {/* Admin'in tanımladığı afiş ve platform kampanya duyurusu — hero'nun
           ÜSTÜNDE. Yuva boşsa hiçbir şey çizilmez (yer ayrılmaz). */}
       <BannerSlot position="header" className="mb-4 space-y-3" />
-      {/* Mobil uygulama tanıtımı admin slaytlarından önce sabit ilk slayt.
-          Web hero anahtarı kapalıyken API `[]` döner ve ikisi birlikte gizlenir. */}
-      <HeroSlider slides={data.heroSlides} pinned={<AppPromoSlide />} />
+      {/* Mobil uygulama tanıtımı (env bayrağıyla) admin slaytlarından önce sabit
+          ilk slayt. Web hero anahtarı kapalıyken API `[]` döner ve ikisi
+          birlikte gizlenir. */}
+      <HeroSlider
+        slides={data.heroSlides}
+        pinned={APP_PROMO_ENABLED ? <AppPromoSlide /> : undefined}
+      />
       <BrandsMarquee items={data.marqueeItems} />
       <FeaturedRail items={data.featured} />
       <OnSaleRail items={data.discounted} />

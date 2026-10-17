@@ -125,8 +125,8 @@ describe("HeroSlider", () => {
     act(() =>
       root.render(<HeroSlider slides={[slide("a")]} pinned={pinned} />),
     );
-    const trackEl = container.querySelector("section > div");
-    expect(trackEl?.firstElementChild?.getAttribute("data-testid")).toBe(
+    const firstSlot = container.querySelector("section > div > div");
+    expect(firstSlot?.firstElementChild?.getAttribute("data-testid")).toBe(
       "pinned",
     );
     expect(container.querySelectorAll("h1")).toHaveLength(1);
@@ -139,6 +139,23 @@ describe("HeroSlider", () => {
       "home.slider.goToSlide:1",
       "home.slider.goToSlide:2",
     ]);
+  });
+
+  it("yalnız etkin slayt etkileşimli; diğerleri inert + aria-hidden", () => {
+    act(() => root.render(<HeroSlider slides={[slide("a"), slide("b")]} />));
+    const slots = [...container.querySelectorAll("section > div > div")];
+    expect(slots).toHaveLength(2);
+    expect(slots[0].hasAttribute("inert")).toBe(false);
+    expect(slots[0].hasAttribute("aria-hidden")).toBe(false);
+    expect(slots[1].hasAttribute("inert")).toBe(true);
+    expect(slots[1].getAttribute("aria-hidden")).toBe("true");
+
+    const dots = container.querySelectorAll("[aria-label]");
+    act(() => {
+      dots[1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(slots[0].hasAttribute("inert")).toBe(true);
+    expect(slots[1].hasAttribute("inert")).toBe(false);
   });
 
   it("admin slaytı yoksa (web hero kapalı) sabit slayt da çizilmez", () => {

@@ -17,6 +17,15 @@ import HeroSlideItem from "./HeroSlideItem";
 const AUTOPLAY_MS = 10000;
 const SWIPE_THRESHOLD = 50;
 
+/**
+ * Etkin olmayan slaytın öznitelikleri. React 18 `inert`'i tanımaz: `true`
+ * DOM'a yazılmaz, boş dize yazılır (`inert=""`) — tipler ise boolean bekler.
+ */
+const INACTIVE_SLIDE_PROPS = {
+  inert: "" as unknown as boolean,
+  "aria-hidden": true,
+} as const;
+
 /** Kodda tanımlı sabit slaytın nokta/anahtar kimliği. */
 const PINNED_ID = "pinned";
 
@@ -90,13 +99,25 @@ function HeroCarousel({
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {pinned}
-        {slides.map((slide, i) => (
-          <HeroSlideItem
-            key={slide.id}
-            slide={slide}
-            isFirst={!pinned && i === 0}
-          />
+        {[
+          ...(pinned ? [pinned] : []),
+          ...slides.map((slide, i) => (
+            <HeroSlideItem
+              key={slide.id}
+              slide={slide}
+              isFirst={!pinned && i === 0}
+            />
+          )),
+        ].map((node, index) => (
+          /* Ekranda olmayan slayt odaklanamaz ve okunmaz (`inert` +
+             `aria-hidden`); yalnız etkin slayt etkileşimli. */
+          <div
+            key={ids[index]}
+            className="w-full flex-shrink-0"
+            {...(index === current ? {} : INACTIVE_SLIDE_PROPS)}
+          >
+            {node}
+          </div>
         ))}
       </div>
 
