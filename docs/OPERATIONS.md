@@ -41,7 +41,7 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
 - **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
   audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
 - **Sözleşme onayı ve kimlik:** yeni hesap zorunlu sözleşmeleri (şartlar, gizlilik,
-  KVKK) yürürlükteki sürümle onaylı açılır; yoksa mobil 1.0.6 girişte kapatılamaz
+  KVKK) yürürlükteki sürümle onaylı açılır; yoksa mobil 1.1.0 girişte kapatılamaz
   onay ekranı açar. Yasal kimlik (ad, soyad, TCKN) istenmez: test şeridi kimlik
   kapısından muaftır (`required: false`). Bu değişiklikten ÖNCE açılmış hesaplar ve
   belge sürümü her değiştiğinde (CONSENTS.md) tamamlama:

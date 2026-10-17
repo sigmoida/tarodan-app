@@ -257,7 +257,7 @@ Satıcının çıkış adresi kayıtlı olmalı (yoksa kargo etiketi açılmaz v
 
 ### 4.4 Senaryo hesapları: onay ve kimlik ekranı
 
-Mobil 1.0.6'nın kapıları (zorunlu sözleşme yeniden-onayı, yasal kimlik ekranı)
+Mobil 1.1.0'ın kapıları (zorunlu sözleşme yeniden-onayı, yasal kimlik ekranı)
 iki sabit senaryo hesabıyla denenir. Bunlar gerçek kişi değildir
 (`data/uat/accounts.json` → `fixtures`); UAT seed'i (staging reset ve
 `--accounts-only` yenileme) her koşuda ekler.

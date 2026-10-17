@@ -6262,8 +6262,8 @@ async function main() {
   }
 
   // --- 28c'. Demo üyelerin sözleşme onayı ---
-  // Mobil 1.0.6 girişte `GET /consents/me/pending` boş değilse kapatılamaz onay
-  // ekranı açar; auto-login'li Maestro akışları (zeynep, ahmet, ali, …) orada
+  // Mobile 1.1.0 opens an undismissable consent screen at login when
+  // `GET /consents/me/pending` is not empty; auto-login'li Maestro akışları (zeynep, ahmet, ali, …) orada
   // takılırdı. Banlı ve "yeni" hesap bilerek dışarıda: ilki girişe hiç ulaşmaz,
   // ikincisi yeni-üye durumunu temsil eder. İdempotent: güncel onayı olana satır
   // eklenmez, sürüm değişince yalnız yenisi eklenir.

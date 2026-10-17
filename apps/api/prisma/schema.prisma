@@ -3558,9 +3558,10 @@ model PushToken {
   userId      String   @map("user_id")
   token       String
   platform    String
-  // Kurulum başına SABİT kimlik (mobil ≥ 1.0.7: iOS identifierForVendor /
-  // Android ANDROID_ID ya da kurulum UUID'si). Eski sürümler buraya cihaz
-  // MODELİNİ yazıyordu; o satırlar cihaz yeni sürümle kaydolunca düzelir.
+  // STABLE per-install identifier (mobile >= 1.1.0: iOS identifierForVendor /
+  // Android ANDROID_ID or an install UUID). Older versions wrote the device
+  // MODEL here; those rows are fixed once the device registers with the new
+  // version.
   deviceId    String?  @map("device_id")
   // Cihaz modeli ("iPhone 15") — destek/teşhis içindir, kimlik değildir.
   deviceModel String?  @map("device_model")

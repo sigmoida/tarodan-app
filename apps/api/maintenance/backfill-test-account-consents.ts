@@ -2,8 +2,9 @@
  * Test şeridi hesaplarının (`isTestAccount=true`: App Review / mobil QA) zorunlu
  * sözleşme onaylarını YÜRÜRLÜKTEKİ sürümle tamamlar.
  *
- * Neden: mobil 1.0.6 girişte `GET /consents/me/pending` boş değilse kapatılamaz
- * bir onay ekranı açar; incelemeci ya da otomasyon (Maestro) o ekranı geçemez.
+ * Why: mobile 1.1.0 opens an undismissable consent screen at login when
+ * `GET /consents/me/pending` is not empty; a reviewer or automation (Maestro)
+ * cannot get past it.
  * Admin → Test Araçları ile AÇILAN yeni hesaplar onaylı gelir; bu script daha
  * önce açılmış hesaplar içindir ve belge sürümü değiştikçe (ör. şartlar
  * güncellendi) yeniden koşulur — yalnız eksik / eski sürümdeki belge için satır

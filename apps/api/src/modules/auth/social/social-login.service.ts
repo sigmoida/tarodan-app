@@ -222,10 +222,11 @@ export class SocialLoginService {
    * → yoksa yeni kullanıcı. Relay email olduğu gibi kaydedilir; kimlik anahtarı sub.
    * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
    *
-   * `authorizationCode` (mobil 1.0.6+) varsa giriş yanıtı üretildikten SONRA
-   * ARKA PLANDA refresh token'a çevrilip şifreli saklanır — hesap silmede
-   * Apple'a iptal edilir (App Store 5.1.1(v)). Giriş bunu beklemez ve bu adım
-   * girişi hiçbir koşulda düşürmez; kodu göndermeyen eski istemci aynen çalışır.
+   * When `authorizationCode` (mobile 1.1.0+) is present, it is exchanged for a
+   * refresh token IN THE BACKGROUND after the login response is built and
+   * stored encrypted; it is revoked at Apple on account deletion (App Store
+   * 5.1.1(v)). Login does not wait for it and this step never fails the login;
+   * older clients that do not send the code keep working unchanged.
    */
   async loginWithApple(
     identityToken: string,
