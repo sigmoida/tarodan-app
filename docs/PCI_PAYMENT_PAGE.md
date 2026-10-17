@@ -65,6 +65,17 @@ tamamen kapatıyoruz. İki katman (`src/lib/replayPolicy.mjs`):
 Hata raporlaması (Replay değil) ödeme sayfasında açık kalır: ödeme hatalarını
 görmek operasyonel zorunluluk.
 
+**What an error event can carry (2026-10):** the SDK is bundled first-party
+code (no extra `<script src>`), compiled in only when `NEXT_PUBLIC_SENTRY_DSN`
+is set at build time, and sends only to the DSN's ingest origin (the one
+`connect-src` entry above). Every event and transaction passes
+`scrubSentryEvent` / `scrubSentryTransaction` (`@tarodan/logger`) in
+`beforeSend`: card-like keys (`cardNumber`, `cvv`, `expiry`, ...) and any
+Luhn-valid 13-19 digit run in any string are replaced with `[REDACTED]`,
+cookies are dropped, and `sendDefaultPii` is off. The card form posts
+straight to PayTR (`form-action`), so the card fields never pass through a
+fetch the SDK instruments.
+
 ---
 
 ## 3. Content Security Policy
