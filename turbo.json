@@ -3,7 +3,13 @@
   "globalDependencies": [
     ".env.*local",
     "apps/*/.env.*local",
-    "packages/*/.env.*local"
+    "packages/*/.env.*local",
+    ".nvmrc",
+    ".eslintrc.cjs",
+    ".prettierrc",
+    "packages/tsconfig/**",
+    "packages/eslint-config/**",
+    "packages/eslint-plugin/**"
   ],
   "pipeline": {
     "build": {
@@ -11,6 +17,24 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "lint": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "app/**",
+        "apps/**",
+        "libs/**",
+        "rules/**",
+        "scripts/**",
+        "test/**",
+        "tests/**",
+        "e2e/**",
+        "plugins/**",
+        "prisma/**",
+        "*.{js,cjs,mjs,ts,json}",
+        ".eslintrc*"
+      ]
+    },
+    "lint:ci": {
       "dependsOn": ["^build"],
       "inputs": [
         "src/**",

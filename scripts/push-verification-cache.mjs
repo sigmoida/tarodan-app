@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 /**
  * Push verification cache, keyed by git TREE (not commit).
  *
- * The push checks (typecheck, unit tests, build per app) depend only on the
+ * The push checks (typecheck + API contract per app) depend only on the
  * file contents, so a tree that already passed them for an app does not need
  * to run them again: a retried push after an interrupted hook, the merge
  * commit of an already verified branch (same tree), or `pnpm verify:push`

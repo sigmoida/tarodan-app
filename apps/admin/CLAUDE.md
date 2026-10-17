@@ -367,6 +367,12 @@ pnpm --filter @tarodan/admin test:api    # api export-name collision guard
 pnpm --filter @tarodan/admin build       # before shipping anything routing-related
 ```
 
+What runs where (details: `docs/OPERATIONS.md` §4): the pre-push hook to
+`development` runs only the affected apps' typecheck + `test:api`; CI gates
+the staging deploy on typecheck + lint and runs every vitest suite as an
+advisory check; PRs to `master` and the production release run the full gate
+(unit tests required, production build, dependency audit).
+
 Touching `@tarodan/ui` (or any package) means verifying the **consumers** too —
 `pnpm --filter @tarodan/web typecheck` at minimum; a shared component is not
 "done" when only one app compiles.

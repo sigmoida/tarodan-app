@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parsePushLines, validateReleaseMarker } from "./pre-push-verify.mjs";
+import {
+  developmentPushes,
+  masterPushes,
+  parsePushLines,
+  treeMismatchError,
+} from "./pre-push-verify.mjs";
 
 test("parses all refs supplied by the git pre-push protocol", () => {
   assert.deepEqual(
@@ -29,18 +34,37 @@ test("parses all refs supplied by the git pre-push protocol", () => {
   );
 });
 
-test("accepts only a passing marker for the exact tree", () => {
-  assert.equal(
-    validateReleaseMarker({ status: "PASS", tree: "tree-1" }, "tree-1"),
-    undefined,
+test("only development pushes run the local gate; deletions run nothing", () => {
+  const pushes = parsePushLines(
+    [
+      "refs/heads/development aaa refs/heads/development bbb",
+      "refs/heads/feature ccc refs/heads/feature ddd",
+      "(delete) 0000000000000000000000000000000000000000 refs/heads/development eee",
+      "refs/heads/master fff refs/heads/master ggg",
+    ].join("\n"),
   );
+  assert.deepEqual(
+    developmentPushes(pushes).map((push) => push.localSha),
+    ["aaa"],
+  );
+  assert.deepEqual(
+    masterPushes(pushes).map((push) => push.localSha),
+    ["fff"],
+  );
+});
+
+test("blocks a development push whose commit is not the checked-out tree", () => {
+  const push = {
+    localRef: "refs/heads/feature",
+    localSha: "abc123",
+    remoteRef: "refs/heads/development",
+    remoteSha: "def456",
+  };
+  const trees = { abc123: "tree-pushed" };
+  const treeOf = (sha) => trees[sha];
+  assert.equal(treeMismatchError(push, "tree-pushed", treeOf), undefined);
   assert.match(
-    validateReleaseMarker({ status: "FAIL", tree: "tree-1" }, "tree-1"),
-    /FAIL/,
+    treeMismatchError(push, "tree-checked-out", treeOf),
+    /Check out the commit you push/,
   );
-  assert.match(
-    validateReleaseMarker({ status: "PASS", tree: "tree-2" }, "tree-1"),
-    /changed/,
-  );
-  assert.match(validateReleaseMarker(undefined, "tree-1"), /No local release/);
 });

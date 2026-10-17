@@ -17,7 +17,7 @@ test("selects each application for its own files", () => {
 });
 
 test("selects transitive consumers of shared packages", () => {
-  assert.deepEqual(detect("packages/types/src/index.ts"), ["api", "web"]);
+  assert.deepEqual(detect("packages/types/src/index.ts"), APP_ORDER);
   assert.deepEqual(detect("packages/api-client/src/index.ts"), [
     "web",
     "admin",

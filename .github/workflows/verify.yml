@@ -1,0 +1,129 @@
+name: Verify
+
+# Reusable CI gate (workflow_call). Each job runs one `ci` group of
+# scripts/verify-local.mjs, so `pnpm verify:ci` locally is exactly this gate
+# and the two cannot drift:
+#
+#   job "Typecheck & lint"  --group static   typecheck + lint (all workspaces,
+#                                            web included) + specs of the
+#                                            verification scripts + API
+#                                            contracts + API seed build
+#   job "Unit tests"        --group unit     the FULL API jest suite + every
+#                                            workspace's vitest suite
+#                                            (`unit: false` skips it)
+#   job "Build & audit"     --group release  production build + dependency
+#                                            audit — only with `full: true`
+#
+# Callers (development = fast and light, master = everything):
+#   PR Checks          job "Verify"             full on PRs to master; on PRs
+#                                               to development static + unit
+#                                               (nothing is required there, so
+#                                               the unit job is advisory). The
+#                                               master ruleset requires
+#                                               "Verify / Typecheck & lint",
+#                                               "Verify / Unit tests",
+#                                               "Verify / Build & audit".
+#   Deploy Staging     job "Staging gate"       static only (`unit: false`);
+#                                               the staging deploy needs it.
+#   Development Tests  job "Development tests"  unit only (`static: false`),
+#                                               advisory, nothing waits for it.
+#   Release Production job "Release gate"       full; the production deploy
+#                                               needs it.
+# The caller job names differ on purpose: a development-level run on a commit
+# must never satisfy a check the master ruleset requires from the full gate.
+#
+# No repository secrets: unit tests mock every provider (DB, Redis, PayTR,
+# S3, …). The two NEXT_PUBLIC_* values below are public placeholders that the
+# Next.js env validation (apps/*/env.config.js) needs for typegen, lint and
+# build — nothing here ever calls them.
+#
+# Measured on ubuntu-latest (Release Production runs, 2026-10): typecheck
+# ~50 s, lint ~20 s, full API unit suite (514 suites) ~110-150 s, production
+# build ~95-150 s. Each job is ~3-5 min including setup; jobs run in parallel.
+
+on:
+  workflow_call:
+    inputs:
+      static:
+        description: Run the "Typecheck & lint" job.
+        type: boolean
+        default: true
+      unit:
+        description: Run the "Unit tests" job.
+        type: boolean
+        default: true
+      full:
+        description: Also run the production build and the dependency audit (master gate).
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  NEXT_PUBLIC_API_URL: https://api.tarodan.example
+  NEXT_PUBLIC_APP_URL: https://tarodan.example
+
+jobs:
+  static:
+    name: Typecheck & lint
+    if: inputs.static
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # The full (master) gate never replays turbo cache hits: every task runs.
+      - uses: ./.github/actions/setup-workspace
+        with:
+          turbo-cache: ${{ inputs.full && 'false' || 'true' }}
+
+      - name: Typecheck, lint, tooling specs, API contracts, seed build
+        run: node scripts/verify-local.mjs ci --group static
+
+  unit:
+    name: Unit tests
+    if: inputs.unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          turbo-cache: ${{ inputs.full && 'false' || 'true' }}
+
+      # The API suite always runs in full (jest, never turbo-cached); jest
+      # uses cores-1 workers, which a dedicated runner can afford.
+      - name: API unit suite and workspace vitest suites
+        run: node scripts/verify-local.mjs ci --group unit
+
+  release:
+    # On the quick gate the job is skipped under a DIFFERENT name: a skipped
+    # check counts as passed for a ruleset, so a development-level run must
+    # never produce the "Build & audit" name the master ruleset requires.
+    name: ${{ inputs.full && 'Build & audit' || 'Build & audit (master only)' }}
+    if: inputs.full
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          turbo-cache: "false"
+
+      # Next's own incremental build cache (webpack/SWC artefacts), not a
+      # result cache: the build still runs, only faster.
+      - name: Cache Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next/cache
+            apps/admin/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Production build and dependency audit
+        run: node scripts/verify-local.mjs ci --group release

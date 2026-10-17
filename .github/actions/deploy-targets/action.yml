@@ -1,0 +1,70 @@
+name: 'Deploy Targets'
+description: >-
+  Decide which applications (api/web/admin) a deploy workflow must ship: the
+  apps changed since the LAST SUCCESSFUL run of that workflow on this branch,
+  not since `github.event.before`. Requires a full-history checkout
+  (fetch-depth: 0) and `actions: read` on the job token.
+
+# Why not `github.event.before`: deploys now wait for a verification gate, so
+# a run can be cancelled (superseded push on development) or fail (gate or
+# Coolify) before it deploys. The next run's `before` is then the commit that
+# never shipped, and an app changed only in that commit would be skipped
+# forever. Diffing against the last successful run's head ships it.
+
+inputs:
+  workflow:
+    description: 'Workflow file name of the calling deploy workflow (e.g. deploy-staging.yml)'
+    required: true
+  github-token:
+    description: 'Token with actions: read, used to look up the last successful run'
+    required: true
+
+outputs:
+  apps:
+    description: 'Comma-separated app names to deploy (empty = nothing deployable changed)'
+    value: ${{ steps.detect.outputs.apps }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: detect
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        WORKFLOW: ${{ inputs.workflow }}
+        EVENT_NAME: ${{ github.event_name }}
+        BRANCH: ${{ github.ref_name }}
+        HEAD_SHA: ${{ github.sha }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        all="api,web,admin"
+        if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          echo "Manual run: deploying every application."
+          apps="$all"
+        else
+          # The current run is still in progress, so it is never its own base.
+          base="$(gh run list \
+            --repo "$REPO" \
+            --workflow "$WORKFLOW" \
+            --branch "$BRANCH" \
+            --status success \
+            --limit 1 \
+            --json headSha \
+            --jq '.[0].headSha // ""' || true)"
+          if [ -z "$base" ]; then
+            echo "::notice::No earlier successful $WORKFLOW run on $BRANCH; deploying every application."
+            apps="$all"
+          elif ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "::notice::Last deployed commit $base is not in this history; deploying every application."
+            apps="$all"
+          else
+            echo "Last successful $WORKFLOW run deployed $base."
+            apps="$(node scripts/detect-affected-apps.mjs \
+              --base "$base" \
+              --head "$HEAD_SHA" \
+              --format csv)"
+          fi
+        fi
+        echo "apps=$apps" >> "$GITHUB_OUTPUT"
+        echo "Affected applications: ${apps:-none}"

@@ -1,5 +1,8 @@
 {
   "root": true,
+  // Ambient declaration files (.d.mts) carry no runtime code; the JS parser
+  // next lint uses for .mts cannot read their `export const X: T;` syntax.
+  "ignorePatterns": ["**/*.d.mts"],
   "extends": ["@tarodan/eslint-config/next.json"],
   "plugins": ["@tarodan"],
   "rules": {

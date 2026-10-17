@@ -1,7 +1,21 @@
 name: Release Production
 
 # Coolify Auto Deploy must be disabled for the production API, web and admin
-# resources. A master push reaches Coolify only after this clean-runner gate.
+# resources. A master push reaches Coolify only after the FULL gate passes on
+# a clean runner (verify.yml, full: true): typecheck, lint, the full API unit
+# suite, every vitest suite, the production build and the dependency audit.
+#
+# The same gate already ran on the development -> master PR ("Verify / *",
+# required by the master ruleset). It runs again here on the exact master
+# commit because a direct push or a manual dispatch must not bypass it, and
+# it costs ~5 min next to a ~10-15 min Coolify rollout.
+#
+# The deploy job diffs against the last SUCCESSFUL release, not against
+# `github.event.before`: a release that failed (e.g. on the audit) would
+# otherwise leave its apps undeployed by the next one
+# (.github/actions/deploy-targets). Coolify always builds the master HEAD, so
+# the deploy refuses to trigger once master has moved past the verified commit
+# (expected-commit); the newer commit's queued run deploys after its own gate.
 
 on:
   push:
@@ -10,47 +24,38 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release-production
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Verify and deploy production
+  verify:
+    name: Release gate
+    uses: ./.github/workflows/verify.yml
+    with:
+      full: true
+
+  deploy:
+    name: Deploy affected production apps
+    needs: verify
+    # A manual run from another branch would gate that branch's tree while
+    # Coolify builds master: never deploy from anything but master.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-workspace
-
-      - name: Verify release
-        run: pnpm verify:ci
-
       - id: affected
-        name: Detect affected applications
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            apps="api,web,admin"
-          else
-            apps="$(node scripts/detect-affected-apps.mjs \
-              --base "$BEFORE_SHA" \
-              --head "$AFTER_SHA" \
-              --format csv)"
-          fi
-          echo "apps=$apps" >> "$GITHUB_OUTPUT"
-          echo "Affected applications: ${apps:-none}"
+        name: Detect applications changed since the last successful release
+        uses: ./.github/actions/deploy-targets
+        with:
+          workflow: deploy-production.yml
+          github-token: ${{ github.token }}
 
       - name: Deploy affected production applications
         if: ${{ steps.affected.outputs.apps != '' }}
@@ -60,6 +65,8 @@ jobs:
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
           all-uuids: ${{ secrets.COOLIFY_PROD_UUIDS }}
           apps: ${{ steps.affected.outputs.apps }}
+          expected-commit: ${{ github.sha }}
+          branch: master
           wait-for-result: "true"
 
       - name: Skip deployment

@@ -43,6 +43,19 @@ inputs:
     description: 'Number of times to retry a failed deployment with a forced rebuild'
     required: false
     default: '1'
+  expected-commit:
+    description: >-
+      The commit this run verified. Coolify's deploy API has no commit/ref
+      parameter — it always builds the configured branch's HEAD — so when set
+      (together with `branch`), every trigger first checks that origin's branch
+      still points at this commit and fails instead of shipping an unverified
+      newer one. The newer commit's own run deploys it after its gate.
+    required: false
+    default: ''
+  branch:
+    description: 'Branch Coolify builds from; required with expected-commit'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -59,6 +72,8 @@ runs:
         POLL_INTERVAL: ${{ inputs.poll-interval }}
         WAIT_FOR_RESULT: ${{ inputs.wait-for-result }}
         RETRY_FAILED_DEPLOYMENTS: ${{ inputs.retry-failed-deployments }}
+        EXPECTED_COMMIT: ${{ inputs.expected-commit }}
+        BRANCH: ${{ inputs.branch }}
       run: |
         set -euo pipefail
 
@@ -89,10 +104,31 @@ runs:
           echo "----------------------------------------"
         }
 
+        # Coolify builds the branch HEAD, not a commit we choose. Refuse to
+        # trigger when that HEAD is no longer the commit this run verified.
+        assert_branch_at_expected_commit() {
+          local remote_head
+          [ -n "${EXPECTED_COMMIT:-}" ] || return 0
+          if [ -z "${BRANCH:-}" ]; then
+            echo "::error::expected-commit is set but branch is empty." >&2
+            return 1
+          fi
+          if ! remote_head="$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)" ||
+            [ -z "$remote_head" ]; then
+            echo "::error::Could not read origin/$BRANCH; not deploying an unknown commit." >&2
+            return 1
+          fi
+          if [ "$remote_head" != "$EXPECTED_COMMIT" ]; then
+            echo "::error::origin/$BRANCH moved to $remote_head after this run verified $EXPECTED_COMMIT. Coolify would build the newer, unverified commit, so this run does not deploy; the run for $remote_head deploys both changes once its gate passes." >&2
+            return 1
+          fi
+        }
+
         trigger_deploy() {
           local resource_uuids="$1"
           local force_rebuild="$2"
           local response_file http_code response_body
+          assert_branch_at_expected_commit || return 1
           response_file="$(mktemp)"
           if ! http_code="$(curl -sS --retry 3 --retry-delay 10 --retry-all-errors \
               -H "Authorization: Bearer $COOLIFY_TOKEN" \
