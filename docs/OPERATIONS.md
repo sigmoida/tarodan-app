@@ -819,6 +819,12 @@ Son beş satır özellikle önemli: bunlar yalnız **veritabanı silindikten son
 çalışan runtime reset adımının ihtiyacı olduğu için, eksiklikleri eskiden yarı
 yolda patlamaya yol açıyordu. Artık dry run da kontrol eder.
 
+**Web önbellek tazeleme (staging ve prod):** API'de `WEB_REVALIDATE_URL` (web'in
+kökü, ör. `https://tarodan.com.tr` — API `/api/revalidate`'i kendisi ekler; tam uç da
+olur) ve `REVALIDATE_SECRET`, web'de AYNI `REVALIDATE_SECRET` tanımlı olmalı. Eksikse
+admin'deki hero / ana sayfa anahtarı / fiyat değişiklikleri web'e ancak ISR penceresi
+(60 sn) dolunca yansır; reddedilen çağrı API logunda `WebRevalidate` uyarısı bırakır.
+
 **Launch'ta kapalı kalması gereken bayraklar:**
 `PAYTR_TRANSFER_CALLBACK_ENABLED` (PayTR panelinde transfer-sonuç bildirim URL'i
 tanımlanmadan açılırsa hiçbir payout tamamlanamaz), `PAYTR_REPORT_SYNC_ENABLED`
@@ -948,8 +954,9 @@ herkesi anında düşürmek için `SITE_UNLOCK_SECRET` rotate et.
 (anasayfa, kategori gezinme, kayıt + giriş, `/api/health/ready` yeşil — ready
 kontrolü komisyon kapsamını ve depo adresini de doğrular). Arama motorlarına
 açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true`. Mağaza sayfaları (App Store +
-Google Play) herkese açıldığında ana sayfadaki mobil uygulama tanıtım slaytı için
-web `NEXT_PUBLIC_APP_PROMO_ENABLED=true` + rebuild (staging'de zaten `true`).
+Google Play) herkese açıldığında mobil uygulama tanıtımı admin → Pazarlama → Hero'dan
+bir slayt olarak yayına alınır (buton adresi mağaza bağlantısıysa web'de mağaza
+butonu olur, uygulamada gizlenir) — env bayrağı ya da rebuild gerekmez.
 
 **İlanlar yayınlanmadan önceki görünüm** (hepsi bilinçli): kategori, üretici,
 marka ve ölçek menüleri katalog seed'lendiği için ÇIKAR; ama ilan listesi

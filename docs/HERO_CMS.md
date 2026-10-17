@@ -17,6 +17,13 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
   formu + API). Sınırlar `HERO_TEXT_LIMITS` (başlık 120, alt başlık 240, buton 40, görsel metni 160) ve `TRUST_BADGE_LIMITS` (başlık 60, açıklama 160).
 - **Buton** = etiket + bağlantı çifti; ikisi birlikte var ya da yok (`server.hero.ctaIncomplete`).
   Bağlantı reklamla aynı kural: mutlak `http(s)` ya da tek `/` ile başlayan site içi yol.
+- **Mağaza butonu** (şema değişikliği yok): buton adresi App Store (`apps.apple.com`,
+  `itunes.apple.com`) ya da Google Play (`play.google.com/store/apps/…`) sayfasıysa
+  (`heroStoreLinkKind`, `@tarodan/types`) web onu koyu mağaza butonu olarak çizer (telefon simgesi,
+  "Mobilde aç" + etiket, yeni sekme); mobil uygulama bu butonları **gizler**. Butonlarının hepsi
+  mağaza bağlantısı olan slayt (`heroHasOnlyStoreCtas`) uygulamada **hiç gösterilmez** ve admin
+  onu uygulamada yayında saymaz (görünürlük kartı ve "Yayında · uygulama gizli"). Uygulama tanıtımı da böylece tamamen admin'den yönetilen bir
+  slayttır (kodda sabit tanıtım slaytı ve `NEXT_PUBLIC_APP_PROMO_ENABLED` kaldırıldı).
 - `auth_register` kayıt ekranlarında, `auth_default` diğer auth ekranlarında kullanılır.
 - `hideOnIos` = **"native uygulamada gizle"**: mobil uygulama bayraklı slaytı (ve güven rozetini)
   iOS'ta da Android'de de göstermez; web yok sayar. Dijital satış native'de artık iki mağazada da
@@ -46,10 +53,12 @@ Yayında = `isActive` + tarih penceresinin içinde (sınırlar dahil; reklamla o
 - **Ana sayfa anahtarı** (istemci başına, PlatformSetting `hero_home_enabled_web` /
   `hero_home_enabled_app`, `'true'`/`'false'`; satır yoksa açık): kapalıyken o istemcinin
   `placement=home` okuması `[]` döner, slaytlara dokunulmaz. Yalnız ana sayfa içindir; auth
-  yerleşimleri yalnız platformla süzülür. Admin: Pazarlama → Hero, ana sayfa sekmesinin
-  başlığındaki "Web'de göster" / "Uygulamada göster"; anahtar kapalı ya da o platformda yayında
-  slayt yoksa sekmede "hero gizli" notu çıkar (uygulamada yayındaki slaytların hepsi `hideOnIos`
-  ise ayrıca "uygulamada gizli" notu — bayrak iOS ve Android'de gizler). Bu anahtarlar ve seed işareti genel
+  yerleşimleri yalnız platformla süzülür. Admin: Pazarlama → Hero, ana sayfa sekmesinde tablonun
+  üstündeki "Ana sayfa görünürlüğü" kartı — istemci başına bir satır (Web sitesi / Mobil uygulama)
+  ve canlı özet ("3 slayt yayında", "yayında slayt yok", "gizli: anahtar kapalı", uygulamada
+  yayındakilerin hepsi `hideOnIos` ise "gizli" — bayrak iOS ve Android'de gizler). Tablodaki yayın
+  durumu da anahtarı hesaba katar: yayında ama platformu kapalı slayt "Yayında · web gizli"
+  (uyarı tonu) görünür. Bu anahtarlar ve seed işareti genel
   `PATCH /admin/settings/:key` ucundan yazılamaz (`server.hero.useDedicatedEndpoint`).
 - Lansman doğrulaması (`verify:prod:launch`) ana sayfa hero'sunu iki istemci için ayrı okur;
   boşsa **uyarır** (`REVIEW:`), düşürmez — boş hero meşru bir karardır.
@@ -98,6 +107,12 @@ varsayılanı kullanılır.
 
 Her yazımdan sonra `notifyWebRevalidate`: ana sayfa slaytı ve ana sayfa anahtarı → `home:hero`,
 auth slaytları → `auth:hero`, rozetler → `home:trust`. Yerleşim değişirse iki etiket birden.
+
+Çağrının ulaşması için API'de `WEB_REVALIDATE_URL` (web kökü — API `/api/revalidate` ekler — ya da
+tam uç) ve web ile AYNI `REVALIDATE_SECRET` gerekir; reddedilen/ulaşmayan çağrı API logunda
+`WebRevalidate` uyarısı bırakır. Ulaşmazsa web değişikliği yedek ISR penceresinde (60 sn) görür.
+Mobil, `platform=app` okumasını 60 sn taze tutar; ana sayfa hero'sunu kalıcı (soğuk açılış)
+önbelleğe yazmaz (giriş/kayıt görseli yazılır).
 
 ## Seed
 

@@ -1,11 +1,11 @@
 import { Badge } from "@tarodan/ui";
+import type { ContentPlatform, HeroHomeVisibilityDto } from "@tarodan/types";
 import { StatusToggle } from "@/components/ActiveBadge";
 import { col, type RowActionItem } from "@/components/table";
 import { fmtDate } from "@/lib/format";
-import { LIVE_STATUS_VARIANT } from "@/lib/live-status";
 import type { useTranslations } from "next-intl";
 import { previewText } from "./preview";
-import { heroLiveStatus } from "./status";
+import { heroRowStatus } from "./status";
 import type { HeroSlide } from "./types";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -14,7 +14,16 @@ export interface HeroColumnProps {
   onToggle: (slide: HeroSlide) => void;
   togglingId?: string;
   rowMenu: (slide: HeroSlide) => RowActionItem[];
+  /** Ana sayfa sekmesinde platform anahtarları (yayın durumu buna göre). */
+  homeVisibility?: HeroHomeVisibilityDto;
 }
+
+/** Platform rozeti: tek platform outline, ikisi birden vurgulu. */
+const PLATFORM_VARIANT: Record<ContentPlatform, "outline" | "default"> = {
+  web: "outline",
+  app: "outline",
+  all: "default",
+};
 
 /** CTA'lar: etiket + altı çizili adres; ikisi de yoksa boş. */
 function CtaCell({ slide }: { slide: HeroSlide }) {
@@ -42,7 +51,7 @@ function CtaCell({ slide }: { slide: HeroSlide }) {
  * yukarı/aşağı eylemleri bu sıraya göre çalışır.
  */
 export function heroColumns(
-  { onToggle, togglingId, rowMenu }: HeroColumnProps,
+  { onToggle, togglingId, rowMenu, homeVisibility }: HeroColumnProps,
   t: T,
 ) {
   const now = new Date();
@@ -74,6 +83,15 @@ export function heroColumns(
       ),
       { grow: 3, minWidth: 200, ...noSort },
     ),
+    col.badge<HeroSlide>(
+      t("admin.marketing.hero.columns.platform"),
+      (s) => (
+        <Badge variant={PLATFORM_VARIANT[s.platform]} size="sm">
+          {t(`admin.marketing.hero.platformBadge.${s.platform}`)}
+        </Badge>
+      ),
+      noSort,
+    ),
     col.custom<HeroSlide>(
       t("admin.marketing.hero.columns.cta"),
       (s) => <CtaCell slide={s} />,
@@ -90,10 +108,16 @@ export function heroColumns(
     col.badge<HeroSlide>(
       t("admin.marketing.ads.liveStatusLabel"),
       (s) => {
-        const status = heroLiveStatus(s, now);
+        const { status, hiddenOn, variant } = heroRowStatus(
+          s,
+          now,
+          homeVisibility,
+        );
         return (
-          <Badge variant={LIVE_STATUS_VARIANT[status]} size="sm">
-            {t(`admin.marketing.ads.liveStatus.${status}`)}
+          <Badge variant={variant} size="sm">
+            {hiddenOn
+              ? t(`admin.marketing.hero.liveHidden.${hiddenOn}`)
+              : t(`admin.marketing.ads.liveStatus.${status}`)}
           </Badge>
         );
       },
@@ -118,15 +142,6 @@ export function heroColumns(
       t("admin.marketing.hero.columns.cta2Clicks"),
       (s) => s.cta2ClickCount,
       { minWidth: 80, ...noSort },
-    ),
-    col.badge<HeroSlide>(
-      t("admin.marketing.hero.columns.platform"),
-      (s) => (
-        <Badge variant="outline" size="sm">
-          {t(`admin.marketing.hero.platform.${s.platform}`)}
-        </Badge>
-      ),
-      noSort,
     ),
     col.badge<HeroSlide>(
       t("admin.marketing.hero.columns.ios"),

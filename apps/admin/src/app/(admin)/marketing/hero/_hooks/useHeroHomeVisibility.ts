@@ -15,9 +15,11 @@ export const HERO_VISIBILITY_QUERY_KEY = adminKeys.detail(
   "visibility",
 );
 
-export function useHeroHomeVisibility() {
+/** `enabled: false` → okunmaz (anahtarlar yalnız Ana sayfa sekmesinde gerekir). */
+export function useHeroHomeVisibility(enabled = true) {
   return useQuery({
     queryKey: HERO_VISIBILITY_QUERY_KEY,
+    enabled,
     queryFn: async (): Promise<HeroHomeVisibilityDto> =>
       (await adminApi.getHeroHomeVisibility()).data,
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { HeroHomeVisibilityDto } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { editDeleteActions, moveActions } from "@/components/table";
@@ -11,7 +12,14 @@ import { heroColumns } from "../_lib/columns";
 import { previewText } from "../_lib/preview";
 import type { HeroSlide } from "../_lib/types";
 
-export function HeroTable({ onEdit }: { onEdit: (slide: HeroSlide) => void }) {
+export function HeroTable({
+  onEdit,
+  homeVisibility,
+}: {
+  onEdit: (slide: HeroSlide) => void;
+  /** Yalnız Ana sayfa sekmesinde: yayın durumu platform anahtarını hesaba katar. */
+  homeVisibility?: HeroHomeVisibilityDto;
+}) {
   const t = useTranslations();
   const confirm = useConfirm();
   const { onMove, positionOf, moving } = useRowReorder<HeroSlide>(
@@ -55,6 +63,7 @@ export function HeroTable({ onEdit }: { onEdit: (slide: HeroSlide) => void }) {
     {
       onToggle: (s) => toggle.mutate(s),
       togglingId: toggle.isPending ? toggle.variables?.id : undefined,
+      homeVisibility,
       rowMenu: (s) => {
         const [edit, remove] = editDeleteActions(s, { onEdit, onDelete }, t);
         return [
