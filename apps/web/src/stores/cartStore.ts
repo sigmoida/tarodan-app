@@ -5,7 +5,7 @@ import type { OfflineCartItem } from "@/lib/api";
 /**
  * Client-only cart state. This is NOT the cart — the authenticated cart lives in
  * TanStack Query (`['cart']`, read/written through `useCart`). This store holds
- * only what is genuinely client state (CLAUDE.md §8):
+ * only what is genuinely client state (root CLAUDE.md, "Frontend"):
  *
  *  - `offlineItems`: the guest cart, kept in localStorage until the user logs in.
  *  - `itemCount`: an optimistic hint so the header badge shows the last known

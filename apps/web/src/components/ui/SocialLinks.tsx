@@ -3,7 +3,7 @@
 import type { SVGProps } from "react";
 // Subpath import on purpose: this component renders inside Server Components
 // (the status pages), and the `@tarodan/ui` barrel would drag every client
-// primitive into that chain — see apps/web/CLAUDE.md §3.
+// primitive into that chain — see apps/web/CLAUDE.md, "Client boundaries".
 import { cn } from "@tarodan/ui/utils";
 
 type SocialIcon = (props: SVGProps<SVGSVGElement>) => React.ReactNode;

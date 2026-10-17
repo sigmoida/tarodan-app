@@ -7,7 +7,7 @@ import { actorLabel, sourceLabel, type DeletedIdentity } from "./types";
 type T = ReturnType<typeof useTranslations<never>>;
 
 /**
- * Kimlik numaraları ve IBAN varsayılan olarak MASKELİ (admin/CLAUDE.md §9):
+ * Kimlik numaraları ve IBAN varsayılan olarak MASKELİ (apps/admin/CLAUDE.md, "Detail pages"):
  * bu ekran yüksek trafikli değil ama içeriği ham TCKN. Ham değer yalnız
  * denetim kaydı bırakan sunucu dökümündedir.
  */
