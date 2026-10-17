@@ -1,6 +1,9 @@
+"use client";
+
 import { type ReactNode } from "react";
-import { Badge, type StatusConfig } from "@tarodan/ui";
+import { Badge, resolveBadge, type StatusConfig } from "@tarodan/ui";
 import { type TableBadgeVariant } from "@/lib/status-tone";
+import { TruncatedText } from "./TruncatedText";
 
 /** The single badge size used inside tables. */
 export const TABLE_BADGE_SIZE = "sm" as const;
@@ -34,30 +37,25 @@ export type TableBadgeProps = {
  * drift in size or pick up decoration from table to table. The colour comes
  * from the state (`variant`, or the status config) — see `STATUS_TONE`.
  *
- * A label longer than its column is clipped with `…` instead of spilling into
- * the next cell; the full text is then on the native tooltip.
+ * The label is a `TruncatedText`: a label longer than its column is clipped
+ * with `…` (never spills into the next cell) and only THEN reachable in full —
+ * hover tooltip, tap / Enter popover — exactly like clipped cell text.
  */
 export function TableBadge(props: TableBadgeProps) {
-  let variant: TableBadgeVariant;
-  let content: ReactNode;
-  if (props.status !== undefined) {
-    const entry = props.config[props.status];
-    variant = entry?.variant ?? "outline";
-    content = props.label ?? entry?.label ?? props.status;
-  } else {
-    variant = props.variant;
-    content = props.children;
-  }
-  const title =
-    props.tooltip ?? (typeof content === "string" ? content : undefined);
+  // Badge's own lookup (plain / status config) — never re-implemented here.
+  const { variant, content } = resolveBadge(props);
+  const text = typeof content === "string" ? content : undefined;
   return (
     <Badge
       size={TABLE_BADGE_SIZE}
       variant={variant}
-      title={title}
-      className="max-w-full"
+      // A deliberate tooltip (full sentence behind a short label) is always on.
+      title={props.tooltip}
+      className="min-w-0 max-w-full"
     >
-      <span className="truncate">{content}</span>
+      <TruncatedText className="min-w-0" fullText={props.tooltip ?? text}>
+        {content}
+      </TruncatedText>
     </Badge>
   );
 }

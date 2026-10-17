@@ -33,12 +33,15 @@ function CtaCell({ slide }: { slide: HeroSlide }) {
   return (
     <div className="min-w-0 space-y-0.5">
       {ctas.map((c, i) => (
-        <div key={i} className="flex min-w-0 items-baseline gap-1">
-          <TruncatedText className="shrink-0 text-body">
+        <div
+          key={i}
+          className="flex min-w-0 items-baseline gap-1 overflow-hidden"
+        >
+          <TruncatedText className="min-w-0 max-w-[60%] text-body">
             {previewText(c.label, "tr")}
           </TruncatedText>
           {c.href && (
-            <TruncatedText className="min-w-0 text-xs text-muted">
+            <TruncatedText className="min-w-0 flex-1 text-xs text-muted">
               {c.href}
             </TruncatedText>
           )}

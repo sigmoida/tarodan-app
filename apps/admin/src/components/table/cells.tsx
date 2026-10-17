@@ -438,7 +438,10 @@ export function CellProduct({
   );
 }
 
-/** Badge — never wraps, never shrinks. */
+/**
+ * Badge — never wraps; may shrink to the column (`min-w-0`) so a `TableBadge`
+ * clips its label with `…` instead of spilling into the next cell.
+ */
 export function CellBadge({ children }: { children: ReactNode }) {
   return <div className="flex min-w-0 whitespace-nowrap">{children}</div>;
 }

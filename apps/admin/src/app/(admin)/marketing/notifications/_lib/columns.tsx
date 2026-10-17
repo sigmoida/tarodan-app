@@ -32,7 +32,8 @@ function EmailContentBadges({
 }) {
   if (!hasHtml && mailingType !== "marketing") return null;
   return (
-    <span className="inline-flex min-w-0 gap-1">
+    // İki rozet sığmazsa ikisi de kırpılır (…), Tarih sütununa taşmaz.
+    <span className="flex min-w-0 flex-nowrap gap-1 overflow-hidden">
       {hasHtml && (
         <TableBadge variant="outline">
           {t("admin.marketing.notifications.htmlEmailBadge")}
@@ -62,7 +63,10 @@ export const historyColumns = (t: T) => [
     (n) => enumLabel(statusConfig(notificationChannelConfig, t), n.channel),
     { ...COL_SIZE.label, sortKey: "channel", sortType: "text" },
   ),
-  col.text<NotificationLog>(t("common.title"), "title"),
+  col.title<NotificationLog>(t("common.title"), (n) => ({ title: n.title }), {
+    sortKey: "title",
+    sortType: "text",
+  }),
   col.badge<NotificationLog>(
     t("admin.marketing.notifications.contentColumn"),
     (n) => (

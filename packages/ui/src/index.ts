@@ -96,7 +96,12 @@ export {
 // uygulamada da kullandığı için web'den buraya taşındı.
 export { default as SectionCard } from "./components/SectionCard";
 export type { SectionCardProps } from "./components/SectionCard";
-export { Badge, badgeVariants, type BadgeProps } from "./components/Badge";
+export {
+  Badge,
+  badgeVariants,
+  resolveBadge,
+  type BadgeProps,
+} from "./components/Badge";
 export { StatusBadge, type StatusBadgeProps } from "./components/StatusBadge";
 export {
   ProductBadge,
