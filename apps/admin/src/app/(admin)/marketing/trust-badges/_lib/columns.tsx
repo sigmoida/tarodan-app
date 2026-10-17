@@ -1,6 +1,9 @@
-import { Badge } from "@tarodan/ui";
-import { StatusToggle } from "@/components/ActiveBadge";
-import { col, type RowActionItem } from "@/components/table";
+import {
+  COL_SIZE,
+  COL_WIDTH,
+  col,
+  type RowActionItem,
+} from "@/components/table";
 import type { useTranslations } from "next-intl";
 import { previewText } from "../../hero/_lib/preview";
 import type { TrustBadge } from "./types";
@@ -23,43 +26,44 @@ export function trustBadgeColumns(
     col.number<TrustBadge>(
       t("admin.marketing.trustBadges.columns.order"),
       (b) => b.displayOrder,
-      { minWidth: 72, ...noSort },
-    ),
-    col.code<TrustBadge>(
-      t("admin.marketing.trustBadges.columns.icon"),
-      (b) => b.icon,
-      noSort,
+      { ...COL_SIZE.count, ...noSort },
     ),
     col.text<TrustBadge>(
+      t("admin.marketing.trustBadges.columns.icon"),
+      (b) => b.icon,
+      { ...COL_SIZE.label, ...noSort },
+    ),
+    col.title<TrustBadge>(
       t("common.title"),
-      (b) => previewText(b.title, "tr"),
+      (b) => ({ title: previewText(b.title, "tr") }),
       noSort,
     ),
     col.muted<TrustBadge>(
       t("common.description"),
       (b) => previewText(b.description, "tr") || null,
-      { grow: 4, minWidth: 220, ...noSort },
+      { minWidth: COL_WIDTH.description, ...noSort },
     ),
-    col.badge<TrustBadge>(
+    col.status<TrustBadge>(
       t("admin.marketing.hero.columns.ios"),
       (b) =>
-        b.hideOnIos ? (
-          <Badge variant="outline" size="sm">
-            {t("admin.marketing.hero.hiddenOnIos")}
-          </Badge>
-        ) : null,
+        b.hideOnIos
+          ? {
+              variant: "outline",
+              children: t("admin.marketing.hero.hiddenOnIos"),
+            }
+          : null,
       noSort,
     ),
-    col.custom<TrustBadge>(
+    col.toggle<TrustBadge>(
       t("common.status"),
-      (b) => (
-        <StatusToggle
-          active={b.isActive}
-          busy={togglingId === b.id}
-          onToggle={() => onToggle(b)}
-        />
-      ),
-      { minWidth: 110, ...noSort },
+      (b) => ({
+        checked: b.isActive,
+        onChange: () => onToggle(b),
+        disabled: togglingId === b.id,
+        label: `${t("common.status")}: ${previewText(b.title, "tr")}`,
+        stateText: b.isActive ? t("common.active") : t("common.inactive"),
+      }),
+      noSort,
     ),
     col.rowMenu<TrustBadge>(rowMenu),
   ];

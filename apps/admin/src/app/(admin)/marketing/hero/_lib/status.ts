@@ -4,6 +4,7 @@ import {
   scheduleLiveStatus,
   type LiveStatus,
 } from "@/lib/live-status";
+import { STATUS_TONE, type TableBadgeVariant } from "@/lib/status-tone";
 import type { HeroSlide } from "./types";
 import { heroHiddenOn } from "./visibility";
 
@@ -28,7 +29,7 @@ export interface HeroRowStatus {
    * (`heroHiddenOn`); yoksa `null`. Yalnız ana sayfa sekmesinde.
    */
   hiddenOn: ContentPlatform | null;
-  variant: "outline" | "success" | "warning";
+  variant: TableBadgeVariant;
 }
 
 /**
@@ -61,6 +62,6 @@ export function heroRowStatus(
   return {
     status,
     hiddenOn,
-    variant: hiddenOn ? "warning" : LIVE_STATUS_VARIANT[status],
+    variant: hiddenOn ? STATUS_TONE.ended : LIVE_STATUS_VARIANT[status],
   };
 }

@@ -90,6 +90,55 @@ export interface BadgeProps
   icon?: React.ReactNode;
 }
 
+type BadgeVariantName = NonNullable<
+  VariantProps<typeof badgeVariants>["variant"]
+>;
+
+/**
+ * Resolves a badge's variant + content from its three modes (plain / status
+ * config / active preset) — the exact lookup `Badge` uses. Exported so a
+ * wrapper (e.g. a table badge that truncates its label) can reuse the rule
+ * instead of re-implementing it.
+ */
+export function resolveBadge({
+  variant,
+  status,
+  config,
+  label,
+  active,
+  activeLabel = "Aktif",
+  passiveLabel = "Pasif",
+  children,
+}: Pick<
+  BadgeProps,
+  | "variant"
+  | "status"
+  | "config"
+  | "label"
+  | "active"
+  | "activeLabel"
+  | "passiveLabel"
+  | "children"
+>): { variant: BadgeVariantName | undefined; content: React.ReactNode } {
+  if (active !== undefined) {
+    return {
+      variant: variant ?? (active ? "success" : "outline"),
+      content: label ?? (active ? activeLabel : passiveLabel),
+    };
+  }
+  if (status !== undefined && config) {
+    const entry = config[status];
+    return {
+      variant: variant ?? entry?.variant ?? "outline",
+      content: label ?? entry?.label ?? status,
+    };
+  }
+  return {
+    variant: variant ?? undefined,
+    content: label !== undefined ? label : children,
+  };
+}
+
 /**
  * The single badge primitive. Three interchangeable modes:
  *  - plain:   `<Badge variant="success">Metin</Badge>`
@@ -118,19 +167,16 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
     },
     ref,
   ) => {
-    let resolvedVariant = variant ?? undefined;
-    let content: React.ReactNode = children;
-
-    if (active !== undefined) {
-      resolvedVariant = variant ?? (active ? "success" : "outline");
-      content = label ?? (active ? activeLabel : passiveLabel);
-    } else if (status !== undefined && config) {
-      const entry = config[status];
-      resolvedVariant = variant ?? entry?.variant ?? "outline";
-      content = label ?? entry?.label ?? status;
-    } else if (label !== undefined) {
-      content = label;
-    }
+    const { variant: resolvedVariant, content } = resolveBadge({
+      variant,
+      status,
+      config,
+      label,
+      active,
+      activeLabel,
+      passiveLabel,
+      children,
+    });
 
     return (
       <span

@@ -92,7 +92,7 @@ describe("heroRowStatus", () => {
         web: false,
         app: false,
       }),
-    ).toEqual({ status: "scheduled", hiddenOn: null, variant: "outline" });
+    ).toEqual({ status: "scheduled", hiddenOn: null, variant: "default" });
   });
 
   it("store-only slide reads as hidden in the app, matching the card", () => {

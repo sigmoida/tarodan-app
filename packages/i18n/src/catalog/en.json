@@ -5550,11 +5550,6 @@
           "app": "App only",
           "all": "Both"
         },
-        "platformBadge": {
-          "web": "Web",
-          "app": "App",
-          "all": "Both"
-        },
         "visibility": {
           "updated": "Hero visibility updated"
         },
@@ -5678,12 +5673,19 @@
         "statistics": "Statistics",
         "preview": "Preview",
         "size": "Size",
+        "iabBadge": "IAB",
+        "nonIabBadge": "Non-IAB",
         "positionLabel": "Position",
         "platformLabel": "Platform",
         "platform": {
           "web": "Web only",
           "app": "App only",
           "all": "Both (web and app)"
+        },
+        "platformShort": {
+          "web": "Web",
+          "app": "App",
+          "all": "Web + App"
         },
         "popupFrequencyLabel": "Display frequency",
         "popupFrequency": {
@@ -5783,6 +5785,9 @@
           "campaignEnded": "Campaign ended",
           "shadowed": "{scope, select, web {Another ad is live in this slot — not shown on the site} app {Another ad is live in this slot — not shown in the app} other {Another ad is live in this slot — not shown}}"
         },
+        "liveStatusShort": {
+          "shadowed": "{scope, select, web {Not shown · web} app {Not shown · app} other {Not shown}}"
+        },
         "linkUrl": "Link URL",
         "linkUrlHelper": "A full address starting with https://… or a site path such as /listings?category=cars (opens on the web and in the mobile app).",
         "content": "Text",
@@ -5859,6 +5864,7 @@
         "startDate": "Start Date",
         "endDate": "End Date",
         "flashSale": "⚡ Flash Sale",
+        "flashBadge": "Flash",
         "stackable": "Can be combined with other discounts",
         "free": "Free",
         "percentDiscount": "{value}% Off",

@@ -1,6 +1,4 @@
-import { Badge } from "@tarodan/ui";
-import { CellLink, col } from "@/components/table";
-import { fmtDate } from "@/lib/format";
+import { CellLink, COL_SIZE, col, TableBadge } from "@/components/table";
 import { type BoostPurchase, purchaseStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -20,7 +18,7 @@ export function purchaseColumns(t: T) {
               href: `/accounts/users/${p.buyer.id}`,
             }
           : null,
-      { minWidth: 280, sortable: false },
+      { sortable: false },
     ),
     col.product<BoostPurchase>(
       t("admin.marketing.boostPurchases.product"),
@@ -36,74 +34,49 @@ export function purchaseColumns(t: T) {
     col.custom<BoostPurchase>(
       t("admin.marketing.boostPurchases.package"),
       (p) => (
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           <CellLink
             href={`/marketing/boost-purchases/${p.id}`}
             label={p.packageName ?? "—"}
           />
           {p.showcaseOnHome && (
-            <Badge variant="default" size="sm">
+            <TableBadge variant="outline">
               {t("admin.marketing.boostPurchases.showcaseBadge")}
-            </Badge>
+            </TableBadge>
           )}
         </div>
       ),
-      { grow: 2, minWidth: 150 },
     ),
-    col.muted<BoostPurchase>(
+    col.text<BoostPurchase>(
       t("admin.marketing.boostPurchases.duration"),
       (p) =>
         t("admin.marketing.boostPurchases.daysValue", { days: p.durationDays }),
-      { minWidth: 90 },
+      COL_SIZE.count,
     ),
     col.money<BoostPurchase>(
       t("admin.marketing.boostPurchases.price"),
       (p) => p.price,
+      COL_SIZE.amount,
     ),
-    col.badge<BoostPurchase>(t("common.status"), (p) => (
-      <Badge status={p.status} config={statusConfig} />
-    )),
+    col.status<BoostPurchase>(t("common.status"), (p) => ({
+      status: p.status,
+      config: statusConfig,
+    })),
     col.date<BoostPurchase>(
       t("admin.marketing.boostPurchases.purchasedAt"),
       (p) => p.purchasedAt ?? p.createdAt,
+      COL_SIZE.date,
     ),
-    col.custom<BoostPurchase>(
+    col.dateRange<BoostPurchase>(
       t("admin.marketing.boostPurchases.period"),
-      (p) => <PeriodCell startsAt={p.startsAt} endsAt={p.endsAt} />,
-      { grow: 2, minWidth: 220 },
+      (p) => ({ start: p.startsAt, end: p.endsAt }),
     ),
-    col.custom<BoostPurchase>(
+    col.text<BoostPurchase>(
       t("admin.marketing.boostPurchases.performance"),
       (p) =>
-        p.metrics.gain ? (
-          <span className="whitespace-nowrap text-sm font-medium text-success">
-            +{p.metrics.gain.views} / +{p.metrics.gain.likes} / +
-            {p.metrics.gain.clicks}
-          </span>
-        ) : (
-          <span className="text-subtle">—</span>
-        ),
-      { minWidth: 220 },
+        p.metrics.gain
+          ? `+${p.metrics.gain.views} / +${p.metrics.gain.likes} / +${p.metrics.gain.clicks}`
+          : null,
     ),
   ];
-}
-
-function fmt(iso: string | null): string {
-  if (!iso) return "—";
-  return fmtDate(iso) ?? "—";
-}
-
-function PeriodCell({
-  startsAt,
-  endsAt,
-}: {
-  startsAt: string | null;
-  endsAt: string | null;
-}) {
-  if (!startsAt && !endsAt) return <span className="text-subtle">—</span>;
-  return (
-    <span className="whitespace-nowrap text-sm text-muted">
-      {fmt(startsAt)} – {fmt(endsAt)}
-    </span>
-  );
 }

@@ -5550,11 +5550,6 @@
           "app": "Yalnız uygulama",
           "all": "İkisi"
         },
-        "platformBadge": {
-          "web": "Web",
-          "app": "Uygulama",
-          "all": "İkisi"
-        },
         "visibility": {
           "updated": "Hero görünürlüğü güncellendi"
         },
@@ -5678,12 +5673,19 @@
         "statistics": "İstatistik",
         "preview": "Önizleme",
         "size": "Boyut",
+        "iabBadge": "IAB",
+        "nonIabBadge": "IAB dışı",
         "positionLabel": "Pozisyon",
         "platformLabel": "Platform",
         "platform": {
           "web": "Yalnız web",
           "app": "Yalnız uygulama",
           "all": "İkisi (web ve uygulama)"
+        },
+        "platformShort": {
+          "web": "Web",
+          "app": "Uygulama",
+          "all": "Web + Uygulama"
         },
         "popupFrequencyLabel": "Gösterim sıklığı",
         "popupFrequency": {
@@ -5783,6 +5785,9 @@
           "campaignEnded": "Kampanya bitti",
           "shadowed": "{scope, select, web {Aynı yuvada başka reklam yayında — sitede gösterilmiyor} app {Aynı yuvada başka reklam yayında — uygulamada gösterilmiyor} other {Aynı yuvada başka reklam yayında — gösterilmiyor}}"
         },
+        "liveStatusShort": {
+          "shadowed": "{scope, select, web {Görünmüyor · web} app {Görünmüyor · uygulama} other {Görünmüyor}}"
+        },
         "linkUrl": "Bağlantı (URL)",
         "linkUrlHelper": "https://… ile başlayan tam adres ya da /listings?category=araba gibi site içi yol (web ve mobil uygulamada açılır).",
         "content": "Metin",
@@ -5859,6 +5864,7 @@
         "startDate": "Başlangıç Tarihi",
         "endDate": "Bitiş Tarihi",
         "flashSale": "⚡ Flash Sale (Flaş İndirim)",
+        "flashBadge": "Flash",
         "stackable": "Diğer indirimlerle kombine edilebilir",
         "free": "Bedava",
         "percentDiscount": "%{value} İndirim",

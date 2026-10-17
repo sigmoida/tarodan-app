@@ -5,7 +5,7 @@ import { Badge, Button, EmptyState } from "@tarodan/ui";
 import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { col } from "@/components/table";
+import { CellMoney, COL_WIDTH, col, Empty } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import {
@@ -60,31 +60,35 @@ export function PackageCard({
   // Fiyat aralığı sütunu + süre başına bir fiyat sütunu.
   const columns = useMemo(
     () => [
-      col.text<PriceRange>(t("admin.marketing.adPackages.priceRange"), (r) =>
-        rangeLabel(r, t("admin.marketing.adPackages.unlimited")),
+      col.text<PriceRange>(
+        t("admin.marketing.adPackages.priceRange"),
+        (r) => rangeLabel(r, t("admin.marketing.adPackages.unlimited")),
+        { minWidth: COL_WIDTH.amountRange },
       ),
       ...durations.map((d) =>
         col.custom<PriceRange>(
           `${d} ${t("admin.marketing.adPackages.days")}`,
           (r) => {
             const tier = byCell.get(`${r.key}#${d}`);
-            if (!tier) return <span className="text-subtle">—</span>;
+            if (!tier) return <Empty />;
+            // Kampanyalı fiyat: eski fiyat üstü çizili, kampanya fiyatı vurgulu.
             return tier.campaignPrice != null ? (
-              <span className="flex items-center justify-end gap-1.5 tabular-nums">
+              <span className="flex items-center justify-end gap-1.5 whitespace-nowrap tabular-nums">
                 <span className="text-xs text-subtle line-through">
                   {fmtTry(tier.price)}
                 </span>
-                <span className="font-semibold text-primary">
-                  {fmtTry(tier.campaignPrice)}
-                </span>
+                <CellMoney value={tier.campaignPrice} tone="primary" />
               </span>
             ) : (
-              <span className="font-medium tabular-nums text-heading">
-                {fmtTry(tier.price)}
-              </span>
+              <CellMoney value={tier.price} />
             );
           },
-          { id: `duration-${d}`, align: "right" },
+          // Üstü çizili eski fiyat + kampanya fiyatı yan yana sığsın.
+          {
+            id: `duration-${d}`,
+            align: "right",
+            minWidth: COL_WIDTH.amountRange,
+          },
         ),
       ),
     ],

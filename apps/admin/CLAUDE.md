@@ -247,7 +247,14 @@ const columns = [
 
 Generators: `text` · `muted` · `money` (`tone`) · `number` · `date` · `code`
 (mono) · `link` · `user` · `badge` · `actions` · `custom` (escape hatch — free
-JSX but still aligned/sized via meta). Format helpers live in **`lib/format.ts`**
+JSX but still aligned/sized via meta). Standardised producers (the
+`(admin)/marketing/*` tables use them): `title` (the ONE primary main-cell style +
+muted second line) · `stacked` (normal text + muted line or a badge) · `status`
+(badge via `TableBadge`) · `dateRange` · `toggle` (compact on/off switch). Every
+table badge is `TableBadge` (`Badge` locked to `size="sm"`, no icon) and its
+colour comes from `STATUS_TONE` (`@/lib/status-tone`; live→success, pending→default, ended→warning,
+failed→danger, inactive→outline). Column widths per kind are shared constants
+(`COL_WIDTH` / spread `COL_SIZE.date` etc. to pin one). Format helpers live in **`lib/format.ts`**
 (`fmtTry`/`fmtNumber`/`fmtDate`/`fmtDateTime`/`fmtTime`, all null-safe → `—`). Cell
 primitives are in `components/table/cells.tsx`; use them directly only inside
 `col.custom` (e.g. `<CellText>`, `<CellCode>`, `<TruncatedText>`).
