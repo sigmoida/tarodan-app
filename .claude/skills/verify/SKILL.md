@@ -2,7 +2,39 @@
 name: verify
 description: Run the right local checks for the files changed on the current branch in tarodan-app (typecheck, lint, targeted tests), sequentially and with --maxWorkers=2, and report the results honestly. Use before committing, before handing work over, or when asked to verify.
 argument-hint: "[base ref, default development]"
-allowed-tools: Bash(git *), Bash(pnpm *), Bash(npx *), Bash(node *), Read, Grep
+allowed-tools:
+  - Read
+  - Grep
+  - Bash(git status *)
+  - Bash(git diff *)
+  - Bash(git log *)
+  - Bash(git show *)
+  - Bash(git rev-parse *)
+  - Bash(git branch --show-current)
+  - Bash(pnpm verify:push)
+  - Bash(pnpm --filter @tarodan/api typecheck)
+  - Bash(pnpm --filter @tarodan/web typecheck)
+  - Bash(pnpm --filter @tarodan/admin typecheck)
+  - Bash(pnpm --filter @tarodan/ui typecheck)
+  - Bash(pnpm --filter @tarodan/types typecheck)
+  - Bash(pnpm --filter @tarodan/shared typecheck)
+  - Bash(pnpm --filter @tarodan/design-tokens typecheck)
+  - Bash(pnpm --filter @tarodan/i18n typecheck)
+  - Bash(pnpm --filter @tarodan/api lint)
+  - Bash(pnpm --filter @tarodan/web lint)
+  - Bash(pnpm --filter @tarodan/admin lint)
+  - Bash(pnpm --filter @tarodan/ui lint)
+  - Bash(pnpm --filter @tarodan/web test:api)
+  - Bash(pnpm --filter @tarodan/admin test:api)
+  - Bash(pnpm --filter @tarodan/web exec vitest run *)
+  - Bash(pnpm --filter @tarodan/admin exec vitest run *)
+  - Bash(pnpm --filter @tarodan/i18n codegen)
+  - Bash(pnpm --filter @tarodan/i18n build)
+  - Bash(pnpm --filter @tarodan/types build)
+  - Bash(npx jest *)
+  - Bash(node --test scripts/*.test.mjs)
+  - Bash(npx prettier --check *)
+  - Bash(npx eslint *)
 ---
 
 # Verify
