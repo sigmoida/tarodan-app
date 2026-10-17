@@ -1,0 +1,74 @@
+import { createHash } from "node:crypto";
+import { extractIdentifiers, maskIdentifiers } from "./error-identifiers";
+
+/**
+ * Repeat-report key for an error log line: "the same failure of the same
+ * entity". Sentry receives one event per key per window
+ * (`SentryReportThrottle`); the console still logs every occurrence.
+ *
+ * Why a second key next to the fingerprint: the fingerprint masks ids so one
+ * KIND of failure is one Sentry issue, which is right for grouping but would
+ * also silence invoice B while invoice A is throttled. This key keeps the
+ * identifiers (see `error-identifiers.ts`) and drops only what changes
+ * between runs of an unchanged failure: durations, counters, timestamps.
+ *
+ * - Same entity, same reason, new run -> same key (suppressed in the window).
+ * - Another entity, another reason, another context or error class -> another
+ *   key (reported at once). A cron summary that starts listing one more
+ *   parcel is a new key, so a new failure is never hidden behind an old one.
+ *
+ * The key is a hash: it is stored in Redis and must not carry message text.
+ */
+export interface ErrorReportKeyInput {
+  context: string;
+  errorName?: string;
+  message: string;
+}
+
+const URL_QUERY_PATTERN = /(\bhttps?:\/\/[^\s?]+)\?[^\s]*/gi;
+const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+const DIGIT_RUN_PATTERN = /\d+/g;
+
+/**
+ * The message with identifiers masked and every number collapsed, so
+ * "1 kayıt (12ms)" and "3 kayıt (40ms)" read the same. Identifiers are taken
+ * out first: they are compared separately and must not lose their digits.
+ */
+export function errorMessageShape(message: string): string {
+  return maskIdentifiers(message, "<id>")
+    .replace(URL_QUERY_PATTERN, "$1?<query>")
+    .replace(EMAIL_PATTERN, "<email>")
+    .replace(DIGIT_RUN_PATTERN, "#")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function buildErrorReportKey(input: ErrorReportKeyInput): string {
+  const parts = [
+    input.context,
+    input.errorName ?? "",
+    errorMessageShape(input.message),
+    ...extractIdentifiers(input.message),
+  ];
+  return createHash("sha256")
+    .update(JSON.stringify(parts))
+    .digest("hex")
+    .slice(0, 32);
+}
+
+const REPORT_KEY = "__sentryReportKey";
+
+interface ErrorWithReportKey extends Error {
+  [REPORT_KEY]?: string;
+}
+
+/** Marks `error` as a throttled log-line report under `key`. */
+export function attachReportKey(error: Error, key: string): void {
+  (error as ErrorWithReportKey)[REPORT_KEY] = key;
+}
+
+/** The key set by `attachReportKey`; `undefined` means "always report". */
+export function readReportKey(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return (error as ErrorWithReportKey)[REPORT_KEY];
+}

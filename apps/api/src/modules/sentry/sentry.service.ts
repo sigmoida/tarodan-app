@@ -2,16 +2,45 @@
  * Sentry Service
  * Provides methods for error tracking and custom event logging
  */
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { readFingerprint } from "../../common/logging/error-fingerprint";
+import { readReportKey } from "../../common/logging/error-report-key";
+import { SentryReportThrottle } from "./sentry-report-throttle";
 
 @Injectable()
 export class SentryService {
+  constructor(@Optional() private readonly throttle?: SentryReportThrottle) {}
+
   /**
-   * Capture an exception and send to Sentry
+   * Capture an exception and send to Sentry.
+   *
+   * An error log line carries a repeat-report key (`AppNestLogger`): it is
+   * sent once per key per window, so a cron failing the same way every run
+   * stops burning the quota. Errors without a key (HTTP 5xx from
+   * `SentryInterceptor`, worker crashes) are always sent: their frequency is
+   * what the 5xx-spike alert counts.
    */
-  captureException(exception: Error, context?: Record<string, any>) {
+  captureException(exception: Error, context?: Record<string, unknown>) {
+    const reportKey = readReportKey(exception);
+    if (!reportKey || !this.throttle) {
+      this.send(exception, context);
+      return;
+    }
+    void this.throttle
+      .shouldReport(reportKey)
+      .then((report) => {
+        if (report) this.send(exception, context, reportKey);
+      })
+      // The throttle never rejects; if it ever does, report rather than drop.
+      .catch(() => this.send(exception, context, reportKey));
+  }
+
+  private send(
+    exception: Error,
+    context?: Record<string, unknown>,
+    reportKey?: string,
+  ) {
     Sentry.withScope((scope) => {
       if (context) {
         Object.entries(context).forEach(([key, value]) => {
@@ -23,6 +52,8 @@ export class SentryService {
       // stack-tabanlı gruplamasının yerine geçer.
       const fingerprint = readFingerprint(exception);
       if (fingerprint) scope.setFingerprint(fingerprint);
+      // Searchable as `reportKey:<hash>`: the events of one throttled key.
+      if (reportKey) scope.setTag("reportKey", reportKey);
       Sentry.captureException(exception);
     });
   }

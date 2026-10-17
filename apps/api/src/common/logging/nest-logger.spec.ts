@@ -1,5 +1,6 @@
 import { AppNestLogger } from "./nest-logger";
 import { readFingerprint } from "./error-fingerprint";
+import { readReportKey } from "./error-report-key";
 import { getAppLogger } from "./logger";
 
 jest.mock("./logger", () => ({ getAppLogger: jest.fn() }));
@@ -91,5 +92,34 @@ describe("AppNestLogger", () => {
       "CustomError",
       "boom",
     ]);
+  });
+  it("gives an unchanged repeat of the same entity's failure the same report key", () => {
+    const logger = new AppNestLogger();
+    logger.error(
+      "Cron 'refund-crons' FAILED (120ms): Failed to finalize refund 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "CronTracker",
+    );
+    logger.error(
+      "Cron 'refund-crons' FAILED (98ms): Failed to finalize refund 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "CronTracker",
+    );
+    logger.error(
+      "Cron 'refund-crons' FAILED (98ms): Failed to finalize refund 9c858901-8a57-4791-81fe-4c455b099bc9",
+      "CronTracker",
+    );
+
+    const [first, repeat, otherRefund] = child.error.mock.calls.map(([, ctx]) =>
+      readReportKey(ctx.error),
+    );
+    expect(first).toEqual(expect.any(String));
+    expect(repeat).toBe(first);
+    expect(otherRefund).not.toBe(first);
+  });
+
+  it("does not key warn lines (they never reach Sentry)", () => {
+    new AppNestLogger().warn("degraded", "OrdersService");
+
+    expect(child.warn).toHaveBeenCalledWith("degraded", undefined);
+    expect(child.error).not.toHaveBeenCalled();
   });
 });
