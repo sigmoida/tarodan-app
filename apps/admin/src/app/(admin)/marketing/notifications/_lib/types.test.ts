@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   emptySendForm,
+  htmlToPlainText,
+  scheduleFormToPayload,
   sendFormToPayload,
   sendNotificationSchema,
   type SendForm,
@@ -148,5 +150,169 @@ describe("hedef link (data.link)", () => {
   ])("%s reddedilir", (link) => {
     const result = schema.safeParse(form({ link }));
     expect(result.success).toBe(false);
+  });
+});
+
+const issuePaths = (values: SendForm) => {
+  const result = schema.safeParse(values);
+  return result.success ? [] : result.error.issues.map((i) => i.path[0]);
+};
+
+describe("kanal başına doğrulama — yalnız görünen kartlar", () => {
+  it("yalnız e-posta: push başlığı/gövdesi/linki doğrulanmaz", () => {
+    const paths = issuePaths(
+      form({
+        channels: ["email"],
+        title: "",
+        body: "",
+        link: "javascript:alert(1)",
+        emailSubject: "Konu",
+        emailHtml: "<p>x</p>",
+      }),
+    );
+    expect(paths).toEqual([]);
+  });
+
+  it.each([["push"], ["in_app"]] as const)(
+    "%s seçiliyse başlık ve gövde zorunlu",
+    (channel) => {
+      const paths = issuePaths(
+        form({ channels: [channel], title: "", body: "" }),
+      );
+      expect(paths).toEqual(expect.arrayContaining(["title", "body"]));
+    },
+  );
+
+  it("push + e-posta: iki kartın alanları da zorunlu", () => {
+    const paths = issuePaths(
+      form({ channels: ["push", "email"], title: "", body: "" }),
+    );
+    expect(paths).toEqual(
+      expect.arrayContaining(["title", "body", "emailSubject", "emailHtml"]),
+    );
+  });
+
+  it("kanal seçilmeden gönderilemez", () => {
+    expect(issuePaths(form({ channels: [] }))).toContain("channels");
+  });
+
+  it("varsayılan kanallar push + zil (eski davranış)", () => {
+    expect(emptySendForm.channels).toEqual(["push", "in_app"]);
+  });
+});
+
+describe("zamanlama", () => {
+  it("şimdi gönder: tarih istenmez", () => {
+    expect(issuePaths(form({ sendMode: "now", scheduledFor: "" }))).toEqual([]);
+  });
+
+  it("zamanla: tarih zorunlu ve gelecekte olmalı", () => {
+    expect(issuePaths(form({ sendMode: "schedule" }))).toContain(
+      "scheduledFor",
+    );
+    expect(
+      issuePaths(
+        form({ sendMode: "schedule", scheduledFor: "2000-01-01T10:00" }),
+      ),
+    ).toContain("scheduledFor");
+    expect(
+      issuePaths(
+        form({ sendMode: "schedule", scheduledFor: "2999-01-01T10:00" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("zamanlama payload'ı gönderimle aynı içerik + ISO tarih", () => {
+    const values = form({
+      sendMode: "schedule",
+      scheduledFor: "2999-01-01T10:00",
+      channels: ["email"],
+      emailSubject: "Konu",
+      emailHtml: "<p>x</p>",
+    });
+    const payload = scheduleFormToPayload(values);
+    expect(payload).toMatchObject(sendFormToPayload(values));
+    expect(payload.scheduledFor).toBe(
+      new Date("2999-01-01T10:00").toISOString(),
+    );
+    // Form yardımcı alanları API'ye sızmaz.
+    expect(payload).not.toHaveProperty("sendMode");
+    expect(payload).not.toHaveProperty("users");
+  });
+});
+
+describe("sendFormToPayload — seçilmeyen kanallar gönderilmez", () => {
+  it("yalnız e-posta: zil kapalı, push metni ve link gitmez", () => {
+    const payload = sendFormToPayload(
+      form({
+        channels: ["email"],
+        title: "Gizli push başlığı",
+        body: "Gizli push gövdesi",
+        link: "/listings/abc",
+        emailSubject: "Kampanya konusu",
+        emailHtml: "<h1>Merhaba</h1><p>Yeni &amp; güzel</p>",
+      }),
+    );
+    expect(payload.channels).toEqual(["email"]);
+    expect(payload.inApp).toBe(false);
+    expect(payload).not.toHaveProperty("data");
+    // Zorunlu API alanları e-postadan türetilir; gizli kartın metni gitmez.
+    expect(payload.title).toBe("Kampanya konusu");
+    expect(payload.body).toBe("Merhaba Yeni & güzel");
+  });
+
+  it("yalnız zil: inApp true, e-posta alanları yok", () => {
+    const payload = sendFormToPayload(
+      form({
+        channels: ["in_app"],
+        emailSubject: "x",
+        emailHtml: "<p>x</p>",
+      }),
+    );
+    expect(payload).toMatchObject({
+      channels: ["in_app"],
+      inApp: true,
+      title: "Başlık",
+      body: "Gövde",
+    });
+    expect(payload).not.toHaveProperty("emailHtml");
+  });
+
+  it("push (zil yok): inApp false gider", () => {
+    expect(sendFormToPayload(form({ channels: ["push"] })).inApp).toBe(false);
+  });
+
+  it("kanal sırası sabittir (push, in_app, email)", () => {
+    expect(
+      sendFormToPayload(
+        form({
+          channels: ["email", "in_app", "push"],
+          emailSubject: "K",
+          emailHtml: "<p>x</p>",
+        }),
+      ).channels,
+    ).toEqual(["push", "in_app", "email"]);
+  });
+
+  it("yalnız e-postada uzun konu ve gövde API sınırına kırpılır", () => {
+    const payload = sendFormToPayload(
+      form({
+        channels: ["email"],
+        emailSubject: "K".repeat(120),
+        emailHtml: `<p>${"a ".repeat(400)}</p>`,
+      }),
+    );
+    expect(payload.title.length).toBeLessThanOrEqual(65);
+    expect(payload.body.length).toBeLessThanOrEqual(240);
+  });
+});
+
+describe("htmlToPlainText", () => {
+  it("etiketleri, stil/script bloklarını atar ve varlıkları çözer", () => {
+    expect(
+      htmlToPlainText(
+        "<style>p{color:red}</style><p>Merhaba&nbsp;<b>dünya</b></p><script>x()</script>&#33;",
+      ),
+    ).toBe("Merhaba dünya !");
   });
 });

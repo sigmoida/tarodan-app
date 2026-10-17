@@ -7,7 +7,7 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
-import { PushPreview } from "./PushPreview";
+import { InAppPreview, PushPreview } from "./PushPreview";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -52,5 +52,24 @@ describe("PushPreview", () => {
     const card = container.querySelector('[data-testid="push-preview-card"]');
     expect(card?.className).toContain("bg-surface-elevated");
     expect(card?.className).not.toContain("bg-heading");
+  });
+
+  it("hedef link ipucu: link varsa yolu, yoksa varsayılanı gösterir", () => {
+    act(() =>
+      root.render(<PushPreview title="a" body="b" link=" /listings/abc " />),
+    );
+    expect(container.textContent).toContain(
+      "admin.marketing.notifications.preview.linkHint",
+    );
+    act(() => root.render(<PushPreview title="a" body="b" />));
+    expect(container.textContent).toContain(
+      "admin.marketing.notifications.preview.noLinkHint",
+    );
+  });
+
+  it("zil önizlemesi başlık ve içeriği gösterir", () => {
+    act(() => root.render(<InAppPreview title="Zil" body="Satır" />));
+    expect(container.textContent).toContain("Zil");
+    expect(container.textContent).toContain("Satır");
   });
 });

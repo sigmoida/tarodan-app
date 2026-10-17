@@ -6054,7 +6054,10 @@
         "channel": {
           "mobileApp": "Mobil uygulama",
           "email": "E-posta",
-          "emailInbox": "E-posta gelen kutusu"
+          "emailInbox": "E-posta gelen kutusu",
+          "push": "Push",
+          "inApp": "Uygulama içi (zil)",
+          "inAppDescription": "Web ve mobildeki bildirim kutusu"
         },
         "target": {
           "allUsers": "Tüm Kullanıcılar",
@@ -6098,12 +6101,35 @@
           "marketing": "Pazarlama",
           "announcementHint": "İşlemsel, hizmet ya da güvenlik duyurusu. Bildirim tercihinden bağımsız olarak kitledeki herkese gider (push, bildirim kutusu, e-posta). Kampanya ya da indirim için kullanmayın.",
           "marketingHint": "Kampanya, indirim ya da tanıtım. Yalnızca pazarlama iletisine izin veren kullanıcılara gider — push ve bildirim kutusu dahil; e-postada abonelikten çıkış linki bulunur.",
-          "placeholder": "Tür seçin"
+          "placeholder": "Tür seçin",
+          "announcementShort": "Hizmet ya da güvenlik duyurusu: tercihten bağımsız olarak kitledeki herkese gider.",
+          "marketingShort": "Kampanya ya da tanıtım: yalnızca pazarlama izni verenlere gider, e-postada çıkış linki bulunur.",
+          "stepHint": "Tür, seçtiğiniz tüm kanallarda kimin bildirimi alacağını belirler."
         },
         "link": {
           "label": "Hedef bağlantı (opsiyonel)",
           "placeholder": "/listings/ilan-kimligi",
           "hint": "Bildirime dokunulunca açılacak site içi sayfa: /listings/…, /collections/…, /seller/…, /profile/orders, /membership. Boş bırakılırsa bildirim listesi açılır."
+        },
+        "channelHint": "Önce kanalları seçin; aşağıda yalnızca seçtiğiniz kanalların içerik alanları görünür.",
+        "pushOnlyTextTitle": "Push metni",
+        "inAppOnlyTextTitle": "Uygulama içi (zil) metni",
+        "selectChannelFirst": "İçerik alanlarını görmek için en az bir kanal seçin",
+        "emailLayoutHint": "İçerik ortak e-posta şablonuna (logo ve altbilgi) yerleştirilir; pazarlama türünde abonelikten çıkış linki otomatik eklenir.",
+        "recipientCountNoType": "Hedefte {total} kullanıcı var; ulaşılacak sayı türe göre değişir",
+        "sendMode": {
+          "title": "Gönderim zamanı",
+          "nowDescription": "Onayladığınızda hemen gönderilir",
+          "scheduleDescription": "Seçtiğiniz tarih ve saatte gönderilir"
+        },
+        "preview": {
+          "lockScreen": "Kilit ekranı",
+          "appName": "Tarodan",
+          "linkHint": "Dokununca açılır: {link}",
+          "noLinkHint": "Dokununca bildirim listesi açılır",
+          "bellTitle": "Bildirim kutusu",
+          "notificationTab": "Bildirim",
+          "emailTab": "E-posta"
         }
       },
       "pages": {

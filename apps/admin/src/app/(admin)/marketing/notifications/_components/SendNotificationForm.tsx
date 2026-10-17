@@ -1,107 +1,33 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
-import clsx from "clsx";
-import { Button, EmptyState } from "@tarodan/ui";
-import {
-  FormDateTimePicker,
-  FormInput,
-  FormModal,
-  FormSelect,
-  FormTextarea,
-  useZodForm,
-} from "@tarodan/ui/form";
-import {
-  BellIcon,
-  ClockIcon,
-  CheckCircleIcon,
-} from "@heroicons/react/24/outline";
+import { FormModal, useZodForm } from "@tarodan/ui/form";
+import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { DataList, Field } from "@/components/detail/DataList";
-import { Panel } from "@/components/detail/Panel";
-import { SectionCard } from "@/components/detail/SectionCard";
-import { EmailHtmlEditor } from "@/components/email/EmailHtmlEditor";
-import { EmailPreviewPane } from "@/components/email/EmailPreviewPane";
-import { useTranslations } from "next-intl";
 import {
   type SendForm,
-  type ScheduleNotificationForm,
   emptySendForm,
-  channelMeta,
-  targetMeta,
-  mailingTypeOptions,
+  scheduleFormToPayload,
   sendFormToPayload,
   sendNotificationSchema,
-  scheduleNotificationSchema,
 } from "../_lib/types";
+import { useAudienceCounts } from "../_lib/useBroadcastEmailPreview";
 import {
-  useAudienceCounts,
-  useBroadcastEmailPreview,
-} from "../_lib/useBroadcastEmailPreview";
-import { PushPreview } from "./PushPreview";
-import { UserPicker } from "./UserPicker";
-
-/** datetime-local için YEREL "şimdi" (yyyy-mm-ddTHH:mm). */
-/** E-posta HTML editörünün "Görsel ekle" yüklemesi: sunucudaki http(s) adresi. */
-const uploadEmailImage = async (file: File): Promise<string> =>
-  (await adminApi.uploadNotificationImage(file)).data.url;
-
-function localDateTimeMin(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours(),
-  )}:${pad(d.getMinutes())}`;
-}
-
-function Tile({
-  active,
-  icon: Icon,
-  label,
-  desc,
-  onClick,
-}: {
-  active: boolean;
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  desc: string;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      onClick={onClick}
-      className={clsx(
-        "relative h-auto flex-col items-center gap-2 rounded-xl border-2 p-4 text-center",
-        active
-          ? "border-primary-500 bg-primary-50 text-primary-700"
-          : "border-border bg-surface text-muted hover:border-border-strong hover:text-body",
-      )}
-    >
-      {active && (
-        <CheckCircleIcon className="absolute right-2 top-2 h-4 w-4 text-primary-500" />
-      )}
-      <Icon
-        className={clsx("h-6 w-6", active ? "text-primary-500" : "text-subtle")}
-      />
-      <span className="text-sm font-medium">{label}</span>
-      <span
-        className={clsx(
-          "text-xs leading-tight",
-          active ? "text-primary-600" : "text-muted",
-        )}
-      >
-        {desc}
-      </span>
-    </Button>
-  );
-}
+  AudienceStep,
+  ChannelStep,
+  ContentStep,
+  MailingTypeStep,
+  TimingStep,
+} from "./compose/ComposeSections";
+import { ComposePreview } from "./compose/ComposePreview";
 
 /**
  * "Bildirim Oluştur" modalı. Sayfa açılışında KENDİLİĞİNDEN açılmaz — sayfa
  * başlığındaki buton mount eder; kapatma/gönderme `onClose` ile sayfaya döner.
+ *
+ * Akış yukarıdan aşağı: 1 kanal → 2 tür → 3 yalnız seçili kanalların içerik
+ * kartları → 4 hedef kitle → 5 şimdi gönder / zamanla. Sağda yapışkan canlı
+ * önizleme; dar ekranda formun altına iner.
  */
 export function SendNotificationForm({
   onClose,
@@ -111,20 +37,12 @@ export function SendNotificationForm({
   onScheduled: () => void;
 }) {
   const t = useTranslations();
-  const channels = channelMeta(t);
-  const targets = targetMeta(t);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const form = useZodForm(sendNotificationSchema(t), {
-    defaultValues: emptySendForm,
-  });
-  const scheduleForm = useZodForm(scheduleNotificationSchema(t), {
-    defaultValues: { scheduledFor: "" },
-  });
+  const schema = sendNotificationSchema(t);
+  const form = useZodForm(schema, { defaultValues: emptySendForm });
   const values = form.watch();
-  const emailPreview = useBroadcastEmailPreview(values);
   const audienceCounts = useAudienceCounts(values);
-  const mailingTypes = mailingTypeOptions(t);
-  const emailSelected = values.channels.includes("email");
+  // Önizlemedeki "hazır" durumu gönderimle AYNI şemadan gelir (tek kaynak).
+  const canSend = schema.safeParse(values).success;
 
   const send = useAdminMutation(
     (formValues: SendForm) =>
@@ -139,403 +57,58 @@ export function SendNotificationForm({
     },
   );
   const schedule = useAdminMutation(
-    (scheduleValues: ScheduleNotificationForm) =>
-      adminApi.scheduleNotification({
-        ...sendFormToPayload(form.getValues()),
-        scheduledFor: new Date(scheduleValues.scheduledFor).toISOString(),
-      }),
+    (formValues: SendForm) =>
+      adminApi.scheduleNotification(scheduleFormToPayload(formValues)),
     {
       invalidates: ["scheduled-notifications"],
       successMessage: t("admin.marketing.notifications.scheduled"),
       onSuccess: () => {
-        setScheduleOpen(false);
-        scheduleForm.reset({ scheduledFor: "" });
+        form.reset(emptySendForm);
         onScheduled();
       },
     },
   );
 
-  const toggleChannel = (channel: SendForm["channels"][number]) => {
-    const channels = form.getValues("channels");
-    form.setValue(
-      "channels",
-      channels.includes(channel)
-        ? channels.filter((item) => item !== channel)
-        : [...channels, channel],
-      { shouldDirty: true, shouldValidate: true },
-    );
-  };
-
-  const openSchedule = async () => {
-    if (await form.trigger()) setScheduleOpen(true);
-  };
-
-  const titleOk = values.title.length > 0 && values.title.length <= 65;
-  const bodyOk = values.body.length > 0 && values.body.length <= 240;
-  const emailOk =
-    !emailSelected ||
-    (values.emailSubject.trim().length > 0 &&
-      values.emailHtml.trim().length > 0);
-  const canSend =
-    titleOk &&
-    bodyOk &&
-    values.channels.length > 0 &&
-    values.mailingType !== "" &&
-    emailOk;
+  const scheduling = values.sendMode === "schedule";
 
   return (
-    <>
-      <FormModal
-        open
-        onClose={onClose}
-        title={t("admin.marketing.notifications.create")}
-        form={form}
-        onSubmit={(formValues) => send.mutate(formValues)}
-        isSubmitting={send.isPending}
-        submitLabel={t("admin.marketing.notifications.sendNow")}
-        size="wide"
-        closeOnBackdrop={false}
-      >
-        {/* Üstte iki sütun (form | sticky önizleme+özet), altta tam genişlikte
-            e-posta kartı: editör ve önizleme yan yana yeterli genişlik alır. */}
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
-            <div className="space-y-5 xl:col-span-3">
-              <SectionCard
-                title={t("admin.marketing.notifications.pushTextTitle")}
-                bodyClassName="space-y-5"
-              >
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-sm font-medium text-body">
-                      {t("common.title")}
-                    </span>
-                    <span
-                      className={clsx(
-                        "text-xs",
-                        values.title.length > 65
-                          ? "font-medium text-danger-500"
-                          : "text-muted",
-                      )}
-                    >
-                      {values.title.length}/65
-                    </span>
-                  </div>
-                  <FormInput
-                    name="title"
-                    placeholder={t(
-                      "admin.marketing.notifications.titlePlaceholder",
-                    )}
-                  />
-                </div>
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-sm font-medium text-body">
-                      {t("admin.marketing.notifications.content")}
-                    </span>
-                    <span
-                      className={clsx(
-                        "text-xs",
-                        values.body.length > 240
-                          ? "font-medium text-danger-500"
-                          : "text-muted",
-                      )}
-                    >
-                      {values.body.length}/240
-                    </span>
-                  </div>
-                  <FormTextarea
-                    name="body"
-                    rows={4}
-                    placeholder={t(
-                      "admin.marketing.notifications.bodyPlaceholder",
-                    )}
-                  />
-                </div>
-                {/* Dokununca açılacak sayfa: push payload'ına ve zil satırına
-                    `data.link` olarak gider (anında ve zamanlanmış gönderim). */}
-                <FormInput
-                  name="link"
-                  label={t("admin.marketing.notifications.link.label")}
-                  placeholder={t(
-                    "admin.marketing.notifications.link.placeholder",
-                  )}
-                  helperText={t("admin.marketing.notifications.link.hint")}
-                />
-              </SectionCard>
-
-              {/* Tür her kanalı belirler (push + bildirim kutusu + e-posta);
-                  bu yüzden e-posta bölümünde değil, her gönderimde görünür. */}
-              <SectionCard
-                title={t("admin.marketing.notifications.mailingType.label")}
-                bodyClassName="space-y-2"
-              >
-                <FormSelect
-                  name="mailingType"
-                  placeholder={t(
-                    "admin.marketing.notifications.mailingType.placeholder",
-                  )}
-                  options={mailingTypes}
-                />
-                {values.mailingType && (
-                  <p className="text-xs text-muted">
-                    {values.mailingType === "marketing"
-                      ? t(
-                          "admin.marketing.notifications.mailingType.marketingHint",
-                        )
-                      : t(
-                          "admin.marketing.notifications.mailingType.announcementHint",
-                        )}
-                  </p>
-                )}
-                {values.mailingType && audienceCounts && (
-                  <p className="text-xs font-medium text-body">
-                    {t("admin.marketing.notifications.recipientCount", {
-                      count:
-                        values.mailingType === "marketing"
-                          ? audienceCounts.marketing
-                          : audienceCounts.total,
-                      total: audienceCounts.total,
-                    })}
-                  </p>
-                )}
-              </SectionCard>
-
-              <SectionCard
-                title={t("admin.marketing.notifications.deliveryChannel")}
-                bodyClassName="space-y-4"
-              >
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {channels.map((channel) => (
-                    <Tile
-                      key={channel.key}
-                      active={values.channels.includes(channel.key)}
-                      icon={channel.icon}
-                      label={channel.label}
-                      desc={channel.desc}
-                      onClick={() => toggleChannel(channel.key)}
-                    />
-                  ))}
-                </div>
-                {form.formState.errors.channels?.message && (
-                  <p className="text-xs text-danger-500">
-                    {form.formState.errors.channels.message}
-                  </p>
-                )}
-              </SectionCard>
-
-              <SectionCard
-                title={t("admin.marketing.notifications.audience")}
-                bodyClassName="space-y-4"
-              >
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {targets.map((target) => (
-                    <Tile
-                      key={target.key}
-                      active={values.targetType === target.key}
-                      icon={target.icon}
-                      label={target.label}
-                      desc={target.desc}
-                      onClick={() =>
-                        form.setValue(
-                          "targetType",
-                          target.key as SendForm["targetType"],
-                          {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          },
-                        )
-                      }
-                    />
-                  ))}
-                </div>
-
-                {values.targetType === "user_ids" && <UserPicker />}
-
-                {values.targetType === "segment" && (
-                  <Panel
-                    tone="muted"
-                    className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-                  >
-                    <FormSelect
-                      name="isSeller"
-                      label={t("admin.marketing.notifications.sellerStatus")}
-                      options={[
-                        {
-                          value: "",
-                          label: t("admin.marketing.notifications.allOption"),
-                        },
-                        {
-                          value: "true",
-                          label: t("admin.marketing.notifications.onlySellers"),
-                        },
-                        {
-                          value: "false",
-                          label: t("admin.marketing.notifications.onlyBuyers"),
-                        },
-                      ]}
-                    />
-                    <FormSelect
-                      name="membershipTier"
-                      label={t("admin.marketing.notifications.membershipType")}
-                      options={[
-                        {
-                          value: "",
-                          label: t("admin.marketing.notifications.allOption"),
-                        },
-                        { value: "free", label: "Free" },
-                        { value: "basic", label: "Basic" },
-                        { value: "premium", label: "Premium" },
-                        { value: "business", label: "Business" },
-                      ]}
-                    />
-                  </Panel>
-                )}
-              </SectionCard>
-
-              <Button
-                type="button"
-                variant="secondary"
-                leftIcon={<ClockIcon className="h-4 w-4" />}
-                onClick={openSchedule}
-                disabled={!canSend}
-                className="w-full justify-center"
-              >
-                {t("admin.marketing.notifications.schedule")}
-              </Button>
-            </div>
-
-            <div className="xl:sticky xl:top-6 xl:col-span-2 xl:self-start">
-              <SectionCard
-                title={
-                  values.channels.includes("push")
-                    ? t("admin.marketing.notifications.livePreview")
-                    : t("admin.marketing.notifications.summary")
-                }
-                bodyClassName="space-y-5"
-              >
-                {values.channels.includes("push") && (
-                  <PushPreview title={values.title} body={values.body} />
-                )}
-
-                {values.channels.length === 0 && (
-                  <EmptyState
-                    size="compact"
-                    icon={<BellIcon className="h-6 w-6" />}
-                    title={t(
-                      "admin.marketing.notifications.selectPreviewChannel",
-                    )}
-                  />
-                )}
-
-                <DataList
-                  columns={1}
-                  className="gap-y-2 border-t border-border pt-2"
-                >
-                  <Field label={t("admin.marketing.notifications.targetLabel")}>
-                    {
-                      targets.find((target) => target.key === values.targetType)
-                        ?.label
-                    }
-                  </Field>
-                  <Field
-                    label={t("admin.marketing.notifications.mailingType.label")}
-                  >
-                    {mailingTypes.find(
-                      (type) => type.value === values.mailingType,
-                    )?.label ?? "—"}
-                  </Field>
-                  <Field label={t("admin.marketing.notifications.channels")}>
-                    {values.channels.length === 0
-                      ? "—"
-                      : values.channels
-                          .map(
-                            (channel) =>
-                              channels.find((item) => item.key === channel)
-                                ?.label,
-                          )
-                          .join(", ")}
-                  </Field>
-                  <Field label={t("common.status")}>
-                    <span
-                      className={clsx(
-                        canSend ? "text-success-600" : "text-warning-600",
-                      )}
-                    >
-                      {canSend
-                        ? t("admin.marketing.notifications.ready")
-                        : t("admin.marketing.notifications.missingFields")}
-                    </span>
-                  </Field>
-                </DataList>
-              </SectionCard>
-            </div>
-          </div>
-
-          {emailSelected && (
-            <SectionCard
-              title={t("admin.marketing.notifications.emailSectionTitle")}
-              bodyClassName="space-y-5"
-            >
-              <FormInput
-                name="emailSubject"
-                label={t("admin.marketing.emailTemplates.emailSubject")}
-                placeholder={t(
-                  "admin.marketing.notifications.emailSubjectPlaceholder",
-                )}
-              />
-              {/* Editör ve önizleme yan yana (lg+), küçükte alt alta ve bitişik:
-              şablon düzenleyicisiyle aynı desen. */}
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <EmailHtmlEditor
-                  name="emailHtml"
-                  placeholder={t(
-                    "admin.marketing.notifications.emailHtmlPlaceholder",
-                  )}
-                  className="h-[460px]"
-                  onUploadImage={uploadEmailImage}
-                />
-                {values.emailHtml.trim() ? (
-                  <EmailPreviewPane
-                    className="h-[460px]"
-                    preview={emailPreview.preview}
-                    isPending={emailPreview.isPending}
-                    error={emailPreview.error}
-                    onRetry={emailPreview.refetch}
-                  />
-                ) : (
-                  <EmptyState
-                    size="compact"
-                    icon={false}
-                    title={t("admin.marketing.notifications.emailPreviewEmpty")}
-                  />
-                )}
-              </div>
-            </SectionCard>
-          )}
-        </div>
-      </FormModal>
-
-      {scheduleOpen && (
-        <FormModal
-          open
-          onClose={() => setScheduleOpen(false)}
-          title={t("admin.marketing.notifications.scheduleTitle")}
-          form={scheduleForm}
-          onSubmit={(scheduleValues) => schedule.mutate(scheduleValues)}
-          isSubmitting={schedule.isPending}
-          submitLabel={t("admin.marketing.notifications.schedule")}
-        >
-          <FormDateTimePicker
-            name="scheduledFor"
-            label={t("admin.marketing.notifications.scheduleDateTime")}
-            // min YEREL tarih olmalı: toISOString UTC döndürür ve TR'de
-            // 00:00-03:00 arası takvim düne izin veriyordu. Saat sınırını zod
-            // (scheduleFuture) tutar.
-            min={localDateTimeMin()}
+    <FormModal
+      open
+      onClose={onClose}
+      title={t("admin.marketing.notifications.create")}
+      form={form}
+      onSubmit={(formValues) =>
+        formValues.sendMode === "schedule"
+          ? schedule.mutate(formValues)
+          : send.mutate(formValues)
+      }
+      isSubmitting={send.isPending || schedule.isPending}
+      submitLabel={
+        scheduling
+          ? t("admin.marketing.notifications.schedule")
+          : t("admin.marketing.notifications.sendNow")
+      }
+      size="full"
+      modalClassName="h-[calc(100dvh-2rem)]"
+      closeOnBackdrop={false}
+    >
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        <div className="space-y-5 lg:col-span-7">
+          <ChannelStep channels={values.channels} />
+          <MailingTypeStep mailingType={values.mailingType} />
+          <ContentStep
+            channels={values.channels}
+            title={values.title}
+            body={values.body}
           />
-        </FormModal>
-      )}
-    </>
+          <AudienceStep values={values} audienceCounts={audienceCounts} />
+          <TimingStep sendMode={values.sendMode} />
+        </div>
+        {/* Modal gövdesi kaydırma kabıdır: sticky top-0 ona göre yapışır. */}
+        <div className="lg:sticky lg:top-0 lg:col-span-5 lg:max-h-[calc(100dvh-11rem)] lg:self-start lg:overflow-y-auto">
+          <ComposePreview values={values} canSend={canSend} />
+        </div>
+      </div>
+    </FormModal>
   );
 }

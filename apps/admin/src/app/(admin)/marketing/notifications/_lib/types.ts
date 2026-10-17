@@ -1,10 +1,14 @@
 import {
+  BellIcon,
+  CalendarDaysIcon,
   DevicePhoneMobileIcon,
+  PaperAirplaneIcon,
   EnvelopeIcon,
   UsersIcon,
   UserIcon,
   AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/outline";
+import type { ComponentType } from "react";
 import { z } from "zod";
 import {
   BROADCAST_EMAIL_HTML_MAX,
@@ -60,15 +64,25 @@ export const notificationTabs = (t: T) => [
 ];
 
 // SMS bilinçli olarak YOK: backend'de SMS gönderim altyapısı bulunmuyor
-// (emitAdminBroadcast yalnız email + push kuyruklar); çalışmayan kanalı
-// seçtirmek yanıltıcıydı. SMS sağlayıcısı eklendiğinde buraya geri gelir.
+// (dağıtım yalnız push + e-posta kuyruklar); çalışmayan kanalı seçtirmek
+// yanıltıcıydı. "Uygulama içi (zil)" ayrı kanaldır: API zil satırını yalnız
+// bu kanal seçiliyse yazar (`inApp`).
+export const NOTIFICATION_CHANNELS = ["push", "in_app", "email"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
 export const channelMeta = (t: T) =>
   [
     {
       key: "push",
-      label: "Push",
+      label: t("admin.marketing.notifications.channel.push"),
       icon: DevicePhoneMobileIcon,
       desc: t("admin.marketing.notifications.channel.mobileApp"),
+    },
+    {
+      key: "in_app",
+      label: t("admin.marketing.notifications.channel.inApp"),
+      icon: BellIcon,
+      desc: t("admin.marketing.notifications.channel.inAppDescription"),
     },
     {
       key: "email",
@@ -76,7 +90,12 @@ export const channelMeta = (t: T) =>
       icon: EnvelopeIcon,
       desc: t("admin.marketing.notifications.channel.emailInbox"),
     },
-  ] as const;
+  ] as const satisfies ReadonlyArray<{
+    key: NotificationChannel;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+    desc: string;
+  }>;
 
 export const targetMeta = (t: T) =>
   [
@@ -103,6 +122,7 @@ export const targetMeta = (t: T) =>
 export const channelFilterOptions = (t: T) => [
   { value: "all", label: t("admin.marketing.notifications.allChannels") },
   { value: "push", label: "Push" },
+  { value: "in_app", label: t("admin.marketing.notifications.channel.inApp") },
   { value: "email", label: "Email" },
   { value: "sms", label: "SMS" },
 ];
@@ -118,24 +138,53 @@ export const deliveryFilterOptions = (t: T) => [
   { value: "failed", label: t("admin.marketing.notifications.status.failed") },
 ];
 
+/** Push başlığı / gövdesi sınırları — API önizleme DTO'su ve mobil ile aynı. */
+export const PUSH_TITLE_MAX = 65;
+export const PUSH_BODY_MAX = 240;
+
+/** Push ya da zil seçili mi — ikisi aynı kısa başlık/gövde/link kartını kullanır. */
+export const usesNotificationText = (channels: readonly string[]) =>
+  channels.includes("push") || channels.includes("in_app");
+
+export const usesEmail = (channels: readonly string[]) =>
+  channels.includes("email");
+
+export const SEND_MODES = ["now", "schedule"] as const;
+export type SendMode = (typeof SEND_MODES)[number];
+
+/**
+ * Oluşturma formu. Kart alanları (başlık/gövde/link, e-posta konusu/HTML) her
+ * zaman formda durur — kanal kapatılıp açılınca yazılan kaybolmasın — ama
+ * DOĞRULAMA ve GÖNDERİM yalnız seçili kanalların kartlarını kapsar
+ * (superRefine + `sendFormToPayload`).
+ */
 export const sendNotificationSchema = (t: T) =>
   z
     .object({
+      channels: z
+        .array(z.enum(NOTIFICATION_CHANNELS))
+        .min(1, t("admin.marketing.notifications.validation.channelRequired")),
+      // Duyuru türü TÜM kanalları belirler (push + zil + e-posta): pazarlama
+      // yalnız izinlilere gider. Başta seçilmemiştir ("") — yönetici türü her
+      // gönderimde açıkça seçer (Apple 4.5.4 / İYS).
+      mailingType: z.union([z.literal(""), z.enum(MAILING_TYPES)]),
       title: z
         .string()
         .trim()
-        .min(1, t("admin.marketing.notifications.validation.titleRequired"))
-        .max(65, t("admin.marketing.notifications.validation.titleMax")),
+        .max(
+          PUSH_TITLE_MAX,
+          t("admin.marketing.notifications.validation.titleMax"),
+        ),
       body: z
         .string()
         .trim()
-        .min(1, t("admin.marketing.notifications.validation.bodyRequired"))
-        .max(240, t("admin.marketing.notifications.validation.bodyMax")),
-      channels: z
-        .array(z.enum(["push", "email"]))
-        .min(1, t("admin.marketing.notifications.validation.channelRequired")),
-      // E-posta kanalına özel alanlar — yalnız "email" seçiliyken zorunlu
-      // (superRefine); push metni yukarıdaki kısa başlık/gövdede kalır.
+        .max(
+          PUSH_BODY_MAX,
+          t("admin.marketing.notifications.validation.bodyMax"),
+        ),
+      // Bildirime dokununca açılacak site içi yol (opsiyonel). İzin listesi
+      // API ile ORTAK (`@tarodan/types`); mobil aynı yolu kendi ekranına çevirir.
+      link: z.string().trim(),
       emailSubject: z
         .string()
         .trim()
@@ -149,98 +198,101 @@ export const sendNotificationSchema = (t: T) =>
           BROADCAST_EMAIL_HTML_MAX,
           t("admin.marketing.notifications.validation.emailHtmlMax"),
         ),
-      // Duyuru türü TÜM kanalları belirler (push + bildirim kutusu + e-posta):
-      // pazarlama yalnız izinlilere gider. Başta seçilmemiştir ("") — yönetici
-      // türü her gönderimde açıkça seçer (Apple 4.5.4 / İYS).
-      mailingType: z.union([z.literal(""), z.enum(MAILING_TYPES)]),
-      // Bildirime dokununca açılacak site içi yol (opsiyonel). İzin listesi
-      // API ile ORTAK (`@tarodan/types`); mobil aynı yolu kendi ekranına çevirir.
-      link: z
-        .string()
-        .trim()
-        .refine(
-          (v) => v === "" || isInternalNotificationPath(v),
-          t("admin.marketing.notifications.validation.linkInvalid"),
-        ),
       targetType: z.enum(["all", "segment", "user_ids"]),
       // Seçimler {value: userId, label: görünen ad} olarak taşınır — çipler
       // arama sonuçları değişse de etiketini korur (SearchableMultiSelect).
       users: z.array(z.object({ value: z.string(), label: z.string() })),
       isSeller: z.enum(["", "true", "false"]),
       membershipTier: z.enum(["", "free", "basic", "premium", "business"]),
+      sendMode: z.enum(SEND_MODES),
+      // datetime-local (yerel saat); yalnız "Zamanla" seçiliyken zorunlu.
+      scheduledFor: z.string(),
     })
     .superRefine((values, ctx) => {
+      const issue = (path: keyof typeof values, message: string) =>
+        ctx.addIssue({ code: "custom", path: [path], message });
+
       if (!values.mailingType) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["mailingType"],
-          message: t(
-            "admin.marketing.notifications.validation.mailingTypeRequired",
-          ),
-        });
+        issue(
+          "mailingType",
+          t("admin.marketing.notifications.validation.mailingTypeRequired"),
+        );
       }
-      if (values.targetType === "user_ids" && values.users.length === 0) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["users"],
-          message: t("admin.marketing.notifications.validation.userIdRequired"),
-        });
+      if (usesNotificationText(values.channels)) {
+        if (!values.title) {
+          issue(
+            "title",
+            t("admin.marketing.notifications.validation.titleRequired"),
+          );
+        }
+        if (!values.body) {
+          issue(
+            "body",
+            t("admin.marketing.notifications.validation.bodyRequired"),
+          );
+        }
+        if (values.link && !isInternalNotificationPath(values.link)) {
+          issue(
+            "link",
+            t("admin.marketing.notifications.validation.linkInvalid"),
+          );
+        }
       }
-      if (values.channels.includes("email")) {
+      if (usesEmail(values.channels)) {
         if (!values.emailSubject) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["emailSubject"],
-            message: t(
-              "admin.marketing.notifications.validation.emailSubjectRequired",
-            ),
-          });
+          issue(
+            "emailSubject",
+            t("admin.marketing.notifications.validation.emailSubjectRequired"),
+          );
         }
         if (!values.emailHtml.trim()) {
-          ctx.addIssue({
-            code: "custom",
-            path: ["emailHtml"],
-            message: t(
-              "admin.marketing.notifications.validation.emailHtmlRequired",
-            ),
-          });
+          issue(
+            "emailHtml",
+            t("admin.marketing.notifications.validation.emailHtmlRequired"),
+          );
+        }
+      }
+      if (values.targetType === "user_ids" && values.users.length === 0) {
+        issue(
+          "users",
+          t("admin.marketing.notifications.validation.userIdRequired"),
+        );
+      }
+      if (values.sendMode === "schedule") {
+        if (!values.scheduledFor) {
+          issue(
+            "scheduledFor",
+            t("admin.marketing.notifications.validation.scheduleRequired"),
+          );
+        } else if (!(new Date(values.scheduledFor).getTime() > Date.now())) {
+          // Saat dahil GELECEK olmalı: takvimin min'i yalnız tarihi sınırlar.
+          // datetime-local yerel saattir, new Date(v) de yerel yorumlar.
+          issue(
+            "scheduledFor",
+            t("admin.marketing.notifications.validation.scheduleFuture"),
+          );
         }
       }
     });
 
-export const scheduleNotificationSchema = (t: T) =>
-  z.object({
-    scheduledFor: z
-      .string()
-      .min(1, t("admin.marketing.notifications.validation.scheduleRequired"))
-      // Saat dahil GELECEK olmalı: takvimin min'i yalnız tarihi sınırlar ve
-      // UTC/yerel farkı yüzünden geçmiş seçilebiliyordu — backend 400
-      // dönüyor, kullanıcı genel hata görüyordu. datetime-local yerel saattir,
-      // new Date(v) de yerel yorumlar; karşılaştırma tutarlı.
-      .refine(
-        (v) => new Date(v).getTime() > Date.now(),
-        t("admin.marketing.notifications.validation.scheduleFuture"),
-      ),
-  });
-
 export type SendForm = z.infer<ReturnType<typeof sendNotificationSchema>>;
-export type ScheduleNotificationForm = z.infer<
-  ReturnType<typeof scheduleNotificationSchema>
->;
 
 export const emptySendForm: SendForm = {
-  title: "",
-  body: "",
-  channels: ["push"],
-  emailSubject: "",
-  emailHtml: "",
+  // Varsayılan eski davranış: push + zil (eskiden zil her gönderimde yazılırdı).
+  channels: ["push", "in_app"],
   // Varsayılan YOK: tür açıkça seçilmeden gönderilemez.
   mailingType: "",
+  title: "",
+  body: "",
   link: "",
+  emailSubject: "",
+  emailHtml: "",
   targetType: "all",
   users: [],
   isSeller: "",
   membershipTier: "",
+  sendMode: "now",
+  scheduledFor: "",
 };
 
 /** Hedef seçimini API'nin `targetType`/`userIds`/`segmentCriteria` alanlarına çevirir. */
@@ -264,19 +316,76 @@ export function mailingTypeFromForm(f: SendForm): MailingType | undefined {
 
 /** E-posta kanalı seçiliyse e-postaya özel alanlar; değilse hiçbiri gönderilmez. */
 export function emailFieldsFromForm(f: SendForm) {
-  if (!f.channels.includes("email")) return {};
+  if (!usesEmail(f.channels)) return {};
   return {
-    emailSubject: f.emailSubject,
+    emailSubject: f.emailSubject.trim(),
     emailHtml: f.emailHtml,
   };
 }
 
-/** Build the send/schedule API payload from the compose form. */
+/**
+ * Hedef link verildiyse `data.link` (push payload'ı + zil satırı; mobil ve web
+ * aynı yolu çözer). Boşsa ya da push/zil seçili değilse `data` gönderilmez.
+ */
+export function linkDataFromForm(f: SendForm) {
+  const link = f.link.trim();
+  return link && usesNotificationText(f.channels) ? { data: { link } } : {};
+}
+
+const HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+/**
+ * HTML'den düz metin (yalnız geçmiş satırının kısa gövdesi için; render
+ * edilmez). Stil/script blokları atılır, etiketler boşluğa döner.
+ */
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<(style|script|head)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(#\d+|[a-z]+);/gi, (match, entity: string) => {
+      if (entity.startsWith("#")) {
+        const code = Number(entity.slice(1));
+        return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      }
+      return HTML_ENTITIES[entity.toLowerCase()] ?? match;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const clip = (value: string, max: number) =>
+  value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value;
+
+/**
+ * API'nin zorunlu `title`/`body` alanları. Push/zil seçiliyse kartın metni;
+ * yalnız e-postada push kartı gizlidir ve değerleri GÖNDERİLMEZ — yerine
+ * e-posta konusu ve HTML'in düz metni gider (geçmiş satırının başlığı/özeti;
+ * HTML verildiği için e-posta gövdesinde kullanılmaz).
+ */
+export function notificationTextFromForm(f: SendForm) {
+  if (usesNotificationText(f.channels)) {
+    return { title: f.title.trim(), body: f.body.trim() };
+  }
+  return {
+    title: clip(f.emailSubject.trim(), PUSH_TITLE_MAX),
+    body: clip(htmlToPlainText(f.emailHtml), PUSH_BODY_MAX),
+  };
+}
+
+/** Build the send API payload from the compose form (only selected channels). */
 export function sendFormToPayload(f: SendForm) {
   return {
-    title: f.title,
-    body: f.body,
-    channels: f.channels,
+    ...notificationTextFromForm(f),
+    channels: NOTIFICATION_CHANNELS.filter((c) => f.channels.includes(c)),
+    // Zil açıkça: false iken API zil satırı yazmaz (yalnız e-posta vb.).
+    inApp: f.channels.includes("in_app"),
     // Tür kanaldan bağımsız gider: yalnız push'ta da pazarlama süzgeci çalışır.
     mailingType: mailingTypeFromForm(f),
     ...audienceFromForm(f),
@@ -285,13 +394,12 @@ export function sendFormToPayload(f: SendForm) {
   };
 }
 
-/**
- * Hedef link verildiyse `data.link` (push payload'ı + zil satırı; mobil ve web
- * aynı yolu çözer). Boşsa `data` hiç gönderilmez — eski davranış.
- */
-export function linkDataFromForm(f: SendForm) {
-  const link = f.link.trim();
-  return link ? { data: { link } } : {};
+/** Zamanlama payload'ı: gönderimle aynı içerik + ISO zaman. */
+export function scheduleFormToPayload(f: SendForm) {
+  return {
+    ...sendFormToPayload(f),
+    scheduledFor: new Date(f.scheduledFor).toISOString(),
+  };
 }
 
 export const mailingTypeOptions = (t: T) =>
@@ -299,9 +407,32 @@ export const mailingTypeOptions = (t: T) =>
     {
       value: "announcement",
       label: t("admin.marketing.notifications.mailingType.announcement"),
+      desc: t("admin.marketing.notifications.mailingType.announcementShort"),
     },
     {
       value: "marketing",
       label: t("admin.marketing.notifications.mailingType.marketing"),
+      desc: t("admin.marketing.notifications.mailingType.marketingShort"),
     },
-  ] satisfies Array<{ value: MailingType; label: string }>;
+  ] satisfies Array<{ value: MailingType; label: string; desc: string }>;
+
+export const sendModeMeta = (t: T) =>
+  [
+    {
+      key: "now",
+      label: t("admin.marketing.notifications.sendNow"),
+      icon: PaperAirplaneIcon,
+      desc: t("admin.marketing.notifications.sendMode.nowDescription"),
+    },
+    {
+      key: "schedule",
+      label: t("admin.marketing.notifications.schedule"),
+      icon: CalendarDaysIcon,
+      desc: t("admin.marketing.notifications.sendMode.scheduleDescription"),
+    },
+  ] as const satisfies ReadonlyArray<{
+    key: SendMode;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+    desc: string;
+  }>;

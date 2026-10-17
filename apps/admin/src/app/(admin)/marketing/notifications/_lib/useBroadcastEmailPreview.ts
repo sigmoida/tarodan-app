@@ -6,7 +6,14 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { EmailPreviewData } from "@/components/email/EmailPreviewPane";
-import { audienceFromForm, mailingTypeFromForm, type SendForm } from "./types";
+import {
+  PUSH_BODY_MAX,
+  PUSH_TITLE_MAX,
+  audienceFromForm,
+  mailingTypeFromForm,
+  notificationTextFromForm,
+  type SendForm,
+} from "./types";
 
 const PREVIEW_DEBOUNCE_MS = 800;
 const AUDIENCE_DEBOUNCE_MS = 500;
@@ -28,10 +35,13 @@ export function useDebouncedObject<T>(value: T, delayMs: number): T {
  * her tuşta istek atmamak için girdi debounce edilir.
  */
 export function useBroadcastEmailPreview(values: SendForm) {
+  // Push/zil kartı kapalıysa onun (gizli) metni gönderilmez — gönderimle aynı
+  // kural (`notificationTextFromForm`); önizleme DTO sınırına kırpılır.
+  const text = notificationTextFromForm(values);
   const draft = useDebouncedObject(
     {
-      title: values.title,
-      body: values.body,
+      title: text.title.slice(0, PUSH_TITLE_MAX),
+      body: text.body.slice(0, PUSH_BODY_MAX),
       emailSubject: values.emailSubject,
       emailHtml: values.emailHtml,
       mailingType: mailingTypeFromForm(values),

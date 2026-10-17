@@ -90,7 +90,10 @@ export function scheduledColumns(onCancel: (id: string) => void, t: T) {
     }),
     col.muted<ScheduledNotification>(
       t("admin.marketing.notifications.channels"),
-      (n) => n.channels?.join(", "),
+      (n) =>
+        n.channels
+          ?.map((c) => enumLabel(statusConfig(notificationChannelConfig, t), c))
+          .join(", "),
       { sortKey: "channels", sortType: "text" },
     ),
     col.muted<ScheduledNotification>(
