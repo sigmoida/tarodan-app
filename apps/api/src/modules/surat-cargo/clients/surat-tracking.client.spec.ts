@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import {
   STUB_TRACKING_PENDING_MESSAGE,
   StubSuratTrackingClient,
@@ -98,6 +99,48 @@ describe("SuratTrackingClient.lookupTracking", () => {
       kind: "failure",
       category: "timeout",
       message: "Surat tracking API timed out after 20000ms for PKG-TEST",
+    });
+  });
+
+  it("includes undici's error.cause (code + message) for a network failure, not just 'fetch failed'", async () => {
+    const networkError = Object.assign(new Error("fetch failed"), {
+      cause: { code: "ECONNRESET", message: "socket hang up" },
+    });
+    global.fetch = jest.fn().mockRejectedValue(networkError) as any;
+
+    const result = await makeClient().lookupTracking("PKG-TEST");
+
+    expect(result.kind).toBe("failure");
+    expect((result as { category: string }).category).toBe("network");
+    const message = (result as { message: string }).message;
+    expect(message).toContain("fetch failed");
+    expect(message).toContain("ECONNRESET");
+    expect(message).toContain("socket hang up");
+  });
+
+  it("logs a network failure as warn, not error (cron layer decides alarms)", async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, "error");
+    const warnSpy = jest.spyOn(Logger.prototype, "warn");
+    const networkError = Object.assign(new Error("fetch failed"), {
+      cause: { code: "ETIMEDOUT", message: "connect ETIMEDOUT" },
+    });
+    global.fetch = jest.fn().mockRejectedValue(networkError) as any;
+
+    await makeClient().lookupTracking("PKG-TEST");
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("ETIMEDOUT"));
+  });
+
+  it("falls back to the bare message when the network error has no cause", async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error("fetch failed")) as any;
+
+    await expect(makeClient().lookupTracking("PKG-TEST")).resolves.toEqual({
+      kind: "failure",
+      category: "network",
+      message: "Surat tracking API request failed for PKG-TEST: fetch failed",
     });
   });
 });

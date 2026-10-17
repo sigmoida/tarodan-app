@@ -10793,6 +10793,10 @@
         "title": "Kargoda Takılı Sipariş — Yönetim Gerekli",
         "message": "{orderNumber} siparişi uzun süredir kargoda ve taşıyıcıdan teslim bilgisi gelmedi; teslim işlenmediği için satıcı ödemesi askıda."
       },
+      "suratTrackingNetworkFailure": {
+        "title": "Sürat Takip Ağ Hatası — Yönetim Gerekli",
+        "message": "{parcels} paket(ler)i {consecutiveFailures} ardışık turdur ({reason}) Sürat takip API'sinden ağ hatası alıyor; senkronlanamıyor. Sürat'a eskale edin."
+      },
       "elogoInvoiceExhausted": {
         "title": "e-Fatura Gönderimi Tıkandı — Yönetim Gerekli",
         "message": "{invoiceNumber} numaralı {typeLabel} belgesi eLogo'ya gönderilemedi ve deneme hakkı tükendi: {reason}. Yasal süre işliyor; nedeni giderip Faturalar ekranından \"Yeniden Dene\" ile gönderin."

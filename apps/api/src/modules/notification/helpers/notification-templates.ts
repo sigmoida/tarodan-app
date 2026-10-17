@@ -441,6 +441,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderStuckInTransit.message",
     icon: "⚠️",
   },
+  [NotificationType.SURAT_TRACKING_NETWORK_FAILURE]: {
+    titleKey: "server.notification.suratTrackingNetworkFailure.title",
+    messageKey: "server.notification.suratTrackingNetworkFailure.message",
+    icon: "📡",
+  },
   [NotificationType.ELOGO_INVOICE_EXHAUSTED]: {
     titleKey: "server.notification.elogoInvoiceExhausted.title",
     messageKey: "server.notification.elogoInvoiceExhausted.message",

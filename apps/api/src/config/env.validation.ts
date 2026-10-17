@@ -123,6 +123,11 @@ const envSchema = z
     SURAT_KARGO_SIFRE: z.string().optional(),
     SURAT_SOAP_TIMEOUT_MS: z.string().optional(),
     SURAT_TRACKING_TIMEOUT_MS: z.string().optional(),
+    // Ardışık ağ/timeout takip hatası eşiği: bu sayıya (varsayılan 6, ~3 saat @
+    // 30dk cron) veya SURAT_TRACKING_NETWORK_FAILURE_HOURS'a ulaşınca cron adımı
+    // düşer + admine tek seferlik uyarı gider; altındaki tek-tur hataları warn'da kalır.
+    SURAT_TRACKING_NETWORK_FAILURE_THRESHOLD: z.string().optional(),
+    SURAT_TRACKING_NETWORK_FAILURE_HOURS: z.string().optional(),
     SURAT_CARGO_MAX_RETRIES: z.string().optional(),
     SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
     // Hangi create sözleşmesi: 'v1' GonderiyiKargoyaGonder (gönderici alanı yok),
