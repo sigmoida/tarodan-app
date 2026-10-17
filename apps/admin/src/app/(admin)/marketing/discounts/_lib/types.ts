@@ -1,4 +1,5 @@
 import type { StatusConfig } from "@tarodan/ui";
+import { STATUS_TONE } from "@/components/table/badgeVariant";
 import { fmtTry } from "@/lib/format";
 import type { useTranslations } from "next-intl";
 import { membershipConfig } from "../../../accounts/seller-performance/_lib/types";
@@ -118,16 +119,16 @@ export const scopeLabels = (t: T): Record<string, string> => ({
 });
 
 export const discountStatusConfig = (t: T): Record<string, StatusConfig> => ({
-  inactive: { label: t("common.inactive"), variant: "outline" },
-  active: { label: t("common.active"), variant: "success" },
-  pending: { label: t("common.pending"), variant: "warning" },
+  inactive: { label: t("common.inactive"), variant: STATUS_TONE.inactive },
+  active: { label: t("common.active"), variant: STATUS_TONE.live },
+  pending: { label: t("common.pending"), variant: STATUS_TONE.pending },
   expired: {
     label: t("admin.marketing.discounts.status.expired"),
-    variant: "danger",
+    variant: STATUS_TONE.ended,
   },
   unknown: {
     label: t("admin.marketing.discounts.status.unknown"),
-    variant: "outline",
+    variant: STATUS_TONE.inactive,
   },
 });
 

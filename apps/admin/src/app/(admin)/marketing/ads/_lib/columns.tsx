@@ -1,26 +1,19 @@
 import Image from "next/image";
-import { Badge, Button } from "@tarodan/ui";
 import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  ComputerDesktopIcon,
-  DevicePhoneMobileIcon,
-  DeviceTabletIcon,
-} from "@heroicons/react/24/outline";
-import type { ContentPlatform } from "@tarodan/types";
-import { col, type RowActionItem } from "@/components/table";
-import { fmtDate, fmtPercent } from "@/lib/format";
-import { type Ad, positionLabels, platformLabels } from "./types";
+  CellText,
+  COL_SIZE,
+  col,
+  Empty,
+  TableBadge,
+  TruncatedText,
+  type RowActionItem,
+} from "@/components/table";
+import { fmtPercent } from "@/lib/format";
+import { type Ad, platformShortLabels, positionLabels } from "./types";
 import { AD_STATUS_VARIANT, adLiveStatus, adShadowScope } from "./status";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
-
-function PlatformIcon({ platform }: { platform: ContentPlatform }) {
-  if (platform === "web") return <ComputerDesktopIcon className="h-4 w-4" />;
-  if (platform === "app") return <DevicePhoneMobileIcon className="h-4 w-4" />;
-  return <DeviceTabletIcon className="h-4 w-4" />;
-}
 
 export interface AdColumnProps {
   onToggle: (ad: Ad) => void;
@@ -28,12 +21,22 @@ export interface AdColumnProps {
   rowMenu: (ad: Ad) => RowActionItem[];
 }
 
+/** `728×90` — reklamın piksel boyutu; boyutsuz (metin) reklamda yok. */
+export function adSizeLabel(ad: Pick<Ad, "width" | "height">): string | null {
+  return ad.width && ad.height ? `${ad.width}×${ad.height}` : null;
+}
+
+/**
+ * Sadeleştirilmiş tablo: renkli rozet yalnız "Yayın durumu"nda. Pozisyon ve
+ * platform düz metin (platform tabloya özel kısa etiketle), IAB uyumu boyutun
+ * yanında ikonsuz bir çerçeve rozet, açık/kapalı kompakt bir anahtar.
+ */
 export function adColumns(
   { onToggle, togglingId, rowMenu }: AdColumnProps,
   t: T,
 ) {
   const positions = positionLabels(t);
-  const platforms = platformLabels(t);
+  const platforms = platformShortLabels(t);
   const now = new Date();
   return [
     col.custom<Ad>(
@@ -50,114 +53,96 @@ export function adColumns(
             />
           </div>
         ) : (
-          <span className="text-sm text-muted">—</span>
+          <Empty />
         ),
-      { grow: 1, minWidth: 96, sortKey: "imageUrl", sortType: "text" },
+      { ...COL_SIZE.preview, sortKey: "imageUrl", sortType: "text" },
     ),
+    col.title<Ad>(t("common.title"), (ad) => ({ title: ad.title }), {
+      minWidth: 240,
+      sortKey: "title",
+      sortType: "text",
+    }),
     col.custom<Ad>(
-      t("common.title"),
-      (ad) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-heading">{ad.title}</p>
-          {ad.iabCompliant ? (
-            <span className="flex items-center gap-1 text-xs text-success-700">
-              <CheckCircleIcon className="h-3 w-3" /> IAB: {ad.iabSize}
-            </span>
-          ) : ad.width && ad.height ? (
-            <span className="flex items-center gap-1 text-xs text-warning-700">
-              <ExclamationTriangleIcon className="h-3 w-3" /> Non-IAB
-            </span>
-          ) : null}
-        </div>
-      ),
-      { grow: 3, minWidth: 180, sortKey: "title", sortType: "text" },
-    ),
-    col.muted<Ad>(
       t("admin.marketing.ads.size"),
-      (ad) => (ad.width && ad.height ? `${ad.width}x${ad.height}` : null),
-      {
-        minWidth: 100,
-        sortKey: "width",
-        sortType: "number",
+      (ad) => {
+        const size = adSizeLabel(ad);
+        if (!size) return <Empty />;
+        return (
+          <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+            <CellText value={size} />
+            {ad.iabCompliant && <TableBadge variant="outline">IAB</TableBadge>}
+          </div>
+        );
       },
+      { minWidth: 130, fixed: true, sortKey: "width", sortType: "number" },
     ),
-    col.badge<Ad>(
+    col.text<Ad>(
       t("admin.marketing.ads.positionLabel"),
-      (ad) => (
-        <Badge variant="outline" size="sm">
-          {positions[ad.position] || ad.position}
-        </Badge>
-      ),
-      { sortKey: "position", sortType: "text" },
+      (ad) => positions[ad.position] || ad.position,
+      { minWidth: 130, fixed: true, sortKey: "position", sortType: "text" },
     ),
-    col.custom<Ad>(
+    col.text<Ad>(
       t("admin.marketing.ads.platformLabel"),
-      (ad) => (
-        <span className="flex items-center gap-1 text-sm text-muted">
-          <PlatformIcon platform={ad.platform} />
-          {platforms[ad.platform] || ad.platform}
-        </span>
-      ),
-      { sortKey: "platform", sortType: "text" },
+      (ad) => platforms[ad.platform] || ad.platform,
+      { minWidth: 150, fixed: true, sortKey: "platform", sortType: "text" },
     ),
-    col.muted<Ad>(
+    col.dateRange<Ad>(
       t("admin.marketing.ads.schedule"),
-      (ad) =>
-        ad.startDate || ad.endDate
-          ? `${fmtDate(ad.startDate) ?? "—"} – ${fmtDate(ad.endDate) ?? "—"}`
-          : null,
-      { minWidth: 150, sortKey: "startDate", sortType: "date" },
+      (ad) => ({ start: ad.startDate, end: ad.endDate }),
+      { sortKey: "startDate" },
     ),
-    col.badge<Ad>(
+    col.status<Ad>(
       t("admin.marketing.ads.liveStatusLabel"),
       (ad) => {
         const status = adLiveStatus(ad, now);
-        return (
-          <Badge variant={AD_STATUS_VARIANT[status]} size="sm">
-            {t(`admin.marketing.ads.liveStatus.${status}`, {
-              scope: adShadowScope(ad),
-            })}
-          </Badge>
-        );
+        const full = t(`admin.marketing.ads.liveStatus.${status}`, {
+          scope: adShadowScope(ad),
+        });
+        // Gölgedeki reklamın tam cümlesi rozete sığmaz: kısa etiket + ipucu.
+        return status === "shadowed"
+          ? {
+              variant: AD_STATUS_VARIANT[status],
+              children: t("admin.marketing.ads.liveStatusShort.shadowed"),
+              tooltip: full,
+            }
+          : { variant: AD_STATUS_VARIANT[status], children: full };
       },
       { sortable: false },
     ),
-    col.custom<Ad>(
+    col.toggle<Ad>(
       t("common.status"),
-      (ad) => (
-        <Button
-          variant={ad.isActive ? "success" : "secondary"}
-          size="sm"
-          onClick={() => onToggle(ad)}
-          disabled={togglingId === ad.id}
-        >
-          {ad.isActive ? t("common.active") : t("common.inactive")}
-        </Button>
-      ),
+      (ad) => ({
+        checked: ad.isActive,
+        onChange: () => onToggle(ad),
+        disabled: togglingId === ad.id,
+        label: t("common.status"),
+      }),
       { sortKey: "isActive", sortType: "number" },
     ),
     // Yalnız görselli reklamın tıklanabilir alanı olur; metin reklamda "—".
     col.number<Ad>(
       t("admin.marketing.ads.hotspots.column"),
       (ad) => (ad.imageUrl ? (ad.hotspots?.length ?? 0) : null),
-      { minWidth: 80, sortable: false },
+      { minWidth: 90, fixed: true, sortable: false },
     ),
     col.custom<Ad>(
       t("admin.marketing.ads.statistics"),
       (ad) => (
-        <div className="text-sm">
-          <div className="text-muted">
+        <div className="min-w-0">
+          <TruncatedText className="text-body">
             {t("admin.marketing.ads.clickCount", { count: ad.clickCount })}
-          </div>
-          <div className="text-muted">
+          </TruncatedText>
+          <TruncatedText className="text-xs text-muted">
             {t("admin.marketing.ads.impressionCount", {
               count: ad.impressionCount,
             })}
-          </div>
-          <div className="text-primary-600">{fmtPercent(ad.ctr, 2)} CTR</div>
+          </TruncatedText>
+          <TruncatedText className="text-xs text-muted">
+            {`${fmtPercent(ad.ctr, 2)} CTR`}
+          </TruncatedText>
         </div>
       ),
-      { grow: 1, minWidth: 120, sortKey: "clickCount", sortType: "number" },
+      { minWidth: 150, sortKey: "clickCount", sortType: "number" },
     ),
     col.rowMenu<Ad>(rowMenu),
   ];

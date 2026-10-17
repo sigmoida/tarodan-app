@@ -4,6 +4,10 @@ import {
   scheduleLiveStatus,
   type LiveStatus,
 } from "@/lib/live-status";
+import {
+  STATUS_TONE,
+  type TableBadgeVariant,
+} from "@/components/table/badgeVariant";
 import type { Ad } from "./types";
 
 /**
@@ -12,14 +16,11 @@ import type { Ad } from "./types";
  */
 export type AdLiveStatus = LiveStatus | "campaignEnded" | "shadowed";
 
-/** Rozet varyantları (yalnız Badge'in mevcut beş varyantı). */
-export const AD_STATUS_VARIANT: Record<
-  AdLiveStatus,
-  "outline" | "success" | "warning"
-> = {
+/** Rozet varyantları — tablo genelindeki tek renk kuralından (`STATUS_TONE`). */
+export const AD_STATUS_VARIANT: Record<AdLiveStatus, TableBadgeVariant> = {
   ...LIVE_STATUS_VARIANT,
-  campaignEnded: "warning",
-  shadowed: "warning",
+  campaignEnded: STATUS_TONE.ended,
+  shadowed: STATUS_TONE.ended,
 };
 
 /**

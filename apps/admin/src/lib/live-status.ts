@@ -1,15 +1,17 @@
+import {
+  STATUS_TONE,
+  type TableBadgeVariant,
+} from "@/components/table/badgeVariant";
+
 /** Zamanlanabilir bir kaydın (reklam, hero slaytı) yayın durumu. */
 export type LiveStatus = "scheduled" | "live" | "expired" | "inactive";
 
-/** Rozet varyantları (yalnız Badge'in mevcut beş varyantı). */
-export const LIVE_STATUS_VARIANT: Record<
-  LiveStatus,
-  "outline" | "success" | "warning"
-> = {
-  scheduled: "outline",
-  live: "success",
-  expired: "warning",
-  inactive: "outline",
+/** Rozet varyantları — tablo genelindeki tek renk kuralından (`STATUS_TONE`). */
+export const LIVE_STATUS_VARIANT: Record<LiveStatus, TableBadgeVariant> = {
+  scheduled: STATUS_TONE.pending,
+  live: STATUS_TONE.live,
+  expired: STATUS_TONE.ended,
+  inactive: STATUS_TONE.inactive,
 };
 
 export interface Schedulable {

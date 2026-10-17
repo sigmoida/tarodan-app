@@ -8,7 +8,7 @@ import {
   ClipboardIcon,
   CubeIcon,
 } from "@heroicons/react/24/outline";
-import { Avatar, IconButton } from "@tarodan/ui";
+import { Avatar, IconButton, Toggle } from "@tarodan/ui";
 import { cn } from "@/lib/utils";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { fmtDate, fmtDateTime, fmtNumber, fmtTime, fmtTry } from "@/lib/format";
@@ -60,6 +60,60 @@ export function CellText({
     <TruncatedText className={cn("text-body", className)}>
       {value}
     </TruncatedText>
+  );
+}
+
+/** Secondary line under a cell's main text — one style for every table. */
+const SECONDARY_LINE = "text-xs text-muted";
+
+/**
+ * The row's main cell (title / name) — the ONE primary text style, matching the
+ * name line of `CellUser` / `CellProduct`. An optional muted second line holds
+ * sub-info (description, slug); both lines are clipped with a tooltip.
+ */
+export function CellTitle({
+  title,
+  secondary,
+}: {
+  title?: ReactNode;
+  secondary?: ReactNode;
+}) {
+  if (title == null || title === "") return <Empty />;
+  return (
+    <div className="min-w-0">
+      <TruncatedText className="font-medium text-heading">
+        {title}
+      </TruncatedText>
+      {secondary != null && secondary !== "" && (
+        <TruncatedText className={SECONDARY_LINE}>{secondary}</TruncatedText>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Normal text with an optional second line. The second line is muted text, or
+ * any node (e.g. a `TableBadge`) when it carries a state instead of sub-info.
+ */
+export function CellStacked({
+  value,
+  secondary,
+}: {
+  value?: ReactNode;
+  secondary?: ReactNode;
+}) {
+  if (value == null || value === "") return <Empty />;
+  return (
+    <div className="min-w-0">
+      <TruncatedText className="text-body">{value}</TruncatedText>
+      {secondary != null &&
+        secondary !== "" &&
+        (typeof secondary === "string" ? (
+          <TruncatedText className={SECONDARY_LINE}>{secondary}</TruncatedText>
+        ) : (
+          <div className="mt-0.5 flex whitespace-nowrap">{secondary}</div>
+        ))}
+    </div>
   );
 }
 
@@ -129,6 +183,55 @@ export function CellDate({
       {text}
       {time && <span className="ml-1 tabular-nums text-muted">{time}</span>}
     </span>
+  );
+}
+
+/**
+ * Date range `03.07.2026 – 10.07.2026` — same text style as `CellDate`, no
+ * wrap; an open end shows `—`, both missing shows the empty placeholder. Full
+ * timestamps on hover.
+ */
+export function CellDateRange({
+  start,
+  end,
+}: {
+  start?: string | number | Date | null;
+  end?: string | number | Date | null;
+}) {
+  const from = fmtDate(start);
+  const to = fmtDate(end);
+  if (from == null && to == null) return <Empty />;
+  const title = `${fmtDateTime(start) ?? "—"} – ${fmtDateTime(end) ?? "—"}`;
+  return (
+    <span className="whitespace-nowrap text-body" title={title}>
+      {from ?? "—"} – {to ?? "—"}
+    </span>
+  );
+}
+
+/** Compact on/off switch — the one way a table flips an `isActive`-style flag. */
+export function CellToggle({
+  checked,
+  onChange,
+  disabled,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  /** Accessible name (the switch has no visible text). */
+  label: string;
+}) {
+  return (
+    <div className="flex items-center">
+      <Toggle
+        size="sm"
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        label={label}
+      />
+    </div>
   );
 }
 

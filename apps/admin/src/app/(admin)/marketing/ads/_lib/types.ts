@@ -111,6 +111,15 @@ export const platformLabels = (t: T): Record<string, string> =>
     CONTENT_PLATFORMS.map((p) => [p, t(`admin.marketing.ads.platform.${p}`)]),
   );
 
+/** Tabloya özel kısa platform etiketleri ("Web" / "Uygulama" / "Web + Uygulama"); form uzun etiketleri kullanır. */
+export const platformShortLabels = (t: T): Record<string, string> =>
+  Object.fromEntries(
+    CONTENT_PLATFORMS.map((p) => [
+      p,
+      t(`admin.marketing.ads.platformShort.${p}`),
+    ]),
+  );
+
 /** Popup gösterim sıklığı etiketleri (sıra = seçici sırası, varsayılan önce). */
 export const popupFrequencyOptions = (t: T) =>
   AD_POPUP_FREQUENCIES.map((value) => ({
