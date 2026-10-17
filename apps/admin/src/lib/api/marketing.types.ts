@@ -12,7 +12,13 @@ export interface BroadcastEmailPreviewPayload {
 export interface NotificationBroadcastPayload {
   title: string;
   body: string;
+  /** "push" | "email" | "in_app". */
   channels: string[];
+  /**
+   * Zil (bildirim kutusu) satırı yazılsın mı. Verilmezse API true sayar
+   * (eski davranış); admin formu her zaman açıkça gönderir.
+   */
+  inApp?: boolean;
   targetType: "all" | "segment" | "user_ids";
   userIds?: string[];
   segmentCriteria?: Record<string, any>;

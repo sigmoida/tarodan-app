@@ -6062,7 +6062,10 @@
         "channel": {
           "mobileApp": "Mobile app",
           "email": "Email",
-          "emailInbox": "Email inbox"
+          "emailInbox": "Email inbox",
+          "push": "Push",
+          "inApp": "In-app (bell)",
+          "inAppDescription": "Notification inbox on web and mobile"
         },
         "target": {
           "allUsers": "All Users",
@@ -6106,12 +6109,35 @@
           "marketing": "Marketing",
           "announcementHint": "A transactional, service or security notice. Reaches everyone in the audience regardless of notification preferences (push, inbox, email). Do not use it for campaigns or discounts.",
           "marketingHint": "A campaign, discount or promotion. Reaches only users who consented to marketing messages — push and inbox included; the email carries an unsubscribe link.",
-          "placeholder": "Select a type"
+          "placeholder": "Select a type",
+          "announcementShort": "Service or security announcement: goes to everyone in the audience regardless of preferences.",
+          "marketingShort": "Campaign or promotion: goes only to users who opted in to marketing; emails include an unsubscribe link.",
+          "stepHint": "The type decides who receives the notification on every selected channel."
         },
         "link": {
           "label": "Target link (optional)",
           "placeholder": "/listings/listing-id",
           "hint": "In-app page opened when the notification is tapped: /listings/…, /collections/…, /seller/…, /profile/orders, /membership. Leave empty to open the notification list."
+        },
+        "channelHint": "Pick the channels first; only the content fields for the selected channels are shown below.",
+        "pushOnlyTextTitle": "Push text",
+        "inAppOnlyTextTitle": "In-app (bell) text",
+        "selectChannelFirst": "Select at least one channel to see its content fields",
+        "emailLayoutHint": "The content is placed in the shared email layout (logo and footer); marketing emails get an unsubscribe link automatically.",
+        "recipientCountNoType": "{total} users in the audience; the number reached depends on the type",
+        "sendMode": {
+          "title": "Delivery time",
+          "nowDescription": "Sent as soon as you confirm",
+          "scheduleDescription": "Sent at the date and time you pick"
+        },
+        "preview": {
+          "lockScreen": "Lock screen",
+          "appName": "Tarodan",
+          "linkHint": "Opens on tap: {link}",
+          "noLinkHint": "Opens the notification list on tap",
+          "bellTitle": "Notification inbox",
+          "notificationTab": "Notification",
+          "emailTab": "Email"
         }
       },
       "pages": {
@@ -11645,7 +11671,8 @@
         "scheduleInFuture": "The scheduled time must be in the future",
         "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
         "scheduledNotFound": "Scheduled notification not found",
-        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages"
+        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages",
+        "noChannel": "Select at least one delivery channel"
       },
       "payment": {
         "partialAmountRequired": "A valid refund amount is required for a partial refund",
