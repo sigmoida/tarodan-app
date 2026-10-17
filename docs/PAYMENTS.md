@@ -244,8 +244,12 @@ paradır.
 - **Units returned one at a time** (v2): the seller's share is carried by the
   refund that completes the line, after earlier partial refunds consumed their
   slices. `holdRetainedAmount` is what must be **left** in the hold after that
-  refund, so the consumption cap counts what earlier refunds already consumed
-  (`amount − retained − refundedAmount`, never negative, never un-consuming).
+  refund, so it caps the cumulative consumption at `amount − retained`
+  (`payment/helpers/hold-consumption.ts`). If an earlier slice already reached
+  past the cap (a cheap item whose hold is small next to the share), that part
+  is given back; a share above the whole hold leaves the whole hold. The same
+  cap keeps an earlier goodwill refund from eating the share of a later full
+  refund.
   Whether the order stays `delivered` (normal release) or closes because the
   cash refund reached T (residual release), the non-faulty seller is paid
   `amount − refundedAmount`.

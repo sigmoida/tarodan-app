@@ -46,7 +46,12 @@ import {
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { groupOrderRefundLimit } from "../helpers/group-refund-limit";
+import { holdRefundedAmountAfter } from "../helpers/hold-consumption";
 import { asPaymentMetadata } from "../helpers/payment-metadata.types";
+import {
+  HOLD_RESIDUAL_MIN,
+  holdResidual,
+} from "../../payout/helpers/hold-release-eligibility";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
@@ -105,9 +110,11 @@ export interface RefundSettlementOptions {
   /** Satıcı hold'unun tüketilecek adet oranı. Nakit iade oranından bağımsızdır. */
   holdPortion?: number;
   /**
-   * Bu iadeden sonra hold'da satıcıya BIRAKILACAK tutar (kendi kargo payının
-   * tazmini). Escrow hold TAM kargoyu düştüğü için satıcı payını peşin ödemiş
-   * sayılır; kusur alıcıdaysa geri verilir. Tüketimi YALNIZ aşağı çeker.
+   * The amount to LEAVE in the hold for the seller after this refund (their
+   * own shipping share): the escrow hold deducted the full shipping, so the
+   * seller paid their share up front and gets it back when not at fault. It
+   * caps the hold's cumulative consumption at `amount − retained`
+   * (`holdRefundedAmountAfter`).
    */
   holdRetainedAmount?: number;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
@@ -957,50 +964,34 @@ export class PaymentRefundService {
             // cancelled; kısmi iadede held/released kalır, payout'ta netAmount =
             // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
             // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
-            const sellerAmount = Number(activeHold.amount);
-            const portion = Math.min(
-              Math.max(
+            // The seller's own shipping share to leave in the hold is
+            // `holdRetainedAmount`; the formula (cumulative cap) is in
+            // `holdRefundedAmountAfter`.
+            const newRefunded = holdRefundedAmountAfter({
+              amount: activeHold.amount,
+              refundedAmount: activeHold.refundedAmount,
+              portion:
                 opts?.settlement?.holdPortion ??
-                  refundPortion(amountToRefund, orderRefundThreshold),
-                0,
-              ),
-              1,
-            );
-            let refundedSeller = Math.round(sellerAmount * portion * 100) / 100;
-            const alreadyConsumed = Number(activeHold.refundedAmount ?? 0);
-            // The amount to LEAVE in the hold for the seller after this refund
-            // (their own shipping share). It only lowers consumption: if the
-            // portion already consumes less, nothing changes; if it exceeds what
-            // is left, nothing more is consumed (never un-consumed). The cap
-            // counts what earlier refunds consumed: v2 puts the share on the
-            // refund that completes the line, after partial refunds have taken
-            // their slices, and capping only this slice let the hold be consumed
-            // in full, so the share silently ended with the platform.
-            const retained = opts?.settlement?.holdRetainedAmount;
-            if (retained != null && retained > 0) {
-              const consumable =
-                Math.round(
-                  Math.max(0, sellerAmount - retained - alreadyConsumed) * 100,
-                ) / 100;
-              refundedSeller = Math.min(refundedSeller, consumable);
-            }
-            const newRefunded =
-              Math.round((alreadyConsumed + refundedSeller) * 100) / 100;
-            if (newRefunded >= sellerAmount - 0.01) {
-              await tx.paymentHold.update({
-                where: { id: activeHold.id },
-                data: {
-                  status: PaymentHoldStatus.cancelled,
-                  refundedAmount: sellerAmount,
-                  frozenByRefundId: null,
-                },
-              });
-            } else {
-              await tx.paymentHold.update({
-                where: { id: activeHold.id },
-                data: { refundedAmount: newRefunded, frozenByRefundId: null },
-              });
-            }
+                refundPortion(amountToRefund, orderRefundThreshold),
+              retained: opts?.settlement?.holdRetainedAmount,
+            });
+            const fullyConsumed = holdResidual({
+              amount: activeHold.amount,
+              refundedAmount: newRefunded,
+            }).lessThanOrEqualTo(HOLD_RESIDUAL_MIN);
+            await tx.paymentHold.update({
+              where: { id: activeHold.id },
+              data: fullyConsumed
+                ? {
+                    status: PaymentHoldStatus.cancelled,
+                    refundedAmount: activeHold.amount,
+                    frozenByRefundId: null,
+                  }
+                : {
+                    refundedAmount: newRefunded.toNumber(),
+                    frozenByRefundId: null,
+                  },
+            });
           }
 
           // #88: Ledger'ı iade oranınca PRO-RATE et (kısmi iadede de). Original alanlar

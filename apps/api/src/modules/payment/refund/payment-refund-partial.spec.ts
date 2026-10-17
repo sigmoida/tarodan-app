@@ -818,34 +818,54 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
    * (K7). In a two-unit order returned one unit at a time, the first refund
    * already consumed half of the hold, and the completing refund carries the
    * seller's shipping share as `holdRetainedAmount`. That amount is what must
-   * be LEFT in the hold after this refund, so the cap has to count what earlier
+   * be LEFT in the hold after this refund, so the cap counts what earlier
    * refunds consumed; capping only this refund's slice let the hold be consumed
    * in full and the seller's share silently ended with the platform.
    */
   describe("line-completing refund after an earlier partial", () => {
-    // hold 860 for qty 2; first unit refunded earlier consumed 430.
+    // hold 860 for qty 2; the first unit, refunded earlier for 500, consumed 430.
     const priorPartial = {
       paymentAmount: 1140,
       holdAmount: 860,
       holdRefundedAmount: 430,
       metadata: { refundedOrders: { [ORDER_ID]: 500 } },
     };
-
-    it("leaves the seller's shipping share in the hold for a non-seller fault", async () => {
-      const { service, captured } = makeService(priorPartial);
-
-      await service.processRefund(ORDER_ID, 452, {
-        cancelledBy: CancellationActor.buyer,
-        idempotencyKey: "completing-refund-retain",
-        refundQuantity: 1,
-        settlement: {
-          closeOrder: false,
-          holdPortion: 0.5,
-          sellerFeeRefundAmount: 0,
-          buyerFeeRefundAmount: 0,
-          holdRetainedAmount: 48,
-        },
+    const twoUnitOrder = (mockTx: { order: { findUnique: jest.Mock } }) =>
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "delivered",
+        productId: "prod-1",
+        quantity: 2,
+        stockRestoredAt: null,
+        offerId: null,
+        sellerId: "s1",
+        buyerId: "b1",
+        cancelledBy: null,
+        deliveredAt: new Date("2026-10-01T09:00:00.000Z"),
       });
+    const completing = (refundAmount: number, holdRetainedAmount: number) => ({
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: `completing-refund-${refundAmount}`,
+      refundQuantity: 1,
+      settlement: {
+        // The request returns one of two units: it does not close the order.
+        closeOrder: false,
+        holdPortion: 0.5,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount,
+      },
+    });
+    const closedTheOrder = (mockTx: { order: { update: jest.Mock } }) =>
+      mockTx.order.update.mock.calls.some(
+        ([arg]) => arg?.data?.status === "cancelled",
+      );
+
+    it("non-seller fault: leaves the share held and keeps the order open", async () => {
+      const { service, captured, mockTx } = makeService(priorPartial);
+      twoUnitOrder(mockTx);
+
+      // Buyer charged return and share: 500 + 452 < 1140 paid.
+      await service.processRefund(ORDER_ID, 452, completing(452, 48));
 
       // 860 − 48 = 812 consumed in total (430 earlier + 382 now); 48 stays
       // held for the seller, the hold is not cancelled.
@@ -856,23 +876,21 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         }),
       );
       expect(captured.holdUpdate.data.status).toBeUndefined();
+      // The order stays delivered: the share goes out on the normal release.
+      expect(closedTheOrder(mockTx)).toBe(false);
+      expect(mockTx.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ quantity: { increment: 1 } }),
+        }),
+      );
     });
 
-    it("consumes the hold in full when nothing is retained (seller fault)", async () => {
-      const { service, captured } = makeService(priorPartial);
+    it("seller fault: retains nothing, consumes the hold and closes the order", async () => {
+      const { service, captured, mockTx } = makeService(priorPartial);
+      twoUnitOrder(mockTx);
 
-      await service.processRefund(ORDER_ID, 640, {
-        cancelledBy: CancellationActor.buyer,
-        idempotencyKey: "completing-refund-seller-fault",
-        refundQuantity: 1,
-        settlement: {
-          closeOrder: false,
-          holdPortion: 0.5,
-          sellerFeeRefundAmount: 0,
-          buyerFeeRefundAmount: 0,
-          holdRetainedAmount: 0,
-        },
-      });
+      // The buyer gets everything back: 500 + 640 = 1140 = paid.
+      await service.processRefund(ORDER_ID, 640, completing(640, 0));
 
       expect(captured.holdUpdate.data).toEqual(
         expect.objectContaining({
@@ -880,34 +898,57 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
           refundedAmount: 860,
         }),
       );
+      expect(closedTheOrder(mockTx)).toBe(true);
     });
 
-    it("never un-consumes: a retained share above what is left leaves the hold as it is", async () => {
-      // Earlier refunds already took more than amount − retained: this refund
-      // consumes nothing more, it never gives back what was consumed.
-      const { service, captured } = makeService({
-        ...priorPartial,
-        holdRefundedAmount: 840,
+    it("small hold: gives back the part of an earlier slice past the share", async () => {
+      // Cheap item: hold 60, share 48. The first unit took 30; leaving 48
+      // means only 12 may stay consumed. The buyer was charged the share.
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 200,
+        holdAmount: 60,
+        holdRefundedAmount: 30,
+        metadata: { refundedOrders: { [ORDER_ID]: 70 } },
       });
+      twoUnitOrder(mockTx);
 
-      await service.processRefund(ORDER_ID, 100, {
-        cancelledBy: CancellationActor.buyer,
-        idempotencyKey: "completing-refund-over-consumed",
-        refundQuantity: 1,
-        settlement: {
-          closeOrder: false,
-          holdPortion: 0.5,
-          sellerFeeRefundAmount: 0,
-          buyerFeeRefundAmount: 0,
-          holdRetainedAmount: 48,
-        },
-      });
+      await service.processRefund(ORDER_ID, 22, completing(22, 48));
 
       expect(captured.holdUpdate.data).toEqual(
-        expect.objectContaining({ refundedAmount: 840 }),
+        expect.objectContaining({ refundedAmount: 12 }),
       );
       expect(captured.holdUpdate.data.status).toBeUndefined();
     });
+  });
+
+  it("an earlier goodwill refund does not eat the share of a later full non-fault refund", async () => {
+    // 50 TL goodwill (amount ratio) consumed 50 of a 1000 hold. The later full
+    // refund still leaves the seller's 48: 1000 − 48 = 952 consumed in total.
+    // (It used to cap only its own slice: 50 + 952 ≥ 1000 cancelled the hold.)
+    const { service, captured } = makeService({
+      paymentAmount: 1250,
+      holdAmount: 1000,
+      holdRefundedAmount: 50,
+      metadata: { refundedOrders: { [ORDER_ID]: 50 } },
+    });
+
+    await service.processRefund(ORDER_ID, 1200, {
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: "full-after-goodwill",
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 48,
+      },
+    });
+
+    expect(captured.holdUpdate.data).toEqual(
+      expect.objectContaining({ refundedAmount: 952 }),
+    );
+    expect(captured.holdUpdate.data.status).toBeUndefined();
   });
 
   /**
