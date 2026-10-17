@@ -364,6 +364,13 @@ pnpm --filter @tarodan/api test:integration # cross-service flows
 pnpm --filter @tarodan/api test:e2e         # full HTTP (needs test DB: test:e2e:setup)
 ```
 
+What runs where (details: `docs/OPERATIONS.md` §4): the pre-push hook to
+`development` runs only the affected apps' typecheck (~1 min); the full API
+unit suite runs in CI on every push and gates the staging deploy; PRs to
+`master` and the production release run the full gate (+ production build and
+dependency audit). `pnpm verify:push --tests` runs the related specs locally
+before a push; don't reach for `--no-verify`.
+
 - Schema changed? `prisma migrate dev` locally; remember the deploy needs
   `migrate deploy` (see docs/OPERATIONS.md).
 - New runtime dependency on a `@tarodan/*` package? The **Dockerfile must
