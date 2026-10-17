@@ -56,13 +56,16 @@ expected-commit check, wait for the result).
 - Deploy targets are the apps (api, web, admin) changed since the last
   successful run, so cancelled or failed runs still ship later.
 - After a successful production rollout, the `Tag the release` job of
-  Release Production pushes the annotated tag `app-YYYY.MM.DD-N`
-  (Europe/Istanbul date, `N` = highest of the day + 1) on the deployed
-  commit. It is the only job with `contents: write`; if it fails, re-run
-  failed jobs only (re-running all jobs redeploys production). No tag when
-  nothing was deployed; a commit that already has an `app-*` tag keeps it.
-  The tag ruleset on `app-*` and `mobile-v*` allows creation only (no move,
-  no delete, no bypass). Format: tarodan-ops `docs/versioning.md`.
+  Release Production pushes the annotated tag `app-YYYY.MM.DD-N` on the
+  deployed commit (the Europe/Istanbul day of the push, `N` = highest of that
+  day on origin + 1). It is the only job with `contents: write`. If it fails,
+  use "Re-run failed jobs" (never "Re-run all jobs", which redeploys
+  production) while no other Release Production run is queued: the re-run
+  joins the `release-production` concurrency group and cancels a pending
+  run. No tag when nothing was deployed; a commit that already has an
+  `app-YYYY.MM.DD-N` tag keeps it. The tag ruleset on `app-*` and
+  `mobile-v*` allows creation only (no move, no delete, no bypass). Format:
+  tarodan-ops `docs/versioning.md`.
 - Secrets used by deploys: `COOLIFY_URL`, `COOLIFY_TOKEN`,
   `COOLIFY_STAGING_UUIDS`, `COOLIFY_PROD_UUIDS`; data workflows use the shared
   `SERVER_*` SSH secrets and their environment's seed secrets. Gates use **no**

@@ -1098,19 +1098,20 @@ Notlar:
   (`development` / `master`) deploy eder.
 - **Release tag:** after every deployment of a production run has finished,
   the `Tag the release` job of Release Production pushes the annotated tag
-  `app-YYYY.MM.DD-N` on the deployed commit (Europe/Istanbul date; `N` = the
-  highest `N` of that day + 1; the message lists the commit, the apps and the
-  run). The name is fixed before the rollout (a run that crosses midnight
-  keeps the start day), so a failed rollout creates no tag and the next run
-  reuses the name. A run that deployed nothing creates no tag; a commit that
-  already has an `app-*` tag keeps it. If the tag job fails, the rollout
-  still succeeded: use **Re-run failed jobs** (never "Re-run all jobs", which
-  redeploys production). If the name is already taken by another commit, the
-  re-run fails too; tag by hand with the next free `N` (with the user's
-  approval): `git tag -a app-YYYY.MM.DD-N <sha> -m "Production release ..."`
-  and `git push origin refs/tags/app-YYYY.MM.DD-N`. The run then stays
-  failed, so the next release also redeploys those apps. The tag ruleset
-  allows creation only: an `app-*` tag is never moved or deleted.
+  `app-YYYY.MM.DD-N` on the deployed commit (the message lists the commit,
+  the apps and the run). The name is computed when the tag is pushed: the
+  Europe/Istanbul day of the push (a rollout that ends after midnight gets
+  the new day) and `N` = the highest `N` of that day on origin + 1. A run
+  that deployed nothing creates no tag; a commit that already has an
+  `app-YYYY.MM.DD-N` tag keeps it. If the tag job fails (network, or the name
+  was taken a moment before the push), the rollout still succeeded: use
+  **Re-run failed jobs**, which retries only the tag job and takes the next
+  free `N`. Never "Re-run all jobs" (it redeploys production), and re-run
+  only while no other Release Production run is queued: the re-run joins the
+  `release-production` concurrency group, which cancels a pending run. Until
+  the tag job passes, the run stays failed; if it is the newest master run,
+  the next release also redeploys its apps. The tag ruleset allows creation
+  only: an `app-*` tag is never moved or deleted.
 - **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
   ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
   engeller: push ettiğin commit'i checkout et.
@@ -1153,7 +1154,8 @@ Raporlar `.git/tarodan-test-results/` altına yazılır (`latest-<mod>.json`).
 
 ### GitHub settings (manual, repo admin)
 
-Rulesets (Settings -> Rules -> Rulesets), all active:
+Rulesets (Settings -> Rules -> Rulesets). The three below are active; the
+fourth, "Code Quality Copilot review for default branch", is disabled.
 
 **`master: production protection`** (branch `master`):
 
@@ -1162,7 +1164,11 @@ Rulesets (Settings -> Rules -> Rulesets), all active:
 - Restrict deletions; block force pushes.
 - Require a pull request before merging, 0 approvals; allowed merge method:
   **merge commit** only.
-- Required status checks: `Verify / Typecheck & lint`, `Verify / Unit tests`,
+- Required status checks, each with source **GitHub Actions** so no other
+  token or app can post a passing status under the same name (the live
+  ruleset does not pin the source yet; set it when you next edit the
+  ruleset):
+  `Verify / Typecheck & lint`, `Verify / Unit tests`,
   `Verify / Build & audit`, `Master source guard`. `Master source guard`
   reports only once `master-source-guard.yml` is on `master`
   (`pull_request_target` reads the workflow from `master`); until that
