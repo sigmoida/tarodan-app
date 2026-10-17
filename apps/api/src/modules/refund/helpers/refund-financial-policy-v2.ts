@@ -68,6 +68,14 @@ export interface RefundFinancialInputV2 {
    * sipariş).
    */
   closesPackageShipping?: boolean;
+  /**
+   * An earlier finalized refund of this order was seller fault
+   * (`sellerShareForfeited`, decision D20): the seller's own shipping share is
+   * not refunded to them (no `seller_refund` outbound component), whatever the
+   * fault of this refund. It stays with the platform; buyer-side lines are
+   * unchanged.
+   */
+  sellerShareForfeited?: boolean;
 }
 
 export interface RefundFinancialResultV2 {
@@ -193,6 +201,19 @@ export function calculateRefundFinancialsV2(
   }
 
   const outboundTax = (amount: number) => lineTax(amount, input.serviceVatRate);
+  // The seller's own outbound shipping share back to them, unless an earlier
+  // seller-fault refund of the order forfeited it (D20).
+  const addSellerShare = () => {
+    if (input.sellerShareForfeited) return;
+    add(
+      "outbound_shipping",
+      "seller_refund",
+      input.sellerShippingAmount,
+      outboundTax(input.sellerShippingAmount),
+      input.sellerShippingAmount,
+      1,
+    );
+  };
   // K7: kısmi (adet) iadede gidiş kargosu HİÇ işlenmez — koli, kalan teslim
   // adetlere hizmet etmiştir. Yalnız satırı tamamlayan iade kargo bileşenlerini
   // ve tek seferlik koli mutabakatını üretir.
@@ -236,14 +257,7 @@ export function calculateRefundFinancialsV2(
         input.buyerShippingAmount,
         1,
       );
-      add(
-        "outbound_shipping",
-        "seller_refund",
-        input.sellerShippingAmount,
-        outboundTax(input.sellerShippingAmount),
-        input.sellerShippingAmount,
-        1,
-      );
+      addSellerShare();
       add(
         "outbound_shipping",
         "buyer_charge",
@@ -262,14 +276,7 @@ export function calculateRefundFinancialsV2(
         input.buyerShippingAmount,
         1,
       );
-      add(
-        "outbound_shipping",
-        "seller_refund",
-        input.sellerShippingAmount,
-        outboundTax(input.sellerShippingAmount),
-        input.sellerShippingAmount,
-        1,
-      );
+      addSellerShare();
       add(
         "outbound_shipping",
         "platform_absorb",
@@ -307,14 +314,7 @@ export function calculateRefundFinancialsV2(
     // için kimseye ödenemiyordu (escrow'da süresiz kilit). Bileşen hiç
     // üretilmeyince hold tamamen tüketilir.
     if (input.faultParty !== "seller") {
-      add(
-        "outbound_shipping",
-        "seller_refund",
-        input.sellerShippingAmount,
-        outboundTax(input.sellerShippingAmount),
-        input.sellerShippingAmount,
-        1,
-      );
+      addSellerShare();
     }
   }
 

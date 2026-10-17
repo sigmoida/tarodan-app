@@ -33,6 +33,7 @@ import {
   shippingAmountForDesi,
 } from "../shipping/helpers/shipping-tariff.helper";
 import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
+import { sellerShareForfeited } from "../payout/helpers/hold-release-eligibility";
 import { readInvoiceLineItems } from "../invoicing/invoice/invoice-lines";
 import {
   calculateRefundFinancials,
@@ -399,8 +400,11 @@ export class RefundFinancialService {
           : {}),
         status: RefundRequestStatus.refunded,
       },
-      select: { refundQuantity: true },
+      select: { refundQuantity: true, faultParty: true, policyCode: true },
     });
+    // D20: an earlier seller-fault refund forfeits the seller's own shipping
+    // share for the rest of the order (one rule: `sellerShareForfeited`).
+    const shareForfeited = sellerShareForfeited(priorRefundedRows);
     const priorRefundedQuantity = priorRefundedRows.reduce(
       (sum, row) => sum + (row.refundQuantity ?? 0),
       0,
@@ -446,6 +450,7 @@ export class RefundFinancialService {
       outboundAlreadySettled,
       completesLine,
       closesPackageShipping,
+      sellerShareForfeited: shareForfeited,
     });
     const returnTariff = activeReturnTariff
       ? {

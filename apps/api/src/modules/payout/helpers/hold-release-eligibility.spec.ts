@@ -14,6 +14,7 @@ import {
   holdResidual,
   holdResidualPayable,
   isSellerFaultRefund,
+  sellerShareForfeited,
   type HoldReleaseHoldFacts,
   type HoldReleaseOrderFacts,
 } from "./hold-release-eligibility";
@@ -90,6 +91,32 @@ describe("isSellerFaultRefund — the fault source", () => {
     ],
   ] as const)("%s → %s", (_name, refund, expected) => {
     expect(isSellerFaultRefund(refund)).toBe(expected);
+  });
+});
+
+describe("sellerShareForfeited — D20", () => {
+  it("is true once any finalized refund is seller fault (v1 or v2)", () => {
+    expect(sellerShareForfeited([])).toBe(false);
+    expect(
+      sellerShareForfeited([
+        { faultParty: "buyer", policyCode: "v2_buyer_return" },
+        { faultParty: "carrier", policyCode: "v2_carrier_return" },
+      ]),
+    ).toBe(false);
+    expect(
+      sellerShareForfeited([
+        { faultParty: "buyer", policyCode: "v2_buyer_return" },
+        { faultParty: "seller", policyCode: "v2_seller_return" },
+      ]),
+    ).toBe(true);
+    expect(
+      sellerShareForfeited([
+        { faultParty: null, policyCode: "seller_fault_return" },
+      ]),
+    ).toBe(true);
+    expect(
+      sellerShareForfeited([{ faultParty: null, policyCode: "legacy" }]),
+    ).toBe(true);
   });
 });
 

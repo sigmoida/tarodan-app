@@ -335,6 +335,80 @@ describe("RefundService policy integration", () => {
     });
   });
 
+  it("an earlier seller-fault refund forfeits the seller's shipping share on the line-completing refund (D20)", async () => {
+    // Two units, the first already refunded as seller fault. The second is a
+    // buyer-fault return that completes the line: the v2 calculation reads
+    // the finalized requests and emits no seller_refund share for the seller.
+    const twoUnits = {
+      ...baseOrder,
+      quantity: 2,
+      package: { ...baseOrder.package, sellerShippingAmount: 40 },
+    };
+    const { service, prisma } = makeService(twoUnits);
+    prisma.refundRequest.findMany.mockResolvedValue([
+      {
+        refundQuantity: 1,
+        faultParty: "seller",
+        policyCode: "v2_seller_return",
+      },
+    ]);
+
+    await service.createRefundRequest("order-1", "buyer-1", {
+      reason: RefundReason.damaged,
+      refundQuantity: 1,
+      evidencePhotoUrls: ["https://example.com/evidence.jpg"],
+    });
+    const preview = await service.previewRefundDecision(
+      "refund-1",
+      RefundReason.damaged,
+      "buyer",
+    );
+
+    const outbound = preview.financials.components.filter(
+      (c) => c.componentCode === "outbound_shipping",
+    );
+    expect(outbound.some((c) => c.treatment === "seller_refund")).toBe(false);
+    // The buyer side is unchanged: the buyer still bears the seller's share.
+    expect(outbound).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ treatment: "buyer_charge", netAmount: 40 }),
+      ]),
+    );
+  });
+
+  it("without an earlier seller fault the same refund still gives the seller their share", async () => {
+    const twoUnits = {
+      ...baseOrder,
+      quantity: 2,
+      package: { ...baseOrder.package, sellerShippingAmount: 40 },
+    };
+    const { service, prisma } = makeService(twoUnits);
+    prisma.refundRequest.findMany.mockResolvedValue([
+      { refundQuantity: 1, faultParty: "buyer", policyCode: "v2_buyer_return" },
+    ]);
+
+    await service.createRefundRequest("order-1", "buyer-1", {
+      reason: RefundReason.damaged,
+      refundQuantity: 1,
+      evidencePhotoUrls: ["https://example.com/evidence.jpg"],
+    });
+    const preview = await service.previewRefundDecision(
+      "refund-1",
+      RefundReason.damaged,
+      "buyer",
+    );
+
+    expect(preview.financials.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          componentCode: "outbound_shipping",
+          treatment: "seller_refund",
+          netAmount: 40,
+        }),
+      ]),
+    );
+  });
+
   it("derives platform-sale product VAT from the original invoice line", async () => {
     const platformOrder = {
       ...baseOrder,

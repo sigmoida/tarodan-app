@@ -16,6 +16,7 @@ import {
   OfferStatus,
   OrderStatus,
   RefundAttemptStatus,
+  RefundRequestStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
 import type { AdminCancelReasonCode } from "@tarodan/types";
@@ -51,6 +52,7 @@ import { asPaymentMetadata } from "../helpers/payment-metadata.types";
 import {
   HOLD_RESIDUAL_MIN,
   holdResidual,
+  sellerShareForfeited,
 } from "../../payout/helpers/hold-release-eligibility";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
@@ -332,6 +334,36 @@ export class PaymentRefundService {
     ...args: Parameters<PaymentTradeRefundService["refundTradeCashTracked"]>
   ) {
     return this.tradeRefunds.refundTradeCashTracked(...args);
+  }
+
+  /**
+   * The seller shipping share to leave in the hold, after the D20 rule: none
+   * once ANY finalized refund of the order is seller fault
+   * (`sellerShareForfeited`). The v2 policy already emits no share then; this
+   * is the last check for every caller, for example a request whose v2
+   * components were finalized before that rule existed. Read inside the
+   * refund transaction, through the order (same shape as the release paths).
+   */
+  private async retainedShareFor(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    requested: number | undefined,
+  ): Promise<number> {
+    if (requested == null || !(requested > 0)) return 0;
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        refundRequests: {
+          where: { status: RefundRequestStatus.refunded },
+          select: { faultParty: true, policyCode: true },
+        },
+      },
+    });
+    if (!sellerShareForfeited(order?.refundRequests ?? [])) return requested;
+    this.logger.warn(
+      `Seller shipping share forfeited (earlier seller-fault refund): order=${orderId} share=${requested}`,
+    );
+    return 0;
   }
 
   private async notifyRefundOutcome(
@@ -968,13 +1000,18 @@ export class PaymentRefundService {
             // seller's own shipping share to leave in the hold is
             // `holdRetainedAmount`; the formula (cumulative cap) is in
             // `holdRefundedAmountAfter`.
+            const retained = await this.retainedShareFor(
+              tx,
+              orderId,
+              opts?.settlement?.holdRetainedAmount,
+            );
             const newRefunded = holdRefundedAmountAfter({
               amount: activeHold.amount,
               refundedAmount: activeHold.refundedAmount,
               portion:
                 opts?.settlement?.holdPortion ??
                 refundPortion(amountToRefund, orderRefundThreshold),
-              retained: opts?.settlement?.holdRetainedAmount,
+              retained,
             });
             const fullyConsumed = holdResidual({
               amount: activeHold.amount,

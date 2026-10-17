@@ -332,6 +332,47 @@ describe("refund financial policy v2", () => {
     );
   });
 
+  describe("an earlier seller-fault refund forfeits the seller's share (D20)", () => {
+    const sellerShare = (
+      result: ReturnType<typeof calculateRefundFinancialsV2>,
+    ) =>
+      result.components.filter(
+        (c) =>
+          c.componentCode === "outbound_shipping" &&
+          c.treatment === "seller_refund",
+      );
+
+    it.each([
+      ["buyer, shipped", "buyer", true],
+      ["carrier, shipped", "carrier", true],
+      ["platform, shipped", "platform", true],
+      ["buyer, before shipment", "buyer", false],
+    ] as const)(
+      "%s: no seller_refund share, buyer side unchanged",
+      (_n, faultParty, hasShipped) => {
+        const forfeited = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped,
+          sellerShareForfeited: true,
+        });
+        const normal = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped,
+        });
+
+        expect(sellerShare(normal)).toHaveLength(1);
+        expect(sellerShare(forfeited)).toHaveLength(0);
+        expect(forfeited.buyerRefundAmount).toBe(normal.buyerRefundAmount);
+        expect(forfeited.sellerNetEffectAmount).toBeCloseTo(
+          normal.sellerNetEffectAmount - 48,
+          2,
+        );
+      },
+    );
+  });
+
   it.each([0, 10, 20])(
     "keeps net + tax = gross at %s service VAT",
     (serviceVatRate) => {

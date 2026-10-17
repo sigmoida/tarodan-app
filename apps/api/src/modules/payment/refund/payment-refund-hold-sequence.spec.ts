@@ -26,6 +26,7 @@ import {
   holdReleaseBlockedReason,
   holdReleaseOrderFacts,
   holdResidualSettleable,
+  sellerShareForfeited,
 } from "../../payout/helpers/hold-release-eligibility";
 
 /**
@@ -493,9 +494,17 @@ function makeWorld(quantity: number) {
   /**
    * One v2 return request of `units`, finalized with `fault`, as the returned
    * shipment finalizer runs it: `completesLine` from the units returned so
-   * far, idempotency key `refund-request:<id>`, buyer as the cancel actor.
+   * far, `sellerShareForfeited` from the finalized requests (as
+   * `computeV2Refund` reads them), idempotency key `refund-request:<id>`,
+   * buyer as the cancel actor. `policyUnaware` computes the request as if it
+   * had been finalized before the D20 rule existed (no forfeit flag), so only
+   * the hold-consumption check in `processRefund` applies.
    */
-  async function returnUnitsV2(units: number, fault: RefundFaultPartyV2) {
+  async function returnUnitsV2(
+    units: number,
+    fault: RefundFaultPartyV2,
+    opts: { policyUnaware?: boolean } = {},
+  ) {
     const completesLine = returnedUnits + units >= quantity;
     const financialsV2 = calculateRefundFinancialsV2({
       ...V2_ORDER_MONEY,
@@ -505,6 +514,9 @@ function makeWorld(quantity: number) {
       hasShipped: true,
       completesLine,
       closesPackageShipping: completesLine,
+      sellerShareForfeited: opts.policyUnaware
+        ? false
+        : sellerShareForfeited(state.refundRequests),
     });
     const rrId = `rr-${++requestNo}`;
     const { components } = financialsV2;
@@ -824,13 +836,13 @@ describe("refund -> hold consumption -> release -> payout (stateful, through the
   });
 
   /**
-   * Mixed faults: a PIN of today's behaviour, not a policy decision. Whether
-   * the share is paid depends on the LAST unit's fault and on whether the cash
-   * refunds happen to reach T (the order then closes and the residual path
-   * checks every finalized request for seller fault). Product decision is
-   * pending; change these on purpose only.
+   * Mixed faults, decision D20: once ANY finalized refund of the order is
+   * seller fault, the seller's own shipping share goes to the platform,
+   * whatever the fault of the line-completing refund and whether or not the
+   * cash refunds reach T. The v2 policy emits no share, the hold retains
+   * nothing, and neither release path has anything to pay or settle.
    */
-  describe("mixed faults (current behaviour pins)", () => {
+  describe("mixed faults (D20: any seller fault forfeits the share)", () => {
     it("buyer fault first, seller fault last: the hold is consumed in full, nothing is paid", async () => {
       const w = makeWorld(2);
 
@@ -849,39 +861,71 @@ describe("refund -> hold consumption -> release -> payout (stateful, through the
       expect(w.state.payouts).toHaveLength(0);
     });
 
-    it("seller fault first, carrier fault last: the order closes and the 48 goes to the platform, not the seller", async () => {
+    it("seller fault first, carrier fault last: the order closes, the hold is consumed, the 48 stays with the platform", async () => {
       const w = makeWorld(2);
 
       await w.returnUnitsV2(1, "seller");
       const second = await w.returnUnitsV2(1, "carrier");
 
-      expect(second.retained).toBe(SHARE);
-      expect(money(w.state.hold.refundedAmount)).toBe("784.00");
-      // 545 + 605 = T: the order closes, the residual path sees a seller-fault
-      // request and blocks the release; the residual is settleable instead.
+      // No seller_refund share component, so nothing is retained.
+      expect(second.retained).toBe(0);
+      expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
+      expect(money(w.state.hold.refundedAmount)).toBe("832.00");
+      // The buyer side is unchanged: 545 + 605 = T and the order closes.
       expect(w.cashRefunded()).toBe(PAYMENT_AMOUNT);
       expect(w.state.order.status).toBe(OrderStatus.cancelled);
-      expect(w.holdBlockedReason()).toBe("seller_at_fault");
-      expect(w.residualSettleable()).toBe(true);
+      // No residual is left to release or to settle by hand.
+      expect(w.residualSettleable()).toBe(false);
 
       const run = await w.releaseAndPay();
 
       expect(run).toEqual({ released: 0, payoutsCreated: 0 });
-      expect(w.state.hold.status).toBe(PaymentHoldStatus.held);
+      expect(w.state.payouts).toHaveLength(0);
     });
 
-    it("seller fault first, buyer fault last: the order stays delivered and the seller IS paid 48", async () => {
+    it("seller fault first, buyer fault last (cash < T): the order stays delivered and the normal release pays nothing", async () => {
       const w = makeWorld(2);
 
       await w.returnUnitsV2(1, "seller");
       const second = await w.returnUnitsV2(1, "buyer");
 
-      expect(second.retained).toBe(SHARE);
-      // 545 + 446 < T: the normal (delivered) release path does not look at
-      // the fault of earlier requests.
+      expect(second.retained).toBe(0);
+      expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
+      expect(money(w.state.hold.refundedAmount)).toBe("832.00");
+      // The buyer is still charged the seller's share on their return
+      // (buyer fault): 545 + 446 < T, so the order stays delivered.
       expect(w.cashRefunded()).toBe(991);
       expect(w.state.order.status).toBe(OrderStatus.delivered);
-      expect(w.holdBlockedReason()).toBeNull();
+
+      await w.releaseAndPay();
+
+      expect(w.state.payouts).toHaveLength(0);
+    });
+
+    it("a completing request finalized before D20 (still carrying the share) is caught at hold consumption", async () => {
+      const w = makeWorld(2);
+
+      await w.returnUnitsV2(1, "seller");
+      // The request's v2 components still have the 48 seller_refund share.
+      const second = await w.returnUnitsV2(1, "buyer", { policyUnaware: true });
+
+      expect(second.retained).toBe(SHARE);
+      // processRefund re-reads the finalized requests and retains nothing.
+      expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
+      expect(money(w.state.hold.refundedAmount)).toBe("832.00");
+
+      await w.releaseAndPay();
+
+      expect(w.state.payouts).toHaveLength(0);
+    });
+
+    it("no seller fault on any unit: the share is still paid (the rule does not over-reach)", async () => {
+      const w = makeWorld(2);
+
+      await w.returnUnitsV2(1, "buyer");
+      const second = await w.returnUnitsV2(1, "carrier");
+
+      expect(second.retained).toBe(SHARE);
 
       await w.releaseAndPay();
 
