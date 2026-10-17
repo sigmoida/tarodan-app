@@ -11,7 +11,7 @@ import { productFilterKeys } from "../_lib/filters";
 /** Maps the raw product rows from context and renders the shared DataTable. */
 export function ProductsTable() {
   const t = useTranslations();
-  const { rows, isLoading, filters, search, sort, setSort } =
+  const { rows, isLoading, filters, search, sort, setSort, selection } =
     useResourceList<any>();
   const products = useMemo(() => mapProducts(rows, t), [rows, t]);
   const columns = useMemo(() => productColumns(t), [t]);
@@ -26,6 +26,10 @@ export function ProductsTable() {
       data={products}
       loading={isLoading}
       getRowId={(p) => p.id}
+      selectable={selection.selectable}
+      selectedIds={selection.selectedIds}
+      onToggleRow={selection.toggleRow}
+      onToggleAll={selection.toggleAll}
       sort={sort}
       onSort={setSort}
       emptyText={

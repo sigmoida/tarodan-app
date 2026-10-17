@@ -50,6 +50,8 @@ export interface Product {
   imageUrl?: string;
   createdAt: string;
   aiCheckStatus?: string | null;
+  /** Pasif ilanın kapanış nedeni (`expired` = toplu yenilenebilir). */
+  inactiveReason?: string | null;
   /** Güncel kaldırma özeti; vitrindeki ilan için `null`. */
   removal: AdminListingRemovalSummary | null;
 }
@@ -88,6 +90,7 @@ export function mapProducts(raw: any[], t: T): Product[] {
     })(),
     createdAt: p.createdAt,
     aiCheckStatus: p.aiCheckStatus ?? null,
+    inactiveReason: p.inactiveReason ?? null,
     removal: p.removal ?? null,
   }));
 }

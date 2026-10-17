@@ -26,9 +26,13 @@ import { ProductsCountText } from "./_components/ProductsCountText";
 import { productFilterFields } from "./_lib/filters";
 import { useBrandOptions, useCarModelOptions } from "@/hooks/useBrandOptions";
 import { ProductsTable } from "./_components/ProductsTable";
+import { ProductsBulkBar } from "./_components/ProductsBulkBar";
 import { ProductBulkImportModal } from "./_components/ProductBulkImportModal";
 
 const DEFAULT_TAB: ProductStatusTab = "active";
+
+/** Süresi dolan ilanlar pasif durumdadır: toplu seçim yalnız bu sekmede açılır. */
+const BULK_RENEW_TAB: ProductStatusTab = "inactive";
 
 /** Sekme sayaçlarının parametreleri: durum başına `{ status }`. */
 const TAB_COUNT_PARAMS = Object.fromEntries(
@@ -84,6 +88,7 @@ export default function ProductsPage() {
           fetcher={(params) => adminApi.getProducts({ ...params, status })}
           getRowId={(p) => p.id}
           syncUrl
+          selectable={status === BULK_RENEW_TAB}
           filters={productFilterFields(t, brands, models)}
           // `sellerId`: satıcı detayından gelen deep-link (kendi kontrolü yok).
           initialFilters={{ sellerId: "" }}
@@ -91,6 +96,7 @@ export default function ProductsPage() {
           <ResourceList.Toolbar
             searchPlaceholder={t("admin.catalog.products.searchPlaceholder")}
           />
+          {status === BULK_RENEW_TAB && <ProductsBulkBar />}
           <ProductsTable />
           <ResourceList.Pagination />
         </ResourceList>
