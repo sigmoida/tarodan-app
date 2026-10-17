@@ -3,7 +3,6 @@ import { AuthController } from "../auth.controller";
 import { NewsletterController } from "../../marketing/newsletter.controller";
 import { OrderController } from "../../order/order.controller";
 import { PaymentController } from "../../payment/payment.controller";
-import { SecurityController } from "../../security/security.controller";
 import { ConsentController } from "../../consent/consent.controller";
 import { readFileSync } from "fs";
 import { resolve } from "path";
@@ -33,8 +32,8 @@ describe("critical public route throttles", () => {
       limit: 60,
     },
     {
-      controller: SecurityController,
-      method: "requestPasswordReset",
+      controller: AuthController,
+      method: "forgotPassword",
       limit: 3,
     },
     // E-posta doğrulama artık YALNIZ auth'ta. Security modülünde ikinci bir

@@ -243,8 +243,9 @@ düşük trafikte çalıştır. Hata olursa `search_indexes.status = error` olur
 `500 server.search.reindexFailed` döner; ES'i kontrol edip yeniden çalıştır
 (idempotent). Koleksiyon indeksi bu değişiklikten etkilenmez.
 
-**Doğrulama:** `GET /api/search/status` → `inSync: true` ve `documentCount`
-≈ `dbCount` (±2); POST yanıtındaki `indexed` = `dbCount`; API logunda
+**Doğrulama:** `GET /api/search/status` → `documentCount` = `dbCount` (hedef
+budur; `inSync` yalnız sayıyı ±2 toleransla karşılaştırır, ID düzeyinde temizlik
+kanıtı değildir); POST yanıtındaki `indexed` = `dbCount`; API logunda
 `Reindexed <N> products`. Takip: `ProductQueryService`'in ES ↔ Postgres
 uyuşmazlık fallback'i (`products.length !== esResult.ids.length`) normal
 trafikte sık tetiklenirse, #439'daki "stale id'leri düşür, toplamı düzelt"
@@ -255,7 +256,8 @@ yumuşatması gündeme alınır.
 > siler; API açılışındaki `syncIndexIfEmpty` de mapping'de `sellerCanSell` /
 > `sellerSalesEntitledUntil` / `productKind` yoksa tam reindex yapar. Elle
 > reindex düzeltmeyi bir saat beklemeden anında yapar. 2026-10-17 itibarıyla
-> staging (551/551) ve production (566/564) `inSync: true`.
+> staging 551/551; production 566/564 (`inSync: true` ama 2 doküman fark var —
+> canlıya çıkışta elle reindex ile `documentCount` = `dbCount` yapılması önerilir).
 
 ### Bir kerelik: silinen hesap kimlik arşivi backfill'i
 

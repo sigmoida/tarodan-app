@@ -22,7 +22,6 @@ import {
   CsrfTokenResponseDto,
   AdminSessionListDto,
 } from "./dto";
-import { Public } from "../auth/decorators/public.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { RequirePermission } from "../auth/decorators/require-permission.decorator";
