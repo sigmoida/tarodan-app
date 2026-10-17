@@ -29,10 +29,10 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { type Locale } from "@tarodan/i18n";
 import { PaymentService } from "./payment.service";
+import { PaymentOptionalAuthService } from "./checkout/payment-optional-auth.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { COOKIE_NAMES, readCookie } from "../auth/utils/auth-cookies";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import {
   InitiatePaymentDto,
@@ -78,64 +78,17 @@ export class PaymentController {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly i18n: I18nService,
+    private readonly optionalAuth: PaymentOptionalAuthService,
   ) {}
 
   /**
-   * @Public uçlarda kimlik belirtecini okur: önce `Authorization: Bearer`
-   * (mobil / web BFF gateway'i açıkça gönderir), yoksa httpOnly cookie
-   * (tarayıcıdan doğrudan API). İkisi birden geldiğinde Bearer kazanır:
-   * istemcinin bilerek gönderdiği belirteç, ortak bir çerez deposunda kalmış
-   * bayat bir çerezin gölgesinde kalmasın. Yalnız biri gelen istemcide (bugünkü
-   * mobil ve web) davranış aynıdır.
+   * @Public uçlarda isteğe bağlı kullanıcı: korumalı uçlarla aynı çıkarıcı ve
+   * hesap kuralları (`PaymentOptionalAuthService`). Kimlik bilgisi yok ya da
+   * geçersizse null döner (misafir akışı).
    */
-  private readAccessToken(req: Request): string | null {
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      const bearer = authHeader.substring(7).trim();
-      if (bearer) return bearer;
-    }
-    return readCookie(req, [COOKIE_NAMES.user.access]) ?? null;
-  }
-
-  /** Belirteç geçerli bir kullanıcı access token'ıysa kullanıcı id'si, değilse null. */
-  private verifyAccessToken(token: string): string | null {
-    try {
-      const decoded = this.jwtService.verify(token) as {
-        sub?: string;
-        id?: string;
-        type?: string;
-      };
-      if (decoded.type !== "access") return null;
-      return decoded.sub || decoded.id || null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * @Public uçlarda isteğe bağlı kullanıcı: belirteç yok/çözülemezse null
-   * döner (misafir akışı).
-   */
-  private extractUserId(req: Request): string | null {
-    const token = this.readAccessToken(req);
-    return token ? this.verifyAccessToken(token) : null;
-  }
-
-  /**
-   * `extractUserId`'nin katı hali: kimlik bilgisi HİÇ yoksa misafir (null);
-   * VARSA ama süresi dolmuş/geçersizse 401. Sessizce misafire düşmek
-   * oturumlu kullanıcının "kartımı kaydet" isteğini düşürüyordu (store_card
-   * kullanıcı ister) ve istemci 401 görmediği için token'ını yenilemiyordu.
-   * 401, mobil ve web BFF'nin refresh + yeniden deneme akışını tetikler.
-   */
-  private extractOptionalUserIdStrict(req: Request): string | null {
-    const token = this.readAccessToken(req);
-    if (!token) return null;
-    const userId = this.verifyAccessToken(token);
-    if (!userId) {
-      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
-    }
-    return userId;
+  private async extractUserId(req: Request): Promise<string | null> {
+    const auth = await this.optionalAuth.resolve(req);
+    return auth.kind === "user" ? auth.userId : null;
   }
 
   private paymentCapabilitySecret(): string {
@@ -265,7 +218,7 @@ export class PaymentController {
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
-    const userId = this.extractUserId(req);
+    const userId = await this.extractUserId(req);
 
     const result = await this.paymentService.initiatePaymentUnified(
       userId,
@@ -313,7 +266,7 @@ export class PaymentController {
     @Req() req: Request,
   ) {
     // Trade-cash zorunlu auth: cookie (web) veya Bearer (mobil).
-    const userId = this.extractUserId(req);
+    const userId = await this.extractUserId(req);
     if (!userId)
       throw new UnauthorizedException(
         i18nMessage("server.payment.loginRequired"),
@@ -342,15 +295,23 @@ export class PaymentController {
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,
     description:
-      "Access token gönderildi ama süresi dolmuş/geçersiz (misafir değil) — istemci yenileyip yeniden dener",
+      "Access token gönderildi ama geçersiz (süresi dolmuş, silinmiş/banlı hesap) ve geçerli ödeme yetki belirteci yok — istemci yenileyip yeniden dener",
   })
   async prepareDirectForm(@Body() dto: DirectPaymentDto, @Req() req: Request) {
     this.assertNoRawCardData(req.body);
-    // Optional auth: kimlik bilgisi yoksa misafir (ödeme yetki belirteciyle);
-    // varsa ama süresi dolmuşsa 401 → istemci yenileyip yeniden dener.
-    const userId = this.extractOptionalUserIdStrict(req);
     const capabilityAuthorized =
       !!dto.paymentId && this.hasPaymentCapability(req, dto.paymentId);
+    // Optional auth: kimlik bilgisi yoksa misafir (ödeme yetki belirteciyle).
+    // Kimlik bilgisi VAR ama geçersizse (süresi dolmuş, silinmiş/banlı hesap):
+    //  - geçerli ödeme yetki belirteci varsa misafir olarak sürer (ödeme
+    //    ortasında zorunlu çıkış yok; store_card kullanıcı ister, eklenmez),
+    //  - yoksa 401 → istemci token'ı yenileyip yeniden dener. Sessizce misafire
+    //    düşmek "kartımı kaydet"i düşürüyor, istemci de token'ı yenilemiyordu.
+    const auth = await this.optionalAuth.resolve(req);
+    if (auth.kind === "invalid" && !capabilityAuthorized) {
+      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
+    }
+    const userId = auth.kind === "user" ? auth.userId : null;
     return this.paymentService.prepareDirectPayment(
       userId,
       dto,
@@ -453,7 +414,7 @@ export class PaymentController {
   })
   async getPaymentStatus(@Param("id") id: string, @Req() req: Request) {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir.
-    const userId = this.extractUserId(req);
+    const userId = await this.extractUserId(req);
 
     return this.paymentService.getPaymentStatusUnified(
       id,
@@ -551,7 +512,7 @@ export class PaymentController {
     @Req() req: Request,
   ): Promise<{ released: boolean }> {
     return this.paymentService.confirmFailedFromClient(paymentId, {
-      userId: this.extractUserId(req),
+      userId: await this.extractUserId(req),
       capabilityAuthorized: this.hasPaymentCapability(req, paymentId),
     });
   }
@@ -573,7 +534,7 @@ export class PaymentController {
     @Req() req: Request,
   ): Promise<{ completed: boolean; status: string }> {
     return this.paymentService.verifyPaymentFromClient(paymentId, {
-      userId: this.extractUserId(req),
+      userId: await this.extractUserId(req),
       capabilityAuthorized: this.hasPaymentCapability(req, paymentId),
     });
   }

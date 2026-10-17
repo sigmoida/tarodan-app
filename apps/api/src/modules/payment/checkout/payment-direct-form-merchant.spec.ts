@@ -72,6 +72,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — merchant scope", (
       merchantOid: "MEM1T1",
       amount: 199,
       successQueryParams: "paymentId=pay-1&type=membership",
+      ownerId: "user-1",
     };
     const build = (dto: Record<string, unknown>, userId: string | null) =>
       (
@@ -196,6 +197,8 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
     env: Record<string, string>;
     dto: Record<string, unknown>;
     userId: string | null;
+    /** Ödemenin sahibi (sipariş alıcısı); varsayılan "user-1". */
+    ownerId?: string | null;
   }) {
     const prisma = {
       savedCard: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -234,6 +237,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
       merchantOid: "ORD1T1",
       amount: 150,
       successQueryParams: "paymentId=pay-1",
+      ownerId: opts.ownerId === undefined ? "user-1" : opts.ownerId,
     };
     const run = (
       svc as unknown as {
@@ -244,7 +248,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
         ) => Promise<{ fields: Array<{ name: string; value: string }> }>;
       }
     ).buildDirectPaymentForm(opts.dto, ctx, opts.userId);
-    return { run, events };
+    return { run, events, prisma };
   }
 
   let warn: jest.SpyInstance;
@@ -310,6 +314,42 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
     });
   });
 
+  it("capability-authorized requester who is NOT the owner → no store_card, no utoken lookup, reason 'not_owner'", async () => {
+    // Misafir siparişi sistem-misafir kullanıcısına aittir; istekte başka bir
+    // oturumun token'ı olsa da kart o hesaba bağlanmamalı.
+    const { run, events, prisma } = build({
+      env: ENV,
+      dto: { paymentId: "pay-1", orderId: "o-1", saveCard: true },
+      userId: "user-1",
+      ownerId: "system-guest",
+    });
+    const form = await run;
+    expect(form.fields.map((f) => f.name)).not.toContain("store_card");
+    expect(form.fields.map((f) => f.name)).not.toContain("utoken");
+    expect(prisma.savedCard.findFirst).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("reason=not_owner"),
+    );
+    expect(events.record.mock.calls[0][0].raw).toMatchObject({
+      storeCard: false,
+      storeCardSkippedReason: "not_owner",
+    });
+  });
+
+  it("owner's existing utoken is reused only for the owner", async () => {
+    const { run, prisma } = build({
+      env: ENV,
+      dto: { orderId: "o-1", saveCard: true },
+      userId: "user-1",
+    });
+    await run;
+    expect(prisma.savedCard.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: "user-1" }),
+      }),
+    );
+  });
+
   it("saveCard not requested → no skip log, raw unchanged", async () => {
     const { run, events } = build({
       env: ENV,
@@ -331,9 +371,10 @@ describe("resolveStoreCard", () => {
   const base = {
     merchant: PaytrMerchant.marketplace,
     userId: "user-1" as string | null,
+    ownerId: "user-1" as string | null,
     cardStorageEnabled: true,
   };
-  it("matches the previous storeCard rule and names the skip reason", () => {
+  it("stores only for the signed-in owner with card storage enabled", () => {
     expect(resolveStoreCard({ ...base, saveCard: true })).toEqual({
       storeCard: true,
       skippedReason: null,
@@ -346,9 +387,18 @@ describe("resolveStoreCard", () => {
       { storeCard: false, skippedReason: "guest" },
     );
     expect(
+      resolveStoreCard({ ...base, saveCard: true, ownerId: "someone-else" }),
+    ).toEqual({ storeCard: false, skippedReason: "not_owner" });
+    expect(
+      resolveStoreCard({ ...base, saveCard: true, ownerId: null }),
+    ).toEqual({ storeCard: false, skippedReason: "not_owner" });
+    expect(
       resolveStoreCard({ ...base, saveCard: true, cardStorageEnabled: false }),
     ).toEqual({ storeCard: false, skippedReason: "card_storage_disabled" });
-    // Üyelik mağazası varsayılan olarak saklar → kullanıcısızsa neden "guest".
+  });
+
+  it("names a skip reason only when the client explicitly sent saveCard=true", () => {
+    // Üyelik mağazası varsayılan olarak saklar; istemci istemediyse gürültü yok.
     expect(
       resolveStoreCard({
         ...base,
@@ -356,7 +406,23 @@ describe("resolveStoreCard", () => {
         saveCard: undefined,
         userId: null,
       }),
-    ).toEqual({ storeCard: false, skippedReason: "guest" });
+    ).toEqual({ storeCard: false, skippedReason: null });
+    expect(
+      resolveStoreCard({
+        ...base,
+        merchant: PaytrMerchant.membership,
+        saveCard: undefined,
+        ownerId: "someone-else",
+      }),
+    ).toEqual({ storeCard: false, skippedReason: null });
+    // Varsayılan saklama sahibi için hâlâ çalışır.
+    expect(
+      resolveStoreCard({
+        ...base,
+        merchant: PaytrMerchant.membership,
+        saveCard: undefined,
+      }),
+    ).toEqual({ storeCard: true, skippedReason: null });
   });
 });
 

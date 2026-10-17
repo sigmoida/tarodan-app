@@ -411,6 +411,7 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
+      ownerId,
     } = await this.resolveDirectPaymentContext(
       userId,
       dto,
@@ -428,6 +429,7 @@ export class PaymentInitiationService {
           merchantOid,
           amount,
           successQueryParams,
+          ownerId,
         },
         userId,
       );
@@ -463,6 +465,8 @@ export class PaymentInitiationService {
       merchantOid: string;
       amount: number;
       successQueryParams: string;
+      /** Kartın senkronlanacağı hesap (callback'teki sahip); bkz. resolveStoreCard. */
+      ownerId: string | null;
     },
     userId: string | null,
   ) {
@@ -473,6 +477,7 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
+      ownerId,
     } = ctx;
     // Ödemenin mağazası claim'de yazıldı (resolvePaytrMerchant). Form, kart
     // kasası ve yetenekler o mağazanındır: üyelik kartları üyelik mağazasında,
@@ -549,10 +554,11 @@ export class PaymentInitiationService {
         saveCard: dto.saveCard,
         merchant,
         userId,
+        ownerId,
         cardStorageEnabled,
       });
     if (storeCardSkippedReason) {
-      // Kart saklama istendi ama forma store_card=1 eklenmiyor: sessiz kalırsa
+      // İstemci açıkça saveCard=true gönderdi ama forma store_card=1 eklenmiyor: sessiz kalırsa
       // "kartımı kaydet" dediği halde kartı kaydedilmeyen kullanıcı iz bırakmaz.
       this.logger.warn(
         `[saved-card] store_card skipped payment=${payment.id} merchant=${merchant} reason=${storeCardSkippedReason}`,
@@ -632,6 +638,11 @@ export class PaymentInitiationService {
     merchantOid: string;
     amount: number;
     successQueryParams: string;
+    /**
+     * Ödemenin sahibi: sipariş/grup alıcısı ya da takas satırının ödeyeni.
+     * Callback kartı bu hesaba yazar (payment-callback savedCardOwnerId).
+     */
+    ownerId: string | null;
   }> {
     const clientIp = this.getClientIp(req);
     const buildBuyer = (u: any, shippingAddress?: any): PayTRBuyer => {
@@ -720,6 +731,7 @@ export class PaymentInitiationService {
     let baseOid: string;
     let amount: number;
     let successQueryParams: string;
+    let ownerId: string | null = null;
     // Mesafeli satış onayının ait olduğu satın alma. Satın alma olmayan
     // hedeflerde (takas ücreti, üyelik / öne çıkarma) null kalır.
     let distanceSalesSubject: DistanceSalesSubject | null = null;
@@ -736,6 +748,7 @@ export class PaymentInitiationService {
       // Sahiplik: üye → alıcı olmalı; misafir → sipariş misafir siparişi olmalı (iframe ile aynı kural).
       const isGuestOrder =
         (order.shippingAddress as any)?.isGuestOrder === true;
+      ownerId = order.buyerId;
       if (!capabilityAuthorized && userId) {
         if (order.buyerId !== userId)
           throw new ForbiddenException(
@@ -860,6 +873,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.orderGroupNotFound"),
         );
       // Sahiplik: üye → grup alıcısı olmalı; misafir → grup misafir grubu olmalı (iframe ile aynı kural).
+      ownerId = group.buyerId;
       if (!capabilityAuthorized && userId) {
         if (group.buyerId !== userId)
           throw new ForbiddenException(
@@ -997,6 +1011,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
         );
       amount = Number(cashPayment.totalAmount);
+      ownerId = cashPayment.payerId;
       // Alıcı bilgisi satırın sahibinden gelir (v1'de sahip = farkı ödeyen).
       const payer =
         cashPayment.payerId === trade.initiatorId
@@ -1143,6 +1158,7 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
+      ownerId,
     };
   }
 
@@ -1663,26 +1679,39 @@ export function shouldStoreCard(
   return saveCard ?? merchant === PaytrMerchant.membership;
 }
 
-/** Kart saklama istendiği halde store_card eklenmemesinin nedeni. */
-export type StoreCardSkippedReason = "guest" | "card_storage_disabled";
+/** İstemcinin açıkça istediği kart saklamanın uygulanmama nedeni. */
+export type StoreCardSkippedReason =
+  "guest" | "not_owner" | "card_storage_disabled";
 
 /**
  * Direct form'a `store_card=1` eklenir mi? İstek (`shouldStoreCard`) + giriş
- * yapmış kullanıcı + mağazanın kart saklama yetkisi. İstendiği halde
- * eklenmiyorsa nedeni döner (gözlemlenebilirlik); istenmediyse neden yoktur.
+ * yapmış kullanıcı + kullanıcı ödemenin SAHİBİ + mağazanın kart saklama
+ * yetkisi.
+ *
+ * Sahiplik şartı: callback kartı ödemenin sahibine yazar (sipariş/grup alıcısı,
+ * takas ödeyeni). Ödeme yetki belirteciyle açılmışken istekte başka bir
+ * oturumun token'ı varsa (ör. sistem-misafir kullanıcısına ait misafir siparişi)
+ * kart PayTR'da istekçinin utoken grubuna bağlanıp sahibin hesabına yazılırdı.
+ *
+ * `skippedReason` yalnız istemci AÇIKÇA `saveCard=true` gönderdiğinde döner
+ * (üyelik mağazasının varsayılan saklaması ya da hiç istenmemesi gürültü değil).
  */
 export function resolveStoreCard(params: {
   saveCard: boolean | undefined;
   merchant: PaytrMerchant;
   userId: string | null;
+  ownerId: string | null;
   cardStorageEnabled: boolean;
 }): { storeCard: boolean; skippedReason: StoreCardSkippedReason | null } {
+  const skip = (reason: StoreCardSkippedReason) => ({
+    storeCard: false,
+    skippedReason: params.saveCard === true ? reason : null,
+  });
   if (!shouldStoreCard(params.saveCard, params.merchant)) {
     return { storeCard: false, skippedReason: null };
   }
-  if (!params.userId) return { storeCard: false, skippedReason: "guest" };
-  if (!params.cardStorageEnabled) {
-    return { storeCard: false, skippedReason: "card_storage_disabled" };
-  }
+  if (!params.userId) return skip("guest");
+  if (params.ownerId !== params.userId) return skip("not_owner");
+  if (!params.cardStorageEnabled) return skip("card_storage_disabled");
   return { storeCard: true, skippedReason: null };
 }
