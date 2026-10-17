@@ -211,32 +211,55 @@ export function createSession<TUser>(
     init: RequestInit = {},
   ): Promise<ApiFetchResult> {
     const { access, refresh } = await readTokens();
-    const authHeaders = (token?: string) => {
-      const h = new Headers(init.headers);
-      if (token) h.set("Authorization", `Bearer ${token}`);
-      return h;
+    const send = (token?: string) => {
+      const headers = new Headers(init.headers);
+      if (token) headers.set("Authorization", `Bearer ${token}`);
+      return fetch(`${apiBaseUrl}${path}`, {
+        ...init,
+        headers,
+        cache: "no-store",
+      });
+    };
+    const persist = async (tokens: { access: string; refresh: string }) => {
+      try {
+        await writeTokens(tokens.access, tokens.refresh);
+      } catch {
+        /* Server Component context can't write cookies; the proxy/middleware will. */
+      }
     };
 
-    let res = await fetch(`${apiBaseUrl}${path}`, {
-      ...init,
-      headers: authHeaders(access),
-      cache: "no-store",
-    });
+    // Access cookie gone (its maxAge is the access TTL, so the browser drops it)
+    // while the refresh cookie lives → refresh FIRST. Sending the request bare
+    // and waiting for a 401 is not enough: optional-auth endpoints (e.g. card
+    // payment) answer a credential-less request as a GUEST and silently lose
+    // the user. Genuine guests (no refresh cookie) never refresh.
+    //
+    // A failed refresh sends the request as a guest — public endpoints keep
+    // working, auth-required ones return their 401 — with the same
+    // `sessionDead` / `transient` flag as the 401 path below. One refresh
+    // attempt per call: that 401 is not refreshed again.
+    if (!access && refresh) {
+      const outcome = await runRefresh(refresh);
+      if (outcome.status === "ok") {
+        await persist(outcome.tokens);
+        return {
+          res: await send(outcome.tokens.access),
+          refreshed: outcome.tokens,
+        };
+      }
+      const res = await send();
+      if (outcome.status === "dead") return { res, sessionDead: true };
+      return { res, transient: true };
+    }
+
+    let res = await send(access);
 
     if (res.status === 401 && refresh) {
       const outcome = await runRefresh(refresh);
       if (outcome.status === "ok") {
         const next = outcome.tokens;
-        try {
-          await writeTokens(next.access, next.refresh);
-        } catch {
-          /* Server Component context can't write cookies; the proxy/middleware will. */
-        }
-        res = await fetch(`${apiBaseUrl}${path}`, {
-          ...init,
-          headers: authHeaders(next.access),
-          cache: "no-store",
-        });
+        await persist(next);
+        res = await send(next.access);
         return { res, refreshed: next };
       }
       // Refresh failed: distinguish a rejected token (dead) from a transient
