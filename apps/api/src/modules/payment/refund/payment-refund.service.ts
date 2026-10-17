@@ -945,17 +945,25 @@ export class PaymentRefundService {
               1,
             );
             let refundedSeller = Math.round(sellerAmount * portion * 100) / 100;
-            // Satıcıya bırakılacak tutar (kargo payı tazmini): tüketimi YALNIZ aşağı
-            // çeker. Oran zaten daha azını tüketiyorsa dokunulmaz; bırakılacak tutar
-            // hold'u aşarsa hiç tüketim olmaz.
+            const alreadyConsumed = Number(activeHold.refundedAmount ?? 0);
+            // The amount to LEAVE in the hold for the seller after this refund
+            // (their own shipping share). It only lowers consumption: if the
+            // portion already consumes less, nothing changes; if it exceeds what
+            // is left, nothing more is consumed (never un-consumed). The cap
+            // counts what earlier refunds consumed: v2 puts the share on the
+            // refund that completes the line, after partial refunds have taken
+            // their slices, and capping only this slice let the hold be consumed
+            // in full, so the share silently ended with the platform.
             const retained = opts?.settlement?.holdRetainedAmount;
             if (retained != null && retained > 0) {
               const consumable =
-                Math.round(Math.max(0, sellerAmount - retained) * 100) / 100;
+                Math.round(
+                  Math.max(0, sellerAmount - retained - alreadyConsumed) * 100,
+                ) / 100;
               refundedSeller = Math.min(refundedSeller, consumable);
             }
             const newRefunded =
-              Number(activeHold.refundedAmount ?? 0) + refundedSeller;
+              Math.round((alreadyConsumed + refundedSeller) * 100) / 100;
             if (newRefunded >= sellerAmount - 0.01) {
               await tx.paymentHold.update({
                 where: { id: activeHold.id },

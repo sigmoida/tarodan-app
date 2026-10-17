@@ -124,6 +124,14 @@ describe("holdReleaseBlockedReason — the one release predicate", () => {
       order({ status: OrderStatus.completed, finalizedRefunds: [] }),
       null,
     ],
+    // Units returned one at a time: the order stays delivered and the seller's
+    // shipping share left by the line-completing refund goes out normally.
+    [
+      "delivered, all units returned one by one, share left",
+      hold({ amount: 860, refundedAmount: 812 }),
+      order({ status: OrderStatus.delivered }),
+      null,
+    ],
     [
       "delivered, not yet due",
       hold({ refundedAmount: 0, releaseAt: FUTURE }),

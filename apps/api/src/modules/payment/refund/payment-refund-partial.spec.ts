@@ -814,6 +814,103 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
   });
 
   /**
+   * v2 defers the outbound shipping legs to the refund that COMPLETES the line
+   * (K7). In a two-unit order returned one unit at a time, the first refund
+   * already consumed half of the hold, and the completing refund carries the
+   * seller's shipping share as `holdRetainedAmount`. That amount is what must
+   * be LEFT in the hold after this refund, so the cap has to count what earlier
+   * refunds consumed; capping only this refund's slice let the hold be consumed
+   * in full and the seller's share silently ended with the platform.
+   */
+  describe("line-completing refund after an earlier partial", () => {
+    // hold 860 for qty 2; first unit refunded earlier consumed 430.
+    const priorPartial = {
+      paymentAmount: 1140,
+      holdAmount: 860,
+      holdRefundedAmount: 430,
+      metadata: { refundedOrders: { [ORDER_ID]: 500 } },
+    };
+
+    it("leaves the seller's shipping share in the hold for a non-seller fault", async () => {
+      const { service, captured } = makeService(priorPartial);
+
+      await service.processRefund(ORDER_ID, 452, {
+        cancelledBy: CancellationActor.buyer,
+        idempotencyKey: "completing-refund-retain",
+        refundQuantity: 1,
+        settlement: {
+          closeOrder: false,
+          holdPortion: 0.5,
+          sellerFeeRefundAmount: 0,
+          buyerFeeRefundAmount: 0,
+          holdRetainedAmount: 48,
+        },
+      });
+
+      // 860 − 48 = 812 consumed in total (430 earlier + 382 now); 48 stays
+      // held for the seller, the hold is not cancelled.
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({
+          refundedAmount: 812,
+          frozenByRefundId: null,
+        }),
+      );
+      expect(captured.holdUpdate.data.status).toBeUndefined();
+    });
+
+    it("consumes the hold in full when nothing is retained (seller fault)", async () => {
+      const { service, captured } = makeService(priorPartial);
+
+      await service.processRefund(ORDER_ID, 640, {
+        cancelledBy: CancellationActor.buyer,
+        idempotencyKey: "completing-refund-seller-fault",
+        refundQuantity: 1,
+        settlement: {
+          closeOrder: false,
+          holdPortion: 0.5,
+          sellerFeeRefundAmount: 0,
+          buyerFeeRefundAmount: 0,
+          holdRetainedAmount: 0,
+        },
+      });
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({
+          status: PaymentHoldStatus.cancelled,
+          refundedAmount: 860,
+        }),
+      );
+    });
+
+    it("never un-consumes: a retained share above what is left leaves the hold as it is", async () => {
+      // Earlier refunds already took more than amount − retained: this refund
+      // consumes nothing more, it never gives back what was consumed.
+      const { service, captured } = makeService({
+        ...priorPartial,
+        holdRefundedAmount: 840,
+      });
+
+      await service.processRefund(ORDER_ID, 100, {
+        cancelledBy: CancellationActor.buyer,
+        idempotencyKey: "completing-refund-over-consumed",
+        refundQuantity: 1,
+        settlement: {
+          closeOrder: false,
+          holdPortion: 0.5,
+          sellerFeeRefundAmount: 0,
+          buyerFeeRefundAmount: 0,
+          holdRetainedAmount: 48,
+        },
+      });
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 840 }),
+      );
+      expect(captured.holdUpdate.data.status).toBeUndefined();
+    });
+  });
+
+  /**
    * Faz 6.2 `refund_issued` kaydı iade TX'İNİN İÇİNDE yazılır. İki sertleştirme:
    *
    *  - İDEMPOTENCY: anahtar iade DENEMESİNDEN türetilir → aynı deneme tekrar

@@ -241,6 +241,14 @@ paradır.
   tüketilir. Satıcı kusurlu iade (kargolanmış) zaten kalıntı üretmiyordu
   (satıcıya tam kargo borcu, tazmin yok). Alıcı/kargo/platform kusurunda
   davranış aynıdır.
+- **Units returned one at a time** (v2): the seller's share is carried by the
+  refund that completes the line, after earlier partial refunds consumed their
+  slices. `holdRetainedAmount` is what must be **left** in the hold after that
+  refund, so the consumption cap counts what earlier refunds already consumed
+  (`amount − retained − refundedAmount`, never negative, never un-consuming).
+  Whether the order stays `delivered` (normal release) or closes because the
+  cash refund reached T (residual release), the non-faulty seller is paid
+  `amount − refundedAmount`.
 - **Birikmiş kalıntılar**: `PaymentHoldResidualService` PSP'ye gitmeden
   platforma **kapatır** — tek işlemde hold `cancelled` +
   `refundedAmount = amount` (CAS: tutuluyor, kilitsiz, okunan `refundedAmount`
