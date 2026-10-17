@@ -23,7 +23,13 @@ export const HERO_CACHE_TAGS = {
   trust: "home:trust",
 } as const;
 
-const REVALIDATE_SECONDS = 300;
+/**
+ * Yedek tazeleme penceresi: admin yazımı (slayt, platform anahtarı) API'den
+ * `revalidateTag` ile anında gelir; çağrı ulaşmazsa (env eksik / hatalı) değişiklik
+ * en geç bu sürede görünür — API'nin `max-age=60`'ı ve diğer ana sayfa raylarıyla
+ * aynı. 300 sn'de anahtar "çalışmıyor" gibi görünüyordu.
+ */
+const REVALIDATE_SECONDS = 60;
 
 /**
  * Site kendini `web` olarak tanıtır: API yalnız web'e ve ikisine (`all`)
