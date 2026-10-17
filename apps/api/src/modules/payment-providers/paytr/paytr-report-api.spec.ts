@@ -1,5 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
+import { Logger } from "@nestjs/common";
 import * as crypto from "crypto";
 import { PayTRService } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
@@ -146,6 +147,59 @@ describe("PayTRService — rapor uçları", () => {
       await expect(
         service.getTransactionStatement({ startDate: START, endDate: END }),
       ).rejects.toThrow(/gecersiz token/);
+      // Not a network failure → no retry, single fetch call.
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not double-log on rethrow (cron tracker owns the canonical alarm)", async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({ status: "error", err_msg: "gecersiz token" }),
+      });
+
+      await expect(
+        service.getTransactionStatement({ startDate: START, endDate: END }),
+      ).rejects.toThrow(/gecersiz token/);
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled(); // BadRequestException is rethrown as-is, not caught/logged here
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("retries a transient network failure and succeeds on the next attempt", async () => {
+      const networkError = Object.assign(new TypeError("fetch failed"), {
+        cause: { code: "ECONNRESET" },
+      });
+      fetchSpy.mockRejectedValueOnce(networkError).mockResolvedValueOnce({
+        text: async () =>
+          JSON.stringify({
+            status: "success",
+            data: [
+              {
+                islem_tipi: "S",
+                islem_tutari: "100,00",
+                islem_tarihi: "31.07.2026",
+                para_birimi: "TL",
+                siparis_no: "ORD1",
+              },
+            ],
+          }),
+      });
+
+      const rows = await service.getTransactionStatement({
+        startDate: START,
+        endDate: END,
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
 
