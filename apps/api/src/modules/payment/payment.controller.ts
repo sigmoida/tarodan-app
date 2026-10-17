@@ -81,18 +81,24 @@ export class PaymentController {
   ) {}
 
   /**
-   * @Public uçlarda kullanıcıyı manuel çıkarır: önce httpOnly cookie (tarayıcı),
-   * yoksa Authorization header (mobil/araçlar) — JwtStrategy ile AYNI sıra.
-   * Web auth artık cookie'de olduğundan yalnızca Bearer header'a bakmak misafir
-   * olmayan oturumlu kullanıcıyı "giriş yapmanız gerekiyor"a düşürüyordu.
-   * Token yok/çözülemezse null döner (misafir akışı).
+   * @Public uçlarda kimlik belirtecini okur: önce `Authorization: Bearer`
+   * (mobil / web BFF gateway'i açıkça gönderir), yoksa httpOnly cookie
+   * (tarayıcıdan doğrudan API). İkisi birden geldiğinde Bearer kazanır:
+   * istemcinin bilerek gönderdiği belirteç, ortak bir çerez deposunda kalmış
+   * bayat bir çerezin gölgesinde kalmasın. Yalnız biri gelen istemcide (bugünkü
+   * mobil ve web) davranış aynıdır.
    */
-  private extractUserId(req: Request): string | null {
+  private readAccessToken(req: Request): string | null {
     const authHeader = req.headers.authorization;
-    const token =
-      readCookie(req, [COOKIE_NAMES.user.access]) ??
-      (authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null);
-    if (!token) return null;
+    if (authHeader?.startsWith("Bearer ")) {
+      const bearer = authHeader.substring(7).trim();
+      if (bearer) return bearer;
+    }
+    return readCookie(req, [COOKIE_NAMES.user.access]) ?? null;
+  }
+
+  /** Belirteç geçerli bir kullanıcı access token'ıysa kullanıcı id'si, değilse null. */
+  private verifyAccessToken(token: string): string | null {
     try {
       const decoded = this.jwtService.verify(token) as {
         sub?: string;
@@ -104,6 +110,32 @@ export class PaymentController {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * @Public uçlarda isteğe bağlı kullanıcı: belirteç yok/çözülemezse null
+   * döner (misafir akışı).
+   */
+  private extractUserId(req: Request): string | null {
+    const token = this.readAccessToken(req);
+    return token ? this.verifyAccessToken(token) : null;
+  }
+
+  /**
+   * `extractUserId`'nin katı hali: kimlik bilgisi HİÇ yoksa misafir (null);
+   * VARSA ama süresi dolmuş/geçersizse 401. Sessizce misafire düşmek
+   * oturumlu kullanıcının "kartımı kaydet" isteğini düşürüyordu (store_card
+   * kullanıcı ister) ve istemci 401 görmediği için token'ını yenilemiyordu.
+   * 401, mobil ve web BFF'nin refresh + yeniden deneme akışını tetikler.
+   */
+  private extractOptionalUserIdStrict(req: Request): string | null {
+    const token = this.readAccessToken(req);
+    if (!token) return null;
+    const userId = this.verifyAccessToken(token);
+    if (!userId) {
+      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
+    }
+    return userId;
   }
 
   private paymentCapabilitySecret(): string {
@@ -307,10 +339,16 @@ export class PaymentController {
     status: HttpStatus.CREATED,
     description: "Doğrudan PayTR'ye POST edilecek form alanları",
   })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description:
+      "Access token gönderildi ama süresi dolmuş/geçersiz (misafir değil) — istemci yenileyip yeniden dener",
+  })
   async prepareDirectForm(@Body() dto: DirectPaymentDto, @Req() req: Request) {
     this.assertNoRawCardData(req.body);
-    // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
-    const userId = this.extractUserId(req);
+    // Optional auth: kimlik bilgisi yoksa misafir (ödeme yetki belirteciyle);
+    // varsa ama süresi dolmuşsa 401 → istemci yenileyip yeniden dener.
+    const userId = this.extractOptionalUserIdStrict(req);
     const capabilityAuthorized =
       !!dto.paymentId && this.hasPaymentCapability(req, dto.paymentId);
     return this.paymentService.prepareDirectPayment(

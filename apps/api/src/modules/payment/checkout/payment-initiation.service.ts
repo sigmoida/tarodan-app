@@ -544,8 +544,20 @@ export class PaymentInitiationService {
     // Flow A — yeni kart: store_card yalnız giriş yapmış kullanıcı ve açık
     // PayTR CAPI yetkisiyle eklenir. Kullanıcının AYNI mağazadaki utoken'ı varsa
     // yeni kart aynı PayTR kullanıcı grubuna bağlanır (utoken mağazaya özeldir).
-    const storeCard =
-      shouldStoreCard(dto.saveCard, merchant) && !!userId && cardStorageEnabled;
+    const { storeCard, skippedReason: storeCardSkippedReason } =
+      resolveStoreCard({
+        saveCard: dto.saveCard,
+        merchant,
+        userId,
+        cardStorageEnabled,
+      });
+    if (storeCardSkippedReason) {
+      // Kart saklama istendi ama forma store_card=1 eklenmiyor: sessiz kalırsa
+      // "kartımı kaydet" dediği halde kartı kaydedilmeyen kullanıcı iz bırakmaz.
+      this.logger.warn(
+        `[saved-card] store_card skipped payment=${payment.id} merchant=${merchant} reason=${storeCardSkippedReason}`,
+      );
+    }
     const existingCard = storeCard
       ? await this.prisma.savedCard.findFirst({
           where: {
@@ -581,7 +593,11 @@ export class PaymentInitiationService {
       amount,
       totalAmount: amount,
       paytrMerchant: merchant,
-      raw: { formPrepared: true, storeCard },
+      raw: {
+        formPrepared: true,
+        storeCard,
+        ...(storeCardSkippedReason ? { storeCardSkippedReason } : {}),
+      },
     });
 
     return {
@@ -1645,4 +1661,28 @@ export function shouldStoreCard(
   merchant: PaytrMerchant,
 ): boolean {
   return saveCard ?? merchant === PaytrMerchant.membership;
+}
+
+/** Kart saklama istendiği halde store_card eklenmemesinin nedeni. */
+export type StoreCardSkippedReason = "guest" | "card_storage_disabled";
+
+/**
+ * Direct form'a `store_card=1` eklenir mi? İstek (`shouldStoreCard`) + giriş
+ * yapmış kullanıcı + mağazanın kart saklama yetkisi. İstendiği halde
+ * eklenmiyorsa nedeni döner (gözlemlenebilirlik); istenmediyse neden yoktur.
+ */
+export function resolveStoreCard(params: {
+  saveCard: boolean | undefined;
+  merchant: PaytrMerchant;
+  userId: string | null;
+  cardStorageEnabled: boolean;
+}): { storeCard: boolean; skippedReason: StoreCardSkippedReason | null } {
+  if (!shouldStoreCard(params.saveCard, params.merchant)) {
+    return { storeCard: false, skippedReason: null };
+  }
+  if (!params.userId) return { storeCard: false, skippedReason: "guest" };
+  if (!params.cardStorageEnabled) {
+    return { storeCard: false, skippedReason: "card_storage_disabled" };
+  }
+  return { storeCard: true, skippedReason: null };
 }
