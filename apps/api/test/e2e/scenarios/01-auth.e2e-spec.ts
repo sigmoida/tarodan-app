@@ -758,7 +758,7 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
     });
 
     scenario("AUTH-048", async () => {
-      // Kullanılmış reset token 400 (security ucu). security/password/reset gövde regexi özel karakter ister.
+      // Kullanılmış reset token 400 (auth ucu — tek sıfırlama yolu, #432).
       const prisma = getPrisma();
       const user = await createUser(ctx.module, {
         email: "used-reset@test.com",
@@ -774,7 +774,7 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
         },
       });
       await request(server())
-        .post("/api/security/password/reset")
+        .post("/api/auth/reset-password")
         .send({ token: raw, newPassword: "BrandNew789!" })
         .expect(400);
     });
@@ -808,7 +808,7 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
     });
 
     scenario("AUTH-051", async () => {
-      // security/password/reset başarılı sıfırlamada TÜM refresh token'ları iptal eder.
+      // auth/reset-password başarılı sıfırlamada TÜM refresh token'ları iptal eder (revokeAllUserTokens).
       const prisma = getPrisma();
       const user = await createUser(ctx.module, {
         email: "reset-revoke@test.com",
@@ -833,7 +833,7 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
         },
       });
       await request(server())
-        .post("/api/security/password/reset")
+        .post("/api/auth/reset-password")
         .send({ token: raw, newPassword: "BrandNew789!" })
         .expect(200);
 
@@ -849,18 +849,12 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
     });
 
     scenario("AUTH-052", async () => {
-      // Parite (negatif): auth/reset-password refresh token'ları İPTAL ETMEZ (security ucundan farklı).
+      // Reset token tek kullanımlık: başarılı sıfırlamadan sonra aynı token ikinci kez 400.
       const prisma = getPrisma();
       const user = await createUser(ctx.module, {
-        email: "reset-noRevoke@test.com",
+        email: "reset-once@test.com",
         password: "Old123!",
       });
-      await login("reset-noRevoke@test.com", "Old123!").expect(200);
-      const activeBefore = await prisma.refreshToken.count({
-        where: { userId: user.id, revokedAt: null },
-      });
-      expect(activeBefore).toBeGreaterThanOrEqual(1);
-
       const raw = crypto.randomBytes(32).toString("hex");
       const hashed = crypto.createHash("sha256").update(raw).digest("hex");
       await prisma.passwordResetToken.create({
@@ -874,12 +868,12 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
         .post("/api/auth/reset-password")
         .send({ token: raw, newPassword: "BrandNew789!" })
         .expect(200);
-
-      // auth ucu refresh iptali yapmaz → hâlâ aktif token var.
-      const activeAfter = await prisma.refreshToken.count({
-        where: { userId: user.id, revokedAt: null },
-      });
-      expect(activeAfter).toBe(activeBefore);
+      await request(server())
+        .post("/api/auth/reset-password")
+        .send({ token: raw, newPassword: "Another789!" })
+        .expect(400);
+      // İkinci deneme şifreyi değiştirmedi.
+      await login("reset-once@test.com", "BrandNew789!").expect(200);
     });
 
     scenario("AUTH-053", async () => {
@@ -1220,7 +1214,7 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
     });
 
     scenario("AUTH-071", async () => {
-      // Şifre sıfırlama (security ucu) sonrası eski oturum geçersiz — AUTH-051 ile aynı garantinin
+      // Şifre sıfırlama (auth ucu) sonrası eski oturum geçersiz — AUTH-051 ile aynı garantinin
       // oturum-geçersizleştirme açısı: eski access token korumalı uçta hâlâ çalışsa da refresh iptal edilir.
       const prisma = getPrisma();
       const user = await createUser(ctx.module, {
@@ -1240,7 +1234,7 @@ describe("01 — Kimlik Doğrulama & Hesap Güvenliği (AUTH)", () => {
         },
       });
       await request(server())
-        .post("/api/security/password/reset")
+        .post("/api/auth/reset-password")
         .send({ token: raw, newPassword: "BrandNew789!" })
         .expect(200);
       // Eski refresh token artık geçersiz.

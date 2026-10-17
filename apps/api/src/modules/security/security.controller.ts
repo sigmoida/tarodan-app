@@ -16,8 +16,6 @@ import { SecurityService } from "./security.service";
 import {
   Verify2FADto,
   Disable2FADto,
-  RequestPasswordResetDto,
-  ResetPasswordDto,
   ChangePasswordDto,
   Enable2FAResponseDto,
   TwoFactorStatusDto,
@@ -104,41 +102,12 @@ export class SecurityController {
   }
 
   // ==========================================================================
-  // PASSWORD RESET (GAP-005)
+  // PASSWORD CHANGE
   // ==========================================================================
-
-  /**
-   * Request password reset (public)
-   * POST /security/password/request-reset
-   */
-  @Public()
-  @Post("password/request-reset")
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @HttpCode(HttpStatus.OK)
-  async requestPasswordReset(
-    @Body() dto: RequestPasswordResetDto,
-  ): Promise<{ message: string }> {
-    await this.securityService.requestPasswordReset(dto.email);
-    return {
-      message:
-        "Eğer bu e-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderildi",
-    };
-  }
-
-  /**
-   * Reset password with token (public)
-   * POST /security/password/reset
-   */
-  @Public()
-  @Post("password/reset")
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @HttpCode(HttpStatus.OK)
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-  ): Promise<{ message: string }> {
-    await this.securityService.resetPassword(dto.token, dto.newPassword);
-    return { message: "Şifreniz başarıyla değiştirildi" };
-  }
+  // Şifre sıfırlama tek yoldan yapılır: `POST /auth/forgot-password` +
+  // `POST /auth/reset-password` (auth-password.service). Buradaki eski
+  // `/security/password/request-reset` + `/reset` çifti e-posta göndermiyordu
+  // ve kötüye kullanıma açıktı; kaldırıldı (#432).
 
   /**
    * Change password (authenticated)

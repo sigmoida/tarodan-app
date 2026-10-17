@@ -37,7 +37,6 @@ import {
 export class SecurityService {
   private readonly logger = new Logger(SecurityService.name);
   private readonly SECRET_BYTES = 20;
-  private readonly TOKEN_EXPIRY_HOURS = 24;
   private readonly CSRF_TOKEN_EXPIRY_MINUTES = 60;
   // Bekleyen (doğrulanmamış) kurulum sırrı bu süre içinde yeniden kullanılır:
   // çift dokunma / ekranı yeniden açma, kullanıcının taradığı QR'ı geçersiz kılmasın.
@@ -329,92 +328,10 @@ export class SecurityService {
   }
 
   // ==========================================================================
-  // GAP-005: PASSWORD RESET
+  // GAP-005: PASSWORD CHANGE
   // ==========================================================================
-
-  /**
-   * Request password reset
-   */
-  async requestPasswordReset(email: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      // Don't reveal if email exists
-      return;
-    }
-
-    // Invalidate existing tokens
-    await this.prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: new Date() },
-    });
-
-    // Generate token
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + this.TOKEN_EXPIRY_HOURS);
-
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        token: tokenHash,
-        expiresAt,
-      },
-    });
-
-    // TODO: Send email with reset link
-    // In production, integrate with email service
-    this.logger.log("Password reset token created");
-  }
-
-  /**
-   * Reset password with token
-   */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { token: tokenHash },
-    });
-
-    if (!resetToken) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
-      );
-    }
-
-    if (resetToken.usedAt) {
-      throw new BadRequestException(
-        i18nMessage("server.security.tokenAlreadyUsed"),
-      );
-    }
-
-    if (resetToken.expiresAt < new Date()) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenExpired"),
-      );
-    }
-
-    // Update password
-    const passwordHash = await bcrypt.hash(newPassword, 12);
-    await this.prisma.user.update({
-      where: { id: resetToken.userId },
-      data: { passwordHash },
-    });
-
-    // Mark token as used
-    await this.prisma.passwordResetToken.update({
-      where: { id: resetToken.id },
-      data: { usedAt: new Date() },
-    });
-
-    // Revoke all refresh tokens — and the push tokens of those sessions
-    await this.revokeAllUserTokens(resetToken.userId);
-  }
+  // Şifre sıfırlama auth modülündedir (auth-password.service); o yol da
+  // oturumları `revokeAllUserTokens` ile kapatır (#432).
 
   /**
    * Change password (logged in user)

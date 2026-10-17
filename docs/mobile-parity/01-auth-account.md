@@ -224,8 +224,8 @@ formu) · `no-token` (bilgi + yeniden gönderme formu).
 > **Gizlilik kuralı:** "şifremi unuttum" **her durumda** "e-posta gönderildi" ekranı gösterir —
 > hata bile olsa. Böylece bir e-postanın kayıtlı olup olmadığı sızmaz. Mobilde de aynen böyle yap.
 
-API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-reset`,
-`/security/password/reset`); **yeni geliştirmede `/auth/*` olanları kullan**.
+Şifre sıfırlamanın tek yolu `/auth/*` uçlarıdır. Eski `/security/password/request-reset` +
+`/security/password/reset` çifti (e-posta göndermiyordu) API'den kaldırıldı (#432).
 
 ---
 
