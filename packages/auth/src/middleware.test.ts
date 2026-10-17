@@ -102,6 +102,26 @@ describe("createAuthMiddleware", () => {
     );
   });
 
+  it.each([429, 408, 503])(
+    "keeps the session when the refresh endpoint answers %i (transient)",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(null, { status })),
+      );
+
+      const response = await middleware(
+        request("/dashboard", {
+          admin_at: jwt(Math.floor(Date.now() / 1000) - 600),
+          admin_rt: "valid-refresh",
+        }),
+      );
+
+      expect(response.headers.get("location")).toBeNull();
+      expect(response.cookies.get("admin_rt")).toBeUndefined();
+    },
+  );
+
   it("still redirects a valid session away from login", async () => {
     const response = await middleware(
       request("/login", {

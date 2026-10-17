@@ -158,9 +158,9 @@ export const FORWARDED_RESPONSE_HEADERS = [
  * The BFF proxy handlers, factored out of the admin app. Every client data call
  * goes to same-origin `/api/*` (no CORS) and is forwarded to the upstream API
  * with a server-side `Bearer` header; the browser never holds the API tokens.
- * Access tokens refresh transparently (on 401, or up front when the access
- * cookie has expired but the refresh cookie lives), and the rotated tokens are
- * persisted onto this response.
+ * Access tokens refresh transparently (on 401, or up front for a mutation whose
+ * access token has expired while the refresh cookie lives), and the rotated
+ * tokens are persisted onto this response.
  *
  * Wire it in `app/api/[...path]/route.ts`:
  *   export const { GET, POST, PUT, PATCH, DELETE } = createBffProxy(session);

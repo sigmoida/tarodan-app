@@ -4,6 +4,9 @@ import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import type { AuthConfig } from "./config";
 import { cookieOptions, indicatorCookieOptions } from "./cookies";
+import { isExpired } from "./jwt";
+import { GATEWAY_CLIENT_IP_HEADER } from "./proxy";
+import { isRefreshRejected } from "./refresh-status";
 
 export interface ApiFetchResult {
   res: Response;
@@ -121,17 +124,26 @@ export function createSession<TUser>(
     if (indicatorCookie) store.delete(indicatorCookie);
   };
 
-  async function doRefresh(refresh: string): Promise<RefreshOutcome> {
+  async function doRefresh(
+    refresh: string,
+    clientIp?: string | null,
+  ): Promise<RefreshOutcome> {
+    // This is a server-to-server BFF call. Sending the token as an upstream
+    // auth cookie makes the API's browser CSRF guard require a double-submit
+    // header and reject the refresh with 403. Body transport is already
+    // supported for native/BFF clients and remains protected by the signed,
+    // persisted, rotating refresh token itself.
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    // The browser's IP (computed by the gateway proxy), so the upstream can
+    // tell users apart instead of seeing every refresh from the BFF host.
+    if (clientIp) headers[GATEWAY_CLIENT_IP_HEADER] = clientIp;
     let res: Response;
     try {
       res = await fetch(`${apiBaseUrl}${endpoints.refresh}`, {
         method: "POST",
-        // This is a server-to-server BFF call. Sending the token as an upstream
-        // auth cookie makes the API's browser CSRF guard require a double-submit
-        // header and reject the refresh with 403. Body transport is already
-        // supported for native/BFF clients and remains protected by the signed,
-        // persisted, rotating refresh token itself.
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ refreshToken: refresh }),
         cache: "no-store",
       });
@@ -154,9 +166,11 @@ export function createSession<TUser>(
       // 2xx but no token (malformed) — don't kill a possibly-valid session.
       return { status: "transient" };
     }
-    // 5xx = upstream hiccup (e.g. API redeploying) → transient, keep the session.
-    // 4xx = the refresh token was rejected → the session is genuinely dead.
-    return res.status >= 500 ? { status: "transient" } : { status: "dead" };
+    // 4xx rejection → the session is genuinely dead. 5xx / 429 / 408 → the API
+    // couldn't answer (redeploy, throttle, timeout) → transient, keep the session.
+    return isRefreshRejected(res.status)
+      ? { status: "dead" }
+      : { status: "transient" };
   }
 
   // Single-flight per refresh token: a page firing many /api calls after expiry
@@ -172,7 +186,10 @@ export function createSession<TUser>(
   // Failed attempts are never cached so retries stay possible.
   const ROTATION_RESULT_TTL_MS = 60_000;
   const inflight = new Map<string, Promise<RefreshOutcome>>();
-  const runRefresh = (refresh: string): Promise<RefreshOutcome> => {
+  const runRefresh = (
+    refresh: string,
+    clientIp?: string | null,
+  ): Promise<RefreshOutcome> => {
     const existing = inflight.get(refresh);
     if (existing) return existing;
 
@@ -181,7 +198,7 @@ export function createSession<TUser>(
         inflight.delete(refresh);
       }
     };
-    const pending: Promise<RefreshOutcome> = doRefresh(refresh).then(
+    const pending: Promise<RefreshOutcome> = doRefresh(refresh, clientIp).then(
       (outcome) => {
         if (outcome.status === "ok") {
           const timer = setTimeout(drop, ROTATION_RESULT_TTL_MS);
@@ -206,11 +223,17 @@ export function createSession<TUser>(
     return outcome.status === "ok" ? outcome.tokens : null;
   };
 
+  // Reads that may go out with an expired/missing access token and rely on the
+  // 401 path. Public GETs and polls therefore never refresh up front (and never
+  // clear cookies on a dead refresh unless the endpoint itself answers 401).
+  const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
   async function apiFetch(
     path: string,
     init: RequestInit = {},
   ): Promise<ApiFetchResult> {
     const { access, refresh } = await readTokens();
+    const clientIp = new Headers(init.headers).get(GATEWAY_CLIENT_IP_HEADER);
     const send = (token?: string) => {
       const headers = new Headers(init.headers);
       if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -220,52 +243,73 @@ export function createSession<TUser>(
         cache: "no-store",
       });
     };
-    const persist = async (tokens: { access: string; refresh: string }) => {
-      try {
-        await writeTokens(tokens.access, tokens.refresh);
-      } catch {
-        /* Server Component context can't write cookies; the proxy/middleware will. */
-      }
-    };
 
-    // Access cookie gone (its maxAge is the access TTL, so the browser drops it)
-    // while the refresh cookie lives → refresh FIRST. Sending the request bare
-    // and waiting for a 401 is not enough: optional-auth endpoints (e.g. card
-    // payment) answer a credential-less request as a GUEST and silently lose
-    // the user. Genuine guests (no refresh cookie) never refresh.
-    //
-    // A failed refresh sends the request as a guest — public endpoints keep
-    // working, auth-required ones return their 401 — with the same
-    // `sessionDead` / `transient` flag as the 401 path below. One refresh
-    // attempt per call: that 401 is not refreshed again.
-    if (!access && refresh) {
-      const outcome = await runRefresh(refresh);
-      if (outcome.status === "ok") {
-        await persist(outcome.tokens);
-        return {
-          res: await send(outcome.tokens.access),
-          refreshed: outcome.tokens,
-        };
-      }
-      const res = await send();
-      if (outcome.status === "dead") return { res, sessionDead: true };
-      return { res, transient: true };
-    }
-
-    let res = await send(access);
-
-    if (res.status === 401 && refresh) {
-      const outcome = await runRefresh(refresh);
+    /**
+     * The ONE refresh-and-resend step (up-front and 401 paths), so the
+     * dead/transient mapping can't drift between them. On failure `onFailure`
+     * supplies the response to return for that outcome.
+     */
+    const refreshThenSend = async (
+      refreshToken: string,
+      onFailure: (status: "dead" | "transient") => Promise<Response> | Response,
+    ): Promise<ApiFetchResult> => {
+      const outcome = await runRefresh(refreshToken, clientIp);
       if (outcome.status === "ok") {
         const next = outcome.tokens;
-        await persist(next);
-        res = await send(next.access);
-        return { res, refreshed: next };
+        try {
+          await writeTokens(next.access, next.refresh);
+        } catch {
+          /* Server Component context can't write cookies; the proxy/middleware will. */
+        }
+        return { res: await send(next.access), refreshed: next };
       }
-      // Refresh failed: distinguish a rejected token (dead) from a transient
-      // upstream failure so the caller doesn't log the user out on a hiccup.
-      if (outcome.status === "dead") return { res, sessionDead: true };
-      return { res, transient: true };
+      // Distinguish a rejected token (dead) from a transient upstream failure
+      // so the caller doesn't log the user out on a hiccup.
+      const res = await onFailure(outcome.status);
+      return outcome.status === "dead"
+        ? { res, sessionDead: true }
+        : { res, transient: true };
+    };
+
+    // A MUTATION with an expired/missing access token but a live refresh cookie
+    // → refresh FIRST (same expiry rule as the middleware). Sending it bare and
+    // waiting for a 401 is not enough: optional-auth endpoints (e.g. POST
+    // /payments/direct-form after 15 min on the card form) answer a
+    // credential-less request as a GUEST and silently lose the user. Genuine
+    // guests (no refresh cookie) never refresh.
+    //
+    // Failure (one attempt per call, never re-refreshed on a later 401):
+    //  - dead (token rejected) → sent as a guest, `sessionDead` (cookies cleared),
+    //    exactly what a guest would get;
+    //  - transient (API down / throttled) → NOT sent: a mutation must not run as
+    //    a guest on a hiccup. A synthetic 503 comes back (`transient`, cookies
+    //    kept) so the client can retry.
+    const method = (init.method ?? "GET").toUpperCase();
+    if (
+      refresh &&
+      !READ_METHODS.has(method) &&
+      isExpired(access, config.jwtSkewMs)
+    ) {
+      return refreshThenSend(refresh, (status) =>
+        status === "dead"
+          ? send()
+          : new Response(
+              JSON.stringify({
+                statusCode: 503,
+                message: "Session refresh temporarily unavailable; retry.",
+              }),
+              {
+                status: 503,
+                headers: { "content-type": "application/json" },
+              },
+            ),
+      );
+    }
+
+    const res = await send(access);
+    if (res.status === 401 && refresh) {
+      // Refresh on 401 and retry once; on failure return the upstream 401.
+      return refreshThenSend(refresh, () => res);
     }
     return { res };
   }
