@@ -230,9 +230,9 @@ function playwrightStage(context, id, label, options = {}) {
  * (~2.5 GB) in memory.
  *
  * Unit tests are NOT part of the hook: the full API suite runs in CI on every
- * push (Deploy Staging → "Verify / Unit tests", ~2 min on a clean runner) and
- * gates the staging deploy. Running jest here is what froze 16 GB machines
- * and pushed everyone to --no-verify. `--tests` (manual: `pnpm verify:push
+ * development push as an advisory run (Development Tests, ~2 min of jest on a
+ * clean runner) and is a required check on PRs to master. Running jest here is
+ * what froze 16 GB machines and pushed everyone to --no-verify. `--tests` (manual: `pnpm verify:push
  * --tests`) adds the related API specs and the web/admin unit suites, capped
  * at half the cores.
  */
@@ -314,8 +314,10 @@ function buildPushStages(context, apps, { changes, withTests }) {
  *   release  production build + dependency audit       (master gate only)
  *   e2e      API e2e + full scenarios against local services (opt-in)
  *
- * development pushes / PRs run static + unit; master PRs and the production
- * release run all three default groups.
+ * Development pushes gate the staging deploy on static only and run unit as
+ * an advisory workflow; PRs to development run static + unit (nothing
+ * required); master PRs and the production release run all three default
+ * groups.
  */
 function buildCiStages(context, groups = CI_GROUPS) {
   const stages = [];
@@ -326,7 +328,7 @@ function buildCiStages(context, groups = CI_GROUPS) {
       // Every workspace's `lint` reports without fixing, except the API's,
       // which runs `eslint --fix` for developers: a fixable error would be
       // rewritten on the runner and pass. The API is linted through its
-      // non-fixing `lint:ci` instead.
+      // non-fixing `lint:ci` instead (a turbo task too, so it is cached).
       commandStage("lint", "Workspace Lint", [
         "exec",
         "turbo",
@@ -335,9 +337,11 @@ function buildCiStages(context, groups = CI_GROUPS) {
         "--filter=!@tarodan/api",
       ]),
       commandStage("api-lint", "API Lint", [
-        "--filter",
-        "@tarodan/api",
+        "exec",
+        "turbo",
+        "run",
         "lint:ci",
+        "--filter=@tarodan/api",
       ]),
       // node:test specs of these very scripts (affected-app detection, push
       // cache, report parsing) — the pipeline checks its own tooling.
@@ -818,7 +822,7 @@ async function run() {
 
   if (options.mode === "push" && !options.tests && report.status === "PASS") {
     console.log(
-      "Unit tests run in CI on every push (Deploy Staging -> Staging gate) and gate the staging deploy. " +
+      "Unit tests run in CI after the push (Development Tests, advisory) and are required on PRs to master. " +
         "Run them locally first with: pnpm verify:push --tests",
     );
   }

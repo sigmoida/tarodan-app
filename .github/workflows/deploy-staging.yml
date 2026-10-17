@@ -3,12 +3,14 @@ name: Deploy Staging
 # Coolify Auto Deploy must be disabled for the staging API, web and admin
 # resources. This workflow is the only deployment trigger for development.
 #
-# development = staging, so the gate is the QUICK one (verify.yml, full:
-# false): typecheck + lint + the full API unit suite + every vitest suite,
-# ~4-5 min wall-clock with the jobs in parallel. A failing gate means nothing
-# is deployed; fix forward or re-run the failed job. The production build is
-# not part of it — Coolify builds the images anyway, and the full gate runs on
-# the development -> master PR.
+# development = staging = our area: pushes must be FAST and breakages are
+# fixed forward. The gate is typecheck + lint only (verify.yml with
+# `unit: false`, turbo-cached, ~1-2 min); the unit suites run on the same push
+# in the separate, advisory Development Tests workflow, which nothing waits
+# for. They live in their own workflow on purpose: a red unit run here would
+# mark this run failed, and deploy-targets only diffs against successful runs.
+# The full gate (all unit tests, production build, audit) runs on the
+# development -> master PR and before the production release.
 #
 # A newer push cancels an older run that is still verifying or waiting on
 # Coolify (concurrency below). The deploy job therefore diffs against the last
@@ -36,7 +38,7 @@ jobs:
     name: Staging gate
     uses: ./.github/workflows/verify.yml
     with:
-      full: false
+      unit: false
 
   deploy:
     name: Deploy affected staging apps

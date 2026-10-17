@@ -365,9 +365,10 @@ pnpm --filter @tarodan/api test:e2e         # full HTTP (needs test DB: test:e2e
 ```
 
 What runs where (details: `docs/OPERATIONS.md` §4): the pre-push hook to
-`development` runs only the affected apps' typecheck (~1 min); the full API
-unit suite runs in CI on every push and gates the staging deploy; PRs to
-`master` and the production release run the full gate (+ production build and
+`development` runs only the affected apps' typecheck (~1 min); CI gates the
+staging deploy on typecheck + lint only and runs the full API unit suite on
+every push as an advisory check (fix a red run forward); PRs to `master` and
+the production release run the full gate (all unit tests, production build,
 dependency audit). `pnpm verify:push --tests` runs the related specs locally
 before a push; don't reach for `--no-verify`.
 

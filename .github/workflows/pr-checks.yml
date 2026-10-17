@@ -1,7 +1,7 @@
 name: PR Checks
 
-# PRs to development run the quick gate (Typecheck & lint + Unit tests, the
-# full API suite included). PRs to master — the development -> master release
+# PRs to development run Typecheck & lint + Unit tests (the full API suite
+# included); development has no required checks, so the unit job is advisory. PRs to master — the development -> master release
 # PR and hotfix/* PRs — run the FULL gate, adding the production build and the
 # dependency audit. The jobs live in the reusable verify.yml.
 #

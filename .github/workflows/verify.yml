@@ -10,20 +10,27 @@ name: Verify
 #                                            contracts + API seed build
 #   job "Unit tests"        --group unit     the FULL API jest suite + every
 #                                            workspace's vitest suite
+#                                            (`unit: false` skips it)
 #   job "Build & audit"     --group release  production build + dependency
 #                                            audit — only with `full: true`
 #
-# Callers:
-#   PR Checks          job "Verify"        full on PRs to master, quick on PRs
-#                                          to development. The master ruleset
-#                                          requires these three check names:
-#                                          "Verify / Typecheck & lint",
-#                                          "Verify / Unit tests",
-#                                          "Verify / Build & audit".
-#   Deploy Staging     job "Staging gate"  quick; the staging deploy needs it.
-#   Release Production job "Release gate"  full; the production deploy needs it.
-# The caller job names differ on purpose: a quick staging run on a commit must
-# never satisfy a check the master ruleset requires from the full gate.
+# Callers (development = fast and light, master = everything):
+#   PR Checks          job "Verify"             full on PRs to master; on PRs
+#                                               to development static + unit
+#                                               (nothing is required there, so
+#                                               the unit job is advisory). The
+#                                               master ruleset requires
+#                                               "Verify / Typecheck & lint",
+#                                               "Verify / Unit tests",
+#                                               "Verify / Build & audit".
+#   Deploy Staging     job "Staging gate"       static only (`unit: false`);
+#                                               the staging deploy needs it.
+#   Development Tests  job "Development tests"  unit only (`static: false`),
+#                                               advisory, nothing waits for it.
+#   Release Production job "Release gate"       full; the production deploy
+#                                               needs it.
+# The caller job names differ on purpose: a development-level run on a commit
+# must never satisfy a check the master ruleset requires from the full gate.
 #
 # No repository secrets: unit tests mock every provider (DB, Redis, PayTR,
 # S3, …). The two NEXT_PUBLIC_* values below are public placeholders that the
@@ -37,6 +44,14 @@ name: Verify
 on:
   workflow_call:
     inputs:
+      static:
+        description: Run the "Typecheck & lint" job.
+        type: boolean
+        default: true
+      unit:
+        description: Run the "Unit tests" job.
+        type: boolean
+        default: true
       full:
         description: Also run the production build and the dependency audit (master gate).
         type: boolean
@@ -52,6 +67,7 @@ env:
 jobs:
   static:
     name: Typecheck & lint
+    if: inputs.static
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,6 +83,7 @@ jobs:
 
   unit:
     name: Unit tests
+    if: inputs.unit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

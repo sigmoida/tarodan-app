@@ -4,8 +4,9 @@
  * Git pre-push hook (.husky/pre-push).
  *
  *   development  quick local gate: typecheck (+ API contract) of the affected
- *                apps, ~1 min, no jest. The full unit suites run in CI and
- *                gate the staging deploy (.github/workflows/deploy-staging.yml).
+ *                apps, ~1 min, no jest. CI gates the staging deploy on
+ *                typecheck + lint only; the unit suites run there as an
+ *                advisory workflow (Development Tests).
  *   master       nothing heavy runs locally. master moves through a PR
  *                development -> master whose "Verify / *" checks are the full
  *                gate, and Release Production re-runs it before deploying.

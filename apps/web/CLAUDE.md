@@ -341,9 +341,10 @@ pnpm --filter @tarodan/web build         # before shipping anything routing-rela
 ```
 
 What runs where (details: `docs/OPERATIONS.md` §4): the pre-push hook to
-`development` runs only the affected apps' typecheck + `test:api`; lint and
-every vitest suite run in CI on each push and gate the staging deploy; the
-production build runs on PRs to `master` and before the production release.
+`development` runs only the affected apps' typecheck + `test:api`; CI gates
+the staging deploy on typecheck + lint and runs every vitest suite as an
+advisory check; PRs to `master` and the production release run the full gate
+(unit tests required, production build, dependency audit).
 
 Touching `@tarodan/ui` (or any package) means verifying the **consumers** too —
 `pnpm --filter @tarodan/admin typecheck` at minimum; a shared component is not

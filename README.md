@@ -98,7 +98,7 @@ sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları baş
 | `pnpm db:migrate`                  | Yeni migration oluştur/uygula (`prisma migrate dev`) |
 | `pnpm lint` / `typecheck` / `test` | Kalite kontrolleri                                   |
 | `pnpm verify:push [--tests]`       | Push hook'unun kontrolü (typecheck; ops. testler)    |
-| `pnpm verify:quick` / `verify:ci`  | CI'ın development / master kapısının yerel kopyası   |
+| `pnpm verify:quick` / `verify:ci`  | development / master CI kontrollerinin yerel kopyası |
 | `pnpm stack:up`                    | PM2 ile arka planda çalıştırma alternatifi           |
 
 Doğrulama hattı (yerel hook'lar, CI kapıları, deploy'lar):

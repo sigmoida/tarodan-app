@@ -1032,8 +1032,11 @@ Lansman stabil ilan edilene kadar reset öncesi yedeği sakla.
 
 ## 4. Doğrulama hattı (CI/CD)
 
-İlke: **development (staging) hafif, master (production) eksiksiz.** Ağır
-doğrulama geliştirici makinesinde değil, temiz bir GitHub runner'ında koşar.
+İlke: **development (staging) hızlı ve hafif, master (production) eksiksiz.**
+development bizim alanımız: staging deploy'u yalnız typecheck + lint bekler,
+kırılan şey ileri düzeltilir. Tam doğrulama (tüm unit testler, production
+build, audit) master'a giderken koşar. Ağır doğrulama geliştirici makinesinde
+değil, temiz bir GitHub runner'ında koşar.
 Kapının içeriği tek yerde tanımlıdır: `scripts/verify-local.mjs`'in `ci`
 grupları. `.github/workflows/verify.yml` her grubu ayrı bir job olarak koşar;
 `pnpm verify:ci` yerelde aynı kapıyı koşar — ikisi ayrışamaz.
@@ -1056,9 +1059,10 @@ Süreler 2026-10 ölçümleri: runner değerleri Release Production koşularınd
 | Yerel pre-commit (`lint-staged`)                 | Staged dosyalarda `eslint --fix` + `prettier`                                                                                                                                  | saniyeler                                 | commit              |
 | Yerel pre-push → `development`                   | Etkilenen app'lerin typecheck'i + web/admin API kontrat script'i, **sırayla** (tek seferde tek `tsc`, ~2,5 GB). Jest YOK. Tree önbelleği + kirli çalışma ağacı engeli korunur. | ~1 dk (api 27 sn, web 22 sn, admin 20 sn) | push                |
 | Yerel pre-push → `master`                        | Ağır bir şey koşmaz; PR yolunu hatırlatan bir not basar                                                                                                                        | —                                         | hiçbir şey          |
-| CI: `development` push (Deploy Staging)          | `Staging gate / Typecheck & lint` ∥ `Staging gate / Unit tests` (paralel)                                                                                                      | ~4-5 dk                                   | staging deploy      |
+| CI: `development` push (Deploy Staging)          | `Staging gate / Typecheck & lint` (turbo önbellekli; değişmeyen workspace'ler önbellekten gelir)                                                                               | ~1-2 dk                                   | staging deploy      |
+| CI: `development` push (Development Tests)       | `Development tests / Unit tests` — tüm API suite'i + tüm vitest, **tavsiye**: deploy beklemez, kırmızısı Actions'ta ve commit'te görünür                                       | ~3-4 dk                                   | hiçbir şey          |
 | Staging deploy                                   | Kapı yeşilse, **son başarılı** Deploy Staging koşusundan beri değişen app'ler Coolify'a tetiklenir ve sonucu beklenir                                                          | Coolify build ~10 dk                      | —                   |
-| CI: PR → `development` (PR Checks)               | `Verify / Typecheck & lint` ∥ `Verify / Unit tests`                                                                                                                            | ~4-5 dk                                   | (zorunlu değil)     |
+| CI: PR → `development` (PR Checks)               | `Verify / Typecheck & lint` ∥ `Verify / Unit tests` (unit tavsiye — development'ta zorunlu check yok)                                                                          | ~1-2 dk / ~3-4 dk                         | (zorunlu değil)     |
 | CI: PR → `master` (PR Checks + diğerleri)        | `Verify / Typecheck & lint` ∥ `Verify / Unit tests` ∥ `Verify / Build & audit` + `Master source guard` + `API e2e` (tavsiye, zorunlu değil)                                    | ~5 dk (e2e henüz ölçülmedi)               | merge (ruleset ile) |
 | Production deploy (Release Production, `master`) | `Release gate / *` = tam kapı tekrar; yeşilse **son başarılı** release'ten beri değişen app'ler Coolify'a, sonuç beklenir                                                      | ~5 dk + ~10-15 dk rollout                 | production deploy   |
 
@@ -1067,10 +1071,18 @@ Notlar:
 - **Jest neden hook'ta yok:** `--changedSince` toplu push'larda büyüyordu (son
   ölçüm ~8 dk / 313 suite); `--findRelatedTests` de sınırsız — tek bir
   controller değişikliği 195 suite çekti (yarım çekirdekle ~4,5 dk). Tüm suite
-  runner'da ~2 dk sürüyor ve staging deploy'unu bekletiyor. Hook typecheck'te
-  kalır, `--no-verify` gerekmemeli. Kullanılsa bile staging kapısı typecheck +
-  tüm testleri koşar ve kırık kodu deploy etmez.
-- **Kapı kırmızıysa:** staging eski sürümde kalır. Düzeltip push'la ya da
+  runner'da ~2 dk sürüyor; her development push'unda tavsiye olarak, master
+  PR'ında zorunlu olarak koşar. Hook typecheck'te kalır, `--no-verify`
+  gerekmemeli. Kullanılsa bile staging kapısı typecheck + lint'i koşar.
+- **Unit testler neden development'ta engellemiyor ama yine koşuyor:** deploy
+  hızlı kalsın diye beklemiyoruz; yine de her push'ta koşması, kırılmayı master
+  PR'ına kalmadan haftalar önce gösterir (runner dakikası herkese açık repoda
+  ücretsiz). Ayrı bir workflow'dur (`development-tests.yml`): Deploy Staging'in
+  içinde olsaydı kırmızı unit job'ı o koşuyu "başarısız" yapar, deploy diff'i
+  yalnız başarılı koşuları taban aldığı için sonraki deploy'lar gereksiz yere
+  büyürdü. Kırmızı bir Development Tests koşusu = ileri düzelt; master PR'ı
+  onunla geçmez.
+- **Staging kapısı (typecheck/lint) kırmızıysa:** staging eski sürümde kalır. Düzeltip push'la ya da
   Actions'ta "Re-run failed jobs". Sonraki başarılı koşu, iptal edilen/başarısız
   koşuların app'lerini de deploy eder: deploy job'ı `github.event.before`'a
   değil, aynı workflow'un son başarılı koşusunun commit'ine göre diff alır
@@ -1091,7 +1103,7 @@ Notlar:
   `master` (acil düzeltme; sonra `development`'a geri birleştir). Eski yerel
   "release marker" şartı kalktı; kapıyı ruleset'teki zorunlu check'ler ve
   Release Production'daki tekrar koşu sağlar.
-- **Önbellek:** turbo görev önbelleği hızlı kapıda açık
+- **Önbellek:** turbo görev önbelleği development kapılarında açık
   (`node_modules/.cache/turbo`; eskiden yanlış dizin önbelleğe alınıyordu, her
   koşu ıskalıyordu), tam kapıda kapalı — master kapısı hiçbir sonucu önbellekten
   oynatmaz. API jest her zaman tam koşar. Build job'ı Next'in kendi derleme
@@ -1110,7 +1122,7 @@ Notlar:
 | `pnpm verify:push`          | Hook'un yaptığının aynısı (etkilenen app typecheck'i). Push'tan önce elle de koşulabilir; geçen tree önbelleğe yazılır, hook onu atlar.                                 |
 | `pnpm verify:push --tests`  | + ilgili API spec'leri (`jest --findRelatedTests`, `--maxWorkers=50%`) + web/admin unit. Riskli bir değişikliği push'tan önce yerelde görmek için; dakikalar sürebilir. |
 | `pnpm verify:watch`         | Geliştirirken canlı jest + tsc.                                                                                                                                         |
-| `pnpm verify:quick`         | CI'ın development kapısının birebir aynısı (`static` + `unit`). Tüm çekirdekleri kullanır — makine yükünü göze alarak.                                                  |
+| `pnpm verify:quick`         | development'taki CI kontrollerinin aynısı (`static` = staging kapısı + `unit` = tavsiye testler). Tüm çekirdekleri kullanır — makine yükünü göze alarak.                |
 | `pnpm verify:ci`            | Master kapısının birebir aynısı (+ build + audit). CI'ı yerelde yeniden üretmek için.                                                                                   |
 | `pnpm verify:release:local` | **Opsiyonel** prova: tam kapı + yerel Docker altyapısı + API e2e + full scenarios + Playwright (`--paytr` ile PayTR entegrasyonu). Master push'u için şart değil.       |
 

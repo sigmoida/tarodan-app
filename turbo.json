@@ -34,6 +34,24 @@
         ".eslintrc*"
       ]
     },
+    "lint:ci": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "app/**",
+        "apps/**",
+        "libs/**",
+        "rules/**",
+        "scripts/**",
+        "test/**",
+        "tests/**",
+        "e2e/**",
+        "plugins/**",
+        "prisma/**",
+        "*.{js,cjs,mjs,ts,json}",
+        ".eslintrc*"
+      ]
+    },
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": [
