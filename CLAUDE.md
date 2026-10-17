@@ -149,7 +149,10 @@ Policy: tarodan-ops: `docs/security-policy.md`.
 ## Claude Code and Definition of Done
 
 - Versioned: `.claude/settings.json` (permissions, hooks), `agents/`, `skills/`,
-  path-scoped `rules/`. `settings.local.json` stays personal. Agents work in
+  path-scoped `rules/`. `settings.local.json` stays personal. Permission
+  rules are a guard, not a boundary: other spellings (e.g. a `:branch` delete
+  push) are not matched, so GitHub branch rules (block force pushes, restrict
+  deletions) remain the real control. Agents work in
   their own worktree and branch, commit their own work, never push or merge,
   and never use the `fable` model.
 - Done means tarodan-ops: `docs/definition-of-done.md`: principles followed,
