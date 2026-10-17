@@ -173,6 +173,10 @@ export function HeroSlideFormModal({
           label={t("admin.marketing.hero.fields.cta2Href")}
           placeholder={t("admin.marketing.ads.linkUrlPlaceholder")}
         />
+        {/* İki adres alanının ortak notu: mağaza bağlantısı (heroStoreLinkKind). */}
+        <p className="text-xs text-muted sm:col-span-2">
+          {t("admin.marketing.hero.ctaStoreHint")}
+        </p>
       </div>
       <ImageUploadField
         name="imageUrl"

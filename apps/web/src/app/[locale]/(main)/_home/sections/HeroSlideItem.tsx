@@ -3,19 +3,53 @@
 "use client";
 
 import { useRef } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { DevicePhoneMobileIcon } from "@heroicons/react/24/outline";
 import { pickLocalized, type HeroSlideDto } from "@tarodan/types";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import HeroPicture from "@/components/marketing/HeroPicture";
 import { useVisibilityImpression } from "@/hooks/useVisibilityImpression";
 import { trackHeroEvent, type HeroCtaIndex } from "@/lib/api/heroTracking";
-import { resolveHeroCta } from "@/lib/heroView";
+import { resolveHeroCta, type ResolvedHeroCta } from "@/lib/heroView";
 import {
   HERO_ACTIONS_CLASS,
   HERO_SUBTITLE_CLASS,
   HERO_TITLE_CLASS,
   HeroSlideLayout,
 } from "./HeroSlideLayout";
+
+/**
+ * Mağaza bağlantılı CTA (App Store / Google Play): koyu mağaza butonu — telefon
+ * simgesi, küçük "Mobilde aç" başlığı ve admin'in yazdığı etiket; yeni sekmede
+ * açılır (`ButtonLink external` → `rel="noopener noreferrer"`).
+ */
+function StoreCtaContent({ label }: { label: string }) {
+  const t = useTranslations("home.slider");
+  return (
+    <>
+      <DevicePhoneMobileIcon
+        aria-hidden="true"
+        className="h-6 w-6 shrink-0 text-primary-500"
+      />
+      <span className="flex flex-col items-start leading-tight">
+        <span className="text-xs font-medium text-inverted/80">
+          {t("openOnMobile")}
+        </span>
+        <span className="text-base font-bold">{label}</span>
+        <span className="sr-only">{t("opensInNewTab")}</span>
+      </span>
+    </>
+  );
+}
+
+/** Mağaza CTA'sının buton görünümü (normal CTA'lar varsayılan boyutta kalır). */
+const STORE_CTA_CLASS =
+  "h-auto min-h-12 w-full gap-3 py-2 sm:w-auto sm:justify-start";
+
+function ctaVariant(cta: ResolvedHeroCta, index: HeroCtaIndex) {
+  if (cta.store) return "dark" as const;
+  return index === 1 ? ("primary" as const) : ("secondary" as const);
+}
 
 /**
  * Tek hero slaytı. Gösterim sayacı slayt başına çalışır: yan slaytlar `overflow`
@@ -66,12 +100,14 @@ export default function HeroSlideItem({
           cta ? (
             <ButtonLink
               key={index}
-              variant={index === 1 ? "primary" : "secondary"}
+              variant={ctaVariant(cta, index)}
               href={cta.href}
               external={cta.external}
+              size={cta.store ? "lg" : undefined}
+              className={cta.store ? STORE_CTA_CLASS : undefined}
               onClick={() => trackHeroEvent(slide.id, "click", index)}
             >
-              {cta.label}
+              {cta.store ? <StoreCtaContent label={cta.label} /> : cta.label}
             </ButtonLink>
           ) : null,
         )}

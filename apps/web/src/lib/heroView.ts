@@ -1,6 +1,11 @@
 /** @format */
 
-import { pickLocalized, type HeroSlideDto } from "@tarodan/types";
+import {
+  heroStoreLinkKind,
+  pickLocalized,
+  type HeroSlideDto,
+  type HeroStoreLinkKind,
+} from "@tarodan/types";
 import { isExternalAdHref, safeAdHref } from "@/lib/ads/safeAdHref";
 
 export interface ResolvedHeroCta {
@@ -8,6 +13,11 @@ export interface ResolvedHeroCta {
   href: string;
   /** Dış adres → yeni sekme; site-içi → locale-aware `Link`. */
   external: boolean;
+  /**
+   * App Store / Google Play bağlantısı → koyu mağaza butonu olarak çizilir
+   * (`heroStoreLinkKind`); değilse `null`.
+   */
+  store: HeroStoreLinkKind | null;
 }
 
 type HeroCta = NonNullable<HeroSlideDto["cta1"]>;
@@ -24,5 +34,10 @@ export function resolveHeroCta(
   const href = safeAdHref(cta.href);
   const label = pickLocalized(cta.label, locale);
   if (!href || !label) return null;
-  return { label, href, external: isExternalAdHref(href) };
+  return {
+    label,
+    href,
+    external: isExternalAdHref(href),
+    store: heroStoreLinkKind(href),
+  };
 }

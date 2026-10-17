@@ -34,12 +34,12 @@ describe("hero slides fetch", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "http://api.test/api/hero-slides?placement=home&platform=web",
-      { next: { revalidate: 300, tags: ["home:hero"] } },
+      { next: { revalidate: 60, tags: ["home:hero"] } },
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "http://api.test/api/hero-slides?placement=auth_register&platform=web",
-      { next: { revalidate: 300, tags: ["auth:hero"] } },
+      { next: { revalidate: 60, tags: ["auth:hero"] } },
     );
   });
 

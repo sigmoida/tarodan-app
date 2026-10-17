@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsObject,
@@ -65,10 +66,23 @@ export class AdminSendNotificationDto extends BroadcastEmailContentDto {
   @IsString()
   body: string;
 
-  @ApiProperty({ type: [String] })
+  @ApiProperty({
+    type: [String],
+    description:
+      'Teslim kanalları: "push", "email". Zil `inApp` ile seçilir; geriye uyum için "in_app" kabul edilir ama sınırda ayıklanır.',
+  })
   @IsArray()
   @IsString({ each: true })
   channels: string[];
+
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      'Zil (uygulama içi bildirim kutusu) satırı yazılsın mı — zilin TEK sinyali (resolveBroadcastInApp). Verilirse kazanır (`channels` içindeki "in_app" ile çelişse bile); verilmezse true (eski çağıranlar her zaman zil satırı yazıyordu). false + yalnız "email" = yalnız e-posta.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  inApp?: boolean;
 
   @ApiProperty({ enum: ["all", "segment", "user_ids"] })
   @IsIn(["all", "segment", "user_ids"])

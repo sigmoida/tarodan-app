@@ -2510,15 +2510,9 @@
     "companyBioFallback": "Premium Diecast araçların alım ve satımı",
     "viewStore": "Mağazayı İncele",
     "slider": {
-      "goToSlide": "Slayta git: {index}"
-    },
-    "appPromo": {
-      "eyebrow": "TARODAN MOBİL",
-      "title": "Koleksiyonun artık <accent>cebinde.</accent>",
-      "description": "İlanların, takasların ve garajın her an yanında. Türkiye'nin ilk diecast uygulamasını mobilde aç.",
+      "goToSlide": "Slayta git: {index}",
       "openOnMobile": "Mobilde aç",
-      "opensInNewTab": "(yeni sekmede açılır)",
-      "imageAlt": "Tarodan mobil uygulamasını gösteren iki telefon ekranı ve önünde beyaz bir diecast model araba"
+      "opensInNewTab": "(yeni sekmede açılır)"
     }
   },
   "search": {
@@ -5556,20 +5550,28 @@
           "app": "Yalnız uygulama",
           "all": "İkisi"
         },
-        "clientName": {
+        "platformBadge": {
           "web": "Web",
-          "app": "Uygulama"
+          "app": "Uygulama",
+          "all": "İkisi"
         },
         "visibility": {
-          "web": "Web'de göster",
-          "app": "Uygulamada göster",
-          "updated": "Hero görünürlüğü güncellendi",
-          "hint": "Ana sayfa hero'su; kapalıyken o platformda gizlenir, slaytlar silinmez."
+          "updated": "Hero görünürlüğü güncellendi"
         },
-        "hiddenOn": {
-          "switchOff": "{platform} ana sayfasında hero gizli: anahtar kapalı.",
-          "noLiveSlide": "{platform} ana sayfasında hero gizli: bu platformda yayında slayt yok.",
-          "hiddenInApp": "Uygulama ana sayfasında hero gizli: yayındaki uygulama slaytlarının hepsi \"Mobil uygulamada gösterme\" işaretli (iOS ve Android)."
+        "homeVisibility": {
+          "title": "Ana sayfa görünürlüğü",
+          "help": "Kapalıyken bu platformda ana sayfa hero'su gizlenir; slaytlar silinmez. Yalnız Ana sayfa sekmesini etkiler.",
+          "client": {
+            "web": "Web sitesi",
+            "app": "Mobil uygulama (iOS + Android)"
+          },
+          "toggle": "{client}: ana sayfa hero'sunu göster",
+          "summary": {
+            "live": "{count, plural, one {# slayt yayında} other {# slayt yayında}}",
+            "noLiveSlide": "Yayında slayt yok; hero gizli",
+            "switchOff": "Gizli: anahtar kapalı",
+            "hiddenInApp": "Gizli: yayındaki slaytların hiçbiri uygulamada gösterilmiyor (\"Mobil uygulamada gösterme\" işaretli ya da yalnız mağaza butonlu)"
+          }
         },
         "columns": {
           "image": "Görsel",
@@ -5621,7 +5623,13 @@
           "ctaLabelRequired": "Adres için bir düğme etiketi girin",
           "linkInvalid": "Geçerli bir adres girin: https://… ile başlayan tam adres ya da / ile başlayan site içi yol.",
           "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz."
-        }
+        },
+        "liveHidden": {
+          "web": "Yayında · web gizli",
+          "app": "Yayında · uygulama gizli",
+          "all": "Yayında · web ve uygulama gizli"
+        },
+        "ctaStoreHint": "App Store / Google Play bağlantısı girilirse buton web'de mağaza butonu olarak görünür, uygulamada gizlenir. Yalnız mağaza butonlu slayt uygulamada gösterilmez."
       },
       "trustBadges": {
         "title": "Güven rozetleri",
@@ -6065,7 +6073,10 @@
         "channel": {
           "mobileApp": "Mobil uygulama",
           "email": "E-posta",
-          "emailInbox": "E-posta gelen kutusu"
+          "emailInbox": "E-posta gelen kutusu",
+          "push": "Push",
+          "inApp": "Uygulama içi (zil)",
+          "inAppDescription": "Web ve mobildeki bildirim kutusu"
         },
         "target": {
           "allUsers": "Tüm Kullanıcılar",
@@ -6109,12 +6120,35 @@
           "marketing": "Pazarlama",
           "announcementHint": "İşlemsel, hizmet ya da güvenlik duyurusu. Bildirim tercihinden bağımsız olarak kitledeki herkese gider (push, bildirim kutusu, e-posta). Kampanya ya da indirim için kullanmayın.",
           "marketingHint": "Kampanya, indirim ya da tanıtım. Yalnızca pazarlama iletisine izin veren kullanıcılara gider — push ve bildirim kutusu dahil; e-postada abonelikten çıkış linki bulunur.",
-          "placeholder": "Tür seçin"
+          "placeholder": "Tür seçin",
+          "announcementShort": "Hizmet ya da güvenlik duyurusu: tercihten bağımsız olarak kitledeki herkese gider.",
+          "marketingShort": "Kampanya ya da tanıtım: yalnızca pazarlama izni verenlere gider, e-postada çıkış linki bulunur.",
+          "stepHint": "Tür, seçtiğiniz tüm kanallarda kimin bildirimi alacağını belirler."
         },
         "link": {
           "label": "Hedef bağlantı (opsiyonel)",
           "placeholder": "/listings/ilan-kimligi",
           "hint": "Bildirime dokunulunca açılacak site içi sayfa: /listings/…, /collections/…, /seller/…, /profile/orders, /membership. Boş bırakılırsa bildirim listesi açılır."
+        },
+        "channelHint": "Önce kanalları seçin; aşağıda yalnızca seçtiğiniz kanalların içerik alanları görünür.",
+        "pushOnlyTextTitle": "Push metni",
+        "inAppOnlyTextTitle": "Uygulama içi (zil) metni",
+        "selectChannelFirst": "İçerik alanlarını görmek için en az bir kanal seçin",
+        "emailLayoutHint": "İçerik ortak e-posta şablonuna (logo ve altbilgi) yerleştirilir; pazarlama türünde abonelikten çıkış linki otomatik eklenir.",
+        "recipientCountNoType": "Hedefte {total} kullanıcı var; ulaşılacak sayı türe göre değişir",
+        "sendMode": {
+          "title": "Gönderim zamanı",
+          "nowDescription": "Onayladığınızda hemen gönderilir",
+          "scheduleDescription": "Seçtiğiniz tarih ve saatte gönderilir"
+        },
+        "preview": {
+          "lockScreen": "Kilit ekranı",
+          "appName": "Tarodan",
+          "linkHint": "Dokununca açılır: {link}",
+          "noLinkHint": "Dokununca bildirim listesi açılır",
+          "bellTitle": "Bildirim kutusu",
+          "notificationTab": "Bildirim",
+          "emailTab": "E-posta"
         }
       },
       "pages": {
@@ -11648,7 +11682,8 @@
         "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
         "emailHtmlEmpty": "E-posta HTML'i güvensiz işaretlemeler çıkarıldıktan sonra kullanılabilir içerik barındırmıyor",
         "scheduledNotFound": "Zamanlanmış bildirim bulunamadı",
-        "noMarketingConsentAudience": "Seçilen kitlede pazarlama iletisine izin veren kullanıcı yok"
+        "noMarketingConsentAudience": "Seçilen kitlede pazarlama iletisine izin veren kullanıcı yok",
+        "noChannel": "En az bir gönderim kanalı seçin"
       },
       "payment": {
         "partialAmountRequired": "Kısmi iade için geçerli bir iade tutarı gerekir",

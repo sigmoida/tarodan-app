@@ -79,6 +79,18 @@ describe("heroSchema", () => {
     ).toEqual([]);
   });
 
+  it("accepts https App Store / Google Play links (store buttons)", () => {
+    expect(
+      issues({
+        cta1LabelTr: "Android",
+        cta1Href:
+          "https://play.google.com/store/apps/details?id=com.tarodan.app",
+        cta2LabelTr: "iOS",
+        cta2Href: "https://apps.apple.com/tr/app/id6786614139",
+      }),
+    ).toEqual([]);
+  });
+
   it("accepts the three platform targets and rejects anything else", () => {
     for (const platform of ["web", "app", "all"] as const) {
       expect(issues({ platform })).toEqual([]);

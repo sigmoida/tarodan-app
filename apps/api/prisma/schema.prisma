@@ -3979,6 +3979,11 @@ model ScheduledNotification {
   title        String
   body         String
   channels     String[]
+  // Zil (uygulama içi bildirim kutusu) satırı yazılsın mı? Varsayılan true:
+  // bu kolondan önceki satırlar ve `inApp` göndermeyen çağıranlar her zaman
+  // zil satırı yazıyordu. Yeni admin formu kanalı açıkça seçer; false iken
+  // (ör. yalnız e-posta) zil satırı yazılmaz.
+  inApp        Boolean   @default(true) @map("in_app")
   targetType   String    @map("target_type")
   targetData   Json?     @map("target_data")
   scheduledFor DateTime  @map("scheduled_for")

@@ -118,6 +118,8 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             title: notification.title,
             body: notification.body,
             channels: notification.channels as string[],
+            // Kolon öncesi satırlar true (eski davranış: her zaman zil).
+            inApp: notification.inApp,
             targetType,
             ...(targetType === "user_ids"
               ? { userIds: (notification.targetData as string[] | null) ?? [] }

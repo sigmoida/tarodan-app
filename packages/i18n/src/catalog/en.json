@@ -2510,15 +2510,9 @@
     "companyBioFallback": "Buying and selling premium diecast vehicles",
     "viewStore": "View Store",
     "slider": {
-      "goToSlide": "Go to slide {index}"
-    },
-    "appPromo": {
-      "eyebrow": "TARODAN MOBILE",
-      "title": "Your collection, now in your <accent>pocket.</accent>",
-      "description": "Your listings, trades and garage, always with you. Open Türkiye's first diecast app on mobile.",
+      "goToSlide": "Go to slide {index}",
       "openOnMobile": "Open on mobile",
-      "opensInNewTab": "(opens in a new tab)",
-      "imageAlt": "Two phone screens showing the Tarodan mobile app, with a white diecast model car in front"
+      "opensInNewTab": "(opens in a new tab)"
     }
   },
   "search": {
@@ -5556,20 +5550,28 @@
           "app": "App only",
           "all": "Both"
         },
-        "clientName": {
-          "web": "web",
-          "app": "app"
+        "platformBadge": {
+          "web": "Web",
+          "app": "App",
+          "all": "Both"
         },
         "visibility": {
-          "web": "Show on web",
-          "app": "Show in app",
-          "updated": "Hero visibility updated",
-          "hint": "Home page hero; when off it is hidden on that platform, slides are kept."
+          "updated": "Hero visibility updated"
         },
-        "hiddenOn": {
-          "switchOff": "Hero is hidden on the {platform} home page: the switch is off.",
-          "noLiveSlide": "Hero is hidden on the {platform} home page: no live slide on this platform.",
-          "hiddenInApp": "Hero is hidden on the app home page: every live app slide is marked \"Hide in the mobile app\" (iOS and Android)."
+        "homeVisibility": {
+          "title": "Home page visibility",
+          "help": "When off, the home hero is hidden on that platform; slides are not deleted. Affects the Home tab only.",
+          "client": {
+            "web": "Website",
+            "app": "Mobile app (iOS + Android)"
+          },
+          "toggle": "{client}: show the home hero",
+          "summary": {
+            "live": "{count, plural, one {# slide live} other {# slides live}}",
+            "noLiveSlide": "No live slide; hero hidden",
+            "switchOff": "Hidden: switch is off",
+            "hiddenInApp": "Hidden: no live slide is shown in the app (marked \"Hide in the mobile app\" or store buttons only)"
+          }
         },
         "columns": {
           "image": "Image",
@@ -5621,7 +5623,13 @@
           "ctaLabelRequired": "Enter a button label for the link",
           "linkInvalid": "Enter a valid link: a full address starting with https://… or a site path starting with /.",
           "endBeforeStart": "The end date cannot be before the start date."
-        }
+        },
+        "liveHidden": {
+          "web": "Live · hidden on web",
+          "app": "Live · hidden in app",
+          "all": "Live · hidden on web and app"
+        },
+        "ctaStoreHint": "With an App Store / Google Play link the button shows as a store button on the web and is hidden in the app. A slide with only store buttons is not shown in the app."
       },
       "trustBadges": {
         "title": "Trust badges",
@@ -6065,7 +6073,10 @@
         "channel": {
           "mobileApp": "Mobile app",
           "email": "Email",
-          "emailInbox": "Email inbox"
+          "emailInbox": "Email inbox",
+          "push": "Push",
+          "inApp": "In-app (bell)",
+          "inAppDescription": "Notification inbox on web and mobile"
         },
         "target": {
           "allUsers": "All Users",
@@ -6109,12 +6120,35 @@
           "marketing": "Marketing",
           "announcementHint": "A transactional, service or security notice. Reaches everyone in the audience regardless of notification preferences (push, inbox, email). Do not use it for campaigns or discounts.",
           "marketingHint": "A campaign, discount or promotion. Reaches only users who consented to marketing messages — push and inbox included; the email carries an unsubscribe link.",
-          "placeholder": "Select a type"
+          "placeholder": "Select a type",
+          "announcementShort": "Service or security announcement: goes to everyone in the audience regardless of preferences.",
+          "marketingShort": "Campaign or promotion: goes only to users who opted in to marketing; emails include an unsubscribe link.",
+          "stepHint": "The type decides who receives the notification on every selected channel."
         },
         "link": {
           "label": "Target link (optional)",
           "placeholder": "/listings/listing-id",
           "hint": "In-app page opened when the notification is tapped: /listings/…, /collections/…, /seller/…, /profile/orders, /membership. Leave empty to open the notification list."
+        },
+        "channelHint": "Pick the channels first; only the content fields for the selected channels are shown below.",
+        "pushOnlyTextTitle": "Push text",
+        "inAppOnlyTextTitle": "In-app (bell) text",
+        "selectChannelFirst": "Select at least one channel to see its content fields",
+        "emailLayoutHint": "The content is placed in the shared email layout (logo and footer); marketing emails get an unsubscribe link automatically.",
+        "recipientCountNoType": "{total} users in the audience; the number reached depends on the type",
+        "sendMode": {
+          "title": "Delivery time",
+          "nowDescription": "Sent as soon as you confirm",
+          "scheduleDescription": "Sent at the date and time you pick"
+        },
+        "preview": {
+          "lockScreen": "Lock screen",
+          "appName": "Tarodan",
+          "linkHint": "Opens on tap: {link}",
+          "noLinkHint": "Opens the notification list on tap",
+          "bellTitle": "Notification inbox",
+          "notificationTab": "Notification",
+          "emailTab": "Email"
         }
       },
       "pages": {
@@ -11648,7 +11682,8 @@
         "scheduleInFuture": "The scheduled time must be in the future",
         "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
         "scheduledNotFound": "Scheduled notification not found",
-        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages"
+        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages",
+        "noChannel": "Select at least one delivery channel"
       },
       "payment": {
         "partialAmountRequired": "A valid refund amount is required for a partial refund",
