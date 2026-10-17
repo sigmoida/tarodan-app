@@ -53,6 +53,7 @@ import {
   HOLD_RESIDUAL_MIN,
   holdResidual,
   sellerShareForfeited,
+  type RefundFaultFacts,
 } from "../../payout/helpers/hold-release-eligibility";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
@@ -119,6 +120,12 @@ export interface RefundSettlementOptions {
    * (`holdRefundedAmountAfter`).
    */
   holdRetainedAmount?: number;
+  /**
+   * The fault of the refund request this settlement belongs to. The D20
+   * forfeit check counts it with the order's earlier finalized refunds, since
+   * some paths mark the request `refunded` only after `processRefund`.
+   */
+  refundFault?: RefundFaultFacts;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
@@ -338,9 +345,9 @@ export class PaymentRefundService {
 
   /**
    * The seller shipping share to leave in the hold, after the D20 rule: none
-   * once ANY finalized refund of the order is seller fault
-   * (`sellerShareForfeited`). The v2 policy already emits no share then; this
-   * is the last check for every caller, for example a request whose v2
+   * once ANY finalized refund of the order, or this request itself, is seller
+   * fault (`sellerShareForfeited`). The v2 policy already emits no share then;
+   * this is the last check for every caller, for example a request whose v2
    * components were finalized before that rule existed. Read inside the
    * refund transaction, through the order (same shape as the release paths).
    */
@@ -348,6 +355,7 @@ export class PaymentRefundService {
     tx: Prisma.TransactionClient,
     orderId: string,
     requested: number | undefined,
+    current: RefundFaultFacts | undefined,
   ): Promise<number> {
     if (requested == null || !(requested > 0)) return 0;
     const order = await tx.order.findUnique({
@@ -359,7 +367,11 @@ export class PaymentRefundService {
         },
       },
     });
-    if (!sellerShareForfeited(order?.refundRequests ?? [])) return requested;
+    const faults = [
+      ...(order?.refundRequests ?? []),
+      ...(current ? [current] : []),
+    ];
+    if (!sellerShareForfeited(faults)) return requested;
     this.logger.warn(
       `Seller shipping share forfeited (earlier seller-fault refund): order=${orderId} share=${requested}`,
     );
@@ -1004,6 +1016,7 @@ export class PaymentRefundService {
               tx,
               orderId,
               opts?.settlement?.holdRetainedAmount,
+              opts?.settlement?.refundFault,
             );
             const newRefunded = holdRefundedAmountAfter({
               amount: activeHold.amount,

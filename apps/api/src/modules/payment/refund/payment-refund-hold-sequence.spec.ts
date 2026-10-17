@@ -464,7 +464,11 @@ function makeWorld(quantity: number) {
 
   /** The settlement `finalizeRefundForReturnedShipment` builds for a request. */
   const settlementOf = (
-    rrId: string,
+    request: {
+      id: string;
+      faultParty: RefundFaultPartyV2 | null;
+      policyCode: string;
+    },
     units: number,
     components: RefundFinancialComponentV2[] | null,
     shipping: {
@@ -479,7 +483,7 @@ function makeWorld(quantity: number) {
       sellerFeeAmount: 0,
       buyerFeeAmount: 0,
     }),
-    ...financials.shippingSettlement(rrId, shipping),
+    ...financials.shippingSettlement(request, shipping),
   });
 
   const grossOf = (
@@ -520,23 +524,28 @@ function makeWorld(quantity: number) {
     });
     const rrId = `rr-${++requestNo}`;
     const { components } = financialsV2;
-    const settlement = settlementOf(rrId, units, components, {
-      sellerShippingCompensationAmount: grossOf(
-        components,
-        "outbound_shipping",
-        "seller_refund",
-      ),
-      outboundShippingChargeToSeller: grossOf(
-        components,
-        "outbound_shipping",
-        "seller_charge",
-      ),
-      returnShippingChargeToSeller: grossOf(
-        components,
-        "return_shipping",
-        "seller_charge",
-      ),
-    });
+    const settlement = settlementOf(
+      { id: rrId, faultParty: fault, policyCode: `v2_${fault}_return` },
+      units,
+      components,
+      {
+        sellerShippingCompensationAmount: grossOf(
+          components,
+          "outbound_shipping",
+          "seller_refund",
+        ),
+        outboundShippingChargeToSeller: grossOf(
+          components,
+          "outbound_shipping",
+          "seller_charge",
+        ),
+        returnShippingChargeToSeller: grossOf(
+          components,
+          "return_shipping",
+          "seller_charge",
+        ),
+      },
+    );
     const result = await refunds.processRefund(
       ORDER_ID,
       financialsV2.buyerRefundAmount,
@@ -571,11 +580,16 @@ function makeWorld(quantity: number) {
       refundQuantity: units,
     });
     const rrId = `rr-${++requestNo}`;
-    const settlement = settlementOf(rrId, units, null, {
-      sellerShippingCompensationAmount: v1.sellerShippingCompensationAmount,
-      outboundShippingChargeToSeller: v1.outboundShippingChargeToSeller,
-      returnShippingChargeToSeller: v1.returnShippingChargeToSeller,
-    });
+    const settlement = settlementOf(
+      { id: rrId, faultParty: null, policyCode: policy.policyCode },
+      units,
+      null,
+      {
+        sellerShippingCompensationAmount: v1.sellerShippingCompensationAmount,
+        outboundShippingChargeToSeller: v1.outboundShippingChargeToSeller,
+        returnShippingChargeToSeller: v1.returnShippingChargeToSeller,
+      },
+    );
     await refunds.processRefund(ORDER_ID, v1.buyerRefundAmount, {
       skipRefundEvent: true,
       refundQuantity: units,
@@ -892,9 +906,9 @@ describe("refund -> hold consumption -> release -> payout (stateful, through the
       expect(second.retained).toBe(0);
       expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
       expect(money(w.state.hold.refundedAmount)).toBe("832.00");
-      // The buyer is still charged the seller's share on their return
-      // (buyer fault): 545 + 446 < T, so the order stays delivered.
-      expect(w.cashRefunded()).toBe(991);
+      // The buyer is NOT charged the forfeited share (the seller paid it from
+      // the hold): 545 + 494 = 1039 < T, so the order stays delivered.
+      expect(w.cashRefunded()).toBe(1039);
       expect(w.state.order.status).toBe(OrderStatus.delivered);
 
       await w.releaseAndPay();

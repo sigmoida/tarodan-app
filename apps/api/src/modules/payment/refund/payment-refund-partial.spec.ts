@@ -921,6 +921,78 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
   });
 
+  describe("D20: the request's own fault counts too", () => {
+    // A seller-fault cancellation finalized before the source fix still
+    // carries the seller's share in its stored components. Some paths mark
+    // the request refunded only after processRefund, so the check must read
+    // the request's own fault, not only the earlier finalized ones.
+    const fullCancellation = (refundFault: {
+      faultParty: "seller" | "buyer" | null;
+      policyCode: string;
+    }) => ({
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: `own-fault-${refundFault.policyCode}`,
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 48,
+        refundFault,
+      },
+    });
+
+    it.each([
+      [
+        "v2 seller",
+        { faultParty: "seller" as const, policyCode: "v2_seller_cancellation" },
+      ],
+      [
+        "v1 seller",
+        { faultParty: null, policyCode: "seller_fault_cancellation" },
+      ],
+    ])(
+      "%s fault: nothing is retained, the hold is consumed",
+      async (_n, fault) => {
+        const { service, captured } = makeService({
+          paymentAmount: 1140,
+          holdAmount: 860,
+        });
+
+        await service.processRefund(ORDER_ID, 1140, fullCancellation(fault));
+
+        expect(captured.holdUpdate.data).toEqual(
+          expect.objectContaining({
+            status: PaymentHoldStatus.cancelled,
+            refundedAmount: 860,
+          }),
+        );
+      },
+    );
+
+    it("non-seller fault: the share stays held", async () => {
+      const { service, captured } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+
+      await service.processRefund(
+        ORDER_ID,
+        1140,
+        fullCancellation({
+          faultParty: "buyer",
+          policyCode: "v2_buyer_cancellation",
+        }),
+      );
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 812 }),
+      );
+      expect(captured.holdUpdate.data.status).toBeUndefined();
+    });
+  });
+
   it("an earlier goodwill refund does not eat the share of a later full non-fault refund", async () => {
     // 50 TL goodwill (amount ratio) consumed 50 of a 1000 hold. The later full
     // refund still leaves the seller's 48: 1000 − 48 = 952 consumed in total.

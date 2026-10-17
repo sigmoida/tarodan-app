@@ -368,12 +368,8 @@ describe("RefundService policy integration", () => {
       (c) => c.componentCode === "outbound_shipping",
     );
     expect(outbound.some((c) => c.treatment === "seller_refund")).toBe(false);
-    // The buyer side is unchanged: the buyer still bears the seller's share.
-    expect(outbound).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ treatment: "buyer_charge", netAmount: 40 }),
-      ]),
-    );
+    // The seller paid the share from the hold, so the buyer is not charged it.
+    expect(outbound.some((c) => c.treatment === "buyer_charge")).toBe(false);
   });
 
   it("without an earlier seller fault the same refund still gives the seller their share", async () => {
@@ -403,6 +399,12 @@ describe("RefundService policy integration", () => {
         expect.objectContaining({
           componentCode: "outbound_shipping",
           treatment: "seller_refund",
+          netAmount: 40,
+        }),
+        // The buyer at fault bears the seller's share to make the seller whole.
+        expect.objectContaining({
+          componentCode: "outbound_shipping",
+          treatment: "buyer_charge",
           netAmount: 40,
         }),
       ]),

@@ -527,7 +527,7 @@ export class RefundCreationService {
                   financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
-            ...this.financials.shippingSettlement(created.id, {
+            ...this.financials.shippingSettlement(created, {
               sellerShippingCompensationAmount: Number(
                 created.sellerShippingCompensationAmount,
               ),
@@ -849,7 +849,7 @@ export class RefundCreationService {
                   financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
-            ...this.financials.shippingSettlement(created.id, {
+            ...this.financials.shippingSettlement(created, {
               sellerShippingCompensationAmount: Number(
                 created.sellerShippingCompensationAmount,
               ),

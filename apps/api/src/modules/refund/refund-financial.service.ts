@@ -33,7 +33,10 @@ import {
   shippingAmountForDesi,
 } from "../shipping/helpers/shipping-tariff.helper";
 import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
-import { sellerShareForfeited } from "../payout/helpers/hold-release-eligibility";
+import {
+  sellerShareForfeited,
+  type RefundFaultFacts,
+} from "../payout/helpers/hold-release-eligibility";
 import { readInvoiceLineItems } from "../invoicing/invoice/invoice-lines";
 import {
   calculateRefundFinancials,
@@ -979,7 +982,7 @@ export class RefundFinancialService {
    * dönüş kargosu satıcıya borç yazılır (Sürat faturası platforma gelir).
    */
   shippingSettlement(
-    refundRequestId: string,
+    refundRequest: { id: string } & RefundFaultFacts,
     financials: {
       sellerShippingCompensationAmount: number;
       outboundShippingChargeToSeller: number;
@@ -987,6 +990,11 @@ export class RefundFinancialService {
     },
   ): {
     holdRetainedAmount: number;
+    /**
+     * This request's own fault, so the hold consumption can apply the D20
+     * forfeit rule to it as well as to the earlier finalized refunds.
+     */
+    refundFault: RefundFaultFacts;
     sellerAdjustments: Array<{
       sourceKey: string;
       amount: number;
@@ -994,8 +1002,13 @@ export class RefundFinancialService {
       refundRequestId: string;
     }>;
   } {
+    const refundRequestId = refundRequest.id;
     return {
       holdRetainedAmount: financials.sellerShippingCompensationAmount,
+      refundFault: {
+        faultParty: refundRequest.faultParty,
+        policyCode: refundRequest.policyCode,
+      },
       sellerAdjustments: [
         {
           sourceKey: `refund-return-shipping:${refundRequestId}`,

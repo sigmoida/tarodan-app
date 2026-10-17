@@ -72,8 +72,10 @@ export interface RefundFinancialInputV2 {
    * An earlier finalized refund of this order was seller fault
    * (`sellerShareForfeited`, decision D20): the seller's own shipping share is
    * not refunded to them (no `seller_refund` outbound component), whatever the
-   * fault of this refund. It stays with the platform; buyer-side lines are
-   * unchanged.
+   * fault of this refund. It stays with the platform, paid once by the seller
+   * from the hold: on a buyer-fault refund the buyer is then NOT charged the
+   * seller's share (that charge only exists to make the seller whole). Other
+   * buyer-side lines are unchanged.
    */
   sellerShareForfeited?: boolean;
 }
@@ -257,16 +259,21 @@ export function calculateRefundFinancialsV2(
         input.buyerShippingAmount,
         1,
       );
-      addSellerShare();
-      add(
-        "outbound_shipping",
-        "buyer_charge",
-        input.sellerShippingAmount,
-        outboundTax(input.sellerShippingAmount),
-        input.sellerShippingAmount,
-        1,
-        { oneShotPackageSettlement: true },
-      );
+      // The buyer bears the seller's share only to make the seller whole.
+      // When an earlier seller fault forfeited it, the seller already paid
+      // it from the hold: charging the buyer too would collect it twice.
+      if (!input.sellerShareForfeited) {
+        addSellerShare();
+        add(
+          "outbound_shipping",
+          "buyer_charge",
+          input.sellerShippingAmount,
+          outboundTax(input.sellerShippingAmount),
+          input.sellerShippingAmount,
+          1,
+          { oneShotPackageSettlement: true },
+        );
+      }
     } else {
       add(
         "outbound_shipping",

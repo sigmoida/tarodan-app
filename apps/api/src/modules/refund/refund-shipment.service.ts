@@ -313,7 +313,7 @@ export class RefundShipmentService {
                 buyerFeeAmount: this.financials.legacyBuyerFeeNetOf(rr),
               },
             ),
-            ...this.financials.shippingSettlement(rr.id, {
+            ...this.financials.shippingSettlement(rr, {
               sellerShippingCompensationAmount: Number(
                 rr.sellerShippingCompensationAmount,
               ),
