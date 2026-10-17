@@ -38,6 +38,13 @@ critical path needs at least one test at the right level.
 - **Critical paths:** propose new or changed rows for `qa/critical-paths.md`
   (the orchestrator writes them in the hub).
 
+## Review
+
+In the delivery flow you come after the senior developer's `/code-review`: you
+review the tests of every money and critical-path change, and important test
+gaps go back to the developer to fix before merge. Process: tarodan-ops
+`CLAUDE.md`, "Process".
+
 ## Hard rules
 
 - **Own branch and worktree.** Work only in the worktree and branch you were

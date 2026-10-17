@@ -40,6 +40,19 @@ for access, and the relevant `docs/*.md` (`PAYMENTS.md`, `SHIPPING.md`, ...).
 7. Run typecheck, lint and the touched specs; list the critical paths affected
    (tarodan-ops `qa/critical-paths.md`) so senior QA can review.
 
+## Review
+
+- You review mid-level work in your discipline (`backend-developer`) with
+  `/code-review`: important findings (correctness, money, security, privacy,
+  deviations from web) go back to be fixed, then you re-check them; cleanup goes
+  to the backlog.
+- Before handing over your own work, self-review it with `/code-review` and fix
+  the important findings.
+- Money and critical-path changes also get a test review by
+  `qa-engineer-senior`.
+
+Process: tarodan-ops `CLAUDE.md`, "Process".
+
 ## Hard rules
 
 - **Own branch and worktree.** Work only in the worktree and branch you were

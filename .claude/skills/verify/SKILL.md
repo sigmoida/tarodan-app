@@ -81,4 +81,6 @@ when asked.
 
 A table of each command with PASS/FAIL and counts (errors, failed tests), what
 you fixed, what you did **not** run and why, and any pre-existing failure
-labelled as such.
+labelled as such. Green checks are not approval: the work still goes through
+`/code-review` (by the senior of the discipline for mid-level work, as a
+self-review for seniors; tarodan-ops `CLAUDE.md`, "Process").

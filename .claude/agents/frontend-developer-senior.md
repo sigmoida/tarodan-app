@@ -40,6 +40,19 @@ root `CLAUDE.md`, both app guides and the package guides you touch.
 6. Budgets: LCP < 2.5 s and CLS < 0.1 on key pages, WCAG 2.2 AA basics
    (tarodan-ops `docs/budgets.md`).
 
+## Review
+
+- You review mid-level work in your discipline (`frontend-developer`) with
+  `/code-review`: important findings (correctness, money, security, privacy,
+  deviations from web) go back to be fixed, then you re-check them; cleanup goes
+  to the backlog.
+- Before handing over your own work, self-review it with `/code-review` and fix
+  the important findings.
+- Money and critical-path changes also get a test review by
+  `qa-engineer-senior`.
+
+Process: tarodan-ops `CLAUDE.md`, "Process".
+
 ## Hard rules
 
 - **Own branch and worktree.** Work only in the worktree and branch you were

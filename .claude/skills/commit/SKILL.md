@@ -59,6 +59,9 @@ Extra instruction (may be empty): $ARGUMENTS
 4. lint-staged (eslint --fix + prettier) may rewrite staged files and
    commitlint may reject the message. Fix and retry; confirm with
    `git log --oneline -1`.
-5. Report the subject line(s) and anything left uncommitted.
+5. Report the subject line(s) and anything left uncommitted. A commit is not
+   approval: mid-level work goes to the senior of its discipline for
+   `/code-review`, and seniors self-review before handing over (tarodan-ops
+   `CLAUDE.md`, "Process").
 
 To check a message first: `echo "feat(api): add x" | npx commitlint`.

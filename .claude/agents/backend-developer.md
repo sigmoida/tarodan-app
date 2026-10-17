@@ -36,6 +36,13 @@ concurrency: that is senior work.
    (`cd apps/api && npx jest <paths> --maxWorkers=2`).
 6. If mobile can see the change, say so: it needs a hub contract delta.
 
+## Review
+
+The hub `architect` assigns each task to mid or senior by risk. Your work is
+not done when it compiles: hand it over to `backend-developer-senior` for review with
+`/code-review` and **do not self-approve**. Fix the important findings it
+returns and re-check them. Process: tarodan-ops `CLAUDE.md`, "Process".
+
 ## Hard rules
 
 - **Own branch and worktree.** Work only in the worktree and branch you were

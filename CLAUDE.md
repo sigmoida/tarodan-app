@@ -156,6 +156,12 @@ Policy: tarodan-ops: `docs/security-policy.md`.
   deletions) remain the real control. Agents work in
   their own worktree and branch, commit their own work, never push or merge,
   and never use the `fable` model.
+- Delivery (tarodan-ops: `CLAUDE.md`, "Process"): the hub `architect`
+  assigns each task to a mid or senior agent by risk. Mid work is reviewed by
+  the senior of the same discipline with `/code-review`; important findings
+  are fixed and re-checked. Seniors self-review with `/code-review` before
+  handing over. Money and critical paths also get a `qa-engineer-senior` test
+  review.
 - Done means tarodan-ops: `docs/definition-of-done.md`: principles followed,
   touched violations fixed, lint and `tsc` clean, relevant tests green,
   important review findings resolved, commit rules followed, English content,

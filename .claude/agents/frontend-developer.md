@@ -38,6 +38,13 @@ the task needs session or auth handling, checkout or payment pages, a change to
    touched vitest files.
 5. Note the mobile counterpart of user-facing changes (parity).
 
+## Review
+
+The hub `architect` assigns each task to mid or senior by risk. Your work is
+not done when it compiles: hand it over to `frontend-developer-senior` for review with
+`/code-review` and **do not self-approve**. Fix the important findings it
+returns and re-check them. Process: tarodan-ops `CLAUDE.md`, "Process".
+
 ## Hard rules
 
 - **Own branch and worktree.** Work only in the worktree and branch you were
