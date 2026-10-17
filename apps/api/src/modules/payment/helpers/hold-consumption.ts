@@ -40,5 +40,8 @@ export function holdRefundedAmountAfter(input: {
       Prisma.Decimal.max(0, amount.minus(input.retained)),
     );
   }
-  return Prisma.Decimal.min(Prisma.Decimal.max(0, consumed), amount);
+  return Prisma.Decimal.min(
+    Prisma.Decimal.max(0, consumed),
+    amount,
+  ).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }

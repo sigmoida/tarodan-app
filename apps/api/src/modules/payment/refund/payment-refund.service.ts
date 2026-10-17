@@ -955,16 +955,17 @@ export class PaymentRefundService {
                 i18nMessage("server.payment.transferAlreadyStarted"),
               );
             }
-            // Hold tüketimi TUTAR oranına göre (MONEY-H3). Adet-bazlı iade akışları
-            // amount = total*adet/siparişAdedi gönderdiğinden bu oran adet oranıyla
-            // BİREBİR örtüşür; tutar-bazlı admin/jest iadesinde ise yalnız iade edilen
-            // TUTAR kadarı tüketilir. Eskiden refundQuantity yoksa portion=1 olup TÜM
-            // hold tüketiliyor, 1000 TL siparişte 50 TL jest satıcı payout'unu 0'a
-            // düşürüyordu. Ledger portion ile AYNI formül (tek otorite). Tam iadede hold
-            // cancelled; kısmi iadede held/released kalır, payout'ta netAmount =
-            // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
-            // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
-            // The seller's own shipping share to leave in the hold is
+            // Hold consumption follows the AMOUNT ratio (MONEY-H3). Quantity-based
+            // refund flows send amount = total * units / orderQuantity, so the
+            // ratio equals the quantity ratio; an amount-based admin or goodwill
+            // refund consumes only the refunded amount's share (it used to
+            // consume the whole hold: a 50 TL gesture on a 1000 TL order took the
+            // seller's payout to 0). The ledger uses the same ratio. A fully
+            // consumed hold is cancelled; otherwise it stays held/released and
+            // the payout pays amount - refundedAmount. orderRefundThreshold is
+            // the order's amount (group: order.totalAmount, single:
+            // payment.amount), computed at the start of the transaction. The
+            // seller's own shipping share to leave in the hold is
             // `holdRetainedAmount`; the formula (cumulative cap) is in
             // `holdRefundedAmountAfter`.
             const newRefunded = holdRefundedAmountAfter({

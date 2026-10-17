@@ -2,8 +2,11 @@ import { Prisma } from "@prisma/client";
 import { holdRefundedAmountAfter } from "./hold-consumption";
 
 /**
- * Worked example (PAYMENTS.md §5): product 1000 for two units, buyer shipping
- * 60, seller shipping 40 (+20% VAT = 48 gross), fees 80 + 100 → hold 860.
+ * Fixture after PAYMENTS.md §5 (which leaves VAT out): hold 860 for two units.
+ * The seller's share is 48 gross = 40 shipping + 8 VAT: the hold deducts the
+ * full shipping AND the seller service VAT, which includes the VAT on the
+ * seller's shipping share (`order-service-tax.helper.ts`), so the gross share
+ * is what the seller paid up front.
  */
 describe("holdRefundedAmountAfter — one formula for hold consumption", () => {
   const consumed = (input: Parameters<typeof holdRefundedAmountAfter>[0]) =>
@@ -120,6 +123,17 @@ describe("holdRefundedAmountAfter — one formula for hold consumption", () => {
         ).toBe(860);
       },
     );
+
+    it("rounds a float share to the kurus", () => {
+      expect(
+        holdRefundedAmountAfter({
+          amount: 860,
+          refundedAmount: 0,
+          portion: 1,
+          retained: 47.999999999,
+        }).toString(),
+      ).toBe("812");
+    });
 
     it("accepts Decimal inputs as Prisma returns them", () => {
       expect(
