@@ -11,6 +11,12 @@
  *                development -> master whose "Verify / *" checks are the full
  *                gate, and Release Production re-runs it before deploying.
  *                A direct push only prints a reminder.
+ *
+ * Every push (except deletions) also checks branch names against
+ * tarodan-ops docs/commit-and-branch-rules.md: the remote branch it creates or
+ * updates, and the local branch it comes from (`git push origin fix/x:development`
+ * checks `fix/x`). `development`, `master`, the tool's temporary `worktree-*`
+ * names and local `integration/<wave>` branches are allowed as well.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
@@ -53,6 +59,60 @@ export function masterPushes(pushes) {
   return pushes.filter(
     (push) =>
       !ZERO_SHA.test(push.localSha) && push.remoteRef === "refs/heads/master",
+  );
+}
+
+export const BRANCH_NAME_PATTERN =
+  /^(feat|fix|refactor|perf|chore|ci|docs|test|hotfix)\/[a-z0-9-]+$/;
+const ALLOWED_BRANCH_NAMES = [
+  /^(development|master)$/,
+  /^worktree-[A-Za-z0-9._-]+$/,
+  /^integration\/[a-z0-9-]+$/,
+];
+
+export function isValidBranchName(name) {
+  return (
+    BRANCH_NAME_PATTERN.test(name) ||
+    ALLOWED_BRANCH_NAMES.some((pattern) => pattern.test(name))
+  );
+}
+
+function branchOf(ref) {
+  return ref?.startsWith("refs/heads/")
+    ? ref.slice("refs/heads/".length)
+    : undefined;
+}
+
+/**
+ * Branch names a push introduces that break the naming rule. Deletions are
+ * skipped (removing a badly named branch must stay possible), and so are local
+ * refs that are not branches (`HEAD`, a sha, a tag).
+ */
+export function invalidBranchNames(pushes) {
+  const names = new Set();
+  for (const push of pushes) {
+    if (ZERO_SHA.test(push.localSha)) {
+      continue;
+    }
+    for (const name of [branchOf(push.remoteRef), branchOf(push.localRef)]) {
+      if (name && !isValidBranchName(name)) {
+        names.add(name);
+      }
+    }
+  }
+  return [...names];
+}
+
+export function branchNameError(names) {
+  if (names.length === 0) {
+    return undefined;
+  }
+  return (
+    `Push blocked: branch name${names.length > 1 ? "s" : ""} ${names.map((name) => `"${name}"`).join(", ")} ` +
+    "must match <type>/<kebab-description> with type one of feat, fix, refactor, perf, chore, ci, docs, test, hotfix " +
+    "(lower-case letters, digits and dashes), e.g. fix/offer-counter-lock. " +
+    "Rename it with `git branch -m <new-name>` and push again. " +
+    "Rules: tarodan-ops docs/commit-and-branch-rules.md."
   );
 }
 
@@ -103,6 +163,13 @@ function verifyDevelopmentPush(push) {
 function runCli() {
   const pushes = parsePushLines(readFileSync(0, "utf8"));
   const development = developmentPushes(pushes);
+
+  const nameError = branchNameError(invalidBranchNames(pushes));
+  if (nameError) {
+    console.error(`\n${nameError}\n`);
+    process.exitCode = 1;
+    return;
+  }
 
   if (masterPushes(pushes).length > 0) {
     console.log(

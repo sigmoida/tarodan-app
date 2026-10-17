@@ -1099,6 +1099,12 @@ Notlar:
 - **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
   ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
   engeller: push ettiğin commit'i checkout et.
+- **Branch names are checked on every push:** the hook blocks a pushed
+  remote branch, or the local branch pushed into another (`fix/x:development`),
+  unless it matches `<type>/<kebab-description>` (types: feat, fix, refactor,
+  perf, chore, ci, docs, test, hotfix). `development`, `master`, `worktree-*`
+  and `integration/<wave>` are allowed; deletions are never blocked. Rules:
+  tarodan-ops `docs/commit-and-branch-rules.md`.
 - **Master yalnız PR ile:** `development` → `master` (sürüm) ya da `hotfix/*` →
   `master` (acil düzeltme; sonra `development`'a geri birleştir). Eski yerel
   "release marker" şartı kalktı; kapıyı ruleset'teki zorunlu check'ler ve
