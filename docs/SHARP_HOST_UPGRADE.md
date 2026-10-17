@@ -4,11 +4,11 @@
 and admin resolves the same version). It carries three high advisories, each
 accepted in `security/dependency-audit-allowlist.json` with an expiry:
 
-| Advisory                        | Fixed in | Expires        | Mitigation in place             |
-| ------------------------------- | -------- | -------------- | ------------------------------- |
-| `GHSA-f88m-g3jw-g9cj`           | 0.35.0   | 2026-11-30     | GIF, TIFF, VIPS loaders blocked |
-| `GHSA-rgj7-g3m4-5g8c`           | 0.35.4   | 2026-11-30     | same host constraint            |
-| `GHSA-wq5f-xc86-pv6w` (librsvg) | 0.35.5   | **2026-10-31** | SVG loader blocked; musl images |
+| Advisory                        | Fixed in | Expires        | Mitigation in place                                                 |
+| ------------------------------- | -------- | -------------- | ------------------------------------------------------------------- |
+| `GHSA-f88m-g3jw-g9cj`           | 0.35.0   | 2026-11-30     | GIF, TIFF, VIPS loaders blocked                                     |
+| `GHSA-rgj7-g3m4-5g8c`           | 0.35.4   | 2026-11-30     | same host constraint                                                |
+| `GHSA-wq5f-xc86-pv6w` (librsvg) | 0.35.5   | **2026-10-31** | API blocks the SVG loader; Next.js serves sniffed SVG without sharp |
 
 When an entry expires, `pnpm audit:prod` fails closed and the production
 release stops. Before the earliest expiry, upgrade (the plan below) or

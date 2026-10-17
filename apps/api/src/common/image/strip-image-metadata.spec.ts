@@ -139,7 +139,9 @@ describe("stripImageMetadata", () => {
       '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
     );
 
-    await expect(safeSharp(svg).metadata()).rejects.toThrow();
+    await expect(safeSharp(svg).metadata()).rejects.toThrow(
+      /unsupported image format/,
+    );
   });
 
   it("GIF olduğu gibi döner (sharp'ın GIF yükleyicisi kapalı)", async () => {
