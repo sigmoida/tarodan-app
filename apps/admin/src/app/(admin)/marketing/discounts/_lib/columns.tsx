@@ -35,7 +35,7 @@ export function discountColumns(
     col.title<Discount>(
       t("admin.marketing.discounts.discount"),
       (d) => ({ title: d.name, secondary: d.description }),
-      { minWidth: 280, sortKey: "name", sortType: "text" },
+      { sortKey: "name", sortType: "text" },
     ),
     col.custom<Discount>(
       t("admin.marketing.discounts.code"),
@@ -47,23 +47,23 @@ export function discountColumns(
             <CellMuted value={t("admin.marketing.discounts.automatic")} />
           )}
           {d.isFlashSale && (
-            <TableBadge variant="default">
+            <TableBadge variant="outline">
               {t("admin.marketing.discounts.flashBadge")}
             </TableBadge>
           )}
         </div>
       ),
-      { minWidth: 200, sortKey: "code", sortType: "text" },
+      { sortKey: "code", sortType: "text" },
     ),
     col.text<Discount>(
       t("admin.marketing.discounts.value"),
       (d) => discountValueLabel(d, t),
-      { minWidth: 140, sortKey: "value", sortType: "number" },
+      { ...COL_SIZE.label, sortKey: "value", sortType: "number" },
     ),
     col.stacked<Discount>(
       t("admin.marketing.discounts.scopeLabel"),
       (d) => ({ value: scopes[d.scope] ?? d.scope, secondary: d.categoryName }),
-      { minWidth: 150, sortKey: "scope", sortType: "text" },
+      { ...COL_SIZE.label, sortKey: "scope", sortType: "text" },
     ),
     // Hangi kalemi indiriyor + kime: kampanyanın anlamı bu iki alanda.
     col.stacked<Discount>(
@@ -72,7 +72,7 @@ export function discountColumns(
         value: targetLabel(t, d.target),
         secondary: audienceLabel(t, d.audience),
       }),
-      { minWidth: 180, sortKey: "target", sortType: "text" },
+      { sortKey: "target", sortType: "text" },
     ),
     // Bütçe, bedel kampanyasının maliyet kontrolüdür: dolduğunda kampanya durur.
     col.stacked<Discount>(
@@ -88,7 +88,7 @@ export function discountColumns(
                 </TableBadge>
               ) : null,
             },
-      { minWidth: 200, sortKey: "budgetSpent", sortType: "number" },
+      { ...COL_SIZE.amountRange, sortKey: "budgetSpent", sortType: "number" },
     ),
     col.text<Discount>(
       t("admin.marketing.discounts.usage"),

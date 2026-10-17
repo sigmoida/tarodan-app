@@ -1,4 +1,9 @@
-import { COL_SIZE, col, type RowActionItem } from "@/components/table";
+import {
+  COL_SIZE,
+  COL_WIDTH,
+  col,
+  type RowActionItem,
+} from "@/components/table";
 import type { useTranslations } from "next-intl";
 import { previewText } from "../../hero/_lib/preview";
 import type { TrustBadge } from "./types";
@@ -26,17 +31,17 @@ export function trustBadgeColumns(
     col.text<TrustBadge>(
       t("admin.marketing.trustBadges.columns.icon"),
       (b) => b.icon,
-      { minWidth: 140, ...noSort },
+      { ...COL_SIZE.label, ...noSort },
     ),
     col.title<TrustBadge>(
       t("common.title"),
       (b) => ({ title: previewText(b.title, "tr") }),
-      { minWidth: 200, ...noSort },
+      noSort,
     ),
     col.muted<TrustBadge>(
       t("common.description"),
       (b) => previewText(b.description, "tr") || null,
-      { minWidth: 240, ...noSort },
+      { minWidth: COL_WIDTH.description, ...noSort },
     ),
     col.status<TrustBadge>(
       t("admin.marketing.hero.columns.ios"),
@@ -55,7 +60,8 @@ export function trustBadgeColumns(
         checked: b.isActive,
         onChange: () => onToggle(b),
         disabled: togglingId === b.id,
-        label: t("common.status"),
+        label: `${t("common.status")}: ${previewText(b.title, "tr")}`,
+        stateText: b.isActive ? t("common.active") : t("common.inactive"),
       }),
       noSort,
     ),

@@ -1,6 +1,6 @@
 import type { StatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
-import { STATUS_TONE } from "@/components/table/badgeVariant";
+import { STATUS_TONE } from "@/lib/status-tone";
 
 type T = ReturnType<typeof useTranslations<never>>;
 

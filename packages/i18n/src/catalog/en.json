@@ -5670,6 +5670,8 @@
         "statistics": "Statistics",
         "preview": "Preview",
         "size": "Size",
+        "iabBadge": "IAB",
+        "nonIabBadge": "Non-IAB",
         "positionLabel": "Position",
         "platformLabel": "Platform",
         "platform": {
@@ -5781,7 +5783,7 @@
           "shadowed": "{scope, select, web {Another ad is live in this slot — not shown on the site} app {Another ad is live in this slot — not shown in the app} other {Another ad is live in this slot — not shown}}"
         },
         "liveStatusShort": {
-          "shadowed": "Not shown"
+          "shadowed": "{scope, select, web {Not shown · web} app {Not shown · app} other {Not shown}}"
         },
         "linkUrl": "Link URL",
         "linkUrlHelper": "A full address starting with https://… or a site path such as /listings?category=cars (opens on the web and in the mobile app).",

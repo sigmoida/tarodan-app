@@ -5,7 +5,7 @@ import { Badge, Button, EmptyState } from "@tarodan/ui";
 import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { CellMoney, col, Empty } from "@/components/table";
+import { CellMoney, COL_WIDTH, col, Empty } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import {
@@ -63,7 +63,7 @@ export function PackageCard({
       col.text<PriceRange>(
         t("admin.marketing.adPackages.priceRange"),
         (r) => rangeLabel(r, t("admin.marketing.adPackages.unlimited")),
-        { minWidth: 200 },
+        { minWidth: COL_WIDTH.amountRange },
       ),
       ...durations.map((d) =>
         col.custom<PriceRange>(
@@ -84,7 +84,11 @@ export function PackageCard({
             );
           },
           // Üstü çizili eski fiyat + kampanya fiyatı yan yana sığsın.
-          { id: `duration-${d}`, align: "right", minWidth: 180 },
+          {
+            id: `duration-${d}`,
+            align: "right",
+            minWidth: COL_WIDTH.amountRange,
+          },
         ),
       ),
     ],

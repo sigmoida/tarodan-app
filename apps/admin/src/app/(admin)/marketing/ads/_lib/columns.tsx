@@ -2,6 +2,7 @@ import Image from "next/image";
 import {
   CellText,
   COL_SIZE,
+  COL_WIDTH,
   col,
   Empty,
   TableBadge,
@@ -29,7 +30,8 @@ export function adSizeLabel(ad: Pick<Ad, "width" | "height">): string | null {
 /**
  * Sadeleştirilmiş tablo: renkli rozet yalnız "Yayın durumu"nda. Pozisyon ve
  * platform düz metin (platform tabloya özel kısa etiketle), IAB uyumu boyutun
- * yanında ikonsuz bir çerçeve rozet, açık/kapalı kompakt bir anahtar.
+ * yanında ikonsuz çerçeve rozet ("IAB" / "IAB dışı"), açık/kapalı kompakt bir
+ * anahtar + yanında durum metni.
  */
 export function adColumns(
   { onToggle, togglingId, rowMenu }: AdColumnProps,
@@ -58,7 +60,6 @@ export function adColumns(
       { ...COL_SIZE.preview, sortKey: "imageUrl", sortType: "text" },
     ),
     col.title<Ad>(t("common.title"), (ad) => ({ title: ad.title }), {
-      minWidth: 240,
       sortKey: "title",
       sortType: "text",
     }),
@@ -70,21 +71,29 @@ export function adColumns(
         return (
           <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
             <CellText value={size} />
-            {ad.iabCompliant && <TableBadge variant="outline">IAB</TableBadge>}
+            {ad.iabCompliant ? (
+              <TableBadge variant="outline" tooltip={ad.iabSize ?? undefined}>
+                {t("admin.marketing.ads.iabBadge")}
+              </TableBadge>
+            ) : (
+              <TableBadge variant="outline">
+                {t("admin.marketing.ads.nonIabBadge")}
+              </TableBadge>
+            )}
           </div>
         );
       },
-      { minWidth: 130, fixed: true, sortKey: "width", sortType: "number" },
+      { ...COL_SIZE.size, sortKey: "width", sortType: "number" },
     ),
     col.text<Ad>(
       t("admin.marketing.ads.positionLabel"),
       (ad) => positions[ad.position] || ad.position,
-      { minWidth: 130, fixed: true, sortKey: "position", sortType: "text" },
+      { ...COL_SIZE.label, sortKey: "position", sortType: "text" },
     ),
     col.text<Ad>(
       t("admin.marketing.ads.platformLabel"),
       (ad) => platforms[ad.platform] || ad.platform,
-      { minWidth: 150, fixed: true, sortKey: "platform", sortType: "text" },
+      { ...COL_SIZE.label, sortKey: "platform", sortType: "text" },
     ),
     col.dateRange<Ad>(
       t("admin.marketing.ads.schedule"),
@@ -95,19 +104,21 @@ export function adColumns(
       t("admin.marketing.ads.liveStatusLabel"),
       (ad) => {
         const status = adLiveStatus(ad, now);
-        const full = t(`admin.marketing.ads.liveStatus.${status}`, {
-          scope: adShadowScope(ad),
-        });
-        // Gölgedeki reklamın tam cümlesi rozete sığmaz: kısa etiket + ipucu.
+        const scope = adShadowScope(ad);
+        const full = t(`admin.marketing.ads.liveStatus.${status}`, { scope });
+        // Gölgedeki reklamın tam cümlesi rozete sığmaz: kısa etiket (nerede
+        // gizli olduğuyla) + ipucunda tam cümle.
         return status === "shadowed"
           ? {
               variant: AD_STATUS_VARIANT[status],
-              children: t("admin.marketing.ads.liveStatusShort.shadowed"),
+              children: t("admin.marketing.ads.liveStatusShort.shadowed", {
+                scope,
+              }),
               tooltip: full,
             }
           : { variant: AD_STATUS_VARIANT[status], children: full };
       },
-      { sortable: false },
+      { ...COL_SIZE.statusLong, sortable: false },
     ),
     col.toggle<Ad>(
       t("common.status"),
@@ -115,7 +126,8 @@ export function adColumns(
         checked: ad.isActive,
         onChange: () => onToggle(ad),
         disabled: togglingId === ad.id,
-        label: t("common.status"),
+        label: `${t("common.status")}: ${ad.title}`,
+        stateText: ad.isActive ? t("common.active") : t("common.inactive"),
       }),
       { sortKey: "isActive", sortType: "number" },
     ),
@@ -123,7 +135,7 @@ export function adColumns(
     col.number<Ad>(
       t("admin.marketing.ads.hotspots.column"),
       (ad) => (ad.imageUrl ? (ad.hotspots?.length ?? 0) : null),
-      { minWidth: 90, fixed: true, sortable: false },
+      { ...COL_SIZE.count, sortable: false },
     ),
     col.custom<Ad>(
       t("admin.marketing.ads.statistics"),
@@ -142,7 +154,7 @@ export function adColumns(
           </TruncatedText>
         </div>
       ),
-      { minWidth: 150, sortKey: "clickCount", sortType: "number" },
+      { minWidth: COL_WIDTH.text, sortKey: "clickCount", sortType: "number" },
     ),
     col.rowMenu<Ad>(rowMenu),
   ];

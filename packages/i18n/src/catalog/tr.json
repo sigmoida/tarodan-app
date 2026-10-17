@@ -5670,6 +5670,8 @@
         "statistics": "İstatistik",
         "preview": "Önizleme",
         "size": "Boyut",
+        "iabBadge": "IAB",
+        "nonIabBadge": "IAB dışı",
         "positionLabel": "Pozisyon",
         "platformLabel": "Platform",
         "platform": {
@@ -5781,7 +5783,7 @@
           "shadowed": "{scope, select, web {Aynı yuvada başka reklam yayında — sitede gösterilmiyor} app {Aynı yuvada başka reklam yayında — uygulamada gösterilmiyor} other {Aynı yuvada başka reklam yayında — gösterilmiyor}}"
         },
         "liveStatusShort": {
-          "shadowed": "Görünmüyor"
+          "shadowed": "{scope, select, web {Görünmüyor · web} app {Görünmüyor · uygulama} other {Görünmüyor}}"
         },
         "linkUrl": "Bağlantı (URL)",
         "linkUrlHelper": "https://… ile başlayan tam adres ya da /listings?category=araba gibi site içi yol (web ve mobil uygulamada açılır).",

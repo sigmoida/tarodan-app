@@ -15,7 +15,7 @@ export {
   TABLE_BADGE_SIZE,
   type TableBadgeProps,
 } from "./TableBadge";
-export { STATUS_TONE, type TableBadgeVariant } from "./badgeVariant";
+export { STATUS_TONE, type TableBadgeVariant } from "@/lib/status-tone";
 export { COL_WIDTH, COL_SIZE, type ColWidthKind } from "./widths";
 export {
   Empty,

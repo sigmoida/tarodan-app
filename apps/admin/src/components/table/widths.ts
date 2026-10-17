@@ -14,17 +14,32 @@
  *  - status    the longest single-line badge label (`Kampanya bitti`, `Süresi doldu`)
  *  - amount    `₺12.345,67`
  *  - count     a short number or `12 / 100`
- *  - toggle    a compact on/off switch
+ *  - toggle    a compact on/off switch + its state text
  */
 export const COL_WIDTH = {
   /** Thumbnail / preview image column. */
   preview: 96,
+  /** The row's main cell (`col.title`) — flexible. */
+  title: 240,
+  /** Free / secondary text (`col.text`, `col.muted`, codes with a badge) — flexible. */
+  text: 180,
+  /** Longer secondary text (description, subject) — flexible. */
+  description: 240,
+  /** Short enum-like label (position, platform, scope, icon name). */
+  label: 140,
+  /** Pixel size + IAB badge (`728×90 IAB dışı`). */
+  size: 150,
   date: 140,
   dateRange: 200,
   status: 160,
+  /** Status badge whose label carries a qualifier (`Görünmüyor · uygulama`). */
+  statusLong: 190,
   amount: 120,
+  /** Two amounts in one cell (`₺1.000 / ₺5.000`, a price range, old + campaign price). */
+  amountRange: 200,
   count: 100,
-  toggle: 100,
+  /** Switch + its visible `Aktif` / `Pasif` text. */
+  toggle: 120,
   /** Inline action buttons (`col.actions`). */
   actions: 96,
   /** The ⋮ row menu (`col.rowMenu`). */

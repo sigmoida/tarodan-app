@@ -102,10 +102,10 @@ function field<T, V>(
 // growth weight. Fixed columns stay at minWidth while flexible columns share the
 // remaining table space. `grow` is retained only for backward compatibility.
 const DEFAULTS = {
-  text: { grow: 3, minWidth: 180, align: "left" },
-  title: { grow: 3, minWidth: 240, align: "left" },
-  stacked: { grow: 2, minWidth: 180, align: "left" },
-  muted: { grow: 2, minWidth: 180, align: "left" },
+  text: { grow: 3, minWidth: COL_WIDTH.text, align: "left" },
+  title: { grow: 3, minWidth: COL_WIDTH.title, align: "left" },
+  stacked: { grow: 2, minWidth: COL_WIDTH.text, align: "left" },
+  muted: { grow: 2, minWidth: COL_WIDTH.text, align: "left" },
   money: { grow: 1, minWidth: COL_WIDTH.amount, align: "left" },
   number: { grow: 1, minWidth: COL_WIDTH.count, align: "left" },
   date: { grow: 1, minWidth: COL_WIDTH.date, align: "left" },
@@ -431,6 +431,7 @@ export const col = {
       onChange: (checked: boolean) => void;
       disabled?: boolean;
       label: string;
+      stateText: string;
     },
     opts?: ColOpts,
   ) {

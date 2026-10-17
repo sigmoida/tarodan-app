@@ -1,5 +1,5 @@
 import type { StatusConfig } from "@tarodan/ui";
-import { STATUS_TONE } from "@/components/table/badgeVariant";
+import { STATUS_TONE } from "@/lib/status-tone";
 import { fmtTry } from "@/lib/format";
 import type { useTranslations } from "next-intl";
 import { membershipConfig } from "../../../accounts/seller-performance/_lib/types";

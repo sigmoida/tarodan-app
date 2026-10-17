@@ -209,21 +209,28 @@ export function CellDateRange({
   );
 }
 
-/** Compact on/off switch — the one way a table flips an `isActive`-style flag. */
+/**
+ * Compact on/off switch — the one way a table flips an `isActive`-style flag.
+ * The state is also printed next to it (muted `Aktif` / `Pasif`), so it reads
+ * without decoding the switch colour.
+ */
 export function CellToggle({
   checked,
   onChange,
   disabled,
   label,
+  stateText,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
-  /** Accessible name (the switch has no visible text). */
+  /** Row-specific accessible name, e.g. `Durum: <başlık>`. */
   label: string;
+  /** Visible state text (`Aktif` / `Pasif`); the switch already announces it. */
+  stateText: string;
 }) {
   return (
-    <div className="flex items-center">
+    <div className="flex min-w-0 items-center gap-2">
       <Toggle
         size="sm"
         checked={checked}
@@ -231,6 +238,9 @@ export function CellToggle({
         disabled={disabled}
         label={label}
       />
+      <span aria-hidden className={cn("truncate", SECONDARY_LINE)}>
+        {stateText}
+      </span>
     </div>
   );
 }

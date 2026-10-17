@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TableBadge, TABLE_BADGE_SIZE } from "./TableBadge";
-import { STATUS_TONE } from "./badgeVariant";
+import { STATUS_TONE } from "@/lib/status-tone";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 

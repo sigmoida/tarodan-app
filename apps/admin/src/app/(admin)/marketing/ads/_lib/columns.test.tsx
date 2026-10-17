@@ -80,15 +80,24 @@ describe("platformShortLabels", () => {
 });
 
 describe("adColumns", () => {
-  it("size column: plain size text + outline IAB badge, no icon", () => {
-    const out = cell("admin.marketing.ads.size", ad);
-    expect(out).toContain("728×90");
-    expect(out).toContain("IAB");
-    expect(out).toContain("border-border");
-    expect(out).not.toContain("<svg");
+  it("size column: plain size text + outline IAB / non-IAB badge, no icon", () => {
+    const ok = cell("admin.marketing.ads.size", ad);
+    expect(ok).toContain("728×90");
+    expect(ok).toContain("admin.marketing.ads.iabBadge");
+    expect(ok).toContain('title="728x90"');
+    expect(ok).toContain("border-border");
+    expect(ok).not.toContain("<svg");
+    const non = cell("admin.marketing.ads.size", {
+      ...ad,
+      iabCompliant: false,
+    });
+    expect(non).toContain("admin.marketing.ads.nonIabBadge");
+    expect(non).toContain("border-border");
+    expect(non).not.toContain("admin.marketing.ads.iabBadge");
+    // Boyutsuz (metin) reklamda IAB rozeti yok.
     expect(
-      cell("admin.marketing.ads.size", { ...ad, iabCompliant: false }),
-    ).not.toContain("IAB");
+      cell("admin.marketing.ads.size", { ...ad, width: null, height: null }),
+    ).not.toContain("Badge");
   });
 
   it("position and platform are plain text, not badges", () => {
@@ -114,24 +123,37 @@ describe("adColumns", () => {
     expect(out).toContain("text-xs");
   });
 
-  it("shadowed: short badge label, full sentence in the tooltip", () => {
-    const out = cell("admin.marketing.ads.liveStatusLabel", {
+  it("shadowed: short badge label with where it's hidden, full sentence in the tooltip", () => {
+    const everywhere = cell("admin.marketing.ads.liveStatusLabel", {
       ...ad,
       platform: "web",
       shadowedOn: ["web"],
     });
-    expect(out).toContain("admin.marketing.ads.liveStatusShort.shadowed");
-    expect(out).toContain(
+    expect(everywhere).toContain(
+      "admin.marketing.ads.liveStatusShort.shadowed|all",
+    );
+    expect(everywhere).toContain(
       'title="admin.marketing.ads.liveStatus.shadowed|all"',
     );
-    expect(out).toContain("bg-warning-100");
+    expect(everywhere).toContain("bg-warning-100");
+    const appOnly = cell("admin.marketing.ads.liveStatusLabel", {
+      ...ad,
+      platform: "all",
+      shadowedOn: ["app"],
+    });
+    expect(appOnly).toContain(
+      "admin.marketing.ads.liveStatusShort.shadowed|app",
+    );
   });
 
-  it("status column is a switch reflecting isActive", () => {
-    expect(cell("common.status", ad)).toContain('aria-checked="true"');
-    expect(cell("common.status", { ...ad, isActive: false })).toContain(
-      'aria-checked="false"',
-    );
+  it("status column: switch with a row-specific name + visible state text", () => {
+    const on = cell("common.status", ad);
+    expect(on).toContain('aria-checked="true"');
+    expect(on).toContain('aria-label="common.status: Yaz kampanyası"');
+    expect(on).toContain("common.active");
+    const off = cell("common.status", { ...ad, isActive: false });
+    expect(off).toContain('aria-checked="false"');
+    expect(off).toContain("common.inactive");
   });
 
   it("every column carries an explicit width", () => {

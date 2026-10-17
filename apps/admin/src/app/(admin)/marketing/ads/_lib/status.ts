@@ -4,10 +4,7 @@ import {
   scheduleLiveStatus,
   type LiveStatus,
 } from "@/lib/live-status";
-import {
-  STATUS_TONE,
-  type TableBadgeVariant,
-} from "@/components/table/badgeVariant";
+import { STATUS_TONE, type TableBadgeVariant } from "@/lib/status-tone";
 import type { Ad } from "./types";
 
 /**

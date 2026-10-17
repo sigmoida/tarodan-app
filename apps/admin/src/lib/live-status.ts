@@ -1,7 +1,4 @@
-import {
-  STATUS_TONE,
-  type TableBadgeVariant,
-} from "@/components/table/badgeVariant";
+import { STATUS_TONE, type TableBadgeVariant } from "@/lib/status-tone";
 
 /** Zamanlanabilir bir kaydın (reklam, hero slaytı) yayın durumu. */
 export type LiveStatus = "scheduled" | "live" | "expired" | "inactive";

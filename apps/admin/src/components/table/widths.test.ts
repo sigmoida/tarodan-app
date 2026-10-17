@@ -37,6 +37,7 @@ describe("col.* widths come from COL_WIDTH", () => {
       checked: true,
       onChange: () => {},
       label: "x",
+      stateText: "y",
     })).meta;
     expect(status).toMatchObject({ minWidth: COL_WIDTH.status, fixed: true });
     expect(range).toMatchObject({ minWidth: COL_WIDTH.dateRange, fixed: true });

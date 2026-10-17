@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Badge, type StatusConfig } from "@tarodan/ui";
-import { type TableBadgeVariant } from "./badgeVariant";
+import { type TableBadgeVariant } from "@/lib/status-tone";
 
 /** The single badge size used inside tables. */
 export const TABLE_BADGE_SIZE = "sm" as const;

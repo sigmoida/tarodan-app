@@ -18,7 +18,7 @@ export function purchaseColumns(t: T) {
               href: `/accounts/users/${p.buyer.id}`,
             }
           : null,
-      { minWidth: 280, sortable: false },
+      { sortable: false },
     ),
     col.product<BoostPurchase>(
       t("admin.marketing.boostPurchases.product"),
@@ -40,13 +40,12 @@ export function purchaseColumns(t: T) {
             label={p.packageName ?? "—"}
           />
           {p.showcaseOnHome && (
-            <TableBadge variant="default">
+            <TableBadge variant="outline">
               {t("admin.marketing.boostPurchases.showcaseBadge")}
             </TableBadge>
           )}
         </div>
       ),
-      { minWidth: 200 },
     ),
     col.text<BoostPurchase>(
       t("admin.marketing.boostPurchases.duration"),
@@ -78,7 +77,6 @@ export function purchaseColumns(t: T) {
         p.metrics.gain
           ? `+${p.metrics.gain.views} / +${p.metrics.gain.likes} / +${p.metrics.gain.clicks}`
           : null,
-      { minWidth: 160 },
     ),
   ];
 }
