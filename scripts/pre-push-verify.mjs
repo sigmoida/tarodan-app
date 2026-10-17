@@ -12,11 +12,14 @@
  *                gate, and Release Production re-runs it before deploying.
  *                A direct push only prints a reminder.
  *
- * Every push (except deletions) also checks branch names against
- * tarodan-ops docs/commit-and-branch-rules.md: the remote branch it creates or
- * updates, and the local branch it comes from (`git push origin fix/x:development`
- * checks `fix/x`). `development`, `master`, the tool's temporary `worktree-*`
- * names and local `integration/<wave>` branches are allowed as well.
+ * Branch names follow tarodan-ops docs/commit-and-branch-rules.md. The hook
+ * checks them only where a name is being introduced: a push that CREATES a
+ * remote branch (checks the remote name), and a push into development or
+ * master from a local branch (checks the local name, so
+ * `git push origin fix/x:development` checks `fix/x`). Updating an existing
+ * remote branch (e.g. dependabot/*) and deletions always pass.
+ * `development`, `master`, the tool's temporary `worktree-*` names and local
+ * `integration/<wave>` branches are allowed as well.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
@@ -83,10 +86,14 @@ function branchOf(ref) {
     : undefined;
 }
 
+const PROTECTED_BRANCHES = new Set(["development", "master"]);
+
 /**
- * Branch names a push introduces that break the naming rule. Deletions are
- * skipped (removing a badly named branch must stay possible), and so are local
- * refs that are not branches (`HEAD`, a sha, a tag).
+ * Branch names a push introduces that break the naming rule: the name of a
+ * remote branch being created, and the local branch pushed into development
+ * or master. Updates of existing remote branches and deletions are skipped
+ * (removing or updating a badly named branch must stay possible), and so are
+ * local refs that are not branches (`HEAD`, a sha, a tag).
  */
 export function invalidBranchNames(pushes) {
   const names = new Set();
@@ -94,7 +101,15 @@ export function invalidBranchNames(pushes) {
     if (ZERO_SHA.test(push.localSha)) {
       continue;
     }
-    for (const name of [branchOf(push.remoteRef), branchOf(push.localRef)]) {
+    const remote = branchOf(push.remoteRef);
+    const candidates = [];
+    if (remote && ZERO_SHA.test(push.remoteSha)) {
+      candidates.push(remote);
+    }
+    if (remote && PROTECTED_BRANCHES.has(remote)) {
+      candidates.push(branchOf(push.localRef));
+    }
+    for (const name of candidates) {
       if (name && !isValidBranchName(name)) {
         names.add(name);
       }

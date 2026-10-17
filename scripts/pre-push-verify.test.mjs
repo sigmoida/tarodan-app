@@ -48,18 +48,41 @@ test("rejects branches outside the naming rule", () => {
   }
 });
 
-test("checks the local branch pushed into development and the remote branch", () => {
+const ZERO = "0000000000000000000000000000000000000000";
+
+test("checks the local branch pushed into development or master", () => {
   const pushes = parsePushLines(
     [
       "refs/heads/fix/offer-lock aaa refs/heads/development bbb",
       "refs/heads/nav/rails ccc refs/heads/development ddd",
-      "refs/heads/feat/ok eee refs/heads/Feature_X fff",
+      "refs/heads/release_x ccc refs/heads/master ddd",
       "HEAD 111 refs/heads/development 222",
-      "refs/tags/v1 333 refs/tags/v1 0000000000000000000000000000000000000000",
       "refs/heads/development 444 refs/heads/development 555",
+      "refs/heads/worktree-agent-1 666 refs/heads/development 777",
     ].join("\n"),
   );
-  assert.deepEqual(invalidBranchNames(pushes), ["nav/rails", "Feature_X"]);
+  assert.deepEqual(invalidBranchNames(pushes), ["nav/rails", "release_x"]);
+});
+
+test("checks the remote name only when the push creates the branch", () => {
+  const pushes = parsePushLines(
+    [
+      `refs/heads/feat/ok aaa refs/heads/Feature_X ${ZERO}`,
+      `refs/heads/local_name bbb refs/heads/fix/good-name ${ZERO}`,
+      `refs/tags/v1 ccc refs/tags/v1 ${ZERO}`,
+    ].join("\n"),
+  );
+  assert.deepEqual(invalidBranchNames(pushes), ["Feature_X"]);
+});
+
+test("updating an existing remote branch passes whatever its name", () => {
+  const pushes = parsePushLines(
+    [
+      "refs/heads/dependabot/npm_and_yarn/next-15.5.9 aaa refs/heads/dependabot/npm_and_yarn/next-15.5.9 bbb",
+      "refs/heads/Feature_X ccc refs/heads/Feature_X ddd",
+    ].join("\n"),
+  );
+  assert.deepEqual(invalidBranchNames(pushes), []);
 });
 
 test("deletions are never blocked by the naming rule", () => {
