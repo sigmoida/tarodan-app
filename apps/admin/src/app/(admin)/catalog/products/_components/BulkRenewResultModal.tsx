@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
 import { Button, Modal } from "@tarodan/ui";
-import { renewFailureRows } from "../_lib/bulkRenew";
+import { renewFailureRows, resolveErrorKey } from "../_lib/bulkRenew";
 import type { RenewReport } from "../_lib/useBulkRenew";
 
 /** Yenilenemeyen ilanlar: ilan + sunucunun döndürdüğü nedenin yerelleştirilmiş metni. */
@@ -23,13 +23,7 @@ export function BulkRenewResultModal({
       onClose={onClose}
       size="lg"
       title={t("admin.catalog.products.bulkRenewFailedTitle")}
-      description={
-        report &&
-        t("admin.catalog.products.bulkRenewFailedDescription", {
-          ok: report.result.renewed,
-          failed: report.result.failed,
-        })
-      }
+      description={t("admin.catalog.products.bulkRenewFailedDescription")}
       footer={
         <Button variant="primary" onClick={onClose}>
           {t("common.close")}
@@ -44,7 +38,12 @@ export function BulkRenewResultModal({
               {row.title}
             </span>
             <span className="text-sm text-danger-600">
-              {t(row.errorKey as MessageKey, row.errorParams)}
+              {t(
+                resolveErrorKey(row.errorKey, (key) =>
+                  t.has(key as MessageKey),
+                ) as MessageKey,
+                row.errorParams,
+              )}
             </span>
           </li>
         ))}

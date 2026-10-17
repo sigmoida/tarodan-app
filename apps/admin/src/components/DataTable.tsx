@@ -61,6 +61,11 @@ export interface DataTableProps<T> {
   selectedIds?: string[];
   onToggleRow?: (id: string) => void;
   onToggleAll?: (ids: string[]) => void;
+  /**
+   * Which rows may be selected (default: all). A row that fails it gets a
+   * disabled checkbox and the header select-all covers only the others.
+   */
+  isRowSelectable?: (row: T) => boolean;
   // ── Expandable row (optional) ──
   /** Panel rendered full-width below the open row (e.g. brand models). */
   renderExpanded?: (row: T) => ReactNode;
@@ -102,6 +107,7 @@ export function DataTable<T>({
   selectedIds = [],
   onToggleRow,
   onToggleAll,
+  isRowSelectable,
   renderExpanded,
   expandedId,
   expandAll = false,
@@ -127,7 +133,12 @@ export function DataTable<T>({
     getRowId,
   });
 
-  const rowIds = getRowId ? data.map((d) => getRowId(d)) : [];
+  // Select-all targets only the rows that may be selected.
+  const rowIds = getRowId
+    ? data
+        .filter((d) => !isRowSelectable || isRowSelectable(d))
+        .map((d) => getRowId(d))
+    : [];
   const allSelected =
     selectable &&
     rowIds.length > 0 &&
@@ -208,6 +219,7 @@ export function DataTable<T>({
                   >
                     <Checkbox
                       checked={!!allSelected}
+                      disabled={!!isRowSelectable && rowIds.length === 0}
                       onChange={() => onToggleAll?.(rowIds)}
                       aria-label={t("admin.shared.table.selectAll")}
                     />
@@ -307,6 +319,10 @@ export function DataTable<T>({
                         >
                           <Checkbox
                             checked={selectedIds.includes(id)}
+                            disabled={
+                              !!isRowSelectable &&
+                              !isRowSelectable(row.original)
+                            }
                             onChange={() => onToggleRow?.(id)}
                             aria-label={t("admin.shared.table.selectRow")}
                           />

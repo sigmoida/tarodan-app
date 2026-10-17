@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
@@ -6,10 +6,13 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import {
   chunkIds,
-  failedChunk,
+  isUnknown,
   mergeRenewBatches,
   readRenewBatch,
+  reconcileUnknown,
   renewableRows,
+  unknownChunk,
+  type CurrentListing,
   type RenewBatchResult,
   type RenewTarget,
 } from "./bulkRenew";
@@ -20,10 +23,39 @@ export interface RenewReport {
   targets: RenewTarget[];
 }
 
+/** Aynı anda en çok bu kadar ilan okunur (düşen parçanın durum doğrulaması). */
+const STATUS_READ_CONCURRENCY = 10;
+
+/** İlanların güncel durumunu okur; okunamayan `null` olur. */
+async function readCurrent(
+  ids: string[],
+): Promise<Map<string, CurrentListing>> {
+  const current = new Map<string, CurrentListing>();
+  for (let i = 0; i < ids.length; i += STATUS_READ_CONCURRENCY) {
+    const group = ids.slice(i, i + STATUS_READ_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      group.map((id) => adminApi.getProduct(id)),
+    );
+    settled.forEach((outcome, index) => {
+      const body = outcome.status === "fulfilled" ? outcome.value.data : null;
+      const product = body?.data?.status ? body.data : body;
+      current.set(
+        group[index],
+        product?.status
+          ? { status: product.status, inactiveReason: product.inactiveReason }
+          : null,
+      );
+    });
+  }
+  return current;
+}
+
 /**
  * İstekleri sunucu üst sınırına göre SIRAYLA parçalar (sunucu da sıralı işler).
- * Tek parça düşerse onun ilanları genel nedenle başarısız sayılır, diğerleri
- * etkilenmez; hiçbir parça ulaşmazsa ilk hata ortak hata toast'ına gider.
+ * Yanıtsız düşen parça "bilinmiyor" sayılır (sunucu kısmen yenilemiş olabilir)
+ * ve ilanları yeniden okunarak yenilendi / başarısız / bilinmiyor diye
+ * sınıflanır. Hiçbir parça ulaşmadıysa ve hiçbir ilan yenilenmediyse ilk hata
+ * ortak hata toast'ına gider.
  */
 async function callBulkRenew(ids: string[]): Promise<RenewBatchResult> {
   const batches: RenewBatchResult[] = [];
@@ -36,11 +68,19 @@ async function callBulkRenew(ids: string[]): Promise<RenewBatchResult> {
       reached += 1;
     } catch (error) {
       firstError ??= error;
-      batches.push(failedChunk(chunk));
+      batches.push(unknownChunk(chunk));
     }
   }
-  if (reached === 0) throw firstError;
-  return mergeRenewBatches(batches);
+  let merged = mergeRenewBatches(batches);
+  if (merged.unknown > 0) {
+    const unknownIds = merged.results.filter(isUnknown);
+    merged = reconcileUnknown(
+      merged,
+      await readCurrent(unknownIds.map((r) => r.id)),
+    );
+  }
+  if (reached === 0 && merged.renewed === 0) throw firstError;
+  return merged;
 }
 
 /**
@@ -52,20 +92,29 @@ export function useBulkRenew() {
   const t = useTranslations();
   const confirm = useConfirm();
   const [report, setReport] = useState<RenewReport | null>(null);
+  // Sonuç diyaloğu, onay penceresi kapanana dek bekler (iki modal üst üste açılmaz).
+  const pendingReport = useRef<RenewReport | null>(null);
 
   const mutation = useAdminMutation(
     (v: { ids: string[]; targets: RenewTarget[] }) => callBulkRenew(v.ids),
     {
       invalidates: ["products"],
       onSuccess: (result, vars) => {
-        const text = t("admin.catalog.products.bulkRenewResult", {
+        const counts = {
           ok: result.renewed,
           failed: result.failed,
-        });
-        if (result.failed === 0) toast.success(text);
+          unknown: result.unknown,
+        };
+        const text =
+          result.unknown > 0
+            ? t("admin.catalog.products.bulkRenewResultUnknown", counts)
+            : t("admin.catalog.products.bulkRenewResult", counts);
+        const problems = result.failed + result.unknown;
+        if (problems === 0) toast.success(text);
         else if (result.renewed === 0) toast.error(text);
         else toast(text, { icon: "⚠️" });
-        if (result.failed > 0) setReport({ result, targets: vars.targets });
+        pendingReport.current =
+          problems > 0 ? { result, targets: vars.targets } : null;
       },
     },
   );
@@ -73,7 +122,8 @@ export function useBulkRenew() {
   const run = async (rows: readonly RenewTarget[]): Promise<boolean> => {
     const targets = renewableRows(rows);
     if (targets.length === 0) return false;
-    return confirm({
+    pendingReport.current = null;
+    const submitted = await confirm({
       title: t("admin.catalog.products.bulkRenewConfirmTitle", {
         count: targets.length,
       }),
@@ -82,6 +132,10 @@ export function useBulkRenew() {
       onConfirm: () =>
         mutation.mutateAsync({ ids: targets.map((r) => r.id), targets }),
     });
+    // Onay penceresi kapandıktan SONRA aç.
+    if (pendingReport.current) setReport(pendingReport.current);
+    pendingReport.current = null;
+    return submitted;
   };
 
   return {

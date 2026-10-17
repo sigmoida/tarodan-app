@@ -7,6 +7,7 @@ import { useResourceList } from "@/components/list";
 import { mapProducts } from "../_lib/types";
 import { productColumns } from "../_lib/columns";
 import { productFilterKeys } from "../_lib/filters";
+import { canRenewExpiredListing } from "../[id]/_lib/renewal";
 
 /** Maps the raw product rows from context and renders the shared DataTable. */
 export function ProductsTable() {
@@ -30,6 +31,8 @@ export function ProductsTable() {
       selectedIds={selection.selectedIds}
       onToggleRow={selection.toggleRow}
       onToggleAll={selection.toggleAll}
+      // Seçim yalnız toplu yenilemeye yarar: süresi dolmuş olmayan satır seçilemez.
+      isRowSelectable={(p) => canRenewExpiredListing(p)}
       sort={sort}
       onSort={setSort}
       emptyText={

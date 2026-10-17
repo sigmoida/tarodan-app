@@ -14,7 +14,8 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { TextLink } from "@/components/TextLink";
 import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { ProductDetail } from "../_lib/types";
-import { canRenewExpiredListing } from "../_lib/renewal";
+import { useSession } from "@/context/SessionContext";
+import { canRenewByRole, canRenewExpiredListing } from "../_lib/renewal";
 
 export interface ProductSidebarProps {
   product: ProductDetail;
@@ -43,7 +44,8 @@ export function ProductSidebar({
   const canApprove = product.status === "pending";
   const canReject = product.status === "pending";
   const canRestore = product.status === "deleted";
-  const canRenew = canRenewExpiredListing(product);
+  const { user } = useSession();
+  const canRenew = canRenewExpiredListing(product) && canRenewByRole(user.role);
   const canDelete =
     product.status !== "sold" &&
     product.status !== "reserved" &&
