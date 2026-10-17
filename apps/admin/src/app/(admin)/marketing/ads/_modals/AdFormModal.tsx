@@ -13,10 +13,6 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { Alert, Button, ConfirmDialog, FileDropzone, Input } from "@tarodan/ui";
-import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
@@ -36,11 +32,15 @@ import {
   AD_CONTENT_MAX,
   platformOptions,
   popupFrequencyOptions,
-  IAB_SIZES,
-  isIabSize,
   hotspotIssues,
 } from "../_lib/types";
+import {
+  sizeAfterContextChange,
+  type AdSize,
+  type AdSizeSource,
+} from "../_lib/sizePresets";
 import { HotspotEditor } from "../_components/HotspotEditor";
+import { AdSizePresets } from "../_components/AdSizePresets";
 import {
   campaignLabel,
   selectableCampaigns,
@@ -50,7 +50,7 @@ import {
 // Sunucu sınırıyla aynı (`POST /admin/ads/upload` 5 MB kabul eder).
 const AD_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-/** Drag-drop upload + dimension detection + IAB presets, bound to the RHF form. */
+/** Drag-drop upload + dimension detection + recommended sizes, bound to the RHF form. */
 function AdImageField() {
   const t = useTranslations();
   const {
@@ -61,6 +61,8 @@ function AdImageField() {
   const imageUrl = watch("imageUrl");
   const width = watch("width");
   const height = watch("height");
+  const position = watch("position");
+  const platform = watch("platform");
   const hotspotCount = (watch("hotspots") ?? []).length;
   const [uploading, setUploading] = useState(false);
   // Yazılan adres odak çıkınca uygulanır: her tuşta "alanlar silinsin mi?" sorulmasın.
@@ -68,6 +70,14 @@ function AdImageField() {
   // Alanlar varken görsel değişirse/kalkarsa onay beklenir (alanlar silinir).
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   useEffect(() => setUrlDraft(imageUrl), [imageUrl]);
+
+  // Boyutun kaynağı: kayıtlı reklamda mevcut değer, yeni görselde tarayıcının
+  // okuduğu doğal boyut, çipte seçilen öneri. Yalnız çip seçimi pozisyon/platform
+  // değişince temizlenir; görselden okunan boyut korunur.
+  const [sizeSource, setSizeSource] = useState<AdSizeSource>(
+    width && height ? "stored" : "none",
+  );
+  const [natural, setNatural] = useState<AdSize | null>(null);
 
   const setDims = useCallback(
     (w: number, h: number) => {
@@ -77,10 +87,28 @@ function AdImageField() {
     [setValue],
   );
 
+  useEffect(() => {
+    const cur = { size: { width: width || 0, height: height || 0 } };
+    const next = sizeAfterContextChange({
+      position,
+      platform,
+      state: { ...cur, source: sizeSource },
+      natural,
+    });
+    if (next.source === sizeSource) return;
+    setSizeSource(next.source);
+    setDims(next.size.width, next.size.height);
+  }, [position, platform, width, height, sizeSource, natural, setDims]);
+
   const loadDims = useCallback(
     (url: string) => {
       const img = new window.Image();
-      img.onload = () => setDims(img.naturalWidth, img.naturalHeight);
+      img.onload = () => {
+        const size = { width: img.naturalWidth, height: img.naturalHeight };
+        setNatural(size);
+        setSizeSource("image");
+        setDims(size.width, size.height);
+      };
       img.src = url;
     },
     [setDims],
@@ -89,7 +117,11 @@ function AdImageField() {
   const applyImage = (url: string) => {
     setValue("imageUrl", url, { shouldDirty: true });
     if (url) loadDims(url);
-    else setDims(0, 0);
+    else {
+      setNatural(null);
+      setSizeSource("none");
+      setDims(0, 0);
+    }
   };
 
   const requestImage = (url: string) => {
@@ -133,8 +165,6 @@ function AdImageField() {
     }
   };
 
-  const compliant = isIabSize(width, height);
-
   return (
     <div className="space-y-2">
       <span className="block text-sm text-muted">
@@ -148,25 +178,11 @@ function AdImageField() {
             alt={t("admin.marketing.ads.preview")}
             className="mx-auto max-h-48 rounded object-contain"
           />
-          <div className="flex items-center justify-center gap-2 text-sm">
-            {width && height ? (
-              <span className="text-muted">
-                {width} x {height} px
-              </span>
-            ) : null}
-            {width && height ? (
-              compliant ? (
-                <span className="flex items-center gap-1 text-success-700">
-                  <CheckCircleIcon className="h-4 w-4" />{" "}
-                  {t("admin.marketing.ads.iabCompliant")}
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-warning-700">
-                  <ExclamationTriangleIcon className="h-4 w-4" /> Non-IAB
-                </span>
-              )
-            ) : null}
-          </div>
+          {width && height ? (
+            <div className="text-sm text-muted">
+              {width} x {height} px
+            </div>
+          ) : null}
           <Button
             variant="danger"
             size="sm"
@@ -216,31 +232,19 @@ function AdImageField() {
         placeholder={t("admin.marketing.ads.upload.urlPlaceholder")}
       />
 
-      <div className="flex flex-wrap gap-2 pt-1">
-        {IAB_SIZES.slice(0, 6).map((s) => (
-          <Button
-            key={`${s.width}x${s.height}`}
-            type="button"
-            size="sm"
-            variant={
-              width === s.width && height === s.height ? "primary" : "outline"
-            }
-            onClick={() => setDims(s.width, s.height)}
-          >
-            {s.name} ({s.width}x{s.height})
-          </Button>
-        ))}
-      </div>
+      <AdSizePresets
+        position={position}
+        platform={platform}
+        size={{ width: width || 0, height: height || 0 }}
+        onPick={(preset) => {
+          setSizeSource("preset");
+          setDims(preset.width, preset.height);
+        }}
+      />
 
       {(errors.width || errors.height) && (
         <Alert variant="danger">
           {t("admin.marketing.ads.validation.sizeMax")}
-        </Alert>
-      )}
-
-      {!!width && !!height && !compliant && (
-        <Alert variant="warning">
-          {t("admin.marketing.ads.iabWarning", { width, height })}
         </Alert>
       )}
 
