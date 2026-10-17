@@ -317,6 +317,8 @@ export class PaymentCallbackService {
         ? `paytr:${oid}:${inquiry.paymentDate}`
         : `paytr:${oid}`;
 
+    // Not: bu kurtarma yolu kayıtlı kartı senkronlamaz (gövdenin utoken'ına
+    // güvenilmez); kart, güvenilir bir bildirim ya da sonraki ödemeyle yazılır.
     const did = await this.paymentFulfillment.processSuccessfulPayment(
       payment,
       txnRef,
