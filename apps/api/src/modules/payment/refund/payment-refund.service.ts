@@ -46,6 +46,7 @@ import {
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { groupOrderRefundLimit } from "../helpers/group-refund-limit";
+import { asPaymentMetadata } from "../helpers/payment-metadata.types";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
@@ -80,13 +81,6 @@ import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-n
  */
 function refundPortion(amountToRefund: number, threshold: number): number {
   return threshold > 0 ? Math.min(amountToRefund / threshold, 1) : 1;
-}
-
-/** The refund bookkeeping `Payment.metadata` accumulates. */
-interface PaymentRefundMetadata {
-  refundedOrders?: Record<string, number>;
-  auditHistory?: Prisma.InputJsonValue[];
-  [key: string]: Prisma.InputJsonValue | undefined;
 }
 
 /**
@@ -484,7 +478,7 @@ export class PaymentRefundService {
       ? Number(refundTargetOrder!.totalAmount)
       : Number(payment.amount);
     const previouslyRefundedOrders: Record<string, number> =
-      (payment.metadata as PaymentRefundMetadata | null)?.refundedOrders ?? {};
+      asPaymentMetadata(payment.metadata).refundedOrders ?? {};
     const refundLimit = isGroupPayment
       ? groupOrderRefundLimit({
           orderTotal: refundCap,
@@ -869,8 +863,7 @@ export class PaymentRefundService {
             where: { id: payment.id },
             select: { metadata: true },
           });
-          const existingMetadata =
-            (freshPayment?.metadata as PaymentRefundMetadata | null) ?? {};
+          const existingMetadata = asPaymentMetadata(freshPayment?.metadata);
           const auditHistory = existingMetadata.auditHistory ?? [];
           const currentRefundedOrders = existingMetadata.refundedOrders ?? {};
 
@@ -907,11 +900,13 @@ export class PaymentRefundService {
             where: { id: payment.id },
             data: {
               status: fullyRefunded ? PaymentStatus.refunded : payment.status,
+              // The payment's metadata is free-form JSON; the known keys are
+              // typed by PaymentMetadata, the write goes back as JSON.
               metadata: {
                 ...existingMetadata,
                 refundAmount: totalRefunded,
                 refundedAt: new Date().toISOString(),
-                refundResult: refundResult as Prisma.InputJsonValue,
+                refundResult,
                 // MONEY-H4: tekilde de persist et — kümülatif iade takibi ve tavan
                 // kontrolü buna dayanır (yoksa art arda kısmi iadeler biriktirilemez).
                 refundedOrders,
@@ -924,7 +919,7 @@ export class PaymentRefundService {
                   orderId,
                   partial: !isOrderFullyRefunded,
                 }),
-              },
+              } as Prisma.InputJsonValue,
             },
           });
 
