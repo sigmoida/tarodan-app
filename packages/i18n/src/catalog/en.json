@@ -11637,7 +11637,8 @@
         "scheduleInFuture": "The scheduled time must be in the future",
         "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
         "scheduledNotFound": "Scheduled notification not found",
-        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages"
+        "noMarketingConsentAudience": "No one in the selected audience has consented to marketing messages",
+        "noChannel": "Select at least one delivery channel"
       },
       "payment": {
         "partialAmountRequired": "A valid refund amount is required for a partial refund",

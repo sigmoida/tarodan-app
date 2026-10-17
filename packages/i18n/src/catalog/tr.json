@@ -11637,7 +11637,8 @@
         "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
         "emailHtmlEmpty": "E-posta HTML'i güvensiz işaretlemeler çıkarıldıktan sonra kullanılabilir içerik barındırmıyor",
         "scheduledNotFound": "Zamanlanmış bildirim bulunamadı",
-        "noMarketingConsentAudience": "Seçilen kitlede pazarlama iletisine izin veren kullanıcı yok"
+        "noMarketingConsentAudience": "Seçilen kitlede pazarlama iletisine izin veren kullanıcı yok",
+        "noChannel": "En az bir gönderim kanalı seçin"
       },
       "payment": {
         "partialAmountRequired": "Kısmi iade için geçerli bir iade tutarı gerekir",

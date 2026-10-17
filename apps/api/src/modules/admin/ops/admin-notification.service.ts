@@ -48,6 +48,11 @@ export interface AdminBroadcastInput {
   title: string;
   body: string;
   channels: string[];
+  /**
+   * Zil satırı yazılsın mı (bkz. `writesInAppRow`). Verilmezse true — eski
+   * çağıranlar ve kolondan önceki zamanlanmış satırlar her zaman yazıyordu.
+   */
+  inApp?: boolean;
   targetType: "all" | "segment" | "user_ids";
   userIds?: string[];
   segmentCriteria?: Record<string, any>;
@@ -74,6 +79,41 @@ export interface AudienceCountInput {
   targetType: "all" | "segment" | "user_ids";
   userIds?: string[];
   segmentCriteria?: Record<string, any>;
+}
+
+/** Yayının gerçekten gönderdiği (worker'ın dağıttığı) kanallar. */
+const DELIVERY_CHANNELS = ["push", "email"] as const;
+
+/**
+ * Yayın zil (uygulama içi bildirim kutusu) satırı yazar mı? "in_app" kanalı
+ * açıkça seçildiyse evet; değilse `inApp` bayrağı, o da yoksa true (geriye
+ * uyum: eskiden her yayın, yalnız e-posta olsa bile, zil satırı yazıyordu).
+ */
+export function writesInAppRow(dto: {
+  channels: string[];
+  inApp?: boolean;
+}): boolean {
+  return dto.channels.includes("in_app") || (dto.inApp ?? true);
+}
+
+/**
+ * Hiçbir kanal bir şey teslim etmeyecekse (zil kapalı, push/e-posta yok) yayın
+ * anlamsız: sessizce "gönderildi" demek yerine reddedilir. Zil kararını döner.
+ */
+function assertDeliversSomething(dto: {
+  channels: string[];
+  inApp?: boolean;
+}): boolean {
+  const writesInApp = writesInAppRow(dto);
+  const delivers = dto.channels.some((c) =>
+    (DELIVERY_CHANNELS as readonly string[]).includes(c),
+  );
+  if (!writesInApp && !delivers) {
+    throw new BadRequestException(
+      i18nMessage("server.admin.notification.noChannel"),
+    );
+  }
+  return writesInApp;
 }
 
 /**
@@ -324,6 +364,7 @@ export class AdminNotificationService {
     const emailContent = this.normalizeEmailContent(dto);
     const sendsEmail = dto.channels.includes("email");
     const isMarketing = isMarketingMailing(emailContent.mailingType);
+    const writesInApp = assertDeliversSomething(dto);
 
     // ADMIN_BROADCAST serbest link taşır (harita: free("link")). DTO kapısına
     // (SafeNotificationLinkData) ek olarak burada da süzülür: bu servis iç
@@ -380,7 +421,7 @@ export class AdminNotificationService {
         ...(emailContent.emailHtml && { hasHtmlEmail: true }),
       };
 
-      // Create notification logs - always include in_app for user visibility
+      // Zil satırı yalnız uygulama içi kanal açıksa (eski çağıranlarda her zaman).
       const notificationLogs: Array<{
         userId: string;
         channel: string;
@@ -394,17 +435,18 @@ export class AdminNotificationService {
       }> = [];
 
       for (const userId of targetUserIds) {
-        // Always create an in_app entry so users see it in their notification center
-        notificationLogs.push({
-          userId,
-          channel: "in_app",
-          type: "admin_broadcast",
-          title: dto.title,
-          body: dto.body,
-          data,
-          status: "sent",
-          sentAt: new Date(),
-        });
+        if (writesInApp) {
+          notificationLogs.push({
+            userId,
+            channel: "in_app",
+            type: "admin_broadcast",
+            title: dto.title,
+            body: dto.body,
+            data,
+            status: "sent",
+            sentAt: new Date(),
+          });
+        }
 
         // Create entries for other selected channels (for tracking/audit)
         for (const channel of dto.channels) {
@@ -495,6 +537,7 @@ export class AdminNotificationService {
         {
           targetCount: targetUserIds.length,
           channels: dto.channels,
+          inApp: writesInApp,
           title: dto.title,
           targetType: dto.targetType,
           mailingType: emailContent.mailingType,
@@ -539,6 +582,7 @@ export class AdminNotificationService {
         i18nMessage("server.admin.notification.scheduleInFuture"),
       );
     }
+    const writesInApp = assertDeliversSomething(dto);
     // Süzülmüş HTML saklanır: zamanlanmış gönderim, anındakiyle aynı içeriği
     // taşır ve gönderim anında bir daha ham girdiye güvenilmez.
     const emailContent = this.normalizeEmailContent(dto);
@@ -551,6 +595,7 @@ export class AdminNotificationService {
         emailHtml: emailContent.emailHtml,
         mailingType: emailContent.mailingType,
         channels: dto.channels,
+        inApp: writesInApp,
         targetType: dto.targetType,
         targetData:
           dto.targetType === "user_ids"
