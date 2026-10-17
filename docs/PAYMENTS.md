@@ -241,6 +241,38 @@ paradır.
   tüketilir. Satıcı kusurlu iade (kargolanmış) zaten kalıntı üretmiyordu
   (satıcıya tam kargo borcu, tazmin yok). Alıcı/kargo/platform kusurunda
   davranış aynıdır.
+- **Units returned one at a time** (v2): the seller's share is carried by the
+  refund that completes the line, after earlier partial refunds consumed their
+  slices. `holdRetainedAmount` is what must be **left** in the hold after that
+  refund, so it caps the cumulative consumption at `amount − retained`
+  (`payment/helpers/hold-consumption.ts`). If an earlier slice already reached
+  past the cap (a cheap item whose hold is small next to the share), that part
+  is given back; a share above the whole hold leaves the whole hold. The same
+  cap keeps an earlier goodwill refund from eating the share of a later full
+  refund.
+  Whether the order stays `delivered` (normal release) or closes because the
+  cash refund reached T (residual release), the non-faulty seller is paid
+  `amount − refundedAmount`.
+- **Mixed faults (D20)**: once ANY finalized refund of the order is seller
+  fault (`sellerShareForfeited`, v1 and v2), the seller's own shipping share
+  stays with the platform, whatever the fault of the line-completing refund:
+  the v2 calculation emits no `seller_refund` share (and, on a buyer-fault
+  refund, no `buyer_charge` of it either: the seller already paid it from the
+  hold) and `processRefund` retains nothing, counting the request's own fault
+  too (also for a request finalized before the rule). For requests computed
+  under D20, neither release path sees a share, whether the order stays
+  `delivered` or closes. One exception for requests decided under the old
+  rule: when the request's own components charge the buyer the share (its
+  cash already reduced by it), the hold keeps what the buyer was charged (at
+  most the share) for the seller, so it is collected once. That kept share
+  goes out on the normal release; on an order that later closes, the residual
+  rule would block it (`seller_at_fault`), so it must not be settled to the
+  platform (see OPERATIONS.md).
+- **Unknown fault (D20)**: a residual on a closed order without a finalized
+  refund that names the fault (none at all, or only a `legacy` request
+  without a fault party: `isNamedSellerFaultRefund`) is decided by a person. The release cron never pays it and the batch
+  script never settles it (listed as `manual_decision`); only the per-hold
+  endpoint below settles it.
 - **Birikmiş kalıntılar**: `PaymentHoldResidualService` PSP'ye gitmeden
   platforma **kapatır** — tek işlemde hold `cancelled` +
   `refundedAmount = amount` (CAS: tutuluyor, kilitsiz, okunan `refundedAmount`

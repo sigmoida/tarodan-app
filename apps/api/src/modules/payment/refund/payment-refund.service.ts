@@ -9,12 +9,14 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
   CancellationActor,
+  Payment,
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
   OfferStatus,
   OrderStatus,
   RefundAttemptStatus,
+  RefundRequestStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
 import type { AdminCancelReasonCode } from "@tarodan/types";
@@ -45,6 +47,14 @@ import {
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { groupOrderRefundLimit } from "../helpers/group-refund-limit";
+import { holdRefundedAmountAfter } from "../helpers/hold-consumption";
+import { asPaymentMetadata } from "../helpers/payment-metadata.types";
+import {
+  HOLD_RESIDUAL_MIN,
+  holdResidual,
+  sellerShareForfeited,
+  type RefundFaultFacts,
+} from "../../payout/helpers/hold-release-eligibility";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
@@ -81,17 +91,47 @@ function refundPortion(amountToRefund: number, threshold: number): number {
   return threshold > 0 ? Math.min(amountToRefund / threshold, 1) : 1;
 }
 
+/**
+ * What a refund attempt resolved to: the provider's response, the persisted
+ * response of a recovered attempt, or a synthetic stand-in (zero cash, test
+ * lane, bypass). Only string ids and the status are read from it.
+ */
+type RefundProviderResult = Record<string, unknown>;
+
+/** The provider's refund id: `paymentId` (synthetic) or `merchant_oid` (PayTR). */
+function providerRefundIdOf(result: RefundProviderResult): string | null {
+  for (const key of ["paymentId", "merchant_oid"]) {
+    const value = result[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
+}
+
 export interface RefundSettlementOptions {
   /** Ürünlerin tamamı fiziksel olarak döndü; nakit iade toplamdan düşük olsa da siparişi kapat. */
   closeOrder?: boolean;
   /** Satıcı hold'unun tüketilecek adet oranı. Nakit iade oranından bağımsızdır. */
   holdPortion?: number;
   /**
-   * Bu iadeden sonra hold'da satıcıya BIRAKILACAK tutar (kendi kargo payının
-   * tazmini). Escrow hold TAM kargoyu düştüğü için satıcı payını peşin ödemiş
-   * sayılır; kusur alıcıdaysa geri verilir. Tüketimi YALNIZ aşağı çeker.
+   * The amount to LEAVE in the hold for the seller after this refund (their
+   * own shipping share): the escrow hold deducted the full shipping, so the
+   * seller paid their share up front and gets it back when not at fault. It
+   * caps the hold's cumulative consumption at `amount − retained`
+   * (`holdRefundedAmountAfter`).
    */
   holdRetainedAmount?: number;
+  /**
+   * The fault of the refund request this settlement belongs to. The D20
+   * forfeit check counts it with the order's earlier finalized refunds, since
+   * some paths mark the request `refunded` only after `processRefund`.
+   */
+  refundFault?: RefundFaultFacts;
+  /**
+   * Gross the request's own components charged the buyer for the seller's
+   * share (pre-D20 buyer-fault rule). The forfeit check keeps up to that much
+   * of the share, so what the buyer paid for it is collected once.
+   */
+  sellerShareChargedToBuyer?: number;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
@@ -309,10 +349,75 @@ export class PaymentRefundService {
     return this.tradeRefunds.refundTradeCashTracked(...args);
   }
 
+  /**
+   * The seller shipping share to leave in the hold, after the D20 rule: none
+   * once ANY finalized refund of the order, or this request itself, is seller
+   * fault (`sellerShareForfeited`). The v2 policy already emits no share then;
+   * this is the last check for every caller, for example a request whose v2
+   * components were finalized before that rule existed. Exception: when the
+   * request's own components charged the buyer that share (pre-D20 buyer
+   * fault), the buyer's cash already bears it, so the share is kept for the
+   * seller and the request is settled under the rule it was decided with.
+   * Read inside the refund transaction, through the order (same shape as the
+   * release paths).
+   */
+  private async retainedShareFor(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    requested: number | undefined,
+    current: RefundFaultFacts | undefined,
+    chargedToBuyer: number,
+  ): Promise<number> {
+    if (requested == null || !(requested > 0)) return 0;
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        refundRequests: {
+          where: { status: RefundRequestStatus.refunded },
+          select: { faultParty: true, policyCode: true },
+        },
+      },
+    });
+    const faults = [
+      ...(order?.refundRequests ?? []),
+      ...(current ? [current] : []),
+    ];
+    if (!sellerShareForfeited(faults)) return requested;
+    if (chargedToBuyer > 0) {
+      // Keep what the buyer paid for (the v2 cap may have scaled the charge
+      // below the share) and forfeit the rest.
+      return this.keptUnderOldRule(
+        orderId,
+        requested,
+        Math.min(requested, chargedToBuyer),
+      );
+    }
+    this.logger.warn(
+      `Seller shipping share forfeited (earlier seller-fault refund): order=${orderId} share=${requested}`,
+    );
+    return 0;
+  }
+
+  /**
+   * Decided under the pre-D20 rule: the buyer's cash already bears `kept` of
+   * the share, so forfeiting that part would collect it twice. It stays for
+   * the seller and the request settles as it was decided.
+   */
+  private keptUnderOldRule(
+    orderId: string,
+    requested: number,
+    kept: number,
+  ): number {
+    this.logger.warn(
+      `Seller shipping share kept under the pre-D20 rule (buyer was charged it): order=${orderId} share=${requested} kept=${kept}`,
+    );
+    return kept;
+  }
+
   private async notifyRefundOutcome(
     orderId: string,
     amountToRefund: number,
-    payment: any,
+    payment: Pick<Payment, "id" | "amount" | "provider">,
     providerRefundId: string | undefined,
     skipRefundEvent: boolean | undefined,
     /** Bu iadeyle kesinleşen yönetici iptalinin kodu (siparişe yazıldıysa). */
@@ -460,8 +565,7 @@ export class PaymentRefundService {
       ? Number(refundTargetOrder!.totalAmount)
       : Number(payment.amount);
     const previouslyRefundedOrders: Record<string, number> =
-      ((payment.metadata as any)?.refundedOrders as Record<string, number>) ||
-      {};
+      asPaymentMetadata(payment.metadata).refundedOrders ?? {};
     const refundLimit = isGroupPayment
       ? groupOrderRefundLimit({
           orderTotal: refundCap,
@@ -671,7 +775,7 @@ export class PaymentRefundService {
     // cron'lar, kısmi iade) buradan geçer.
     const isTestLaneRefund = payment.isTest === true;
     try {
-      let refundResult: any;
+      let refundResult: RefundProviderResult;
       if (refundAttempt.action === "finalize") {
         refundResult = (refundAttempt.attempt.providerResponse as Record<
           string,
@@ -713,15 +817,17 @@ export class PaymentRefundService {
           } else {
             try {
               // İade, ödemenin ALINDIĞI mağazaya gider (kaydın paytrMerchant'ı).
-              refundResult = await this.paymentProviders
-                .resolve(payment.provider, payment.paytrMerchant)
-                // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
-                // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
-                .createRefund(
-                  paytrOid,
-                  amountToRefund,
-                  refundAttempt.attempt.id,
-                );
+              refundResult = {
+                ...(await this.paymentProviders
+                  .resolve(payment.provider, payment.paytrMerchant)
+                  // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
+                  // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
+                  .createRefund(
+                    paytrOid,
+                    amountToRefund,
+                    refundAttempt.attempt.id,
+                  )),
+              };
             } catch (err) {
               const reason = (err as Error).message || "refund request failed";
               if (err instanceof ProviderRefundRejectedException) {
@@ -770,8 +876,7 @@ export class PaymentRefundService {
         // Provider success is persisted before any order/hold/ledger mutation.
         // A crash after this point is safely recoverable without calling PayTR again.
         paytrRefunded = true;
-        const providerRefundId =
-          refundResult?.paymentId || refundResult?.merchant_oid || null;
+        const providerRefundId = providerRefundIdOf(refundResult);
         const persisted = await this.prisma.refundAttempt.updateMany({
           where: {
             id: refundAttempt.attempt.id,
@@ -797,11 +902,14 @@ export class PaymentRefundService {
             eventType: "refund",
             merchantOid: paytrOid,
             paymentId: payment.id,
-            status: refundResult?.status ?? "success",
+            status:
+              typeof refundResult.status === "string"
+                ? refundResult.status
+                : "success",
             amount: amountToRefund,
             totalAmount: amountToRefund,
             raw: {
-              ...(refundResult as Record<string, unknown>),
+              ...refundResult,
               refundAttemptId: refundAttempt.attempt.id,
             },
           });
@@ -842,10 +950,9 @@ export class PaymentRefundService {
             where: { id: payment.id },
             select: { metadata: true },
           });
-          const existingMetadata = (freshPayment?.metadata as any) || {};
-          const auditHistory = existingMetadata.auditHistory || [];
-          const currentRefundedOrders: Record<string, number> =
-            (existingMetadata.refundedOrders as Record<string, number>) || {};
+          const existingMetadata = asPaymentMetadata(freshPayment?.metadata);
+          const auditHistory = existingMetadata.auditHistory ?? [];
+          const currentRefundedOrders = existingMetadata.refundedOrders ?? {};
 
           // Kısmi iade birikimi: sipariş başına iade TOPLANIR. Grup zaten order
           // başına biriktiriyordu; MONEY-H4: tekil ödemede de biriktir — aksi halde
@@ -880,6 +987,8 @@ export class PaymentRefundService {
             where: { id: payment.id },
             data: {
               status: fullyRefunded ? PaymentStatus.refunded : payment.status,
+              // The payment's metadata is free-form JSON; the known keys are
+              // typed by PaymentMetadata, the write goes back as JSON.
               metadata: {
                 ...existingMetadata,
                 refundAmount: totalRefunded,
@@ -897,7 +1006,7 @@ export class PaymentRefundService {
                   orderId,
                   partial: !isOrderFullyRefunded,
                 }),
-              },
+              } as Prisma.InputJsonValue,
             },
           });
 
@@ -926,51 +1035,51 @@ export class PaymentRefundService {
                 i18nMessage("server.payment.transferAlreadyStarted"),
               );
             }
-            // Hold tüketimi TUTAR oranına göre (MONEY-H3). Adet-bazlı iade akışları
-            // amount = total*adet/siparişAdedi gönderdiğinden bu oran adet oranıyla
-            // BİREBİR örtüşür; tutar-bazlı admin/jest iadesinde ise yalnız iade edilen
-            // TUTAR kadarı tüketilir. Eskiden refundQuantity yoksa portion=1 olup TÜM
-            // hold tüketiliyor, 1000 TL siparişte 50 TL jest satıcı payout'unu 0'a
-            // düşürüyordu. Ledger portion ile AYNI formül (tek otorite). Tam iadede hold
-            // cancelled; kısmi iadede held/released kalır, payout'ta netAmount =
-            // amount - refundedAmount ödenir. orderRefundThreshold = siparişin tutarı
-            // (grup'ta order.totalAmount, tekilde payment.amount) — tx başında hesaplandı.
-            const sellerAmount = Number(activeHold.amount);
-            const portion = Math.min(
-              Math.max(
-                opts?.settlement?.holdPortion ??
-                  refundPortion(amountToRefund, orderRefundThreshold),
-                0,
-              ),
-              1,
+            // Hold consumption follows the AMOUNT ratio (MONEY-H3). Quantity-based
+            // refund flows send amount = total * units / orderQuantity, so the
+            // ratio equals the quantity ratio; an amount-based admin or goodwill
+            // refund consumes only the refunded amount's share (it used to
+            // consume the whole hold: a 50 TL gesture on a 1000 TL order took the
+            // seller's payout to 0). The ledger uses the same ratio. A fully
+            // consumed hold is cancelled; otherwise it stays held/released and
+            // the payout pays amount - refundedAmount. orderRefundThreshold is
+            // the order's amount (group: order.totalAmount, single:
+            // payment.amount), computed at the start of the transaction. The
+            // seller's own shipping share to leave in the hold is
+            // `holdRetainedAmount`; the formula (cumulative cap) is in
+            // `holdRefundedAmountAfter`.
+            const retained = await this.retainedShareFor(
+              tx,
+              orderId,
+              opts?.settlement?.holdRetainedAmount,
+              opts?.settlement?.refundFault,
+              opts?.settlement?.sellerShareChargedToBuyer ?? 0,
             );
-            let refundedSeller = Math.round(sellerAmount * portion * 100) / 100;
-            // Satıcıya bırakılacak tutar (kargo payı tazmini): tüketimi YALNIZ aşağı
-            // çeker. Oran zaten daha azını tüketiyorsa dokunulmaz; bırakılacak tutar
-            // hold'u aşarsa hiç tüketim olmaz.
-            const retained = opts?.settlement?.holdRetainedAmount;
-            if (retained != null && retained > 0) {
-              const consumable =
-                Math.round(Math.max(0, sellerAmount - retained) * 100) / 100;
-              refundedSeller = Math.min(refundedSeller, consumable);
-            }
-            const newRefunded =
-              Number(activeHold.refundedAmount ?? 0) + refundedSeller;
-            if (newRefunded >= sellerAmount - 0.01) {
-              await tx.paymentHold.update({
-                where: { id: activeHold.id },
-                data: {
-                  status: PaymentHoldStatus.cancelled,
-                  refundedAmount: sellerAmount,
-                  frozenByRefundId: null,
-                },
-              });
-            } else {
-              await tx.paymentHold.update({
-                where: { id: activeHold.id },
-                data: { refundedAmount: newRefunded, frozenByRefundId: null },
-              });
-            }
+            const newRefunded = holdRefundedAmountAfter({
+              amount: activeHold.amount,
+              refundedAmount: activeHold.refundedAmount,
+              portion:
+                opts?.settlement?.holdPortion ??
+                refundPortion(amountToRefund, orderRefundThreshold),
+              retained,
+            });
+            const fullyConsumed = holdResidual({
+              amount: activeHold.amount,
+              refundedAmount: newRefunded,
+            }).lessThanOrEqualTo(HOLD_RESIDUAL_MIN);
+            await tx.paymentHold.update({
+              where: { id: activeHold.id },
+              data: fullyConsumed
+                ? {
+                    status: PaymentHoldStatus.cancelled,
+                    refundedAmount: activeHold.amount,
+                    frozenByRefundId: null,
+                  }
+                : {
+                    refundedAmount: newRefunded.toNumber(),
+                    frozenByRefundId: null,
+                  },
+            });
           }
 
           // #88: Ledger'ı iade oranınca PRO-RATE et (kısmi iadede de). Original alanlar
@@ -1230,8 +1339,7 @@ export class PaymentRefundService {
             paymentId: payment.id,
             refundAmount: amountToRefund,
             providerRefundId:
-              refundResult.paymentId ||
-              refundResult.merchant_oid ||
+              providerRefundIdOf(refundResult) ||
               freshAttempt.providerRefundId ||
               undefined,
             // Çağıran (ör. finalizeRefundForReturnedShipment) satıcıya "ilan
@@ -1333,7 +1441,7 @@ export class PaymentRefundService {
           );
       }
       return refundCommitResult;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
         `Refund error for payment ${payment.id}: ${errorMessage(error)}`,
       );

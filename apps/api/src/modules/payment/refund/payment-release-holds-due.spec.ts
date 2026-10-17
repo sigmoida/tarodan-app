@@ -247,6 +247,32 @@ describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", 
         expect((await service.releaseHoldsDue()).count).toBe(0);
         expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
       });
+
+      it("unknown fault (no finalized refund) is never released by the cron (D20: decided by hand)", async () => {
+        const { service, prisma } = withClosedOrderCandidate([]);
+
+        expect((await service.releaseHoldsDue()).count).toBe(0);
+        expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
+      });
+
+      it("a legacy refund without a fault party is in doubt: the cron never releases it (D20)", async () => {
+        const { service, prisma } = withClosedOrderCandidate([
+          finalized(null, "legacy"),
+        ]);
+
+        expect((await service.releaseHoldsDue()).count).toBe(0);
+        expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
+      });
+
+      it("a buyer-fault refund does not un-block an earlier seller-fault one (D20)", async () => {
+        const { service, prisma } = withClosedOrderCandidate([
+          finalized("seller"),
+          finalized("buyer"),
+        ]);
+
+        expect((await service.releaseHoldsDue()).count).toBe(0);
+        expect(prisma.paymentHold.updateMany).not.toHaveBeenCalled();
+      });
     });
 
     it("tam iadeden sonra planlanan tarih henüz gelmediyse bekler", async () => {

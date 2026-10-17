@@ -33,6 +33,10 @@ import {
   shippingAmountForDesi,
 } from "../shipping/helpers/shipping-tariff.helper";
 import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
+import {
+  sellerShareForfeited,
+  type RefundFaultFacts,
+} from "../payout/helpers/hold-release-eligibility";
 import { readInvoiceLineItems } from "../invoicing/invoice/invoice-lines";
 import {
   calculateRefundFinancials,
@@ -399,8 +403,11 @@ export class RefundFinancialService {
           : {}),
         status: RefundRequestStatus.refunded,
       },
-      select: { refundQuantity: true },
+      select: { refundQuantity: true, faultParty: true, policyCode: true },
     });
+    // D20: an earlier seller-fault refund forfeits the seller's own shipping
+    // share for the rest of the order (one rule: `sellerShareForfeited`).
+    const shareForfeited = sellerShareForfeited(priorRefundedRows);
     const priorRefundedQuantity = priorRefundedRows.reduce(
       (sum, row) => sum + (row.refundQuantity ?? 0),
       0,
@@ -446,6 +453,7 @@ export class RefundFinancialService {
       outboundAlreadySettled,
       completesLine,
       closesPackageShipping,
+      sellerShareForfeited: shareForfeited,
     });
     const returnTariff = activeReturnTariff
       ? {
@@ -974,14 +982,32 @@ export class RefundFinancialService {
    * dönüş kargosu satıcıya borç yazılır (Sürat faturası platforma gelir).
    */
   shippingSettlement(
-    refundRequestId: string,
+    refundRequest: { id: string } & RefundFaultFacts,
     financials: {
       sellerShippingCompensationAmount: number;
       outboundShippingChargeToSeller: number;
       returnShippingChargeToSeller: number;
     },
+    /** The request's stored v2 components (absent on v1 requests). */
+    components?: ReadonlyArray<{
+      componentCode: string;
+      treatment: string;
+      grossAmount: Prisma.Decimal.Value;
+    }> | null,
   ): {
     holdRetainedAmount: number;
+    /**
+     * This request's own fault, so the hold consumption can apply the D20
+     * forfeit rule to it as well as to the earlier finalized refunds.
+     */
+    refundFault: RefundFaultFacts;
+    /**
+     * Gross the request's own components charge the buyer for the seller's
+     * outbound share (v2 buyer fault under the pre-D20 rule; after the v2 cap
+     * to the refundable amount). The buyer's cash already has it deducted, so
+     * the hold keeps up to that much for the seller.
+     */
+    sellerShareChargedToBuyer: number;
     sellerAdjustments: Array<{
       sourceKey: string;
       amount: number;
@@ -989,8 +1015,24 @@ export class RefundFinancialService {
       refundRequestId: string;
     }>;
   } {
+    const refundRequestId = refundRequest.id;
     return {
       holdRetainedAmount: financials.sellerShippingCompensationAmount,
+      refundFault: {
+        faultParty: refundRequest.faultParty,
+        policyCode: refundRequest.policyCode,
+      },
+      sellerShareChargedToBuyer: (components ?? [])
+        .filter(
+          (component) =>
+            component.componentCode === "outbound_shipping" &&
+            component.treatment === "buyer_charge",
+        )
+        .reduce(
+          (sum, component) => sum.plus(component.grossAmount),
+          new Prisma.Decimal(0),
+        )
+        .toNumber(),
       sellerAdjustments: [
         {
           sourceKey: `refund-return-shipping:${refundRequestId}`,

@@ -49,6 +49,7 @@ import {
 } from "./helpers/pre-shipment-cancellation";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { storedComponentsOf } from "./helpers/stored-refund-components";
 import { RefundShipmentService } from "./refund-shipment.service";
 
 /** Kargo öncesi iptalin okuduğu sipariş yükü (alıcı + platform iptali ortak). */
@@ -518,7 +519,7 @@ export class RefundCreationService {
             closeOrder: true,
             holdPortion: 1,
             ...this.financials.feeSettlementFromComponents(
-              (created as any).financialComponents,
+              storedComponentsOf(created),
               {
                 sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
                 // Defter NET tutar ister; brüt beslemek KDV kadar fazla ters
@@ -527,17 +528,21 @@ export class RefundCreationService {
                   financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
-            ...this.financials.shippingSettlement(created.id, {
-              sellerShippingCompensationAmount: Number(
-                created.sellerShippingCompensationAmount,
-              ),
-              outboundShippingChargeToSeller: Number(
-                created.outboundShippingChargeToSeller,
-              ),
-              returnShippingChargeToSeller: Number(
-                created.returnShippingChargeToSeller,
-              ),
-            }),
+            ...this.financials.shippingSettlement(
+              created,
+              {
+                sellerShippingCompensationAmount: Number(
+                  created.sellerShippingCompensationAmount,
+                ),
+                outboundShippingChargeToSeller: Number(
+                  created.outboundShippingChargeToSeller,
+                ),
+                returnShippingChargeToSeller: Number(
+                  created.returnShippingChargeToSeller,
+                ),
+              },
+              storedComponentsOf(created),
+            ),
           },
         },
       );
@@ -840,7 +845,7 @@ export class RefundCreationService {
               1,
             ),
             ...this.financials.feeSettlementFromComponents(
-              (created as any).financialComponents,
+              storedComponentsOf(created),
               {
                 sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
                 // Defter NET tutar ister; brüt beslemek KDV kadar fazla ters
@@ -849,17 +854,21 @@ export class RefundCreationService {
                   financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
-            ...this.financials.shippingSettlement(created.id, {
-              sellerShippingCompensationAmount: Number(
-                created.sellerShippingCompensationAmount,
-              ),
-              outboundShippingChargeToSeller: Number(
-                created.outboundShippingChargeToSeller,
-              ),
-              returnShippingChargeToSeller: Number(
-                created.returnShippingChargeToSeller,
-              ),
-            }),
+            ...this.financials.shippingSettlement(
+              created,
+              {
+                sellerShippingCompensationAmount: Number(
+                  created.sellerShippingCompensationAmount,
+                ),
+                outboundShippingChargeToSeller: Number(
+                  created.outboundShippingChargeToSeller,
+                ),
+                returnShippingChargeToSeller: Number(
+                  created.returnShippingChargeToSeller,
+                ),
+              },
+              storedComponentsOf(created),
+            ),
           },
         },
       );

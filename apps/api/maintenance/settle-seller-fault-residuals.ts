@@ -1,31 +1,38 @@
 /**
- * Satıcı kusurlu escrow KALINTILARINI platforma kapatır — tek seferlik, deploy
- * sonrası.
+ * Settles seller-fault escrow RESIDUALS to the platform: one-off, after the
+ * deploy.
  *
- * Kalıntı = iade/iptalle kapanmış siparişin hold'unda kalan `amount −
- * refundedAmount` (satıcının kargo payı tazmini). Kusur satıcıdaysa bırakma
- * yolları onu ödemez ve escrow'da süresiz kilitli kalıyordu. O para alıcının
- * DEĞİL platformundur: alıcı ödediğinin tamamını (T) zaten geri almıştır;
- * satıcının kargo payı T'de değil, satıcının hak edişinden düşülmüştü. Bu
- * yüzden PSP'ye gidilmez — hold `cancelled` + `refundedAmount = amount`
- * yapılır ve dengeli bir defter kaydı (seller_escrow → platform) yazılır.
- * Kaynak kapandı (satıcı kusurlu kargo öncesi iptal artık satıcı payını tazmin
- * etmez); bu script birikmişleri temizler.
+ * A residual is the `amount − refundedAmount` left in the hold of an order
+ * closed by a refund or cancellation (the seller's shipping share retained
+ * for them). With the seller at fault no release path pays it, so it stayed
+ * locked in escrow. That money belongs to the platform, not the buyer: the
+ * buyer already got back everything they paid (T), and the seller's share was
+ * never in T but deducted from the seller's earnings. So there is no PSP call:
+ * the hold becomes `cancelled` with `refundedAmount = amount` and a balanced
+ * ledger group (seller_escrow -> platform) is written.
  *
- * Mantık tek yerde: `PaymentHoldResidualService.settleSellerFaultResiduals`
- * (admin ucu `POST /admin/payouts/holds/:id/settle-residual` aynı kapatmayı
- * kullanır). Her hold kendi işleminde kapatılır; uygunluk tek yüklemden
- * (`holdResidualSettleable`). Tekrar çalıştırmak güvenli: kapatılan hold aday
- * kümesinden düşer, defter anahtarı (`hold-residual-settle:<holdId>`) çift
- * kaydı DB'de de engeller.
+ * Only rows where a finalized refund NAMES the seller at fault (the v2 fault
+ * column or a v1 `seller_fault_*` code) are settled. A residual whose fault is
+ * unknown (closed order with no finalized refund, or only a `legacy` refund
+ * without a fault party) is listed as "decide manually"
+ * and never settled by this script, not even with `--apply` (decision D20):
+ * an admin settles it per hold with
+ * `POST /admin/payouts/holds/:id/settle-residual` after looking at it.
  *
- * Nest uygulama bağlamı DERLENMİŞ uygulamadan (`dist/`) yüklenir; seed grafiğine
- * AppModule'ü sokmamak için bilinçli (bkz. tsconfig.seed.json).
+ * The logic lives in one place,
+ * `PaymentHoldResidualService.settleSellerFaultResiduals`; the admin endpoint
+ * uses the same settlement. Each hold is settled in its own transaction;
+ * eligibility comes from one predicate (`holdResidualSettleable`). Re-running
+ * is safe: a settled hold leaves the candidate set, and the ledger key
+ * (`hold-residual-settle:<holdId>`) blocks a double entry in the database too.
  *
- * Varsayılan KURU koşudur (yalnız raporlar): para hareketi geri alınamaz,
- * yazma ancak açık `--apply` ile yapılır.
+ * The Nest application context is loaded from the COMPILED app (`dist/`), on
+ * purpose, to keep AppModule out of the seed graph (see tsconfig.seed.json).
  *
- * Kullanım (API konteynerinde, deploy + migrate sonrası):
+ * The default is a DRY RUN (report only): money moves cannot be undone, so
+ * writing needs an explicit `--apply`.
+ *
+ * Usage (in the API container, after deploy + migrate):
  *   node dist-seed/maintenance/settle-seller-fault-residuals.js
  *   node dist-seed/maintenance/settle-seller-fault-residuals.js --apply
  */
@@ -35,20 +42,22 @@ import { NestFactory } from "@nestjs/core";
 import { pinProcessRole } from "../src/process-role";
 
 /**
- * Servisin rapor şekli — `import type` bile servis dosyasını (ve AppModule
- * grafiğini) seed derlemesine sokardı, bu yüzden yalnız okunan alanlar burada.
+ * The service's report shape. Even an `import type` would pull the service
+ * file (and the AppModule graph) into the seed build, so only the fields read
+ * here are declared.
  */
 interface SellerFaultResidualReport {
   dryRun: boolean;
   scanned: number;
   totalAmount: number;
+  manualDecisionAmount: number;
   rows: Array<{
     holdId: string;
     orderId: string;
     sellerId: string;
     residualAmount: number;
     faultBasis: string;
-    outcome: "would_settle" | "settled" | "failed";
+    outcome: "would_settle" | "settled" | "failed" | "manual_decision";
     error?: string;
   }>;
 }
@@ -63,21 +72,31 @@ interface ResidualServiceLike {
 
 const ACTOR = "maintenance:settle-seller-fault-residuals";
 const REASON =
-  "Satıcı kusurlu kalıntı birikimi — kaynak düzeltmesi sonrası tek seferlik kapatma";
+  "Seller-fault residual backlog: one-off settlement after the source fix";
 
 function printReport(report: SellerFaultResidualReport): void {
+  const manualRows = report.rows.filter(
+    (row) => row.outcome === "manual_decision",
+  );
+  const settleRows = report.rows.filter(
+    (row) => row.outcome !== "manual_decision",
+  );
   console.log(
     report.dryRun
-      ? "\n[DRY RUN] Yazma yapılmadı. Yazmak için --apply.\n"
-      : "\nKapatma bitti.\n",
+      ? "\n[DRY RUN] Nothing written. Pass --apply to write.\n"
+      : "\nSettlement finished.\n",
   );
-  console.log(`Taranan hold (kapanmış sipariş) : ${report.scanned}`);
-  console.log(`Satıcı kusurlu kalıntı          : ${report.rows.length}`);
+  console.log(`Holds scanned (closed orders)       : ${report.scanned}`);
+  console.log(`Seller-fault residuals              : ${settleRows.length}`);
   console.log(
-    `${report.dryRun ? "Kapatılacak" : "Kapatılan"} toplam (TL)       : ${report.totalAmount.toFixed(2)}`,
+    `${report.dryRun ? "To settle" : "Settled"} total (TL)              : ${report.totalAmount.toFixed(2)}`,
+  );
+  console.log(`Unknown fault (decide manually)     : ${manualRows.length}`);
+  console.log(
+    `Unknown fault total (TL), not settled : ${report.manualDecisionAmount.toFixed(2)}`,
   );
   if (report.rows.length === 0) return;
-  console.log("\nhold | sipariş | satıcı | kalıntı | kusur | sonuç");
+  console.log("\nhold | order | seller | residual | fault | outcome");
   for (const row of report.rows) {
     console.log(
       [
@@ -86,23 +105,28 @@ function printReport(report: SellerFaultResidualReport): void {
         row.sellerId,
         row.residualAmount.toFixed(2),
         row.faultBasis,
-        row.outcome + (row.error ? ` (${row.error})` : ""),
+        (row.outcome === "manual_decision"
+          ? "DECIDE MANUALLY (never settled by this script)"
+          : row.outcome) + (row.error ? ` (${row.error})` : ""),
       ].join(" | "),
+    );
+  }
+  if (manualRows.length > 0) {
+    console.log(
+      `\n${manualRows.length} hold(s) have an unknown fault: review each and settle it, if at all, with POST /admin/payouts/holds/:id/settle-residual.`,
     );
   }
   const failed = report.rows.filter((row) => row.outcome === "failed").length;
   if (failed > 0) {
-    console.log(
-      `\n${failed} hold kapatılamadı — script'i yeniden çalıştırmak güvenli.`,
-    );
+    console.log(`\n${failed} hold(s) failed; re-running the script is safe.`);
   }
 }
 
 async function main(): Promise<void> {
   const dryRun = !process.argv.includes("--apply");
 
-  // Tek bir servis çağrısı için ayağa kalkar: zamanlanmış işler (worker rolü)
-  // burada KOŞMAMALI — çalışan worker ile çift tur olurdu.
+  // Boots for a single service call: scheduled jobs (worker role) must NOT
+  // run here, or they would double up with the running worker.
   pinProcessRole("web");
 
   const dist = join(__dirname, "..", "..", "dist");

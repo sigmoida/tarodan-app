@@ -145,6 +145,33 @@ export function isSellerFaultRefund(refund: RefundFaultFacts): boolean {
   return refund.policyCode.startsWith("seller_fault");
 }
 
+/**
+ * Is the seller fault NAMED (the v2 `faultParty` column, or a v1
+ * `seller_fault_*` policy code), rather than only assumed because the fault
+ * cannot be determined (a `legacy` request without a fault party)? Both block
+ * the payout (`isSellerFaultRefund`), but only a named fault may be settled to
+ * the platform without a person looking at it (decision D20).
+ */
+export function isNamedSellerFaultRefund(refund: RefundFaultFacts): boolean {
+  if (!isSellerFaultRefund(refund)) return false;
+  return refund.faultParty != null || refund.policyCode !== LEGACY_POLICY_CODE;
+}
+
+/**
+ * Has the seller forfeited their own shipping share on this order? Yes once
+ * ANY finalized refund of the order is seller fault (`isSellerFaultRefund`,
+ * v1 and v2), whichever unit or request it was (decision D20). The share then
+ * stays with the platform: the v2 policy emits no `seller_refund` shipping
+ * component and the hold consumption retains nothing, so neither the normal
+ * release (order still delivered) nor the residual release (order closed)
+ * ever sees it. The residual block below reads the same rule.
+ */
+export function sellerShareForfeited(
+  finalizedRefunds: readonly RefundFaultFacts[],
+): boolean {
+  return finalizedRefunds.some(isSellerFaultRefund);
+}
+
 /** Satıcıya kalan tutar: `amount − refundedAmount` (negatife inmez). */
 export function holdResidual(hold: {
   amount: Prisma.Decimal.Value;
@@ -173,7 +200,7 @@ export function holdPayoutOrderBlock(
   }
   if (
     order.finalizedRefunds.length === 0 ||
-    order.finalizedRefunds.some(isSellerFaultRefund)
+    sellerShareForfeited(order.finalizedRefunds)
   ) {
     return "seller_at_fault";
   }

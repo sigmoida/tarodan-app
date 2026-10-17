@@ -332,6 +332,88 @@ describe("refund financial policy v2", () => {
     );
   });
 
+  describe("an earlier seller-fault refund forfeits the seller's share (D20)", () => {
+    const sellerShare = (
+      result: ReturnType<typeof calculateRefundFinancialsV2>,
+    ) =>
+      result.components.filter(
+        (c) =>
+          c.componentCode === "outbound_shipping" &&
+          c.treatment === "seller_refund",
+      );
+
+    it("buyer fault, shipped: no share for the seller and no charge of it to the buyer", () => {
+      const forfeited = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: true,
+        sellerShareForfeited: true,
+      });
+      const normal = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: true,
+      });
+      const outboundBuyerCharge = (
+        result: ReturnType<typeof calculateRefundFinancialsV2>,
+      ) =>
+        result.components.filter(
+          (c) =>
+            c.componentCode === "outbound_shipping" &&
+            c.treatment === "buyer_charge",
+        );
+
+      expect(sellerShare(forfeited)).toHaveLength(0);
+      expect(outboundBuyerCharge(normal)).toHaveLength(1);
+      // The seller paid the share from the hold: the buyer is not charged it
+      // too, so the buyer gets the 48 back that the normal case deducts.
+      expect(outboundBuyerCharge(forfeited)).toHaveLength(0);
+      expect(forfeited.buyerRefundAmount).toBeCloseTo(
+        normal.buyerRefundAmount + 48,
+        2,
+      );
+      // The buyer still bears their own outbound share (platform_retain).
+      expect(forfeited.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "platform_retain",
+            netAmount: 60,
+          }),
+        ]),
+      );
+    });
+
+    it.each([
+      ["carrier, shipped", "carrier", true],
+      ["platform, shipped", "platform", true],
+      ["buyer, before shipment", "buyer", false],
+    ] as const)(
+      "%s: no seller_refund share, buyer side unchanged",
+      (_n, faultParty, hasShipped) => {
+        const forfeited = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped,
+          sellerShareForfeited: true,
+        });
+        const normal = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped,
+        });
+
+        expect(sellerShare(normal)).toHaveLength(1);
+        expect(sellerShare(forfeited)).toHaveLength(0);
+        expect(forfeited.buyerRefundAmount).toBe(normal.buyerRefundAmount);
+        expect(forfeited.sellerNetEffectAmount).toBeCloseTo(
+          normal.sellerNetEffectAmount - 48,
+          2,
+        );
+      },
+    );
+  });
+
   it.each([0, 10, 20])(
     "keeps net + tax = gross at %s service VAT",
     (serviceVatRate) => {
