@@ -135,8 +135,11 @@ at a time. Details: [scripts/CLAUDE.md](scripts/CLAUDE.md), `docs/OPERATIONS.md`
 
 - `development` deploys **staging**; every push needs the user's approval.
 - `master` is **production**, changed only by a PR from `development` or
-  `hotfix/*` (merged back). The production freeze is active
-  (tarodan-ops: `decisions/0010-production-freeze.md`).
+  `hotfix/*` (merged back). The production freeze was lifted on 2026-10-17
+  (tarodan-ops: `decisions/0010-production-freeze.md`); each production
+  action (a merge to `master`, "Release Production", a post-deploy script,
+  a production env change, a tag push) still needs the user's explicit
+  approval, every time.
 - Deploy order (tarodan-ops: `CLAUDE.md`, "Releases and deploy order"): a
   mobile OTA that the new API needs ships first; then the API, web and admin
   deploy **together** from one `master` release (one Coolify trigger for the
