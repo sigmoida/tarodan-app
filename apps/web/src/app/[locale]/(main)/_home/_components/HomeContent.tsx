@@ -2,6 +2,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import type { HomePageData } from "../lib/types";
 import BrandsMarquee from "../sections/BrandsMarquee";
 import FeaturedRail from "../sections/FeaturedRail";
+import AppPromoSlide from "../sections/AppPromoSlide";
 import HeroSlider from "../sections/HeroSlider";
 import OnSaleRail from "../sections/OnSaleRail";
 import PopularRail from "../sections/PopularRail";
@@ -38,7 +39,9 @@ export default function HomeContent({
       {/* Admin'in tanımladığı afiş ve platform kampanya duyurusu — hero'nun
           ÜSTÜNDE. Yuva boşsa hiçbir şey çizilmez (yer ayrılmaz). */}
       <BannerSlot position="header" className="mb-4 space-y-3" />
-      <HeroSlider slides={data.heroSlides} />
+      {/* Mobil uygulama tanıtımı admin slaytlarından önce sabit ilk slayt.
+          Web hero anahtarı kapalıyken API `[]` döner ve ikisi birlikte gizlenir. */}
+      <HeroSlider slides={data.heroSlides} pinned={<AppPromoSlide />} />
       <BrandsMarquee items={data.marqueeItems} />
       <FeaturedRail items={data.featured} />
       <OnSaleRail items={data.discounted} />

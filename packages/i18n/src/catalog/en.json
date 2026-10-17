@@ -2511,6 +2511,14 @@
     "viewStore": "View Store",
     "slider": {
       "goToSlide": "Go to slide {index}"
+    },
+    "appPromo": {
+      "eyebrow": "TARODAN MOBILE",
+      "title": "Your collection, now in your <accent>pocket.</accent>",
+      "description": "Your listings, trades and garage, always with you. Open Türkiye's first diecast app on mobile.",
+      "openOnMobile": "Open on mobile",
+      "storeLinkLabel": "Open the Tarodan app on {store} (opens in a new tab)",
+      "imageAlt": "Two phone screens showing the Tarodan mobile app, with a white diecast model car in front"
     }
   },
   "search": {

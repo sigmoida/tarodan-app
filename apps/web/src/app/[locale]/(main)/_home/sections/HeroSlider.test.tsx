@@ -29,7 +29,10 @@ vi.mock("@/i18n/navigation", () => ({
     href,
     children,
     ...rest
-  }: { href: string; children?: React.ReactNode } & Record<string, unknown>) => (
+  }: { href: string; children?: React.ReactNode } & Record<
+    string,
+    unknown
+  >) => (
     <a href={href} {...rest}>
       {children}
     </a>
@@ -87,7 +90,10 @@ describe("HeroSlider", () => {
     const labels = [...container.querySelectorAll("[aria-label]")].map((el) =>
       el.getAttribute("aria-label"),
     );
-    expect(labels).toEqual(["home.slider.goToSlide:1", "home.slider.goToSlide:2"]);
+    expect(labels).toEqual([
+      "home.slider.goToSlide:1",
+      "home.slider.goToSlide:2",
+    ]);
 
     act(() => root.render(<HeroSlider slides={[slide("a")]} />));
     expect(container.querySelectorAll("[aria-label]")).toHaveLength(0);
@@ -108,6 +114,36 @@ describe("HeroSlider", () => {
       links[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(track).toHaveBeenCalledWith("a", "click", 2);
+  });
+
+  it("sabit slayt admin slaytlarından önce gelir, h1 onun olur, noktası sayılır", () => {
+    const pinned = (
+      <div data-testid="pinned">
+        <h1>Promo</h1>
+      </div>
+    );
+    act(() =>
+      root.render(<HeroSlider slides={[slide("a")]} pinned={pinned} />),
+    );
+    const trackEl = container.querySelector("section > div");
+    expect(trackEl?.firstElementChild?.getAttribute("data-testid")).toBe(
+      "pinned",
+    );
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+    expect(container.querySelector("h1")?.textContent).toBe("Promo");
+    expect(container.querySelector("h2")?.textContent).toBe("Başlık a");
+    const labels = [...container.querySelectorAll("[aria-label]")].map((el) =>
+      el.getAttribute("aria-label"),
+    );
+    expect(labels).toEqual([
+      "home.slider.goToSlide:1",
+      "home.slider.goToSlide:2",
+    ]);
+  });
+
+  it("admin slaytı yoksa (web hero kapalı) sabit slayt da çizilmez", () => {
+    act(() => root.render(<HeroSlider slides={[]} pinned={<p>Promo</p>} />));
+    expect(container.innerHTML).toBe("");
   });
 
   it("dış bağlantıyı yeni sekmede açar", () => {
