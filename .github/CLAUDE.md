@@ -29,13 +29,16 @@ expected-commit check, wait for the result).
 - **development is light:** the staging deploy waits only for typecheck + lint;
   unit tests are advisory. **master is complete:** the PR runs the full gate
   and Release Production repeats it.
-- No ruleset protects `master` yet (`docs/OPERATIONS.md` section 4, "GitHub
-  ayarları"). The planned `master` ruleset (manual GitHub setting) will
-  require these checks:
+- The `master` ruleset (manual GitHub setting, `docs/OPERATIONS.md` section
+  4, "GitHub settings") blocks direct pushes, deletion and force pushes,
+  allows merge commits only, and requires these checks (repo admins may
+  bypass on a PR merge):
   - `Verify / Typecheck & lint`
   - `Verify / Unit tests`
   - `Verify / Build & audit`
-  - later `Master source guard` and `API e2e`
+  - `Master source guard` (reports only once `master-source-guard.yml` is on
+    `master`; until then a master PR needs the admin bypass)
+  - later `API e2e`
 
   **Never rename these jobs** without updating the ruleset, or master PRs wait
   forever. No path filters on required checks.

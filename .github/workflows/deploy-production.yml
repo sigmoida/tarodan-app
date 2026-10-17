@@ -5,12 +5,11 @@ name: Release Production
 # a clean runner (verify.yml, full: true): typecheck, lint, the full API unit
 # suite, every vitest suite, the production build and the dependency audit.
 #
-# The same gate already ran on the development -> master PR ("Verify / *").
-# No ruleset protects master yet (docs/OPERATIONS.md section 4, "GitHub
-# ayarları"), so nothing on GitHub requires those checks before a merge, and
-# a direct push or a manual dispatch would skip them. The gate therefore runs
-# again here on the exact master commit; it costs ~5 min next to a ~10-15 min
-# Coolify rollout.
+# The same gate already ran on the development -> master PR: the master
+# ruleset requires the "Verify / *" checks and allows no direct push. It runs
+# again here on the exact master commit because the ruleset lets a repo admin
+# bypass those checks on a PR merge and a manual dispatch has no PR; it costs
+# ~5 min next to a ~10-15 min Coolify rollout.
 #
 # The deploy job diffs against the last SUCCESSFUL release, not against
 # `github.event.before`: a release that failed (e.g. on the audit) would

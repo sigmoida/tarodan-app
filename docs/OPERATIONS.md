@@ -1147,30 +1147,35 @@ Notlar:
 
 Raporlar `.git/tarodan-test-results/` altına yazılır (`latest-<mod>.json`).
 
-### GitHub ayarları (elle, repo yöneticisi)
+### GitHub settings (manual, repo admin)
 
-Bugün `master` ve `development` korumasız; tek ruleset (Copilot review)
-devre dışı.
+Rulesets (Settings -> Rules -> Rulesets), all active:
 
-**`master` ruleset'i** (Settings → Rules → Rulesets → New branch ruleset):
+**`master: production protection`** (branch `master`):
 
-- Target: `master`; Enforcement: Active; bypass listesi boş (acil durum için
-  yalnız repo admin, "pull requests only").
-- Restrict deletions; Block force pushes.
-- Require a pull request before merging — onay sayısı ekip tercihi (2 kişilik
-  ekipte 0 ya da 1); Allowed merge methods: **Merge commit** yalnız.
-- Require status checks to pass — kaynak GitHub Actions:
-  `Verify / Typecheck & lint`, `Verify / Unit tests`, `Verify / Build & audit`.
-  `Master source guard`'ı, `master-source-guard.yml` master'a ulaştıktan sonra
-  ekle (`pull_request_target` dosyayı master'dan okur; öncesinde hiç raporlamaz
-  ve PR sonsuza dek bekler). `API e2e`'yi runner'da birkaç kez yeşil koştuktan
-  sonra ekle. "Require branches to be up to date" gerekmez — PR kontrolleri
-  zaten birleşmiş sonucu (merge ref) test eder.
-- Check adlarını değiştirme: `pr-checks.yml`'deki `Verify` job adı ve
-  `verify.yml`'deki job adları ruleset'teki adlarla birebir eşleşmeli.
+- Bypass: repository admins, "pull requests only" (an admin can merge a PR
+  past failing checks, but nobody pushes to `master` directly).
+- Restrict deletions; block force pushes.
+- Require a pull request before merging, 0 approvals; allowed merge method:
+  **merge commit** only.
+- Required status checks: `Verify / Typecheck & lint`, `Verify / Unit tests`,
+  `Verify / Build & audit`, `Master source guard`. `Master source guard`
+  reports only once `master-source-guard.yml` is on `master`
+  (`pull_request_target` reads the workflow from `master`); until that
+  release, a master PR waits for it and needs the admin bypass. Add
+  `API e2e` after it has run green on the runner a few times. "Require
+  branches to be up to date" is not needed: PR checks test the merge ref.
+- Do not rename the checks: the `Verify` job in `pr-checks.yml` and the job
+  names in `verify.yml` must match the ruleset exactly.
 
-**`development`** doğrudan push alır (staging kapısı CI'da); PR zorunluluğu
-KONMAZ. İstenirse yalnız Restrict deletions + Block force pushes.
+**`development: no deletion or force push`** (branch `development`):
+restrict deletions and block force pushes only. `development` takes direct
+pushes (the staging gate runs in CI); no PR requirement.
+
+**`release tags: no deletion or move`** (tags `app-*`, `mobile-v*`):
+restrict deletions, updates and force pushes; no bypass. Creating a new tag
+is allowed, so Release Production can tag a release, but a tag can never be
+moved or recreated: a wrong tag stays, and the fix is a new tag.
 
 **Güvenlik (repo herkese açık, ücretsiz):** Settings → Code security →
 CodeQL "Default setup", Secret scanning + Push protection ve Dependabot
