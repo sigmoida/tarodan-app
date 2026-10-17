@@ -128,6 +128,7 @@ describe("PayoutSchedulerService — failures reach Bull", () => {
       checkReturnedTransfers: jest
         .fn()
         .mockResolvedValue({ returned: 1, unmatched: 2 }),
+      purgeDeletedSellerBankAccounts: jest.fn().mockResolvedValue(0),
     });
 
     await service.runCheckReturnedTransfers();

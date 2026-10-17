@@ -215,9 +215,13 @@ export class PayTRTransferService {
       const status = String(data?.status ?? "");
       if (status === "failed") return [];
       if (status !== "success") {
+        const reason = String(data?.err_msg ?? "PayTR geçersiz/boş yanıt");
+        // PayTR iş hatası: catch bunu loglamadan yeniden fırlatır, tek kayıt
+        // burada — `warn`, çünkü kanonik alarmı cron tracker üretir.
+        this.logger.warn(`Get returned transfers failed: ${reason}`);
         throw new BadRequestException(
           i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
-            reason: String(data?.err_msg ?? "PayTR geçersiz/boş yanıt"),
+            reason,
           }),
         );
       }
