@@ -1097,6 +1097,26 @@ Notlar:
   deploy etmez — yeni commit'in koşusu kendi kapısından sonra ikisini birden
   deploy eder. Elle tetikleme (`workflow_dispatch`) yalnız ilgili daldan
   (`development` / `master`) deploy eder.
+- **Release tag:** after every deployment of a production run has finished,
+  the `Tag the release` job of Release Production pushes the annotated tag
+  `app-YYYY.MM.DD-N` on the deployed commit (the message lists the commit,
+  the apps and the run). The name is computed when the tag is pushed: the
+  Europe/Istanbul day of the push (a rollout that ends after midnight gets
+  the new day) and `N` = the highest `N` of that day on origin + 1. A run
+  that deployed nothing creates no tag; a commit that already has an
+  `app-YYYY.MM.DD-N` tag keeps it. If the tag job fails (network, or the name
+  was taken a moment before the push), the rollout still succeeded: use
+  **Re-run failed jobs**, which retries only the tag job and takes the next
+  free `N`. Never "Re-run all jobs" (it redeploys production). Re-run only
+  while no other Release Production run is queued or in progress: the re-run
+  joins the `release-production` concurrency group, so it cancels a pending
+  run, or waits and is itself cancelled by the next push. Re-run only while
+  the run is still the newest production release; once a newer release is
+  tagged, leave the superseded run untagged (its changes are in the newer
+  tag, and a late tag would give the older commit the higher `N`). Until the
+  tag job passes, the run stays failed; if it is the newest master run, the
+  next release also redeploys its apps. The tag ruleset allows creation
+  only: an `app-*` tag is never moved or deleted.
 - **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
   ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
   engeller: push ettiğin commit'i checkout et.
@@ -1137,30 +1157,40 @@ Notlar:
 
 Raporlar `.git/tarodan-test-results/` altına yazılır (`latest-<mod>.json`).
 
-### GitHub ayarları (elle, repo yöneticisi)
+### GitHub settings (manual, repo admin)
 
-Bugün `master` ve `development` korumasız; tek ruleset (Copilot review)
-devre dışı.
+Rulesets (Settings -> Rules -> Rulesets). The three below are active; the
+fourth, "Code Quality Copilot review for default branch", is disabled.
 
-**`master` ruleset'i** (Settings → Rules → Rulesets → New branch ruleset):
+**`master: production protection`** (branch `master`):
 
-- Target: `master`; Enforcement: Active; bypass listesi boş (acil durum için
-  yalnız repo admin, "pull requests only").
-- Restrict deletions; Block force pushes.
-- Require a pull request before merging — onay sayısı ekip tercihi (2 kişilik
-  ekipte 0 ya da 1); Allowed merge methods: **Merge commit** yalnız.
-- Require status checks to pass — kaynak GitHub Actions:
-  `Verify / Typecheck & lint`, `Verify / Unit tests`, `Verify / Build & audit`.
-  `Master source guard`'ı, `master-source-guard.yml` master'a ulaştıktan sonra
-  ekle (`pull_request_target` dosyayı master'dan okur; öncesinde hiç raporlamaz
-  ve PR sonsuza dek bekler). `API e2e`'yi runner'da birkaç kez yeşil koştuktan
-  sonra ekle. "Require branches to be up to date" gerekmez — PR kontrolleri
-  zaten birleşmiş sonucu (merge ref) test eder.
-- Check adlarını değiştirme: `pr-checks.yml`'deki `Verify` job adı ve
-  `verify.yml`'deki job adları ruleset'teki adlarla birebir eşleşmeli.
+- Bypass: repository admins, "pull requests only" (an admin can merge a PR
+  past failing checks, but nobody pushes to `master` directly).
+- Restrict deletions; block force pushes.
+- Require a pull request before merging, 0 approvals, extra approval for
+  unattributed changes on; allowed merge method: **merge commit** only.
+- Required status checks, each with source **GitHub Actions** so no other
+  token or app can post a passing status under the same name (the live
+  ruleset does not pin the source yet; set it when you next edit the
+  ruleset):
+  `Verify / Typecheck & lint`, `Verify / Unit tests`,
+  `Verify / Build & audit`, `Master source guard`. `Master source guard`
+  reports only once `master-source-guard.yml` is on `master`
+  (`pull_request_target` reads the workflow from `master`); until that
+  release, a master PR waits for it and needs the admin bypass. Add
+  `API e2e` after it has run green on the runner a few times. "Require
+  branches to be up to date" is not needed: PR checks test the merge ref.
+- Do not rename the checks: the `Verify` job in `pr-checks.yml` and the job
+  names in `verify.yml` must match the ruleset exactly.
 
-**`development`** doğrudan push alır (staging kapısı CI'da); PR zorunluluğu
-KONMAZ. İstenirse yalnız Restrict deletions + Block force pushes.
+**`development: no deletion or force push`** (branch `development`):
+restrict deletions and block force pushes only. `development` takes direct
+pushes (the staging gate runs in CI); no PR requirement.
+
+**`release tags: no deletion or move`** (tags `app-*`, `mobile-v*`):
+restrict deletions, updates and force pushes; no bypass. Creating a new tag
+is allowed, so Release Production can tag a release, but a tag can never be
+moved or recreated: a wrong tag stays, and the fix is a new tag.
 
 **Güvenlik (repo herkese açık, ücretsiz):** Settings → Code security →
 CodeQL "Default setup", Secret scanning + Push protection ve Dependabot

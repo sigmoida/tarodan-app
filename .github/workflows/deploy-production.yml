@@ -5,10 +5,11 @@ name: Release Production
 # a clean runner (verify.yml, full: true): typecheck, lint, the full API unit
 # suite, every vitest suite, the production build and the dependency audit.
 #
-# The same gate already ran on the development -> master PR ("Verify / *",
-# required by the master ruleset). It runs again here on the exact master
-# commit because a direct push or a manual dispatch must not bypass it, and
-# it costs ~5 min next to a ~10-15 min Coolify rollout.
+# The same gate already ran on the development -> master PR: the master
+# ruleset requires the "Verify / *" checks and allows no direct push. It runs
+# again here on the exact master commit because the ruleset lets a repo admin
+# bypass those checks on a PR merge and a manual dispatch has no PR; it costs
+# ~5 min next to a ~10-15 min Coolify rollout.
 #
 # The deploy job diffs against the last SUCCESSFUL release, not against
 # `github.event.before`: a release that failed (e.g. on the audit) would
@@ -16,6 +17,14 @@ name: Release Production
 # (.github/actions/deploy-targets). Coolify always builds the master HEAD, so
 # the deploy refuses to trigger once master has moved past the verified commit
 # (expected-commit); the newer commit's queued run deploys after its own gate.
+#
+# After a successful rollout the `tag` job puts the annotated tag
+# `app-YYYY.MM.DD-N` on the deployed commit: the Europe/Istanbul day the tag
+# is pushed, N = the highest N of that day + 1, read from origin at push
+# time. A run that deployed nothing creates no tag. A commit that already has
+# an `app-YYYY.MM.DD-N` tag keeps it (re-runs, manual redeploys). The tag
+# ruleset on `app-*` allows creation only: a tag is never moved, deleted or
+# recreated. Re-run rules for a failed tag job: docs/OPERATIONS.md section 4.
 
 on:
   push:
@@ -45,6 +54,8 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    outputs:
+      apps: ${{ steps.affected.outputs.apps }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,3 +83,63 @@ jobs:
       - name: Skip deployment
         if: ${{ steps.affected.outputs.apps == '' }}
         run: echo "No deployable application changed."
+
+  # A job of its own so only it holds contents: write, and so a tagging
+  # failure can be re-run ("Re-run failed jobs") without redeploying
+  # production. The name is computed here, at push time, so a re-run takes
+  # the next free N instead of retrying a name another release took.
+  tag:
+    name: Tag the release
+    needs: deploy
+    if: ${{ needs.deploy.outputs.apps != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # The default depth-1 checkout holds the commit to tag; tags are read
+      # from origin with ls-remote, so no history or tag fetch is needed.
+      - uses: actions/checkout@v7
+
+      - name: Push the release tag
+        env:
+          APPS: ${{ needs.deploy.outputs.apps }}
+          RELEASE_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # One "<object> <name>" line per remote release tag; names outside
+          # the app-YYYY.MM.DD-N format are dropped. An annotated tag is listed
+          # twice: its tag object, then "<name>^{}" with its commit (the
+          # suffix is dropped here); a lightweight tag once, with its commit.
+          # A tag object id never equals a commit id.
+          tags="$(git ls-remote --tags origin 'refs/tags/app-*' \
+            | awk '{ n = $2; sub(/^refs\/tags\//, "", n); sub(/\^\{\}$/, "", n)
+                if (n ~ /^app-[0-9][0-9][0-9][0-9][.][0-9][0-9][.][0-9][0-9]-[1-9][0-9]*$/) print $1, n }')"
+          released="$(printf '%s\n' "$tags" \
+            | awk -v sha="$RELEASE_SHA" '$1 == sha { print $2 }' | sort -V | tail -n 1)"
+          if [ -n "$released" ]; then
+            echo "::notice::$RELEASE_SHA is already released as $released; no new tag."
+            exit 0
+          fi
+          day="$(TZ=Europe/Istanbul date +%Y.%m.%d)"
+          last="$(printf '%s\n' "$tags" \
+            | awk -v p="app-$day-" 'index($2, p) == 1 { print substr($2, length(p) + 1) }' \
+            | sort -n | tail -n 1)"
+          tag="app-$day-$(( ${last:-0} + 1 ))"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$tag" "$RELEASE_SHA" -F - <<MSG
+          Production release $tag
+
+          Commit: $RELEASE_SHA
+          Apps: $APPS
+          Run: $RUN_URL
+          MSG
+          # A plain push: origin refuses a name taken since ls-remote (no tag
+          # is ever moved), and a re-run of this job takes the next N.
+          if ! git push origin "refs/tags/$tag"; then
+            echo "::error::The rollout of $RELEASE_SHA succeeded, but pushing $tag failed. Re-run failed jobs only (docs/OPERATIONS.md section 4)." >&2
+            exit 1
+          fi
+          echo "::notice::Tagged $RELEASE_SHA as $tag."

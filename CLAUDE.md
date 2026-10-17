@@ -137,8 +137,12 @@ at a time. Details: [scripts/CLAUDE.md](scripts/CLAUDE.md), `docs/OPERATIONS.md`
 - `master` is **production**, changed only by a PR from `development` or
   `hotfix/*` (merged back). The production freeze is active
   (tarodan-ops: `decisions/0010-production-freeze.md`).
-- Deploy order web -> API -> mobile; flags flip only after mobile supports them;
-  post-deploy scripts follow `docs/OPERATIONS.md`, dry run first.
+- Deploy order (tarodan-ops: `CLAUDE.md`, "Releases and deploy order"): a
+  mobile OTA that the new API needs ships first; then the API, web and admin
+  deploy **together** from one `master` release (one Coolify trigger for the
+  affected apps, no order between them); mobile store builds follow once it
+  is live; flags flip last, only after mobile supports them. Post-deploy
+  scripts follow `docs/OPERATIONS.md`, dry run first.
 
 ## Security
 

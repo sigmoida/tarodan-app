@@ -17,8 +17,9 @@ name: Master Source Guard
 #   - every PR-controlled value (branch / repo name) reaches the script through
 #     `env:`, never through `${{ }}` inside `run:` (no script injection);
 #   - the token is read-only.
-# Because the file is read from master, the guard starts working only once it
-# is ON master — add the required check to the ruleset after that release.
+# Because the file is read from master, the guard reports only once it is ON
+# master. The master ruleset already requires it, so the release that brings
+# this file to master needs the admin bypass for that one check.
 
 on:
   pull_request_target:

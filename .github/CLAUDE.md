@@ -15,7 +15,7 @@ writes need the user's approval; the production freeze is active (tarodan-ops:
 | `pr-checks.yml` (**PR Checks**)                                                                                        | PRs to `development`, `master`    | `Verify` job: static + unit on development (advisory), the full gate on master.                                                                                                             |
 | `master-source-guard.yml`                                                                                              | `pull_request_target` to `master` | Allows PRs into `master` only from `development` or `hotfix/*`. Reads event metadata only.                                                                                                  |
 | `api-e2e.yml` (**API E2E**)                                                                                            | PRs to `master`, manual           | API e2e + scenarios against service containers. Advisory until proven green.                                                                                                                |
-| `deploy-production.yml` (**Release Production**)                                                                       | push to `master`                  | Re-runs the full gate on the exact commit, then deploys changed apps to Coolify production.                                                                                                 |
+| `deploy-production.yml` (**Release Production**)                                                                       | push to `master`                  | Re-runs the full gate on the exact commit, deploys changed apps to Coolify production, then tags the commit `app-YYYY.MM.DD-N`.                                                             |
 | `staging-reset.yml`, `staging-refresh-from-prod.yml`, `staging-run-reference-seed.yml`, `staging-run-uat-accounts.yml` | manual (`staging` environment)    | Staging data operations over SSH on the Coolify host, with staging fingerprint guards.                                                                                                      |
 | `production-reset.yml`                                                                                                 | manual (`production` environment) | Pre-launch production wipe. Never run without explicit user approval.                                                                                                                       |
 
@@ -29,11 +29,16 @@ expected-commit check, wait for the result).
 - **development is light:** the staging deploy waits only for typecheck + lint;
   unit tests are advisory. **master is complete:** the PR runs the full gate
   and Release Production repeats it.
-- The `master` ruleset (manual GitHub setting) requires these checks:
+- The `master` ruleset (manual GitHub setting, `docs/OPERATIONS.md` section
+  4, "GitHub settings") blocks direct pushes, deletion and force pushes,
+  allows merge commits only, and requires these checks (repo admins may
+  bypass on a PR merge):
   - `Verify / Typecheck & lint`
   - `Verify / Unit tests`
   - `Verify / Build & audit`
-  - later `Master source guard` and `API e2e`
+  - `Master source guard` (reports only once `master-source-guard.yml` is on
+    `master`; until then a master PR needs the admin bypass)
+  - later `API e2e`
 
   **Never rename these jobs** without updating the ruleset, or master PRs wait
   forever. No path filters on required checks.
@@ -50,6 +55,13 @@ expected-commit check, wait for the result).
   production runs queue.
 - Deploy targets are the apps (api, web, admin) changed since the last
   successful run, so cancelled or failed runs still ship later.
+- After a successful production rollout, the `Tag the release` job of
+  Release Production pushes the annotated tag `app-YYYY.MM.DD-N` on the
+  deployed commit; it is the only job with `contents: write`. Naming, the
+  tag ruleset and how to recover a failed tag job (re-run failed jobs only,
+  never all jobs):
+  `docs/OPERATIONS.md` section 4, "Release tag". Format: tarodan-ops
+  `docs/versioning.md`.
 - Secrets used by deploys: `COOLIFY_URL`, `COOLIFY_TOKEN`,
   `COOLIFY_STAGING_UUIDS`, `COOLIFY_PROD_UUIDS`; data workflows use the shared
   `SERVER_*` SSH secrets and their environment's seed secrets. Gates use **no**
