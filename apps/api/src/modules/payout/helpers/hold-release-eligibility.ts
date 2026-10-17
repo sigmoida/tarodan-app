@@ -146,6 +146,18 @@ export function isSellerFaultRefund(refund: RefundFaultFacts): boolean {
 }
 
 /**
+ * Is the seller fault NAMED (the v2 `faultParty` column, or a v1
+ * `seller_fault_*` policy code), rather than only assumed because the fault
+ * cannot be determined (a `legacy` request without a fault party)? Both block
+ * the payout (`isSellerFaultRefund`), but only a named fault may be settled to
+ * the platform without a person looking at it (decision D20).
+ */
+export function isNamedSellerFaultRefund(refund: RefundFaultFacts): boolean {
+  if (!isSellerFaultRefund(refund)) return false;
+  return refund.faultParty != null || refund.policyCode !== LEGACY_POLICY_CODE;
+}
+
+/**
  * Has the seller forfeited their own shipping share on this order? Yes once
  * ANY finalized refund of the order is seller fault (`isSellerFaultRefund`,
  * v1 and v2), whichever unit or request it was (decision D20). The share then

@@ -418,6 +418,36 @@ describe("PaymentHoldResidualService.settleSellerFaultResiduals", () => {
     ).not.toContain("hold-unknown");
   });
 
+  it("a legacy 'in doubt' fault is unknown too: listed for a person, never settled (D20)", async () => {
+    const { service, ledger } = makeService({
+      holds: {
+        "hold-legacy": heldHold({ id: "hold-legacy", orderId: "o-legacy" }),
+      },
+      orders: {
+        "o-legacy": {
+          status: OrderStatus.refunded,
+          refundRequests: [finalized(null, "legacy")],
+        },
+      },
+      candidatePages: [[candidate("hold-legacy")]],
+    });
+
+    const report = await service.settleSellerFaultResiduals({
+      ...run,
+      dryRun: false,
+    });
+
+    expect(report.rows).toEqual([
+      expect.objectContaining({
+        holdId: "hold-legacy",
+        faultBasis: "unknown",
+        outcome: "manual_decision",
+      }),
+    ]);
+    expect(report.totalAmount).toBe(0);
+    expect(ledger.record).not.toHaveBeenCalled();
+  });
+
   it("pages the candidates with a keyset cursor until the set is exhausted", async () => {
     const { service, prisma } = makeService(backlog());
 

@@ -599,9 +599,10 @@ context from `dist/`).
 The report lists, per hold: hold, order, seller, residual, fault basis and
 outcome.
 
-- `seller` (a finalized refund names the seller at fault): settled by
-  `--apply`.
-- `unknown` (closed order without a finalized refund): **decide manually**.
+- `seller` (a finalized refund names the seller at fault: the v2 fault
+  column or a v1 `seller_fault_*` code): settled by `--apply`.
+- `unknown` (closed order without a finalized refund, or only a `legacy`
+  refund without a fault party): **decide manually**.
   The script lists these rows and their total but never settles them, not
   even with `--apply`, and the release cron never pays them either. Review
   each one, and if it belongs to the platform, settle it with
@@ -610,12 +611,12 @@ outcome.
 
 The script is idempotent: a settled hold leaves the candidate set, so a second
 run settles nothing, and re-running after `failed` rows is safe. Run the dry
-run again a few days after the deploy as well: a seller-fault v2
-cancellation finalized before the source fix but approved after the deploy
-still carries the seller's share in its stored components and leaves a new
-seller-fault residual (the hold-consumption check only sees earlier finalized
-refunds, not the request being processed). Only a re-run or the endpoint
-clears it.
+run again a few days after the deploy as a check. It should find nothing
+new: a request finalized before the fix whose stored components still carry
+the seller's share is now caught when its refund consumes the hold (its own
+fault and the order's earlier refunds are checked, `processRefund` logs
+"Seller shipping share forfeited"). Anything it does find is settled the same
+way.
 
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 

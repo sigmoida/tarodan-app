@@ -256,11 +256,14 @@ paradır.
 - **Mixed faults (D20)**: once ANY finalized refund of the order is seller
   fault (`sellerShareForfeited`, v1 and v2), the seller's own shipping share
   stays with the platform, whatever the fault of the line-completing refund:
-  the v2 calculation emits no `seller_refund` share and `processRefund`
-  retains nothing (also for a request finalized before the rule). Neither
+  the v2 calculation emits no `seller_refund` share (and, on a buyer-fault
+  refund, no `buyer_charge` of it either: the seller already paid it from the
+  hold) and `processRefund` retains nothing, counting the request's own fault
+  too (also for a request finalized before the rule). Neither
   release path sees a share, whether the order stays `delivered` or closes.
 - **Unknown fault (D20)**: a residual on a closed order without a finalized
-  refund is decided by a person. The release cron never pays it and the batch
+  refund that names the fault (none at all, or only a `legacy` request
+  without a fault party: `isNamedSellerFaultRefund`) is decided by a person. The release cron never pays it and the batch
   script never settles it (listed as `manual_decision`); only the per-hold
   endpoint below settles it.
 - **Birikmiş kalıntılar**: `PaymentHoldResidualService` PSP'ye gitmeden

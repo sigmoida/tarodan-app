@@ -21,7 +21,7 @@ import {
   closedOrderHoldResidual,
   holdReleaseOrderFacts,
   holdResidualSettleable,
-  isSellerFaultRefund,
+  isNamedSellerFaultRefund,
   type HoldReleaseOrderFacts,
 } from "../../payout/helpers/hold-release-eligibility";
 import {
@@ -37,9 +37,10 @@ export const holdResidualSettleKey = (holdId: string) =>
 const SETTLE_BATCH_SIZE = 200;
 
 /**
- * Kusurun dayanağı: sonuçlanmış talepte satıcı kusuru mu, yoksa kusur hiç
- * belirlenemedi mi (kapanmış siparişte sonuçlanmış talep yok). İkisi de
- * satıcıya ödenmez; rapor ayrımı finansa gösterir.
+ * The basis of the fault: `seller` when a finalized refund NAMES the seller
+ * at fault (`isNamedSellerFaultRefund`); `unknown` when no finalized refund
+ * names a fault (none at all, or only a legacy "in doubt" one). Neither is
+ * paid to the seller; only `seller` is settled by the batch (D20).
  */
 export type ResidualFaultBasis = "seller" | "unknown";
 
@@ -78,10 +79,10 @@ export interface SellerFaultResidualReportRow {
 
 export interface SellerFaultResidualReport {
   dryRun: boolean;
-  /** Okunan aday (kapanmış siparişte tutulan hold) sayısı. */
+  /** Candidates read (held holds of closed orders). */
   scanned: number;
   rows: SellerFaultResidualReportRow[];
-  /** Kapatılan (dry-run'da kapatılacak) toplam tutar. */
+  /** Total settled (in a dry run: to be settled). */
   totalAmount: number;
   /** Total of the `manual_decision` rows: listed, never settled by the batch. */
   manualDecisionAmount: number;
@@ -277,7 +278,7 @@ export class PaymentHoldResidualService {
             row.outcome = "failed";
             row.error = errorMessage(error);
             this.logger.error(
-              `Kalıntı kapatılamadı hold=${hold.id}: ${row.error}`,
+              `Residual settlement failed hold=${hold.id}: ${row.error}`,
             );
           }
         }
@@ -313,7 +314,9 @@ export class PaymentHoldResidualService {
 function faultBasisOf(
   facts: Pick<HoldReleaseOrderFacts, "finalizedRefunds"> | null,
 ): ResidualFaultBasis {
-  return facts?.finalizedRefunds.some(isSellerFaultRefund)
+  // Only a NAMED seller fault is "seller"; a legacy "in doubt" fault, or no
+  // finalized refund at all, is "unknown" and left to a person (D20).
+  return facts?.finalizedRefunds.some(isNamedSellerFaultRefund)
     ? "seller"
     : "unknown";
 }

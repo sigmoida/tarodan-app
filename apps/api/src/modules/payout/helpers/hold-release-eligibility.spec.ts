@@ -13,6 +13,7 @@ import {
   holdReleaseOrderFacts,
   holdResidual,
   holdResidualPayable,
+  isNamedSellerFaultRefund,
   isSellerFaultRefund,
   sellerShareForfeited,
   type HoldReleaseHoldFacts,
@@ -91,6 +92,21 @@ describe("isSellerFaultRefund — the fault source", () => {
     ],
   ] as const)("%s → %s", (_name, refund, expected) => {
     expect(isSellerFaultRefund(refund)).toBe(expected);
+  });
+});
+
+describe("isNamedSellerFaultRefund — D20", () => {
+  it.each([
+    ["v2 seller", { faultParty: "seller", policyCode: "v2_seller_x" }, true],
+    [
+      "v1 seller code",
+      { faultParty: null, policyCode: "seller_fault_return" },
+      true,
+    ],
+    ["legacy, in doubt", { faultParty: null, policyCode: "legacy" }, false],
+    ["v2 buyer", { faultParty: "buyer", policyCode: "v2_buyer_x" }, false],
+  ] as const)("%s → %s", (_name, refund, expected) => {
+    expect(isNamedSellerFaultRefund(refund)).toBe(expected);
   });
 });
 
