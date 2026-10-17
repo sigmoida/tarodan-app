@@ -56,7 +56,7 @@ export class AdvertisementController {
   @ApiResponse({
     status: 200,
     description:
-      "Live ads, at most one per position (displayOrder ASC, createdAt DESC). deviceType is derived from platform for legacy clients.",
+      "Live ads, at most one per position (displayOrder ASC, createdAt DESC). deviceType is derived from platform for legacy clients. Image ads carry linkUrl null (links are in hotspots), except for legacy mobile requests (no platform, no device), which get the link of the first hotspot that is not a digital-sales page.",
   })
   getActive(
     @Query("position") position?: string,

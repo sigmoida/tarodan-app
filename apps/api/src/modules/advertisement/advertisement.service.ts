@@ -31,8 +31,10 @@ import {
   adShadowedPlatforms,
   adSlotChanged,
   adSlotConflictWhere,
+  adPublicLinkUrl,
   adSlotLockKey,
   firstAdPerPosition,
+  isLegacyAppRequest,
   resolveAdClientPlatform,
   type AdShadowFields,
   type AdSlotCandidate,
@@ -140,9 +142,10 @@ export class AdvertisementService {
    * öncesinden kalan veriye karşı güvenlik ağıdır. "Yayında" kuralı
    * `isAdLive`'dır; veritabanı süzmesi (`adLiveWhere`) yalnız daraltır.
    *
-   * İstemci `platform` (web | app) ile seçilir; parametre yoksa eski mobil
-   * sürüm sayılır (`resolveAdClientPlatform`). Eski `device` yalnız bu
-   * çözümlemede ipucudur, süzmez.
+   * The client is chosen by `platform` (web | app); with no parameter at all
+   * the request is a legacy mobile build (`resolveAdClientPlatform`), which
+   * also gets the legacy `linkUrl` fallback (`adPublicLinkUrl`). The legacy
+   * `device` is only a hint for that resolution, never a filter.
    */
   async getActive(position?: string, platform?: string, legacyDevice?: string) {
     // Bilinmeyen yuva/platform (ör. kaldırılan `sidebar`) hiçbir reklamla
@@ -150,6 +153,7 @@ export class AdvertisementService {
     if (position && !AD_POSITIONS.has(position)) return [];
     const client = resolveAdClientPlatform(platform, legacyDevice);
     if (!client) return [];
+    const legacyApp = isLegacyAppRequest(platform, legacyDevice);
 
     try {
       const now = new Date();
@@ -189,7 +193,8 @@ export class AdvertisementService {
           id: a.id,
           title: a.title,
           imageUrl: a.imageUrl,
-          linkUrl: a.linkUrl,
+          // Image ads: null, except the legacy-build fallback (see helper).
+          linkUrl: adPublicLinkUrl(a, legacyApp),
           content: a.content,
           altText: a.altText,
           width: a.width,
@@ -203,8 +208,9 @@ export class AdvertisementService {
           // `<id>:<popupVersion>` ile saklar (admin güncelleyince yeniden açılır).
           popupFrequency: a.popupFrequency,
           popupVersion: a.popupVersion,
-          // Görselli reklamda tıklama YALNIZ bu alanlarda olur (`linkUrl` null);
-          // istemci tıkı `POST /ads/:id/click?hotspot=<id>` ile bildirir.
+          // An image ad is clicked ONLY in these areas (`linkUrl` null for
+          // current clients); the client reports the click with
+          // `POST /ads/:id/click?hotspot=<id>`.
           hotspots: a.hotspots,
           campaign: a.discount
             ? {
