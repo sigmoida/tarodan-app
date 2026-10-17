@@ -206,6 +206,57 @@ Yukarıdaki uyarı burada da geçerli: delta/reconcile bu alanları tazelemez.
 Veritabanı tarafında yapılacak bir işlem YOKTUR — şema, benzersiz indeks ve
 `legacy_########` yer tutucuları zaten mevcut (`20260729180000` migration'ı).
 
+### Deploy sonrası: satış yetkisi (seller) filtresi sonrası Elasticsearch reindex
+
+`SearchCommonService.indexableProductWhere()` artık `seller:
+saleCapableSellerWhere()` içerir (e218a720 / 7fae49213, #439): satış yetkisini
+yitirmiş satıcının (süresi biten BUSINESS dönemi, geri alınan kurumsal onay)
+ilanları indekslenebilir kümeden çıkar. Eski koşulla yazılmış dokümanlar
+indekste kaldıkça her eşleşen istek PostgreSQL yoluna düşer (arama/liste
+yavaşlar, yanlış sonuç vermez) ve `inSync` kontrolü drift raporlar. Bu
+değişikliği ilk kez alan bir ortamda deploy'dan sonra bir kez çalıştır.
+
+Mekanizma: `SearchService.reindexAll` — indekslenebilir tüm ürünleri okur,
+`products` indeksini **silip** güncel mapping'le yeniden kurar, tek bulk
+istekle doldurur. **Dry-run yoktur**; önce salt-okunur durum kontrolü:
+
+```
+curl -s https://api.tarodan.com.tr/api/search/status          # public, salt-okunur
+# → {"documentCount":N,"dbCount":M,"inSync":true|false,...}
+```
+
+Çalıştırma — ikisinden biri:
+
+- Admin panel → **Sistem Ayarları** başlığındaki **"Yeniden Dizinle"** butonu
+  (admin / super_admin, `products` izni);
+- ya da admin token'ıyla:
+
+```
+curl -X POST https://api.tarodan.com.tr/api/search/admin/reindex \
+  -H "Authorization: Bearer $ADMIN_ACCESS_TOKEN"
+# → {"indexed": <dbCount ile aynı>}
+```
+
+**Süre / etki:** güncel katalog boyutunda (~550 ürün) birkaç saniye. İstek
+senkrondur; indeks silinip bulk tamamlanana dek arama boş/eksik dönebilir —
+düşük trafikte çalıştır. Hata olursa `search_indexes.status = error` olur ve
+`500 server.search.reindexFailed` döner; ES'i kontrol edip yeniden çalıştır
+(idempotent). Koleksiyon indeksi bu değişiklikten etkilenmez.
+
+**Doğrulama:** `GET /api/search/status` → `inSync: true` ve `documentCount`
+≈ `dbCount` (±2); POST yanıtındaki `indexed` = `dbCount`; API logunda
+`Reindexed <N> products`. Takip: `ProductQueryService`'in ES ↔ Postgres
+uyuşmazlık fallback'i (`products.length !== esResult.ids.length`) normal
+trafikte sık tetiklenirse, #439'daki "stale id'leri düşür, toplamı düzelt"
+yumuşatması gündeme alınır.
+
+> Bu küme farkı kendiliğinden de kapanır: saatlik `search-hourly-reconcile`
+> aynı `indexableProductWhere()` ile ID kümesi farkını alıp yetim dokümanları
+> siler; API açılışındaki `syncIndexIfEmpty` de mapping'de `sellerCanSell` /
+> `sellerSalesEntitledUntil` / `productKind` yoksa tam reindex yapar. Elle
+> reindex düzeltmeyi bir saat beklemeden anında yapar. 2026-10-17 itibarıyla
+> staging (551/551) ve production (566/564) `inSync: true`.
+
 ### Bir kerelik: silinen hesap kimlik arşivi backfill'i
 
 `20260909090000_deleted_user_identity` migration'ı `deleted_user_identities`
