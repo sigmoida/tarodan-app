@@ -20387,7 +20387,7 @@
       "tur": "Happy path",
       "pri": "P2",
       "steps": "1. GET /api/ads/iab-sizes.",
-      "exp": "HTTP 200, 10 öğeli dizi (Leaderboard 728x90, Medium Rectangle 300x250, ...).",
+      "exp": "HTTP 200, 11 öğeli dizi (Leaderboard 728x90, Medium Rectangle 300x250, ...).",
       "gap": false,
       "gapRefs": []
     },

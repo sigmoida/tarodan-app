@@ -5715,6 +5715,11 @@
         "sizeCustom": "Özel: {width}×{height}",
         "sizeSplitHint": "Geniş bir web görseli telefonda çok ince kalır; web ve uygulama için ayrı reklamlar öneririz.",
         "sizeRatioWarning": "Görsel {width}×{height} — {position} için önerilen {sizes}; {direction, select, tall {görsel uzun görünecek} other {görsel yassı ve çok ince görünecek}}.",
+        "sizeGroup": {
+          "web": "Web",
+          "app": "Uygulama"
+        },
+        "sizeImageMismatch": "Seçilen boyut {width}×{height} görselin oranıyla ({imageWidth}×{imageHeight}) uyuşmuyor; görsel yüklenirken ayrılan yer farklı olur, yüklenince görselin kendi oranı geçerlidir.",
         "sizePreset": {
           "strip": "Şerit",
           "billboard": "Billboard",

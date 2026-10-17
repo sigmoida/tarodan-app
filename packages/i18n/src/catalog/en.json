@@ -5715,6 +5715,11 @@
         "sizeCustom": "Custom: {width}×{height}",
         "sizeSplitHint": "A wide web image becomes very thin on phones; we recommend separate ads for web and the app.",
         "sizeRatioWarning": "Image is {width}×{height} — recommended for {position}: {sizes}; {direction, select, tall {the image will look tall} other {the image will look flat and very thin}}.",
+        "sizeGroup": {
+          "web": "Web",
+          "app": "App"
+        },
+        "sizeImageMismatch": "The selected size {width}×{height} does not match the image ratio ({imageWidth}×{imageHeight}); the reserved space differs while loading, and the image's own ratio wins once loaded.",
         "sizePreset": {
           "strip": "Strip",
           "billboard": "Billboard",

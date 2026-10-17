@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   AD_SIZE_PRESETS,
-  customSize,
+  customSizes,
+  fallbackSize,
+  sizeVsImageMismatch,
   formatSizes,
   groupsAreIdentical,
   matchPreset,
@@ -54,30 +56,74 @@ describe("preset table", () => {
   });
 });
 
-describe("customSize", () => {
-  it("is null when the size matches a recommendation or is empty", () => {
-    expect(customSize("header", "web", { width: 970, height: 250 })).toBeNull();
-    expect(customSize("header", "web", { width: 0, height: 0 })).toBeNull();
+describe("matchPreset (by ratio)", () => {
+  it("matches a larger image with the same ratio and keeps pixels untouched", () => {
+    const m = matchPreset("header", "web", { width: 1940, height: 500 });
+    expect(m?.id).toBe("billboard");
   });
 
-  it("returns the stored size when it matches no preset for the slot", () => {
-    expect(customSize("header", "web", { width: 160, height: 600 })).toEqual({
-      width: 160,
-      height: 600,
-    });
+  it("does not match a clearly different ratio", () => {
+    expect(
+      matchPreset("header", "web", { width: 320, height: 100 }),
+    ).toBeUndefined();
+    expect(
+      matchPreset("header", "web", { width: 0, height: 0 }),
+    ).toBeUndefined();
+  });
+});
+
+describe("customSizes", () => {
+  it("is empty when candidates match a recommendation (by ratio) or are empty", () => {
+    expect(
+      customSizes("header", "web", [
+        { width: 970, height: 250 },
+        { width: 1940, height: 500 },
+        null,
+        { width: 0, height: 0 },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("returns stored/detected sizes that match no preset, de-duplicated in order", () => {
+    const stored = { width: 160, height: 600 };
+    const natural = { width: 800, height: 800 };
+    expect(customSizes("header", "web", [stored, natural, stored])).toEqual([
+      stored,
+      natural,
+    ]);
     // valid elsewhere, not for this slot
-    expect(customSize("header", "web", { width: 320, height: 100 })).toEqual({
-      width: 320,
-      height: 100,
-    });
+    expect(customSizes("header", "web", [{ width: 320, height: 100 }])).toEqual(
+      [{ width: 320, height: 100 }],
+    );
     expect(
       matchPreset("header", "all", { width: 320, height: 100 }),
     ).toBeDefined();
   });
 });
 
+describe("fallbackSize", () => {
+  const natural = { width: 800, height: 800 };
+  const stored = { width: 160, height: 600 };
+
+  it("prefers the loaded image, then the stored size, then empty", () => {
+    expect(fallbackSize(natural, stored)).toEqual({
+      size: natural,
+      source: "image",
+    });
+    expect(fallbackSize(null, stored)).toEqual({
+      size: stored,
+      source: "stored",
+    });
+    expect(fallbackSize(null, null)).toEqual({
+      size: { width: 0, height: 0 },
+      source: "none",
+    });
+  });
+});
+
 describe("sizeAfterContextChange", () => {
   const natural = { width: 800, height: 800 };
+  const stored = { width: 160, height: 600 };
 
   it("keeps a preset that still applies", () => {
     const state = {
@@ -90,30 +136,38 @@ describe("sizeAfterContextChange", () => {
         platform: "web",
         state,
         natural: null,
+        stored: null,
       }),
     ).toBe(state);
   });
 
-  it("clears a preset that no longer applies", () => {
+  it("clears a preset that no longer applies (new ad: empty)", () => {
     expect(
       sizeAfterContextChange({
         position: "header",
         platform: "app",
         state: { size: { width: 970, height: 250 }, source: "preset" },
         natural: null,
+        stored: null,
       }),
     ).toEqual({ size: { width: 0, height: 0 }, source: "none" });
   });
 
-  it("falls back to the detected image size when a preset is cleared", () => {
-    expect(
-      sizeAfterContextChange({
-        position: "topbar",
-        platform: "web",
-        state: { size: { width: 728, height: 90 }, source: "preset" },
-        natural,
-      }),
-    ).toEqual({ size: natural, source: "image" });
+  it("falls back to the detected image size, then the stored size", () => {
+    const state = {
+      size: { width: 728, height: 90 },
+      source: "preset" as const,
+    };
+    const base = { position: "topbar", platform: "web" as const, state };
+    expect(sizeAfterContextChange({ ...base, natural, stored })).toEqual({
+      size: natural,
+      source: "image",
+    });
+    // edit flow: chip -> position change must NOT null out the stored size
+    expect(sizeAfterContextChange({ ...base, natural: null, stored })).toEqual({
+      size: stored,
+      source: "stored",
+    });
   });
 
   it("keeps image-detected and stored dimensions", () => {
@@ -125,9 +179,30 @@ describe("sizeAfterContextChange", () => {
           platform: "app",
           state,
           natural,
+          stored,
         }),
       ).toBe(state);
     }
+  });
+});
+
+describe("sizeVsImageMismatch", () => {
+  const image = { width: 1940, height: 500 };
+  it("flags a chip whose ratio differs notably from the image", () => {
+    expect(
+      sizeVsImageMismatch({ size: { width: 300, height: 250 }, image }),
+    ).toBe(true);
+  });
+  it("is quiet for the same ratio, a missing image or a missing size", () => {
+    expect(
+      sizeVsImageMismatch({ size: { width: 970, height: 250 }, image }),
+    ).toBe(false);
+    expect(
+      sizeVsImageMismatch({ size: { width: 300, height: 250 }, image: null }),
+    ).toBe(false);
+    expect(sizeVsImageMismatch({ size: { width: 0, height: 0 }, image })).toBe(
+      false,
+    );
   });
 });
 

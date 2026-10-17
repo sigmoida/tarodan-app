@@ -34,6 +34,8 @@ export const IAB_STANDARD_SIZES = [
   { name: "Wide Skyscraper", width: 160, height: 600 },
   { name: "Half Page", width: 300, height: 600 },
   { name: "Billboard", width: 970, height: 250 },
+  // Üst şerit (topbar) yuvasının önerilen boyutu.
+  { name: "Large Leaderboard", width: 970, height: 90 },
   { name: "Mobile Leaderboard", width: 320, height: 50 },
   { name: "Mobile Banner", width: 320, height: 100 },
   { name: "Large Mobile Banner", width: 320, height: 480 },

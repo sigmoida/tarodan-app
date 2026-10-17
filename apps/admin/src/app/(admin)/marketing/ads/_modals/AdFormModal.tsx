@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -35,6 +35,7 @@ import {
   hotspotIssues,
 } from "../_lib/types";
 import {
+  fallbackSize,
   sizeAfterContextChange,
   type AdSize,
   type AdSizeSource,
@@ -73,11 +74,17 @@ function AdImageField() {
 
   // Boyutun kaynağı: kayıtlı reklamda mevcut değer, yeni görselde tarayıcının
   // okuduğu doğal boyut, çipte seçilen öneri. Yalnız çip seçimi pozisyon/platform
-  // değişince temizlenir; görselden okunan boyut korunur.
+  // değişince temizlenir; geri dönüş sırası: görselden okunan → kayıtlı özgün →
+  // boş. Kayıtlı boyut örtük olarak asla silinmez.
+  const [stored] = useState<AdSize | null>(() =>
+    width && height ? { width, height } : null,
+  );
   const [sizeSource, setSizeSource] = useState<AdSizeSource>(
-    width && height ? "stored" : "none",
+    stored ? "stored" : "none",
   );
   const [natural, setNatural] = useState<AdSize | null>(null);
+  // Eski görselin geç gelen yüklemesi yeni görselin boyutunu ezmesin.
+  const currentUrl = useRef(imageUrl);
 
   const setDims = useCallback(
     (w: number, h: number) => {
@@ -88,33 +95,46 @@ function AdImageField() {
   );
 
   useEffect(() => {
-    const cur = { size: { width: width || 0, height: height || 0 } };
     const next = sizeAfterContextChange({
       position,
       platform,
-      state: { ...cur, source: sizeSource },
+      state: {
+        size: { width: width || 0, height: height || 0 },
+        source: sizeSource,
+      },
       natural,
+      stored,
     });
     if (next.source === sizeSource) return;
     setSizeSource(next.source);
     setDims(next.size.width, next.size.height);
-  }, [position, platform, width, height, sizeSource, natural, setDims]);
+  }, [position, platform, width, height, sizeSource, natural, stored, setDims]);
 
   const loadDims = useCallback(
     (url: string) => {
       const img = new window.Image();
       img.onload = () => {
+        if (currentUrl.current !== url) return;
         const size = { width: img.naturalWidth, height: img.naturalHeight };
         setNatural(size);
         setSizeSource("image");
         setDims(size.width, size.height);
       };
+      img.onerror = () => {
+        if (currentUrl.current !== url) return;
+        setNatural(null);
+        // Yüklenemeyen görselin boyutu geçerli değil: kayıtlı boyuta dön.
+        const fb = fallbackSize(null, stored);
+        setSizeSource(fb.source);
+        setDims(fb.size.width, fb.size.height);
+      };
       img.src = url;
     },
-    [setDims],
+    [setDims, stored],
   );
 
   const applyImage = (url: string) => {
+    currentUrl.current = url;
     setValue("imageUrl", url, { shouldDirty: true });
     if (url) loadDims(url);
     else {
@@ -236,9 +256,11 @@ function AdImageField() {
         position={position}
         platform={platform}
         size={{ width: width || 0, height: height || 0 }}
-        onPick={(preset) => {
-          setSizeSource("preset");
-          setDims(preset.width, preset.height);
+        natural={natural}
+        stored={stored}
+        onPick={(picked, source) => {
+          setSizeSource(source);
+          setDims(picked.width, picked.height);
         }}
       />
 

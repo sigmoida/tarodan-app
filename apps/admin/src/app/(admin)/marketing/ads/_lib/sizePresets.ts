@@ -126,26 +126,54 @@ export function recommendedSizes(
   return out;
 }
 
-/** Boyut bu yuva için önerilenlerden biri mi? */
+/** Çip eşleşmesinde göreli oran toleransı: 1940×500 görsel Billboard'ı vurgular. */
+export const RATIO_MATCH_TOLERANCE = 0.03;
+
+const ratioOf = (s: AdSize) => s.width / s.height;
+
+/** `a`, `b`'den göreli olarak ne kadar sapıyor (oran cinsinden). */
+const ratioDeviation = (a: AdSize, b: AdSize) =>
+  Math.abs(ratioOf(a) - ratioOf(b)) / ratioOf(b);
+
+/**
+ * Boyut bu yuva için önerilenlerden biriyle ORANDA eşleşiyor mu? Piksel değil
+ * oran karşılaştırılır; eşleşen çip yalnız vurgulanır, boyut değiştirilmez.
+ */
 export function matchPreset(
   position: string,
   platform: ContentPlatform,
   size: AdSize,
 ): AdSizePreset | undefined {
-  return recommendedSizes(position, platform).find((x) => sameSize(x, size));
+  if (!hasSize(size)) return undefined;
+  let best: AdSizePreset | undefined;
+  let bestDev = Infinity;
+  for (const r of recommendedSizes(position, platform)) {
+    const dev = ratioDeviation(size, r);
+    if (dev <= RATIO_MATCH_TOLERANCE && dev < bestDev) {
+      best = r;
+      bestDev = dev;
+    }
+  }
+  return best;
 }
 
 /**
- * Kayıtlı/algılanan boyut hiçbir öneriyle eşleşmiyorsa "Özel" çipi gösterilir;
- * böylece veri korunur ve kayıtta sessizce değişmez.
+ * Hiçbir öneriyle eşleşmeyen adaylar (kayıtlı özgün boyut, görselden okunan
+ * boyut) "Özel" çipleri olarak sunulur: veri korunur, admin çipten dönebilir.
+ * Aynı boyut bir kez; sıra adayların sırasıdır.
  */
-export function customSize(
+export function customSizes(
   position: string,
   platform: ContentPlatform,
-  size: AdSize,
-): AdSize | null {
-  if (!hasSize(size)) return null;
-  return matchPreset(position, platform, size) ? null : size;
+  candidates: readonly (AdSize | null | undefined)[],
+): AdSize[] {
+  const out: AdSize[] = [];
+  for (const c of candidates) {
+    if (!c || !hasSize(c)) continue;
+    if (matchPreset(position, platform, c)) continue;
+    if (!out.some((o) => sameSize(o, c))) out.push(c);
+  }
+  return out;
 }
 
 /** Boyutun nereden geldiği: çip, görselden okuma ya da kayıtlı reklam. */
@@ -156,23 +184,38 @@ export interface SizeState {
   source: AdSizeSource;
 }
 
+const EMPTY_SIZE: AdSize = { width: 0, height: 0 };
+
 /**
- * Pozisyon/platform değişince: artık uygulanmayan ÇİP seçimi temizlenir.
- * Çipten gelen boyut, varsa görselin doğal boyutuna geri döner (yoksa boşalır);
- * görselden algılanan ve kayıtlı boyutlar korunur.
+ * Çip seçimi artık uygulanmıyorsa (ya da görsel yüklenemediyse) geri dönülecek
+ * boyut: görselden okunan → kayıtlı özgün → ikisi de yoksa boş. Kayıtlı boyut
+ * ASLA örtük olarak boşaltılmaz.
+ */
+export function fallbackSize(
+  natural: AdSize | null,
+  stored: AdSize | null,
+): SizeState {
+  if (natural && hasSize(natural)) return { size: natural, source: "image" };
+  if (stored && hasSize(stored)) return { size: stored, source: "stored" };
+  return { size: EMPTY_SIZE, source: "none" };
+}
+
+/**
+ * Pozisyon/platform değişince: artık uygulanmayan ÇİP seçimi temizlenir ve
+ * `fallbackSize` sırasıyla geri dönülür; görselden algılanan ve kayıtlı
+ * boyutlar olduğu gibi korunur.
  */
 export function sizeAfterContextChange(args: {
   position: string;
   platform: ContentPlatform;
   state: SizeState;
   natural: AdSize | null;
+  stored: AdSize | null;
 }): SizeState {
-  const { position, platform, state, natural } = args;
+  const { position, platform, state, natural, stored } = args;
   if (state.source !== "preset") return state;
   if (matchPreset(position, platform, state.size)) return state;
-  return natural && hasSize(natural)
-    ? { size: natural, source: "image" }
-    : { size: { width: 0, height: 0 }, source: "none" };
+  return fallbackSize(natural, stored);
 }
 
 export type RatioDirection = "tall" | "wide";
@@ -209,6 +252,21 @@ export function ratioMismatch(args: {
     direction: ratio < nearest.width / nearest.height ? "tall" : "wide",
     recommended,
   };
+}
+
+/**
+ * Seçilen boyutun oranı görselin oranından belirgin ayrışıyorsa true: görsel
+ * yüklenirken ayrılan yer gerçek oranla uyuşmaz (yüklenince görselin oranı
+ * kazanır). Engellemeyen uyarı verisi.
+ */
+export function sizeVsImageMismatch(args: {
+  size: AdSize;
+  image: AdSize | null;
+  tolerance?: number;
+}): boolean {
+  const { size, image, tolerance = RATIO_WARN_TOLERANCE } = args;
+  if (!image || !hasSize(image) || !hasSize(size)) return false;
+  return ratioDeviation(size, image) > tolerance;
 }
 
 /** "970×250, 728×90" */

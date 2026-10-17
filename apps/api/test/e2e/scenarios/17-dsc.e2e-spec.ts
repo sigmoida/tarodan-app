@@ -32,7 +32,7 @@
  *  - POST /api/ads/:id/click|impression @Public → 204 (gövdesiz, beacon dostu); yalnız yayındaki reklamda ve
  *    IP+reklam başına pencerede bir kez sayılır (tık 10 sn, gösterim 30 dk); yok/yayında değil → 204, sayılmaz.
  *    Görselli reklamda tık yalnız `?hotspot=<alanId>` ile (reklam + alan sayacı birlikte); görselsizde alansız.
- *  - GET /api/ads/iab-sizes → 10 öğe (IAB_STANDARD_SIZES).
+ *  - GET /api/ads/iab-sizes → 11 öğe (IAB_STANDARD_SIZES).
  *  - POST /api/admin/ads (@Roles) → varsayılan 201, toResponse iabCompliant/iabSize/ctr/clickCount/impressionCount.
  *    CreateAdvertisementDto width/height @Min(1)@Max(4000) → 4500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
  *  - PATCH /api/admin/ads/:id → 200; PATCH /api/admin/ads/reorder @HttpCode(200); DELETE @HttpCode(204).
@@ -1572,10 +1572,10 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-061", async () => {
-    // IAB boyutları (public) — 10 öğe.
+    // IAB boyutları (public) — 11 öğe.
     const res = await request(server()).get("/api/ads/iab-sizes").expect(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body).toHaveLength(10);
+    expect(res.body).toHaveLength(11);
     const leaderboard = res.body.find((s: any) => s.name === "Leaderboard");
     expect(leaderboard).toEqual({
       name: "Leaderboard",
@@ -2753,6 +2753,6 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       .set(authHeader(admin))
       .expect(200);
     expect(Array.isArray(iab.body)).toBe(true);
-    expect(iab.body).toHaveLength(10);
+    expect(iab.body).toHaveLength(11);
   });
 });
