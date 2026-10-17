@@ -10,6 +10,7 @@ export function ResourceListTable<T>({
   columns,
   onRowClick,
   rowClassName,
+  isRowSelectable,
   renderExpanded,
   expandedId,
   emptyText,
@@ -20,6 +21,7 @@ export function ResourceListTable<T>({
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: T) => void;
   rowClassName?: (row: T) => string | undefined;
+  isRowSelectable?: (row: T) => boolean;
   renderExpanded?: (row: T) => ReactNode;
   expandedId?: string | null;
   emptyText?: string;
@@ -48,6 +50,7 @@ export function ResourceListTable<T>({
       getRowId={getRowId}
       onRowClick={onRowClick}
       rowClassName={rowClassName}
+      isRowSelectable={isRowSelectable}
       renderExpanded={renderExpanded}
       expandedId={expandedId}
       emptyText={resolvedEmptyText}

@@ -26,9 +26,16 @@ import { ProductsCountText } from "./_components/ProductsCountText";
 import { productFilterFields } from "./_lib/filters";
 import { useBrandOptions, useCarModelOptions } from "@/hooks/useBrandOptions";
 import { ProductsTable } from "./_components/ProductsTable";
+import { ProductsBulkBar } from "./_components/ProductsBulkBar";
+import { ExpiredQuickFilter } from "./_components/ExpiredQuickFilter";
+import { useSession } from "@/context/SessionContext";
+import { canRenewByRole } from "./[id]/_lib/renewal";
 import { ProductBulkImportModal } from "./_components/ProductBulkImportModal";
 
 const DEFAULT_TAB: ProductStatusTab = "active";
+
+/** Süresi dolan ilanlar pasif durumdadır: toplu yenileme ve hızlı filtre yalnız bu sekmede. */
+const BULK_RENEW_TAB: ProductStatusTab = "inactive";
 
 /** Sekme sayaçlarının parametreleri: durum başına `{ status }`. */
 const TAB_COUNT_PARAMS = Object.fromEntries(
@@ -51,6 +58,9 @@ export default function ProductsPage() {
     adminApi.getProducts,
   );
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const { user } = useSession();
+  const inactiveTab = status === BULK_RENEW_TAB;
+  const canBulkRenew = inactiveTab && canRenewByRole(user.role);
   const brands = useBrandOptions();
   const models = useCarModelOptions();
 
@@ -84,13 +94,17 @@ export default function ProductsPage() {
           fetcher={(params) => adminApi.getProducts({ ...params, status })}
           getRowId={(p) => p.id}
           syncUrl
+          selectable={canBulkRenew}
           filters={productFilterFields(t, brands, models)}
           // `sellerId`: satıcı detayından gelen deep-link (kendi kontrolü yok).
           initialFilters={{ sellerId: "" }}
         >
           <ResourceList.Toolbar
             searchPlaceholder={t("admin.catalog.products.searchPlaceholder")}
-          />
+          >
+            {inactiveTab && <ExpiredQuickFilter />}
+          </ResourceList.Toolbar>
+          {canBulkRenew && <ProductsBulkBar />}
           <ProductsTable />
           <ResourceList.Pagination />
         </ResourceList>

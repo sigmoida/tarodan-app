@@ -360,7 +360,9 @@ export class AdminProductController {
   @Get("discounts/:id/codes/export")
   // Kodlar paraya denk: dökümü, kodu ÜRETEBİLEN rollerle aynı kapı.
   @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Export a discount's voucher codes as XLSX (admin)" })
+  @ApiOperation({
+    summary: "Export a discount's voucher codes as XLSX (admin)",
+  })
   @ApiParam({ name: "id", description: "Discount (template) ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "XLSX file" })
   async exportVoucherCodes(
@@ -439,7 +441,8 @@ export class AdminProductController {
    * (`products/:id/…` rotalarından önce). Sıralı; her ilan kendi sonucuyla döner.
    */
   @Post("products/bulk-renew")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  // Moderatör hariç: ilanı onaysız yayına almak yönetici kararıdır.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Bulk re-publish expired listings",
@@ -458,7 +461,8 @@ export class AdminProductController {
   }
 
   @Post("products/:id/renew")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  // Moderatör hariç: ilanı onaysız yayına almak yönetici kararıdır.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Re-publish an expired listing (admin)",
