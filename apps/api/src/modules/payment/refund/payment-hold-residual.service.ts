@@ -67,7 +67,12 @@ export interface SellerFaultResidualReportRow {
   sellerId: string;
   residualAmount: number;
   faultBasis: ResidualFaultBasis;
-  outcome: "would_settle" | "settled" | "failed";
+  /**
+   * `manual_decision`: the fault is unknown (closed order, no finalized
+   * refund). The batch never settles it (decision D20); an admin decides per
+   * hold through `POST /admin/payouts/holds/:id/settle-residual`.
+   */
+  outcome: "would_settle" | "settled" | "failed" | "manual_decision";
   error?: string;
 }
 
@@ -78,6 +83,8 @@ export interface SellerFaultResidualReport {
   rows: SellerFaultResidualReportRow[];
   /** Kapatılan (dry-run'da kapatılacak) toplam tutar. */
   totalAmount: number;
+  /** Total of the `manual_decision` rows: listed, never settled by the batch. */
+  manualDecisionAmount: number;
 }
 
 /**
@@ -203,11 +210,16 @@ export class PaymentHoldResidualService {
   }
 
   /**
-   * Birikmiş satıcı kusurlu kalıntıları tarar ve (dry-run değilse) kapatır —
-   * bakım script'inin ve olası toplu admin aksiyonunun tek yolu. Her hold
-   * `settleResidual` ile AYRI işlemde kapatılır; biri düşerse diğerleri
-   * etkilenmez, satır `failed` olarak raporlanır. Tekrar çalıştırmak güvenli:
-   * kapatılmış hold aday kümesinden düşer.
+   * Scans the accumulated seller-fault residuals and, unless it is a dry run,
+   * settles them: the one path of the maintenance script and of any future
+   * bulk admin action. Each hold is settled by `settleResidual` in its OWN
+   * transaction; one failure leaves the others alone and is reported as
+   * `failed`. Re-running is safe: a settled hold leaves the candidate set.
+   *
+   * Only `faultBasis: "seller"` rows are settled. A residual whose fault is
+   * unknown (closed order, no finalized refund) is listed as
+   * `manual_decision` and never settled here (decision D20); the admin
+   * endpoint settles it per hold after a person has looked at it.
    */
   async settleSellerFaultResiduals(opts: {
     dryRun: boolean;
@@ -220,8 +232,10 @@ export class PaymentHoldResidualService {
       scanned: 0,
       rows: [],
       totalAmount: 0,
+      manualDecisionAmount: 0,
     };
     let total = new Prisma.Decimal(0);
+    let manual = new Prisma.Decimal(0);
     let after: HoldCandidateCursor | undefined;
     for (;;) {
       const candidates = await findClosedOrderHeldHolds(this.prisma, {
@@ -244,6 +258,13 @@ export class PaymentHoldResidualService {
           faultBasis: faultBasisOf(facts),
           outcome: "would_settle",
         };
+        // D20: an unknown fault is not decided by a batch, in either mode.
+        if (row.faultBasis === "unknown") {
+          row.outcome = "manual_decision";
+          manual = manual.plus(row.residualAmount);
+          report.rows.push(row);
+          continue;
+        }
         if (!opts.dryRun) {
           try {
             const settled = await this.settleResidual(hold.id, {
@@ -267,6 +288,7 @@ export class PaymentHoldResidualService {
       }
     }
     report.totalAmount = total.toNumber();
+    report.manualDecisionAmount = manual.toNumber();
     return report;
   }
 

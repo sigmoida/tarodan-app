@@ -570,36 +570,52 @@ _c) Manuel çözüm (her satır için):_
 Geçiş öncesi alınmış üyelik ödemelerinin iadeleri eski (pazaryeri) mağazadan
 yapılır — ek iş gerekmez.
 
-### Bir kerelik: satıcı kusurlu escrow kalıntılarını kapatma
+### One-off: settle seller-fault escrow residuals
 
-Satıcı kusurlu kargo öncesi iptal eskiden satıcının kargo payını hold'da
-bırakıyordu; sipariş kapanıyor ama hold `amount − refundedAmount > 0` ile
-`held` kalıyor ve kusur satıcıda olduğu için **hiç ödenmiyordu** (admin
-listesinde "Satıcı kusurlu — ödenmez"). Kaynak düzeltildi; birikmiş olanlar bu
-script'le kapatılır. Para alıcıya gitmez — alıcı ödediğinin tamamını zaten geri
-almıştı; kalıntı platformun parasıdır (`PAYMENTS.md` §5 Kalıntı). PSP çağrısı
-yoktur: hold `cancelled` + `refundedAmount = amount` olur, defterde
-`seller_escrow → platform_commission` `adjustment` grubu yazılır
+A seller-fault cancellation before shipment used to leave the seller's
+shipping share in the hold: the order closed, but the hold stayed `held` with
+`amount − refundedAmount > 0`, and because the seller was at fault it was
+**never paid** (admin list: "Satıcı kusurlu — ödenmez"). The source is fixed,
+and since decision D20 any earlier seller-fault refund of an order forfeits
+the share at the source as well. The residuals that piled up are settled with
+this script. The money does not go to the buyer, who already got back
+everything they paid; the residual belongs to the platform (`PAYMENTS.md` §5).
+There is no PSP call: the hold becomes `cancelled` with
+`refundedAmount = amount`, and the ledger gets a balanced
+`seller_escrow → platform_commission` `adjustment` group
 (`hold-residual-settle:<holdId>`).
 
-Deploy sonrası, önce kuru koşu (varsayılan — yalnız raporlar):
+After the deploy, dry run first (the default, report only):
 
 ```
 docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/settle-seller-fault-residuals.js'
 docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/settle-seller-fault-residuals.js --apply'
 ```
 
-Yerelde: `pnpm --filter @tarodan/api settle:prod:seller-fault-residuals` (önce
-`build` + `build:seed`; script derlenmiş uygulama bağlamını `dist/`'ten yükler).
+Locally: `pnpm --filter @tarodan/api settle:prod:seller-fault-residuals` (run
+`build` + `build:seed` first; the script loads the compiled application
+context from `dist/`).
 
-Rapor hold başına: hold, sipariş, satıcı, kalıntı, kusur dayanağı (`seller` =
-sonuçlanmış talepte satıcı kusuru; `unknown` = kapanmış siparişte sonuçlanmış
-talep yok — şüphede satıcıya ödenmez kuralıyla aynı küme) ve sonuç. `unknown`
-satırlarını `--apply`'dan önce gözle kontrol edin. Idempotenttir: kapatılan
-hold aday kümesinden düşer, ikinci koşu hiçbir şey kapatmaz; `failed` satır
-varsa yeniden çalıştırmak güvenlidir. Tek hold için panel ucu:
-`POST /admin/payouts/holds/:id/settle-residual` (sebep zorunlu, denetim
-kaydı yazılır).
+The report lists, per hold: hold, order, seller, residual, fault basis and
+outcome.
+
+- `seller` (a finalized refund names the seller at fault): settled by
+  `--apply`.
+- `unknown` (closed order without a finalized refund): **decide manually**.
+  The script lists these rows and their total but never settles them, not
+  even with `--apply`, and the release cron never pays them either. Review
+  each one, and if it belongs to the platform, settle it with
+  `POST /admin/payouts/holds/:id/settle-residual` (admin panel, reason
+  required, audit record written).
+
+The script is idempotent: a settled hold leaves the candidate set, so a second
+run settles nothing, and re-running after `failed` rows is safe. Run the dry
+run again a few days after the deploy as well: a seller-fault v2
+cancellation finalized before the source fix but approved after the deploy
+still carries the seller's share in its stored components and leaves a new
+seller-fault residual (the hold-consumption check only sees earlier finalized
+refunds, not the request being processed). Only a re-run or the endpoint
+clears it.
 
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 
