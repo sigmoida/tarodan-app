@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parsePushLines, validateReleaseMarker } from "./pre-push-verify.mjs";
+import {
+  developmentPushes,
+  masterPushes,
+  parsePushLines,
+} from "./pre-push-verify.mjs";
 
 test("parses all refs supplied by the git pre-push protocol", () => {
   assert.deepEqual(
@@ -29,18 +33,21 @@ test("parses all refs supplied by the git pre-push protocol", () => {
   );
 });
 
-test("accepts only a passing marker for the exact tree", () => {
-  assert.equal(
-    validateReleaseMarker({ status: "PASS", tree: "tree-1" }, "tree-1"),
-    undefined,
+test("only development pushes run the local gate; deletions run nothing", () => {
+  const pushes = parsePushLines(
+    [
+      "refs/heads/development aaa refs/heads/development bbb",
+      "refs/heads/feature ccc refs/heads/feature ddd",
+      "(delete) 0000000000000000000000000000000000000000 refs/heads/development eee",
+      "refs/heads/master fff refs/heads/master ggg",
+    ].join("\n"),
   );
-  assert.match(
-    validateReleaseMarker({ status: "FAIL", tree: "tree-1" }, "tree-1"),
-    /FAIL/,
+  assert.deepEqual(
+    developmentPushes(pushes).map((push) => push.localSha),
+    ["aaa"],
   );
-  assert.match(
-    validateReleaseMarker({ status: "PASS", tree: "tree-2" }, "tree-1"),
-    /changed/,
+  assert.deepEqual(
+    masterPushes(pushes).map((push) => push.localSha),
+    ["fff"],
   );
-  assert.match(validateReleaseMarker(undefined, "tree-1"), /No local release/);
 });

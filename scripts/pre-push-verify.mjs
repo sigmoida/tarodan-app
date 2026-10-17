@@ -1,8 +1,20 @@
 #!/usr/bin/env node
 
+/**
+ * Git pre-push hook (.husky/pre-push).
+ *
+ *   development  quick local gate: typecheck (+ API contract) of the affected
+ *                apps, ~1 min, no jest. The full unit suites run in CI and
+ *                gate the staging deploy (.github/workflows/deploy-staging.yml).
+ *   master       nothing heavy runs locally. master moves through a PR
+ *                development -> master whose "Verify / *" checks are the full
+ *                gate, and Release Production re-runs it before deploying.
+ *                A direct push only prints a reminder.
+ */
+
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -24,17 +36,23 @@ export function parsePushLines(input) {
     );
 }
 
-export function validateReleaseMarker(marker, expectedTree) {
-  if (!marker) {
-    return "No local release verification was found.";
-  }
-  if (marker.status !== "PASS") {
-    return `Latest local release verification is ${marker.status ?? "unknown"}.`;
-  }
-  if (marker.tree !== expectedTree) {
-    return "Code changed after the latest local release verification.";
-  }
-  return undefined;
+/**
+ * Pushes that run the local gate. Deletions (all-zero local sha) and pushes to
+ * any other branch run nothing.
+ */
+export function developmentPushes(pushes) {
+  return pushes.filter(
+    (push) =>
+      !ZERO_SHA.test(push.localSha) &&
+      push.remoteRef === "refs/heads/development",
+  );
+}
+
+export function masterPushes(pushes) {
+  return pushes.filter(
+    (push) =>
+      !ZERO_SHA.test(push.localSha) && push.remoteRef === "refs/heads/master",
+  );
 }
 
 function git(...args) {
@@ -43,18 +61,6 @@ function git(...args) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
   }).trim();
-}
-
-function releaseMarkerPath() {
-  const gitDirectory = git("rev-parse", "--git-dir");
-  const absoluteGitDirectory = isAbsolute(gitDirectory)
-    ? gitDirectory
-    : resolve(REPO_ROOT, gitDirectory);
-  return join(
-    absoluteGitDirectory,
-    "tarodan-test-results",
-    "release-verification.json",
-  );
 }
 
 function run(command, args) {
@@ -82,34 +88,21 @@ function verifyDevelopmentPush(push) {
   ]);
 }
 
-function verifyMasterPush(push) {
-  const markerPath = releaseMarkerPath();
-  const marker = existsSync(markerPath)
-    ? JSON.parse(readFileSync(markerPath, "utf8"))
-    : undefined;
-  const expectedTree = git("rev-parse", `${push.localSha}^{tree}`);
-  const error = validateReleaseMarker(marker, expectedTree);
-
-  if (error) {
-    console.error(`\nMaster push blocked: ${error}`);
-    console.error("Run pnpm verify:release:local and retry the push.\n");
-    return 1;
-  }
-
-  console.log(
-    `Local release verification accepted (${expectedTree.slice(0, 12)}).\n`,
-  );
-  return 0;
-}
-
 function runCli() {
   const pushes = parsePushLines(readFileSync(0, "utf8"));
-  const activePushes = pushes.filter((push) => !ZERO_SHA.test(push.localSha));
-  const protectedPush = activePushes.some((push) =>
-    ["refs/heads/development", "refs/heads/master"].includes(push.remoteRef),
-  );
+  const development = developmentPushes(pushes);
 
-  if (protectedPush && git("status", "--porcelain")) {
+  if (masterPushes(pushes).length > 0) {
+    console.log(
+      "\nPushing to master directly. The intended path is a PR development -> master: " +
+        'its "Verify / *" checks are the full gate (all unit tests, typecheck, lint, ' +
+        "production build, dependency audit). Release Production re-runs that gate " +
+        "before it deploys, so nothing heavy runs here.\n",
+    );
+  }
+
+  // The local gate runs on the working tree, so it must BE the pushed tree.
+  if (development.length > 0 && git("status", "--porcelain")) {
     console.error(
       "\nPush blocked: commit or remove local changes so verification matches the pushed tree.\n",
     );
@@ -117,19 +110,11 @@ function runCli() {
     return;
   }
 
-  for (const push of activePushes) {
-    if (push.remoteRef === "refs/heads/development") {
-      const status = verifyDevelopmentPush(push);
-      if (status !== 0) {
-        process.exitCode = status;
-        return;
-      }
-    } else if (push.remoteRef === "refs/heads/master") {
-      const status = verifyMasterPush(push);
-      if (status !== 0) {
-        process.exitCode = status;
-        return;
-      }
+  for (const push of development) {
+    const status = verifyDevelopmentPush(push);
+    if (status !== 0) {
+      process.exitCode = status;
+      return;
     }
   }
 }
