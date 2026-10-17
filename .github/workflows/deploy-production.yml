@@ -5,10 +5,12 @@ name: Release Production
 # a clean runner (verify.yml, full: true): typecheck, lint, the full API unit
 # suite, every vitest suite, the production build and the dependency audit.
 #
-# The same gate already ran on the development -> master PR ("Verify / *",
-# required by the master ruleset). It runs again here on the exact master
-# commit because a direct push or a manual dispatch must not bypass it, and
-# it costs ~5 min next to a ~10-15 min Coolify rollout.
+# The same gate already ran on the development -> master PR ("Verify / *").
+# No ruleset protects master yet (docs/OPERATIONS.md section 4, "GitHub
+# ayarları"), so nothing on GitHub requires those checks before a merge, and
+# a direct push or a manual dispatch would skip them. The gate therefore runs
+# again here on the exact master commit; it costs ~5 min next to a ~10-15 min
+# Coolify rollout.
 #
 # The deploy job diffs against the last SUCCESSFUL release, not against
 # `github.event.before`: a release that failed (e.g. on the audit) would
@@ -16,6 +18,11 @@ name: Release Production
 # (.github/actions/deploy-targets). Coolify always builds the master HEAD, so
 # the deploy refuses to trigger once master has moved past the verified commit
 # (expected-commit); the newer commit's queued run deploys after its own gate.
+#
+# After a successful rollout the deployed commit gets the annotated tag
+# `app-YYYY.MM.DD-N` (Europe/Istanbul date, N counts the releases of that
+# day). A run that deployed nothing creates no tag. A commit that already has
+# an `app-*` tag keeps it (re-runs, manual redeploys).
 
 on:
   push:
@@ -45,6 +52,11 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    # contents: write only to push the release tag; actions: read for
+    # deploy-targets (job permissions replace the workflow defaults).
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -57,6 +69,34 @@ jobs:
           workflow: deploy-production.yml
           github-token: ${{ github.token }}
 
+      # Computed before the rollout so the name is fixed for the whole run. A
+      # failed rollout creates no tag, so the next run computes the same name.
+      - id: release
+        name: Compute release tag
+        if: ${{ steps.affected.outputs.apps != '' }}
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet --force --tags origin
+          existing="$(git tag --points-at "$RELEASE_SHA" --list 'app-*' | sort -V | tail -n 1)"
+          if [ -n "$existing" ]; then
+            echo "::notice::$RELEASE_SHA is already released as $existing; no new tag."
+            tag="$existing"
+          else
+            day="$(TZ=Europe/Istanbul date +%Y.%m.%d)"
+            # The glob selects the day; the pattern ignores non-numeric suffixes.
+            last="$(git tag --list "app-$day-*" \
+              | sed -nE 's/^app-[0-9]{4}\.[0-9]{2}\.[0-9]{2}-([1-9][0-9]*)$/\1/p' \
+              | sort -n | tail -n 1)"
+            tag="app-$day-$(( ${last:-0} + 1 ))"
+            echo "Release tag for $RELEASE_SHA: $tag"
+          fi
+          {
+            echo "tag=$tag"
+            echo "existing=${existing:+true}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Deploy affected production applications
         if: ${{ steps.affected.outputs.apps != '' }}
         uses: ./.github/actions/coolify-deploy
@@ -68,6 +108,44 @@ jobs:
           expected-commit: ${{ github.sha }}
           branch: master
           wait-for-result: "true"
+
+      # Runs only after every deployment finished (default success()). A
+      # failure here fails the run, so the next release also redeploys these
+      # apps: the rollout itself already succeeded.
+      - name: Tag the release
+        if: ${{ steps.affected.outputs.apps != '' && steps.release.outputs.existing != 'true' }}
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          APPS: ${{ steps.affected.outputs.apps }}
+          RELEASE_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet --force --tags origin
+          if current="$(git rev-parse -q --verify "refs/tags/$TAG^{commit}")"; then
+            if [ "$current" = "$RELEASE_SHA" ]; then
+              echo "::notice::$TAG already points at $RELEASE_SHA."
+              exit 0
+            fi
+            echo "::error::The rollout of $RELEASE_SHA succeeded, but $TAG already exists on $current. Tag the release by hand (docs/OPERATIONS.md section 4)." >&2
+            exit 1
+          fi
+          other="$(git tag --points-at "$RELEASE_SHA" --list 'app-*' | head -n 1)"
+          if [ -n "$other" ]; then
+            echo "::notice::$RELEASE_SHA was tagged $other during the rollout; no new tag."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" "$RELEASE_SHA" -F - <<MSG
+          Production release $TAG
+
+          Commit: $RELEASE_SHA
+          Apps: $APPS
+          Run: $RUN_URL
+          MSG
+          git push origin "refs/tags/$TAG"
+          echo "::notice::Tagged $RELEASE_SHA as $TAG."
 
       - name: Skip deployment
         if: ${{ steps.affected.outputs.apps == '' }}

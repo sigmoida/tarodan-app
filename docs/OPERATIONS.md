@@ -1096,6 +1096,17 @@ Notlar:
   deploy etmez — yeni commit'in koşusu kendi kapısından sonra ikisini birden
   deploy eder. Elle tetikleme (`workflow_dispatch`) yalnız ilgili daldan
   (`development` / `master`) deploy eder.
+- **Release tag:** after every deployment of a production run has finished,
+  Release Production pushes the annotated tag `app-YYYY.MM.DD-N` on the
+  deployed commit (Europe/Istanbul date; `N` = the highest `N` of that day +
+  1; the message lists the commit, the apps and the run). The name is fixed
+  before the rollout, so a failed rollout creates no tag and the next run
+  reuses the name. A run that deployed nothing creates no tag; a commit that
+  already has an `app-*` tag keeps it. If the name is already taken by
+  another commit, the run fails after a successful rollout (the next release
+  then redeploys those apps too); tag by hand:
+  `git tag -a app-YYYY.MM.DD-N <sha> -m "Production release ..."` and
+  `git push origin refs/tags/app-YYYY.MM.DD-N` (with the user's approval).
 - **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
   ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
   engeller: push ettiğin commit'i checkout et.
