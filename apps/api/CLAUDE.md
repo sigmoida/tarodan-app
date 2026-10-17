@@ -159,6 +159,25 @@ shares a process with HTTP.
   **ordered** candidate query, and claims its work so two instances cannot
   double-process. Cron keys are bound to Bull and Sentry: renaming one is an ops step.
 
+## Logging and Sentry
+
+`error` is an alarm and reaches Sentry; `warn` is "watch this" and does not.
+(tarodan-ops: `docs/observability.md`.)
+
+- An `error` log line reaches Sentry **once per repeat-report key per ~20h**,
+  shared through Redis by every process (`common/logging/error-report-key.ts`,
+  `modules/sentry/sentry-report-throttle.ts`); the console logs every
+  occurrence. The key keeps the entity and drops counters and durations, so
+  **name the entity in the message** (UUID, reference code, `id=...`): another
+  entity, or another reason, is reported at once. HTTP 5xx captured by
+  `SentryInterceptor` are never throttled.
+- **One failure, one alarm in crons.** A per-record failure logs at `warn`
+  and its id goes into the run summary, which is the alarm. A step that
+  throws logs its own `error`; a summary made only of those is
+  `CronStepFailuresError(..., alreadyReported = true)` and the cron tracker
+  logs it at `warn`. A cron that rethrows to the tracker does not also log
+  the same failure at `error`: the tracker reports it with its stack.
+
 ## Configuration
 
 - Deploy-time env goes through `config/env.validation.ts`; production boot fails
