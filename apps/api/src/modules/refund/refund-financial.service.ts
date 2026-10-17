@@ -988,6 +988,12 @@ export class RefundFinancialService {
       outboundShippingChargeToSeller: number;
       returnShippingChargeToSeller: number;
     },
+    /** The request's stored v2 components (absent on v1 requests). */
+    components?: ReadonlyArray<{
+      componentCode: string;
+      treatment: string;
+      grossAmount: Prisma.Decimal.Value;
+    }> | null,
   ): {
     holdRetainedAmount: number;
     /**
@@ -995,6 +1001,12 @@ export class RefundFinancialService {
      * forfeit rule to it as well as to the earlier finalized refunds.
      */
     refundFault: RefundFaultFacts;
+    /**
+     * The request's own components charge the buyer the seller's outbound
+     * share (v2 buyer fault under the pre-D20 rule). The buyer's cash already
+     * has it deducted, so the hold must keep it for the seller.
+     */
+    sellerShareChargedToBuyer: boolean;
     sellerAdjustments: Array<{
       sourceKey: string;
       amount: number;
@@ -1009,6 +1021,12 @@ export class RefundFinancialService {
         faultParty: refundRequest.faultParty,
         policyCode: refundRequest.policyCode,
       },
+      sellerShareChargedToBuyer: (components ?? []).some(
+        (component) =>
+          component.componentCode === "outbound_shipping" &&
+          component.treatment === "buyer_charge" &&
+          Number(component.grossAmount) > 0,
+      ),
       sellerAdjustments: [
         {
           sourceKey: `refund-return-shipping:${refundRequestId}`,

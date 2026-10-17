@@ -259,7 +259,10 @@ paradır.
   the v2 calculation emits no `seller_refund` share (and, on a buyer-fault
   refund, no `buyer_charge` of it either: the seller already paid it from the
   hold) and `processRefund` retains nothing, counting the request's own fault
-  too (also for a request finalized before the rule). Neither
+  too (also for a request finalized before the rule). One exception: a
+  request decided under the old rule whose own components charge the buyer
+  the share (its cash already reduced by it) keeps the share for the seller,
+  so the share is collected once. Neither
   release path sees a share, whether the order stays `delivered` or closes.
 - **Unknown fault (D20)**: a residual on a closed order without a finalized
   refund that names the fault (none at all, or only a `legacy` request

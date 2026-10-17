@@ -11,8 +11,10 @@
  * the hold becomes `cancelled` with `refundedAmount = amount` and a balanced
  * ledger group (seller_escrow -> platform) is written.
  *
- * Only rows whose fault is the SELLER are settled. A residual whose fault is
- * unknown (closed order, no finalized refund) is listed as "decide manually"
+ * Only rows where a finalized refund NAMES the seller at fault (the v2 fault
+ * column or a v1 `seller_fault_*` code) are settled. A residual whose fault is
+ * unknown (closed order with no finalized refund, or only a `legacy` refund
+ * without a fault party) is listed as "decide manually"
  * and never settled by this script, not even with `--apply` (decision D20):
  * an admin settles it per hold with
  * `POST /admin/payouts/holds/:id/settle-residual` after looking at it.

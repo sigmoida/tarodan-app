@@ -612,11 +612,21 @@ outcome.
 The script is idempotent: a settled hold leaves the candidate set, so a second
 run settles nothing, and re-running after `failed` rows is safe. Run the dry
 run again a few days after the deploy as a check. It should find nothing
-new: a request finalized before the fix whose stored components still carry
-the seller's share is now caught when its refund consumes the hold (its own
-fault and the order's earlier refunds are checked, `processRefund` logs
-"Seller shipping share forfeited"). Anything it does find is settled the same
-way.
+new. When a request decided before the fix still carries the seller's share
+in its stored components, `processRefund` checks the request's own fault and
+the order's earlier finalized refunds as it consumes the hold:
+
+- any of them is seller fault and the request's components do NOT charge the
+  buyer that share: the share is forfeited, the hold is consumed in full, and
+  the log says "Seller shipping share forfeited";
+- any of them is seller fault but the request's components DO charge the
+  buyer the share (a buyer-fault request decided under the old rule, its
+  cash already reduced by it): the share is kept for the seller so it is
+  collected only once, and the log says "Seller shipping share kept under the
+  pre-D20 rule".
+
+Neither case leaves a residual. Anything the re-run does find is settled the
+same way as above.
 
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 

@@ -483,7 +483,7 @@ function makeWorld(quantity: number) {
       sellerFeeAmount: 0,
       buyerFeeAmount: 0,
     }),
-    ...financials.shippingSettlement(request, shipping),
+    ...financials.shippingSettlement(request, shipping, components),
   });
 
   const grossOf = (
@@ -916,15 +916,46 @@ describe("refund -> hold consumption -> release -> payout (stateful, through the
       expect(w.state.payouts).toHaveLength(0);
     });
 
-    it("a completing request finalized before D20 (still carrying the share) is caught at hold consumption", async () => {
+    it("a buyer-fault request decided before D20 is settled under the old rule: the buyer was charged the share, the seller gets it", async () => {
+      // Decided before the deploy, finalized after it: its stored components
+      // still carry seller_refund 48 AND buyer_charge 48, and the buyer's cash
+      // (fixed at decision time) already has the 48 deducted. Forfeiting the
+      // share here would leave the buyer charged and the seller unpaid, so
+      // the platform would collect the 48 twice (QA re-check, option a).
       const w = makeWorld(2);
 
       await w.returnUnitsV2(1, "seller");
-      // The request's v2 components still have the 48 seller_refund share.
       const second = await w.returnUnitsV2(1, "buyer", { policyUnaware: true });
 
       expect(second.retained).toBe(SHARE);
-      // processRefund re-reads the finalized requests and retains nothing.
+      // 545 + 446: the buyer bears the share as decided.
+      expect(w.cashRefunded()).toBe(991);
+      expect(w.state.hold.status).toBe(PaymentHoldStatus.held);
+      expect(money(w.state.hold.refundedAmount)).toBe("784.00");
+
+      await w.releaseAndPay();
+
+      const paidToSeller = w.state.payouts.reduce(
+        (sum, p) => sum + Number(p.netAmount),
+        0,
+      );
+      expect(paidToSeller).toBe(SHARE);
+      // Buyer and seller together end where the D20 outcome ends (1039):
+      // the share is collected once, from the buyer, and paid to the seller.
+      expect(w.cashRefunded() + paidToSeller).toBe(1039);
+    });
+
+    it("a request decided before D20 WITHOUT a buyer charge of the share is still forfeited at hold consumption", async () => {
+      // Carrier fault: the old components refund the seller 48 and charge
+      // nobody for it, so the backstop forfeits it (seller fault earlier).
+      const w = makeWorld(2);
+
+      await w.returnUnitsV2(1, "seller");
+      const second = await w.returnUnitsV2(1, "carrier", {
+        policyUnaware: true,
+      });
+
+      expect(second.retained).toBe(SHARE);
       expect(w.state.hold.status).toBe(PaymentHoldStatus.cancelled);
       expect(money(w.state.hold.refundedAmount)).toBe("832.00");
 

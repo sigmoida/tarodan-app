@@ -126,6 +126,12 @@ export interface RefundSettlementOptions {
    * some paths mark the request `refunded` only after `processRefund`.
    */
   refundFault?: RefundFaultFacts;
+  /**
+   * The request's own components charge the buyer the seller's share
+   * (pre-D20 buyer-fault rule). The forfeit check then keeps the share, so
+   * the request is settled consistently under the rule it was decided with.
+   */
+  sellerShareChargedToBuyer?: boolean;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
@@ -348,14 +354,19 @@ export class PaymentRefundService {
    * once ANY finalized refund of the order, or this request itself, is seller
    * fault (`sellerShareForfeited`). The v2 policy already emits no share then;
    * this is the last check for every caller, for example a request whose v2
-   * components were finalized before that rule existed. Read inside the
-   * refund transaction, through the order (same shape as the release paths).
+   * components were finalized before that rule existed. Exception: when the
+   * request's own components charged the buyer that share (pre-D20 buyer
+   * fault), the buyer's cash already bears it, so the share is kept for the
+   * seller and the request is settled under the rule it was decided with.
+   * Read inside the refund transaction, through the order (same shape as the
+   * release paths).
    */
   private async retainedShareFor(
     tx: Prisma.TransactionClient,
     orderId: string,
     requested: number | undefined,
     current: RefundFaultFacts | undefined,
+    chargedToBuyer: boolean,
   ): Promise<number> {
     if (requested == null || !(requested > 0)) return 0;
     const order = await tx.order.findUnique({
@@ -372,6 +383,15 @@ export class PaymentRefundService {
       ...(current ? [current] : []),
     ];
     if (!sellerShareForfeited(faults)) return requested;
+    if (chargedToBuyer) {
+      // Decided under the pre-D20 rule: the buyer's cash already bears the
+      // share, so forfeiting it here would collect it twice. Keep it for the
+      // seller and settle the request as it was decided.
+      this.logger.warn(
+        `Seller shipping share kept under the pre-D20 rule (buyer was charged it): order=${orderId} share=${requested}`,
+      );
+      return requested;
+    }
     this.logger.warn(
       `Seller shipping share forfeited (earlier seller-fault refund): order=${orderId} share=${requested}`,
     );
@@ -1017,6 +1037,7 @@ export class PaymentRefundService {
               orderId,
               opts?.settlement?.holdRetainedAmount,
               opts?.settlement?.refundFault,
+              opts?.settlement?.sellerShareChargedToBuyer === true,
             );
             const newRefunded = holdRefundedAmountAfter({
               amount: activeHold.amount,

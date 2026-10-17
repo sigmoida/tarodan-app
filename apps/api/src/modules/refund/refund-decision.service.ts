@@ -148,17 +148,21 @@ export class RefundDecisionService {
                 buyerFeeAmount: this.financials.legacyBuyerFeeNetOf(rr),
               },
             ),
-            ...this.financials.shippingSettlement(rr, {
-              sellerShippingCompensationAmount: Number(
-                rr.sellerShippingCompensationAmount,
-              ),
-              outboundShippingChargeToSeller: Number(
-                rr.outboundShippingChargeToSeller,
-              ),
-              returnShippingChargeToSeller: Number(
-                rr.returnShippingChargeToSeller,
-              ),
-            }),
+            ...this.financials.shippingSettlement(
+              rr,
+              {
+                sellerShippingCompensationAmount: Number(
+                  rr.sellerShippingCompensationAmount,
+                ),
+                outboundShippingChargeToSeller: Number(
+                  rr.outboundShippingChargeToSeller,
+                ),
+                returnShippingChargeToSeller: Number(
+                  rr.returnShippingChargeToSeller,
+                ),
+              },
+              rr.financialComponents,
+            ),
           },
         },
       );

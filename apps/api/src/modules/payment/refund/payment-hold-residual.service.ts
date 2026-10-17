@@ -69,9 +69,11 @@ export interface SellerFaultResidualReportRow {
   residualAmount: number;
   faultBasis: ResidualFaultBasis;
   /**
-   * `manual_decision`: the fault is unknown (closed order, no finalized
-   * refund). The batch never settles it (decision D20); an admin decides per
-   * hold through `POST /admin/payouts/holds/:id/settle-residual`.
+   * `manual_decision`: the fault is unknown (closed order with no finalized
+   * refund, or only a `legacy` refund without a fault party; see
+   * `isNamedSellerFaultRefund`). The batch never settles it (decision D20);
+   * an admin decides per hold through
+   * `POST /admin/payouts/holds/:id/settle-residual`.
    */
   outcome: "would_settle" | "settled" | "failed" | "manual_decision";
   error?: string;
@@ -218,7 +220,8 @@ export class PaymentHoldResidualService {
    * `failed`. Re-running is safe: a settled hold leaves the candidate set.
    *
    * Only `faultBasis: "seller"` rows are settled. A residual whose fault is
-   * unknown (closed order, no finalized refund) is listed as
+   * unknown (closed order with no finalized refund, or only a `legacy` one
+   * without a fault party) is listed as
    * `manual_decision` and never settled here (decision D20); the admin
    * endpoint settles it per hold after a person has looked at it.
    */
