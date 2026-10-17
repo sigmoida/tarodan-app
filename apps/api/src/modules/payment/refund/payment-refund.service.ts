@@ -9,6 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
   CancellationActor,
+  Payment,
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
@@ -79,6 +80,29 @@ import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-n
  */
 function refundPortion(amountToRefund: number, threshold: number): number {
   return threshold > 0 ? Math.min(amountToRefund / threshold, 1) : 1;
+}
+
+/** The refund bookkeeping `Payment.metadata` accumulates. */
+interface PaymentRefundMetadata {
+  refundedOrders?: Record<string, number>;
+  auditHistory?: Prisma.InputJsonValue[];
+  [key: string]: Prisma.InputJsonValue | undefined;
+}
+
+/**
+ * What a refund attempt resolved to: the provider's response, the persisted
+ * response of a recovered attempt, or a synthetic stand-in (zero cash, test
+ * lane, bypass). Only string ids and the status are read from it.
+ */
+type RefundProviderResult = Record<string, unknown>;
+
+/** The provider's refund id: `paymentId` (synthetic) or `merchant_oid` (PayTR). */
+function providerRefundIdOf(result: RefundProviderResult): string | null {
+  for (const key of ["paymentId", "merchant_oid"]) {
+    const value = result[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return null;
 }
 
 export interface RefundSettlementOptions {
@@ -312,7 +336,7 @@ export class PaymentRefundService {
   private async notifyRefundOutcome(
     orderId: string,
     amountToRefund: number,
-    payment: any,
+    payment: Pick<Payment, "id" | "amount" | "provider">,
     providerRefundId: string | undefined,
     skipRefundEvent: boolean | undefined,
     /** Bu iadeyle kesinleşen yönetici iptalinin kodu (siparişe yazıldıysa). */
@@ -460,8 +484,7 @@ export class PaymentRefundService {
       ? Number(refundTargetOrder!.totalAmount)
       : Number(payment.amount);
     const previouslyRefundedOrders: Record<string, number> =
-      ((payment.metadata as any)?.refundedOrders as Record<string, number>) ||
-      {};
+      (payment.metadata as PaymentRefundMetadata | null)?.refundedOrders ?? {};
     const refundLimit = isGroupPayment
       ? groupOrderRefundLimit({
           orderTotal: refundCap,
@@ -671,7 +694,7 @@ export class PaymentRefundService {
     // cron'lar, kısmi iade) buradan geçer.
     const isTestLaneRefund = payment.isTest === true;
     try {
-      let refundResult: any;
+      let refundResult: RefundProviderResult;
       if (refundAttempt.action === "finalize") {
         refundResult = (refundAttempt.attempt.providerResponse as Record<
           string,
@@ -713,15 +736,17 @@ export class PaymentRefundService {
           } else {
             try {
               // İade, ödemenin ALINDIĞI mağazaya gider (kaydın paytrMerchant'ı).
-              refundResult = await this.paymentProviders
-                .resolve(payment.provider, payment.paytrMerchant)
-                // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
-                // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
-                .createRefund(
-                  paytrOid,
-                  amountToRefund,
-                  refundAttempt.attempt.id,
-                );
+              refundResult = {
+                ...(await this.paymentProviders
+                  .resolve(payment.provider, payment.paytrMerchant)
+                  // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
+                  // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
+                  .createRefund(
+                    paytrOid,
+                    amountToRefund,
+                    refundAttempt.attempt.id,
+                  )),
+              };
             } catch (err) {
               const reason = (err as Error).message || "refund request failed";
               if (err instanceof ProviderRefundRejectedException) {
@@ -770,8 +795,7 @@ export class PaymentRefundService {
         // Provider success is persisted before any order/hold/ledger mutation.
         // A crash after this point is safely recoverable without calling PayTR again.
         paytrRefunded = true;
-        const providerRefundId =
-          refundResult?.paymentId || refundResult?.merchant_oid || null;
+        const providerRefundId = providerRefundIdOf(refundResult);
         const persisted = await this.prisma.refundAttempt.updateMany({
           where: {
             id: refundAttempt.attempt.id,
@@ -797,11 +821,14 @@ export class PaymentRefundService {
             eventType: "refund",
             merchantOid: paytrOid,
             paymentId: payment.id,
-            status: refundResult?.status ?? "success",
+            status:
+              typeof refundResult.status === "string"
+                ? refundResult.status
+                : "success",
             amount: amountToRefund,
             totalAmount: amountToRefund,
             raw: {
-              ...(refundResult as Record<string, unknown>),
+              ...refundResult,
               refundAttemptId: refundAttempt.attempt.id,
             },
           });
@@ -842,10 +869,10 @@ export class PaymentRefundService {
             where: { id: payment.id },
             select: { metadata: true },
           });
-          const existingMetadata = (freshPayment?.metadata as any) || {};
-          const auditHistory = existingMetadata.auditHistory || [];
-          const currentRefundedOrders: Record<string, number> =
-            (existingMetadata.refundedOrders as Record<string, number>) || {};
+          const existingMetadata =
+            (freshPayment?.metadata as PaymentRefundMetadata | null) ?? {};
+          const auditHistory = existingMetadata.auditHistory ?? [];
+          const currentRefundedOrders = existingMetadata.refundedOrders ?? {};
 
           // Kısmi iade birikimi: sipariş başına iade TOPLANIR. Grup zaten order
           // başına biriktiriyordu; MONEY-H4: tekil ödemede de biriktir — aksi halde
@@ -884,7 +911,7 @@ export class PaymentRefundService {
                 ...existingMetadata,
                 refundAmount: totalRefunded,
                 refundedAt: new Date().toISOString(),
-                refundResult,
+                refundResult: refundResult as Prisma.InputJsonValue,
                 // MONEY-H4: tekilde de persist et — kümülatif iade takibi ve tavan
                 // kontrolü buna dayanır (yoksa art arda kısmi iadeler biriktirilemez).
                 refundedOrders,
@@ -1238,8 +1265,7 @@ export class PaymentRefundService {
             paymentId: payment.id,
             refundAmount: amountToRefund,
             providerRefundId:
-              refundResult.paymentId ||
-              refundResult.merchant_oid ||
+              providerRefundIdOf(refundResult) ||
               freshAttempt.providerRefundId ||
               undefined,
             // Çağıran (ör. finalizeRefundForReturnedShipment) satıcıya "ilan
@@ -1341,7 +1367,7 @@ export class PaymentRefundService {
           );
       }
       return refundCommitResult;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
         `Refund error for payment ${payment.id}: ${errorMessage(error)}`,
       );
