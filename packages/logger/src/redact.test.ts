@@ -35,6 +35,11 @@ describe("isSensitiveKey", () => {
       "guestPhone",
       "contactEmail",
       "ipAddress",
+      "ip",
+      "X-Forwarded-For",
+      "x-real-ip",
+      "CF-Connecting-IP",
+      "remote_addr",
     ]) {
       expect(isSensitiveKey(key)).toBe(true);
     }
@@ -52,6 +57,8 @@ describe("isSensitiveKey", () => {
       "status",
       "amount",
       "digest",
+      "x-forwarded-proto",
+      "x-forwarded-host",
     ]) {
       expect(isSensitiveKey(key)).toBe(false);
     }

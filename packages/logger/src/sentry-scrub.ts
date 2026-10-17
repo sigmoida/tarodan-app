@@ -16,7 +16,8 @@ import {
  *  - `request`: the Node SDK attaches headers, cookies, the query string and
  *    the body of the failing request. The session cookies (`web_at`, `web_rt`,
  *    `admin_at`, `admin_rt`) are bearer tokens, so cookies are dropped whole
- *    and sensitive headers are masked.
+ *    and sensitive headers are masked, including the proxy headers that carry
+ *    the visitor's IP (`x-forwarded-for`, `x-real-ip`, ...).
  *  - `user`: only the id survives ("ids only"); e-mail, username and IP go.
  *  - `extra`, `contexts`, `tags`, breadcrumbs, exception and log messages:
  *    redacted by key and by value shape (see `redact.ts`).

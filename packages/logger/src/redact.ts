@@ -68,6 +68,21 @@ const SENSITIVE_KEYS = new Set<string>([
   "street",
   "postalcode",
   "zipcode",
+  // Client IP (personal data under KVKK). The proxy headers carry it on every
+  // server request, also with `sendDefaultPii: false`; `ipAddress` and
+  // `remoteAddress` are caught by the "address" part below.
+  "ip",
+  "clientip",
+  "remoteip",
+  "remoteaddr",
+  "forwarded",
+  "xforwardedfor",
+  "xrealip",
+  "xclientip",
+  "xclusterclientip",
+  "cfconnectingip",
+  "trueclientip",
+  "fastlyclientip",
   // Sign in with Apple / OAuth codes.
   "authorizationcode",
   "apikey",

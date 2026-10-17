@@ -27,6 +27,35 @@ describe("scrubSentryEvent", () => {
     });
   });
 
+  it("masks the client IP that the proxy headers carry (KVKK personal data)", () => {
+    // `onRequestError` attaches the raw request headers; behind the reverse
+    // proxy they hold the visitor's IP even with `sendDefaultPii: false`.
+    const out = scrubSentryEvent({
+      request: {
+        headers: {
+          "x-forwarded-for": "203.0.113.7, 10.0.0.2",
+          "x-real-ip": "203.0.113.7",
+          forwarded: "for=203.0.113.7;proto=https",
+          "cf-connecting-ip": "203.0.113.7",
+          "true-client-ip": "203.0.113.7",
+          "x-client-ip": "203.0.113.7",
+          "x-forwarded-proto": "https",
+          host: "tarodan.test",
+        },
+      },
+    });
+    expect(out.request?.headers).toEqual({
+      "x-forwarded-for": REDACTED,
+      "x-real-ip": REDACTED,
+      forwarded: REDACTED,
+      "cf-connecting-ip": REDACTED,
+      "true-client-ip": REDACTED,
+      "x-client-ip": REDACTED,
+      "x-forwarded-proto": "https",
+      host: "tarodan.test",
+    });
+  });
+
   it("redacts the request body, also when it is a JSON string", () => {
     const fromObject = scrubSentryEvent({
       request: { data: { password: "p", email: "a@b.co", listingId: "l1" } },
