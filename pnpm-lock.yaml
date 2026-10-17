@@ -831,6 +831,10 @@ importers:
         version: 3.25.76
 
   packages/logger:
+    dependencies:
+      '@tarodan/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
       '@tarodan/eslint-config':
         specifier: workspace:*

@@ -19,6 +19,9 @@
     "test": "vitest run",
     "clean": "rm -rf dist .turbo"
   },
+  "dependencies": {
+    "@tarodan/types": "workspace:*"
+  },
   "devDependencies": {
     "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",

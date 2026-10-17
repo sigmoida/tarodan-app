@@ -678,6 +678,55 @@ YYYY-AA** (portala yüklenecek veri; kolon sırası değişmedi), son sayfa
 **Bilgi**. Portal ilk sayfayı okuyorsa yüklemeden önce Bildirim sayfasını
 ayrı kaydedin. Bkz. `docs/ADMIN_EXPORTS.md`.
 
+### Sentry for web and admin (Coolify)
+
+Sentry is compiled into web and admin only when `NEXT_PUBLIC_SENTRY_DSN` is
+set **at build time** (`apps/{web,admin}/sentry.build.js`); server and edge
+init run from `src/instrumentation.ts`, the browser init from
+`sentry.client.config.ts`. Every event passes the shared scrubber
+(`scrubSentryEvent` in `@tarodan/logger`): cookies dropped, credential
+headers, client-IP proxy headers (`x-forwarded-for`, `x-real-ip`, ...) and
+query parameters masked, user reduced to its id, card, IBAN, TCKN, TR phone
+and e-mail values removed.
+
+Per app (web -> project `tarodan-web`, admin -> project `tarodan-admin`, org
+`tarodan`) and per environment:
+
+| Variable                         | Build / runtime        | Value                                                  |
+| -------------------------------- | ---------------------- | ------------------------------------------------------ |
+| `NEXT_PUBLIC_SENTRY_DSN`         | build (and runtime)    | the project's DSN (public; it ships in the JS bundle)  |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | build                  | `staging` or `production`, never derived from NODE_ENV |
+| `NEXT_PUBLIC_SENTRY_RELEASE`     | build, optional        | leave unset: the short `SOURCE_COMMIT` is used         |
+| `SENTRY_AUTH_TOKEN`              | build only, **secret** | org auth token with release + source map upload scope  |
+| `SENTRY_ORG`, `SENTRY_PROJECT`   | build, optional        | defaults `tarodan` / `tarodan-web` or `tarodan-admin`  |
+
+Coolify settings, per app (Advanced > Build):
+
+- **Source commit availability: Available during build**, so the release is the
+  deployed short sha (the API tags its events the same way).
+- **Build secrets: Docker BuildKit secrets** _before_ adding `SENTRY_AUTH_TOKEN`.
+  In that mode Coolify passes every build variable with `--secret` and mounts
+  it on each `RUN` (`--mount=type=secret,id=<KEY>,env=<KEY>`), so nothing lands
+  in the image history. In the default build-arg mode Coolify injects an
+  `ARG` for every build variable and the token would be readable with
+  `docker history`; without the token the build still succeeds and only the
+  source map upload is skipped. Check the first deploy log for `--secret` (if
+  the build server has no BuildKit, Coolify silently falls back to build args).
+- `SENTRY_AUTH_TOKEN` is **build-time only**: untick "Available at runtime",
+  so the running container never holds it.
+- The Dockerfiles declare the public values as `ARG` only (no `ENV` re-export)
+  and must not mount secrets themselves; Coolify skips `RUN` lines that already
+  have a secret mount. `apps/*/src/sentry-build.test.ts` pins both rules.
+- In BuildKit secrets mode a secret's **value** is not part of the Docker layer
+  cache key. After changing only a variable's value (a new DSN, `staging` ->
+  `production`) on an already-built commit, deploy with **Force deploy
+  (without cache)**, or the cached `next build` layer keeps the old inlined
+  value. A new commit or a newly added variable rebuilds anyway.
+
+Sentry project settings (both projects): turn on "Prevent Storing of IP
+Addresses" and the server-side data scrubber; the client SDK does not send IPs
+(`sendDefaultPii: false`), this covers what Sentry would infer itself.
+
 ---
 
 ## 2. Staging reset ve seed-assets modeli
