@@ -40,6 +40,62 @@ describe("holdRefundedAmountAfter — one formula for hold consumption", () => {
     );
   });
 
+  describe("kurus boundaries", () => {
+    const after = (input: Parameters<typeof holdRefundedAmountAfter>[0]) =>
+      holdRefundedAmountAfter(input).toFixed(2);
+
+    it("a slice of exactly half a kurus rounds up", () => {
+      // 100.01 x 0.5 = 50.005
+      expect(after({ amount: "100.01", refundedAmount: 0, portion: 0.5 })).toBe(
+        "50.01",
+      );
+    });
+
+    it("three one-third slices of an odd-kurus hold never consume more than the hold", () => {
+      // 832.01 / 3 = 277.3366... -> 277.34 each; the third would reach 832.02.
+      const first = after({
+        amount: "832.01",
+        refundedAmount: 0,
+        portion: 1 / 3,
+      });
+      const second = after({
+        amount: "832.01",
+        refundedAmount: first,
+        portion: 1 / 3,
+      });
+      const third = after({
+        amount: "832.01",
+        refundedAmount: second,
+        portion: 1 / 3,
+      });
+
+      expect([first, second, third]).toEqual(["277.34", "554.68", "832.01"]);
+    });
+
+    it("the line-completing third leaves exactly the share after rounded slices", () => {
+      expect(
+        after({
+          amount: "832.01",
+          refundedAmount: "554.68",
+          portion: 1 / 3,
+          retained: 48,
+        }),
+      ).toBe("784.01");
+    });
+
+    it("a give-back keeps kurus precision", () => {
+      // hold 60.10, first unit took 30.05; leaving 48 keeps 12.10 consumed.
+      expect(
+        after({
+          amount: "60.10",
+          refundedAmount: "30.05",
+          portion: 0.5,
+          retained: 48,
+        }),
+      ).toBe("12.10");
+    });
+  });
+
   describe("retained seller shipping share", () => {
     it("single full refund leaves the share (amount − retained consumed)", () => {
       expect(
