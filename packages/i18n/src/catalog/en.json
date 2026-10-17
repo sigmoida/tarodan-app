@@ -2510,15 +2510,9 @@
     "companyBioFallback": "Buying and selling premium diecast vehicles",
     "viewStore": "View Store",
     "slider": {
-      "goToSlide": "Go to slide {index}"
-    },
-    "appPromo": {
-      "eyebrow": "TARODAN MOBILE",
-      "title": "Your collection, now in your <accent>pocket.</accent>",
-      "description": "Your listings, trades and garage, always with you. Open Türkiye's first diecast app on mobile.",
+      "goToSlide": "Go to slide {index}",
       "openOnMobile": "Open on mobile",
-      "opensInNewTab": "(opens in a new tab)",
-      "imageAlt": "Two phone screens showing the Tarodan mobile app, with a white diecast model car in front"
+      "opensInNewTab": "(opens in a new tab)"
     }
   },
   "search": {
@@ -5556,20 +5550,28 @@
           "app": "App only",
           "all": "Both"
         },
-        "clientName": {
-          "web": "web",
-          "app": "app"
+        "platformBadge": {
+          "web": "Web",
+          "app": "App",
+          "all": "Both"
         },
         "visibility": {
-          "web": "Show on web",
-          "app": "Show in app",
-          "updated": "Hero visibility updated",
-          "hint": "Home page hero; when off it is hidden on that platform, slides are kept."
+          "updated": "Hero visibility updated"
         },
-        "hiddenOn": {
-          "switchOff": "Hero is hidden on the {platform} home page: the switch is off.",
-          "noLiveSlide": "Hero is hidden on the {platform} home page: no live slide on this platform.",
-          "hiddenInApp": "Hero is hidden on the app home page: every live app slide is marked \"Hide in the mobile app\" (iOS and Android)."
+        "homeVisibility": {
+          "title": "Home page visibility",
+          "help": "When off, the home hero is hidden on that platform; slides are not deleted. Affects the Home tab only.",
+          "client": {
+            "web": "Website",
+            "app": "Mobile app (iOS + Android)"
+          },
+          "toggle": "{client}: show the home hero",
+          "summary": {
+            "live": "{count, plural, one {# slide live} other {# slides live}}",
+            "noLiveSlide": "No live slide; hero hidden",
+            "switchOff": "Hidden: switch is off",
+            "hiddenInApp": "Hidden: every live slide is marked \"Hide in the mobile app\""
+          }
         },
         "columns": {
           "image": "Image",
@@ -5621,7 +5623,13 @@
           "ctaLabelRequired": "Enter a button label for the link",
           "linkInvalid": "Enter a valid link: a full address starting with https://… or a site path starting with /.",
           "endBeforeStart": "The end date cannot be before the start date."
-        }
+        },
+        "liveHidden": {
+          "web": "Live · hidden on web",
+          "app": "Live · hidden in app",
+          "all": "Live · hidden on web and app"
+        },
+        "ctaStoreHint": "With an App Store / Google Play link the button shows as a store button; it is hidden in the app."
       },
       "trustBadges": {
         "title": "Trust badges",

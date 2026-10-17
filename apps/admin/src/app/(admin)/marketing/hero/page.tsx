@@ -14,12 +14,12 @@ import { clientListFetcher } from "@/lib/query/client-list";
 import { useTabParam } from "@/hooks/useTabParam";
 import type { HeroPlacement, HeroSlide } from "./_lib/types";
 import { HeroTable } from "./_components/HeroTable";
-import { HeroHiddenNotes } from "./_components/HeroHiddenNotes";
-import { HeroVisibilitySwitches } from "./_components/HeroVisibilitySwitches";
+import { HeroHomeVisibilityCard } from "./_components/HeroHomeVisibilityCard";
+import { useHeroHomeVisibility } from "./_hooks/useHeroHomeVisibility";
 import { HeroSlideFormModal } from "./_modals/HeroSlideFormModal";
 
 const DEFAULT_PLACEMENT: HeroPlacement = HERO_PLACEMENTS[0];
-/** Platform anahtarları ve "hero gizli" notu yalnız ana sayfa içindir. */
+/** Platform anahtarları (görünürlük kartı, platforma göre yayın durumu) yalnız ana sayfa içindir. */
 const HOME: HeroPlacement = "home";
 
 const isPlacement = (v: string): v is HeroPlacement =>
@@ -31,6 +31,7 @@ export default function HeroSlidesPage() {
   const placement = isPlacement(tab) ? tab : DEFAULT_PLACEMENT;
   const [modal, setModal] = useState<{ slide?: HeroSlide } | null>(null);
   const isHome = placement === HOME;
+  const { data: visibility } = useHeroHomeVisibility(isHome);
 
   return (
     <AdminPage>
@@ -38,8 +39,7 @@ export default function HeroSlidesPage() {
         title={t("admin.marketing.hero.title")}
         description={t("admin.marketing.hero.subtitle")}
       >
-        {isHome && <HeroVisibilitySwitches />}
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-start gap-1 sm:items-end">
           <Button
             variant="primary"
             leftIcon={<PlusIcon className="h-5 w-5" />}
@@ -75,8 +75,11 @@ export default function HeroSlidesPage() {
         limit={100}
         getRowId={(s) => s.id}
       >
-        {isHome && <HeroHiddenNotes />}
-        <HeroTable onEdit={(slide) => setModal({ slide })} />
+        {isHome && <HeroHomeVisibilityCard visibility={visibility} />}
+        <HeroTable
+          onEdit={(slide) => setModal({ slide })}
+          homeVisibility={isHome ? visibility : undefined}
+        />
       </ResourceList>
 
       {modal && (

@@ -2510,15 +2510,9 @@
     "companyBioFallback": "Premium Diecast araçların alım ve satımı",
     "viewStore": "Mağazayı İncele",
     "slider": {
-      "goToSlide": "Slayta git: {index}"
-    },
-    "appPromo": {
-      "eyebrow": "TARODAN MOBİL",
-      "title": "Koleksiyonun artık <accent>cebinde.</accent>",
-      "description": "İlanların, takasların ve garajın her an yanında. Türkiye'nin ilk diecast uygulamasını mobilde aç.",
+      "goToSlide": "Slayta git: {index}",
       "openOnMobile": "Mobilde aç",
-      "opensInNewTab": "(yeni sekmede açılır)",
-      "imageAlt": "Tarodan mobil uygulamasını gösteren iki telefon ekranı ve önünde beyaz bir diecast model araba"
+      "opensInNewTab": "(yeni sekmede açılır)"
     }
   },
   "search": {
@@ -5556,20 +5550,28 @@
           "app": "Yalnız uygulama",
           "all": "İkisi"
         },
-        "clientName": {
+        "platformBadge": {
           "web": "Web",
-          "app": "Uygulama"
+          "app": "Uygulama",
+          "all": "İkisi"
         },
         "visibility": {
-          "web": "Web'de göster",
-          "app": "Uygulamada göster",
-          "updated": "Hero görünürlüğü güncellendi",
-          "hint": "Ana sayfa hero'su; kapalıyken o platformda gizlenir, slaytlar silinmez."
+          "updated": "Hero görünürlüğü güncellendi"
         },
-        "hiddenOn": {
-          "switchOff": "{platform} ana sayfasında hero gizli: anahtar kapalı.",
-          "noLiveSlide": "{platform} ana sayfasında hero gizli: bu platformda yayında slayt yok.",
-          "hiddenInApp": "Uygulama ana sayfasında hero gizli: yayındaki uygulama slaytlarının hepsi \"Mobil uygulamada gösterme\" işaretli (iOS ve Android)."
+        "homeVisibility": {
+          "title": "Ana sayfa görünürlüğü",
+          "help": "Kapalıyken bu platformda ana sayfa hero'su gizlenir; slaytlar silinmez. Yalnız Ana sayfa sekmesini etkiler.",
+          "client": {
+            "web": "Web sitesi",
+            "app": "Mobil uygulama (iOS + Android)"
+          },
+          "toggle": "{client}: ana sayfa hero'sunu göster",
+          "summary": {
+            "live": "{count, plural, one {# slayt yayında} other {# slayt yayında}}",
+            "noLiveSlide": "Yayında slayt yok; hero gizli",
+            "switchOff": "Gizli: anahtar kapalı",
+            "hiddenInApp": "Gizli: yayındaki slaytların hepsi \"Mobil uygulamada gösterme\" işaretli"
+          }
         },
         "columns": {
           "image": "Görsel",
@@ -5621,7 +5623,13 @@
           "ctaLabelRequired": "Adres için bir düğme etiketi girin",
           "linkInvalid": "Geçerli bir adres girin: https://… ile başlayan tam adres ya da / ile başlayan site içi yol.",
           "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz."
-        }
+        },
+        "liveHidden": {
+          "web": "Yayında · web gizli",
+          "app": "Yayında · uygulama gizli",
+          "all": "Yayında · web ve uygulama gizli"
+        },
+        "ctaStoreHint": "App Store / Google Play bağlantısı girilirse butonlar mağaza butonu olarak görünür; uygulamada gizlenir."
       },
       "trustBadges": {
         "title": "Güven rozetleri",

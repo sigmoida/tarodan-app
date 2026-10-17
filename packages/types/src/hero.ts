@@ -87,6 +87,42 @@ export interface HeroCtaDto {
   href: string;
 }
 
+/** Mağaza bağlantılı CTA'nın mağazası. */
+export type HeroStoreLinkKind = "appStore" | "googlePlay";
+
+/**
+ * CTA adresi bir uygulama mağazası sayfası mı — şema değişikliği olmadan
+ * "mağaza butonu" tanıma kuralının TEK kaynağı (web, admin; mobil aynı kuralı
+ * kendi `heroView`'unda taşır). App Store: `apps.apple.com` / `itunes.apple.com`;
+ * Google Play: `play.google.com/store/apps/…`. Yalnız mutlak http(s) adres;
+ * site içi yol ve başka host `null`. Web bu CTA'ları koyu mağaza butonu
+ * olarak çizer, mobil uygulama gizler (kullanıcı zaten uygulamada).
+ */
+export function heroStoreLinkKind(
+  href: string | null | undefined,
+): HeroStoreLinkKind | null {
+  if (typeof href !== "string") return null;
+  const raw = href.trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (host === "apps.apple.com" || host === "itunes.apple.com") {
+    return "appStore";
+  }
+  if (
+    host === "play.google.com" &&
+    /^\/store\/apps(\/|$)/i.test(url.pathname)
+  ) {
+    return "googlePlay";
+  }
+  return null;
+}
+
 /** `GET /hero-slides?placement=&platform=` öğesi — iki dil birden döner. */
 export interface HeroSlideDto {
   id: string;

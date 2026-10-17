@@ -116,31 +116,6 @@ describe("HeroSlider", () => {
     expect(track).toHaveBeenCalledWith("a", "click", 2);
   });
 
-  it("sabit slayt admin slaytlarından önce gelir, h1 onun olur, noktası sayılır", () => {
-    const pinned = (
-      <div data-testid="pinned">
-        <h1>Promo</h1>
-      </div>
-    );
-    act(() =>
-      root.render(<HeroSlider slides={[slide("a")]} pinned={pinned} />),
-    );
-    const firstSlot = container.querySelector("section > div > div");
-    expect(firstSlot?.firstElementChild?.getAttribute("data-testid")).toBe(
-      "pinned",
-    );
-    expect(container.querySelectorAll("h1")).toHaveLength(1);
-    expect(container.querySelector("h1")?.textContent).toBe("Promo");
-    expect(container.querySelector("h2")?.textContent).toBe("Başlık a");
-    const labels = [...container.querySelectorAll("[aria-label]")].map((el) =>
-      el.getAttribute("aria-label"),
-    );
-    expect(labels).toEqual([
-      "home.slider.goToSlide:1",
-      "home.slider.goToSlide:2",
-    ]);
-  });
-
   it("yalnız etkin slayt etkileşimli; diğerleri inert + aria-hidden", () => {
     act(() => root.render(<HeroSlider slides={[slide("a"), slide("b")]} />));
     const slots = [...container.querySelectorAll("section > div > div")];
@@ -158,9 +133,30 @@ describe("HeroSlider", () => {
     expect(slots[1].hasAttribute("inert")).toBe(false);
   });
 
-  it("admin slaytı yoksa (web hero kapalı) sabit slayt da çizilmez", () => {
-    act(() => root.render(<HeroSlider slides={[]} pinned={<p>Promo</p>} />));
-    expect(container.innerHTML).toBe("");
+  it("mağaza bağlantılı CTA koyu mağaza butonu olur, yeni sekmede açılır", () => {
+    const promo = slide("a", {
+      cta1: {
+        label: { tr: "Google Play", en: "Google Play" },
+        href: "https://play.google.com/store/apps/details?id=com.tarodan.app",
+      },
+      cta2: { label: { tr: "Gez", en: "Browse" }, href: "/listings" },
+    });
+    act(() => root.render(<HeroSlider slides={[promo]} />));
+    const [store, normal] = [...container.querySelectorAll("a")];
+    expect(store.getAttribute("target")).toBe("_blank");
+    expect(store.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(store.className).toContain("bg-heading");
+    expect(store.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+      "true",
+    );
+    expect(store.textContent).toContain("openOnMobile");
+    expect(store.textContent).toContain("Google Play");
+    expect(store.querySelector(".sr-only")?.textContent).toContain(
+      "opensInNewTab",
+    );
+    expect(normal.className).not.toContain("bg-heading");
+    expect(normal.textContent).toBe("Gez");
+    expect(normal.querySelector(".sr-only")).toBeNull();
   });
 
   it("dış bağlantıyı yeni sekmede açar", () => {

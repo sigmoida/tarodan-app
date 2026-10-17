@@ -2,13 +2,7 @@
 
 "use client";
 
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  type ReactNode,
-} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import type { HeroSlideDto } from "@tarodan/types";
 import { Button } from "@tarodan/ui";
@@ -26,36 +20,19 @@ const INACTIVE_SLIDE_PROPS = {
   "aria-hidden": true,
 } as const;
 
-/** Kodda tanımlı sabit slaytın nokta/anahtar kimliği. */
-const PINNED_ID = "pinned";
-
 /**
  * Slayt yoksa (boş liste / API hatası / web hero anahtarı kapalı) bölüm hiç
- * çizilmez — `pinned` verilmiş olsa bile. `pinned`, admin slaytlarından ÖNCE
- * gelen kodda tanımlı ilk slayttır (tam genişlikte `flex-shrink-0` bir öğe);
- * verildiğinde sayfanın `<h1>`'i onundur, admin slaytları `<h2>` olur.
+ * çizilmez. Tüm slaytlar admin'den gelir (kodda sabit slayt yok); sayfanın
+ * `<h1>`'i ilk slaytın başlığıdır, diğerleri `<h2>`.
  */
-export default function HeroSlider({
-  slides,
-  pinned,
-}: {
-  slides: HeroSlideDto[];
-  pinned?: ReactNode;
-}) {
+export default function HeroSlider({ slides }: { slides: HeroSlideDto[] }) {
   if (slides.length === 0) return null;
-  return <HeroCarousel slides={slides} pinned={pinned} />;
+  return <HeroCarousel slides={slides} />;
 }
 
-function HeroCarousel({
-  slides,
-  pinned,
-}: {
-  slides: HeroSlideDto[];
-  pinned?: ReactNode;
-}) {
+function HeroCarousel({ slides }: { slides: HeroSlideDto[] }) {
   const t = useTranslations();
-  const ids = [...(pinned ? [PINNED_ID] : []), ...slides.map((s) => s.id)];
-  const count = ids.length;
+  const count = slides.length;
 
   const [current, setCurrent] = useState(0);
   const goTo = useCallback(
@@ -99,24 +76,15 @@ function HeroCarousel({
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {[
-          ...(pinned ? [pinned] : []),
-          ...slides.map((slide, i) => (
-            <HeroSlideItem
-              key={slide.id}
-              slide={slide}
-              isFirst={!pinned && i === 0}
-            />
-          )),
-        ].map((node, index) => (
+        {slides.map((slide, index) => (
           /* Ekranda olmayan slayt odaklanamaz ve okunmaz (`inert` +
              `aria-hidden`); yalnız etkin slayt etkileşimli. */
           <div
-            key={ids[index]}
+            key={slide.id}
             className="w-full flex-shrink-0"
             {...(index === current ? {} : INACTIVE_SLIDE_PROPS)}
           >
-            {node}
+            <HeroSlideItem slide={slide} isFirst={index === 0} />
           </div>
         ))}
       </div>
@@ -125,10 +93,10 @@ function HeroCarousel({
           mobilde kısalan dolgu yüzünden içeriğin üstüne biniyordu. */}
       {count > 1 && (
         <div className="flex justify-center gap-2 pb-6">
-          {ids.map((id, index) => (
+          {slides.map((slide, index) => (
             <Button
               variant="secondary"
-              key={id}
+              key={slide.id}
               onClick={() => goTo(index)}
               className={`h-2 rounded-full transition-all duration-300 ease-premium ${
                 index === current
