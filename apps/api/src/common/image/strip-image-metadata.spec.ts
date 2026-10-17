@@ -124,7 +124,7 @@ describe("stripImageMetadata", () => {
     expect([meta.width, meta.height, meta.format]).toEqual([10, 10, "png"]);
   });
 
-  it("SVG reddedilir", async () => {
+  it("rejects SVG", async () => {
     const svg = Buffer.from(
       '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
     );
@@ -132,6 +132,14 @@ describe("stripImageMetadata", () => {
     await expect(stripImageMetadata(safeSharp, svg)).rejects.toBeInstanceOf(
       UnsupportedImageError,
     );
+  });
+
+  it("never hands SVG to librsvg (the native loader is blocked)", async () => {
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+    );
+
+    await expect(safeSharp(svg).metadata()).rejects.toThrow();
   });
 
   it("GIF olduğu gibi döner (sharp'ın GIF yükleyicisi kapalı)", async () => {

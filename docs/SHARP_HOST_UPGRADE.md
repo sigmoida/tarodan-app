@@ -1,11 +1,18 @@
 # sharp 0.35 ve Coolify host yükseltmesi
 
-**Durum (2026-09-02):** `apps/api` `sharp@0.34.5`'e sabit. Bu sürüm
-`GHSA-f88m-g3jw-g9cj` (yüksek) advisory'sini taşıyor; düzeltme `>=0.35.0`.
-Açık, `security/dependency-audit-allowlist.json` içinde **2026-11-30'a kadar**
-bilinçli kabul edildi. Kayıt dolunca `pnpm audit:prod` fail-closed çalışır ve
-`deploy-production` durur — bu tarihten önce ya yükseltme yapılmalı ya da kayıt
-gerekçesiyle birlikte yeniden değerlendirilmelidir.
+**Status (2026-10-17):** `apps/api` is pinned to `sharp@0.34.5` (Next.js in web
+and admin resolves the same version). It carries three high advisories, each
+accepted in `security/dependency-audit-allowlist.json` with an expiry:
+
+| Advisory                        | Fixed in | Expires        | Mitigation in place             |
+| ------------------------------- | -------- | -------------- | ------------------------------- |
+| `GHSA-f88m-g3jw-g9cj`           | 0.35.0   | 2026-11-30     | GIF, TIFF, VIPS loaders blocked |
+| `GHSA-rgj7-g3m4-5g8c`           | 0.35.4   | 2026-11-30     | same host constraint            |
+| `GHSA-wq5f-xc86-pv6w` (librsvg) | 0.35.5   | **2026-10-31** | SVG loader blocked; musl images |
+
+When an entry expires, `pnpm audit:prod` fails closed and the production
+release stops. Before the earliest expiry, upgrade (the plan below) or
+re-review the entry with its reason. The upgrade target is now **0.35.5**.
 
 ## Neden yükseltilemiyor
 
@@ -29,17 +36,18 @@ verdi. O günden beri:
    `ld.so --help | grep x86-64-v2` ile v2 desteğini kontrol et. Alternatif:
    Coolify'ı v2 destekli yeni bir sunucuya taşı (staging ve production aynı
    host'ta; ikisi birlikte taşınır, bkz. `docs/OPERATIONS.md`).
-2. **Staging'de dene.** `apps/api/package.json` → `"sharp": "^0.35.x"`,
-   `pnpm install`, `dependabot.yml`'deki ignore kaydını kaldır. Dockerfile'daki
-   guard yükleme hatasını build'de yakalar; imaj çıkmazsa host hâlâ uygun
-   değildir.
-3. **Görsel yükleme smoke testi.** Staging'de JPEG/PNG/WebP yükle; dönüştürme
-   ve presigned URL akışı 200 dönmeli. Yükseltmeyle birlikte GIF/TIFF/VIPS
-   yükleyici engelleri korunur (advisory kapansa da ürün kararı).
+2. **Try it on staging.** Set `apps/api/package.json` to `"sharp": "^0.35.5"`,
+   run `pnpm install` (check that Next.js resolves the same version) and remove
+   the ignore entry from `dependabot.yml`. The Dockerfile guard catches a load
+   failure at build time; if no image comes out, the host is still not ready.
+3. **Image upload smoke test.** Upload a JPEG, PNG and WebP on staging; the
+   transform and presigned URL flow must return 200. The GIF, SVG, TIFF and
+   VIPS loader blocks stay after the upgrade (a product decision, even once
+   the advisories close).
 4. **Production.** Normal release akışı (development → master). Deploy sonrası
    ilk görsel yüklemesini elle doğrula.
-5. **Allowlist kaydını sil.** `security/dependency-audit-allowlist.json`
-   içindeki `GHSA-f88m-g3jw-g9cj` girdisini kaldır; audit yeşil kalmalı.
+5. **Remove the allowlist entries.** Delete the three sharp entries from
+   `security/dependency-audit-allowlist.json`; the audit must stay green.
 
 ## Alternatif: kaynaktan derleme
 

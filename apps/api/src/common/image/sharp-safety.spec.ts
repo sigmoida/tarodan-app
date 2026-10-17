@@ -1,13 +1,14 @@
 import { configureSharpSafety, isBlockedSharpMimeType } from "./sharp-safety";
 
 describe("sharp safety", () => {
-  it("blocks the vulnerable GIF, TIFF and VIPS loaders", () => {
+  it("blocks the vulnerable GIF, SVG, TIFF and VIPS loaders", () => {
     const sharp = { block: jest.fn() };
 
     expect(configureSharpSafety(sharp)).toBe(sharp);
     expect(sharp.block).toHaveBeenCalledWith({
       operation: [
         "VipsForeignLoadNsgif",
+        "VipsForeignLoadSvg",
         "VipsForeignLoadTiff",
         "VipsForeignLoadVips",
       ],
