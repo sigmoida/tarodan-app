@@ -1,12 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { heroClientSummaries, heroSwitchHiddenOn } from "./visibility";
+import { heroClientSummaries, heroHiddenOn } from "./visibility";
 
 const ON = { web: true, app: true };
 const live = (
   platform: "web" | "app" | "all",
   isLive = true,
   hideOnIos = false,
-) => ({ platform, isLive, hideOnIos });
+) => ({
+  platform,
+  isLive,
+  hideOnIos,
+  cta1Href: null as string | null,
+  cta2Href: null as string | null,
+});
+
+const IOS = "https://apps.apple.com/tr/app/id6786614139";
+const ANDROID = "https://play.google.com/store/apps/details?id=com.tarodan.app";
+/** Butonlarının hepsi mağaza bağlantısı olan ("uygulamayı indir") slayt. */
+const storePromo = (platform: "web" | "app" | "all") => ({
+  ...live(platform),
+  cta1Href: ANDROID,
+  cta2Href: IOS,
+});
 
 /** Satırları `platform → [state, liveCount]` olarak sadeleştirir. */
 const summarize = (...args: Parameters<typeof heroClientSummaries>) =>
@@ -89,23 +104,52 @@ describe("heroClientSummaries", () => {
   });
 });
 
-describe("heroSwitchHiddenOn", () => {
+describe("heroClientSummaries — store-only slides", () => {
+  it("a slide whose CTAs are all store links does not count in the app", () => {
+    expect(summarize([storePromo("all")], ON)).toEqual({
+      web: ["live", 1],
+      app: ["hiddenInApp", 0],
+    });
+    expect(summarize([storePromo("all"), live("app")], ON)).toEqual({
+      web: ["live", 1],
+      app: ["live", 1],
+    });
+  });
+
+  it("a store link next to a normal CTA still counts in the app", () => {
+    const mixed = { ...live("all"), cta1Href: IOS, cta2Href: "/listings" };
+    expect(summarize([mixed], ON)).toEqual({
+      web: ["live", 1],
+      app: ["live", 1],
+    });
+  });
+});
+
+describe("heroHiddenOn", () => {
   it("lists the slide's target clients whose switch is off", () => {
-    expect(heroSwitchHiddenOn(live("web"), { web: false, app: true })).toEqual([
+    expect(heroHiddenOn(live("web"), { web: false, app: true })).toEqual([
       "web",
     ]);
-    expect(heroSwitchHiddenOn(live("all"), { web: false, app: false })).toEqual(
-      ["web", "app"],
-    );
-    expect(heroSwitchHiddenOn(live("app"), { web: false, app: true })).toEqual(
-      [],
-    );
-    expect(heroSwitchHiddenOn(live("all"), ON)).toEqual([]);
+    expect(heroHiddenOn(live("all"), { web: false, app: false })).toEqual([
+      "web",
+      "app",
+    ]);
+    expect(heroHiddenOn(live("app"), { web: false, app: true })).toEqual([]);
+    expect(heroHiddenOn(live("all"), ON)).toEqual([]);
   });
 
   it("ignores the app for a slide already hidden in the native app", () => {
     expect(
-      heroSwitchHiddenOn(live("all", true, true), { web: true, app: false }),
+      heroHiddenOn(live("all", true, true), { web: true, app: false }),
     ).toEqual([]);
+  });
+
+  it("store-only slide is hidden in the app even with its switch on", () => {
+    expect(heroHiddenOn(storePromo("all"), ON)).toEqual(["app"]);
+    expect(heroHiddenOn(storePromo("all"), { web: false, app: true })).toEqual([
+      "web",
+      "app",
+    ]);
+    expect(heroHiddenOn(storePromo("web"), ON)).toEqual([]);
   });
 });

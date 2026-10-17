@@ -24,6 +24,7 @@ describe("resolveWebRevalidateUrl", () => {
 
 describe("notifyWebRevalidate", () => {
   const env = { ...process.env };
+  const originalFetch = global.fetch;
   let fetchMock: jest.Mock;
   let warn: jest.SpyInstance;
 
@@ -39,6 +40,7 @@ describe("notifyWebRevalidate", () => {
 
   afterEach(() => {
     process.env = { ...env };
+    global.fetch = originalFetch;
     warn.mockRestore();
   });
 

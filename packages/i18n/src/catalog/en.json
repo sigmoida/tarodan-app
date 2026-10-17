@@ -5570,7 +5570,7 @@
             "live": "{count, plural, one {# slide live} other {# slides live}}",
             "noLiveSlide": "No live slide; hero hidden",
             "switchOff": "Hidden: switch is off",
-            "hiddenInApp": "Hidden: every live slide is marked \"Hide in the mobile app\""
+            "hiddenInApp": "Hidden: no live slide is shown in the app (marked \"Hide in the mobile app\" or store buttons only)"
           }
         },
         "columns": {
@@ -5629,7 +5629,7 @@
           "app": "Live · hidden in app",
           "all": "Live · hidden on web and app"
         },
-        "ctaStoreHint": "With an App Store / Google Play link the button shows as a store button; it is hidden in the app."
+        "ctaStoreHint": "With an App Store / Google Play link the button shows as a store button on the web and is hidden in the app. A slide with only store buttons is not shown in the app."
       },
       "trustBadges": {
         "title": "Trust badges",

@@ -123,6 +123,20 @@ export function heroStoreLinkKind(
   return null;
 }
 
+/**
+ * Slaytın butonlarının HEPSİ mağaza bağlantısı mı (en az bir buton varsa).
+ * Böyle bir slayt "uygulamayı indir" tanıtımıdır: mobil uygulama slaytı hiç
+ * göstermez, admin de onu uygulamada yayında saymaz. Butonsuz slayt `false`.
+ */
+export function heroHasOnlyStoreCtas(
+  hrefs: readonly (string | null | undefined)[],
+): boolean {
+  const present = hrefs.filter((h): h is string => !!h?.trim());
+  return (
+    present.length > 0 && present.every((h) => heroStoreLinkKind(h) !== null)
+  );
+}
+
 /** `GET /hero-slides?placement=&platform=` öğesi — iki dil birden döner. */
 export interface HeroSlideDto {
   id: string;

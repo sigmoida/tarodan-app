@@ -5,7 +5,7 @@ import {
   type LiveStatus,
 } from "@/lib/live-status";
 import type { HeroSlide } from "./types";
-import { heroSwitchHiddenOn } from "./visibility";
+import { heroHiddenOn } from "./visibility";
 
 /**
  * Yayın durumu: sunucunun `isLive`'ı esas; canlı değilse neden pencereden
@@ -23,8 +23,9 @@ export function heroLiveStatus(
 export interface HeroRowStatus {
   status: LiveStatus;
   /**
-   * Yayında ama platform anahtarı kapalı olduğu için görünmediği yer
-   * (`web`, `app`, ikisi → `all`); yoksa `null`. Yalnız ana sayfa sekmesinde.
+   * Yayında ama görünmediği yer (`web`, `app`, ikisi → `all`): platform
+   * anahtarı kapalı ya da uygulamada yalnız mağaza butonlu slayt
+   * (`heroHiddenOn`); yoksa `null`. Yalnız ana sayfa sekmesinde.
    */
   hiddenOn: ContentPlatform | null;
   variant: "outline" | "success" | "warning";
@@ -32,21 +33,29 @@ export interface HeroRowStatus {
 
 /**
  * Tablodaki "Yayın durumu" rozeti. `heroLiveStatus` anlamı aynen korunur;
- * ana sayfa sekmesinde (`visibility` verilince) yayındaki slaytın platform
- * anahtarı kapalıysa "Yayında · web gizli" gibi uyarı tonuna döner — yeşil
- * "Yayında" sitede/uygulamada göründüğünü sanmaya yol açıyordu.
+ * ana sayfa sekmesinde (`visibility` verilince) yayındaki slayt bir platformda
+ * görünmüyorsa (anahtar kapalı; uygulamada yalnız mağaza butonlu) "Yayında ·
+ * web gizli" gibi uyarı tonuna döner — kartla aynı kural. Yeşil "Yayında"
+ * sitede/uygulamada göründüğünü sanmaya yol açıyordu.
  */
 export function heroRowStatus(
   s: Pick<
     HeroSlide,
-    "isLive" | "isActive" | "startDate" | "endDate" | "platform" | "hideOnIos"
+    | "isLive"
+    | "isActive"
+    | "startDate"
+    | "endDate"
+    | "platform"
+    | "hideOnIos"
+    | "cta1Href"
+    | "cta2Href"
   >,
   now: Date,
   visibility?: HeroHomeVisibilityDto,
 ): HeroRowStatus {
   const status = heroLiveStatus(s, now);
   const hidden =
-    status === "live" && visibility ? heroSwitchHiddenOn(s, visibility) : [];
+    status === "live" && visibility ? heroHiddenOn(s, visibility) : [];
   const hiddenOn: ContentPlatform | null =
     hidden.length === 0 ? null : hidden.length > 1 ? "all" : hidden[0];
   return {

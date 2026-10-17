@@ -20,8 +20,9 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
 - **Mağaza butonu** (şema değişikliği yok): buton adresi App Store (`apps.apple.com`,
   `itunes.apple.com`) ya da Google Play (`play.google.com/store/apps/…`) sayfasıysa
   (`heroStoreLinkKind`, `@tarodan/types`) web onu koyu mağaza butonu olarak çizer (telefon simgesi,
-  "Mobilde aç" + etiket, yeni sekme); mobil uygulama bu butonları **gizler** — tek butonları mağaza
-  olan slayt butonsuz görünür. Uygulama tanıtımı da böylece tamamen admin'den yönetilen bir
+  "Mobilde aç" + etiket, yeni sekme); mobil uygulama bu butonları **gizler**. Butonlarının hepsi
+  mağaza bağlantısı olan slayt (`heroHasOnlyStoreCtas`) uygulamada **hiç gösterilmez** ve admin
+  onu uygulamada yayında saymaz (görünürlük kartı ve "Yayında · uygulama gizli"). Uygulama tanıtımı da böylece tamamen admin'den yönetilen bir
   slayttır (kodda sabit tanıtım slaytı ve `NEXT_PUBLIC_APP_PROMO_ENABLED` kaldırıldı).
 - `auth_register` kayıt ekranlarında, `auth_default` diğer auth ekranlarında kullanılır.
 - `hideOnIos` = **"native uygulamada gizle"**: mobil uygulama bayraklı slaytı (ve güven rozetini)
@@ -110,7 +111,8 @@ auth slaytları → `auth:hero`, rozetler → `home:trust`. Yerleşim değişirs
 Çağrının ulaşması için API'de `WEB_REVALIDATE_URL` (web kökü — API `/api/revalidate` ekler — ya da
 tam uç) ve web ile AYNI `REVALIDATE_SECRET` gerekir; reddedilen/ulaşmayan çağrı API logunda
 `WebRevalidate` uyarısı bırakır. Ulaşmazsa web değişikliği yedek ISR penceresinde (60 sn) görür.
-Mobil, `platform=app` okumasını 60 sn taze tutar ve kalıcı (soğuk açılış) önbelleğe yazmaz.
+Mobil, `platform=app` okumasını 60 sn taze tutar; ana sayfa hero'sunu kalıcı (soğuk açılış)
+önbelleğe yazmaz (giriş/kayıt görseli yazılır).
 
 ## Seed
 

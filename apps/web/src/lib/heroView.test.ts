@@ -1,7 +1,7 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { heroStoreLinkKind } from "@tarodan/types";
+import { heroHasOnlyStoreCtas, heroStoreLinkKind } from "@tarodan/types";
 import { resolveHeroCta } from "./heroView";
 
 const cta = (href: string, label = { tr: "Keşfet", en: "Explore" }) => ({
@@ -87,5 +87,15 @@ describe("resolveHeroCta — mağaza bağlantısı", () => {
     });
     expect(resolveHeroCta(cta(ANDROID), "tr")?.store).toBe("googlePlay");
     expect(resolveHeroCta(cta("https://example.com"), "tr")?.store).toBeNull();
+  });
+});
+
+describe("heroHasOnlyStoreCtas (@tarodan/types)", () => {
+  it("true only when there is a CTA and every CTA is a store link", () => {
+    expect(heroHasOnlyStoreCtas([ANDROID, IOS])).toBe(true);
+    expect(heroHasOnlyStoreCtas([IOS, null])).toBe(true);
+    expect(heroHasOnlyStoreCtas([IOS, "/listings"])).toBe(false);
+    expect(heroHasOnlyStoreCtas([null, undefined])).toBe(false);
+    expect(heroHasOnlyStoreCtas([" ", "/listings"])).toBe(false);
   });
 });

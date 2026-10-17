@@ -5570,7 +5570,7 @@
             "live": "{count, plural, one {# slayt yayında} other {# slayt yayında}}",
             "noLiveSlide": "Yayında slayt yok; hero gizli",
             "switchOff": "Gizli: anahtar kapalı",
-            "hiddenInApp": "Gizli: yayındaki slaytların hepsi \"Mobil uygulamada gösterme\" işaretli"
+            "hiddenInApp": "Gizli: yayındaki slaytların hiçbiri uygulamada gösterilmiyor (\"Mobil uygulamada gösterme\" işaretli ya da yalnız mağaza butonlu)"
           }
         },
         "columns": {
@@ -5629,7 +5629,7 @@
           "app": "Yayında · uygulama gizli",
           "all": "Yayında · web ve uygulama gizli"
         },
-        "ctaStoreHint": "App Store / Google Play bağlantısı girilirse butonlar mağaza butonu olarak görünür; uygulamada gizlenir."
+        "ctaStoreHint": "App Store / Google Play bağlantısı girilirse buton web'de mağaza butonu olarak görünür, uygulamada gizlenir. Yalnız mağaza butonlu slayt uygulamada gösterilmez."
       },
       "trustBadges": {
         "title": "Güven rozetleri",

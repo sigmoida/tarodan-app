@@ -32,9 +32,13 @@ describe("heroLiveStatus", () => {
 
 describe("heroRowStatus", () => {
   const row = (p: Record<string, unknown>) =>
-    slide({ platform: "all", hideOnIos: false, ...p }) as Parameters<
-      typeof heroRowStatus
-    >[0];
+    slide({
+      platform: "all",
+      hideOnIos: false,
+      cta1Href: null,
+      cta2Href: null,
+      ...p,
+    }) as Parameters<typeof heroRowStatus>[0];
   const ON = { web: true, app: true };
 
   it("keeps heroLiveStatus semantics without visibility (other tabs)", () => {
@@ -89,5 +93,18 @@ describe("heroRowStatus", () => {
         app: false,
       }),
     ).toEqual({ status: "scheduled", hiddenOn: null, variant: "outline" });
+  });
+
+  it("store-only slide reads as hidden in the app, matching the card", () => {
+    expect(
+      heroRowStatus(
+        row({
+          isLive: true,
+          cta1Href: "https://apps.apple.com/tr/app/id6786614139",
+        }),
+        now,
+        ON,
+      ),
+    ).toEqual({ status: "live", hiddenOn: "app", variant: "warning" });
   });
 });
