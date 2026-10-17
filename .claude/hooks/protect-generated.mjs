@@ -9,7 +9,15 @@
 //   integrated). A new folder on a feature branch stays editable.
 // - apps/api/prisma/migrations/migration_lock.toml -> always denied
 //
-// Fails open: if the input cannot be read, the call proceeds.
+// For migration edits the hook first refreshes origin/development and
+// origin/master (`git fetch`, 3 s timeout, at most once per 5 minutes). If the
+// refresh fails (offline) it cannot know whether the folder was deployed
+// since, so it fails CLOSED when the folder exists on any remote-tracking ref.
+// Unreadable input fails open: the call proceeds.
+
+import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { git, readHookInput, repoRelative, targetPath } from "./lib.mjs";
 
@@ -21,8 +29,17 @@ const GENERATED = {
 };
 const MIGRATIONS = "apps/api/prisma/migrations/";
 const APPLIED_REFS = ["origin/development", "origin/master", "development"];
+const FETCH_TIMEOUT_MS = 3000;
+const FETCH_FRESH_MS = 5 * 60 * 1000;
+const FIX_FORWARD =
+  "Never edit an applied migration: add a new migration folder that sorts after the latest one. See apps/api/prisma/CLAUDE.md.";
 
-export function denyReason(rel, folderExistsOn) {
+/**
+ * `status(folder)` returns `{ applied: ref }` when the folder is on a deployed
+ * or integrated ref, `{ unverified: ref }` when origin could not be refreshed
+ * and the folder exists on a remote-tracking ref, or `{}`.
+ */
+export function denyReason(rel, status) {
   if (GENERATED[rel]) {
     return `${rel} ${GENERATED[rel]}`;
   }
@@ -33,18 +50,95 @@ export function denyReason(rel, folderExistsOn) {
   if (rest === "migration_lock.toml") {
     return `${rel} is managed by Prisma; never edit it by hand.`;
   }
-  const folder = rest.split("/")[0];
   if (!rest.includes("/")) {
     return undefined;
   }
-  const ref = folderExistsOn(folder);
-  if (ref) {
+  const folder = rest.split("/")[0];
+  const { applied, unverified } = status(folder);
+  if (applied) {
+    return `${MIGRATIONS}${folder} is already on ${applied}, so it is (or will be) applied by \`prisma migrate deploy\`. ${FIX_FORWARD}`;
+  }
+  if (unverified) {
     return (
-      `${MIGRATIONS}${folder} is already on ${ref}, so it is (or will be) applied by \`prisma migrate deploy\`. ` +
-      "Never edit an applied migration: add a new migration folder that sorts after the latest one. See apps/api/prisma/CLAUDE.md."
+      `Could not refresh origin (offline or timed out), so it is unknown whether ${MIGRATIONS}${folder} has been deployed; ` +
+      `it already exists on ${unverified}. Treating it as applied. Run \`git fetch origin development master\` and retry if it is really unreleased. ${FIX_FORWARD}`
     );
   }
   return undefined;
+}
+
+function hasPath(root, ref, path) {
+  try {
+    git(root, "cat-file", "-e", `${ref}:${path}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Refreshes origin/development and origin/master; true when the refs are fresh. */
+function refreshOrigin(root) {
+  let stamp;
+  try {
+    stamp = join(
+      resolve(root, git(root, "rev-parse", "--git-common-dir")),
+      "claude-migration-fetch",
+    );
+    const last = Number(readFileSync(stamp, "utf8"));
+    if (Date.now() - last < FETCH_FRESH_MS) {
+      return true;
+    }
+  } catch {
+    // no stamp yet
+  }
+  try {
+    execFileSync(
+      "git",
+      [
+        "-C",
+        root,
+        "fetch",
+        "--quiet",
+        "--no-tags",
+        "origin",
+        "development",
+        "master",
+      ],
+      {
+        stdio: "ignore",
+        timeout: FETCH_TIMEOUT_MS,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      },
+    );
+    if (stamp) {
+      writeFileSync(stamp, String(Date.now()));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function migrationStatus(root, folder) {
+  const path = `${MIGRATIONS}${folder}`;
+  const fresh = refreshOrigin(root);
+  const applied = APPLIED_REFS.find((ref) => hasPath(root, ref, path));
+  if (applied) {
+    return { applied };
+  }
+  if (fresh) {
+    return {};
+  }
+  const remoteRefs = git(
+    root,
+    "for-each-ref",
+    "--format=%(refname:short)",
+    "refs/remotes",
+  )
+    .split("\n")
+    .filter((ref) => ref && !ref.endsWith("/HEAD"));
+  const unverified = remoteRefs.find((ref) => hasPath(root, ref, path));
+  return unverified ? { unverified } : {};
 }
 
 function main() {
@@ -55,14 +149,7 @@ function main() {
     return;
   }
   const reason = denyReason(location.rel, (folder) =>
-    APPLIED_REFS.find((ref) => {
-      try {
-        git(location.root, "cat-file", "-e", `${ref}:${MIGRATIONS}${folder}`);
-        return true;
-      } catch {
-        return false;
-      }
-    }),
+    migrationStatus(location.root, folder),
   );
   if (reason) {
     process.stdout.write(
