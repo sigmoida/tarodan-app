@@ -4,6 +4,7 @@
  */
 import { Injectable } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
+import { readFingerprint } from "../../common/logging/error-fingerprint";
 
 @Injectable()
 export class SentryService {
@@ -17,6 +18,11 @@ export class SentryService {
           scope.setExtra(key, value);
         });
       }
+      // AppNestLogger her hata için context+mesaja göre bir fingerprint
+      // iliştirir (bkz. error-fingerprint.ts); varsa Sentry'nin varsayılan
+      // stack-tabanlı gruplamasının yerine geçer.
+      const fingerprint = readFingerprint(exception);
+      if (fingerprint) scope.setFingerprint(fingerprint);
       Sentry.captureException(exception);
     });
   }
