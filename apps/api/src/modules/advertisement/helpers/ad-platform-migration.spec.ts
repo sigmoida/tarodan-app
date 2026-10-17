@@ -13,7 +13,7 @@ import { adDeviceTypeFor } from "./ad-platform.helper";
  * `20261016110000_ad_platform_popup`: reklama platform (web / app / all),
  * popup sıklığı ve popup sürümü gelir. Göç YALNIZ şemadır; eski
  * `device_type` değerlerinin taşınması ayrı, idempotent script'tir
- * (`maintenance/backfill-ad-platform.ts`, CLAUDE.md §13). Kolon silinmez
+ * (`maintenance/backfill-ad-platform.ts`, apps/api/prisma/CLAUDE.md). Kolon silinmez
  * (eski mobil sürümler türetilmiş `deviceType` okur). `ContentPlatform` tipi
  * hero göçüyle ortaktır: hangisi önce çalışırsa kurar.
  */

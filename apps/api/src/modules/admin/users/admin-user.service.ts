@@ -403,7 +403,7 @@ export class AdminUserService {
       // `include:` idi ve dönüş `...u` ile yayılıyordu: User'ın HER sütunu
       // (passwordHash, fcmToken, notificationSettings, bannedBy…) ve ilişkilerin
       // her alanı yanıta giriyordu. Açık select, ekranın gerçekten okuduğu
-      // alanlarla sınırlar (CLAUDE.md §5 "yalnız döndürdüğünü sorgula").
+      // alanlarla sınırlar (apps/api/CLAUDE.md "Prisma discipline": yalnız döndürdüğünü sorgula).
       // getUsers'ın select'iyle birleştirilmedi: liste satırı sayaç/üyelik
       // alt-seçimlerinde farklı, ortak sabit ikisini de bozardı.
       select: {

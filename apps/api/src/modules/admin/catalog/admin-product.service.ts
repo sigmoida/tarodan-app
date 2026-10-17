@@ -391,7 +391,7 @@ export class AdminProductService {
    * indirim matematiği, komisyon kuralı, görsel sahipliği, iyimser kilit,
    * arama indeksi ve ISR tazeleme orada TEK yerde durur. Buradaki eski kopya
    * bunların hiçbirini yapmıyordu; kademe düzeltmesi dışında bir alana
-   * dokunmak sessizce kuralsız yazıyordu (bkz. apps/api/CLAUDE.md §15/3).
+   * dokunmak sessizce kuralsız yazıyordu (bkz. apps/api/CLAUDE.md, "Fix what you touch" 3).
    *
    * Yöneticiye özgü olan tek şey DENETİM KAYDIdır — onu burada tutuyoruz.
    */

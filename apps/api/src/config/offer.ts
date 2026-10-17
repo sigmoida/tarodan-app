@@ -8,7 +8,7 @@
  * varsayıyordu; iki yer ayrı okusaydı env değişince istemci yanlış ipucu verirdi.
  *
  * DİKKAT: anahtar `env.validation.ts`te bildirilmemiştir ve yalnız gerçek ortam
- * değişkeni olarak verildiğinde etkilidir (apps/api/CLAUDE.md §15 "Known, undecided").
+ * değişkeni olarak verildiğinde etkilidir (apps/api/CLAUDE.md, "Known, undecided").
  * Bu davranış bilerek korunur: bildirmek, bir `.env` dosyasında duran ama bugün
  * etkisiz olan değeri deploy'da etkin kılardı.
  */

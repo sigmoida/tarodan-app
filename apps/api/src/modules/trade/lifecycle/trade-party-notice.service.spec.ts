@@ -4,7 +4,7 @@ import { OUTBOX_TRADE_PARTY_NOTICE } from "../../outbox/outbox.types";
 import { NotificationType } from "../../notification/dto";
 
 /**
- * Takas taraf duyuruları outbox üzerinden gider (CLAUDE.md §10): olayın tx'inde
+ * Takas taraf duyuruları outbox üzerinden gider (apps/api/CLAUDE.md outbox): olayın tx'inde
  * alıcı × olay başına bir satır, commit sonrası anlık yol; handler kayıtlıdır ki
  * süreç ölürse drainer tamamlasın.
  */

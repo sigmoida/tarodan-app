@@ -141,7 +141,7 @@ export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
  * Takas tarafına duyuru (zil + push; tamamlanmada e-posta da): kullanıcı iptali
  * (karşı tarafa), itiraz açıldı (karşı tarafa), itiraz sonuçlandı ve takas
  * tamamlandı (iki tarafa). Olayın tx'iyle AYNI tx'te yazılır — olay commit olduysa
- * duyuru kesin gider (CLAUDE.md §10: kaybı kullanıcıya görünen yan etki).
+ * duyuru kesin gider (apps/api/CLAUDE.md "Side effects go through the outbox": kaybı kullanıcıya görünen yan etki).
  * Satır = TEK alıcı × TEK olay; `dedupeKey` aynı olayın ikinci kez duyurulmasını
  * engeller.
  */

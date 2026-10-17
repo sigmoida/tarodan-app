@@ -110,7 +110,7 @@ export class AdminAnalyticsController {
   constructor(
     private readonly adminService: AdminService,
     // Yeni dashboard bölgeleri facade'e eklenmez: AdminService zaten çözülmeye
-    // çalışılan tanrı-facade'dir (apps/api/CLAUDE.md §1/§15).
+    // çalışılan tanrı-facade'dir (apps/api/CLAUDE.md, "Modules are bounded contexts", "Fix what you touch").
     private readonly worklistService: AdminDashboardWorklistService,
     private readonly stockService: AdminDashboardStockService,
     private readonly dashboardStatsService: AdminAnalyticsDashboardService,

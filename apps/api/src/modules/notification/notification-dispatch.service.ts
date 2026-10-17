@@ -121,7 +121,7 @@ export class NotificationDispatchService implements OnModuleDestroy {
    * çalışan bir dağıtımda kuyruğa yazılan push hiç gitmezdi. Süreç içi
    * ateşle-unut + Expo isteğinde zaman aşımı (EXPO_REQUEST_TIMEOUT_MS) worker'a
    * bağımlılık eklemeden isteği hızlandırır. Push kaybı kabul edilebilir bir
-   * yan etkidir (CLAUDE.md §10); zil kaydı zaten yazılmıştır.
+   * yan etkidir (apps/api/CLAUDE.md, "Side effects go through the outbox"); zil kaydı zaten yazılmıştır.
    *
    * Android kanalı tipten, iOS rozeti okunmamış zil sayısından gelir.
    * Sonuç `onSettled` ile bildirilir (ör. teslim izleme satırı).

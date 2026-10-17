@@ -207,7 +207,7 @@ export class PayTRService implements IPaymentProvider {
      * PayTR kimlikleri PayTRCredentials'ta; bu yalnız `FRONTEND_URL` içindir.
      * Bilinçli olarak `config/app-urls`'e taşınmadı: oradaki erişimci bir
      * fallback uygular ve bu, ödeme dönüş URL'lerinin davranışını değiştirir
-     * (CLAUDE.md §15 "Known, undecided").
+     * (apps/api/CLAUDE.md, "Known, undecided").
      */
     private readonly configService: ConfigService,
     @Optional()

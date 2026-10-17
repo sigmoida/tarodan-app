@@ -146,7 +146,7 @@ model User {
 model DeletedUserIdentity {
   id                String          @id @default(uuid())
   /// Anonimleştirilmiş User satırıyla tek-tek bağ. Restrict: arşiv, kullanıcı
-  /// kaydının yanlışlıkla fiziksel silinmesini de engeller (CLAUDE.md §13).
+  /// kaydının yanlışlıkla fiziksel silinmesini de engeller (apps/api/prisma/CLAUDE.md).
   userId            String          @unique @map("user_id")
   /// Silme anındaki gerçek kimlik. Backfill satırlarında kaynak bulunamayan
   /// alanlar boş kalır — tahmin edilmez.
@@ -262,7 +262,7 @@ model ConsentRecord {
   orderId         String?        @map("order_id")
   createdAt       DateTime       @default(now()) @map("created_at")
   /// Restrict: üyeler fiziksel silinmez (anonimleşir); kanıt satırı, kullanıcı
-  /// kaydının yanlışlıkla silinmesini de engeller (CLAUDE.md §13).
+  /// kaydının yanlışlıkla silinmesini de engeller (apps/api/prisma/CLAUDE.md).
   user            User?          @relation(fields: [userId], references: [id], onDelete: Restrict)
   checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
   order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
