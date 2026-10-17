@@ -1,10 +1,12 @@
 import {
   adDeviceTypeFor,
+  adPublicLinkUrl,
   adShadowedPlatforms,
   adSlotChanged,
   adSlotConflictWhere,
   adSlotLockKey,
   firstAdPerPosition,
+  isLegacyAppRequest,
   overlappingAdPlatforms,
   resolveAdClientPlatform,
   type AdSlotCandidate,
@@ -44,6 +46,113 @@ describe("resolveAdClientPlatform", () => {
   it("bilinmeyen platform (ya da istemci olmayan `all`) eşleşmez", () => {
     expect(resolveAdClientPlatform("ios")).toBeNull();
     expect(resolveAdClientPlatform("all")).toBeNull();
+  });
+});
+
+describe("isLegacyAppRequest — store 1.0.5 sends no parameter", () => {
+  it("is true only when neither platform nor device is given", () => {
+    expect(isLegacyAppRequest()).toBe(true);
+    expect(isLegacyAppRequest(undefined, undefined)).toBe(true);
+    expect(isLegacyAppRequest("", "")).toBe(true);
+  });
+
+  it("is false for any current client", () => {
+    expect(isLegacyAppRequest("app")).toBe(false);
+    expect(isLegacyAppRequest("web")).toBe(false);
+    expect(isLegacyAppRequest(undefined, "mobile")).toBe(false);
+    // An unknown platform is not a legacy build: it matches no ad at all.
+    expect(isLegacyAppRequest("ios")).toBe(false);
+  });
+
+  it("agrees with resolveAdClientPlatform: legacy exactly when no platform resolves to app", () => {
+    const inputs: Array<[string | undefined, string | undefined]> = [
+      [undefined, undefined],
+      ["", ""],
+      [undefined, "desktop"],
+      [undefined, "mobile"],
+      ["app", undefined],
+      ["web", "mobile"],
+      ["ios", undefined],
+    ];
+    for (const [platform, device] of inputs) {
+      expect(isLegacyAppRequest(platform, device)).toBe(
+        !platform && resolveAdClientPlatform(platform, device) === "app",
+      );
+    }
+  });
+});
+
+describe("adPublicLinkUrl — legacy linkUrl fallback for image ads", () => {
+  const hotspots = [
+    { linkUrl: "/first" },
+    { linkUrl: "https://x.test/second" },
+  ];
+  const imageAd = { linkUrl: null, hotspots };
+
+  it("legacy request: an image ad gets its first hotspot's link", () => {
+    expect(adPublicLinkUrl(imageAd, true)).toBe("/first");
+  });
+
+  it("current client: an image ad keeps linkUrl null", () => {
+    expect(adPublicLinkUrl(imageAd, false)).toBeNull();
+  });
+
+  it("legacy request: an image ad without hotspots stays null", () => {
+    expect(adPublicLinkUrl({ ...imageAd, hotspots: [] }, true)).toBeNull();
+  });
+
+  it("legacy request: an ad that still has its own link keeps it", () => {
+    expect(adPublicLinkUrl({ ...imageAd, linkUrl: "/own" }, true)).toBe("/own");
+  });
+
+  it("text ads (no hotspots) always keep their own link", () => {
+    const textAd = { linkUrl: "/kategori/x", hotspots: [] };
+    expect(adPublicLinkUrl(textAd, true)).toBe("/kategori/x");
+    expect(adPublicLinkUrl(textAd, false)).toBe("/kategori/x");
+  });
+
+  it.each([
+    "/membership",
+    "/en/pricing",
+    "/tr/boost/",
+    "/profile/membership?tab=plans",
+    "/settings/subscription#top",
+    "https://tarodan.test/en/upgrade",
+    "HTTPS://TARODAN.TEST/PREMIUM",
+  ])("legacy request: skips a digital-sales hotspot (%s)", (purchase) => {
+    expect(
+      adPublicLinkUrl(
+        { linkUrl: null, hotspots: [{ linkUrl: purchase }, ...hotspots] },
+        true,
+      ),
+    ).toBe("/first");
+  });
+
+  it("legacy request: only digital-sales hotspots -> null", () => {
+    expect(
+      adPublicLinkUrl(
+        {
+          linkUrl: null,
+          hotspots: [{ linkUrl: "/membership" }, { linkUrl: "/boost" }],
+        },
+        true,
+      ),
+    ).toBeNull();
+  });
+
+  it("legacy request: a look-alike path is not a digital-sales page", () => {
+    expect(
+      adPublicLinkUrl(
+        { linkUrl: null, hotspots: [{ linkUrl: "/listings?q=membership" }] },
+        true,
+      ),
+    ).toBe("/listings?q=membership");
+    expect(
+      adPublicLinkUrl(
+        { linkUrl: null, hotspots: [{ linkUrl: "/boosters" }] },
+        true,
+      ),
+    ).toBe("/boosters");
   });
 });
 

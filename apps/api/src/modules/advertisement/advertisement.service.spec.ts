@@ -794,7 +794,7 @@ describe("AdvertisementService — tıklanabilir alanlar (hotspot)", () => {
         row({ linkUrl: null, hotspots: [hotspot] }),
       ]);
 
-      const [ad] = await service.getActive("header");
+      const [ad] = await service.getActive("header", "app");
 
       expect(advertisement.findMany.mock.calls[0][0].include.hotspots).toEqual({
         select: {
@@ -811,6 +811,70 @@ describe("AdvertisementService — tıklanabilir alanlar (hotspot)", () => {
       });
       expect(ad.hotspots).toEqual([hotspot]);
       expect(ad.linkUrl).toBeNull();
+    });
+
+    describe("legacy linkUrl (store 1.0.5 reads only linkUrl)", () => {
+      const first = { id: H1, ...left, sortOrder: 0 };
+      const second = { id: H2, ...right, sortOrder: 1 };
+      const liveAds = (advertisement: { findMany: jest.Mock }) =>
+        advertisement.findMany.mockResolvedValue([
+          row({
+            id: "img",
+            position: "header",
+            linkUrl: null,
+            hotspots: [first, second],
+          }),
+          row({ id: "bare", position: "popup", linkUrl: null, hotspots: [] }),
+          row({
+            id: "txt",
+            position: "topbar",
+            imageUrl: null,
+            linkUrl: "/kategori/x",
+          }),
+          // Migrated as an image ad (`image_url <> ''`) although blank.
+          row({
+            id: "blank",
+            position: "footer",
+            imageUrl: " ",
+            linkUrl: null,
+            hotspots: [second],
+          }),
+        ]);
+      const links = (ads: Array<{ id: string; linkUrl: string | null }>) =>
+        Object.fromEntries(ads.map((a) => [a.id, a.linkUrl]));
+
+      it("no platform, no device: image ad gets the first hotspot link; text ad and bare image ad unchanged", async () => {
+        const { service, advertisement } = makeService();
+        liveAds(advertisement);
+        const ads = await service.getActive();
+        expect(links(ads)).toEqual({
+          img: "/sol",
+          bare: null,
+          txt: "/kategori/x",
+          blank: "https://x.com",
+        });
+        // Hotspots are still returned as stored.
+        expect(ads[0].hotspots).toEqual([first, second]);
+      });
+
+      it.each([
+        ["platform=app", "app", undefined],
+        ["platform=web", "web", undefined],
+        ["legacy web device", undefined, "desktop"],
+      ])(
+        "%s: image ad keeps linkUrl null",
+        async (_label, platform, device) => {
+          const { service, advertisement } = makeService();
+          liveAds(advertisement);
+          const ads = await service.getActive(undefined, platform, device);
+          expect(links(ads)).toEqual({
+            img: null,
+            bare: null,
+            txt: "/kategori/x",
+            blank: null,
+          });
+        },
+      );
     });
   });
 });
