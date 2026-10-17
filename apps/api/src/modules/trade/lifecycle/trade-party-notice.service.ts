@@ -22,7 +22,7 @@ const KIND_TO_TYPE: Record<
 };
 
 /**
- * Takas taraf duyuruları — outbox üzerinden (CLAUDE.md §10). Olayın tx'inde
+ * Takas taraf duyuruları — outbox üzerinden (apps/api/CLAUDE.md outbox). Olayın tx'inde
  * `enqueue`, commit sonrası `flush` (anlık yol, `runInline`); süreç arada ölürse
  * drainer aynı handler'ı çalıştırır. `dedupeKey` alıcı × olay başına tektir.
  */

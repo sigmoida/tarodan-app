@@ -90,7 +90,7 @@ const envSchema = z
     // KAPSAM NOTU: aynı .env.example bloğundaki RETURN_WINDOW_DAYS,
     // REFUND_RETURN_INSPECTION_HOURS ve REFUND_WAIT_DELIVERY_MAX_DAYS de
     // bildirilmemiş durumda; onları burada bildirmek para yollarının süre
-    // pencerelerini değiştirir ve CLAUDE.md §15'te "karar bekleyen" başlığı
+    // pencerelerini değiştirir ve apps/api/CLAUDE.md "Known, undecided" başlığı
     // altındadır — bu düzeltmenin kapsamına alınmadı, ayrı karar.
     REFUND_RETURN_DROPOFF_DAYS: z.string().optional(),
     REFUND_RETURN_DROPOFF_HARD_DAYS: z.string().optional(),

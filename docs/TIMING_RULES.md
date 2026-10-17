@@ -340,7 +340,7 @@ Dashboard kuyruk/uyarı şeridi bu değerleri her derlemede bir kez okur
 
 Admin bir kaydı bir kez kaydettiğinde env değeri o kayıt için etkisiz kalır.
 Çoğu `config/env.validation.ts`te bildirilmemiştir; yalnız gerçek ortam
-değişkeni olarak verildiklerinde etkilidir (CLAUDE.md §15) — bu davranış
+değişkeni olarak verildiklerinde etkilidir (`apps/api/CLAUDE.md`, "Known, undecided") — bu davranış
 bilerek korundu.
 
 **Env'de kalanlar (iş kuralı değil, teknik):** `PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL`,

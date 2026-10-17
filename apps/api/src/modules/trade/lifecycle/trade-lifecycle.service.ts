@@ -138,7 +138,7 @@ export class TradeLifecycleService {
     // filtresinden geçer (Apple 1.2). TradeModule MessagingModule'ü içe
     // aktarır; dar test kurulumlarında yok.
     @Optional() private readonly contentFilter?: ContentFilterService,
-    // Taraf duyuruları outbox üzerinden (CLAUDE.md §10). Dar test kurulumlarında
+    // Taraf duyuruları outbox üzerinden (apps/api/CLAUDE.md outbox). Dar test kurulumlarında
     // yoksa duyuru commit sonrası doğrudan gönderilir.
     @Optional() private readonly partyNotices?: TradePartyNoticeService,
   ) {}
@@ -1300,7 +1300,7 @@ export class TradeLifecycleService {
       });
 
       // Karşı taraf takasın iptal edildiğini yalnız ekrana bakınca görüyordu.
-      // Duyuru iptalle AYNI tx'te outbox'a yazılır (CLAUDE.md §10).
+      // Duyuru iptalle AYNI tx'te outbox'a yazılır (apps/api/CLAUDE.md outbox).
       cancelNotices = [{ tradeId, userId: otherPartyId, kind: "cancelled" }];
       await this.enqueuePartyNotices(tx, cancelNotices);
     });
@@ -1325,7 +1325,7 @@ export class TradeLifecycleService {
   }
 
   /**
-   * Takas taraf duyurusunu olayın tx'inde outbox'a yazar (CLAUDE.md §10: kaybı
+   * Takas taraf duyurusunu olayın tx'inde outbox'a yazar (apps/api/CLAUDE.md outbox: kaybı
    * kullanıcıya görünen yan etki). Outbox servisi yoksa (dar test kurulumu)
    * duyuru commit sonrası `flushPartyNotices` ile doğrudan gider.
    */

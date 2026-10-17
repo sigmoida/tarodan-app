@@ -138,7 +138,7 @@ export class UatRefreshService {
       });
     });
 
-    // Dış çağrı transaction DIŞINDA (CLAUDE.md §5).
+    // Dış çağrı transaction DIŞINDA (apps/api/CLAUDE.md, "Prisma discipline").
     const dispatched = await this.dispatcher.dispatch(config, {
       runId: run.id,
       reportToken: token,

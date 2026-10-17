@@ -3,7 +3,7 @@
  *
  * Both rules are ratchets rather than switches: they make the state of an
  * in-progress migration visible and stop it from getting worse, while the
- * existing sites are converted file by file (see apps/api/CLAUDE.md §15).
+ * existing sites are converted file by file (see apps/api/CLAUDE.md, "Fix what you touch").
  */
 module.exports = {
   plugins: ["@tarodan"],

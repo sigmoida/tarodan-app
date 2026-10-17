@@ -190,7 +190,7 @@ export function parseSettings(raw: unknown): Settings {
 /**
  * A single numeric setting: kept as a string (native number input yields
  * strings) and validated for "is a number ≥ min". Payload shaping to a number
- * stays in the mutationFn (CLAUDE.md §11).
+ * stays in the mutationFn (apps/admin/CLAUDE.md, "Forms and CRUD").
  */
 const numField = (t: T, min?: number, optional?: boolean) => {
   const trimmed = z.string().trim();

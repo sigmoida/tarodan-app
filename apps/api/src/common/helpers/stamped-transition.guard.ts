@@ -18,7 +18,7 @@ import { apiAppRoot } from "./app-root";
  */
 
 // Anchored, not counted in `../` hops: this reads SOURCE files, so the path
-// must survive the caller moving folders (apps/api/CLAUDE.md §1).
+// must survive the caller moving folders (apps/api/CLAUDE.md, "Folder layout inside a module").
 const API_SRC = join(apiAppRoot(), "src");
 
 /** Every non-spec `.ts` file under `apps/api/src`. */

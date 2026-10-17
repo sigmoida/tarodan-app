@@ -14,7 +14,7 @@ import { apiAppRoot } from "../../../common/helpers/app-root";
  * sayıları okur (serbest metin seçmez). Yeni bir okuyucu eklemek bu listeyi
  * BİLİNÇLİ olarak değiştirmeyi gerektirir.
  *
- * Kontrat ağacı özyinelemeli tarar (bkz. apps/api/CLAUDE.md §1): klasör
+ * Kontrat ağacı özyinelemeli tarar (bkz. apps/api/CLAUDE.md, "Folder layout inside a module"): klasör
  * taşınsa da kapsam düşmez.
  */
 describe("listing removal — serbest metin yalnız admin uçlarında", () => {

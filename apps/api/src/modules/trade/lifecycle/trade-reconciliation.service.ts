@@ -71,7 +71,7 @@ export class TradeReconciliationService {
     private readonly tradeCommon: TradeCommonService,
     // Yanıt / ödeme süresi için extend_once kararı (iptal mantığı bu serviste kalır).
     private readonly tradeExtension: TradeDeadlineExtensionService,
-    // Otomatik tamamlanma duyurusu outbox üzerinden (CLAUDE.md §10). Dar test
+    // Otomatik tamamlanma duyurusu outbox üzerinden (apps/api/CLAUDE.md outbox). Dar test
     // kurulumlarında yoksa commit sonrası doğrudan gönderilir.
     @Optional() private readonly partyNotices?: TradePartyNoticeService,
   ) {}
