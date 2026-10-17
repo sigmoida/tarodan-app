@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { NextRequest, type NextResponse } from "next/server";
 import {
+  createBffProxy,
   FORWARDED_REQUEST_HEADERS,
   FORWARDED_RESPONSE_HEADERS,
   GATEWAY_CLIENT_IP_HEADER,
@@ -22,6 +24,7 @@ describe("gateway forwarded headers", () => {
       "cache-control",
       "pragma",
       "idempotency-key",
+      "x-payment-capability",
     ]) {
       expect(FORWARDED_REQUEST_HEADERS).toContain(header);
     }
@@ -88,5 +91,63 @@ describe("gateway client IP (onay kaydı kanıtı)", () => {
 
   it("vekil başlığı hiç yoksa null döner", () => {
     expect(gatewayClientIp(new Headers())).toBeNull();
+  });
+});
+
+describe("gateway proxy request forwarding", () => {
+  async function forward(headers: Record<string, string>) {
+    const apiFetch = vi.fn(async (_path: string, _init?: RequestInit) => ({
+      res: new Response("{}", { status: 200 }),
+    }));
+    const { POST } = createBffProxy({
+      apiFetch,
+      attachSessionCookies: (_res: NextResponse) => undefined,
+    });
+    const request = new NextRequest(
+      "https://tarodan.test/gateway/payments/direct-form",
+      {
+        method: "POST",
+        headers: {
+          host: "tarodan.test",
+          origin: "https://tarodan.test",
+          "content-type": "application/json",
+          ...headers,
+        },
+        body: JSON.stringify({ paymentId: "p1" }),
+      },
+    );
+    await POST(request, {
+      params: Promise.resolve({ path: ["payments", "direct-form"] }),
+    });
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    const [path, init] = apiFetch.mock.calls[0];
+    return { path, headers: new Headers(init?.headers) };
+  }
+
+  it("ödeme yetki başlığını (X-Payment-Capability) API'ye taşır", async () => {
+    // Misafir kart ödemesi bu başlık olmadan API'den 403 alıyordu.
+    const { path, headers } = await forward({
+      "X-Payment-Capability": "cap-token",
+    });
+    expect(path).toBe("/payments/direct-form");
+    expect(headers.get("x-payment-capability")).toBe("cap-token");
+  });
+
+  it("safelist dışındaki başlıkları ve tarayıcı kimlik bilgisini taşımaz", async () => {
+    const { headers } = await forward({
+      "x-evil": "1",
+      "x-payment-capability-extra": "1",
+      authorization: "Bearer browser",
+      cookie: "web_at=a1",
+      [GATEWAY_CLIENT_IP_HEADER]: "6.6.6.6",
+    });
+    expect(headers.get("x-evil")).toBeNull();
+    expect(headers.get("x-payment-capability-extra")).toBeNull();
+    expect(headers.get("authorization")).toBeNull();
+    expect(headers.get("cookie")).toBeNull();
+    // Tarayıcının uydurduğu istemci-IP başlığı yukarı taşınmaz (vekil başlığı
+    // olmadığı için gateway de kendi değerini koymaz).
+    expect(headers.get(GATEWAY_CLIENT_IP_HEADER)).toBeNull();
+    expect(headers.get("content-type")).toBe("application/json");
   });
 });

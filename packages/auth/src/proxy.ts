@@ -92,6 +92,11 @@ function isForbiddenCrossOrigin(request: NextRequest): boolean {
  *
  * `user-agent` onay kayıtlarının kanıtıdır (KVKK / sözleşme onayı "nereden"):
  * taşınmazsa API her web isteğinde Node'un kendi ajanını görür.
+ *
+ * `x-payment-capability` ödemeye özel kısa ömürlü yetki belirtecidir (oturum
+ * kimliği değil): misafir kart ödemesi (`/payments/direct-form`) ve ödeme
+ * durum / doğrulama / başarısız-onay / fatura uçları onu okur. Taşınmadığında
+ * web misafir kart ödemesi 403 alıyordu.
  */
 export const FORWARDED_REQUEST_HEADERS = [
   "content-type",
@@ -100,6 +105,7 @@ export const FORWARDED_REQUEST_HEADERS = [
   "pragma",
   "idempotency-key",
   "user-agent",
+  "x-payment-capability",
 ] as const;
 
 /**
@@ -152,7 +158,8 @@ export const FORWARDED_RESPONSE_HEADERS = [
  * The BFF proxy handlers, factored out of the admin app. Every client data call
  * goes to same-origin `/api/*` (no CORS) and is forwarded to the upstream API
  * with a server-side `Bearer` header; the browser never holds the API tokens.
- * Access tokens refresh transparently on 401, and the rotated tokens are
+ * Access tokens refresh transparently (on 401, or up front when the access
+ * cookie has expired but the refresh cookie lives), and the rotated tokens are
  * persisted onto this response.
  *
  * Wire it in `app/api/[...path]/route.ts`:
