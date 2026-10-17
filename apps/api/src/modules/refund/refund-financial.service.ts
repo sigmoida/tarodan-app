@@ -1002,11 +1002,12 @@ export class RefundFinancialService {
      */
     refundFault: RefundFaultFacts;
     /**
-     * The request's own components charge the buyer the seller's outbound
-     * share (v2 buyer fault under the pre-D20 rule). The buyer's cash already
-     * has it deducted, so the hold must keep it for the seller.
+     * Gross the request's own components charge the buyer for the seller's
+     * outbound share (v2 buyer fault under the pre-D20 rule; after the v2 cap
+     * to the refundable amount). The buyer's cash already has it deducted, so
+     * the hold keeps up to that much for the seller.
      */
-    sellerShareChargedToBuyer: boolean;
+    sellerShareChargedToBuyer: number;
     sellerAdjustments: Array<{
       sourceKey: string;
       amount: number;
@@ -1021,12 +1022,17 @@ export class RefundFinancialService {
         faultParty: refundRequest.faultParty,
         policyCode: refundRequest.policyCode,
       },
-      sellerShareChargedToBuyer: (components ?? []).some(
-        (component) =>
-          component.componentCode === "outbound_shipping" &&
-          component.treatment === "buyer_charge" &&
-          Number(component.grossAmount) > 0,
-      ),
+      sellerShareChargedToBuyer: (components ?? [])
+        .filter(
+          (component) =>
+            component.componentCode === "outbound_shipping" &&
+            component.treatment === "buyer_charge",
+        )
+        .reduce(
+          (sum, component) => sum.plus(component.grossAmount),
+          new Prisma.Decimal(0),
+        )
+        .toNumber(),
       sellerAdjustments: [
         {
           sourceKey: `refund-return-shipping:${refundRequestId}`,

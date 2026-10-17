@@ -993,6 +993,90 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
   });
 
+  describe("D20 backstop vs a request decided under the old rule", () => {
+    // The order already has a finalized seller-fault refund. A buyer-fault
+    // request decided before D20 charged the buyer the seller's share: the
+    // hold keeps what the buyer paid for, so it is collected once.
+    const oldRuleBuyerFault = (sellerShareChargedToBuyer: number) => ({
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: `old-rule-${sellerShareChargedToBuyer}`,
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 48,
+        refundFault: {
+          faultParty: "buyer" as const,
+          policyCode: "v2_buyer_return",
+        },
+        sellerShareChargedToBuyer,
+      },
+    });
+    const withEarlierSellerFault = (mockTx: {
+      order: { findUnique: jest.Mock };
+    }) =>
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "delivered",
+        productId: "prod-1",
+        quantity: 1,
+        stockRestoredAt: null,
+        offerId: null,
+        sellerId: "s1",
+        buyerId: "b1",
+        cancelledBy: null,
+        refundRequests: [
+          { faultParty: "seller", policyCode: "v2_seller_return" },
+        ],
+      });
+
+    it("the buyer paid the whole share: 48 stays for the seller", async () => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+      withEarlierSellerFault(mockTx);
+
+      await service.processRefund(ORDER_ID, 900, oldRuleBuyerFault(48));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 812 }),
+      );
+    });
+
+    it("the v2 cap scaled the charge to 17: only 17 stays, the rest is forfeited", async () => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+      withEarlierSellerFault(mockTx);
+
+      await service.processRefund(ORDER_ID, 900, oldRuleBuyerFault(17));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 843 }),
+      );
+    });
+
+    it("no charge to the buyer: the share is forfeited in full", async () => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+      withEarlierSellerFault(mockTx);
+
+      await service.processRefund(ORDER_ID, 900, oldRuleBuyerFault(0));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({
+          status: PaymentHoldStatus.cancelled,
+          refundedAmount: 860,
+        }),
+      );
+    });
+  });
+
   it("an earlier goodwill refund does not eat the share of a later full non-fault refund", async () => {
     // 50 TL goodwill (amount ratio) consumed 50 of a 1000 hold. The later full
     // refund still leaves the seller's 48: 1000 − 48 = 952 consumed in total.

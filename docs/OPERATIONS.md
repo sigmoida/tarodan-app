@@ -621,12 +621,16 @@ the order's earlier finalized refunds as it consumes the hold:
   the log says "Seller shipping share forfeited";
 - any of them is seller fault but the request's components DO charge the
   buyer the share (a buyer-fault request decided under the old rule, its
-  cash already reduced by it): the share is kept for the seller so it is
-  collected only once, and the log says "Seller shipping share kept under the
-  pre-D20 rule".
+  cash already reduced by it): the part the buyer was charged (at most the
+  share) stays in the hold for the seller, so it is collected only once, and
+  the log says "Seller shipping share kept under the pre-D20 rule". The order
+  normally stays `delivered` and the normal release pays it.
 
-Neither case leaves a residual. Anything the re-run does find is settled the
-same way as above.
+The first case leaves no residual. In the second, if that order later closes
+(an admin refund reaching T), the kept share shows up in the dry run as a
+`seller` row. Do NOT settle it to the platform: the buyer already paid it.
+Find it by the log line and leave it to the payout. Anything else the re-run
+finds is settled the same way as above.
 
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 

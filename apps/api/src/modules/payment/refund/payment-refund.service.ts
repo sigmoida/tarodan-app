@@ -127,11 +127,11 @@ export interface RefundSettlementOptions {
    */
   refundFault?: RefundFaultFacts;
   /**
-   * The request's own components charge the buyer the seller's share
-   * (pre-D20 buyer-fault rule). The forfeit check then keeps the share, so
-   * the request is settled consistently under the rule it was decided with.
+   * Gross the request's own components charged the buyer for the seller's
+   * share (pre-D20 buyer-fault rule). The forfeit check keeps up to that much
+   * of the share, so what the buyer paid for it is collected once.
    */
-  sellerShareChargedToBuyer?: boolean;
+  sellerShareChargedToBuyer?: number;
   /** Terslenecek satıcı kesintisinin kesin TL tutarı. */
   sellerFeeRefundAmount?: number;
   /** Terslenecek alıcı hizmet/komisyon kesintisinin kesin TL tutarı. */
@@ -366,7 +366,7 @@ export class PaymentRefundService {
     orderId: string,
     requested: number | undefined,
     current: RefundFaultFacts | undefined,
-    chargedToBuyer: boolean,
+    chargedToBuyer: number,
   ): Promise<number> {
     if (requested == null || !(requested > 0)) return 0;
     const order = await tx.order.findUnique({
@@ -383,19 +383,35 @@ export class PaymentRefundService {
       ...(current ? [current] : []),
     ];
     if (!sellerShareForfeited(faults)) return requested;
-    if (chargedToBuyer) {
-      // Decided under the pre-D20 rule: the buyer's cash already bears the
-      // share, so forfeiting it here would collect it twice. Keep it for the
-      // seller and settle the request as it was decided.
-      this.logger.warn(
-        `Seller shipping share kept under the pre-D20 rule (buyer was charged it): order=${orderId} share=${requested}`,
+    if (chargedToBuyer > 0) {
+      // Keep what the buyer paid for (the v2 cap may have scaled the charge
+      // below the share) and forfeit the rest.
+      return this.keptUnderOldRule(
+        orderId,
+        requested,
+        Math.min(requested, chargedToBuyer),
       );
-      return requested;
     }
     this.logger.warn(
       `Seller shipping share forfeited (earlier seller-fault refund): order=${orderId} share=${requested}`,
     );
     return 0;
+  }
+
+  /**
+   * Decided under the pre-D20 rule: the buyer's cash already bears `kept` of
+   * the share, so forfeiting that part would collect it twice. It stays for
+   * the seller and the request settles as it was decided.
+   */
+  private keptUnderOldRule(
+    orderId: string,
+    requested: number,
+    kept: number,
+  ): number {
+    this.logger.warn(
+      `Seller shipping share kept under the pre-D20 rule (buyer was charged it): order=${orderId} share=${requested} kept=${kept}`,
+    );
+    return kept;
   }
 
   private async notifyRefundOutcome(
@@ -1037,7 +1053,7 @@ export class PaymentRefundService {
               orderId,
               opts?.settlement?.holdRetainedAmount,
               opts?.settlement?.refundFault,
-              opts?.settlement?.sellerShareChargedToBuyer === true,
+              opts?.settlement?.sellerShareChargedToBuyer ?? 0,
             );
             const newRefunded = holdRefundedAmountAfter({
               amount: activeHold.amount,
