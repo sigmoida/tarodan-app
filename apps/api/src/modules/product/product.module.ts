@@ -6,6 +6,7 @@ import { ProductService } from "./product.service";
 import { ProductCommonService } from "./product-common.service";
 import { ProductCreateService } from "./lifecycle/product-create.service";
 import { ProductUpdateService } from "./lifecycle/product-update.service";
+import { ProductRenewalService } from "./lifecycle/product-renewal.service";
 import { ProductQueryService } from "./query/product-query.service";
 import { ProductFilterService } from "./query/product-filter.service";
 import { ProductRankingService } from "./ranking/product-ranking.service";
@@ -51,6 +52,7 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductCommonService,
     ProductCreateService,
     ProductUpdateService,
+    ProductRenewalService,
     ProductQueryService,
     ProductFilterService,
     ProductRankingService,
@@ -68,6 +70,9 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductRankingService,
     ProductBoostService,
     ProductSchedulerService,
+    // Admin bakım işlemi (süresi dolmuş ilanları işaretle/reaktive et) yazmayı
+    // alan servisten yapar — doğrudan Prisma yazımı değil.
+    ProductRenewalService,
     ProductLockModule,
   ],
 })

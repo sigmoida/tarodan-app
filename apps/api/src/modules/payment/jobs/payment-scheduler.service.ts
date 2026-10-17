@@ -422,7 +422,8 @@ export class PaymentSchedulerService implements OnModuleInit {
 
   /**
    * Run every 30 minutes: check for orders stuck in "preparing" past deadline.
-   * Warns sellers 24h before deadline, auto-cancels + refunds when deadline passes.
+   * Warns sellers `preparingWarningLeadHours` before the deadline; when it
+   * passes, extends it once (`extend_once`) or auto-cancels + refunds.
    */
   /** Gerçek iş — Bull processor 'payment-expired-preparing' buradan çağırır. */
   async runHandleExpiredPreparingOrders(log: (msg: string) => void = () => {}) {
@@ -431,11 +432,16 @@ export class PaymentSchedulerService implements OnModuleInit {
     try {
       const result = await this.paymentService.handleExpiredPreparingOrders();
       log(
-        `${result.warned} satıcı uyarıldı · ${result.cancelled} sipariş oto-iptal`,
+        `${result.warned} satıcı uyarıldı · ${result.extended} süre uzatıldı · ${result.cancelled} sipariş oto-iptal`,
       );
       if (result.warned > 0) {
         this.logger.log(
           `Warned ${result.warned} seller(s) about preparing deadline`,
+        );
+      }
+      if (result.extended > 0) {
+        this.logger.log(
+          `Extended the preparing deadline once for ${result.extended} order(s)`,
         );
       }
       if (result.cancelled > 0) {
@@ -444,8 +450,12 @@ export class PaymentSchedulerService implements OnModuleInit {
         );
       }
       return {
-        summary: `${result.warned} uyarı · ${result.cancelled} oto-iptal`,
-        stats: { warned: result.warned, cancelled: result.cancelled },
+        summary: `${result.warned} uyarı · ${result.extended} uzatma · ${result.cancelled} oto-iptal`,
+        stats: {
+          warned: result.warned,
+          extended: result.extended,
+          cancelled: result.cancelled,
+        },
       };
     } catch (error: any) {
       this.logger.error(

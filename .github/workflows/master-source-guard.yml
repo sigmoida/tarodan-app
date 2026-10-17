@@ -1,0 +1,56 @@
+name: Master Source Guard
+
+# master = production. A PR into master may come only from this repository's
+# `development` (a normal release) or `hotfix/*` (an emergency fix, merged
+# back into development afterwards). Mirrors the guard of the mobile repo
+# (tarodan-mobile .github/workflows/master-flow.yml), without its automatic
+# hotfix back-merge.
+#
+# "Master source guard" belongs in the master ruleset's required checks. No
+# path filter: a required check that is skipped leaves the PR waiting forever.
+#
+# Why `pull_request_target` (not `pull_request`): pull_request reads this file
+# from the PR's HEAD, so a PR could edit the guard into always passing.
+# pull_request_target reads it from the TARGET branch (master), out of the
+# PR's reach. That trigger is only dangerous when it runs PR code; here:
+#   - nothing is checked out, only event metadata is read;
+#   - every PR-controlled value (branch / repo name) reaches the script through
+#     `env:`, never through `${{ }}` inside `run:` (no script injection);
+#   - the token is read-only.
+# Because the file is read from master, the guard reports only once it is ON
+# master. The master ruleset already requires it, so the release that brings
+# this file to master needs the admin bypass for that one check.
+
+on:
+  pull_request_target:
+    branches: [master]
+    # edited: also re-run when a PR's base is switched to master afterwards.
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  source-guard:
+    name: Master source guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Source branch must be development or hotfix/*
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$HEAD_REPO" != "$REPO" ]; then
+            echo "::error::PRs into master must come from a branch of this repository (source: $HEAD_REPO:$HEAD_REF)."
+            exit 1
+          fi
+          case "$HEAD_REF" in
+            development|hotfix/*)
+              echo "OK: $HEAD_REF -> master" ;;
+            *)
+              echo "::error::PRs into master must come from 'development' or 'hotfix/*' (source: '$HEAD_REF'). Merge the change into development, or name an emergency branch hotfix/<name>."
+              exit 1 ;;
+          esac

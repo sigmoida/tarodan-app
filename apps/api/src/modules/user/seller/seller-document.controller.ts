@@ -3,7 +3,6 @@ import {
   Post,
   Get,
   Body,
-  Param,
   Patch,
   UseGuards,
   UseInterceptors,
@@ -26,6 +25,7 @@ import {
   CreateCorporateStakeholderDto,
   UpdateCorporateApplicationDto,
 } from "../dto";
+import { UuidParam } from "../../../common/pipes/uuid-param.decorator";
 
 /**
  * Kurumsal satıcı başvuru belgeleri: kullanıcı kendi belgelerini yükler/listeler.
@@ -96,7 +96,7 @@ export class SellerDocumentController {
   @ApiOperation({ summary: "Belge kararına itiraz et" })
   appeal(
     @CurrentUser("id") userId: string,
-    @Param("id") documentId: string,
+    @UuidParam("id") documentId: string,
     @Body() dto: AppealSellerDocumentDto,
   ) {
     return this.service.appealDocument(userId, documentId, dto.note);

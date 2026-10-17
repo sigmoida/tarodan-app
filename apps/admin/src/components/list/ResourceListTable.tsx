@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { useResourceList } from "@/context/ResourceListContext";
 
@@ -9,21 +10,38 @@ export function ResourceListTable<T>({
   columns,
   onRowClick,
   rowClassName,
+  isRowSelectable,
   renderExpanded,
   expandedId,
   emptyText,
   emptyAction,
+  footer,
+  dense,
 }: {
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: T) => void;
   rowClassName?: (row: T) => string | undefined;
+  isRowSelectable?: (row: T) => boolean;
   renderExpanded?: (row: T) => ReactNode;
   expandedId?: string | null;
   emptyText?: string;
   emptyAction?: ReactNode;
+  footer?: ReactNode;
+  dense?: boolean;
 }) {
-  const { rows, isLoading, getRowId, selection, sort, setSort } =
-    useResourceList<T>();
+  const {
+    rows,
+    isLoading,
+    getRowId,
+    selection,
+    sort,
+    setSort,
+    isPristineEmpty,
+  } = useResourceList<T>();
+  const t = useTranslations();
+  // Sayfanın "henüz kayıt yok" metni yalnız liste GERÇEKTEN boşken doğrudur;
+  // arama/filtre sonucu boşalan listede "sonuç bulunamadı" denir.
+  const resolvedEmptyText = isPristineEmpty ? emptyText : t("common.noResults");
   return (
     <DataTable
       columns={columns}
@@ -32,9 +50,10 @@ export function ResourceListTable<T>({
       getRowId={getRowId}
       onRowClick={onRowClick}
       rowClassName={rowClassName}
+      isRowSelectable={isRowSelectable}
       renderExpanded={renderExpanded}
       expandedId={expandedId}
-      emptyText={emptyText}
+      emptyText={resolvedEmptyText}
       emptyAction={emptyAction}
       selectable={selection.selectable}
       selectedIds={selection.selectedIds}
@@ -42,6 +61,8 @@ export function ResourceListTable<T>({
       onToggleAll={selection.toggleAll}
       sort={sort}
       onSort={setSort}
+      footer={footer}
+      dense={dense}
     />
   );
 }

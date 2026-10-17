@@ -18,10 +18,8 @@ import {
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
-import {
-  PAYMENT_CONFIG_KEYS,
-  envConfigNumber,
-} from "../payment/helpers/payment.constants";
+import { resolveTimingValue } from "../../common/timing-rules";
+import { effectiveReturnWindowEnd } from "../order/helpers/order-return-window";
 import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./helpers/refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
@@ -34,8 +32,14 @@ import {
   resolvePlatformCancellationPolicy,
   resolveReturnPolicy,
 } from "./helpers/refund-financial-policy";
-import { isPreShipmentCancellableStatus } from "@tarodan/types";
-import { REFUND_REQUEST_ACTOR_KEY } from "../payment/helpers/refund-attempt-actor";
+import {
+  isPreShipmentCancellableStatus,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
+import {
+  REFUND_REQUEST_ACTOR_KEY,
+  REFUND_REQUEST_ADMIN_REASON_KEY,
+} from "../payment/helpers/refund-attempt-actor";
 import {
   PLATFORM_CANCELLATION_FAULT_PARTY,
   PLATFORM_CANCELLATION_REASON,
@@ -45,6 +49,7 @@ import {
 } from "./helpers/pre-shipment-cancellation";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { storedComponentsOf } from "./helpers/stored-refund-components";
 import { RefundShipmentService } from "./refund-shipment.service";
 
 /** Kargo öncesi iptalin okuduğu sipariş yükü (alıcı + platform iptali ortak). */
@@ -65,14 +70,6 @@ const CANCELLATION_ORDER_INCLUDE = {
 type CancellationOrder = Prisma.OrderGetPayload<{
   include: typeof CANCELLATION_ORDER_INCLUDE;
 }>;
-
-/**
- * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
- * (PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS). Burada gömülü bir 14 tutmak,
- * env'den okunan payout penceresiyle sessizce kaymasına yol açıyordu.
- */
-const coolingOffDays = () =>
-  envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
 /**
  * İade talebinin DOĞUŞU — RefundService'ten birebir taşındı. Bir talebin hangi
@@ -176,7 +173,15 @@ export class RefundCreationService {
       orderQty,
     );
 
-    const phase = this.classifyOrderPhase(order);
+    // Cayma penceresi: teslimde damgalanan sonu (`returnWindowEndsAt`) varsa o
+    // geçerlidir — escrow ödemesi de aynı damgadan hesaplanır. Bugünkü değer
+    // (Süreler ve Kurallar → returnWindowDays) yalnız damgasız eski siparişte
+    // kullanılır.
+    const coolingOffDays = await resolveTimingValue(
+      this.prisma,
+      "returnWindowDays",
+    );
+    const phase = this.classifyOrderPhase(order, coolingOffDays);
     const policy =
       phase === "preparing" || phase === "paid"
         ? resolveCancellationPolicy(
@@ -215,7 +220,9 @@ export class RefundCreationService {
       // talebi oluşturamaz. (Escrow de gün 15'te payout ettiği için bu kural
       // sayesinde payout anında asla açık/açılabilir iade kalmaz.)
       throw new BadRequestException(
-        i18nMessage("server.refund.coolingOffExpired"),
+        i18nMessage("server.refund.coolingOffExpired", {
+          returnWindowDays: coolingOffDays,
+        }),
       );
     }
 
@@ -252,17 +259,19 @@ export class RefundCreationService {
    * grup (sepet) ödemesinde de çalışır, çünkü para yolu siparişin kendi
    * payını iade eden processRefund'dur. Yetki kontrolü çağıranın (admin
    * rolü) işidir. Alıcı iptaliyle AYNI çekirdekten geçer; fark yalnız
-   * platformCancellationSpec'tedir.
+   * platformCancellationSpec'tedir. Neden yalnız katalog KODU olarak gelir —
+   * yöneticinin iç notu çekirdeğe (ve taraflara görünen alanlara) girmez.
+   * Taraf duyurusu çağıranındır (spec `notifyParties: []`).
    */
   async createPlatformCancellationRefund(
     orderId: string,
     adminId: string,
-    reason: string,
+    reasonCode: AdminCancelReasonCode,
   ) {
     const order = await this.loadOrderForCancellation(orderId);
     return this.executePreShipmentCancellation(
       order,
-      platformCancellationSpec(order.buyerId, adminId, reason),
+      platformCancellationSpec(order.buyerId, adminId, reasonCode),
     );
   }
 
@@ -407,7 +416,15 @@ export class RefundCreationService {
             description: spec.description,
             // Talep sonradan (admin onayı, takılı deneme kurtarması) iade
             // edilirse iptal aktörü buradan okunur (refundRequestCancelActor).
-            metadata: { [REFUND_REQUEST_ACTOR_KEY]: spec.initiator },
+            // Platform iptalinde neden kodu da talepte taşınır: iptal, iade
+            // hangi yoldan tamamlanırsa (eşzamanlı, admin onayı, kurtarma)
+            // o an siparişe yazılır (refundRequestAdminReasonCode).
+            metadata: {
+              [REFUND_REQUEST_ACTOR_KEY]: spec.initiator,
+              ...(spec.adminReasonCode
+                ? { [REFUND_REQUEST_ADMIN_REASON_KEY]: spec.adminReasonCode }
+                : {}),
+            },
             amount: financial.financials.buyerRefundAmount,
             refundQuantity: order.quantity ?? 1,
             status: policy.requiresAdminReview
@@ -472,7 +489,7 @@ export class RefundCreationService {
         reason: spec.snapshotReason,
         requiresAdminReview: true,
       });
-      return created;
+      return { ...created, closedWithAdminReason: null };
     }
 
     // `processRefund` resolves to null when the attempt was already finalized —
@@ -481,6 +498,7 @@ export class RefundCreationService {
     let refundResult: {
       providerRefundId?: string;
       stockQuarantined?: boolean;
+      closedWithAdminReason?: AdminCancelReasonCode | null;
     } | null;
     try {
       refundResult = await this.paymentService.processRefund(
@@ -494,11 +512,14 @@ export class RefundCreationService {
           idempotencyKey: `refund-request:${created.id}`,
           // İptalin aktörü spec'ten — alıcı ya da platform (admin iptali).
           cancelledBy: spec.initiator,
+          // Platform iptali bu iadeyle kesinleşirse kod siparişe AYNI
+          // işlemde yazılır (PSP hatasında yazılmaz; talep taşır).
+          adminCancelReasonCode: spec.adminReasonCode,
           settlement: {
             closeOrder: true,
             holdPortion: 1,
             ...this.financials.feeSettlementFromComponents(
-              (created as any).financialComponents,
+              storedComponentsOf(created),
               {
                 sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
                 // Defter NET tutar ister; brüt beslemek KDV kadar fazla ters
@@ -507,17 +528,21 @@ export class RefundCreationService {
                   financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
-            ...this.financials.shippingSettlement(created.id, {
-              sellerShippingCompensationAmount: Number(
-                created.sellerShippingCompensationAmount,
-              ),
-              outboundShippingChargeToSeller: Number(
-                created.outboundShippingChargeToSeller,
-              ),
-              returnShippingChargeToSeller: Number(
-                created.returnShippingChargeToSeller,
-              ),
-            }),
+            ...this.financials.shippingSettlement(
+              created,
+              {
+                sellerShippingCompensationAmount: Number(
+                  created.sellerShippingCompensationAmount,
+                ),
+                outboundShippingChargeToSeller: Number(
+                  created.outboundShippingChargeToSeller,
+                ),
+                returnShippingChargeToSeller: Number(
+                  created.returnShippingChargeToSeller,
+                ),
+              },
+              storedComponentsOf(created),
+            ),
           },
         },
       );
@@ -561,7 +586,14 @@ export class RefundCreationService {
       Number(updated.amount),
       spec.notifyParties,
     );
-    return updated;
+    // Siparişi BU çağrının iadesi platform iptali olarak kapattıysa kodu; aksi
+    // halde null (ör. takılı deneme kurtarması aynı denemeyi önce sonlandırıp
+    // duyuruyu kendisi gönderdi). Platform duyurusunu gönderen çağıran
+    // (AdminOrderCancelService) yalnız buna bakar — çift mesaj olmaz.
+    return {
+      ...updated,
+      closedWithAdminReason: refundResult?.closedWithAdminReason ?? null,
+    };
   }
 
   /**
@@ -592,15 +624,20 @@ export class RefundCreationService {
     );
   }
 
-  private classifyOrderPhase(order: {
-    status: OrderStatus;
-    deliveredAt?: Date | null;
-    shipment: {
-      status: ShipmentStatus;
-      deliveredAt: Date | null;
-      shippedAt?: Date | null;
-    } | null;
-  }): "paid" | "preparing" | "in_cooling_off" | "past_cooling_off" | "unknown" {
+  private classifyOrderPhase(
+    order: {
+      status: OrderStatus;
+      deliveredAt?: Date | null;
+      /** Teslimde damgalanan cayma penceresi sonu (eski siparişte null). */
+      returnWindowEndsAt?: Date | null;
+      shipment: {
+        status: ShipmentStatus;
+        deliveredAt: Date | null;
+        shippedAt?: Date | null;
+      } | null;
+    },
+    coolingOffDays: number,
+  ): "paid" | "preparing" | "in_cooling_off" | "past_cooling_off" | "unknown" {
     if (
       order.status === OrderStatus.paid ||
       order.status === OrderStatus.preparing
@@ -627,8 +664,15 @@ export class RefundCreationService {
       const deliveredAt =
         order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
       if (!deliveredAt) return "in_cooling_off";
-      const ageDays = (Date.now() - deliveredAt.getTime()) / (1000 * 3600 * 24);
-      return ageDays <= coolingOffDays()
+      // Pencere sonu teslimde damgalandı; escrow ödemesi de aynı damgadan
+      // hesaplanır, bu yüzden iade hakkı ödemeyle çakışamaz. Damgasız eski
+      // siparişte bugünkü pencere geçerlidir.
+      const windowEnd = effectiveReturnWindowEnd(
+        order,
+        deliveredAt,
+        coolingOffDays,
+      );
+      return Date.now() <= windowEnd.getTime()
         ? "in_cooling_off"
         : "past_cooling_off";
     }
@@ -801,7 +845,7 @@ export class RefundCreationService {
               1,
             ),
             ...this.financials.feeSettlementFromComponents(
-              (created as any).financialComponents,
+              storedComponentsOf(created),
               {
                 sellerFeeAmount: financial.financials.sellerFeeRefundAmount,
                 // Defter NET tutar ister; brüt beslemek KDV kadar fazla ters
@@ -810,17 +854,21 @@ export class RefundCreationService {
                   financial.financials.buyerProtectionNetRefundAmount,
               },
             ),
-            ...this.financials.shippingSettlement(created.id, {
-              sellerShippingCompensationAmount: Number(
-                created.sellerShippingCompensationAmount,
-              ),
-              outboundShippingChargeToSeller: Number(
-                created.outboundShippingChargeToSeller,
-              ),
-              returnShippingChargeToSeller: Number(
-                created.returnShippingChargeToSeller,
-              ),
-            }),
+            ...this.financials.shippingSettlement(
+              created,
+              {
+                sellerShippingCompensationAmount: Number(
+                  created.sellerShippingCompensationAmount,
+                ),
+                outboundShippingChargeToSeller: Number(
+                  created.outboundShippingChargeToSeller,
+                ),
+                returnShippingChargeToSeller: Number(
+                  created.returnShippingChargeToSeller,
+                ),
+              },
+              storedComponentsOf(created),
+            ),
           },
         },
       );

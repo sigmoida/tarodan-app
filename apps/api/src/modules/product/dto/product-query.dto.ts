@@ -9,8 +9,13 @@ import {
   IsBoolean,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type, Transform } from "class-transformer";
-import { ProductStatus, ProductCondition } from "@prisma/client";
+import { Type } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
+import {
+  ProductStatus,
+  ProductCondition,
+  ProductInactiveReason,
+} from "@prisma/client";
 
 export class ProductQueryDto {
   @ApiPropertyOptional({
@@ -54,6 +59,16 @@ export class ProductQueryDto {
   @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
+
+  @ApiPropertyOptional({
+    enum: ProductInactiveReason,
+    example: "expired",
+    description:
+      "Pasif ilanın nedeni (yalnız satıcının kendi listesinde): expired = süresi dolan",
+  })
+  @IsOptional()
+  @IsEnum(ProductInactiveReason)
+  inactiveReason?: ProductInactiveReason;
 
   @ApiPropertyOptional({
     enum: ProductCondition,
@@ -128,7 +143,7 @@ export class ProductQueryDto {
     description: "Filter only trade-enabled products",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   tradeOnly?: boolean;
 
@@ -138,7 +153,7 @@ export class ProductQueryDto {
       "Only products that can be offered in a trade (active, not in an active trade, has available stock). Used by /products/my.",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   tradeEligible?: boolean;
 
@@ -147,7 +162,7 @@ export class ProductQueryDto {
     description: "Filter only actively boosted (sponsored) products",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   boostedOnly?: boolean;
 
@@ -157,7 +172,7 @@ export class ProductQueryDto {
       "Home showcase (Vitrin): only products with an active showcaseOnHome boost",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   homeShowcase?: boolean;
 
@@ -166,7 +181,7 @@ export class ProductQueryDto {
     description: "Filter only products currently on sale/discount",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   discountOnly?: boolean;
 
@@ -175,7 +190,7 @@ export class ProductQueryDto {
     description: "Filter only pre-order products",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   preOrder?: boolean;
 
@@ -184,7 +199,7 @@ export class ProductQueryDto {
     description: "Filter only limited edition products",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   limited?: boolean;
 
@@ -193,7 +208,7 @@ export class ProductQueryDto {
     description: "Filter only set/bundle products (multi-pack, car sets)",
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   set?: boolean;
 

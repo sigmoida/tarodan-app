@@ -1,5 +1,6 @@
 import type { LoggerService } from "@nestjs/common";
 import { getRequestId } from "../context/request-context";
+import { attachFingerprint, buildErrorFingerprint } from "./error-fingerprint";
 import { getAppLogger } from "./logger";
 
 const QUIET_CONTEXTS = new Set(["RouterExplorer", "RoutesResolver"]);
@@ -70,6 +71,17 @@ export class AppNestLogger implements LoggerService {
           item.includes("at "),
       );
       if (stack && !suppliedError) error.stack = stack;
+      // Sentry gruplamasını (§ error-fingerprint.ts) context+mesaja göre
+      // sabitle: aksi halde stack her zaman burada bittiği için ilgisiz
+      // hatalar tek issue'da eriyor.
+      attachFingerprint(
+        error,
+        buildErrorFingerprint({
+          context,
+          errorName: suppliedError?.name,
+          message: text,
+        }),
+      );
       logger.error(text, { error, details, ...(requestId && { requestId }) });
       return;
     }

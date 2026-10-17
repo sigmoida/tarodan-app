@@ -12,9 +12,16 @@ import {
   PaymentHoldStatus,
   PaymentStatus,
   Prisma,
-  RefundRequestStatus,
   TradeStatus,
 } from "@prisma/client";
+import {
+  HOLD_RELEASE_BLOCKED_MESSAGE_KEYS,
+  HOLD_RELEASE_ORDER_SELECT,
+  holdReleaseBlockedReason,
+  holdReleaseOrderFacts,
+  holdResidual,
+} from "../../payout/helpers/hold-release-eligibility";
+import { findClosedOrderHeldHolds } from "../../payout/helpers/closed-order-hold-candidates";
 import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { CacheService } from "../../cache/cache.service";
@@ -23,31 +30,20 @@ import {
   OUTBOX_ORDER_REVENUE_INVOICE,
   type OrderRevenueInvoicePayload,
 } from "../../outbox/outbox.types";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import {
-  PAYMENT_CONFIG_KEYS,
-  resolvePaymentConfigNumber,
-} from "../helpers/payment.constants";
+  escrowReleaseAt,
+  returnWindowEndsAt,
+} from "../../order/helpers/order-return-window";
+import { NON_DELIVERABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 import { i18nMessage } from "../../i18n";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
 
-const PAYOUT_ELIGIBLE_ORDER_STATUSES: OrderStatus[] = [
-  OrderStatus.delivered,
-  OrderStatus.awaiting_buyer_confirmation,
-  OrderStatus.completed,
-];
-
-const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
-  RefundRequestStatus.pending_review,
-  RefundRequestStatus.approved,
-  RefundRequestStatus.wait_for_delivery,
-  RefundRequestStatus.return_shipment_open,
-  RefundRequestStatus.return_in_transit,
-  RefundRequestStatus.return_delivered,
-  RefundRequestStatus.disputed,
-];
+/** Bir cron turunda okunan damgasız kalıntı adayı üst sınırı. */
+const RESIDUAL_CANDIDATE_BATCH = 500;
 
 /**
  * Escrow'un SERBEST BIRAKMA tarafı — PaymentRefundService'ten birebir taşındı.
@@ -69,9 +65,11 @@ export class PaymentHoldReleaseService {
   // penceresi = teslim + returnWindowDays (14); satıcı payout uygunluğu =
   // teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi
   // kapandıktan SONRA payout'u başlatır → "14. günün son saniyesinde iade +
-  // payout çoktan gitti" çakışması imkânsız olur.
-  private readonly returnWindowDays: number;
-  private readonly payoutGraceDays: number;
+  // payout çoktan gitti" çakışması imkânsız olur. İki süre de Süreler ve
+  // Kurallar'dan teslim ANINDA okunur; iade penceresi sonu siparişe
+  // (`returnWindowEndsAt`), ödeme tarihi hold'a (`releaseAt`) damgalanır.
+  // İade uygunluğu da aynı damgayı okur — sonradan yapılan değişiklik teslim
+  // edilmiş siparişin ne iade hakkını ne ödeme tarihini kaydırır.
 
   constructor(
     private readonly prisma: PrismaService,
@@ -85,16 +83,7 @@ export class PaymentHoldReleaseService {
     // (eksik bildirimdense fazlası yeğdir).
     @Optional()
     private readonly cache?: CacheService,
-  ) {
-    this.returnWindowDays = resolvePaymentConfigNumber(
-      this.configService,
-      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
-    );
-    this.payoutGraceDays = resolvePaymentConfigNumber(
-      this.configService,
-      PAYMENT_CONFIG_KEYS.PAYOUT_GRACE_DAYS,
-    );
-  }
+  ) {}
 
   /**
    * Release held payment to seller (admin manuel release yolu).
@@ -111,63 +100,45 @@ export class PaymentHoldReleaseService {
     // H4: açık iade ile DONDURULMUŞ (frozenByRefundId dolu) bir hold ASLA serbest
     // bırakılamaz — aksi halde admin manuel release, açık iadeyle birlikte çift
     // kayba yol açar (satıcıya öde + alıcıya iade). releaseHoldsDue/releasePaymentIfHeld
-    // ile aynı invaryant. Hem okuma hem güncelleme frozenByRefundId:null ile sınırlı.
+    // ile aynı invaryant: karar `holdReleaseBlockedReason`'da, atomik güncelleme
+    // de frozenByRefundId:null ile sınırlı.
+    //
+    // Kapanmış (iade/iptal) siparişin KALINTISI da buradan bırakılır — kusur
+    // satıcıda değilse. Satıcı kusurunda ret, nedeni söyleyen mesajla döner.
     const now = new Date();
-    const releaseDateFilter = opts?.ignoreReleaseDate
-      ? {}
-      : { releaseAt: { lte: now } };
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: {
-        status: true,
-        refundRequests: {
-          where: { status: { in: OPEN_REFUND_STATUSES } },
-          select: { id: true },
-          take: 1,
-        },
-      },
+      select: HOLD_RELEASE_ORDER_SELECT,
     });
-    if (
-      !order ||
-      !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
-      order.refundRequests.length > 0
-    ) {
+    if (!order) {
       throw new BadRequestException(
         i18nMessage("server.payment.holdNotReleasable"),
       );
     }
 
     const hold = await this.prisma.paymentHold.findFirst({
-      where: {
-        orderId,
-        status: PaymentHoldStatus.held,
-        frozenByRefundId: null,
-        ...releaseDateFilter,
-      },
+      where: { orderId, status: PaymentHoldStatus.held },
     });
-
     if (!hold) {
       throw new NotFoundException(
         i18nMessage("server.payment.holdNotReleasable"),
       );
     }
 
-    // Atomik son guard: held + frozenByRefundId:null WHERE içinde — eşzamanlı açılan
-    // bir iade (freeze) yarışını kapatır (TOCTOU yok).
-    const released = await this.prisma.paymentHold.updateMany({
-      where: {
-        id: hold.id,
-        status: PaymentHoldStatus.held,
-        frozenByRefundId: null,
-        ...releaseDateFilter,
-      },
-      data: {
-        status: PaymentHoldStatus.released,
-        releasedAt: now,
-      },
+    const blocked = holdReleaseBlockedReason({
+      hold,
+      order: holdReleaseOrderFacts(order),
+      now,
+      ignoreReleaseDate: opts?.ignoreReleaseDate,
     });
+    if (blocked) {
+      throw new BadRequestException(
+        i18nMessage(HOLD_RELEASE_BLOCKED_MESSAGE_KEYS[blocked]),
+      );
+    }
 
-    if (released.count === 0) {
+    const released = await this.claimHoldRelease(hold.id, now);
+    if (!released) {
       throw new NotFoundException(
         i18nMessage("server.payment.holdNotReleasable"),
       );
@@ -178,7 +149,30 @@ export class PaymentHoldReleaseService {
       `Payment hold ${hold.id} released to seller ${hold.sellerId}`,
     );
 
-    return { success: true, holdId: hold.id, amount: Number(hold.amount) };
+    // Satıcıya gidecek tutar: kısmi/kalıntı iadede amount − refundedAmount
+    // (payout aynı formülle öder).
+    return {
+      success: true,
+      holdId: hold.id,
+      amount: holdResidual(hold).toNumber(),
+    };
+  }
+
+  /**
+   * Atomik son guard: held + frozenByRefundId:null WHERE içinde — karar ile
+   * yazım arasında açılan bir iade (freeze) yarışını kapatır (TOCTOU yok).
+   * Tekrar çağrı (çift tık, cron'un ikinci turu) 0 satır günceller: idempotent.
+   */
+  private async claimHoldRelease(holdId: string, now: Date): Promise<boolean> {
+    const released = await this.prisma.paymentHold.updateMany({
+      where: {
+        id: holdId,
+        status: PaymentHoldStatus.held,
+        frozenByRefundId: null,
+      },
+      data: { status: PaymentHoldStatus.released, releasedAt: now },
+    });
+    return released.count > 0;
   }
 
   /**
@@ -188,10 +182,16 @@ export class PaymentHoldReleaseService {
    * Returns the number of order holds and trade cash payments released.
    */
   /**
-   * Teslimde çağrılır: ürünün PaymentHold(ler)inin releaseAt'ini
-   * deliveredAt + returnWindowDays + payoutGraceDays olarak ayarlar.
-   * Tek otorite kaynağı: hold serbestliği SADECE bu tarihten sonra (ve açık iade
-   * yokken) olur. Idempotent: held olmayan hold'a dokunmaz.
+   * Teslimde çağrılır — iki damgayı BİRLİKTE yazar:
+   *   1) `Order.returnWindowEndsAt` = deliveredAt + returnWindowDays (o an
+   *      geçerli değer). Sipariş zaten damgalıysa (tekrar çağrı) damga korunur.
+   *   2) PaymentHold `releaseAt` = returnWindowEndsAt + payoutGraceDays.
+   * İade uygunluğu ve teslim → tamamlandı geçişi de aynı damgayı okur
+   * (`order-return-window`), bu yüzden admin pencereyi sonradan değiştirse de
+   * iade hakkı satıcı ödemesiyle çakışamaz. Tek otorite kaynağı: hold
+   * serbestliği SADECE bu tarihten sonra (ve açık iade yokken) olur.
+   * Idempotent: held olmayan hold'a dokunmaz. Ayar okumaları da çağıranın
+   * işlem istemcisinden yapılır (işlem içinde ikinci bağlantı beklenmez).
    */
   async scheduleHoldReleaseOnDelivery(
     orderId: string,
@@ -199,16 +199,35 @@ export class PaymentHoldReleaseService {
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const db = tx ?? this.prisma;
-    const releaseAt = new Date(deliveredAt.getTime());
-    releaseAt.setDate(
-      releaseAt.getDate() + this.returnWindowDays + this.payoutGraceDays,
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: { returnWindowEndsAt: true },
+    });
+    let windowEndsAt = order?.returnWindowEndsAt ?? null;
+    if (!windowEndsAt) {
+      const returnWindowDays = await resolveTimingValue(
+        db,
+        "returnWindowDays",
+        this.configService,
+      );
+      windowEndsAt = returnWindowEndsAt(deliveredAt, returnWindowDays);
+      await db.order.updateMany({
+        where: { id: orderId, returnWindowEndsAt: null },
+        data: { returnWindowEndsAt: windowEndsAt },
+      });
+    }
+    const payoutGraceDays = await resolveTimingValue(
+      db,
+      "payoutGraceDays",
+      this.configService,
     );
+    const releaseAt = escrowReleaseAt(windowEndsAt, payoutGraceDays);
     await db.paymentHold.updateMany({
       where: { orderId, status: PaymentHoldStatus.held },
       data: { releaseAt },
     });
     this.logger.log(
-      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (teslim+${this.returnWindowDays}+${this.payoutGraceDays}g)`,
+      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (iade penceresi sonu ${windowEndsAt.toISOString()} + ${payoutGraceDays}g)`,
     );
   }
 
@@ -336,14 +355,7 @@ export class PaymentHoldReleaseService {
       where: {
         id: orderId,
         deliveredAt: null,
-        status: {
-          notIn: [
-            OrderStatus.completed,
-            OrderStatus.cancelled,
-            OrderStatus.refund_requested,
-            OrderStatus.refunded,
-          ],
-        },
+        status: { notIn: [...NON_DELIVERABLE_ORDER_STATUSES] },
       },
       data: {
         status: targetStatus,
@@ -401,13 +413,22 @@ export class PaymentHoldReleaseService {
     // dondurulmamış (frozenByRefundId null) olanları release et. releaseAt artık
     // teslim + return + grace olduğu için süre dolduğunda iade penceresi zaten
     // kapanmıştır; açık iade varsa frozen + status guard'ları release'i engeller.
-    const dueHolds = await this.prisma.paymentHold.findMany({
+    // Adaylar: tarihi gelmiş hold'lar + KALINTI adayları (`residualHoldCandidates`).
+    // Asıl karar aşağıdaki yüklemdedir.
+    const datedHolds = await this.prisma.paymentHold.findMany({
       where: {
         status: PaymentHoldStatus.held,
-        releaseAt: { lte: now },
         frozenByRefundId: null,
+        releaseAt: { lte: now },
       },
+      orderBy: { createdAt: "asc" },
     });
+    const residualHolds = await this.residualHoldCandidates();
+    const dueHolds = [
+      ...new Map(
+        [...datedHolds, ...residualHolds].map((hold) => [hold.id, hold]),
+      ).values(),
+    ];
 
     // Y1: Escrow yalnızca ürün en az sevk edildiyse VE açık bir iade/itiraz yoksa
     // serbest bırakılmalı. releaseAt ödeme anında NULL'dır; yalnız teslimde
@@ -416,38 +437,21 @@ export class PaymentHoldReleaseService {
     // edilmemiş ya da iadesi açık bir siparişte (releaseAt bir şekilde geçmişte olsa bile)
     // parayı satıcıya BIRAKMAYIZ (held bırakmak, yanlış ödemekten güvenlidir). preparing'de
     // takılan siparişler zaten handleExpiredPreparingOrders tarafından iptal+iade edilir.
+    // Kapanmış siparişin kalıntısı yalnız kusur satıcıda değilse bırakılır.
     let holdCount = 0;
     for (const hold of dueHolds) {
       const order = await this.prisma.order.findUnique({
         where: { id: hold.orderId },
-        select: {
-          status: true,
-          refundRequests: {
-            where: { status: { in: OPEN_REFUND_STATUSES } },
-            select: { id: true },
-            take: 1,
-          },
-        },
+        select: HOLD_RELEASE_ORDER_SELECT,
       });
-      if (
-        !order ||
-        !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
-        order.refundRequests.length > 0
-      ) {
-        // Henüz serbest bırakma — bir sonraki cron turunda tekrar denenir.
-        continue;
-      }
-      // Atomik son guard: frozenByRefundId null kontrolü WHERE içinde — bu cron
-      // turuyla eşzamanlı açılan bir iade (freeze) yarışını kapatır (TOCTOU yok).
-      const updated = await this.prisma.paymentHold.updateMany({
-        where: {
-          id: hold.id,
-          status: PaymentHoldStatus.held,
-          frozenByRefundId: null,
-        },
-        data: { status: PaymentHoldStatus.released, releasedAt: now },
+      const blocked = holdReleaseBlockedReason({
+        hold,
+        order: order ? holdReleaseOrderFacts(order) : null,
+        now,
       });
-      if (updated.count > 0) holdCount++;
+      // Henüz serbest bırakma — bir sonraki cron turunda tekrar denenir.
+      if (blocked) continue;
+      if (await this.claimHoldRelease(hold.id, now)) holdCount++;
     }
     if (holdCount > 0) {
       this.logger.log(
@@ -495,6 +499,35 @@ export class PaymentHoldReleaseService {
   }
 
   /**
+   * Damgasız KALINTI adayları: iade/iptalle KAPANMIŞ siparişin hâlâ tutulan,
+   * kilitsiz, `releaseAt`'siz hold'ları. Kargoya verilmeden iptal edilen
+   * siparişte `releaseAt` hiç yazılmaz (yalnız teslimde yazılır), bu yüzden
+   * tarih filtresi bu hold'ları hiç görmez.
+   *
+   * Eskiden aday `refundedAmount > 0` ile daraltılıyordu; ama bırakılacak pay
+   * hold'u aşarsa iade HİÇ tüketmez (`refundedAmount` 0 kalır) ve kalıntı hold'un
+   * tamamı olur — cron o hold'u hiç seçmiyordu. Aday artık siparişin kapanmış
+   * olmasından seçilir (`findClosedOrderHeldHolds`). Sınırlı ve sıralı (§11):
+   * kapanmış siparişte tutulan hold yalnız kalıntı taşır, küme doğası gereği
+   * küçüktür; satıcı kusurlu kalıntılar da kalıntı kapatmayla tükenir.
+   */
+  private async residualHoldCandidates() {
+    const rows = await findClosedOrderHeldHolds(this.prisma, {
+      undatedOnly: true,
+      limit: RESIDUAL_CANDIDATE_BATCH,
+    });
+    if (rows.length === 0) return [];
+    return this.prisma.paymentHold.findMany({
+      where: {
+        id: { in: rows.map((row) => row.id) },
+        status: PaymentHoldStatus.held,
+        frozenByRefundId: null,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
    * Try to release payment hold for an order (e.g. on delivery). Idempotent: no-op if already released or not found.
    */
   async releasePaymentIfHeld(orderId: string): Promise<boolean> {
@@ -504,32 +537,19 @@ export class PaymentHoldReleaseService {
     const now = new Date();
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: {
-        status: true,
-        refundRequests: {
-          where: { status: { in: OPEN_REFUND_STATUSES } },
-          select: { id: true },
-          take: 1,
-        },
-      },
+      select: HOLD_RELEASE_ORDER_SELECT,
     });
-    if (
-      !order ||
-      !PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status) ||
-      order.refundRequests.length > 0
-    ) {
-      return false;
-    }
-    const updated = await this.prisma.paymentHold.updateMany({
-      where: {
-        orderId,
-        status: PaymentHoldStatus.held,
-        frozenByRefundId: null,
-        releaseAt: { lte: now },
-      },
-      data: { status: PaymentHoldStatus.released, releasedAt: now },
+    const hold = await this.prisma.paymentHold.findFirst({
+      where: { orderId, status: PaymentHoldStatus.held },
     });
-    if (updated.count === 0) return false;
+    if (!order || !hold) return false;
+    const blocked = holdReleaseBlockedReason({
+      hold,
+      order: holdReleaseOrderFacts(order),
+      now,
+    });
+    if (blocked) return false;
+    if (!(await this.claimHoldRelease(hold.id, now))) return false;
     this.logger.log(`Payment hold released for order ${orderId}`);
     return true;
   }

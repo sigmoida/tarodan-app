@@ -145,6 +145,25 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Atomik "yoksa yaz" (`SET key 1 EX ttl NX`): anahtarı BU çağrı
+   * oluşturduysa true, zaten varsa false. Bir olayı pencere başına bir kez
+   * saymak (tekilleştirme) için — `exists` + `set` ikilisi eşzamanlı iki
+   * istekte ikisine de "ilk" derdi.
+   *
+   * Redis hatasında false döner (kapalı başarısızlık): bu bir kilit/sayım
+   * kapısıdır; Redis yokken her isteği "ilk" saymak tekilleştirmeyi tamamen
+   * kaldırırdı.
+   */
+  async setIfAbsent(key: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      return (await this.client.set(key, "1", "EX", ttlSeconds, "NX")) === "OK";
+    } catch (error) {
+      this.logger.warn("Cache setIfAbsent error");
+      return false;
+    }
+  }
+
+  /**
    * Get or set (cache-aside pattern)
    */
   async getOrSet<T>(

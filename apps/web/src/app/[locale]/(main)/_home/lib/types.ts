@@ -1,9 +1,11 @@
 // `Product` is the canonical `@/types/product` shape — the home rails feed it
 // straight into the shared `ProductCard`. Import it from there, not here.
 
+import type { HeroSlideDto, TrustBadgeDto } from "@tarodan/types";
 import type { Product } from "@/types/product";
 
 export interface BrandMarqueeItem {
+  id: string;
   name: string;
   logoUrl: string;
   desc: string;
@@ -82,4 +84,8 @@ export interface HomePageData {
   featuredCollector: FeaturedCollector | null;
   featuredBusiness: FeaturedBusiness | null;
   marqueeItems: BrandMarqueeItem[];
+  /** Panelden yönetilen hero slaytları; boşsa bölüm çizilmez. */
+  heroSlides: HeroSlideDto[];
+  /** Panelden yönetilen güven rozetleri; boşsa bölüm çizilmez. */
+  trustBadges: TrustBadgeDto[];
 }

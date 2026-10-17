@@ -200,20 +200,31 @@ describe("refund financial policy", () => {
     expect(result.sellerShippingCompensationAmount).toBe(0);
   });
 
-  it.each(["wrong_product_selected", "delivery_delayed"])(
-    "compensates seller shipping on %s cancellation without an outbound charge",
-    (reason) => {
-      // Gönderi taşıyıcıya hiç verilmedi: Sürat maliyeti yok → kimse kargo
-      // ödemez. Satıcının escrow'da kesilen payı iade edilir, borç yazılmaz.
-      const result = calculateRefundFinancials(
-        resolveCancellationPolicy(reason),
-        orderAmounts,
-      );
+  it("compensates seller shipping on a buyer-remorse cancellation without an outbound charge", () => {
+    // Gönderi taşıyıcıya hiç verilmedi: Sürat maliyeti yok → kimse kargo
+    // ödemez. Satıcının escrow'da kesilen payı iade edilir, borç yazılmaz.
+    const result = calculateRefundFinancials(
+      resolveCancellationPolicy("wrong_product_selected"),
+      orderAmounts,
+    );
 
-      expect(result.sellerShippingCompensationAmount).toBe(40);
-      expect(result.outboundShippingChargeToSeller).toBe(0);
-    },
-  );
+    expect(result.sellerShippingCompensationAmount).toBe(40);
+    expect(result.outboundShippingChargeToSeller).toBe(0);
+  });
+
+  it("does not compensate seller shipping on a seller-fault (delivery delay) cancellation before shipment", () => {
+    // Alıcı ödediğinin tamamını alır (1180 = T); satıcı payı T'de değildir.
+    // Tazmin hold'da satıcıya ödenemeyen bir kalıntı bırakıyordu — artık
+    // hold tamamen tüketilir. Gönderi taşınmadığı için borç da yazılmaz.
+    const result = calculateRefundFinancials(
+      resolveCancellationPolicy("delivery_delayed", { hasShipped: false }),
+      orderAmounts,
+    );
+
+    expect(result.buyerRefundAmount).toBe(orderAmounts.totalAmount);
+    expect(result.sellerShippingCompensationAmount).toBe(0);
+    expect(result.outboundShippingChargeToSeller).toBe(0);
+  });
 
   it("keeps manual-review flows fully conservative", () => {
     for (const policy of [
@@ -440,7 +451,9 @@ describe("refund financial policy", () => {
         resolveCancellationPolicy("delivery_delayed", { hasShipped: false }),
       ).toMatchObject({
         chargeSellerOutboundShipping: false,
-        compensateSellerShipping: true,
+        // Kusur satıcıda: kendi payı kargo öncesinde de tazmin edilmez —
+        // aksi halde hold'da ödenemeyen bir kalıntı kalıyordu.
+        compensateSellerShipping: false,
         refundSellerPlatformFee: false,
       });
     });

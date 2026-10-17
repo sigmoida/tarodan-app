@@ -7,18 +7,25 @@ import {
   CellActions,
   CellBadge,
   CellCode,
+  Empty,
   CellDate,
+  CellDateRange,
   CellId,
   CellLink,
   CellMoney,
   CellMuted,
   CellNumber,
   CellProduct,
+  CellStacked,
   CellText,
+  CellTitle,
+  CellToggle,
   CellUser,
   type MoneyTone,
 } from "./cells";
 import { RowActionMenu, type RowActionItem } from "./RowActionMenu";
+import { TableBadge, type TableBadgeProps } from "./TableBadge";
+import { COL_WIDTH } from "./widths";
 
 /**
  * Typed column factory. Instead of raw `ColumnDef`, use producers like
@@ -42,16 +49,6 @@ export interface ColOpts extends CellColumnMeta {
   id?: string;
 }
 
-/** Coerce a cell value to a CSV-safe scalar; dates → ISO, non-primitives → empty. */
-const toText = (v: unknown): string | number =>
-  v == null
-    ? ""
-    : v instanceof Date
-      ? v.toISOString()
-      : typeof v === "number" || typeof v === "string"
-        ? v
-        : "";
-
 /**
  * An accessor is either a plain field key (string) or a getter function.
  * The string form auto-builds the getter AND opts the column into sorting:
@@ -69,6 +66,8 @@ type Accessor<T, V> = string | ((r: T) => V);
 // Cell producer → default client comparator family (see meta.ts SortType).
 const SORT_TYPE: Partial<Record<keyof typeof DEFAULTS, SortType>> = {
   text: "text",
+  title: "text",
+  stacked: "text",
   muted: "text",
   code: "text",
   link: "text",
@@ -77,6 +76,7 @@ const SORT_TYPE: Partial<Record<keyof typeof DEFAULTS, SortType>> = {
   money: "number",
   number: "number",
   date: "date",
+  dateRange: "date",
 };
 
 /**
@@ -91,11 +91,8 @@ function field<T, V>(
     typeof accessor === "string"
       ? (r) => (r as Record<string, unknown>)[accessor] as V
       : accessor;
-  // Default CSV export = the scalar value; callers can still override with their
-  // own `exportValue` (it wins via the `...opts` spread).
   const resolved: ColOpts = {
     ...(typeof accessor === "string" ? { sortKey: accessor } : {}),
-    exportValue: (r) => toText(get(r as T)),
     ...opts,
   };
   return [get, resolved];
@@ -105,17 +102,21 @@ function field<T, V>(
 // growth weight. Fixed columns stay at minWidth while flexible columns share the
 // remaining table space. `grow` is retained only for backward compatibility.
 const DEFAULTS = {
-  text: { grow: 3, minWidth: 180, align: "left" },
-  muted: { grow: 2, minWidth: 180, align: "left" },
-  money: { grow: 1, minWidth: 120, align: "left" },
-  number: { grow: 1, minWidth: 100, align: "left" },
-  date: { grow: 1, minWidth: 140, align: "left" },
+  text: { grow: 3, minWidth: COL_WIDTH.text, align: "left" },
+  title: { grow: 3, minWidth: COL_WIDTH.title, align: "left" },
+  stacked: { grow: 2, minWidth: COL_WIDTH.text, align: "left" },
+  muted: { grow: 2, minWidth: COL_WIDTH.text, align: "left" },
+  money: { grow: 1, minWidth: COL_WIDTH.amount, align: "left" },
+  number: { grow: 1, minWidth: COL_WIDTH.count, align: "left" },
+  date: { grow: 1, minWidth: COL_WIDTH.date, align: "left" },
+  dateRange: { grow: 1, minWidth: COL_WIDTH.dateRange, align: "left" },
   code: { grow: 2, minWidth: 140, align: "left" },
   link: { grow: 3, minWidth: 180, align: "left" },
   user: { grow: 4, minWidth: 280, align: "left" },
   product: { grow: 4, minWidth: 300, align: "left" },
-  badge: { grow: 1, minWidth: 160, align: "left" },
-  actions: { grow: 1, minWidth: 96, align: "right" },
+  badge: { grow: 1, minWidth: COL_WIDTH.status, align: "left" },
+  toggle: { grow: 1, minWidth: COL_WIDTH.toggle, align: "left" },
+  actions: { grow: 1, minWidth: COL_WIDTH.actions, align: "right" },
   custom: { grow: 2, minWidth: 180, align: "left" },
 } as const;
 
@@ -153,8 +154,6 @@ function base<T>(
       minWidth: Math.max(configuredMin, headerMin),
       fixed: opts.fixed,
       grow: opts.grow ?? d.grow,
-      exportHeader: typeof header === "string" ? header : undefined,
-      exportValue: opts.exportValue,
       ...(sortable ? { sortKey, sortable, sortType } : {}),
     },
   };
@@ -182,6 +181,48 @@ export const col = {
   muted<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {
     const [g, o] = field(get, opts);
     return base<T>("muted", header, (r) => <CellMuted value={g(r)} />, o);
+  },
+  /**
+   * The row's main cell (title/name) — primary text style + optional muted
+   * second line. Use it for exactly one column per table.
+   */
+  title<T>(
+    header: ReactNode,
+    get: (
+      r: T,
+    ) => { title?: ReactNode; secondary?: ReactNode } | null | undefined,
+    opts?: ColOpts,
+  ) {
+    return base<T>(
+      "title",
+      header,
+      (r) => {
+        const v = get(r);
+        return <CellTitle title={v?.title} secondary={v?.secondary} />;
+      },
+      opts,
+    );
+  },
+  /**
+   * Normal text + optional second line (muted text, or a `TableBadge` when the
+   * second line is a state).
+   */
+  stacked<T>(
+    header: ReactNode,
+    get: (
+      r: T,
+    ) => { value?: ReactNode; secondary?: ReactNode } | null | undefined,
+    opts?: ColOpts,
+  ) {
+    return base<T>(
+      "stacked",
+      header,
+      (r) => {
+        const v = get(r);
+        return <CellStacked value={v?.value} secondary={v?.secondary} />;
+      },
+      opts,
+    );
   },
   /** Money (₺, tabular-nums). `tone` only changes the color. */
   money<T>(
@@ -224,6 +265,25 @@ export const col = {
       o,
     );
   },
+  /** Date range (`start – end`, full timestamps on hover). Fixed `COL_WIDTH.dateRange`. */
+  dateRange<T>(
+    header: ReactNode,
+    get: (r: T) => {
+      start?: string | number | Date | null;
+      end?: string | number | Date | null;
+    },
+    opts?: ColOpts,
+  ) {
+    return base<T>(
+      "dateRange",
+      header,
+      (r) => {
+        const v = get(r);
+        return <CellDateRange start={v.start} end={v.end} />;
+      },
+      { fixed: true, ...opts },
+    );
+  },
   /** ID / tracking no (mono, clipped). Pass a field key to make it sortable. */
   code<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {
     const [g, o] = field(get, opts);
@@ -257,7 +317,7 @@ export const col = {
         const v = get(r);
         return <CellLink href={v?.href} label={v?.label} />;
       },
-      { exportValue: (r) => toText(get(r as T)?.label), ...opts },
+      opts,
     );
   },
   /** Person/entity (name + optional sub-line). */
@@ -290,7 +350,7 @@ export const col = {
           />
         );
       },
-      { exportValue: (r) => toText(get(r as T)?.name), ...opts },
+      opts,
     );
   },
   /** Product (thumbnail + title + optional supporting lines). */
@@ -325,7 +385,7 @@ export const col = {
           />
         );
       },
-      { exportValue: (r) => toText(get(r as T)?.title), ...opts },
+      opts,
     );
   },
   /** Badge (no wrap). `render` returns the badge JSX. */
@@ -336,6 +396,49 @@ export const col = {
       (r) => <CellBadge>{render(r)}</CellBadge>,
       opts,
     );
+  },
+  /**
+   * Status badge — the getter returns the `TableBadge` props (state colour +
+   * label, or `status` + `config`), or `null` for no badge. Size, wrapping
+   * and width are locked here; this is the preferred badge column.
+   */
+  status<T>(
+    header: ReactNode,
+    get: (r: T) => TableBadgeProps | null | undefined,
+    opts?: ColOpts,
+  ) {
+    return base<T>(
+      "badge",
+      header,
+      (r) => {
+        const v = get(r);
+        return v ? (
+          <CellBadge>
+            <TableBadge {...v} />
+          </CellBadge>
+        ) : (
+          <Empty />
+        );
+      },
+      { fixed: true, ...opts },
+    );
+  },
+  /** Compact on/off switch for a boolean flag (e.g. `isActive`). */
+  toggle<T>(
+    header: ReactNode,
+    get: (r: T) => {
+      checked: boolean;
+      onChange: (checked: boolean) => void;
+      disabled?: boolean;
+      label: string;
+      stateText: string;
+    },
+    opts?: ColOpts,
+  ) {
+    return base<T>("toggle", header, (r) => <CellToggle {...get(r)} />, {
+      fixed: true,
+      ...opts,
+    });
   },
   /** Action area (right-aligned). Header defaults to empty. */
   actions<T>(
@@ -370,7 +473,7 @@ export const col = {
           <RowActionMenu items={getItems(r)} />
         </CellActions>
       ),
-      { id: "actions", minWidth: 72, fixed: true, ...opts },
+      { id: "actions", minWidth: COL_WIDTH.rowMenu, fixed: true, ...opts },
     );
   },
   /** Escape hatch — free JSX but still with alignment/width meta. */

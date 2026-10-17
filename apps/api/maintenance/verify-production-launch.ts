@@ -101,6 +101,36 @@ async function reportPackageTiersForReview(baseUrl: string): Promise<void> {
   }
 }
 
+/**
+ * Ana sayfa hero'su istemci başına (`?platform=web|app`) sayılır. Boş hero
+ * meşru bir karardır (admin anahtarı kapatmış ya da yerleşimi bilerek
+ * boşaltmış; istemci slider'ı gizler) — bu yüzden ASSERT DEĞİL, operatöre
+ * gözden geçirme uyarısı. Uygulama `hideOnIos` ("native'de gizle") slaytları
+ * iOS'ta da Android'de de kendisi süzer: uygulama listesinin hepsi `hideOnIos`
+ * ise hero uygulamada boştur.
+ */
+async function reportHomeHeroForReview(baseUrl: string): Promise<void> {
+  for (const platform of ["web", "app"] as const) {
+    const path = `/hero-slides?placement=home&platform=${platform}`;
+    const slides = asList(await getJson(baseUrl, path));
+    if (slides.length === 0) {
+      console.warn(
+        `REVIEW: ${path} returned no live slide — the ${platform} home hero is hidden (switch off or no live slide). Fine if intended; otherwise add a slide in admin > Marketing > Hero.`,
+      );
+    } else {
+      console.log(`home hero slides (${platform}): ${slides.length} live`);
+      const appVisible = slides.filter(
+        (slide) => (slide as JsonRecord).hideOnIos !== true,
+      ).length;
+      if (platform === "app" && appVisible === 0) {
+        console.warn(
+          `REVIEW: every live app home slide has hideOnIos — the hero is hidden in the app (iOS and Android). Fine if intended; otherwise add an app-visible slide in admin > Marketing > Hero.`,
+        );
+      }
+    }
+  }
+}
+
 async function main(): Promise<void> {
   if (process.env.APP_ENV !== "production") {
     throw new Error("Launch verification requires APP_ENV=production");
@@ -141,6 +171,7 @@ async function main(): Promise<void> {
     `Production API is ready. Catalog seeded; ${loadCount("products.json")} launch listings are inactive and invisible to buyers.`,
   );
   await reportPackageTiersForReview(baseUrl);
+  await reportHomeHeroForReview(baseUrl);
 }
 
 main().catch((error) => {

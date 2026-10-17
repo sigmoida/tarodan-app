@@ -43,7 +43,6 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   finance: ["payments"],
   "refund-attempts": ["payments"],
   products: ["products"],
-  "products-export": ["products"],
   categories: ["categories"],
   brands: ["brands"],
   manufacturers: ["manufacturers"],
@@ -52,10 +51,16 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   "attribute-groups": ["attributes"],
   attributes: ["attributes"],
   discounts: ["discounts"],
+  // `/admin/ads/upload` (banner görseli) da bu segmentte: yalnız reklam izni
+  // olan rol ürün yüklemesine (`media` → products) erişmeden banner yükler.
   ads: ["ads"],
   // Reklam paketleri + boost satın alımları: menüde /marketing/ad-packages ve
   // /marketing/boost-purchases sayfaları "ads" izniyle gösterilir.
   "ad-packages": ["ads"],
+  // Vitrin hero'su (slider + auth görseli, `/admin/hero-slides/upload` dahil)
+  // ve ana sayfa güven rozetleri: pazarlama içeriği, reklamla aynı izin.
+  "hero-slides": ["ads"],
+  "trust-badges": ["ads"],
   notifications: ["notifications"],
   "email-templates": ["email_templates"],
   pages: ["pages"],
@@ -64,6 +69,9 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   // bir anahtar gerçek bir sınır kurmazdı (aynı izinle kullanıcı detayında
   // TCKN/IBAN zaten görülüyor) ama rol matrisi göçü gerektirirdi.
   "deleted-identities": ["users"],
+  // Onay Kayıtları (KVKK / sözleşme / çerez / pazarlama ispatı) kullanıcı
+  // verisinin parçası; kullanıcı detayındaki onaylar bölümü de aynı uçları okur.
+  consents: ["users"],
   "seller-applications": ["seller_applications", "seller_performance"],
   "user-ratings": ["reviews"],
   reviews: ["reviews"],
@@ -74,14 +82,27 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   commission: ["commission"],
   payouts: ["payouts"],
   tax: ["tax"],
+  // GİB ilan/satıcı raporu: toplu TCKN/vergi no taşır, Finans menüsünde Vergi
+  // Ayarları ile birlikte durur → aynı `tax` izni (varsayılan yalnız
+  // super_admin). `finance` segmenti `payments`e bağlı olduğu için kardeş
+  // literal segment kullanılır; `@Roles` moderator'ü ayrıca dışarıda tutar.
+  "gib-report": ["tax"],
   shipping: ["shipping"],
   settings: ["settings", "payment_settings"],
+  // Süreler ve Kurallar ayar ekranının parçası: aynı izinle görünür; yazma
+  // ayrıca @Roles(super_admin) ile korunur.
+  "timing-rules": ["settings"],
+  // Mail Yönlendirme (gönderici kutuları + personel bildirimleri) da Sistem
+  // ayarlarının parçası; bütün uçlar ayrıca @Roles(super_admin).
+  "mail-routing": ["settings"],
   "site-access-pins": ["settings"],
   logs: ["logs"],
   "audit-logs": ["audit_logs"],
   moderation: ["ai_moderation"],
   "membership-tiers": ["membership_tiers"],
   staff: ["staff"],
+  // Genel admin yükleme ucu (üretici logosu + geriye dönük banner). Reklam
+  // banner'ı için `ads` izniyle açılan uç `/admin/ads/upload`'dur.
   media: ["products"],
 };
 

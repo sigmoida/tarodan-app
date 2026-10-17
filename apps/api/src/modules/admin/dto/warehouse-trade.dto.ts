@@ -1,6 +1,12 @@
 import { IsOptional, IsString, MaxLength, IsEnum, IsIn } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { ShipmentStatus } from "@prisma/client";
+import {
+  ADMIN_CANCEL_NOTE_MAX,
+  ADMIN_CANCEL_REASON_CODES,
+  type AdminCancelReasonCode,
+  type AdminCancelRequest,
+} from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
 
 /**
@@ -113,6 +119,33 @@ export class ForceCancelStuckDto {
   })
   @IsOptional()
   sendArrivedItemBack?: boolean;
+}
+
+/**
+ * Platform (admin) takas iptali — ortak `AdminCancelRequest` sözleşmesi.
+ * Kod katalogdan seçilir ve taraflara ETİKETİ gider; iç not yalnız denetim
+ * kaydına yazılır. "Diğer"de notun zorunluluğu (boşluk-only dahil) serviste
+ * yerelleştirilmiş hatayla denetlenir.
+ */
+export class AdminCancelTradeDto implements AdminCancelRequest {
+  @ApiProperty({
+    enum: ADMIN_CANCEL_REASON_CODES,
+    example: "suspicious_activity",
+    description:
+      "Catalog reason code — its label is what both parties are told",
+  })
+  @IsIn(ADMIN_CANCEL_REASON_CODES)
+  reasonCode: AdminCancelReasonCode;
+
+  @ApiPropertyOptional({
+    maxLength: ADMIN_CANCEL_NOTE_MAX,
+    description:
+      "Internal note, audit log only (never shown to the parties); required when reasonCode is 'other'",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(ADMIN_CANCEL_NOTE_MAX)
+  note?: string;
 }
 
 export class TradeShipmentQueryDto extends AdminListQueryDto {

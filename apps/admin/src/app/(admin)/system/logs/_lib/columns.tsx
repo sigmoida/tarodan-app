@@ -1,4 +1,4 @@
-import { Badge, cn, severityConfig } from "@tarodan/ui";
+import { Badge, severityConfig } from "@tarodan/ui";
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -12,11 +12,10 @@ import {
   type SecurityLog,
   type EmailLog,
   type AuditLog,
-  statusColors,
+  emailStatusVariants,
   eventTypeLabels,
   actionLabels,
   entityLabels,
-  formatDate,
 } from "./types";
 import type { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
@@ -174,14 +173,9 @@ export function buildEmailColumns(t: T) {
     col.custom<EmailLog>(
       t("common.status"),
       (r) => (
-        <span
-          className={cn(
-            "rounded-full px-2 py-1 text-xs",
-            statusColors[r.status],
-          )}
-        >
+        <Badge variant={emailStatusVariants[r.status] ?? "outline"} size="sm">
           {emailStatuses[r.status] ?? r.status}
-        </span>
+        </Badge>
       ),
       { minWidth: 100, sortKey: "status", sortType: "text" },
     ),
@@ -192,15 +186,7 @@ export function buildEmailColumns(t: T) {
 export function buildAuditColumns(toggle: Toggle, t: T) {
   return [
     expandCol<AuditLog>(toggle, t),
-    col.custom<AuditLog>(
-      t("common.date"),
-      (r) => (
-        <span className="whitespace-nowrap text-sm text-muted">
-          {formatDate(r.createdAt, t("common.dateLocale"))}
-        </span>
-      ),
-      { sortKey: "createdAt", sortType: "date" },
-    ),
+    col.date<AuditLog>(t("common.date"), "createdAt", { withTime: true }),
     col.custom<AuditLog>(
       t("admin.system.logs.admin"),
       (r) => (
@@ -218,9 +204,9 @@ export function buildAuditColumns(toggle: Toggle, t: T) {
     col.custom<AuditLog>(
       t("admin.system.logs.action"),
       (r) => (
-        <span className="rounded-full bg-info-100 px-2 py-0.5 text-xs text-info-800">
+        <Badge variant="default" size="sm">
           {actionLabels(t)[r.action] ?? r.action}
-        </span>
+        </Badge>
       ),
       { sortKey: "action", sortType: "text" },
     ),

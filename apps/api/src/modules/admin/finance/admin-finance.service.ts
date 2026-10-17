@@ -10,6 +10,7 @@ import {
   retryableFailedInvoicesWhere,
   uninvoicedDeliveredWhere,
 } from "./finance-health.where";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * Finans ÖZETİ — admin'in "para nerede?" sorusuna tek bakışta cevap.
@@ -40,6 +41,12 @@ export class AdminFinanceService {
    */
   async getFinanceOverview() {
     const now = new Date();
+    // Fatura süresi eşiği Süreler ve Kurallar'dan — dashboard kuyruğu ve
+    // order-scheduler alarmı ile aynı değer.
+    const invoiceDeadlineDays = await resolveTimingValue(
+      this.prisma,
+      "invoiceDeadlineDays",
+    );
 
     const [
       reconciliation,
@@ -52,8 +59,12 @@ export class AdminFinanceService {
       this.reconciliation.build(),
       this.prisma.payoutTransfer.count({ where: failedTransfersWhere }),
       this.prisma.paymentHold.count({ where: overdueHoldsWhere(now) }),
-      this.prisma.order.count({ where: uninvoicedDeliveredWhere(now) }),
-      this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
+      this.prisma.order.count({
+        where: uninvoicedDeliveredWhere(now, {
+          timing: { invoiceDeadlineDays },
+        }),
+      }),
+      this.prisma.fiscalInvoice.count({ where: exhaustedInvoicesWhere }),
       this.prisma.sellerAccountAdjustment.aggregate({
         where: openAdjustmentsWhere,
         _sum: { remainingAmount: true },
@@ -87,7 +98,7 @@ export class AdminFinanceService {
 
     const [issued, pendingCount, failedCount, exhaustedCount] =
       await Promise.all([
-        this.prisma.elogoInvoice.aggregate({
+        this.prisma.fiscalInvoice.aggregate({
           where: {
             status: { in: ["sent", "signed"] },
             createdAt: { gte: monthStart, lte: now },
@@ -95,11 +106,13 @@ export class AdminFinanceService {
           _sum: { total: true },
           _count: { id: true },
         }),
-        this.prisma.elogoInvoice.count({
+        this.prisma.fiscalInvoice.count({
           where: { status: { in: ["pending", "processing"] } },
         }),
-        this.prisma.elogoInvoice.count({ where: retryableFailedInvoicesWhere }),
-        this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
+        this.prisma.fiscalInvoice.count({
+          where: retryableFailedInvoicesWhere,
+        }),
+        this.prisma.fiscalInvoice.count({ where: exhaustedInvoicesWhere }),
       ]);
 
     return {

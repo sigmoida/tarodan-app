@@ -230,3 +230,92 @@ describe("PhoneVerificationService", () => {
     });
   });
 });
+
+/**
+ * UAT sabit kod modu: staging'de test kullanıcısı gerçek telefon olmadan
+ * doğrulayabilsin. SMS gitmez; bekleme süresi ve deneme sınırı DEĞİŞMEZ.
+ */
+describe("PhoneVerificationService — SMS_FIXED_VERIFICATION_CODE (UAT)", () => {
+  const saved = {
+    NODE_ENV: process.env.NODE_ENV,
+    APP_ENV: process.env.APP_ENV,
+    SMS_FIXED_VERIFICATION_CODE: process.env.SMS_FIXED_VERIFICATION_CODE,
+  };
+  const restore = (key: keyof typeof saved) => {
+    if (saved[key] === undefined) delete process.env[key];
+    else process.env[key] = saved[key];
+  };
+
+  beforeEach(() => {
+    process.env.NODE_ENV = "production";
+    process.env.APP_ENV = "staging";
+    process.env.SMS_FIXED_VERIFICATION_CODE = "246810";
+  });
+  afterEach(() => {
+    restore("NODE_ENV");
+    restore("APP_ENV");
+    restore("SMS_FIXED_VERIFICATION_CODE");
+  });
+
+  it("does not send an SMS and verifies with the fixed code", async () => {
+    const { prisma, netgsm, users, tokenStore } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode("u1", "+905551234567");
+    expect(netgsm.sendOtp).not.toHaveBeenCalled();
+    expect(tokenStore).toHaveLength(1);
+
+    await expect(svc.verify("u1", "246810")).resolves.toEqual({
+      isPhoneVerified: true,
+    });
+    expect(users.u1).toMatchObject({
+      phone: "+905551234567",
+      isPhoneVerified: true,
+    });
+  });
+
+  it("keeps the resend cooldown", async () => {
+    const { prisma, netgsm } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode("u1", "+905551234567");
+    await expect(svc.sendCode("u1", "+905551234567")).rejects.toMatchObject({
+      response: { i18nKey: "server.auth.phoneVerificationTooFrequent" },
+    });
+  });
+
+  it("keeps the wrong-attempt lockout — even the fixed code is refused after it", async () => {
+    const { prisma, netgsm } = makeDeps();
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode("u1", "+905551234567");
+    for (let i = 0; i < PhoneVerificationService.MAX_ATTEMPTS; i++) {
+      await expect(svc.verify("u1", "111111")).rejects.toMatchObject({
+        response: { i18nKey: "server.auth.wrongVerificationCode" },
+      });
+    }
+    await expect(svc.verify("u1", "246810")).rejects.toMatchObject({
+      response: { i18nKey: "server.auth.tooManyWrongAttempts" },
+    });
+  });
+
+  it("keeps the phone-ownership conflict rule", async () => {
+    const { prisma, netgsm, users } = makeDeps();
+    users.u2 = { id: "u2", phone: "+905551234567", isPhoneVerified: true };
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await expect(svc.sendCode("u1", "+905551234567")).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it("is ignored on the live deployment: a random code goes out by SMS", async () => {
+    process.env.APP_ENV = "production";
+    const { prisma, netgsm } = makeDeps();
+    let sentCode = "";
+    netgsm.sendOtp.mockImplementation(async (_p: string, c: string) => {
+      sentCode = c;
+      return { success: true };
+    });
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    await svc.sendCode("u1", "+905551234567");
+    expect(netgsm.sendOtp).toHaveBeenCalledTimes(1);
+    expect(sentCode).toMatch(/^\d{6}$/);
+  });
+});

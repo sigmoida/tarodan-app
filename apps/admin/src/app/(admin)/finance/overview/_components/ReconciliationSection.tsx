@@ -2,7 +2,6 @@
 
 "use client";
 
-import Link from "next/link";
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -10,9 +9,9 @@ import {
 import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
+import { TextLink } from "@/components/TextLink";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
-import { SECTION_PRESENTATION } from "../_lib/sections";
 import type {
   ReconciliationLine,
   ReconciliationSection as Section,
@@ -51,13 +50,7 @@ function LineRow({
   );
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      {line.href ? (
-        <Link href={line.href} className="hover:underline">
-          {text}
-        </Link>
-      ) : (
-        text
-      )}
+      {line.href ? <TextLink href={line.href}>{text}</TextLink> : text}
       <span
         className={`tabular-nums ${emphasis ? "font-semibold text-heading" : ""}`}
       >
@@ -86,7 +79,6 @@ export function ReconciliationSectionView({
   /** Satır anahtarları API'den gelir; i18n anahtarı çalışma zamanında kurulur. */
   const asKey = (k: string) => k as Parameters<typeof t>[0];
   const base = `admin.finance.overview.sections.${section.key}` as const;
-  const { icon, tone } = SECTION_PRESENTATION[section.key];
   const needsSync =
     !syncEnabled &&
     (section.components.some((c) => c.syncDependent) ||
@@ -108,8 +100,6 @@ export function ReconciliationSectionView({
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_2fr]">
         <MetricCard
-          icon={icon}
-          tone={tone}
           label={t(asKey(`${base}.total`))}
           value={fmtTry(section.total.amount)}
           loading={loading}

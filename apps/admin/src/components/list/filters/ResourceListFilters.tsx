@@ -35,7 +35,7 @@ export function ResourceListFilters() {
           active > 0 ? (
             <>
               <Badge
-                variant="primary"
+                variant="default"
                 appearance="solid"
                 size="sm"
                 aria-hidden

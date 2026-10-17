@@ -9,6 +9,7 @@ import {
   looseLines,
 } from "./admin-cancellation.service";
 import { cancellationSourceWheres } from "./helpers/cancellation-where";
+import { ExportListService } from "../../../common/export";
 
 const D = (n: number) => new Prisma.Decimal(n);
 const party = (id: string) => ({
@@ -160,7 +161,7 @@ describe("AdminCancellationService.list", () => {
         ),
     );
 
-    const service = new AdminCancellationService(prisma as any);
+    const service = new AdminCancellationService(prisma as any, {} as never);
     const result = await service.list({ tab: "all", bucket: "all" });
 
     expect(result.data.map((row) => [row.kind, row.number])).toEqual([
@@ -186,7 +187,7 @@ describe("AdminCancellationService.list", () => {
           : [],
       ),
     );
-    const service = new AdminCancellationService(prisma as any);
+    const service = new AdminCancellationService(prisma as any, {} as never);
     await service.list({ tab: "direct_sale", bucket: "buyer" });
 
     const lineQuery = prisma.order.findMany.mock.calls
@@ -207,7 +208,7 @@ describe("AdminCancellationService.list", () => {
 
   it("sorts unstamped rows last in BOTH directions", async () => {
     const prisma = makePrisma();
-    const service = new AdminCancellationService(prisma as any);
+    const service = new AdminCancellationService(prisma as any, {} as never);
     await service.list({ tab: "trade", sortOrder: "asc" });
     expect(prisma.trade.findMany.mock.calls[0][0].orderBy[0]).toEqual({
       cancelledAt: { sort: "asc", nulls: "last" },
@@ -221,7 +222,7 @@ describe("AdminCancellationService.counts", () => {
     prisma.checkoutGroup.count.mockResolvedValue(2);
     prisma.order.count.mockResolvedValue(3);
     prisma.trade.count.mockResolvedValue(5);
-    const service = new AdminCancellationService(prisma as any);
+    const service = new AdminCancellationService(prisma as any, {} as never);
 
     const counts = await service.counts({});
 
@@ -249,5 +250,71 @@ describe("AdminCancellationService.counts", () => {
     );
     expect(groupWheres).toContain(JSON.stringify(groupsWithLines(order!)));
     expect(looseWheres).toContain(JSON.stringify(looseLines(order!)));
+  });
+});
+
+describe("AdminCancellationService.export", () => {
+  const exportRow = (number: string) => ({
+    kind: "order",
+    number,
+    origin: "direct_sale",
+    createdAt: "2026-09-20T09:00:00.000Z",
+    isTest: false,
+    buyer: { displayName: "Alıcı", code: "K-1" },
+    totalAmount: 120,
+    packages: [],
+    cancellations: {},
+  });
+
+  function setup(pages: unknown[][]) {
+    const audit = {
+      createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new AdminCancellationService(
+      {} as never,
+      new ExportListService(audit as never),
+    );
+    const list = jest
+      .spyOn(service, "list")
+      .mockImplementation(async (query) => ({
+        data: (pages[(query.page ?? 1) - 1] ?? []) as never,
+        meta: { total: 0, page: query.page ?? 1, limit: 0, totalPages: 0 },
+      }));
+    return { service, list, audit };
+  }
+
+  it("listeyi aynı sekme/filtre/sırayla, en büyük sayfa boyuyla okur", async () => {
+    const { service, list } = setup([[exportRow("ORD-1")]]);
+    const query = { tab: "offer", bucket: "buyer", sortOrder: "asc" as const };
+
+    const file = await service.export(query, "admin-1", "tr");
+
+    expect(list).toHaveBeenCalledWith({ ...query, page: 1, limit: 500 });
+    expect(file.rowCount).toBe(1);
+    expect(file.filename).toMatch(/^iptaller-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  });
+
+  it("denetim kaydı bırakır; taraf terimi (ad/e-posta) yazılmaz", async () => {
+    const { service, audit } = setup([[]]);
+
+    await service.export(
+      { party: "ahmet@ornek.com", orderNumber: "ORD-9" },
+      "admin-1",
+      "tr",
+    );
+
+    const [actor, action, entityType, , , payload] =
+      audit.createRequiredAuditLog.mock.calls[0];
+    expect([actor, action, entityType]).toEqual([
+      "admin-1",
+      "cancellations_export",
+      "Cancellation",
+    ]);
+    expect(JSON.stringify(payload)).not.toContain("ahmet@ornek.com");
+    expect(payload.filters).toMatchObject({
+      orderNumber: "ORD-9",
+      partyApplied: true,
+      partyLength: 15,
+    });
   });
 });

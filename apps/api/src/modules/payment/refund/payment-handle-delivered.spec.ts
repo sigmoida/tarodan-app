@@ -15,6 +15,8 @@ describe("PaymentHoldReleaseService.handleOrderDelivered — escrow trigger", ()
         findUnique: jest.fn().mockResolvedValue({ buyerId: "b1" }),
       },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      // İade penceresi + grace Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const configService = { get: jest.fn().mockReturnValue(undefined) };
     const service = new PaymentHoldReleaseService(

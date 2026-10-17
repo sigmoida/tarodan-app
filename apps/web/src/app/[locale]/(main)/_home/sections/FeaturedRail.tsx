@@ -17,6 +17,7 @@ export default async function FeaturedRail({ items }: { items: Product[] }) {
         initialItems={items}
         sponsoredLabel={t("product.sponsored")}
         tradeLabel={t("faq.trade")}
+        discountLabel={t("product.discount")}
         outOfStockLabel={t("product.stockFinished")}
       />
     </HomeSection>

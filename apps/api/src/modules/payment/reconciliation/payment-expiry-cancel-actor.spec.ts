@@ -46,6 +46,8 @@ describe("PaymentExpiryReconciliationService.expireUnpaidOrders — iptal aktör
         ]),
       },
       $transaction: jest.fn((fn: any) => fn(tx)),
+      // Fail penceresi turun başında Süreler ve Kurallar'dan okunur.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const notificationService = {
       notifyOrderPaymentExpired: jest.fn().mockResolvedValue(undefined),
@@ -54,7 +56,7 @@ describe("PaymentExpiryReconciliationService.expireUnpaidOrders — iptal aktör
     const service = new PaymentExpiryReconciliationService(
       prisma,
       { del: jest.fn().mockResolvedValue(undefined) } as any, // cache
-      {} as any, // configService
+      { get: jest.fn() } as any, // configService (env yok → varsayılan)
       notificationService as any,
       {} as any, // commissionLedger
       {} as any, // paymentRefund
@@ -77,5 +79,13 @@ describe("PaymentExpiryReconciliationService.expireUnpaidOrders — iptal aktör
         cancelReason: ORDER_CANCEL_REASON.paymentWindowExpired,
       },
     });
+    // Kilit sırası ödeme → sipariş (claim ile aynı; deadlock yok): ilk ham
+    // sorgu ödeme satırlarını, ikincisi siparişi kilitler.
+    const lockSql = tx.$queryRaw.mock.calls.map((call: unknown[]) =>
+      (call[0] as TemplateStringsArray).join("?").replace(/\s+/g, " "),
+    );
+    expect(lockSql[0]).toContain("FROM payments p");
+    expect(lockSql[0]).toContain("FOR UPDATE OF p");
+    expect(lockSql[1]).toContain("FROM orders WHERE id = ? FOR UPDATE");
   });
 });

@@ -172,6 +172,7 @@ const workflows = [
       "Arama, filtre ve koleksiyonlar",
       "Ürün detayı, satıcı profili ve benzer ürünler",
       "Reklam gösterim/tıklama ölçümü",
+      "Vitrin hero'su (GET /hero-slides?placement=&platform=app — boş dizi = hero gizli) ve güven rozetleri",
     ],
     routes: [
       "GET /app-config",
@@ -181,6 +182,8 @@ const workflows = [
       "GET /categories",
       "GET /collections/browse",
       "GET /ads/active",
+      "GET /hero-slides",
+      "GET /trust-badges",
     ],
   },
   {
@@ -449,7 +452,7 @@ const statusContractDefinitions = {
     "PayTR ödeme sonucu; kesin durum sunucu/callback otoritesindedir",
   ShipmentStatus: "Sürat durum kodlarından normalize edilen kargo durumu",
   RefundRequestStatus: "İade talebi, iade kargosu ve para iadesi yaşam döngüsü",
-  ElogoInvoiceStatus: "eLogo resmi belge üretim durumu",
+  FiscalInvoiceStatus: "Resmi e-belge (e-Arşiv / e-Fatura) üretim durumu",
   TradeStatus: "Takas, depo, kargo ve teslim yaşam döngüsü",
   SubscriptionStatus: "Üyelik yenileme/iptal durumu",
   MessageStatus: "Mesaj moderasyon ve okundu durumu",

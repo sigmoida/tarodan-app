@@ -3,8 +3,12 @@
 "use client";
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { profileGateHref } from "@/lib/profileGate";
 import { useNewListing } from "../_context/NewListingContext";
 import { useTranslations } from "next-intl";
+
+/** Kapılar tamamlanınca dönülecek yol (profil kaydı bitince buraya gelinir). */
+const RETURN_PATH = "/listings/new";
 
 /** Listing-quota banner shown above the form. */
 export function LimitBanner() {
@@ -77,7 +81,7 @@ export function BankGate() {
           "page.new.listingbanners.satislarinizdanEldeEdeceginizTutarinSizeAktarilabilmesi",
         )}
       </p>
-      <ButtonLink href="/profile">
+      <ButtonLink href={profileGateHref("bank", RETURN_PATH)}>
         {t("page.new.listingbanners.ibanEkle")}
       </ButtonLink>
     </div>
@@ -112,7 +116,7 @@ export function AddressGate() {
       <p className="text-sm text-danger-700 mb-3">
         {t("address.dispatchPromptDesc")}
       </p>
-      <ButtonLink href="/profile">
+      <ButtonLink href={profileGateHref("address", RETURN_PATH)}>
         {dispatchAddressNeedsFix
           ? t("address.dispatchFixButton")
           : t("address.dispatchAddButton")}

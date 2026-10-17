@@ -29,10 +29,10 @@ function statusBadge(
     };
   if (status === "sold")
     return {
-      variant: "secondary",
+      variant: "outline",
       label: t("page.analytics.topproductscard.satildi"),
     };
-  return { variant: "primary", label: status };
+  return { variant: "default", label: status };
 }
 
 export default function TopProductsCard({

@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { Button, cn, enumLabel, shipmentStatusConfig } from "@tarodan/ui";
+import { Alert, Button, enumLabel, shipmentStatusConfig } from "@tarodan/ui";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import { fmtDateTime } from "@/lib/format";
 import {
   ShipmentProducts,
@@ -53,23 +54,20 @@ export function ShipmentLegCard({
       }
     >
       {infoMessage && (
-        <p className="mb-4 rounded border border-info-200 bg-info-50 p-3 text-sm text-info-700">
+        <Alert variant="info" className="mb-4 p-3">
           {infoMessage}
-        </p>
+        </Alert>
       )}
       <div className="space-y-3">
         {shipments.map((s) => {
           const delivered = isShipmentDelivered(s);
           const isProcessing = processingShipmentId === s.id;
           return (
-            <div
+            <Panel
               key={s.id}
-              className={cn(
-                "rounded-lg border p-4",
-                delivered
-                  ? "border-success-200 bg-success-50"
-                  : "border-border bg-surface",
-              )}
+              className={
+                delivered ? "border-success-200 bg-success-50" : undefined
+              }
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-1 text-sm">
@@ -78,12 +76,9 @@ export function ShipmentLegCard({
                       <span className="font-medium text-body">
                         {t("admin.operations.trades.sender")}:
                       </span>{" "}
-                      <Link
-                        href={`/accounts/users/${s.sender.id}`}
-                        className="text-primary-600 hover:underline"
-                      >
+                      <TextLink href={`/accounts/users/${s.sender.id}`}>
                         {s.sender.displayName}
-                      </Link>
+                      </TextLink>
                     </p>
                   )}
                   {s.recipient && (
@@ -91,12 +86,9 @@ export function ShipmentLegCard({
                       <span className="font-medium text-body">
                         {t("admin.operations.common.recipient")}:
                       </span>{" "}
-                      <Link
-                        href={`/accounts/users/${s.recipient.id}`}
-                        className="text-primary-600 hover:underline"
-                      >
+                      <TextLink href={`/accounts/users/${s.recipient.id}`}>
                         {s.recipient.displayName}
-                      </Link>
+                      </TextLink>
                       {s.recipientType && (
                         <span className="ml-1 text-xs text-muted">
                           ({s.recipientType})
@@ -191,7 +183,7 @@ export function ShipmentLegCard({
                 products={productsByShipmentId?.[s.id] ?? []}
                 label={t("admin.operations.trades.shipmentProducts")}
               />
-            </div>
+            </Panel>
           );
         })}
       </div>

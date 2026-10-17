@@ -134,6 +134,9 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
   {
+    // Kimlik eLogo adını taşısa da iş sağlayıcıdan bağımsızdır (InvoiceSchedulerService).
+    // Bull repeatable anahtarı, Sentry check-in'i ve geçmiş koşu kayıtları bu
+    // değere bağlı; değiştirmek bir ops adımı ister (docs/INVOICING_PROVIDERS.md).
     key: "elogo-retry-pending",
     label: "e-Fatura gönderimlerini yeniden dene",
     description: "Bekleyen/başarısız e-Logo faturalarını yeniden dener",
@@ -173,6 +176,23 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     label: "Bekleyen ilan özeti",
     description:
       "Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere günlük özet",
+    triggerable: true,
+  },
+  // Mail Yönlendirme özetleri: yalnız personele gider ve satırlar sahiplenilip
+  // gönderildi işaretlendiği için elle tetiklemek mükerrer e-posta üretmez —
+  // yalnız özeti öne çeker.
+  {
+    key: "mail-digest-hourly",
+    label: "Personel bildirimi saatlik özeti",
+    description:
+      "Saatlik teslim seçilmiş iç bildirimleri alan başına tek e-postada gönderir",
+    triggerable: true,
+  },
+  {
+    key: "mail-digest-daily",
+    label: "Personel bildirimi günlük özeti",
+    description:
+      "Günlük teslim seçilmiş iç bildirimleri 09:00'da alan başına tek e-postada gönderir; 90 günden eski gönderilmiş kayıtları siler",
     triggerable: true,
   },
 
@@ -252,7 +272,8 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
   {
     key: "payout-check-returned",
     label: "Dönen havale kontrolü",
-    description: "Bankadan geri dönen havaleleri tespit eder",
+    description:
+      "Bankadan geri dönen havaleleri tespit eder; ödemesi kapanan silinmiş hesapların IBAN'ını siler",
     triggerable: false,
   },
 

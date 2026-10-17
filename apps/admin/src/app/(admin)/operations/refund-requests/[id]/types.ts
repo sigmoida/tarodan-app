@@ -1,3 +1,5 @@
+import type { RefundFinancialTotals } from "@tarodan/types";
+
 export interface HistoryEntry {
   action: string;
   by: string;
@@ -56,6 +58,7 @@ export interface RefundRequestDetail {
   retainedBuyerServiceTaxAmount?: number | string;
   retainedSellerServiceTaxAmount?: number | string;
   financialComponents?: RefundFinancialComponent[];
+  financialTotals?: RefundFinancialTotals | null;
   metadata?: { history?: HistoryEntry[] } | null;
   refundProductAmount?: boolean;
   refundShippingFee?: boolean;
@@ -94,6 +97,9 @@ export interface RefundRequestDetail {
     shipment?: { status: string; deliveredAt?: string | null } | null;
   };
 }
+
+/** Tarafa göre toplamlar — API ile ortak şekil (`@tarodan/types`). */
+export type { RefundFinancialTotals };
 
 export interface RefundFinancialComponent {
   id?: string;

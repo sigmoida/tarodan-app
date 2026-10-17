@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { AuthConfig } from "./config";
 import { isExpired } from "./jwt";
+import { isRefreshRejected } from "./refresh-status";
 import { cookieOptions, indicatorCookieOptions } from "./cookies";
 
 export interface AuthMiddlewareOptions {
@@ -168,7 +169,9 @@ export function createAuthMiddleware(
       // well still be valid, so keep it: let the request through on the current
       // (expired) token and retry the refresh on the next navigation. Otherwise
       // a deploy blip would bounce authed users off protected pages to /login.
-      const dead = !!refreshRes && !refreshRes.ok && refreshRes.status < 500;
+      // 429 / 408 count as transient too (shared rule, see refresh-status.ts).
+      const dead =
+        !!refreshRes && !refreshRes.ok && isRefreshRejected(refreshRes.status);
       if (!dead) return next();
       const loginUrl = new URL(loginPath, request.url);
       loginUrl.searchParams.set(

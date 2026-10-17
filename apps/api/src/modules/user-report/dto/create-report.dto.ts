@@ -14,6 +14,12 @@ export enum ReportType {
   USER = "user",
   COLLECTION = "collection",
   MESSAGE = "message",
+  /**
+   * Yorum/değerlendirme (Apple 1.2). `targetId` bir ürün yorumunun
+   * (`ProductRating`) ya da satıcı değerlendirmesinin (`Rating`) kimliğidir;
+   * sunucu hangisi olduğunu kendisi çözer.
+   */
+  REVIEW = "review",
 }
 
 export enum ReportReason {
@@ -63,7 +69,7 @@ export class CreateReportDto {
 
   @ApiProperty({
     description:
-      "ID of the content being reported (product, user, collection, or message)",
+      "ID of the content being reported (product, user, collection, message, or review — a product review or a seller rating id)",
   })
   @IsUUID()
   targetId: string;

@@ -66,13 +66,26 @@ describe("Surat poll delivery → escrow release (#83/#84) [P0]", () => {
       },
     };
     // Sürat poll logic moved from SuratTrackingService (now a thin delegate) into
-    // OrderTrackingSyncService(prisma, moduleRef, client). fetchTrackingInfo now
-    // lives on the SuratTrackingClient, so we spy on the client below.
+    // OrderTrackingSyncService(prisma, moduleRef, client, config, cache, notifications).
+    // fetchTrackingInfo now lives on the SuratTrackingClient, so we spy on the
+    // client below. Cache/notifications are stubs: this suite exercises the
+    // delivery/escrow path, not the network-failure escalation counter.
     suratClient = new SuratTrackingClient(configStub as any);
+    const cacheStub = {
+      get: async () => null,
+      set: async () => {},
+      del: async () => {},
+    };
+    const notificationsStub = {
+      notifyAllAdminsOnce: async () => true,
+    };
     surat = new OrderTrackingSyncService(
       prisma,
       moduleRefStub as any,
       suratClient,
+      configStub as any,
+      cacheStub as any,
+      notificationsStub as any,
     );
   });
 

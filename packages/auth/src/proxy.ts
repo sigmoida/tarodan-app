@@ -89,6 +89,14 @@ function isForbiddenCrossOrigin(request: NextRequest): boolean {
  *
  * `authorization` ve `cookie` bilinçli olarak YOKTUR: yetki sunucu tarafında
  * Bearer ile ekleniyor, tarayıcının kimlik bilgisi yukarı taşınmıyor.
+ *
+ * `user-agent` onay kayıtlarının kanıtıdır (KVKK / sözleşme onayı "nereden"):
+ * taşınmazsa API her web isteğinde Node'un kendi ajanını görür.
+ *
+ * `x-payment-capability` ödemeye özel kısa ömürlü yetki belirtecidir (oturum
+ * kimliği değil): misafir kart ödemesi (`/payments/direct-form`) ve ödeme
+ * durum / doğrulama / başarısız-onay / fatura uçları onu okur. Taşınmadığında
+ * web misafir kart ödemesi 403 alıyordu.
  */
 export const FORWARDED_REQUEST_HEADERS = [
   "content-type",
@@ -96,7 +104,39 @@ export const FORWARDED_REQUEST_HEADERS = [
   "cache-control",
   "pragma",
   "idempotency-key",
+  "user-agent",
+  "x-payment-capability",
 ] as const;
+
+/**
+ * Tarayıcının IP'sini API'ye taşıyan başlık. `@tarodan/types`
+ * GATEWAY_CLIENT_IP_HEADER ile AYNI değer (bu paket types'a bağlı değil;
+ * proxy.test ve API'deki client-ip.spec ikisini de bu sabite iğneler).
+ *
+ * Gateway isteği sunucudan attığı için API'nin gördüğü bağlantı web
+ * sunucusunundur; onay kaydının IP'si bu başlıktan okunur. API başlığa yalnız
+ * özel ağdan gelen istekte güvenir (bkz. apps/api common/helpers/client-ip).
+ * Tarayıcının gönderdiği aynı adlı başlık safelist'te olmadığı için yukarı
+ * hiç taşınmaz — değer her zaman burada, gelen istekten hesaplanır.
+ */
+export const GATEWAY_CLIENT_IP_HEADER = "x-tarodan-client-ip";
+
+/**
+ * Web'in önündeki vekilin (Traefik/nginx) gördüğü istemci: X-Forwarded-For'un
+ * EN SAĞDAKİ girdisi — o girdiyi vekil ekler, istemci uyduramaz (API'deki
+ * `trust proxy 1` ile aynı kural). Başlık yoksa X-Real-IP, o da yoksa null.
+ */
+export function gatewayClientIp(headers: Headers): string | null {
+  const forwardedFor = headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const hops = forwardedFor
+      .split(",")
+      .map((hop) => hop.trim())
+      .filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1];
+  }
+  return headers.get("x-real-ip")?.trim() || null;
+}
 
 /**
  * Yukarıdan tarayıcıya GERİ taşınan başlıklar. `content-type` ve
@@ -106,16 +146,21 @@ export const FORWARDED_REQUEST_HEADERS = [
  */
 export const FORWARDED_RESPONSE_HEADERS = [
   "x-admin-session-expires-at",
-  // Admin Excel dışa aktarımları: dosya tavanda kırpıldıysa satır tavanı.
+  // Admin Excel dışa aktarımları (apps/api common/export/export-response.ts):
+  // dosya tavanda kırpıldıysa tavan, dosyadaki kayıt sayısı ve kişisel veri
+  // taşıyan dosyanın tarayıcı önbelleğinde kalmaması için `no-store`.
   "x-export-truncated-at",
+  "x-export-row-count",
+  "cache-control",
 ] as const;
 
 /**
  * The BFF proxy handlers, factored out of the admin app. Every client data call
  * goes to same-origin `/api/*` (no CORS) and is forwarded to the upstream API
  * with a server-side `Bearer` header; the browser never holds the API tokens.
- * Access tokens refresh transparently on 401, and the rotated tokens are
- * persisted onto this response.
+ * Access tokens refresh transparently (on 401, or up front for a mutation whose
+ * access token has expired while the refresh cookie lives), and the rotated
+ * tokens are persisted onto this response.
  *
  * Wire it in `app/api/[...path]/route.ts`:
  *   export const { GET, POST, PUT, PATCH, DELETE } = createBffProxy(session);
@@ -145,6 +190,8 @@ export function createBffProxy(session: ProxySession) {
       const value = request.headers.get(name);
       if (value) fwd.set(name, value);
     }
+    const clientIp = gatewayClientIp(request.headers);
+    if (clientIp) fwd.set(GATEWAY_CLIENT_IP_HEADER, clientIp);
     const init: RequestInit = {
       method: request.method,
       headers: fwd,

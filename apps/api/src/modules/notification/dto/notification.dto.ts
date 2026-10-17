@@ -5,6 +5,7 @@ import {
   IsUUID,
   IsObject,
   IsBoolean,
+  MaxLength,
   Validate,
   ValidatorConstraint,
   type ValidatorConstraintInterface,
@@ -22,8 +23,18 @@ export enum NotificationType {
   ORDER_CANCELLED = "order_cancelled",
   ORDER_CANCELLED_SELLER = "order_cancelled_seller",
   ORDER_CANCELLED_OUT_OF_STOCK = "order_cancelled_out_of_stock",
+  // Yönetici (platform) iptali — genel iptal metninden AYRI: "Tarodan iptal
+  // etti", katalog nedeninin etiketi ve (ödenmişse) iade tutarı. Alıcı ve
+  // satıcı metinleri farklı olduğu için iki tip.
+  ORDER_CANCELLED_BY_PLATFORM = "order_cancelled_by_platform",
+  ORDER_CANCELLED_BY_PLATFORM_SELLER = "order_cancelled_by_platform_seller",
   ORDER_REFUNDED = "order_refunded",
   ORDER_PREPARING_DEADLINE_WARNING = "order_preparing_deadline_warning",
+  // Hazırlık süresi bir kez uzatıldı (Süreler ve Kurallar → extend_once):
+  // alıcıya "gecikiyor, yeni son tarih, iptal hakkın sürüyor", satıcıya
+  // "yeni son tarih, son şans". Metinler farklı olduğu için iki tip.
+  ORDER_PREPARING_EXTENDED = "order_preparing_extended",
+  ORDER_PREPARING_EXTENDED_SELLER = "order_preparing_extended_seller",
   ORDER_RESERVATION_RELEASED = "order_reservation_released",
   // 48h pencere (Faz 3B.1)
   ORDER_DELIVERED_CONFIRM = "order_delivered_confirm",
@@ -40,11 +51,15 @@ export enum NotificationType {
   OFFER_COUNTER_ACCEPTED = "offer_counter_accepted",
   OFFER_EXPIRED = "offer_expired",
   OFFER_EXPIRED_SELLER = "offer_expired_seller",
+  /** Teklif süresi bir kez uzatıldı (extend_once) — sırası gelen tarafa gider. */
+  OFFER_EXTENDED = "offer_extended",
   OFFER_PAYMENT_EXPIRED = "offer_payment_expired",
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
   /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
   OFFER_CANCELLED_LISTING_REMOVED = "offer_cancelled_listing_removed",
   OFFER_CANCELLED_BY_ADMIN = "offer_cancelled_by_admin",
+  /** Teklifi veren alıcı hesabını sildiği için teklif kapandı — satıcıya gider. */
+  OFFER_CANCELLED_BUYER_DELETED = "offer_cancelled_buyer_deleted",
 
   // Product notifications
   PRODUCT_APPROVED = "product_approved",
@@ -63,11 +78,28 @@ export enum NotificationType {
   TRADE_SHIPPED = "trade_shipped",
   TRADE_COMPLETED = "trade_completed",
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
+  // Taraflardan biri takası iptal etti — KARŞI tarafa gider.
+  TRADE_CANCELLED = "trade_cancelled",
+  // Taraflardan biri itiraz açtı — KARŞI tarafa gider.
+  TRADE_DISPUTE_OPENED = "trade_dispute_opened",
+  // Admin itirazı sonuçlandırdı (takas tamamlandı) — iki tarafa da.
+  TRADE_DISPUTE_RESOLVED = "trade_dispute_resolved",
+  // Takas Tarodan (admin) tarafından iptal edildi — iki tarafa da; gerekçe
+  // kodun katalog etiketidir, adminin iç notu asla taşınmaz.
+  TRADE_CANCELLED_BY_PLATFORM = "trade_cancelled_by_platform",
+  // Takas yanıt / ödeme süresi bir kez uzatıldı (extend_once) — işlem sırası gelen tarafa.
+  TRADE_RESPONSE_EXTENDED = "trade_response_extended",
+  TRADE_PAYMENT_EXTENDED = "trade_payment_extended",
+  // Ödemesini yapmış tarafa: karşı tarafa ödeme için ek süre verildi.
+  TRADE_PAYMENT_EXTENDED_PAID = "trade_payment_extended_paid",
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = "trade_stuck_at_warehouse",
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.
   // Teslim yazılmadan escrow release tarihi kurulmaz → satıcı parası askıda kalır.
   ORDER_STUCK_IN_TRANSIT = "order_stuck_in_transit",
+  // Admin uyarısı: Sürat takip sorgusu bir koli için ardışık ağ/timeout hatası
+  // veriyor (eşik aşıldı) — geçici tek-tur hataları alarm üretmez, yalnız bu.
+  SURAT_TRACKING_NETWORK_FAILURE = "surat_tracking_network_failure",
   // Admin uyarısı: bir e-Arşiv/e-Fatura belgesi deneme bütçesini tüketti — cron
   // artık denemez, yasal süre işliyor; admin "Yeniden Dene" ile kurtarır.
   ELOGO_INVOICE_EXHAUSTED = "elogo_invoice_exhausted",
@@ -312,11 +344,22 @@ export class RegisterPushTokenDto {
 
   @ApiPropertyOptional({
     example: "device-uuid-123",
-    description: "Device unique identifier",
+    description:
+      "Stable per-install device identifier (mobile >= 1.1.0). Older apps sent the device model here.",
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   deviceId?: string;
+
+  @ApiPropertyOptional({
+    example: "iPhone 15",
+    description: "Device model name (diagnostics only, not an identifier)",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  deviceModel?: string;
 
   @ApiPropertyOptional({
     example: false,

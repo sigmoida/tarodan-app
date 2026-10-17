@@ -21,6 +21,7 @@ import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
 import type { NotificationAudience } from "./helpers/notification-link";
 import type { OrderCancelNoticeParty } from "./helpers/order-cancel-notice";
+import type { TradePlatformCancelNotice } from "./helpers/trade-platform-cancel-notice";
 
 @Injectable()
 export class NotificationService {
@@ -40,8 +41,11 @@ export class NotificationService {
     userId: string,
     type: NotificationType,
     data?: Record<string, any>,
+    opts?: { pushRequiresRecord?: boolean },
   ): Promise<boolean> {
-    return this.dispatch.createInAppNotification(userId, type, data);
+    return opts
+      ? this.dispatch.createInAppNotification(userId, type, data, opts)
+      : this.dispatch.createInAppNotification(userId, type, data);
   }
 
   async notifyAllAdmins(
@@ -61,7 +65,7 @@ export class NotificationService {
     return this.dispatch.notifyAllAdminsOnce(key, ttlSeconds, type, data);
   }
 
-  async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
+  async registerPushToken(userId: string | null, dto: RegisterPushTokenDto) {
     return this.dispatch.registerPushToken(userId, dto);
   }
 
@@ -169,6 +173,14 @@ export class NotificationService {
     return this.commerce.notifySellerDidNotShipRefunded(buyerId, orderId);
   }
 
+  /** Hazırlık süresi bir kez uzatıldı — alıcıya (misafirde e-postayla). */
+  async notifyPreparingExtendedBuyer(
+    orderId: string,
+    data: { orderNumber: string; productTitle: string; deadline: string },
+  ) {
+    return this.commerce.notifyPreparingExtendedBuyer(orderId, data);
+  }
+
   async notifyOfferReceived(
     sellerId: string,
     productId: string,
@@ -212,12 +224,24 @@ export class NotificationService {
   }
 
   async notifyOfferExpired(params: {
+    offerId?: string;
     buyerId: string;
     sellerId: string;
     productId: string;
     productTitle: string;
   }) {
     return this.commerce.notifyOfferExpired(params);
+  }
+
+  async notifyOfferExtended(params: {
+    recipientId: string;
+    audience: NotificationAudience;
+    offerId: string;
+    productId: string;
+    productTitle: string;
+    until: Date;
+  }) {
+    return this.commerce.notifyOfferExtended(params);
   }
 
   async notifyOrderCancelledOutOfStock(
@@ -263,6 +287,11 @@ export class NotificationService {
   /** İlan silindiği için kapanan teklif — stok bitişinden ayrı, doğru metin. */
   async notifyOfferCancelledListingRemoved(buyerId: string, productId: string) {
     return this.commerce.notifyOfferCancelledListingRemoved(buyerId, productId);
+  }
+
+  /** Alıcı hesabını silince kapanan teklif — satıcıya bildirim. */
+  async notifyOfferCancelledBuyerDeleted(sellerId: string, productId: string) {
+    return this.commerce.notifyOfferCancelledBuyerDeleted(sellerId, productId);
   }
 
   async notifyReservationReleased(
@@ -313,6 +342,15 @@ export class NotificationService {
     );
   }
 
+  /** Yönetici (platform) iptalinin iki tarafa duyurusu (zil + e-posta). */
+  async notifyOrderCancelledByPlatform(
+    ...args: Parameters<
+      NotificationCommerceService["notifyOrderCancelledByPlatform"]
+    >
+  ): Promise<void> {
+    return this.commerce.notifyOrderCancelledByPlatform(...args);
+  }
+
   async broadcastBackInStock(
     productId: string,
     productTitle: string,
@@ -352,20 +390,17 @@ export class NotificationService {
     return this.commerce.notifyTradeCompleted(userId, tradeId);
   }
 
+  /** Platform (admin) takas iptali: tek alıcıya tek kanaldan; gönderemezse fırlatır. */
+  async sendTradeCancelledByPlatformNotice(
+    notice: TradePlatformCancelNotice,
+  ): Promise<void> {
+    return this.commerce.sendTradeCancelledByPlatformNotice(notice);
+  }
+
   // ==================== ACCOUNT NOTIFIERS ====================
 
   async sendWelcomeEmail(userId: string) {
     return this.account.sendWelcomeEmail(userId);
-  }
-
-  async sendGuestContactAdminEmail(data: {
-    referenceNumber: string;
-    name: string;
-    email: string;
-    subject: string;
-    message: string;
-  }) {
-    return this.account.sendGuestContactAdminEmail(data);
   }
 
   async sendPasswordResetEmail(userId: string, resetToken: string) {

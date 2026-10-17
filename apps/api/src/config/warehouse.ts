@@ -23,7 +23,7 @@
  * Note also that `TARODAN_WAREHOUSE_*` is not declared in
  * `config/env.validation.ts`, and ConfigModule drops undeclared keys read from
  * an `.env` file — so these only take effect where they are injected as real
- * environment variables (see CLAUDE.md §15, "Known, undecided").
+ * environment variables (see apps/api/CLAUDE.md, "Known, undecided").
  *
  * Defaults are deliberately non-null: an unset env must not block a return or a
  * trade, so the address falls back to head office rather than failing.

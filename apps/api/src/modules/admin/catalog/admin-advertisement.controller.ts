@@ -74,7 +74,6 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -122,9 +121,9 @@ export class AdminAdvertisementController {
     description: "Filter by position",
   })
   @ApiQuery({
-    name: "deviceType",
+    name: "platform",
     required: false,
-    description: "Filter by device type",
+    description: "Filter by platform: web, app, all",
   })
   @ApiQuery({
     name: "isActive",
@@ -134,12 +133,12 @@ export class AdminAdvertisementController {
   @ApiResponse({ status: HttpStatus.OK, description: "List of ads" })
   async getAds(
     @Query("position") position?: string,
-    @Query("deviceType") deviceType?: string,
+    @Query("platform") platform?: string,
     @Query("isActive") isActive?: string,
   ) {
     const active =
       isActive === "true" ? true : isActive === "false" ? false : undefined;
-    return this.advertisementService.findAll(position, deviceType, active);
+    return this.advertisementService.findAll(position, platform, active);
   }
 
   @Get("ads/statistics")
@@ -171,6 +170,11 @@ export class AdminAdvertisementController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Create advertisement" })
   @ApiResponse({ status: HttpStatus.CREATED, description: "Ad created" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Another active ad already holds this position on an overlapping platform and date window (server.ads.slotTaken)",
+  })
   async createAd(@Body() dto: CreateAdvertisementDto) {
     return this.advertisementService.create(dto);
   }
@@ -186,11 +190,39 @@ export class AdminAdvertisementController {
 
   @Patch("ads/:id")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Update advertisement" })
+  @ApiOperation({
+    summary: "Update advertisement (every update bumps popupVersion)",
+  })
   @ApiParam({ name: "id", description: "Ad ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Ad updated" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Another active ad already holds this position on an overlapping platform and date window (server.ads.slotTaken)",
+  })
   async updateAd(@Param("id") id: string, @Body() dto: UpdateAdvertisementDto) {
     return this.advertisementService.update(id, dto);
+  }
+
+  @Post("ads/upload")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @UseInterceptors(FileInterceptor("file", UPLOAD_MULTER_OPTIONS))
+  @ApiOperation({
+    summary:
+      "Upload an ad banner image (multipart field `file`; needs only the `ads` permission)",
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Returns { url, key, … } — store `url` as the ad's imageUrl",
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description: "S3_PUBLIC_BASE_URL is not configured",
+  })
+  // URL segmenti `ads` → izin matrisinde `ads`: yalnız reklam izni olan rol
+  // banner yükleyebilir, ürün (`media` → `products`) yüklemesine erişmeden.
+  async uploadAdImage(@UploadedFile() file?: Express.Multer.File) {
+    return this.advertisementService.uploadImage(file);
   }
 
   @Delete("ads/:id")
@@ -206,7 +238,8 @@ export class AdminAdvertisementController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @UseInterceptors(FileInterceptor("file", UPLOAD_MULTER_OPTIONS))
   @ApiOperation({
-    summary: "Upload an admin-managed image (ad banner or manufacturer logo)",
+    summary:
+      "Upload an admin-managed image (manufacturer logo; ad banners → POST /admin/ads/upload)",
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -216,18 +249,18 @@ export class AdminAdvertisementController {
     @UploadedFile() file: Express.Multer.File,
     @Body("purpose") purpose?: string,
   ) {
+    // Reklam banner'ları artık `POST /admin/ads/upload` ile (yalnız `ads`
+    // izni) yüklenir; amaç belirtilmeyen eski çağrılar aynı hedefe gider
+    // (tek tanım: AdvertisementService.uploadImage).
+    if (purpose !== "manufacturers") {
+      return this.advertisementService.uploadImage(file);
+    }
     if (!file) {
       throw new BadRequestException(i18nMessage("server.admin.fileMissing"));
     }
-    // Tek admin yükleme ucu birden çok özelliğe hizmet eder (reklam
-    // banner'ları, üretici logoları); hedef klasör çağrının amacına göre
-    // seçilir, aksi halde her şey "ads" altına düşer.
-    const target =
-      purpose === "manufacturers"
-        ? { bucket: "brands" as const, folder: "manufacturers" }
-        : { bucket: "products" as const, folder: "ads" };
     return this.mediaService.upload(file, {
-      ...target,
+      bucket: "brands",
+      folder: "manufacturers",
       allowedTypes: ["image/jpeg", "image/png", "image/webp"],
       maxSize: 5 * 1024 * 1024, // 5MB
     });

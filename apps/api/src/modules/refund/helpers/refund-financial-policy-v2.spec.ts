@@ -236,6 +236,184 @@ describe("refund financial policy v2", () => {
     });
   });
 
+  describe("satıcı kusurunda satıcının kargo payı hold'da kalmaz", () => {
+    // Alıcı ödediğinin TAMAMINI (T = ürün + alıcı kargo payı + alıcı ücretleri)
+    // geri alır; satıcının kargo payı T'de değil, satıcının hak edişinden
+    // düşülmüştür. Bu pay `seller_refund` olarak tazmin edilirse hold'da
+    // `amount − refundedAmount` kalıntısı doğar; satıcı kusurlu olduğu için o
+    // para kimseye ödenemez ve escrow'da süresiz kilitli kalırdı.
+    const sellerShippingRetention = (
+      result: ReturnType<typeof calculateRefundFinancialsV2>,
+    ) =>
+      result.components.filter(
+        (c) =>
+          c.componentCode === "outbound_shipping" &&
+          c.treatment === "seller_refund",
+      );
+    const buyerPaid =
+      base.productGrossAmount +
+      base.buyerShippingAmount * 1.2 +
+      base.buyerCommissionAmount * 1.2 +
+      base.buyerPlatformFeeAmount * 1.2;
+
+    it("kargo öncesi satıcı kusurlu iptal: alıcıya T, satıcı payı tazmin edilmez", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "seller",
+        hasShipped: false,
+        returnShippingAmount: 0,
+      });
+
+      expect(sellerShippingRetention(result)).toHaveLength(0);
+      expect(result.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "buyer_refund",
+            netAmount: 60,
+            taxAmount: 12,
+          }),
+        ]),
+      );
+      // Taşıma doğmadı: satıcıya gidiş kargosu borcu da yazılmaz.
+      expect(
+        result.components.some((c) => c.treatment === "seller_charge"),
+      ).toBe(false);
+      // Alıcı ödediği her kuruşu geri alır, fazlasını değil.
+      expect(result.buyerRefundAmount).toBeCloseTo(buyerPaid, 2);
+      // Koli mutabakatı yine tek seferlik yazılır.
+      expect(result.outboundSettlementRequired).toBe(true);
+    });
+
+    it("satıcı kusurlu iade (kargolanmış): satıcı payı tazmin edilmez, tam kargo satıcıya borç", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "seller",
+        hasShipped: true,
+      });
+
+      expect(sellerShippingRetention(result)).toHaveLength(0);
+      expect(result.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "buyer_refund",
+            netAmount: 60,
+          }),
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "seller_charge",
+            netAmount: 100,
+          }),
+        ]),
+      );
+      expect(result.buyerRefundAmount).toBeCloseTo(buyerPaid, 2);
+    });
+
+    it.each(["buyer", "carrier", "platform"] as const)(
+      "kargo öncesi %s kusurunda satıcı payı AYNEN tazmin edilir (davranış değişmez)",
+      (faultParty) => {
+        const result = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped: false,
+          returnShippingAmount: 0,
+        });
+
+        expect(sellerShippingRetention(result)).toEqual([
+          expect.objectContaining({
+            netAmount: 40,
+            taxAmount: 8,
+            grossAmount: 48,
+            quantityPortion: 1,
+          }),
+        ]);
+      },
+    );
+  });
+
+  describe("an earlier seller-fault refund forfeits the seller's share (D20)", () => {
+    const sellerShare = (
+      result: ReturnType<typeof calculateRefundFinancialsV2>,
+    ) =>
+      result.components.filter(
+        (c) =>
+          c.componentCode === "outbound_shipping" &&
+          c.treatment === "seller_refund",
+      );
+
+    it("buyer fault, shipped: no share for the seller and no charge of it to the buyer", () => {
+      const forfeited = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: true,
+        sellerShareForfeited: true,
+      });
+      const normal = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: true,
+      });
+      const outboundBuyerCharge = (
+        result: ReturnType<typeof calculateRefundFinancialsV2>,
+      ) =>
+        result.components.filter(
+          (c) =>
+            c.componentCode === "outbound_shipping" &&
+            c.treatment === "buyer_charge",
+        );
+
+      expect(sellerShare(forfeited)).toHaveLength(0);
+      expect(outboundBuyerCharge(normal)).toHaveLength(1);
+      // The seller paid the share from the hold: the buyer is not charged it
+      // too, so the buyer gets the 48 back that the normal case deducts.
+      expect(outboundBuyerCharge(forfeited)).toHaveLength(0);
+      expect(forfeited.buyerRefundAmount).toBeCloseTo(
+        normal.buyerRefundAmount + 48,
+        2,
+      );
+      // The buyer still bears their own outbound share (platform_retain).
+      expect(forfeited.components).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentCode: "outbound_shipping",
+            treatment: "platform_retain",
+            netAmount: 60,
+          }),
+        ]),
+      );
+    });
+
+    it.each([
+      ["carrier, shipped", "carrier", true],
+      ["platform, shipped", "platform", true],
+      ["buyer, before shipment", "buyer", false],
+    ] as const)(
+      "%s: no seller_refund share, buyer side unchanged",
+      (_n, faultParty, hasShipped) => {
+        const forfeited = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped,
+          sellerShareForfeited: true,
+        });
+        const normal = calculateRefundFinancialsV2({
+          ...base,
+          faultParty,
+          hasShipped,
+        });
+
+        expect(sellerShare(normal)).toHaveLength(1);
+        expect(sellerShare(forfeited)).toHaveLength(0);
+        expect(forfeited.buyerRefundAmount).toBe(normal.buyerRefundAmount);
+        expect(forfeited.sellerNetEffectAmount).toBeCloseTo(
+          normal.sellerNetEffectAmount - 48,
+          2,
+        );
+      },
+    );
+  });
+
   it.each([0, 10, 20])(
     "keeps net + tax = gross at %s service VAT",
     (serviceVatRate) => {

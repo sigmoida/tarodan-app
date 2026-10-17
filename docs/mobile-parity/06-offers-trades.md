@@ -22,10 +22,12 @@ apps/web/src/app/[locale]/(main)/profile/(commerce)/trades/     # takas listesi,
 Kurallar (istemci + sunucu):
 
 - `amount >= round(effectivePrice * 0.5)` **ve** `amount < effectivePrice`
-  (alt sınır `MIN_OFFER_PERCENTAGE`, varsayılan %50).
+  (alt sınır `MIN_OFFER_PERCENTAGE`, varsayılan %50). İstemci oranı sabit varsaymaz:
+  sunucunun uyguladığı değer `GET /api/admin/settings/public` → `min_offer_percentage`
+  (public, sayı; eski istemci alanı yok sayar).
 - `message` opsiyonel, max 500.
 - İlan `active` olmalı; sahibi teklif veremez.
-- Teklif ömrü `OFFER_EXPIRY_HOURS`, varsayılan **24 saat**.
+- Teklif ömrü Süreler ve Kurallar → `offerExpiryHours` (varsayılan **24 saat**); güncel değer `GET /api/timing-rules` → `offerExpiryHours`.
 
 ---
 

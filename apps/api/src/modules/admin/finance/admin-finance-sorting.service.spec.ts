@@ -127,17 +127,17 @@ describe("admin finance list sorting", () => {
   });
 
   it("sorts eLogo invoices by total", async () => {
-    const elogoInvoice = createDelegate();
+    const fiscalInvoice = createDelegate();
     const service = new AdminTaxService(
-      { elogoInvoice } as any,
+      { fiscalInvoice } as any,
       {} as any,
       {} as any,
       {} as any,
     );
 
-    await service.getElogoInvoices({ sortBy: "total", sortOrder: "asc" });
+    await service.getFiscalInvoices({ sortBy: "total", sortOrder: "asc" });
 
-    expect(elogoInvoice.findMany).toHaveBeenCalledWith(
+    expect(fiscalInvoice.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: { total: "asc" },
         skip: 0,
@@ -147,21 +147,21 @@ describe("admin finance list sorting", () => {
   });
 
   it("sorts eLogo invoices by the displayed PDF availability", async () => {
-    const elogoInvoice = createDelegate();
-    elogoInvoice.findMany.mockResolvedValue([
+    const fiscalInvoice = createDelegate();
+    fiscalInvoice.findMany.mockResolvedValue([
       { id: "missing", pdfUrl: null, type: "penalty", sourceId: "rr-1" },
       { id: "ready", pdfUrl: "invoice.pdf", type: "penalty", sourceId: "rr-2" },
     ]);
     // Satırların işlem referansı çözülürken iade talepleri okunur.
     const refundRequest = createDelegate();
     const service = new AdminTaxService(
-      { elogoInvoice, refundRequest } as any,
+      { fiscalInvoice, refundRequest } as any,
       {} as any,
       {} as any,
       {} as any,
     );
 
-    const result = await service.getElogoInvoices({
+    const result = await service.getFiscalInvoices({
       sortBy: "hasPdf",
       sortOrder: "desc",
     });

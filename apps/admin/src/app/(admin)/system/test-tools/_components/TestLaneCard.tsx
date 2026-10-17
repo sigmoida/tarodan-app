@@ -2,15 +2,25 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Badge, Button, Checkbox, Input } from "@tarodan/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  EmptyState,
+  Input,
+  Spinner,
+} from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { DataTable } from "@/components/DataTable";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { testLaneColumns } from "../_lib/columns";
+import { canCreateTestAccount } from "../_lib/testLane";
 import { type TestAccount, type TestLaneResetResult } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -98,10 +108,7 @@ export function TestLaneCard({ isProd }: { isProd: boolean }) {
       onConfirm: () => resetMut.mutateAsync(undefined),
     });
 
-  const canCreate =
-    form.email.trim().length > 3 &&
-    form.password.length >= 8 &&
-    form.displayName.trim().length >= 2;
+  const canCreate = canCreateTestAccount(form);
 
   return (
     <SectionCard
@@ -132,18 +139,22 @@ export function TestLaneCard({ isProd }: { isProd: boolean }) {
           data={accounts}
           getRowId={(r) => r.id}
         />
+      ) : accountsQuery.isLoading ? (
+        <div className="flex justify-center py-4">
+          <Spinner size="sm" />
+        </div>
       ) : (
-        <p className="text-sm text-muted">
-          {accountsQuery.isLoading
-            ? "…"
-            : t("admin.system.testTools.lane.accountsEmpty")}
-        </p>
+        <EmptyState
+          size="compact"
+          icon={false}
+          title={t("admin.system.testTools.lane.accountsEmpty")}
+        />
       )}
 
       <div className="border-t border-border pt-4">
-        <h3 className="mb-3 text-sm font-semibold text-heading">
+        <SectionTitle as="h3" size="sm" className="mb-3">
           {t("admin.system.testTools.lane.createTitle")}
-        </h3>
+        </SectionTitle>
         <div className="flex flex-wrap items-end gap-3">
           <Input
             label={t("admin.system.testTools.lane.email")}

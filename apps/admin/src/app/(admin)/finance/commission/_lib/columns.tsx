@@ -1,5 +1,5 @@
 import { col } from "@/components/table";
-import { fmtTry } from "@/lib/format";
+import { fmtPercent, fmtTry } from "@/lib/format";
 import { commissionRowMenu } from "./rowActions";
 import {
   inclusiveCommissionMaximum,
@@ -10,7 +10,7 @@ import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-const rate = (value: number) => `%${value.toFixed(2)}`;
+const rate = (value: number) => fmtPercent(value, 2);
 const range = (rule: CommissionRule) => {
   const inclusiveMax = inclusiveCommissionMaximum(rule.maxAmount);
   return inclusiveMax == null
@@ -75,7 +75,7 @@ export function commissionColumns(
     col.muted<CommissionRule>(
       t("admin.finance.commission.tradeFeeColumn"),
       (rule) =>
-        `${rule.tradeFeeSellerAmount.toFixed(2)} / ${rule.tradeFeeBuyerAmount.toFixed(2)} ₺`,
+        `${fmtTry(rule.tradeFeeSellerAmount)} / ${fmtTry(rule.tradeFeeBuyerAmount)}`,
       { sortKey: "tradeFeeSellerAmount", sortType: "number" },
     ),
     col.rowMenu<CommissionRule>(

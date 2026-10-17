@@ -1,0 +1,30 @@
+name: Development Tests
+
+# ADVISORY unit tests on every push to development: the full API jest suite
+# and every workspace's vitest suite (verify.yml, unit job only), ~3-4 min.
+# Nothing waits for this run — the staging deploy is gated on typecheck + lint
+# only (Deploy Staging) — but a failure is visible in Actions and on the
+# commit, so a breakage can be fixed forward before the development -> master
+# PR, where the same suites are a required check ("Verify / Unit tests").
+#
+# A separate workflow, not a job of Deploy Staging: a failing job there would
+# turn that run red and stop it being the diff base for the next deploy.
+
+on:
+  push:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: development-tests
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Development tests
+    uses: ./.github/workflows/verify.yml
+    with:
+      static: false

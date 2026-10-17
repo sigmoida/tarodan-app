@@ -39,13 +39,21 @@ import {
   ShippingPackageTiersNotConfiguredError,
 } from "../shipping/helpers/shipping-tariff.helper";
 import { i18nMessage } from "../i18n";
+import { translateMessage } from "../i18n/translate";
+import { defaultLocale, type Locale } from "@tarodan/i18n";
+import { cartStockWarning } from "./helpers/cart-stock-warning";
 import { canSellFromMembership } from "../membership/helpers/membership.util";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 
-// Cart expiry time: 24 hours
+// Sepet SÜRESİZDİR (ürün kararı): ürünler ve kupon zaman aşımıyla silinmez.
+// `expiresAt` kolonu şema gereği zorunlu olduğu için yalnız oluşturmada
+// doldurulur; hiçbir akış onu okumaz/uzatmaz. Kupon geçerliliği her sepet
+// okumasında ve checkout'ta validateCoupon ile yeniden denetlenir; stok
+// rezervasyonu sepete değil checkout'a bağlıdır.
 const CART_EXPIRY_HOURS = 24;
 
 @Injectable()
@@ -64,7 +72,10 @@ export class CartService {
   /**
    * Get or create a cart for user
    */
-  async getOrCreate(userId: string): Promise<CartResponseDto> {
+  async getOrCreate(
+    userId: string,
+    locale: Locale = defaultLocale,
+  ): Promise<CartResponseDto> {
     let cart = await this.prisma.cart.findUnique({
       where: { userId },
       include: {
@@ -101,37 +112,19 @@ export class CartService {
           },
         },
       });
-    } else if (cart.expiresAt < new Date()) {
-      // Cart expired, clear items and reset expiry
-      await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-      cart = await this.prisma.cart.update({
-        where: { id: cart.id },
-        data: {
-          expiresAt: this.getNewExpiryDate(),
-          couponCode: null,
-        },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  images: { take: 1, orderBy: { sortOrder: "asc" } },
-                  seller: { select: this.saleEligibilitySellerSelect() },
-                },
-              },
-            },
-          },
-        },
-      });
     }
 
-    return this.buildCartResponse(cart, userId);
+    return this.buildCartResponse(cart, userId, locale);
   }
 
   /**
    * Add item to cart
    */
-  async addItem(userId: string, dto: AddToCartDto): Promise<CartResponseDto> {
+  async addItem(
+    userId: string,
+    dto: AddToCartDto,
+    locale: Locale = defaultLocale,
+  ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
     // Verify product exists and is available
@@ -184,8 +177,10 @@ export class CartService {
     if (!canAddRequestedQuantityToCart(product, dto.quantity || 1)) {
       throw new BadRequestException(
         product.quantity === 0
-          ? "Ürün stokta yok"
-          : `Bu üründen en fazla ${product.quantity} adet sipariş verilebilir`,
+          ? i18nMessage("server.cart.outOfStock")
+          : i18nMessage("server.cart.onlyCountInStock", {
+              count: product.quantity,
+            }),
       );
     }
 
@@ -244,10 +239,7 @@ export class CartService {
       });
     }
 
-    // Extend cart expiry
-    await this.extendCartExpiry(cart.id);
-
-    return this.getOrCreate(userId);
+    return this.getOrCreate(userId, locale);
   }
 
   /**
@@ -257,6 +249,7 @@ export class CartService {
     userId: string,
     productId: string,
     dto: UpdateCartItemDto,
+    locale: Locale = defaultLocale,
   ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
@@ -284,7 +277,9 @@ export class CartService {
         dto.quantity > item.product.quantity
       ) {
         throw new BadRequestException(
-          `Stokta sadece ${item.product.quantity} adet var`,
+          i18nMessage("server.cart.onlyCountInStock", {
+            count: item.product.quantity,
+          }),
         );
       }
 
@@ -306,9 +301,7 @@ export class CartService {
       });
     }
 
-    await this.extendCartExpiry(cart.id);
-
-    return this.getOrCreate(userId);
+    return this.getOrCreate(userId, locale);
   }
 
   /**
@@ -317,6 +310,7 @@ export class CartService {
   async removeItem(
     userId: string,
     productId: string,
+    locale: Locale = defaultLocale,
   ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
@@ -335,7 +329,7 @@ export class CartService {
 
     await this.prisma.cartItem.delete({ where: { id: item.id } });
 
-    return this.getOrCreate(userId);
+    return this.getOrCreate(userId, locale);
   }
 
   /**
@@ -344,6 +338,7 @@ export class CartService {
   async applyCoupon(
     userId: string,
     dto: ApplyCouponDto,
+    locale: Locale = defaultLocale,
   ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
@@ -385,13 +380,16 @@ export class CartService {
       data: { couponCode: dto.code.toUpperCase() },
     });
 
-    return this.getOrCreate(userId);
+    return this.getOrCreate(userId, locale);
   }
 
   /**
    * Remove coupon from cart
    */
-  async removeCoupon(userId: string): Promise<CartResponseDto> {
+  async removeCoupon(
+    userId: string,
+    locale: Locale = defaultLocale,
+  ): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
 
     await this.prisma.cart.update({
@@ -399,7 +397,7 @@ export class CartService {
       data: { couponCode: null },
     });
 
-    return this.getOrCreate(userId);
+    return this.getOrCreate(userId, locale);
   }
 
   /**
@@ -426,8 +424,9 @@ export class CartService {
    */
   async getCartWithCalculations(
     userId: string,
+    locale: Locale = defaultLocale,
   ): Promise<CartCalculationResponseDto> {
-    const cart = await this.getOrCreate(userId);
+    const cart = await this.getOrCreate(userId, locale);
     return cart.calculation;
   }
 
@@ -473,18 +472,12 @@ export class CartService {
     return expiry;
   }
 
-  private async extendCartExpiry(cartId: string): Promise<void> {
-    await this.prisma.cart.update({
-      where: { id: cartId },
-      data: { expiresAt: this.getNewExpiryDate() },
-    });
-  }
-
   private async buildCartResponse(
     cart: any,
     userId: string,
+    locale: Locale,
   ): Promise<CartResponseDto> {
-    const calculation = await this.calculateCart(cart, userId);
+    const calculation = await this.calculateCart(cart, userId, locale);
 
     return {
       id: cart.id,
@@ -500,6 +493,7 @@ export class CartService {
   private async calculateCart(
     cart: any,
     userId: string,
+    locale: Locale,
   ): Promise<CartCalculationResponseDto> {
     const items: CartItemResponseDto[] = [];
     const appliedDiscounts: AppliedDiscountDto[] = [];
@@ -511,7 +505,9 @@ export class CartService {
     // Calculate effective prices with campaign discounts
     for (const item of cart.items || []) {
       const product = item.product;
-      const basePrice = Number(product.price);
+      // Checkout'un tahsil ettiği taban (satış penceresi dahil) — sepet aynı
+      // rakamı göstersin.
+      const basePrice = resolveSalePrice(product).price;
 
       // Get campaign discount price from DiscountService
       const campaignPrice = await this.discountService.getEffectiveDisplayPrice(
@@ -543,26 +539,29 @@ export class CartService {
       let stockWarning: string | undefined;
 
       if (!sellerCanSell) {
-        stockWarning =
-          "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.";
-      }
-
-      if (sellerCanSell && available !== null) {
-        if (available === 0) {
-          isAvailable = false;
-          stockWarning = "Stokta yok";
-        } else if (available < item.quantity) {
-          stockWarning = `Stokta sadece ${available} adet var`;
-        } else if (available <= 5) {
-          stockWarning = "Son birkaç ürün!";
+        stockWarning = translateMessage(
+          "server.commission.sellerSalesSuspended",
+          locale,
+        );
+      } else {
+        // Gerçek müsait adet ("Stokta sadece N adet var" / "Son N ürün").
+        if (available !== null && available <= 0) isAvailable = false;
+        const warning = cartStockWarning(available, item.quantity);
+        if (warning) {
+          stockWarning = translateMessage(warning.key, locale, warning.values);
         }
       }
 
       if (!isAvailable) {
         warnings.push(
           sellerCanSell
-            ? `"${product.title}" artık satışta değil`
-            : `"${product.title}": ${stockWarning}`,
+            ? translateMessage("server.cart.noLongerForSale", locale, {
+                title: product.title,
+              })
+            : translateMessage("server.cart.itemWarning", locale, {
+                title: product.title,
+                warning: stockWarning ?? "",
+              }),
         );
       } else {
         subtotal += lineTotal;
@@ -600,6 +599,7 @@ export class CartService {
         productDiscount: productDiscount > 0 ? productDiscount : undefined,
         isAvailable,
         stockWarning,
+        availableQuantity: available ?? undefined,
         maxQuantity,
         shippingDesi: product.shippingDesi,
       });
@@ -615,6 +615,7 @@ export class CartService {
         cart.couponCode,
         availableItems,
         userId,
+        locale,
       );
       couponDiscountTotal = couponResult.discountAmount;
       if (couponResult.appliedDiscount) {
@@ -738,6 +739,7 @@ export class CartService {
     code: string,
     items: CartItemResponseDto[],
     userId: string,
+    locale: Locale,
   ): Promise<{
     discountAmount: number;
     appliedDiscount?: AppliedDiscountDto;
@@ -760,7 +762,9 @@ export class CartService {
       if (!validation.isValid || !validation.discount) {
         return {
           discountAmount: 0,
-          warning: validation.error ?? "Kupon uygulanamadı",
+          warning:
+            validation.error ??
+            translateMessage("server.cart.couponNotApplied", locale),
         };
       }
       const coupon = validation.discount;
@@ -805,7 +809,10 @@ export class CartService {
       };
     } catch (error) {
       this.logger.error(`Error applying coupon: ${error}`);
-      return { discountAmount: 0, warning: "Kupon uygulanırken hata oluştu" };
+      return {
+        discountAmount: 0,
+        warning: translateMessage("server.cart.couponApplyFailed", locale),
+      };
     }
   }
 

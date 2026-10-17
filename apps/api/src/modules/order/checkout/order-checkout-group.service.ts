@@ -45,7 +45,7 @@ import {
   allocateCouponAcrossLines,
   remainingDiscountAllowanceFor,
 } from "../../discount/engine/fee-discount.engine";
-import { distanceSalesConsent } from "../helpers/distance-sales-contract";
+import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
 import { ORDER_CANCEL_REASON } from "../helpers/order-cancel-reasons";
 import { orderCancelledData } from "../helpers/order-cancellation";
 import {
@@ -56,6 +56,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { lockActiveUsersShared } from "../../user/helpers/user-row-lock";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -78,6 +79,7 @@ export class OrderCheckoutGroupService {
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly userBlocks: UserBlockService,
     private readonly lanes: AccountLaneService,
+    private readonly distanceSalesConsent: DistanceSalesConsentService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -174,8 +176,13 @@ export class OrderCheckoutGroupService {
 
     let result;
     try {
+      // Ödeme penceresi işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+      // ikinci bir bağlantı beklemesin (eşzamanlı checkout'ta havuz tükenmesi).
+      const paymentExpiresAt = await paymentWindowEnd(this.prisma);
       result = await this.prisma.$transaction(
         async (tx) => {
+          // Üye alıcı: hesap silme ile serileşir (ilk kilit; user-row-lock).
+          if (!isGuest) await lockActiveUsersShared(tx, [buyerId]);
           const lockedRows = await tx.$queryRaw<{ id: string }[]>`
           SELECT p.id
           FROM products p
@@ -581,7 +588,6 @@ export class OrderCheckoutGroupService {
               })) > 0,
           );
 
-          const paymentExpiresAt = paymentWindowEnd();
           const orderInputs: Array<{
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;
@@ -908,11 +914,20 @@ export class OrderCheckoutGroupService {
               idempotencyKey: dto.idempotencyKey,
               totalAmount: groupTotalAmount,
               isGuest,
-              // Onay damgası SUNUCUDA basılır: istemci yalnız "kabul ettim" der,
-              // zamanı ve sözleşme sürümünü söyleyemez.
-              ...distanceSalesConsent(dto.distanceSalesAccepted),
             },
           });
+
+          // Mesafeli satış onayı grupla AYNI transaction'da consent_records'a
+          // yazılır (tek kayıt). Damga SUNUCUDA basılır: istemci yalnız "kabul
+          // ettim" der, zamanı ve sözleşme sürümünü söyleyemez. Onay gelmediyse
+          // satır yok; ödeme kapısı (direct-form) onu ödeme adımında ister.
+          if (dto.distanceSalesAccepted === true) {
+            await this.distanceSalesConsent.recordAtCheckout(tx, {
+              checkoutGroupId: group.id,
+              userId: isGuest ? null : buyerId,
+              guestEmail: isGuest ? (guest?.email ?? null) : null,
+            });
+          }
 
           // Satıcı başına OrderPackage (çatı): o satıcının order'ları + tek kargo ücreti.
           // shippingCost KANONİK olarak alıcı payıdır (direct/guest ile aynı) + tarife

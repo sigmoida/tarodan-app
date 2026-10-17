@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "async_hooks";
 import { randomUUID } from "crypto";
 import type { NextFunction, Request, Response } from "express";
+import { resolveClientIp, resolveUserAgent } from "../helpers/client-ip";
 
 /**
  * İstek korelasyon kimliği (requestId) — bir isteğin ürettiği tüm izleri
@@ -10,9 +11,22 @@ import type { NextFunction, Request, Response } from "express";
  *
  * Taşıyıcı AsyncLocalStorage: Node tek process'te binlerce isteği eşzamanlı
  * yürütür, global değişken kimlikleri birbirine karıştırırdı.
+ *
+ * Aynı bağlam isteği yapan istemcinin IP'sini ve kullanıcı ajanını da taşır:
+ * onay kayıtları "nereden" sorusunu buradan cevaplar. Böylece checkout gibi
+ * çok katmanlı bir akışın derinindeki yazım için `req`'i her imzaya taşımak
+ * gerekmez.
  */
 interface RequestStore {
   requestId: string;
+  clientIp?: string | null;
+  userAgent?: string | null;
+}
+
+/** Onay kaydının kanıt alanları; istek bağlamı yoksa ikisi de null. */
+export interface RequestClientInfo {
+  ipAddress: string | null;
+  userAgent: string | null;
 }
 
 const storage = new AsyncLocalStorage<RequestStore>();
@@ -20,6 +34,15 @@ const storage = new AsyncLocalStorage<RequestStore>();
 /** Aktif isteğin kimliği; istek bağlamı dışında (cron/worker) undefined. */
 export function getRequestId(): string | undefined {
   return storage.getStore()?.requestId;
+}
+
+/** Aktif isteği yapan istemci (bkz. `resolveClientIp`); cron/worker'da null'lar. */
+export function getRequestClientInfo(): RequestClientInfo {
+  const store = storage.getStore();
+  return {
+    ipAddress: store?.clientIp ?? null,
+    userAgent: store?.userAgent ?? null,
+  };
 }
 
 /** Verilen kimlikle bir bağlam açar — testler ve worker'lar için. */
@@ -46,5 +69,12 @@ export function requestIdMiddleware(
     candidate && SAFE_ID.test(candidate) ? candidate : randomUUID();
 
   res.setHeader("X-Request-Id", requestId);
-  storage.run({ requestId }, () => next());
+  storage.run(
+    {
+      requestId,
+      clientIp: resolveClientIp(req),
+      userAgent: resolveUserAgent(req),
+    },
+    () => next(),
+  );
 }

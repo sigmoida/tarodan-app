@@ -9,6 +9,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { Panel } from "@/components/detail/Panel";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { fmtTry } from "@/lib/format";
 import {
@@ -106,9 +107,9 @@ export function TierFormModal({
                 {t("admin.tiers.field.automatic")}
               </span>
             </span>
-            <div className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-muted">
+            <Panel tone="muted" padding="sm" className="text-sm text-muted">
               {fmtTry(yearly)}
-            </div>
+            </Panel>
             <p className="mt-1 text-xs text-subtle">
               {t("admin.tiers.field.yearlyFormula", {
                 monthly,

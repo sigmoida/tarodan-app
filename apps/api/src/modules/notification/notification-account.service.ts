@@ -1,17 +1,14 @@
 /**
  * Notification Account Notifiers
- * Welcome / password-reset / email-verification / guest-checkout / guest-contact
- * template senders. Delegates delivery to the shared NotificationDispatchService.
+ * Welcome / password-reset / email-verification / guest-checkout template
+ * senders. Delegates delivery to the shared NotificationDispatchService. (The
+ * guest contact staff notice moved to Mail Routing: MailInternalNotifier.)
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../mail/smtp.provider";
-import {
-  escapeEmailHtml,
-  renderManagedEmailTemplate,
-  wrapEmailTemplateLayout,
-} from "../../common/helpers/email-template-renderer";
+import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import {
   frontendUrl as resolveFrontendUrl,
@@ -49,82 +46,6 @@ export class NotificationAccountService {
       verifyUrl: `${frontendUrl}/listings`,
     });
     return { success: true };
-  }
-
-  /**
-   * Yeni misafir (guest) iletişim formu mesajı geldiğinde destek ekibine bildirim
-   * maili gönderir. Hedef adres SUPPORT_NOTIFICATION_EMAIL env'inden, yoksa
-   * uygulama genelinde standart olan destek@tarodan.com.tr'ye gider. Provider seçimi
-   * şifre sıfırlama akışıyla aynı (SendGrid → SMTP fallback). Çağrı fire-and-forget
-   * yapılmalı: mail hatası iletişim mesajının kaydını bozmamalı.
-   */
-  async sendGuestContactAdminEmail(data: {
-    referenceNumber: string;
-    name: string;
-    email: string;
-    subject: string;
-    message: string;
-  }) {
-    const adminEmail =
-      this.configService.get<string>("SUPPORT_NOTIFICATION_EMAIL") ||
-      "destek@tarodan.com.tr";
-    // Subject bir mail başlığıdır: guest girdisindeki CR/LF header injection'a
-    // yol açabilir. Satır sonlarını boşluğa çevirip kırp (defense-in-depth).
-    const safeSubject = String(data.subject ?? "")
-      .replace(/[\r\n]+/g, " ")
-      .trim();
-    const subject = `Yeni İletişim Mesajı: ${safeSubject} (${data.referenceNumber})`;
-    const content = `
-      <h2>Yeni iletişim formu mesajı</h2>
-      <p><strong>Referans:</strong> ${escapeEmailHtml(data.referenceNumber)}</p>
-      <p><strong>Ad:</strong> ${escapeEmailHtml(data.name)}</p>
-      <p><strong>E-posta:</strong> ${escapeEmailHtml(data.email)}</p>
-      <p><strong>Konu:</strong> ${escapeEmailHtml(data.subject)}</p>
-      <p><strong>Mesaj:</strong></p>
-      <p style="white-space:pre-wrap">${escapeEmailHtml(data.message)}</p>
-    `;
-    const frontendUrl = resolveFrontendUrl();
-    const html = wrapEmailTemplateLayout(
-      content,
-      subject,
-      { to: adminEmail },
-      {
-        frontendUrl,
-        logoUrl:
-          this.configService.get<string>("EMAIL_LOGO_URL") ||
-          `${frontendUrl.replace(/\/+$/, "")}/tarodan-logo.jpg`,
-        supportEmail: adminEmail,
-      },
-    );
-
-    if (!this.smtpProvider.isConfigured()) {
-      this.logger.warn("Guest contact bildirimi için SMTP yapılandırılmamış");
-      return { success: false, error: "No email provider configured" };
-    }
-    const result = await this.smtpProvider.sendEmail({
-      to: adminEmail,
-      subject,
-      html,
-      template: "guest-contact-admin",
-      // Destek kutusunda "Yanıtla" doğrudan müşteriye gitsin. Gönderen kimliği
-      // MAIL_FROM olmak zorunda (SMTP sağlayıcısı eşleşme istiyor), o yüzden
-      // müşteri adresi from'a değil replyTo'ya konur. CRLF header injection'a
-      // karşı satır sonları temizlenir — subject ile aynı savunma.
-      replyTo: String(data.email ?? "")
-        .replace(/[\r\n]+/g, " ")
-        .trim(),
-    });
-
-    if (result.success) {
-      this.logger.log(
-        `Guest contact bildirim maili gönderildi: ${data.referenceNumber} → ${adminEmail}`,
-      );
-    } else {
-      this.logger.error(
-        `Guest contact bildirim maili başarısız (${data.referenceNumber}): ${result.error}`,
-      );
-    }
-    return result;
   }
 
   /**

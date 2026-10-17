@@ -29,9 +29,9 @@ export const MEMBERSHIP_TIER_LABEL = (
 
 export const MEMBERSHIP_TIER_VARIANT: Record<string, BadgeVariant> = {
   business: "warning",
-  premium: "primary",
-  basic: "secondary",
-  free: "secondary",
+  premium: "default",
+  basic: "outline",
+  free: "outline",
 };
 
 /** Ücretli bir üyelik var mı? `free` ve boş değer üyeliksiz sayılır. */

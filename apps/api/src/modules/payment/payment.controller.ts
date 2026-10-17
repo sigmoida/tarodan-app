@@ -29,10 +29,10 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { type Locale } from "@tarodan/i18n";
 import { PaymentService } from "./payment.service";
+import { PaymentOptionalAuthService } from "./checkout/payment-optional-auth.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { COOKIE_NAMES, readCookie } from "../auth/utils/auth-cookies";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import {
   InitiatePaymentDto,
@@ -52,6 +52,7 @@ import {
   paytrMerchantCapabilities,
   type PaymentPurpose,
 } from "../../config/paytr";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
 @ApiTags("payments")
 @Controller("payments")
@@ -77,32 +78,17 @@ export class PaymentController {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly i18n: I18nService,
+    private readonly optionalAuth: PaymentOptionalAuthService,
   ) {}
 
   /**
-   * @Public uçlarda kullanıcıyı manuel çıkarır: önce httpOnly cookie (tarayıcı),
-   * yoksa Authorization header (mobil/araçlar) — JwtStrategy ile AYNI sıra.
-   * Web auth artık cookie'de olduğundan yalnızca Bearer header'a bakmak misafir
-   * olmayan oturumlu kullanıcıyı "giriş yapmanız gerekiyor"a düşürüyordu.
-   * Token yok/çözülemezse null döner (misafir akışı).
+   * @Public uçlarda isteğe bağlı kullanıcı: korumalı uçlarla aynı çıkarıcı ve
+   * hesap kuralları (`PaymentOptionalAuthService`). Kimlik bilgisi yok ya da
+   * geçersizse null döner (misafir akışı).
    */
-  private extractUserId(req: Request): string | null {
-    const authHeader = req.headers.authorization;
-    const token =
-      readCookie(req, [COOKIE_NAMES.user.access]) ??
-      (authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null);
-    if (!token) return null;
-    try {
-      const decoded = this.jwtService.verify(token) as {
-        sub?: string;
-        id?: string;
-        type?: string;
-      };
-      if (decoded.type !== "access") return null;
-      return decoded.sub || decoded.id || null;
-    } catch {
-      return null;
-    }
+  private async extractUserId(req: Request): Promise<string | null> {
+    const auth = await this.optionalAuth.resolve(req);
+    return auth.kind === "user" ? auth.userId : null;
   }
 
   private paymentCapabilitySecret(): string {
@@ -232,7 +218,7 @@ export class PaymentController {
     @Req() req: Request,
   ): Promise<PaymentInitResponseDto> {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
-    const userId = this.extractUserId(req);
+    const userId = await this.extractUserId(req);
 
     const result = await this.paymentService.initiatePaymentUnified(
       userId,
@@ -280,7 +266,7 @@ export class PaymentController {
     @Req() req: Request,
   ) {
     // Trade-cash zorunlu auth: cookie (web) veya Bearer (mobil).
-    const userId = this.extractUserId(req);
+    const userId = await this.extractUserId(req);
     if (!userId)
       throw new UnauthorizedException(
         i18nMessage("server.payment.loginRequired"),
@@ -306,12 +292,26 @@ export class PaymentController {
     status: HttpStatus.CREATED,
     description: "Doğrudan PayTR'ye POST edilecek form alanları",
   })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description:
+      "Access token gönderildi ama geçersiz (süresi dolmuş, silinmiş/banlı hesap) ve geçerli ödeme yetki belirteci yok — istemci yenileyip yeniden dener",
+  })
   async prepareDirectForm(@Body() dto: DirectPaymentDto, @Req() req: Request) {
     this.assertNoRawCardData(req.body);
-    // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir olarak devam.
-    const userId = this.extractUserId(req);
     const capabilityAuthorized =
       !!dto.paymentId && this.hasPaymentCapability(req, dto.paymentId);
+    // Optional auth: kimlik bilgisi yoksa misafir (ödeme yetki belirteciyle).
+    // Kimlik bilgisi VAR ama geçersizse (süresi dolmuş, silinmiş/banlı hesap):
+    //  - geçerli ödeme yetki belirteci varsa misafir olarak sürer (ödeme
+    //    ortasında zorunlu çıkış yok; store_card kullanıcı ister, eklenmez),
+    //  - yoksa 401 → istemci token'ı yenileyip yeniden dener. Sessizce misafire
+    //    düşmek "kartımı kaydet"i düşürüyor, istemci de token'ı yenilemiyordu.
+    const auth = await this.optionalAuth.resolve(req);
+    if (auth.kind === "invalid" && !capabilityAuthorized) {
+      throw new UnauthorizedException(i18nMessage("server.auth.loginRequired"));
+    }
+    const userId = auth.kind === "user" ? auth.userId : null;
     return this.paymentService.prepareDirectPayment(
       userId,
       dto,
@@ -414,7 +414,7 @@ export class PaymentController {
   })
   async getPaymentStatus(@Param("id") id: string, @Req() req: Request) {
     // Optional auth: cookie (web) veya Bearer (mobil) — yoksa misafir.
-    const userId = this.extractUserId(req);
+    const userId = await this.extractUserId(req);
 
     return this.paymentService.getPaymentStatusUnified(
       id,
@@ -485,7 +485,7 @@ export class PaymentController {
     description: "User does not have permission to retry this payment",
   })
   async retryPayment(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @CurrentUser("id") userId: string,
     @Req() req: Request,
   ): Promise<RetryPaymentResponseDto> {
@@ -508,11 +508,11 @@ export class PaymentController {
     description: "Released or already processed",
   })
   async confirmFailed(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @Req() req: Request,
   ): Promise<{ released: boolean }> {
     return this.paymentService.confirmFailedFromClient(paymentId, {
-      userId: this.extractUserId(req),
+      userId: await this.extractUserId(req),
       capabilityAuthorized: this.hasPaymentCapability(req, paymentId),
     });
   }
@@ -530,11 +530,11 @@ export class PaymentController {
   @ApiParam({ name: "id", description: "Payment ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Verification result" })
   async verifyPayment(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @Req() req: Request,
   ): Promise<{ completed: boolean; status: string }> {
     return this.paymentService.verifyPaymentFromClient(paymentId, {
-      userId: this.extractUserId(req),
+      userId: await this.extractUserId(req),
       capabilityAuthorized: this.hasPaymentCapability(req, paymentId),
     });
   }
@@ -584,7 +584,7 @@ export class PaymentController {
     description: "User does not have permission to cancel this payment",
   })
   async cancelPayment(
-    @Param("id") paymentId: string,
+    @UuidParam("id") paymentId: string,
     @CurrentUser("id") userId: string,
     @ReqLocale() locale: Locale,
   ): Promise<CancelPaymentResponseDto> {

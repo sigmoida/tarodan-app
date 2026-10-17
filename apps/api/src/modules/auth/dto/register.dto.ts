@@ -11,9 +11,23 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
+  IsArray,
+  ArrayMaxSize,
+  IsIn,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  ACCOUNT_REQUIRED_CONSENTS,
+  CONSENT_DOCUMENT_KEYS,
+} from "@tarodan/types";
 import { IsTrPhone } from "../../../common/validators/tr-phone";
+import { IsPassword } from "../../../common/validators/password";
+import {
+  IsLegalName,
+  IsTckn,
+  NormalizeLegalName,
+  NormalizeTckn,
+} from "../../../common/validators/legal-identity";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -84,13 +98,7 @@ export class RegisterDto {
     example: "SecurePass123!",
     description: "Password (min 8 chars, 1 uppercase, 1 lowercase, 1 number)",
   })
-  @IsString()
-  @MinLength(8, { message: "Şifre en az 8 karakter olmalıdır" })
-  @MaxLength(50, { message: "Şifre en fazla 50 karakter olabilir" })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message:
-      "Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir",
-  })
+  @IsPassword()
   password: string;
 
   @ApiProperty({
@@ -101,6 +109,35 @@ export class RegisterDto {
   @MinLength(2, { message: "İsim en az 2 karakter olmalıdır" })
   @MaxLength(100, { message: "İsim en fazla 100 karakter olabilir" })
   displayName: string;
+
+  // YASAL KİMLİK — OPSİYONEL (DTO'da). Web kayıt formu üçünü de zorunlu ister;
+  // bugünkü mobil sürümler göndermediği için sunucu zorunlu tutmaz: alanları
+  // göndermeden açılan hesap kimlik kapısına ilk girişte düşer (bkz.
+  // docs/IDENTITY.md). Gönderilen alan ortak kuralla doğrulanır; TCKN başka
+  // bir hesaptaysa kayıt reddedilir (o hesap hakkında bilgi verilmeden).
+  @ApiPropertyOptional({ example: "Ayşe Nur", description: "Yasal ad" })
+  @IsOptional()
+  @IsString()
+  @NormalizeLegalName()
+  @IsLegalName()
+  legalFirstName?: string;
+
+  @ApiPropertyOptional({ example: "Yılmaz", description: "Yasal soyad" })
+  @IsOptional()
+  @IsString()
+  @NormalizeLegalName()
+  @IsLegalName()
+  legalLastName?: string;
+
+  @ApiPropertyOptional({
+    example: "10000000146",
+    description: "T.C. Kimlik Numarası (11 hane, checksum'lı)",
+  })
+  @IsOptional()
+  @IsString()
+  @NormalizeTckn()
+  @IsTckn()
+  nationalId?: string;
 
   // OPSİYONEL — App Store Review 5.1.1(v) (16 Tem 2026): pazar yerinin çekirdek
   // işlevi için gerekli olmayan kişisel veri kayıtta zorunlu tutulamaz. Alan
@@ -146,4 +183,21 @@ export class RegisterDto {
   @IsOptional()
   @IsBoolean()
   notificationConsent?: boolean;
+
+  // OPSİYONEL — onay kutularını göndermeyen eski mobil sürümler kayıt
+  // olabilmeye devam eder; eksik kalan zorunlu belgeyi yeniden-onay kapısı
+  // ilk girişte ister. Sürüm sunucuda damgalanır (bkz. docs/CONSENTS.md).
+  @ApiPropertyOptional({
+    enum: ACCOUNT_REQUIRED_CONSENTS,
+    isArray: true,
+    example: ["terms", "privacy", "kvkk"],
+    description:
+      "Kayıt formunda onaylanan zorunlu belgeler (terms, privacy, kvkk). " +
+      "Her biri ayrı bir onay kaydı olur.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(CONSENT_DOCUMENT_KEYS.length)
+  @IsIn(CONSENT_DOCUMENT_KEYS, { each: true })
+  acceptedConsents?: string[];
 }

@@ -16,6 +16,9 @@ import { NotificationService } from "../notification/notification.service";
 import { RatingService } from "../rating/rating.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { UserBlockService } from "../user-block/user-block.service";
+import { ConsentService } from "../consent/consent.service";
+import { NewsletterService } from "../marketing/newsletter.service";
+import { SearchService } from "../search/search.service";
 import { AccountLaneService } from "../account-lane/account-lane.service";
 import { accountLaneServiceStub } from "../account-lane/account-lane.testing";
 
@@ -60,8 +63,17 @@ describe("UserService deleteAddress (edge case 1.11)", () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CacheService, useValue: { checkRateLimit: jest.fn() } },
         { provide: NotificationService, useValue: {} },
+        { provide: SearchService, useValue: {} },
         { provide: RatingService, useValue: {} },
         { provide: UserBlockService, useValue: {} },
+        {
+          provide: ConsentService,
+          useValue: { recordMarketingChange: jest.fn() },
+        },
+        {
+          provide: NewsletterService,
+          useValue: { syncUserConsent: jest.fn() },
+        },
         { provide: AccountLaneService, useValue: accountLaneServiceStub() },
         {
           provide: ModerationAiClient,

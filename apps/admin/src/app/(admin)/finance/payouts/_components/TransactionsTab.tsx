@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { adminApi } from "@/lib/api";
-import { ResourceList } from "@/components/list";
+import { ExportButton, ResourceList } from "@/components/list";
 import { transactionColumns } from "../_lib/columns";
 import { type PayoutTransaction } from "../_lib/types";
 import { payoutTransactionFilterFields } from "../_lib/filters";
@@ -18,11 +18,17 @@ export function TransactionsTab() {
   const [releaseTarget, setReleaseTarget] = useState<{
     orderId: string;
     early: boolean;
+    releaseAt: string | null;
   } | null>(null);
 
   const columns = transactionColumns(
     user?.role === "super_admin"
-      ? (orderId, early) => setReleaseTarget({ orderId, early })
+      ? (row, early) =>
+          setReleaseTarget({
+            orderId: row.orderId,
+            early,
+            releaseAt: row.releaseAt,
+          })
       : undefined,
     t,
   );
@@ -38,6 +44,8 @@ export function TransactionsTab() {
           status: p.status,
           dateFrom: p.dateFrom,
           dateTo: p.dateTo,
+          earlyReleased: p.earlyReleased,
+          overdue: p.overdue,
           sortBy: p.sortBy,
           sortOrder: p.sortOrder,
         })
@@ -46,7 +54,9 @@ export function TransactionsTab() {
       syncUrl
       filters={payoutTransactionFilterFields(t)}
     >
-      <ResourceList.Toolbar />
+      <ResourceList.Toolbar>
+        <ExportButton fetcher={(p) => adminApi.exportPayoutHolds(p)} />
+      </ResourceList.Toolbar>
       <ResourceList.Table
         columns={columns}
         emptyText={t("admin.finance.payouts.empty")}
@@ -56,6 +66,7 @@ export function TransactionsTab() {
         <ReleasePayoutModal
           orderId={releaseTarget.orderId}
           early={releaseTarget.early}
+          releaseAt={releaseTarget.releaseAt}
           onClose={() => setReleaseTarget(null)}
         />
       )}

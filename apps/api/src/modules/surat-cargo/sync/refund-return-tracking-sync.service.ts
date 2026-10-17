@@ -1,9 +1,24 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
-import { ShipmentStatus } from "@prisma/client";
+import {
+  RefundRequestStatus,
+  ShipmentStatus,
+  type RefundRequest,
+} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import type { SuratTakipGonderi } from "../helpers/surat-cargo.types";
 import { interpretSuratTracking } from "../mappers/surat-status.mapper";
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
+
+/**
+ * İade dönüş kolisinin YOLDA sayıldığı talep statüleri: poller yalnız bunları
+ * sorar, Test Araçları simülasyonu da yalnız bunlarda adım sunar (tek kaynak).
+ * Kapanmış/iptal edilmiş bir iadenin kolisi ilerletilmez.
+ */
+export const ACTIVE_RETURN_REFUND_STATUSES: readonly RefundRequestStatus[] = [
+  RefundRequestStatus.return_shipment_open,
+  RefundRequestStatus.return_in_transit,
+];
 
 /**
  * RefundReturnTrackingSyncService (Faz 11.3a): iade dönüş kargolarının (alıcı →
@@ -33,9 +48,7 @@ export class RefundReturnTrackingSyncService {
       where: {
         returnProvider: "surat",
         order: { isTest: false },
-        status: {
-          in: ["return_shipment_open", "return_in_transit"],
-        },
+        status: { in: [...ACTIVE_RETURN_REFUND_STATUSES] },
         returnTrackingNumber: { not: null },
       },
     });
@@ -65,17 +78,41 @@ export class RefundReturnTrackingSyncService {
     );
   }
 
-  private async syncRefundReturnTrackingState(
+  /**
+   * Hazır bir taşıyıcı okumasını, Sürat'a SORMADAN, iade dönüş kolisine uygular
+   * — poll'un bulduğu okumayla aynı çekirdek (`applyReading`). Tek çağıranı Test
+   * Araçları'nın kargo simülasyonudur; ikinci bir statü yazımı yoktur.
+   */
+  async applyCarrierReading(
     refundRequestId: string,
-  ): Promise<"synced" | "pending" | "ignored"> {
+    gonderi: SuratTakipGonderi,
+  ): Promise<"synced" | "ignored"> {
+    const tracked = await this.findSuratReturn(refundRequestId);
+    if (!tracked) return "ignored";
+    return this.applyReading(tracked.rr, gonderi);
+  }
+
+  /** Sürat'la izlenen iade dönüşü; değilse (manuel/eksik referans) null. */
+  private async findSuratReturn(
+    refundRequestId: string,
+  ): Promise<{ rr: RefundRequest; trackingRef: string } | null> {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
     });
     if (!rr || rr.returnProvider !== "surat" || !rr.returnTrackingNumber) {
-      return "ignored";
+      return null;
     }
+    return { rr, trackingRef: rr.returnTrackingNumber };
+  }
 
-    const lookup = await this.client.lookupTracking(rr.returnTrackingNumber);
+  private async syncRefundReturnTrackingState(
+    refundRequestId: string,
+  ): Promise<"synced" | "pending" | "ignored"> {
+    const tracked = await this.findSuratReturn(refundRequestId);
+    if (!tracked) return "ignored";
+    const { rr } = tracked;
+
+    const lookup = await this.client.lookupTracking(tracked.trackingRef);
     if (lookup.kind === "pending") return "pending";
     if (lookup.kind === "cancelled") {
       // İade etiketi taşıyıcıda iptal edilmiş. İade TALEBİNİN statüsüne burada
@@ -95,7 +132,15 @@ export class RefundReturnTrackingSyncService {
     const data = lookup.data;
     if (data.Gonderiler.length === 0) return "pending";
 
-    const gonderi = data.Gonderiler[0];
+    return this.applyReading(rr, data.Gonderiler[0]);
+  }
+
+  /** Okumayı iade talebine uygular — poll ve simülasyonun ORTAK çekirdeği. */
+  private async applyReading(
+    rr: RefundRequest,
+    gonderi: SuratTakipGonderi,
+  ): Promise<"synced" | "ignored"> {
+    const refundRequestId = rr.id;
     const suratCode = gonderi.KargonunDurumuSayi;
     // Tek karar mercii (order/trade path ile aynı): kod + iade bayrağı +
     // tamamlanma sinyalleri birlikte okunur. `status: null` (bilinmeyen ya da

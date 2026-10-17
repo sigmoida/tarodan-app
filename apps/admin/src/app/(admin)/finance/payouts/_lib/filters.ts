@@ -4,6 +4,8 @@ import {
   payoutStatusFilterOptions,
   transferStatusFilterOptions,
   adjustmentStatusFilterOptions,
+  earlyReleaseFilterOptions,
+  overdueFilterOptions,
 } from "./types";
 
 export const payoutTransactionFilterFields = (
@@ -11,6 +13,18 @@ export const payoutTransactionFilterFields = (
 ): FilterField[] => [
   statusField(t, payoutStatusFilterOptions(t)),
   dateRangeField(t, "dateFrom", "dateTo"),
+  {
+    type: "select",
+    name: "earlyReleased",
+    label: t("admin.finance.payouts.filterReleaseTiming"),
+    options: earlyReleaseFilterOptions(t),
+  },
+  {
+    type: "select",
+    name: "overdue",
+    label: t("admin.finance.payouts.filterDue"),
+    options: overdueFilterOptions(t),
+  },
 ];
 
 export const payoutTransferFilterFields = (t: TranslateFn): FilterField[] => [

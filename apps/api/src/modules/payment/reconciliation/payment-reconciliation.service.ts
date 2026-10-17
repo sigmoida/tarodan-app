@@ -65,6 +65,7 @@ export class PaymentReconciliationService {
 
   handleExpiredPreparingOrders(): Promise<{
     warned: number;
+    extended: number;
     cancelled: number;
   }> {
     return this.expiry.handleExpiredPreparingOrders();

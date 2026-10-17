@@ -1,5 +1,8 @@
 import { CancellationActor, OrderStatus, ShipmentStatus } from "@prisma/client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
+import { buildSimulatedSuratReading } from "../helpers/surat-simulated-reading";
+import { StubSuratTrackingClient } from "../clients/surat-tracking.client";
+import { SHIPPABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 
 describe("OrderTrackingSyncService", () => {
   const shipment = (overrides: Record<string, unknown> = {}) => ({
@@ -98,12 +101,47 @@ describe("OrderTrackingSyncService", () => {
         .fn()
         .mockReturnValue(new Date("2026-07-28T09:00:00.000Z")),
     };
+    const configValues: Record<string, string> = {};
+    const configService = {
+      get: jest.fn(
+        (key: string, fallback?: string) => configValues[key] ?? fallback,
+      ),
+    };
+    // In-memory stand-in for the Redis-backed CacheService — enough to exercise
+    // the consecutive-network-failure counter without a real Redis connection.
+    const cacheStore = new Map<string, unknown>();
+    const cache = {
+      get: jest.fn(async (key: string) => cacheStore.get(key) ?? null),
+      set: jest.fn(async (key: string, value: unknown) => {
+        cacheStore.set(key, value);
+      }),
+      del: jest.fn(async (key: string) => {
+        cacheStore.delete(key);
+      }),
+    };
+    const notifications = {
+      notifyAllAdminsOnce: jest.fn().mockResolvedValue(true),
+    };
     const service = new OrderTrackingSyncService(
       prisma as any,
       moduleRef as any,
       client as any,
+      configService as any,
+      cache as any,
+      notifications as any,
     );
-    return { service, prisma, tx, client, paymentService, moduleRef };
+    return {
+      service,
+      prisma,
+      tx,
+      client,
+      paymentService,
+      moduleRef,
+      configService,
+      cache,
+      cacheStore,
+      notifications,
+    };
   };
 
   it("queries with the package reference and atomically applies delivery escrow", async () => {
@@ -539,6 +577,318 @@ describe("OrderTrackingSyncService", () => {
     expect(prisma.shipment.findMany.mock.calls[0][0].where).toMatchObject({
       provider: "surat",
       order: { isTest: false },
+    });
+  });
+
+  // Sahte taşıyıcı (staging UAT): poller koliyi Sürat'a sormaz, "henüz haber
+  // yok" alır — hata/alarm sayılmaz ve koliye hiçbir şey yazılmaz.
+  it("with the stub tracking client the cron reports pending, never failed, and writes nothing", async () => {
+    const { prisma, tx, moduleRef, configService, cache, notifications } =
+      makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({ id: "s1", trackingNumber: "PKG-AAA" }),
+      shipment({ id: "s2", trackingNumber: "PKG-BBB" }),
+    ]);
+    const stubClient = new StubSuratTrackingClient({
+      get: (_key: string, fallback?: string) => fallback,
+    } as any);
+    const service = new OrderTrackingSyncService(
+      prisma as any,
+      moduleRef as any,
+      stubClient,
+      configService as any,
+      cache as any,
+      notifications as any,
+    );
+
+    await expect(service.syncAllActiveShipments()).resolves.toEqual({
+      synced: 0,
+      pending: 2,
+      failed: 0,
+      skipped: 0,
+      failures: [],
+    });
+    expect(tx.shipment.updateMany).not.toHaveBeenCalled();
+    expect(prisma.shipment.updateMany).not.toHaveBeenCalled();
+    // "pending" bir yanıttır: ağ-hatası sayacını artırmaz, eskalasyon yok.
+    expect(cache.set).not.toHaveBeenCalled();
+    expect(notifications.notifyAllAdminsOnce).not.toHaveBeenCalled();
+  });
+
+  // UAT kargo simülasyonu: okuma Sürat'tan değil Test Araçları'ndan gelir, ama
+  // uygulandığı çekirdek poll'unkiyle AYNIDIR — ayrı bir statü yazımı yoktur.
+  describe("applyParcelReading (Test Tools simulation seam)", () => {
+    const at = new Date("2026-10-05T10:00:00.000Z");
+
+    it("never asks the carrier and moves every sibling row of the parcel", async () => {
+      const { service, prisma, client, tx } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", orderId: "o1", trackingNumber: "PKG-AAA" }),
+        shipment({ id: "s2", orderId: "o2", trackingNumber: "PKG-AAA" }),
+      ]);
+
+      const res = await service.applyParcelReading(
+        "PKG-AAA",
+        buildSimulatedSuratReading({
+          step: "delivered",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(client.lookupTracking).not.toHaveBeenCalled();
+      expect(prisma.shipment.findMany).toHaveBeenCalledWith({
+        where: { provider: "surat", trackingNumber: "PKG-AAA" },
+        include: { order: true },
+      });
+      expect(tx.shipment.updateMany).toHaveBeenCalledTimes(2);
+      expect(res).toEqual([
+        { shipmentId: "s1", outcome: "updated" },
+        { shipmentId: "s2", outcome: "updated" },
+      ]);
+    });
+
+    it("a simulated delivery runs the real delivery + escrow handler inside the CAS transaction", async () => {
+      const { service, prisma, tx, paymentService } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([shipment()]);
+
+      await service.applyParcelReading(
+        "PACKAGE-REF-1",
+        buildSimulatedSuratReading({
+          step: "delivered",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(tx.shipment.updateMany).toHaveBeenCalledWith({
+        where: { id: "shipment-1", status: ShipmentStatus.in_transit },
+        data: expect.objectContaining({
+          status: ShipmentStatus.delivered,
+          providerStatusCode: 6,
+        }),
+      });
+      // parseSuratDate mock'unun döndürdüğü an (gerçek istemci okumanın
+      // TeslimTarihi'ni kayıpsız çözer — bkz. surat-simulated-reading.spec).
+      expect(paymentService.handleOrderDelivered).toHaveBeenCalledWith(
+        "order-1",
+        new Date("2026-07-28T09:00:00.000Z"),
+        tx,
+      );
+    });
+
+    it("a simulated pickup marks a not-yet-shipped order shipped (same shippable guard)", async () => {
+      const { service, prisma, tx, paymentService } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({
+          status: ShipmentStatus.label_created,
+          shippedAt: null,
+          order: {
+            id: "order-1",
+            buyerId: "buyer-1",
+            status: OrderStatus.preparing,
+          },
+        }),
+      ]);
+
+      await service.applyParcelReading(
+        "PACKAGE-REF-1",
+        buildSimulatedSuratReading({
+          step: "picked_up",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(tx.shipment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "shipment-1",
+          status: ShipmentStatus.label_created,
+          shippedAt: null,
+        },
+        data: expect.objectContaining({
+          status: ShipmentStatus.picked_up,
+          shippedAt: expect.any(Date),
+        }),
+      });
+      expect(tx.order.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "order-1",
+          status: { in: [...SHIPPABLE_ORDER_STATUSES] },
+        },
+        data: { status: OrderStatus.shipped, version: { increment: 1 } },
+      });
+      expect(paymentService.handleOrderDelivered).not.toHaveBeenCalled();
+    });
+
+    it("keeps the terminal-regression guard: a delivered parcel is not picked up again", async () => {
+      const { service, prisma, tx } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ status: ShipmentStatus.delivered }),
+      ]);
+
+      const res = await service.applyParcelReading(
+        "PACKAGE-REF-1",
+        buildSimulatedSuratReading({
+          step: "picked_up",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(res).toEqual([{ shipmentId: "shipment-1", outcome: "skipped" }]);
+      expect(tx.shipment.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("transient network/timeout failures (consecutive-failure escalation)", () => {
+    /**
+     * Prod evidence (release e9bcb90): 4 packages fail every 30-min cron run
+     * with "fetch failed" (network) while everything else syncs fine. A single
+     * transient network hiccup must not fail the cron nor spam an admin alarm
+     * every 30 minutes — only sustained failure should.
+     */
+    it("does not fail the cron on a first transient network failure — warns instead", async () => {
+      const { service, prisma, client, notifications } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", trackingNumber: "PKG-FLAKY" }),
+      ]);
+      client.lookupTracking.mockResolvedValue({
+        kind: "failure",
+        category: "network",
+        message:
+          "Surat tracking API request failed for PKG-FLAKY: fetch failed",
+      });
+
+      const res = await service.syncAllActiveShipments();
+
+      expect(res.failed).toBe(0);
+      expect(res.failures).toEqual([]);
+      expect(notifications.notifyAllAdminsOnce).not.toHaveBeenCalled();
+    });
+
+    it("treats a timeout the same as network for the escalation counter", async () => {
+      const { service, prisma, client } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", trackingNumber: "PKG-SLOW" }),
+      ]);
+      client.lookupTracking.mockResolvedValue({
+        kind: "failure",
+        category: "timeout",
+        message: "Surat tracking API timed out after 15000ms for PKG-SLOW",
+      });
+
+      const res = await service.syncAllActiveShipments();
+
+      expect(res.failed).toBe(0);
+      expect(res.failures).toEqual([]);
+    });
+
+    it("escalates (fails the cron + notifies admins once) after the consecutive-failure threshold", async () => {
+      const { service, prisma, client, cacheStore, notifications } =
+        makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", trackingNumber: "PKG-STUCK" }),
+      ]);
+      client.lookupTracking.mockResolvedValue({
+        kind: "failure",
+        category: "network",
+        message:
+          "Surat tracking API request failed for PKG-STUCK: fetch failed",
+      });
+
+      // Default threshold is 6 consecutive runs — the first 5 stay transient.
+      for (let i = 0; i < 5; i++) {
+        const res = await service.syncAllActiveShipments();
+        expect(res.failed).toBe(0);
+      }
+      expect(notifications.notifyAllAdminsOnce).not.toHaveBeenCalled();
+
+      const escalated = await service.syncAllActiveShipments();
+
+      expect(escalated.failed).toBe(1);
+      expect(escalated.failures[0]).toContain("PKG-STUCK");
+      expect(escalated.failures[0]).toContain("eşik aşıldı");
+      expect(notifications.notifyAllAdminsOnce).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyAllAdminsOnce).toHaveBeenCalledWith(
+        "surat-tracking-network-failure:PKG-STUCK",
+        expect.any(Number),
+        expect.stringContaining("surat_tracking_network_failure"),
+        expect.objectContaining({
+          parcels: "PKG-STUCK",
+          consecutiveFailures: 6,
+        }),
+      );
+      // Sayaç Redis'te (schema migration yok) — anahtar cache store'da görünür.
+      expect(cacheStore.size).toBeGreaterThan(0);
+    });
+
+    it("escalates once the failure has spanned the configured hour threshold, even below the run-count threshold", async () => {
+      const { service, prisma, client, cache } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", trackingNumber: "PKG-OLD" }),
+      ]);
+      client.lookupTracking.mockResolvedValue({
+        kind: "failure",
+        category: "network",
+        message: "Surat tracking API request failed for PKG-OLD: fetch failed",
+      });
+      // Simulate a failure counter that started 4 hours ago (past the 3h default).
+      await cache.set("surat:tracking-network-fail:PKG-OLD", {
+        count: 1,
+        firstFailureAt: new Date(Date.now() - 4 * 3_600_000).toISOString(),
+      });
+
+      const res = await service.syncAllActiveShipments();
+
+      expect(res.failed).toBe(1);
+    });
+
+    it("clears the consecutive-failure counter once the parcel responds again", async () => {
+      const { service, prisma, client, cache } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", trackingNumber: "PKG-RECOVERED" }),
+      ]);
+      client.lookupTracking.mockResolvedValueOnce({
+        kind: "failure",
+        category: "network",
+        message:
+          "Surat tracking API request failed for PKG-RECOVERED: fetch failed",
+      });
+      await service.syncAllActiveShipments();
+      expect(
+        await cache.get("surat:tracking-network-fail:PKG-RECOVERED"),
+      ).not.toBeNull();
+
+      client.lookupTracking.mockResolvedValueOnce({
+        kind: "pending",
+        message: "Veri aktarımı sağlanmış olup kargo kabul bekleniyor.",
+      });
+      await service.syncAllActiveShipments();
+
+      expect(
+        await cache.get("surat:tracking-network-fail:PKG-RECOVERED"),
+      ).toBeNull();
+    });
+
+    it("still fails the cron immediately for a provider/auth error — no escalation grace period", async () => {
+      const { service, prisma, client, notifications } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", trackingNumber: "PKG-AUTH" }),
+      ]);
+      client.lookupTracking.mockResolvedValue({
+        kind: "failure",
+        category: "provider",
+        message: "Kullanıcı kodu veya şifreniz hatalı",
+      });
+
+      const res = await service.syncAllActiveShipments();
+
+      expect(res.failed).toBe(1);
+      expect(res.failures).toEqual([
+        "PKG-AUTH (provider: Kullanıcı kodu veya şifreniz hatalı)",
+      ]);
+      expect(notifications.notifyAllAdminsOnce).not.toHaveBeenCalled();
     });
   });
 });

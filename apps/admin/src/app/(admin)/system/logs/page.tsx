@@ -37,13 +37,7 @@ function LogsStats({ tab }: { tab: LogTab }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
       {cards.map((card) => (
-        <MetricCard
-          key={card.label}
-          icon={card.icon}
-          tone={card.tone}
-          label={card.label}
-          value={card.value}
-        />
+        <MetricCard key={card.label} label={card.label} value={card.value} />
       ))}
     </div>
   );

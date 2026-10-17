@@ -13,6 +13,14 @@ export interface NotificationTemplate {
   titleKey: MessageKey;
   messageKey: MessageKey;
   icon?: string;
+  /**
+   * Değeri bir katalog ANAHTARI olan parametreler: `{ param: dataField }`.
+   * Render sırasında `data[dataField]` alıcının dilinde çevrilir ve metne
+   * `{param}` olarak girer (ör. yönetici iptal nedeninin etiketi). Bildirim
+   * verisine dile bağlı metin değil anahtar yazılır; her alıcı kendi dilini
+   * görür.
+   */
+  localizedValues?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -61,6 +69,18 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderCancelledSeller.message",
     icon: "❌",
   },
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM]: {
+    titleKey: "server.notification.orderCancelledByPlatform.title",
+    messageKey: "server.notification.orderCancelledByPlatform.message",
+    icon: "🛡️",
+    localizedValues: { reason: "reasonKey" },
+  },
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER]: {
+    titleKey: "server.notification.orderCancelledByPlatformSeller.title",
+    messageKey: "server.notification.orderCancelledByPlatformSeller.message",
+    icon: "🛡️",
+    localizedValues: { reason: "reasonKey" },
+  },
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: {
     titleKey: "server.notification.orderCancelledOutOfStock.title",
     messageKey: "server.notification.orderCancelledOutOfStock.message",
@@ -74,6 +94,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
   [NotificationType.ORDER_PREPARING_DEADLINE_WARNING]: {
     titleKey: "server.notification.orderPreparingDeadlineWarning.title",
     messageKey: "server.notification.orderPreparingDeadlineWarning.message",
+    icon: "⚠️",
+  },
+  [NotificationType.ORDER_PREPARING_EXTENDED]: {
+    titleKey: "server.notification.orderPreparingExtended.title",
+    messageKey: "server.notification.orderPreparingExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: {
+    titleKey: "server.notification.orderPreparingExtendedSeller.title",
+    messageKey: "server.notification.orderPreparingExtendedSeller.message",
     icon: "⚠️",
   },
   [NotificationType.ORDER_RESERVATION_RELEASED]: {
@@ -141,6 +171,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.offerExpiredSeller.message",
     icon: "⏰",
   },
+  [NotificationType.OFFER_EXTENDED]: {
+    titleKey: "server.notification.offerExtended.title",
+    messageKey: "server.notification.offerExtended.message",
+    icon: "⏳",
+  },
   [NotificationType.OFFER_PAYMENT_EXPIRED]: {
     titleKey: "server.notification.offerPaymentExpired.title",
     messageKey: "server.notification.offerPaymentExpired.message",
@@ -159,6 +194,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: {
     titleKey: "server.notification.offerCancelledListingRemoved.title",
     messageKey: "server.notification.offerCancelledListingRemoved.message",
+    icon: "❌",
+  },
+  [NotificationType.OFFER_CANCELLED_BUYER_DELETED]: {
+    titleKey: "server.notification.offerCancelledBuyerDeleted.title",
+    messageKey: "server.notification.offerCancelledBuyerDeleted.message",
     icon: "❌",
   },
   [NotificationType.PRODUCT_APPROVED]: {
@@ -341,10 +381,45 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.boostActivated.message",
     icon: "🚀",
   },
+  [NotificationType.TRADE_CANCELLED]: {
+    titleKey: "server.notification.tradeCancelled.title",
+    messageKey: "server.notification.tradeCancelled.message",
+    icon: "❌",
+  },
+  [NotificationType.TRADE_DISPUTE_OPENED]: {
+    titleKey: "server.notification.tradeDisputeOpened.title",
+    messageKey: "server.notification.tradeDisputeOpened.message",
+    icon: "⚠️",
+  },
+  [NotificationType.TRADE_DISPUTE_RESOLVED]: {
+    titleKey: "server.notification.tradeDisputeResolved.title",
+    messageKey: "server.notification.tradeDisputeResolved.message",
+    icon: "✅",
+  },
   [NotificationType.TRADE_AUTO_CANCELLED]: {
     titleKey: "server.notification.tradeAutoCancelled.title",
     messageKey: "server.notification.tradeAutoCancelled.message",
     icon: "🔄",
+  },
+  [NotificationType.TRADE_CANCELLED_BY_PLATFORM]: {
+    titleKey: "server.notification.tradeCancelledByPlatform.title",
+    messageKey: "server.notification.tradeCancelledByPlatform.message",
+    icon: "🛡️",
+  },
+  [NotificationType.TRADE_RESPONSE_EXTENDED]: {
+    titleKey: "server.notification.tradeResponseExtended.title",
+    messageKey: "server.notification.tradeResponseExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.TRADE_PAYMENT_EXTENDED]: {
+    titleKey: "server.notification.tradePaymentExtended.title",
+    messageKey: "server.notification.tradePaymentExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: {
+    titleKey: "server.notification.tradePaymentExtendedPaid.title",
+    messageKey: "server.notification.tradePaymentExtendedPaid.message",
+    icon: "⏳",
   },
   [NotificationType.TRADE_AT_WAREHOUSE]: {
     titleKey: "server.notification.tradeAtWarehouse.title",
@@ -365,6 +440,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.orderStuckInTransit.title",
     messageKey: "server.notification.orderStuckInTransit.message",
     icon: "⚠️",
+  },
+  [NotificationType.SURAT_TRACKING_NETWORK_FAILURE]: {
+    titleKey: "server.notification.suratTrackingNetworkFailure.title",
+    messageKey: "server.notification.suratTrackingNetworkFailure.message",
+    icon: "📡",
   },
   [NotificationType.ELOGO_INVOICE_EXHAUSTED]: {
     titleKey: "server.notification.elogoInvoiceExhausted.title",

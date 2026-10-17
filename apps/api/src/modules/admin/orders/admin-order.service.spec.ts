@@ -72,7 +72,7 @@ function makePrisma() {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
+    fiscalInvoice: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((queries: unknown[]) =>
       Promise.all(queries as Promise<number>[]),
     ),
@@ -270,7 +270,7 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
         lineRow({ id: "o2", packageId: "p1" }),
         lineRow({ id: "o3", packageId: "p2" }),
       ]);
-    prisma.elogoInvoice.findMany.mockResolvedValue([
+    prisma.fiscalInvoice.findMany.mockResolvedValue([
       {
         id: "i1",
         type: "seller_commission",
@@ -285,8 +285,8 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
 
     const result = await service.getOrders({});
 
-    expect(prisma.elogoInvoice.findMany).toHaveBeenCalledTimes(1);
-    const where = prisma.elogoInvoice.findMany.mock.calls[0][0].where;
+    expect(prisma.fiscalInvoice.findMany).toHaveBeenCalledTimes(1);
+    const where = prisma.fiscalInvoice.findMany.mock.calls[0][0].where;
     expect([...where.sourceId.in].sort()).toEqual(
       ["o1", "o2", "o3", "p1", "p2"].sort(),
     );
@@ -300,7 +300,7 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
     const result = await service.getOrders({ tab: "all", bucket: "other" });
     expect(result.data).toEqual([]);
     expect(prisma.order.findMany).toHaveBeenCalledTimes(1);
-    expect(prisma.elogoInvoice.findMany).not.toHaveBeenCalled();
+    expect(prisma.fiscalInvoice.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -370,18 +370,21 @@ describe("AdminOrderService.getOrderCounts", () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     // group source is identical for "all" and "direct_sale" → counted once;
     // the offer-order tab has no group source
-    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(6);
-    // the groupless source differs per tab (its origins) → 3 tabs × 6 buckets
-    expect(prisma.order.count).toHaveBeenCalledTimes(18);
+    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(8);
+    // the groupless source differs per tab (its origins) → 3 tabs × 8 buckets
+    expect(prisma.order.count).toHaveBeenCalledTimes(24);
     expect(prisma.offer.count).not.toHaveBeenCalled();
     // the same where-builder as the list, filters included
     expect(prisma.order.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("offer_order", "new", { party: "ali" })
         .loose,
     });
-    expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
-      where: orderListSourceWheres("all", "other", { party: "ali" }).group,
-    });
+    // the closed carts are split three ways — each its own count
+    for (const bucket of ["cancelled", "refunds", "other"] as const) {
+      expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
+        where: orderListSourceWheres("all", bucket, { party: "ali" }).group,
+      });
+    }
     // "Tümü" counts the tab with the list's own unbucketed where
     expect(prisma.order.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("direct_sale", undefined, { party: "ali" })
@@ -396,6 +399,8 @@ describe("AdminOrderService.getOrderCounts", () => {
         shipped: n,
         in_transit: n,
         delivered: n,
+        cancelled: n,
+        refunds: n,
         other: n,
       },
     });
@@ -406,5 +411,52 @@ describe("AdminOrderService.getOrderCounts", () => {
     expect(Object.keys(counts).sort()).toEqual(
       ["all", "direct_sale", "offer_order"].sort(),
     );
+  });
+});
+
+describe("AdminOrderService — PayTR sipariş no araması", () => {
+  const OID = "GRPDBN4NPYYTZT790149";
+  const withPayments = () => {
+    const prisma = {
+      ...makePrisma(),
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            orderId: null,
+            checkoutGroupId: "g1",
+            tradeCashPaymentId: null,
+          },
+        ]),
+      },
+    };
+    return { ...makeService(prisma as never), prisma };
+  };
+
+  it("list: resolves the payment once and puts only id lists into the where", async () => {
+    const { service, prisma } = withPayments();
+
+    await service.getOrders({ search: OID, page: 1, limit: 5 } as never);
+
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+    const where = JSON.stringify(prisma.order.findMany.mock.calls[0][0].where);
+    expect(where).toContain('"checkoutGroupId":{"in":["g1"]}');
+    expect(where).not.toContain("merchantOidHistory");
+  });
+
+  it("counts: one resolution shared by every tab/bucket count query", async () => {
+    const { service, prisma } = withPayments();
+
+    await service.getOrderCounts({ search: OID } as never);
+
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("an ordinary search never touches payments", async () => {
+    const { service, prisma } = withPayments();
+
+    await service.getOrders({ search: "ORD-NGGCF4J4V4" } as never);
+
+    expect(prisma.payment.findMany).not.toHaveBeenCalled();
   });
 });

@@ -33,6 +33,8 @@ describe("RefundShipmentService — expireStaleOpenReturns", () => {
         update: jest.fn().mockResolvedValue({}),
       },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      // Drop-off pencereleri Süreler ve Kurallar'dan; satır yok → env/varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const carrierCancellations = {
       request: jest.fn().mockImplementation(async (input: any) => {

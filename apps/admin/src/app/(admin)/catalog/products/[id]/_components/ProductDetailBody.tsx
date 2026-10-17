@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminTabs } from "@/components/AdminTabs";
+import { DetailLayout } from "@/components/detail/DetailLayout";
 import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -17,18 +16,21 @@ import { ProductInfoSection } from "../_sections/ProductInfoSection";
 import { ProductSellerSection } from "../_sections/ProductSellerSection";
 import { ProductSidebar } from "../_sections/ProductSidebar";
 import { ProductReviewsSection } from "../_sections/ProductReviewsSection";
+import { ProductRemovalSection } from "../_sections/ProductRemovalSection";
 import { ProductApproveModal } from "../_modals/ProductApproveModal";
 import { ProductRejectModal } from "../_modals/ProductRejectModal";
+import { ProductRemoveModal } from "../_modals/ProductRemoveModal";
 
 type Tab = "info" | "reviews" | "ai";
 
 export function ProductDetailBody({ product }: { product: ProductDetail }) {
   const t = useTranslations();
-  const router = useRouter();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("info");
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  // Kaldırma bir onay değil, bir FORM: ihlal kodu + açıklama kayda geçer.
+  const [removeOpen, setRemoveOpen] = useState(false);
 
   const { data: reviews = [] } = useQuery<Review[]>({
     queryKey: adminKeys.detail("product-reviews", product.id),
@@ -38,31 +40,35 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
   });
   const reviewCount = reviews.filter((r) => r.status !== "deleted").length;
 
-  const del = useAdminMutation(() => adminApi.deleteProduct(product.id), {
-    invalidates: ["products"],
-    successMessage: t("admin.catalog.products.removed"),
-    onSuccess: () => router.push("/catalog/products"),
-  });
   const restore = useAdminMutation(() => adminApi.restoreProduct(product.id), {
     invalidates: ["products"],
     successMessage: t("admin.catalog.products.restored"),
   });
 
-  const onDelete = async () => {
-    await confirm({
-      title: t("admin.catalog.products.removeTitle"),
-      description: t("admin.catalog.products.removeDescription"),
-      confirmLabel: t("common.remove"),
-      destructive: true,
-      onConfirm: () => del.mutateAsync(),
-    });
-  };
   const onRestore = async () => {
     await confirm({
       title: t("admin.catalog.products.restoreTitle"),
       description: t("admin.catalog.products.restoreDescription"),
       confirmLabel: t("admin.catalog.products.restore"),
       onConfirm: () => restore.mutateAsync(),
+    });
+  };
+
+  // Hata mesajı sunucunun yerelleştirilmiş metnidir (ortak hata toast'ı).
+  const renew = useAdminMutation(
+    () => adminApi.renewExpiredProduct(product.id),
+    {
+      invalidates: ["products"],
+      successMessage: t("admin.catalog.products.renewedExpired"),
+    },
+  );
+
+  const onRenew = async () => {
+    await confirm({
+      title: t("admin.catalog.products.renewExpiredTitle"),
+      description: t("admin.catalog.products.renewExpiredDescription"),
+      confirmLabel: t("admin.catalog.products.renewExpired"),
+      onConfirm: () => renew.mutateAsync(),
     });
   };
 
@@ -73,12 +79,10 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
           {
             key: "info",
             label: t("admin.catalog.products.infoTab"),
-            icon: CubeIcon,
           },
           {
             key: "reviews",
             label: t("admin.catalog.products.reviewsTab"),
-            icon: StarIcon,
             badge: reviewCount,
           },
           { key: "ai", label: t("admin.catalog.common.aiModeration") },
@@ -88,24 +92,28 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
       />
 
       {tab === "info" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            <ProductImagesSection product={product} />
-            <ProductInfoSection product={product} />
-            <ProductSellerSection seller={product.seller} />
-          </div>
-          <div className="space-y-6">
+        <DetailLayout
+          main={
+            <>
+              <ProductImagesSection product={product} />
+              <ProductInfoSection product={product} />
+              <ProductSellerSection seller={product.seller} />
+              <ProductRemovalSection history={product.removalHistory ?? []} />
+            </>
+          }
+          aside={
             <ProductSidebar
               product={product}
               onApprove={() => setApproveOpen(true)}
               onReject={() => setRejectOpen(true)}
               onRestore={onRestore}
-              onDelete={onDelete}
+              onRenew={onRenew}
+              onDelete={() => setRemoveOpen(true)}
               busyRestore={restore.isPending}
-              busyDelete={del.isPending}
+              busyRenew={renew.isPending}
             />
-          </div>
-        </div>
+          }
+        />
       )}
 
       {tab === "reviews" && (
@@ -131,6 +139,13 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
         onClose={() => setRejectOpen(false)}
         productId={product.id}
       />
+      {removeOpen && (
+        <ProductRemoveModal
+          open
+          onClose={() => setRemoveOpen(false)}
+          productId={product.id}
+        />
+      )}
     </>
   );
 }

@@ -12,6 +12,8 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { useUserOptions, userOptionLabel } from "../_hooks/useUserOptions";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
@@ -345,10 +347,10 @@ export function DiscountFormModal({
       </div>
 
       {type === "bogo" && (
-        <div className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-surface/60 p-4 sm:grid-cols-2">
-          <p className="text-sm font-medium text-primary sm:col-span-2">
+        <Panel className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <SectionTitle as="h4" size="sm" className="sm:col-span-2">
             {t("admin.marketing.discounts.bogoSettings")}
-          </p>
+          </SectionTitle>
           <FormInput
             name="buyQuantity"
             type="number"
@@ -363,14 +365,14 @@ export function DiscountFormModal({
             label={t("admin.marketing.discounts.getQuantity")}
             placeholder={t("admin.marketing.discounts.oneExample")}
           />
-        </div>
+        </Panel>
       )}
 
       {type === "bulk_quantity" && (
-        <div className="rounded-lg border border-border bg-surface/60 p-4">
-          <p className="mb-2 text-sm font-medium text-primary">
+        <Panel>
+          <SectionTitle as="h4" size="sm" className="mb-2">
             {t("admin.marketing.discounts.bulkSettings")}
-          </p>
+          </SectionTitle>
           <FormInput
             name="minQuantity"
             type="number"
@@ -378,7 +380,7 @@ export function DiscountFormModal({
             label={t("admin.marketing.discounts.minQuantity")}
             placeholder={t("admin.marketing.discounts.minQuantityPlaceholder")}
           />
-        </div>
+        </Panel>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

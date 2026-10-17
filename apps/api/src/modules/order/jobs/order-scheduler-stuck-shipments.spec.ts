@@ -48,6 +48,8 @@ describe("OrderSchedulerService — takılı kargo alarmları", () => {
       adminUser: {
         findMany: jest.fn().mockResolvedValue([{ userId: "u-admin" }]),
       },
+      // Alarm eşikleri Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const cache = {
       get: jest.fn().mockResolvedValue(opts.alreadyAlerted ? true : null),

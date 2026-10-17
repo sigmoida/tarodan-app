@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Alert, Button } from "@tarodan/ui";
+import { Alert, Button, EmptyState } from "@tarodan/ui";
 import { ResourceList } from "@/components/list";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { TierCard } from "./_components/TierCard";
@@ -60,9 +60,9 @@ function MembershipTiersContent() {
       <ResourceList.Toolbar />
 
       {yearlyDiscountError && (
-        <Alert variant="warning">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span>{t("admin.tiers.page.discountLoadError")}</span>
+        <Alert
+          variant="warning"
+          action={
             <Button
               variant="outline"
               size="sm"
@@ -71,7 +71,9 @@ function MembershipTiersContent() {
             >
               {t("admin.shared.suspense.retry")}
             </Button>
-          </div>
+          }
+        >
+          {t("admin.tiers.page.discountLoadError")}
         </Alert>
       )}
 
@@ -84,9 +86,11 @@ function MembershipTiersContent() {
 
       {rows.length === 0 ? (
         <SectionCard>
-          <p className="py-8 text-center text-muted">
-            {t("admin.tiers.page.empty")}
-          </p>
+          <EmptyState
+            size="compact"
+            icon={false}
+            title={t("admin.tiers.page.empty")}
+          />
         </SectionCard>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

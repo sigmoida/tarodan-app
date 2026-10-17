@@ -6,6 +6,7 @@ import {
   isKnownNotificationType,
   requiredFieldsFor,
   resolveWebNotificationLink,
+  withDefaultAudience,
 } from "./notification-link";
 
 /**
@@ -71,6 +72,17 @@ describe("bildirim hedefleri", () => {
     const cases: Array<[NotificationType, Record<string, string>, string]> = [
       [NotificationType.ORDER_CREATED, { orderId: "o1" }, "/profile/orders/o1"],
       [NotificationType.ORDER_SHIPPED, { orderId: "o1" }, "/profile/orders/o1"],
+      // Hazırlık uzatması: alıcı ve satıcı ayrı tiplerle kendi ekranına gider.
+      [
+        NotificationType.ORDER_PREPARING_EXTENDED,
+        { orderId: "o1" },
+        "/profile/orders/o1",
+      ],
+      [
+        NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
+        { orderId: "o1" },
+        "/seller/orders/o1",
+      ],
       [NotificationType.OFFER_RECEIVED, {}, "/profile/offers?tab=received"],
       [NotificationType.OFFER_COUNTER, {}, "/profile/offers?tab=sent"],
       [
@@ -475,5 +487,91 @@ describe("bildirim hedefleri", () => {
     ])("eski link doğrulamadan geçmez: %s", (_name, legacy) => {
       expect(normalizeLegacyNotificationLink(legacy)).toBeNull();
     });
+  });
+});
+
+describe("withDefaultAudience", () => {
+  /** Satıcı sipariş ekranına (`/seller/orders/…`) giden tipler. */
+  const SELLER_ORDER_TYPES = [
+    NotificationType.ORDER_CANCELLED_SELLER,
+    NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER,
+    NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
+    NotificationType.PRODUCT_SOLD,
+    NotificationType.CARGO_MOVEMENT_MISSING,
+    NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
+    NotificationType.REFUND_RETURN_SHIPPED_SELLER,
+    NotificationType.REFUND_RETURN_DELIVERED_SELLER,
+    NotificationType.REFUND_COMPLETED_SELLER,
+    NotificationType.REFUND_AUTO_ACCEPTED_SELLER,
+    // Kendi kalıbıyla (fallback'li) satıcı sipariş ekranına giden tipler.
+    NotificationType.SELLER_ADDRESS_REQUIRED,
+    NotificationType.CARGO_CODE_READY,
+    NotificationType.OFFER_COUNTER_ACCEPTED,
+    // Satıcının "Yeni Sipariş" bildirimi (order.paid): satış siparişine gider.
+    NotificationType.PAYMENT_RECEIVED,
+  ];
+
+  it.each(SELLER_ORDER_TYPES)("%s — audience=seller eklenir", (type) => {
+    expect(withDefaultAudience(type, { orderId: "o1" })).toEqual({
+      orderId: "o1",
+      audience: "seller",
+    });
+  });
+
+  it("veri yoksa da audience taşıyan bir nesne döner", () => {
+    expect(
+      withDefaultAudience(NotificationType.PRODUCT_SOLD, undefined),
+    ).toEqual({ audience: "seller" });
+  });
+
+  it("üreticinin verdiği audience'a dokunmaz", () => {
+    const data = { orderId: "o1", audience: "buyer" };
+    expect(withDefaultAudience(NotificationType.PRODUCT_SOLD, data)).toBe(data);
+  });
+
+  it("girdiyi değiştirmez", () => {
+    const data = { orderId: "o1" };
+    withDefaultAudience(NotificationType.PRODUCT_SOLD, data);
+    expect(data).toEqual({ orderId: "o1" });
+  });
+
+  it("satıcı sipariş ekranı OLMAYAN hiçbir tipin verisini değiştirmez", () => {
+    const sellerTypes = new Set<NotificationType>(SELLER_ORDER_TYPES);
+    for (const type of ALL_TYPES.filter((t) => !sellerTypes.has(t))) {
+      const data = { orderId: "o1" };
+      expect(withDefaultAudience(type, data)).toBe(data);
+    }
+  });
+
+  it("küme link kalıbından türer: /seller/orders/ kalıplı her pattern tipi içindedir", () => {
+    const patternSellerTypes = ALL_TYPES.filter((type) => {
+      const spec = NOTIFICATION_LINKS[type];
+      return (
+        spec.kind === "pattern" && spec.pattern.startsWith("/seller/orders/")
+      );
+    });
+    for (const type of patternSellerTypes) {
+      expect(withDefaultAudience(type, { orderId: "o1" })?.audience).toBe(
+        "seller",
+      );
+    }
+  });
+
+  it("iki yöne giden (byAudience) tiplere varsayılan audience eklenmez", () => {
+    for (const type of ALL_TYPES.filter(
+      (t) => NOTIFICATION_LINKS[t].kind === "audience",
+    )) {
+      const data = { orderId: "o1" };
+      expect(withDefaultAudience(type, data)).toBe(data);
+    }
+  });
+
+  it("türetilen küme, satıcı ekranına giden tiplerle birebir örtüşür", () => {
+    // Harita değişirse (yeni *_SELLER tipi eklendi) bu liste bilinçli güncellenir.
+    const resolvedSeller = ALL_TYPES.filter(
+      (type) =>
+        withDefaultAudience(type, { orderId: "o1" })?.audience === "seller",
+    );
+    expect(new Set(resolvedSeller)).toEqual(new Set(SELLER_ORDER_TYPES));
   });
 });

@@ -16,18 +16,18 @@ apps/web/src/components/notifications/NotificationBell.tsx
 
 ## 1. Mesajlaşma
 
-| Method | Path                             | Auth   | Amaç                                                              |
-| ------ | -------------------------------- | ------ | ----------------------------------------------------------------- |
-| `GET`  | `/messages/threads`              | bearer | Sohbet listesi                                                    |
-| `GET`  | `/messages/threads/:id`          | bearer | Tek sohbet                                                        |
-| `GET`  | `/messages/threads/:id/messages` | bearer | Mesajlar (istemci `createdAt` artan sıralar)                      |
-| `POST` | `/messages/threads`              | bearer | `{ participantId, productId? }` — **409 = zaten var**             |
-| `POST` | `/messages/threads/:id/messages` | bearer | `{ content, productId? }`                                         |
-| `GET`  | `/messages/unread-count`         | bearer | `{ count }` — **web kullanmıyor, mobil kullanmalı**               |
-| `GET`  | `/messages/daily-limit`          | bearer | Katman başına günlük mesaj hakkı — **hiçbir yerde gösterilmiyor** |
-| `POST` | `/media/upload?folder=messages`  | bearer | Görsel eki (multipart `file`)                                     |
-| `GET`  | `/admin/settings/public`         | public | `max_message_length` (varsayılan **1000**)                        |
-| `POST` | `/user-reports`                  | bearer | Mesaj/kullanıcı şikayeti                                          |
+| Method | Path                             | Auth   | Amaç                                                                                                        |
+| ------ | -------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/messages/threads`              | bearer | Sohbet listesi                                                                                              |
+| `GET`  | `/messages/threads/:id`          | bearer | Tek sohbet                                                                                                  |
+| `GET`  | `/messages/threads/:id/messages` | bearer | Mesajlar (istemci `createdAt` artan sıralar)                                                                |
+| `POST` | `/messages/threads`              | bearer | `{ participantId, productId? }` — **409 = zaten var**                                                       |
+| `POST` | `/messages/threads/:id/messages` | bearer | `{ content, productId? }`                                                                                   |
+| `GET`  | `/messages/unread-count`         | bearer | `{ count }` — **web kullanmıyor, mobil kullanmalı**                                                         |
+| `GET`  | `/messages/daily-limit`          | bearer | Katman başına günlük mesaj hakkı — **hiçbir yerde gösterilmiyor**                                           |
+| `POST` | `/media/upload?folder=messages`  | bearer | Görsel eki (multipart `file`)                                                                               |
+| `GET`  | `/admin/settings/public`         | public | `max_message_length` (varsayılan **1000**), `min_offer_percentage` (teklif alt sınırı %, varsayılan **50**) |
+| `POST` | `/user-reports`                  | bearer | Mesaj/kullanıcı şikayeti                                                                                    |
 
 ### Satıcıyla sohbet açma (ürün detayından)
 

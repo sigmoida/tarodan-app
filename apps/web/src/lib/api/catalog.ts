@@ -7,9 +7,18 @@ export const categoriesApi = {
   findBySlug: (slug: string) => api.get(`/categories/slug/${slug}`),
 };
 
+/**
+ * Vitrindeki üretici listesi — TEK kaynak. Aktif ilanı olmayan üretici web'de
+ * gösterilmez; süzme API'de (`hasListings`, mağaza sayacıyla aynı predikat)
+ * yapılır. Sunucu (ISR) fetch'leri de bu yolu kullanır.
+ */
+export const MANUFACTURERS_WITH_LISTINGS_PATH =
+  "/manufacturers?hasListings=true";
+
 // Manufacturers
 export const manufacturersApi = {
-  findAll: () => api.get("/manufacturers"),
+  /** Yalnız aktif ilanı olan üreticiler (bkz. MANUFACTURERS_WITH_LISTINGS_PATH). */
+  findAll: () => api.get(MANUFACTURERS_WITH_LISTINGS_PATH),
   findOne: (id: string) => api.get(`/manufacturers/${id}`),
   findBySlug: (slug: string) => api.get(`/manufacturers/slug/${slug}`),
 };

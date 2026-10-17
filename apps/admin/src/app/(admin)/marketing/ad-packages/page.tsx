@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Spinner } from "@tarodan/ui";
+import { Button, EmptyState, Spinner } from "@tarodan/ui";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
@@ -60,9 +60,10 @@ export default function AdPackagesPage() {
       ) : isError ? (
         <QueryErrorCard onRetry={refetch} />
       ) : !packages || packages.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted">
-          {t("admin.marketing.adPackages.empty")}
-        </p>
+        <EmptyState
+          size="compact"
+          title={t("admin.marketing.adPackages.empty")}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {packages.map((pkg) => (

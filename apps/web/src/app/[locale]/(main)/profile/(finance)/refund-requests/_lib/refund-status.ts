@@ -20,27 +20,27 @@ export const refundStatusMeta: Record<string, RefundStatusMeta> = {
     labelKey: "refund.statusPendingReview",
     variant: "warning",
   },
-  approved: { labelKey: "refund.statusApproved", variant: "info" },
+  approved: { labelKey: "refund.statusApproved", variant: "default" },
   wait_for_delivery: {
     labelKey: "refund.statusWaitForDelivery",
-    variant: "info",
+    variant: "default",
   },
   return_shipment_open: {
     labelKey: "refund.statusReturnShipmentOpen",
-    variant: "info",
+    variant: "default",
   },
   return_in_transit: {
     labelKey: "refund.statusReturnInTransit",
-    variant: "info",
+    variant: "default",
   },
   return_delivered: {
     labelKey: "refund.statusReturnDelivered",
-    variant: "info",
+    variant: "default",
   },
   refunded: { labelKey: "refund.statusRefunded", variant: "success" },
   rejected: { labelKey: "common.rejected", variant: "danger" },
   disputed: { labelKey: "refund.statusDisputed", variant: "warning" },
-  cancelled: { labelKey: "order.statusCancelled", variant: "secondary" },
+  cancelled: { labelKey: "order.statusCancelled", variant: "outline" },
 };
 
 /** Meta for a status, or `null` labelKey (caller falls back to the raw status). */

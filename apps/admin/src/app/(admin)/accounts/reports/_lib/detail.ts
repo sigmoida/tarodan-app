@@ -8,8 +8,8 @@ import { type Report, type ReportStatus } from "./types";
 export interface ReportTarget {
   id: string;
   deleted?: boolean;
-  /** product */
-  title?: string;
+  /** product (review: ürün yorumunun başlığı, boş olabilir) */
+  title?: string | null;
   status?: string;
   seller?: { id: string; displayName: string };
   /** user */
@@ -22,6 +22,16 @@ export interface ReportTarget {
   /** message */
   content?: string;
   sender?: { id: string; displayName: string };
+  /**
+   * review — ürün yorumu ya da satıcı değerlendirmesi (API tek şekle çevirir).
+   * `user` alanı koleksiyonla çakışmasın diye yazar `author`dır.
+   */
+  reviewKind?: "product" | "seller";
+  score?: number;
+  comment?: string | null;
+  author?: { id: string; displayName: string } | null;
+  product?: { id: string; title: string } | null;
+  receiver?: { id: string; displayName: string } | null;
 }
 
 export interface ReportDetail extends Report {
@@ -52,6 +62,12 @@ export function targetHref(report: ReportDetail): string | null {
       return `/catalog/products/${report.targetId}`;
     case "user":
       return `/accounts/users/${report.targetId}`;
+    case "review":
+      // Tekil yorum sayfası yok: ilgili sekmedeki yorum listesine gider
+      // (reddetme/geri alma orada).
+      return `/accounts/reviews?tab=${
+        report.target.reviewKind === "seller" ? "seller" : "product"
+      }`;
     default:
       // Koleksiyon ve mesajın admin panelinde tekil sayfası yok.
       return null;

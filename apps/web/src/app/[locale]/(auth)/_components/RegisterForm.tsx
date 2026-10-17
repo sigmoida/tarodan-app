@@ -14,6 +14,7 @@ import {
   FormError,
   useZodForm,
 } from "@tarodan/ui/form";
+import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import { registerSchema, type RegisterValues } from "../_lib/auth";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 import { AppleSignInButton } from "./AppleSignInButton";
@@ -40,6 +41,9 @@ export function RegisterForm() {
   const form = useZodForm(registerSchema(locale), {
     defaultValues: {
       displayName: "",
+      legalFirstName: "",
+      legalLastName: "",
+      nationalId: "",
       username: "",
       email: "",
       phone: "",
@@ -47,6 +51,7 @@ export function RegisterForm() {
       password: "",
       confirmPassword: "",
       agreeTerms: false,
+      agreeKvkk: false,
       acceptsMarketingEmails: false,
     },
   });
@@ -54,6 +59,9 @@ export function RegisterForm() {
   const onSubmit = (v: RegisterValues) =>
     submit({
       displayName: v.displayName,
+      legalFirstName: v.legalFirstName,
+      legalLastName: v.legalLastName,
+      nationalId: v.nationalId,
       username: v.username,
       email: v.email,
       phone: v.phone ?? "",
@@ -61,6 +69,7 @@ export function RegisterForm() {
       password: v.password,
       confirmPassword: v.confirmPassword,
       agreeTerms: v.agreeTerms,
+      agreeKvkk: v.agreeKvkk,
       acceptMarketing: v.acceptsMarketingEmails,
     });
 
@@ -149,12 +158,39 @@ export function RegisterForm() {
         <RegisterAccountTabs active="individual" />
       </div>
       <Form form={form} onSubmit={onSubmit} className="space-y-4">
+        {/* Yasal ad-soyad aşağıda ayrı istenir; bu alan kişinin kendi
+            yüzeylerinde görünen addır (takma ad olabilir). */}
         <FormInput
           name="displayName"
-          label={`${t("checkout.fullName")} *`}
-          placeholder={t("auth.fullNamePlaceholder")}
-          autoComplete="name"
+          label={`${t("profile.displayName")} *`}
+          placeholder={t("profile.displayNamePlaceholder")}
+          autoComplete="nickname"
         />
+
+        <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
+          <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
+            <FormInput
+              name="legalFirstName"
+              label={`${t("identity.legalFirstName")} *`}
+              helperText={t("identity.legalNameHint")}
+              autoComplete="given-name"
+            />
+            <FormInput
+              name="legalLastName"
+              label={`${t("identity.legalLastName")} *`}
+              autoComplete="family-name"
+            />
+          </div>
+          <FormInput
+            name="nationalId"
+            label={`${t("identity.nationalId")} *`}
+            placeholder={t("identity.nationalIdPlaceholder")}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={11}
+          />
+          <p className="text-xs text-muted">{t("identity.registerHint")}</p>
+        </div>
 
         <FormInput
           name="username"
@@ -222,6 +258,24 @@ export function RegisterForm() {
                 privacy: (chunks) => (
                   <Link
                     href="/privacy"
+                    className="font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </span>
+          }
+        />
+
+        <FormCheckbox
+          name="agreeKvkk"
+          label={
+            <span className="text-sm text-muted leading-snug">
+              {t.rich("auth.kvkkAgreeRich", {
+                kvkk: (chunks) => (
+                  <Link
+                    href={CONSENT_DOCUMENTS.kvkk.path ?? "/privacy"}
                     className="font-medium text-primary-600 hover:text-primary-700"
                   >
                     {chunks}

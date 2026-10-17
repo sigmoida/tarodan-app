@@ -26,6 +26,8 @@ describe("PaymentFulfillmentService — ödeme sonrası stok yetersizliği iptal
 
   it("siparişi sistem aktörü ve stok yetersizliği gerekçesiyle iptal eder, iadeyi de sistem adına ister", async () => {
     const tx: any = {
+      // Sipariş satırı kilidi (iptalle dışlama) + ürün kilidi.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       payment: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       order: {
         findUnique: jest
@@ -43,6 +45,8 @@ describe("PaymentFulfillmentService — ödeme sonrası stok yetersizliği iptal
       $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
       wishlistItem: { findMany: jest.fn().mockResolvedValue([]) },
       productBoost: { findUnique: jest.fn().mockResolvedValue(null) },
+      // Hazırlık süresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),

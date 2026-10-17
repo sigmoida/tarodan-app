@@ -25,7 +25,7 @@ import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
 import { TaxService } from "../../tax/tax.service";
-import { ElogoInvoicingService } from "../../elogo";
+import { InvoicingService } from "../../invoicing";
 import { RefundService } from "../../refund/refund.service";
 import {
   CancellationActor,
@@ -36,9 +36,13 @@ import {
 import { flatPackageTiers } from "../../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 import { UserBlockService } from "../../user-block/user-block.service";
+import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
 
 // Engel kapısı: bu testlerde çift engelli değil.
 const userBlocksStub = { assertNotBlocked: async () => undefined };
+
+// Mesafeli satış onayı: grupla aynı transaction'da consent_records'a yazılır.
+const distanceSalesStub = { recordAtCheckout: jest.fn() };
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB.
@@ -264,12 +268,13 @@ describe("OrderService checkout group (batch checkout)", () => {
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
         { provide: AccountLaneService, useValue: accountLaneServiceStub() },
+        { provide: DistanceSalesConsentService, useValue: distanceSalesStub },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
         OrderLifecycleService,
         {
-          provide: ElogoInvoicingService,
+          provide: InvoicingService,
           useValue: {
             issueCommissionInvoice: jest.fn().mockResolvedValue(undefined),
             issueServiceFeeInvoice: jest.fn().mockResolvedValue(undefined),
@@ -393,6 +398,61 @@ describe("OrderService checkout group (batch checkout)", () => {
         productId: { in: [productA, productB].sort() },
       },
     });
+  });
+
+  it("mesafeli satış onayını grupla AYNI transaction'da onay kaydına yazar", async () => {
+    await service.checkout(buyerId, {
+      ...baseDto(),
+      distanceSalesAccepted: true,
+    } as any);
+
+    expect(distanceSalesStub.recordAtCheckout).toHaveBeenCalledWith(mockTx, {
+      checkoutGroupId: "group-1",
+      userId: buyerId,
+      guestEmail: null,
+    });
+    // Tek kayıt: eski checkout_groups kolonları artık yazılmaz.
+    const data = mockTx.checkoutGroup.create.mock.calls[0][0].data;
+    expect(data.distanceSalesAcceptedAt).toBeUndefined();
+    expect(data.distanceSalesVersion).toBeUndefined();
+  });
+
+  it("onay gönderilmediyse (eski mobil) checkout sürer, onay kaydı yazılmaz", async () => {
+    const result: any = await service.checkout(buyerId, baseDto() as any);
+
+    expect(result.checkoutGroupId).toBe("group-1");
+    expect(distanceSalesStub.recordAtCheckout).not.toHaveBeenCalled();
+  });
+
+  // Hesap silme ile serileşme (TOCTOU): üye alıcının kullanıcı satırı, ürün
+  // kilitlerinden ÖNCE FOR SHARE kilitlenir; silinmiş hesap sipariş açamaz.
+  it("üye checkout'u alıcının kullanıcı satırını ilk iş FOR SHARE kilitler", async () => {
+    await service.checkout(buyerId, baseDto() as any);
+
+    const first = mockTx.$queryRaw.mock.calls[0];
+    const sql = (first[0] as string[]).join("?").replace(/\s+/g, " ");
+    expect(sql).toContain("FROM users");
+    expect(sql).toContain("FOR SHARE");
+    expect(first[1].values).toEqual([buyerId]);
+    const productLock = (mockTx.$queryRaw.mock.calls[1][0] as string[]).join(
+      "?",
+    );
+    expect(productLock).toContain("FROM products");
+  });
+
+  it("alıcı hesabı silinmişse checkout reddedilir, sipariş açılmaz", async () => {
+    mockTx.$queryRaw.mockResolvedValueOnce([
+      { id: buyerId, deleted_at: new Date() },
+    ]);
+
+    await expect(
+      service.checkout(buyerId, baseDto() as any),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.auth.accountDeleted" },
+    });
+
+    expect(mockTx.order.create).not.toHaveBeenCalled();
+    expect(mockTx.checkoutGroup.create).not.toHaveBeenCalled();
   });
 
   // Faz 1: satıcı-bazlı kargo + OrderPackage (çatı) senaryoları.
@@ -823,6 +883,39 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(Number(data.subtotal)).toBe(80);
     });
 
+    it("tekil misafir alımı da mesafeli satış onayını misafir e-postasıyla kaydeder", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+
+      await service.guestCheckout({
+        productId: productA,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
+        expectedPricingHash: pricingHashFor([{ productId: productA }]),
+        distanceSalesAccepted: true,
+      } as any);
+
+      expect(distanceSalesStub.recordAtCheckout).toHaveBeenCalledWith(mockTx, {
+        checkoutGroupId: "group-1",
+        userId: null,
+        guestEmail,
+      });
+    });
+
     it("quantity=3 → order.quantity=3, subtotal=fiyat*3, rezervasyon +3 (1 değil)", async () => {
       await service.checkoutGuest(
         guestDto([{ productId: productA, quantity: 3 }]) as any,
@@ -842,6 +935,22 @@ describe("OrderService checkout group (batch checkout)", () => {
         where: { id: productA },
         data: { reservedQuantity: { increment: 3 } },
       });
+    });
+
+    it("misafir onayı sistem hesabına değil misafir e-postasına yazılır", async () => {
+      await service.checkoutGuest({
+        ...guestDto([{ productId: productA }]),
+        distanceSalesAccepted: true,
+      } as any);
+
+      expect(distanceSalesStub.recordAtCheckout).toHaveBeenCalledWith(
+        mockTx,
+        expect.objectContaining({
+          checkoutGroupId: "group-1",
+          userId: null,
+          guestEmail,
+        }),
+      );
     });
 
     it("adet verilmezse (===1) davranış değişmez: order.quantity=1, rezervasyon +1", async () => {
@@ -1010,7 +1119,7 @@ describe("OrderService checkout group (batch checkout)", () => {
 
     it("satıcı başına TEK fatura kaynağı üretir (3 sipariş → 2 paket)", async () => {
       // Komisyon ve hizmet bedeli faturaları artık `packageId` anahtarlı
-      // kesiliyor (ElogoInvoicingService.resolvePackageInvoiceBasis), sipariş
+      // kesiliyor (InvoicingService.resolvePackageInvoiceBasis), sipariş
       // değil. Paket satıcı başına tek olduğu için 2 satıcı → 2 fatura seti:
       // biri iki kalemli, diğeri tek kalemli.
       splitTwoAndOne();

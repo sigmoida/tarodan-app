@@ -36,6 +36,8 @@ describe("OrderQueryService group-umbrella views", () => {
       checkoutGroup: { findUnique: jest.fn(), findMany: jest.fn() },
       order: { findUnique: jest.fn(), findMany: jest.fn() },
       orderPackage: { findMany: jest.fn() },
+      // Detay okumaları bekleyen hold'ları (escrowReleaseAt) tek sorguyla yükler.
+      paymentHold: { findMany: jest.fn().mockResolvedValue([]) },
       ...prismaOverrides,
     };
     const orderCommon = {
@@ -119,6 +121,27 @@ describe("OrderQueryService group-umbrella views", () => {
       expect(view.orders.map((o: any) => o.id).sort()).toEqual(["o1", "o2"]);
       // Kendi dilim toplamı: 100 + 100 (o3 dahil değil)
       expect(view.totalAmount).toBe(200);
+    });
+
+    it("escrowReleaseAt için bekleyen hold'ları görünen siparişler adına TEK sorguyla okur (N+1 yok)", async () => {
+      const { svc, prisma } = makeService();
+      prisma.checkoutGroup.findUnique.mockResolvedValue(fullGroup());
+
+      await svc.findCheckoutGroup("grp-1", "buyer-1");
+      expect(prisma.paymentHold.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.paymentHold.findMany.mock.calls[0][0].where).toEqual({
+        orderId: { in: ["o1", "o2", "o3"] },
+        status: "held",
+      });
+
+      prisma.paymentHold.findMany.mockClear();
+      prisma.checkoutGroup.findUnique.mockResolvedValue(fullGroup());
+      await svc.findCheckoutGroup("grp-1", "sA");
+      // Satıcı yalnız kendi diliminin hold'unu sorgular.
+      expect(prisma.paymentHold.findMany).toHaveBeenCalledTimes(1);
+      expect(
+        prisma.paymentHold.findMany.mock.calls[0][0].where.orderId.in,
+      ).toEqual(["o1", "o2"]);
     });
 
     it("grupla ilgisi olmayan kullanıcı Forbidden alır", async () => {

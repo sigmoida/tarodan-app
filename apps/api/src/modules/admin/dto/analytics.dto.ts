@@ -14,17 +14,15 @@ import {
   type ValidatorConstraintInterface,
 } from "class-validator";
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { OrderStatus } from "@prisma/client";
 import {
-  ANALYTICS_EXPORT_FORMATS,
   ANALYTICS_GROUP_BYS,
   DASHBOARD_PERIODS,
   DEFAULT_ANALYTICS_GROUP_BY,
   DEFAULT_DASHBOARD_PERIOD,
   analyticsRangeIssue,
   dashboardRangeIssue,
-  type AnalyticsExportFormat,
   type AnalyticsGroupBy,
   type AnalyticsRangeQuery,
   type DashboardPeriod,
@@ -115,19 +113,6 @@ export class UpdateOrderStatusDto {
   @IsNotEmpty()
   @MaxLength(500)
   notes: string;
-}
-
-/** POST /admin/orders/:id/cancel — kargo öncesi platform iptali (tam iade). */
-export class AdminCancelOrderDto {
-  @ApiProperty({
-    description:
-      "İptal gerekçesi — denetim kaydına yazılır ve iptal e-postasında alıcıya/satıcıya iletilir",
-    maxLength: 500,
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  reason: string;
 }
 
 export class AddOrderTrackingDto {
@@ -252,18 +237,7 @@ export class AnalyticsRangeQueryDto implements AnalyticsRangeQuery {
     description: "Also measure the preceding window of equal length",
   })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === "true")
+  @QueryBoolean()
   @IsBoolean()
   compare?: boolean;
-}
-
-/** Dışa aktarım sorgusu — ekranla AYNI aralık, artı dosya biçimi. */
-export class AnalyticsExportQueryDto extends AnalyticsRangeQueryDto {
-  @ApiPropertyOptional({
-    enum: ANALYTICS_EXPORT_FORMATS,
-    default: "csv",
-  })
-  @IsOptional()
-  @IsIn(ANALYTICS_EXPORT_FORMATS)
-  format?: AnalyticsExportFormat = "csv";
 }

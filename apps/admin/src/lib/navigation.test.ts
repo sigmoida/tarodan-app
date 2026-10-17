@@ -39,10 +39,11 @@ describe("routePermission", () => {
     expect(routePermission("/operations/trades")).toBe("trades");
   });
 
-  it("guards the cancellations & refunds screen and the refund-request file with the refund permission", () => {
+  it("guards the cancellations screen, the refunds screen and the refund-request file with the refund permission", () => {
     expect(routePermission("/operations/cancellations-refunds")).toBe(
       "refund_requests",
     );
+    expect(routePermission("/operations/refunds")).toBe("refund_requests");
     // Liste menüden çıktı, dosya yerinde: aynı izinle korunur.
     expect(routePermission("/operations/refund-requests/rr-1")).toBe(
       "refund_requests",
@@ -51,6 +52,26 @@ describe("routePermission", () => {
     expect(routePermission("/operations/refund-requests")).toBe(
       "refund_requests",
     );
+  });
+
+  it("guards the mail routing screen with the settings permission", () => {
+    // API: PERMISSION_MAP["mail-routing"] = ["settings"] — menü ve uç aynı izni ister.
+    expect(routePermission("/system/mail-routing")).toBe("settings");
+  });
+
+  it("guards the durations & rules screen with the settings permission", () => {
+    // API: PERMISSION_MAP["timing-rules"] = ["settings"] — menü ve uç aynı izni ister.
+    expect(routePermission("/system/timing-rules")).toBe("settings");
+  });
+
+  it("guards the consent records screen with the users permission", () => {
+    // API: PERMISSION_MAP.consents = ["users"] — menü ve uç aynı izni ister.
+    expect(routePermission("/accounts/consents")).toBe("users");
+  });
+
+  it("guards the GIB report screen with the tax permission", () => {
+    // API: PERMISSION_MAP["gib-report"] = ["tax"] — menü ve uç aynı izni ister.
+    expect(routePermission("/finance/gib-report")).toBe("tax");
   });
 
   it("matches a sub-path of a registered route (prefix match)", () => {
@@ -150,12 +171,12 @@ describe("humanizeSegment", () => {
 });
 
 describe("breadcrumbsFor", () => {
-  it("places the refund-request file under the cancellations & refunds page", () => {
+  it("places the refund-request file under the refunds page", () => {
     const crumbs = breadcrumbsFor(
       "/operations/refund-requests/3f2a9c1e-0000-4000-8000-000000000000",
       t,
     );
-    expect(crumbs.at(-2)?.href).toBe("/operations/cancellations-refunds");
+    expect(crumbs.at(-2)?.href).toBe("/operations/refunds");
     expect(crumbs.at(-1)).toEqual({ label: "admin.nav.detailSuffix" });
   });
 

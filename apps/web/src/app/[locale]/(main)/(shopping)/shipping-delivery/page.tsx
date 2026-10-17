@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { LegalDocument } from "@/components/legal/LegalDocument";
 import { localizedCanonical } from "@/lib/seo";
+import { getTimingPolicy } from "@/lib/server/timing-policy";
+import { withTimingValues } from "@/lib/timing-policy";
 import { shippingDeliveryParts } from "./_lib/shipping-delivery";
 
 export async function generateMetadata({
@@ -21,7 +23,8 @@ export async function generateMetadata({
 }
 
 export default async function ShippingDeliveryPage() {
-  const t = await getTranslations();
+  // Hazırlama süresi (preparingDeadlineDays) Süreler ve Kurallar'dan gelir.
+  const t = withTimingValues(await getTranslations(), await getTimingPolicy());
   return (
     <LegalDocument
       title={t("information.shippingDelivery.pageTitle")}

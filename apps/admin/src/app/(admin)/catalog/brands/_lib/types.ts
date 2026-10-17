@@ -1,4 +1,6 @@
-export interface Brand {
+import type { ListingCounts } from "../../_lib/listingCountColumns";
+
+export interface Brand extends ListingCounts {
   id: string;
   name: string;
   slug: string;

@@ -25,6 +25,7 @@ export {
   isExpiryValid,
   parseExpiry,
   isValidIban,
+  maskIban,
 } from "./components/PaymentInputs";
 export { Slider, type SliderProps } from "./components/Slider";
 export {
@@ -95,7 +96,12 @@ export {
 // uygulamada da kullandığı için web'den buraya taşındı.
 export { default as SectionCard } from "./components/SectionCard";
 export type { SectionCardProps } from "./components/SectionCard";
-export { Badge, badgeVariants, type BadgeProps } from "./components/Badge";
+export {
+  Badge,
+  badgeVariants,
+  resolveBadge,
+  type BadgeProps,
+} from "./components/Badge";
 export { StatusBadge, type StatusBadgeProps } from "./components/StatusBadge";
 export {
   ProductBadge,
@@ -104,7 +110,12 @@ export {
 } from "./components/ProductBadge";
 export { Avatar, type AvatarProps } from "./components/Avatar";
 export { Alert, type AlertProps } from "./components/Alert";
-export { Modal, type ModalProps, type ModalSize } from "./components/Modal";
+export {
+  Modal,
+  type ModalProps,
+  type ModalSize,
+  type ModalVariant,
+} from "./components/Modal";
 export { Drawer, type DrawerProps, type DrawerSide } from "./components/Drawer";
 export {
   Dialog,

@@ -1,15 +1,21 @@
 import Link from "next/link";
-import { Button, StatusBadge, enumLabel } from "@tarodan/ui";
+import {
+  Button,
+  StatusBadge,
+  enumLabel,
+  paymentStatusConfig,
+  tradeStatusConfig,
+} from "@tarodan/ui";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
+import { TextLink } from "@/components/TextLink";
 import { fmtTry } from "@/lib/format";
-import {
-  paymentStatusConfig,
-  tradePaymentStatusConfig,
-} from "../../_lib/types";
+import { statusConfig } from "@/lib/statusLabels";
 import type {
   TradePaymentDetail,
   TradePaymentItem,
@@ -37,8 +43,8 @@ function partyForPayment(
 export function TradePaymentSection({ trade }: { trade: TradePaymentDetail }) {
   const t = useTranslations();
   const current = trade.currentPayment;
-  const localizedPaymentStatuses = paymentStatusConfig(t);
-  const localizedTradeStatuses = tradePaymentStatusConfig(t);
+  const localizedPaymentStatuses = statusConfig(paymentStatusConfig, t);
+  const localizedTradeStatuses = statusConfig(tradeStatusConfig, t);
 
   return (
     <>
@@ -55,12 +61,9 @@ export function TradePaymentSection({ trade }: { trade: TradePaymentDetail }) {
       >
         <DataList>
           <Field label={t("admin.finance.payments.referenceNumber")}>
-            <Link
-              href={`/operations/trades/${trade.id}`}
-              className="font-mono text-primary-600 hover:underline"
-            >
+            <TextLink href={`/operations/trades/${trade.id}`} mono>
               #{trade.tradeNumber}
-            </Link>
+            </TextLink>
           </Field>
           <Field label={t("admin.finance.payments.tradeStatus")}>
             {enumLabel(localizedTradeStatuses, trade.status)}
@@ -105,23 +108,22 @@ export function TradePaymentSection({ trade }: { trade: TradePaymentDetail }) {
 
         {trade.payments.length > 1 && (
           <div className="mt-5 space-y-2 border-t border-border-subtle pt-4">
-            <p className="text-sm font-medium">
+            <SectionTitle as="h4" size="sm">
               {t("admin.finance.payments.tradePartyPayments")}
-            </p>
+            </SectionTitle>
             {trade.payments.map((payment) => {
               const payer = partyForPayment(trade, payment.payerId);
               return (
-                <div
+                <Panel
                   key={payment.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-alt p-3 text-sm"
+                  tone="muted"
+                  padding="sm"
+                  className="flex flex-wrap items-center justify-between gap-3 text-sm"
                 >
                   {payer ? (
-                    <Link
-                      href={`/accounts/users/${payer.id}`}
-                      className="text-primary-600 hover:underline"
-                    >
+                    <TextLink href={`/accounts/users/${payer.id}`}>
                       {payer.displayName}
-                    </Link>
+                    </TextLink>
                   ) : (
                     <span className="text-muted">—</span>
                   )}
@@ -135,7 +137,7 @@ export function TradePaymentSection({ trade }: { trade: TradePaymentDetail }) {
                       {fmtTry(payment.totalAmount)}
                     </span>
                   </div>
-                </div>
+                </Panel>
               );
             })}
           </div>

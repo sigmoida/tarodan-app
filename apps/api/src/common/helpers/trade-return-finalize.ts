@@ -2,12 +2,14 @@
 
 import {
   CancellationActor,
+  ListingRemovalReason,
   Prisma,
   ProductStatus,
   TradeStatus,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../../modules/product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../../modules/product/helpers/product-status.helper";
+import { recordListingRemovals } from "../../modules/product/helpers/listing-removal";
 import { tradeCancelledData } from "../../modules/trade/helpers/trade-cancellation";
 
 /**
@@ -130,21 +132,31 @@ export async function finalizeReturningTradeIfResolved(
     await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
     const prod = await tx.product.findUnique({
       where: { id: productId },
-      select: { reservedQuantity: true, quantity: true },
+      select: { reservedQuantity: true, quantity: true, status: true },
     });
     if (!prod) continue;
     const newReserved = safeDecrementReserved(prod.reservedQuantity, qty);
     if (lost) {
       const newQuantity =
         prod.quantity === null ? null : Math.max(0, prod.quantity - qty);
+      const nextStatus = getProductStatusFromQuantity(newQuantity);
       await tx.product.update({
         where: { id: productId },
         data: {
           reservedQuantity: newReserved,
           ...(prod.quantity === null ? {} : { quantity: newQuantity }),
-          status: getProductStatusFromQuantity(newQuantity),
+          status: nextStatus,
         },
       });
+      // Kargoda kaybolan birim stoğu sıfırladıysa ilan "stok tükendi"yle düşer.
+      await recordListingRemovals(tx, [
+        {
+          productId,
+          statusBefore: prod.status,
+          statusAfter: nextStatus,
+          reason: ListingRemovalReason.out_of_stock,
+        },
+      ]);
     } else {
       await tx.product.update({
         where: { id: productId },

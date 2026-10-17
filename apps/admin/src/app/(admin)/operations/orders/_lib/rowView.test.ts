@@ -10,6 +10,7 @@ import {
   feeRate,
   invoiceSearchHref,
   invoiceStatusSummary,
+  nearestPreparingDeadline,
   packageBlockMinHeight,
   packageOrderStatuses,
   packageSellerSlot,
@@ -17,7 +18,6 @@ import {
   rowDetailHref,
   rowSingleLine,
   sellerSlots,
-  sellerSlotsExport,
 } from "./rowView";
 
 const line = (orderId: string) => ({ orderId }) as AdminOrderLine;
@@ -63,6 +63,61 @@ describe("rowSingleLine", () => {
       rowSingleLine(row({ packages: [pkg([line("o1")]), pkg([line("o2")])] })),
     ).toBeNull();
     expect(rowSingleLine(row({ packages: [] }))).toBeNull();
+  });
+});
+
+describe("nearestPreparingDeadline", () => {
+  const deadlineLine = (
+    orderId: string,
+    status: AdminOrderLine["status"],
+    preparingDeadline: string | null,
+    preparingExtendedAt: string | null = null,
+  ) =>
+    ({
+      orderId,
+      status,
+      preparingDeadline,
+      preparingExtendedAt,
+    }) as AdminOrderLine;
+
+  it("picks the earliest open deadline and says whether it was extended", () => {
+    const result = nearestPreparingDeadline(
+      row({
+        packages: [
+          pkg([
+            deadlineLine("o1", "preparing", "2026-10-12T09:00:00.000Z"),
+            deadlineLine(
+              "o2",
+              "preparing",
+              "2026-10-10T09:00:00.000Z",
+              "2026-10-07T09:00:00.000Z",
+            ),
+          ]),
+        ],
+      }),
+    );
+    expect(result).toEqual({
+      deadline: "2026-10-10T09:00:00.000Z",
+      extended: true,
+    });
+  });
+
+  it("ignores shipped and cancelled lines and lines without a deadline", () => {
+    expect(
+      nearestPreparingDeadline(
+        row({
+          packages: [
+            pkg([
+              deadlineLine("o1", "shipped", "2026-10-01T09:00:00.000Z"),
+              deadlineLine("o2", "cancelled", "2026-10-02T09:00:00.000Z"),
+              deadlineLine("o3", "paid", null),
+              deadlineLine("o4", "paid", "2026-10-09T09:00:00.000Z"),
+            ]),
+          ],
+        }),
+      ),
+    ).toEqual({ deadline: "2026-10-09T09:00:00.000Z", extended: false });
+    expect(nearestPreparingDeadline(row({ packages: [] }))).toBeNull();
   });
 });
 
@@ -143,18 +198,6 @@ describe("sellerSlots (Satıcı column)", () => {
       { key: "of1", seller: party("s9"), packageNumber: null },
     ]);
     expect(sellerSlots({ packages: [], offer: null })).toEqual([]);
-  });
-
-  it("exports one 'seller PKG' entry per line", () => {
-    expect(
-      sellerSlotsExport({
-        offer: null,
-        packages: [
-          sellerPkg("p1", "s1", "PKG-1", [line("o1"), line("o2")]),
-          sellerPkg("p2", "s2", null, [line("o3")]),
-        ],
-      }),
-    ).toBe("name-s1 PKG-1 | name-s1 PKG-1 | name-s2");
   });
 });
 

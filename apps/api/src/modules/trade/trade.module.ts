@@ -10,6 +10,9 @@ import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module"
 import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.module";
 import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
 import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
+import { TradeDeadlineExtensionService } from "./lifecycle/trade-deadline-extension.service";
+import { TradePlatformCancelService } from "./lifecycle/trade-platform-cancel.service";
+import { TradePartyNoticeService } from "./lifecycle/trade-party-notice.service";
 import { TradeSchedulerService } from "./jobs/trade-scheduler.service";
 import { TradeScheduledProcessor } from "./jobs/trade-scheduled.processor";
 import { TradeCashClearedListener } from "./lifecycle/trade-cash-cleared.listener";
@@ -28,6 +31,7 @@ import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service
 import { DiscountModule } from "../discount/discount.module";
 
 import { UserBlockModule } from "../user-block/user-block.module";
+import { MessagingModule } from "../messaging/messaging.module";
 
 @Module({
   imports: [
@@ -47,6 +51,9 @@ import { UserBlockModule } from "../user-block/user-block.module";
     WarehouseAddressModule,
     // Takas hizmet bedeli kampanyası (İ25) — DiscountService kabulde çözer.
     DiscountModule,
+    // Takas mesajı ve red/iptal gerekçesi mesajlaşmayla aynı içerik
+    // filtresinden geçer (Apple 1.2).
+    MessagingModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [TradeController],
@@ -60,6 +67,12 @@ import { UserBlockModule } from "../user-block/user-block.module";
     TradeQuoteService,
     TradeLifecycleService,
     TradeReconciliationService,
+    // extend_once kararı (yanıt / ödeme süresi) — iptal mantığı mutabakatta kalır.
+    TradeDeadlineExtensionService,
+    // Platform (admin) iptali: süre dolumu taramasının kargo öncesi çekirdeği.
+    TradePlatformCancelService,
+    // Takas taraf duyuruları (iptal / itiraz / tamamlanma) — outbox üzerinden.
+    TradePartyNoticeService,
     TradeSchedulerService,
     ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,

@@ -24,8 +24,8 @@ import {
 import {
   MATCH_TOLERANCE_TL,
   PaytrReportMatchingService,
-  paymentOids,
 } from "../../../modules/payment/reconciliation/paytr-report-matching.service";
+import { paymentOids } from "../../payment/helpers/payment-oids";
 import {
   PaytrSyncStateService,
   type PaytrSyncState,

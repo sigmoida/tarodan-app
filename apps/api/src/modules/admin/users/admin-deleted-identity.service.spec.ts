@@ -1,7 +1,12 @@
 import * as ExcelJS from "exceljs";
 
-import { AdminDeletedIdentityService } from "./admin-deleted-identity.service";
-import { ARCHIVE_EXPORT_COLUMNS } from "../../../common/helpers/deleted-user-identity";
+import { translateMessage } from "../../i18n/translate";
+import { ExportListService, type Translate } from "../../../common/export";
+import {
+  AdminDeletedIdentityService,
+  EXPORT_FORMAT_VERSION,
+  deletedIdentityInfoRows,
+} from "./admin-deleted-identity.service";
 
 function makeService(rows: Record<string, unknown>[] = []) {
   const prisma = {
@@ -10,17 +15,48 @@ function makeService(rows: Record<string, unknown>[] = []) {
       count: jest.fn().mockResolvedValue(rows.length),
     },
   };
+  const audit = {
+    createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
+  };
   return {
-    service: new AdminDeletedIdentityService(prisma as never),
+    service: new AdminDeletedIdentityService(
+      prisma as never,
+      new ExportListService(audit as never),
+    ),
     prisma,
+    audit,
   };
 }
 
+/** Portalın beklediği kolon başlıkları ve SIRASI — resmî biçimin sözleşmesi. */
+const PORTAL_HEADER = [
+  "Kullanıcı Kodu",
+  "Kullanıcı Adı",
+  "Ad Soyad / Unvan",
+  "E-posta",
+  "Telefon",
+  "TC Kimlik No",
+  "Vergi No",
+  "Vergi Dairesi",
+  "Firma Adı",
+  "İl",
+  "İlçe",
+  "Adres",
+  "IBAN",
+  "Satıcı",
+  "Kayıt Tarihi",
+  "Silinme Tarihi",
+  "Saklama Bitişi",
+];
+
 const row = {
+  id: "identity-1",
   userId: "user-1",
   adminCode: "B10001",
   username: "ahmet",
   displayName: "Ahmet Yılmaz",
+  legalFirstName: null,
+  legalLastName: null,
   email: "ahmet@example.com",
   phone: "+905551112233",
   nationalId: "12345678901",
@@ -101,65 +137,131 @@ describe("AdminDeletedIdentityService.list", () => {
 });
 
 describe("AdminDeletedIdentityService.exportPeriod", () => {
-  it("dönemi ay sınırlarına kapatır", async () => {
+  async function load(body: Buffer) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(body as never);
+    return workbook;
+  }
+
+  /**
+   * BİLİNÇLİ DEĞİŞİKLİK: ay sınırları eskiden UTC gece yarısıydı
+   * (2026-09-01T00:00Z) — ayın son gecesi 21:00'den sonra silinen hesap bir
+   * sonraki ayın bildirimine düşüyordu. Artık Türkiye takvimi: 1 Eylül 00:00
+   * İstanbul = 31 Ağustos 21:00Z.
+   */
+  it("dönemi TÜRKİYE takviminde ay sınırlarına kapatır", async () => {
     const { service, prisma } = makeService([row]);
 
-    await service.exportPeriod({ year: 2026, month: 9 });
+    await service.exportPeriod({ year: 2026, month: 9 }, "admin-1");
 
-    const { where } = prisma.deletedUserIdentity.findMany.mock.calls[0][0];
-    expect(where.deletedAt.gte.toISOString()).toBe("2026-09-01T00:00:00.000Z");
-    expect(where.deletedAt.lt.toISOString()).toBe("2026-10-01T00:00:00.000Z");
+    const { where, orderBy } =
+      prisma.deletedUserIdentity.findMany.mock.calls[0][0];
+    expect(where.deletedAt.gte.toISOString()).toBe("2026-08-31T21:00:00.000Z");
+    expect(where.deletedAt.lt.toISOString()).toBe("2026-09-30T21:00:00.000Z");
+    expect(orderBy).toEqual([{ deletedAt: "asc" }, { id: "asc" }]);
   });
 
-  it("kolon sözleşmesini ve sırasını korur", async () => {
+  it("Özet, Bildirim ve Bilgi sayfalarını bu sırayla yazar; kolon sözleşmesi korunur", async () => {
     const { service } = makeService([row]);
 
-    const result = await service.exportPeriod({ year: 2026, month: 9 });
+    const file = await service.exportPeriod({ year: 2026, month: 9 }, "admin-1");
 
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(result.buffer as never);
+    const workbook = await load(file.body);
+    expect(workbook.worksheets.map((s) => s.name)).toEqual([
+      "Özet",
+      "Bildirim 2026-09",
+      "Bilgi",
+    ]);
     const sheet = workbook.getWorksheet("Bildirim 2026-09");
     const header = (sheet?.getRow(1).values as unknown[]).slice(1);
-
-    expect(header).toEqual(ARCHIVE_EXPORT_COLUMNS.map((c) => c.header));
-    expect(result.rowCount).toBe(1);
-    expect(result.filename).toBe(
-      "tarodan-silinen-hesap-bildirimi-2026-09.xlsx",
+    expect(header).toEqual(PORTAL_HEADER);
+    expect(file.rowCount).toBe(1);
+    expect(file.truncatedAt).toBeNull();
+    expect(file.filename).toMatch(
+      /^tarodan-silinen-hesap-bildirimi-2026-09-\d{4}-\d{2}-\d{2}\.xlsx$/,
     );
   });
 
-  // Tavanı sınamanın tek yolu tavan kadar satır üretmek, o da ExcelJS'e gerçek
-  // bir 5000 satırlık dosya yazdırıyor: boş makinede ~4 sn, jest'in 5 sn'lik
-  // varsayılanının hemen altı. Paralel koşuda düzenli olarak aşıyordu ve
-  // push'u bloke ediyordu; süre testin gerçek maliyeti, açıkça yazılır.
-  it("tavanı aşan dönemi SESSİZCE kırpmaz, işaretler", async () => {
-    const many = Array.from({ length: 5001 }, (_, index) => ({
-      ...row,
-      userId: `user-${index}`,
-    }));
-    const { service } = makeService(many);
-
-    const result = await service.exportPeriod({ year: 2026, month: 9 });
-
-    expect(result.truncated).toBe(true);
-    expect(result.rowCount).toBe(5000);
-  }, 30_000);
-
-  it("tavan altındaki dönemi kırpılmamış işaretler", async () => {
+  it("resmî bildirim kimliği maskesiz, tarihleri İstanbul takviminde yazar", async () => {
     const { service } = makeService([row]);
 
-    const result = await service.exportPeriod({ year: 2026, month: 9 });
+    const file = await service.exportPeriod({ year: 2026, month: 9 }, "admin-1");
 
-    expect(result.truncated).toBe(false);
+    const sheet = (await load(file.body)).getWorksheet("Bildirim 2026-09");
+    const cells = sheet?.getRow(2);
+    const col = (title: string) => PORTAL_HEADER.indexOf(title) + 1;
+    expect(cells?.getCell(col("TC Kimlik No")).value).toBe("12345678901");
+    expect(cells?.getCell(col("Satıcı")).value).toBe("Evet");
+    // 2026-09-05T00:00Z = 03:00 İstanbul, gün biçimiyle.
+    expect(cells?.getCell(col("Silinme Tarihi")).value).toEqual(
+      new Date("2026-09-05T03:00:00.000Z"),
+    );
+    expect(cells?.getCell(col("Silinme Tarihi")).numFmt).toBe("dd.mm.yyyy");
+  });
+
+  it("Bilgi sayfası dönemi, kayıt sayısını ve biçim sürümünü taşır", async () => {
+    const { service } = makeService([row]);
+
+    const file = await service.exportPeriod({ year: 2026, month: 9 }, "admin-1");
+
+    const info = (await load(file.body)).getWorksheet("Bilgi");
+    const rows = (info?.getSheetValues() ?? []).filter(Boolean) as unknown[][];
+    const byLabel = new Map(rows.map((r) => [r[1], r[2]]));
+    expect(byLabel.get("Dönem")).toBe("2026-09");
+    expect(byLabel.get("Kayıt sayısı")).toBe(1);
+    expect(byLabel.get("Biçim sürümü")).toBe(EXPORT_FORMAT_VERSION);
+  });
+
+  it("kırpılan dönemi Bilgi sayfasında da SESSİZ bırakmaz", () => {
+    const t: Translate = (key, values) => translateMessage(key, "tr", values);
+    const rows = deletedIdentityInfoRows(t, "2026-09", {
+      rowCount: 20000,
+      truncatedAt: 20000,
+      generatedAt: new Date(),
+    });
+    const last = rows[rows.length - 1];
+    expect(last).toMatchObject({ label: "Notlar" });
+    expect(String(last.value)).toContain("ilk 20.000 kaydı");
+
+    const complete = deletedIdentityInfoRows(t, "2026-09", {
+      rowCount: 1,
+      truncatedAt: null,
+      generatedAt: new Date(),
+    });
+    expect(complete.some((r) => r.label === "Notlar")).toBe(false);
+  });
+
+  it("zorunlu denetim kaydı dönemi anahtar alır; kimlik DEĞERİ yazılmaz", async () => {
+    const { service, audit } = makeService([row]);
+
+    await service.exportPeriod(
+      { year: 2026, month: 9, wasSeller: true },
+      "admin-1",
+    );
+
+    const [actor, action, entityType, entityId, , payload] =
+      audit.createRequiredAuditLog.mock.calls[0];
+    expect([actor, action, entityType, entityId]).toEqual([
+      "admin-1",
+      "deleted_identity_export",
+      "DeletedUserIdentity",
+      "2026-09",
+    ]);
+    expect(payload).toMatchObject({
+      filters: { year: 2026, month: 9, wasSeller: true },
+      rowCount: 1,
+      truncated: false,
+    });
+    expect(JSON.stringify(payload)).not.toContain("12345678901");
   });
 
   it("kayıt yoksa da geçerli bir dosya üretir", async () => {
     const { service } = makeService([]);
 
-    const result = await service.exportPeriod({ year: 2026, month: 1 });
+    const file = await service.exportPeriod({ year: 2026, month: 1 }, "admin-1");
 
-    expect(result.rowCount).toBe(0);
-    expect(result.buffer.byteLength).toBeGreaterThan(0);
+    expect(file.rowCount).toBe(0);
+    expect(file.body.byteLength).toBeGreaterThan(0);
   });
 });
 

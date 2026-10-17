@@ -13,7 +13,12 @@ import {
   type AdminOrderTab,
 } from "@tarodan/types";
 import { buildSearchWhere, dateRangeWhere } from "../../../../common/list";
+import {
+  orderPaytrOidClauses,
+  type PaytrOidMatch,
+} from "../../../payment/helpers/paytr-oid-search";
 import { cartBucketWhere, groupLines, singleLine } from "./order-bucket-where";
+import { shippedBeforeWhere } from "./shipped-before-where";
 
 /** Liste + sayaç uçlarının ortak filtre alanları (DTO'nun alt kümesi). */
 export interface OrderListFilters {
@@ -30,6 +35,17 @@ export interface OrderListFilters {
   productId?: string;
   /** Eski deep-link'ler (`?status=delivered`): tek sipariş durumu. */
   status?: OrderStatus;
+  /**
+   * ISO an: bu andan ÖNCE kargoya verilmiş, hâlâ `shipped` satırlar —
+   * dashboard'un "uzun süredir kargoda" uyarısının bağlantısı
+   * (`shippedBeforeWhere`, uyarıyla aynı yüklem).
+   */
+  shippedBefore?: string;
+  /**
+   * `search` bir PayTR "sipariş no"suysa isteğin başında BİR KEZ çözülmüş
+   * kayıtlar (`resolvePaytrOidMatch`); `where`'ler yalnız `id IN (...)` taşır.
+   */
+  paytr?: PaytrOidMatch | null;
 }
 
 const PARTY_COLUMNS = ["buyer", "seller"].flatMap((side) =>
@@ -63,6 +79,21 @@ function textFilterWhere(
   return buildSearchWhere(term, columns) ?? MATCH_NOTHING;
 }
 
+/**
+ * Serbest arama: kolonlarda arama + (terim PayTR "sipariş no"su gibiyse) o
+ * id'nin ödemesi/iş numarası. Diğer terimlerde yalnız kolon araması kalır.
+ */
+function freeSearchWhere(
+  term: string | undefined,
+  columns: readonly string[],
+  paytr: PaytrOidMatch | null | undefined,
+): Record<string, unknown> | undefined {
+  const byColumns = textFilterWhere(term, columns);
+  const byPaytrOid = orderPaytrOidClauses(paytr);
+  if (!byColumns || byPaytrOid.length === 0) return byColumns;
+  return { OR: [byColumns, ...byPaytrOid] };
+}
+
 /** Deep-link kapsamı (kullanıcı / ürün detayından gelen). */
 function scopeParts(filters: OrderListFilters): Record<string, unknown>[] {
   const parts: Record<string, unknown>[] = [];
@@ -79,13 +110,16 @@ function scopeParts(filters: OrderListFilters): Record<string, unknown>[] {
 function filterParts(filters: OrderListFilters): Record<string, unknown>[] {
   const parts: Record<string, unknown>[] = [];
   const everyColumn = TEXT_FILTERS.flatMap((key) => TEXT_FILTER_COLUMNS[key]);
-  const search = textFilterWhere(filters.search, everyColumn);
+  const search = freeSearchWhere(filters.search, everyColumn, filters.paytr);
   if (search) parts.push(search);
   for (const key of TEXT_FILTERS) {
     const where = textFilterWhere(filters[key], TEXT_FILTER_COLUMNS[key]);
     if (where) parts.push(where);
   }
   if (filters.status) parts.push({ status: filters.status });
+  if (filters.shippedBefore) {
+    parts.push(shippedBeforeWhere(new Date(filters.shippedBefore)));
+  }
   const dates = dateRangeWhere(filters);
   if (Object.keys(dates).length > 0) parts.push(dates);
   parts.push(...scopeParts(filters));
@@ -194,6 +228,7 @@ export function orderListScopeOf(query: OrderListQuery): {
     userRole: query.userRole,
     productId: query.productId,
     status: query.status,
+    shippedBefore: query.shippedBefore,
   };
   return { tab, bucket, filters };
 }

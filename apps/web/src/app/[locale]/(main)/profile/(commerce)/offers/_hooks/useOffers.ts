@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
+import { useTimingValues } from "@/hooks/useTimingPolicy";
 import type { Offer, OfferTab } from "../_lib/types";
 
 const RESOURCE = "offers";
@@ -44,6 +45,7 @@ export function useOfferAction() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const t = useTranslations();
+  const timingValues = useTimingValues();
   const mutation = useMutation({
     mutationFn: ({
       offerId,
@@ -79,8 +81,8 @@ export function useOfferAction() {
         title: t("offer.acceptConfirmTitle"),
         description:
           vars.acceptAs === "buyer"
-            ? t("offer.acceptConfirmDescBuyer")
-            : t("offer.acceptConfirmDescSeller"),
+            ? t("offer.acceptConfirmDescBuyer", timingValues)
+            : t("offer.acceptConfirmDescSeller", timingValues),
         destructive: false,
       },
       reject: {

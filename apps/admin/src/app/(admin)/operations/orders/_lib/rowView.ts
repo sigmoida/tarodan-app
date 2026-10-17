@@ -1,8 +1,9 @@
-import type {
-  AdminOrderLine,
-  AdminOrderListRow,
-  AdminOrderPackage,
-  AdminOrderParty,
+import {
+  isPreShipmentCancellableStatus,
+  type AdminOrderLine,
+  type AdminOrderListRow,
+  type AdminOrderPackage,
+  type AdminOrderParty,
 } from "@tarodan/types";
 
 /**
@@ -17,6 +18,37 @@ export function rowDetailHref(row: AdminOrderListRow): string {
 
 export function rowLines(row: AdminOrderListRow): AdminOrderLine[] {
   return row.packages.flatMap((pkg) => pkg.lines);
+}
+
+/**
+ * Satırın en yakın açık hazırlama son tarihi — "Yeni" kovasında operatörün
+ * baktığı ilk tarih. Yalnız henüz kargolanmamış (ödendi/hazırlanıyor)
+ * kalemler sayılır. API son tarihi uzatmada yerinde günceller; `extended`, o
+ * kalemin tek seferlik uzatmasının kullanıldığını söyler (bir daha uzatılmaz).
+ */
+export function nearestPreparingDeadline(
+  row: AdminOrderListRow,
+): { deadline: string; extended: boolean } | null {
+  const open = rowLines(row)
+    .filter((line) => isPreShipmentCancellableStatus(line.status))
+    .filter((line): line is AdminOrderLine & { preparingDeadline: string } =>
+      Boolean(line.preparingDeadline),
+    )
+    // ISO zaman damgaları: sözlük sırası = zaman sırası.
+    .sort((a, b) =>
+      a.preparingDeadline < b.preparingDeadline
+        ? -1
+        : a.preparingDeadline > b.preparingDeadline
+          ? 1
+          : 0,
+    );
+  const nearest = open[0];
+  return nearest
+    ? {
+        deadline: nearest.preparingDeadline,
+        extended: Boolean(nearest.preparingExtendedAt),
+      }
+    : null;
 }
 
 /**
@@ -77,17 +109,6 @@ export function sellerSlots(
   return row.packages.flatMap((pkg) =>
     pkg.lines.map((line) => ({ key: line.orderId, ...packageSellerSlot(pkg) })),
   );
-}
-
-/** Dışa aktarım: yuva başına "satıcı PKG", kalem sırasıyla. */
-export function sellerSlotsExport(
-  row: Pick<AdminOrderListRow, "packages" | "offer">,
-): string {
-  return sellerSlots(row)
-    .map((slot) =>
-      [slot.seller.displayName, slot.packageNumber].filter(Boolean).join(" "),
-    )
-    .join(" | ");
 }
 
 /**

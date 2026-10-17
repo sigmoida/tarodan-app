@@ -14,8 +14,11 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { errorMessage } from "../../../common/helpers/error-message";
-import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
-import { refundAttemptCancelActor } from "../helpers/refund-attempt-actor";
+import { refundRequestIdOf } from "../../invoicing/helpers/refund-request-key";
+import {
+  refundAttemptCancelActor,
+  refundRequestAdminReasonCode,
+} from "../helpers/refund-attempt-actor";
 
 /**
  * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
@@ -440,6 +443,12 @@ export class RefundReconciliationService {
             idempotencyKey: attempt.idempotencyKey,
             cancelledBy: refundAttemptCancelActor(
               attempt.idempotencyKey,
+              request?.metadata,
+            ),
+            // İncelemeye/mutabakata düşmüş platform iptali bu kurtarmayla
+            // kesinleşirse: kod siparişe yazılır ve genel iptal metni yerine
+            // nedenli platform duyurusu gider (processRefund).
+            adminCancelReasonCode: refundRequestAdminReasonCode(
               request?.metadata,
             ),
           },

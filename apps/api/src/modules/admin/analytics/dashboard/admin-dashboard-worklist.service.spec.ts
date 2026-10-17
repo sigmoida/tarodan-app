@@ -17,7 +17,10 @@ describe("AdminDashboardWorklistService", () => {
   let revenueSplit: any;
   let service: AdminDashboardWorklistService;
   /** Per-part reading the stubbed aggregate should answer with. */
-  let partReadings: Record<string, { count: number; oldestAt: Date | null }>;
+  let partReadings: Record<
+    string,
+    { count: number; oldestAt: Date | null; amount?: number }
+  >;
   /** Per-alert count the stubbed query should answer with. */
   let alertCounts: Record<string, number>;
 
@@ -46,6 +49,8 @@ describe("AdminDashboardWorklistService", () => {
 
     prisma = {
       $transaction: jest.fn(async (ops: unknown[]) => ops),
+      // Eşikler turun başında Süreler ve Kurallar'dan tek sorguyla okunur.
+      platformSetting: { findMany: jest.fn().mockResolvedValue([]) },
     };
     cache = {
       getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) =>
@@ -106,6 +111,26 @@ describe("AdminDashboardWorklistService", () => {
 
     // 7 open (3 of them urgent) + 2 reports — not 12.
     expect(support?.total).toBe(9);
+  });
+
+  it("shows upcoming releases in the money tile without counting them as waiting work", async () => {
+    partReadings.payoutsFailed = { count: 2, oldestAt: RECENT };
+    partReadings.holdsUpcoming = { count: 5, oldestAt: null, amount: 1234.5 };
+
+    const { queues } = await service.getWorklist();
+    const money = queues.find((tile) => tile.key === "moneyOperations");
+    const upcoming = money?.parts.find((part) => part.key === "holdsUpcoming");
+
+    expect(money?.total).toBe(2);
+    expect(money?.oldestAt).toBe(RECENT.toISOString());
+    expect(upcoming).toEqual({
+      key: "holdsUpcoming",
+      count: 5,
+      oldestAt: null,
+      amount: 1234.5,
+      informational: true,
+      href: "/finance/payouts?tab=schedule",
+    });
   });
 
   it("ages a tile by its OLDEST waiting item, ignoring empty lines", async () => {
@@ -173,5 +198,66 @@ describe("AdminDashboardWorklistService", () => {
     expect(AdminDashboardWorklistService.CACHE_TTL_SECONDS).toBeLessThanOrEqual(
       60,
     );
+  });
+
+  it("shows the admin-set threshold from Durations & Rules, read once per build", async () => {
+    prisma.platformSetting.findMany.mockResolvedValue([
+      {
+        settingKey: "shipped_stale_alert_days",
+        settingValue: "3",
+        updatedAt: new Date(),
+      },
+    ]);
+    alertCounts.stuckShippedOrders = 1;
+
+    const { alerts } = await service.getWorklist();
+
+    expect(prisma.platformSetting.findMany).toHaveBeenCalledTimes(1);
+    expect(
+      alerts.find((alert) => alert.key === "stuckShippedOrders")?.threshold,
+    ).toEqual({ value: 3, unit: "days" });
+  });
+
+  it("links the stuck-shipment alert to the order list cut at the SAME threshold", async () => {
+    prisma.platformSetting.findMany.mockResolvedValue([
+      {
+        settingKey: "shipped_stale_alert_days",
+        settingValue: "3",
+        updatedAt: new Date(),
+      },
+    ]);
+    alertCounts.stuckShippedOrders = 4;
+
+    const { generatedAt, alerts } = await service.getWorklist();
+    const alert = alerts.find((row) => row.key === "stuckShippedOrders");
+    const url = new URL(alert?.href ?? "", "https://admin.test");
+
+    expect(url.pathname).toBe("/operations/orders");
+    expect(url.searchParams.get("bucket")).toBe("all");
+    const cutoff = new Date(url.searchParams.get("shippedBefore") ?? "");
+    const DAY = 24 * 60 * 60 * 1000;
+    // The href's cutoff is generatedAt − threshold, the threshold the row shows.
+    expect((new Date(generatedAt).getTime() - cutoff.getTime()) / DAY).toBe(
+      alert?.threshold?.value,
+    );
+    expect(alert?.threshold).toEqual({ value: 3, unit: "days" });
+  });
+
+  it("keeps the static catalogue link for alerts with no threshold-bound list", async () => {
+    alertCounts.outboxDead = 1;
+
+    const { alerts } = await service.getWorklist();
+
+    expect(alerts[0]?.href).toBe("/system/logs");
+  });
+
+  it("keeps today's default threshold when no admin value is set", async () => {
+    alertCounts.stuckShippedOrders = 1;
+
+    const { alerts } = await service.getWorklist();
+
+    expect(
+      alerts.find((alert) => alert.key === "stuckShippedOrders")?.threshold,
+    ).toEqual({ value: 10, unit: "days" });
   });
 });

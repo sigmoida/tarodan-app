@@ -17,6 +17,7 @@ import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { PaymentCommonService } from "../payment-common.service";
+import { lockPaymentOrders } from "../helpers/payment-order-lock";
 import { PaymentRefundService } from "../refund/payment-refund.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
@@ -28,15 +29,26 @@ import { DiscountService } from "../../discount/discount.service";
 import {
   OUTBOX_ORDER_FULFILLMENT,
   OUTBOX_REVENUE_INVOICE_ISSUE,
+  OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+  tradeCancelledPaymentRefundDedupeKey,
+  type TradeCancelledPaymentRefundPayload,
 } from "../../outbox/outbox.types";
 import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
+import { isPaymentExpiryCancellation } from "../../trade/helpers/trade-cancellation";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
+  type PublicIdentityInput,
 } from "../../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import {
+  boostPurchasedNotice,
+  orderPaidNotice,
+} from "../../mail-routing/helpers/mail-internal-notices";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -48,6 +60,28 @@ export interface ProviderPaymentData {
   installmentCount?: number;
   currency?: string;
 }
+
+/**
+ * Takas nakit ödemesi tx'inin sonucu — commit sonrası adımlar YALNIZ buna göre
+ * dallanır, böylece "iptal edilmiş takas" dalına iade yükü olmadan girilemez.
+ * - `not_claimed`: ödeme zaten tamamlanmıştı (idempotent tekrar / yarış).
+ * - `cancelled_trade`: takas bu ödeme yoldayken iptal edildi; `refund` iadeye
+ *   verilecek satırdır (aynı tx'te kuyruğa da alındı).
+ * - `completed`: olağan tamamlama; `shipping` doluysa takas bu callback'le
+ *   kargoya alındı (sevkiyat duyurusu + inbound etiketleri tetiklenir).
+ */
+type TradeCashCompletion =
+  | { kind: "not_claimed" }
+  | { kind: "cancelled_trade"; refund: TradeCancelledPaymentRefundPayload }
+  | {
+      kind: "completed";
+      shipping: {
+        tradeId: string;
+        initiatorId: string;
+        receiverId: string;
+        shippingDeadline: Date;
+      } | null;
+    };
 
 /** Başarısız ödeme yüzünden kapanan siparişin iptal kaydı: kim ve (varsa) neden. */
 export interface FailedPaymentCancellation {
@@ -172,6 +206,9 @@ export class PaymentFulfillmentService {
     // #8: fulfillment sonlandırmasını ödeme tx'iyle atomik olarak dayanıklı kılan backstop.
     // @Optional: OutboxModule @Global; yoksa (test) anlık yol yine çalışır (graceful degrade).
     @Optional() private readonly outbox?: OutboxService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI çağrılır,
+    // fırlatmaz. Dar test kurulumlarında yoksa bildirim atlanır.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -226,6 +263,14 @@ export class PaymentFulfillmentService {
     }[] = [];
     let stockoutCategoryId: string | null = null;
 
+    // Satıcı hazırlık süresi Süreler ve Kurallar'dan (ayar → env → 3 gün);
+    // tx dışında okunur, son tarih siparişe damgalanır.
+    const preparingDays = await resolveTimingValue(
+      this.prisma,
+      "preparingDeadlineDays",
+      this.configService,
+    );
+
     const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await this.claimPaymentCompleted(tx, payment, {
         transactionId,
@@ -235,6 +280,15 @@ export class PaymentFulfillmentService {
       if (!claimed) {
         return null;
       }
+
+      // Sipariş satırı KİLİTLİYKEN okunur: kilitsiz okumada, okuma ile
+      // aşağıdaki `preparing` yazımı arasında commit eden bir iptal (alıcı,
+      // yönetici, 24s süpürmesi) eziliyor ve iptal edilmiş sipariş sessizce
+      // canlanıyordu. Kilit altında iptali görürüz → otomatik iade.
+      await lockPaymentOrders(tx, {
+        orderId: payment.orderId ?? null,
+        checkoutGroupId: null,
+      });
 
       // Verify order is still pending_payment before promoting to preparing.
       // Race window: cron may have cancelled the order while PayTR callback was in flight.
@@ -257,11 +311,7 @@ export class PaymentFulfillmentService {
         };
       }
 
-      // Update order status to PREPARING with shipping deadline for the seller
-      const preparingDays = parseInt(
-        this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
-        10,
-      );
+      // Update order status to PREPARING with shipping deadline for the seller.
       // Pazar hariç sayılır: kargo pazar çalışmaz, cuma ödemesinin süresi
       // fiilen kısalmasın (bkz. addDaysSkippingSundays).
       const preparingDeadline = addDaysSkippingSundays(
@@ -508,6 +558,10 @@ export class PaymentFulfillmentService {
         resultOrder.sellerId,
         resultOrder.buyerId,
       );
+      // Personel bildirimi: grupsuz fiziksel sipariş (teklif siparişi).
+      void this.notifyStaffOrderPaid(resultOrder.checkoutGroupId, [
+        resultOrder,
+      ]);
     }
 
     // Tarodan gelir e-Arşivi (sanal hizmet): üyelik → üyeye, boost → satıcıya.
@@ -527,9 +581,102 @@ export class PaymentFulfillmentService {
       // Satın alana "öne çıkarma aktif" bildirimi — post-commit, hata
       // aktivasyonu bozmaz. (Eskiden hiçbir aktivasyon bildirimi yoktu.)
       void this.notifyBoostActivated(resultOrder.id, resultOrder.buyerId);
+      void this.notifyStaffBoostPurchased(resultOrder);
     }
 
     return true;
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `order.paid`): sepet başına TEK
+   * e-posta — tekilleştirme anahtarı sepet (grupsuzda sipariş) kimliğidir.
+   * Commit sonrası, fırlatmaz; test şeridi siparişleri atlanır.
+   */
+  private async notifyStaffOrderPaid(
+    checkoutGroupId: string | null,
+    orders: ReadonlyArray<{
+      id: string;
+      orderNumber: string;
+      totalAmount: { valueOf(): unknown } | number;
+      isTest: boolean;
+      product?: { title: string } | null;
+      buyer: PublicIdentityInput;
+      seller: PublicIdentityInput;
+    }>,
+  ): Promise<void> {
+    if (!this.mailNotifier || orders.length === 0) return;
+    try {
+      const first = orders[0];
+      const group = checkoutGroupId
+        ? await this.prisma.checkoutGroup.findUnique({
+            where: { id: checkoutGroupId },
+            select: { groupNumber: true },
+          })
+        : null;
+      await this.mailNotifier.emit(
+        "order.paid",
+        orderPaidNotice({
+          ref: group?.groupNumber ?? first.orderNumber,
+          buyerName: publicName(first.buyer),
+          total: orders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+          orders: orders.map((o) => ({
+            id: o.id,
+            orderNumber: o.orderNumber,
+            productTitle: o.product?.title,
+            amount: o.totalAmount,
+            sellerName: publicName(o.seller),
+          })),
+        }),
+        {
+          isTest: orders.some((o) => o.isTest),
+          dedupeKey: checkoutGroupId ?? first.id,
+        },
+      );
+    } catch (err: unknown) {
+      this.logger.warn(
+        `order.paid personel bildirimi hazırlanamadı (${checkoutGroupId ?? orders[0]?.id}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Personel bildirimi (`boost.purchased`): ödenen öne çıkarma paketi. */
+  private async notifyStaffBoostPurchased(order: {
+    id: string;
+    orderNumber: string;
+    isTest: boolean;
+    buyer: PublicIdentityInput;
+  }): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const boost = await this.prisma.productBoost.findUnique({
+        where: { orderId: order.id },
+        select: {
+          id: true,
+          packageName: true,
+          durationDays: true,
+          price: true,
+          product: { select: { title: true } },
+        },
+      });
+      if (!boost) return;
+      await this.mailNotifier.emit(
+        "boost.purchased",
+        boostPurchasedNotice({
+          boostId: boost.id,
+          orderNumber: order.orderNumber,
+          userName: publicName(order.buyer),
+          packageName: boost.packageName,
+          durationDays: boost.durationDays,
+          amount: boost.price,
+          productTitle: boost.product?.title,
+        }),
+        { isTest: order.isTest },
+      );
+    } catch (err: unknown) {
+      this.logger.warn(
+        `boost.purchased personel bildirimi hazırlanamadı (${order.id}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /** Boost aktivasyon bildirimi: gerçek ürünün başlığı ProductBoost'tan gelir. */
@@ -657,6 +804,13 @@ export class PaymentFulfillmentService {
     }[] = [];
     let stockoutCategoryId: string | null = null;
 
+    // Tekil ödemeyle aynı kaynak (tx dışında okunur, siparişlere damgalanır).
+    const preparingDays = await resolveTimingValue(
+      this.prisma,
+      "preparingDeadlineDays",
+      this.configService,
+    );
+
     const result = await this.prisma.$transaction(
       async (tx) => {
         const claimed = await this.claimPaymentCompleted(tx, payment, {
@@ -667,6 +821,13 @@ export class PaymentFulfillmentService {
         if (!claimed) {
           return null;
         }
+
+        // Tekil yolla aynı: sepetin siparişleri kilit altında okunur, araya
+        // giren iptal ezilmez; iptal edilen kalem kısmi otomatik iadeye gider.
+        await lockPaymentOrders(tx, {
+          orderId: null,
+          checkoutGroupId: payment.checkoutGroupId,
+        });
 
         const groupOrders = await tx.order.findMany({
           where: { checkoutGroupId: payment.checkoutGroupId },
@@ -683,10 +844,6 @@ export class PaymentFulfillmentService {
         const fulfilledOrders: typeof aliveOrders = [];
         const stockShortageOrders: typeof aliveOrders = [];
 
-        const preparingDays = parseInt(
-          this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
-          10,
-        );
         // Pazar hariç sayılır (bkz. addDaysSkippingSundays).
         const preparingDeadline = addDaysSkippingSundays(
           new Date(),
@@ -929,6 +1086,11 @@ export class PaymentFulfillmentService {
           `Failed to emit group buyer order.paid for payment ${payment.id}: ${error}`,
         );
       }
+      // Personel bildirimi: sepet başına TEK e-posta, siparişleri listeler.
+      void this.notifyStaffOrderPaid(
+        payment.checkoutGroupId,
+        result.fulfilledOrders,
+      );
     }
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı
@@ -980,87 +1142,137 @@ export class PaymentFulfillmentService {
     capturedMerchantOid?: string,
     providerData?: ProviderPaymentData,
   ): Promise<boolean> {
-    // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
-    const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_shipping_deadline_days" },
-    });
-    const shippingDays =
-      parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
+    // Takas kargo süresi Süreler ve Kurallar'dan (ayar → varsayılan 7 gün).
+    const shippingDays = await resolveTimingValue(
+      this.prisma,
+      "tradeShippingDays",
+    );
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık
-      // tutarlı şekilde denetim izine yazılır; eskiden auditHistory eklenmiyordu).
-      const claimed = await this.claimPaymentCompleted(tx, payment, {
-        transactionId,
-        capturedMerchantOid,
-        providerData,
-      });
-      if (!claimed) {
-        return { didComplete: false } as const;
-      }
-
-      const tcp = await tx.tradeCashPayment.update({
-        where: { id: payment.tradeCashPaymentId },
-        data: {
-          status: PaymentStatus.completed,
-          providerPaymentId: transactionId || payment.providerPaymentId,
-          paidAt: new Date(),
-        },
-      });
-
-      // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse.
-      //
-      // v2'de takasın İKİ ödemesi vardır ve depo süreci ancak İKİSİ de
-      // tamamlanınca başlar: tek taraf ödediğinde ürünler kargoya çıkmaz.
-      // İki callback aynı anda gelebileceği için sayım bu tx İÇİNDE yapılır ve
-      // geçiş `version` guard'ıyla yazılır — yarışan ikinci callback'in update'i
-      // 0 satır etkiler, ikinci kez sevkiyat tetiklenmez.
-      const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
-      const siblingPayments = await tx.tradeCashPayment.findMany({
-        where: { tradeId: tcp.tradeId },
-        select: { status: true },
-      });
-      const fullyPaid = isTradeFullyPaid(siblingPayments);
-      let tradeTransitioned = false;
-      let shippingDeadline: Date | null = null;
-
-      if (trade && trade.status === TradeStatus.awaiting_payment && fullyPaid) {
-        const now = new Date();
-        shippingDeadline = new Date(now);
-        shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
-
-        const moved = await tx.trade.updateMany({
-          where: {
-            id: trade.id,
-            version: trade.version,
-            status: TradeStatus.awaiting_payment,
-          },
-          data: {
-            status: TradeStatus.shipping_to_warehouse,
-            shippingDeadline,
-            version: { increment: 1 },
-          },
+    const result = await this.prisma.$transaction(
+      async (tx): Promise<TradeCashCompletion> => {
+        // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık
+        // tutarlı şekilde denetim izine yazılır; eskiden auditHistory eklenmiyordu).
+        const claimed = await this.claimPaymentCompleted(tx, payment, {
+          transactionId,
+          capturedMerchantOid,
+          providerData,
         });
-        // Yarışı KAYBEDEN callback burada 0 satır günceller ve sevkiyatı
-        // tetiklemez (aksi halde etiketler iki kez oluşurdu).
-        if (moved.count === 0) {
-          return { didComplete: true, tradeTransitioned: false } as const;
+        if (!claimed) {
+          return { kind: "not_claimed" };
         }
 
-        // Etiketler + Sürat sevkiyatı tx SONRASI tek kaynaktan
-        // (TradeService.createInboundTradeShipments) yapılır — aşağıda çağrılıyor.
-        tradeTransitioned = true;
-      }
+        // Takas satırı, ödeme satırına dokunmadan ÖNCE kilitlenir: iptal yolları
+        // (kullanıcı, süre dolumu, platform) aynı sırayla kilitler (takas →
+        // ödeme satırı). Böylece "takas iptal mi?" sorusu aşağıda kesin cevaplanır
+        // — yarışan bir iptal ya önce commit olur (burada `cancelled` görülür ve
+        // ödeme iade edilir) ya da bu tx'ten sonra gelir (ödemeyi `completed`
+        // görür ve kendi iadesine katar). Ters kilit sırası kilitlenmeye de yol
+        // açardı.
+        const tcpRef = await tx.tradeCashPayment.findUnique({
+          where: { id: payment.tradeCashPaymentId },
+          select: { tradeId: true },
+        });
+        if (tcpRef) {
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tcpRef.tradeId} FOR UPDATE`;
+        }
 
-      return {
-        didComplete: true,
-        tradeTransitioned,
-        trade,
-        shippingDeadline,
-      } as const;
-    });
+        const tcp = await tx.tradeCashPayment.update({
+          where: { id: payment.tradeCashPaymentId },
+          data: {
+            status: PaymentStatus.completed,
+            providerPaymentId: transactionId || payment.providerPaymentId,
+            paidAt: new Date(),
+          },
+        });
 
-    if (!result.didComplete) {
+        // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse.
+        //
+        // v2'de takasın İKİ ödemesi vardır ve depo süreci ancak İKİSİ de
+        // tamamlanınca başlar: tek taraf ödediğinde ürünler kargoya çıkmaz.
+        // İki callback aynı anda gelebileceği için sayım bu tx İÇİNDE yapılır ve
+        // geçiş `version` guard'ıyla yazılır — yarışan ikinci callback'in update'i
+        // 0 satır etkiler, ikinci kez sevkiyat tetiklenmez.
+        const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
+        const siblingPayments = await tx.tradeCashPayment.findMany({
+          where: { tradeId: tcp.tradeId },
+          select: { status: true },
+        });
+        const fullyPaid = isTradeFullyPaid(siblingPayments);
+
+        // Takas bu ödeme yoldayken iptal edildi: iptalin iadesi bu satırı (o an
+        // tamamlanmamıştı) kapsamadı. Para burada kalamaz — mevcut izlenen iade
+        // yoluna verilir; iş bu tx'le ATOMİK kuyruğa girer (çökmede drainer).
+        if (trade && trade.status === TradeStatus.cancelled) {
+          // Karar (2026-10-05): ödeme SÜRESİ dolumu iptalinde, ödemesi iptalden
+          // sonra tamamlanan taraf da kusursuzdur — tarama yalnız iptal anında
+          // tamamlanmış satırları işaretleyebildi. Aynı bayrak ve aynı iade
+          // politikası (tam iade); iade satırıyla aynı tx'te yazılır ki drainer
+          // tutarı bayrakla hesaplasın. Kendi takasını iptal eden tarafın geç
+          // ödemesi bu kümeye GİRMEZ (aktör buyer/seller): kesintili kalır.
+          if (isPaymentExpiryCancellation(trade)) {
+            await tx.tradeCashPayment.update({
+              where: { id: tcp.id },
+              data: { fullRefundEntitled: true },
+            });
+          }
+          const refund: TradeCancelledPaymentRefundPayload = {
+            tradeId: trade.id,
+            payerId: tcp.payerId,
+            tradeCashPaymentId: tcp.id,
+          };
+          await this.outbox?.enqueue(tx, {
+            type: OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+            payload: { ...refund },
+            dedupeKey: tradeCancelledPaymentRefundDedupeKey(tcp.id),
+          });
+          return { kind: "cancelled_trade", refund };
+        }
+
+        if (
+          trade &&
+          trade.status === TradeStatus.awaiting_payment &&
+          fullyPaid
+        ) {
+          const now = new Date();
+          const shippingDeadline = new Date(now);
+          shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
+
+          const moved = await tx.trade.updateMany({
+            where: {
+              id: trade.id,
+              version: trade.version,
+              status: TradeStatus.awaiting_payment,
+            },
+            data: {
+              status: TradeStatus.shipping_to_warehouse,
+              shippingDeadline,
+              version: { increment: 1 },
+            },
+          });
+          // Yarışı KAYBEDEN callback burada 0 satır günceller ve sevkiyatı
+          // tetiklemez (aksi halde etiketler iki kez oluşurdu).
+          if (moved.count === 0) {
+            return { kind: "completed", shipping: null };
+          }
+
+          // Etiketler + Sürat sevkiyatı tx SONRASI tek kaynaktan
+          // (TradeService.createInboundTradeShipments) yapılır — aşağıda çağrılıyor.
+          return {
+            kind: "completed",
+            shipping: {
+              tradeId: trade.id,
+              initiatorId: trade.initiatorId,
+              receiverId: trade.receiverId,
+              shippingDeadline,
+            },
+          };
+        }
+
+        return { kind: "completed", shipping: null };
+      },
+    );
+
+    if (result.kind === "not_claimed") {
       return false;
     }
 
@@ -1076,21 +1288,35 @@ export class PaymentFulfillmentService {
       );
     }
 
+    // İptal edilmiş takasa gelen ödeme: iade burada (PayTR callback'inin
+    // içinde, "OK" yanıtından önce) YAPILMAZ — PayTR henüz bildirmediği ödemenin
+    // iadesini "odeme henuz siteye bildirilmemis" ile reddeder ve callback-içi
+    // bir iadenin kabul edildiğine dair kanıt yok. Tx'te yazılan outbox satırını
+    // drainer (callback yanıtlandıktan sonra, ~1 dk içinde) işler.
+    if (result.kind === "cancelled_trade") {
+      this.logger.warn(
+        `Trade ${result.refund.tradeId} was cancelled before payment ${result.refund.tradeCashPaymentId} completed; refund queued`,
+      );
+      await this.refundWithoutOutbox(result.refund);
+      return true;
+    }
+
     // NOT: Takas nakit komisyonu e-Arşivi ARTIK BURADA (ödeme anında) DEĞİL, ürünler DEPOYA VARINCA
     // (at_warehouse) kesilir — surat-tracking.maybeTransitionTradeToAtWarehouse. İptal penceresi
     // ödeme sonrası/depo öncesi olduğundan, iptalde henüz fatura kesilmemiş olur (iade faturası gerekmez).
 
     // İşlem tamamlandıktan sonra bildirim emit et (her iki tarafa)
-    if (result.tradeTransitioned && result.trade && result.shippingDeadline) {
+    const shipping = result.shipping;
+    if (shipping) {
       try {
         await this.eventService.emitTradeReadyForShipping({
-          tradeId: result.trade.id,
-          initiatorId: result.trade.initiatorId,
-          receiverId: result.trade.receiverId,
-          shippingDeadline: result.shippingDeadline,
+          tradeId: shipping.tradeId,
+          initiatorId: shipping.initiatorId,
+          receiverId: shipping.receiverId,
+          shippingDeadline: shipping.shippingDeadline,
         });
         this.logger.log(
-          `trade.ready-for-shipping event emitted for trade ${result.trade.id}`,
+          `trade.ready-for-shipping event emitted for trade ${shipping.tradeId}`,
         );
       } catch (error) {
         // Log but don't fail - payment was already completed
@@ -1104,10 +1330,25 @@ export class PaymentFulfillmentService {
       // ediliyordu (Trade↔Payment döngüsünü aşmak için). Artık in-process event yayınlanıp
       // Trade tarafındaki dinleyici (TradeCashClearedListener) createInboundTradeShipments'ı
       // çağırır → Payment, Trade'e statik veya runtime bağımlılık taşımaz (döngü tamamen kalktı).
-      this.eventService.emitTradeCashCleared({ tradeId: result.trade.id });
+      this.eventService.emitTradeCashCleared({ tradeId: shipping.tradeId });
     }
 
     return true;
+  }
+
+  /**
+   * Outbox YOKSA (yalnız dar unit test kurulumları — production'da OutboxModule
+   * globaldir) iadeyi yürütecek drainer de yoktur; para askıda kalmasın diye
+   * izlenen iade doğrudan denenir. Erteleme seçeneği verilmez: PayTR erken
+   * denemeyi reddederse `refundFailureReason` + retry cron'u toparlar.
+   */
+  private async refundWithoutOutbox(
+    ref: TradeCancelledPaymentRefundPayload,
+  ): Promise<void> {
+    if (this.outbox) return;
+    await this.paymentRefund.refundTradeCashTracked(ref.tradeId, {
+      payerId: ref.payerId,
+    });
   }
 
   /**

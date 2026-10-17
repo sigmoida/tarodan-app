@@ -3,14 +3,15 @@
 import { Badge, Modal } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { DataList, Field } from "@/components/detail/DataList";
-import { fmtTry } from "@/lib/format";
+import { Panel } from "@/components/detail/Panel";
+import { fmtPercent, fmtTry } from "@/lib/format";
 import {
   inclusiveCommissionMaximum,
   sellerTypeLabel,
   type CommissionRule,
 } from "../_lib/types";
 
-const percent = (value: number) => `%${value.toFixed(2)}`;
+const percent = (value: number) => fmtPercent(value, 2);
 const optionalMoney = (value: number | null) =>
   value == null ? "—" : fmtTry(value);
 
@@ -43,7 +44,7 @@ export function CommissionRuleDetailModal({
       size="2xl"
     >
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface p-4">
+        <Panel className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-semibold text-heading">{rule.name}</p>
             <p className="mt-1 break-all font-mono text-xs text-muted">
@@ -53,7 +54,7 @@ export function CommissionRuleDetailModal({
           <Badge variant={set?.status === "DRAFT" ? "warning" : "success"}>
             {set ? `${set.name} · v${set.version} · ${set.status}` : "—"}
           </Badge>
-        </div>
+        </Panel>
 
         <DataList>
           <Field label={t("common.category")}>{rule.categoryName}</Field>

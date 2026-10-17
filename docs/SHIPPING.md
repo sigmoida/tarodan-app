@@ -137,18 +137,22 @@ akar (bkz. PAYMENTS §5). Sürat durumları `surat-status.mapper.ts` ile eşleni
 CAS geçişi + `ShipmentEvent` kaydı transaction içinde yapılır.
 
 **Hazırlama süresi ve `seller_no_ship`:** ödeme sonrası sipariş `preparing` +
-`preparingDeadline = now + PREPARING_DEADLINE_DAYS` (varsayılan 3).
-`handleExpiredPreparingOrders` iki fazlıdır: son 24 saatte **uyarı** bildirimi;
-süre aşımında `FOR UPDATE` + yeniden okuma guard'ıyla **otomatik iptal + iade**
-(`seller_no_ship`). Kaçış kapısı: koli Sürat'ta fiilen hareket ediyorsa
-(satıcı "kargoladım" demese bile) iptal atlanır.
+`preparingDeadline = now + preparingDeadlineDays` (Süreler ve Kurallar, varsayılan 3; bkz. `TIMING_RULES.md`).
+`handleExpiredPreparingOrders` iki fazlıdır: son tarihten
+`preparingWarningLeadHours` (varsayılan 24) önce **uyarı** bildirimi; süre
+aşımında `FOR UPDATE` + yeniden okuma guard'ıyla seçili eylem uygulanır:
+varsayılan **otomatik iptal ve iade** (`seller_no_ship`) ya da `extend_once`
+ile son tarihin BİR KEZ tam bir hazırlık süresi uzatılması (ikinci dolumda
+iptal ve iade). Kaçış kapısı: koli Sürat'ta fiilen hareket ediyorsa (satıcı
+"kargoladım" demese bile) ne iptal edilir ne uzatılır. Ayrıntı:
+`TIMING_RULES.md` → Sipariş.
 
 **Kargo cron'ları** (`workers/cron-catalog.ts`):
 
 | Anahtar                                           | Zamanlama | Görev                                            |
 | ------------------------------------------------- | --------- | ------------------------------------------------ |
 | `sync-surat-tracking`                             | */30 dk   | barkod retry + takip poll'u (sipariş+takas+iade) |
-| `payment-expired-preparing`                       | */30 dk   | hazırlama uyarısı + seller_no_ship iptali        |
+| `payment-expired-preparing`                       | */30 dk   | hazırlama uyarısı + uzatma / seller_no_ship      |
 | `refund-crons`                                    | 10 dk     | başarısız iade-kargo açılışını yeniden dener     |
 | `order-auto-complete`, `process-delivered-orders` | katalogda | teslim sonrası tamamlama                         |
 
@@ -167,7 +171,10 @@ tazmin edilir mi, (c) dönüş bacağını kim öder.
 - **Cayma / alıcı kusuru:** gidiş iade edilmez, dönüş alıcının iadesinden
   düşülür, satıcının payı tazmin edilir (yalnız tam iadede).
 - **İptal `hasShipped`'e bağlı:** kargoya verilmeden maliyet yoktur → iki taraf
-  bütünlenir; verildiyse maliyet kusurlu tarafa gider.
+  bütünlenir; verildiyse maliyet kusurlu tarafa gider. İstisna: satıcı
+  kusurunda satıcının payı kargo öncesinde de tazmin edilmez (alıcı ödediğinin
+  tamamını alır; tazmin hold'da ödenemeyen bir kalıntı bırakıyordu — PAYMENTS
+  §5).
 - **Kargo asla oranlanmaz** (kısmi iadede tek koli tüm adetlere hizmet eder);
   satıcıya yansıtılan gidiş, fiilen iade edilen tutarı izlediği için oranlanır.
 - **İade kolisi** `RefundService.openReturnShipment` ile yine

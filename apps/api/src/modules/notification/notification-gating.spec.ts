@@ -25,12 +25,16 @@ describe("Notification preference gating (wiring)", () => {
   describe("NotificationService", () => {
     let service: NotificationService;
     let storedSettings: Record<string, unknown> | null;
+    let acceptsMarketing: boolean | undefined;
 
     const mockPrisma = {
       user: {
         findUnique: jest.fn(({ select }: any) => {
           if (select?.notificationSettings) {
-            return Promise.resolve({ notificationSettings: storedSettings });
+            return Promise.resolve({
+              notificationSettings: storedSettings,
+              acceptsMarketingEmails: acceptsMarketing,
+            });
           }
           return Promise.resolve({
             id: "user-1",
@@ -59,6 +63,7 @@ describe("Notification preference gating (wiring)", () => {
     beforeEach(async () => {
       jest.clearAllMocks();
       storedSettings = null; // varsayılan = hepsi açık
+      acceptsMarketing = undefined;
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [
@@ -136,6 +141,31 @@ describe("Notification preference gating (wiring)", () => {
       expect(sendToUser).not.toHaveBeenCalled();
     });
 
+    it("createInAppNotification: kampanya bildirimi izin kolonunu izler (JSON bayat olsa da)", async () => {
+      // Kolon kapalı, bayat JSON açık → zil + push atlanır.
+      storedSettings = { marketingEmails: true };
+      acceptsMarketing = false;
+      const suppressed = await service.createInAppNotification(
+        "user-1",
+        NotificationType.PROMOTION,
+        {},
+      );
+      expect(suppressed).toBe(false);
+      expect(inAppCreateCount()).toBe(0);
+      expect(sendToUser).not.toHaveBeenCalled();
+
+      // Kolon açık, JSON'da anahtar kapalı → gider.
+      storedSettings = { marketingEmails: false };
+      acceptsMarketing = true;
+      const delivered = await service.createInAppNotification(
+        "user-1",
+        NotificationType.PROMOTION,
+        {},
+      );
+      expect(delivered).toBe(true);
+      expect(inAppCreateCount()).toBe(1);
+    });
+
     it("createInAppNotification: varsayılan (hepsi açık) → zil + push gider", async () => {
       storedSettings = null;
 
@@ -187,12 +217,16 @@ describe("Notification preference gating (wiring)", () => {
   describe("PushWorker.handleSendNotification", () => {
     let worker: PushWorker;
     let storedSettings: Record<string, unknown> | null;
+    let acceptsMarketing: boolean | undefined;
     let fetchMock: jest.Mock;
 
     const mockPrisma = {
       user: {
         findUnique: jest.fn(() =>
-          Promise.resolve({ notificationSettings: storedSettings }),
+          Promise.resolve({
+            notificationSettings: storedSettings,
+            acceptsMarketingEmails: acceptsMarketing,
+          }),
         ),
       },
       pushToken: {
@@ -221,12 +255,20 @@ describe("Notification preference gating (wiring)", () => {
     beforeEach(() => {
       jest.clearAllMocks();
       storedSettings = null;
+      acceptsMarketing = undefined;
       fetchMock = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ data: [{ status: "ok" }] }),
       });
       (global as any).fetch = fetchMock;
-      worker = new PushWorker({ get: () => "" } as any, mockPrisma as any);
+      // Gerçek gönderim çekirdeği (ExpoPushProvider.sendMessages) — fetch mock'lu.
+      worker = new PushWorker(
+        mockPrisma as any,
+        new ExpoPushProvider({ get: () => "" } as any, mockPrisma as any),
+        {} as any,
+        { getUnreadCount: jest.fn().mockResolvedValue(0) } as any,
+        {} as any,
+      );
     });
 
     it("messageAlerts=false → in-app KAYDEDİLMEZ, Expo fetch çağrılmaz, pushSent=false", async () => {
@@ -259,6 +301,98 @@ describe("Notification preference gating (wiring)", () => {
 
       expect(mockPrisma.notificationLog.create).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // S1 — Apple 4.5.4 / İYS: admin duyurusu türüne göre davranır.
+    const broadcastJob = (mailingType?: string) =>
+      ({
+        id: "job-2",
+        data: {
+          userId: "user-1",
+          title: "Duyuru",
+          body: "Gövde",
+          data: { type: "admin_broadcast", mailingType },
+        },
+      }) as any;
+
+    it("pazarlama duyurusu + pushNotifications=false → push GİTMEZ, zil yazılmaz", async () => {
+      storedSettings = { pushNotifications: false };
+
+      const res = await worker.handleSendNotification(
+        broadcastJob("marketing"),
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      // Zil satırını admin servisi (izinli kitleye) yazar; worker yazmaz.
+      expect(mockPrisma.notificationLog.create).not.toHaveBeenCalled();
+      expect(res).toMatchObject({
+        pushSent: false,
+        reason: "Suppressed by user preference",
+      });
+    });
+
+    it("duyuru (işlemsel/güvenlik) + pushNotifications=false → push yine GİDER", async () => {
+      storedSettings = { pushNotifications: false };
+
+      await worker.handleSendNotification(broadcastJob("announcement"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.notificationLog.create).not.toHaveBeenCalled();
+    });
+
+    it("pazarlama duyurusu + izin kolonu kapalı → push GİTMEZ", async () => {
+      storedSettings = null;
+      acceptsMarketing = false;
+
+      await worker.handleSendNotification(broadcastJob("marketing"));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("pazarlama duyurusu + izin kolonu açık (JSON'da anahtar yok) → push GİDER", async () => {
+      storedSettings = null;
+      acceptsMarketing = true;
+
+      await worker.handleSendNotification(broadcastJob("marketing"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("pazarlama duyurusu: bayat JSON kararı değiştirmez; kolon esastır", async () => {
+      // JSON kapalı ama kolon açık → gider.
+      storedSettings = { marketingEmails: false };
+      acceptsMarketing = true;
+      await worker.handleSendNotification(broadcastJob("marketing"));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // JSON açık ama kolon kapalı (bülten çıkışı) → gitmez.
+      fetchMock.mockClear();
+      storedSettings = { marketingEmails: true };
+      acceptsMarketing = false;
+      await worker.handleSendNotification(broadcastJob("marketing"));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("duyuru + izin kolonu kapalı → push yine GİDER", async () => {
+      acceptsMarketing = false;
+
+      await worker.handleSendNotification(broadcastJob("announcement"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("pazarlama duyurusu push'u istemciye type=admin_broadcast olarak gider", async () => {
+      acceptsMarketing = true;
+
+      await worker.handleSendNotification(broadcastJob("marketing"));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+      const messages = Array.isArray(sent) ? sent : [sent];
+      expect(messages[0].data).toMatchObject({
+        type: "admin_broadcast",
+        mailingType: "marketing",
+      });
     });
   });
 });

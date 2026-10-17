@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Logger,
+} from "@nestjs/common";
+import { isValidTckn, normalizeTckn } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 
@@ -38,7 +44,7 @@ export class UserBankService {
     data: {
       accountHolder: string;
       iban: string;
-      tcKimlikNo?: string;
+      tcKimlikNo?: string | null;
       taxId?: string;
     },
   ) {
@@ -49,9 +55,14 @@ export class UserBankService {
     // ödeme takılmaz; ödemeler zaten teslimden ~14 gün sonra yapılır (F2.1).
     const existing = await this.prisma.sellerBankAccount.findUnique({
       where: { userId },
-      select: { iban: true },
+      select: { iban: true, tcKimlikNo: true },
     });
     const ibanChanged = !!existing && existing.iban !== normalizedIban;
+    const tcKimlikNo = await this.resolveBankTckn(
+      userId,
+      data.tcKimlikNo,
+      existing?.tcKimlikNo ?? null,
+    );
 
     const account = await this.prisma.sellerBankAccount.upsert({
       where: { userId },
@@ -60,13 +71,15 @@ export class UserBankService {
         userId,
         accountHolder: data.accountHolder.trim(),
         iban: normalizedIban,
-        tcKimlikNo: data.tcKimlikNo || null,
+        tcKimlikNo: tcKimlikNo ?? null,
         taxId: data.taxId || null,
       },
       update: {
         accountHolder: data.accountHolder.trim(),
         iban: normalizedIban,
-        tcKimlikNo: data.tcKimlikNo || null,
+        // Gönderilmediyse DOKUNULMAZ: web formu alanı artık göstermiyor ve her
+        // IBAN kaydı eski TCKN'yi (kimlik kapısının ön doldurma kaynağı) silerdi.
+        ...(tcKimlikNo !== undefined ? { tcKimlikNo } : {}),
         taxId: data.taxId || null,
         ...(ibanChanged ? { ibanChangedAt: new Date() } : {}),
       },
@@ -106,6 +119,45 @@ export class UserBankService {
     }
 
     return account;
+  }
+
+  /**
+   * Yazılacak banka TCKN'si; `undefined` = DOKUNMA (mevcut değer korunur).
+   *
+   * - Gönderilmedi (`undefined`, `null`, boş): dokunma.
+   * - Kayıtlı değerin AYNISI geri geldi (istemci formunu GET yanıtıyla
+   *   doldurdu): dokunma, doğrulama da yok. Bugünkü kurala uymayan ya da
+   *   üyenin beyanından farklı ESKİ bir değer, IBAN güncellemesini
+   *   kilitlememeli.
+   * - YENİ değer: ortak TCKN kuralıyla doğrulanır (`isValidTckn`) ve üyenin
+   *   yasal kimliğinde numara varsa onunla AYNI olmalıdır — banka hesabı
+   *   ikinci, çelişen bir kimlik kaynağı olamaz.
+   */
+  private async resolveBankTckn(
+    userId: string,
+    sent: string | null | undefined,
+    stored: string | null,
+  ): Promise<string | undefined> {
+    if (sent === undefined || sent === null || sent.trim() === "") {
+      return undefined;
+    }
+    const tckn = normalizeTckn(sent);
+    if (stored !== null && normalizeTckn(stored) === tckn) return undefined;
+    if (!isValidTckn(tckn)) {
+      throw new BadRequestException(
+        i18nMessage("server.identity.nationalIdInvalid"),
+      );
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { nationalId: true },
+    });
+    if (user?.nationalId && user.nationalId !== tckn) {
+      throw new BadRequestException(
+        i18nMessage("server.identity.bankNationalIdMismatch"),
+      );
+    }
+    return tckn;
   }
 
   async deleteBankAccount(userId: string) {

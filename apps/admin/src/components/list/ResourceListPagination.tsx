@@ -17,6 +17,10 @@ export function ResourceListPagination() {
     useResourceList();
   const t = useTranslations();
 
+  // Hiç kayıt yokken sayfa boyutu seçmenin anlamı yok (arama/filtre sonucu
+  // boşalmış liste dahil): sayfalama tümüyle gizlenir.
+  if (total === 0) return null;
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex shrink-0 items-center gap-2">

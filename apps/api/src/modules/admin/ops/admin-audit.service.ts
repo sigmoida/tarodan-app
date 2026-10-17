@@ -3,6 +3,7 @@ import { PrismaService } from "../../../prisma";
 import { AuditLogQueryDto } from "../dto";
 import { Prisma } from "@prisma/client";
 import { paginate, resolveOrderBy } from "../../../common/list";
+import { IDENTITY_LOG_KEYS } from "../../../common/security/redact-sensitive";
 
 /**
  * Admin audit log yazımı + sorgulama — tüm Admin* alt-servislerinin ortak
@@ -16,6 +17,11 @@ export class AdminAuditService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Fail-closed denetim yazımı. `db` verilirse (işlem istemcisi) kayıt
+   * değişiklikle AYNI işlemde yazılır: denetim yazılamazsa değişiklik de geri
+   * alınır — "değişti ama denetimi yok" durumu oluşamaz.
+   */
   async createRequiredAuditLog(
     adminUserId: string,
     action: string,
@@ -23,6 +29,7 @@ export class AdminAuditService {
     entityId: string,
     oldValue: any,
     newValue: any,
+    db?: Prisma.TransactionClient,
   ) {
     return this.writeAuditLog(
       adminUserId,
@@ -31,6 +38,7 @@ export class AdminAuditService {
       entityId,
       oldValue,
       newValue,
+      db,
     );
   }
 
@@ -67,8 +75,9 @@ export class AdminAuditService {
     entityId: string,
     oldValue: any,
     newValue: any,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    const adminUser = await this.prisma.adminUser.findFirst({
+    const adminUser = await db.adminUser.findFirst({
       where: { userId: adminUserId, isActive: true },
       select: { id: true },
     });
@@ -77,6 +86,10 @@ export class AdminAuditService {
     }
 
     const sensitiveKeys = new Set([
+      // Yasal kimlik (ad, soyad, TCKN) ve banka TCKN'si denetim kaydına değer
+      // olarak girmez: audit_logs purge edilmez, ikinci bir kalıcı kimlik
+      // deposu olurdu. Kimlik düzeltmesi yalnız maskeli değeri yazar.
+      ...IDENTITY_LOG_KEYS,
       "password",
       "passwordHash",
       "passwordConfirm",
@@ -142,7 +155,7 @@ export class AdminAuditService {
       }
     };
 
-    return this.prisma.auditLog.create({
+    return db.auditLog.create({
       data: {
         adminUserId: adminUser.id,
         action,

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, offerStatusConfig } from "@tarodan/ui";
@@ -9,17 +8,19 @@ import { ADMIN_OFFERS_TAB_HREF } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
+import { DetailLayout } from "@/components/detail/DetailLayout";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TextLink } from "@/components/TextLink";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { canCancelOffer } from "../_lib/offers";
+import { offerCancelAction } from "../_lib/offers";
 import type { AdminOfferDetail } from "./_lib/types";
 import { OfferSummarySection } from "./_sections/OfferSummarySection";
 import { OfferChainSection } from "./_sections/OfferChainSection";
 import { LinkedOrderSection } from "./_sections/LinkedOrderSection";
 import { ProductOffersSection } from "./_sections/ProductOffersSection";
-import { CancelOfferModal } from "./_modals/CancelOfferModal";
+import { OfferCancelDialog } from "./_modals/OfferCancelDialog";
 
 /**
  * Teklif detayı: /operations/offers/[id] — Siparişler ekranının Teklifler
@@ -55,60 +56,69 @@ export default function OfferDetailPage() {
           <TestLaneBadge isTest={d.offer.isTest} />
         </div>
       )}
-      actions={(d) =>
-        canCancelOffer(d.offer) ? (
+      actions={(d) => {
+        const action = offerCancelAction(d.offer);
+        if (!action) return undefined;
+        return (
           <Button variant="danger" onClick={() => setShowCancel(true)}>
-            {t("admin.operations.offers.cancel")}
+            {action.kind === "order"
+              ? t("admin.operations.orders.cancel.action")
+              : t("admin.operations.offers.cancel")}
           </Button>
-        ) : undefined
-      }
+        );
+      }}
     >
       {(d) => (
         <>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <OfferSummarySection offer={d.offer} />
-              <OfferChainSection chain={d.chain} />
-              <ProductOffersSection
-                productId={d.product.id}
-                siblings={d.siblings}
-                competing={d.competing}
-              />
-            </div>
-            <div className="space-y-6">
-              <SectionCard title={t("admin.catalog.common.product")}>
-                <Link
-                  href={`/catalog/products/${d.product.id}`}
-                  className="block font-medium text-primary-600 hover:underline"
-                >
-                  {d.product.title}
-                </Link>
-                <p className="mt-1 text-sm text-muted">
-                  {t("admin.operations.offers.productStock", {
-                    quantity: d.product.quantity ?? "∞",
-                    reserved: d.product.reservedQuantity,
-                  })}
-                </p>
-              </SectionCard>
-              <PartyCard
-                title={t("admin.operations.common.buyer")}
-                name={d.offer.buyer.displayName}
-                userHref={`/accounts/users/${d.offer.buyer.id}`}
-                email={d.offer.buyer.email}
-              />
-              <PartyCard
-                title={t("admin.operations.common.seller")}
-                name={d.offer.seller.displayName}
-                userHref={`/accounts/users/${d.offer.seller.id}`}
-                email={d.offer.seller.email}
-              />
-              <LinkedOrderSection order={d.order} />
-            </div>
-          </div>
-          <CancelOfferModal
+          <DetailLayout
+            main={
+              <>
+                <OfferSummarySection offer={d.offer} />
+                <OfferChainSection chain={d.chain} />
+                <ProductOffersSection
+                  productId={d.product.id}
+                  siblings={d.siblings}
+                  competing={d.competing}
+                />
+              </>
+            }
+            aside={
+              <>
+                <SectionCard title={t("admin.catalog.common.product")}>
+                  <TextLink
+                    href={`/catalog/products/${d.product.id}`}
+                    className="block font-medium"
+                  >
+                    {d.product.title}
+                  </TextLink>
+                  <p className="mt-1 text-sm text-muted">
+                    {t("admin.operations.offers.productStock", {
+                      quantity: d.product.quantity ?? "∞",
+                      reserved: d.product.reservedQuantity,
+                    })}
+                  </p>
+                </SectionCard>
+                <PartyCard
+                  title={t("admin.operations.common.buyer")}
+                  name={d.offer.buyer.displayName}
+                  userHref={`/accounts/users/${d.offer.buyer.id}`}
+                  email={d.offer.buyer.email}
+                />
+                <PartyCard
+                  title={t("admin.operations.common.seller")}
+                  name={d.offer.seller.displayName}
+                  userHref={`/accounts/users/${d.offer.seller.id}`}
+                  email={d.offer.seller.email}
+                />
+                <LinkedOrderSection order={d.order} />
+              </>
+            }
+          />
+          <OfferCancelDialog
+            action={offerCancelAction(d.offer)}
+            offerId={d.offer.id}
             open={showCancel}
             onClose={() => setShowCancel(false)}
-            offer={d.offer}
           />
         </>
       )}

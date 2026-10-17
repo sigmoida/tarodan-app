@@ -5,6 +5,10 @@ import { PayTRCredentials } from "./paytr-credentials.service";
 import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { parsePaytrMoneyString } from "./paytr-money.util";
 import { normalizeTrIban } from "../../../common/validators/tr-iban";
+import {
+  networkErrorReason,
+  withPaytrFetchRetry,
+} from "./paytr-fetch-retry.util";
 
 /** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
  *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
@@ -193,14 +197,14 @@ export class PayTRTransferService {
     }).toString();
 
     try {
-      const response = await fetch(
-        "https://www.paytr.com/odeme/geri-donen-transfer",
-        {
+      // Okuma/idempotent sorgu — para taşımaz, ağ kesintisinde güvenle denenir.
+      const response = await withPaytrFetchRetry(() =>
+        fetch("https://www.paytr.com/odeme/geri-donen-transfer", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: postData,
           signal: AbortSignal.timeout(this.httpTimeoutMs),
-        },
+        }),
       );
       const rawText = await response.text();
       const data = this.parsePaytrJson<{
@@ -211,9 +215,13 @@ export class PayTRTransferService {
       const status = String(data?.status ?? "");
       if (status === "failed") return [];
       if (status !== "success") {
+        const reason = String(data?.err_msg ?? "PayTR geçersiz/boş yanıt");
+        // PayTR iş hatası: catch bunu loglamadan yeniden fırlatır, tek kayıt
+        // burada — `warn`, çünkü kanonik alarmı cron tracker üretir.
+        this.logger.warn(`Get returned transfers failed: ${reason}`);
         throw new BadRequestException(
           i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
-            reason: String(data?.err_msg ?? "PayTR geçersiz/boş yanıt"),
+            reason,
           }),
         );
       }
@@ -241,7 +249,13 @@ export class PayTRTransferService {
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
-      this.logger.error(`Get returned transfers failed: ${error.message}`);
+      // İzin verilen deneme sayısı tükendikten sonra buraya düşer; rethrow eden
+      // exception filter zaten alarm üretecek — burada `warn` yeterli, tekrar
+      // `error` seviyesinde loglamak aynı olayı ikinci kez alarma çevirir.
+      // `networkErrorReason` cause.code'u (ECONNRESET vb.) mesaja ekler.
+      this.logger.warn(
+        `Get returned transfers failed: ${networkErrorReason(error)}`,
+      );
       throw new BadRequestException(
         i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
           reason: error.message,

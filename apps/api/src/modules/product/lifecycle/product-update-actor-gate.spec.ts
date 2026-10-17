@@ -7,7 +7,7 @@ import { ProductUpdateService } from "./product-update.service";
  * yapamıyor, her seferinde satıcıya dönmek zorunda kalıyordu.
  *
  * Sahiplik kontrolü bir GUARD değil, servis içi iş kuralıdır (apps/api/CLAUDE.md
- * §9: "decorator'lar erişimi, servisler sahipliği yönetir"). Bu yüzden aktör
+ * "AuthN and AuthZ": "decorator'lar erişimi, servisler sahipliği yönetir"). Bu yüzden aktör
  * ayrımı da burada sabitlenir: yönetici sahiplik ve üyelik kapılarını geçer,
  * satıcı geçemez.
  */

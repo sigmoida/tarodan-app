@@ -54,7 +54,10 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
             ),
           ),
       },
+      // Claim ödeme satırını kilitler; takasın siparişi yoktur.
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
+    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
     const service = new PaymentInitiationService(
       prisma,
       {} as any,
@@ -64,6 +67,7 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
       {} as any,
       {} as any,
       {} as any,
+      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
     );
     return { service, prisma };
   };

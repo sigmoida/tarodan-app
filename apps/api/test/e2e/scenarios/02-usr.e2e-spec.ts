@@ -781,21 +781,32 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
       );
     });
 
+    // S3 — Apple 5.1.1(v): aktif ilan silmeyi ENGELLEMEZ; ilan pasife alınır.
     scenario("USR-041", async () => {
       const user = await createUser(ctx.module, { isSeller: true });
-      await createProduct({
+      const product = await createProduct({
         sellerId: user.id,
         categoryId: baseline.categoryId,
         status: "active",
       });
-      const res = await request(server())
+      await request(server())
         .delete("/api/users/me")
         .set(authHeader(user))
-        .expect(400);
-      expect(res.body.message).toContain("tamamlamanız gerekmektedir");
-      expect(Array.isArray(res.body.errors)).toBe(true);
-      expect(JSON.stringify(res.body.errors)).toContain("aktif ilanınız");
-      expect(res.body.details.activeProducts).toBeGreaterThanOrEqual(1);
+        .expect(200);
+      const prisma = getPrisma();
+      const row = await prisma.product.findUnique({
+        where: { id: product.id },
+        select: { status: true, removalReason: true },
+      });
+      expect(row).toEqual({
+        status: "inactive",
+        removalReason: "account_deleted",
+      });
+      expect(
+        await prisma.productRemovalEvent.count({
+          where: { productId: product.id, reason: "account_deleted" },
+        }),
+      ).toBe(1);
     });
 
     scenario("USR-042", async () => {
@@ -1194,7 +1205,8 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
         .send({
           accountHolder: "Ahmet Yılmaz",
           iban: "TR330006100519786457841326",
-          tcKimlikNo: "12345678901",
+          // Checksum'ı tutan TCKN: yeni değer ortak kuralla doğrulanır.
+          tcKimlikNo: "10000000146",
         })
         .expect(200);
       const get = await request(server())

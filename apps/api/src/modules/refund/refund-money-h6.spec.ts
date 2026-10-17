@@ -25,6 +25,8 @@ describe("RefundService — MONEY-H6 frozen-hold terminal escape", () => {
         findMany: jest.fn().mockResolvedValue(rr ? [rr] : []),
       },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      // Bekleme üst sınırı Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const notificationService = {
       createInAppNotification: jest.fn().mockResolvedValue(undefined),

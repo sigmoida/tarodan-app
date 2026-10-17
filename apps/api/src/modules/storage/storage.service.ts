@@ -523,16 +523,38 @@ export class StorageService implements OnModuleInit {
     return { folders, files };
   }
 
-  /** Tam key ile S3 nesnesi + varsa MediaFile kaydını siler (temizlik cron'u için). */
+  /**
+   * Tam key ile S3 nesnesi + varsa MediaFile kaydını siler (temizlik cron'u için).
+   *
+   * Yalnız KENDİ env önekindeki nesneyi siler. Staging production'ın maskeli
+   * kopyasıyla çalışırken (docs/UAT_REFRESH.md) satırlar `prod/…` key'leri
+   * taşır; bu ortamın başka bir ortamın nesnesini silmesi asla doğru değildir.
+   * Satır yine silinir (kendi veritabanımız), nesneye dokunulmaz.
+   */
   async deleteFileByKey(key: string): Promise<void> {
     await this.prisma.mediaFile.deleteMany({ where: { key } });
     if (!this.isS3Available) return;
+    if (!hasEnvPrefix(this.envPrefix, key)) {
+      this.logger.warn(
+        `Refusing to delete ${key}: outside this environment's prefix (${this.envPrefix})`,
+      );
+      return;
+    }
     await this.client().send(
       new DeleteObjectCommand({ Bucket: this.baseBucket, Key: key }),
     );
   }
 
-  async deleteFile(bucket: string, key: string): Promise<void> {
+  /**
+   * MediaFile kaydını ve nesneyi siler. S3 hatası varsayılan olarak yalnız
+   * loglanır (best-effort çağıranlar); `throwOnError` ile yükseltilir —
+   * outbox handler'ı gibi yeniden deneyen çağıranlar hatayı görmeli.
+   */
+  async deleteFile(
+    bucket: string,
+    key: string,
+    options: { throwOnError?: boolean } = {},
+  ): Promise<void> {
     // Database'den sil
     await this.prisma.mediaFile.deleteMany({
       where: { bucket, key },
@@ -556,6 +578,7 @@ export class StorageService implements OnModuleInit {
         this.logger.log(`✅ File deleted: ${fullKey}`);
       } catch (error: any) {
         this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
+        if (options.throwOnError) throw error;
       }
     }
   }
@@ -571,12 +594,26 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  private publicBaseUrl(): string {
+    return this.configService.get<string>("S3_PUBLIC_BASE_URL", "") ?? "";
+  }
+
+  /**
+   * Public kök URL'i tanımlı mı. Okuma yolları tanımsızken boş URL'e düşüp
+   * yedek görsele geçer; YÜKLEME yolu ise bunu önceden sormalı — aksi halde
+   * nesne yüklenir ve istemciye `url: ""` döner, kaydedilen alan sessizce
+   * kırık kalır.
+   */
+  hasPublicAssetBaseUrl(): boolean {
+    return this.publicBaseUrl().trim() !== "";
+  }
+
   /**
    * Build direct public URL for public-read S3 assets (product/collection images).
    * Key must include env prefix (e.g. dev/products/product-images/...).
    */
   getPublicAssetUrl(key: string): string {
-    const baseUrl = this.configService.get("S3_PUBLIC_BASE_URL", "");
+    const baseUrl = this.publicBaseUrl();
     if (!baseUrl) {
       this.logger.warn(
         "S3_PUBLIC_BASE_URL not configured; returning empty URL",
@@ -585,6 +622,18 @@ export class StorageService implements OnModuleInit {
     }
     const normalizedKey = key.startsWith("/") ? key.slice(1) : key;
     return `${baseUrl.replace(/\/$/, "")}/${normalizedKey}`;
+  }
+
+  /**
+   * `getPublicAssetUrl`'in tersi: bizim public kökümüzdeki tam URL'den nesne
+   * anahtarını çıkarır. Kök tanımsızsa, URL başka bir adresteyse (ör. sosyal
+   * girişin profil resmi) ya da yol bir public nesne anahtarı değilse null.
+   */
+  publicAssetKeyFromUrl(url: string): string | null {
+    const base = this.publicBaseUrl().trim().replace(/\/$/, "");
+    if (!base || !url.startsWith(`${base}/`)) return null;
+    const key = url.slice(base.length + 1).split(/[?#]/)[0];
+    return isPublicStorageKey(key) ? key : null;
   }
 
   /**

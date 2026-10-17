@@ -1,46 +1,58 @@
-import { IsOptional, IsEnum, IsNumber, Min, Max, IsBoolean } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type, Transform } from 'class-transformer';
-import { OrderStatus } from '@prisma/client';
+import {
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  Min,
+  Max,
+  IsBoolean,
+} from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { Type, Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
+import { OrderStatus } from "@prisma/client";
 
 export class OrderQueryDto {
   @ApiPropertyOptional({
     enum: OrderStatus,
-    example: 'paid',
+    example: "paid",
     description:
       'Filter by order status. Tek değer ("paid") veya virgülle çoklu ("cancelled,refunded").',
   })
   @IsOptional()
   @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.split(',').map((s) => s.trim()).filter(Boolean)
+    typeof value === "string"
+      ? value
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : value,
   )
   @IsEnum(OrderStatus, { each: true })
   status?: OrderStatus | OrderStatus[];
 
   @ApiPropertyOptional({
-    example: 'buyer',
-    description: 'Filter by role (buyer = orders I placed, seller = orders I received)',
-    enum: ['buyer', 'seller'],
+    example: "buyer",
+    description:
+      "Filter by role (buyer = orders I placed, seller = orders I received)",
+    enum: ["buyer", "seller"],
   })
   @IsOptional()
-  role?: 'buyer' | 'seller';
+  role?: "buyer" | "seller";
 
   @ApiPropertyOptional({
     example: true,
     description:
-      'Yalnız iade talebi olan siparişler (status filtresini geçersiz kılar; ' +
+      "Yalnız iade talebi olan siparişler (status filtresini geçersiz kılar; " +
       'iade tamamlanınca sipariş cancelled olduğu için ayrı "İadeler" sekmesi için)',
   })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  @QueryBoolean()
   @IsBoolean()
   refundsOnly?: boolean;
 
   @ApiPropertyOptional({
     example: 1,
-    description: 'Page number',
+    description: "Page number",
   })
   @IsOptional()
   @IsNumber()
@@ -50,7 +62,7 @@ export class OrderQueryDto {
 
   @ApiPropertyOptional({
     example: 20,
-    description: 'Items per page',
+    description: "Items per page",
   })
   @IsOptional()
   @IsNumber()

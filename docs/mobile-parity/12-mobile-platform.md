@@ -45,6 +45,13 @@ edilmiyor. Sonucu:
 1. **Universal links / App Links** kur: iOS `associatedDomains` (`applinks:<domain>`),
    Android `intentFilters` (`autoVerify: true`) + sunucuda `apple-app-site-association` ve
    `assetlinks.json` yayınla.
+   - **Staging** (`com.tarodan.app.staging`): `staging.tarodan.com.tr/.well-known/assetlinks.json`
+     host koşullu bir yeniden yazımla `apps/web/public/.well-known/assetlinks-staging.json`
+     dosyasını sunar (`apps/web/well-known-rewrites.js`, AASA'daki staging kuralıyla aynı
+     kalıp). Play App Signing parmak izleri bu dosyada.
+   - **Production** (`com.tarodan.app`): `public/.well-known/assetlinks.json` yayında; şimdilik
+     yalnız upload-key parmak izini taşır — Play'den kurulan sürümde doğrulama, Play App
+     Signing parmak izi eklenene dek geçmez (`docs/ANDROID_APP_LINKS.md`).
 2. Custom scheme'i (`tarodan://`) yedek olarak koru.
 3. **Yol eşlemesi** tanımla — web yolu → mobil rota:
 

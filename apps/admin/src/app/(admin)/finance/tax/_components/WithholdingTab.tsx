@@ -1,13 +1,7 @@
 "use client";
 
 import { Button, Input, Select } from "@tarodan/ui";
-import {
-  ReceiptPercentIcon,
-  UsersIcon,
-  ArrowsRightLeftIcon,
-  ClockIcon,
-  ArrowDownTrayIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { downloadBlob } from "@/lib/download";
 import { ResourceList, useResourceList } from "@/components/list";
@@ -128,26 +122,18 @@ function WithholdingSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
       <MetricCard
-        icon={ReceiptPercentIcon}
-        tone="primary"
         label={t("admin.finance.tax.periodWithholding")}
         value={fmtTry(summary.totalWithholding)}
       />
       <MetricCard
-        icon={UsersIcon}
-        tone="info"
         label={t("admin.finance.tax.sellerCount")}
         value={summary.sellerCount}
       />
       <MetricCard
-        icon={ArrowsRightLeftIcon}
-        tone="success"
         label={t("admin.finance.tax.transferCount")}
         value={summary.transferCount}
       />
       <MetricCard
-        icon={ClockIcon}
-        tone="warning"
         label={t("admin.finance.tax.pendingWithholding")}
         value={fmtTry(summary.pendingWithholding)}
       />

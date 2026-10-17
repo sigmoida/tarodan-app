@@ -13,12 +13,15 @@ import { AuthLoginService } from "../auth-login.service";
 import { SocialLoginService } from "./social-login.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
+import { AppleTokenService } from "./apple-token.service";
 import { PrismaService } from "../../../prisma";
 import { NotificationService } from "../../notification/notification.service";
 import { CacheService } from "../../cache/cache.service";
 import { StorageService } from "../../storage/storage.service";
 import { SecurityService } from "../../security/security.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
+import { ConsentService } from "../../consent/consent.service";
+import { LegalIdentityService } from "../../legal-identity/legal-identity.service";
 
 describe("AuthService.loginWithGoogle", () => {
   let service: AuthService;
@@ -91,11 +94,24 @@ describe("AuthService.loginWithGoogle", () => {
           provide: AppleAuthService,
           useValue: { verifyIdentityToken: jest.fn() },
         },
+        {
+          provide: AppleTokenService,
+          useValue: { storeFromAuthorizationCode: jest.fn() },
+        },
         { provide: SecurityService, useValue: { validateTOTP: jest.fn() } },
         {
           provide: NewsletterService,
           useValue: { syncUserConsent: jest.fn() },
         },
+        {
+          provide: ConsentService,
+          useValue: {
+            recordAccountConsents: jest.fn().mockResolvedValue(0),
+            recordMarketingChange: jest.fn(),
+          },
+        },
+        // Kayıt formundaki yasal kimlik (bu spec'in konusu değil).
+        { provide: LegalIdentityService, useValue: {} },
         // AuthRegistrationService toplu aktivasyon mailini kuyruğa yazıyor.
         {
           provide: getQueueToken(QUEUE_NAMES.EMAIL),

@@ -68,7 +68,7 @@ export default function DiscountCard({
 
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge
-              variant="primary"
+              variant="default"
               size="sm"
               icon={
                 discount.type === "percentage" ? (
@@ -88,7 +88,7 @@ export default function DiscountCard({
             </Badge>
 
             {discount.code ? (
-              <Badge variant="secondary" size="sm" className="font-mono">
+              <Badge variant="outline" size="sm" className="font-mono">
                 {discount.code}
               </Badge>
             ) : (

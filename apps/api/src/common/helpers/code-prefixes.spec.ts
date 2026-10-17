@@ -27,7 +27,7 @@ describe("code prefixes", () => {
   it("never reuses an externally dictated prefix", () => {
     // e-Arşiv numarası "TRD" ile başlar (GİB'e kayıtlı); takas referansı bu
     // yüzden TKS kullanır. Bu test öneki geri almayı engeller.
-    const elogoPrefix = EXTERNAL_CODE_FORMATS.elogoInvoice.slice(0, 3);
+    const elogoPrefix = EXTERNAL_CODE_FORMATS.fiscalInvoice.slice(0, 3);
     expect(Object.values(REFERENCE_PREFIX)).not.toContain(elogoPrefix);
   });
 

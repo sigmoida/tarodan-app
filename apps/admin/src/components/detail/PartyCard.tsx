@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TextLink } from "@/components/TextLink";
 import { SectionCard } from "./SectionCard";
 
 /**
@@ -22,12 +22,9 @@ export function PartyCard({
   return (
     <SectionCard title={title} bodyClassName="space-y-1">
       {userHref ? (
-        <Link
-          href={userHref}
-          className="block font-medium text-primary-600 hover:text-primary-700"
-        >
+        <TextLink href={userHref} className="block font-medium">
           {name}
-        </Link>
+        </TextLink>
       ) : (
         <span className="block font-medium text-heading">{name}</span>
       )}

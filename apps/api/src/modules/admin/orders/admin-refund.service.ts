@@ -9,7 +9,6 @@ import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import {
-  Prisma,
   PaymentStatus,
   TradeStatus,
   RefundFaultParty,
@@ -18,14 +17,13 @@ import {
 import { PaymentService } from "../../payment/payment.service";
 import { EventService } from "../../events/event.service";
 import { RefundService } from "../../refund/refund.service";
-import { ApproveRefundRequestDto, RefundRequestQueryDto } from "../dto";
-import { paginate, resolveOrderBy } from "../../../common/list";
+import { ApproveRefundRequestDto } from "../dto";
 import { primaryCashPayment } from "../../trade/helpers/trade.constants";
 import { i18nMessage } from "../../i18n";
-import { refundRequestKindWhere } from "./helpers/refund-request-kind-where";
+import { refundComponentTotals } from "../../refund/helpers/refund-component-totals";
 
 /**
- * İade talepleri admin operasyonları (liste/detay, force-finalize) +
+ * İade talepleri admin operasyonları (detay, karar, force-finalize) +
  * takas tazminat kapatma ve takas iade yeniden deneme — AdminService'in
  * REFUND REQUEST ADMIN bölümünden birebir taşındı.
  * AdminService aynı imzalarla buraya delege eder.
@@ -79,102 +77,7 @@ export class AdminRefundService {
 
   // ==================== REFUND REQUEST ADMIN ====================
 
-  /**
-   * List refund requests for admin operations queue.
-   */
-  async listRefundRequests(query: RefundRequestQueryDto) {
-    const where: Prisma.RefundRequestWhereInput = {};
-    if (query.status && query.status.length > 0) {
-      where.status = { in: query.status };
-    }
-    if (query.from || query.to) {
-      where.createdAt = {};
-      if (query.from) where.createdAt.gte = new Date(query.from);
-      if (query.to) where.createdAt.lte = new Date(query.to);
-    }
-    if (query.kind) where.AND = [refundRequestKindWhere(query.kind)];
-    if (query.userSearch && query.userSearch.trim().length > 0) {
-      const term = query.userSearch.trim();
-      where.OR = [
-        { requester: { displayName: { contains: term, mode: "insensitive" } } },
-        { requester: { email: { contains: term, mode: "insensitive" } } },
-        {
-          order: {
-            seller: { displayName: { contains: term, mode: "insensitive" } },
-          },
-        },
-        {
-          order: { seller: { email: { contains: term, mode: "insensitive" } } },
-        },
-        {
-          order: {
-            orderNumber: { contains: term, mode: "insensitive" },
-          },
-        },
-        {
-          order: {
-            product: { title: { contains: term, mode: "insensitive" } },
-          },
-        },
-        { refundNumber: { contains: term, mode: "insensitive" } },
-        { description: { contains: term, mode: "insensitive" } },
-        {
-          returnTrackingNumber: { contains: term, mode: "insensitive" },
-        },
-      ];
-    }
-
-    const orderBy =
-      resolveOrderBy<Prisma.RefundRequestOrderByWithRelationInput>(
-        "RefundRequest",
-        query,
-        { defaultSort: { createdAt: "desc" } },
-      );
-    const result = await paginate(
-      this.prisma.refundRequest,
-      {
-        where,
-        orderBy,
-        include: {
-          requester: { select: { id: true, displayName: true, email: true } },
-          order: {
-            select: {
-              id: true,
-              orderNumber: true,
-              totalAmount: true,
-              // Test şeridi rozeti (liste test talebini gizlemez).
-              isTest: true,
-              seller: { select: { id: true, displayName: true, email: true } },
-              product: {
-                select: {
-                  id: true,
-                  title: true,
-                  images: {
-                    take: 1,
-                    orderBy: { sortOrder: "asc" },
-                    select: { cardKey: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      query,
-    );
-    const data = result.data.map((rr: any) => {
-      const product = rr?.order?.product;
-      if (product) {
-        product.images = (product.images ?? [])
-          .map((img: any) => ({
-            url: this.resolveProductImageUrl(img?.cardKey),
-          }))
-          .filter((img: any) => img.url);
-      }
-      return rr;
-    });
-    return { ...result, data };
-  }
+  // Liste / sayaç / Excel: `AdminRefundListService` (İadeler ekranı).
 
   async getRefundRequestDetail(refundRequestId: string) {
     const rr = await this.prisma.refundRequest.findUnique({
@@ -204,7 +107,12 @@ export class AdminRefundService {
         .map((img: any) => ({ url: this.resolveProductImageUrl(img?.cardKey) }))
         .filter((img: any) => img.url);
     }
-    return rr;
+    // Taraf başına özet (alıcı / satıcı / platform) — bileşen satırlarından,
+    // tek yardımcıyla; panel kendi toplamını yapmaz.
+    return {
+      ...rr,
+      financialTotals: refundComponentTotals(rr.financialComponents),
+    };
   }
 
   async approveRefundRequest(

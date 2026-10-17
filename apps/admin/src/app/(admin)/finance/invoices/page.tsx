@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import { CORPORATE_TAB, invoiceTabs, normalizeInvoiceTab } from "./_lib/types";
-import { ElogoInvoicesTab } from "./_components/ElogoInvoicesTab";
+import { FiscalInvoicesTab } from "./_components/FiscalInvoicesTab";
 import { CorporateInvoicesTab } from "./_components/CorporateInvoicesTab";
 import { InvoicesSummary } from "./_components/InvoicesSummary";
 import { useTranslations } from "next-intl";
@@ -27,7 +27,7 @@ export default function InvoicesPage() {
       {tab === CORPORATE_TAB ? (
         <CorporateInvoicesTab />
       ) : (
-        <ElogoInvoicesTab scope={tab} />
+        <FiscalInvoicesTab scope={tab} />
       )}
     </AdminPage>
   );

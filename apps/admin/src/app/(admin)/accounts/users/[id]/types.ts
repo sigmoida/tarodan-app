@@ -1,5 +1,4 @@
-import type { StatusConfig } from "@tarodan/ui";
-import type { AccountStatus } from "@tarodan/types";
+import type { AccountStatus, LegalIdentityField } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -81,6 +80,12 @@ export interface UserDetail {
   sellerType?: string;
   companyName?: string;
   taxId?: string;
+  /** Yasal kimlik — tam değer (ekran TCKN'yi MaskedValue ile gizler). */
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  nationalId: string | null;
+  /** Kimlik kapısıyla aynı kural; personel / test hesabında hep boş. */
+  legalIdentityMissing: LegalIdentityField[];
   bankAccount?: {
     accountHolder: string;
     iban: string;
@@ -134,49 +139,6 @@ export interface UserDetail {
     blocksReceivedCount?: number;
   };
 }
-
-/** Order/product/trade status → badge, shared across the activity tabs. */
-export const getUserStatusConfig = (t: T): Record<string, StatusConfig> => ({
-  pending: { label: t("admin.users.status.pending"), variant: "warning" },
-  pending_payment: {
-    label: t("admin.operations.orders.status.pendingPayment"),
-    variant: "warning",
-  },
-  paid: { label: t("admin.operations.orders.status.paid"), variant: "info" },
-  preparing: {
-    label: t("admin.operations.orders.status.preparing"),
-    variant: "info",
-  },
-  shipped: {
-    label: t("admin.operations.orders.status.shipped"),
-    variant: "primary",
-  },
-  delivered: {
-    label: t("admin.operations.orders.status.delivered"),
-    variant: "success",
-  },
-  completed: {
-    label: t("admin.operations.orders.status.completed"),
-    variant: "success",
-  },
-  cancelled: {
-    label: t("admin.operations.orders.status.cancelled"),
-    variant: "danger",
-  },
-  rejected: { label: t("common.rejected"), variant: "danger" },
-  active: { label: t("common.active"), variant: "success" },
-  inactive: { label: t("common.inactive"), variant: "secondary" },
-  sold: { label: t("admin.catalog.products.statusSold"), variant: "primary" },
-  accepted: {
-    label: t("admin.operations.trades.timeline.accepted"),
-    variant: "info",
-  },
-  both_shipped: {
-    label: t("admin.users.status.bothShipped"),
-    variant: "primary",
-  },
-  disputed: { label: t("admin.operations.trades.disputed"), variant: "danger" },
-});
 
 export const getMembershipTierOptions = (t: T) => [
   { value: "free", label: t("admin.users.membershipFree") },

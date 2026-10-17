@@ -38,3 +38,4 @@ export const ResourceList = Object.assign(ResourceListRoot, {
 
 export { useResourceList } from "@/context/ResourceListContext";
 export type { ResourceListProps } from "./ResourceList";
+export { ExportButton } from "./ExportButton";

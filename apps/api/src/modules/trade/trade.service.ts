@@ -8,6 +8,15 @@ import { TradeQueryService } from "./trade-query.service";
 import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
 import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
 import {
+  TradePlatformCancelService,
+  type TradePlatformCancelHooks,
+  type TradePlatformCancelOutcome,
+} from "./lifecycle/trade-platform-cancel.service";
+import type {
+  AdminCancelReasonCode,
+  AdminTradeCancelPreview,
+} from "@tarodan/types";
+import {
   CreateTradeDto,
   TradeQueryDto,
   AcceptTradeDto,
@@ -35,6 +44,7 @@ export class TradeService {
     private readonly tradeQuery: TradeQueryService,
     private readonly tradeLifecycle: TradeLifecycleService,
     private readonly tradeReconciliation: TradeReconciliationService,
+    private readonly tradePlatformCancel: TradePlatformCancelService,
   ) {}
 
   // Taşındı: trade-shipment.service.ts — Sürat kargo orkestrasyonu
@@ -184,6 +194,23 @@ export class TradeService {
 
   async autoConfirmExpiredReceipts(): Promise<number> {
     return this.tradeReconciliation.autoConfirmExpiredReceipts();
+  }
+
+  // Platform (admin) iptali — trade-platform-cancel.service.ts. Admin yazma
+  // yolu domain servisinden geçer; denetim kaydı kancayla aynı tx'e girer.
+
+  async previewPlatformCancel(
+    tradeId: string,
+  ): Promise<AdminTradeCancelPreview> {
+    return this.tradePlatformCancel.preview(tradeId);
+  }
+
+  async cancelByPlatform(
+    tradeId: string,
+    reasonCode: AdminCancelReasonCode,
+    hooks: TradePlatformCancelHooks,
+  ): Promise<TradePlatformCancelOutcome> {
+    return this.tradePlatformCancel.cancel(tradeId, reasonCode, hooks);
   }
 }
 

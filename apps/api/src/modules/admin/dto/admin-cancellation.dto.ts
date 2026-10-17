@@ -1,8 +1,10 @@
 import { IsIn, IsOptional, IsString } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
+  ADMIN_CANCELLATION_ADMIN_REASON_FILTERS,
   ADMIN_CANCELLATION_BUCKETS,
   ADMIN_CANCELLATION_TABS,
+  type AdminCancellationAdminReasonFilter,
   type AdminCancellationBucket,
   type AdminCancellationTab,
 } from "@tarodan/types";
@@ -48,6 +50,15 @@ export class AdminCancellationCountsQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   party?: string;
+
+  @ApiPropertyOptional({
+    enum: ADMIN_CANCELLATION_ADMIN_REASON_FILTERS,
+    description:
+      "Yönetici iptali: 'any' bütün yönetici iptalleri, bir katalog kodu yalnız o nedenle yapılanlar",
+  })
+  @IsOptional()
+  @IsIn(ADMIN_CANCELLATION_ADMIN_REASON_FILTERS)
+  adminReason?: AdminCancellationAdminReasonFilter;
 }
 
 export class AdminCancellationQueryDto extends AdminCancellationCountsQueryDto {

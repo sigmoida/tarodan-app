@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import {
   CancellationActor,
+  ListingRemovalReason,
   OfferStatus,
   OrderStatus,
   ProductStatus,
@@ -19,6 +20,7 @@ import {
   safeDecrementReserved,
 } from "../helpers/product-availability.helper";
 import { getReservedAwareStatus } from "../helpers/product-status.helper";
+import { recordListingRemovals } from "../helpers/listing-removal";
 import { NotificationService } from "../../notification/notification.service";
 import { DiscountService } from "../../discount/discount.service";
 import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
@@ -181,13 +183,23 @@ export class ProductLockService {
     const product = await this.lockProductForUpdate(tx, productId);
     if (!product) return;
     const newReserved = safeDecrementReserved(product.reservedQuantity, qty);
+    const nextStatus = getReservedAwareStatus(product.quantity, newReserved);
     await tx.product.update({
       where: { id: productId },
       data: {
         reservedQuantity: newReserved,
-        status: getReservedAwareStatus(product.quantity, newReserved),
+        status: nextStatus,
       },
     });
+    // Serbest bırakılan rezervasyon stoğu bitmiş ilanı pasife düşürdüyse.
+    await recordListingRemovals(tx, [
+      {
+        productId,
+        statusBefore: product.status,
+        statusAfter: nextStatus,
+        reason: ListingRemovalReason.out_of_stock,
+      },
+    ]);
   }
 
   /**

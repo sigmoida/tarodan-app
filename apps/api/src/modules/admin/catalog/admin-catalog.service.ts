@@ -16,7 +16,7 @@ import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
 } from "../../../common/helpers/fulltext-search";
-import { Brand, Prisma, ProductKind } from "@prisma/client";
+import { Prisma, ProductKind } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../../common/list";
 import {
   AdminAttributeGroupQueryDto,
@@ -37,6 +37,12 @@ import {
   SCALE_GROUP_SLUG,
   isProtectedAttributeGroup,
 } from "../../../common/helpers/attribute-groups";
+import {
+  hasListingsWhere,
+  listingCountInclude,
+  listingCountSortMap,
+  paginateWithListingCounts,
+} from "./catalog-listing-counts";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -435,7 +441,7 @@ export class AdminCatalogService {
    * Get all brands
    */
   async getBrands(query: AdminBrandQueryDto = new AdminBrandQueryDto()) {
-    const { search, status } = query;
+    const { search, status, hasListings } = query;
     const where: Prisma.BrandWhereInput = {};
     if (status === "active") where.isActive = true;
     else if (status === "inactive") where.isActive = false;
@@ -447,14 +453,30 @@ export class AdminCatalogService {
       ];
     }
 
+    // "İlan var/yok" filtresi = "Aktif ilan" kolonuyla aynı (vitrin) kural.
+    Object.assign(where, hasListingsWhere(hasListings));
+
     const orderBy = resolveOrderBy<Prisma.BrandOrderByWithRelationInput>(
       "Brand",
       query,
-      { defaultSort: { name: "asc" } },
+      {
+        defaultSort: { name: "asc" },
+        sortMap: listingCountSortMap<Prisma.BrandOrderByWithRelationInput>(),
+      },
     );
-    const result = await paginate(this.prisma.brand, { where, orderBy }, query);
+    const include = listingCountInclude();
+    const result = await paginateWithListingCounts(
+      this.prisma,
+      "brandId",
+      query,
+      {
+        page: () =>
+          paginate(this.prisma.brand, { where, orderBy, include }, query),
+        all: () => this.prisma.brand.findMany({ where, orderBy, include }),
+      },
+    );
 
-    const data = result.data.map((b: Brand) => ({
+    const data = result.data.map((b) => ({
       id: b.id,
       name: b.name,
       slug: b.slug,
@@ -466,6 +488,8 @@ export class AdminCatalogService {
       foundedYear: b.foundedYear,
       sortOrder: b.sortOrder,
       isActive: b.isActive,
+      listingCount: b.listingCount,
+      activeListingCount: b.activeListingCount,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
     }));
@@ -666,8 +690,10 @@ export class AdminCatalogService {
   async getManufacturers(
     query: AdminManufacturerQueryDto = new AdminManufacturerQueryDto(),
   ) {
-    const { search } = query;
+    const { search, status, hasListings } = query;
     const where: Prisma.ManufacturerWhereInput = {};
+    if (status === "active") where.isActive = true;
+    else if (status === "inactive") where.isActive = false;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -678,18 +704,37 @@ export class AdminCatalogService {
       ];
     }
 
+    // Markalarla aynı "İlan var/yok" filtresi.
+    Object.assign(where, hasListingsWhere(hasListings));
+
     const orderBy = resolveOrderBy<Prisma.ManufacturerOrderByWithRelationInput>(
       "Manufacturer",
       query,
-      { defaultSort: { name: "asc" } },
+      {
+        defaultSort: { name: "asc" },
+        sortMap:
+          listingCountSortMap<Prisma.ManufacturerOrderByWithRelationInput>(),
+      },
     );
-    const result = await paginate(
-      this.prisma.manufacturer,
-      { where, orderBy },
+    const include = listingCountInclude();
+    const result = await paginateWithListingCounts(
+      this.prisma,
+      "manufacturerId",
       query,
+      {
+        page: () =>
+          paginate(
+            this.prisma.manufacturer,
+            { where, orderBy, include },
+            query,
+          ),
+        all: () =>
+          this.prisma.manufacturer.findMany({ where, orderBy, include }),
+      },
     );
 
-    const data = result.data.map((m) => ({
+    // `_count` iç sayaçtır; yanıta listingCount/activeListingCount olarak çıkar.
+    const data = result.data.map(({ _count, ...m }) => ({
       ...m,
       logo: this.resolveProductImageUrl(m.logo),
     }));

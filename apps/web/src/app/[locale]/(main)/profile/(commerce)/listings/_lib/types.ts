@@ -10,6 +10,8 @@ export interface Listing {
   isOnSale?: boolean;
   discountPercent?: number | null;
   status: string;
+  /** Pasif ilanın nedeni — `expired` = ömrü doldu, tek eylemle yenilenebilir. */
+  inactiveReason?: string | null;
   /** Moderasyon reddi gerekçesi — yalnız rejected'ta dolu, kartta gösterilir. */
   rejectionReason?: string | null;
   isBoosted?: boolean;

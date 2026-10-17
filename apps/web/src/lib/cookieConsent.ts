@@ -8,6 +8,7 @@
  * panelden yapılan kayıt banner'ın tercihini bozuyordu.
  */
 
+import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import type { Translate } from "@/types/i18n";
 import { GOOGLE_ADS_ID, updateGtagConsent } from "./googleAds";
 
@@ -35,6 +36,17 @@ export const ALL_ACCEPTED: CookiePreferences = {
 
 export const CONSENT_KEY = "cookie_consent";
 export const PREFERENCES_KEY = "cookie_preferences";
+/**
+ * Rızanın verildiği Çerez Politikası sürümü. Politika değişince
+ * (`CONSENT_DOCUMENTS.cookies.version`) kayıtlı rıza geçersiz sayılır ve bant
+ * yeniden çıkar — hesap belgelerindeki yeniden-onay kuralının çerez karşılığı.
+ */
+export const CONSENT_VERSION_KEY = "cookie_consent_version";
+/**
+ * Giriş yapmamış ziyaretçinin kalıcı kimliği: sunucudaki onay kaydının sahibi.
+ * Kişisel veri değil, rastgele bir UUID; yalnız rıza kanıtı için tutulur.
+ */
+export const VISITOR_ID_KEY = "cookie_consent_visitor";
 
 /**
  * `saveConsent` her kayıttan sonra bu olayı yayar. Rızaya bağlı yüklenen
@@ -104,7 +116,7 @@ export function cookieCategories(t: Translate): CookieCategoryInfo[] {
           active: true,
         },
         {
-          name: "cookie_consent / cookie_preferences",
+          name: "cookie_consent / cookie_preferences / cookie_consent_version / cookie_consent_visitor",
           purpose: t("legal.cookies.purpose.consentRecord"),
           duration: t("legal.cookies.duration.y1"),
           active: true,
@@ -283,15 +295,46 @@ export function readPreferences(): CookiePreferences {
   }
 }
 
+/**
+ * Geçerli bir rıza var mı: verilmiş VE yürürlükteki politika sürümüne. Sürüm
+ * kaydı olmayan eski rıza da geçersizdir — bant bir kez daha çıkar ve rıza bu
+ * kez sunucuda kayda geçer.
+ */
 export function hasConsent(): boolean {
   if (typeof window === "undefined") return true;
-  return localStorage.getItem(CONSENT_KEY) === "true";
+  return isConsentCurrent(
+    localStorage.getItem(CONSENT_KEY),
+    localStorage.getItem(CONSENT_VERSION_KEY),
+  );
+}
+
+export function isConsentCurrent(
+  consent: string | null,
+  version: string | null,
+): boolean {
+  return consent === "true" && version === CONSENT_DOCUMENTS.cookies.version;
+}
+
+/** Ziyaretçi kimliği: yoksa üretilir ve saklanır. */
+export function getOrCreateVisitorId(): string {
+  const existing = localStorage.getItem(VISITOR_ID_KEY);
+  if (existing) return existing;
+  const id =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+        });
+  localStorage.setItem(VISITOR_ID_KEY, id);
+  return id;
 }
 
 /**
  * Tercihleri kalıcılaştırır: yerel depolama + sunucunun okuyabildiği çerez,
- * Consent Mode güncellemesi, reddedilen kategorilerin temizliği ve KVKK ispat
- * kaydı için sunucuya log.
+ * Consent Mode güncellemesi ve reddedilen kategorilerin temizliği. KVKK ispat
+ * kaydı (sunucudaki onay tablosu) `useCookieConsent`ta yazılır — API çağrısı
+ * hook'un işidir, bu modül yalnız tarayıcı durumunu yönetir.
  */
 export function saveConsent(input: CookiePreferences): CookiePreferences {
   const prefs: CookiePreferences = {
@@ -302,6 +345,7 @@ export function saveConsent(input: CookiePreferences): CookiePreferences {
   const serialized = JSON.stringify(prefs);
 
   localStorage.setItem(CONSENT_KEY, "true");
+  localStorage.setItem(CONSENT_VERSION_KEY, CONSENT_DOCUMENTS.cookies.version);
   localStorage.setItem(PREFERENCES_KEY, serialized);
   setCookie(CONSENT_KEY, "true", CONSENT_MAX_AGE_DAYS);
   setCookie(PREFERENCES_KEY, serialized, CONSENT_MAX_AGE_DAYS);
@@ -313,18 +357,6 @@ export function saveConsent(input: CookiePreferences): CookiePreferences {
     if (prefs[category as CookieCategory]) continue;
     names.forEach(deleteCookie);
   }
-
-  void fetch("/api/consent-log", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      type: "cookie_consent",
-      preferences: prefs,
-      userAgent: navigator.userAgent,
-    }),
-  }).catch(() => {
-    // İstemci tarafındaki rıza yine de geçerli; log en iyi çaba.
-  });
 
   return prefs;
 }

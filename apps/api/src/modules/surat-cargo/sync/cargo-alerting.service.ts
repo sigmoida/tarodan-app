@@ -4,6 +4,7 @@ import { CacheService } from "../../cache/cache.service";
 import { PrismaService } from "../../../prisma";
 import { ShipmentStatus } from "@prisma/client";
 import { notifyUser } from "./surat-tracking-support";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * CargoAlertingService (Faz 11.3a): insani senaryolar A9 + B15/D27 — bayat/kayıp
@@ -26,8 +27,15 @@ export class CargoAlertingService {
    * uyarı kanalı yakalar; alarm sonrası akış ops runbook'ta.
    */
   async alertStaleCargo(): Promise<void> {
-    const pickupDays = Number(process.env.CARGO_PICKUP_NO_DATA_DAYS) || 3;
-    const staleDays = Number(process.env.CARGO_STALE_MOVEMENT_DAYS) || 14;
+    // Eşikler Süreler ve Kurallar → operasyon alarmları (env yalnız geri düşüş).
+    const pickupDays = await resolveTimingValue(
+      this.prisma,
+      "cargoPickupNoDataDays",
+    );
+    const staleDays = await resolveTimingValue(
+      this.prisma,
+      "cargoStaleMovementDays",
+    );
     const now = Date.now();
     const pickupCutoff = new Date(now - pickupDays * 24 * 3600 * 1000);
     const staleCutoff = new Date(now - staleDays * 24 * 3600 * 1000);

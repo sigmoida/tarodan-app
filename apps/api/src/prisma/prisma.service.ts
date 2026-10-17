@@ -9,7 +9,10 @@ import { PrismaClient } from "@prisma/client";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { isProduction, isTest } from "../config/environment";
 import { errorMessage } from "../common/helpers/error-message";
-import { clearStaleInactiveReasonOnWrite } from "../modules/product/helpers/product-status.helper";
+import {
+  clearStaleInactiveReasonOnWrite,
+  clearStaleRemovalReasonOnWrite,
+} from "../modules/product/helpers/product-status.helper";
 
 const WATCHED_WRITE_ACTIONS = ["create", "update", "upsert", "delete"];
 
@@ -136,9 +139,10 @@ export class PrismaService
   }
 
   /**
-   * Single integration point for `clearStaleInactiveReasonOnWrite` (see
-   * `modules/product/helpers/product-status.helper.ts` for the rule and why
-   * it lives here rather than at each of the ~30 call sites that write
+   * Single integration point for `clearStaleInactiveReasonOnWrite` and
+   * `clearStaleRemovalReasonOnWrite` (see
+   * `modules/product/helpers/product-status.helper.ts` for the rules and why
+   * they live here rather than at each of the ~30 call sites that write
    * `Product.status`). Applies to every `Product` update/updateMany —
    * including ones issued through an interactive `$transaction`'s `tx`,
    * which shares this client's middleware stack.
@@ -149,9 +153,9 @@ export class PrismaService
         params.model === "Product" &&
         (params.action === "update" || params.action === "updateMany")
       ) {
-        clearStaleInactiveReasonOnWrite(
-          params.args?.data as Record<string, unknown> | undefined,
-        );
+        const data = params.args?.data as Record<string, unknown> | undefined;
+        clearStaleInactiveReasonOnWrite(data);
+        clearStaleRemovalReasonOnWrite(data);
       }
       return next(params);
     });

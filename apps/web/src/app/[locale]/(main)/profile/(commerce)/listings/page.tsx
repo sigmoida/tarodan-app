@@ -19,7 +19,8 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useConfirm } from "@/components/ConfirmProvider";
+import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
+import type { SellerRemovalAction } from "@/components/listings/listingRemovalSchema";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import {
@@ -28,14 +29,23 @@ import {
   useDeactivateListing,
 } from "./_hooks/useMyListings";
 import { useCommissionPreviews } from "../_hooks/useCommissionPreviews";
-import { FILTER_TABS } from "./_lib/status";
+import { EXPIRED_FILTER, FILTER_TABS } from "./_lib/status";
 import type { Listing } from "./_lib/types";
 import ListingCard from "./_components/ListingCard";
+import {
+  ExpiredListingCheckbox,
+  ExpiredListingsBanner,
+  ExpiredSelectionBar,
+} from "./_components/ExpiredListingsBar";
+import {
+  useListingSelection,
+  useRenewListing,
+  useRenewListings,
+} from "./_hooks/useRenewListings";
 import { useTranslations } from "next-intl";
 
 export default function ProfileListingsPage() {
   const t = useTranslations();
-  const confirm = useConfirm();
   const searchParams = useSearchParams();
   const { ready } = useRequireAuth();
   const user = useAuthStore((s) => s.user);
@@ -46,8 +56,20 @@ export default function ProfileListingsPage() {
     searchParams.get("status") || "all",
   );
   const [boostTarget, setBoostTarget] = useState<Listing | null>(null);
+  // Silme ve pasife alma önce NEDEN sorar; hangi ilan, hangi eylem.
+  const [removalTarget, setRemovalTarget] = useState<{
+    id: string;
+    action: SellerRemovalAction;
+  } | null>(null);
 
   const { listings, isLoading } = useMyListings(activeFilter, ready);
+  // Süresi dolan ilan sayısı her sekmede banner'ı besler; expired sekmesindeyken
+  // aynı sorgu (aynı anahtar) yeniden kullanılır.
+  const { listings: expiredListings } = useMyListings(EXPIRED_FILTER, ready);
+  const isExpiredTab = activeFilter === EXPIRED_FILTER;
+  const selection = useListingSelection(listings);
+  const renewMutation = useRenewListing();
+  const renewManyMutation = useRenewListings();
   const estimatedNets = useCommissionPreviews(
     listings.map((l) => ({
       id: l.id,
@@ -61,17 +83,10 @@ export default function ProfileListingsPage() {
 
   const pendingCount = listings.filter((l) => l.status === "pending").length;
 
-  const handleDelete = async (id: string) => {
-    const ok = await confirm({
-      title: t("profile.listingsPage.ilaniSil"),
-      description: t(
-        "profile.listingsPage.buIlaniSilmekIstediginizeEminMisiniz",
-      ),
-      confirmLabel: t("page.listings.page.sil"),
-      destructive: true,
-    });
-    if (ok) deleteMutation.mutate(id);
-  };
+  const removalMutation =
+    removalTarget?.action === "deactivate"
+      ? deactivateMutation
+      : deleteMutation;
 
   if (!ready) {
     return (
@@ -130,6 +145,29 @@ export default function ProfileListingsPage() {
         </Alert>
       )}
 
+      {expiredListings.length > 0 && !isExpiredTab && (
+        <ExpiredListingsBanner
+          count={expiredListings.length}
+          onShow={() => setActiveFilter(EXPIRED_FILTER)}
+        />
+      )}
+
+      {isExpiredTab && listings.length > 0 && (
+        <ExpiredSelectionBar
+          selectedCount={selection.selectedCount}
+          allSelected={selection.allSelected}
+          isRenewing={renewManyMutation.isPending}
+          onToggleAll={selection.toggleAll}
+          onClear={selection.clear}
+          onRenew={() =>
+            renewManyMutation.mutate(
+              listings.filter((l) => selection.selected.has(l.id)),
+              { onSuccess: selection.clear },
+            )
+          }
+        />
+      )}
+
       {isLoading ? (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
@@ -146,13 +184,19 @@ export default function ProfileListingsPage() {
       ) : listings.length === 0 ? (
         <EmptyStateCard
           title={
-            activeFilter !== "all"
-              ? t("profile.listingsPage.buFiltreyeUygunIlanYok")
-              : t("profile.listingsPage.henuzIlaninizYok")
+            isExpiredTab
+              ? t("profile.expiredListings.empty")
+              : activeFilter !== "all"
+                ? t("profile.listingsPage.buFiltreyeUygunIlanYok")
+                : t("profile.listingsPage.henuzIlaninizYok")
           }
-          description={t(
-            "profile.listingsPage.koleksiyonunuzdakiUrunleriSatisaCikarin",
-          )}
+          description={
+            isExpiredTab
+              ? t("profile.expiredListings.emptyDescription")
+              : t(
+                  "profile.listingsPage.koleksiyonunuzdakiUrunleriSatisaCikarin",
+                )
+          }
           action={
             <ButtonLink href="/listings/new">
               {t("profile.listingsPage.ilkIlaniniziOlusturun")}
@@ -162,25 +206,56 @@ export default function ProfileListingsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {listings.map((listing, index) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              index={index}
-              estimatedNet={estimatedNets[listing.id]}
-              isDeleting={
-                deleteMutation.isPending &&
-                deleteMutation.variables === listing.id
-              }
-              isDeactivating={
-                deactivateMutation.isPending &&
-                deactivateMutation.variables === listing.id
-              }
-              onDelete={handleDelete}
-              onDeactivate={(id) => deactivateMutation.mutate(id)}
-              onBoost={setBoostTarget}
-            />
+            <div key={listing.id} className="relative">
+              {isExpiredTab && (
+                <ExpiredListingCheckbox
+                  checked={selection.selected.has(listing.id)}
+                  onToggle={() => selection.toggle(listing.id)}
+                />
+              )}
+              <ListingCard
+                listing={listing}
+                index={index}
+                estimatedNet={estimatedNets[listing.id]}
+                isDeleting={
+                  deleteMutation.isPending &&
+                  deleteMutation.variables?.id === listing.id
+                }
+                isDeactivating={
+                  deactivateMutation.isPending &&
+                  deactivateMutation.variables?.id === listing.id
+                }
+                isRenewing={
+                  renewMutation.isPending &&
+                  renewMutation.variables === listing.id
+                }
+                onDelete={(id) => setRemovalTarget({ id, action: "delete" })}
+                onDeactivate={(id) =>
+                  setRemovalTarget({ id, action: "deactivate" })
+                }
+                onRenew={(id) => renewMutation.mutate(id)}
+                onBoost={setBoostTarget}
+              />
+            </div>
           ))}
         </div>
+      )}
+
+      {removalTarget && (
+        <ListingRemovalModal
+          // Her açılış taze bir form: ilan ya da eylem değişince yeniden kurulur.
+          key={`${removalTarget.action}:${removalTarget.id}`}
+          action={removalTarget.action}
+          open
+          onClose={() => setRemovalTarget(null)}
+          isSubmitting={removalMutation.isPending}
+          onSubmit={(removal) =>
+            removalMutation.mutate(
+              { id: removalTarget.id, removal },
+              { onSuccess: () => setRemovalTarget(null) },
+            )
+          }
+        />
       )}
 
       {boostTarget && (

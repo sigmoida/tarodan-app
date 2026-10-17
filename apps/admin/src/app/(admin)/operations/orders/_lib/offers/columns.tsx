@@ -1,4 +1,5 @@
 import { Badge, offerStatusConfig, orderStatusConfig } from "@tarodan/ui";
+import { TextLink } from "@/components/TextLink";
 import { EyeIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import type { useTranslations } from "next-intl";
 import { col, RowActionMenu, TruncatedText } from "@/components/table";
@@ -7,7 +8,7 @@ import { cancelReasonLabel } from "@/lib/utils";
 import { statusConfig } from "@/lib/statusLabels";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 import {
-  canCancelOffer,
+  offerCancelAction,
   offerPercentOfList,
   type OfferRow,
 } from "@/app/(admin)/operations/offers/_lib/offers";
@@ -99,12 +100,13 @@ export function offerColumns({ t, onView, onCancel }: OfferColumnProps) {
       (o) =>
         o.order ? (
           <div className="flex min-w-0 flex-col items-start gap-1">
-            <a
+            <TextLink
               href={`/operations/orders/${o.order.id}`}
-              className="font-mono text-sm text-primary-600 hover:underline"
+              mono
+              className="text-sm"
             >
               {o.order.orderNumber}
-            </a>
+            </TextLink>
             <Badge
               status={o.order.status}
               config={statusConfig(orderStatusConfig, t)}
@@ -127,11 +129,16 @@ export function offerColumns({ t, onView, onCancel }: OfferColumnProps) {
             icon: EyeIcon,
             onClick: () => onView(o),
           },
+          // Canlı siparişi olan teklifte işlem sipariş iptalidir (sepet
+          // siparişiyle aynı diyalog/uç); siparişsiz teklifte teklif iptali.
           {
-            label: t("admin.operations.offers.cancel"),
+            label:
+              offerCancelAction(o)?.kind === "order"
+                ? t("admin.operations.orders.cancel.action")
+                : t("admin.operations.offers.cancel"),
             icon: XCircleIcon,
             destructive: true,
-            disabled: !canCancelOffer(o),
+            disabled: !offerCancelAction(o),
             onClick: () => onCancel(o),
           },
         ]}

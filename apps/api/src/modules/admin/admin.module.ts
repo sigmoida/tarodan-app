@@ -21,6 +21,8 @@ import { AdminCatalogController } from "./catalog/admin-catalog.controller";
 import { AdminTaxController } from "./finance/admin-tax.controller";
 import { AdminCollectionController } from "./catalog/admin-collection.controller";
 import { AdminAdvertisementController } from "./catalog/admin-advertisement.controller";
+import { AdminHeroController } from "./catalog/admin-hero.controller";
+import { AdminHeroService } from "./catalog/admin-hero.service";
 import { AdminShippingController } from "./orders/admin-shipping.controller";
 import { AdminLogsController } from "./analytics/admin-logs.controller";
 import { AdminReviewController } from "./ops/admin-review.controller";
@@ -34,6 +36,7 @@ import { AdminPspReconciliationService } from "./finance/admin-psp-reconciliatio
 import { AdminMediaService } from "./catalog/admin-media.service";
 import { AdminMediaController } from "./catalog/admin-media.controller";
 import { AdminAuditService } from "./ops/admin-audit.service";
+import { ExportListService } from "../../common/export/export-list.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminSiteAccessService } from "./users/admin-site-access.service";
@@ -43,9 +46,25 @@ import { AdminUserService } from "./users/admin-user.service";
 import { UserModule } from "../user/user.module";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
+import { AdminConsentService } from "./users/admin-consent.service";
+import { AdminConsentController } from "./users/admin-consent.controller";
+import { AdminLegalIdentityService } from "./users/admin-legal-identity.service";
+import { AdminLegalIdentityController } from "./users/admin-legal-identity.controller";
+import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
+import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
+import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
+import { ConsentModule } from "../consent/consent.module";
+import { TimingRulesModule } from "../timing-rules/timing-rules.module";
+import { AdminTimingRulesService } from "./ops/admin-timing-rules.service";
+import { AdminTimingRulesController } from "./ops/admin-timing-rules.controller";
+import { AdminMailRoutingService } from "./ops/admin-mail-routing.service";
+import { AdminMailRoutingController } from "./ops/admin-mail-routing.controller";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
+import { AdminExpiredListingsService } from "./catalog/admin-expired-listings.service";
+import { AdminProductRenewalService } from "./catalog/admin-product-renewal.service";
+import { AdminVoucherCodeExportService } from "./catalog/admin-voucher-code-export.service";
 import {
   ProductImportBatchProcessor,
   ProductImportBatchScheduler,
@@ -63,10 +82,12 @@ import { AnalyticsMembershipService } from "./analytics/insights/analytics-membe
 import { AnalyticsExportService } from "./analytics/insights/analytics-export.service";
 import { AdminDashboardWorklistService } from "./analytics/dashboard/admin-dashboard-worklist.service";
 import { AdminDashboardStockService } from "./analytics/dashboard/admin-dashboard-stock.service";
+import { AdminDashboardRemovalsService } from "./analytics/dashboard/admin-dashboard-removals.service";
 import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
 import { AdminPayoutService } from "./finance/admin-payout.service";
+import { AdminPayoutExportService } from "./finance/admin-payout-export.service";
 import { AdminFinanceService } from "./finance/admin-finance.service";
 import { AdminTradeService } from "./trade/admin-trade.service";
 import { AdminTradeCommonService } from "./trade/admin-trade-common.service";
@@ -77,7 +98,9 @@ import { AdminOfferService } from "./orders/admin-offer.service";
 import { AdminOrderCancelService } from "./orders/admin-order-cancel.service";
 import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.service";
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
+import { AdminTradeCancelService } from "./trade/admin-trade-cancel.service";
 import { AdminRefundService } from "./orders/admin-refund.service";
+import { AdminRefundListService } from "./orders/admin-refund-list.service";
 import { AdminMessagingService } from "./ops/admin-messaging.service";
 import { AdminSupportService } from "./ops/admin-support.service";
 import { AdminContentService } from "./catalog/admin-content.service";
@@ -115,17 +138,21 @@ import { SupportModule } from "../support";
 import { SearchModule } from "../search/search.module";
 import { CacheModule } from "../cache";
 import { AdvertisementModule } from "../advertisement/advertisement.module";
+import { HeroModule } from "../hero/hero.module";
 import { MediaModule } from "../media/media.module";
 import { DiscountModule } from "../discount/discount.module";
 import { EventModule } from "../events/event.module";
+import { MarketingModule } from "../marketing/marketing.module";
 import { StorageModule } from "../storage/storage.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { RatingModule } from "../rating/rating.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { RefundModule } from "../refund/refund.module";
 import { NotificationModule } from "../notification/notification.module";
+import { PushTokenModule } from "../notification/push-token/push-token.module";
 import { OrderModule } from "../order/order.module";
-import { ElogoModule } from "../elogo/elogo.module";
+import { OfferModule } from "../offer/offer.module";
+import { InvoicingModule } from "../invoicing/invoicing.module";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { TradeModule } from "../trade/trade.module";
 import { CommissionModule } from "../commission/commission.module";
@@ -145,18 +172,26 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     SearchModule,
     CacheModule,
     AdvertisementModule,
+    // Vitrin hero'su + güven rozetleri: yazma domain servisinden, denetim burada.
+    HeroModule,
     MediaModule,
     DiscountModule,
     EventModule,
+    // NewsletterService: pazarlama e-postası alıcıları + çıkış token'ları.
+    MarketingModule,
     StorageModule,
     RatingModule,
     SuratCargoModule,
     RefundModule,
     NotificationModule,
+    // Yasaklamada push token'ları pasifleştirme (AdminStaffService.banUser).
+    PushTokenModule,
     OrderModule,
+    // extend_once kuralı (teklifin görünen durumu) — OfferExtensionPolicy.
+    OfferModule,
     UserModule,
     ModerationModule,
-    ElogoModule,
+    InvoicingModule,
     ShippingTariffModule,
     // Depo adresi tek kaynağı — AdminTradeCommonService buna delege eder.
     WarehouseAddressModule,
@@ -165,6 +200,12 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     MembershipModule,
     ProductModule,
     SiteAccessModule,
+    // Onay Kayıtları ekranı: üye durumu domain servisinden okunur.
+    ConsentModule,
+    // Yasal kimlik düzeltmesi: yazım domain servisinden, denetim burada.
+    LegalIdentityModule,
+    // Süreler ve Kurallar ekranı: yazma domain servisinden, denetim burada.
+    TimingRulesModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
@@ -174,6 +215,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminCommissionController,
     AdminUserController,
     AdminDeletedIdentityController,
+    AdminConsentController,
+    AdminLegalIdentityController,
+    AdminGibReportController,
     AdminProductController,
     AdminOrderController,
     AdminAnalyticsController,
@@ -196,27 +240,41 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTaxController,
     AdminCollectionController,
     AdminAdvertisementController,
+    AdminHeroController,
     AdminShippingController,
     AdminLogsController,
     AdminReviewController,
     AdminSellerApplicationController,
     AdminAdPackageController,
     AdminSiteAccessController,
+    AdminTimingRulesController,
+    AdminMailRoutingController,
   ],
   providers: [
     AdminService,
     AdminPspReconciliationService,
     AdminMediaService,
     AdminAuditService,
+    // Admin Excel dökümlerinin tek hattı (common/export) — denetimi AdminAuditService ile yazar.
+    ExportListService,
     AdminCommissionService,
     AdminSettingsService,
+    AdminTimingRulesService,
+    // Mail Yönlendirme: domain servisleri MailRoutingModule'den (@Global).
+    AdminMailRoutingService,
     AdminSiteAccessService,
     AdminUserService,
     AdminUserAccountService,
     AdminDeletedIdentityService,
+    AdminConsentService,
+    AdminLegalIdentityService,
+    AdminGibReportService,
     AdminStaffService,
     AdminProductService,
     AdminProductBulkImportService,
+    AdminExpiredListingsService,
+    AdminProductRenewalService,
+    AdminVoucherCodeExportService,
     AdminOrderService,
     AdminCancellationService,
     AdminAnalyticsService,
@@ -230,10 +288,12 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AnalyticsExportService,
     AdminDashboardWorklistService,
     AdminDashboardStockService,
+    AdminDashboardRemovalsService,
     AdminAnalyticsOrderService,
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,
+    AdminPayoutExportService,
     AdminFinanceService,
     AdminTradeService,
     AdminTradeCommonService,
@@ -243,7 +303,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminOrderCancelService,
     AdminTradeWarehouseService,
     AdminTradeResolutionService,
+    AdminTradeCancelService,
     AdminRefundService,
+    AdminRefundListService,
     AdminMessagingService,
     AdminSupportService,
     AdminContentService,
@@ -264,6 +326,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminReviewService,
     AdminSellerApplicationService,
     AdminAdPackageService,
+    AdminHeroService,
     ScheduledNotificationScheduler,
     ...scheduledProcessors(ScheduledNotificationProcessor),
     LogRetentionService,

@@ -1,4 +1,5 @@
 import { TradeTrackingSyncService } from "./sync/trade-tracking-sync.service";
+import { buildSimulatedSuratReading } from "./helpers/surat-simulated-reading";
 import { ShipmentStatus, TradeStatus } from "@prisma/client";
 
 /**
@@ -65,6 +66,7 @@ describe("TradeTrackingSyncService", () => {
           client as any,
         ),
         prisma,
+        client,
         notifyTradeShipped,
       };
     };
@@ -103,6 +105,62 @@ describe("TradeTrackingSyncService", () => {
       await service.syncTradeShipmentTracking("trade-shipment-1");
 
       expect(notifyTradeShipped).not.toHaveBeenCalled();
+    });
+
+    // UAT kargo simülasyonu: Sürat'a sorulmaz, okuma poll'la AYNI çekirdeğe gider.
+    it("simüle kabul (applyCarrierReading) poll ile aynı CAS'i yazar ve aynı bildirimi atar", async () => {
+      const { service, prisma, client, notifyTradeShipped } = makeService();
+
+      await expect(
+        service.applyCarrierReading(
+          "trade-shipment-1",
+          buildSimulatedSuratReading({
+            step: "picked_up",
+            carrierCode: "STUB-TRADE-1",
+            at: new Date("2026-10-05T10:00:00.000Z"),
+          }),
+        ),
+      ).resolves.toBe("synced");
+
+      expect(client.lookupTracking).not.toHaveBeenCalled();
+      expect(prisma.tradeShipment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "trade-shipment-1",
+          status: ShipmentStatus.label_created,
+          shippedAt: null,
+        },
+        data: expect.objectContaining({
+          status: ShipmentStatus.picked_up,
+          providerTrackingId: "STUB-TRADE-1",
+          shippedAt: expect.any(Date),
+        }),
+      });
+      expect(notifyTradeShipped).toHaveBeenCalledWith(
+        "receiver-1",
+        "trade-1",
+        "STUB-TRADE-1",
+      );
+    });
+
+    it("simülasyon Sürat dışı bacağı poll gibi yok sayar", async () => {
+      const { service, prisma } = makeService();
+      prisma.tradeShipment.findUnique.mockResolvedValue({
+        id: "trade-shipment-1",
+        carrier: "manual",
+        trackingNumber: "X",
+      });
+
+      await expect(
+        service.applyCarrierReading(
+          "trade-shipment-1",
+          buildSimulatedSuratReading({
+            step: "delivered",
+            carrierCode: "X",
+            at: new Date(),
+          }),
+        ),
+      ).resolves.toBe("ignored");
+      expect(prisma.tradeShipment.updateMany).not.toHaveBeenCalled();
     });
   });
 

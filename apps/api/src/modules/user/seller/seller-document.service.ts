@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { SellerDocumentType } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
@@ -12,6 +13,11 @@ import {
   UpdateCorporateApplicationDto,
 } from "../dto";
 import { i18nMessage } from "../../i18n";
+import { loadSafeSharp } from "../../../common/image/sharp-safety";
+import {
+  stripImageMetadata,
+  UnsupportedImageError,
+} from "../../../common/image/strip-image-metadata";
 
 /** All corporate-seller document slots, in display order. */
 export const SELLER_DOCUMENT_TYPES: SellerDocumentType[] = [
@@ -67,6 +73,36 @@ export class SellerDocumentService {
     return application;
   }
 
+  /**
+   * Belge GÖRSELİNİN EXIF/GPS meta verisi silinir (yön korunur) — kimlik
+   * fotoğrafı çeken telefonun konumu depoya gitmesin. PDF olduğu gibi kalır.
+   * Biçim içerikten belirlenir; çözülemeyen/SVG görsel 400.
+   */
+  private async prepareDocumentFile(
+    file: Express.Multer.File,
+  ): Promise<{ buffer: Buffer; mimeType: string }> {
+    if (file.mimetype === "application/pdf") {
+      return { buffer: file.buffer, mimeType: file.mimetype };
+    }
+    const sharpLib = loadSafeSharp();
+    if (!sharpLib) {
+      throw new ServiceUnavailableException(
+        i18nMessage("server.media.processingUnavailable"),
+      );
+    }
+    try {
+      const prepared = await stripImageMetadata(sharpLib, file.buffer);
+      return { buffer: prepared.buffer, mimeType: prepared.mimeType };
+    } catch (error) {
+      if (error instanceof UnsupportedImageError) {
+        throw new BadRequestException(
+          i18nMessage("server.user.documentFormats"),
+        );
+      }
+      throw error;
+    }
+  }
+
   async uploadDocument(
     userId: string,
     documentType: SellerDocumentType,
@@ -120,14 +156,15 @@ export class SellerDocumentService {
       }
     }
 
-    const ext = file.mimetype === "application/pdf" ? "pdf" : "img";
+    const prepared = await this.prepareDocumentFile(file);
+    const ext = prepared.mimeType === "application/pdf" ? "pdf" : "img";
     const up = await this.storage.uploadFile(
-      file.buffer,
+      prepared.buffer,
       {
         bucket: "documents",
         folder: "seller-documents",
         filename: `${userId}-${documentType}-${Date.now()}.${ext}`,
-        mimeType: file.mimetype,
+        mimeType: prepared.mimeType,
         isPublic: false,
         entityType: "seller_document",
         entityId: userId,
@@ -160,8 +197,8 @@ export class SellerDocumentService {
           documentType,
           s3Key: up.key,
           fileName: file.originalname,
-          mimeType: file.mimetype,
-          size: file.size,
+          mimeType: prepared.mimeType,
+          size: prepared.buffer.length,
           version: (previous?.version ?? 0) + 1,
           supersedesId: previous?.id,
         },

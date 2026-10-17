@@ -5,6 +5,7 @@ import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { useDashboardPeriod } from "./_lib/useDashboardPeriod";
 import {
+  useDashboardListingRemovals,
   useDashboardLists,
   useDashboardStats,
   useDashboardStock,
@@ -18,6 +19,8 @@ import { DashboardRefreshButton } from "./_components/DashboardRefreshButton";
 import { QueuesZone } from "./_components/QueuesZone";
 import { AlertsZone } from "./_components/AlertsZone";
 import { DashboardStats } from "./_components/DashboardStats";
+import { ListingRemovalsPanel } from "./_components/ListingRemovalsPanel";
+import { ZoneHeader } from "./_components/ZoneHeader";
 import { StockZone } from "./_components/StockZone";
 import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
@@ -41,21 +44,28 @@ function PeriodZone({
 }) {
   const t = useTranslations();
   const stats = useDashboardStats(selection);
+  const removals = useDashboardListingRemovals(selection);
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-heading">
-          {t("admin.dashboard.zones.period")}
-        </h2>
-        <DashboardPeriodFilter
-          selection={selection}
-          onChange={onSelectionChange}
-        />
-      </div>
+      <ZoneHeader
+        title={t("admin.dashboard.zones.period")}
+        actions={
+          <DashboardPeriodFilter
+            selection={selection}
+            onChange={onSelectionChange}
+          />
+        }
+      />
       <DashboardStats
         metrics={stats.data?.metrics ?? EMPTY_METRICS}
         isLoading={stats.isLoading}
+      />
+      {/* Same period, same event-stamp counting: a flow, so it belongs here. */}
+      <ListingRemovalsPanel
+        data={removals.data}
+        isLoading={removals.isLoading}
+        isError={removals.isError}
       />
     </section>
   );

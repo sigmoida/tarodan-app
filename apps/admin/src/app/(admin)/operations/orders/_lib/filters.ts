@@ -38,11 +38,13 @@ export const orderFilterFields = (t: TranslateFn): FilterField[] => [
 
 /**
  * Kontrolü olmayan deep-link parametreleri: kullanıcı / ürün detayından gelen
- * kapsam ve eski `?status=` bağlantıları (finans özetinin "teslim edilen").
+ * kapsam, eski `?status=` bağlantıları (finans özetinin "teslim edilen") ve
+ * dashboard'un `?shippedBefore=<iso>` ("uzun süredir kargoda") uyarısı.
  */
 export const ORDER_DEEP_LINK_FILTERS = {
   userId: "",
   userRole: "",
   productId: "",
   status: "",
+  shippedBefore: "",
 };

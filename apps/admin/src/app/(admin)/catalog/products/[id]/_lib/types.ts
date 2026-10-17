@@ -11,10 +11,11 @@ export const PACKAGE_TIER_OPTIONS = [
   labelKey: string;
 }>;
 
-import { useTranslations } from "next-intl";
 import type { ListingEditPayload } from "@tarodan/listing-form";
-
-type T = ReturnType<typeof useTranslations<never>>;
+import type {
+  AdminListingRemovalEvent,
+  AdminListingRemovalSummary,
+} from "@tarodan/types";
 
 export interface ProductDetail {
   id: string;
@@ -41,6 +42,8 @@ export interface ProductDetail {
   carModel?: { id: string; name: string } | null;
   manufacturer?: { id: string; name: string } | null;
   status: string;
+  /** Pasif ilanın kapanış nedeni (`expired` = süresi doldu); aksi hâlde null. */
+  inactiveReason?: string | null;
   category: { id: string; name: string };
   seller: { id: string; displayName: string; email: string };
   images: Array<{ id: string; url: string; sortOrder: number }>;
@@ -59,6 +62,13 @@ export interface ProductDetail {
   edit?: Pick<ListingEditPayload, "attributes"> | null;
   /** Ürüne verilen toplam teklif sayısı (tüm durumlar) — hızlı link rozeti. */
   _count?: { offers: number };
+  /** Güncel kaldırma özeti; vitrindeki ilan için `null`. */
+  removal?: AdminListingRemovalSummary | null;
+  /**
+   * Kaldırma geçmişi (yeniden eskiye) — satıcının serbest metni DAHİL; yalnız
+   * bu admin ucu döndürür.
+   */
+  removalHistory?: AdminListingRemovalEvent[];
 }
 
 export interface Review {
@@ -73,43 +83,3 @@ export interface Review {
   isVerifiedPurchase: boolean;
   user: { id: string; displayName: string; email: string; avatarUrl?: string };
 }
-
-export const productStatusConfig = (
-  t: T,
-): Record<string, { label: string; color: string; bg: string }> => ({
-  pending: {
-    label: t("common.pending"),
-    color: "text-warning-600",
-    bg: "bg-warning-100",
-  },
-  active: {
-    label: t("common.active"),
-    color: "text-success-600",
-    bg: "bg-success-100",
-  },
-  inactive: {
-    label: t("common.inactive"),
-    color: "text-muted",
-    bg: "bg-surface-alt",
-  },
-  rejected: {
-    label: t("common.rejected"),
-    color: "text-danger-600",
-    bg: "bg-danger-100",
-  },
-  reserved: {
-    label: t("admin.catalog.products.statusReserved"),
-    color: "text-info-600",
-    bg: "bg-info-100",
-  },
-  sold: {
-    label: t("admin.catalog.products.statusSold"),
-    color: "text-primary-600",
-    bg: "bg-primary-100",
-  },
-  deleted: {
-    label: t("admin.catalog.products.statusDeleted"),
-    color: "text-danger-600",
-    bg: "bg-danger-100",
-  },
-});

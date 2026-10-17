@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { MediaService } from "./media.service";
 import { MediaController } from "./media.controller";
+import { MediaOutboxHandlers } from "./media-outbox-handlers.service";
 import { MediaCleanupService } from "./jobs/media-cleanup.service";
 import {
   MediaCleanupSchedulerService,
@@ -11,6 +12,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { MembershipModule } from "../membership/membership.module";
 import { StorageModule } from "../storage/storage.module";
 import { ModerationModule } from "../moderation/moderation.module";
+import { MessageAttachmentAccessModule } from "../messaging/attachment-access/message-attachment-access.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
@@ -20,11 +22,15 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     MembershipModule,
     StorageModule,
     ModerationModule,
+    // Mesaj eki okuma yetkisi (mesaj alıcısı). Yaprak modül — döngü yok.
+    MessageAttachmentAccessModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [MediaController],
   providers: [
     MediaService,
+    // Hesap silmede avatar nesnesi (outbox, commit sonrası).
+    MediaOutboxHandlers,
     MediaCleanupService,
     MediaCleanupSchedulerService,
     ...scheduledProcessors(MediaScheduledProcessor),

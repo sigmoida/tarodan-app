@@ -9,6 +9,8 @@ import {
 import { PrismaService } from "../../prisma";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { ContentFilterService } from "./content-filter.service";
+import { extractImageMarkerTargets } from "./helpers/message-image-markers.helper";
+import { MediaService } from "../media/media.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { RealtimeService } from "../websocket/realtime.service";
@@ -47,6 +49,7 @@ export class MessagingService {
     private readonly storageService: StorageService,
     private readonly realtime: RealtimeService,
     private readonly userBlocks: UserBlockService,
+    private readonly mediaService: MediaService,
   ) {}
 
   private async resolveAvatarUrl(
@@ -148,6 +151,11 @@ export class MessagingService {
       return this.getThreadById(thread.id, senderId);
     }
 
+    // Silinmiş hesapla YENİ konu açılmaz. Var olan konu yukarıda döner:
+    // "satıcıya yaz" gibi mesajsız açılışlar geçmişe ulaşabilsin; mesaj
+    // gönderimini sendMessage ayrıca reddeder.
+    this.assertRecipientActive(recipient);
+
     // Create new thread
     thread = await this.prisma.messageThread.create({
       data: {
@@ -225,7 +233,15 @@ export class MessagingService {
         ? thread.participant2Id
         : thread.participant1Id;
 
+    // Var olan konuda karşı taraf sonradan hesabını silmiş olabilir.
+    this.assertRecipientActive(
+      await this.prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { deletedAt: true },
+      }),
+    );
     await this.assertNotBlocked(senderId, receiverId);
+    await this.assertImageMarkersAllowed(dto.content, senderId);
 
     // Apply content filtering
     const filterResult = await this.contentFilterService.moderateWithAI(
@@ -457,6 +473,48 @@ export class MessagingService {
   /** İki yönlü engel varsa konu açma/okuma/yazma 403 (Apple: abuse stop). */
   private assertNotBlocked(a: string, b: string): Promise<void> {
     return this.userBlocks.assertNotBlocked(a, b, "server.messaging.blocked");
+  }
+
+  /**
+   * Gövdedeki her `[IMG:…]` işareti göndericinin KENDİ yüklediği mesaj ekini
+   * göstermeli; aksi 400. İstemciler işaretin hedefini alıcının oturum
+   * jetonuyla yükler — harici bir URL jeton sızdırır/izleme pikseli olur.
+   * Sessizce ayıklamak yerine reddediyoruz: meşru istemci bu biçimin dışına
+   * hiç çıkmaz, gövdeyi değiştirmek ise kullanıcının yazdığını bozar.
+   */
+  private async assertImageMarkersAllowed(
+    content: string,
+    senderId: string,
+  ): Promise<void> {
+    const targets = extractImageMarkerTargets(content);
+    if (targets.length === 0) return;
+    const invalid = await this.mediaService.findInvalidMessageAttachmentTargets(
+      targets,
+      senderId,
+    );
+    if (invalid.length > 0) {
+      this.logger.warn(
+        `Rejected message with ${invalid.length} invalid image marker(s) from user ${senderId}`,
+      );
+      throw new BadRequestException(
+        i18nMessage("server.messaging.invalidImageAttachment"),
+      );
+    }
+  }
+
+  /**
+   * Silinmiş (anonimleşmiş) hesapla yeni konu açılamaz, mesaj gönderilemez.
+   * Engelli alıcıyla aynı tür (403): istemciler ikisini de "mesajlaşılamaz"
+   * olarak gösterir. Var olan konu açılabilir ve okunabilir kalır.
+   */
+  private assertRecipientActive(
+    recipient: { deletedAt: Date | null } | null,
+  ): void {
+    if (!recipient || recipient.deletedAt) {
+      throw new ForbiddenException(
+        i18nMessage("server.messaging.recipientDeleted"),
+      );
+    }
   }
 
   // ==========================================================================

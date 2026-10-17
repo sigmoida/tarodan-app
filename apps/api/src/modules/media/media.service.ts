@@ -4,8 +4,10 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { ResizeOptions, Sharp, WebpOptions } from "sharp";
 import { v4 as uuidv4 } from "uuid";
 import { MembershipService } from "../membership/membership.service";
 import { PrismaService } from "../../prisma";
@@ -23,15 +25,32 @@ import {
   configureSharpSafety,
   isBlockedSharpMimeType,
 } from "../../common/image/sharp-safety";
+import {
+  stripImageMetadata,
+  UnsupportedImageError,
+} from "../../common/image/strip-image-metadata";
 import { i18nMessage } from "../i18n";
+import {
+  isMessageAttachmentId,
+  messageAttachmentIdFromUrl,
+  messageAttachmentUrl,
+} from "./helpers/message-attachment-url";
+import { MessageAttachmentAccessService } from "../messaging/attachment-access/message-attachment-access.service";
+import type { RequestUser } from "../auth/interfaces/jwt-payload.interface";
+
+/**
+ * sharp modülünün KENDİ tipi. `require` `any` döndürür; açıkça bağlanmazsa
+ * boyutlandırma/kodlama seçeneklerini derleyici hiç denetlemez.
+ */
+type SharpFactory = typeof import("sharp");
 
 // Sharp is optional - image resizing will be skipped if not available.
 // Yükleme hatası SESSİZCE yutulmasın: staging'de imaj sharp'sız çıktığında tek
 // gördüğümüz 400 cevabıydı, neden bilgisi yoktu — nedeni sakla ve logla.
-let sharp: any;
+let sharp: SharpFactory | null;
 let sharpLoadError: string | null = null;
 try {
-  sharp = configureSharpSafety(require("sharp"));
+  sharp = configureSharpSafety(require("sharp") as SharpFactory);
 } catch (e: any) {
   sharp = null;
   sharpLoadError = e?.message ?? String(e);
@@ -40,16 +59,63 @@ try {
   console.error(`[MediaService] sharp failed to load: ${sharpLoadError}`);
 }
 
+/** Tek görsel türevi: boyutlandırma + WebP kodlaması (sharp'ın kendi tipleri). */
+interface ImageVariant {
+  resize: ResizeOptions;
+  webp: WebpOptions;
+}
+
+/** Ürün detay türevi: en çok 1200 px, oran korunur. */
+const PRODUCT_DETAIL_VARIANT = {
+  resize: { width: 1200, height: 1200, fit: "inside" },
+  webp: { quality: 90 },
+} satisfies ImageVariant;
+
+/** Ürün kart türevi: 500×500 kırpılmış. */
+const PRODUCT_CARD_VARIANT = {
+  resize: { width: 500, height: 500, fit: "cover" },
+  webp: { quality: 85 },
+} satisfies ImageVariant;
+
+/** Koleksiyon kapağı: 1200×600 kırpılmış. */
+const COLLECTION_COVER_VARIANT = {
+  resize: { width: 1200, height: 600, fit: "cover" },
+  webp: { quality: 85 },
+} satisfies ImageVariant;
+
+/**
+ * Uuid adlı, üzerine asla yazılmayan WebP türevlerinin depo seçenekleri — ürün
+ * kartı/detayı ve koleksiyon kapağı aynısını kullanır. Tipi depo servisinin
+ * kendi `UploadOptions`'ından gelir.
+ */
+const IMMUTABLE_WEBP_UPLOAD = {
+  mimeType: "image/webp",
+  contentType: "image/webp",
+  cacheControl: "public, max-age=31536000, immutable",
+  skipMediaFile: true,
+} satisfies Partial<StorageUploadOptions>;
+
+/** Türevi uygular: boyutlandır + WebP. Yönlendirme (autoOrient) çağıranın işidir. */
+function encodeVariant(
+  pipeline: Sharp,
+  variant: ImageVariant,
+): Promise<Buffer> {
+  return pipeline.resize(variant.resize).webp(variant.webp).toBuffer();
+}
+
 export interface UploadOptions {
   bucket?: StorageBucketType;
   folder?: string;
   maxSize?: number;
   allowedTypes?: string[];
-  resize?: {
-    width?: number;
-    height?: number;
-    fit?: "cover" | "contain" | "fill" | "inside" | "outside";
-  };
+  /**
+   * sharp'ın kendi `ResizeOptions` alanları. `withoutEnlargement`: "en çok şu
+   * kadar" sınırı — küçük görsel büyütülmez (bulanıklaşmasın).
+   */
+  resize?: Pick<
+    ResizeOptions,
+    "width" | "height" | "fit" | "withoutEnlargement"
+  >;
   generateThumbnail?: boolean;
   entityType?: string;
   entityId?: string;
@@ -76,7 +142,24 @@ export class MediaService {
     private membershipService: MembershipService,
     private storageService: StorageService,
     private prisma: PrismaService,
+    private attachmentAccess: MessageAttachmentAccessService,
   ) {}
+
+  /**
+   * Yüklenmiş sharp'ı döner; yüklenemediyse nedenini loglayıp 400 verir.
+   * Görsel türevi üreten her uç bu kapıdan geçer.
+   */
+  private requireSharp(action: "upload" | "rotate"): SharpFactory {
+    if (!sharp) {
+      this.logger.error(
+        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image ${action} rejected`,
+      );
+      throw new BadRequestException(
+        "Image processing (sharp) is not available",
+      );
+    }
+    return sharp;
+  }
 
   /**
    * Faz 0: private mesaj ekinin KALICI istemci URL'si — public S3 URL yerine
@@ -84,26 +167,82 @@ export class MediaService {
    * yönlendirilir (getMessageAttachmentPresignedUrl).
    */
   buildMessageAttachmentUrl(mediaFileId: string): string {
-    const apiUrl = (
-      this.configService.get<string>("API_URL") || "http://localhost:3001"
-    ).replace(/\/$/, "");
-    return `${apiUrl}/api/media/message-attachment/${mediaFileId}`;
+    return messageAttachmentUrl(
+      this.configService.get<string>("API_URL") || "http://localhost:3001",
+      mediaFileId,
+    );
+  }
+
+  /**
+   * Mesaj gövdesindeki `[IMG:…]` hedeflerinden GEÇERSİZ olanları döner (boş
+   * dizi = hepsi geçerli). Geçerli hedef: bu sunucunun `buildMessageAttachmentUrl`
+   * ile BİREBİR ürettiği URL + `messages` kökünde, GÖNDERİCİNİN yüklediği bir
+   * MediaFile. Başka her şey (harici URL, çıplak key, başka kullanıcının eki,
+   * başka bucket) reddedilir — alıcının istemcisi bu görseli kendi oturum
+   * jetonuyla yükler.
+   *
+   * Konu (thread) bağı denetlenemez: ek, mesajdan ÖNCE yüklenir ve MediaFile
+   * konu bilgisi taşımaz; sahiplik göndericiyle sınırlanır.
+   */
+  async findInvalidMessageAttachmentTargets(
+    targets: string[],
+    uploaderId: string,
+  ): Promise<string[]> {
+    const idByTarget = new Map<string, string | null>();
+    for (const target of targets) {
+      const id = messageAttachmentIdFromUrl(target);
+      idByTarget.set(
+        target,
+        id && this.buildMessageAttachmentUrl(id) === target ? id : null,
+      );
+    }
+
+    const ids = [
+      ...new Set(
+        [...idByTarget.values()].filter((id): id is string => id !== null),
+      ),
+    ];
+    const owned = ids.length
+      ? await this.prisma.mediaFile.findMany({
+          where: { id: { in: ids }, bucket: "messages", uploaderId },
+          select: { id: true },
+        })
+      : [];
+    const ownedIds = new Set(owned.map((file) => file.id));
+
+    return targets.filter((target) => {
+      const id = idByTarget.get(target);
+      return !id || !ownedIds.has(id);
+    });
   }
 
   /**
    * Mesaj ekini presigned URL'e çözer. Yalnız `messages` kökündeki dosyalar —
-   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez. Çağıran
-   * controller JWT zorunlu kılar; uuid tahmin edilemezliği + kısa süreli
-   * presigned ile birlikte erişim modeli budur (thread-üyeliği denetimi v2).
+   * bu uç üzerinden başka bucket'lara (fatura vb.) erişilemez.
+   *
+   * Erişim: yükleyen ya da eki taşıyan mesajın alıcısı
+   * (`MessageAttachmentAccessService`). Bu uç kullanıcı JWT'si ister; admin
+   * erişimi şimdilik kapsam dışı. Yetkisiz istek de 404 alır (403
+   * değil) — id yoklayarak bir ekin VARLIĞI öğrenilemesin.
    */
-  async getMessageAttachmentPresignedUrl(mediaFileId: string): Promise<string> {
+  async getMessageAttachmentPresignedUrl(
+    mediaFileId: string,
+    requester: Pick<RequestUser, "id">,
+  ): Promise<string> {
+    const notFound = () =>
+      new NotFoundException(i18nMessage("server.media.fileNotFound"));
+    if (!isMessageAttachmentId(mediaFileId)) throw notFound();
+
     const file = await this.prisma.mediaFile.findUnique({
       where: { id: mediaFileId },
-      select: { key: true, bucket: true },
+      select: { id: true, key: true, bucket: true, uploaderId: true },
     });
-    if (!file || file.bucket !== "messages") {
-      throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
+    if (!file || file.bucket !== "messages") throw notFound();
+
+    if (!(await this.attachmentAccess.canRead(file, requester.id))) {
+      throw notFound();
     }
+
     return this.storageService.getPresignedDownloadUrl(
       "messages",
       file.key,
@@ -141,20 +280,45 @@ export class MediaService {
       );
     }
 
-    // Generate unique filename
-    const ext = file.originalname.split(".").pop();
-    const filename = `${uuidv4()}.${ext}`;
+    // Public kökün kalıcı URL'i `S3_PUBLIC_BASE_URL`'den kurulur. Tanımsızsa
+    // nesne yüklenip `url: ""` dönüyor, istemci boş URL'i kaydediyordu
+    // (reklam görseli kırık kalıyordu). Yüklemeden ÖNCE açık 503 ver; aşağıdaki
+    // try bloğu her hatayı 400'e çevirdiği için kontrol onun dışında.
+    if (
+      isPublicBucket(bucket) &&
+      !this.storageService.hasPublicAssetBaseUrl()
+    ) {
+      throw new ServiceUnavailableException(
+        i18nMessage("server.storage.publicUrlNotConfigured"),
+      );
+    }
+
+    // Görsel her yolda sharp'tan geçer (meta veri silme dahil); sharp yoksa
+    // ham dosyayı (GPS'iyle) yüklemek yerine açık hata — ürün görseli yolu
+    // da aynı kapıyı kullanır. Try'ın dışında: nedeni 400'e gömülmesin.
+    const sharpLib = file.mimetype.startsWith("image/")
+      ? this.requireSharp("upload")
+      : null;
 
     try {
       let buffer = file.buffer;
+      let mimeType = file.mimetype;
+      let ext = file.originalname.split(".").pop();
 
-      // Process image if resize options provided and sharp is available
-      if (resize && file.mimetype.startsWith("image/") && sharp) {
-        buffer = await sharp(buffer)
-          .autoOrient()
-          .resize(resize.width, resize.height, { fit: resize.fit || "cover" })
-          .toBuffer();
+      if (sharpLib) {
+        // EXIF/GPS silinir, yön uygulanır, istenirse boyutlandırılır. Biçim
+        // İÇERİKTEN belirlenir (istemci MIME'ı keyfi): JPEG/PNG/WebP kalır,
+        // başka raster JPEG olur → depodaki tür/uzantı gerçeğe göre yazılır.
+        const prepared = await stripImageMetadata(sharpLib, buffer, {
+          resize,
+        });
+        buffer = prepared.buffer;
+        mimeType = prepared.mimeType;
+        ext = prepared.extension;
       }
+
+      // Generate unique filename
+      const filename = `${uuidv4()}.${ext}`;
 
       // Upload main file using StorageService
       const uploadResult = await this.storageService.uploadFile(
@@ -163,7 +327,7 @@ export class MediaService {
           bucket,
           folder,
           filename,
-          mimeType: file.mimetype,
+          mimeType,
           entityType,
           entityId,
         },
@@ -200,9 +364,9 @@ export class MediaService {
       }
 
       // Generate thumbnail if requested and sharp is available
-      if (generateThumbnail && file.mimetype.startsWith("image/") && sharp) {
-        const thumbBuffer = await sharp(file.buffer)
-          .autoOrient()
+      if (generateThumbnail && sharpLib) {
+        // Kaynak, meta verisi silinmiş ve yönü uygulanmış tampondur.
+        const thumbBuffer = await sharpLib(buffer)
           .resize(200, 200, { fit: "cover" })
           .toBuffer();
 
@@ -213,7 +377,7 @@ export class MediaService {
             bucket,
             folder: `${folder}/thumbnails`,
             filename: thumbFilename,
-            mimeType: file.mimetype,
+            mimeType,
             entityType,
             entityId,
           },
@@ -227,6 +391,11 @@ export class MediaService {
       return result;
     } catch (error: any) {
       this.logger.error(`Upload failed: ${error.message}`);
+      if (error instanceof UnsupportedImageError) {
+        throw new BadRequestException(
+          i18nMessage("server.media.unsupportedTypeWithGif"),
+        );
+      }
       throw new BadRequestException("File upload failed");
     }
   }
@@ -365,14 +534,7 @@ export class MediaService {
      */
     ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
-    if (!sharp) {
-      this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image upload rejected`,
-      );
-      throw new BadRequestException(
-        "Image processing (sharp) is not available",
-      );
-    }
+    const sharpLib = this.requireSharp("upload");
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -392,7 +554,7 @@ export class MediaService {
       throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
-    return this.writeProductImageVariants(file.buffer, ownerUserId);
+    return this.writeProductImageVariants(sharpLib, file.buffer, ownerUserId);
   }
 
   /**
@@ -415,14 +577,7 @@ export class MediaService {
     detailKey: string,
     ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
-    if (!sharp) {
-      this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image rotate rejected`,
-      );
-      throw new BadRequestException(
-        "Image processing (sharp) is not available",
-      );
-    }
+    const sharpLib = this.requireSharp("rotate");
     // Sahiplik İKİ yoldan kabul edilir, çünkü depoda iki anahtar şeması var:
     //
     //  - yeni şema anahtarı kullanıcının yükleme klasöründedir
@@ -446,9 +601,9 @@ export class MediaService {
     const source = await this.storageService.downloadFileByKey(detailKey);
     // Saat yönünde 90°. Kaynak zaten yönlendirilmiş bir WebP, o yüzden
     // `autoOrient` burada etkisiz — çevirme AÇIKÇA istenir.
-    const rotated = await sharp(source).rotate(90).toBuffer();
+    const rotated = await sharpLib(source).rotate(90).toBuffer();
 
-    return this.writeProductImageVariants(rotated, ownerUserId);
+    return this.writeProductImageVariants(sharpLib, rotated, ownerUserId);
   }
 
   /**
@@ -459,44 +614,48 @@ export class MediaService {
    * yüklenenle aynı biçimde üretilmiyor olurdu.
    */
   private async writeProductImageVariants(
+    sharpLib: SharpFactory,
     source: Buffer,
     ownerUserId: string,
   ): Promise<{ cardKey: string; detailKey: string }> {
     const baseId = uuidv4();
     const folder = productImageFolder(ownerUserId);
-    const cacheOpts = {
-      contentType: "image/webp" as const,
-      cacheControl: "public, max-age=31536000, immutable",
-      skipMediaFile: true,
-    };
 
-    const cardBuffer = await sharp(source)
-      .autoOrient()
-      .resize(500, 500, { fit: "cover" })
-      .webp({ quality: 85 })
-      .toBuffer();
+    // Kaynak TEK kez çözülür: detay (1200 inside) kaynaktan, kart (500×500
+    // cover) bu detay tamponundan üretilir. İki kez tam çözmek tepe belleği
+    // ikiye katlıyordu; detay zaten yönlendirilmiş ve 1200 px'e inmiş olduğu
+    // için kart için `autoOrient` gerekmez. Encode'lar sıralıdır; yalnız iki
+    // depo yüklemesi paralel koşar (süreyi asıl bekleyen kısım onlar).
+    const detailBuffer = await encodeVariant(
+      sharpLib(source).autoOrient(),
+      PRODUCT_DETAIL_VARIANT,
+    );
 
-    const detailBuffer = await sharp(source)
-      .autoOrient()
-      .resize(1200, 1200, { fit: "inside" })
-      .webp({ quality: 90 })
-      .toBuffer();
+    const cardBuffer = await encodeVariant(
+      sharpLib(detailBuffer),
+      PRODUCT_CARD_VARIANT,
+    );
 
-    const cardResult = await this.storageService.uploadFile(cardBuffer, {
-      bucket: "products",
-      folder,
-      filename: `${baseId}-card.webp`,
-      mimeType: "image/webp",
-      ...cacheOpts,
-    });
-
-    const detailResult = await this.storageService.uploadFile(detailBuffer, {
-      bucket: "products",
-      folder,
-      filename: `${baseId}-detail.webp`,
-      mimeType: "image/webp",
-      ...cacheOpts,
-    });
+    // Hata semantiği: bir yükleme düşerse çağrı reddedilir; ama `Promise.all`
+    // diğer yüklemeyi İPTAL ETMEZ — o tamamlanırsa nesne depoda SAHİPSİZ kalır
+    // (eskiden yalnız kart yazılıp detay düşünce kart böyle kalıyordu; artık
+    // her iki yönde de olabilir). Anahtarlar kullanıcının geçici klasöründedir
+    // (`productImageFolder`); ürüne bağlanmayanları günlük `media-temp-cleanup`
+    // işi toplar, burada ayrıca silmek silmenin kendi hatasını yönetmek demek.
+    const [cardResult, detailResult] = await Promise.all([
+      this.storageService.uploadFile(cardBuffer, {
+        bucket: "products",
+        folder,
+        filename: `${baseId}-card.webp`,
+        ...IMMUTABLE_WEBP_UPLOAD,
+      }),
+      this.storageService.uploadFile(detailBuffer, {
+        bucket: "products",
+        folder,
+        filename: `${baseId}-detail.webp`,
+        ...IMMUTABLE_WEBP_UPLOAD,
+      }),
+    ]);
 
     return { cardKey: cardResult.key, detailKey: detailResult.key };
   }
@@ -507,14 +666,7 @@ export class MediaService {
   async uploadCollectionCover(
     file: Express.Multer.File,
   ): Promise<{ key: string }> {
-    if (!sharp) {
-      this.logger.error(
-        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image upload rejected`,
-      );
-      throw new BadRequestException(
-        "Image processing (sharp) is not available",
-      );
-    }
+    const sharpLib = this.requireSharp("upload");
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -534,20 +686,16 @@ export class MediaService {
       throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
-    const buffer = await sharp(file.buffer)
-      .autoOrient()
-      .resize(1200, 600, { fit: "cover" })
-      .webp({ quality: 85 })
-      .toBuffer();
+    const buffer = await encodeVariant(
+      sharpLib(file.buffer).autoOrient(),
+      COLLECTION_COVER_VARIANT,
+    );
 
     const result = await this.storageService.uploadFile(buffer, {
       bucket: "collections",
       folder: "covers",
       filename: `${uuidv4()}.webp`,
-      mimeType: "image/webp",
-      contentType: "image/webp",
-      cacheControl: "public, max-age=31536000, immutable",
-      skipMediaFile: true,
+      ...IMMUTABLE_WEBP_UPLOAD,
     });
 
     return { key: result.key };

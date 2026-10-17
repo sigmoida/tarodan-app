@@ -12,6 +12,7 @@ import {
   RefundAttemptStatus,
 } from "@prisma/client";
 import {
+  DASHBOARD_METRIC_DESCRIPTION_KEYS,
   DASHBOARD_METRIC_KEYS,
   type DashboardMetric,
   type DashboardMetricKey,
@@ -21,6 +22,7 @@ import {
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { CacheService } from "../../cache/cache.service";
 import {
+  dashboardPeriodCacheSlot,
   resolveDashboardRange,
   resolveThisMonthWindow,
   resolveYesterdayWindow,
@@ -246,13 +248,18 @@ export class AdminAnalyticsDashboardService {
       this.getThisMonthMetrics(now),
     ]);
 
+    const descriptions: Partial<Record<DashboardMetricKey, string>> =
+      DASHBOARD_METRIC_DESCRIPTION_KEYS;
     const metrics = {} as Record<DashboardMetricKey, DashboardMetric>;
     DASHBOARD_METRIC_KEYS.forEach((key) => {
+      const description = descriptions[key];
       metrics[key] = {
         period: period[key],
         yesterday: closed[key].yesterday,
         thisMonth: thisMonth[key],
         allTime: closed[key].allTime,
+        // Panel ipucu olarak çevirir; servis dil seçmez.
+        ...(description ? { description } : {}),
       };
     });
 
@@ -336,28 +343,22 @@ export class AdminAnalyticsDashboardService {
     range: ResolvedDashboardRange,
     now: Date,
   ): { key: string; ttl: number } {
-    const from = range.current.gte.toISOString();
-    const closed =
-      range.type === "custom" && range.current.lte.getTime() < now.getTime();
-
-    if (closed) {
-      return {
-        // v3: dönem sözleşmesi "önceki dönem" trendini (previous/changePercent)
-        // kaybetti, sabit Dün/Bu ay üçlüsü eklendi — eski anahtarın
-        // önbelleğinde eski şekilli bir satır kalmasın diye sürüm arttı.
-        // v4 (sabitlerde v2): metrikler test şeridini dışlamaya başladı —
-        // kapalı aralıklar 6 saat tutulduğu için eski rakam sürüm artmadan
-        // düşmezdi.
-        key: `admin:dashboard:period:v4:custom:${from}:${range.current.lte.toISOString()}`,
-        ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
-      };
-    }
-
-    const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
-    const bucket = Math.floor(now.getTime() / (ttl * 1000));
+    const { slot, closed } = dashboardPeriodCacheSlot(
+      range,
+      now,
+      AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS,
+    );
     return {
-      key: `admin:dashboard:period:v4:${range.type}:${from}:${bucket}`,
-      ttl,
+      // v3: dönem sözleşmesi "önceki dönem" trendini (previous/changePercent)
+      // kaybetti, sabit Dün/Bu ay üçlüsü eklendi — eski anahtarın
+      // önbelleğinde eski şekilli bir satır kalmasın diye sürüm arttı.
+      // v4 (sabitlerde v2): metrikler test şeridini dışlamaya başladı —
+      // kapalı aralıklar 6 saat tutulduğu için eski rakam sürüm artmadan
+      // düşmezdi.
+      key: `admin:dashboard:period:v4:${slot}`,
+      ttl: closed
+        ? AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS
+        : AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS,
     };
   }
 

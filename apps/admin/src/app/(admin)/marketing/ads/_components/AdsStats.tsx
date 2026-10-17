@@ -1,15 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  MegaphoneIcon,
-  CursorArrowRaysIcon,
-  EyeIcon,
-  ChartBarIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
-import { fmtNumber } from "@/lib/format";
+import { fmtNumber, fmtPercent } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Ad } from "../_lib/types";
@@ -32,7 +26,7 @@ export function AdsStats() {
         active: ads.filter((a) => a.isActive).length,
         clicks,
         impressions,
-        ctr: impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : "0",
+        ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
       };
     },
     staleTime: 30_000,
@@ -43,7 +37,7 @@ export function AdsStats() {
     active: 0,
     clicks: 0,
     impressions: 0,
-    ctr: "0",
+    ctr: 0,
   };
 
   if (isError) {
@@ -55,8 +49,6 @@ export function AdsStats() {
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       <MetricCard
-        icon={MegaphoneIcon}
-        tone="info"
         label={t("admin.marketing.ads.totalAds")}
         value={s.total}
         footer={
@@ -67,24 +59,18 @@ export function AdsStats() {
         loading={isLoading}
       />
       <MetricCard
-        icon={CursorArrowRaysIcon}
-        tone="primary"
         label={t("admin.marketing.ads.totalClicks")}
         value={fmtNumber(s.clicks)}
         loading={isLoading}
       />
       <MetricCard
-        icon={EyeIcon}
-        tone="success"
         label={t("admin.marketing.ads.impressions")}
         value={fmtNumber(s.impressions)}
         loading={isLoading}
       />
       <MetricCard
-        icon={ChartBarIcon}
-        tone="primary"
         label={t("admin.marketing.ads.averageCtr")}
-        value={`${s.ctr}%`}
+        value={fmtPercent(s.ctr, 2)}
         loading={isLoading}
       />
     </div>

@@ -224,8 +224,8 @@ formu) · `no-token` (bilgi + yeniden gönderme formu).
 > **Gizlilik kuralı:** "şifremi unuttum" **her durumda** "e-posta gönderildi" ekranı gösterir —
 > hata bile olsa. Böylece bir e-postanın kayıtlı olup olmadığı sızmaz. Mobilde de aynen böyle yap.
 
-API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-reset`,
-`/security/password/reset`); **yeni geliştirmede `/auth/*` olanları kullan**.
+Şifre sıfırlamanın tek yolu `/auth/*` uçlarıdır. Eski `/security/password/request-reset` +
+`/security/password/reset` çifti (e-posta göndermiyordu) API'den kaldırıldı (#432).
 
 ---
 
@@ -234,7 +234,7 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
 | Method | Path           | Auth   | Amaç                                                         |
 | ------ | -------------- | ------ | ------------------------------------------------------------ |
 | `POST` | `/auth/google` | public | Web: `{ code }` · **Native: `{ idToken }`** (throttle 10/dk) |
-| `POST` | `/auth/apple`  | public | `{ identityToken, fullName? }` (throttle 10/dk)              |
+| `POST` | `/auth/apple`  | public | `{ identityToken, fullName?, authorizationCode? }` (10/dk)   |
 
 - Web auth-code akışı kullanıyor; **mobil `idToken` göndermeli** — backend bu şekli zaten destekliyor.
 - **Apple Sign-In web'de de açık** (2026-08-13): giriş ve kayıt formlarında buton var, popup akışı
@@ -243,7 +243,21 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
   web token'ının audience'ı Services ID olur. iOS'ta Google ile giriş sunuluyorsa Apple Sign-In
   App Store için **zorunludur** → mobilde de uygulanmalı.
 - Apple'ın web akışında **client secret gerekmiyor**: `id_token` JWKS ile doğrulanıyor, Apple'ın token
-  endpoint'i hiç çağrılmıyor. `.p8` yalnızca mobilde hesap silme (token iptali) için gerekecek.
+  endpoint'i hiç çağrılmıyor. `.p8` yalnızca mobilde hesap silme (token iptali) için gerekiyor.
+- **Token revocation (App Store 5.1.1(v), 2026-10):** mobile (1.1.0+) also sends `authorizationCode`.
+  Sunucu kodu girişin yapıldığı client id (identity token `aud`: `com.tarodan.app` / staging
+  `com.tarodan.app.staging`) ile Apple'da refresh token'a çevirir ve şifreli saklar
+  (`apple_sign_in_tokens`). `DELETE /users/me` iptali outbox'a yazar (`apple.token_revoke`); Apple
+  çağrısı commit sonrası, yeniden denenerek yapılır, silmeyi engellemez. Kodu göndermeyen eski
+  istemci ve web aynen çalışır (iptal edilecek token yoktur). Kullanıcı × client id başına yalnız
+  SON girişin token'ı tutulur; yeni cihaz girişi eskisini iptal etmeden ezer — Apple'ın revoke'u
+  uygulamaya verilen yetkinin tamamını düşürdüğü için eskiyi iptal etmek yeni oturumu da bozar,
+  silmede son token'ın iptali yetkiyi bütünüyle kaldırır. Env: `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+  `APPLE_PRIVATE_KEY`, `APPLE_TOKEN_ENCRYPTION_KEY`; biri eksikse uyarı loglanır: girişte token
+  saklanmaz, hesap silmede yazılmış iptal işi yeniden denenir (~1 gün) ve sonra DLQ'ya düşer —
+  kendiliğinden toparlanmaz; env düzeltilince `redrive-apple-token-revocations` script'iyle yeniden
+  kuyruğa alınır (`docs/OPERATIONS.md`). Kalıcı Apple reddinde (`invalid_grant`, 3 denemeden sonra
+  `invalid_client`) iş DLQ'ya düşer ve şifreli token silinmez; aynı script geri getirir.
 - Yanıt normal login ile aynı: `{ user, tokens }`.
 
 ### Kabul kriterleri

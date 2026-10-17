@@ -1,4 +1,9 @@
+import type { HeroHomeVisibilityDto } from "@tarodan/types";
 import { api } from "./client";
+import type {
+  BroadcastEmailPreviewPayload,
+  NotificationBroadcastPayload,
+} from "./marketing.types";
 
 /** Marketing domain: static pages, email templates, ads, and notifications. */
 export const marketingApi = {
@@ -48,6 +53,57 @@ export const marketingApi = {
   updateAd: (id: string, data: any) => api.patch(`/admin/ads/${id}`, data),
   deleteAd: (id: string) => api.delete(`/admin/ads/${id}`),
   reorderAds: (ids: string[]) => api.patch("/admin/ads/reorder", { ids }),
+  /** Reklam görseli yükleme (multipart); yanıt `/admin/media/upload` ile aynı: `{ url, key }`. */
+  uploadAdImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string; key: string }>(
+      "/admin/ads/upload",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+  },
+  /** Kampanya (indirim) listesi; reklam formundaki kampanya seçimi için. */
+  getDiscounts: (params?: { isActive?: boolean; limit?: number }) =>
+    api.get("/admin/discounts", { params }),
+  /** Bir kampanyanın kupon kodları, Excel dosyası olarak. */
+  exportDiscountCodes: (discountId: string) =>
+    api.get(`/admin/discounts/${discountId}/codes/export`, {
+      responseType: "blob",
+    }),
+
+  // Hero slaytları (ana sayfa + giriş/kayıt ekranları)
+  getHeroSlides: (params?: { placement?: string }) =>
+    api.get("/admin/hero-slides", { params }),
+  createHeroSlide: (data: any) => api.post("/admin/hero-slides", data),
+  updateHeroSlide: (id: string, data: any) =>
+    api.patch(`/admin/hero-slides/${id}`, data),
+  deleteHeroSlide: (id: string) => api.delete(`/admin/hero-slides/${id}`),
+  reorderHeroSlides: (ids: string[]) =>
+    api.patch("/admin/hero-slides/reorder", { ids }),
+  /** Ana sayfa hero'sunun platform anahtarları; satır yoksa açık. */
+  getHeroHomeVisibility: () =>
+    api.get<HeroHomeVisibilityDto>("/admin/hero-slides/visibility"),
+  /** Gönderilmeyen platform değişmez. */
+  updateHeroHomeVisibility: (data: Partial<HeroHomeVisibilityDto>) =>
+    api.patch<HeroHomeVisibilityDto>("/admin/hero-slides/visibility", data),
+  /** Hero görseli yükleme (multipart `file`); yanıt `{ url }`. */
+  uploadHeroImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string }>("/admin/hero-slides/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  // Güven rozetleri
+  getTrustBadges: () => api.get("/admin/trust-badges"),
+  createTrustBadge: (data: any) => api.post("/admin/trust-badges", data),
+  updateTrustBadge: (id: string, data: any) =>
+    api.patch(`/admin/trust-badges/${id}`, data),
+  deleteTrustBadge: (id: string) => api.delete(`/admin/trust-badges/${id}`),
+  reorderTrustBadges: (ids: string[]) =>
+    api.patch("/admin/trust-badges/reorder", { ids }),
 
   // Notifications
   getNotificationHistory: (params?: {
@@ -63,24 +119,28 @@ export const marketingApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/notifications/history", { params }),
-  sendNotification: (data: {
-    title: string;
-    body: string;
-    channels: string[];
+  sendNotification: (data: NotificationBroadcastPayload) =>
+    api.post("/admin/notifications/send", data),
+  scheduleNotification: (
+    data: NotificationBroadcastPayload & { scheduledFor: string },
+  ) => api.post("/admin/notifications/schedule", data),
+  /** E-posta gövdesine eklenecek görseli yükler (multipart `file`); yanıt `{ url }`. */
+  uploadNotificationImage: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string }>("/admin/notifications/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  /** Gerçekte gidecek (sunucuda süzülmüş + iskeletli) e-postayı döner. */
+  previewBroadcastEmail: (data: BroadcastEmailPreviewPayload) =>
+    api.post("/admin/notifications/email-preview", data),
+  /** Hedef kitlenin toplam / pazarlama-izinli kullanıcı sayısı. */
+  countNotificationAudience: (data: {
     targetType: "all" | "segment" | "user_ids";
     userIds?: string[];
     segmentCriteria?: Record<string, any>;
-    data?: Record<string, any>;
-  }) => api.post("/admin/notifications/send", data),
-  scheduleNotification: (data: {
-    title: string;
-    body: string;
-    channels: string[];
-    targetType: "all" | "segment" | "user_ids";
-    userIds?: string[];
-    segmentCriteria?: Record<string, any>;
-    scheduledFor: string;
-  }) => api.post("/admin/notifications/schedule", data),
+  }) => api.post("/admin/notifications/audience-count", data),
   getScheduledNotifications: (params?: {
     page?: number;
     limit?: number;

@@ -1,8 +1,12 @@
 "use client";
 
-import { enumLabel, refundReasonConfig } from "@tarodan/ui";
+import { Alert, enumLabel, refundReasonConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
+import {
+  adminCancelReasonLabel,
+  platformCancelReasonCode,
+} from "@/lib/admin-cancel-reasons";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { TradeDetail } from "../types";
 import { statusConfig } from "@/lib/statusLabels";
@@ -10,41 +14,53 @@ import { statusConfig } from "@/lib/statusLabels";
 /** Rejection/cancellation reason + admin notes + legacy dispute cards. */
 export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
   const t = useTranslations();
-  const rawReason =
-    trade.rejectionReason || trade.cancellationReason || trade.cancelReason;
+  // Platform (admin) iptali: neden katalog kodundan, admin'in dilinde. Ham
+  // `cancelReason` taraflara gösterilen (varsayılan dilde) metindir; iç not
+  // takasta değil denetim kaydındadır.
+  const platformCode = platformCancelReasonCode(trade);
+  const rawReason = platformCode
+    ? null
+    : trade.rejectionReason || trade.cancellationReason || trade.cancelReason;
   const shortReason = trade.rejectionReason
     ? null
     : cancelReasonLabel(trade.cancellationReason || trade.cancelReason, t);
 
   return (
     <>
-      {rawReason && (
-        <div className="rounded-lg border border-danger-200 bg-danger-50 p-6 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold text-danger-900">
-            {trade.rejectionReason
-              ? t("admin.operations.trades.rejectReason")
-              : t("admin.operations.trades.cancelReason")}
-          </h2>
-          {shortReason && shortReason !== rawReason && (
-            <p className="mb-1 text-sm font-medium text-danger-700">
-              {shortReason}
-            </p>
-          )}
-          <p className="whitespace-pre-wrap text-sm text-danger-800">
-            {rawReason}
+      {platformCode && (
+        <Alert
+          variant="danger"
+          title={t("admin.operations.trades.adminCancel.cancelledByPlatform")}
+        >
+          <p>
+            <span className="font-medium">
+              {t("admin.operations.trades.cancelReason")}:
+            </span>{" "}
+            {adminCancelReasonLabel(platformCode, t)}
           </p>
-        </div>
+        </Alert>
+      )}
+
+      {rawReason && (
+        <Alert
+          variant="danger"
+          title={
+            trade.rejectionReason
+              ? t("admin.operations.trades.rejectReason")
+              : t("admin.operations.trades.cancelReason")
+          }
+        >
+          {shortReason && shortReason !== rawReason && (
+            <p className="mb-1 font-medium">{shortReason}</p>
+          )}
+          <p className="whitespace-pre-wrap">{rawReason}</p>
+        </Alert>
       )}
 
       {trade.adminNotes && (
-        <div className="rounded-lg border border-info-200 bg-info-50 p-6 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold text-info-900">
-            {t("admin.operations.trades.adminNotes")}
-          </h2>
-          <p className="whitespace-pre-wrap text-sm text-info-800">
-            {trade.adminNotes}
-          </p>
-        </div>
+        <Alert variant="info" title={t("admin.operations.trades.adminNotes")}>
+          <p className="whitespace-pre-wrap">{trade.adminNotes}</p>
+        </Alert>
       )}
 
       {trade.dispute && (
@@ -67,12 +83,12 @@ export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
               </p>
             )}
             {trade.dispute.resolution && (
-              <div className="mt-3 rounded-lg border border-success-200 bg-success-50 p-3">
-                <p className="text-sm text-success-800">
+              <Alert variant="success" className="mt-3 p-3">
+                <p>
                   <strong>{t("admin.operations.trades.resolution")}:</strong>{" "}
                   {trade.dispute.resolution}
                 </p>
-              </div>
+              </Alert>
             )}
           </div>
         </SectionCard>

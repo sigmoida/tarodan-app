@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import * as QRCode from "qrcode";
@@ -19,7 +20,14 @@ import {
   AdminSessionListDto,
 } from "./dto";
 import { generateTotpSecret, verifyTotpCode } from "./totp.util";
+import {
+  decryptSecret,
+  deriveSecretKey,
+  encryptSecret,
+  isEncryptedSecret,
+} from "../../common/security/secret-cipher";
 import { i18nMessage } from "../i18n";
+import { PushTokenRevocationService } from "../notification/push-token/push-token-revocation.service";
 import {
   adminSessionExpiryFrom,
   resolveAdminSessionTimeoutMinutes,
@@ -29,12 +37,15 @@ import {
 export class SecurityService {
   private readonly logger = new Logger(SecurityService.name);
   private readonly SECRET_BYTES = 20;
-  private readonly TOKEN_EXPIRY_HOURS = 24;
   private readonly CSRF_TOKEN_EXPIRY_MINUTES = 60;
+  // Bekleyen (doğrulanmamış) kurulum sırrı bu süre içinde yeniden kullanılır:
+  // çift dokunma / ekranı yeniden açma, kullanıcının taradığı QR'ı geçersiz kılmasın.
+  private readonly PENDING_SETUP_REUSE_MS = 10 * 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly pushTokens: PushTokenRevocationService,
   ) {}
 
   // ==========================================================================
@@ -54,10 +65,6 @@ export class SecurityService {
       throw new BadRequestException("2FA zaten etkin");
     }
 
-    // Generate secret
-    const secret = this.generateTOTPSecret();
-    const backupCodes = this.generateBackupCodes();
-
     // Get user info for QR code label
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -69,10 +76,25 @@ export class SecurityService {
       );
     }
 
+    // Yakın zamanda üretilmiş bekleyen sır varsa aynısını döndür (QR değişmez).
+    // Yedek kodların düz hali saklanmadığı için yalnız onlar yeniden üretilir;
+    // etkinleştirme öncesi kullanılamadıklarından bu güvenlidir. Etkin olmayan
+    // satır yalnız hiç etkinleştirilmemiş bir kurulumdur: disable2FA satırı
+    // siler, eski (sızmış olabilecek) bir sır yeniden kullanılamaz.
+    const isPending =
+      !!existing &&
+      Date.now() - existing.updatedAt.getTime() < this.PENDING_SETUP_REUSE_MS;
+    const secret = isPending
+      ? this.decryptSecret(existing.secret)
+      : this.generateTOTPSecret();
+    const backupCodes = this.generateBackupCodes();
+
     // Sağlama URI'si (otpauth) — kimlik doğrulayıcı uygulamasına verilen
     // bağlantı. Bir GÖRSEL adresi DEĞİL: doğrudan <img src> içine konulamaz.
+    // Etiket e-posta: kullanıcıya özgü; özel karakterler (+ vb.) kodlanır.
     const issuer = "Tarodan";
-    const qrCodeUrl = `otpauth://totp/${issuer}:${user?.email}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
+    const label = encodeURIComponent(`${issuer}:${user.email}`);
+    const qrCodeUrl = `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
     // Taranabilir görsel sunucuda üretilir: her istemci (web + mobil) aynı
     // görseli alsın, her biri ayrı bir QR kütüphanesi taşımasın.
     const qrCodeImage = await QRCode.toDataURL(qrCodeUrl, {
@@ -81,30 +103,44 @@ export class SecurityService {
       width: 240,
     });
 
-    // Store encrypted secret
-    const encryptedSecret = this.encryptSecret(secret);
     const hashedBackupCodes = await Promise.all(
       backupCodes.map((code) => bcrypt.hash(code, 10)),
     );
 
     if (existing) {
-      await this.prisma.twoFactorSecret.update({
-        where: { userId },
+      // Yalnız hâlâ etkin olmayan kurulumu yaz: arada verify2FA etkinleştirdiyse
+      // etkin kaydın sırrı/yedek kodları ezilmez.
+      const { count } = await this.prisma.twoFactorSecret.updateMany({
+        where: { userId, isEnabled: false },
         data: {
-          secret: encryptedSecret,
+          ...(isPending ? {} : { secret: this.encryptSecret(secret) }),
           backupCodes: hashedBackupCodes,
-          isEnabled: false, // Not enabled until verified
         },
       });
+      if (count === 0) {
+        throw new BadRequestException("2FA zaten etkin");
+      }
     } else {
-      await this.prisma.twoFactorSecret.create({
-        data: {
-          userId,
-          secret: encryptedSecret,
-          backupCodes: hashedBackupCodes,
-          isEnabled: false,
-        },
-      });
+      try {
+        await this.prisma.twoFactorSecret.create({
+          data: {
+            userId,
+            secret: this.encryptSecret(secret),
+            backupCodes: hashedBackupCodes,
+            isEnabled: false,
+          },
+        });
+      } catch (e) {
+        // Eşzamanlı ilk kurulum (çift dokunma): diğer istek satırı açtı;
+        // baştan çalış — bekleyen sır yeniden kullanılır, aynı QR döner.
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          return this.enable2FA(userId);
+        }
+        throw e;
+      }
     }
 
     return {
@@ -133,9 +169,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     // Enable 2FA
@@ -176,15 +210,13 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
-    await this.prisma.twoFactorSecret.update({
-      where: { userId },
-      data: { isEnabled: false },
-    });
+    // Sır ve yedek kodlar silinir: yeniden etkinleştirme her zaman yeni sır
+    // üretir (eski, sızmış olabilecek sır bekleyen kurulum gibi yeniden
+    // kullanılamaz).
+    await this.prisma.twoFactorSecret.deleteMany({ where: { userId } });
 
     await this.prisma.adminUser.updateMany({
       where: { userId },
@@ -279,9 +311,7 @@ export class SecurityService {
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException(
-        i18nMessage("server.security.invalidCode"),
-      );
+      throw this.invalidCodeException();
     }
 
     const newBackupCodes = this.generateBackupCodes();
@@ -298,95 +328,10 @@ export class SecurityService {
   }
 
   // ==========================================================================
-  // GAP-005: PASSWORD RESET
+  // GAP-005: PASSWORD CHANGE
   // ==========================================================================
-
-  /**
-   * Request password reset
-   */
-  async requestPasswordReset(email: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      // Don't reveal if email exists
-      return;
-    }
-
-    // Invalidate existing tokens
-    await this.prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: new Date() },
-    });
-
-    // Generate token
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + this.TOKEN_EXPIRY_HOURS);
-
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        token: tokenHash,
-        expiresAt,
-      },
-    });
-
-    // TODO: Send email with reset link
-    // In production, integrate with email service
-    this.logger.log("Password reset token created");
-  }
-
-  /**
-   * Reset password with token
-   */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { token: tokenHash },
-    });
-
-    if (!resetToken) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
-      );
-    }
-
-    if (resetToken.usedAt) {
-      throw new BadRequestException(
-        i18nMessage("server.security.tokenAlreadyUsed"),
-      );
-    }
-
-    if (resetToken.expiresAt < new Date()) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenExpired"),
-      );
-    }
-
-    // Update password
-    const passwordHash = await bcrypt.hash(newPassword, 12);
-    await this.prisma.user.update({
-      where: { id: resetToken.userId },
-      data: { passwordHash },
-    });
-
-    // Mark token as used
-    await this.prisma.passwordResetToken.update({
-      where: { id: resetToken.id },
-      data: { usedAt: new Date() },
-    });
-
-    // Revoke all refresh tokens
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: resetToken.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-  }
+  // Şifre sıfırlama auth modülündedir (auth-password.service); o yol da
+  // oturumları `revokeAllUserTokens` ile kapatır (#432).
 
   /**
    * Change password (logged in user)
@@ -480,9 +425,15 @@ export class SecurityService {
    * Revoke all user's refresh tokens
    */
   async revokeAllUserTokens(userId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
+    // Oturumlarla birlikte push token'ları da düşer: "tüm cihazlardan çıkış"
+    // sonrası çıkışı yapılan cihazlar bildirim almaya devam etmesin. İkisi aynı
+    // transaction'da — biri kalıp diğeri düşmesin.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.pushTokens.deactivateAllForUser(userId, tx);
     });
   }
 
@@ -694,42 +645,24 @@ export class SecurityService {
   }
 
   private encryptSecret(secret: string): string {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv(
-      "aes-256-gcm",
-      this.getTwoFactorEncryptionKey(),
-      iv,
-    );
-    const ciphertext = Buffer.concat([
-      cipher.update(secret, "utf8"),
-      cipher.final(),
-    ]);
-    const tag = cipher.getAuthTag();
-
-    return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${ciphertext.toString("base64")}`;
+    return encryptSecret(secret, this.getTwoFactorEncryptionKey());
   }
 
   private decryptSecret(encrypted: string): string {
-    if (!encrypted.startsWith("v1:")) {
+    // Şifreleme öncesi dönemden kalan düz base64 kayıtlar okunmaya devam eder;
+    // bir sonraki yazımda v1 biçimine geçerler.
+    if (!isEncryptedSecret(encrypted)) {
       return Buffer.from(encrypted, "base64").toString("utf8");
     }
+    return decryptSecret(encrypted, this.getTwoFactorEncryptionKey());
+  }
 
-    const [, iv, tag, ciphertext] = encrypted.split(":");
-    if (!iv || !tag || !ciphertext) {
-      throw new Error("Invalid encrypted two-factor secret");
-    }
-
-    const decipher = crypto.createDecipheriv(
-      "aes-256-gcm",
-      this.getTwoFactorEncryptionKey(),
-      Buffer.from(iv, "base64"),
-    );
-    decipher.setAuthTag(Buffer.from(tag, "base64"));
-
-    return Buffer.concat([
-      decipher.update(Buffer.from(ciphertext, "base64")),
-      decipher.final(),
-    ]).toString("utf8");
+  /** Geçersiz 2FA kodu: 401 değil 400 — istemciler 401'i oturum bitti sanıp çıkış yapıyordu. */
+  private invalidCodeException(): BadRequestException {
+    return new BadRequestException({
+      ...i18nMessage("server.security.invalidCode"),
+      errorCode: "INVALID_2FA_CODE",
+    });
   }
 
   private verifyTOTP(secret: string, code: string): boolean {
@@ -737,9 +670,9 @@ export class SecurityService {
   }
 
   private getTwoFactorEncryptionKey(): Buffer {
-    const material =
+    return deriveSecretKey(
       this.configService.get<string>("TWO_FACTOR_ENCRYPTION_KEY") ||
-      this.configService.getOrThrow<string>("JWT_SECRET");
-    return crypto.createHash("sha256").update(material).digest();
+        this.configService.getOrThrow<string>("JWT_SECRET"),
+    );
   }
 }

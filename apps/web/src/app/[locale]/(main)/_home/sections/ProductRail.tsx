@@ -53,6 +53,7 @@ export default async function ProductRail({
                   priority={index < 4}
                   sponsoredLabel={t("product.sponsored")}
                   tradeLabel={t("faq.trade")}
+                  discountLabel={t("product.discount")}
                   outOfStockLabel={t("product.stockFinished")}
                 />
               </div>
@@ -76,6 +77,7 @@ export default async function ProductRail({
             priority={index < 4}
             sponsoredLabel={t("product.sponsored")}
             tradeLabel={t("faq.trade")}
+            discountLabel={t("product.discount")}
             outOfStockLabel={t("product.stockFinished")}
           />
         ))

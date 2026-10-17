@@ -3,6 +3,8 @@ import {
   OrderCancellationReason,
   RefundReason,
 } from "@prisma/client";
+import type { AdminCancelReasonCode } from "@tarodan/types";
+import { adminCancelReasonText } from "../../order/helpers/admin-cancel-reason";
 import type { RefundRequestActor } from "../../payment/helpers/refund-attempt-actor";
 import type { OrderCancelNoticeParty } from "../../notification/helpers/order-cancel-notice";
 import {
@@ -34,11 +36,20 @@ export interface PreShipmentCancellationSpec {
   actorId: string;
   /** İadeyi kesinleştiren: alıcı iptalinde otomatik ("system"), platformda admin. */
   decidedBy: string;
-  /** Order.cancellationReasonCode — platform iptalinde yapılandırılmış neden yok. */
+  /** Order.cancellationReasonCode — alıcının yapılandırılmış nedeni. */
   reasonCode: OrderCancellationReason | null;
-  /** RefundRequest.description (alıcının açıklaması / admin gerekçesi). */
+  /**
+   * Order.adminCancelReasonCode — yalnız platform (yönetici) iptalinde ve
+   * yalnız iade tamamlanıp iptal kesinleşince yazılır.
+   */
+  adminReasonCode: AdminCancelReasonCode | null;
+  /**
+   * RefundRequest.description (alıcının açıklaması / platform iptalinde
+   * nedenin etiketi). Taraflara görünür: yöneticinin iç notu ASLA buraya
+   * yazılmaz.
+   */
   description: string | null;
-  /** Order.cancelReason — iptal e-postasında iki tarafa gösterilir. */
+  /** Order.cancelReason — taraflara görünür (iptal e-postası, sipariş ekranı). */
   cancelReason: string;
   /** Politika snapshot'ının ve inceleme bildiriminin neden etiketi. */
   snapshotReason: string;
@@ -52,9 +63,12 @@ export interface PreShipmentCancellationSpec {
   /** İade geçmişine yazılan ayrıntı. */
   historyDetails: Record<string, unknown>;
   /**
-   * İptal duyurusunun (in-app + e-posta) gideceği taraflar — iptali yapan
-   * taraf kendi eylemi için duyuru almaz: alıcı iptalinde yalnız satıcı
-   * ("kargoya vermeyin"), platform iptalinde alıcı ve satıcı.
+   * Çekirdeğin göndereceği iptal duyurusunun (in-app + e-posta) tarafları —
+   * iptali yapan taraf kendi eylemi için duyuru almaz: alıcı iptalinde yalnız
+   * satıcı ("kargoya vermeyin"). Platform iptalinde BOŞTUR: iki tarafa giden
+   * platform duyurusunu (neden etiketi + iade tutarı) iptalin her türü için
+   * tek yerden AdminOrderCancelService gönderir; çekirdek de gönderseydi
+   * taraflar tek iptal için iki mesaj alırdı.
    */
   notifyParties: readonly OrderCancelNoticeParty[];
 }
@@ -76,6 +90,7 @@ export function buyerCancellationSpec(
     actorId: buyerId,
     decidedBy: "system",
     reasonCode,
+    adminReasonCode: null,
     description: trimmed,
     cancelReason: trimmed || reasonCode,
     snapshotReason: reasonCode,
@@ -100,27 +115,35 @@ export const PLATFORM_CANCELLATION_FAULT_PARTY: RefundFaultPartyV2 = "platform";
  * Platform (admin) iptali — kusur platformda: alıcı ödediği her kalemi geri
  * alır (ürün, alıcı komisyonu + hizmet bedeli, paketi kapatıyorsa gidiş
  * kargosu), satıcı kesintileri terslenir, kupon hakkı geri verilir.
+ *
+ * Yalnız katalog KODU gelir: taraflara görünen her alan (talep açıklaması,
+ * sipariş gerekçesi, iade geçmişi) kodun etiketinden türetilir. Yöneticinin iç
+ * notu çekirdeğe hiç verilmez; yalnız denetim kaydındadır.
  */
 export function platformCancellationSpec(
   buyerId: string,
   adminId: string,
-  reason: string,
+  reasonCode: AdminCancelReasonCode,
 ): PreShipmentCancellationSpec {
-  const trimmed = reason.trim();
+  const visibleReason = adminCancelReasonText(reasonCode);
   return {
     initiator: CancellationActor.platform,
     requesterId: buyerId,
     actorId: adminId,
     decidedBy: adminId,
     reasonCode: null,
-    description: trimmed || null,
-    cancelReason: trimmed,
+    adminReasonCode: reasonCode,
+    description: visibleReason,
+    cancelReason: visibleReason,
     snapshotReason: PLATFORM_CANCELLATION_REASON,
     policy: resolvePlatformCancellationPolicy(),
     requestReason: RefundReason.other,
     resolvedReason: RefundReason.other,
     faultParty: PLATFORM_CANCELLATION_FAULT_PARTY,
-    historyDetails: { initiator: CancellationActor.platform, reason: trimmed },
-    notifyParties: ["buyer", "seller"],
+    historyDetails: {
+      initiator: CancellationActor.platform,
+      adminReasonCode: reasonCode,
+    },
+    notifyParties: [],
   };
 }

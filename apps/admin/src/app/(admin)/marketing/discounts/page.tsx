@@ -7,6 +7,7 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
+import { useListExport } from "@/hooks/useListExport";
 import { type Discount } from "./_lib/types";
 import { discountFilterFields } from "./_lib/filters";
 import { DiscountsStats } from "./_components/DiscountsStats";
@@ -14,29 +15,18 @@ import { DiscountsTable } from "./_components/DiscountsTable";
 import { DiscountFormModal } from "./_modals/DiscountFormModal";
 import { GenerateCodesModal } from "./_modals/GenerateCodesModal";
 import { useTranslations } from "next-intl";
-import toast from "react-hot-toast";
 
 export default function DiscountsPage() {
   const t = useTranslations();
   const [modal, setModal] = useState<{ discount?: Discount } | null>(null);
   const [codesFor, setCodesFor] = useState<Discount | null>(null);
 
-  /** Download a discount's voucher codes as CSV (auth via adminApi). */
-  const exportCodes = async (d: Discount) => {
-    try {
-      const res = await adminApi.get(`/admin/discounts/${d.id}/codes/export`, {
-        responseType: "blob",
-      });
-      const url = URL.createObjectURL(res.data as Blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `voucher-codes-${d.code || d.id}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error(t("admin.marketing.discounts.codes.generateFailed"));
-    }
-  };
+  const { download: exportCodes } = useListExport({ listState: false });
+  const onExportCodes = (d: Discount) =>
+    exportCodes({
+      fetcher: () => adminApi.exportDiscountCodes(d.id),
+      fallbackFilename: `voucher-codes-${d.code || d.id}.xlsx`,
+    });
 
   return (
     <AdminPage>
@@ -89,7 +79,7 @@ export default function DiscountsPage() {
         <DiscountsTable
           onEdit={(discount) => setModal({ discount })}
           onGenerateCodes={(discount) => setCodesFor(discount)}
-          onExportCodes={exportCodes}
+          onExportCodes={onExportCodes}
         />
         <ResourceList.Pagination />
       </ResourceList>

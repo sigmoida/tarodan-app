@@ -1,3 +1,4 @@
+import { isPasswordValid } from "@tarodan/types";
 import { AdminStaffService } from "./admin-staff.service";
 
 /**
@@ -59,6 +60,7 @@ describe("AdminStaffService.assignAdminStaff — personel/müşteri ayrımı", (
     const service = new AdminStaffService(
       prisma as any,
       audit as any,
+      undefined as any,
       undefined as any,
       undefined as any,
       undefined as any,
@@ -179,5 +181,13 @@ describe("AdminStaffService.assignAdminStaff — personel/müşteri ayrımı", (
     );
     expect(prisma.adminUser.create).toHaveBeenCalled();
     expect(res.tempPassword).toBeTruthy();
+  });
+
+  it("üretilen geçici şifre ortak şifre politikasına her zaman uyar", () => {
+    const { service } = makeService(null);
+    for (let i = 0; i < 200; i++) {
+      const pw = (service as any).generateTempPassword() as string;
+      expect(isPasswordValid(pw)).toBe(true);
+    }
   });
 });

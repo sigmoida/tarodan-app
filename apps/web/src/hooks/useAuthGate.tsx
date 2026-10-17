@@ -1,25 +1,25 @@
-'use client';
+"use client";
 
-import { useCallback, useState, type ReactNode } from 'react';
-import dynamic from 'next/dynamic';
-import { useAuthStore } from '@/stores/authStore';
-import { withChunkErrorLogging } from '@/lib/withChunkErrorLogging';
+import { useCallback, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { useAuthStore } from "@/stores/authStore";
+import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
 
 const AuthRequiredModal = dynamic(
-	withChunkErrorLogging(
-		() => import('@/components/AuthRequiredModal'),
-		'AuthRequiredModal',
-	),
-	{ ssr: false },
+  withChunkErrorLogging(
+    () => import("@/components/AuthRequiredModal"),
+    "AuthRequiredModal",
+  ),
+  { ssr: false },
 );
 
 export interface AuthGateConfig {
-	/** Modal heading. Falls back to the generic "auth required" title. */
-	title?: string;
-	message: string;
-	icon?: ReactNode;
-	/** Where to send the user after login/register. Defaults to the current URL. */
-	redirectPath?: string;
+  /** Modal heading. Falls back to the generic "auth required" title. */
+  title?: string;
+  message: string;
+  icon?: ReactNode;
+  /** Where to send the user after login/register. Defaults to the current URL. */
+  redirectPath?: string;
 }
 
 /**
@@ -35,38 +35,40 @@ export interface AuthGateConfig {
  * cookie. Server-enforced routes use middleware / `getSession()` instead.
  */
 export function useAuthGate() {
-	const { isAuthenticated } = useAuthStore();
-	const [config, setConfig] = useState<AuthGateConfig | null>(null);
+  // Selector: her ürün kartının kalbi bu hook'u kullanır; store'un ilgisiz
+  // yazımları (limits, user alanları) bütün kalpleri yeniden çizmesin.
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [config, setConfig] = useState<AuthGateConfig | null>(null);
 
-	const close = useCallback(() => setConfig(null), []);
+  const close = useCallback(() => setConfig(null), []);
 
-	/**
-	 * Run `action` when authed; otherwise open the auth modal with `config`.
-	 * Returns `true` when the action ran. Call with just a config to gate an early
-	 * return: `if (!requireAuth(cfg)) return;`.
-	 */
-	const requireAuth = useCallback(
-		(cfg: AuthGateConfig, action?: () => void): boolean => {
-			if (!isAuthenticated) {
-				setConfig(cfg);
-				return false;
-			}
-			action?.();
-			return true;
-		},
-		[isAuthenticated],
-	);
+  /**
+   * Run `action` when authed; otherwise open the auth modal with `config`.
+   * Returns `true` when the action ran. Call with just a config to gate an early
+   * return: `if (!requireAuth(cfg)) return;`.
+   */
+  const requireAuth = useCallback(
+    (cfg: AuthGateConfig, action?: () => void): boolean => {
+      if (!isAuthenticated) {
+        setConfig(cfg);
+        return false;
+      }
+      action?.();
+      return true;
+    },
+    [isAuthenticated],
+  );
 
-	const authModal = config ? (
-		<AuthRequiredModal
-			isOpen
-			onClose={close}
-			title={config.title}
-			message={config.message}
-			icon={config.icon}
-			redirectPath={config.redirectPath}
-		/>
-	) : null;
+  const authModal = config ? (
+    <AuthRequiredModal
+      isOpen
+      onClose={close}
+      title={config.title}
+      message={config.message}
+      icon={config.icon}
+      redirectPath={config.redirectPath}
+    />
+  ) : null;
 
-	return { isAuthenticated, requireAuth, authModal, close };
+  return { isAuthenticated, requireAuth, authModal, close };
 }

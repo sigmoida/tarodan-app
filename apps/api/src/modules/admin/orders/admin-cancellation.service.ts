@@ -3,13 +3,13 @@ import type { Prisma } from "@prisma/client";
 import {
   ADMIN_CANCELLATION_BUCKETS,
   ADMIN_CANCELLATION_TABS,
+  EXPORT_CATALOGS,
   type AdminCancellationCounts,
   type AdminCancellationRow,
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import {
-  ADMIN_LIST_MAX_LIMIT,
   paginateMerged,
   type ListQuery,
   type PaginatedResult,
@@ -35,14 +35,19 @@ import {
   cancellationHeadComparator,
   type CancellationHead,
 } from "./helpers/cancellation-heads";
-import { cancellationExportSheet } from "./helpers/cancellation-export";
-import { toXlsx } from "../../../common/helpers/tabular-export";
-import { translateMessage } from "../../i18n/translate";
+import {
+  cancellationExportFilters,
+  cancellationExportRecords,
+  cancellationExportTotals,
+} from "./helpers/cancellation-export";
+import { ExportListService, type ExportFile } from "../../../common/export";
 import type { Locale } from "@tarodan/i18n";
 
 /**
- * Excel'in satır (sepet/sipariş/takas) tavanı. Aşarsa dosya ilk N satırı taşır
- * ve `X-Export-Truncated-At` başlığı döner — sessiz kırpma yok.
+ * Excel'in kayıt (sepet/sipariş/takas) tavanı — ortak 20.000'in altında:
+ * birleşik sayfalama (`paginateMerged`) N. sayfa için her kaynaktan N × sayfa
+ * kadar baş okur, yani maliyet sayfa sayısıyla karesel büyür. Aşarsa dosya ilk
+ * N kaydı taşır ve `X-Export-Truncated-At` başlığı döner — sessiz kırpma yok.
  */
 export const CANCELLATION_EXPORT_ROW_CAP = 5000;
 
@@ -68,6 +73,7 @@ export type CancellationListRequest = CancellationListQuery &
 export class AdminCancellationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly exports: ExportListService,
     @Optional()
     private readonly storageService?: StorageService,
   ) {}
@@ -175,40 +181,38 @@ export class AdminCancellationService {
   }
 
   /**
-   * Geçerli filtrenin Excel dosyası — listeyle AYNI kaynak ve sıralama: liste
-   * sayfaları en büyük sayfa boyuyla sırayla okunur (tavana kadar).
+   * Geçerli filtrenin Excel dosyası — listeyle AYNI kaynak, sekme/alt sekme,
+   * filtre ve sıralama: liste sayfaları en büyük sayfa boyuyla sırayla okunur
+   * (tavana kadar). Uzun biçim: satır = iptal kalemi, kaydın kolonları her
+   * kalemde tekrarlanır, kaydın tutarı Özet'te. Taraf filtresi (ad/e-posta)
+   * arama gibi redakte edilir.
    */
-  async exportXlsx(
+  async export(
     query: CancellationListRequest,
+    actorId: string,
     locale: Locale,
-  ): Promise<{ filename: string; body: Buffer; truncated: boolean }> {
-    const rows: AdminCancellationRow[] = [];
-    let truncated = false;
-    for (let page = 1; ; page++) {
-      const result = await this.list({
-        ...query,
-        page,
-        limit: ADMIN_LIST_MAX_LIMIT,
-      });
-      rows.push(...result.data);
-      if (rows.length >= CANCELLATION_EXPORT_ROW_CAP) {
-        truncated =
-          rows.length > CANCELLATION_EXPORT_ROW_CAP ||
-          page < result.meta.totalPages;
-        rows.length = Math.min(rows.length, CANCELLATION_EXPORT_ROW_CAP);
-        break;
-      }
-      if (page >= result.meta.totalPages) break;
-    }
-    const sheet = cancellationExportSheet(rows, (key) =>
-      translateMessage(key, locale),
-    );
-    const day = new Date().toISOString().slice(0, 10);
-    return {
-      filename: `iptaller-${day}.xlsx`,
-      body: await toXlsx([sheet]),
-      truncated,
-    };
+  ): Promise<ExportFile> {
+    return this.exports.exportList({
+      catalog: EXPORT_CATALOGS.cancellations,
+      locale,
+      slug: "iptaller",
+      titleKey: "admin.operations.cancellations.export.sheetName",
+      filters: cancellationExportFilters(query),
+      sort: { sortBy: "cancelledAt", sortOrder: query.sortOrder },
+      cap: CANCELLATION_EXPORT_ROW_CAP,
+      longFormat: true,
+      fetchPage: async ({ page, take }) =>
+        (await this.list({ ...query, page, limit: take })).data,
+      map: cancellationExportRecords,
+      totals: cancellationExportTotals,
+      audit: {
+        actorId,
+        action: "cancellations_export",
+        entityType: "Cancellation",
+        query,
+        redact: ["party"],
+      },
+    });
   }
 
   // ── Kaynaklar ──────────────────────────────────────────────────────────────

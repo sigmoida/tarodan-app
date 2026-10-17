@@ -1,8 +1,7 @@
 "use client";
 
-import { LockClosedIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Card } from "@tarodan/ui";
+import { MetricCard } from "@/components/MetricCard";
 import { ROLES, getRoleMeta } from "../_lib/constants";
 
 /**
@@ -28,25 +27,23 @@ export function RoleSummaryCards({
                 count: (permissions[role] ?? []).length,
               });
         return (
-          <Card key={role} variant="bordered" className="px-4 py-3">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-heading">
+          <MetricCard
+            key={role}
+            label={meta.label}
+            value={count}
+            footer={
+              <div className="space-y-1">
+                <p className="text-xs leading-relaxed text-muted">
+                  {meta.description}
+                </p>
                 {role === "super_admin" && (
-                  <LockClosedIcon className="h-3.5 w-3.5 text-subtle" />
+                  <p className="text-xs text-subtle">
+                    {t("admin.roles.lockedCannotChange")}
+                  </p>
                 )}
-                {meta.label}
-              </span>
-              <span className="font-mono text-xs text-muted">{count}</span>
-            </div>
-            <p className="text-xs leading-relaxed text-muted">
-              {meta.description}
-            </p>
-            {role === "super_admin" && (
-              <p className="mt-2 text-xs text-subtle">
-                {t("admin.roles.lockedCannotChange")}
-              </p>
-            )}
-          </Card>
+              </div>
+            }
+          />
         );
       })}
     </div>

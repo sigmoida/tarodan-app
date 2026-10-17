@@ -1,8 +1,30 @@
 #!/usr/bin/env node
 
+/**
+ * Git pre-push hook (.husky/pre-push).
+ *
+ *   development  quick local gate: typecheck (+ API contract) of the affected
+ *                apps, ~1 min, no jest. CI gates the staging deploy on
+ *                typecheck + lint only; the unit suites run there as an
+ *                advisory workflow (Development Tests).
+ *   master       nothing heavy runs locally. master moves through a PR
+ *                development -> master whose "Verify / *" checks are the full
+ *                gate, and Release Production re-runs it before deploying.
+ *                A direct push only prints a reminder.
+ *
+ * Branch names follow tarodan-ops docs/commit-and-branch-rules.md. The hook
+ * checks them only where a name is being introduced: a push that CREATES a
+ * remote branch (checks the remote name), and a push into development or
+ * master from a local branch (checks the local name, so
+ * `git push origin fix/x:development` checks `fix/x`). Updating an existing
+ * remote branch (e.g. dependabot/*) and deletions always pass.
+ * `development`, `master`, the tool's temporary `worktree-*` names and local
+ * `integration/<wave>` branches are allowed as well.
+ */
+
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -24,17 +46,100 @@ export function parsePushLines(input) {
     );
 }
 
-export function validateReleaseMarker(marker, expectedTree) {
-  if (!marker) {
-    return "No local release verification was found.";
+/**
+ * Pushes that run the local gate. Deletions (all-zero local sha) and pushes to
+ * any other branch run nothing.
+ */
+export function developmentPushes(pushes) {
+  return pushes.filter(
+    (push) =>
+      !ZERO_SHA.test(push.localSha) &&
+      push.remoteRef === "refs/heads/development",
+  );
+}
+
+export function masterPushes(pushes) {
+  return pushes.filter(
+    (push) =>
+      !ZERO_SHA.test(push.localSha) && push.remoteRef === "refs/heads/master",
+  );
+}
+
+export const BRANCH_NAME_PATTERN =
+  /^(feat|fix|refactor|perf|chore|ci|docs|test|hotfix)\/[a-z0-9-]+$/;
+const ALLOWED_BRANCH_NAMES = [
+  /^(development|master)$/,
+  /^worktree-[A-Za-z0-9._-]+$/,
+  /^integration\/[a-z0-9-]+$/,
+];
+
+export function isValidBranchName(name) {
+  return (
+    BRANCH_NAME_PATTERN.test(name) ||
+    ALLOWED_BRANCH_NAMES.some((pattern) => pattern.test(name))
+  );
+}
+
+function branchOf(ref) {
+  return ref?.startsWith("refs/heads/")
+    ? ref.slice("refs/heads/".length)
+    : undefined;
+}
+
+const PROTECTED_BRANCHES = new Set(["development", "master"]);
+
+/**
+ * Branch names a push introduces that break the naming rule: the name of a
+ * remote branch being created, and the local branch pushed into development
+ * or master. Updates of existing remote branches and deletions are skipped
+ * (removing or updating a badly named branch must stay possible), and so are
+ * local refs that are not branches (`HEAD`, a sha, a tag).
+ */
+export function invalidBranchNames(pushes) {
+  const names = new Set();
+  for (const push of pushes) {
+    if (ZERO_SHA.test(push.localSha)) {
+      continue;
+    }
+    const remote = branchOf(push.remoteRef);
+    const candidates = [];
+    if (remote && ZERO_SHA.test(push.remoteSha)) {
+      candidates.push(remote);
+    }
+    if (remote && PROTECTED_BRANCHES.has(remote)) {
+      candidates.push(branchOf(push.localRef));
+    }
+    for (const name of candidates) {
+      if (name && !isValidBranchName(name)) {
+        names.add(name);
+      }
+    }
   }
-  if (marker.status !== "PASS") {
-    return `Latest local release verification is ${marker.status ?? "unknown"}.`;
+  return [...names];
+}
+
+export function branchNameError(names) {
+  if (names.length === 0) {
+    return undefined;
   }
-  if (marker.tree !== expectedTree) {
-    return "Code changed after the latest local release verification.";
+  return (
+    `Push blocked: branch name${names.length > 1 ? "s" : ""} ${names.map((name) => `"${name}"`).join(", ")} ` +
+    "must match <type>/<kebab-description> with type one of feat, fix, refactor, perf, chore, ci, docs, test, hotfix " +
+    "(lower-case letters, digits and dashes), e.g. fix/offer-counter-lock. " +
+    "Rename it with `git branch -m <new-name>` and push again. " +
+    "Rules: tarodan-ops docs/commit-and-branch-rules.md."
+  );
+}
+
+/**
+ * The local gate verifies the working tree, so the pushed commit must have the
+ * checked-out tree. Returns the block message, or undefined when they match.
+ */
+export function treeMismatchError(push, headTree, treeOf) {
+  if (treeOf(push.localSha) === headTree) {
+    return undefined;
   }
-  return undefined;
+  return `Push blocked: ${push.remoteRef} would receive ${push.localSha.slice(0, 12)}, but the checked-out tree differs, so the local checks would verify the wrong code. Check out the commit you push (or push HEAD) and retry.`;
 }
 
 function git(...args) {
@@ -43,18 +148,6 @@ function git(...args) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
   }).trim();
-}
-
-function releaseMarkerPath() {
-  const gitDirectory = git("rev-parse", "--git-dir");
-  const absoluteGitDirectory = isAbsolute(gitDirectory)
-    ? gitDirectory
-    : resolve(REPO_ROOT, gitDirectory);
-  return join(
-    absoluteGitDirectory,
-    "tarodan-test-results",
-    "release-verification.json",
-  );
 }
 
 function run(command, args) {
@@ -82,34 +175,28 @@ function verifyDevelopmentPush(push) {
   ]);
 }
 
-function verifyMasterPush(push) {
-  const markerPath = releaseMarkerPath();
-  const marker = existsSync(markerPath)
-    ? JSON.parse(readFileSync(markerPath, "utf8"))
-    : undefined;
-  const expectedTree = git("rev-parse", `${push.localSha}^{tree}`);
-  const error = validateReleaseMarker(marker, expectedTree);
-
-  if (error) {
-    console.error(`\nMaster push blocked: ${error}`);
-    console.error("Run pnpm verify:release:local and retry the push.\n");
-    return 1;
-  }
-
-  console.log(
-    `Local release verification accepted (${expectedTree.slice(0, 12)}).\n`,
-  );
-  return 0;
-}
-
 function runCli() {
   const pushes = parsePushLines(readFileSync(0, "utf8"));
-  const activePushes = pushes.filter((push) => !ZERO_SHA.test(push.localSha));
-  const protectedPush = activePushes.some((push) =>
-    ["refs/heads/development", "refs/heads/master"].includes(push.remoteRef),
-  );
+  const development = developmentPushes(pushes);
 
-  if (protectedPush && git("status", "--porcelain")) {
+  const nameError = branchNameError(invalidBranchNames(pushes));
+  if (nameError) {
+    console.error(`\n${nameError}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  if (masterPushes(pushes).length > 0) {
+    console.log(
+      "\nPushing to master directly. The intended path is a PR development -> master: " +
+        'its "Verify / *" checks are the full gate (all unit tests, typecheck, lint, ' +
+        "production build, dependency audit). Release Production re-runs that gate " +
+        "before it deploys, so nothing heavy runs here.\n",
+    );
+  }
+
+  // The local gate runs on the working tree, so it must BE the pushed tree.
+  if (development.length > 0 && git("status", "--porcelain")) {
     console.error(
       "\nPush blocked: commit or remove local changes so verification matches the pushed tree.\n",
     );
@@ -117,19 +204,26 @@ function runCli() {
     return;
   }
 
-  for (const push of activePushes) {
-    if (push.remoteRef === "refs/heads/development") {
-      const status = verifyDevelopmentPush(push);
-      if (status !== 0) {
-        process.exitCode = status;
-        return;
-      }
-    } else if (push.remoteRef === "refs/heads/master") {
-      const status = verifyMasterPush(push);
-      if (status !== 0) {
-        process.exitCode = status;
-        return;
-      }
+  // Same reason: the checks read the checked-out files, so pushing another
+  // commit (`git push origin other:development`) would verify the wrong tree.
+  const headTree =
+    development.length > 0 ? git("rev-parse", "HEAD^{tree}") : "";
+  for (const push of development) {
+    const error = treeMismatchError(push, headTree, (sha) =>
+      git("rev-parse", `${sha}^{tree}`),
+    );
+    if (error) {
+      console.error(`\n${error}\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  for (const push of development) {
+    const status = verifyDevelopmentPush(push);
+    if (status !== 0) {
+      process.exitCode = status;
+      return;
     }
   }
 }

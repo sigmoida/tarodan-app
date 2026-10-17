@@ -1,6 +1,10 @@
 "use client";
 
 import { Modal } from "@tarodan/ui";
+import { fmtDateTime } from "@/lib/format";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
+import { TextLink } from "@/components/TextLink";
 import { type GuestContact } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -16,45 +20,39 @@ export function GuestContactModal({
   return (
     <Modal isOpen onClose={onClose} title={contact.subject} size="lg">
       <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-          <div className="min-w-0">
-            <p className="text-muted">
-              {t("admin.messaging.support.fullName")}
-            </p>
-            <p className="font-medium text-heading">{contact.name}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-muted">{t("common.email")}</p>
-            <a
+        <DataList columns={2}>
+          <Field layout="stacked" label={t("admin.messaging.support.fullName")}>
+            {contact.name}
+          </Field>
+          <Field layout="stacked" label={t("common.email")}>
+            <TextLink
               href={`mailto:${contact.email}`}
-              className="block truncate font-medium text-primary-600 hover:underline"
+              className="block truncate"
             >
               {contact.email}
-            </a>
-          </div>
-          <div className="min-w-0">
-            <p className="text-muted">
-              {t("admin.messaging.support.reference")}
-            </p>
-            <p className="font-mono text-xs text-heading">
-              {contact.referenceNumber}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-muted">{t("common.date")}</p>
-            <p className="font-medium text-heading">
-              {new Date(contact.createdAt).toLocaleString(
-                t("common.dateLocale"),
-              )}
-            </p>
-          </div>
-        </div>
-        <div>
-          <p className="mb-1 text-sm text-muted">{t("common.message")}</p>
-          <p className="whitespace-pre-wrap rounded-lg border border-border bg-surface-alt p-4 text-body">
-            {contact.message}
-          </p>
-        </div>
+            </TextLink>
+          </Field>
+          <Field
+            layout="stacked"
+            mono
+            label={t("admin.messaging.support.reference")}
+          >
+            {contact.referenceNumber}
+          </Field>
+          <Field layout="stacked" label={t("common.date")}>
+            {fmtDateTime(contact.createdAt)}
+          </Field>
+        </DataList>
+        <DataList columns={1}>
+          <Field layout="stacked" label={t("common.message")}>
+            <Panel
+              tone="muted"
+              className="whitespace-pre-wrap font-normal text-body"
+            >
+              {contact.message}
+            </Panel>
+          </Field>
+        </DataList>
       </div>
     </Modal>
   );

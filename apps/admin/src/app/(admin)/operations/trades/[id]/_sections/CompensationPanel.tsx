@@ -1,7 +1,6 @@
 "use client";
 
-import { Button } from "@tarodan/ui";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { Alert, Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { usePrompt } from "@/provider/PromptProvider";
@@ -48,28 +47,20 @@ export function CompensationPanel({ trade }: { trade: TradeDetail }) {
         : trade.compensationPendingUserId;
 
   return (
-    <div className="rounded-xl border-2 border-warning-400 bg-warning-50 p-4 shadow-sm">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
-        <div className="flex items-start gap-3">
-          <ExclamationTriangleIcon className="h-7 w-7 flex-shrink-0 text-warning-700" />
-          <div>
-            <h2 className="text-base font-semibold text-warning-900">
-              {t("admin.operations.trades.compensationTitle")}
-            </h2>
-            <p className="mt-1 text-sm text-warning-800">
-              {t("admin.operations.trades.compensationBody", { who })}
-            </p>
-          </div>
-        </div>
+    <Alert
+      variant="warning"
+      title={t("admin.operations.trades.compensationTitle")}
+      action={
         <Button
           variant="primary"
           onClick={handle}
           isLoading={resolve.isPending}
-          className="sm:flex-shrink-0"
         >
           {t("admin.operations.trades.compensationClosed")}
         </Button>
-      </div>
-    </div>
+      }
+    >
+      <p>{t("admin.operations.trades.compensationBody", { who })}</p>
+    </Alert>
   );
 }

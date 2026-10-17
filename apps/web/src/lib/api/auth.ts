@@ -1,3 +1,4 @@
+import type { ConsentDocumentKey } from "@tarodan/types";
 import { api } from "./client";
 
 // Auth
@@ -14,12 +15,18 @@ export const authApi = {
     api.post("/auth/forgot-password", { email }),
   register: (data: {
     displayName: string;
+    /** Yasal kimlik — web formunda zorunlu, API'de opsiyonel (eski mobil). */
+    legalFirstName?: string;
+    legalLastName?: string;
+    nationalId?: string;
     username: string;
     email: string;
     password: string;
     phone?: string;
     birthDate?: string;
     acceptsMarketingEmails?: boolean;
+    /** Kayıt formunda onaylanan zorunlu belgeler (terms, privacy, kvkk). */
+    acceptedConsents?: ConsentDocumentKey[];
   }) => api.post("/auth/register", data),
   logout: () => api.post("/auth/logout"),
   getProfile: () => api.get("/auth/profile"),

@@ -16,6 +16,7 @@ import {
   type PackageTierCode,
 } from "../usePackageTiers";
 import type { CommissionPreview, PackageTierShipping } from "../queries";
+import type { PriceLimits } from "../price-limits";
 
 interface PricingCardProps {
   locale: string;
@@ -31,6 +32,11 @@ interface PricingCardProps {
   /** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
   quantityPlaceholder: string;
   quantityHelper: string;
+  /**
+   * Platform fiyat sınırları (admin ayarı). Verilmezse ya da boşsa fiyat
+   * alanının altında ipucu çıkmaz — yönetici ekranı sınır göstermez.
+   */
+  priceLimits?: PriceLimits;
 }
 
 // Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
@@ -46,8 +52,23 @@ export default function PricingCard({
   commissionPreviewEnabled,
   quantityPlaceholder,
   quantityHelper,
+  priceLimits,
 }: PricingCardProps) {
   const t = useTranslations();
+  // Fiyat alanının altındaki ipucu: yalnız alt sınır → "En az 250,00 TL", yalnız
+  // üst → "En fazla …", ikisi de → "… ile … arasında"; ikisi de boşsa yok.
+  const { minPrice = null, maxPrice = null } = priceLimits ?? {};
+  const priceHint =
+    minPrice != null && maxPrice != null
+      ? t("listing.priceRangeHint", {
+          minPrice: fmt(minPrice),
+          maxPrice: fmt(maxPrice),
+        })
+      : minPrice != null
+        ? t("listing.priceMinHint", { minPrice: fmt(minPrice) })
+        : maxPrice != null
+          ? t("listing.priceMaxHint", { maxPrice: fmt(maxPrice) })
+          : undefined;
   return (
     <SectionCard title={t("product.pricing")}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -59,6 +80,7 @@ export default function PricingCard({
           min={1}
           max={9999999}
           step="0.01"
+          helperText={priceHint}
         />
         <FormInput
           name="quantity"

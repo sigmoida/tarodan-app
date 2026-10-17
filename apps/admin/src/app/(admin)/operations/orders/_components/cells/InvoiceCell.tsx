@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TextLink } from "@/components/TextLink";
 import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
 import type { AdminOrderListRow } from "@tarodan/types";
@@ -40,12 +40,9 @@ export function InvoiceCell({ row }: { row: AdminOrderListRow }) {
               ))}
             </div>
             {href && (
-              <Link
-                href={href}
-                className="text-xs text-primary-600 hover:underline"
-              >
+              <TextLink href={href} className="text-xs">
                 {t("admin.operations.orders.cells.openInvoices")}
-              </Link>
+              </TextLink>
             )}
           </div>
         );

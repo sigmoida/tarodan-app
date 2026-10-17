@@ -2,7 +2,8 @@
 
 > `PRODUCTION_LAUNCH.md`, `production-database-reset.md` ve `STAGING_AND_SEED.md`
 > 2026-08-02'de bu dosyada birleştirildi. Konular: ortam guard'ları, staging
-> reset + seed-assets modeli, production launch runbook'u ve veritabanı reset'i.
+> reset + seed-assets modeli, production launch runbook'u, veritabanı reset'i ve
+> doğrulama hattı (yerel hook'lar, CI kapıları, deploy'lar — §4).
 
 ---
 
@@ -39,6 +40,29 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
 
 - **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
   audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
+- **Consents and identity:** a new account opens with the mandatory agreements
+  (terms, privacy, KVKK) accepted at the current version; otherwise mobile 1.1.0
+  shows an undismissable consent screen at login. No legal identity (first name,
+  last name, TCKN) is asked for: the test lane is exempt from the identity gate
+  (`required: false`). To complete accounts opened BEFORE this change, and every
+  time a document version changes (CONSENTS.md):
+  `docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-test-account-consents.js'`
+  — VARSAYILAN dry-run'dır: hedef veritabanını (host/db, şifresiz), etkilenecek
+  hesap / satır sayısını ve atlananları yazar, hiçbir şey yazmaz. Yazmak için aynı
+  komuta `--apply --db=<veritabanı adı>` eklenir; ad, çıktıdaki hedef veritabanıyla
+  birebir eşleşmezse (ya da hedef doğrulanamazsa: boş host / Unix socket URL'si)
+  betik yazmaz. Eski `--confirm` artık kabul edilmez. Tablo ekleme-yalnızdır, geri
+  alınamaz. Yazma sonunda "yazılan N / planlanan M" yazılır (fark uyarı verir);
+  bağlantı hatasında o ana kadar yazılan raporlanır ve tekrar koşmak güvenlidir.
+  İdempotent; yalnız eksik / eski sürümdeki belgeye satır ekler. En son kaydı
+  `withdrawn` olan belge ATLANIR (bilinçli geri çekme yeniden onaylanmaz) ve
+  raporlanır. Yeni açılan hesapların onay satırlarında IP ve kullanıcı ajanı boştur
+  (yöneticinin isteği kanıt olarak damgalanmaz).
+  Staging'de elle `docker exec` yerine GitHub Actions → **Staging Run UAT Accounts**
+  kullanılabilir: `backfill=dry-run` (varsayılan) yazmadan raporlar, `backfill=apply` +
+  `db_name=<ad>` yazar (workflow önce dry-run çıktısını da basar; ad yine betik
+  tarafından hedef DB ile doğrulanır). Aynı koşu UAT hesaplarını da uygular
+  (`seed-uat.js --accounts-only`).
 - **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1` — pazaryeri VE üyelik
   mağazasında; oto-yenileme de test modunda çekilir), PayTR iadesi (aşağıda),
   Sürat gönderisi (`TEST…` takip kodu), eLogo belgesi (üyelik faturası dahil),
@@ -184,6 +208,59 @@ Yukarıdaki uyarı burada da geçerli: delta/reconcile bu alanları tazelemez.
 Veritabanı tarafında yapılacak bir işlem YOKTUR — şema, benzersiz indeks ve
 `legacy_########` yer tutucuları zaten mevcut (`20260729180000` migration'ı).
 
+### Deploy sonrası: satış yetkisi (seller) filtresi sonrası Elasticsearch reindex
+
+`SearchCommonService.indexableProductWhere()` artık `seller:
+saleCapableSellerWhere()` içerir (e218a720 / 7fae49213, #439): satış yetkisini
+yitirmiş satıcının (süresi biten BUSINESS dönemi, geri alınan kurumsal onay)
+ilanları indekslenebilir kümeden çıkar. Eski koşulla yazılmış dokümanlar
+indekste kaldıkça her eşleşen istek PostgreSQL yoluna düşer (arama/liste
+yavaşlar, yanlış sonuç vermez) ve `inSync` kontrolü drift raporlar. Bu
+değişikliği ilk kez alan bir ortamda deploy'dan sonra bir kez çalıştır.
+
+Mekanizma: `SearchService.reindexAll` — indekslenebilir tüm ürünleri okur,
+`products` indeksini **silip** güncel mapping'le yeniden kurar, tek bulk
+istekle doldurur. **Dry-run yoktur**; önce salt-okunur durum kontrolü:
+
+```
+curl -s https://api.tarodan.com.tr/api/search/status          # public, salt-okunur
+# → {"documentCount":N,"dbCount":M,"inSync":true|false,...}
+```
+
+Çalıştırma — ikisinden biri:
+
+- Admin panel → **Sistem Ayarları** başlığındaki **"Yeniden Dizinle"** butonu
+  (admin / super_admin, `products` izni);
+- ya da admin token'ıyla:
+
+```
+curl -X POST https://api.tarodan.com.tr/api/search/admin/reindex \
+  -H "Authorization: Bearer $ADMIN_ACCESS_TOKEN"
+# → {"indexed": <dbCount ile aynı>}
+```
+
+**Süre / etki:** güncel katalog boyutunda (~550 ürün) birkaç saniye. İstek
+senkrondur; indeks silinip bulk tamamlanana dek arama boş/eksik dönebilir —
+düşük trafikte çalıştır. Hata olursa `search_indexes.status = error` olur ve
+`500 server.search.reindexFailed` döner; ES'i kontrol edip yeniden çalıştır
+(idempotent). Koleksiyon indeksi bu değişiklikten etkilenmez.
+
+**Doğrulama:** `GET /api/search/status` → `documentCount` = `dbCount` (hedef
+budur; `inSync` yalnız sayıyı ±2 toleransla karşılaştırır, ID düzeyinde temizlik
+kanıtı değildir); POST yanıtındaki `indexed` = `dbCount`; API logunda
+`Reindexed <N> products`. Takip: `ProductQueryService`'in ES ↔ Postgres
+uyuşmazlık fallback'i (`products.length !== esResult.ids.length`) normal
+trafikte sık tetiklenirse, #439'daki "stale id'leri düşür, toplamı düzelt"
+yumuşatması gündeme alınır.
+
+> Bu küme farkı kendiliğinden de kapanır: saatlik `search-hourly-reconcile`
+> aynı `indexableProductWhere()` ile ID kümesi farkını alıp yetim dokümanları
+> siler; API açılışındaki `syncIndexIfEmpty` de mapping'de `sellerCanSell` /
+> `sellerSalesEntitledUntil` / `productKind` yoksa tam reindex yapar. Elle
+> reindex düzeltmeyi bir saat beklemeden anında yapar. 2026-10-17 itibarıyla
+> staging 551/551; production 566/564 (`inSync: true` ama 2 doküman fark var —
+> canlıya çıkışta elle reindex ile `documentCount` = `dbCount` yapılması önerilir).
+
 ### Bir kerelik: silinen hesap kimlik arşivi backfill'i
 
 `20260909090000_deleted_user_identity` migration'ı `deleted_user_identities`
@@ -219,7 +296,7 @@ imha gerekirse `SET LOCAL "tarodan.allow_identity_purge" = 'on'` gerekir.
 ### Bir kerelik: fatura taraf/işlem kolonları backfill'i
 
 `20260910100000_elogo_invoice_parties_and_context` migration'ı
-`elogo_invoices` tablosuna `seller_user_id`, `buyer_user_id` ve `context`
+`elogo_invoices` (model: `FiscalInvoice`) tablosuna `seller_user_id`, `buyer_user_id` ve `context`
 (sipariş gerçekleşme şekli) kolonlarını ekler. Yeni kesilen belgeler bunları
 kesim anında yazar; **migration'dan önce kesilmiş belgelerde boştur**.
 
@@ -241,6 +318,97 @@ Yerelde: `pnpm --filter @tarodan/api backfill:prod:invoice-parties` (önce
 Idempotenttir: yalnız üç kolonu da boş olan satırlara dokunur. `--dry-run`
 iade faturalarını "çözülemeyen" sayar — tarafları ters çevirdikleri belgeden
 devraldıkları için kaynakları henüz yazılmamıştır; gerçek koşuda dolarlar.
+
+### Faz 1b (Netsis geçişi): e-belge kaydı sağlayıcıdan bağımsız
+
+`20261012120000_fiscal_invoice_provider` migration'ı YALNIZ `provider`
+kolonunu (`elogo` varsayılanlı) ekler. Kod adları sağlayıcıdan bağımsızdır
+(`FiscalInvoice`, `providerRef`…) ama **veritabanı adları bilerek değişmez**:
+`elogo_invoices`, `elogo_doc_sequences`, `elogo_ref_id` / `elogo_result_code` /
+`elogo_result_msg` ve `ElogoInvoice*` enum tipleri Prisma `@map` ile eşlenir.
+Ek geriye dönük uyumludur: eski imaj kolonu yok sayar, deploy penceresi ve
+geri dönüş adımı gerektirmez.
+
+Bilinçli olarak eski adıyla kalanlar (ayrı bir ops adımı isterler, bkz.
+`INVOICING_PROVIDERS.md` "Faz 5"): `/elogo/invoices*` yolları, `elogo-retry-pending`
+cron kimliği, `ELOGO_*` ortam anahtarları, S3 klasörü `elogo-invoices/`, e-posta
+şablonu `elogo-invoice`, bildirim türü `ELOGO_INVOICE_EXHAUSTED`.
+
+### Bir kerelik: onay kayıtları (consent_records) geçişi
+
+`20261005100000_consent_records` migration'ı hukuki onay kayıtları tablosunu
+ekler (yalnız ekleme; ayrıntı ve sözleşme: `CONSENTS.md`). Deploy'da kendiliğinden
+koşar. Ardından iki adım:
+
+**1. Eski sepet onaylarını aktar.** Mesafeli satış onayı daha önce
+`checkout_groups.distance_sales_*` kolonlarına yazılıyordu; artık tek kayıt
+`consent_records`. Aktarılmayan eski onaylar Onay Kayıtları ekranında görünmez:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-distance-sales-consents.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-distance-sales-consents.js'
+```
+
+Yerelde: `pnpm --filter @tarodan/api backfill:prod:distance-sales-consents`
+(önce `build:seed`). İdempotent; orijinal onay anı ve sürümüyle yazar, IP /
+kullanıcı ajanı o dönemde saklanmadığı için boştur.
+
+**2. Mesafeli satış zorunluluğunu (sonra) aç.** Ödeme formu (`direct-form`)
+onaysız satın almayı varsayılan olarak REDDETMEZ — onay kutusunu göndermeyen
+eski mobil sürümler ödeme yapabilsin diye. Mobilin onayı gönderen sürümü
+yeterince yayıldığında panelde **Ayarlar → Yasal** sekmesinden
+"Mesafeli satış onayı ödemede zorunlu" açılır (platform ayarı
+`distance_sales_consent_required = "true"`; deploy gerekmez). Açıkken onay
+kaydı olmayan satın alma `400 server.consent.distanceSalesRequired` alır.
+
+Hesap belgeleri (kullanım şartları / gizlilik / KVKK) için ayrı bir anahtar
+yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte web'de
+yeniden-onay penceresini görür. Belge metni değiştiğinde
+`packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
+
+### Bir kerelik: reklam platformu (web / uygulama) geçişi
+
+`20261016110000_ad_platform_popup` migration'ı reklamlara `platform`
+(`web` / `app` / `all`), popup gösterim sıklığı ve popup sürümü ekler. Göç
+yalnız şemadır: deploy'da kendiliğinden koşar ve TÜM reklamlar `platform =
+all` ile başlar. Eski "Cihaz" hedefini (`device_type`: masaüstü → web, mobil
+→ uygulama) taşıyan backfill KENDİLİĞİNDEN KOŞMAZ — **deploy'dan hemen sonra**
+elle çalıştırılır; çalışana dek yalnız masaüstüne hedeflenmiş eski bir reklam
+uygulamada da görünür:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-ad-platform.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-ad-platform.js'
+```
+
+Yerelde: `pnpm --filter @tarodan/api backfill:prod:ad-platform` (önce
+`build:seed`). İdempotent; admin'in sonradan seçtiği platformu ezmez (API her
+yazımda `device_type`'ı platformdan türetir, script yalnız `platform = all`
+iken `device_type` hâlâ masaüstü / mobil olan satırlara dokunur).
+
+Ardından panelde **Pazarlama → Reklamlar** listesine bakın: aynı yuvada
+(pozisyon + platform) yayında birden çok reklam varsa vitrin yalnız ilkini
+gösterir, ötekiler "Aynı yuvada başka reklam yayında" rozetiyle işaretlidir.
+Yeni kayıtlarda bu durum oluşamaz (API `409 server.ads.slotTaken`); eskileri
+admin pasife alır ya da tarihlerini ayırır.
+
+### Bir kerelik: Süreler ve Kurallar geçişi
+
+İş süreleri artık **Sistem → Süreler ve Kurallar** ekranından yönetilir
+(ayrıntı: `TIMING_RULES.md`). Deploy hiçbir süreyi değiştirmez: admin bir
+değer kaydedene kadar eski env değişkeni, o da yoksa kod varsayılanı geçerlidir.
+Seed'deki eski satırlar (`offer_expiry_hours`, `payment_hold_days`; `updated_by`
+boş) env değişkeninin önüne geçmez — `OFFER_EXPIRY_HOURS` canlıda 24'ten farklıysa
+o değer korunur.
+
+`20261005150000_order_return_window_ends_at` migration'ı `orders`a boş bir
+kolon ekler (yalnız ekleme, geri doldurma YOK). Deploy'dan sonra teslim edilen
+siparişlerin cayma penceresi sonu teslimde damgalanır; öncekiler bugünkü
+pencereyle hesaplanmaya devam eder.
+
+Deploy sonrası ekranı bir kez açıp **"sınır dışı"** uyarısı taşıyan satır var
+mı bakın (ör. env'de `RETURN_WINDOW_DAYS` 14'ün altındaysa). Uyarılı değer
+uygulanmaya devam eder; aralık içinde bir değer kaydederek düzeltin.
 
 ### Bir kerelik: PayTR üyelik mağazası geçişi (2026-09)
 
@@ -402,14 +570,113 @@ _c) Manuel çözüm (her satır için):_
 Geçiş öncesi alınmış üyelik ödemelerinin iadeleri eski (pazaryeri) mağazadan
 yapılır — ek iş gerekmez.
 
+### One-off: settle seller-fault escrow residuals
+
+A seller-fault cancellation before shipment used to leave the seller's
+shipping share in the hold: the order closed, but the hold stayed `held` with
+`amount − refundedAmount > 0`, and because the seller was at fault it was
+**never paid** (admin list: "Satıcı kusurlu — ödenmez"). The source is fixed,
+and since decision D20 any earlier seller-fault refund of an order forfeits
+the share at the source as well. The residuals that piled up are settled with
+this script. The money does not go to the buyer, who already got back
+everything they paid; the residual belongs to the platform (`PAYMENTS.md` §5).
+There is no PSP call: the hold becomes `cancelled` with
+`refundedAmount = amount`, and the ledger gets a balanced
+`seller_escrow → platform_commission` `adjustment` group
+(`hold-residual-settle:<holdId>`).
+
+After the deploy, dry run first (the default, report only):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/settle-seller-fault-residuals.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/settle-seller-fault-residuals.js --apply'
+```
+
+Locally: `pnpm --filter @tarodan/api settle:prod:seller-fault-residuals` (run
+`build` + `build:seed` first; the script loads the compiled application
+context from `dist/`).
+
+The report lists, per hold: hold, order, seller, residual, fault basis and
+outcome.
+
+- `seller` (a finalized refund names the seller at fault: the v2 fault
+  column or a v1 `seller_fault_*` code): settled by `--apply`.
+- `unknown` (closed order without a finalized refund, or only a `legacy`
+  refund without a fault party): **decide manually**.
+  The script lists these rows and their total but never settles them, not
+  even with `--apply`, and the release cron never pays them either. Review
+  each one, and if it belongs to the platform, settle it with
+  `POST /admin/payouts/holds/:id/settle-residual` (admin panel, reason
+  required, audit record written).
+
+The script is idempotent: a settled hold leaves the candidate set, so a second
+run settles nothing, and re-running after `failed` rows is safe. Run the dry
+run again a few days after the deploy as a check. It should find nothing
+new. When a request decided before the fix still carries the seller's share
+in its stored components, `processRefund` checks the request's own fault and
+the order's earlier finalized refunds as it consumes the hold:
+
+- any of them is seller fault and the request's components do NOT charge the
+  buyer that share: the share is forfeited, the hold is consumed in full, and
+  the log says "Seller shipping share forfeited";
+- any of them is seller fault but the request's components DO charge the
+  buyer the share (a buyer-fault request decided under the old rule, its
+  cash already reduced by it): the part the buyer was charged (at most the
+  share) stays in the hold for the seller, so it is collected only once, and
+  the log says "Seller shipping share kept under the pre-D20 rule". The order
+  normally stays `delivered` and the normal release pays it.
+
+The first case leaves no residual. In the second, if that order later closes
+(an admin refund reaching T), the kept share shows up in the dry run as a
+`seller` row. Do NOT settle it to the platform: the buyer already paid it.
+Find it by the log line and leave it to the payout. Anything else the re-run
+finds is settled the same way as above.
+
+### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
+
+Hesap silme, Sign in with Apple refresh token'ının Apple'da iptalini outbox'a
+yazar (`apple.token_revoke`; App Store 5.1.1(v)). Silme bu işe bağlı değildir;
+iş yeniden denenir. DLQ'ya (`outbox_events.status = 'dead'`, log:
+`OUTBOX_DEAD type=apple.token_revoke`) şu durumlarda düşer:
+
+- `invalid_grant`, `unauthorized_client`, `invalid_request` vb. kalıcı Apple
+  reddi; `invalid_client` ise 3 denemeden sonra. Apple `invalid_grant`ı
+  geçersiz token kadar yanlış/uyuşmayan client id için de döndürür; şifreli
+  token bu yüzden **silinmez** (`apple_sign_in_tokens.last_revoke_error`
+  teşhistir).
+- `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` /
+  `APPLE_TOKEN_ENCRYPTION_KEY` eksik ya da anahtar okunamıyor: iş ~1 gün
+  (30 deneme) yeniden denenir, sonra düşer. **Kendiliğinden toparlanmaz** —
+  düşmüş işi aşağıdaki script geri getirir.
+
+Önce nedeni düzeltin (Apple anahtarının `com.tarodan.app` ana App ID'ye
+bağlanması, env değerleri), sonra yeniden kuyruğa alın. Dedupe upsert'i ölü
+işe dokunmadığı için başka yol yoktur. Varsayılan kuru koşudur (yalnız sayar):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/redrive-apple-token-revocations.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/redrive-apple-token-revocations.js --apply'
+```
+
+Yerelde: `pnpm --filter @tarodan/api redrive:prod:apple-token-revocations`.
+Yalnız şifreli token'ı duran ve `revoked_at` boş satırların işleri alınır;
+yapılandırma hâlâ eksikse `--apply` reddedilir. Yeniden kuyruğa alınan iş taze
+deneme hakkıyla bir sonraki drain turunda (en geç 1 dk) koşar. İdempotenttir.
+
 ### Her ay: silinen hesap bildirimi
 
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel
 indirilir (`GET /api/admin/deleted-identities/export`). Dosya, o ay **silinen**
 hesapları içerir (arşiv satırının oluşturulma tarihini değil, `deleted_at`'i
-esas alır — backfill satırlarının hepsi aynı güne düşer). Her indirme
-`deleted_identity_export` adıyla denetim kaydına yazılır; kayda kimlik
-DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
+esas alır — backfill satırlarının hepsi aynı güne düşer). Ay sınırları
+**Türkiye takvimindedir** (ayın son gecesi 21:00'den sonra silinen hesap o
+aydadır). Her indirme `deleted_identity_export` adıyla denetim kaydına yazılır;
+kayda kimlik DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
+
+Dosya düzeni (biçim sürümü 2): 1. sayfa **Özet**, 2. sayfa **Bildirim
+YYYY-AA** (portala yüklenecek veri; kolon sırası değişmedi), son sayfa
+**Bilgi**. Portal ilk sayfayı okuyorsa yüklemeden önce Bildirim sayfasını
+ayrı kaydedin. Bkz. `docs/ADMIN_EXPORTS.md`.
 
 ---
 
@@ -420,7 +687,7 @@ DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
 GitHub → Actions → **Staging Reset** → `confirm` alanına `STAGING` yaz.
 `.github/workflows/staging-reset.yml` SSH ile `scripts/staging-reset-remote.sh`
 çalıştırır: pg_dump yedeği (opsiyonel, `skip_backup`) → api+worker durdurulur →
-`prisma migrate reset --force` + derlenmiş seed → redis flush + bayat ES
+`prisma migrate reset --force` + derlenmiş UAT seed (+ görsel senkronu) → redis flush + bayat ES
 indeksleri silinir → container'lar açılır (API boş indeksleri taze DB'den
 kendisi doldurur, `syncIndexIfEmpty`).
 
@@ -435,6 +702,99 @@ staging host içermeli; (2) görselli seed için `S3_ENV_PREFIX=staging` zorunlu
 > cron'unu bekle. Listedeki sayı = `active` + `sold` ürünler; pending/rejected/
 > suspended/reserved indexlenmez.
 
+### Staging / UAT
+
+Staging artık gerçek bir kabul (UAT) ortamıdır: Staging Reset **demo seed'ini
+(`seed.ts`) değil UAT seed'ini (`apps/api/prisma/seed-uat.ts`) koşar**. Demo seed
+yalnız lokal geliştirme içindir (`pnpm dev:seed`); silinmedi.
+
+**Seed neyi içerir**
+
+| Katman                        | İçerik                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Referans (production'la aynı) | Üyelik katmanları, vergi, kargo tarifesi, ayarlar, katalog (`data/launch/*.json`) ve ACTIVE komisyon kural seti. Lansman seed'iyle aynı fonksiyonlar (`seed-launch-core.ts`) — ikinci kopya yok.                                                                                                                                           |
+| Üyeler (düz kullanıcı)        | `nur@tarodan.com.tr`, `serhat@tarodan.com.tr`: e-posta doğrulanmış, aktif, bireysel satıcı. Varsayılan katmanda (üyelik satırı yok = Free) alır/satar; takas Free'de kapalıdır. **Yasal ad/TCKN, onay kayıtları ve kullanıcı adı bilerek boş**: kişiler zorunlu onay/kimlik/kullanıcı-adı diyaloglarını kendileri geçer (UAT'nin parçası). |
+| Personel (admin panel)        | `tarodan@tarodan.com.tr`, `developers@tarodan.com.tr`: `super_admin`. `users` + `admin_users` satırı (bootstrap-production-admin ile aynı biçim); personel web vitrinine giremez, üye hesabıyla karışmaz.                                                                                                                                  |
+| Başlangıç ilanları            | Her üyeye 4 ACTIVE ilan (`data/uat/listings.json`), lansman kataloğundan; ilan sahipleri birbirinden alışveriş yapabilsin diye. Free katman kotasının (5) altında — spec bunu kilitler.                                                                                                                                                    |
+| Depo adresi                   | İlk süper adminin adresi (`/health/ready` ister); adminlerin görünen adına dokunulmaz.                                                                                                                                                                                                                                                     |
+
+Sipariş, teklif, takas, ödeme, bildirim vb. operasyonel veri **yoktur**. Kayıt
+herkese açıktır: izin listesi yok, yeni kişiler staging'e normal kayıt olur.
+
+**İlan görselleri.** Seed yalnız Postgres'e yazar; reset workflow'u ardından
+mevcut mekanizmayı (`seed-media.js`, `seed-assets/` → env-prefix'li S3 kopyası)
+koşar. İlan slug'ları `<seed-assets taban adı>-<n>` biçimindedir (spec doğrular)
+ve görseller **kategori/model olarak yakın ama birebir aynı olmayan** demo
+fotoğraflarıdır (katalogda yalnız Mini GT var). `skip_images` görsel adımını
+atlar; ilanlar görselsiz kalır. `S3_ENV_PREFIX=prod` iken görselli reset zaten
+reddedilir.
+
+**Yeni kişi eklemek** = `apps/api/prisma/data/uat/accounts.json` içindeki
+`members` (düz kullanıcı) ya da `staff` (`role` ile) listesine tek satır:
+
+```json
+{ "email": "yeni@tarodan.com.tr", "displayName": "Yeni" }
+```
+
+Üye ve personel listeleri ayrıdır; aynı adres ikisinde olamaz (spec/doğrulama
+reddeder). Değişiklik bir sonraki reset'te devreye girer; reset yapmadan eklemek
+için derlenmiş seed'i elle koş (aşağıda) — mevcut hesaplara dokunmaz.
+
+**Gerekli secret / env**
+
+| Ad                                  | Nerede                              | Not                                                                                                                                                   |
+| ----------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UAT_SEED_PASSWORD`                 | GitHub `staging` environment secret | Zorunlu; 16+ karakter, en çok 72 bayt. Tüm sabit hesapların **başlangıç** şifresi; asla commit'lenmez/loglanmaz. Kişiler girişten sonra değiştirmeli. |
+| `UAT_SEED_RESET_PASSWORDS=1`        | yalnız elle koşuda                  | Verilmezse var olan hesabın şifresi DEĞİŞMEZ. Workflow bunu geçmez (reset zaten DB'yi sıfırlıyor).                                                    |
+| `SERVER_*`, `COOLIFY_STAGING_UUIDS` | GitHub secrets                      | Mevcut reset secret'ları (değişmedi).                                                                                                                 |
+
+Staging api imajı bu commit'i içermeli (`dist-seed/prisma/seed-uat.js`): önce
+staging'i deploy et, sonra reset çalıştır. Eksikse pre-flight, veritabanına
+dokunmadan durur.
+
+**Reset nasıl yapılır.** Actions → **Staging Reset** → `confirm=STAGING`. Önce
+`dry_run` ile dene: tüm guard'ları ve UAT seed pre-flight'ını (`seed-uat.js
+--check`: production reddi, şifre kuralı, veri dosyaları) veritabanına dokunmadan
+koşar. Guard'lar eskisi gibi: onay kelimesi, staging host kontrolü, S3 prefix
+kontrolü, yedek (`skip_backup`), ek olarak api `APP_ENV` tam olarak `staging`
+olmalı ve `UAT_SEED_PASSWORD` set olmalı. Seed de kendisi reddeder: derlenmiş
+konteynerde `APP_ENV=staging` değilse (boşsa bile) çalışmaz.
+
+Elle (reset'siz) koşu, yalnız api konteynerinde:
+
+```bash
+docker exec -e UAT_SEED_PASSWORD "$API_CID" sh -c 'cd /app && node dist-seed/prisma/seed-uat.js'
+```
+
+İdempotent: eksik hesabı/ilanı ekler, var olanın şifresini ve ilanını ezmez;
+mevcut personelin `admin_users` satırını veriyle eşitler.
+
+**Reset neyi yok eder.** Staging veritabanının TAMAMI (kayıt olan herkes dahil,
+siparişler, mesajlar, yüklenen içerik satırları) ve Redis'in seçili db'si
+silinir; ES indeksleri bayat kalır ve yeniden dolar. UAT'de testçilerin elle
+girdiği her şey gider — haftalık otomatik reset (`STAGING_WEEKLY_RESET=true`)
+açıksa bu her Pazartesi olur; UAT sürerken kapalı tut. Reset öncesi pg_dump
+yedeği `~/tarodan-staging-backups` altında son 5 kopya tutulur.
+
+**Elasticsearch.** Seed ES'e yazmaz. Workflow Redis'i temizleyip api'yi yeniden
+başlatır; açılışta api indeksleri garantiler ve 5 dakikada bir
+`search-periodic-sync` (DB↔ES fark > 2 ise delta senkron) ile saatlik
+`search-hourly-reconcile` işleri ACTIVE ilanları indeksler — ilanlar yeniden
+başlatmadan yaklaşık 5 dk içinde aranabilir olur. Bu işler worker rolünde
+koşar; staging'de worker (veya `PROCESS_ROLE=all`) ayakta olmalı.
+
+### Staging'i production'dan yenile (maskeli)
+
+Staging Reset'in tamamlayıcısı: staging veritabanını UAT seed'i yerine
+**production'ın maskeli kopyasıyla** değiştirir. Staging admin panelinde
+Sistem → Test Araçları düğmesi (ya da GitHub → Actions → **Staging Refresh From
+Production**, `confirm=STAGING`). Kişisel veri `masking-catalog.ts`'teki tek
+katalogla maskelenir (e-posta `@uat.invalid`, şifre/oturum/OAuth/2FA/kart/push
+token'ı silinir); sabit UAT hesapları `seed-uat.js --accounts-only` ile yeniden
+yazılır; başlangıç ilanları yazılmaz. Production dökümü sunucudan çıkmaz.
+Staging Reset ile aynı `concurrency` grubundadır. Önce **dry run**. Tasarım,
+maskeleme tablosu, secret'lar ve runbook: [UAT_REFRESH.md](./UAT_REFRESH.md).
+
 ### seed-assets
 
 Demo görseller repoda değil S3'te yaşar: `s3://amzn-tarodan/seed-assets/`.
@@ -444,8 +804,9 @@ kopyalarına sahiptir, uygulamadaki silme akışları paylaşılan kaynaklara do
 
 Anahtar düzeni: ürün `seed-assets/products/<slugBase>-card.webp` + `-detail.webp`
 · koleksiyon `seed-assets/collections/<slug>.webp` · hero
-`seed-assets/hero/<dosya>.png` (web CDN'den doğrudan çeker —
-`apps/web/src/lib/assetCdn.ts`, `NEXT_PUBLIC_ASSET_CDN_URL`) · avatar
+`seed-assets/hero/<dosya>.png` (referans seed'in `hero_slides` satırlarına
+mutlak URL olarak yazılır — `apps/api/prisma/seed-hero-content.ts`; web/mobil
+yalnız API'den okur) · avatar
 `seed-assets/avatars/avatar-XX.webp`.
 
 Bucket policy: [`docs/s3-bucket-policy-public-read.json`](./s3-bucket-policy-public-read.json) —
@@ -496,7 +857,8 @@ adımı bunu ayrıca doğrular.
 | -------- | -------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Referans | `seed-production.ts` | her API açılışında         | Uygulama açılsın diye gereken iskelet: üyelik satırları, vergi, platform hesabı, tarife kabuğu. Tüm upsert'lerin `update` dalı boş — girilen değeri ASLA ezmez. |
 | Lansman  | `seed-launch.ts`     | yalnız reset workflow'unda | Onaylanmış iş değerleri + katalog + kurumsal satıcı + komisyon seti + ilanlar. Veri `data/launch/*.json`'da.                                                    |
-| Demo     | `seed.ts`            | yalnız staging reset       | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz.                                                                                                |
+| UAT      | `seed-uat.ts`        | yalnız staging reset       | Lansman referans verisi (aynı fonksiyonlar) + sabit gerçek kişiler + başlangıç ilanları. Production'da çalışmayı reddeder. Bkz. "Staging / UAT".                |
+| Demo     | `seed.ts`            | yalnız lokal geliştirme    | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz; staging reset artık bunu koşmaz.                                                               |
 
 Demo ile canlı arasındaki bağ `src/common/seed-independence.spec.ts` ile CI'da
 kilitli: komisyon oranları bir dönem ortak config'ten geliyordu ve yerel "Araba"
@@ -542,6 +904,12 @@ Reset workflow'unun API container'ında aradığı değerler (biri tutmazsa hiç
 Son beş satır özellikle önemli: bunlar yalnız **veritabanı silindikten sonra**
 çalışan runtime reset adımının ihtiyacı olduğu için, eksiklikleri eskiden yarı
 yolda patlamaya yol açıyordu. Artık dry run da kontrol eder.
+
+**Web önbellek tazeleme (staging ve prod):** API'de `WEB_REVALIDATE_URL` (web'in
+kökü, ör. `https://tarodan.com.tr` — API `/api/revalidate`'i kendisi ekler; tam uç da
+olur) ve `REVALIDATE_SECRET`, web'de AYNI `REVALIDATE_SECRET` tanımlı olmalı. Eksikse
+admin'deki hero / ana sayfa anahtarı / fiyat değişiklikleri web'e ancak ISR penceresi
+(60 sn) dolunca yansır; reddedilen çağrı API logunda `WebRevalidate` uyarısı bırakır.
 
 **Launch'ta kapalı kalması gereken bayraklar:**
 `PAYTR_TRANSFER_CALLBACK_ENABLED` (PayTR panelinde transfer-sonuç bildirim URL'i
@@ -671,7 +1039,10 @@ herkesi anında düşürmek için `SITE_UNLOCK_SECRET` rotate et.
 **Tam açılış:** Coolify'da `SITE_LOCKED=false` + web restart; smoke test
 (anasayfa, kategori gezinme, kayıt + giriş, `/api/health/ready` yeşil — ready
 kontrolü komisyon kapsamını ve depo adresini de doğrular). Arama motorlarına
-açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true`.
+açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true`. Mağaza sayfaları (App Store +
+Google Play) herkese açıldığında mobil uygulama tanıtımı admin → Pazarlama → Hero'dan
+bir slayt olarak yayına alınır (buton adresi mağaza bağlantısıysa web'de mağaza
+butonu olur, uygulamada gizlenir) — env bayrağı ya da rebuild gerekmez.
 
 **İlanlar yayınlanmadan önceki görünüm** (hepsi bilinçli): kategori, üretici,
 marka ve ölçek menüleri katalog seed'lendiği için ÇIKAR; ama ilan listesi
@@ -688,3 +1059,170 @@ yazar ve reset'in son adımı public katalogun boş olduğunu doğrular.
 PostgreSQL container'ından `pg_restore --clean --if-exists` ile geri yükle;
 API/web restart, `/api/health/ready` + vitrin doğrulaması, sonra kilidi kaldır.
 Lansman stabil ilan edilene kadar reset öncesi yedeği sakla.
+
+---
+
+## 4. Doğrulama hattı (CI/CD)
+
+İlke: **development (staging) hızlı ve hafif, master (production) eksiksiz.**
+development bizim alanımız: staging deploy'u yalnız typecheck + lint bekler,
+kırılan şey ileri düzeltilir. Tam doğrulama (tüm unit testler, production
+build, audit) master'a giderken koşar. Ağır doğrulama geliştirici makinesinde
+değil, temiz bir GitHub runner'ında koşar.
+Kapının içeriği tek yerde tanımlıdır: `scripts/verify-local.mjs`'in `ci`
+grupları. `.github/workflows/verify.yml` her grubu ayrı bir job olarak koşar;
+`pnpm verify:ci` yerelde aynı kapıyı koşar — ikisi ayrışamaz.
+
+| Grup      | İçerik                                                                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `static`  | Workspace typecheck + lint (web dahil; API `--fix`'siz `lint:ci` ile) + doğrulama script'lerinin spec'leri + web/admin API kontratı + API seed build |
+| `unit`    | **Tüm** API jest suite'i + jest dışı her workspace'in vitest suite'i (web, admin, listing-form, auth, logger)                                        |
+| `release` | Production build + bağımlılık denetimi (`audit:prod`) — yalnız master kapısında                                                                      |
+| `e2e`     | API e2e + full scenarios, yerel servislerle (Postgres/Redis/ES/Mailpit) — opsiyonel; CI'da `API E2E` workflow'u (tavsiye)                            |
+
+### Ne nerede koşar
+
+Süreler 2026-10 ölçümleri: runner değerleri Release Production koşularından
+(typecheck ~50 sn, lint ~20 sn, 514 suite'lik API unit ~110-150 sn, build
+~95-150 sn), yerel değerler M serisi Mac'te.
+
+| Aşama                                            | Ne koşar                                                                                                                                                                       | Süre                                      | Neyi durdurur       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------- |
+| Yerel pre-commit (`lint-staged`)                 | Staged dosyalarda `eslint --fix` + `prettier`                                                                                                                                  | saniyeler                                 | commit              |
+| Yerel pre-push → `development`                   | Etkilenen app'lerin typecheck'i + web/admin API kontrat script'i, **sırayla** (tek seferde tek `tsc`, ~2,5 GB). Jest YOK. Tree önbelleği + kirli çalışma ağacı engeli korunur. | ~1 dk (api 27 sn, web 22 sn, admin 20 sn) | push                |
+| Yerel pre-push → `master`                        | Ağır bir şey koşmaz; PR yolunu hatırlatan bir not basar                                                                                                                        | —                                         | hiçbir şey          |
+| CI: `development` push (Deploy Staging)          | `Staging gate / Typecheck & lint` (turbo önbellekli; değişmeyen workspace'ler önbellekten gelir)                                                                               | ~1-2 dk                                   | staging deploy      |
+| CI: `development` push (Development Tests)       | `Development tests / Unit tests` — tüm API suite'i + tüm vitest, **tavsiye**: deploy beklemez, kırmızısı Actions'ta ve commit'te görünür                                       | ~3-4 dk                                   | hiçbir şey          |
+| Staging deploy                                   | Kapı yeşilse, **son başarılı** Deploy Staging koşusundan beri değişen app'ler Coolify'a tetiklenir ve sonucu beklenir                                                          | Coolify build ~10 dk                      | —                   |
+| CI: PR → `development` (PR Checks)               | `Verify / Typecheck & lint` ∥ `Verify / Unit tests` (unit tavsiye — development'ta zorunlu check yok)                                                                          | ~1-2 dk / ~3-4 dk                         | (zorunlu değil)     |
+| CI: PR → `master` (PR Checks + diğerleri)        | `Verify / Typecheck & lint` ∥ `Verify / Unit tests` ∥ `Verify / Build & audit` + `Master source guard` + `API e2e` (tavsiye, zorunlu değil)                                    | ~5 dk (e2e henüz ölçülmedi)               | merge (ruleset ile) |
+| Production deploy (Release Production, `master`) | `Release gate / *` = tam kapı tekrar; yeşilse **son başarılı** release'ten beri değişen app'ler Coolify'a, sonuç beklenir                                                      | ~5 dk + ~10-15 dk rollout                 | production deploy   |
+
+Notlar:
+
+- **Jest neden hook'ta yok:** `--changedSince` toplu push'larda büyüyordu (son
+  ölçüm ~8 dk / 313 suite); `--findRelatedTests` de sınırsız — tek bir
+  controller değişikliği 195 suite çekti (yarım çekirdekle ~4,5 dk). Tüm suite
+  runner'da ~2 dk sürüyor; her development push'unda tavsiye olarak, master
+  PR'ında zorunlu olarak koşar. Hook typecheck'te kalır, `--no-verify`
+  gerekmemeli. Kullanılsa bile staging kapısı typecheck + lint'i koşar.
+- **Unit testler neden development'ta engellemiyor ama yine koşuyor:** deploy
+  hızlı kalsın diye beklemiyoruz; yine de her push'ta koşması, kırılmayı master
+  PR'ına kalmadan haftalar önce gösterir (runner dakikası herkese açık repoda
+  ücretsiz). Ayrı bir workflow'dur (`development-tests.yml`): Deploy Staging'in
+  içinde olsaydı kırmızı unit job'ı o koşuyu "başarısız" yapar, deploy diff'i
+  yalnız başarılı koşuları taban aldığı için sonraki deploy'lar gereksiz yere
+  büyürdü. Kırmızı bir Development Tests koşusu = ileri düzelt; master PR'ı
+  onunla geçmez.
+- **Staging kapısı (typecheck/lint) kırmızıysa:** staging eski sürümde kalır. Düzeltip push'la ya da
+  Actions'ta "Re-run failed jobs". Sonraki başarılı koşu, iptal edilen/başarısız
+  koşuların app'lerini de deploy eder: deploy job'ı `github.event.before`'a
+  değil, aynı workflow'un son başarılı koşusunun commit'ine göre diff alır
+  (`.github/actions/deploy-targets`). Koşu ancak Coolify her build'i bitirdi
+  dediğinde başarılı sayılır. Yeni push eski bir staging koşusunu iptal eder
+  (`concurrency`); production koşuları sıraya girer.
+- **Doğrulanan commit = deploy edilen commit:** Coolify'ın deploy API'sinde
+  commit/ref parametresi yok, her zaman dalın HEAD'ini build eder. Bu yüzden
+  deploy her tetiklemeden önce `git ls-remote` ile dalın hâlâ doğrulanan
+  commit'te olduğunu kontrol eder; dal ilerlemişse koşu kırmızı biter ve
+  deploy etmez — yeni commit'in koşusu kendi kapısından sonra ikisini birden
+  deploy eder. Elle tetikleme (`workflow_dispatch`) yalnız ilgili daldan
+  (`development` / `master`) deploy eder.
+- **Release tag:** after every deployment of a production run has finished,
+  the `Tag the release` job of Release Production pushes the annotated tag
+  `app-YYYY.MM.DD-N` on the deployed commit (the message lists the commit,
+  the apps and the run). The name is computed when the tag is pushed: the
+  Europe/Istanbul day of the push (a rollout that ends after midnight gets
+  the new day) and `N` = the highest `N` of that day on origin + 1. A run
+  that deployed nothing creates no tag; a commit that already has an
+  `app-YYYY.MM.DD-N` tag keeps it. If the tag job fails (network, or the name
+  was taken a moment before the push), the rollout still succeeded: use
+  **Re-run failed jobs**, which retries only the tag job and takes the next
+  free `N`. Never "Re-run all jobs" (it redeploys production). Re-run only
+  while no other Release Production run is queued or in progress: the re-run
+  joins the `release-production` concurrency group, so it cancels a pending
+  run, or waits and is itself cancelled by the next push. Re-run only while
+  the run is still the newest production release; once a newer release is
+  tagged, leave the superseded run untagged (its changes are in the newer
+  tag, and a late tag would give the older commit the higher `N`). Until the
+  tag job passes, the run stays failed; if it is the newest master run, the
+  next release also redeploys its apps. The tag ruleset allows creation
+  only: an `app-*` tag is never moved or deleted.
+- **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
+  ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
+  engeller: push ettiğin commit'i checkout et.
+- **Branch names are checked where they are introduced:** the hook blocks a
+  push that creates a remote branch, or pushes a local branch into
+  `development` / `master` (`fix/x:development` checks `fix/x`), unless the
+  name matches `<type>/<kebab-description>` (types: feat, fix, refactor, perf,
+  chore, ci, docs, test, hotfix). `development`, `master`, `worktree-*` and
+  `integration/<wave>` are allowed. Updates of existing remote branches (e.g.
+  `dependabot/*`) and deletions always pass. Rules: tarodan-ops
+  `docs/commit-and-branch-rules.md`.
+- **Master yalnız PR ile:** `development` → `master` (sürüm) ya da `hotfix/*` →
+  `master` (acil düzeltme; sonra `development`'a geri birleştir). Eski yerel
+  "release marker" şartı kalktı; kapıyı ruleset'teki zorunlu check'ler ve
+  Release Production'daki tekrar koşu sağlar.
+- **Önbellek:** turbo görev önbelleği development kapılarında açık
+  (`node_modules/.cache/turbo`; eskiden yanlış dizin önbelleğe alınıyordu, her
+  koşu ıskalıyordu), tam kapıda kapalı — master kapısı hiçbir sonucu önbellekten
+  oynatmaz. API jest her zaman tam koşar. Build job'ı Next'in kendi derleme
+  önbelleğini (`.next/cache`) geri yükler. Yalnız yapılandırma taşıyan paketler
+  (`packages/tsconfig`, `eslint-config`, `eslint-plugin`) ve kök
+  yapılandırmalar turbo `globalDependencies`'te: değişince tüm önbellek düşer.
+- **Secret yok:** kapılar repo secret'ı kullanmaz (unit testler tüm
+  sağlayıcıları mock'lar; `NEXT_PUBLIC_*` değerleri herkese açık yer
+  tutuculardır). Deploy job'ları değişmedi: `COOLIFY_URL`, `COOLIFY_TOKEN`,
+  `COOLIFY_STAGING_UUIDS` / `COOLIFY_PROD_UUIDS`.
+
+### Yerel komutlar
+
+| Komut                       | Ne zaman                                                                                                                                                                |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm verify:push`          | Hook'un yaptığının aynısı (etkilenen app typecheck'i). Push'tan önce elle de koşulabilir; geçen tree önbelleğe yazılır, hook onu atlar.                                 |
+| `pnpm verify:push --tests`  | + ilgili API spec'leri (`jest --findRelatedTests`, `--maxWorkers=50%`) + web/admin unit. Riskli bir değişikliği push'tan önce yerelde görmek için; dakikalar sürebilir. |
+| `pnpm verify:watch`         | Geliştirirken canlı jest + tsc.                                                                                                                                         |
+| `pnpm verify:quick`         | development'taki CI kontrollerinin aynısı (`static` = staging kapısı + `unit` = tavsiye testler). Tüm çekirdekleri kullanır — makine yükünü göze alarak.                |
+| `pnpm verify:ci`            | Master kapısının birebir aynısı (+ build + audit). CI'ı yerelde yeniden üretmek için.                                                                                   |
+| `pnpm verify:release:local` | **Opsiyonel** prova: tam kapı + yerel Docker altyapısı + API e2e + full scenarios + Playwright (`--paytr` ile PayTR entegrasyonu). Master push'u için şart değil.       |
+
+Raporlar `.git/tarodan-test-results/` altına yazılır (`latest-<mod>.json`).
+
+### GitHub settings (manual, repo admin)
+
+Rulesets (Settings -> Rules -> Rulesets). The three below are active; the
+fourth, "Code Quality Copilot review for default branch", is disabled.
+
+**`master: production protection`** (branch `master`):
+
+- Bypass: repository admins, "pull requests only" (an admin can merge a PR
+  past failing checks, but nobody pushes to `master` directly).
+- Restrict deletions; block force pushes.
+- Require a pull request before merging, 0 approvals, extra approval for
+  unattributed changes on; allowed merge method: **merge commit** only.
+- Required status checks, each with source **GitHub Actions** so no other
+  token or app can post a passing status under the same name (the live
+  ruleset does not pin the source yet; set it when you next edit the
+  ruleset):
+  `Verify / Typecheck & lint`, `Verify / Unit tests`,
+  `Verify / Build & audit`, `Master source guard`. `Master source guard`
+  reports only once `master-source-guard.yml` is on `master`
+  (`pull_request_target` reads the workflow from `master`); until that
+  release, a master PR waits for it and needs the admin bypass. Add
+  `API e2e` after it has run green on the runner a few times. "Require
+  branches to be up to date" is not needed: PR checks test the merge ref.
+- Do not rename the checks: the `Verify` job in `pr-checks.yml` and the job
+  names in `verify.yml` must match the ruleset exactly.
+
+**`development: no deletion or force push`** (branch `development`):
+restrict deletions and block force pushes only. `development` takes direct
+pushes (the staging gate runs in CI); no PR requirement.
+
+**`release tags: no deletion or move`** (tags `app-*`, `mobile-v*`):
+restrict deletions, updates and force pushes; no bypass. Creating a new tag
+is allowed, so Release Production can tag a release, but a tag can never be
+moved or recreated: a wrong tag stays, and the fix is a new tag.
+
+**Güvenlik (repo herkese açık, ücretsiz):** Settings → Code security →
+CodeQL "Default setup", Secret scanning + Push protection ve Dependabot
+security updates — üçü de bugün kapalı.

@@ -17,9 +17,11 @@ import { PaymentReconciliationService } from "../reconciliation/payment-reconcil
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { CacheService } from "../../cache/cache.service";
 import { VirtualOrderFulfillmentService } from "../fulfillment/virtual-order-fulfillment.service";
-import { nodeEnv } from "../../../config/environment";
+import { appEnv, nodeEnv } from "../../../config/environment";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { payerIpFromPaymentMetadata } from "../helpers/paytr-merchant.helper";
+import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * A callback whose four protocol-required fields are present.
@@ -153,12 +155,7 @@ export class PaymentCallbackService {
     // PayTR token'ıdır, merchant_oid içermez — kaldırıldı.)
     if (!payment) {
       payment = await this.prisma.payment.findFirst({
-        where: {
-          metadata: {
-            path: ["merchantOidHistory"],
-            array_contains: merchantOid,
-          },
-        },
+        where: paymentOidHistoryWhere(merchantOid),
         include: callbackInclude,
       });
     }
@@ -320,6 +317,8 @@ export class PaymentCallbackService {
         ? `paytr:${oid}:${inquiry.paymentDate}`
         : `paytr:${oid}`;
 
+    // Not: bu kurtarma yolu kayıtlı kartı senkronlamaz (gövdenin utoken'ına
+    // güvenilmez); kart, güvenilir bir bildirim ya da sonraki ödemeyle yazılır.
     const did = await this.paymentFulfillment.processSuccessfulPayment(
       payment,
       txnRef,
@@ -434,6 +433,7 @@ export class PaymentCallbackService {
       if (
         isRejectableTestModeSuccess({
           nodeEnv: nodeEnv(),
+          appEnv: appEnv(),
           status: dto.status,
           testMode: parsed.testMode,
           paymentIsTest: membershipOwner?.user.isTestAccount ?? false,
@@ -511,12 +511,13 @@ export class PaymentCallbackService {
       return "OK";
     }
 
-    // Prod'da test-modu BAŞARI bildirimini reddet: hash `test_mode`'u kapsamaz ve
+    // Canlı prod'da (staging değil) test-modu BAŞARI bildirimini reddet: hash `test_mode`'u kapsamaz ve
     // test modunda para hareketi olmaz → gerçek-hash'li bir test bildirimi siparişi
     // sıfır gelirle tamamlayabilirdi.
     if (
       isRejectableTestModeSuccess({
         nodeEnv: nodeEnv(),
+        appEnv: appEnv(),
         status: dto.status,
         testMode: parsed.testMode,
         paymentIsTest: payment.isTest,
@@ -587,9 +588,10 @@ export class PaymentCallbackService {
       // çekimi sürüyorsa ertele: aksi halde attempt-1'in geç failed'i attempt-2
       // uçarken siparişi iptal eder, attempt-2 başarısı CAS'ta `failed` görüp
       // fulfillment'ı atlar ve alıcı parası çekilmiş halde manuel iadeye düşer.
-      const failWindowMin = parseInt(
-        this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
-        10,
+      const failWindowMin = await resolveTimingValue(
+        this.prisma,
+        "paymentFailTimeoutMinutes",
+        this.configService,
       );
       const deferred = shouldDeferSupersededOidFailure({
         callbackOid: dto.merchant_oid,

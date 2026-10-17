@@ -1,27 +1,13 @@
 import {
-  ArrowPathIcon,
-  ArrowTrendingUpIcon,
   ArrowsRightLeftIcon,
-  BanknotesIcon,
-  ChartBarIcon,
-  ClockIcon,
-  CreditCardIcon,
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
-  MegaphoneIcon,
-  ReceiptRefundIcon,
-  ShoppingBagIcon,
-  SparklesIcon,
   TagIcon,
-  TruckIcon,
-  UserGroupIcon,
   UsersIcon,
-  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import type { ComponentType } from "react";
 import type { AnalyticsTab } from "@tarodan/types";
 import type { MessageKey } from "@tarodan/i18n";
-import type { MetricTone } from "@/components/MetricCard";
 
 /**
  * What each analytics tab shows — a TABLE, not five hand-written screens.
@@ -37,8 +23,6 @@ export interface MetricCardConfig {
   /** Key inside the tab response's `metrics` map. */
   metric: string;
   labelKey: MessageKey;
-  icon: ComponentType<{ className?: string }>;
-  tone: MetricTone;
   format: MetricFormat;
   /** A caveat printed under the card — what the number cannot tell you. */
   noteKey?: MessageKey;
@@ -77,15 +61,11 @@ export interface TabSections {
 
 const card = (
   metric: string,
-  icon: ComponentType<{ className?: string }>,
-  tone: MetricTone,
   format: MetricFormat,
   noteKey?: MessageKey,
 ): MetricCardConfig => ({
   metric,
   labelKey: `admin.analytics.metric.${metric}` as MessageKey,
-  icon,
-  tone,
   format,
   noteKey,
 });
@@ -109,24 +89,22 @@ const section = (field: string) => ({
 export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
   sales: {
     cards: [
-      card("gmv", BanknotesIcon, "success", "currency"),
-      card("orderCount", ShoppingBagIcon, "info", "count"),
-      card("averageBasket", ChartBarIcon, "primary", "currency"),
-      card("netRevenue", ArrowTrendingUpIcon, "success", "currency"),
-      card("refundedAmount", ReceiptRefundIcon, "danger", "currency"),
-      card("discountCost", TagIcon, "warning", "currency"),
-      card("platformFundedDiscount", TagIcon, "warning", "currency"),
-      card("feeDiscountCost", TagIcon, "warning", "currency"),
-      card("collectedShipping", TruckIcon, "info", "currency"),
+      card("gmv", "currency"),
+      card("orderCount", "count"),
+      card("averageBasket", "currency"),
+      card("netRevenue", "currency"),
+      card("refundedAmount", "currency"),
+      card("discountCost", "currency"),
+      card("platformFundedDiscount", "currency"),
+      card("feeDiscountCost", "currency"),
+      card("collectedShipping", "currency"),
       card(
         "carrierCost",
-        TruckIcon,
-        "danger",
         "currency",
         "admin.analytics.notes.carrierCostReconciledOnly",
       ),
-      card("shipmentsAwaitingCarrierCost", TruckIcon, "warning", "count"),
-      card("carrierCostReconciledShare", TruckIcon, "info", "percent"),
+      card("shipmentsAwaitingCarrierCost", "count"),
+      card("carrierCostReconciledShare", "percent"),
     ],
     charts: [
       {
@@ -147,14 +125,14 @@ export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
 
   trade: {
     cards: [
-      card("averageTradeValue", ArrowsRightLeftIcon, "primary", "currency"),
-      card("tradeFeeRevenue", BanknotesIcon, "success", "currency"),
-      card("offersCreated", TagIcon, "info", "count"),
-      card("offersResponded", ArrowPathIcon, "info", "count"),
-      card("offersAccepted", SparklesIcon, "success", "count"),
-      card("offerOrders", ShoppingBagIcon, "success", "count"),
-      card("offerResponseRate", ChartBarIcon, "primary", "percent"),
-      card("offerConversionRate", ArrowTrendingUpIcon, "primary", "percent"),
+      card("averageTradeValue", "currency"),
+      card("tradeFeeRevenue", "currency"),
+      card("offersCreated", "count"),
+      card("offersResponded", "count"),
+      card("offersAccepted", "count"),
+      card("offerOrders", "count"),
+      card("offerResponseRate", "percent"),
+      card("offerConversionRate", "percent"),
     ],
     charts: [
       {
@@ -174,15 +152,15 @@ export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
 
   catalog: {
     cards: [
-      card("listingsCreated", TagIcon, "info", "count"),
-      card("listingsPublished", SparklesIcon, "primary", "count"),
-      card("listingsSold", ShoppingBagIcon, "success", "count"),
-      card("averagePrice", CurrencyDollarIcon, "primary", "currency"),
-      card("medianTimeToSellDays", ClockIcon, "info", "days"),
-      card("medianSellerTimeToFirstSaleDays", ClockIcon, "info", "days"),
-      card("boostRevenue", MegaphoneIcon, "success", "currency"),
-      card("boostCount", MegaphoneIcon, "info", "count"),
-      card("averageBoostViewUplift", ArrowTrendingUpIcon, "primary", "count"),
+      card("listingsCreated", "count"),
+      card("listingsPublished", "count"),
+      card("listingsSold", "count"),
+      card("averagePrice", "currency"),
+      card("medianTimeToSellDays", "days"),
+      card("medianSellerTimeToFirstSaleDays", "days"),
+      card("boostRevenue", "currency"),
+      card("boostCount", "count"),
+      card("averageBoostViewUplift", "count"),
     ],
     charts: [
       {
@@ -204,18 +182,18 @@ export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
 
   quality: {
     cards: [
-      card("paidOrders", ShoppingBagIcon, "info", "count"),
-      card("refundedOrders", ReceiptRefundIcon, "danger", "count"),
-      card("refundRate", ExclamationTriangleIcon, "danger", "percent"),
-      card("refundedAmount", BanknotesIcon, "danger", "currency"),
-      card("cancelledOrders", XCircleIcon, "warning", "count"),
-      card("cancellationRate", XCircleIcon, "warning", "percent"),
-      card("paymentAttempts", CreditCardIcon, "info", "count"),
-      card("failedPayments", CreditCardIcon, "danger", "count"),
-      card("paymentFailureRate", ExclamationTriangleIcon, "danger", "percent"),
-      card("medianPaidToShippedHours", ClockIcon, "info", "hours"),
-      card("medianShippedToDeliveredHours", TruckIcon, "info", "hours"),
-      card("medianPaidToDeliveredHours", ClockIcon, "primary", "hours"),
+      card("paidOrders", "count"),
+      card("refundedOrders", "count"),
+      card("refundRate", "percent"),
+      card("refundedAmount", "currency"),
+      card("cancelledOrders", "count"),
+      card("cancellationRate", "percent"),
+      card("paymentAttempts", "count"),
+      card("failedPayments", "count"),
+      card("paymentFailureRate", "percent"),
+      card("medianPaidToShippedHours", "hours"),
+      card("medianShippedToDeliveredHours", "hours"),
+      card("medianPaidToDeliveredHours", "hours"),
     ],
     charts: [
       {
@@ -238,12 +216,12 @@ export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
 
   membership: {
     cards: [
-      card("newMemberships", UserGroupIcon, "success", "count"),
-      card("renewals", ArrowPathIcon, "primary", "count"),
-      card("churned", XCircleIcon, "danger", "count"),
-      card("pastDue", ExclamationTriangleIcon, "warning", "count"),
-      card("pastDueNow", ExclamationTriangleIcon, "warning", "count"),
-      card("membershipRevenue", BanknotesIcon, "success", "currency"),
+      card("newMemberships", "count"),
+      card("renewals", "count"),
+      card("churned", "count"),
+      card("pastDue", "count"),
+      card("pastDueNow", "count"),
+      card("membershipRevenue", "currency"),
     ],
     charts: [
       { keys: ["newMemberships", "renewals"], kind: "bar", format: "count" },

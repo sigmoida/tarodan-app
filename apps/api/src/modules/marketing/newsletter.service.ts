@@ -6,6 +6,8 @@ import {
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../../prisma";
+import { ConsentSource } from "@prisma/client";
+import { ConsentService } from "../consent/consent.service";
 import { NewsletterSubscribeDto } from "./dto/newsletter-subscribe.dto";
 import { i18nMessage } from "../i18n";
 
@@ -31,7 +33,10 @@ export interface NewsletterRecipient {
 export class NewsletterService {
   private readonly logger = new Logger(NewsletterService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly consents: ConsentService,
+  ) {}
 
   private generateUnsubscribeToken(): string {
     return randomBytes(32).toString("hex");
@@ -177,12 +182,88 @@ export class NewsletterService {
       }));
   }
 
-  /** Çıkış yapan e-posta bir üyeye aitse profil tercihini de kapat. */
+  /**
+   * Pazarlama e-postası gidecek üyeler: pazarlama izni AÇIK, banlı olmayan ve
+   * abonelikten çıkmamış olanlar → `userId → unsubscribeToken`.
+   *
+   * Admin toplu e-postası alıcıyı kullanıcı kimliğiyle bilir; çıkış linki ise
+   * abone tablosundaki token'a bağlıdır. İzni açık ama abone satırı olmayan
+   * (eski) üyeler için satır burada açılır — böylece her pazarlama mailinin
+   * çalışan bir tek-tık çıkış linki olur. Abone satırında çıkış işareti varsa
+   * üye ATLANIR: çıkış, profil bayrağından önceliklidir.
+   */
+  async resolveMarketingUnsubscribeTokens(
+    userIds: string[],
+  ): Promise<Map<string, string>> {
+    const tokens = new Map<string, string>();
+    const chunkSize = 1000;
+    for (let i = 0; i < userIds.length; i += chunkSize) {
+      const users = await this.prisma.user.findMany({
+        where: {
+          id: { in: userIds.slice(i, i + chunkSize) },
+          acceptsMarketingEmails: true,
+          isBanned: false,
+        },
+        select: { id: true, email: true },
+      });
+      if (users.length === 0) continue;
+
+      const emails = users.map((u) => this.normalizeEmail(u.email));
+      await this.prisma.newsletterSubscriber.createMany({
+        data: emails.map((email) => ({
+          email,
+          newsletter: true,
+          promotions: true,
+          unsubscribeToken: this.generateUnsubscribeToken(),
+        })),
+        skipDuplicates: true,
+      });
+      const subscribers = await this.prisma.newsletterSubscriber.findMany({
+        where: { email: { in: emails } },
+        select: { email: true, unsubscribeToken: true, unsubscribedAt: true },
+      });
+      const byEmail = new Map(subscribers.map((s) => [s.email, s]));
+
+      for (const user of users) {
+        const subscriber = byEmail.get(this.normalizeEmail(user.email));
+        if (subscriber && !subscriber.unsubscribedAt) {
+          tokens.set(user.id, subscriber.unsubscribeToken);
+        }
+      }
+    }
+    return tokens;
+  }
+
+  /**
+   * Çıkış yapan e-posta bir üyeye aitse profil tercihini de kapat ve izin
+   * geri çekmesini tarihli onay kaydı olarak yaz (bayrak + kayıt tek
+   * transaction'da). İzni zaten kapalı üyede satır yazılmaz.
+   */
   private async clearUserConsent(email: string): Promise<void> {
     try {
-      await this.prisma.user.updateMany({
+      const members = await this.prisma.user.findMany({
         where: { email, acceptsMarketingEmails: true },
-        data: { acceptsMarketingEmails: false },
+        select: { id: true },
+      });
+      if (members.length === 0) return;
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.updateMany({
+          where: {
+            id: { in: members.map((m) => m.id) },
+            acceptsMarketingEmails: true,
+          },
+          data: { acceptsMarketingEmails: false },
+        });
+        for (const member of members) {
+          await this.consents.recordMarketingChange(
+            {
+              userId: member.id,
+              granted: false,
+              source: ConsentSource.newsletter_unsubscribe,
+            },
+            tx,
+          );
+        }
       });
     } catch (error: any) {
       this.logger.error(

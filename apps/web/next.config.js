@@ -2,6 +2,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 const createNextIntlPlugin = require('next-intl/plugin');
 const path = require('path');
 const { env } = require('./env.config');
+const { wellKnownStagingRewrites } = require('./well-known-rewrites');
 
 // next-intl plugin — points at the request config (locale + messages per request).
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
@@ -119,9 +120,13 @@ const nextConfig = {
       // SILENTLY unless it is served as JSON — no error, the association just
       // never works. The filename has no extension (Apple requires exactly
       // `apple-app-site-association`), so Next cannot infer the type from it.
-      // `assetlinks.json` needs no rule: its extension already resolves.
       {
         source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
+      // Android App Links: uzantısı JSON'a çözülür ama tip açıkça sabitlenir.
+      {
+        source: '/.well-known/assetlinks.json',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
       },
     ];
@@ -158,6 +163,7 @@ const nextConfig = {
     const apiUrl = env.API_INTERNAL_URL || env.NEXT_PUBLIC_API_URL;
     return {
       beforeFiles: [
+        ...wellKnownStagingRewrites,
         {
           // @tarodan/brand'dan sync-brand-assets.mjs ile üretilir (build artifact).
           source: '/favicon.ico',

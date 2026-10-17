@@ -10,6 +10,9 @@ export interface PaymentDetail {
   failureReason?: string;
   providerPaymentId?: string;
   providerConversationId?: string;
+  /** PayTR "sipariş no" (güncel) + önceki denemeler (en yenisi başta). */
+  paytrOid?: string | null;
+  paytrOidHistory?: string[];
   metadata?: any;
   order?: {
     id: string;

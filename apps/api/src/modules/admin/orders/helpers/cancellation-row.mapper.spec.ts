@@ -46,6 +46,7 @@ function line(overrides: Partial<CancellationLine> = {}): CancellationLine {
     cancelledAt: new Date("2026-09-21T10:00:00.000Z"),
     cancelReason: "vazgeçtim",
     cancellationReasonCode: "changed_mind",
+    adminCancelReasonCode: null,
     quantity: 1,
     unitPrice: D(100),
     subtotal: D(100),
@@ -125,11 +126,47 @@ const ctx: RowMapContext = {
 };
 
 describe("cancellation reason", () => {
+  it("shows the admin's catalog reason for a platform cancellation (never a free-text note)", () => {
+    expect(
+      orderCancellationReason({
+        cancelledBy: "platform",
+        cancellationReasonCode: null,
+        adminCancelReasonCode: "suspicious_activity",
+        cancelReason: "Yönetici tarafından iptal edildi: Şüpheli işlem",
+      }),
+    ).toEqual({ kind: "admin", code: "suspicious_activity" });
+  });
+
+  it("ignores an admin code the catalog does not know, and one on a non-platform cancellation", () => {
+    expect(
+      orderCancellationReason({
+        cancelledBy: "platform",
+        cancellationReasonCode: null,
+        adminCancelReasonCode: "retired_code",
+        cancelReason: "Yönetici tarafından iptal edildi: Eski",
+      }),
+    ).toEqual({
+      kind: "text",
+      text: "Yönetici tarafından iptal edildi: Eski",
+    });
+    // Ödenmiş iptalde PSP hatası sonrası sipariş başka aktörle kapanabilir:
+    // kod yalnız platform aktörüyle birlikte okunur.
+    expect(
+      orderCancellationReason({
+        cancelledBy: "buyer",
+        cancellationReasonCode: "wrong_card",
+        adminCancelReasonCode: "stock_error",
+        cancelReason: "yanlış kart",
+      }),
+    ).toEqual({ kind: "code", code: "wrong_card" });
+  });
+
   it("shows the buyer's chosen reason code when the buyer cancelled", () => {
     expect(
       orderCancellationReason({
         cancelledBy: "buyer",
         cancellationReasonCode: "wrong_card",
+        adminCancelReasonCode: null,
         cancelReason: "yanlış kart",
       }),
     ).toEqual({ kind: "code", code: "wrong_card" });
@@ -143,6 +180,7 @@ describe("cancellation reason", () => {
       orderCancellationReason({
         cancelledBy: "system",
         cancellationReasonCode: null,
+        adminCancelReasonCode: null,
         cancelReason: text,
       }),
     ).toEqual({ kind: "expired" });
@@ -155,6 +193,7 @@ describe("cancellation reason", () => {
       orderCancellationReason({
         cancelledBy: "system",
         cancellationReasonCode: "delivery_delayed",
+        adminCancelReasonCode: null,
         cancelReason: ORDER_CANCEL_REASON.sellerShipDeadlineExpired,
       }),
     ).toEqual({ kind: "expired" });
@@ -165,6 +204,7 @@ describe("cancellation reason", () => {
       orderCancellationReason({
         cancelledBy: null,
         cancellationReasonCode: "other",
+        adminCancelReasonCode: null,
         cancelReason: null,
       }),
     ).toEqual({ kind: "code", code: "other" });
@@ -172,6 +212,7 @@ describe("cancellation reason", () => {
       orderCancellationReason({
         cancelledBy: "platform",
         cancellationReasonCode: null,
+        adminCancelReasonCode: null,
         cancelReason: "  Stok tükendi  ",
       }),
     ).toEqual({ kind: "text", text: "Stok tükendi" });
@@ -179,6 +220,7 @@ describe("cancellation reason", () => {
       orderCancellationReason({
         cancelledBy: "system",
         cancellationReasonCode: null,
+        adminCancelReasonCode: null,
         cancelReason: "   ",
       }),
     ).toEqual({ kind: "none" });

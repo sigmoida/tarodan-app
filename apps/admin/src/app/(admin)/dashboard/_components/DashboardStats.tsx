@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { MessageKey } from "@tarodan/i18n";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtNumber, fmtTry } from "@/lib/format";
 import { STAT_CARDS, type StatCardConfig } from "../_lib/statCards";
@@ -38,9 +39,11 @@ function StatCard({
 
   return (
     <MetricCard
-      icon={config.icon}
-      tone={config.tone}
       label={t(config.labelKey)}
+      // Sunucu i18n ANAHTARI yazar; çeviri burada.
+      description={
+        metric.description ? t(metric.description as MessageKey) : undefined
+      }
       loading={loading}
       value={<span className="tabular-nums">{format(metric.period)}</span>}
       footer={
@@ -86,7 +89,7 @@ export function DashboardStats({
   isLoading: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {STAT_CARDS.map((config) => (
         <StatCard
           key={config.metric}

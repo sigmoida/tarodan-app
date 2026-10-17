@@ -26,8 +26,11 @@ describe("PaymentFulfillmentService — takas iki-ödeme kapısı", () => {
       version: 3,
     };
     const tx = {
+      // Ödeme satırından önce takas satırı kilitlenir (iptal yollarıyla aynı sıra).
+      $queryRaw: jest.fn().mockResolvedValue([]),
       payment: { update: jest.fn().mockResolvedValue({}) },
       tradeCashPayment: {
+        findUnique: jest.fn().mockResolvedValue({ tradeId: "trade-1" }),
         update: jest.fn().mockResolvedValue({ tradeId: "trade-1" }),
         findMany: jest
           .fn()

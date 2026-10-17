@@ -48,10 +48,10 @@ export default function AdsPage() {
           {
             // No searchFields → full-content search across all displayed columns (#378).
             // Boş değer = filtre yok. `=== "all"` kaçışı KALDIRILDI: `all`
-            // gerçek bir cihaz hedefi ve süzülebilmeli (bkz. FILTER_ALL).
+            // gerçek bir platform hedefi ve süzülebilmeli (bkz. FILTER_ALL).
             filter: (a, p) =>
               (!p.position || a.position === p.position) &&
-              (!p.device || a.deviceType === p.device),
+              (!p.platform || a.platform === p.platform),
           },
         )}
         getRowId={(a) => a.id}

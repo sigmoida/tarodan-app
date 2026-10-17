@@ -39,11 +39,23 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
+import { offerExpiresAt } from "./helpers/offer-expiry";
+import { assertOfferAmountAboveFloor } from "./helpers/offer-price-floor";
+import { loadProductPriceLimits } from "../product/helpers/product-price-limits";
+import { resolveMinOfferPercentage } from "../../config/offer";
+import { OfferExtensionPolicy } from "./offer-extension-policy.service";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { offerConvertedNotice } from "../mail-routing/helpers/mail-internal-notices";
+import {
+  ContentFilterService,
+  unscreenedText,
+  type ScreenedText,
+} from "../messaging/content-filter.service";
+import { lockActiveUsersShared } from "../user/helpers/user-row-lock";
 
 @Injectable()
 export class OfferService {
   private readonly logger = new Logger(OfferService.name);
-  private readonly offerExpiryHours: number;
   private readonly minOfferPercentage: number;
 
   constructor(
@@ -62,15 +74,101 @@ export class OfferService {
     private readonly userBlocks: UserBlockService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
+    // extend_once: cron'un uzatacağı teklif süresi dolmuş sayılmaz (tek kural).
+    @Optional()
+    private readonly extensionPolicy?: OfferExtensionPolicy,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional()
+    private readonly mailNotifier?: MailInternalNotifier,
+    // Teklif notu mesajlaşmayla AYNI içerik filtresinden geçer (Apple 1.2).
+    // OfferModule MessagingModule'ü içe aktarır; dar test kurulumlarında yok.
+    @Optional()
+    private readonly contentFilter?: ContentFilterService,
   ) {
-    this.offerExpiryHours = parseInt(
-      this.configService.get("OFFER_EXPIRY_HOURS") || "24",
-      10,
-    );
-    this.minOfferPercentage = parseInt(
-      this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
-      10,
-    );
+    this.minOfferPercentage = resolveMinOfferPercentage(this.configService);
+  }
+
+  /**
+   * Yeni teklif/karşı teklifin bitiş anı: şimdi + offerExpiryHours (Süreler ve
+   * Kurallar; seed'in `offer_expiry_hours` satırı artık gerçekten okunur, env
+   * OFFER_EXPIRY_HOURS yalnız geri düşüş). Teklife `expiresAt` olarak
+   * damgalanır — değişiklik bekleyen teklifleri etkilemez.
+   */
+  private async offerExpiresAt(): Promise<Date> {
+    return offerExpiresAt(this.prisma, this.configService);
+  }
+
+  /**
+   * Cron'un bu teklifi uzatacağı (extend_once) kararı — işlem AÇILMADAN okunur:
+   * `OfferExtensionPolicy` sorgularını kök bağlantıda atar; açık bir işlemin
+   * içinde çağrılırsa işlem bir bağlantı tutarken ikincisini bekler (havuz
+   * tükenmesi). Karar zamandan bağımsızdır; süre koşulu `hasLapsed`'te, işlem
+   * içinde kilitli satırdan gelir. Okuma ile işlem arasında kararı bayatlatacak
+   * her şey işlemde yeniden doğrulanır: durum ve süre (cron araya girip
+   * uzattıysa `expiresAt` ileridedir → dolmuş sayılmaz), taraflar arası engel
+   * (`assertNotBlocked`), ilanın satılabilirliği (ürün kilidi). Politika yoksa
+   * (eski kurulum) uzatılmaz.
+   */
+  private async readExtendable(offerId: string): Promise<boolean> {
+    return (await this.extensionPolicy?.isExtendable(offerId)) ?? false;
+  }
+
+  /**
+   * Teklifin süresi DOLDU mu? Süresi geçmiş ama bir sonraki cron turunun
+   * extend_once ile uzatacağı teklif dolmuş sayılmaz (kullanıcıya "expired"
+   * gösterilip sonra yeniden açılmasın); uzatılmayacak teklif bugünkü gibi
+   * dolmuştur. Karar `OfferExtensionPolicy` ile cron'la AYNI kuraldır
+   * (`extendable`: işlemden önce `readExtendable` ile okunmuş karar).
+   */
+  /**
+   * Teklif notunu mesajlaşma filtresinden geçirir (S9a): uygunsuz içerik 400,
+   * iletişim bilgisi maskelenir. Yavaş olabilir — işlem AÇILMADAN çağrılır.
+   * Karşı tekliflerde inceleme kaydı hemen, yanıt verilen teklifin kimliğiyle
+   * (`relatedOfferId`) atılır.
+   */
+  private async screenMessage(
+    message: string | undefined,
+    authorId: string,
+    relatedOfferId: string,
+  ): Promise<string | null> {
+    const screened = this.contentFilter
+      ? await this.contentFilter.screenUnqueuedText(message, {
+          entityType: "offer",
+          entityId: relatedOfferId,
+          userId: authorId,
+          field: "offer_message",
+        })
+      : message;
+    return screened || null;
+  }
+
+  /**
+   * Yeni teklifin notu: tarama teklif YOKKEN yapılır, bu yüzden inceleme kaydı
+   * (admin "AI Denetim") teklif yazıldıktan sonra `recordFlag(offerId)` ile
+   * teklifin kimliğine bağlanır.
+   */
+  private async screenNewOfferMessage(
+    message: string | undefined,
+    authorId: string,
+  ): Promise<{
+    message: string | null;
+    recordFlag: ScreenedText<string | undefined>["recordFlag"];
+  }> {
+    const screened = this.contentFilter
+      ? await this.contentFilter.screenUnqueuedTextDeferred(message, {
+          entityType: "offer",
+          userId: authorId,
+          field: "offer_message",
+        })
+      : unscreenedText(message);
+    return {
+      message: screened.text || null,
+      recordFlag: screened.recordFlag,
+    };
+  }
+
+  private hasLapsed(expiresAt: Date, extendable: boolean): boolean {
+    return new Date() > new Date(expiresAt) && !extendable;
   }
 
   /**
@@ -84,6 +182,15 @@ export class OfferService {
    * - Uses FOR UPDATE SKIP LOCKED to prevent race conditions
    */
   async create(buyerId: string, dto: CreateOfferDto) {
+    // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
+    // bağlantı beklemesin (havuz tükenmesi).
+    const expiresAt = await this.offerExpiresAt();
+    // Platform fiyat sınırı da işlem açılmadan okunur (aynı havuz gerekçesi).
+    const priceLimits = await loadProductPriceLimits(this.prisma);
+    const { message, recordFlag } = await this.screenNewOfferMessage(
+      dto.message,
+      buyerId,
+    );
     // Use transaction with row locking for race condition prevention
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock product row with FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -135,6 +242,7 @@ export class OfferService {
       // `oldPrice`tan satılıyor). Tek kaynak `resolveSalePrice`; aksi halde alıcı
       // gerçek fiyatın %50'sinin altında teklif verebiliyordu.
       const productPrice = resolveSalePrice(product).price;
+      assertOfferAmountAboveFloor(dto.amount, priceLimits, productPrice);
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       if (dto.amount < minOffer) {
         throw new BadRequestException(
@@ -163,8 +271,6 @@ export class OfferService {
       }
 
       // Calculate expiration time
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
 
       // Create offer
       const offer = await tx.offer.create({
@@ -173,7 +279,7 @@ export class OfferService {
           buyerId,
           sellerId: product.sellerId,
           amount: dto.amount,
-          message: dto.message || null,
+          message,
           status: OfferStatus.pending,
           expiresAt,
         },
@@ -212,6 +318,12 @@ export class OfferService {
         sellerName: publicName(product.seller),
       };
     });
+
+    // İncelemeye işaretlenen not artık teklif kimliğiyle kaydedilir; hata
+    // teklifi geri çevirmez.
+    await recordFlag(result.offer.id).catch((error) =>
+      this.logger.warn(`offer note review flag failed: ${error}`),
+    );
 
     // Emit offer.created event AFTER transaction commits
     try {
@@ -260,7 +372,19 @@ export class OfferService {
     // (direct/group checkout ile aynı sıra; tx içinde dış okuma yapılmaz).
     const { shippingTariff, commissionRuleSet } =
       await this.checkoutCommon.resolveOfferOrderSnapshots();
+    // Ödeme penceresi işlem AÇILMADAN okunur (havuz tükenmesi; bkz. yukarı).
+    const paymentExpiresAt = await paymentWindowEnd(this.prisma);
+    const extendable = await this.readExtendable(offerId);
     const result = await this.prisma.$transaction(async (tx) => {
+      // Kabul alıcıya sipariş açar: alıcı hesap silme ile serileşir. Alıcı
+      // kimliği değişmez, bu yüzden teklif satırı kilitlenmeden önce okunur
+      // (kilit sırası: kullanıcı → teklif → ürün; silme de kullanıcıdan başlar).
+      const offerOwner = await tx.offer.findUnique({
+        where: { id: offerId },
+        select: { buyerId: true },
+      });
+      if (offerOwner) await lockActiveUsersShared(tx, [offerOwner.buyerId]);
+
       // Lock offer row with FOR UPDATE
       const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
         SELECT o.id
@@ -307,7 +431,7 @@ export class OfferService {
       await this.assertNotBlocked(offerData.buyerId, offerData.sellerId);
 
       // Check expiration
-      if (new Date() > new Date(offerData.expiresAt)) {
+      if (this.hasLapsed(offerData.expiresAt, extendable)) {
         // Auto-expire the offer
         await tx.offer.update({
           where: { id: offerId },
@@ -470,7 +594,7 @@ export class OfferService {
             pricing: offerPricing,
           }),
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: paymentWindowEnd(),
+          paymentExpiresAt,
         },
       });
 
@@ -544,6 +668,21 @@ export class OfferService {
     } catch (error) {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
+
+    // Personel bildirimi (Mail Yönlendirme): teklif siparişe dönüştü.
+    // Commit sonrası; emit fırlatmaz, test şeridi siparişleri atlanır.
+    void this.mailNotifier?.emit(
+      "offer.converted",
+      offerConvertedNotice({
+        offerId: result.offer.id,
+        orderNumber: result.order.orderNumber,
+        buyerName: publicName(result.offer.buyer),
+        sellerName: publicName(result.offer.seller),
+        productTitle: result.offer.product.title,
+        amount: result.order.totalAmount,
+      }),
+      { isTest: result.order.isTest },
+    );
 
     // Zil bildirimleri: `notifyOfferAccepted` tanımlıydı ama HİÇ çağrılmıyordu —
     // alıcı, 24 saatlik ödeme penceresini yalnız e-postadan öğreniyordu.
@@ -645,6 +784,8 @@ export class OfferService {
           rejectedOffer.sellerId,
           NotificationType.OFFER_COUNTER_DECLINED,
           {
+            // Kimlik: mobil push/zil dokunuşu teklif detayını açar.
+            offerId: rejectedOffer.id,
             productId: rejectedOffer.productId,
             productTitle: rejectedOffer.product.title,
           },
@@ -654,6 +795,7 @@ export class OfferService {
           rejectedOffer.buyerId,
           NotificationType.OFFER_REJECTED,
           {
+            offerId: rejectedOffer.id,
             productId: rejectedOffer.productId,
             productTitle: rejectedOffer.product.title,
           },
@@ -671,6 +813,12 @@ export class OfferService {
    * POST /offers/:id/counter
    */
   async counter(offerId: string, sellerId: string, dto: CounterOfferDto) {
+    // Süre ve uzatma kararı işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (havuz tükenmesi).
+    const expiresAt = await this.offerExpiresAt();
+    const extendable = await this.readExtendable(offerId);
+    const priceLimits = await loadProductPriceLimits(this.prisma);
+    const message = await this.screenMessage(dto.message, sellerId, offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -705,7 +853,7 @@ export class OfferService {
       }
 
       // Check expiration
-      if (new Date() > offer.expiresAt) {
+      if (this.hasLapsed(offer.expiresAt, extendable)) {
         await tx.offer.update({
           where: { id: offerId },
           data: { status: OfferStatus.expired },
@@ -721,11 +869,14 @@ export class OfferService {
       }
 
       // Tavan da ilan fiyatının TEK kaynağından (`resolveSalePrice`) gelir.
-      if (dto.amount > resolveSalePrice(offer.product).price) {
+      const listingPrice = resolveSalePrice(offer.product).price;
+      if (dto.amount > listingPrice) {
         throw new BadRequestException(
           i18nMessage("server.offer.counterCannotExceedPrice"),
         );
       }
+      // Karşı teklif de platform alt sınırının altına inemez.
+      assertOfferAmountAboveFloor(dto.amount, priceLimits, listingPrice);
 
       // Önceki tur kapanır — "reddedildi" değil, "karşı teklifle devam etti".
       await tx.offer.update({
@@ -737,8 +888,6 @@ export class OfferService {
       });
 
       // Yeni kayıt: aynı alıcı/satıcı; kabul hakkı alıcıda (buyerMustAccept)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
 
       const counterOffer = await tx.offer.create({
         data: {
@@ -746,7 +895,7 @@ export class OfferService {
           buyerId: offer.buyerId,
           sellerId: offer.sellerId,
           amount: dto.amount,
-          message: dto.message ?? null,
+          message,
           status: OfferStatus.pending,
           buyerMustAccept: true,
           expiresAt,
@@ -802,6 +951,12 @@ export class OfferService {
    * POST /offers/:id/buyer-counter
    */
   async buyerCounter(offerId: string, buyerId: string, dto: CounterOfferDto) {
+    // Süre ve uzatma kararı işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (havuz tükenmesi).
+    const expiresAt = await this.offerExpiresAt();
+    const extendable = await this.readExtendable(offerId);
+    const priceLimits = await loadProductPriceLimits(this.prisma);
+    const message = await this.screenMessage(dto.message, buyerId, offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -832,7 +987,7 @@ export class OfferService {
         );
       }
 
-      if (new Date() > offer.expiresAt) {
+      if (this.hasLapsed(offer.expiresAt, extendable)) {
         await tx.offer.update({
           where: { id: offerId },
           data: { status: OfferStatus.expired },
@@ -849,6 +1004,8 @@ export class OfferService {
           i18nMessage("server.offer.buyerCounterMustBeLower"),
         );
       }
+
+      assertOfferAmountAboveFloor(dto.amount, priceLimits, productPrice);
 
       if (dto.amount < minOffer) {
         throw new BadRequestException(
@@ -868,16 +1025,13 @@ export class OfferService {
         },
       });
 
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
-
       const newOffer = await tx.offer.create({
         data: {
           productId: offer.productId,
           buyerId: offer.buyerId,
           sellerId: offer.sellerId,
           amount: dto.amount,
-          message: dto.message ?? null,
+          message,
           status: OfferStatus.pending,
           buyerMustAccept: false,
           expiresAt,
@@ -1236,11 +1390,15 @@ export class OfferService {
   private async formatOfferResponse(offer: any) {
     const now = new Date();
     const expiresAt = new Date(offer.expiresAt);
-    const isExpired = now > expiresAt && offer.status === OfferStatus.pending;
+    const isExpired =
+      now > expiresAt &&
+      offer.status === OfferStatus.pending &&
+      !(await this.extensionPolicy?.willExtend(offer.id, now));
 
     let timeRemaining: string | undefined;
     if (offer.status === OfferStatus.pending && !isExpired) {
-      const diff = expiresAt.getTime() - now.getTime();
+      // Süresi geçmiş ama uzatılacak teklif: sayaç 00:00:00'da bekler.
+      const diff = Math.max(0, expiresAt.getTime() - now.getTime());
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);

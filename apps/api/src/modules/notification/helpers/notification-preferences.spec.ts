@@ -1,5 +1,7 @@
 import {
   categoryForType,
+  MARKETING_BROADCAST_PREFERENCE_TYPE,
+  preferenceTypeFor,
   resolveSettings,
   shouldDeliver,
 } from "./notification-preferences";
@@ -172,6 +174,133 @@ describe("notification-preferences", () => {
         shouldDeliver(s, NotificationType.EMAIL_VERIFICATION, "email"),
       ).toBe(true);
       expect(shouldDeliver(s, "admin_broadcast", "push")).toBe(true);
+    });
+  });
+
+  // S1 — Apple 4.5.4 / İYS: pazarlama türündeki admin duyurusu ALWAYS_SEND'den
+  // yararlanmaz; duyuru (işlemsel/güvenlik) türü yararlanmaya devam eder.
+  describe("preferenceTypeFor", () => {
+    it("pazarlama türündeki admin duyurusu ayrı tercih anahtarına çevrilir", () => {
+      expect(
+        preferenceTypeFor({
+          type: "admin_broadcast",
+          mailingType: "marketing",
+        }),
+      ).toBe(MARKETING_BROADCAST_PREFERENCE_TYPE);
+    });
+
+    it("duyuru türü ve türsüz (eski) admin duyurusu aynen kalır", () => {
+      expect(
+        preferenceTypeFor({
+          type: "admin_broadcast",
+          mailingType: "announcement",
+        }),
+      ).toBe("admin_broadcast");
+      expect(preferenceTypeFor({ type: "admin_broadcast" })).toBe(
+        "admin_broadcast",
+      );
+    });
+
+    it("başka tiplerde mailingType yok sayılır; tip yoksa 'general'", () => {
+      expect(
+        preferenceTypeFor({ type: "order_shipped", mailingType: "marketing" }),
+      ).toBe("order_shipped");
+      expect(preferenceTypeFor(undefined)).toBe("general");
+      expect(preferenceTypeFor({ type: "" })).toBe("general");
+    });
+
+    it("pazarlama duyurusu push master anahtarına uyar, duyuru uymaz", () => {
+      const pushOff = withPrefs({ pushNotifications: false });
+      expect(
+        shouldDeliver(pushOff, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(false);
+      expect(shouldDeliver(pushOff, "admin_broadcast", "push")).toBe(true);
+    });
+
+    it("pazarlama duyurusu kampanya (PROMOTION) kategorisine bağlıdır", () => {
+      expect(categoryForType(MARKETING_BROADCAST_PREFERENCE_TYPE)).toBe(
+        categoryForType(NotificationType.PROMOTION),
+      );
+      expect(categoryForType(MARKETING_BROADCAST_PREFERENCE_TYPE)).toBe(
+        "marketingEmails",
+      );
+    });
+
+    it("kampanya tercihi kapalıysa pazarlama push'u gitmez, duyuru gider", () => {
+      const off = withPrefs({ marketingEmails: false });
+      expect(
+        shouldDeliver(off, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(false);
+      expect(
+        shouldDeliver(off, MARKETING_BROADCAST_PREFERENCE_TYPE, "in_app"),
+      ).toBe(false);
+      expect(shouldDeliver(off, "admin_broadcast", "push")).toBe(true);
+    });
+
+    it("kampanya tercihi açıksa pazarlama push'u gider", () => {
+      expect(
+        shouldDeliver(
+          withPrefs({ marketingEmails: true }),
+          MARKETING_BROADCAST_PREFERENCE_TYPE,
+          "push",
+        ),
+      ).toBe(true);
+    });
+
+    it("kayıtlı tercihi olmayan kullanıcı varsayılanı alır (kapalı)", () => {
+      expect(DEFAULT_NOTIFICATION_SETTINGS.marketingEmails).toBe(false);
+      expect(
+        shouldDeliver(
+          resolveSettings(null),
+          MARKETING_BROADCAST_PREFERENCE_TYPE,
+          "push",
+        ),
+      ).toBe(false);
+      expect(
+        shouldDeliver(
+          resolveSettings({}),
+          MARKETING_BROADCAST_PREFERENCE_TYPE,
+          "push",
+        ),
+      ).toBe(false);
+    });
+
+    it("resolveSettings: kolon geçilirse JSON'daki marketingEmails yok sayılır", () => {
+      // Kolon tek kaynak: bayat JSON kararı değiştirmez.
+      expect(
+        resolveSettings({ marketingEmails: true }, false).marketingEmails,
+      ).toBe(false);
+      expect(
+        resolveSettings({ marketingEmails: false }, true).marketingEmails,
+      ).toBe(true);
+      expect(resolveSettings(null, true).marketingEmails).toBe(true);
+      expect(resolveSettings({}, false).marketingEmails).toBe(false);
+    });
+
+    it("kolon geçilmezse JSON/varsayılan geçerlidir", () => {
+      expect(resolveSettings(null).marketingEmails).toBe(false);
+      expect(resolveSettings({ marketingEmails: true }).marketingEmails).toBe(
+        true,
+      );
+      expect(resolveSettings(null, null).marketingEmails).toBe(false);
+    });
+
+    it("kolon yalnız kampanya düğmesini etkiler", () => {
+      const settings = resolveSettings({ orderUpdates: false }, true);
+      expect(settings.orderUpdates).toBe(false);
+      expect(settings.messageAlerts).toBe(true);
+      expect(settings.pushNotifications).toBe(true);
+    });
+
+    it("pazarlama duyurusu kararı kolonu izler (kolon açık → gider, kapalı → gitmez)", () => {
+      const on = resolveSettings({ marketingEmails: false }, true);
+      const off = resolveSettings({ marketingEmails: true }, false);
+      expect(
+        shouldDeliver(on, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(true);
+      expect(
+        shouldDeliver(off, MARKETING_BROADCAST_PREFERENCE_TYPE, "push"),
+      ).toBe(false);
     });
   });
 });

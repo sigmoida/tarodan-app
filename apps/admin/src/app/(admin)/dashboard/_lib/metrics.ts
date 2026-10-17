@@ -36,6 +36,11 @@ export function toDashboardMetrics(raw: unknown): DashboardMetrics {
       yesterday: Number(value.yesterday ?? 0),
       thisMonth: Number(value.thisMonth ?? 0),
       allTime: Number(value.allTime ?? 0),
+      // Kartın üzerine gelince gösterilen açıklama (sunucu yazar).
+      description:
+        typeof value.description === "string" && value.description
+          ? value.description
+          : undefined,
     };
   }
 

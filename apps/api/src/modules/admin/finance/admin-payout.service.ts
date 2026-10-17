@@ -1,8 +1,9 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import type { Queue } from "bull";
@@ -11,11 +12,15 @@ import {
   LIVE_PAYMENT,
   LIVE_PAYOUT_TRANSFER,
 } from "../../account-lane/live-lane.where";
-import { failedTransfersWhere } from "./finance-health.where";
+import {
+  failedTransfersWhere,
+  overdueHoldsWhere,
+  upcomingHoldsWhere,
+} from "./finance-health.where";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PayoutService } from "../../payout/payout.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { PayoutTransactionsQueryDto, PayoutExportQueryDto } from "../dto";
+import { PayoutTransactionsQueryDto } from "../dto";
 import {
   Prisma,
   PaymentHoldStatus,
@@ -24,12 +29,71 @@ import {
   TradeStatus,
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
+import { PaymentHoldResidualService } from "../../payment/refund/payment-hold-residual.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
 import { generatePayoutTransId } from "../../../common/helpers/payout-trans-id";
+import { istanbulRangeEdge } from "../../../common/helpers/tr-calendar";
 import { i18nMessage } from "../../i18n";
+import {
+  HOLD_RELEASE_ORDER_SELECT,
+  holdReleasabilityOf,
+} from "../../payout/helpers/hold-release-eligibility";
+
+/** Hold satırının ilişkileri — liste ve döküm aynı şekli okur. */
+export const HOLD_ROW_INCLUDE = {
+  payment: { select: { id: true, paidAt: true } },
+  seller: { select: { id: true, displayName: true, email: true } },
+} satisfies Prisma.PaymentHoldInclude;
+
+export type HoldWithRelations = Prisma.PaymentHoldGetPayload<{
+  include: typeof HOLD_ROW_INCLUDE;
+}>;
+
+/** Transfer satırının ilişkileri. PaymentHold'da Order ilişkisi yok (yalnız
+ *  orderId) — numara toplu çözülür. */
+export const TRANSFER_ROW_INCLUDE = {
+  seller: { select: { id: true, displayName: true, email: true } },
+  paymentHold: { select: { orderId: true } },
+} satisfies Prisma.PayoutTransferInclude;
+
+export type TransferWithRelations = Prisma.PayoutTransferGetPayload<{
+  include: typeof TRANSFER_ROW_INCLUDE;
+}>;
+
+/** Transfer listesi sabit sıralıdır (en yeni önce); döküm aynı sırayı okur. */
+export const TRANSFER_LIST_ORDER = {
+  createdAt: "desc",
+} as const satisfies Prisma.PayoutTransferOrderByWithRelationInput;
+
+/** Transfer listesi/dökümü süzgeci (`PayoutTransfersQueryDto` ile aynı alanlar). */
+export interface PayoutTransferFilter {
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface PayoutTransferListQuery extends PayoutTransferFilter {
+  page?: number;
+  limit?: number;
+}
+
+/** `dateFrom` / `dateTo` → Türkiye günü sınırlarında `createdAt` aralığı. */
+function istanbulDateRange(filter: {
+  dateFrom?: string;
+  dateTo?: string;
+}): { gte?: Date; lte?: Date } | undefined {
+  if (!filter.dateFrom && !filter.dateTo) return undefined;
+  return {
+    ...(filter.dateFrom
+      ? { gte: istanbulRangeEdge(filter.dateFrom, "start") }
+      : {}),
+    ...(filter.dateTo ? { lte: istanbulRangeEdge(filter.dateTo, "end") } : {}),
+  };
+}
 
 /**
- * Satıcı ödemeleri (escrow özet/işlem/plan/CSV, manuel release, transfer retry) —
+ * Satıcı ödemeleri (escrow özet/işlem/plan, manuel release, transfer retry) —
  * AdminService'in SELLER PAYOUTS bölümünden birebir taşındı.
  * AdminService aynı imzalarla buraya delege eder.
  */
@@ -43,7 +107,49 @@ export class AdminPayoutService {
     private readonly paymentService: PaymentService,
     private readonly payoutCore: PayoutService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
+    // Sondaki opsiyonel bağımlılık: mevcut dar spec kurulumları 5 argümanla kurar.
+    @Optional() private readonly holdResidual?: PaymentHoldResidualService,
   ) {}
+
+  /**
+   * Satıcı kusurlu kalıntıyı platforma kapatır (PSP'ye gidilmez). Kalan tutar
+   * alıcının değil platformun parasıdır — alıcı ödediğinin tamamını zaten geri
+   * almıştır. Geri dönülemez bir para hareketi olduğu için sebep zorunlu ve
+   * denetim kaydı kapatmayla AYNI işlemde yazılır (yazılamazsa kapatma da
+   * geri alınır). Uygun değilse 409.
+   */
+  async settleHoldResidual(adminId: string, holdId: string, reason: string) {
+    if (!reason?.trim()) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.payment.escrowReasonRequired"),
+      );
+    }
+    if (!this.holdResidual) {
+      throw new Error(
+        "PaymentHoldResidualService is not wired into AdminPayoutService",
+      );
+    }
+    const settled = await this.holdResidual.settleResidual(holdId, {
+      actor: adminId,
+      reason: reason.trim(),
+      afterWrite: (tx, result) =>
+        this.audit.createRequiredAuditLog(
+          adminId,
+          "payout_hold_residual_settle",
+          "PaymentHold",
+          holdId,
+          { action: "settle_residual", reason: reason.trim() },
+          {
+            settledAmount: result.settledAmount,
+            orderId: result.orderId,
+            sellerId: result.sellerId,
+            faultBasis: result.faultBasis,
+          },
+          tx,
+        ),
+    });
+    return { success: true, ...settled };
+  }
 
   /**
    * Release SONRASI hızlı yol: transfer satırını KAPSAMLI oluştur (DB-only,
@@ -144,12 +250,11 @@ export class AdminPayoutService {
         _count: { id: true },
       }),
       this.prisma.payoutTransfer.count({ where: failedTransfersWhere }),
+      // "Yaklaşan" = tarihi HENÜZ gelmemiş ve tarihinde açılacak olan. Süresi
+      // geçmiş hold'lar artı tarihe göre en başa dizildiği için kartı
+      // dolduruyordu; onların yeri "süresi geçmiş hold" kuyruğudur.
       this.prisma.paymentHold.findMany({
-        where: {
-          ...liveHold,
-          status: PaymentHoldStatus.held,
-          releaseAt: { not: null },
-        },
+        where: upcomingHoldsWhere(new Date()),
         orderBy: { releaseAt: "asc" },
         take: 5,
         select: {
@@ -199,25 +304,44 @@ export class AdminPayoutService {
    * Başarısız/iade dönen transferler burada görünür ve retry'lanır; eskiden
    * yalnız `payouts/failed` ucu vardı ve hiçbir UI ona bağlanmamıştı.
    */
-  async getPayoutTransfers(query: {
-    status?: string;
-    search?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async getPayoutTransfers(query: PayoutTransferListQuery) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const where = await this.transferListWhere(query);
+
+    const [items, total] = await Promise.all([
+      this.prisma.payoutTransfer.findMany({
+        where,
+        include: TRANSFER_ROW_INCLUDE,
+        orderBy: TRANSFER_LIST_ORDER,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payoutTransfer.count({ where }),
+    ]);
+
+    return {
+      items: await this.toTransferRows(items),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Transfer listesi + dökümünün ORTAK süzgeci (durum / oluşturma tarihi /
+   * arama). Tarih uçları Türkiye günüdür: bitiş günü TAMAMIYLA dahil.
+   */
+  async transferListWhere(
+    query: PayoutTransferFilter,
+  ): Promise<Prisma.PayoutTransferWhereInput> {
     const where: Prisma.PayoutTransferWhereInput = {};
     if (query.status && query.status !== "all") {
       where.status = query.status as PayoutStatus;
     }
-    if (query.dateFrom || query.dateTo) {
-      where.createdAt = {};
-      if (query.dateFrom) where.createdAt.gte = new Date(query.dateFrom);
-      if (query.dateTo) where.createdAt.lte = new Date(query.dateTo);
-    }
+    const createdAt = istanbulDateRange(query);
+    if (createdAt) where.createdAt = createdAt;
     if (query.search) {
       const searchOr: Prisma.PayoutTransferWhereInput[] = [
         {
@@ -229,78 +353,61 @@ export class AdminPayoutService {
           },
         },
       ];
-      const matchingOrders = await this.prisma.order.findMany({
-        where: { orderNumber: { contains: query.search, mode: "insensitive" } },
-        select: { id: true },
-      });
+      const matchingOrders = await this.matchingOrderIds(query.search);
       if (matchingOrders.length > 0) {
-        searchOr.push({
-          paymentHold: {
-            orderId: { in: matchingOrders.map((o) => o.id) },
-          },
-        });
+        searchOr.push({ paymentHold: { orderId: { in: matchingOrders } } });
       }
       where.OR = searchOr;
     }
+    return where;
+  }
 
-    const [items, total] = await Promise.all([
-      this.prisma.payoutTransfer.findMany({
-        where,
-        include: {
-          seller: { select: { id: true, displayName: true, email: true } },
-          // PaymentHold'da Order ilişkisi yok (yalnız orderId) — numara aşağıda
-          // toplu çözülür.
-          paymentHold: { select: { orderId: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.payoutTransfer.count({ where }),
-    ]);
-
-    const transferOrderIds = [
-      ...new Set(
-        items
-          .map((t) => t.paymentHold?.orderId)
-          .filter((v): v is string => !!v),
-      ),
-    ];
-    const transferOrders = transferOrderIds.length
-      ? await this.prisma.order.findMany({
-          where: { id: { in: transferOrderIds } },
-          select: { id: true, orderNumber: true },
-        })
-      : [];
-    const orderNumberById = new Map(
-      transferOrders.map((o) => [o.id, o.orderNumber] as const),
+  /** Transfer satırları → liste satırı; sipariş numaraları toplu çözülür. */
+  async toTransferRows(items: TransferWithRelations[]) {
+    const orderNumberById = await this.orderNumbersById(
+      items.map((t) => t.paymentHold?.orderId),
     );
+    return items.map((t) => ({
+      id: t.id,
+      orderId: t.paymentHold?.orderId ?? null,
+      orderNumber: t.paymentHold?.orderId
+        ? (orderNumberById.get(t.paymentHold.orderId) ?? null)
+        : null,
+      tradeCashPaymentId: t.tradeCashPaymentId,
+      seller: t.seller,
+      amount: Number(t.amount),
+      netAmount: Number(t.netAmount),
+      adjustmentDeduction: Number(t.adjustmentDeduction),
+      // KVKK: IBAN yalnız son 4 hane.
+      ibanLast4: (t.transferIban ?? "").replace(/\s/g, "").slice(-4),
+      status: t.status,
+      failureReason: t.failureReason,
+      retryCount: t.retryCount,
+      processedAt: t.processedAt,
+      createdAt: t.createdAt,
+    }));
+  }
 
-    return {
-      items: items.map((t) => ({
-        id: t.id,
-        orderId: t.paymentHold?.orderId ?? null,
-        orderNumber: t.paymentHold?.orderId
-          ? (orderNumberById.get(t.paymentHold.orderId) ?? null)
-          : null,
-        tradeCashPaymentId: t.tradeCashPaymentId,
-        seller: t.seller,
-        amount: Number(t.amount),
-        netAmount: Number(t.netAmount),
-        adjustmentDeduction: Number(t.adjustmentDeduction),
-        // KVKK: IBAN yalnız son 4 hane.
-        ibanLast4: (t.transferIban ?? "").replace(/\s/g, "").slice(-4),
-        status: t.status,
-        failureReason: t.failureReason,
-        retryCount: t.retryCount,
-        processedAt: t.processedAt,
-        createdAt: t.createdAt,
-      })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+  /** Sipariş numarası araması → sipariş id'leri (hold'da Order ilişkisi yok). */
+  private async matchingOrderIds(search: string): Promise<string[]> {
+    const orders = await this.prisma.order.findMany({
+      where: { orderNumber: { contains: search, mode: "insensitive" } },
+      select: { id: true },
+    });
+    return orders.map((o) => o.id);
+  }
+
+  /** id → sipariş numarası, tek sorguda (PaymentHold yalnız orderId taşır). */
+  private async orderNumbersById(
+    orderIds: ReadonlyArray<string | null | undefined>,
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(orderIds.filter((v): v is string => !!v))];
+    if (ids.length === 0) return new Map();
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, orderNumber: true },
+    });
+    return new Map(orders.map((o) => [o.id, o.orderNumber] as const));
   }
 
   /**
@@ -400,18 +507,54 @@ export class AdminPayoutService {
   }
 
   /**
-   * Payout transaction history (payment holds with order/seller info)
+   * Hold listesi + Excel dökümünün ORTAK süzgeci (satıcı/durum/oluşturma
+   * tarihi/erken). İki yüzey aynı kümeyi görsün diye tek yerde kurulur. Tarih
+   * uçları Türkiye günüdür: `dateTo=2026-10-12` o günün TAMAMINI kapsar (eskiden
+   * UTC gece yarısıydı ve seçilen gün dışarıda kalıyordu).
+   *
+   * `earlyReleased`: ERKEN bırakılanlar = `releasedAt < releaseAt`. İki sütun
+   * karşılaştırıldığı için Prisma alan referansı (`fields.releaseAt`) kullanılır
+   * — sunucu tarafında kaldığından sayfalama ve toplam doğru kalır. NULL
+   * karşılaştırması SQL'de elenir: bırakılmamış ya da planlanmamış satır girmez.
+   * Kural `earlyReleaseDays` (@tarodan/types) ile aynıdır.
+   *
+   * `overdue`: dashboard'un "süresi geçmiş hold" kuyruğu ve Finans Özeti
+   * sağlık şeridiyle AYNI küme (`overdueHoldsWhere`) — bağlantı sayılanı açar.
    */
-  async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
-    const { search, sellerId, status, dateFrom, dateTo } = query;
-    const where: Prisma.PaymentHoldWhereInput = {};
+  private holdListWhere(
+    filter: {
+      sellerId?: string;
+      status?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      earlyReleased?: boolean;
+      overdue?: boolean;
+    },
+    now = new Date(),
+  ): Prisma.PaymentHoldWhereInput {
+    const { sellerId, status, earlyReleased, overdue } = filter;
+    const where: Prisma.PaymentHoldWhereInput = overdue
+      ? { AND: [overdueHoldsWhere(now)] }
+      : {};
     if (sellerId) where.sellerId = sellerId;
     if (status) where.status = status as PaymentHoldStatus;
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
+    const createdAt = istanbulDateRange(filter);
+    if (createdAt) where.createdAt = createdAt;
+    if (earlyReleased) {
+      where.releasedAt = { lt: this.prisma.paymentHold.fields.releaseAt };
     }
+    return where;
+  }
+
+  /**
+   * Hold listesinin where + orderBy'ı — liste ve döküm AYNI sorguyu kullanır.
+   */
+  async holdListArgs(query: PayoutTransactionsQueryDto): Promise<{
+    where: Prisma.PaymentHoldWhereInput;
+    orderBy: Prisma.PaymentHoldOrderByWithRelationInput;
+  }> {
+    const { search } = query;
+    const where = this.holdListWhere(query);
     if (search) {
       const searchOr: Prisma.PaymentHoldWhereInput[] = [
         {
@@ -423,12 +566,9 @@ export class AdminPayoutService {
           },
         },
       ];
-      const matchingOrders = await this.prisma.order.findMany({
-        where: { orderNumber: { contains: search, mode: "insensitive" } },
-        select: { id: true },
-      });
+      const matchingOrders = await this.matchingOrderIds(search);
       if (matchingOrders.length > 0) {
-        searchOr.push({ orderId: { in: matchingOrders.map((o) => o.id) } });
+        searchOr.push({ orderId: { in: matchingOrders } });
       }
       where.OR = searchOr;
     }
@@ -447,47 +587,63 @@ export class AdminPayoutService {
         },
       },
     );
+    return { where, orderBy };
+  }
+
+  /**
+   * Payout transaction history (payment holds with order/seller info)
+   */
+  async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
+    const { where, orderBy } = await this.holdListArgs(query);
     const result = await paginate(
       this.prisma.paymentHold,
-      {
-        where,
-        include: {
-          payment: { select: { id: true, paidAt: true } },
-          seller: { select: { id: true, displayName: true, email: true } },
-        },
-        orderBy,
-      },
+      { where, include: HOLD_ROW_INCLUDE, orderBy },
       query,
     );
-    const holds = result.data;
 
-    const orders = await this.prisma.order.findMany({
-      where: { id: { in: holds.map((h) => h.orderId) } },
-      select: { id: true, orderNumber: true },
-    });
-    const orderMap = new Map(orders.map((o) => [o.id, o]));
+    return { ...result, data: await this.toHoldRows(result.data) };
+  }
 
-    return {
-      ...result,
-      data: holds.map((h) => ({
-        id: h.id,
-        orderId: h.orderId,
-        orderNumber: orderMap.get(h.orderId)?.orderNumber ?? "-",
-        sellerId: h.sellerId,
-        sellerName: h.seller.displayName ?? h.seller.email,
-        sellerEmail: h.seller.email,
-        amount: Number(h.amount),
-        // Kısmi iadede tüketilen pay — net ödenecek = amount - refundedAmount.
-        refundedAmount: Number(h.refundedAmount ?? 0),
-        // GERÇEK iade kilidi — UI neden rozetini bununla üretir (uydurma yok).
-        frozenByRefundId: h.frozenByRefundId ?? null,
-        status: h.status,
-        releaseAt: h.releaseAt,
-        releasedAt: h.releasedAt,
-        paidAt: h.payment?.paidAt,
-        createdAt: h.createdAt,
-      })),
-    };
+  /**
+   * Hold → liste satırı; sipariş numaraları toplu çözülür (grup ödemesi dahil).
+   * Sipariş, bırakma yüklemiyle AYNI seçimle okunur: liste rozeti
+   * (`releasable` / `releaseBlockedReason`) ile gerçek bırakma kararı aynı
+   * gerçekten türer.
+   */
+  async toHoldRows(holds: HoldWithRelations[]) {
+    const orderIds = [...new Set(holds.map((h) => h.orderId))];
+    const orders =
+      orderIds.length === 0
+        ? []
+        : await this.prisma.order.findMany({
+            where: { id: { in: orderIds } },
+            select: {
+              id: true,
+              orderNumber: true,
+              ...HOLD_RELEASE_ORDER_SELECT,
+            },
+          });
+    const orderById = new Map(orders.map((o) => [o.id, o]));
+    const now = new Date();
+    return holds.map((h) => ({
+      id: h.id,
+      orderId: h.orderId,
+      orderNumber: orderById.get(h.orderId)?.orderNumber ?? "-",
+      sellerId: h.sellerId,
+      sellerName: h.seller.displayName ?? h.seller.email,
+      sellerEmail: h.seller.email,
+      amount: Number(h.amount),
+      // Kısmi iadede tüketilen pay — net ödenecek = amount - refundedAmount.
+      refundedAmount: Number(h.refundedAmount ?? 0),
+      // GERÇEK iade kilidi — UI neden rozetini bununla üretir (uydurma yok).
+      frozenByRefundId: h.frozenByRefundId ?? null,
+      status: h.status,
+      releaseAt: h.releaseAt,
+      releasedAt: h.releasedAt,
+      paidAt: h.payment?.paidAt,
+      createdAt: h.createdAt,
+      ...holdReleasabilityOf(h, orderById.get(h.orderId) ?? null, now),
+    }));
   }
 
   /**
@@ -503,7 +659,10 @@ export class AdminPayoutService {
     sortType?: "text" | "number" | "date";
   }) {
     const { sellerId, search } = query;
+    // Test şeridi hold'u payout'ta bilinçli atlanır — planda görünürse hiç
+    // gerçekleşmeyecek bir ödeme gibi durur.
     const where: Prisma.PaymentHoldWhereInput = {
+      payment: LIVE_PAYMENT,
       status: PaymentHoldStatus.held,
     };
     if (sellerId) where.sellerId = sellerId;
@@ -539,112 +698,14 @@ export class AdminPayoutService {
     );
     const result = await paginate(
       this.prisma.paymentHold,
-      {
-        where,
-        include: {
-          seller: { select: { id: true, displayName: true, email: true } },
-        },
-        orderBy,
-      },
+      { where, include: HOLD_ROW_INCLUDE, orderBy },
       query,
     );
 
-    // Grup ödemesinde payment.order NULL'dur — sipariş numarası hold.orderId
-    // üzerinden çözülür (eskiden her sepet hold'u "-" görünüyordu).
-    const scheduleOrders = await this.prisma.order.findMany({
-      where: { id: { in: result.data.map((h) => h.orderId) } },
-      select: { id: true, orderNumber: true },
-    });
-    const scheduleOrderMap = new Map(
-      scheduleOrders.map((o) => [o.id, o.orderNumber]),
-    );
-
-    return {
-      ...result,
-      data: result.data.map((h) => ({
-        id: h.id,
-        orderId: h.orderId,
-        orderNumber: scheduleOrderMap.get(h.orderId) ?? "-",
-        sellerId: h.sellerId,
-        sellerName: h.seller.displayName ?? h.seller.email,
-        sellerEmail: h.seller.email,
-        amount: Number(h.amount),
-        refundedAmount: Number(h.refundedAmount ?? 0),
-        frozenByRefundId: h.frozenByRefundId ?? null,
-        releaseAt: h.releaseAt,
-        createdAt: h.createdAt,
-      })),
-    };
-  }
-
-  /**
-   * Export payout transactions as CSV
-   */
-  async getPayoutsExport(query: PayoutExportQueryDto) {
-    const { sellerId, status, dateFrom, dateTo } = query;
-    const where: Prisma.PaymentHoldWhereInput = {};
-    if (sellerId) where.sellerId = sellerId;
-    if (status) where.status = status as PaymentHoldStatus;
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
-    }
-
-    const holds = await this.prisma.paymentHold.findMany({
-      where,
-      include: {
-        seller: { select: { displayName: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5000,
-    });
-
-    const orders = await this.prisma.order.findMany({
-      where: { id: { in: holds.map((h) => h.orderId) } },
-      select: { id: true, orderNumber: true },
-    });
-    const orderMap = new Map(orders.map((o) => [o.id, o]));
-
-    const headers = [
-      "id",
-      "orderId",
-      "orderNumber",
-      "sellerId",
-      "sellerName",
-      "sellerEmail",
-      "amount",
-      "status",
-      "releaseAt",
-      "releasedAt",
-      "createdAt",
-    ];
-    const rows = holds.map((h) =>
-      [
-        h.id,
-        h.orderId,
-        orderMap.get(h.orderId)?.orderNumber ?? "",
-        h.sellerId,
-        h.seller.displayName ?? h.seller.email ?? "",
-        h.seller.email ?? "",
-        Number(h.amount),
-        h.status,
-        h.releaseAt ? new Date(h.releaseAt).toISOString() : "",
-        h.releasedAt ? new Date(h.releasedAt).toISOString() : "",
-        new Date(h.createdAt).toISOString(),
-      ]
-        .map((c) =>
-          typeof c === "string" && c.includes(",")
-            ? `"${c.replace(/"/g, '""')}"`
-            : c,
-        )
-        .join(","),
-    );
-    const csv = [headers.join(","), ...rows].join("\n");
-    return {
-      csv,
-      filename: `payouts-${new Date().toISOString().slice(0, 10)}.csv`,
-    };
+    // Escrow listesiyle AYNI satır: sipariş numarası hold.orderId üzerinden
+    // çözülür (grup ödemesinde payment.order NULL) ve `releasable` /
+    // `releaseBlockedReason` rozeti bırakma yükleminden gelir.
+    return { ...result, data: await this.toHoldRows(result.data) };
   }
 
   /**

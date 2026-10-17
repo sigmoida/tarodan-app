@@ -10,8 +10,12 @@ import { catchError } from "rxjs/operators";
 import { PrismaService } from "../../prisma/prisma.service";
 import { getRequestId } from "../context/request-context";
 import { errorMessage } from "../helpers/error-message";
+import { IDENTITY_LOG_KEYS } from "../security/redact-sensitive";
 
 const SENSITIVE_BODY_KEYS = new Set([
+  // Hatalı kimlik gönderimi (ör. tekillik reddi) gövdesiyle error_logs'a
+  // yazılır; TCKN ve yasal ad orada değer olarak durmamalı.
+  ...IDENTITY_LOG_KEYS,
   "password",
   "passwordHash",
   "passwordConfirm",

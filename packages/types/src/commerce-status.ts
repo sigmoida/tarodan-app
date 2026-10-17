@@ -72,3 +72,60 @@ export const CANCELLATION_ACTORS = [
 ] as const;
 
 export type CancellationActorValue = (typeof CANCELLATION_ACTORS)[number];
+
+/**
+ * İade talebi durumları — Prisma `RefundRequestStatus` ile birebir. Admin
+ * İadeler ekranının kova kuralı (`admin-refund-list.ts`) bunları okur.
+ */
+export const REFUND_REQUEST_STATUSES = [
+  "pending_review",
+  "approved",
+  "wait_for_delivery",
+  "return_shipment_open",
+  "return_in_transit",
+  "return_delivered",
+  "refunded",
+  "rejected",
+  "disputed",
+  "cancelled",
+] as const;
+
+export type RefundRequestStatusValue = (typeof REFUND_REQUEST_STATUSES)[number];
+
+/** Sağlayıcı iade denemesinin durumu — Prisma `RefundAttemptStatus` ile birebir. */
+export const REFUND_ATTEMPT_STATUSES = [
+  "prepared",
+  "submitting",
+  "succeeded",
+  "finalized",
+  "failed",
+  "manual_review",
+] as const;
+
+export type RefundAttemptStatusValue = (typeof REFUND_ATTEMPT_STATUSES)[number];
+
+/**
+ * Takas durumları — Prisma `TradeStatus` ile birebir (`trade.ts` içindeki
+ * büyük harfli enum eski istemciler içindir, şemayla örtüşmez).
+ */
+export const TRADE_STATUSES = [
+  "pending",
+  "accepted",
+  "rejected",
+  "initiator_shipped",
+  "receiver_shipped",
+  "both_shipped",
+  "initiator_received",
+  "receiver_received",
+  "awaiting_payment",
+  "shipping_to_warehouse",
+  "at_warehouse",
+  "admin_reviewing",
+  "shipping_to_recipients",
+  "returning",
+  "completed",
+  "cancelled",
+  "disputed",
+] as const;
+
+export type TradeStatusValue = (typeof TRADE_STATUSES)[number];

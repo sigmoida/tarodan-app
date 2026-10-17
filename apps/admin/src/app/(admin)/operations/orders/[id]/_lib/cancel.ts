@@ -1,11 +1,20 @@
 import {
-  isPreShipmentCancellable,
-  preShipmentCancelBlocker,
+  ADMIN_CANCEL_REASON_I18N_KEYS,
+  ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS,
+  adminCancelRequestProblem,
+  adminOrderCancelBlockerOf,
+  adminOrderCancelEligibility,
+  isAdminCancelReasonCode,
+  type AdminCancelRequest,
+  type AdminOrderCancelBlocker,
+  type AdminOrderCancelEligibility,
   type AdminOrderCancelPreview,
   type AdminOrderLine,
   type AdminOrderListRow,
-  type PreShipmentCancelBlocker,
+  type CancellationActorValue,
 } from "@tarodan/types";
+import type { Translate } from "@/lib/statusLabels";
+import { cancelReasonLabel } from "@/lib/utils";
 import { rowSingleLine } from "../../_lib/rowView";
 import {
   activeRefundOf,
@@ -15,27 +24,49 @@ import {
 
 /**
  * "Siparişi iptal et" uygunluğu — kural `@tarodan/types`'taki
- * `isPreShipmentCancellable`'dır, API de iptali aynı kuralla kabul/red eder.
- * Burada yalnız ekranların veri şekli o kuralın girdisine çevrilir.
+ * `adminOrderCancelEligibility`'dir, API de iptali aynı kuralla kabul/red
+ * eder (ödenmemiş, kargo öncesi ödenmiş, teklif siparişi). Burada yalnız
+ * ekranların veri şekli o kuralın girdisine çevrilir.
  */
 
-/** Gerekçe üst sınırı — API DTO'su (`AdminCancelOrderDto.reason`) ile aynı. */
-export const CANCEL_REASON_MAX_LENGTH = 500;
-
-/** Sipariş dosyasındaki kalemin kargo öncesi iptal engeli (yoksa null). */
-export function fileEntryCancelBlocker(
+/** Sipariş dosyasındaki kalemin uygunluğu. */
+export function fileEntryCancelEligibility(
   entry: OrderFileEntry,
-): PreShipmentCancelBlocker | null {
-  return preShipmentCancelBlocker({
+): AdminOrderCancelEligibility {
+  return adminOrderCancelEligibility({
     status: entry.status,
     shipment: entry.shipment,
     hasActiveRefund: activeRefundOf(entry) !== null,
   });
 }
 
-/** Sipariş dosyasındaki kalem kargo öncesi iptal edilebilir mi? */
+/** Sipariş dosyasındaki kalem yönetici tarafından iptal edilebilir mi? */
 export function canCancelFileEntry(entry: OrderFileEntry): boolean {
-  return fileEntryCancelBlocker(entry) === null;
+  return fileEntryCancelEligibility(entry).allowed;
+}
+
+/**
+ * Dosyada gösterilecek engel: iptal kapalıysa nedeni. Zaten kapanmış
+ * (`closed`) sipariş için metin gösterilmez — iptal/iade durumu rozetten
+ * okunur; yarıda kalmış iptalin kendi uyarısı vardır.
+ */
+export function fileEntryVisibleBlocker(
+  entry: OrderFileEntry,
+): AdminOrderCancelBlocker | null {
+  const blocker = adminOrderCancelBlockerOf(fileEntryCancelEligibility(entry));
+  return blocker === "closed" || blocker === "pending_cancellation"
+    ? null
+    : blocker;
+}
+
+/** Engelin panel metni ("Yönetici iptali kapalı: …"). */
+export function cancelBlockerText(
+  blocker: AdminOrderCancelBlocker,
+  t: Translate,
+): string {
+  return t("admin.operations.orders.cancel.blocked", {
+    reason: t(ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS[blocker]),
+  });
 }
 
 /**
@@ -45,7 +76,8 @@ export function canCancelFileEntry(entry: OrderFileEntry): boolean {
 export function pendingCancellationRefund(
   entry: OrderFileEntry,
 ): OrderFileRefundRequest | null {
-  return fileEntryCancelBlocker(entry) === "pending_cancellation"
+  return adminOrderCancelBlockerOf(fileEntryCancelEligibility(entry)) ===
+    "pending_cancellation"
     ? activeRefundOf(entry)
     : null;
 }
@@ -63,28 +95,52 @@ export function cancellableRowLine(
   const pkg = row.packages.find((p) =>
     p.lines.some((l) => l.orderId === line.orderId),
   );
-  return isPreShipmentCancellable({
+  return adminOrderCancelEligibility({
     status: line.status,
     shipment: pkg?.shipment ?? null,
     hasActiveRefund: line.hasActiveRefund,
-  })
+  }).allowed
     ? line
     : null;
 }
 
-/** Gönderilebilir gerekçe: boşluktan ibaret değil ve üst sınırı aşmıyor. */
-export function isValidCancelReason(reason: string): boolean {
-  const trimmed = reason.trim();
-  return trimmed.length > 0 && trimmed.length <= CANCEL_REASON_MAX_LENGTH;
+/** Gönderilebilir istek: katalogdan bir neden; "Diğer"de iç not (paylaşılan kural). */
+export function isCancelRequestReady(request: Partial<AdminCancelRequest>) {
+  return adminCancelRequestProblem(request) === null;
+}
+
+/** "Diğer" seçiliyken not zorunlu ama boş mu (alan hatası için). */
+export function isNoteMissing(request: Partial<AdminCancelRequest>): boolean {
+  return adminCancelRequestProblem(request) === "note_required";
 }
 
 /** Önizlemenin kargo notu — kargo dahil mi, paket yine gidiyor mu. */
 export function cancelShippingNoteKey(
-  preview: AdminOrderCancelPreview,
+  preview: Extract<AdminOrderCancelPreview, { kind: "paid_pre_handover" }>,
 ):
   | "admin.operations.orders.cancel.shippingIncluded"
   | "admin.operations.orders.cancel.shippingExcluded" {
   return preview.shippingRefunded
     ? "admin.operations.orders.cancel.shippingIncluded"
     : "admin.operations.orders.cancel.shippingExcluded";
+}
+
+/**
+ * İptal edilmiş siparişin görünen nedeni: yönetici iptalinde katalog etiketi,
+ * diğerlerinde kayıtlı gerekçenin etiketi. Yöneticinin iç notu panelde de
+ * yalnız denetim kaydındadır.
+ */
+export function orderCancelReasonText(
+  order: {
+    cancelledBy?: CancellationActorValue | null;
+    adminCancelReasonCode?: string | null;
+    cancelReason?: string | null;
+  },
+  t: Translate,
+): string | null {
+  const code = order.adminCancelReasonCode;
+  if (order.cancelledBy === "platform" && isAdminCancelReasonCode(code)) {
+    return t(ADMIN_CANCEL_REASON_I18N_KEYS[code]);
+  }
+  return cancelReasonLabel(order.cancelReason, t);
 }

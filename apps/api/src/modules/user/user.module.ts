@@ -22,6 +22,11 @@ import { RatingModule } from "../rating/rating.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { UserBlockModule } from "../user-block/user-block.module";
+import { ConsentModule } from "../consent/consent.module";
+import { MarketingModule } from "../marketing/marketing.module";
+import { SearchModule } from "../search/search.module";
+import { AppleTokenModule } from "../auth/social/apple-token.module";
+import { WebSocketModule } from "../websocket/websocket.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
 
 @Module({
@@ -31,6 +36,19 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     RatingModule,
     ModerationModule,
     UserBlockModule,
+    // Pazarlama izni değişimi: tarihli onay kaydı + bülten listesi senkronu.
+    // İkisi de User'a bağlı değil, döngü yok.
+    ConsentModule,
+    MarketingModule,
+    // Hesap silmede pasife alınan ilanlar arama dizininden düşer (S3).
+    // SearchModule User'a bağlı değil, döngü yok.
+    SearchModule,
+    // Hesap silmede Sign in with Apple token iptali kuyruğa yazılır (App Store
+    // 5.1.1(v)). Yaprak modül; AuthModule'e bağlanmaz, döngü yok.
+    AppleTokenModule,
+    // Hesap silmede açık soketler kapatılır (commit sonrası). WebSocketModule
+    // User'a bağlı değil, döngü yok.
+    WebSocketModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],

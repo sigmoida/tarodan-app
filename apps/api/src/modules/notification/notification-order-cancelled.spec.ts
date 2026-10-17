@@ -5,7 +5,8 @@ import { NotificationType } from "./dto";
  * Kargo öncesi İPTAL duyurusu TEK tanımdır: processRefund'ın "iptal" dalı ve
  * admin (platform) iptali aynı metodu kullanır. Kullanıcıya "iade" değil
  * "iptal" denir; alıcı tutarı görür, satıcı kendi iptal bildirimini alır, iki
- * tarafa da iptal e-postası gider.
+ * tarafa da iptal e-postası gider. Alıcı e-postası siparişin alıcısına
+ * çözülür (`orderBuyerContact`): misafir siparişinde gerçek misafire.
  */
 describe("NotificationCommerceService.notifyOrderCancelledParties", () => {
   const order = {
@@ -15,10 +16,21 @@ describe("NotificationCommerceService.notifyOrderCancelledParties", () => {
     sellerId: "seller-1",
   };
 
-  const makeService = () => {
+  const makeService = (
+    buyerRow: {
+      buyer: { email: string; displayName: string };
+      shippingAddress: unknown;
+    } = {
+      buyer: { email: "alici@example.com", displayName: "Alıcı" },
+      shippingAddress: { fullName: "Alıcı" },
+    },
+  ) => {
     const dispatch = {
       createInAppNotification: jest.fn().mockResolvedValue(true),
       sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),
+      sendTemplateEmailToAddress: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
     };
     const prisma = {
       order: {
@@ -26,8 +38,8 @@ describe("NotificationCommerceService.notifyOrderCancelledParties", () => {
           ...order,
           cancelReason: "Satıcı stoğu bitti",
           product: { title: "Model araba" },
-          buyer: { displayName: "Alıcı" },
           seller: { displayName: "Satıcı" },
+          ...buyerRow,
         }),
       },
     };
@@ -73,6 +85,7 @@ describe("NotificationCommerceService.notifyOrderCancelledParties", () => {
       "order-cancelled-seller",
       expect.anything(),
     );
+    expect(dispatch.sendTemplateEmailToAddress).not.toHaveBeenCalled();
   });
 
   it("taraf verilmezse (processRefund'ın iptal dalı) ikisine gider", async () => {
@@ -81,7 +94,9 @@ describe("NotificationCommerceService.notifyOrderCancelledParties", () => {
     await service.notifyOrderCancelledParties(order, 1180);
 
     expect(dispatch.createInAppNotification).toHaveBeenCalledTimes(2);
-    expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledTimes(2);
+    // Satıcıya hesabına, alıcıya çözülmüş adresine.
+    expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledTimes(1);
+    expect(dispatch.sendTemplateEmailToAddress).toHaveBeenCalledTimes(1);
   });
 
   it("iki tarafa da gerekçeli iptal e-postası gönderir", async () => {
@@ -89,15 +104,51 @@ describe("NotificationCommerceService.notifyOrderCancelledParties", () => {
 
     await service.notifyOrderCancelledParties(order, 1180);
 
-    expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledWith(
-      "buyer-1",
+    expect(dispatch.sendTemplateEmailToAddress).toHaveBeenCalledWith(
+      "alici@example.com",
       "order-cancelled-buyer",
-      expect.objectContaining({ reason: "Satıcı stoğu bitti" }),
+      expect.objectContaining({
+        reason: "Satıcı stoğu bitti",
+        buyerName: "Alıcı",
+        isGuestOrder: false,
+      }),
     );
     expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledWith(
       "seller-1",
       "order-cancelled-seller",
       expect.objectContaining({ reason: "Satıcı stoğu bitti" }),
+    );
+  });
+
+  /**
+   * Regresyon: misafir siparişinde alıcı ortak sistem hesabıdır; iptal
+   * e-postası `guest@tarodan.system`'a gidiyor, misafire hiç ulaşmıyordu.
+   */
+  it("misafir siparişinde iptal e-postası teslimat verisindeki gerçek adrese gider", async () => {
+    const { service, dispatch } = makeService({
+      buyer: { email: "guest@tarodan.system", displayName: "GUEST_SYSTEM" },
+      shippingAddress: {
+        isGuestOrder: true,
+        guestEmail: "misafir@example.com",
+        guestName: "Misafir Alıcı",
+      },
+    });
+
+    await service.notifyOrderCancelledParties(order, 1180);
+
+    expect(dispatch.sendTemplateEmailToAddress).toHaveBeenCalledWith(
+      "misafir@example.com",
+      "order-cancelled-buyer",
+      expect.objectContaining({
+        buyerName: "Misafir Alıcı",
+        isGuestOrder: true,
+        buyerEmail: "misafir@example.com",
+      }),
+    );
+    expect(dispatch.sendTemplateEmailToUser).not.toHaveBeenCalledWith(
+      "buyer-1",
+      expect.anything(),
+      expect.anything(),
     );
   });
 });

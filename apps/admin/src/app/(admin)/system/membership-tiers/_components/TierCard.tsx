@@ -3,26 +3,17 @@
 import { useTranslations } from "next-intl";
 import {
   AsyncValue,
+  Badge,
   Button,
   enumLabel,
   membershipTierConfig,
 } from "@tarodan/ui";
 import { PencilIcon } from "@heroicons/react/24/outline";
+import { DataList, Field } from "@/components/detail/DataList";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
 import { type MembershipTier, computedYearly } from "../_lib/types";
 import { statusConfig } from "@/lib/statusLabels";
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <span className="min-w-0 truncate text-muted">{label}</span>
-      <span className="shrink-0 whitespace-nowrap text-heading">{value}</span>
-    </div>
-  );
-}
-
-const featurePill = "rounded px-2 py-1 text-xs";
 
 export function TierCard({
   tier,
@@ -66,71 +57,59 @@ export function TierCard({
         <p className="text-sm text-muted">{tier.description}</p>
       )}
 
-      <div className="space-y-2 text-sm">
+      <DataList columns={1} className="gap-y-2">
         {!isFree && (
           <>
-            <Row
-              label={t("admin.tiers.card.monthly")}
-              value={fmtTry(tier.monthlyPrice)}
-            />
-            <Row
-              label={t("admin.tiers.card.yearly")}
-              value={
-                <AsyncValue loading={yearlyDiscountLoading} width="8ch">
-                  {fmtTry(
-                    yearlyDiscount == null
-                      ? null
-                      : computedYearly(tier.monthlyPrice, yearlyDiscount),
-                  )}
-                </AsyncValue>
-              }
-            />
+            <Field label={t("admin.tiers.card.monthly")}>
+              {fmtTry(tier.monthlyPrice)}
+            </Field>
+            <Field label={t("admin.tiers.card.yearly")}>
+              <AsyncValue loading={yearlyDiscountLoading} width="8ch">
+                {fmtTry(
+                  yearlyDiscount == null
+                    ? null
+                    : computedYearly(tier.monthlyPrice, yearlyDiscount),
+                )}
+              </AsyncValue>
+            </Field>
           </>
         )}
-        <Row
-          label={t("admin.tiers.card.freeListings")}
-          value={tier.maxFreeListings}
-        />
-        <Row
-          label={t("admin.tiers.card.totalListings")}
-          value={
-            tier.maxTotalListings === -1
-              ? t("admin.tiers.card.unlimited")
-              : tier.maxTotalListings
-          }
-        />
-        <Row
-          label={t("admin.tiers.card.imagesPerListing")}
-          value={tier.maxImagesPerListing}
-        />
-        <div className="border-t border-border pt-2">
-          <Row
-            label={t("admin.tiers.card.userCount")}
-            value={<span className="font-medium">{tier.userCount}</span>}
-          />
-        </div>
-      </div>
+        <Field label={t("admin.tiers.card.freeListings")}>
+          {tier.maxFreeListings}
+        </Field>
+        <Field label={t("admin.tiers.card.totalListings")}>
+          {tier.maxTotalListings === -1
+            ? t("admin.tiers.card.unlimited")
+            : tier.maxTotalListings}
+        </Field>
+        <Field label={t("admin.tiers.card.imagesPerListing")}>
+          {tier.maxImagesPerListing}
+        </Field>
+      </DataList>
+      <DataList columns={1} className="border-t border-border pt-2">
+        <Field label={t("admin.tiers.card.userCount")}>{tier.userCount}</Field>
+      </DataList>
 
       <div className="flex flex-wrap gap-2 border-t border-border pt-4">
         {tier.canCreateCollections && (
-          <span className={`${featurePill} bg-success-50 text-success-700`}>
+          <Badge variant="success" size="sm">
             {t("admin.tiers.card.collectionsPill")}
-          </span>
+          </Badge>
         )}
         {tier.canTrade && (
-          <span className={`${featurePill} bg-info-50 text-info-700`}>
+          <Badge variant="default" size="sm">
             {t("admin.tiers.card.tradePill")}
-          </span>
+          </Badge>
         )}
         {tier.isAdFree && (
-          <span className={`${featurePill} bg-primary-50 text-primary-700`}>
+          <Badge variant="default" size="sm">
             {t("admin.tiers.field.isAdFree")}
-          </span>
+          </Badge>
         )}
         {!tier.isActive && (
-          <span className={`${featurePill} bg-surface-alt text-muted`}>
+          <Badge variant="outline" size="sm">
             {t("common.inactive")}
-          </span>
+          </Badge>
         )}
       </div>
     </SectionCard>

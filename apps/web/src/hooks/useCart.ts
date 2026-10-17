@@ -58,7 +58,7 @@ function cartErrorMessage(error: unknown, fallback: string): string {
  * the same shape from the client-only offline cart in `cartStore`. Writes branch
  * on auth: server calls go through `cartApi` (then invalidate the query), guest
  * ops mutate the offline store. This replaces the old fetching `cartStore`, which
- * held server data and made API calls itself (CLAUDE.md §7/§8). Consumers get the
+ * held server data and made API calls itself (root CLAUDE.md, "Frontend"). Consumers get the
  * same fields + methods the store exposed, so they read one unified cart.
  */
 export function useCart() {

@@ -10,7 +10,8 @@ import {
   IsUUID,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Type, Transform } from "class-transformer";
+import { Type } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { AdminListQueryDto } from "../../../common/list";
 
 // =============================================================================
@@ -25,7 +26,7 @@ export class AdminAttributeGroupQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isActive?: boolean;
 }
@@ -43,7 +44,7 @@ export class AdminAttributeQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isActive?: boolean;
 }

@@ -1,14 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  BanknotesIcon,
-  UserIcon,
-  BuildingStorefrontIcon,
-  ChartBarIcon,
-  ReceiptPercentIcon,
-  TruckIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
@@ -41,8 +33,6 @@ export function CommissionSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <MetricCard
-        icon={BanknotesIcon}
-        tone="success"
         label={t("admin.finance.commission.totalCollected")}
         value={data ? fmtTry(data.totalCommission) : null}
         loading={isLoading}
@@ -55,36 +45,26 @@ export function CommissionSummary() {
         }
       />
       <MetricCard
-        icon={UserIcon}
-        tone="info"
         label={t("admin.finance.commission.buyerServiceFee")}
         value={data ? fmtTry(data.totalBuyerFee ?? 0) : null}
         loading={isLoading}
       />
       <MetricCard
-        icon={BuildingStorefrontIcon}
-        tone="primary"
         label={t("admin.finance.commission.sellerCommission")}
         value={data ? fmtTry(data.totalSellerFee ?? 0) : null}
         loading={isLoading}
       />
       <MetricCard
-        icon={ChartBarIcon}
-        tone="info"
         label={t("admin.finance.commission.gmv")}
         value={data ? fmtTry(data.totalSubtotal ?? 0) : null}
         loading={isLoading}
       />
       <MetricCard
-        icon={ReceiptPercentIcon}
-        tone="warning"
         label={t("admin.finance.commission.taxToState")}
         value={data ? fmtTry(data.totalTax ?? 0) : null}
         loading={isLoading}
       />
       <MetricCard
-        icon={TruckIcon}
-        tone="primary"
         label={t("admin.finance.commission.shippingToCarrier")}
         value={data ? fmtTry(data.totalShipping ?? 0) : null}
         loading={isLoading}

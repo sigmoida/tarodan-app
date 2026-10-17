@@ -8,6 +8,8 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { Button, Checkbox, Input } from "@tarodan/ui";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { adminKeys } from "@/lib/query/keys";
@@ -158,7 +160,11 @@ export function PackageFormModal({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-surface-alt/40 p-3">
+      <Panel
+        tone="muted"
+        padding="sm"
+        className="flex flex-wrap items-center gap-x-6 gap-y-2"
+      >
         <FormCheckbox
           name="showcaseOnHome"
           label={t("admin.marketing.adPackages.showcaseOnHomeLabel")}
@@ -167,13 +173,13 @@ export function PackageFormModal({
         <p className="basis-full text-xs text-muted">
           {t("admin.marketing.adPackages.showcaseOnHomeHelper")}
         </p>
-      </div>
+      </Panel>
 
-      <section className="space-y-4 rounded-lg border border-border bg-surface-alt/30 p-4">
+      <Panel tone="muted" className="space-y-4">
         <div>
-          <h3 className="text-sm font-semibold text-heading">
+          <SectionTitle as="h3" size="sm">
             {t("admin.marketing.adPackages.audience")}
-          </h3>
+          </SectionTitle>
           <p className="mt-1 text-xs text-muted">
             {t("admin.marketing.adPackages.audienceHelper")}
           </p>
@@ -320,7 +326,7 @@ export function PackageFormModal({
             )}
           </div>
         )}
-      </section>
+      </Panel>
 
       <div className="border-t border-border pt-4">
         <TierRowsEditor />

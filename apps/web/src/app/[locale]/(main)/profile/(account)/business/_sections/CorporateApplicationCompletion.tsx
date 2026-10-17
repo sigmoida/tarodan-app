@@ -144,7 +144,7 @@ export default function CorporateApplicationCompletion({
           <h1 className="text-xl font-semibold text-heading">{t("title")}</h1>
           <p className="mt-1 text-sm text-muted">{application.companyTitle}</p>
         </div>
-        <Badge variant={locked ? "warning" : "primary"}>
+        <Badge variant={locked ? "warning" : "default"}>
           {locked ? t("statusReview") : t("statusCompletion")}
         </Badge>
       </div>

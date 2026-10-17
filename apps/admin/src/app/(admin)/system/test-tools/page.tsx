@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/AdminList";
 import { CronsCard } from "./_components/CronsCard";
 import { TimeAdjustCard } from "./_components/TimeAdjustCard";
 import { TestLaneCard } from "./_components/TestLaneCard";
+import { UatRefreshCard } from "./_components/UatRefreshCard";
+import { ShipmentSimulationCard } from "./_components/ShipmentSimulationCard";
 import { useTestToolsPage } from "./_lib/useTestToolsPage";
 import { useTranslations } from "next-intl";
 
@@ -20,7 +22,7 @@ export default function TestToolsPage() {
         description={t("admin.system.testTools.description")}
       >
         {env && (
-          <Badge variant={env.isProd ? "danger" : "secondary"}>
+          <Badge variant={env.isProd ? "danger" : "outline"}>
             {env.isProd ? "⚠ PROD" : env.env}
           </Badge>
         )}
@@ -34,7 +36,9 @@ export default function TestToolsPage() {
         </Alert>
       )}
 
+      {env && !env.isProd && <UatRefreshCard />}
       <TestLaneCard isProd={!!env?.isProd} />
+      <ShipmentSimulationCard isProd={!!env?.isProd} />
       <CronsCard isProd={!!env?.isProd} />
       <TimeAdjustCard isProd={!!env?.isProd} />
     </AdminPage>

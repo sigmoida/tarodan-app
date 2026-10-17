@@ -1,8 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge, Button, EmptyState } from "@tarodan/ui";
+import { DataList, Field } from "@/components/detail/DataList";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { Eyebrow } from "@/components/detail/SectionTitle";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import {
   type ShippingTariff,
@@ -48,9 +50,9 @@ export function TariffCard({
         </Badge>
       </div>
 
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+      <Eyebrow className="mb-2">
         {t("admin.shippingTariffs.tiersTitle")}
-      </p>
+      </Eyebrow>
       {tiers.length ? (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {tiers.map((tier) => (
@@ -71,29 +73,27 @@ export function TariffCard({
           ))}
         </ul>
       ) : (
-        <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-subtle">
-          {t("admin.shippingTariffs.noTiers")}
-        </p>
+        <EmptyState
+          size="compact"
+          icon={false}
+          title={t("admin.shippingTariffs.noTiers")}
+        />
       )}
 
-      <dl className="mt-3 space-y-1 text-sm">
-        <Row
-          label={t("admin.shippingTariffs.freeShipping")}
-          value={
-            tariff.freeShippingEnabled
-              ? t("admin.shippingTariffs.freeOver", {
-                  amount: fmtTry(Number(tariff.freeShippingThreshold)),
-                })
-              : t("admin.shippingTariffs.freeDisabled")
-          }
-        />
+      <DataList columns={1} className="mt-3 gap-y-1">
+        <Field label={t("admin.shippingTariffs.freeShipping")}>
+          {tariff.freeShippingEnabled
+            ? t("admin.shippingTariffs.freeOver", {
+                amount: fmtTry(Number(tariff.freeShippingThreshold)),
+              })
+            : t("admin.shippingTariffs.freeDisabled")}
+        </Field>
         {/* Son yazma anı: taslakta "en son ne zaman düzenlendi", aktif/arşiv
             tarifede "ne zaman aktifleştirildi/arşivlendi" sorusunu cevaplar. */}
-        <Row
-          label={t("admin.shippingTariffs.lastUpdated")}
-          value={fmtDateTime(tariff.updatedAt) ?? "—"}
-        />
-      </dl>
+        <Field label={t("admin.shippingTariffs.lastUpdated")}>
+          {fmtDateTime(tariff.updatedAt) ?? "—"}
+        </Field>
+      </DataList>
 
       {tariff.status === "draft" && (
         <div className="mt-4 flex gap-2 border-t border-border pt-4">
@@ -106,14 +106,5 @@ export function TariffCard({
         </div>
       )}
     </SectionCard>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-muted">{label}</dt>
-      <dd className="text-right font-medium text-body">{value}</dd>
-    </div>
   );
 }

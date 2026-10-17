@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ALL_ACCEPTED,
+  CONSENT_CHANGED_EVENT,
   DEFAULT_PREFERENCES,
+  getOrCreateVisitorId,
   hasConsent,
   readPreferences,
   saveConsent,
   type CookieCategory,
   type CookiePreferences,
 } from "@/lib/cookieConsent";
+import { consentsApi } from "@/lib/api";
 
 /**
  * Çerez rızası durumu — banner ve /cookies tercih paneli aynı hook'u kullanır,
@@ -23,8 +26,15 @@ export function useCookieConsent() {
   useEffect(() => {
     // Kayıtlı tercihi rızadan bağımsız oku: kullanıcı banner'da onay verdikten
     // sonra /cookies sayfasında tercihlerini gerçek değerleriyle görmeli.
-    setPreferences(readPreferences());
-    setNeedsConsent(!hasConsent());
+    const sync = () => {
+      setPreferences(readPreferences());
+      setNeedsConsent(!hasConsent());
+    };
+    sync();
+    // Hook'un başka bir örneği (ör. banner) kaydettiğinde bu örnek de bilsin:
+    // tanıtım turu çerez bandının kapanmasını buradan bekler.
+    window.addEventListener(CONSENT_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(CONSENT_CHANGED_EVENT, sync);
   }, []);
 
   const toggle = useCallback((category: CookieCategory) => {
@@ -33,8 +43,22 @@ export function useCookieConsent() {
   }, []);
 
   const save = useCallback((prefs: CookiePreferences) => {
-    setPreferences(saveConsent(prefs));
+    const saved = saveConsent(prefs);
+    setPreferences(saved);
     setNeedsConsent(false);
+    // KVKK ispat kaydı: sunucu sürümü, IP'yi ve kullanıcı ajanını damgalar;
+    // oturum varsa kaydı üyeye de bağlar. İstemcideki rıza kayıttan bağımsız
+    // geçerlidir — kayıt en iyi çaba.
+    void consentsApi
+      .recordCookiePreferences({
+        visitorId: getOrCreateVisitorId(),
+        preferences: {
+          functional: saved.functional,
+          analytics: saved.analytics,
+          marketing: saved.marketing,
+        },
+      })
+      .catch(() => undefined);
   }, []);
 
   return {

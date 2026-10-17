@@ -21,8 +21,10 @@ import {
 import { CompensationPanel } from "./_sections/CompensationPanel";
 import { RefundFailurePanel } from "./_sections/RefundFailurePanel";
 import { EscrowReleasePanel } from "./_sections/EscrowReleasePanel";
+import { EscrowReleasedInfo } from "./_sections/EscrowReleasedInfo";
 import { StuckPanel } from "./_sections/StuckPanel";
 import { ReviewPanel } from "./_sections/ReviewPanel";
+import { AdminCancelPanel } from "./_sections/AdminCancelPanel";
 import { TradeInfoCards } from "./_sections/TradeInfoCards";
 import { TradeBalanceCard } from "./_sections/TradeBalanceCard";
 import { TradePartyCard } from "./_components/TradePartyCard";
@@ -171,6 +173,7 @@ export default function TradeDetailPage() {
             <CompensationPanel trade={trade} />
             <RefundFailurePanel trade={trade} />
             <EscrowReleasePanel trade={trade} />
+            <EscrowReleasedInfo trade={trade} />
             <StuckPanel
               trade={trade}
               show={canForceCancelStuck}
@@ -184,6 +187,7 @@ export default function TradeDetailPage() {
               onApprove={() => setShowApprove(true)}
               onReject={() => setShowReject(true)}
             />
+            <AdminCancelPanel trade={trade} />
 
             <TradeBalanceCard trade={trade} />
 
@@ -203,7 +207,7 @@ export default function TradeDetailPage() {
             </div>
 
             {trade.shipments && trade.shipments.length > 0 && (
-              <div className="space-y-6">
+              <>
                 {toWarehouse.length > 0 && (
                   <ShipmentLegCard
                     title={t("admin.operations.trades.legToWarehouse")}
@@ -263,7 +267,7 @@ export default function TradeDetailPage() {
                     }
                   />
                 )}
-              </div>
+              </>
             )}
 
             <TradeInfoCards trade={trade} />

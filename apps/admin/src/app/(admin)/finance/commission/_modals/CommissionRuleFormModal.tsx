@@ -14,6 +14,8 @@ import {
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { extractErrorMessage } from "@/lib/error";
 import {
   commissionFormToPayload,
@@ -52,8 +54,8 @@ function RateBlock({
   }, [boundsDisabled, form, minName, maxName]);
 
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
-      <h3 className="text-sm font-medium text-heading">{title}</h3>
+    <Panel className="space-y-3">
+      <SectionTitle size="sm">{title}</SectionTitle>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormInput
           name={rateName}
@@ -82,7 +84,7 @@ function RateBlock({
           placeholder={t("admin.finance.commission.noCap")}
         />
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -181,11 +183,11 @@ function ShippingSplitSection() {
   ];
 
   return (
-    <div className="space-y-4 rounded-lg border border-border p-4">
+    <Panel className="space-y-4">
       <div>
-        <h3 className="text-sm font-medium text-heading">
+        <SectionTitle size="sm">
           {t("admin.finance.commission.shippingSharesTitle")}
-        </h3>
+        </SectionTitle>
         <p className="text-xs text-muted">
           {t("admin.finance.commission.shippingSharesHelper")}
         </p>
@@ -224,7 +226,7 @@ function ShippingSplitSection() {
           })}
         </div>
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -325,10 +327,10 @@ export function CommissionRuleFormModal({
         />
       </div>
 
-      <div className="rounded-lg border border-border p-4">
-        <h3 className="mb-1 text-sm font-medium text-heading">
+      <Panel>
+        <SectionTitle size="sm" className="mb-1">
           {t("admin.finance.commission.amountRangeTitle")}
-        </h3>
+        </SectionTitle>
         <p className="mb-3 text-xs text-muted">
           {t("admin.finance.commission.amountRangeStrictHint")}
         </p>
@@ -349,7 +351,7 @@ export function CommissionRuleFormModal({
             placeholder="∞"
           />
         </div>
-      </div>
+      </Panel>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <RateBlock
@@ -378,11 +380,11 @@ export function CommissionRuleFormModal({
         />
       </div>
 
-      <div className="space-y-3 rounded-lg border border-border p-4">
+      <Panel className="space-y-3">
         <div>
-          <h3 className="text-sm font-medium text-heading">
+          <SectionTitle size="sm">
             {t("admin.finance.commission.tradeFeesTitle")}
-          </h3>
+          </SectionTitle>
           <p className="text-xs text-muted">
             {t("admin.finance.commission.tradeFeesHelper")}
           </p>
@@ -403,7 +405,7 @@ export function CommissionRuleFormModal({
             min="0"
           />
         </div>
-      </div>
+      </Panel>
 
       <ShippingSplitSection />
     </FormModal>

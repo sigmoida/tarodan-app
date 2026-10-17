@@ -1,6 +1,7 @@
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { CancellationActor, PaymentStatus } from "@prisma/client";
+import { NotFoundException } from "@nestjs/common";
 
 /**
  * SEC-H1: bypass-complete üç katmanlı kilit — production'da SERT ret (PAYMENT_BYPASS
@@ -11,8 +12,11 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
   describe("SEC-H1 bypassCompletePayment", () => {
     const OWNER = "buyer-1";
     const origEnv = process.env.NODE_ENV;
+    const origAppEnv = process.env.APP_ENV;
     afterEach(() => {
       process.env.NODE_ENV = origEnv;
+      if (origAppEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = origAppEnv;
     });
 
     const makeService = (bypass: string) => {
@@ -42,17 +46,34 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
         { processSuccessfulPayment } as any, // paymentFulfillment
         {} as any, // paymentLifecycle
         { record: jest.fn() } as any, // providerEvents
+        { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
       );
-      return { service, processSuccessfulPayment };
+      return { service, processSuccessfulPayment, prisma, configService };
     };
 
-    it("production'da PAYMENT_BYPASS açık olsa bile SERT reddedilir", async () => {
+    it("production'da PAYMENT_BYPASS açık olsa bile 404 — uç yokmuş gibi", async () => {
       process.env.NODE_ENV = "production";
+      process.env.APP_ENV = "production";
+      const { service, processSuccessfulPayment, prisma, configService } =
+        makeService("true");
+
+      await expect(
+        service.bypassCompletePayment("pay-1", OWNER),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      // Bayrak, ödeme ve sahiplik hiç okunmaz: ret her şeyden önce gelir.
+      expect(configService.get).not.toHaveBeenCalled();
+      expect(prisma.payment.findUnique).not.toHaveBeenCalled();
+      expect(processSuccessfulPayment).not.toHaveBeenCalled();
+    });
+
+    it("staging (NODE_ENV=production, APP_ENV=staging) da 404 — kapalı-başarısız", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.APP_ENV = "staging";
       const { service, processSuccessfulPayment } = makeService("true");
 
       await expect(
         service.bypassCompletePayment("pay-1", OWNER),
-      ).rejects.toThrow();
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(processSuccessfulPayment).not.toHaveBeenCalled();
     });
 
@@ -101,6 +122,8 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
             order: { id: "o1" },
           }),
         },
+        // Fail penceresi Süreler ve Kurallar'dan; satır yok → env (35).
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       };
       const configService = {
         get: jest.fn(() => "35"),

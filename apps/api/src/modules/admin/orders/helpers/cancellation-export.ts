@@ -1,45 +1,30 @@
 import {
+  ADMIN_CANCEL_REASON_I18N_KEYS,
+  ADMIN_CANCELLATION_ADMIN_REASON_ANY,
+  ADMIN_CANCELLATION_BUCKET_I18N_KEYS,
   ADMIN_CANCELLATION_REFUND_STATE_I18N_KEYS,
-  cancellationActorI18nKey,
-  cancellationReasonMessage,
+  ADMIN_CANCELLATION_TAB_I18N_KEYS,
+  type CANCELLATION_EXPORT_PARENT_KEYS,
+  type EXPORT_CATALOGS,
   type AdminCancellationInfo,
   type AdminCancellationRow,
-  type AdminOrderLine,
-  type AdminOrderPackage,
+  type ExportCatalogKey,
+  cancellationActorI18nKey,
+  cancellationReasonMessage,
+  resolveAdminCancellationAdminReason,
 } from "@tarodan/types";
-import {
-  renderSheet,
-  type ExportColumn,
-  type RenderedSheet,
-} from "../../../../common/helpers/tabular-export";
-
-/** Katalog anahtarını isteğin dilinde metne çeviren fonksiyon. */
-export type Translate = (key: string) => string;
-
-/** Dışa aktarım satırı: bir iptal KALEMİ (satır başına değil — Excel düz ister). */
-export interface CancellationExportLine {
-  row: AdminCancellationRow;
-  pkg: AdminOrderPackage;
-  line: AdminOrderLine;
-  info: AdminCancellationInfo | undefined;
-}
+import type {
+  ExportRecord,
+  ExportSummaryEntry,
+  Translate,
+} from "../../../../common/export";
+import type { CancellationListRequest } from "../admin-cancellation.service";
+import { cancellationScopeOf } from "./cancellation-where";
 
 const HEADER = "admin.operations.cancellations.export";
 
-export function flattenCancellationRows(
-  rows: readonly AdminCancellationRow[],
-): CancellationExportLine[] {
-  return rows.flatMap((row) =>
-    row.packages.flatMap((pkg) =>
-      pkg.lines.map((line) => ({
-        row,
-        pkg,
-        line,
-        info: row.cancellations[line.orderId],
-      })),
-    ),
-  );
-}
+type CancellationKey = ExportCatalogKey<typeof EXPORT_CATALOGS.cancellations>;
+type ParentKey = (typeof CANCELLATION_EXPORT_PARENT_KEYS)[number];
 
 /** İptal nedeninin metni — panel ile aynı çözüm (`cancellationReasonMessage`). */
 export function cancellationReasonText(
@@ -52,61 +37,110 @@ export function cancellationReasonText(
 }
 
 /**
- * İptaller sekmesinin Excel sayfası. Başlıklar ve etiketler panelin katalog
- * anahtarlarından (tek kaynak); tutarlar sayı olarak yazılır.
+ * İptaller dökümünün satırları — UZUN biçim: kayıt (sepet / sipariş / takas)
+ * başına değil, iptal KALEMİ başına bir satır. Üst kaydın kolonları
+ * (`CANCELLATION_EXPORT_PARENT_KEYS`) her kalemde tekrarlanır; kaydın tutarı
+ * veri sayfasında değil Özet'te toplanır. Etiketler panelin katalog
+ * anahtarlarından; tutarlar sayı.
  */
-export function cancellationExportSheet(
-  rows: readonly AdminCancellationRow[],
+export function cancellationExportRecords(
+  row: AdminCancellationRow,
   t: Translate,
-): RenderedSheet {
-  const columns: ExportColumn<CancellationExportLine>[] = [
-    { header: t(`${HEADER}.rowNumber`), value: (x) => x.row.number },
+): ExportRecord<CancellationKey>[] {
+  const parent: ExportRecord<ParentKey> = {
+    rowNumber: row.number,
     // Test şeridi kaydı dökümden çıkarılmaz (liste gibi) — işaretlenir.
+    testLane: row.isTest,
+    origin: t(`${HEADER}.originValue.${row.origin}`),
+    orderDate: row.createdAt,
+    buyer: row.buyer.displayName,
+    buyerCode: row.buyer.code,
+  };
+  const lines = row.packages.flatMap((pkg) =>
+    pkg.lines.map((line): ExportRecord<CancellationKey> => {
+      const info = row.cancellations[line.orderId];
+      return {
+        ...parent,
+        orderNumber: line.orderNumber,
+        seller: pkg.seller.displayName,
+        sellerCode: pkg.seller.code,
+        product: line.product.title,
+        productCode: line.product.productCode,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        subtotal: line.subtotal,
+        cancelledAt: info?.cancelledAt,
+        cancelledBy: t(cancellationActorI18nKey(info?.cancelledBy ?? null)),
+        reason: cancellationReasonText(info, t),
+        refundState: info
+          ? t(ADMIN_CANCELLATION_REFUND_STATE_I18N_KEYS[info.refundState])
+          : null,
+      };
+    }),
+  );
+  // Kalemi olmayan kayıt (olmamalı) yine de dosyada görünsün — sayım tutsun.
+  return lines.length > 0 ? lines : [parent];
+}
+
+/** Üst kayıtların tutar toplamı — Özet'e; veri sayfasında toplanmaz. */
+export function cancellationExportTotals(
+  rows: readonly AdminCancellationRow[],
+): ExportSummaryEntry[] {
+  const total = rows.reduce((sum, row) => sum + row.totalAmount, 0);
+  return [
     {
-      header: t(`${HEADER}.testLane`),
-      value: (x) => (x.row.isTest ? t("admin.shared.testLane.badge") : ""),
-    },
-    {
-      header: t(`${HEADER}.origin`),
-      value: (x) => t(`${HEADER}.originValue.${x.row.origin}`),
-    },
-    { header: t(`${HEADER}.orderNumber`), value: (x) => x.line.orderNumber },
-    { header: t(`${HEADER}.orderDate`), value: (x) => x.row.createdAt },
-    { header: t(`${HEADER}.buyer`), value: (x) => x.row.buyer.displayName },
-    { header: t(`${HEADER}.buyerCode`), value: (x) => x.row.buyer.code },
-    { header: t(`${HEADER}.seller`), value: (x) => x.pkg.seller.displayName },
-    { header: t(`${HEADER}.sellerCode`), value: (x) => x.pkg.seller.code },
-    { header: t(`${HEADER}.product`), value: (x) => x.line.product.title },
-    {
-      header: t(`${HEADER}.productCode`),
-      value: (x) => x.line.product.productCode,
-    },
-    { header: t(`${HEADER}.quantity`), value: (x) => x.line.quantity },
-    { header: t(`${HEADER}.unitPrice`), value: (x) => x.line.unitPrice },
-    { header: t(`${HEADER}.subtotal`), value: (x) => x.line.subtotal },
-    {
-      header: t(`${HEADER}.cancelledAt`),
-      value: (x) => x.info?.cancelledAt ?? "",
-    },
-    {
-      header: t(`${HEADER}.cancelledBy`),
-      value: (x) => t(cancellationActorI18nKey(x.info?.cancelledBy ?? null)),
-    },
-    {
-      header: t(`${HEADER}.reason`),
-      value: (x) => cancellationReasonText(x.info, t),
-    },
-    {
-      header: t(`${HEADER}.refundState`),
-      value: (x) =>
-        x.info
-          ? t(ADMIN_CANCELLATION_REFUND_STATE_I18N_KEYS[x.info.refundState])
-          : "",
+      labelKey: "server.export.summary.parentTotal",
+      value: Math.round(total * 100) / 100,
+      type: "money",
     },
   ];
-  return renderSheet(
-    t(`${HEADER}.sheetName`),
-    columns,
-    flattenCancellationRows(rows),
-  );
+}
+
+/** Özet'teki filtreler: sekme, alt sekme ve metin filtreleri (taraf terimi YOK). */
+export function cancellationExportFilters(
+  query: CancellationListRequest,
+): ExportSummaryEntry[] {
+  const { tab, bucket } = cancellationScopeOf(query);
+  const adminReason = resolveAdminCancellationAdminReason(query.adminReason);
+  return [
+    {
+      labelKey: "server.export.summary.tab",
+      value: tab,
+      valueKey: ADMIN_CANCELLATION_TAB_I18N_KEYS[tab],
+    },
+    {
+      labelKey: "server.export.summary.subTab",
+      value: bucket,
+      valueKey: ADMIN_CANCELLATION_BUCKET_I18N_KEYS[bucket],
+    },
+    {
+      labelKey: "admin.operations.cancellations.filters.orderNumber",
+      value: query.orderNumber,
+    },
+    {
+      labelKey: "admin.operations.cancellations.filters.cargoCode",
+      value: query.cargoCode,
+    },
+    {
+      labelKey: "admin.operations.cancellations.filters.groupNumber",
+      value: query.groupNumber,
+    },
+    {
+      // Ad / e-posta / kullanıcı kodu olabilir: terim yazılmaz.
+      labelKey: "admin.operations.cancellations.filters.party",
+      value: query.party,
+      redacted: true,
+    },
+    {
+      labelKey: "admin.operations.cancellations.filters.adminReason",
+      value: adminReason,
+      valueKey: !adminReason
+        ? undefined
+        : adminReason === ADMIN_CANCELLATION_ADMIN_REASON_ANY
+          ? "admin.operations.cancellations.filters.adminReasonAny"
+          : ADMIN_CANCEL_REASON_I18N_KEYS[adminReason],
+    },
+    { labelKey: "admin.finance.common.startDate", value: query.startDate },
+    { labelKey: "admin.finance.common.endDate", value: query.endDate },
+  ];
 }

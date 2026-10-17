@@ -10,10 +10,10 @@ import { PrismaService } from "../../src/prisma";
 import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
 import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
 import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
-import { ElogoInvoicingService } from "../../src/modules/elogo/elogo-invoicing.service";
-import { ElogoDocumentService } from "../../src/modules/elogo/elogo-document.service";
-import { ElogoDeliveryService } from "../../src/modules/elogo/elogo-delivery.service";
-import { ElogoIssuingService } from "../../src/modules/elogo/elogo-issuing.service";
+import { InvoicingService } from "../../src/modules/invoicing/invoicing.service";
+import { InvoiceDocumentService } from "../../src/modules/invoicing/invoice-document.service";
+import { InvoiceDeliveryService } from "../../src/modules/invoicing/invoice-delivery.service";
+import { InvoiceIssuingService } from "../../src/modules/invoicing/invoice-issuing.service";
 import {
   truncateAll,
   getPrisma,
@@ -221,30 +221,30 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       data: { refundedSellerCommission: new Prisma.Decimal(3) },
     });
 
-    const documents = new ElogoDocumentService(
+    const documents = new InvoiceDocumentService(
       prisma,
-      {} as any, // elogo client
+      {} as any, // e-belge sağlayıcısı (E_INVOICE_PROVIDER) — kesim casuslandığı için çağrılmaz
       { get: () => "" } as any, // config
     );
     // Kesim GÖNDERIM servisinde yaşıyor; casus da orada olmalı.
-    const delivery = new ElogoDeliveryService(
+    const delivery = new InvoiceDeliveryService(
       prisma,
-      {} as any, // elogo client
+      {} as any, // e-belge sağlayıcısı (E_INVOICE_PROVIDER) — kesim casuslandığı için çağrılmaz
       documents,
     );
-    const elogo = new ElogoInvoicingService(
+    const invoicing = new InvoicingService(
       {} as any, // queries
       delivery,
       // Bu spec KESİM yolunu sürüyor (issueCommissionInvoice), o yüzden gerçek
       // kesme servisi — ve casusun izlediği AYNI delivery örneği.
-      new ElogoIssuingService(prisma, documents, delivery),
+      new InvoiceIssuingService(prisma, documents, delivery),
       {} as any, // reversals — bu spec ters kayıt çağırmıyor
     );
     const cutSpy = jest
       .spyOn(delivery as any, "cut")
       .mockResolvedValue(undefined);
 
-    await elogo.issueCommissionInvoice(orderId);
+    await invoicing.issueCommissionInvoice(orderId);
 
     expect(cutSpy).toHaveBeenCalledTimes(1);
     // net = 10 - 3 = 7 (original 10 DEĞİL)

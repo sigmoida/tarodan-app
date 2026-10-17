@@ -7,10 +7,13 @@ import {
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { buildPaytrMerchantOid } from "@tarodan/types";
+import { nextMerchantOidHistory } from "../helpers/payment-oids";
 import { PrismaService } from "../../../prisma";
 import { InitiatePaymentDto, PaymentProvider, DirectPaymentDto } from "../dto";
 import {
   PaymentStatus,
+  OrderOrigin,
   OrderStatus,
   TradeStatus,
   SavedCardStatus,
@@ -36,6 +39,24 @@ import {
   PAYER_IP_METADATA_KEY,
   resolvePaytrMerchant,
 } from "../helpers/paytr-merchant.helper";
+import { lockOrdersStillPayable } from "../helpers/payment-order-lock";
+import {
+  DistanceSalesConsentService,
+  type DistanceSalesSubject,
+} from "../../consent/distance-sales-consent.service";
+
+/** Misafir siparişinin alıcı e-postası — `shippingAddress` JSON'ında saklanır. */
+function guestEmailOf(shippingAddress: Prisma.JsonValue | null): string | null {
+  if (
+    !shippingAddress ||
+    typeof shippingAddress !== "object" ||
+    Array.isArray(shippingAddress)
+  ) {
+    return null;
+  }
+  const email = shippingAddress.guestEmail;
+  return typeof email === "string" && email.trim() ? email : null;
+}
 
 @Injectable()
 export class PaymentInitiationService {
@@ -50,6 +71,7 @@ export class PaymentInitiationService {
     private readonly paymentFulfillment: PaymentFulfillmentService,
     private readonly paymentLifecycle: PaymentLifecycleService,
     private readonly providerEvents: PaymentProviderEventService,
+    private readonly distanceSalesConsent: DistanceSalesConsentService,
   ) {}
 
   /**
@@ -389,6 +411,7 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
+      ownerId,
     } = await this.resolveDirectPaymentContext(
       userId,
       dto,
@@ -406,6 +429,7 @@ export class PaymentInitiationService {
           merchantOid,
           amount,
           successQueryParams,
+          ownerId,
         },
         userId,
       );
@@ -441,6 +465,8 @@ export class PaymentInitiationService {
       merchantOid: string;
       amount: number;
       successQueryParams: string;
+      /** Kartın senkronlanacağı hesap (callback'teki sahip); bkz. resolveStoreCard. */
+      ownerId: string | null;
     },
     userId: string | null,
   ) {
@@ -451,6 +477,7 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
+      ownerId,
     } = ctx;
     // Ödemenin mağazası claim'de yazıldı (resolvePaytrMerchant). Form, kart
     // kasası ve yetenekler o mağazanındır: üyelik kartları üyelik mağazasında,
@@ -522,8 +549,21 @@ export class PaymentInitiationService {
     // Flow A — yeni kart: store_card yalnız giriş yapmış kullanıcı ve açık
     // PayTR CAPI yetkisiyle eklenir. Kullanıcının AYNI mağazadaki utoken'ı varsa
     // yeni kart aynı PayTR kullanıcı grubuna bağlanır (utoken mağazaya özeldir).
-    const storeCard =
-      shouldStoreCard(dto.saveCard, merchant) && !!userId && cardStorageEnabled;
+    const { storeCard, skippedReason: storeCardSkippedReason } =
+      resolveStoreCard({
+        saveCard: dto.saveCard,
+        merchant,
+        userId,
+        ownerId,
+        cardStorageEnabled,
+      });
+    if (storeCardSkippedReason) {
+      // İstemci açıkça saveCard=true gönderdi ama forma store_card=1 eklenmiyor: sessiz kalırsa
+      // "kartımı kaydet" dediği halde kartı kaydedilmeyen kullanıcı iz bırakmaz.
+      this.logger.warn(
+        `[saved-card] store_card skipped payment=${payment.id} merchant=${merchant} reason=${storeCardSkippedReason}`,
+      );
+    }
     const existingCard = storeCard
       ? await this.prisma.savedCard.findFirst({
           where: {
@@ -559,7 +599,11 @@ export class PaymentInitiationService {
       amount,
       totalAmount: amount,
       paytrMerchant: merchant,
-      raw: { formPrepared: true, storeCard },
+      raw: {
+        formPrepared: true,
+        storeCard,
+        ...(storeCardSkippedReason ? { storeCardSkippedReason } : {}),
+      },
     });
 
     return {
@@ -594,6 +638,11 @@ export class PaymentInitiationService {
     merchantOid: string;
     amount: number;
     successQueryParams: string;
+    /**
+     * Ödemenin sahibi: sipariş/grup alıcısı ya da takas satırının ödeyeni.
+     * Callback kartı bu hesaba yazar (payment-callback savedCardOwnerId).
+     */
+    ownerId: string | null;
   }> {
     const clientIp = this.getClientIp(req);
     const buildBuyer = (u: any, shippingAddress?: any): PayTRBuyer => {
@@ -682,6 +731,10 @@ export class PaymentInitiationService {
     let baseOid: string;
     let amount: number;
     let successQueryParams: string;
+    let ownerId: string | null = null;
+    // Mesafeli satış onayının ait olduğu satın alma. Satın alma olmayan
+    // hedeflerde (takas ücreti, üyelik / öne çıkarma) null kalır.
+    let distanceSalesSubject: DistanceSalesSubject | null = null;
 
     if (dto.orderId && !dto.checkoutGroupId) {
       const order = await this.prisma.order.findUnique({
@@ -695,6 +748,7 @@ export class PaymentInitiationService {
       // Sahiplik: üye → alıcı olmalı; misafir → sipariş misafir siparişi olmalı (iframe ile aynı kural).
       const isGuestOrder =
         (order.shippingAddress as any)?.isGuestOrder === true;
+      ownerId = order.buyerId;
       if (!capabilityAuthorized && userId) {
         if (order.buyerId !== userId)
           throw new ForbiddenException(
@@ -792,6 +846,14 @@ export class PaymentInitiationService {
       ];
       baseOid = String(order.orderNumber || order.id).replace(/-/g, "");
       paytrMerchant = resolvePaytrMerchant({ order });
+      // Sepete bağlı olmayan tekil satın alma: teklif siparişi.
+      if (order.origin !== OrderOrigin.platform_service) {
+        distanceSalesSubject = {
+          orderId: order.id,
+          userId: isGuestOrder ? null : order.buyerId,
+          guestEmail: isGuestOrder ? guestEmailOf(order.shippingAddress) : null,
+        };
+      }
       const isMembershipOrder = paytrMerchant === PaytrMerchant.membership;
       // Misafir siparişinde başarı URL'ine guest=true taşı: aksi halde PayTR
       // dönüşünde /payment/success guest'i tanıyamayıp /login'e atıyor (fatura
@@ -811,6 +873,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.orderGroupNotFound"),
         );
       // Sahiplik: üye → grup alıcısı olmalı; misafir → grup misafir grubu olmalı (iframe ile aynı kural).
+      ownerId = group.buyerId;
       if (!capabilityAuthorized && userId) {
         if (group.buyerId !== userId)
           throw new ForbiddenException(
@@ -885,6 +948,13 @@ export class PaymentInitiationService {
         quantity: 1,
       }));
       baseOid = String(group.groupNumber || group.id).replace(/-/g, "");
+      distanceSalesSubject = {
+        checkoutGroupId: group.id,
+        userId: group.isGuest ? null : group.buyerId,
+        guestEmail: group.isGuest
+          ? guestEmailOf(group.orders[0].shippingAddress)
+          : null,
+      };
       // Misafir grup ödemesinde başarı URL'ine guest=true taşı (yukarıdaki order
       // yolundaki ile aynı sebep: dönüşte /login'e atılmasın, fatura görünsün).
       successQueryParams = `paymentId=${payment.id}${group.isGuest ? "&guest=true" : ""}`;
@@ -941,6 +1011,7 @@ export class PaymentInitiationService {
           i18nMessage("server.payment.tradeCashPaymentAlreadyCompleted"),
         );
       amount = Number(cashPayment.totalAmount);
+      ownerId = cashPayment.payerId;
       // Alıcı bilgisi satırın sahibinden gelir (v1'de sahip = farkı ödeyen).
       const payer =
         cashPayment.payerId === trade.initiatorId
@@ -986,6 +1057,15 @@ export class PaymentInitiationService {
       );
     }
 
+    // MESAFELİ SATIŞ KAPISI — çekimden ÖNCE (claim'den de önce: ret, ödeme
+    // satırını `processing`e almadan döner). Bu form, her satın almanın PayTR
+    // çekiminden önceki ORTAK son adımıdır: checkout'ta alınmamış onay (teklif
+    // siparişi, eski istemci) burada alınır; ayar açıksa onaysız ödeme başlamaz.
+    await this.distanceSalesConsent.ensureForPayment(
+      distanceSalesSubject,
+      dto.distanceSalesAccepted,
+    );
+
     // ÇİFT-ÇEKİM KORUMASI: bu ödemenin önceki bir denemesi (providerConversationId) varsa,
     // YENİ çekimden ÖNCE PayTR'a durum-sorgu yap. Callback gecikmiş/ulaşmamış (ör. tünel ölü)
     // olabilir ama ödeme PayTR'da BAŞARILI olmuş olabilir. Zaten ödendiyse yeni merchant_oid'le
@@ -1004,18 +1084,13 @@ export class PaymentInitiationService {
     }
 
     // merchant_oid + Y8 deseni: eski oid'li callback de eşleşsin diye geçmişini koru.
-    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+    const merchantOid = buildPaytrMerchantOid(baseOid);
     const prevMeta = (payment.metadata as any) || {};
-    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
-      ? prevMeta.merchantOidHistory
-      : [];
-    if (
-      payment.providerConversationId &&
-      payment.providerConversationId !== merchantOid &&
-      !oidHistory.includes(payment.providerConversationId)
-    ) {
-      oidHistory.push(payment.providerConversationId);
-    }
+    const oidHistory = nextMerchantOidHistory(
+      prevMeta,
+      payment.providerConversationId,
+      merchantOid,
+    );
     // H2: ÇİFT-ÇEKİM YARIŞI KORUMASI. Bu payment satırını PayTR çekiminden ÖNCE
     // atomik olarak `processing`'e CLAIM et. Eşzamanlı ikinci bir direct-form
     // (aynı payment satırı, ör. çift tıklama) status'ü `pending`/`failed` BULAMAZ
@@ -1023,31 +1098,49 @@ export class PaymentInitiationService {
     // yapılmaz. Çekim bitince prepareDirectPayment status'ü tekrar `pending`'e çeker
     // (callback CAS'ı `pending` bekler). Önceki kod burada koşulsuz `pending` yazıyordu
     // → guard ile gerçek çekim arasında kilit yoktu, iki eşzamanlı çekim mümkündü.
-    const claimed = await this.prisma.payment.updateMany({
-      where: {
-        id: payment.id,
-        status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
-      },
-      data: {
-        providerConversationId: merchantOid,
-        providerPaymentId: null,
-        status: PaymentStatus.processing,
-        failureReason: null,
-        // Çekim bu mağazada başlıyor; sonraki her PayTR çağrısı bu kolona bakar.
-        paytrMerchant,
-        // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
-        // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
-        // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
-        // girse bile (createdAt eski, charge yeni) canlı 3DS oturumu iptal EDİLMEZ.
-        metadata: {
-          ...prevMeta,
-          merchantOidHistory: oidHistory,
-          lastChargeStartedAt: new Date().toISOString(),
-          // Kart saklanırsa vekâlet IP'si olur: kullanıcısız yenileme user_ip
-          // olarak bunu gönderir (0.0.0.0 değil).
-          [PAYER_IP_METADATA_KEY]: clientIp,
+    //
+    // İPTALLE DIŞLAMA: claim, siparişlerin HÂLÂ ödenebilir olduğu kilit
+    // altında doğrulanarak yazılır (bkz. payment-order-lock). Yukarıdaki
+    // `pending_payment` kontrolü düz okumadır; mesafeli satış kapısı ve PayTR
+    // durum sorgusu sürerken sipariş iptal edilmiş olabilir — o durumda
+    // çekim başlamaz. Kilit sırası: ödeme → sipariş (callback ve iade ile aynı).
+    const claimTarget = {
+      orderId: payment.orderId ?? null,
+      checkoutGroupId: payment.checkoutGroupId ?? null,
+    };
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${payment.id} FOR UPDATE`;
+      if (!(await lockOrdersStillPayable(tx, claimTarget))) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderNotAwaitingPayment"),
+        );
+      }
+      return tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
         },
-      },
+        data: {
+          providerConversationId: merchantOid,
+          providerPaymentId: null,
+          status: PaymentStatus.processing,
+          failureReason: null,
+          // Çekim bu mağazada başlıyor; sonraki her PayTR çağrısı bu kolona bakar.
+          paytrMerchant,
+          // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
+          // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
+          // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
+          // girse bile (createdAt eski, charge yeni) canlı 3DS oturumu iptal EDİLMEZ.
+          metadata: {
+            ...prevMeta,
+            merchantOidHistory: oidHistory,
+            lastChargeStartedAt: new Date().toISOString(),
+            // Kart saklanırsa vekâlet IP'si olur: kullanıcısız yenileme user_ip
+            // olarak bunu gönderir (0.0.0.0 değil).
+            [PAYER_IP_METADATA_KEY]: clientIp,
+          },
+        },
+      });
     });
     if (claimed.count === 0) {
       throw new BadRequestException(
@@ -1065,6 +1158,7 @@ export class PaymentInitiationService {
       merchantOid,
       amount,
       successQueryParams,
+      ownerId,
     };
   }
 
@@ -1515,8 +1609,12 @@ export class PaymentInitiationService {
     // SEC-H1: Bypass ASLA production'da çalışmaz — PAYMENT_BYPASS yanlışlıkla "true"
     // olsa bile. Bir config hatasının prod'da PARASIZ ödeme tamamlamasını engelleyen
     // SERT güvenlik ağı (endpoint ayrıca JWT auth + ownership ister).
+    // 404: production'da uç VAR GİBİ bile görünmez — config/DB bayrağına,
+    // ödemenin varlığına ya da sahipliğine bakılmadan, hiçbir okuma yapılmadan
+    // döner. `isProduction()` staging'i de kapsar (aynı optimize build,
+    // NODE_ENV=production) — kasıtlı: kapalı-başarısız, bugünkü davranış.
     if (isProduction()) {
-      throw new ForbiddenException("Payment bypass is disabled in production");
+      throw new NotFoundException(i18nMessage("server.common.recordNotFound"));
     }
     const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";
     if (!bypassEnabled) {
@@ -1579,4 +1677,41 @@ export function shouldStoreCard(
   merchant: PaytrMerchant,
 ): boolean {
   return saveCard ?? merchant === PaytrMerchant.membership;
+}
+
+/** İstemcinin açıkça istediği kart saklamanın uygulanmama nedeni. */
+export type StoreCardSkippedReason =
+  "guest" | "not_owner" | "card_storage_disabled";
+
+/**
+ * Direct form'a `store_card=1` eklenir mi? İstek (`shouldStoreCard`) + giriş
+ * yapmış kullanıcı + kullanıcı ödemenin SAHİBİ + mağazanın kart saklama
+ * yetkisi.
+ *
+ * Sahiplik şartı: callback kartı ödemenin sahibine yazar (sipariş/grup alıcısı,
+ * takas ödeyeni). Ödeme yetki belirteciyle açılmışken istekte başka bir
+ * oturumun token'ı varsa (ör. sistem-misafir kullanıcısına ait misafir siparişi)
+ * kart PayTR'da istekçinin utoken grubuna bağlanıp sahibin hesabına yazılırdı.
+ *
+ * `skippedReason` yalnız istemci AÇIKÇA `saveCard=true` gönderdiğinde döner
+ * (üyelik mağazasının varsayılan saklaması ya da hiç istenmemesi gürültü değil).
+ */
+export function resolveStoreCard(params: {
+  saveCard: boolean | undefined;
+  merchant: PaytrMerchant;
+  userId: string | null;
+  ownerId: string | null;
+  cardStorageEnabled: boolean;
+}): { storeCard: boolean; skippedReason: StoreCardSkippedReason | null } {
+  const skip = (reason: StoreCardSkippedReason) => ({
+    storeCard: false,
+    skippedReason: params.saveCard === true ? reason : null,
+  });
+  if (!shouldStoreCard(params.saveCard, params.merchant)) {
+    return { storeCard: false, skippedReason: null };
+  }
+  if (!params.userId) return skip("guest");
+  if (params.ownerId !== params.userId) return skip("not_owner");
+  if (!params.cardStorageEnabled) return skip("card_storage_disabled");
+  return { storeCard: true, skippedReason: null };
 }

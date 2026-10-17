@@ -40,12 +40,12 @@ export default function ManufacturerHero({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {brand.country && (
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {countryToFlag(brand.country) || "🌍"} {brand.country}
             </Badge>
           )}
           {brand.foundedYear && (
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {brand.foundedYear}
             </Badge>
           )}

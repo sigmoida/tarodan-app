@@ -1,3 +1,7 @@
+// Banka hesabı hesap alanında tek öğedir (`useWebItem` kaynağı + sabit id).
+const BANK_ACCOUNT_RESOURCE = "bank-account";
+const BANK_ACCOUNT_ID = "me";
+
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
  * and the **client `useQuery`** for a given resource use the exact same key, so
@@ -71,7 +75,11 @@ export const queryKeys = {
     all: () => ["collections"] as const,
   },
   manufacturers: {
-    /** The public manufacturers list — seeded by the server, read by the client. */
+    /**
+     * The public manufacturers list (only those with active listings —
+     * `MANUFACTURERS_WITH_LISTINGS_PATH`) — seeded by the server, read by the
+     * client, shared with the header nav and the listings sidebar.
+     */
     list: () => ["manufacturers", "list"] as const,
     /** A single manufacturer resolved by slug. */
     detail: (slug: string) => ["manufacturers", "detail", slug] as const,
@@ -96,6 +104,8 @@ export const queryKeys = {
     tiers: () => ["membership", "tiers"] as const,
     /** The current user's membership (tier + status + period). */
     me: () => ["membership", "me"] as const,
+    /** The current user's permissions/limits, incl. the tier's `isAdFree` flag. */
+    limits: () => ["membership", "limits"] as const,
   },
   // NOTE: every factory below returns the SAME array a call site used inline
   // before the registry existed — do NOT change the string values, or an
@@ -117,7 +127,11 @@ export const queryKeys = {
   wishlist: {
     /** The full wishlist list (invalidated after any favorite toggle). */
     all: () => ["wishlist"] as const,
-    check: (id: string | number) => ["wishlist-check", String(id)] as const,
+    /**
+     * Favori ekle/çıkar MUTATION anahtarı (sorgu değil). Aynı ürün için ikinci
+     * isteği ve eşzamanlı isteklerde liste tazelemesini bununla sayarız.
+     */
+    toggle: () => ["wishlist-toggle"] as const,
     /** Shared wishlist by comma-joined ids (undefined preserved for parity). */
     shared: (ids: string | undefined) => ["favorites-shared", ids] as const,
   },
@@ -127,10 +141,17 @@ export const queryKeys = {
     bell: () => ["notifications-bell"] as const,
   },
   messages: {
-    settings: () => ["message-settings"] as const,
     threads: () => ["message-threads"] as const,
     unreadCount: () => ["messages-unread-count"] as const,
     thread: (id: string | undefined) => ["messages", id] as const,
+  },
+  ads: {
+    /**
+     * Yuvanın yayındaki afişi (`GET /ads/active?position=&platform=web`).
+     * `device` geçiş dönemi parametresidir (bkz. `useDeviceType`).
+     */
+    active: (position: string, device: string | null) =>
+      ["advertisements", position, device] as const,
   },
   offers: {
     pendingCount: () => ["offers-pending-count"] as const,
@@ -198,14 +219,26 @@ export const queryKeys = {
     pricing: () => ["boost-pricing"] as const,
     options: (productId: string) => ["boost-options", productId] as const,
   },
+  // Hesap alanındaki tek öğe: `useWebItem` anahtarıyla BİREBİR aynı
+  // (`webKeys.detail(resource, id)`), böylece `invalidates: ['bank-account']`
+  // ve `refetchQueries` aynı kayda ulaşır.
   bankAccount: {
-    detail: () => ["bank-account"] as const,
+    resource: BANK_ACCOUNT_RESOURCE,
+    id: BANK_ACCOUNT_ID,
+    detail: () => webKeys.detail(BANK_ACCOUNT_RESOURCE, BANK_ACCOUNT_ID),
   },
   sellerDocuments: {
     all: () => ["seller-documents"] as const,
   },
   search: {
     autocomplete: (query: string) => ["autocomplete-rich", query] as const,
+  },
+  timingPolicy: {
+    all: () => ["timing-policy"] as const,
+  },
+  /** Herkese açık platform ayarları (mesaj uzunluğu, ilan fiyat sınırları…). */
+  publicSettings: {
+    all: () => ["public-settings"] as const,
   },
 } as const;
 

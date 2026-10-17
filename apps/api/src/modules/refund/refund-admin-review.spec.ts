@@ -42,9 +42,11 @@ describe("RefundService admin review", () => {
       paymentHold: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      order: { update: jest.fn().mockResolvedValue({}) },
     };
     const notifications = {
       appendHistory: jest.fn(),
+      notifyPlatformCancellation: jest.fn().mockResolvedValue(undefined),
       safeNotify: jest.fn(),
       notifyRefundRequestOpened: jest.fn(),
       sendRefundEmail: jest.fn(),
@@ -88,7 +90,7 @@ describe("RefundService admin review", () => {
     jest
       .spyOn((service as any).notifications, "appendHistory")
       .mockResolvedValue(undefined);
-    return { service, prisma };
+    return { service, prisma, notifications };
   };
 
   it("approves a reviewed return into the delivery/return-shipment flow", async () => {
@@ -169,6 +171,123 @@ describe("RefundService admin review", () => {
         cancelledBy: CancellationActor.platform,
       }),
     );
+  });
+
+  describe("incelemeye düşmüş yönetici iptalinin onayla tamamlanması", () => {
+    const platformRow = {
+      policyCode: "platform_cancellation",
+      metadata: {
+        cancellationActor: CancellationActor.platform,
+        adminCancelReasonCode: "user_request",
+      },
+      order: {
+        id: "order-1",
+        sellerId: "seller-1",
+        status: "paid",
+        quantity: 1,
+      },
+    };
+
+    it("talepteki neden kodunu processRefund'a verir (sipariş kapanırken yazılır) ve TEK platform duyurusu gönderir", async () => {
+      const processRefund = jest.fn().mockResolvedValue({
+        providerRefundId: "paytr-9",
+        closedWithAdminReason: "user_request",
+      });
+      const { service, notifications } = makeService(platformRow, {
+        processRefund,
+      });
+
+      await service.adminApproveRefundRequest("refund-1", "admin-1");
+
+      expect(processRefund).toHaveBeenCalledWith(
+        "order-1",
+        1180,
+        expect.objectContaining({
+          skipRefundEvent: true,
+          cancelledBy: CancellationActor.platform,
+          adminCancelReasonCode: "user_request",
+        }),
+      );
+      expect(notifications.notifyPlatformCancellation).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyPlatformCancellation).toHaveBeenCalledWith(
+        "order-1",
+        "user_request",
+        1180,
+      );
+    });
+
+    it.each([
+      ["null (sonlandırma işlemi no-op)", null],
+      [
+        "idempotent sonuç",
+        {
+          providerRefundId: "paytr-9",
+          idempotent: true,
+          closedWithAdminReason: null,
+        },
+      ],
+    ])(
+      "eşzamanlı kurtarma iadeyi önce kesinleştirdiyse (%s) duyuruyu o göndermiştir — ikinci yok",
+      async (_, result) => {
+        const processRefund = jest.fn().mockResolvedValue(result);
+        const { service, notifications } = makeService(platformRow, {
+          processRefund,
+        });
+
+        await service.adminApproveRefundRequest("refund-1", "admin-1");
+
+        expect(notifications.notifyPlatformCancellation).not.toHaveBeenCalled();
+      },
+    );
+
+    it("sipariş arada başka yoldan iptal edildiyse (ör. kargolamama süpürmesi) iade onu platform iptali yapmaz: 'Tarodan iptal etti' duyurusu GİTMEZ", async () => {
+      // processRefund siparişi zaten iptal buldu: aktörü korudu, kodu yazmadı.
+      const processRefund = jest.fn().mockResolvedValue({
+        providerRefundId: "paytr-9",
+        closedWithAdminReason: null,
+      });
+      const { service, notifications } = makeService(platformRow, {
+        processRefund,
+      });
+
+      await service.adminApproveRefundRequest("refund-1", "admin-1");
+
+      // İade yine yönetici kodu ile istendi (kapatırsa yazılsın diye) …
+      expect(processRefund).toHaveBeenCalledWith(
+        "order-1",
+        1180,
+        expect.objectContaining({ adminCancelReasonCode: "user_request" }),
+      );
+      // … ama kayıtla çelişen duyuru gönderilmedi.
+      expect(notifications.notifyPlatformCancellation).not.toHaveBeenCalled();
+    });
+
+    it("alıcının iptal talebinde kod yoktur, platform duyurusu gitmez", async () => {
+      const processRefund = jest.fn().mockResolvedValue({
+        providerRefundId: "paytr-9",
+        closedWithAdminReason: null,
+      });
+      const { service, notifications } = makeService(
+        {
+          ...platformRow,
+          policyCode: "buyer_remorse_cancellation",
+          metadata: {},
+        },
+        { processRefund },
+      );
+
+      await service.adminApproveRefundRequest("refund-1", "admin-1");
+
+      expect(processRefund).toHaveBeenCalledWith(
+        "order-1",
+        1180,
+        expect.objectContaining({
+          cancelledBy: CancellationActor.buyer,
+          adminCancelReasonCode: null,
+        }),
+      );
+      expect(notifications.notifyPlatformCancellation).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects a reviewed return and releases the frozen seller hold", async () => {

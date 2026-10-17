@@ -29,7 +29,7 @@ import {
 } from "@nestjs/swagger";
 import { AdminService } from "../admin.service";
 import type { Response } from "express";
-import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
+import { InvoicingService } from "../../invoicing/invoicing.service";
 import { SettlementReportService } from "./settlement/settlement-report.service";
 import { SettlementReportWorkbookService } from "./settlement/settlement-report-workbook.service";
 import { InvoiceDetailService } from "./invoice-detail.service";
@@ -77,12 +77,11 @@ import {
   UpdateOrderStatusDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
-  ElogoInvoiceQueryDto,
+  FiscalInvoiceQueryDto,
   SellerUploadedInvoiceQueryDto,
   SettlementReportQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -119,7 +118,7 @@ import {
 export class AdminTaxController {
   constructor(
     private readonly adminService: AdminService,
-    private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly invoicing: InvoicingService,
     private readonly settlementReport: SettlementReportService,
     private readonly settlementWorkbook: SettlementReportWorkbookService,
     private readonly invoiceDetail: InvoiceDetailService,
@@ -372,8 +371,8 @@ export class AdminTaxController {
   @ApiOperation({
     summary: "Kesilen + iade e-Arşiv/e-Fatura belgeleri (sayfalı, filtreli)",
   })
-  async getElogoInvoices(@Query() query: ElogoInvoiceQueryDto) {
-    return this.adminService.getElogoInvoices(query);
+  async getFiscalInvoices(@Query() query: FiscalInvoiceQueryDto) {
+    return this.adminService.getFiscalInvoices(query);
   }
 
   @Post("invoices/:id/retry")
@@ -382,10 +381,10 @@ export class AdminTaxController {
     summary:
       "Deneme bütçesi tükenmiş faturayı yeniden gönder (sayaç sıfırlanır, numara/ETTN korunur)",
   })
-  async retryElogoInvoice(@Param("id", ParseUUIDPipe) id: string) {
+  async retryFiscalInvoice(@Param("id", ParseUUIDPipe) id: string) {
     // Sağlayıcı arızası bittikten sonra kurtarma yolu: eskiden admin API salt
     // okunurdu ve tükenmiş faturayı yalnız DB'ye elle dokunarak kurtarmak mümkündü.
-    await this.elogoInvoicing.resetInvoiceAttempts(id);
+    await this.invoicing.resetInvoiceAttempts(id);
     return { success: true };
   }
 
@@ -395,8 +394,8 @@ export class AdminTaxController {
     summary:
       "Kesilmiş faturayı alıcısına yeniden e-postala (kesimdeki tek-gönderim güvencesini bilerek aşar)",
   })
-  async emailElogoInvoice(@Param("id", ParseUUIDPipe) id: string) {
-    return this.elogoInvoicing.emailInvoice(id);
+  async emailFiscalInvoice(@Param("id", ParseUUIDPipe) id: string) {
+    return this.invoicing.emailInvoice(id);
   }
 
   @Get("invoices/:id/detail")
@@ -404,7 +403,7 @@ export class AdminTaxController {
   @ApiOperation({
     summary: "Fatura detay dökümü (Excel) — kalem kırılımı + kaynak işlem",
   })
-  async getElogoInvoiceDetail(
+  async getFiscalInvoiceDetail(
     @Param("id", ParseUUIDPipe) id: string,
     @Res() res: Response,
   ) {
@@ -426,11 +425,11 @@ export class AdminTaxController {
   @Get("invoices/:id/pdf")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({ summary: "Fatura PDF (S3 presigned URL veya canlı stream)" })
-  async getElogoInvoicePdf(
+  async getFiscalInvoicePdf(
     @Param("id", ParseUUIDPipe) id: string,
     @Res() res: any,
   ) {
-    const r = await this.elogoInvoicing.getInvoiceDownload(id); // userId yok → admin
+    const r = await this.invoicing.getInvoiceDownload(id); // userId yok → admin
     if (r.url) {
       res.json({ url: r.url, invoiceNumber: r.invoiceNumber });
       return;

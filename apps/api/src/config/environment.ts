@@ -33,3 +33,39 @@ export function isDevelopment(): boolean {
 export function nodeEnv(): string | undefined {
   return process.env.NODE_ENV;
 }
+
+/**
+ * Which deployment an optimized build is (`APP_ENV`): `staging` or
+ * `production`. `NODE_ENV=production` alone does not say — staging runs the
+ * same optimized build. Boot validation requires it whenever NODE_ENV is
+ * production; outside production it is normally unset.
+ */
+export function appEnv(): string | undefined {
+  return process.env.APP_ENV?.trim() || undefined;
+}
+
+/**
+ * The live marketplace: real customers, real money, real carrier.
+ *
+ * Fails closed — an optimized build counts as live unless it explicitly says
+ * `APP_ENV=staging`. Guards that must never open on live (UAT shortcuts,
+ * carrier simulation, fixed verification codes) ask this, not
+ * `isProduction()`, which is also true on staging.
+ */
+export function isLiveProduction(): boolean {
+  return isLiveDeployment(process.env.NODE_ENV, process.env.APP_ENV);
+}
+
+/**
+ * The rule behind `isLiveProduction`, for callers that hold the two values
+ * themselves (a `ConfigService` factory, a test double) instead of reading
+ * `process.env`.
+ */
+export function isLiveDeployment(
+  nodeEnvValue: string | undefined,
+  appEnvValue: string | undefined,
+): boolean {
+  return (
+    nodeEnvValue?.trim() === "production" && appEnvValue?.trim() !== "staging"
+  );
+}

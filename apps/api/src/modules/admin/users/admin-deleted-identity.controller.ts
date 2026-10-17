@@ -1,5 +1,17 @@
-import { Controller, Get, Query, Res, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import type { Response } from "express";
 import { AdminRole } from "@prisma/client";
 
@@ -8,15 +20,12 @@ import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
-import { AdminAuditService } from "../ops/admin-audit.service";
+import { sendExport } from "../../../common/export";
 import { AdminDeletedIdentityService } from "./admin-deleted-identity.service";
 import {
   DeletedUserIdentityExportQueryDto,
   DeletedUserIdentityQueryDto,
 } from "../dto/deleted-user-identity.dto";
-
-const XLSX_MIME =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /**
  * Silinen hesapların kimlik arşivi (aylık resmî bildirim).
@@ -25,7 +34,7 @@ const XLSX_MIME =
  * sonrasındaki İLK segmentten çözüyor, dolayısıyla `users/deleted-identities`
  * hem `users/:id` route'una yem olurdu hem de sıralamaya bağlı kırılgan olurdu.
  * Kardeş literal segment + `PERMISSION_MAP["deleted-identities"] = ["users"]`
- * eşlemesi, `products-export` ile aynı yerleşik kalıp.
+ * eşlemesi, `consents` ve `gib-report` ile aynı yerleşik kalıp.
  *
  * `@Roles` bilinçli olarak moderator'ü DIŞARIDA bırakır: `users` izin anahtarı
  * moderator'e de verili, yani ham TCKN'yi kapatan tek şey bu liste.
@@ -36,10 +45,7 @@ const XLSX_MIME =
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminDeletedIdentityController {
-  constructor(
-    private readonly service: AdminDeletedIdentityService,
-    private readonly audit: AdminAuditService,
-  ) {}
+  constructor(private readonly service: AdminDeletedIdentityService) {}
 
   @Get("deleted-identities")
   @Roles(AdminRole.super_admin, AdminRole.admin)
@@ -51,36 +57,15 @@ export class AdminDeletedIdentityController {
   @Get("deleted-identities/export")
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @ApiOperation({ summary: "Aylık bildirim dosyası (Excel)" })
+  @ApiResponse({ status: 200, description: "XLSX file" })
   async export(
     @CurrentUser("id") adminId: string,
     @Query() query: DeletedUserIdentityExportQueryDto,
-    @Res() res: Response,
-  ): Promise<void> {
-    const result = await this.service.exportPeriod(query);
-
-    // Zorunlu denetim kaydı: bu uç toplu kimlik verisi dışarı taşıyor.
-    // newValue'ya kimlik DEĞERLERİ yazılmaz — `audit_logs` hiç purge edilmiyor,
-    // TCKN'leri oraya kopyalamak ikinci bir kalıcı kimlik deposu yaratırdı.
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "deleted_identity_export",
-      "DeletedUserIdentity",
-      result.period,
-      null,
-      {
-        period: result.period,
-        wasSeller: query.wasSeller ?? null,
-        rowCount: result.rowCount,
-        truncated: result.truncated,
-      },
-    );
-
-    res.setHeader("Content-Type", XLSX_MIME);
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${result.filename}"`,
-    );
-    res.send(result.buffer);
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // Zorunlu denetim kaydı hatta yazılır; newValue'ya kimlik DEĞERLERİ
+    // yazılmaz — `audit_logs` hiç purge edilmiyor, TCKN'leri oraya kopyalamak
+    // ikinci bir kalıcı kimlik deposu yaratırdı.
+    return sendExport(res, await this.service.exportPeriod(query, adminId));
   }
 }

@@ -1,7 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { useTranslations } from "next-intl";
 import {
   StarIcon,
@@ -9,9 +7,16 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import { IconButton } from "@tarodan/ui";
+import {
+  Avatar,
+  Badge,
+  EmptyState,
+  IconButton,
+  type BadgeVariant,
+} from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { fmtDate } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { Review } from "../_lib/types";
 
@@ -31,20 +36,16 @@ function Stars({ score }: { score: number }) {
 
 function ReviewStatusBadge({ status }: { status: string }) {
   const t = useTranslations();
-  const map: Record<string, [string, string]> = {
-    approved: [
-      "bg-success-100 text-success-700",
-      t("admin.catalog.products.reviewApproved"),
-    ],
-    pending: [
-      "bg-warning-100 text-warning-700",
-      t("admin.catalog.products.reviewPending"),
-    ],
-    rejected: ["bg-danger-100 text-danger-700", t("common.rejected")],
+  const map: Record<string, [BadgeVariant, string]> = {
+    approved: ["success", t("admin.catalog.products.reviewApproved")],
+    pending: ["warning", t("admin.catalog.products.reviewPending")],
+    rejected: ["danger", t("common.rejected")],
   };
-  const [cls, label] = map[status] ?? ["bg-surface-alt text-body", status];
+  const [variant, label] = map[status] ?? ["outline", status];
   return (
-    <span className={`rounded-full px-2 py-1 text-xs ${cls}`}>{label}</span>
+    <Badge variant={variant} size="sm">
+      {label}
+    </Badge>
   );
 }
 
@@ -71,9 +72,11 @@ export function ProductReviewsSection({
       bodyClassName="space-y-4"
     >
       {reviews.length === 0 ? (
-        <p className="py-8 text-center text-muted">
-          {t("admin.catalog.products.noReviews")}
-        </p>
+        <EmptyState
+          size="compact"
+          icon={false}
+          title={t("admin.catalog.products.noReviews")}
+        />
       ) : (
         <div className="divide-y divide-border">
           {reviews.map((review) => (
@@ -82,9 +85,7 @@ export function ProductReviewsSection({
               className="flex items-start justify-between gap-4 py-4 first:pt-0"
             >
               <div className="flex min-w-0 items-start gap-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 font-bold text-primary-600">
-                  {review.user.displayName.charAt(0)}
-                </div>
+                <Avatar fallback={review.user.displayName.charAt(0)} />
                 <div className="min-w-0">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
                     <span className="font-medium text-heading">
@@ -101,9 +102,7 @@ export function ProductReviewsSection({
                   <div className="mb-2 flex items-center gap-2">
                     <Stars score={review.score} />
                     <span className="text-sm text-muted">
-                      {format(new Date(review.createdAt), "dd MMM yyyy", {
-                        locale: tr,
-                      })}
+                      {fmtDate(review.createdAt)}
                     </span>
                   </div>
                   {review.title && (

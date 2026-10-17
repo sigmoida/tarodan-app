@@ -3,7 +3,7 @@
  *
  * Both rules are ratchets rather than switches: they make the state of an
  * in-progress migration visible and stop it from getting worse, while the
- * existing sites are converted file by file (see apps/api/CLAUDE.md §15).
+ * existing sites are converted file by file (see apps/api/CLAUDE.md, "Fix what you touch").
  */
 module.exports = {
   plugins: ["@tarodan"],
@@ -25,17 +25,16 @@ module.exports = {
           "src/worker.ts",
           "src/process-role.ts",
           "src/bull-board.setup.ts",
-          // Already a config accessor — `envConfigNumber` reads a key spec with
-          // its default and minimum. Nothing about it is payment-specific, so
-          // it belongs under src/config/; moving it changes an export other
-          // modules import, which is its own change.
-          "src/modules/payment/helpers/payment.constants.ts",
         ],
         // Keys not yet behind an accessor. This list only shrinks: take a key
         // off it when you give it one, and never add to it.
         //
+        // Business durations are not on it: they are Durations & Rules
+        // settings now, and their legacy env keys are read only through
+        // config/timing-env.ts.
+        //
         // Note: several of these (TARODAN_WAREHOUSE_*, WEB_REVALIDATE_URL,
-        // REVALIDATE_SECRET, CARGO_*, LOG_LEVEL, …) are NOT declared in
+        // REVALIDATE_SECRET, LOG_LEVEL, …) are NOT declared in
         // config/env.validation.ts, and ConfigModule drops undeclared keys
         // coming from an .env file — so today they only work when injected as
         // real environment variables. Declaring them changes runtime values,
@@ -44,8 +43,6 @@ module.exports = {
           "ADMIN_JWT_EXPIRES_IN",
           "ADMIN_JWT_REFRESH_EXPIRES_IN",
           "APP_URL",
-          "CARGO_PICKUP_NO_DATA_DAYS",
-          "CARGO_STALE_MOVEMENT_DAYS",
           "COOKIE_DOMAIN",
           "COOKIE_SECURE",
           "DATABASE_URL",
@@ -53,13 +50,11 @@ module.exports = {
           "EMAIL_LOGO_URL",
           "JWT_EXPIRES_IN",
           "JWT_REFRESH_EXPIRES_IN",
-          "LISTING_TTL_DAYS",
           "LOG_FORMAT",
           "LOG_LEVEL",
           "NEST_VERBOSE_ROUTES",
           "NOTIFICATION_LOG_RETENTION_DAYS",
           "REFUND_POLICY_V2_ENABLED",
-          "REFUND_WAIT_DELIVERY_MAX_DAYS",
           "REVALIDATE_SECRET",
           "TARODAN_WAREHOUSE_ADDRESS",
           "TARODAN_WAREHOUSE_CITY",
@@ -68,7 +63,6 @@ module.exports = {
           "TARODAN_WAREHOUSE_PHONE",
           "TEST_DATABASE_URL",
           "TEST_THROTTLING_ENABLED",
-          "TRADE_LOST_PARCEL_GRACE_DAYS",
           "WEB_REVALIDATE_URL",
           // Injected by npm itself, not app configuration.
           "npm_package_version",
@@ -87,7 +81,7 @@ module.exports = {
     },
     {
       // Seeds, maintenance and one-off scripts run standalone, outside Nest.
-      files: ["prisma/**/*.ts", "scripts/**/*.ts", "src/maintenance/**/*.ts"],
+      files: ["prisma/**/*.ts", "scripts/**/*.ts", "maintenance/**/*.ts", "src/maintenance/**/*.ts"],
       rules: { "@tarodan/no-raw-process-env": "off" },
     },
   ],

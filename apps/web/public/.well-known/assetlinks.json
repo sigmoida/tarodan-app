@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tarodan.app",
+      "sha256_cert_fingerprints": [
+        "AD:59:A4:90:B8:7E:43:EB:01:FC:66:5E:7A:4C:9C:31:24:59:74:63:51:99:41:66:3B:D6:D4:6E:52:55:4C:B9"
+      ]
+    }
+  }
+]

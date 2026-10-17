@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button, Toggle } from "@tarodan/ui";
 import { Link } from "@/i18n/navigation";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
+import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 import { cookieCategories } from "@/lib/cookieConsent";
 
 export default function CookieConsentBanner() {
@@ -19,8 +20,11 @@ export default function CookieConsentBanner() {
     rejectAll,
   } = useCookieConsent();
   const [showSettings, setShowSettings] = useState(false);
+  // Sıra: önce zorunlu onay/kimlik pencereleri, sonra çerez bandı, en son tur.
+  // Zorunlu pencere açıkken bant onun altında kalıp tıklanamıyordu.
+  const outstanding = useRequiredStepsStore((s) => s.outstanding);
 
-  if (!needsConsent) return null;
+  if (!needsConsent || outstanding) return null;
 
   const categories = cookieCategories(t);
 

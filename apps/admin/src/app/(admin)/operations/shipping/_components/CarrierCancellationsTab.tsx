@@ -14,7 +14,7 @@ import { carrierCancellationFilterFields } from "../_lib/filters";
 const statusVariant = {
   pending: "warning",
   resolved: "success",
-  dismissed: "secondary",
+  dismissed: "outline",
 } as const;
 
 function CarrierCancellationTasksTable() {

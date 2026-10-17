@@ -1,4 +1,18 @@
+import { LEGAL_IDENTITY_FIELDS } from "@tarodan/types";
+
+/**
+ * Kişisel kimlik alanları — loglara, Sentry'ye ve hata kayıtlarına DEĞER olarak
+ * girmez. Yasal kimlik alanları (`@tarodan/types` LEGAL_IDENTITY_FIELDS) +
+ * banka hesabındaki eski TCKN alanı. Hata kaydı (`ErrorLogInterceptor`) ve admin
+ * denetim kaydı (`AdminAuditService`) aynı listeyi kullanır.
+ */
+export const IDENTITY_LOG_KEYS: readonly string[] = [
+  ...LEGAL_IDENTITY_FIELDS,
+  "tcKimlikNo",
+];
+
 const SENSITIVE_KEYS = new Set([
+  ...IDENTITY_LOG_KEYS.map((key) => key.toLowerCase()),
   "password",
   "passwordhash",
   "passwordconfirm",
@@ -12,6 +26,11 @@ const SENSITIVE_KEYS = new Set([
   "verifytoken",
   "confirmtoken",
   "idtoken",
+  // Sign in with Apple: giriş gövdesindeki kimlik belirteci ve tek kullanımlık
+  // yetkilendirme kodu (refresh token'a çevrilir) ile şifreli token kolonu.
+  "identitytoken",
+  "authorizationcode",
+  "refreshtokenencrypted",
   "authorization",
   "cookie",
   "setcookie",

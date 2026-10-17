@@ -6,8 +6,12 @@ import {
 } from "@nestjs/common";
 import * as crypto from "crypto";
 import { PrismaService } from "../../../prisma";
-import { NetGsmProvider } from "../../notification/providers/netgsm.provider";
+import {
+  NetGsmProvider,
+  type NetGsmResult,
+} from "../../notification/providers/netgsm.provider";
 import { i18nMessage } from "../../i18n";
+import { smsFixedVerificationCode } from "../../../config/sms";
 
 @Injectable()
 export class PhoneVerificationService {
@@ -16,17 +20,49 @@ export class PhoneVerificationService {
   static readonly RESEND_COOLDOWN_MS = 60 * 1000; // 60 sn
   static readonly MAX_ATTEMPTS = 5;
 
+  /**
+   * UAT sabit kod modu (staging): kod her zaman bu değerdir ve SMS GÖNDERİLMEZ.
+   * Bekleme süresi, deneme sınırı, süre dolumu ve numara çakışma kuralları
+   * aynen işler — yalnız kodun üretimi ve teslimi değişir. Canlıda erişimci
+   * null döner (bkz. config/sms.ts).
+   */
+  private readonly fixedCode: string | null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly netgsm: NetGsmProvider,
-  ) {}
+  ) {
+    this.fixedCode = smsFixedVerificationCode();
+    if (this.fixedCode) {
+      this.logger.warn(
+        "SMS_FIXED_VERIFICATION_CODE is set: phone verification uses a FIXED code and sends NO SMS (UAT mode — must never run on production)",
+      );
+    }
+  }
 
   private hash(code: string): string {
     return crypto.createHash("sha256").update(code).digest("hex");
   }
 
   private generateCode(): string {
-    return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+    return (
+      this.fixedCode ??
+      crypto.randomInt(0, 1_000_000).toString().padStart(6, "0")
+    );
+  }
+
+  /** Kodu kullanıcıya iletir; sabit kod modunda SMS atlanır (UAT). */
+  private async deliverCode(
+    phone: string,
+    code: string,
+  ): Promise<NetGsmResult> {
+    if (this.fixedCode) {
+      this.logger.log(
+        `Fixed-code mode: SMS skipped for ${phone.slice(0, -4)}****`,
+      );
+      return { success: true };
+    }
+    return this.netgsm.sendOtp(phone, code);
   }
 
   async sendCode(userId: string, phone: string): Promise<void> {
@@ -81,7 +117,7 @@ export class PhoneVerificationService {
       },
     });
 
-    const result = await this.netgsm.sendOtp(normalized, code);
+    const result = await this.deliverCode(normalized, code);
     if (!result.success) {
       await this.prisma.phoneVerificationToken.delete({
         where: { id: created.id },

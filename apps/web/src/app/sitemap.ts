@@ -56,6 +56,7 @@ const STATIC_PATHS = [
   "/refund-policy",
   "/seller-agreement",
   "/intellectual-property",
+  "/account-deletion",
 ];
 
 /** Best-effort: append active listing detail URLs. Never throws — a failed or

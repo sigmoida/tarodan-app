@@ -1,11 +1,18 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
-import { OrderStatus, ProductStatus, TradeStatus } from "@prisma/client";
+import {
+  ListingRemovalReason,
+  OrderStatus,
+  ProductStatus,
+  TradeStatus,
+} from "@prisma/client";
 import { getReservedAwareStatus } from "../../product/helpers/product-status.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 // Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
 // ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
@@ -54,9 +61,13 @@ export class ReservationReconciliationService {
    * 24h kill-switch'i için ayrı method: expireUnpaidOrders.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
-    const timeoutMinutes = parseInt(
-      this.configService.get("PAYMENT_TIMEOUT_MINUTES") || "5",
-      10,
+    // Süreler ve Kurallar → `paymentReservationMinutes` (env PAYMENT_TIMEOUT_MINUTES
+    // yalnız ilk kurulum geri düşüşü). Süre sipariş satırına damgalanmaz:
+    // createdAt'ten her turda yeniden hesaplanır.
+    const timeoutMinutes = await resolveTimingValue(
+      this.prisma,
+      "paymentReservationMinutes",
+      this.configService,
     );
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);
@@ -126,14 +137,26 @@ export class ReservationReconciliationService {
               product.reservedQuantity,
               freshOrder.quantity ?? 1,
             );
+            const nextStatus = getReservedAwareStatus(
+              product.quantity,
+              newReserved,
+            );
             await tx.product.update({
               where: { id: order.productId },
               data: {
                 reservedQuantity: newReserved,
                 // Bulgu C: rezerv-duyarlı status (quantity=null → active, quantity=0 → inactive).
-                status: getReservedAwareStatus(product.quantity, newReserved),
+                status: nextStatus,
               },
             });
+            await recordListingRemovals(tx, [
+              {
+                productId: order.productId,
+                statusBefore: product.status,
+                statusAfter: nextStatus,
+                reason: ListingRemovalReason.out_of_stock,
+              },
+            ]);
           }
 
           // Mark the reservation as released; order stays pending_payment so

@@ -1,6 +1,6 @@
 import { IsOptional, IsString, IsEnum, IsBoolean } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { DiscountScope } from "@prisma/client";
 import { AdminListQueryDto } from "../../../common/list";
 
@@ -17,7 +17,7 @@ export class DiscountQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ description: "Aktif durumu filtresi" })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isActive?: boolean;
 
@@ -28,7 +28,7 @@ export class DiscountQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ description: "Sadece kupon kodları", default: false })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   couponsOnly?: boolean;
 
@@ -37,7 +37,7 @@ export class DiscountQueryDto extends AdminListQueryDto {
     default: false,
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   autoOnly?: boolean;
 }

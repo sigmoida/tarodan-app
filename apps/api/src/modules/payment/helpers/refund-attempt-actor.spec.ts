@@ -1,7 +1,9 @@
 import { CancellationActor } from "@prisma/client";
 import {
   REFUND_REQUEST_ACTOR_KEY,
+  REFUND_REQUEST_ADMIN_REASON_KEY,
   refundAttemptCancelActor,
+  refundRequestAdminReasonCode,
   refundRequestCancelActor,
 } from "./refund-attempt-actor";
 
@@ -60,5 +62,38 @@ describe("refundRequestCancelActor", () => {
         history: [{ action: "cancellation_refunded" }],
       }),
     ).toBe(CancellationActor.platform);
+  });
+});
+
+describe("refundRequestAdminReasonCode", () => {
+  it("reads the admin's catalog code from a platform request (history kept alongside)", () => {
+    expect(
+      refundRequestAdminReasonCode({
+        [REFUND_REQUEST_ACTOR_KEY]: CancellationActor.platform,
+        [REFUND_REQUEST_ADMIN_REASON_KEY]: "duplicate_transaction",
+        history: [{ action: "cancellation_pending_admin_review" }],
+      }),
+    ).toBe("duplicate_transaction");
+  });
+
+  it("is null for a buyer request, a missing / unknown code, or no metadata", () => {
+    expect(
+      refundRequestAdminReasonCode({
+        [REFUND_REQUEST_ACTOR_KEY]: CancellationActor.buyer,
+        [REFUND_REQUEST_ADMIN_REASON_KEY]: "stock_error",
+      }),
+    ).toBeNull();
+    expect(
+      refundRequestAdminReasonCode({
+        [REFUND_REQUEST_ACTOR_KEY]: CancellationActor.platform,
+      }),
+    ).toBeNull();
+    expect(
+      refundRequestAdminReasonCode({
+        [REFUND_REQUEST_ACTOR_KEY]: CancellationActor.platform,
+        [REFUND_REQUEST_ADMIN_REASON_KEY]: "made_up",
+      }),
+    ).toBeNull();
+    expect(refundRequestAdminReasonCode(null)).toBeNull();
   });
 });

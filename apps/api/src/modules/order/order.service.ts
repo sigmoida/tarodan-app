@@ -272,6 +272,13 @@ export class OrderService {
     return this.orderLifecycle.cancelUnpaidOrderInTx(...args);
   }
 
+  /** Ödenmemiş iptalin commit SONRASI personel bildirimi (fırlatmaz). */
+  notifyStaffUnpaidCancelled(
+    ...args: Parameters<OrderLifecycleService["notifyStaffUnpaidCancelled"]>
+  ): Promise<void> {
+    return this.orderLifecycle.notifyStaffUnpaidCancelled(...args);
+  }
+
   async invalidateProductCaches(productId: string): Promise<void> {
     return this.orderLifecycle.invalidateProductCaches(productId);
   }

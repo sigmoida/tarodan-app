@@ -9,7 +9,7 @@ import {
   Min,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform, Type } from "class-transformer";
+import { Type } from "class-transformer";
 import {
   ProductStatus,
   OrderOrigin,
@@ -21,13 +21,19 @@ import {
   ACCOUNT_STATUSES,
   ADMIN_ORDER_BUCKETS,
   ADMIN_ORDER_TABS,
+  LISTING_REMOVAL_ACTORS,
+  LISTING_REMOVAL_REASONS,
+  LISTING_REMOVAL_REASON_FILTER_UNKNOWN,
   LOGIN_STATES,
   type AccountStatus,
   type AdminOrderBucket,
   type AdminOrderTab,
+  type ListingRemovalActor,
+  type ListingRemovalReasonFilter,
   type LoginState,
 } from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
+import { QueryBoolean } from "../../../common/transforms";
 
 export class AdminUserQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: "john" })
@@ -35,30 +41,32 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @IsString()
   search?: string;
 
-  // Query string'den "false" gelince de false olmalı; dönüşümsüz hali "false"
-  // metnini truthy olarak Prisma'ya geçiriyordu (Alıcılar filtresi çalışmıyordu).
+  // Query string'den "false" gelince de false olmalı. `value`ya bakan eski
+  // dönüşüm global pipe'ın örtük dönüşümünden (Boolean("false") === true)
+  // SONRA çalıştığı için "false"u true'ya çeviriyordu; `QueryBoolean` ham
+  // girdiyi okur (bkz. common/transforms/query-boolean.ts).
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isSeller?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isVerified?: boolean;
 
   /** Test şeridi hesapları (canlıdaki mağaza incelemesi / QA hesapları). */
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isTestAccount?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isBanned?: boolean;
 
@@ -100,6 +108,16 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsIn(LOGIN_STATES)
   loginState?: LoginState;
+
+  /**
+   * Yalnız yasal kimliği (ad, soyad, TCKN) eksik üyeler — kimlik kapısının
+   * kuralıyla aynı (personel ve test hesabı muaf). `false` filtre uygulamaz.
+   */
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  identityIncomplete?: boolean;
 }
 
 export class SellerApplicationQueryDto extends AdminListQueryDto {
@@ -144,6 +162,23 @@ export class AdminProductQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   carModelId?: string;
+
+  /**
+   * Güncel kaldırma nedeni; `unknown` = vitrinden düşmüş ama nedeni kayıtsız
+   * (bu özellikten önceki) ilanlar.
+   */
+  @ApiPropertyOptional({
+    enum: [...LISTING_REMOVAL_REASONS, LISTING_REMOVAL_REASON_FILTER_UNKNOWN],
+  })
+  @IsOptional()
+  @IsIn([...LISTING_REMOVAL_REASONS, LISTING_REMOVAL_REASON_FILTER_UNKNOWN])
+  removalReason?: ListingRemovalReasonFilter;
+
+  /** Kaldıran: nedenin aktör grubu (satıcı / sistem / Tarodan). */
+  @ApiPropertyOptional({ enum: LISTING_REMOVAL_ACTORS })
+  @IsOptional()
+  @IsIn([...LISTING_REMOVAL_ACTORS])
+  removalActor?: ListingRemovalActor;
 }
 
 /**
@@ -192,6 +227,15 @@ export class AdminOrderCountsQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;
+
+  @ApiPropertyOptional({
+    example: "2026-10-02T09:00:00.000Z",
+    description:
+      "Bu andan önce kargoya verilmiş, hâlâ kargodaki siparişler (dashboard 'uzun süredir kargoda' uyarısı)",
+  })
+  @IsOptional()
+  @IsDateString()
+  shippedBefore?: string;
 
   @ApiPropertyOptional({
     example: "2024-01-01",

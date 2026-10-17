@@ -7,7 +7,9 @@ import { revalidateTag } from "next/cache";
  * and product pages update immediately instead of waiting out the `revalidate`
  * window. Guarded by a shared secret; a no-op (401) if the secret is unset/wrong.
  *
- * Body: `{ "tags": ["products:list", "product:<id>"] }`.
+ * Body: `{ "tags": ["products:list", "product:<id>"] }`. Any tag is accepted;
+ * hero/güven rozeti içeriği `home:hero`, `home:trust` ve `auth:hero` kullanır
+ * (bkz. `lib/api/hero.ts`).
  * Header: `x-revalidate-secret: <REVALIDATE_SECRET>`.
  */
 export const dynamic = "force-dynamic";

@@ -5,8 +5,11 @@ import {
   payoutStatusConfig,
 } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { CellDate, Empty } from "@/components/table";
+import { EarlyReleaseBadge } from "@/components/finance/EarlyReleaseBadge";
 import { fmtTry } from "@/lib/format";
-import { HoldReasonBadge, holdReasonForRow } from "./holds";
+import { HoldReasonBadge } from "./holds";
+import { holdReleaseAction } from "./holdReason";
 import {
   type ScheduleItem,
   type PayoutTransaction,
@@ -41,24 +44,13 @@ export const scheduleColumns = (t: T) => [
   col.date<ScheduleItem>(t("admin.finance.payouts.releaseDate"), "releaseAt"),
   col.badge<ScheduleItem>(
     t("admin.finance.payouts.holdReason"),
-    (s) => (
-      <HoldReasonBadge
-        reason={holdReasonForRow(
-          {
-            status: "held",
-            releaseAt: s.releaseAt,
-            frozenByRefundId: s.frozenByRefundId,
-          },
-          t,
-        )}
-      />
-    ),
+    (s) => <HoldReasonBadge flags={s} t={t} />,
     { sortKey: "releaseAt", sortType: "date" },
   ),
 ];
 
 export function transactionColumns(
-  onRelease: ((orderId: string, early: boolean) => void) | undefined,
+  onRelease: ((row: PayoutTransaction, early: boolean) => void) | undefined,
   t: T,
 ) {
   return [
@@ -105,55 +97,62 @@ export function transactionColumns(
       ),
       { sortKey: "status", sortType: "text" },
     ),
+    // Planlanan tarih (releaseAt) bırakıldıktan sonra da yerinde kalır; gerçek
+    // tarih ayrı sütunda, erken bırakıldıysa "N gün erken" rozetiyle.
     col.date<PayoutTransaction>(
-      t("admin.finance.payouts.release"),
-      (row) => row.releasedAt || row.releaseAt,
+      t("admin.finance.payouts.plannedRelease"),
+      "releaseAt",
       { sortKey: "releaseAt", sortType: "date" },
+    ),
+    col.custom<PayoutTransaction>(
+      t("admin.finance.payouts.releasedOn"),
+      (row) =>
+        row.releasedAt ? (
+          <div className="flex flex-col items-start gap-1">
+            <CellDate value={row.releasedAt} />
+            <EarlyReleaseBadge
+              releaseAt={row.releaseAt}
+              releasedAt={row.releasedAt}
+            />
+          </div>
+        ) : (
+          <Empty />
+        ),
+      { grow: 1, minWidth: 140, sortKey: "releasedAt", sortType: "date" },
     ),
     col.badge<PayoutTransaction>(
       t("admin.finance.payouts.holdReason"),
-      (row) => (
-        <HoldReasonBadge
-          reason={holdReasonForRow(
-            {
-              status: row.status,
-              releaseAt: row.releaseAt,
-              frozenByRefundId: row.frozenByRefundId,
-            },
-            t,
-          )}
-        />
-      ),
+      (row) => <HoldReasonBadge flags={row} t={t} />,
       { sortKey: "status" },
     ),
     // Tek aksiyon için ⋯ menüsü gereksiz tıklamaydı; Transferler sekmesindeki
     // "Yeniden Dene" ile aynı desen: doğrudan düğme. Yalnız HELD satırda görünür.
-    // Süresi dolmuşsa normal release; teslim edilmiş ama süresi dolmamışsa
-    // ERKEN release (uyarılı modal, force ile gider). Teslim edilmemiş
-    // (releaseAt yok) ya da donuk (açık iade) satırda düğme yok — backend de
-    // reddeder.
+    // Düğme kararı SUNUCUDAN gelir (releasable / releaseBlockedReason): vadesi
+    // gelmişse normal release, yalnız vade engeli varsa ERKEN release (uyarılı
+    // modal, force ile gider); donuk, kusurlu, teslim edilmemiş ya da bırakılmış
+    // satırda düğme yok — backend de reddeder.
     ...(onRelease
       ? [
           col.actions<PayoutTransaction>(
             (row) => {
               if (row.status !== "held") return null;
-              if (row.releaseAt == null || row.frozenByRefundId) return null;
-              const releaseDue =
-                new Date(row.releaseAt).getTime() <= Date.now();
+              const action = holdReleaseAction(row);
+              if (action === "none") return null;
+              const early = action === "early";
               return (
                 <Button
                   size="sm"
-                  variant={releaseDue ? "secondary" : "outline"}
+                  variant={early ? "outline" : "secondary"}
                   title={
-                    releaseDue
-                      ? undefined
-                      : t("admin.finance.payouts.earlyReleaseHint")
+                    early
+                      ? t("admin.finance.payouts.earlyReleaseHint")
+                      : undefined
                   }
-                  onClick={() => onRelease(row.orderId, !releaseDue)}
+                  onClick={() => onRelease(row, early)}
                 >
-                  {releaseDue
-                    ? t("admin.finance.payouts.release")
-                    : t("admin.finance.payouts.releaseEarly")}
+                  {early
+                    ? t("admin.finance.payouts.releaseEarly")
+                    : t("admin.finance.payouts.release")}
                 </Button>
               );
             },

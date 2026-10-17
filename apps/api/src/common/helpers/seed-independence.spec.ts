@@ -27,7 +27,17 @@ const DEMO_MODULES = [
   "./seed-commerce",
   "./seed-media",
 ];
-const PRODUCTION_SEEDS = ["seed-production.ts", "seed-launch.ts"];
+// UAT seed'i ve paylaşılan lansman çekirdeği de demo katmanına bağlanamaz;
+// görselleri `seed-media.ts` ayrı bir adım olarak workflow'dan bağlanır, import
+// edilmez.
+const PRODUCTION_SEEDS = [
+  "seed-production.ts",
+  "seed-launch.ts",
+  "seed-launch-core.ts",
+  "seed-uat.ts",
+  // Vitrin hero'su + güven rozetleri: referans katmanı, her açılışta koşar.
+  "seed-hero-content.ts",
+];
 
 describe("production seeds are independent of the demo seed", () => {
   it.each(PRODUCTION_SEEDS)("%s imports no demo module", (file) => {
@@ -67,6 +77,27 @@ describe("production seeds are independent of the demo seed", () => {
     }
   });
 
+  it("never overwrites or resurrects admin-managed storefront content", () => {
+    // Her açılışta koşar: admin'in düzenlediği slayt/rozet ezilmemeli, sildiği
+    // seed slaytı geri gelmemeli (yerleşimi bilerek boşaltmış olabilir) —
+    // içerik yalnız ilk kurulumda, boş update ile; sonrasını işaret keser.
+    const source = read("seed-hero-content.ts");
+    const upserts = source.split("prisma.").slice(1);
+    const contentWrites = upserts.filter((chunk) =>
+      /^(heroSlide|trustBadge|platformSetting)\.upsert/.test(chunk),
+    );
+    expect(contentWrites).toHaveLength(3);
+    for (const chunk of contentWrites) {
+      expect(chunk).toContain("update: {}");
+    }
+    expect(source).toContain("settingKey: HERO_SEED_APPLIED_SETTING");
+    expect(source).toContain("prisma.heroSlide.count()");
+    expect(source).toContain("prisma.trustBadge.count()");
+    expect(source).not.toMatch(
+      /prisma\.(heroSlide|trustBadge|platformSetting)\.(update|delete)/,
+    );
+  });
+
   it("sources every launch business value from the data files", () => {
     // Rakamlar JSON'da durmalı: seed dosyasına gömülen bir oran, gözden
     // geçirilebilir tek kaynağı ikiye böler.
@@ -78,5 +109,25 @@ describe("production seeds are independent of the demo seed", () => {
     expect(source).not.toMatch(
       /\b(?:buyerCommissionRate|sellerCommissionRate|tradeFee\w*)\s*:\s*\d/,
     );
+  });
+
+  it("keeps the UAT seed on the shared launch pieces and behind its guard", () => {
+    const source = read("seed-uat.ts");
+    // Referans veri paylaşılan fonksiyonlardan gelir: kopya yok.
+    expect(source).toContain("seedBusinessConfig(prisma, businessConfig)");
+    expect(source).toContain("seedCatalog(prisma)");
+    expect(source).toContain("seedCommissionRuleSet(prisma, commission)");
+    expect(source).toContain('load<BusinessConfig>("business-config.json")');
+    // Production'da çalışmayı reddeden guard, herhangi bir yazımdan önce.
+    expect(source).toContain("assertUatSeedAllowed(process.env)");
+    const main = source.slice(source.indexOf("async function main"));
+    expect(main.indexOf("assertUatSeedAllowed(process.env)")).toBeGreaterThan(
+      -1,
+    );
+    expect(main.indexOf("assertUatSeedAllowed(process.env)")).toBeLessThan(
+      main.indexOf("seedBusinessConfig("),
+    );
+    // Şifre kaynakta sabit durmaz.
+    expect(source).not.toMatch(/passwordHash:\s*["']/);
   });
 });

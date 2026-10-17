@@ -27,7 +27,7 @@ describe("SecurityService 2FA setup QR", () => {
     get: jest.fn().mockReturnValue("test-two-factor-key"),
     getOrThrow: jest.fn().mockReturnValue("test-two-factor-key"),
   };
-  const service = new SecurityService(prisma as any, config as any);
+  const service = new SecurityService(prisma as any, config as any, {} as any);
 
   // Her iki test de gerçek bir QR PNG'si üretiyor. Tek başına ~100 ms sürüyor
   // ama tüm paket paralel koşarken 5 sn'lik varsayılanı aşıp sürüm kapısını

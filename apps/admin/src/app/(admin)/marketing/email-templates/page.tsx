@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Input } from "@tarodan/ui";
+import { EmptyState, Input, Spinner } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminPage } from "@/components/page/AdminPage";
@@ -77,15 +77,20 @@ export default function EmailTemplatesPage() {
         />
       ) : isLoading ? (
         <SectionCard>
-          <p className="text-center text-muted">{t("common.loading")}</p>
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
         </SectionCard>
       ) : visible.length === 0 ? (
         <SectionCard>
-          <p className="text-center text-muted">
-            {q
-              ? t("admin.marketing.emailTemplates.noSearchResults")
-              : t("admin.marketing.emailTemplates.notFound")}
-          </p>
+          <EmptyState
+            size="compact"
+            title={
+              q
+                ? t("admin.marketing.emailTemplates.noSearchResults")
+                : t("admin.marketing.emailTemplates.notFound")
+            }
+          />
         </SectionCard>
       ) : (
         <div className="space-y-4">

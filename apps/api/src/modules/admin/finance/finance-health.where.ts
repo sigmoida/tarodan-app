@@ -5,16 +5,13 @@ import {
   Prisma,
   SellerAdjustmentStatus,
 } from "@prisma/client";
-import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/helpers/elogo-retry-policy";
+import { INVOICE_MAX_SEND_ATTEMPTS } from "../../invoicing/helpers/invoice-retry-policy";
 import {
   LIVE_ORDER,
   LIVE_PAYMENT,
   LIVE_PAYOUT_TRANSFER,
 } from "../../account-lane/live-lane.where";
-import {
-  invoiceDeadlineDays,
-  type ThresholdConfigReader,
-} from "../../../config/alert-thresholds";
+import type { AlertThresholdContext } from "../../../config/alert-thresholds";
 
 /**
  * Finans sağlık şeridinin KÜME TANIMLARI — tek kaynak.
@@ -48,16 +45,37 @@ export function overdueHoldsWhere(now: Date): Prisma.PaymentHoldWhereInput {
   };
 }
 
+/** "Yaklaşan serbest bırakmalar" penceresi: dashboard bilgi satırı. */
+export const UPCOMING_RELEASE_WINDOW_DAYS = 7;
+
+/**
+ * Serbest kalma tarihi HENÜZ gelmemiş, tarihinde kendiliğinden açılacak
+ * hold'lar: tutuluyor, iade kilidi yok, `releaseAt` şimdi ya da sonrası
+ * (`until` verilirse en geç o an). Süresi geçmişler `overdueHoldsWhere`'dedir —
+ * iki küme kesişmez.
+ */
+export function upcomingHoldsWhere(
+  now: Date,
+  until?: Date,
+): Prisma.PaymentHoldWhereInput {
+  return {
+    payment: LIVE_PAYMENT,
+    status: PaymentHoldStatus.held,
+    frozenByRefundId: null,
+    releaseAt: until ? { gt: now, lte: until } : { gt: now },
+  };
+}
+
 /** Deneme bütçesi tükenmiş e-belgeler — yasal süre işliyor, elle müdahale şart. */
-export const exhaustedInvoicesWhere: Prisma.ElogoInvoiceWhereInput = {
+export const exhaustedInvoicesWhere: Prisma.FiscalInvoiceWhereInput = {
   status: "failed",
-  attemptCount: { gte: ELOGO_MAX_SEND_ATTEMPTS },
+  attemptCount: { gte: INVOICE_MAX_SEND_ATTEMPTS },
 };
 
 /** Denemesi süren başarısız belgeler (tükenmişlerden ayrı sayılır). */
-export const retryableFailedInvoicesWhere: Prisma.ElogoInvoiceWhereInput = {
+export const retryableFailedInvoicesWhere: Prisma.FiscalInvoiceWhereInput = {
   status: "failed",
-  attemptCount: { lt: ELOGO_MAX_SEND_ATTEMPTS },
+  attemptCount: { lt: INVOICE_MAX_SEND_ATTEMPTS },
 };
 
 /** Açık satıcı borcu (payout mahsubu bekleyen). */
@@ -72,10 +90,10 @@ export const openAdjustmentsWhere: Prisma.SellerAccountAdjustmentWhereInput = {
  */
 export function uninvoicedDeliveredWhere(
   now: Date,
-  config?: ThresholdConfigReader,
+  ctx: { timing: Pick<AlertThresholdContext["timing"], "invoiceDeadlineDays"> },
 ): Prisma.OrderWhereInput {
   const cutoff = new Date(
-    now.getTime() - invoiceDeadlineDays(config) * 24 * 60 * 60 * 1000,
+    now.getTime() - ctx.timing.invoiceDeadlineDays * 24 * 60 * 60 * 1000,
   );
   return {
     ...LIVE_ORDER,

@@ -1,11 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { ListingRemovalReason, Prisma } from "@prisma/client";
 import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
 } from "../../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { productSoldData } from "../../product/helpers/product-sale";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import {
@@ -72,13 +73,23 @@ export class FulfillmentStockService {
         product.reservedQuantity,
         orderQty,
       );
+      const nextStatus = getReservedAwareStatus(product.quantity, newReserved);
       await tx.product.update({
         where: { id: productId },
         data: {
           reservedQuantity: newReserved,
-          status: getReservedAwareStatus(product.quantity, newReserved),
+          status: nextStatus,
         },
       });
+      // Fiziksel stoğu bitmiş ilan rezervasyon bırakılınca pasife düşer.
+      await recordListingRemovals(tx, [
+        {
+          productId,
+          statusBefore: product.status,
+          statusAfter: nextStatus,
+          reason: ListingRemovalReason.out_of_stock,
+        },
+      ]);
       return {
         cancelledOrders: [],
         cancelledOffers: [],

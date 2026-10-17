@@ -1,3 +1,6 @@
+import type { CancellationActorValue } from "@tarodan/types";
+import type { PaytrOidFields } from "@/lib/paytr-oid";
+
 export interface TradeShipment {
   id: string;
   leg?: "to_warehouse" | "from_warehouse" | "return";
@@ -47,7 +50,7 @@ export interface TradeCommissionRuleMatch {
   source: "snapshot" | "live";
 }
 
-export interface TradeCashPayment {
+export interface TradeCashPayment extends PaytrOidFields {
   id?: string;
   payerId: string;
   /** Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. */
@@ -116,6 +119,10 @@ export interface TradeDetail {
   rejectionReason?: string;
   cancellationReason?: string;
   cancelReason?: string;
+  /** İptali kim yaptı (buyer = teklifi açan, seller = ilan sahibi, platform, system). */
+  cancelledBy?: CancellationActorValue | null;
+  /** Platform (admin) iptalinin katalog kodu; yalnız admin iptalinde dolu. */
+  adminCancelReasonCode?: string | null;
   createdAt: string;
   acceptedAt?: string;
   approvedAt?: string;

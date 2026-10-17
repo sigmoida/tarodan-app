@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Button, EmptyState, StatusBadge } from "@tarodan/ui";
+import { Avatar, Button, EmptyState, StatusBadge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
@@ -33,11 +33,10 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
               className="flex flex-col gap-2 border-b border-border py-3 transition-colors last:border-0 hover:bg-surface-alt sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 flex-1 items-center">
-                <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100">
-                  <span className="text-sm font-medium text-primary-600">
-                    {order.buyerName?.charAt(0) || "?"}
-                  </span>
-                </div>
+                <Avatar
+                  className="mr-3"
+                  fallback={order.buyerName?.charAt(0) || "?"}
+                />
                 <div className="min-w-0">
                   <p className="truncate text-sm text-heading">
                     <span className="font-medium">{order.orderNumber}</span>

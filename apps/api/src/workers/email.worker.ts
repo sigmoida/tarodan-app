@@ -15,6 +15,7 @@ import {
 import { Logger } from "@nestjs/common";
 import { Job } from "bull";
 import { ConfigService } from "@nestjs/config";
+import type { MailAreaId } from "@tarodan/types";
 import { PrismaService } from "../prisma";
 import { SmtpProvider } from "../modules/mail/smtp.provider";
 import {
@@ -23,8 +24,10 @@ import {
   extractEmailTemplateVariables,
   renderStoredEmailTemplate,
 } from "../common/helpers/email-template-renderer";
+import { withEmailTimingData } from "../common/timing-rules";
 import { frontendUrlForEnvironment } from "../config/app-urls";
 import { NotificationDispatchService } from "../modules/notification/notification-dispatch.service";
+import { markBroadcastLogRows } from "../modules/notification/helpers/broadcast-delivery";
 
 export interface EmailJobData {
   to: string;
@@ -35,8 +38,15 @@ export interface EmailJobData {
   templateData?: Record<string, any>;
   overrideHtml?: string;
   overrideSubject?: string;
-  from?: string;
+  /**
+   * Mail Yönlendirme alanı — yalnız şablonsuz gönderimler için (toplu duyuru
+   * → `marketing`). Şablonlu işlerde alan şablondan türetilir. Gönderen
+   * adresi iş verisiyle SEÇİLEMEZ: kimliği yalnız yönlendirme belirler.
+   */
+  area?: MailAreaId;
   replyTo?: string;
+  /** Ek SMTP başlıkları (pazarlamada `List-Unsubscribe`). */
+  headers?: Record<string, string>;
   attachments?: Array<{
     filename: string;
     content: Buffer | string;
@@ -48,6 +58,11 @@ export interface EmailJobData {
    * mevcut sipariş mailleri etkilenmez.
    */
   notificationLog?: { userId: string; type: string; title: string };
+  /**
+   * Yönetici yayını: admin servisinin yazdığı "pending" e-posta satırı
+   * (`data.broadcastId`) gönderim SONUCUNDAN güncellenir.
+   */
+  broadcastLog?: { userId: string; broadcastId: string };
   /**
    * `templateData`'yı `EmailLog.metadata`'ya YAZMA. Yük bir sır taşıyorsa
    * (token'lı aktivasyon linki gibi) metadata onu kalıcı olarak düz metin
@@ -76,16 +91,17 @@ export class EmailWorker {
       subject,
       html,
       text,
-      from,
+      area,
       replyTo,
+      headers,
       attachments,
       template,
       templateData,
       notificationLog,
+      broadcastLog,
       redactTemplateData,
     } = job.data;
     if (!html) throw new Error("Email HTML content is required");
-    const fromEmail = from || this.smtp.defaultFrom;
 
     // EmailLog kaydı ARTIK BURADA YAZILMAZ: tek yazar SmtpProvider.sendEmail
     // (her gönderim oradan geçer). Burada da yazsaydık kuyruktan giden
@@ -94,13 +110,15 @@ export class EmailWorker {
     //
     // SmtpProvider handles the unconfigured case itself (logs and reports a
     // mock message id), so there is no separate mock branch here.
+    // Gönderen kimliği SmtpProvider'da çözülür (şablon/alan → kutu).
     const result = await this.smtp.sendEmail({
-      from: fromEmail,
+      area,
       to,
       subject,
       html,
       text: text || this.stripHtml(html),
       replyTo,
+      headers,
       attachments,
       template: template || undefined,
       userId: (templateData as Record<string, any>)?.userId || undefined,
@@ -113,9 +131,24 @@ export class EmailWorker {
     // Senkron gönderim yolları her denemede DEĞİL, her mantıksal gönderimde bir
     // notification_log satırı yazıyor. Bull 3 kez deneyeceği için başarısızlıkta
     // yalnız SON denemede yazılır; aksi halde tek mail üç satır üretirdi.
+    const isLastAttempt =
+      (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+    if (broadcastLog && (result.success || isLastAttempt)) {
+      await markBroadcastLogRows(this.prisma, {
+        broadcastId: broadcastLog.broadcastId,
+        userIds: [broadcastLog.userId],
+        channels: ["email"],
+        delivered: result.success,
+        error: result.error,
+      }).catch((err: unknown) =>
+        this.logger.warn(
+          `Broadcast email log update failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }
+
     if (notificationLog) {
-      const isFinalAttempt =
-        (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+      const isFinalAttempt = isLastAttempt;
       if (result.success || isFinalAttempt) {
         await this.dispatch.logNotification(
           notificationLog.userId,
@@ -167,7 +200,11 @@ export class EmailWorker {
         this.configService.get<string>("SUPPORT_EMAIL") ||
         "destek@tarodan.com.tr",
     };
-    const renderData = { ...data, to };
+    // İş süreleri ("14 gün", "24 saat"…) gönderim anında Süreler ve Kurallar'dan.
+    const renderData = await withEmailTimingData(this.prisma, {
+      ...data,
+      to,
+    });
 
     // Check DB for custom template first
     const dbTemplate = await this.prisma.emailTemplate.findUnique({

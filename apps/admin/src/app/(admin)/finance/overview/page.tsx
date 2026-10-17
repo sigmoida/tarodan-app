@@ -3,10 +3,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Alert } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
+import { PageLoading } from "@/components/PageLoading";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
@@ -84,23 +86,21 @@ export default function FinanceOverviewPage() {
               loading={isLoading}
             />
           ))}
-          {isLoading && !data && (
-            <p className="py-8 text-center text-muted">{t("common.loading")}</p>
-          )}
+          {isLoading && !data && <PageLoading />}
           {data && <ComparisonSectionView comparison={data.comparison} />}
           {diagnosticItems.length > 0 && (
-            <div className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
-              <p className="font-semibold">
-                {t("admin.finance.overview.diagnostics.title")}
-              </p>
-              <ul className="mt-1 list-disc pl-5">
+            <Alert
+              variant="danger"
+              title={t("admin.finance.overview.diagnostics.title")}
+            >
+              <ul className="list-disc pl-5">
                 {diagnosticItems.map((d) => (
                   <li key={d.key}>
                     {t(`admin.finance.overview.diagnostics.${d.key}`)}: {d.text}
                   </li>
                 ))}
               </ul>
-            </div>
+            </Alert>
           )}
           {data && <HealthStrip health={data.health} />}
         </div>

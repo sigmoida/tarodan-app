@@ -1,6 +1,6 @@
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { RolesGuard } from "./roles.guard";
+import { PERMISSION_MAP, RolesGuard } from "./roles.guard";
 import { ROLES_KEY } from "../decorators/roles.decorator";
 import { PERMISSION_KEY } from "../decorators/require-permission.decorator";
 import { BYPASS_PERMISSION_MATRIX_KEY } from "../decorators/bypass-permission-matrix.decorator";
@@ -119,6 +119,9 @@ describe("RolesGuard — admin iade yüzeyi URL-segment izin kapısı", () => {
   // [açıklama, method, url]
   const refundSurfaces: Array<[string, string, string]> = [
     ["iade listesi", "GET", "/api/admin/refund-requests"],
+    // İadeler ekranının sayaçları ve Excel'i liste ile aynı izni ister.
+    ["iade sayaçları", "GET", "/api/admin/refund-requests/counts?tab=trade"],
+    ["iade Excel", "GET", "/api/admin/refund-requests/export"],
     ["iade detayı", "GET", "/api/admin/refund-requests/abc"],
     ["force-finalize", "POST", "/api/admin/refund-requests/abc/force-finalize"],
     [
@@ -296,5 +299,201 @@ describe("RolesGuard — permission store failure", () => {
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+});
+
+/**
+ * Reklam görseli yükleme `ads` izniyle açılır, ürün yüklemesi açılmadan:
+ * `/admin/ads/upload` segmenti `ads`, genel `/admin/media/upload` ise
+ * `products` iznine bağlıdır. Yalnız `ads` izni olan bir rol (burada
+ * moderator) banner yükleyebilmeli ama medya ucuna girememeli.
+ */
+describe("RolesGuard — reklam görseli yükleme izni", () => {
+  const makeGuard = () => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn().mockResolvedValue({
+          settingValue: JSON.stringify({ moderator: ["ads"] }),
+        }),
+      },
+    } as any;
+    return new RolesGuard(new Reflector(), prisma);
+  };
+
+  const ctx = (originalUrl: string): ExecutionContext => {
+    const req = {
+      user: { isAdmin: true, role: "moderator" },
+      method: "POST",
+      originalUrl,
+    };
+    const handler = () => undefined;
+    (handler as any)[ROLES_KEY] = ["super_admin", "admin", "moderator"];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  const stub = (guard: RolesGuard) => {
+    jest
+      .spyOn((guard as any).reflector as Reflector, "getAllAndOverride")
+      .mockImplementation((key: any, targets: any[]) => {
+        const h = targets[0];
+        if (key === ROLES_KEY) return h?.[ROLES_KEY];
+        return undefined;
+      });
+  };
+
+  it("yalnız ads izni → POST /api/admin/ads/upload izinli", async () => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(guard.canActivate(ctx("/api/admin/ads/upload"))).resolves.toBe(
+      true,
+    );
+  });
+
+  it("yalnız ads izni → POST /api/admin/media/upload 403 (products izni gerekir)", async () => {
+    const guard = makeGuard();
+    stub(guard);
+    await expect(
+      guard.canActivate(ctx("/api/admin/media/upload")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("izin haritası: ads → ads, media → products", () => {
+    expect(PERMISSION_MAP.ads).toEqual(["ads"]);
+    expect(PERMISSION_MAP.media).toEqual(["products"]);
+  });
+});
+
+/**
+ * Vitrin hero'su ve güven rozetleri pazarlama içeriğidir: reklamla aynı `ads`
+ * izniyle yönetilir (görsel yükleme dahil); ürün ya da ayar izni gerekmez,
+ * verilmez de.
+ */
+describe("RolesGuard — hero slaytları ve güven rozetleri izni", () => {
+  const makeGuard = (permissions: string[]) => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn().mockResolvedValue({
+          settingValue: JSON.stringify({ moderator: permissions }),
+        }),
+      },
+    } as any;
+    const guard = new RolesGuard(new Reflector(), prisma);
+    jest
+      .spyOn((guard as any).reflector as Reflector, "getAllAndOverride")
+      .mockImplementation((key: any, targets: any[]) =>
+        key === ROLES_KEY ? targets[0]?.[ROLES_KEY] : undefined,
+      );
+    return guard;
+  };
+
+  const ctx = (method: string, originalUrl: string): ExecutionContext => {
+    const req = {
+      user: { isAdmin: true, role: "moderator" },
+      method,
+      originalUrl,
+    };
+    const handler = () => undefined;
+    (handler as any)[ROLES_KEY] = ["super_admin", "admin", "moderator"];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  it("izin haritası: hero-slides → ads, trust-badges → ads", () => {
+    expect(PERMISSION_MAP["hero-slides"]).toEqual(["ads"]);
+    expect(PERMISSION_MAP["trust-badges"]).toEqual(["ads"]);
+  });
+
+  it.each([
+    ["GET", "/api/admin/hero-slides?placement=home"],
+    ["POST", "/api/admin/hero-slides/upload"],
+    ["PATCH", "/api/admin/hero-slides/reorder"],
+    ["DELETE", "/api/admin/hero-slides/abc"],
+    ["PATCH", "/api/admin/hero-slides/visibility"],
+    ["GET", "/api/admin/trust-badges"],
+    ["PATCH", "/api/admin/trust-badges/abc"],
+  ])("yalnız ads izni → %s %s izinli", async (method, url) => {
+    await expect(
+      makeGuard(["ads"]).canActivate(ctx(method, url)),
+    ).resolves.toBe(true);
+  });
+
+  it.each([
+    "/api/admin/hero-slides",
+    "/api/admin/hero-slides/upload",
+    "/api/admin/trust-badges",
+  ])("ads izni yoksa (yalnız products) → %s 403", async (url) => {
+    await expect(
+      makeGuard(["products"]).canActivate(ctx("POST", url)),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+/**
+ * Bildirim görseli `POST /admin/notifications/upload` ile `notifications`
+ * izniyle yüklenir — reklam yüklemesiyle aynı desen: ürün (`media` →
+ * `products`) yüklemesine erişim gerekmez, verilmez de.
+ */
+describe("RolesGuard — bildirim görseli yükleme izni", () => {
+  const makeGuard = (permissions: string[]) => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn().mockResolvedValue({
+          settingValue: JSON.stringify({ moderator: permissions }),
+        }),
+      },
+    } as any;
+    const guard = new RolesGuard(new Reflector(), prisma);
+    jest
+      .spyOn((guard as any).reflector as Reflector, "getAllAndOverride")
+      .mockImplementation((key: any, targets: any[]) =>
+        key === ROLES_KEY ? targets[0]?.[ROLES_KEY] : undefined,
+      );
+    return guard;
+  };
+
+  const ctx = (originalUrl: string): ExecutionContext => {
+    const req = {
+      user: { isAdmin: true, role: "moderator" },
+      method: "POST",
+      originalUrl,
+    };
+    const handler = () => undefined;
+    (handler as any)[ROLES_KEY] = ["super_admin", "admin", "moderator"];
+    return {
+      getHandler: () => handler,
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as any;
+  };
+
+  it("izin haritası: notifications → notifications", () => {
+    expect(PERMISSION_MAP.notifications).toEqual(["notifications"]);
+  });
+
+  it("yalnız notifications izni → POST /api/admin/notifications/upload izinli", async () => {
+    await expect(
+      makeGuard(["notifications"]).canActivate(
+        ctx("/api/admin/notifications/upload"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("yalnız notifications izni → POST /api/admin/media/upload 403", async () => {
+    await expect(
+      makeGuard(["notifications"]).canActivate(ctx("/api/admin/media/upload")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("notifications izni yoksa (yalnız ads) → bildirim yüklemesi 403", async () => {
+    await expect(
+      makeGuard(["ads"]).canActivate(ctx("/api/admin/notifications/upload")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

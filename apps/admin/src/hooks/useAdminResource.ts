@@ -112,6 +112,14 @@ export interface UseAdminResourceResult<T> {
   setSort: SetSort;
   /** Data is loading (initial load or refetch) */
   isLoading: boolean;
+  /**
+   * The list has NO records and nothing is narrowing it: no search (typed or
+   * committed) and no filter value that reaches the server — so a list whose
+   * DEFAULT filter narrows it (e.g. "this month") does not count either.
+   * Only then may the list hide its search/filter/pagination chrome — a list
+   * emptied BY a search or filter must keep the controls that undo it.
+   */
+  isPristineEmpty: boolean;
   /** Raw backend response (not extracted) — for extra fields like meta/stats. */
   data: any;
   /** Manually triggers react-query refetch */
@@ -583,6 +591,7 @@ export function useAdminResource<T>({
   // ── Data extraction (suspense → data is always defined) ────────────────────
   const { rows, total } = extractData<T>(queryResult.data, queryKey);
   const totalPages = Math.ceil(total / pageSize) || 1;
+  const isLoading = isPending || queryResult.isFetching;
 
   return {
     rows,
@@ -602,7 +611,14 @@ export function useAdminResource<T>({
     sort,
     setSort,
     // Dim the table during a transition (filter/search/page) or a background refetch.
-    isLoading: isPending || queryResult.isFetching,
+    isLoading,
+    isPristineEmpty:
+      !isLoading &&
+      rows.length === 0 &&
+      // Nothing would be sent to the server as search/filter — the same test
+      // the request itself uses — and nothing is typed but not yet committed.
+      Object.keys(listFilterParams(committedSearch, filters)).length === 0 &&
+      inputSearch === "",
     data: queryResult.data,
     refetch: queryResult.refetch,
     setTabUrl,

@@ -36,6 +36,11 @@ describe("UserProfileService.updateProfile — telefon", () => {
         isBlockedEither: async () => false,
         getHiddenUserIds: async () => [],
       } as any,
+      { recordMarketingChange: jest.fn() } as never, // consents
+      { syncUserConsent: jest.fn() } as never, // newsletter
+      {} as never, // search
+      {} as never, // cache
+      {} as never, // notifications
     );
     jest.spyOn(service, "findByIdWithAddresses").mockResolvedValue({} as never);
     const written = () => prisma.user.update.mock.calls[0][0].data;

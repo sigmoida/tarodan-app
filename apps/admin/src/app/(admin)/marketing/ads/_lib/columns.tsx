@@ -1,23 +1,20 @@
 import Image from "next/image";
-import { Badge, Button } from "@tarodan/ui";
 import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  ComputerDesktopIcon,
-  DevicePhoneMobileIcon,
-  DeviceTabletIcon,
-} from "@heroicons/react/24/outline";
-import { col, type RowActionItem } from "@/components/table";
-import { type Ad, positionLabels, deviceLabels } from "./types";
+  CellText,
+  COL_SIZE,
+  COL_WIDTH,
+  col,
+  Empty,
+  TableBadge,
+  TruncatedText,
+  type RowActionItem,
+} from "@/components/table";
+import { fmtPercent } from "@/lib/format";
+import { type Ad, platformShortLabels, positionLabels } from "./types";
+import { AD_STATUS_VARIANT, adLiveStatus, adShadowScope } from "./status";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
-
-function DeviceIcon({ type }: { type: string }) {
-  if (type === "desktop") return <ComputerDesktopIcon className="h-4 w-4" />;
-  if (type === "mobile") return <DevicePhoneMobileIcon className="h-4 w-4" />;
-  return <DeviceTabletIcon className="h-4 w-4" />;
-}
 
 export interface AdColumnProps {
   onToggle: (ad: Ad) => void;
@@ -25,12 +22,24 @@ export interface AdColumnProps {
   rowMenu: (ad: Ad) => RowActionItem[];
 }
 
+/** `728×90` — reklamın piksel boyutu; boyutsuz (metin) reklamda yok. */
+export function adSizeLabel(ad: Pick<Ad, "width" | "height">): string | null {
+  return ad.width && ad.height ? `${ad.width}×${ad.height}` : null;
+}
+
+/**
+ * Sadeleştirilmiş tablo: renkli rozet yalnız "Yayın durumu"nda. Pozisyon ve
+ * platform düz metin (platform tabloya özel kısa etiketle), IAB uyumu boyutun
+ * yanında ikonsuz çerçeve rozet ("IAB" / "IAB dışı"), açık/kapalı kompakt bir
+ * anahtar + yanında durum metni.
+ */
 export function adColumns(
   { onToggle, togglingId, rowMenu }: AdColumnProps,
   t: T,
 ) {
   const positions = positionLabels(t);
-  const devices = deviceLabels(t);
+  const platforms = platformShortLabels(t);
+  const now = new Date();
   return [
     col.custom<Ad>(
       t("admin.marketing.ads.preview"),
@@ -46,86 +55,106 @@ export function adColumns(
             />
           </div>
         ) : (
-          <span className="text-sm text-muted">—</span>
+          <Empty />
         ),
-      { grow: 1, minWidth: 96, sortKey: "imageUrl", sortType: "text" },
+      { ...COL_SIZE.preview, sortKey: "imageUrl", sortType: "text" },
     ),
+    col.title<Ad>(t("common.title"), (ad) => ({ title: ad.title }), {
+      sortKey: "title",
+      sortType: "text",
+    }),
     col.custom<Ad>(
-      t("common.title"),
-      (ad) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-heading">{ad.title}</p>
-          {ad.iabCompliant ? (
-            <span className="flex items-center gap-1 text-xs text-success-700">
-              <CheckCircleIcon className="h-3 w-3" /> IAB: {ad.iabSize}
-            </span>
-          ) : ad.width && ad.height ? (
-            <span className="flex items-center gap-1 text-xs text-warning-700">
-              <ExclamationTriangleIcon className="h-3 w-3" /> Non-IAB
-            </span>
-          ) : null}
-        </div>
-      ),
-      { grow: 3, minWidth: 180, sortKey: "title", sortType: "text" },
-    ),
-    col.muted<Ad>(
       t("admin.marketing.ads.size"),
-      (ad) => (ad.width && ad.height ? `${ad.width}x${ad.height}` : null),
-      {
-        minWidth: 100,
-        sortKey: "width",
-        sortType: "number",
+      (ad) => {
+        const size = adSizeLabel(ad);
+        if (!size) return <Empty />;
+        return (
+          <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+            <CellText value={size} />
+            {ad.iabCompliant ? (
+              <TableBadge variant="outline" tooltip={ad.iabSize ?? undefined}>
+                {t("admin.marketing.ads.iabBadge")}
+              </TableBadge>
+            ) : (
+              <TableBadge variant="outline">
+                {t("admin.marketing.ads.nonIabBadge")}
+              </TableBadge>
+            )}
+          </div>
+        );
       },
+      { ...COL_SIZE.size, sortKey: "width", sortType: "number" },
     ),
-    col.badge<Ad>(
+    col.text<Ad>(
       t("admin.marketing.ads.positionLabel"),
-      (ad) => (
-        <Badge variant="secondary" size="sm">
-          {positions[ad.position] || ad.position}
-        </Badge>
-      ),
-      { sortKey: "position", sortType: "text" },
+      (ad) => positions[ad.position] || ad.position,
+      { ...COL_SIZE.label, sortKey: "position", sortType: "text" },
     ),
-    col.custom<Ad>(
-      t("admin.marketing.ads.deviceLabel"),
-      (ad) => (
-        <span className="flex items-center gap-1 text-sm text-muted">
-          <DeviceIcon type={ad.deviceType} />
-          {devices[ad.deviceType] || ad.deviceType}
-        </span>
-      ),
-      { sortKey: "deviceType", sortType: "text" },
+    col.text<Ad>(
+      t("admin.marketing.ads.platformLabel"),
+      (ad) => platforms[ad.platform] || ad.platform,
+      { ...COL_SIZE.label, sortKey: "platform", sortType: "text" },
     ),
-    col.custom<Ad>(
+    col.dateRange<Ad>(
+      t("admin.marketing.ads.schedule"),
+      (ad) => ({ start: ad.startDate, end: ad.endDate }),
+      { sortKey: "startDate" },
+    ),
+    col.status<Ad>(
+      t("admin.marketing.ads.liveStatusLabel"),
+      (ad) => {
+        const status = adLiveStatus(ad, now);
+        const scope = adShadowScope(ad);
+        const full = t(`admin.marketing.ads.liveStatus.${status}`, { scope });
+        // Gölgedeki reklamın tam cümlesi rozete sığmaz: kısa etiket (nerede
+        // gizli olduğuyla) + ipucunda tam cümle.
+        return status === "shadowed"
+          ? {
+              variant: AD_STATUS_VARIANT[status],
+              children: t("admin.marketing.ads.liveStatusShort.shadowed", {
+                scope,
+              }),
+              tooltip: full,
+            }
+          : { variant: AD_STATUS_VARIANT[status], children: full };
+      },
+      { ...COL_SIZE.statusLong, sortable: false },
+    ),
+    col.toggle<Ad>(
       t("common.status"),
-      (ad) => (
-        <Button
-          variant={ad.isActive ? "success" : "secondary"}
-          size="sm"
-          onClick={() => onToggle(ad)}
-          disabled={togglingId === ad.id}
-        >
-          {ad.isActive ? t("common.active") : t("common.inactive")}
-        </Button>
-      ),
+      (ad) => ({
+        checked: ad.isActive,
+        onChange: () => onToggle(ad),
+        disabled: togglingId === ad.id,
+        label: `${t("common.status")}: ${ad.title}`,
+        stateText: ad.isActive ? t("common.active") : t("common.inactive"),
+      }),
       { sortKey: "isActive", sortType: "number" },
+    ),
+    // Yalnız görselli reklamın tıklanabilir alanı olur; metin reklamda "—".
+    col.number<Ad>(
+      t("admin.marketing.ads.hotspots.column"),
+      (ad) => (ad.imageUrl ? (ad.hotspots?.length ?? 0) : null),
+      { ...COL_SIZE.count, sortable: false },
     ),
     col.custom<Ad>(
       t("admin.marketing.ads.statistics"),
       (ad) => (
-        <div className="text-sm">
-          <div className="text-muted">
+        <div className="min-w-0">
+          <TruncatedText className="text-body">
             {t("admin.marketing.ads.clickCount", { count: ad.clickCount })}
-          </div>
-          <div className="text-muted">
+          </TruncatedText>
+          <TruncatedText className="text-xs text-muted">
             {t("admin.marketing.ads.impressionCount", {
               count: ad.impressionCount,
             })}
-          </div>
-          <div className="text-primary-600">{ad.ctr}% CTR</div>
+          </TruncatedText>
+          <TruncatedText className="text-xs text-muted">
+            {`${fmtPercent(ad.ctr, 2)} CTR`}
+          </TruncatedText>
         </div>
       ),
-      { grow: 1, minWidth: 120, sortKey: "clickCount", sortType: "number" },
+      { minWidth: COL_WIDTH.text, sortKey: "clickCount", sortType: "number" },
     ),
     col.rowMenu<Ad>(rowMenu),
   ];

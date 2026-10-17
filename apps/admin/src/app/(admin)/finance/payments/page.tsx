@@ -3,11 +3,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  ArrowPathRoundedSquareIcon,
-  ChartBarIcon,
-  ListBulletIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
@@ -36,17 +31,14 @@ export default function PaymentsPage() {
     {
       key: "list",
       label: t("admin.finance.payments.tabs.list"),
-      icon: ListBulletIcon,
     },
     {
       key: "statistics",
       label: t("admin.finance.payments.tabs.statistics"),
-      icon: ChartBarIcon,
     },
     {
       key: "reconciliation",
       label: t("admin.finance.payments.tabs.reconciliation"),
-      icon: ArrowPathRoundedSquareIcon,
     },
   ];
 

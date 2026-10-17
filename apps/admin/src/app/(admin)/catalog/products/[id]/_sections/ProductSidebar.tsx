@@ -11,16 +11,21 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { ProductDetail } from "../_lib/types";
+import { useSession } from "@/context/SessionContext";
+import { canRenewByRole, canRenewExpiredListing } from "../_lib/renewal";
 
 export interface ProductSidebarProps {
   product: ProductDetail;
   onApprove: () => void;
   onReject: () => void;
   onRestore: () => void;
+  onRenew: () => void;
   onDelete: () => void;
   busyRestore?: boolean;
+  busyRenew?: boolean;
   busyDelete?: boolean;
 }
 
@@ -29,14 +34,18 @@ export function ProductSidebar({
   onApprove,
   onReject,
   onRestore,
+  onRenew,
   onDelete,
   busyRestore,
+  busyRenew,
   busyDelete,
 }: ProductSidebarProps) {
   const t = useTranslations();
   const canApprove = product.status === "pending";
   const canReject = product.status === "pending";
   const canRestore = product.status === "deleted";
+  const { user } = useSession();
+  const canRenew = canRenewExpiredListing(product) && canRenewByRole(user.role);
   const canDelete =
     product.status !== "sold" &&
     product.status !== "reserved" &&
@@ -87,6 +96,16 @@ export function ProductSidebar({
             {t("admin.catalog.products.restore")}
           </Button>
         )}
+        {canRenew && (
+          <Button
+            variant="success"
+            onClick={onRenew}
+            isLoading={busyRenew}
+            className="w-full justify-center"
+          >
+            {t("admin.catalog.products.renewExpired")}
+          </Button>
+        )}
         {canDelete && (
           <Button
             variant="secondary"
@@ -104,26 +123,26 @@ export function ProductSidebar({
         title={t("admin.catalog.products.quickLinks")}
         bodyClassName="space-y-2"
       >
-        <Link
+        <TextLink
           href={`/accounts/users/${product.seller.id}`}
-          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+          className="block"
         >
           {t("admin.catalog.products.viewSeller")}
-        </Link>
-        <Link
+        </TextLink>
+        <TextLink
           href={`/operations/orders?productId=${product.id}`}
-          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+          className="block"
         >
           {t("admin.catalog.products.viewOrders")}
-        </Link>
-        <Link
+        </TextLink>
+        <TextLink
           href={ordersTabHref("offers", { productId: product.id })}
-          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+          className="block"
         >
           {t("admin.catalog.products.viewOffers", {
             count: product._count?.offers ?? 0,
           })}
-        </Link>
+        </TextLink>
       </SectionCard>
     </>
   );

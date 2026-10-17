@@ -1,5 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { AdminRole } from "@prisma/client";
+import type { AdminCancelReasonCode } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
 import { StorageService } from "../storage/storage.service";
@@ -11,6 +12,8 @@ import {
 import { NotificationType } from "../notification/dto";
 import type { OrderCancelNoticeParty } from "../notification/helpers/order-cancel-notice";
 import { adminUrl } from "../../config/app-urls";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { refundRequestedNotice } from "../mail-routing/helpers/mail-internal-notices";
 
 /**
  * Refund notifications, e-mails and history entries.
@@ -31,6 +34,8 @@ export class RefundNotificationService {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -140,6 +145,31 @@ export class RefundNotificationService {
   }
 
   /**
+   * İncelemeye düşmüş bir platform (yönetici) iptalinin, iade sonradan
+   * tamamlanınca iki tarafa duyurusu — iptal anındaki duyuruyla AYNI tanım
+   * (nedenin etiketi + iade tutarı). Best-effort; asla throw etmez.
+   */
+  async notifyPlatformCancellation(
+    orderId: string,
+    reasonCode: AdminCancelReasonCode,
+    refundAmount: number,
+  ): Promise<void> {
+    try {
+      await this.notificationService.notifyOrderCancelledByPlatform({
+        orderId,
+        reasonCode,
+        refundAmount,
+      });
+    } catch (err: unknown) {
+      this.logger.error(
+        `Order ${orderId} platform cancellation notify failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  /**
    * Yeni ve kalıcı bir iade talebini satıcıya bildirir. Yönetici incelemesi
    * gerekiyorsa yalnız iade kararı verebilen aktif admin/super-admin hesaplarına
    * ayrıca operasyon uyarısı gönderir. Bildirim arızaları ticaret akışını bozmaz.
@@ -166,6 +196,7 @@ export class RefundNotificationService {
       "refund-requested-seller",
       { refundNumber: input.refundNumber, refundReason: input.reason },
     );
+    await this.notifyStaffRefundRequested(input);
 
     if (!input.requiresAdminReview) return;
 
@@ -195,6 +226,47 @@ export class RefundNotificationService {
     } catch (error: any) {
       this.logger.error(
         `Refund review admin notifications failed for ${input.refundNumber}: ${error?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `refund.requested`). Kalıcı iade
+   * talebinin TEK açılış noktası burasıdır (kargo öncesi iptalin inceleme
+   * yolu, anlık iadenin inceleme yolu, teslim sonrası iade). İncelemesiz
+   * otomatik iptaller talep olarak değil, `order.cancelled` olarak bildirilir.
+   */
+  private async notifyStaffRefundRequested(input: {
+    refundRequestId: string;
+    refundNumber: string;
+    reason: string;
+    requiresAdminReview: boolean;
+  }): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const request = await this.prisma.refundRequest.findUnique({
+        where: { id: input.refundRequestId },
+        select: {
+          amount: true,
+          order: { select: { orderNumber: true, isTest: true } },
+        },
+      });
+      if (!request) return;
+      await this.mailNotifier.emit(
+        "refund.requested",
+        refundRequestedNotice({
+          refundRequestId: input.refundRequestId,
+          refundNumber: input.refundNumber,
+          orderNumber: request.order.orderNumber,
+          amount: request.amount,
+          reason: input.reason,
+          requiresAdminReview: input.requiresAdminReview,
+        }),
+        { isTest: request.order.isTest },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `refund.requested personel bildirimi hazırlanamadı (${input.refundNumber}): ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

@@ -24,6 +24,12 @@
       "package": "sharp",
       "expires": "2026-11-30",
       "reason": "Same host constraint as GHSA-f88m-g3jw-g9cj: the fix is sharp >=0.35.4 and 0.35.x prebuilt binaries need x86-64-v2 while the Coolify host is v1 — a previous attempt deployed green and failed every upload at runtime. Accepted on the same expiry so both lapse with the host upgrade tracked in docs/SHARP_HOST_UPGRADE.md."
+    },
+    {
+      "ghsa": "GHSA-wq5f-xc86-pv6w",
+      "package": "sharp",
+      "expires": "2026-10-31",
+      "reason": "Time-boxed exception, owner devops. librsvg memory bug bundled with sharp <0.35.5; the fix (0.35.5) needs x86-64-v2 and the Coolify host is v1 (docs/SHARP_HOST_UPGRADE.md), and no 0.34.x patch exists. Not reachable here: (1) the API applies the upstream workaround, blocking VipsForeignLoadSvg in apps/api/src/common/image/sharp-safety.ts, pinned by a real-sharp test in strip-image-metadata.spec.ts; SVG is also not an accepted upload type. (2) Next.js 15.5 image optimisation (web, admin; dangerouslyAllowSVG is on) picks the decoder by sniffing the upstream bytes and returns SVG, BMP and the other bypass types untouched; only JPEG, PNG, GIF, WebP, TIFF and JP2 reach sharp, and libvips picks a non-SVG loader for those signatures (checked against sharp 0.34.5). remotePatterns do not limit this: s3.eu-west-1.amazonaws.com without a pathname admits any path-style bucket. (3) Defence in depth: the advisory names RCE only on glibc Linux and every image is node:20-alpine (musl); the use-after-free itself still exists on musl. Resolve by the host upgrade or a source build of sharp 0.35.5 before expiry; do not extend without re-review."
     }
   ]
 }

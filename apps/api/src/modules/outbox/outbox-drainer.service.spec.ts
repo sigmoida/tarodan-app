@@ -1,5 +1,6 @@
 import { OutboxDrainerService } from "./outbox-drainer.service";
 import { OutboxHandlerRegistry } from "./outbox-handler.registry";
+import { PermanentOutboxError } from "./outbox-errors";
 
 /**
  * Outbox drainer: CAS claim + handler dispatch + retry/backoff + DLQ (dead).
@@ -92,6 +93,29 @@ describe("OutboxDrainerService.runDrain", () => {
       dead: 1,
       reclaimed: 0,
     });
+  });
+
+  // Yeniden denemenin sonucu değiştirmeyeceği hata: geri çekilme yok, DLQ.
+  it("PermanentOutboxError → ilk denemede dead (DLQ), geri çekilme yok", async () => {
+    const prisma = makePrisma([
+      { id: "e1", type: "t", payload: {}, attempts: 0, maxAttempts: 30 },
+    ]);
+    const registry = new OutboxHandlerRegistry();
+    registry.register(
+      "t",
+      jest.fn().mockRejectedValue(new PermanentOutboxError("invalid_client")),
+    );
+
+    const svc = new OutboxDrainerService(prisma, registry, config, {} as any);
+    const r = await svc.runDrain();
+
+    const call = prisma.outboxEvent.update.mock.calls[0][0];
+    expect(call.data.status).toBe("dead");
+    expect(call.data.attempts).toBe(1);
+    expect(call.data.lastError).toContain("invalid_client");
+    expect(call.data.nextAttemptAt).toBeUndefined();
+    expect(r.stats.dead).toBe(1);
+    expect(r.stats.retried).toBe(0);
   });
 
   it("CAS claim kaybı (count=0) → handler çağrılmaz, atlanır", async () => {

@@ -1,4 +1,5 @@
 import { ProductInactiveReason, ProductStatus } from "@prisma/client";
+import { isListingRemovedStatus } from "@tarodan/types";
 
 /**
  * quantity'dan product status belirler.
@@ -82,6 +83,33 @@ export function clearStaleInactiveReasonOnWrite(
   if (data.status === ProductStatus.inactive) return;
   if (Object.prototype.hasOwnProperty.call(data, "inactiveReason")) return;
   data.inactiveReason = null;
+}
+
+/**
+ * `Product.removalReason` (bkz. şema) ilan vitrinden düşmüşken anlamlıdır.
+ * İlan kaldırma statülerinin (inactive/deleted/rejected/suspended) DIŞINA
+ * çıktığında — yeniden yayın, onaya gönderme, satış, rezervasyon — güncel
+ * neden artık yoktur; bayat bir neden admin listesinde "vitrinde ama
+ * kaldırılmış" gibi okunurdu.
+ *
+ * Aynı tek entegrasyon noktası (Product middleware'i): ilanı vitrine
+ * döndüren ~30 yazıcıyı tek tek dolaşmak yerine her Product
+ * `update`/`updateMany`'ye uygulanır. Kaldırma statüsüne yapılan yazımlara
+ * DOKUNMAZ — nedeni o yazımın ardından `recordListingRemovals` damgalar;
+ * aynı statünün yeniden yazılması (ör. stok yeniden hesabı) mevcut nedeni
+ * silmemelidir. Çağıran `removalReason`ı aynı yazımda belirtmişse çağıranın
+ * niyeti kazanır.
+ */
+export function clearStaleRemovalReasonOnWrite(
+  data: Record<string, unknown> | undefined,
+): void {
+  if (!data) return;
+  if (!Object.prototype.hasOwnProperty.call(data, "status")) return;
+  // `status: undefined` Prisma'da "dokunma" demektir — statü değişmiyor.
+  if (data.status === undefined) return;
+  if (isListingRemovedStatus(data.status)) return;
+  if (Object.prototype.hasOwnProperty.call(data, "removalReason")) return;
+  data.removalReason = null;
 }
 
 /**

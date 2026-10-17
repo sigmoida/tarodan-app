@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { parseNetsisMode } from "./netsis";
+import { SMS_VERIFICATION_CODE_PATTERN } from "./sms";
+import { GITHUB_REPO_PATTERN } from "./uat-refresh";
 
 /**
  * Startup environment validation (issues #62 + #68).
@@ -87,7 +90,7 @@ const envSchema = z
     // KAPSAM NOTU: aynı .env.example bloğundaki RETURN_WINDOW_DAYS,
     // REFUND_RETURN_INSPECTION_HOURS ve REFUND_WAIT_DELIVERY_MAX_DAYS de
     // bildirilmemiş durumda; onları burada bildirmek para yollarının süre
-    // pencerelerini değiştirir ve CLAUDE.md §15'te "karar bekleyen" başlığı
+    // pencerelerini değiştirir ve apps/api/CLAUDE.md "Known, undecided" başlığı
     // altındadır — bu düzeltmenin kapsamına alınmadı, ayrı karar.
     REFUND_RETURN_DROPOFF_DAYS: z.string().optional(),
     REFUND_RETURN_DROPOFF_HARD_DAYS: z.string().optional(),
@@ -120,6 +123,11 @@ const envSchema = z
     SURAT_KARGO_SIFRE: z.string().optional(),
     SURAT_SOAP_TIMEOUT_MS: z.string().optional(),
     SURAT_TRACKING_TIMEOUT_MS: z.string().optional(),
+    // Ardışık ağ/timeout takip hatası eşiği: bu sayıya (varsayılan 6, ~3 saat @
+    // 30dk cron) veya SURAT_TRACKING_NETWORK_FAILURE_HOURS'a ulaşınca cron adımı
+    // düşer + admine tek seferlik uyarı gider; altındaki tek-tur hataları warn'da kalır.
+    SURAT_TRACKING_NETWORK_FAILURE_THRESHOLD: z.string().optional(),
+    SURAT_TRACKING_NETWORK_FAILURE_HOURS: z.string().optional(),
     SURAT_CARGO_MAX_RETRIES: z.string().optional(),
     SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
     // Hangi create sözleşmesi: 'v1' GonderiyiKargoyaGonder (gönderici alanı yok),
@@ -137,6 +145,19 @@ const envSchema = z
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     APPLE_CLIENT_ID: z.string().optional(),
     APPLE_SERVICES_ID: z.string().optional(),
+    // Sign in with Apple token iptali (App Store 5.1.1(v)): mobil giriş
+    // `authorizationCode`u bu anahtarla imzalanan client secret ile refresh
+    // token'a çevrilir, hesap silmede Apple'a iptal edilir. Dördü birden yoksa
+    // özellik çalışmaz (uyarı: `appleTokenRevocationWarnings`; hesap silmede
+    // yazılmış iptal işi ~1 gün yeniden denenir, sonra DLQ — redrive script'i
+    // gerekir, bkz. docs/OPERATIONS.md). Private key
+    // .p8 içeriğidir (PEM); tek satır env için satır sonları `\n` yazılabilir.
+    // Refresh token'lar APPLE_TOKEN_ENCRYPTION_KEY ile şifreli saklanır (canlı
+    // dışında boşsa JWT_SECRET'a düşer — 2FA/posta kutusu ile aynı kolaylık).
+    APPLE_TEAM_ID: z.string().optional(),
+    APPLE_KEY_ID: z.string().optional(),
+    APPLE_PRIVATE_KEY: z.string().optional(),
+    APPLE_TOKEN_ENCRYPTION_KEY: z.string().optional(),
 
     // NetGSM — phone-verification OTP. Required in production: without the
     // credentials the provider falls back to a mock that logs the code and
@@ -145,6 +166,9 @@ const envSchema = z
     NETGSM_PASSWORD: z.string().optional(),
     NETGSM_MSGHEADER: z.string().optional(),
     NETGSM_BASE_URL: z.string().optional(),
+    // UAT: telefon doğrulama kodunu sabitler ve SMS göndermez (config/sms.ts).
+    // Canlı dağıtımda (APP_ENV=production) verilirse açılış durur — aşağıda.
+    SMS_FIXED_VERIFICATION_CODE: z.string().optional(),
 
     // eLogo — when enabled in production it must use the live SOAP client.
     ELOGO_ENABLED: z.string().optional(),
@@ -155,6 +179,22 @@ const envSchema = z
     ELOGO_COMPANY_VKN: z.string().optional(),
     ELOGO_COMPANY_TITLE: z.string().optional(),
     ELOGO_ALLOW_NON_LIVE_HOST: z.string().optional(),
+
+    // Logo Netsis (NetOpenX REST) — eLogo'nun yerine geçecek ERP entegrasyonu
+    // (config/netsis.ts, docs/NETSIS.md). Varsayılan kapalı; açıkken canlıda
+    // yalnız gerçek istemci ve tam kimlik kabul edilir — aşağıda.
+    NETSIS_ENABLED: z.string().optional(),
+    NETSIS_MODE: z.string().optional(),
+    NETSIS_BASE_URL: z.string().optional(),
+    NETSIS_USERNAME: z.string().optional(),
+    NETSIS_PASSWORD: z.string().optional(),
+    NETSIS_DB_NAME: z.string().optional(),
+    NETSIS_DB_USER: z.string().optional(),
+    NETSIS_DB_PASSWORD: z.string().optional(),
+    NETSIS_DB_TYPE: z.string().optional(),
+    NETSIS_BRANCH_CODE: z.string().optional(),
+    NETSIS_TIMEOUT_MS: z.string().optional(),
+    NETSIS_TOKEN_SAFETY_SECONDS: z.string().optional(),
 
     // Production delivery/telemetry dependencies.
     SENDGRID_API_KEY: z.string().optional(),
@@ -176,6 +216,11 @@ const envSchema = z
     MAIL_FROM: z.string().optional(),
     SUPPORT_EMAIL: z.string().optional(),
     SUPPORT_NOTIFICATION_EMAIL: z.string().optional(),
+    // Mail Yönlendirme gönderici kutularının şifrelerini (AES-256-GCM) açan
+    // anahtar. Kendi anahtarıdır: 2FA anahtarı döndürülünce kutu şifreleri
+    // okunmaz hale gelmesin. Canlıda ilk kutu eklenmeden önce verilmeli; yoksa
+    // panel kutu kaydını reddeder (bkz. docs/MAIL_ROUTING.md).
+    MAIL_ACCOUNT_ENCRYPTION_KEY: z.string().optional(),
     EMAIL_LOGO_URL: z.string().optional(),
     AWS_ACCESS_KEY_ID: z.string().optional(),
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
@@ -184,9 +229,67 @@ const envSchema = z
     S3_ENV_PREFIX: z.string().optional(),
     ELASTICSEARCH_INDEX_PREFIX: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
+    // Staging "production'dan maskeli yenile" düğmesinin GitHub tetikleyicisi
+    // (config/uat-refresh.ts, docs/UAT_REFRESH.md). Yoksa düğme
+    // "yapılandırılmamış" görünür; canlı dağıtımda verilirse açılış durur.
+    GITHUB_DISPATCH_TOKEN: z.string().optional(),
+    GITHUB_DISPATCH_REPO: z.string().optional(),
+    GITHUB_DISPATCH_REF: z.string().optional(),
   })
   .strip()
   .superRefine((env, ctx) => {
+    // Sabit SMS kodu NODE_ENV'den bağımsız denetlenir: canlı dağıtımda tek bir
+    // değer bile herkesin telefonunu tek kodla doğrulanabilir kılar.
+    const smsFixedCode = env.SMS_FIXED_VERIFICATION_CODE?.trim() ?? "";
+    if (smsFixedCode && !SMS_VERIFICATION_CODE_PATTERN.test(smsFixedCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SMS_FIXED_VERIFICATION_CODE"],
+        message:
+          "SMS_FIXED_VERIFICATION_CODE must be exactly 6 digits (the verify endpoint accepts nothing else)",
+      });
+    }
+    if (smsFixedCode && env.APP_ENV === "production") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SMS_FIXED_VERIFICATION_CODE"],
+        message:
+          "SMS_FIXED_VERIFICATION_CODE must not be set on the production deployment (every phone would verify with one known code)",
+      });
+    }
+
+    // Yenileme tetikleyicisi: ya ikisi birden ya hiçbiri (yarısı sessizce
+    // "yapılandırılmamış" görünürdü); depo "owner/repo" biçiminde. Canlıda
+    // token YOK: düğme orada reddedilir, production veritabanını okuyan bir
+    // workflow'u tetikleyebilen bir kimliğin canlı konteynerde durması gereksiz.
+    const dispatchToken = env.GITHUB_DISPATCH_TOKEN?.trim() ?? "";
+    const dispatchRepo = env.GITHUB_DISPATCH_REPO?.trim() ?? "";
+    if (Boolean(dispatchToken) !== Boolean(dispatchRepo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [
+          dispatchToken ? "GITHUB_DISPATCH_REPO" : "GITHUB_DISPATCH_TOKEN",
+        ],
+        message:
+          "GITHUB_DISPATCH_TOKEN and GITHUB_DISPATCH_REPO must be set together (staging refresh trigger)",
+      });
+    }
+    if (dispatchRepo && !GITHUB_REPO_PATTERN.test(dispatchRepo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["GITHUB_DISPATCH_REPO"],
+        message: "GITHUB_DISPATCH_REPO must be 'owner/repo'",
+      });
+    }
+    if (dispatchToken && env.APP_ENV === "production") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["GITHUB_DISPATCH_TOKEN"],
+        message:
+          "GITHUB_DISPATCH_TOKEN must not be set on the production deployment (the staging refresh is refused there)",
+      });
+    }
+
     if (env.NODE_ENV !== "production") return;
 
     if (!env.APP_ENV) {
@@ -387,6 +490,39 @@ const envSchema = z
       });
     }
 
+    // Durağan sır anahtarları (gönderici kutu şifreleri, Apple refresh
+    // token'ları) OPSİYONEL — özellik kullanılmadıkça gerekmez — ama
+    // verildiyse güçlü ve diğer sırlardan ayrı olmalı: 2FA anahtarıyla aynı
+    // olursa ikisinin döndürülmesi birbirine bağlanır. Birbirlerinden de ayrı.
+    const atRestKeys = [
+      "MAIL_ACCOUNT_ENCRYPTION_KEY",
+      "APPLE_TOKEN_ENCRYPTION_KEY",
+    ] as const;
+    for (const key of atRestKeys) {
+      const value = env[key]?.trim() ?? "";
+      if (!value) continue;
+      if (
+        value.length < MIN_PROD_SECRET_LENGTH ||
+        KNOWN_PLACEHOLDER.test(value)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} must be at least ${MIN_PROD_SECRET_LENGTH} characters and not the committed placeholder in production`,
+        });
+      }
+      const others = atRestKeys
+        .filter((other) => other !== key)
+        .map((other) => env[other]?.trim());
+      if (signing.includes(value) || others.includes(value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} must differ from the authentication, payment capability, guest OTP, two-factor and other at-rest encryption secrets`,
+        });
+      }
+    }
+
     for (const key of [
       "PAYTR_MERCHANT_ID",
       "PAYTR_MERCHANT_KEY",
@@ -474,45 +610,70 @@ const envSchema = z
       });
     }
     if (cargoEnabled) {
-      if ((env.SURAT_SOAP_MODE ?? "").trim().toLowerCase() !== "rest") {
+      const suratMode = (env.SURAT_SOAP_MODE ?? "").trim().toLowerCase();
+      // UAT: staging taşıyıcıyı tamamen sahteleyebilir ('stub'). Gönderi yerelde
+      // sahte takip koduyla açılır, Sürat'a hiçbir çağrı gitmez; koliyi ileri
+      // götüren dış olayı (kabul, teslim) tester Test Araçları'ndan tetikler
+      // (docs/UAT.md). Kimlik ve test-modu şartları yalnız gerçek REST
+      // istemcisi içindir. Canlıda stub ASLA kabul edilmez.
+      const stagingStubCargo = isStagingDeployment && suratMode === "stub";
+      if (suratMode !== "rest" && !stagingStubCargo) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SURAT_SOAP_MODE"],
-          message:
-            "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (only the documented REST create + tracking contract is supported)",
+          message: isStagingDeployment
+            ? "SURAT_SOAP_MODE must be 'rest' (Sürat test host) or 'stub' (no carrier calls, UAT) on staging when SURAT_CARGO_ENABLED is set"
+            : "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (only the documented REST create + tracking contract is supported)",
         });
       }
-      const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")
-        .trim()
-        .toLowerCase();
-      if (isProductionDeployment && cargoTestMode !== "false") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["SURAT_KARGO_TEST_MODE"],
-          message:
-            "SURAT_KARGO_TEST_MODE must be 'false' in production when SURAT_CARGO_ENABLED is set; test mode does not create live shipments",
-        });
-      } else if (
-        isStagingDeployment &&
-        !["true", "1"].includes(cargoTestMode)
+      // Sahte taşıyıcı ağa çıkmaz (carrier VE takip istemcisi stub'dır, bkz.
+      // SuratCargoModule): kimlik şartı yalnız gerçek REST istemcisi içindir.
+      // Yine de staging'de canlı host'u seçen bayrak kabul edilmez — biri
+      // modu 'rest'e çevirdiğinde ilk istek canlıya gitmesin.
+      if (
+        stagingStubCargo &&
+        (env.SURAT_KARGO_TEST_MODE ?? "").trim().toLowerCase() === "false"
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SURAT_KARGO_TEST_MODE"],
           message:
-            "SURAT_KARGO_TEST_MODE must be enabled in staging to prevent live shipments",
+            "SURAT_KARGO_TEST_MODE must not be 'false' on staging (it selects the live Sürat host); leave it unset or 'true'",
         });
       }
-      for (const key of [
-        "SURAT_KARGO_CARI_KODU",
-        "SURAT_KARGO_SIFRE",
-      ] as const) {
-        if (!env[key]) {
+      if (!stagingStubCargo) {
+        const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")
+          .trim()
+          .toLowerCase();
+        if (isProductionDeployment && cargoTestMode !== "false") {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: [key],
-            message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+            path: ["SURAT_KARGO_TEST_MODE"],
+            message:
+              "SURAT_KARGO_TEST_MODE must be 'false' in production when SURAT_CARGO_ENABLED is set; test mode does not create live shipments",
           });
+        } else if (
+          isStagingDeployment &&
+          !["true", "1"].includes(cargoTestMode)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["SURAT_KARGO_TEST_MODE"],
+            message:
+              "SURAT_KARGO_TEST_MODE must be enabled in staging to prevent live shipments",
+          });
+        }
+        for (const key of [
+          "SURAT_KARGO_CARI_KODU",
+          "SURAT_KARGO_SIFRE",
+        ] as const) {
+          if (!env[key]) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [key],
+              message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+            });
+          }
         }
       }
       const createApiVersion = (env.SURAT_CREATE_API_VERSION ?? "")
@@ -527,8 +688,8 @@ const envSchema = z
         });
       }
       // GonderiOlustur FirmaId olmadan her çağrıda reddeder; boot'ta yakala,
-      // her gönderide değil.
-      if (createApiVersion === "v2") {
+      // her gönderide değil. Sahte taşıyıcıda create sözleşmesi devreye girmez.
+      if (createApiVersion === "v2" && !stagingStubCargo) {
         const firmaId = Number((env.SURAT_FIRMA_ID ?? "").trim());
         if (!Number.isInteger(firmaId) || firmaId <= 0) {
           ctx.addIssue({
@@ -551,12 +712,15 @@ const envSchema = z
     // NetGSM OTP: bu üçü eksikse sağlayıcı mock'a düşer, kodu log'a yazar ve
     // BAŞARILI döner. Kullanıcı "kod gönderildi" görür, SMS hiç gelmez ve telefon
     // doğrulaması canlıda sessizce ölür — bu yüzden production'da zorunlu.
+    // İstisna: staging'de sabit kod modu açıksa SMS hiç gönderilmez (UAT), o
+    // yüzden NetGSM kimliği istenmez. Canlıda sabit kod yukarıda zaten yasak.
+    const smsDispatchSkipped = isStagingDeployment && Boolean(smsFixedCode);
     for (const key of [
       "NETGSM_USERCODE",
       "NETGSM_PASSWORD",
       "NETGSM_MSGHEADER",
     ] as const) {
-      if (!env[key]?.trim()) {
+      if (!smsDispatchSkipped && !env[key]?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: [key],
@@ -645,6 +809,80 @@ const envSchema = z
       }
     }
 
+    // Netsis: kapalıyken hiçbir şey istenmez (eLogo'dan geçiş sürerken
+    // varsayılan budur). Açıkken canlı dağıtım YALNIZ gerçek istemciyle koşar —
+    // stub, faturayı kesilmiş gösterip ERP'ye hiçbir şey yazmaz. Staging stub
+    // ya da live seçebilir; live seçildiği her yerde HTTPS ve tam kimlik şart,
+    // yoksa ilk faturada değil açılışta durulur.
+    const netsisEnabled = ["true", "1"].includes(
+      (env.NETSIS_ENABLED ?? "").trim().toLowerCase(),
+    );
+    if (netsisEnabled) {
+      const netsisMode = parseNetsisMode(env.NETSIS_MODE);
+      if (netsisMode === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_MODE"],
+          message: "NETSIS_MODE must be 'stub' or 'live'",
+        });
+      } else if (isProductionDeployment && netsisMode !== "live") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_MODE"],
+          message:
+            "NETSIS_MODE must be 'live' in production when NETSIS_ENABLED is set (the stub records invoices that never reach Netsis)",
+        });
+      }
+      if (netsisMode === "live") {
+        if (!(env.NETSIS_BASE_URL ?? "").trim().startsWith("https://")) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["NETSIS_BASE_URL"],
+            message:
+              "NETSIS_BASE_URL must be an HTTPS URL when NETSIS_MODE is 'live' (credentials travel in the token request)",
+          });
+        }
+        for (const key of [
+          "NETSIS_USERNAME",
+          "NETSIS_PASSWORD",
+          "NETSIS_DB_NAME",
+          "NETSIS_DB_USER",
+          "NETSIS_DB_PASSWORD",
+        ] as const) {
+          if (!env[key]?.trim()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [key],
+              message: `${key} is required when NETSIS_ENABLED is set with NETSIS_MODE 'live'`,
+            });
+          }
+        }
+      }
+      // Geçersiz sayı accessor'da sessizce varsayılana düşerdi; açılışta söyle.
+      const netsisTimeout = (env.NETSIS_TIMEOUT_MS ?? "").trim();
+      if (
+        netsisTimeout &&
+        !(Number.isInteger(Number(netsisTimeout)) && Number(netsisTimeout) > 0)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_TIMEOUT_MS"],
+          message: "NETSIS_TIMEOUT_MS must be a positive integer",
+        });
+      }
+      const netsisSafety = (env.NETSIS_TOKEN_SAFETY_SECONDS ?? "").trim();
+      if (
+        netsisSafety &&
+        !(Number.isInteger(Number(netsisSafety)) && Number(netsisSafety) >= 0)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["NETSIS_TOKEN_SAFETY_SECONDS"],
+          message: "NETSIS_TOKEN_SAFETY_SECONDS must be a non-negative integer",
+        });
+      }
+    }
+
     // Mail delivery is SMTP-only since the SendGrid provider was removed.
     // Without SMTP_HOST the transport silently degrades to logging every mail,
     // so production must fail to boot instead.
@@ -717,6 +955,35 @@ export function socialSignInWarnings(
   );
 }
 
+/**
+ * Sign in with Apple token iptali (App Store 5.1.1(v)) canlıda kapalı mı?
+ * İptal anahtarlarından biri eksikse özellik çalışmaz: girişte token saklanmaz,
+ * hesap silmede Apple bağlantısı kalır (kuyruktaki iptal işi ~1 gün denenip
+ * DLQ'ya düşer; env düzeltilince redrive script'i gerekir). Açılışı durdurmaz
+ * (giriş çalışmaya devam eder), ama görünür olmalı.
+ *
+ * APPLE_CLIENT_ID'ye bakılmaz: Apple girişi canlıda HER ZAMAN açıktır —
+ * env yoksa `AppleAuthService` varsayılan bundle id'yi (`com.tarodan.app`)
+ * kabul eder. Uyarıyı APPLE_CLIENT_ID'ye bağlamak tam o durumda susardı.
+ */
+export function appleTokenRevocationWarnings(
+  config: Record<string, unknown>,
+): string[] {
+  if (config.NODE_ENV !== "production") return [];
+  const missing = (
+    [
+      "APPLE_TEAM_ID",
+      "APPLE_KEY_ID",
+      "APPLE_PRIVATE_KEY",
+      "APPLE_TOKEN_ENCRYPTION_KEY",
+    ] as const
+  ).filter((key) => !String(config[key] ?? "").trim());
+  if (missing.length === 0) return [];
+  return [
+    `${missing.join(", ")} not set — Sign in with Apple tokens are not stored or revoked on account deletion (App Store 5.1.1(v))`,
+  ];
+}
+
 export function validateEnv(
   config: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -727,7 +994,10 @@ export function validateEnv(
       .join("\n");
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
-  for (const warning of socialSignInWarnings(config)) {
+  for (const warning of [
+    ...socialSignInWarnings(config),
+    ...appleTokenRevocationWarnings(config),
+  ]) {
     console.warn(`[env] ${warning}`);
   }
   return result.data;

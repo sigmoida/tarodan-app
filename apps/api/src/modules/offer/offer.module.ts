@@ -5,6 +5,7 @@ import { UserBlockModule } from "../user-block/user-block.module";
 import { OfferController } from "./offer.controller";
 import { OfferService } from "./offer.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
+import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { OfferScheduledProcessor } from "./offer-scheduled.processor";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
@@ -14,6 +15,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
 import { OrderModule } from "../order/order.module";
 import { ProductModule } from "../product/product.module";
+import { MessagingModule } from "../messaging/messaging.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -27,14 +29,17 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     StorageModule,
     OrderModule,
     ProductModule,
+    // Teklif notu mesajlaşmayla aynı içerik filtresinden geçer (Apple 1.2).
+    MessagingModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OfferController],
   providers: [
     OfferService,
     OfferSchedulerService,
+    OfferExtensionPolicy,
     ...scheduledProcessors(OfferScheduledProcessor),
   ],
-  exports: [OfferService, OfferSchedulerService],
+  exports: [OfferService, OfferSchedulerService, OfferExtensionPolicy],
 })
 export class OfferModule {}

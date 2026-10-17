@@ -1,20 +1,30 @@
 import { describe, expect, it } from "vitest";
-import type {
-  AdminOrderLine,
-  AdminOrderListRow,
-  AdminOrderPackage,
-  AdminOrderShipment,
-} from "@tarodan/types";
 import {
-  CANCEL_REASON_MAX_LENGTH,
+  type AdminOrderLine,
+  type AdminOrderListRow,
+  type AdminOrderPackage,
+  type AdminOrderShipment,
+} from "@tarodan/types";
+import type { Translate } from "@/lib/statusLabels";
+import {
   canCancelFileEntry,
+  cancelBlockerText,
   cancelShippingNoteKey,
   cancellableRowLine,
-  fileEntryCancelBlocker,
-  isValidCancelReason,
+  fileEntryCancelEligibility,
+  fileEntryVisibleBlocker,
+  isCancelRequestReady,
+  isNoteMissing,
+  orderCancelReasonText,
   pendingCancellationRefund,
 } from "./cancel";
 import type { OrderFileEntry, OrderFileRefundRequest } from "./fileTypes";
+
+/** Anahtarı (ve parametreleri) döndürür: testte etiketin kaynağı görünür. */
+const t = ((key: string, values?: Record<string, unknown>) =>
+  values
+    ? `[${key}|${JSON.stringify(values)}]`
+    : `[${key}]`) as unknown as Translate;
 
 const entry = (overrides: Partial<OrderFileEntry> = {}) =>
   ({
@@ -28,9 +38,22 @@ const entry = (overrides: Partial<OrderFileEntry> = {}) =>
 
 const refund = (status: string) => ({ status }) as OrderFileRefundRequest;
 
-describe("canCancelFileEntry", () => {
-  it.each(["paid", "preparing"])("%s kalem iptal edilebilir", (status) => {
-    expect(canCancelFileEntry(entry({ status }))).toBe(true);
+describe("fileEntryCancelEligibility (yönetici iptali — API ile ortak kural)", () => {
+  it.each(["paid", "preparing"])(
+    "%s kalem kargo öncesi ödenmiş iptaldir",
+    (status) => {
+      expect(fileEntryCancelEligibility(entry({ status }))).toEqual({
+        allowed: true,
+        kind: "paid_pre_handover",
+      });
+      expect(canCancelFileEntry(entry({ status }))).toBe(true);
+    },
+  );
+
+  it("ödeme bekleyen kalem artık iptal edilebilir (para yok türü)", () => {
+    expect(
+      fileEntryCancelEligibility(entry({ status: "pending_payment" })),
+    ).toEqual({ allowed: true, kind: "unpaid" });
   });
 
   it("yalnız etiketi oluşmuş kargo iptali kapatmaz", () => {
@@ -45,16 +68,18 @@ describe("canCancelFileEntry", () => {
   });
 
   it.each([
-    "pending_payment",
-    "shipped",
-    "delivered",
-    "awaiting_buyer_confirmation",
-    "completed",
-    "cancelled",
-    "refunded",
-    "refund_requested",
-  ])("%s kalem iptal edilemez", (status) => {
-    expect(canCancelFileEntry(entry({ status }))).toBe(false);
+    ["shipped", "handed_over"],
+    ["delivered", "delivered"],
+    ["awaiting_buyer_confirmation", "delivered"],
+    ["completed", "completed"],
+    ["cancelled", "closed"],
+    ["refunded", "closed"],
+    ["refund_requested", "active_refund"],
+  ])("%s kalem iptal edilemez → %s", (status, blocker) => {
+    expect(fileEntryCancelEligibility(entry({ status }))).toEqual({
+      allowed: false,
+      blocker,
+    });
   });
 
   it("koli taşıyıcıya geçtiyse (hareket ya da shippedAt) iptal kapanır", () => {
@@ -89,6 +114,28 @@ describe("canCancelFileEntry", () => {
   });
 });
 
+describe("fileEntryVisibleBlocker + cancelBlockerText", () => {
+  it("devir sonrası engelin metnini gösterir", () => {
+    const blocker = fileEntryVisibleBlocker(entry({ status: "delivered" }));
+    expect(blocker).toBe("delivered");
+    expect(cancelBlockerText("delivered", t)).toBe(
+      `[admin.operations.orders.cancel.blocked|${JSON.stringify({
+        reason: "[admin.operations.orders.cancel.blockers.delivered]",
+      })}]`,
+    );
+  });
+
+  it("uygun, kapanmış ya da yarıda kalmış iptalde ayrı metin yoktur", () => {
+    expect(fileEntryVisibleBlocker(entry())).toBeNull();
+    expect(fileEntryVisibleBlocker(entry({ status: "cancelled" }))).toBeNull();
+    expect(
+      fileEntryVisibleBlocker(
+        entry({ refundRequests: [refund("pending_review")] }),
+      ),
+    ).toBeNull();
+  });
+});
+
 describe("pendingCancellationRefund", () => {
   const open = {
     id: "rr-1",
@@ -97,7 +144,10 @@ describe("pendingCancellationRefund", () => {
 
   it("kargo öncesi kalemde açık talep = yarıda kalmış iptal (uyarı + talep linki)", () => {
     const pending = entry({ status: "paid", refundRequests: [open] });
-    expect(fileEntryCancelBlocker(pending)).toBe("pending_cancellation");
+    expect(fileEntryCancelEligibility(pending)).toEqual({
+      allowed: false,
+      blocker: "pending_cancellation",
+    });
     expect(pendingCancellationRefund(pending)?.id).toBe("rr-1");
   });
 
@@ -145,6 +195,13 @@ describe("cancellableRowLine", () => {
     expect(cancellableRowLine(row([pkg([line()])]))?.orderId).toBe("o1");
   });
 
+  it("ödeme bekleyen (sepet ya da teklif) tek kalemli satırda da iptal vardır", () => {
+    expect(
+      cancellableRowLine(row([pkg([line({ status: "pending_payment" })])]))
+        ?.orderId,
+    ).toBe("o1");
+  });
+
   it("çok kalemli sepette menüde iptal yoktur (dosyada kalem seçilir)", () => {
     expect(
       cancellableRowLine(
@@ -184,22 +241,24 @@ describe("cancellableRowLine", () => {
   });
 });
 
-describe("isValidCancelReason", () => {
-  it("boş ya da yalnız boşluktan oluşan gerekçeyi reddeder", () => {
-    expect(isValidCancelReason("")).toBe(false);
-    expect(isValidCancelReason("   \n ")).toBe(false);
+describe("iptal isteği (paylaşılan kural)", () => {
+  it("katalog nedeni olmadan gönderilemez", () => {
+    expect(isCancelRequestReady({})).toBe(false);
+    expect(isCancelRequestReady({ note: "x" })).toBe(false);
   });
 
-  it("dolu gerekçeyi kabul eder", () => {
-    expect(isValidCancelReason("  Satıcı stoğu bitti ")).toBe(true);
+  it("'Diğer' dışındaki nedenlerde not isteğe bağlıdır", () => {
+    expect(isCancelRequestReady({ reasonCode: "stock_error" })).toBe(true);
+    expect(isNoteMissing({ reasonCode: "stock_error" })).toBe(false);
   });
 
-  it("API sınırını aşan gerekçeyi reddeder", () => {
-    expect(isValidCancelReason("a".repeat(CANCEL_REASON_MAX_LENGTH))).toBe(
-      true,
-    );
-    expect(isValidCancelReason("a".repeat(CANCEL_REASON_MAX_LENGTH + 1))).toBe(
+  it("'Diğer' nedeninde boş not alan hatasıdır", () => {
+    expect(isCancelRequestReady({ reasonCode: "other", note: "  " })).toBe(
       false,
+    );
+    expect(isNoteMissing({ reasonCode: "other", note: "  " })).toBe(true);
+    expect(isCancelRequestReady({ reasonCode: "other", note: "Ayrıntı" })).toBe(
+      true,
     );
   });
 });
@@ -207,10 +266,55 @@ describe("isValidCancelReason", () => {
 describe("cancelShippingNoteKey", () => {
   it("kargo iadeye dahilse 'dahil', değilse paketin yine gideceğini söyler", () => {
     expect(
-      cancelShippingNoteKey({ refundAmount: 1180, shippingRefunded: true }),
+      cancelShippingNoteKey({
+        kind: "paid_pre_handover",
+        quantity: 1,
+        refundAmount: 1180,
+        shippingRefunded: true,
+      }),
     ).toBe("admin.operations.orders.cancel.shippingIncluded");
     expect(
-      cancelShippingNoteKey({ refundAmount: 1050, shippingRefunded: false }),
+      cancelShippingNoteKey({
+        kind: "paid_pre_handover",
+        quantity: 1,
+        refundAmount: 1050,
+        shippingRefunded: false,
+      }),
     ).toBe("admin.operations.orders.cancel.shippingExcluded");
+  });
+});
+
+describe("orderCancelReasonText", () => {
+  it("yönetici iptalinde katalog etiketini gösterir", () => {
+    expect(
+      orderCancelReasonText(
+        {
+          cancelledBy: "platform",
+          adminCancelReasonCode: "listing_violation",
+          cancelReason:
+            "Yönetici tarafından iptal edildi: İlan kurallarına aykırılık",
+        },
+        t,
+      ),
+    ).toBe("[adminCancel.reasons.listing_violation]");
+  });
+
+  it("diğer iptallerde kayıtlı gerekçeye düşer; hiç yoksa null", () => {
+    expect(
+      orderCancelReasonText(
+        {
+          cancelledBy: "buyer",
+          adminCancelReasonCode: null,
+          cancelReason: "Fikrimi değiştirdim",
+        },
+        t,
+      ),
+    ).toBe("Fikrimi değiştirdim");
+    expect(
+      orderCancelReasonText(
+        { cancelledBy: null, adminCancelReasonCode: null, cancelReason: null },
+        t,
+      ),
+    ).toBeNull();
   });
 });

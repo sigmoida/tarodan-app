@@ -99,6 +99,9 @@ const TABLES_TO_TRUNCATE = [
   // bilinçli olarak serbest bırakıldı; `users`ın CASCADE'i zaten süpürürdü,
   // liste kendini belgelesin diye açıkça yazılı.
   "deleted_user_identities",
+  // Onay kayıtları: ekleme-yalnız (UPDATE/DELETE tetikleyiciyle yasak) ama
+  // TRUNCATE serbest; users'a RESTRICT FK ile bağlı olduğu için ondan önce.
+  "consent_records",
   "users",
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
   "attributes",

@@ -25,6 +25,7 @@
  *     order awaiting_buyer_confirmation'a çekilip OrderService.completeOrder çağrılır).
  */
 import * as request from "supertest";
+import * as ExcelJS from "exceljs";
 import {
   PaymentStatus,
   PaymentHoldStatus,
@@ -1830,10 +1831,11 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       const res = await patchBank(user, {
         accountHolder: "Ahmet Yılmaz",
         iban: IBAN_A,
-        tcKimlikNo: "12345678901",
+        // Checksum'ı tutan TCKN: yeni değer ortak kuralla doğrulanır.
+        tcKimlikNo: "10000000146",
         taxId: "1234567890",
       }).expect(200);
-      expect(res.body.tcKimlikNo).toBe("12345678901");
+      expect(res.body.tcKimlikNo).toBe("10000000146");
       expect(res.body.taxId).toBe("1234567890");
     });
 
@@ -2386,19 +2388,49 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
     });
 
     scenario("COM-081", async () => {
-      // Payout CSV export: csv + filename + başlıklar.
+      // Payout Excel dökümü: ortak döküm başlıkları + Özet'in ardından Escrow
+      // sayfası, katalog başlıklarıyla (dosya = ekran).
       const adm = await admin();
       const { orderId } = await heldOrder();
       await releaseHold(orderId);
       const res = await request(server())
         .get("/api/admin/payouts/export?status=released")
         .set(authHeader(adm))
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("end", () => callback(null, Buffer.concat(chunks)));
+        })
         .expect(200);
-      expect(res.body.filename).toMatch(/^payouts-\d{4}-\d{2}-\d{2}\.csv$/);
-      const firstLine = (res.body.csv as string).split("\n")[0];
-      expect(firstLine).toBe(
-        "id,orderId,orderNumber,sellerId,sellerName,sellerEmail,amount,status,releaseAt,releasedAt,createdAt",
+      expect(res.headers["content-type"]).toContain("spreadsheetml");
+      expect(res.headers["content-disposition"]).toMatch(
+        /^attachment; filename="satici-odemeleri-escrow-\d{4}-\d{2}-\d{2}\.xlsx"$/,
       );
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect(Number(res.headers["x-export-row-count"])).toBeGreaterThanOrEqual(
+        1,
+      );
+      expect(res.headers["x-export-truncated-at"]).toBeUndefined();
+
+      const book = new ExcelJS.Workbook();
+      await book.xlsx.load(res.body);
+      expect(book.worksheets[0].name).toBe("Özet");
+      const header = (book.worksheets[1].getRow(1).values as unknown[]).slice(
+        1,
+      );
+      expect(header).toEqual([
+        "Sipariş",
+        "Satıcı",
+        "E-posta",
+        "Tutar",
+        "İade Edilen",
+        "Durum",
+        "Planlanan Serbest Bırakma",
+        "Serbest Bırakıldı",
+        "Erken Bırakma (gün)",
+        "Oluşturulma",
+      ]);
     });
   });
 

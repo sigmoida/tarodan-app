@@ -80,10 +80,24 @@ describe("post-delivery carrier return", () => {
       }),
       parseSuratDate: jest.fn().mockReturnValue(DELIVERED_AT),
     };
+    const configService = {
+      get: (_key: string, fallback?: string) => fallback,
+    };
+    const cache = {
+      get: async () => null,
+      set: async () => {},
+      del: async () => {},
+    };
+    const notifications = {
+      notifyAllAdminsOnce: jest.fn().mockResolvedValue(true),
+    };
     const service = new OrderTrackingSyncService(
       prisma as any,
       { get: () => paymentService } as any,
       client as any,
+      configService as any,
+      cache as any,
+      notifications as any,
     );
     return { service, prisma, tx, client, paymentService };
   };

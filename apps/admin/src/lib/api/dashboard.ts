@@ -1,5 +1,4 @@
 import type {
-  AnalyticsExportFormat,
   AnalyticsRangeQuery,
   AnalyticsTab,
   DashboardPeriodQuery,
@@ -16,6 +15,12 @@ export const dashboardApi = {
     api.get("/admin/dashboard/recent-orders", { params: { limit } }),
   /** Zone A + B — action queues and alerts; never date-filtered. */
   getDashboardWorklist: () => api.get("/admin/dashboard/worklist"),
+  /**
+   * Zone C breakdown — listings taken off the storefront in the period, by
+   * reason / sold-elsewhere platform / violation code (same period query).
+   */
+  getDashboardListingRemovals: (params?: DashboardPeriodQuery) =>
+    api.get("/admin/dashboard/listing-removals", { params }),
   /** Zone D — escrow, seller debt, active listings/memberships/boosts. */
   getDashboardStock: () => api.get("/admin/dashboard/stock"),
   /** Drops the server-side dashboard caches so the next read recomputes. */
@@ -30,17 +35,10 @@ export const dashboardApi = {
   getAnalyticsTab: (tab: AnalyticsTab, params: AnalyticsRangeQuery) =>
     api.get(`/admin/analytics/${tab}`, { params }),
   /**
-   * The same tab, same window, as a file. The API renders it FROM the response
+   * The same tab, same window, as an Excel file. The API renders it FROM the response
    * the screen is showing, so the two cannot disagree — and it arrives as a
    * blob, not as JSON to be re-assembled in the browser.
    */
-  exportAnalyticsTab: (
-    tab: AnalyticsTab,
-    format: AnalyticsExportFormat,
-    params: AnalyticsRangeQuery,
-  ) =>
-    api.get(`/admin/analytics/${tab}/export`, {
-      params: { ...params, format },
-      responseType: "blob",
-    }),
+  exportAnalyticsTab: (tab: AnalyticsTab, params: AnalyticsRangeQuery) =>
+    api.get(`/admin/analytics/${tab}/export`, { params, responseType: "blob" }),
 };

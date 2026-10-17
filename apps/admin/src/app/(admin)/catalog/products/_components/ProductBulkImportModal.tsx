@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import {
   Alert,
   Button,
+  EmptyState,
   Modal,
   ModalFooter,
   SearchableSelect,
@@ -19,10 +20,12 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
-  formatProductImportFileSize,
   productImportFileKey,
   useProductBulkImport,
 } from "@/hooks/useProductBulkImport";
+import { Panel } from "@/components/detail/Panel";
+import { ProgressBar } from "@/components/ProgressBar";
+import { fmtFileSize } from "@/lib/format";
 
 export function ProductBulkImportModal({
   open,
@@ -97,14 +100,11 @@ export function ProductBulkImportModal({
       }
     >
       <div className="space-y-5">
-        <Alert
-          variant="warning"
-          icon={<ExclamationTriangleIcon className="h-5 w-5" />}
-        >
+        <Alert variant="warning">
           {t("admin.catalog.products.bulkImportApprovalNotice")}
         </Alert>
 
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+        <Panel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-medium text-heading">
               {t("admin.catalog.products.bulkImportTemplateTitle")}
@@ -123,7 +123,7 @@ export function ProductBulkImportModal({
               {t("admin.catalog.products.bulkImportDownloadTemplate")}
             </a>
           </Button>
-        </div>
+        </Panel>
 
         <SearchableSelect
           value={sellerId}
@@ -138,7 +138,7 @@ export function ProductBulkImportModal({
         />
 
         <div className="space-y-4">
-          <section className="rounded-lg border border-border bg-surface p-4">
+          <Panel>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="flex items-center gap-2 font-medium text-heading">
@@ -169,14 +169,14 @@ export function ProductBulkImportModal({
             </div>
 
             {workbook ? (
-              <div className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-surface-elevated px-3 py-2.5">
+              <Panel padding="sm" className="mt-4 flex items-center gap-3">
                 <DocumentArrowUpIcon className="h-5 w-5 shrink-0 text-primary-600" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-heading">
                     {workbook.name}
                   </p>
                   <p className="text-xs text-muted">
-                    {formatProductImportFileSize(workbook.size)}
+                    {fmtFileSize(workbook.size)}
                   </p>
                 </div>
                 <Button
@@ -193,15 +193,18 @@ export function ProductBulkImportModal({
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </Button>
-              </div>
+              </Panel>
             ) : (
-              <p className="mt-4 rounded-lg border border-dashed border-border-strong px-4 py-5 text-center text-sm text-muted">
-                {t("admin.catalog.products.bulkImportNoWorkbook")}
-              </p>
+              <EmptyState
+                size="compact"
+                icon={false}
+                className="mt-4"
+                title={t("admin.catalog.products.bulkImportNoWorkbook")}
+              />
             )}
-          </section>
+          </Panel>
 
-          <section className="rounded-lg border border-border bg-surface p-4">
+          <Panel>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="flex items-center gap-2 font-medium text-heading">
@@ -241,97 +244,86 @@ export function ProductBulkImportModal({
             {images.length ? (
               <ul className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
                 {images.map((image) => (
-                  <li
-                    key={productImportFileKey(image)}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-surface-elevated px-3 py-2.5"
-                  >
-                    <PhotoIcon className="h-5 w-5 shrink-0 text-primary-600" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-heading">
-                        {image.name}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {formatProductImportFileSize(image.size)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={isProcessing}
-                      aria-label={t(
-                        "admin.catalog.products.bulkImportRemoveFile",
-                        { name: image.name },
-                      )}
-                      onClick={() => removeImage(image)}
-                    >
-                      <XMarkIcon className="h-5 w-5" />
-                    </Button>
+                  <li key={productImportFileKey(image)}>
+                    <Panel padding="sm" className="flex items-center gap-3">
+                      <PhotoIcon className="h-5 w-5 shrink-0 text-primary-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-heading">
+                          {image.name}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {fmtFileSize(image.size)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={isProcessing}
+                        aria-label={t(
+                          "admin.catalog.products.bulkImportRemoveFile",
+                          { name: image.name },
+                        )}
+                        onClick={() => removeImage(image)}
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </Button>
+                    </Panel>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 rounded-lg border border-dashed border-border-strong px-4 py-5 text-center text-sm text-muted">
-                {t("admin.catalog.products.bulkImportNoImages")}
-              </p>
+              <EmptyState
+                size="compact"
+                icon={false}
+                className="mt-4"
+                title={t("admin.catalog.products.bulkImportNoImages")}
+              />
             )}
-          </section>
+          </Panel>
         </div>
 
         {(isProcessing || errors.length > 0 || result) && (
-          <div
-            ref={statusRef}
-            className="rounded-lg border border-border bg-surface p-4"
-            aria-live="polite"
-          >
-            <p className="font-medium text-heading">
-              {t("admin.catalog.products.bulkImportProgressTitle")}
-            </p>
-            <div className="mt-3 flex items-start gap-3">
-              {isProcessing ? (
-                <Spinner size="sm" className="mt-0.5 shrink-0" />
-              ) : result ? (
-                <CheckCircleIcon className="h-5 w-5 shrink-0 text-success-600" />
-              ) : (
-                <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-danger-600" />
+          <div ref={statusRef} aria-live="polite">
+            <Panel>
+              <p className="font-medium text-heading">
+                {t("admin.catalog.products.bulkImportProgressTitle")}
+              </p>
+              <div className="mt-3 flex items-start gap-3">
+                {isProcessing ? (
+                  <Spinner size="sm" className="mt-0.5 shrink-0" />
+                ) : result ? (
+                  <CheckCircleIcon className="h-5 w-5 shrink-0 text-success-600" />
+                ) : (
+                  <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-danger-600" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-heading">
+                    {isProcessing
+                      ? uploadProgress < 100
+                        ? t("admin.catalog.products.bulkImportUploading", {
+                            progress: uploadProgress,
+                          })
+                        : t("admin.catalog.products.bulkImportProcessing")
+                      : result
+                        ? t("admin.catalog.products.bulkImportProcessCompleted")
+                        : t("admin.catalog.products.bulkImportProcessFailed")}
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    {isProcessing
+                      ? uploadProgress < 100
+                        ? t("admin.catalog.products.bulkImportUploadingHelp")
+                        : t("admin.catalog.products.bulkImportProcessingHelp")
+                      : result
+                        ? t("admin.catalog.products.bulkImportCompletedHelp")
+                        : t("admin.catalog.products.bulkImportFailedHelp")}
+                  </p>
+                </div>
+              </div>
+              {isProcessing && uploadProgress < 100 && (
+                <ProgressBar value={uploadProgress} className="mt-3" />
               )}
-              <div>
-                <p className="text-sm font-medium text-heading">
-                  {isProcessing
-                    ? uploadProgress < 100
-                      ? t("admin.catalog.products.bulkImportUploading", {
-                          progress: uploadProgress,
-                        })
-                      : t("admin.catalog.products.bulkImportProcessing")
-                    : result
-                      ? t("admin.catalog.products.bulkImportProcessCompleted")
-                      : t("admin.catalog.products.bulkImportProcessFailed")}
-                </p>
-                <p className="mt-1 text-sm text-muted">
-                  {isProcessing
-                    ? uploadProgress < 100
-                      ? t("admin.catalog.products.bulkImportUploadingHelp")
-                      : t("admin.catalog.products.bulkImportProcessingHelp")
-                    : result
-                      ? t("admin.catalog.products.bulkImportCompletedHelp")
-                      : t("admin.catalog.products.bulkImportFailedHelp")}
-                </p>
-              </div>
-            </div>
-            {isProcessing && uploadProgress < 100 && (
-              <div
-                className="mt-3 h-2 overflow-hidden rounded-full bg-border"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={uploadProgress}
-              >
-                <div
-                  className="h-full rounded-full bg-primary-600 transition-[width] duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            )}
+            </Panel>
           </div>
         )}
 

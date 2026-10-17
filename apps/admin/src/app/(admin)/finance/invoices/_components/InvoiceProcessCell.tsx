@@ -1,8 +1,8 @@
 "use client";
 
 import { Badge } from "@tarodan/ui";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { TextLink } from "@/components/TextLink";
 import { invoiceProcessHref } from "@/lib/invoice-process";
 import {
   type Invoice,
@@ -22,20 +22,21 @@ export function InvoiceProcessCell({ invoice }: { invoice: Invoice }) {
   return (
     <div className="flex flex-col items-start gap-1">
       {context ? (
-        <Badge variant="secondary">
+        <Badge variant="outline">
           {invoiceContextLabels(t)[context] ?? context}
         </Badge>
       ) : (
         !process && <span className="text-muted">—</span>
       )}
       {process?.refs.map((ref) => (
-        <Link
+        <TextLink
           key={`${ref.kind}:${ref.targetId}:${ref.label ?? ""}`}
           href={invoiceProcessHref(ref)}
-          className="whitespace-nowrap font-mono text-xs text-primary-600 hover:underline"
+          mono
+          className="whitespace-nowrap text-xs"
         >
           {invoiceProcessLabel(t, ref)}
-        </Link>
+        </TextLink>
       ))}
     </div>
   );

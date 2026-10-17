@@ -13,6 +13,8 @@ describe("PaymentExpiryReconciliationService.cancelExpiredPayments — FLOW-H2 l
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findMany: jest.fn().mockResolvedValue([candidate]),
       },
+      // Fail penceresi Süreler ve Kurallar'dan; satır yok → env (35).
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const configService = {
       get: jest.fn((k: string) =>

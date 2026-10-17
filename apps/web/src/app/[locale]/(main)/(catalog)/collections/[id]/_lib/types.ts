@@ -16,6 +16,8 @@ export interface CollectionItem {
   productImage?: string;
   productPrice?: number;
   productStatus?: string;
+  /** Ürünün satıcısı; özel öğede null. Kart kalbi kendi ilanında gizlenir. */
+  sellerId?: string | null;
   sortOrder: number;
   isFeatured: boolean;
   isBoosted?: boolean;
@@ -69,11 +71,20 @@ export const itemToProduct = (item: CollectionItem): Product => ({
     item.customImageUrl || item.productImage
       ? [{ url: (item.customImageUrl || item.productImage) as string }]
       : [],
+  sellerId: item.sellerId ?? undefined,
   brand: item.customBrand,
   scale: item.customScale,
   year: item.customYear,
   isBoosted: Boolean(item.isBoosted) && item.productStatus !== "sold",
 });
+
+/**
+ * Kartın sol-üst `overlayStart` yuvasına konacak durum rozeti var mı (özel
+ * öğe / satıldı). Yoksa yuva HİÇ verilmez — verilirse kartın kendi rozet
+ * yığını (indirim, takas, sponsorlu…) çizilmez.
+ */
+export const hasItemBadges = (item: CollectionItem): boolean =>
+  item.isCustom || item.productStatus === "sold";
 
 /**
  * Visible + ordered items. Hidden/deleted listings are dropped, but sold/reserved

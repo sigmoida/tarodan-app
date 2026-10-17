@@ -11,9 +11,20 @@ import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { fulltextProductSearch } from "../../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
+import { adminRemovalFields } from "../../product/helpers/listing-removal-input";
+import {
+  LATEST_REMOVAL_INCLUDE,
+  REMOVAL_HISTORY_INCLUDE,
+  listingRemovalFilterWhere,
+  toAdminRemovalEvent,
+  toAdminRemovalSummary,
+} from "./admin-product-removal.helper";
+import { stampApprovedContentFingerprint } from "../../product/helpers/product-content-fingerprint";
 import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 import {
   AdminProductQueryDto,
+  AdminRemoveProductDto,
   ApproveProductDto,
   RejectProductDto,
 } from "../dto";
@@ -222,6 +233,12 @@ export class AdminProductService {
 
     Object.assign(where, dateRangeWhere(query));
 
+    const removalParts = listingRemovalFilterWhere({
+      removalReason: query.removalReason,
+      removalActor: query.removalActor,
+    });
+    if (removalParts.length > 0) where.AND = removalParts;
+
     const orderBy = resolveOrderBy<Prisma.ProductOrderByWithRelationInput>(
       "Product",
       query,
@@ -244,6 +261,8 @@ export class AdminProductService {
           brand: { select: { name: true } },
           images: { take: 1, orderBy: { sortOrder: "asc" } },
           _count: { select: { images: true } },
+          // Güncel kaldırmanın platform/ihlal/tarih ayrıntısı (serbest metin yok).
+          removalEvents: LATEST_REMOVAL_INCLUDE,
         },
         orderBy,
       },
@@ -252,7 +271,7 @@ export class AdminProductService {
 
     // Calculate campaign prices for each product
     const productsWithCampaignPrices = await Promise.all(
-      result.data.map(async (p) => {
+      result.data.map(async ({ removalEvents, ...p }) => {
         const basePrice = Number(p.price);
 
         // Get campaign discount price from DiscountService
@@ -283,6 +302,7 @@ export class AdminProductService {
             hasDiscount ||
             (p.salePrice != null && Number(p.salePrice) < basePrice),
           imageUrl,
+          removal: toAdminRemovalSummary({ ...p, removalEvents }),
         };
       }),
     );
@@ -294,76 +314,10 @@ export class AdminProductService {
   }
 
   /**
-   * Export products to CSV format
-   */
-  async exportProducts(query: {
-    status?: string;
-    categoryId?: string;
-    sellerId?: string;
-  }) {
-    const where: Prisma.ProductWhereInput = catalogProductWhere();
-
-    if (query.status) {
-      where.status = query.status as ProductStatus;
-    }
-    if (query.categoryId) {
-      where.categoryId = query.categoryId;
-    }
-    if (query.sellerId) {
-      where.sellerId = query.sellerId;
-    }
-
-    const products = await this.prisma.product.findMany({
-      where,
-      include: {
-        seller: { select: { displayName: true, email: true } },
-        category: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Create CSV header
-    const headers = [
-      "ID",
-      "İlan No",
-      "Başlık",
-      "Fiyat",
-      "Durum",
-      "Kondisyon",
-      "Kategori",
-      "Satıcı",
-      "Satıcı Email",
-      "Oluşturulma Tarihi",
-    ];
-
-    // Create CSV rows
-    const rows = products.map((p) => [
-      p.id,
-      p.productCode,
-      `"${(p.title || "").replace(/"/g, '""')}"`,
-      Number(p.price).toFixed(2),
-      p.status,
-      p.condition,
-      p.category?.name || "",
-      p.seller?.displayName || "",
-      p.seller?.email || "",
-      new Date(p.createdAt).toISOString(),
-    ]);
-
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-
-    return {
-      filename: `products_${new Date().toISOString().split("T")[0]}.csv`,
-      content: csv,
-      mimeType: "text/csv",
-    };
-  }
-
-  /**
    * Get single product by ID (admin)
    */
   async getProduct(productId: string) {
-    const product = await this.prisma.product.findFirst({
+    const found = await this.prisma.product.findFirst({
       where: { id: productId, ...catalogProductWhere() },
       include: {
         seller: { select: { id: true, displayName: true, email: true } },
@@ -377,11 +331,14 @@ export class AdminProductService {
         images: { orderBy: { sortOrder: "asc" } },
         // Ürün detayındaki "Teklifler (n)" hızlı linki için.
         _count: { select: { offers: true } },
+        // Kaldırma geçmişi — satıcının serbest metni dahil; YALNIZ bu admin ucu.
+        removalEvents: REMOVAL_HISTORY_INCLUDE,
       },
     });
-    if (!product) {
+    if (!found) {
       throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
+    const { removalEvents, ...product } = found;
 
     // Convert S3 keys to presigned URLs for all images
     const imagesWithPresignedUrls = await Promise.all(
@@ -415,6 +372,8 @@ export class AdminProductService {
         imageUrl: (key: string) => this.resolveProductImageUrl(key) ?? key,
       }),
       images: imagesWithPresignedUrls,
+      removal: toAdminRemovalSummary({ ...product, removalEvents }),
+      removalHistory: removalEvents.map(toAdminRemovalEvent),
       price: Number(product.price),
       originalPrice:
         product.originalPrice != null ? Number(product.originalPrice) : null,
@@ -432,7 +391,7 @@ export class AdminProductService {
    * indirim matematiği, komisyon kuralı, görsel sahipliği, iyimser kilit,
    * arama indeksi ve ISR tazeleme orada TEK yerde durur. Buradaki eski kopya
    * bunların hiçbirini yapmıyordu; kademe düzeltmesi dışında bir alana
-   * dokunmak sessizce kuralsız yazıyordu (bkz. apps/api/CLAUDE.md §15/3).
+   * dokunmak sessizce kuralsız yazıyordu (bkz. apps/api/CLAUDE.md, "Fix what you touch" 3).
    *
    * Yöneticiye özgü olan tek şey DENETİM KAYDIdır — onu burada tutuyoruz.
    */
@@ -508,6 +467,9 @@ export class AdminProductService {
         rejectionReason: null,
       },
     });
+    // Onaylanan içeriğin izi: süresi dolunca satıcı yenilemesi içerik değişmediyse
+    // moderasyona girmeden yayına döner (bkz. ProductRenewalService).
+    await stampApprovedContentFingerprint(this.prisma, productId);
 
     await this.audit.createAuditLog(
       adminId,
@@ -577,11 +539,30 @@ export class AdminProductService {
       throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
-    const updated = await this.prisma.product.update({
-      where: { id: productId },
-      // Gerekçe KALICI yazılır: bildirim tek seferlikti, satıcı ve admin
-      // detayı gerekçeyi sonradan göremiyordu. Onay temizler.
-      data: { status: ProductStatus.rejected, rejectionReason: dto.reason },
+    // Kaldırma nedeni: kural ihlali + ihlal kodu; açıklama (satıcıya giden
+    // gerekçe) kayda da geçer. Kod yazımdan ÖNCE doğrulanır.
+    const reasonFields = adminRemovalFields("reject", {
+      violationCode: dto.violationCode,
+      detail: dto.reason,
+    });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.product.update({
+        where: { id: productId },
+        // Gerekçe KALICI yazılır: bildirim tek seferlikti, satıcı ve admin
+        // detayı gerekçeyi sonradan göremiyordu. Onay temizler.
+        data: { status: ProductStatus.rejected, rejectionReason: dto.reason },
+      });
+      await recordListingRemovals(tx, [
+        {
+          productId,
+          statusBefore: product.status,
+          statusAfter: ProductStatus.rejected,
+          actorUserId: adminId,
+          ...reasonFields,
+        },
+      ]);
+      return row;
     });
 
     await this.audit.createAuditLog(
@@ -677,6 +658,7 @@ export class AdminProductService {
     adminId: string,
     ids: string[] | undefined,
     reason: string,
+    violationCode?: string,
   ) {
     if (!ids || ids.length === 0) {
       throw new BadRequestException(
@@ -693,7 +675,10 @@ export class AdminProductService {
     const results: { id: string; success: boolean; error?: string }[] = [];
     for (const productId of ids) {
       try {
-        await this.rejectProduct(adminId, productId, { reason });
+        await this.rejectProduct(adminId, productId, {
+          reason,
+          violationCode,
+        });
         results.push({ id: productId, success: true });
       } catch (error) {
         results.push({
@@ -728,6 +713,7 @@ export class AdminProductService {
     adminId: string,
     productId: string,
     hardDelete: boolean = false,
+    removal: AdminRemoveProductDto = {},
   ) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -777,6 +763,14 @@ export class AdminProductService {
 
     const oldProduct = { ...product };
 
+    // Kaldırma nedeni (yumuşak silme): kural ihlali + ihlal kodu + açıklama.
+    // Kalıcı silmede kayıt ürünle birlikte gider (bkz. şema), yine de giriş
+    // yazımdan ÖNCE doğrulanır — iki yol aynı kuralı görür.
+    const reasonFields = adminRemovalFields("delete", {
+      violationCode: removal.violationCode,
+      detail: removal.note,
+    });
+
     if (
       hardDelete &&
       product._count.offers === 0 &&
@@ -820,9 +814,20 @@ export class AdminProductService {
     } else {
       // Soft delete - set to deleted (pasif/inactive'den AYRI state: yönetici
       // kaldırması. Satıcı bunu yeniden aktive edemez; kendi pasifiyle karışmaz.)
-      await this.prisma.product.update({
-        where: { id: productId },
-        data: { status: ProductStatus.deleted },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.product.update({
+          where: { id: productId },
+          data: { status: ProductStatus.deleted },
+        });
+        await recordListingRemovals(tx, [
+          {
+            productId,
+            statusBefore: product.status,
+            statusAfter: ProductStatus.deleted,
+            actorUserId: adminId,
+            ...reasonFields,
+          },
+        ]);
       });
 
       // Create audit log

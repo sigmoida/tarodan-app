@@ -3,10 +3,12 @@ import { hasRealDiscount } from "@/lib/productPrice";
 import { unwrapList } from "@/lib/unwrapList";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
+import { fetchHeroSlides, fetchTrustBadges } from "@/lib/api/hero";
+import { MANUFACTURERS_WITH_LISTINGS_PATH } from "@/lib/api/catalog";
 import type { Product } from "@/types/product";
 import HomeContent from "./_home/_components/HomeContent";
+import { toMarqueeItems, type MarqueeManufacturer } from "./_home/lib/helpers";
 import type {
-  BrandMarqueeItem,
   FeaturedBusiness,
   FeaturedCollector,
   HomePageData,
@@ -78,18 +80,14 @@ async function fetchDiscountedProducts(): Promise<Product[]> {
   return products.filter(hasRealDiscount);
 }
 
-interface Manufacturer {
-  name: string;
-  logo?: string | null;
-  description?: string | null;
-}
-
-async function fetchManufacturers(): Promise<Manufacturer[]> {
-  const res = await fetch(`${API_BASE}/api/manufacturers`, {
-    next: { revalidate: 60 },
-  });
+/** Marka şeridi: yalnız aktif ilanı olan üreticiler (API `hasListings`). */
+async function fetchManufacturers(): Promise<MarqueeManufacturer[]> {
+  const res = await fetch(
+    `${API_BASE}/api${MANUFACTURERS_WITH_LISTINGS_PATH}`,
+    { next: { revalidate: 60 } },
+  );
   if (!res.ok) throw new Error(`manufacturers ${res.status}`);
-  return unwrapList<Manufacturer>(await res.json());
+  return unwrapList<MarqueeManufacturer>(await res.json());
 }
 
 async function fetchTopCollections(): Promise<FeaturedCollector[]> {
@@ -127,6 +125,8 @@ export default async function HomePage({
     featuredCollector,
     featuredBusiness,
     topCollections,
+    heroSlides,
+    trustBadges,
   ] = await Promise.allSettled([
     // Vitrin (home showcase): yalnızca "ana sayfada vitrinlensin" paketini alan
     // ürünler, en son satın alınan en başta olacak şekilde (LIFO — boostedAt DESC).
@@ -143,17 +143,15 @@ export default async function HomePage({
     fetchNullable<FeaturedCollector>("/api/users/featured-collector"),
     fetchNullable<FeaturedBusiness>("/api/users/featured-business"),
     fetchTopCollections(),
+    // Panelden yönetilen hero + güven rozetleri; hata/boşta bölüm çizilmez.
+    fetchHeroSlides("home"),
+    fetchTrustBadges(),
   ]);
 
   // Faz 1: marka şeridi tamamen API'den — logolar S3'ten mutlak URL olarak
   // gelir (manufacturer.logo key → getPublicAssetUrl). Statik fallback listesi
   // ve repo içi logo dosyaları kaldırıldı.
-  const manufacturerItems = settledValue(manufacturers, []);
-  const marqueeItems: BrandMarqueeItem[] = manufacturerItems.map((item) => ({
-    name: item.name,
-    logoUrl: item.logo || "",
-    desc: item.description || "",
-  }));
+  const marqueeItems = toMarqueeItems(settledValue(manufacturers, []));
 
   const data: HomePageData = {
     featured: settledValue(featured, []),
@@ -164,6 +162,8 @@ export default async function HomePage({
     featuredCollector: settledValue(featuredCollector, null),
     featuredBusiness: settledValue(featuredBusiness, null),
     marqueeItems,
+    heroSlides: settledValue(heroSlides, []),
+    trustBadges: settledValue(trustBadges, []),
   };
 
   return <HomeContent data={data} locale={locale} />;

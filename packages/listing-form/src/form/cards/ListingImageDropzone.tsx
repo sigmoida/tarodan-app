@@ -106,13 +106,13 @@ export default function ListingImageDropzone({
             {t("product.imageUpload.browse")}
           </span>
           <span className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {t("product.imageUpload.formats")}
             </Badge>
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {t("product.imageUpload.maxSize", { size: MEGABYTES })}
             </Badge>
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {t("product.imageUpload.minDimension", {
                 size: MIN_RECOMMENDED_DIMENSION,
               })}

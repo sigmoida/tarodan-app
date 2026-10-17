@@ -16,9 +16,9 @@ export interface ToolbarActionButtonProps extends Omit<
 }
 
 /**
- * The toolbar's two actions (CSV export, filters) share one responsive shape:
- * on mobile they split the row as full-width icon + label buttons, from `sm` up
- * they collapse to a square icon button. `label` is the accessible name in both
+ * Toolbar actions (filters) share one responsive shape: on mobile they split
+ * the row as full-width icon + label buttons, from `sm` up they collapse to a
+ * square icon button. `label` is the accessible name in both
  * states, so the icon-only form is never a screen-reader dead end.
  *
  * The icon is a plain child rather than the Button's `leftIcon` slot — that slot

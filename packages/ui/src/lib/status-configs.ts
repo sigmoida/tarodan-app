@@ -12,8 +12,8 @@ import type { VariantProps } from "class-variance-authority";
 import type { badgeVariants } from "../components/Badge";
 
 /**
- * Web badge variant, derived from the CVA config. Superset of the shared
- * `StatusVariant` (also includes the legacy `destructive` alias).
+ * Web badge variant, derived from the CVA config. Same five values as the
+ * shared `StatusVariant`.
  */
 export type BadgeVariant = NonNullable<
   VariantProps<typeof badgeVariants>["variant"]

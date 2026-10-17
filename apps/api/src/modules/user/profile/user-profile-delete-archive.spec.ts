@@ -1,5 +1,10 @@
 import { UserProfileService } from "./user-profile.service";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { ANONYMIZED_DISPLAY_NAME } from "../../../common/helpers/deleted-user-identity";
+
+jest.mock("../../../common/helpers/revalidate", () => ({
+  notifyWebRevalidate: jest.fn(),
+}));
 
 /**
  * Hesap silme, kimliği geri dönülemez şekilde anonimleştiriyor. Yasal aylık
@@ -12,6 +17,9 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     email: "ahmet@example.com",
     username: "ahmet",
     displayName: "Ahmet Yılmaz",
+    legalFirstName: "Ahmet Can",
+    legalLastName: "Yılmaz",
+    nationalId: "10000000146",
     phone: "+905551112233",
     birthDate: null,
     taxId: "1234567890",
@@ -28,10 +36,81 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     deletedAt: null,
   };
 
-  function makeService(overrides: { upsert?: jest.Mock } = {}) {
+  function makeService(
+    overrides: {
+      upsert?: jest.Mock;
+      listings?: Array<{ id: string; status: string }>;
+      /** İşlem İÇİ engel denetiminde görünen açık sipariş (yarış). */
+      ordersInTx?: Array<{ id: string; status: string }>;
+      /** Pasife alınan ilanlardaki açık teklifler. */
+      openOffers?: Array<{ id: string; buyerId: string; productId: string }>;
+      /** Silinen hesabın ALICI olarak verdiği açık teklifler. */
+      buyerOffers?: Array<{ id: string; sellerId: string; productId: string }>;
+      /** Silinen hesabın herkese açık koleksiyonları. */
+      publicCollectionIds?: string[];
+      /** İşlem içinde okunan avatar anahtarı. */
+      avatarUrl?: string | null;
+      /** Tamamlanmamış payout sayısı (banka hesabı korunur mu). */
+      openPayouts?: number;
+    } = {},
+  ) {
+    const listings = overrides.listings ?? [];
+    const txEmpty = () => ({ findMany: jest.fn().mockResolvedValue([]) });
     const tx = {
+      // İlan satırı kilidi (SELECT … FOR UPDATE).
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      // S3: aktif / onay bekleyen ilanlar silme transaction'ında pasife.
+      product: {
+        // Rezerve-ilan engel sorgusu boş; pasifleştirme okumaları ilanları görür.
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            where?.status?.in?.length === 1 && where.status.in[0] === "reserved"
+              ? []
+              : listings,
+          ),
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      // İşlem içi engel denetimi.
+      trade: txEmpty(),
+      order: {
+        findMany: jest.fn().mockResolvedValue(overrides.ordersInTx ?? []),
+      },
+      refundRequest: txEmpty(),
+      payoutTransfer: {
+        findMany: jest.fn().mockResolvedValue([]),
+        // Satıcı verisi temizliği: ödenecek hakediş var mı?
+        count: jest.fn().mockResolvedValue(overrides.openPayouts ?? 0),
+      },
+      // Ödenmemiş hakediş denetimi (hasUnsettledPayout): hold / takas nakdi yok.
+      tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      refundAttempt: { count: jest.fn().mockResolvedValue(0) },
+      paymentHold: txEmpty(),
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      offer: {
+        // Alıcı tarafı sorguları `where.buyerId` (aday okuma) ya da
+        // `where.cancelReason` (yazım sonrası yeniden okuma) ile, ilan tarafı
+        // `productId` ile gelir.
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            where?.buyerId || where?.cancelReason
+              ? (overrides.buyerOffers ?? [])
+              : (overrides.openOffers ?? []),
+          ),
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       user: {
-        findUnique: jest.fn().mockResolvedValue(user),
+        // Arşiv okuması tam satırı, avatar okuması yalnız `avatarUrl`'i ister.
+        findUnique: jest.fn(({ select }: any): Promise<unknown> =>
+          Promise.resolve(
+            select?.avatarUrl
+              ? { avatarUrl: overrides.avatarUrl ?? null }
+              : user,
+          ),
+        ),
         update: jest.fn().mockResolvedValue(user),
       },
       address: {
@@ -51,8 +130,20 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
           iban: "TR000000000000000000000000",
           accountHolder: "Ahmet Yılmaz",
         }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      corporateApplication: { findUnique: jest.fn().mockResolvedValue(null) },
+      corporateApplication: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      collection: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue(
+            (overrides.publicCollectionIds ?? []).map((id) => ({ id })),
+          ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       deletedUserIdentity: {
         upsert: overrides.upsert ?? jest.fn().mockResolvedValue({}),
       },
@@ -79,13 +170,54 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       $transaction: jest.fn((fn: (client: unknown) => unknown) => fn(tx)),
     };
 
+    const search = {
+      syncProduct: jest.fn().mockResolvedValue(undefined),
+      removeCollection: jest.fn().mockResolvedValue(undefined),
+    };
+    const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    const realtime = { disconnectUser: jest.fn() };
+    const cache = {
+      del: jest.fn().mockResolvedValue(undefined),
+      delPattern: jest.fn().mockResolvedValue(undefined),
+    };
+    const notifications = {
+      notifyOfferCancelledListingRemoved: jest
+        .fn()
+        .mockResolvedValue(undefined),
+      notifyOfferCancelledBuyerDeleted: jest.fn().mockResolvedValue(undefined),
+    };
+    // Bizim public kökümüzdeki tam avatar URL'i anahtara çözülür.
+    const common = {
+      publicAssetKeyFromUrl: jest.fn((url: string) =>
+        url.startsWith("https://cdn.tarodan.test/")
+          ? url.slice("https://cdn.tarodan.test/".length)
+          : null,
+      ),
+    };
     const service = new UserProfileService(
       prisma as never,
       {} as never,
+      common as never,
       {} as never,
-      {} as never,
+      { recordMarketingChange: jest.fn() } as never, // consents
+      { syncUserConsent: jest.fn() } as never, // newsletter
+      search as never,
+      cache as never,
+      notifications as never,
+      undefined, // appleTokens
+      outbox as never,
+      realtime as never,
     );
-    return { service, prisma, tx };
+    return {
+      service,
+      prisma,
+      tx,
+      search,
+      cache,
+      notifications,
+      outbox,
+      realtime,
+    };
   }
 
   it("arşivi, adresler silinmeden ve satır anonimleştirilmeden ÖNCE yazar", async () => {
@@ -103,7 +235,7 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     );
   });
 
-  it("silme öncesi gerçek kimliği ve banka hesabındaki TCKN'yi saklar", async () => {
+  it("silme öncesi gerçek kimliği saklar; TCKN'de üyenin beyanı banka hesabından önce gelir", async () => {
     const { service, tx } = makeService();
 
     await service.deleteAccount("user-1");
@@ -112,13 +244,46 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     expect(create.email).toBe("ahmet@example.com");
     expect(create.username).toBe("ahmet");
     expect(create.displayName).toBe("Ahmet Yılmaz");
-    expect(create.nationalId).toBe("12345678901");
+    expect(create.legalFirstName).toBe("Ahmet Can");
+    expect(create.legalLastName).toBe("Yılmaz");
+    expect(create.nationalId).toBe("10000000146");
+    expect(create.sourceDetail.nationalId).toBe("user");
     expect(create.taxId).toBe("1234567890");
     expect(create.addressCity).toBe("İstanbul");
     expect(create.wasSeller).toBe(true);
     expect(create.deletedByActor).toBe("self");
     expect(create.source).toBe("live");
+  });
+
+  it("üyenin beyanı yoksa banka hesabındaki TCKN'yi saklar (eski hesap)", async () => {
+    const { service, tx } = makeService();
+    tx.user.findUnique.mockResolvedValueOnce({
+      ...user,
+      legalFirstName: null,
+      legalLastName: null,
+      nationalId: null,
+    });
+
+    await service.deleteAccount("user-1");
+
+    const { create } = tx.deletedUserIdentity.upsert.mock.calls[0][0];
+    expect(create.nationalId).toBe("12345678901");
     expect(create.sourceDetail.nationalId).toBe("seller_bank_account");
+    expect(create.legalFirstName).toBeNull();
+  });
+
+  it("yasal kimliği arşivden SONRA canlı satırda NULL'lar (TCKN serbest kalır)", async () => {
+    const { service, tx } = makeService();
+
+    await service.deleteAccount("user-1");
+
+    const { data } = tx.user.update.mock.calls[0][0];
+    expect(data.legalFirstName).toBeNull();
+    expect(data.legalLastName).toBeNull();
+    expect(data.nationalId).toBeNull();
+    expect(
+      tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+    ).toBeLessThan(tx.user.update.mock.invocationCallOrder[0]);
   });
 
   it("saklama bitişini silme tarihine 10 yıl ekleyerek yazar", async () => {
@@ -172,5 +337,384 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     const { data } = tx.user.update.mock.calls[0][0];
     expect(data.email).toBe("deleted_user-1@deleted.local");
     expect(data.displayName).toBe(ANONYMIZED_DISPLAY_NAME);
+  });
+
+  describe("aktif ilanlar (S3 — Apple 5.1.1(v))", () => {
+    const listings = [
+      { id: "p-active", status: "active" },
+      { id: "p-pending", status: "pending" },
+    ];
+
+    it("ilanlar anonimleştirmeyle AYNI transaction'da, arşivden sonra pasife alınır", async () => {
+      const { service, tx } = makeService({ listings });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.product.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: "inactive" } }),
+      );
+      const deactivateOrder = tx.product.updateMany.mock.invocationCallOrder[0];
+      expect(
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+      ).toBeLessThan(deactivateOrder);
+      expect(deactivateOrder).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("commit sonrası arama dizini, önbellek, web ISR ve üyelik önbelleği tazelenir", async () => {
+      const { service, search, cache } = makeService({ listings });
+
+      await service.deleteAccount("user-1");
+
+      expect(search.syncProduct).toHaveBeenCalledWith("p-active");
+      expect(search.syncProduct).toHaveBeenCalledWith("p-pending");
+      expect(cache.delPattern).toHaveBeenCalledWith("products:list:*");
+      expect(cache.del).toHaveBeenCalledWith("products:detail:p-active");
+      // refreshProductVisibility: web ISR de tazelenir.
+      expect(notifyWebRevalidate).toHaveBeenCalledWith([
+        "products:list",
+        "product:p-active",
+        "product:p-pending",
+      ]);
+      // İlan sayacı üyelik önbelleğinde.
+      expect(cache.del).toHaveBeenCalledWith("membership:user-1");
+    });
+
+    it("ilan yoksa senkron çağrısı yapılmaz", async () => {
+      const { service, search, cache } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(search.syncProduct).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+    });
+
+    it("senkron hatası silmeyi başarısız göstermez (hesap zaten silindi)", async () => {
+      const { service, search, cache } = makeService({ listings });
+      cache.delPattern.mockRejectedValue(new Error("redis down"));
+      search.syncProduct.mockRejectedValue(new Error("es down"));
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme transaction'ı düşerse senkron yapılmaz", async () => {
+      const upsert = jest.fn().mockRejectedValue(new Error("db down"));
+      const { service, search } = makeService({ upsert, listings });
+
+      await expect(service.deleteAccount("user-1")).rejects.toBeDefined();
+      expect(search.syncProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  // P1 inceleme (TOCTOU): dış denetimden sonra başlayan bir checkout, ilanlar
+  // kilitlenip pasife alındıktan sonraki işlem içi denetimde görünür.
+  describe("işlem içi engel denetimi", () => {
+    it("pasifleştirmeden SONRA, anonimleştirmeden ÖNCE yeniden denetler", async () => {
+      const { service, tx } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+      });
+
+      await service.deleteAccount("user-1");
+
+      const statusUpdate = tx.product.updateMany.mock.invocationCallOrder[0];
+      const blockerCheck = tx.order.findMany.mock.invocationCallOrder[0];
+      expect(statusUpdate).toBeLessThan(blockerCheck);
+      expect(blockerCheck).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("arada açılmış sipariş → aynı engel yanıtı, hesap anonimleşmez", async () => {
+      const { service, tx, search } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        ordersInTx: [{ id: "o1", status: "pending_payment" }],
+      });
+
+      const error = (await service.deleteAccount("user-1").then(
+        () => {
+          throw new Error("deleteAccount reddedilmeliydi");
+        },
+        (e: unknown) => e,
+      )) as { getResponse(): any };
+
+      const body = error.getResponse();
+      expect(body.i18nKey).toBe("server.user.deleteAccountBlocked");
+      expect(body.details.pendingOrders).toBe(1);
+      expect(tx.user.update).not.toHaveBeenCalled();
+      // İşlem geri alındı: commit sonrası senkron da yok.
+      expect(search.syncProduct).not.toHaveBeenCalled();
+    });
+  });
+
+  // P1 inceleme: hesap silmeyle kapanan tekliflerin alıcıları, satıcının ilan
+  // silme yoluyla aynı bildirimi alır (commit SONRASI).
+  describe("kapanan tekliflerin alıcıları", () => {
+    const openOffers = [{ id: "o1", buyerId: "b1", productId: "p-active" }];
+
+    it("commit sonrası bildirim gider", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledListingRemoved,
+      ).toHaveBeenCalledWith("b1", "p-active");
+    });
+
+    it("bildirim hatası silmeyi bozmaz", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+      });
+      notifications.notifyOfferCancelledListingRemoved.mockRejectedValue(
+        new Error("push down"),
+      );
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa bildirim gitmez", async () => {
+      const { service, notifications } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+        openOffers,
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(
+        notifications.notifyOfferCancelledListingRemoved,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  // Hesap silme ile alıcı/takas tarafı yarışı (TOCTOU): silme kullanıcı satırını
+  // FOR UPDATE kilitler; böylece eşzamanlı checkout/teklif kabulü/takas ya
+  // beklemeden önce biter (engel denetimi görür) ya da silmeden sonra reddedilir.
+  describe("kullanıcı satırı kilidi", () => {
+    it("ilk iş kullanıcı satırını FOR UPDATE kilitler (arşivden ve ilan kilidinden önce)", async () => {
+      const { service, tx } = makeService({
+        listings: [{ id: "p-active", status: "active" }],
+      });
+
+      await service.deleteAccount("user-1");
+
+      const firstQuery = (tx.$queryRaw.mock.calls[0][0] as string[])
+        .join("?")
+        .replace(/\s+/g, " ");
+      expect(firstQuery).toContain("FROM users WHERE id = ?");
+      expect(firstQuery).toContain("FOR UPDATE");
+      expect(tx.$queryRaw.mock.calls[0][1]).toBe("user-1");
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+      );
+      // İlan satırı kilidi sonra gelir.
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // Silinen kullanıcının ALICI olarak verdiği bekleyen teklifler kapanır;
+  // satıcılara (mevcut ilan-silme bildiriminden ayrı şablonla) haber gider.
+  describe("alıcı olarak verilen teklifler", () => {
+    const buyerOffers = [{ id: "bo1", sellerId: "s1", productId: "p-x" }];
+
+    it("transaction içinde, engel denetiminden önce kapatılır", async () => {
+      const { service, tx } = makeService({ buyerOffers });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.offer.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "cancelled" }),
+        }),
+      );
+      expect(tx.offer.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.order.findMany.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("commit sonrası satıcılara bildirim gider", async () => {
+      const { service, notifications } = makeService({ buyerOffers });
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledBuyerDeleted,
+      ).toHaveBeenCalledWith("s1", "p-x");
+    });
+
+    it("bildirim hatası silmeyi bozmaz", async () => {
+      const { service, notifications } = makeService({ buyerOffers });
+      notifications.notifyOfferCancelledBuyerDeleted.mockRejectedValue(
+        new Error("push down"),
+      );
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa satıcılara bildirim gitmez", async () => {
+      const { service, notifications } = makeService({
+        buyerOffers,
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(
+        notifications.notifyOfferCancelledBuyerDeleted,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("teklifi olmayan hesapta bildirim yok", async () => {
+      const { service, notifications } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(
+        notifications.notifyOfferCancelledBuyerDeleted,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  // KVKK: anonimleştirmeden sonra canlı tablolarda kişisel veri kalmamalı.
+  describe("KVKK kalıntıları", () => {
+    it("kullanıcı adını tekil sentinel'e çeker, doğum tarihini siler", async () => {
+      const { service, tx } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      const { data } = tx.user.update.mock.calls[0][0];
+      expect(data.username).toBe("deleted_user-1");
+      expect(data.birthDate).toBeNull();
+      // Arşiv eski kullanıcı adını taşır (sentinel'den ÖNCE yazıldı).
+      expect(
+        tx.deletedUserIdentity.upsert.mock.calls[0][0].create.username,
+      ).toBe("ahmet");
+    });
+
+    it("banka hesabını ve kurumsal başvurunun iletişim alanlarını arşivden SONRA temizler", async () => {
+      const { service, tx } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.sellerBankAccount.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+      });
+      expect(tx.corporateApplication.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: "user-1" } }),
+      );
+      const archived =
+        tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0];
+      expect(archived).toBeLessThan(
+        tx.sellerBankAccount.deleteMany.mock.invocationCallOrder[0],
+      );
+      expect(archived).toBeLessThan(
+        tx.corporateApplication.updateMany.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("ödenecek hakediş varken banka hesabını korur, silme yine tamamlanır", async () => {
+      const { service, tx } = makeService({ openPayouts: 1 });
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+
+      expect(tx.sellerBankAccount.deleteMany).not.toHaveBeenCalled();
+      expect(tx.user.update).toHaveBeenCalled();
+    });
+
+    it("herkese açık koleksiyonları gizler ve commit sonrası dizinden düşürür", async () => {
+      const { service, tx, search } = makeService({
+        publicCollectionIds: ["c1", "c2"],
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.collection.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["c1", "c2"] } },
+        data: { isPublic: false },
+      });
+      expect(search.removeCollection).toHaveBeenCalledWith("c1");
+      expect(search.removeCollection).toHaveBeenCalledWith("c2");
+    });
+
+    it("dizin hatası silmeyi başarısız göstermez", async () => {
+      const { service, search } = makeService({ publicCollectionIds: ["c1"] });
+      search.removeCollection.mockRejectedValue(new Error("es down"));
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("avatar silme işini transaction İÇİNDE outbox'a yazar", async () => {
+      const { service, tx, outbox } = makeService({
+        avatarUrl: "dev/avatars/a.jpg",
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(outbox.enqueue).toHaveBeenCalledWith(tx, {
+        type: "media.avatar_delete",
+        payload: { key: "dev/avatars/a.jpg" },
+        dedupeKey: "media.avatar_delete:dev/avatars/a.jpg",
+      });
+      expect(outbox.enqueue.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.user.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("yükleme ucunun döndürdüğü public tam URL'i anahtara çevirip yazar", async () => {
+      const { service, outbox } = makeService({
+        avatarUrl: "https://cdn.tarodan.test/dev/avatars/u1/a.jpg",
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(outbox.enqueue).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ payload: { key: "dev/avatars/u1/a.jpg" } }),
+      );
+    });
+
+    it("sosyal girişten gelen avatar URL'i için iş yazmaz", async () => {
+      const { service, outbox } = makeService({
+        avatarUrl: "https://lh3.googleusercontent.com/a",
+      });
+
+      await service.deleteAccount("user-1");
+
+      expect(outbox.enqueue).not.toHaveBeenCalled();
+    });
+
+    it("commit sonrası açık soketleri kapatır", async () => {
+      const { service, realtime } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(realtime.disconnectUser).toHaveBeenCalledWith("user-1");
+    });
+
+    it("soket kapatma hatası silmeyi bozmaz", async () => {
+      const { service, realtime } = makeService();
+      realtime.disconnectUser.mockImplementation(() => {
+        throw new Error("io down");
+      });
+
+      await expect(service.deleteAccount("user-1")).resolves.toBeUndefined();
+    });
+
+    it("silme geri alınırsa soket kapatılmaz, dizin ve avatar işi yok", async () => {
+      const { service, realtime, search } = makeService({
+        publicCollectionIds: ["c1"],
+        ordersInTx: [{ id: "o9", status: "pending_payment" }],
+      });
+
+      await service.deleteAccount("user-1").catch(() => undefined);
+
+      expect(realtime.disconnectUser).not.toHaveBeenCalled();
+      expect(search.removeCollection).not.toHaveBeenCalled();
+    });
   });
 });

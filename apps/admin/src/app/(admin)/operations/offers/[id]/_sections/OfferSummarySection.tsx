@@ -44,6 +44,11 @@ export function OfferSummarySection({ offer }: { offer: OfferRow }) {
         <Field label={t("admin.operations.offers.expiresAt")}>
           {fmtDateTime(offer.expiresAt)}
         </Field>
+        {offer.extendedAt && (
+          <Field label={t("admin.operations.offers.extendedAt")}>
+            {fmtDateTime(offer.extendedAt)}
+          </Field>
+        )}
         <Field label={t("admin.operations.common.createdAt")}>
           {fmtDateTime(offer.createdAt)}
         </Field>

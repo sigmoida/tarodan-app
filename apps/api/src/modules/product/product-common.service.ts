@@ -391,6 +391,8 @@ export class ProductCommonService {
       // Moderasyon reddi gerekçesi — yalnız satıcının kendi listesinde anlamlı;
       // public detay rejected ürünü zaten 404'ler, sızıntı riski yok.
       rejectionReason: product.rejectionReason ?? null,
+      // Satıcının kendi listesi "süresi dolan" ilanı bununla ayırt eder.
+      inactiveReason: product.inactiveReason ?? null,
       isTradeEnabled: product.isTradeEnabled || false,
       // Satıcının NİYETİ (isTradeEnabled) ile GERÇEKTEN takas edilebilirliği
       // ayrı alanlardır: üyelik bitince yetki düşer, bayrak üründe kalır.

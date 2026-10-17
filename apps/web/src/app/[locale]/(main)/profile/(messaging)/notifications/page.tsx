@@ -24,10 +24,15 @@ export default function NotificationsPage() {
   const { ready } = useRequireAuth();
   const [filter, setFilter] = useState<FilterType>("all");
 
-  const { notifications, isLoading, markRead, markAllRead } =
-    useNotifications(ready);
+  const {
+    notifications,
+    isLoading,
+    unreadCount,
+    canMarkAllRead,
+    markRead,
+    markAllRead,
+  } = useNotifications(ready);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
   const filtered = useMemo(
     () =>
       notifications.filter((n) => {
@@ -67,7 +72,7 @@ export default function NotificationsPage() {
                 </option>
               ))}
             </Select>
-            {unreadCount > 0 && (
+            {canMarkAllRead && (
               <Button
                 variant="secondary"
                 onClick={markAllRead}

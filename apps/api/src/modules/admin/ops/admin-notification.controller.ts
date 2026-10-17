@@ -16,9 +16,15 @@ import {
   BadRequestException,
   Res,
 } from "@nestjs/common";
-import { AdminSendNotificationDto } from "../dto/admin-notification.dto";
+import {
+  AdminScheduleNotificationDto,
+  AdminSendNotificationDto,
+  AudienceCountDto,
+  PreviewBroadcastEmailDto,
+} from "../dto/admin-notification.dto";
 
 import { FileInterceptor } from "@nestjs/platform-express";
+import { UPLOAD_MULTER_OPTIONS } from "../../../common/upload/multer-options";
 import {
   ApiTags,
   ApiOperation,
@@ -73,7 +79,6 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -149,18 +154,54 @@ export class AdminNotificationController {
   })
   async scheduleNotification(
     @CurrentUser("id") adminId: string,
-    @Body()
-    body: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      scheduledFor: string;
-    },
+    // DTO: whitelist yoksa e-posta alanları (emailHtml…) sessizce düşerdi.
+    @Body() body: AdminScheduleNotificationDto,
   ) {
     return this.adminService.scheduleNotification(adminId, body);
+  }
+
+  @Post("notifications/email-preview")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview the broadcast email exactly as it will be sent",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Rendered email" })
+  previewBroadcastEmail(@Body() body: PreviewBroadcastEmailDto) {
+    return this.adminService.previewBroadcastEmail(body);
+  }
+
+  @Post("notifications/upload")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @UseInterceptors(FileInterceptor("file", UPLOAD_MULTER_OPTIONS))
+  @ApiOperation({
+    summary:
+      "Upload a notification image (multipart field `file`, jpeg/png/webp, 5 MB; needs only the `notifications` permission)",
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Returns { url, key, … } — put `url` into the notification",
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description: "S3_PUBLIC_BASE_URL is not configured",
+  })
+  // URL segmenti `notifications` → izin matrisinde `notifications`: bildirim
+  // izni olan rol görsel yükler, ürün (`media` → `products`) yüklemesine
+  // erişmeden.
+  async uploadNotificationImage(@UploadedFile() file?: Express.Multer.File) {
+    return this.adminService.uploadNotificationImage(file);
+  }
+
+  @Post("notifications/audience-count")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Count users a broadcast reaches (all / marketing-consented)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Audience counts" })
+  async countNotificationAudience(@Body() body: AudienceCountDto) {
+    return this.adminService.countNotificationAudience(body);
   }
 
   @Get("notifications/scheduled")

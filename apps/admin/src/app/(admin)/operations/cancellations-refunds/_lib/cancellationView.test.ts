@@ -45,6 +45,18 @@ describe("cancellationReasonLabel", () => {
     ).toBe("[status.orderCancellationReason.wrong_card]");
   });
 
+  it("labels an admin (platform) cancellation with the shared reason catalog", () => {
+    expect(
+      cancellationReasonLabel(
+        info({
+          cancelledBy: "platform",
+          reason: { kind: "admin", code: "duplicate_transaction" },
+        }),
+        t,
+      ),
+    ).toBe("[adminCancel.reasons.duplicate_transaction]");
+  });
+
   it("shows system expiries as Süresi Dolan", () => {
     expect(
       cancellationReasonLabel(info({ reason: { kind: "expired" } }), t),
@@ -102,8 +114,8 @@ describe("row helpers", () => {
     expect(refundStateVariant("refunded")).toBe("success");
     expect(refundStateVariant("failed")).toBe("danger");
     expect(refundStateVariant("pending")).toBe("warning");
-    expect(refundStateVariant("in_review")).toBe("info");
-    expect(refundStateVariant("not_charged")).toBe("default");
+    expect(refundStateVariant("in_review")).toBe("default");
+    expect(refundStateVariant("not_charged")).toBe("outline");
   });
 
   it("maps row statuses to catalog keys, unknown ones to cancelled", () => {

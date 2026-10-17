@@ -87,6 +87,48 @@ describe("AdminOfferQueryService", () => {
     ).not.toContain("isTest");
   });
 
+  /** extend_once: yönetici teklifin uzatıldığını ve ne zaman uzatıldığını görür. */
+  it("exposes extendedAt (null until the one-time extension is used)", async () => {
+    const { service, prisma } = makeService();
+    const extendedAt = new Date(now - 1800_000);
+    prisma.offer.findMany.mockResolvedValue([
+      row({ id: "plain" }),
+      row({ id: "extended", extendedAt }),
+    ]);
+    prisma.offer.count.mockResolvedValue(2);
+
+    const result = await service.getOffers({} as any);
+
+    expect(result.data.map((o: any) => [o.id, o.extendedAt ?? null])).toEqual([
+      ["plain", null],
+      ["extended", extendedAt],
+    ]);
+  });
+
+  it("a PayTR id resolves payments once and searches the offer's order by id; an ordinary term does not", async () => {
+    const { service, prisma } = makeService({
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            orderId: "o1",
+            checkoutGroupId: null,
+            tradeCashPaymentId: null,
+          },
+        ]),
+      },
+    });
+    await service.getOffers({ search: "ORDNGGCF4J4V4T790149" } as any);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+    const paytr = JSON.stringify(prisma.offer.findMany.mock.calls[0][0].where);
+    expect(paytr).toContain('"id":{"in":["o1"]}');
+    expect(paytr).toContain("ORD-NGGCF4J4V4");
+    expect(paytr).not.toContain("merchantOidHistory");
+
+    await service.getOffers({ search: "ORD-NGGCF4J4V4" } as any);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it("effectiveStatus: süresi geçmiş pending → expired, diğerleri aynen", () => {
     expect(
       AdminOfferQueryService.effectiveStatus({
@@ -157,8 +199,12 @@ describe("AdminOfferQueryService", () => {
               totalAmount: 830,
               cancelReason: null,
               cancellationType: null,
+              cancelledBy: null,
+              adminCancelReasonCode: null,
               createdAt: new Date(),
               payment: null,
+              shipment: null,
+              refundRequests: [],
             },
           }),
         ]),
@@ -176,6 +222,9 @@ describe("AdminOfferQueryService", () => {
           orderNumber: "ORD-1",
           totalAmount: 830,
           paymentStatus: null,
+          // Panelin iptal uygunluğu için (adminOrderCancelEligibility girdisi).
+          shipment: null,
+          hasActiveRefund: false,
         }),
       }),
     );

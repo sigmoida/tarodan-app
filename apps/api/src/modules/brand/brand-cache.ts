@@ -7,6 +7,9 @@
  */
 export const BRANDS_ALL_CACHE_KEY = "brands:all";
 
+/** `?hasListings=true` varyantı — ayrı anahtar, `BRANDS_CACHE_PATTERN` kapsar. */
+export const BRANDS_WITH_LISTINGS_CACHE_KEY = "brands:all:with-listings";
+
 export const brandSlugCacheKey = (slug: string) => `brands:slug:${slug}`;
 
 /** `CacheService.delPattern` için: marka ile ilgili TÜM anahtarları kapsar. */

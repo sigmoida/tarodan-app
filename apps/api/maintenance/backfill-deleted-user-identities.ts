@@ -54,7 +54,7 @@ async function collectSources(userId: string) {
   const [
     bankAccount,
     corporateApplication,
-    elogoInvoice,
+    fiscalInvoice,
     order,
     payoutTransfer,
     auditLog,
@@ -96,7 +96,7 @@ async function collectSources(userId: string) {
     }),
     // `pending` belge alıcı bilgisinde yer tutucu taşıyabiliyor; kesilmiş
     // belgeler tercih edilir.
-    prisma.elogoInvoice.findFirst({
+    prisma.fiscalInvoice.findFirst({
       where: { recipientUserId: userId, status: { in: ["sent", "signed"] } },
       orderBy: { createdAt: "desc" },
       select: {
@@ -150,7 +150,7 @@ async function collectSources(userId: string) {
   return {
     bankAccount,
     corporateApplication,
-    elogoInvoice,
+    fiscalInvoice,
     order,
     payoutTransfer,
     auditLog: auditLog
@@ -191,6 +191,12 @@ async function main(): Promise<void> {
         email: true,
         username: true,
         displayName: true,
+        // Anonimleştirmede NULL'lanır; satır zaten silinmiş olduğundan burada
+        // boş gelir ve çözümleyici eski kaynaklara düşer. Seçim, kaynak
+        // sözleşmesinin (`IdentityUserSource`) tam karşılanması için.
+        legalFirstName: true,
+        legalLastName: true,
+        nationalId: true,
         phone: true,
         birthDate: true,
         taxId: true,

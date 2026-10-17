@@ -4,10 +4,15 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
-import { api } from "@/lib/api";
+import { api, authApi } from "@/lib/api";
+import { legalIdentitySubmission } from "@/lib/legalIdentity";
+import { registrationConsentDocuments } from "../_lib/auth";
 
 interface RegisterInput {
   displayName: string;
+  legalFirstName: string;
+  legalLastName: string;
+  nationalId: string;
   username: string;
   email: string;
   phone: string;
@@ -15,6 +20,7 @@ interface RegisterInput {
   password: string;
   confirmPassword: string;
   agreeTerms: boolean;
+  agreeKvkk: boolean;
   acceptMarketing: boolean;
 }
 
@@ -33,14 +39,23 @@ export function useRegister() {
     mutationFn: (input: RegisterInput) => {
       // FormPhone stores the normalized full number ("+90" + digits) or "".
       const formattedPhone = input.phone || undefined;
-      return api.post("/auth/register", {
+      return authApi.register({
         displayName: input.displayName,
+        // Kapıyla aynı normalizasyon (TCKN yalnız rakam, ad boşlukları teklenmiş).
+        ...legalIdentitySubmission(input, [
+          "legalFirstName",
+          "legalLastName",
+          "nationalId",
+        ]),
         username: input.username.trim().toLowerCase(),
         email: input.email,
         password: input.password,
         phone: formattedPhone,
         birthDate: input.birthDate,
         acceptsMarketingEmails: input.acceptMarketing,
+        // Sürüm ve zaman sunucuda damgalanır; burada yalnız hangi belgelerin
+        // onaylandığı söylenir.
+        acceptedConsents: registrationConsentDocuments(input),
       });
     },
     onSuccess: (_res, input) => {

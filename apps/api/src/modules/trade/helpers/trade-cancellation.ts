@@ -1,4 +1,5 @@
 import { CancellationActor, TradeStatus } from "@prisma/client";
+import { isTradeExpiryCancelReason } from "./trade-cancel-reasons";
 
 /**
  * "Bir takası iptal etmek" ne demek — TEK tanım (`orderCancelledData`'nın
@@ -23,6 +24,32 @@ export function tradeCancelledData(
   cancelledBy: CancellationActor;
 } {
   return { status: TradeStatus.cancelled, cancelledAt: at, cancelledBy: by };
+}
+
+/**
+ * Takas, ÖDEME süresi dolduğu için süre dolumu taramasınca mı iptal edildi?
+ *
+ * Satır aşamayı ayrıca kaydetmez; karar en dar sinyallerin birleşimidir:
+ * aktör `system` (yalnız cron yolları; taraf iptali buyer/seller, admin
+ * platform yazar), gerekçe süre dolumu sabiti (yalnız tarama yazar — taraf
+ * serbest metinle aynı cümleyi yazsa bile aktörü onu dışarıda tutar), ödeme
+ * son tarihi kurulmuş ve kargolama son tarihi kurulmamış (iptal anında takas
+ * `awaiting_payment`taydı; kargolama süresi aşımı bu kümeye girmez).
+ */
+export function isPaymentExpiryCancellation(trade: {
+  status: TradeStatus;
+  cancelledBy: CancellationActor | null;
+  cancelReason: string | null;
+  paymentDeadline: Date | null;
+  shippingDeadline: Date | null;
+}): boolean {
+  return (
+    trade.status === TradeStatus.cancelled &&
+    trade.cancelledBy === CancellationActor.system &&
+    isTradeExpiryCancelReason(trade.cancelReason) &&
+    trade.paymentDeadline !== null &&
+    trade.shippingDeadline === null
+  );
 }
 
 /**

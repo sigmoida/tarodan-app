@@ -8,7 +8,11 @@
  * the axios `*Api` wrappers.
  */
 
-import { manufacturersApi, listingsApi } from "@/lib/api";
+import {
+  manufacturersApi,
+  listingsApi,
+  MANUFACTURERS_WITH_LISTINGS_PATH,
+} from "@/lib/api";
 import { getServerApiOrigin } from "@/lib/api/origin";
 import { countryToFlag } from "./countryFlag";
 import { BRANDS_DATA } from "./brands-data";
@@ -67,9 +71,10 @@ export function mergeManufacturers(
 
 export async function fetchManufacturersServer(): Promise<ManufacturerApi[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/manufacturers`, {
-      next: { revalidate: 60 },
-    });
+    const res = await fetch(
+      `${API_BASE}/api${MANUFACTURERS_WITH_LISTINGS_PATH}`,
+      { next: { revalidate: 60 } },
+    );
     if (!res.ok) return [];
     return unwrapManufacturers(await res.json());
   } catch {

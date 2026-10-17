@@ -9,6 +9,7 @@ import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./refund/payment-refund.service";
 import { PaymentHoldReleaseService } from "./refund/payment-hold-release.service";
+import { PaymentHoldResidualService } from "./refund/payment-hold-residual.service";
 import { PaymentRefundAttemptService } from "./refund/payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./refund/payment-trade-refund.service";
 import { PaymentReconciliationService } from "./reconciliation/payment-reconciliation.service";
@@ -18,6 +19,7 @@ import { PspReconciliationService } from "./reconciliation/psp-reconciliation.se
 import { RefundReconciliationService } from "./refund/refund-reconciliation.service";
 import { MiscReconciliationService } from "./reconciliation/misc-reconciliation.service";
 import { PaymentInitiationService } from "./checkout/payment-initiation.service";
+import { PaymentOptionalAuthService } from "./checkout/payment-optional-auth.service";
 import { PaymentCallbackService } from "./checkout/payment-callback.service";
 import { PaymentFulfillmentService } from "./fulfillment/payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
@@ -47,8 +49,9 @@ import { PayoutModule } from "../payout/payout.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { CommissionModule } from "../commission/commission.module";
 import { StorageModule } from "../storage/storage.module";
-import { ElogoModule } from "../elogo";
+import { InvoicingModule } from "../invoicing";
 import { DiscountModule } from "../discount";
+import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -65,8 +68,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     CommissionModule,
     StorageModule,
     ProductLockModule,
-    ElogoModule,
+    InvoicingModule,
     DiscountModule,
+    // Ödeme formu kapısı: mesafeli satış onayı (consent_records).
+    ConsentModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     // Üyelik aktivasyonunda satıcının takas ilanları yeniden indekslenir.
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
@@ -82,10 +87,12 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   controllers: [PaymentController, PaytrCallbackAliasController],
   providers: [
     PaymentService,
+    PaymentOptionalAuthService,
     PaymentQueryService,
     PaymentCommonService,
     PaymentRefundService,
     PaymentHoldReleaseService,
+    PaymentHoldResidualService,
     PaymentRefundAttemptService,
     PaymentTradeRefundService,
     PaymentReconciliationService,
@@ -115,6 +122,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   ],
   exports: [
     PaymentService,
+    // Satıcı kusurlu kalıntıyı platforma kapatma (admin ucu + bakım script'i).
+    PaymentHoldResidualService,
     PaymentProviderEventService,
     VirtualOrderFulfillmentService,
     // Admin PSP mutabakat ekranı: tek satır yeniden eşleme + senkron durumu.

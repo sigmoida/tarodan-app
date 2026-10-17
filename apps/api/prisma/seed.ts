@@ -27,10 +27,11 @@ import {
   CommissionLedgerStatus,
   BoostStatus,
   OrderCancellationType,
-  ElogoInvoiceType,
-  ElogoInvoiceStatus,
+  FiscalInvoiceType,
+  FiscalInvoiceStatus,
   ShippingTariffStatus,
   CouponReservationStatus,
+  ConsentSource,
   Prisma,
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
@@ -55,9 +56,9 @@ import { generateReferenceCode } from "../src/common/helpers/generate-reference"
 import { generatePayoutTransIdCode } from "../src/common/helpers/payout-trans-id";
 import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
-  formatElogoInvoiceNumber,
+  formatInvoiceNumber,
   highestSequenceValue,
-} from "../src/modules/elogo/invoice/elogo-document-number";
+} from "../src/modules/invoicing/invoice/document-number";
 import {
   billableDesiForTier,
   tierCodeForDesi,
@@ -69,7 +70,13 @@ import {
   SEED_SHIPPING_TIERS,
 } from "./seed-demo-config";
 import { SEED_COMMISSION_RULE_SET_IDS } from "./seed-ids";
+import { seedHeroContent } from "./seed-hero-content";
+import {
+  INSTAGRAM_HANDLE_PATTERN_SOURCE,
+  WHATSAPP_PATTERN_SOURCE,
+} from "../src/common/helpers/contact-patterns";
 import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
+import { grantPendingAccountConsents } from "../src/modules/consent/helpers/account-consents";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -1287,14 +1294,17 @@ async function main() {
         priority: 10,
       },
     }),
+    // Kalıp ortak kaynaktan (Türkçe kelime sınırlı): "Kawasaki 1" ya da
+    // "Big Rig" eşleşmez. `update` kalıbı tazeler — eski sınırsız kalıp
+    // meşru teklif notlarını yakalıyordu.
     prisma.contentFilter.upsert({
       where: { id: "whatsapp-filter" },
-      update: {},
+      update: { pattern: WHATSAPP_PATTERN_SOURCE },
       create: {
         id: "whatsapp-filter",
         filterType: "social_media",
         name: "WhatsApp",
-        pattern: "(whatsapp|wp|wa)[\\s:]*[\\d+()-]+",
+        pattern: WHATSAPP_PATTERN_SOURCE,
         replacement: "[iletişim bilgisi gizlendi]",
         requiresApproval: true,
         priority: 10,
@@ -1302,12 +1312,12 @@ async function main() {
     }),
     prisma.contentFilter.upsert({
       where: { id: "instagram-filter" },
-      update: {},
+      update: { pattern: INSTAGRAM_HANDLE_PATTERN_SOURCE },
       create: {
         id: "instagram-filter",
         filterType: "social_media",
         name: "Instagram",
-        pattern: "(instagram|ig|insta)[:\\s@]+[a-zA-Z0-9_.]+",
+        pattern: INSTAGRAM_HANDLE_PATTERN_SOURCE,
         replacement: "[sosyal medya gizlendi]",
         requiresApproval: true,
         priority: 8,
@@ -6251,6 +6261,35 @@ async function main() {
     });
   }
 
+  // --- 28c'. Consent records of the demo members ---
+  // Mobile 1.1.0 opens an undismissable consent screen at login when
+  // `GET /consents/me/pending` is not empty; the auto-login Maestro flows
+  // (zeynep, ahmet, ali, ...) would get stuck there. The banned and the "new"
+  // account are left out on purpose: the first never reaches login, the second
+  // stands for the new-member state. Idempotent: a member with a current
+  // consent gets no row; when the version changes only the new one is added.
+  //
+  // Yasal kimlik (ad, soyad, TCKN) BİLİNÇLİ yazılmaz: seed'e gömülü numaralar
+  // public repoda kalıcı olurdu ve gerçek bir kişiye ait olmadıkları garanti
+  // edilemez. Muafiyet (`required:false`) yalnız test şeridine (`isTestAccount`)
+  // aittir; demo hesaplarına verilemez çünkü şerit canlı vitrinden ve diğer
+  // demo hesaplarından yalıtır. Kimlik ekranını geçmesi gereken otomasyon test
+  // şeridi hesabı kullanır (docs/IDENTITY.md "Seed ve test hesapları").
+  const demoMembers = [
+    ...users.filter((u) => String(u.email).endsWith("@demo.com")),
+    corporateSeller,
+  ];
+  for (const member of demoMembers) {
+    await grantPendingAccountConsents(
+      prisma,
+      member.id,
+      ConsentSource.registration,
+    );
+  }
+  console.log(
+    `✅ Demo members: required consents on file (${demoMembers.length})`,
+  );
+
   // --- 28d. Üyelik durum çeşitleri (MEVCUT demo kullanıcılarında) ---
   // cancelled: iptal edildi ama ödenmiş dönem sonuna kadar aktif (currentPeriodEnd gelecekte).
   await prisma.userMembership.upsert({
@@ -7747,13 +7786,13 @@ async function main() {
 
   // SupportTicket waiting_customer: ticketScenarios içinde zaten mevcut (2 örnek) → eklenmedi.
 
-  // --- 29g. eLogo geçmiş faturaları: Invoice + ElogoInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
+  // --- 29g. eLogo geçmiş faturaları: Invoice + FiscalInvoice + SellerUploadedInvoice (SADECE DB kaydı) ---
   const elogoYear = new Date().getFullYear();
   // GİB zorunlu 16 karakter — format runtime ile TEK kaynaktan gelir.
   const elogoPrefix = process.env.ELOGO_INVOICE_PREFIX?.trim() || "TRD";
   const seededElogoNumbers: string[] = [];
   const genElogoNumber = () => {
-    const number = formatElogoInvoiceNumber(
+    const number = formatInvoiceNumber(
       elogoPrefix,
       elogoYear,
       seededElogoNumbers.length + 1,
@@ -7770,9 +7809,9 @@ async function main() {
 
   const invoiceSaleOrders = corpSales.map((s) => s.order);
   const elogoStatuses = [
-    ElogoInvoiceStatus.sent,
-    ElogoInvoiceStatus.signed,
-    ElogoInvoiceStatus.sent,
+    FiscalInvoiceStatus.sent,
+    FiscalInvoiceStatus.signed,
+    FiscalInvoiceStatus.sent,
   ];
   for (let i = 0; i < invoiceSaleOrders.length; i++) {
     const o = invoiceSaleOrders[i];
@@ -7799,9 +7838,9 @@ async function main() {
     // Tarodan'ın KENDİ komisyon gelir e-Arşiv faturası (recipient = satıcı).
     const commissionGross = Number(o.commissionAmount);
     const net = round2(commissionGross / 1.2);
-    await prisma.elogoInvoice.create({
+    await prisma.fiscalInvoice.create({
       data: {
-        type: ElogoInvoiceType.commission,
+        type: FiscalInvoiceType.commission,
         sourceId: o.id,
         recipientUserId: o.sellerId,
         recipientVknTckn: "1234567890",
@@ -7815,10 +7854,10 @@ async function main() {
         total: round2(net * 1.2),
         originalTotal: round2(net * 1.2),
         vatRate: 20,
-        status: elogoStatuses[i] ?? ElogoInvoiceStatus.sent,
-        elogoRefId: `${Math.floor(Math.random() * 1e6)}`,
-        elogoResultCode: 0,
-        elogoResultMsg: "İşlem başarılı",
+        status: elogoStatuses[i] ?? FiscalInvoiceStatus.sent,
+        providerRef: `${Math.floor(Math.random() * 1e6)}`,
+        providerResultCode: 0,
+        providerResultMsg: "İşlem başarılı",
         issuedAt,
         sentAt: issuedAt,
       },
@@ -7836,7 +7875,7 @@ async function main() {
     elogoYear,
   );
   if (seededLastValue > 0) {
-    await prisma.elogoDocSequence.upsert({
+    await prisma.fiscalDocSequence.upsert({
       where: { prefix_year: { prefix: elogoPrefix, year: elogoYear } },
       update: { lastValue: seededLastValue },
       create: {
@@ -8091,6 +8130,11 @@ async function main() {
   } else {
     console.log("⏭️  SEED_SKIP_IMAGES set — skipping user avatars");
   }
+
+  // Vitrin hero'su + güven rozetleri: canlıyla AYNI referans içerik (kodda
+  // yedek slayt yok, yerelde de slider boş kalmasın).
+  await seedHeroContent(prisma);
+  console.log("✅ Hero slides + trust badges ready");
 
   // ==========================================================================
   // Summary

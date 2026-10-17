@@ -1,3 +1,8 @@
+import {
+  DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
+  parseDistanceSalesConsentRequired,
+} from "@tarodan/types";
+
 /**
  * Normalizes the platform_settings API response. The backend sometimes returns
  * a `[{ settingKey, settingValue }]` array and sometimes a plain `{ key: value }`
@@ -33,4 +38,15 @@ export const DEFAULT_PSP_FEE_RATE = 3;
 export function readPspFeeRate(raw: unknown): number {
   const value = Number(readSetting(raw, "psp_fee_rate"));
   return Number.isFinite(value) && value >= 0 ? value : DEFAULT_PSP_FEE_RATE;
+}
+
+/**
+ * Mesafeli satış onayı ödemede zorunlu mu (`distance_sales_consent_required`).
+ * Anahtar ve "yalnız `true` açık" kuralı API ile aynı kaynaktan
+ * (`@tarodan/types`) gelir; ayar yoksa kapalıdır.
+ */
+export function readDistanceSalesConsentRequired(raw: unknown): boolean {
+  return parseDistanceSalesConsentRequired(
+    readSetting(raw, DISTANCE_SALES_CONSENT_REQUIRED_SETTING),
+  );
 }

@@ -1,4 +1,5 @@
 import { BusinessStatus, SellerType } from "@prisma/client";
+import { legalFullName } from "@tarodan/types";
 
 /**
  * Silinen hesabın kimlik arşivi — alan çözümlemesi.
@@ -29,7 +30,30 @@ export function anonymizedEmailFor(userId: string): string {
   return `deleted_${userId}@deleted.local`;
 }
 
-const ANONYMIZED_EMAIL_PATTERN = /^deleted_.+@deleted\.local$/i;
+export const ANONYMIZED_EMAIL_PATTERN = /^deleted_.+@deleted\.local$/i;
+
+/**
+ * Anonimleştirmede kullanıcı adının yerine yazılan sentinel. `User.id` uuid
+ * olduğu için tekildir (`users_username_key` çakışmaz) ve kullanıcı adı deseni
+ * (≤30 karakter, tiresiz) onu üretemez: hiçbir üye bu değeri seçemez.
+ */
+export function anonymizedUsernameFor(userId: string): string {
+  return `deleted_${userId}`;
+}
+
+const ANONYMIZED_USERNAME_PATTERN =
+  /^deleted_[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+/**
+ * Silinmiş hesabın kullanıcı adı sentinel'i mi? Herkese açık gösterim bunu
+ * kimlik saymaz (public-identity). Desen uuid'e bağlıdır: üyenin seçebildiği
+ * `deleted_fan` gibi bir ad sentinel sayılıp gerçek ada düşmesin.
+ */
+export function isAnonymizedUsername(
+  username: string | null | undefined,
+): boolean {
+  return !!username && ANONYMIZED_USERNAME_PATTERN.test(username);
+}
 
 /**
  * Anonimleştirilmiş `users` satırı, kimlik alanları için kaynak DEĞİLDİR.
@@ -54,6 +78,9 @@ export type IdentitySourceKey =
   | "seller_bank_account"
   | "corporate_application"
   | "corporate_stakeholder"
+  // `elogo_invoices` (model: FiscalInvoice) satırı. Değer arşive yazıldı ve
+  // `deleted_user_identities.source_detail`'te saklanıyor; okuyucular bu
+  // değeri arıyor, o yüzden yeniden adlandırılmaz.
   | "elogo_invoice"
   | "order_shipping_address"
   | "payout_transfer"
@@ -66,6 +93,13 @@ export interface IdentityUserSource {
   email: string | null;
   username: string;
   displayName: string | null;
+  /**
+   * Üyenin beyan ettiği yasal kimlik (`User.legalFirstName/LastName/nationalId`).
+   * Her alanın İLK kaynağıdır; boşsa eski kalıntı kaynaklara düşülür.
+   */
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  nationalId: string | null;
   phone: string | null;
   birthDate: Date | null;
   taxId: string | null;
@@ -122,7 +156,7 @@ export interface IdentityCorporateSource {
   stakeholders?: IdentityStakeholderSource[];
 }
 
-export interface IdentityElogoSource {
+export interface IdentityFiscalInvoiceSource {
   id: string;
   recipientVknTckn: string | null;
   recipientName: string | null;
@@ -159,7 +193,7 @@ export interface IdentitySources {
   address?: IdentityAddressSource | null;
   bankAccount?: IdentityBankAccountSource | null;
   corporateApplication?: IdentityCorporateSource | null;
-  elogoInvoice?: IdentityElogoSource | null;
+  fiscalInvoice?: IdentityFiscalInvoiceSource | null;
   order?: IdentityOrderSource | null;
   payoutTransfer?: IdentityPayoutSource | null;
   auditLog?: IdentityAuditSource | null;
@@ -176,6 +210,8 @@ export interface ResolvedIdentityValues {
   email: string | null;
   username: string;
   displayName: string | null;
+  legalFirstName: string | null;
+  legalLastName: string | null;
   phone: string | null;
   birthDate: Date | null;
   nationalId: string | null;
@@ -276,7 +312,7 @@ export function resolveIdentityFields(
     address,
     bankAccount,
     corporateApplication: corp,
-    elogoInvoice: elogo,
+    fiscalInvoice: elogo,
     order,
     payoutTransfer: payout,
     auditLog: audit,
@@ -289,6 +325,8 @@ export function resolveIdentityFields(
   const corpRef: [string, string] | undefined = corp
     ? ["corporateApplicationId", corp.id]
     : undefined;
+  // Ref anahtarı `deleted_user_identities.source_refs`'e yazılıyor; tablo adı
+  // değişse de saklanan veriyle uyum için sabit kalır.
   const elogoRef: [string, string] | undefined = elogo
     ? ["elogoInvoiceId", elogo.id]
     : undefined;
@@ -364,7 +402,9 @@ export function resolveIdentityFields(
       clean(s.fullName) !== null &&
       clean(s.fullName) === clean(corp.authorizedFullName),
   );
+  // Üyenin kendi beyanı (kimlik kapısı) önce; eski kaynaklar yalnız o boşsa.
   const nationalId = r.pick("nationalId", [
+    { value: tcknOrNull(user.nationalId), source: "user" },
     {
       value: tcknOrNull(bankAccount?.tcKimlikNo),
       source: "seller_bank_account",
@@ -490,6 +530,14 @@ export function resolveIdentityFields(
       email,
       username: user.username,
       displayName,
+      // Yasal ad yalnız üyenin beyanından gelir; tahmin edilmez (görünen ad /
+      // adres adı başka bir kişinin ya da takma ad olabilir).
+      legalFirstName: r.pick("legalFirstName", [
+        { value: user.legalFirstName, source: "user" },
+      ]),
+      legalLastName: r.pick("legalLastName", [
+        { value: user.legalLastName, source: "user" },
+      ]),
       phone,
       birthDate: r.fromUser("birthDate", user.birthDate),
       nationalId,
@@ -514,31 +562,36 @@ export function resolveIdentityFields(
 }
 
 /**
- * Aylık bildirim dosyasının kolon sözleşmesi. Müşteri bu dosyayı resmî bir
- * portala yüklüyor: kolon kümesi ve SIRASI tek yerde tanımlı, XLSX ve CSV aynı
- * listeyi kullanır. Değişiklik `EXPORT_FORMAT_VERSION` ile görünür olur.
+ * Bildirimdeki "Ad Soyad / Unvan" değeri: üyenin yasal adı (ad VE soyad
+ * birlikte) varsa o, yoksa silme anındaki ad (eski hesaplar). Yarım yasal ad
+ * ("Ayşe") tam addan üstün tutulmaz. Kolon kümesi değişmez — yalnız değerin
+ * kaynağı güçlenir, bu yüzden biçim sürümü artmaz.
  */
-export const EXPORT_FORMAT_VERSION = "1";
+export function archiveLegalFullName(row: {
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  displayName: string | null;
+}): string | null {
+  return (
+    legalFullName(row.legalFirstName, row.legalLastName) ??
+    clean(row.displayName)
+  );
+}
 
-export const ARCHIVE_EXPORT_COLUMNS = [
-  { key: "adminCode", header: "Kullanıcı Kodu" },
-  { key: "username", header: "Kullanıcı Adı" },
-  { key: "displayName", header: "Ad Soyad / Unvan" },
-  { key: "email", header: "E-posta" },
-  { key: "phone", header: "Telefon" },
-  { key: "nationalId", header: "TC Kimlik No" },
-  { key: "taxId", header: "Vergi No" },
-  { key: "taxOffice", header: "Vergi Dairesi" },
-  { key: "companyName", header: "Firma Adı" },
-  { key: "addressCity", header: "İl" },
-  { key: "addressDistrict", header: "İlçe" },
-  { key: "addressLine", header: "Adres" },
-  { key: "iban", header: "IBAN" },
-  { key: "wasSeller", header: "Satıcı" },
-  { key: "registeredAt", header: "Kayıt Tarihi" },
-  { key: "deletedAt", header: "Silinme Tarihi" },
-  { key: "retainUntil", header: "Saklama Bitişi" },
-] as const;
-
-export type ArchiveExportColumnKey =
-  (typeof ARCHIVE_EXPORT_COLUMNS)[number]["key"];
+/**
+ * Arşivdeki TCKN üyenin KENDİ beyanından mı (`User.nationalId`, kimlik kapısı)
+ * geldi? `sourceDetail.nationalId === "user"` bunu söyler; bu alandan önceki
+ * arşiv satırlarında numara eski kaynaklardan (banka hesabı, ortak kaydı,
+ * fatura) gelmiştir ve beyan sayılmaz.
+ */
+export function archivedNationalIdIsDeclared(sourceDetail: unknown): boolean {
+  if (
+    !sourceDetail ||
+    typeof sourceDetail !== "object" ||
+    Array.isArray(sourceDetail)
+  ) {
+    return false;
+  }
+  const source: IdentitySourceKey = "user";
+  return (sourceDetail as Record<string, unknown>).nationalId === source;
+}

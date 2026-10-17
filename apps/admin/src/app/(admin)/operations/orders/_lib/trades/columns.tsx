@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { TextLink } from "@/components/TextLink";
 import { Badge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { cancelReasonLabel } from "@/lib/utils";
 import { col, TruncatedText } from "@/components/table";
 import { fmtTry } from "@/lib/format";
-import { type Trade, disputeConfig, cashPayer } from "./trades";
+import {
+  type Trade,
+  disputeConfig,
+  cashPayer,
+  tradeCancelNote,
+} from "./trades";
 import { statusConfig } from "@/lib/statusLabels";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 
@@ -16,14 +21,14 @@ export function tradeColumns(t: T) {
       t("admin.operations.trades.tradeNumber"),
       (trade) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
-          <Link
+          <TextLink
             href={`/operations/trades/${trade.id}`}
-            className="block max-w-full text-primary-600 hover:underline"
+            className="block max-w-full"
           >
             <TruncatedText className="font-mono">
               {trade.tradeNumber}
             </TruncatedText>
-          </Link>
+          </TextLink>
           <TestLaneBadge isTest={trade.isTest} />
         </div>
       ),
@@ -31,7 +36,6 @@ export function tradeColumns(t: T) {
         minWidth: 240,
         sortKey: "tradeNumber",
         sortType: "text",
-        exportValue: (trade) => trade.tradeNumber,
       },
     ),
     col.custom<Trade>(
@@ -49,12 +53,11 @@ export function tradeColumns(t: T) {
               status={r.status}
               config={statusConfig(tradeStatusConfig, t)}
             />
-            {r.status === "cancelled" &&
-              cancelReasonLabel(r.cancelReason, t) && (
-                <span className="truncate text-xs text-muted">
-                  {cancelReasonLabel(r.cancelReason, t)}
-                </span>
-              )}
+            {tradeCancelNote(r, t) && (
+              <span className="truncate text-xs text-muted">
+                {tradeCancelNote(r, t)}
+              </span>
+            )}
           </div>
         ),
       { grow: 2, minWidth: 200, sortKey: "status", sortType: "text" },
@@ -101,10 +104,6 @@ export function tradeColumns(t: T) {
         minWidth: 240,
         sortKey: "cashAmount",
         sortType: "number",
-        exportValue: (r) =>
-          r.cashAmount
-            ? `${r.cashAmount} / ${cashPayer(r)?.displayName ?? ""}`
-            : "",
       },
     ),
     col.date<Trade>(t("common.date"), "createdAt"),

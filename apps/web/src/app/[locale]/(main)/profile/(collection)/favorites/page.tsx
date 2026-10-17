@@ -6,19 +6,10 @@ import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
-import { useFavorites } from "./_hooks/useFavorites";
-import FavoritesGrid from "./_components/FavoritesGrid";
+import { useFavorites } from "@/hooks/useFavorites";
+import FavoritesGrid from "@/components/favorites/FavoritesGrid";
+import FavoritesSkeleton from "@/components/favorites/FavoritesSkeleton";
 import ShareFavoritesButton from "./_components/ShareFavoritesButton";
-
-function FavoritesSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="h-40 rounded bg-border-subtle sm:h-64" />
-      ))}
-    </div>
-  );
-}
 
 export default function FavoritesPage() {
   const t = useTranslations();
@@ -26,11 +17,13 @@ export default function FavoritesPage() {
 
   const {
     items,
+    pendingCount,
     isLoading,
     isSharedView,
     handleRemove,
     handleCartToggle,
     isInCart,
+    isPending,
   } = useFavorites();
 
   // Private favorites require auth; a shared (?ids=) view is public.
@@ -50,7 +43,8 @@ export default function FavoritesPage() {
         title={
           isSharedView ? t("favorites.sharedList") : t("favorites.myFavorites")
         }
-        description={`${items.length} ${t("favorites.itemsInFavorites")}`}
+        // Yükleniyor kartları da sayılır: header rozetiyle aynı sayı.
+        description={`${items.length + pendingCount} ${t("favorites.itemsInFavorites")}`}
         actions={
           !isSharedView && items.length > 0 ? (
             <ShareFavoritesButton productIds={items.map((i) => i.productId)} />
@@ -63,10 +57,12 @@ export default function FavoritesPage() {
       ) : (
         <FavoritesGrid
           items={items}
+          pendingCount={pendingCount}
           isSharedView={isSharedView}
           onRemove={handleRemove}
           onCartToggle={handleCartToggle}
           isInCart={isInCart}
+          isPending={isPending}
         />
       )}
     </PageShell>

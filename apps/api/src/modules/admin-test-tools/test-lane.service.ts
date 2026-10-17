@@ -4,10 +4,16 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, ProductStatus, SellerType } from "@prisma/client";
+import {
+  ConsentSource,
+  Prisma,
+  ProductStatus,
+  SellerType,
+} from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../prisma";
 import { AccountLaneService } from "../account-lane/account-lane.service";
+import { grantPendingAccountConsents } from "../consent/helpers/account-consents";
 import { i18nMessage } from "../i18n";
 import { CreateTestAccountDto } from "./dto/create-test-account.dto";
 
@@ -42,8 +48,11 @@ const DEFAULT_TEST_ADDRESS = {
 /**
  * Canlı ortamdaki test şeridinin yönetimi (yalnız süper-admin, controller gate'ler).
  *
- * - Hesap açma: doğrulanmış (e-posta/telefon), `isTestAccount=true`, varsayılan adresli.
- *   Reviewer SMS/e-posta doğrulaması yapamaz; bu yüzden hesap hazır gelir.
+ * - Hesap açma: doğrulanmış (e-posta/telefon), `isTestAccount=true`, varsayılan adresli,
+ *   yürürlükteki zorunlu sözleşmeleri onaylı. Reviewer SMS/e-posta doğrulaması ve
+ *   onay penceresi yapamaz (mobil girişte kapatılamaz ekran açılır); bu yüzden hesap
+ *   hazır gelir. Yasal kimlik ayrıca istenmez: test şeridi kapıdan muaftır
+ *   (`isLegalIdentityExempt`).
  * - Şerit sıfırlama: test hesaplarının İŞLEM kayıtlarını siler (sipariş, ödeme, takas,
  *   teklif, sepet, ledger…), hesapları ve ilanları korur; satılan ilanları yeniden
  *   satışa açar. Silme sırası FK zincirini izler ve tek transaction'da koşar.
@@ -139,6 +148,17 @@ export class TestLaneService {
           ...DEFAULT_TEST_ADDRESS,
         },
       });
+      // Zorunlu belgeler yürürlükteki sürümle onaylı. `ConsentService.record`
+      // KULLANILMAZ: o, isteğin IP ve kullanıcı ajanını kanıt olarak damgalar;
+      // burada istek süper admin'indir ve ekleme-yalnız tabloda sonradan
+      // düzeltilemeyecek yanlış bir "kullanıcı kayıtta onayladı" izi olurdu.
+      // Kanıt alanları BOŞ kalır (backfill ile aynı).
+      // Belge sürümü sonradan değişirse `backfill:prod:test-account-consents`.
+      await grantPendingAccountConsents(
+        tx,
+        created.id,
+        ConsentSource.registration,
+      );
       return created;
     });
     await this.lanes.invalidate(user.id);

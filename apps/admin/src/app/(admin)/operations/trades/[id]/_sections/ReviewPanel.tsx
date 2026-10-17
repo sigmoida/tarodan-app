@@ -1,11 +1,7 @@
 "use client";
 
-import { Button } from "@tarodan/ui";
-import {
-  BuildingStorefrontIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
+import { Alert, Button } from "@tarodan/ui";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 
 /**
@@ -33,22 +29,11 @@ export function ReviewPanel({
   if (!show) return null;
 
   return (
-    <div className="rounded-xl border-2 border-warning-400 bg-warning-50 p-6 shadow-sm">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
-        <div className="flex items-start gap-3">
-          <BuildingStorefrontIcon className="h-8 w-8 flex-shrink-0 text-warning-600" />
-          <div>
-            <h2 className="text-lg font-semibold text-warning-900">
-              {t("admin.operations.trades.reviewTitle")}
-            </h2>
-            <p className="mt-1 text-sm text-warning-800">
-              {underReview
-                ? t("admin.operations.trades.reviewInProgress")
-                : t("admin.operations.trades.reviewBody")}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+    <Alert
+      variant="warning"
+      title={t("admin.operations.trades.reviewTitle")}
+      action={
+        <div className="flex flex-wrap gap-2">
           {!underReview && (
             <Button
               variant="secondary"
@@ -67,7 +52,13 @@ export function ReviewPanel({
             {t("common.confirm")}
           </Button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <p>
+        {underReview
+          ? t("admin.operations.trades.reviewInProgress")
+          : t("admin.operations.trades.reviewBody")}
+      </p>
+    </Alert>
   );
 }

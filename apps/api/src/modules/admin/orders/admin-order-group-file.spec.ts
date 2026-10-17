@@ -263,6 +263,121 @@ describe("AdminAnalyticsOrderService.getOrderGroupFile", () => {
     expect(file.packages[0].shipping.sellerShippingAmount).toBe(10);
   });
 
+  it("ödeme bloğu PayTR sipariş no'yu ve önceki denemeleri (yeniden eskiye) taşır, ham metadata'yı sızdırmaz", async () => {
+    const { svc, prisma } = makeService();
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o9",
+      checkoutGroupId: null,
+    });
+    prisma.order.findMany.mockResolvedValue([
+      baseOrder("o9", {
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        payment: {
+          id: "pay-9",
+          status: "completed",
+          amount: 245,
+          provider: "paytr",
+          providerPaymentId: null,
+          providerConversationId: "ORDAAAAAAAAAAT000003",
+          metadata: {
+            merchantOidHistory: [
+              "ORDAAAAAAAAAAT000001",
+              "ORDAAAAAAAAAAT000002",
+            ],
+            lastChargeStartedAt: "2026-07-01T00:00:00.000Z",
+          },
+          paidAt: new Date("2026-07-01"),
+          refundAttempts: [],
+        },
+      }),
+    ]);
+
+    const file = await svc.getOrderGroupFile("o9");
+
+    expect(file.payment).toMatchObject({
+      paytrOid: "ORDAAAAAAAAAAT000003",
+      paytrOidHistory: ["ORDAAAAAAAAAAT000002", "ORDAAAAAAAAAAT000001"],
+    });
+    expect(file.payment).not.toHaveProperty("metadata");
+  });
+
+  it("hazırlık son tarihini ve tek seferlik uzatmanın kaydını taşır", async () => {
+    const { svc, prisma } = makeService();
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o9",
+      checkoutGroupId: null,
+    });
+    const extendedDeadline = new Date("2026-10-10T09:00:00.000Z");
+    const extendedAt = new Date("2026-10-07T09:00:00.000Z");
+    const original = new Date("2026-10-07T08:00:00.000Z");
+    prisma.order.findMany.mockResolvedValue([
+      baseOrder("o9", {
+        status: "preparing",
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        payment: null,
+        preparingDeadline: extendedDeadline,
+        preparingExtendedAt: extendedAt,
+        originalPreparingDeadline: original,
+      }),
+      baseOrder("o10", {
+        status: "preparing",
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        payment: null,
+        preparingDeadline: original,
+      }),
+    ]);
+
+    const file = await svc.getOrderGroupFile("o9");
+    const [extended, plain] = file.packages.flatMap((p) => p.orders);
+
+    expect(extended).toMatchObject({
+      preparingDeadline: extendedDeadline,
+      preparingExtendedAt: extendedAt,
+      originalPreparingDeadline: original,
+    });
+    expect(plain).toMatchObject({
+      preparingDeadline: original,
+      preparingExtendedAt: null,
+      originalPreparingDeadline: null,
+    });
+  });
+
+  it("iptali kimin yaptığını, yönetici nedenini ve kaynağı taşır", async () => {
+    const { svc, prisma } = makeService();
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o11",
+      checkoutGroupId: null,
+    });
+    prisma.order.findMany.mockResolvedValue([
+      baseOrder("o11", {
+        status: "cancelled",
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        payment: null,
+        origin: "offer",
+        cancelledBy: "platform",
+        adminCancelReasonCode: "stock_error",
+        cancelReason: "Yönetici tarafından iptal edildi: Stok hatası",
+      }),
+    ]);
+
+    const file = await svc.getOrderGroupFile("o11");
+    const [entry] = file.packages.flatMap((p) => p.orders);
+
+    expect(entry).toMatchObject({
+      origin: "offer",
+      cancelledBy: "platform",
+      adminCancelReasonCode: "stock_error",
+    });
+  });
+
   it("sipariş yoksa NotFound", async () => {
     const { svc, prisma } = makeService();
     prisma.order.findUnique.mockResolvedValue(null);

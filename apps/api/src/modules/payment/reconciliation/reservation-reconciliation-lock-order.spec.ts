@@ -38,6 +38,11 @@ describe("ReservationReconciliationService.reconcileReservedQuantities — kilit
           callOrder.push("UPDATE");
           return Promise.resolve({});
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Rezervasyon bırakmanın kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     const prisma = {

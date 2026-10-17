@@ -3,15 +3,12 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import {
-  HeartIcon,
-  EyeIcon,
-  ShareIcon,
-  FlagIcon,
-} from "@heroicons/react/24/outline";
+import { HeartIcon, EyeIcon, FlagIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import ShareMenu from "@/components/share/ShareMenu";
+import { collectionSharePath } from "@/lib/share";
 import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
@@ -34,7 +31,6 @@ export default function CollectionHeaderCard() {
     isOwner,
     isLiked,
     sortedItems,
-    handleShare,
     handleLike,
     setShowAddModal,
     handleReport,
@@ -80,7 +76,9 @@ export default function CollectionHeaderCard() {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-heading md:text-3xl">
+              {/* 360px'de sağdaki 3 düğme (128px) başlığa ~150px bırakır; uzun tek
+                  kelimelik ad satırı taşıp düğmelerin altına girmesin diye kırılır. */}
+              <h1 className="break-words text-2xl font-bold tracking-tight text-heading md:text-3xl">
                 {collection.name}
               </h1>
               {collection.description && (
@@ -91,14 +89,12 @@ export default function CollectionHeaderCard() {
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
-              <IconButton
-                variant="ghost"
-                onClick={handleShare}
-                aria-label={t("collection.share")}
-                title={t("collection.share")}
-              >
-                <ShareIcon className="h-5 w-5" />
-              </IconButton>
+              <ShareMenu
+                path={collectionSharePath(collectionIdOrSlug)}
+                title={collection.name}
+                text={collection.name}
+                iconClassName="h-5 w-5"
+              />
               {!isOwner && (
                 <>
                   <IconButton

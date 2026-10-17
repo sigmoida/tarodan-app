@@ -147,6 +147,11 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       product: {
         findUnique: jest.fn().mockResolvedValue({ quantity: 5 }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Stok geri yüklemenin kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       offer: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
@@ -200,16 +205,18 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
     };
     const providerEvents = { record: jest.fn().mockResolvedValue(undefined) };
+    const notifications = {
+      createInAppNotification: jest.fn().mockResolvedValue(undefined),
+      sendOrderCancelledEmails: jest.fn().mockResolvedValue(undefined),
+      notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
+      notifyOrderCancelledByPlatform: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new PaymentRefundService(
       prisma as any,
       { get: jest.fn().mockReturnValue(undefined) } as any,
       { resolve: () => paytr } as any,
       { emitPaymentRefunded: jest.fn().mockResolvedValue(undefined) } as any,
-      {
-        createInAppNotification: jest.fn().mockResolvedValue(undefined),
-        sendOrderCancelledEmails: jest.fn().mockResolvedValue(undefined),
-        notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      notifications as any,
       commissionLedger as any,
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as any,
       paymentCommon as any,
@@ -229,6 +236,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       commissionLedger,
       paymentCommon,
       providerEvents,
+      notifications,
     };
   };
 
@@ -436,6 +444,135 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         status: "cancelled",
         cancelReason: "Bağlı sipariş iade edildiği için teklif kapatıldı",
       },
+    });
+  });
+
+  /**
+   * İncelemeye düşmüş yönetici iptali sonradan (admin onayı, takılı deneme
+   * kurtarması) bu iadeyle kesinleşir: neden kodu siparişin kapandığı AYNI
+   * yazımda, taraflara genel metin değil nedenli platform duyurusu.
+   */
+  describe("yönetici iptalinin geç tamamlanması", () => {
+    const platformOpts = {
+      cancelledBy: CancellationActor.platform,
+      adminCancelReasonCode: "stock_error" as const,
+      idempotencyKey: "refund-request:rr-1",
+      settlement: { closeOrder: true },
+    };
+
+    it("kodu siparişi kapatan yazıma koyar ve platform duyurusunu gönderir (genel duyuru yok)", async () => {
+      const { service, mockTx, notifications } = makeService({
+        paymentAmount: 1000,
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: ORDER_ID },
+        data: expect.objectContaining({
+          status: "cancelled",
+          cancelledBy: CancellationActor.platform,
+          adminCancelReasonCode: "stock_error",
+        }),
+      });
+      // Çağıranlar duyuruyu bu dönüşe bağlar.
+      expect(result?.closedWithAdminReason).toBe("stock_error");
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyOrderCancelledByPlatform).toHaveBeenCalledWith(
+        {
+          orderId: ORDER_ID,
+          reasonCode: "stock_error",
+          refundAmount: 1000,
+        },
+      );
+      expect(notifications.notifyOrderCancelledParties).not.toHaveBeenCalled();
+    });
+
+    it("skipRefundEvent: kod yazılır ama duyuru çağıranındır (çift mesaj yok)", async () => {
+      const { service, mockTx, notifications } = makeService({
+        paymentAmount: 1000,
+      });
+
+      await service.processRefund(ORDER_ID, 1000, {
+        ...platformOpts,
+        skipRefundEvent: true,
+      });
+
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: ORDER_ID },
+        data: expect.objectContaining({ adminCancelReasonCode: "stock_error" }),
+      });
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("sipariş başka yolla zaten iptal edildiyse kod yazılmaz, platform duyurusu gitmez", async () => {
+      const { service, mockTx, notifications } = makeService({
+        paymentAmount: 1000,
+      });
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "cancelled",
+        cancelledBy: CancellationActor.system,
+        productId: "prod-1",
+        quantity: 1,
+        stockRestoredAt: new Date(),
+        buyerId: "b1",
+        sellerId: "s1",
+        orderNumber: "ORD1",
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      const closeWrite = mockTx.order.update.mock.calls.find(
+        (call: any[]) => call[0].data?.status === "cancelled",
+      );
+      expect(closeWrite?.[0].data).not.toHaveProperty("adminCancelReasonCode");
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+      // Bu iade siparişi platform iptali olarak KAPATMADI: çağıran da duyuru
+      // göndermez (admin onayı / orkestratör).
+      expect(result?.closedWithAdminReason).toBeNull();
+    });
+
+    it("aynı deneme başka bir çağrıda zaten sonlandırıldıysa (kurtarma kazandı) idempotent döner: kod null, duyuru yok", async () => {
+      const { service, notifications, paytr } = makeService({
+        paymentAmount: 1000,
+        existingAttempt: {
+          idempotencyKey: "refund-request:rr-1",
+          amount: 1000,
+          status: RefundAttemptStatus.finalized,
+          providerRefundId: "REFUND1",
+        },
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      expect(result).toMatchObject({
+        idempotent: true,
+        closedWithAdminReason: null,
+      });
+      expect(paytr.createRefund).not.toHaveBeenCalled();
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("alıcı aktörlü iadede kod verilse bile yazılmaz", async () => {
+      const { service, mockTx } = makeService({ paymentAmount: 1000 });
+
+      await service.processRefund(ORDER_ID, 1000, {
+        ...platformOpts,
+        cancelledBy: CancellationActor.buyer,
+      });
+
+      const closeWrite = mockTx.order.update.mock.calls.find(
+        (call: any[]) => call[0].data?.status === "cancelled",
+      );
+      expect(closeWrite?.[0].data).not.toHaveProperty("adminCancelReasonCode");
     });
   });
 
@@ -674,6 +811,300 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     expect(captured.holdUpdate.data).toEqual(
       expect.objectContaining({ refundedAmount: 0 }),
     );
+  });
+
+  /**
+   * v2 defers the outbound shipping legs to the refund that COMPLETES the line
+   * (K7). In a two-unit order returned one unit at a time, the first refund
+   * already consumed half of the hold, and the completing refund carries the
+   * seller's shipping share as `holdRetainedAmount`. That amount is what must
+   * be LEFT in the hold after this refund, so the cap counts what earlier
+   * refunds consumed; capping only this refund's slice let the hold be consumed
+   * in full and the seller's share silently ended with the platform.
+   */
+  describe("line-completing refund after an earlier partial", () => {
+    // hold 860 for qty 2; the first unit, refunded earlier for 500, consumed 430.
+    const priorPartial = {
+      paymentAmount: 1140,
+      holdAmount: 860,
+      holdRefundedAmount: 430,
+      metadata: { refundedOrders: { [ORDER_ID]: 500 } },
+    };
+    const twoUnitOrder = (mockTx: { order: { findUnique: jest.Mock } }) =>
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "delivered",
+        productId: "prod-1",
+        quantity: 2,
+        stockRestoredAt: null,
+        offerId: null,
+        sellerId: "s1",
+        buyerId: "b1",
+        cancelledBy: null,
+        deliveredAt: new Date("2026-10-01T09:00:00.000Z"),
+      });
+    const completing = (refundAmount: number, holdRetainedAmount: number) => ({
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: `completing-refund-${refundAmount}`,
+      refundQuantity: 1,
+      settlement: {
+        // The request returns one of two units: it does not close the order.
+        closeOrder: false,
+        holdPortion: 0.5,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount,
+      },
+    });
+    const closedTheOrder = (mockTx: { order: { update: jest.Mock } }) =>
+      mockTx.order.update.mock.calls.some(
+        ([arg]) => arg?.data?.status === "cancelled",
+      );
+
+    it("non-seller fault: leaves the share held and keeps the order open", async () => {
+      const { service, captured, mockTx } = makeService(priorPartial);
+      twoUnitOrder(mockTx);
+
+      // Buyer charged return and share: 500 + 452 < 1140 paid.
+      await service.processRefund(ORDER_ID, 452, completing(452, 48));
+
+      // 860 − 48 = 812 consumed in total (430 earlier + 382 now); 48 stays
+      // held for the seller, the hold is not cancelled.
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({
+          refundedAmount: 812,
+          frozenByRefundId: null,
+        }),
+      );
+      expect(captured.holdUpdate.data.status).toBeUndefined();
+      // The order stays delivered: the share goes out on the normal release.
+      expect(closedTheOrder(mockTx)).toBe(false);
+      expect(mockTx.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ quantity: { increment: 1 } }),
+        }),
+      );
+    });
+
+    it("seller fault: retains nothing, consumes the hold and closes the order", async () => {
+      const { service, captured, mockTx } = makeService(priorPartial);
+      twoUnitOrder(mockTx);
+
+      // The buyer gets everything back: 500 + 640 = 1140 = paid.
+      await service.processRefund(ORDER_ID, 640, completing(640, 0));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({
+          status: PaymentHoldStatus.cancelled,
+          refundedAmount: 860,
+        }),
+      );
+      expect(closedTheOrder(mockTx)).toBe(true);
+    });
+
+    it("small hold: gives back the part of an earlier slice past the share", async () => {
+      // Cheap item: hold 60, share 48. The first unit took 30; leaving 48
+      // means only 12 may stay consumed. The buyer was charged the share.
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 200,
+        holdAmount: 60,
+        holdRefundedAmount: 30,
+        metadata: { refundedOrders: { [ORDER_ID]: 70 } },
+      });
+      twoUnitOrder(mockTx);
+
+      await service.processRefund(ORDER_ID, 22, completing(22, 48));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 12 }),
+      );
+      expect(captured.holdUpdate.data.status).toBeUndefined();
+    });
+  });
+
+  describe("D20: the request's own fault counts too", () => {
+    // A seller-fault cancellation finalized before the source fix still
+    // carries the seller's share in its stored components. Some paths mark
+    // the request refunded only after processRefund, so the check must read
+    // the request's own fault, not only the earlier finalized ones.
+    const fullCancellation = (refundFault: {
+      faultParty: "seller" | "buyer" | null;
+      policyCode: string;
+    }) => ({
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: `own-fault-${refundFault.policyCode}`,
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 48,
+        refundFault,
+      },
+    });
+
+    it.each([
+      [
+        "v2 seller",
+        { faultParty: "seller" as const, policyCode: "v2_seller_cancellation" },
+      ],
+      [
+        "v1 seller",
+        { faultParty: null, policyCode: "seller_fault_cancellation" },
+      ],
+    ])(
+      "%s fault: nothing is retained, the hold is consumed",
+      async (_n, fault) => {
+        const { service, captured } = makeService({
+          paymentAmount: 1140,
+          holdAmount: 860,
+        });
+
+        await service.processRefund(ORDER_ID, 1140, fullCancellation(fault));
+
+        expect(captured.holdUpdate.data).toEqual(
+          expect.objectContaining({
+            status: PaymentHoldStatus.cancelled,
+            refundedAmount: 860,
+          }),
+        );
+      },
+    );
+
+    it("non-seller fault: the share stays held", async () => {
+      const { service, captured } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+
+      await service.processRefund(
+        ORDER_ID,
+        1140,
+        fullCancellation({
+          faultParty: "buyer",
+          policyCode: "v2_buyer_cancellation",
+        }),
+      );
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 812 }),
+      );
+      expect(captured.holdUpdate.data.status).toBeUndefined();
+    });
+  });
+
+  describe("D20 backstop vs a request decided under the old rule", () => {
+    // The order already has a finalized seller-fault refund. A buyer-fault
+    // request decided before D20 charged the buyer the seller's share: the
+    // hold keeps what the buyer paid for, so it is collected once.
+    const oldRuleBuyerFault = (sellerShareChargedToBuyer: number) => ({
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: `old-rule-${sellerShareChargedToBuyer}`,
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 48,
+        refundFault: {
+          faultParty: "buyer" as const,
+          policyCode: "v2_buyer_return",
+        },
+        sellerShareChargedToBuyer,
+      },
+    });
+    const withEarlierSellerFault = (mockTx: {
+      order: { findUnique: jest.Mock };
+    }) =>
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "delivered",
+        productId: "prod-1",
+        quantity: 1,
+        stockRestoredAt: null,
+        offerId: null,
+        sellerId: "s1",
+        buyerId: "b1",
+        cancelledBy: null,
+        refundRequests: [
+          { faultParty: "seller", policyCode: "v2_seller_return" },
+        ],
+      });
+
+    it("the buyer paid the whole share: 48 stays for the seller", async () => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+      withEarlierSellerFault(mockTx);
+
+      await service.processRefund(ORDER_ID, 900, oldRuleBuyerFault(48));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 812 }),
+      );
+    });
+
+    it("the v2 cap scaled the charge to 17: only 17 stays, the rest is forfeited", async () => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+      withEarlierSellerFault(mockTx);
+
+      await service.processRefund(ORDER_ID, 900, oldRuleBuyerFault(17));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({ refundedAmount: 843 }),
+      );
+    });
+
+    it("no charge to the buyer: the share is forfeited in full", async () => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 1140,
+        holdAmount: 860,
+      });
+      withEarlierSellerFault(mockTx);
+
+      await service.processRefund(ORDER_ID, 900, oldRuleBuyerFault(0));
+
+      expect(captured.holdUpdate.data).toEqual(
+        expect.objectContaining({
+          status: PaymentHoldStatus.cancelled,
+          refundedAmount: 860,
+        }),
+      );
+    });
+  });
+
+  it("an earlier goodwill refund does not eat the share of a later full non-fault refund", async () => {
+    // 50 TL goodwill (amount ratio) consumed 50 of a 1000 hold. The later full
+    // refund still leaves the seller's 48: 1000 − 48 = 952 consumed in total.
+    // (It used to cap only its own slice: 50 + 952 ≥ 1000 cancelled the hold.)
+    const { service, captured } = makeService({
+      paymentAmount: 1250,
+      holdAmount: 1000,
+      holdRefundedAmount: 50,
+      metadata: { refundedOrders: { [ORDER_ID]: 50 } },
+    });
+
+    await service.processRefund(ORDER_ID, 1200, {
+      cancelledBy: CancellationActor.buyer,
+      idempotencyKey: "full-after-goodwill",
+      refundQuantity: 1,
+      settlement: {
+        closeOrder: true,
+        holdPortion: 1,
+        sellerFeeRefundAmount: 0,
+        buyerFeeRefundAmount: 0,
+        holdRetainedAmount: 48,
+      },
+    });
+
+    expect(captured.holdUpdate.data).toEqual(
+      expect.objectContaining({ refundedAmount: 952 }),
+    );
+    expect(captured.holdUpdate.data.status).toBeUndefined();
   });
 
   /**

@@ -5,7 +5,11 @@ import {
   TRADE_EXPIRY_CANCEL_REASONS,
   isTradeExpiryCancelReason,
 } from "./trade-cancel-reasons";
-import { tradeCancelledData, tradePartyActor } from "./trade-cancellation";
+import {
+  isPaymentExpiryCancellation,
+  tradeCancelledData,
+  tradePartyActor,
+} from "./trade-cancellation";
 
 describe("tradeCancelledData", () => {
   it("stamps the cancellation moment and the actor alongside the status", () => {
@@ -95,5 +99,76 @@ describe("trade expiry reasons", () => {
     expect(TRADE_CANCEL_REASON.membershipDowngraded).toBe(
       "Üyelik süresi sona erdiği için bekleyen takas teklifiniz otomatik iptal edildi.",
     );
+  });
+});
+
+/**
+ * Karar (2026-10-05): ödeme süresi dolumu iptalinde geç tamamlanan ödeme tam
+ * iade alır. Yüklem bu kümeyi DAR tutar: taraf ya da platform iptali, başka
+ * sistem iptalleri ve kargolama süresi aşımı girmez.
+ */
+describe("isPaymentExpiryCancellation", () => {
+  const paymentExpiry = {
+    status: TradeStatus.cancelled,
+    cancelledBy: CancellationActor.system as CancellationActor | null,
+    cancelReason: TRADE_CANCEL_REASON.autoExpired as string | null,
+    paymentDeadline: new Date("2026-10-05T10:00:00.000Z") as Date | null,
+    shippingDeadline: null as Date | null,
+  };
+
+  it("tarama + süre dolumu gerekçesi + ödeme aşamasında iptal → evet", () => {
+    expect(isPaymentExpiryCancellation(paymentExpiry)).toBe(true);
+  });
+
+  it.each([CancellationActor.buyer, CancellationActor.seller])(
+    "taraf iptali (%s) aynı gerekçe metnini yazsa bile → hayır",
+    (cancelledBy) => {
+      expect(
+        isPaymentExpiryCancellation({ ...paymentExpiry, cancelledBy }),
+      ).toBe(false);
+    },
+  );
+
+  it("platform iptali → hayır (zaten iptal anında hepsi kusursuz)", () => {
+    expect(
+      isPaymentExpiryCancellation({
+        ...paymentExpiry,
+        cancelledBy: CancellationActor.platform,
+      }),
+    ).toBe(false);
+  });
+
+  it.each([
+    TRADE_CANCEL_REASON.stockDepleted,
+    TRADE_CANCEL_REASON.accountBanned,
+    TRADE_CANCEL_REASON.lostParcel,
+  ])("başka sistem iptali (%s) → hayır", (cancelReason) => {
+    expect(
+      isPaymentExpiryCancellation({ ...paymentExpiry, cancelReason }),
+    ).toBe(false);
+  });
+
+  it("kargolama süresi aşımı (kargolama son tarihi kurulu) → hayır", () => {
+    expect(
+      isPaymentExpiryCancellation({
+        ...paymentExpiry,
+        shippingDeadline: new Date("2026-10-12T10:00:00.000Z"),
+      }),
+    ).toBe(false);
+  });
+
+  it("ödeme son tarihi hiç kurulmamış (yanıt aşaması) → hayır", () => {
+    expect(
+      isPaymentExpiryCancellation({ ...paymentExpiry, paymentDeadline: null }),
+    ).toBe(false);
+  });
+
+  it("iptal edilmemiş takas → hayır", () => {
+    expect(
+      isPaymentExpiryCancellation({
+        ...paymentExpiry,
+        status: TradeStatus.awaiting_payment,
+      }),
+    ).toBe(false);
   });
 });

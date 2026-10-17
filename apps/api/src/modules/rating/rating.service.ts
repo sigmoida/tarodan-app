@@ -31,6 +31,8 @@ import {
   publicName,
 } from "../../common/helpers/public-identity";
 import { i18nMessage } from "../i18n";
+import { UserBlockService } from "../user-block/user-block.service";
+import { excludeIds } from "../user-block/user-block.helpers";
 
 @Injectable()
 export class RatingService {
@@ -42,6 +44,7 @@ export class RatingService {
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
     private readonly moderationAi: ModerationAiClient,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   /** Yorum metni küfür/uygunsuz mu kontrol et — uygunsuzsa engelle + event log'a yaz. */
@@ -415,10 +418,18 @@ export class RatingService {
   // ==========================================================================
   // GET USER RATINGS
   // ==========================================================================
+  /**
+   * Satıcı değerlendirmeleri listesi. Engel ilişkisindeki (simetrik)
+   * kullanıcıların değerlendirmeleri viewer'a listelenmez (S9b, Apple 1.2) —
+   * mesaj, ilan ve koleksiyon keşfiyle aynı gizli-kullanıcı kümesi. Ortalama
+   * ve sayaç (stats) herkese aynıdır: viewer'a göre değişen bir puan
+   * önbelleklenemez ve satıcının itibarını kişiye göre oynatırdı.
+   */
   async getUserRatings(
     userId: string,
     page?: number,
     pageSize?: number,
+    viewerId?: string,
   ): Promise<{
     ratings: UserRatingResponseDto[];
     total: number;
@@ -428,10 +439,15 @@ export class RatingService {
     // Ensure valid pagination values
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
+    const hiddenUserIds = await this.userBlocks.getHiddenUserIds(viewerId);
+    const where = publicUserRatingWhere({
+      receiverId: userId,
+      giverId: excludeIds(hiddenUserIds),
+    });
 
     const [ratings, total] = await Promise.all([
       this.prisma.rating.findMany({
-        where: publicUserRatingWhere({ receiverId: userId }),
+        where,
         select: {
           id: true,
           giverId: true,
@@ -450,9 +466,7 @@ export class RatingService {
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
       }),
-      this.prisma.rating.count({
-        where: publicUserRatingWhere({ receiverId: userId }),
-      }),
+      this.prisma.rating.count({ where }),
     ]);
 
     const resolvedRatings = await Promise.all(
@@ -473,12 +487,17 @@ export class RatingService {
   // ==========================================================================
   // GET PRODUCT RATINGS
   // ==========================================================================
+  /**
+   * Ürün yorumları listesi; engel ilişkisindeki kullanıcıların yorumları
+   * viewer'a listelenmez (S9b — bkz. getUserRatings).
+   */
   async getProductRatings(
     productId: string,
     page?: number,
     pageSize?: number,
     sortBy?: string,
     score?: number,
+    viewerId?: string,
   ): Promise<{
     ratings: ProductRatingResponseDto[];
     total: number;
@@ -510,8 +529,10 @@ export class RatingService {
     }
 
     // Build where clause with optional score filter
+    const hiddenUserIds = await this.userBlocks.getHiddenUserIds(viewerId);
     const where: Prisma.ProductRatingWhereInput = publicProductRatingWhere({
       productId,
+      userId: excludeIds(hiddenUserIds),
     });
     const safeScore = Number(score);
     if (safeScore >= 1 && safeScore <= 5) {

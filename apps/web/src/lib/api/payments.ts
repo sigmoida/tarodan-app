@@ -155,6 +155,11 @@ export const paymentsApi = {
     tradeId?: string;
     savedCardId?: string;
     saveCard?: boolean;
+    /**
+     * Bu ekranda mesafeli satış onayı verildi mi. Sunucu, satın almanın henüz
+     * onay kaydı yoksa (teklif siparişi) burada kaydeder.
+     */
+    distanceSalesAccepted?: boolean;
   }) =>
     api.post<{
       paymentId: string;

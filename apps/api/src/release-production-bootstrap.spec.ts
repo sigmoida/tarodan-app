@@ -18,6 +18,8 @@ describe("production reference-data bootstrap", () => {
     "maintenance/verify-production-launch.ts",
   );
   const launchSeedPath = resolve(apiRoot, "prisma/seed-launch.ts");
+  // Katalog/depo/ilan yazımı UAT seed'iyle paylaşılan çekirdekte yaşar.
+  const launchCorePath = resolve(apiRoot, "prisma/seed-launch-core.ts");
   const resetWorkflowPath = resolve(
     repoRoot,
     ".github/workflows/production-reset.yml",
@@ -100,6 +102,28 @@ describe("production reference-data bootstrap", () => {
     expect(source).toContain("REVIEW");
   });
 
+  it("reports an empty home hero per client as a review note, not a failure", () => {
+    const source = readFileSync(launchSmokePath, "utf8");
+
+    // Boş hero meşru (admin anahtarı kapalı ya da yerleşim bilerek boş):
+    // lansman doğrulamasını düşürmemeli, iki istemci için ayrı uyarmalı.
+    expect(source).toContain(
+      "/hero-slides?placement=home&platform=${platform}",
+    );
+    expect(source).toContain('for (const platform of ["web", "app"] as const)');
+    expect(source).not.toMatch(
+      /no live slide[^"]*the storefront hero would be empty/,
+    );
+    const hero = source.slice(
+      source.indexOf("async function reportHomeHeroForReview"),
+    );
+    const body = hero.slice(0, hero.indexOf("\n}\n"));
+    expect(body).not.toContain("throw ");
+    // Uygulama hideOnIos slaytlarını (iOS + Android) süzer: hepsi öyleyse ayrı uyarı.
+    expect(body).toContain("hideOnIos !== true");
+    expect(body).toContain('platform === "app" && appVisible === 0');
+  });
+
   it("keeps launch shipping prices out of the seed, where migrations already win", () => {
     const source = readFileSync(bootstrapPath, "utf8");
 
@@ -128,7 +152,9 @@ describe("production reference-data bootstrap", () => {
 
   it("seeds the launch catalog from data files, independently of the demo seed", () => {
     expect(existsSync(launchSeedPath)).toBe(true);
-    const source = readFileSync(launchSeedPath, "utf8");
+    const source =
+      readFileSync(launchSeedPath, "utf8") +
+      readFileSync(launchCorePath, "utf8");
 
     expect(source).toContain('process.env.APP_ENV !== "production"');
     expect(source).toContain("LAUNCH_SELLER_PASSWORD");

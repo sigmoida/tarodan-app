@@ -18,6 +18,9 @@ import {
   type OnboardingTourKey,
 } from "@/lib/userExperiencePolicy.mjs";
 import { useAuthStore } from "@/stores/authStore";
+import { useCookieConsent } from "@/hooks/useCookieConsent";
+import { useOnboardingTourStore } from "@/stores/onboardingTourStore";
+import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 import { tourOptions, tourStyles } from "./tourTheme";
 
 /**
@@ -40,9 +43,15 @@ export default function OnboardingTour({
   const [run, setRun] = useState(false);
   const completionPending = useRef(false);
   const config = ONBOARDING_TOURS[tour];
+  // Tur en son açılır: zorunlu pencereler ve çerez bandı kapanmadan başlarsa
+  // üçü üst üste binip hiçbiri tıklanamıyordu.
+  const outstanding = useRequiredStepsStore((s) => s.outstanding);
+  const { needsConsent: cookieBannerOpen } = useCookieConsent();
 
   const eligible =
     ready &&
+    !outstanding &&
+    !cookieBannerOpen &&
     steps.length > 0 &&
     shouldStartTour({
       isAuthenticated,
@@ -78,6 +87,13 @@ export default function OnboardingTour({
       completionPending.current = false;
     }
   }, [config.field, config.version, setUser, tour]);
+
+  // Tur ekrandayken reklam popup'ı açılmasın (aynı sırayı çerez bandı da bekler).
+  const setTourRunning = useOnboardingTourStore((s) => s.setRunning);
+  useEffect(() => {
+    setTourRunning(run);
+    return () => setTourRunning(false);
+  }, [run, setTourRunning]);
 
   const handleEvent = useCallback(
     (event: EventData) => {

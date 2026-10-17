@@ -2,6 +2,7 @@
  * Shared email template rendering utilities.
  * Used by EmailWorker (queue processor) and AdminService (preview).
  */
+import { TIMING_RULES, type TimingRuleId } from "@tarodan/types";
 
 export interface EmailBrandOptions {
   frontendUrl?: string;
@@ -87,6 +88,26 @@ function safeEmailUrl(url: string, fallback: string): string {
     // Fall through to the configured safe URL.
   }
   return escapeEmailHtml(fallback);
+}
+
+/**
+ * Şablon metinlerindeki iş süresi ("14 gün", "24 saat"…). Değer şablon verisinin
+ * `timing` alanından gelir — gönderim anında Süreler ve Kurallar'dan okunup
+ * eklenir (`withEmailTimingData`, common/timing-rules). Alan yoksa (önizleme,
+ * doğrudan çağrı) kayıt varsayılanı kullanılır. Bu render katmanı senkron ve
+ * DB'siz kalır; süreyi kendisi OKUMAZ.
+ *
+ * Süre olmayan teknik ömürler (şifre sıfırlama bağlantısı, doğrulama kodu)
+ * buradan geçmez — iş kuralı değil, token ömrüdür.
+ */
+export function emailTimingValue(
+  data: Record<string, any> | undefined,
+  id: TimingRuleId,
+): number {
+  const value = Number(data?.timing?.[id]);
+  return Number.isFinite(value) && value >= 1
+    ? Math.floor(value)
+    : TIMING_RULES[id].default;
 }
 
 export function substituteEmailVariables(
@@ -294,6 +315,7 @@ const REPORT_TYPE_LABELS: Record<string, string> = {
   user: "Kullanıcı",
   collection: "Koleksiyon",
   message: "Mesaj",
+  review: "Değerlendirme",
 };
 
 const REPORT_REASON_LABELS: Record<string, string> = {
@@ -349,10 +371,12 @@ export function getEmailTemplateSubject(
     "marketing-newsletter": "Tarodan Haftalık Bülteni",
     "marketing-monthly": "Tarodan Aylık Özel Fırsatlar",
     "seller-did-not-ship-refunded": "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
+    "order-preparing-extended-buyer": `Siparişinizin Kargoya Verilmesi Gecikiyor - ${data?.orderNumber || ""}`,
     "trade-received": "Yeni Takas Teklifi Aldınız",
     "trade-accepted": "Takas Teklifiniz Kabul Edildi",
     "trade-shipped": "Takasınız Kargoya Verildi",
     "trade-completed": "Takasınız Tamamlandı",
+    "trade-cancelled-platform": `Takasınız Tarodan Tarafından İptal Edildi - ${data?.tradeNumber || ""}`,
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
     "site-access-invite": "Tarodan Erken Erişim Davetiniz",
@@ -361,6 +385,8 @@ export function getEmailTemplateSubject(
     "seller-invoice-reminder": `Fatura Bekleniyor - Sipariş #${data?.orderNumber || ""}`,
     "order-cancelled-buyer": `Siparişiniz İptal Edildi - ${data?.orderNumber || ""}`,
     "order-cancelled-seller": `Sipariş İptal Edildi - ${data?.orderNumber || ""}`,
+    "order-cancelled-by-platform-buyer": `Siparişiniz Tarodan Tarafından İptal Edildi - ${data?.orderNumber || ""}`,
+    "order-cancelled-by-platform-seller": `Sipariş Tarodan Tarafından İptal Edildi - ${data?.orderNumber || ""}`,
     "refund-requested-seller": `İade Talebi - ${data?.orderNumber || ""}`,
     "refund-approved-buyer": `İade Talebiniz Onaylandı - ${data?.orderNumber || ""}`,
     "refund-rejected-buyer": `İade Talebiniz Hakkında - ${data?.orderNumber || ""}`,
@@ -587,7 +613,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("Yeni Sipariş!", "🎉")}
       ${greeting(data?.sellerName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç ${emailTimingValue(data, "preparingDeadlineDays")} iş günü</strong> içinde kargoya veriniz.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme hesabınıza yansıyacak</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
@@ -601,7 +627,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Kargo Bilgisi Gir", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan ${emailTimingValue(data, "returnWindowDays")} gün sonra hesabınıza aktarılacaktır.</p>`)}
     `,
       "Yeni Sipariş!",
     ),
@@ -635,11 +661,11 @@ export function renderEmailTemplate(
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
         </table>
       `)}
-      <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>14 gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
+      <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>${emailTimingValue(data, "returnWindowDays")} gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: ${emailTimingValue(data, "returnWindowDays")} günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
     `,
       "Siparişiniz Teslim Edildi",
     ),
@@ -670,7 +696,7 @@ export function renderEmailTemplate(
           ${detailRow("Teklif Veren", data?.buyerName || "")}
         </table>
       `)}
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : "24 saat içinde"} dolacak.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : `${emailTimingValue(data, "offerExpiryHours")} saat içinde`} dolacak.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Teklifi İncele", `${frontendUrl}/profile/offers`)}
       </div>
@@ -1051,10 +1077,35 @@ export function renderEmailTemplate(
       `)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">İade tutarı ödeme yönteminize bağlı olarak 3–5 iş günü içinde yansıyacaktır.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
       </div>
     `,
       "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
+    ),
+
+    // Hazırlık süresi bir kez uzatıldı (alıcıya). Misafir siparişinde de
+    // gider: link misafirde sipariş takip sayfasıdır (orderPaidTrackUrl).
+    "order-preparing-extended-buyer": wrapEmail(
+      `
+      ${titleBlock("Siparişinizin Kargoya Verilmesi Gecikiyor")}
+      ${greeting(data?.name || data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Satıcı siparişinizi süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || data?.orderId || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+          ${detailRow("En geç kargoya verilme", data?.deadline || "", true)}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Sipariş bu tarihe kadar kargoya verilmezse otomatik iptal edilir ve ödemenizin tamamı iade edilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Kargoya verilene kadar siparişinizi dilediğiniz zaman iptal edebilirsiniz.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
+      </div>
+    `,
+      "Siparişinizin Kargoya Verilmesi Gecikiyor",
     ),
 
     "trade-received": wrapEmail(
@@ -1121,6 +1172,30 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">İyi takaslar dileriz!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
     `,
       "Takasınız Tamamlandı!",
+    ),
+
+    // Platform (admin) iptali — iki tarafa da. Gerekçe katalog etiketidir;
+    // adminin iç notu bu şablona hiç gelmez. Süre ifadesi yoktur: iadenin
+    // karta yansıma süresi bankaya bağlıdır ve Süreler ve Kurallar'da değildir.
+    "trade-cancelled-platform": wrapEmail(
+      `
+      ${titleBlock("Takasınız Tarodan Tarafından İptal Edildi")}
+      ${greeting(data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki takas Tarodan tarafından iptal edildi. Bu iptal sizin bir eyleminizden kaynaklanmıyor.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Takas No", "#" + (data?.tradeNumber || ""))}
+          ${data?.reason ? detailRow("İptal Nedeni", data.reason) : ""}
+          ${Number(rawData?.refundAmount) > 0 ? detailRow("İade Tutarı", formatEmailPrice(rawData.refundAmount) + " TL", true) : ""}
+        </table>
+      `)}
+      ${Number(rawData?.refundAmount) > 0 ? infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu takas için ödediğiniz tutarın tamamı, hizmet bedeli ve kargo dahil, ödeme yönteminize iade edilecek.</p>`) : ""}
+      ${successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">Takasa konu ürünleriniz yeniden serbest; dilediğiniz gibi satışa ya da yeni bir takasa açabilirsiniz.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/profile/trades`)}
+      </div>
+    `,
+      "Takasınız Tarodan Tarafından İptal Edildi",
     ),
 
     "guest-checkout-otp": wrapEmail(
@@ -1278,6 +1353,59 @@ export function renderEmailTemplate(
       </div>
     `,
       "Sipariş İptal Edildi",
+    ),
+
+    // Yönetici (platform) iptali: neden yalnız katalog etiketidir (yöneticinin
+    // iç notu bu veriye hiç girmez). İade süresi bankaya bağlıdır; platform
+    // süresi değildir, bu yüzden metinde rakam yoktur.
+    "order-cancelled-by-platform-buyer": wrapEmail(
+      `
+      ${titleBlock("Siparişiniz Tarodan Tarafından İptal Edildi", "🛡️")}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki siparişiniz Tarodan tarafından iptal edildi.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+          ${data?.paid ? detailRow("İade Tutarı", formatEmailPrice(data.refundAmount) + " TL", true) : ""}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ""}
+      ${infoBox(
+        `<p style="margin: 0; font-size: 14px; color: #92400e;">${
+          data?.paid
+            ? "Ödediğiniz tutarın tamamı iade edildi. Tutar, bankanızın olağan iade süresi içinde ödeme yönteminize yansır."
+            : "Bu sipariş için ödeme alınmamıştı; herhangi bir tutar tahsil edilmedi."
+        }</p>`,
+      )}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
+      </div>
+    `,
+      "Siparişiniz Tarodan Tarafından İptal Edildi",
+    ),
+
+    "order-cancelled-by-platform-seller": wrapEmail(
+      `
+      ${titleBlock("Sipariş Tarodan Tarafından İptal Edildi", "🛡️")}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüze ait bir sipariş Tarodan tarafından iptal edildi. ${
+        data?.paid
+          ? "Lütfen ürünü kargoya vermeyin; alıcıya ödemesi iade edildi ve stok ilanınıza geri eklendi."
+          : "Sipariş için ödeme alınmamıştı; ayrılan stok ilanınıza geri döndü."
+      }</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ""}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Satıcı Paneline Git", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
+      </div>
+    `,
+      "Sipariş Tarodan Tarafından İptal Edildi",
     ),
 
     "refund-requested-seller": wrapEmail(
@@ -1485,7 +1613,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("İlanınızın Süresi Doluyor", "⏰")}
       ${greeting(data?.sellerName || data?.userName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Yenileyerek görünürlüğünü koruyabilirsiniz.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Süre dolunca ilanlarım sayfasından tek tıkla yenileyip görünürlüğünü koruyabilirsiniz.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("İlan", data?.productTitle || "")}
@@ -1493,7 +1621,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("İlanı Yenile", data?.listingUrl || `${frontendUrl}/profile/listings`)}
+        ${primaryButton("İlanlarıma Git", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>
     `,
       "İlanınızın Süresi Doluyor",
@@ -1504,7 +1632,7 @@ export function renderEmailTemplate(
       ${titleBlock("İlanınızın Süresi Doldu", "📭")}
       ${greeting(data?.sellerName || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanlarım sayfasındaki "Süresi dolan" sekmesinden ilanınızı tek tıkla, isterseniz birkaç ilanı birlikte yenileyebilirsiniz.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("İlanı Yeniden Yayınla", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>

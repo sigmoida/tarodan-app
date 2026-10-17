@@ -9,13 +9,21 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   APP_ORDER,
   changedFilesBetween,
   detectAffectedApps,
 } from "./detect-affected-apps.mjs";
+import {
+  appsToVerify,
+  passedApps,
+  readPushCache,
+  recordVerifiedApps,
+  verifiedAppsForTree,
+  writePushCache,
+} from "./push-verification-cache.mjs";
 import {
   emptyCounts,
   formatMarkdownSummary,
@@ -30,13 +38,20 @@ const API_ROOT = join(REPO_ROOT, "apps/api");
 const WEB_ROOT = join(REPO_ROOT, "apps/web");
 const REPORTER_PATH = join(SCRIPT_DIR, "jest-live-summary-reporter.cjs");
 
-function parseArguments(argv) {
+/** `ci` groups, in run order. `pnpm verify:ci` (no --group) = the full gate. */
+export const CI_GROUPS = ["static", "unit", "release"];
+/** Opt-in group: needs Postgres/Redis/Elasticsearch/Mailpit on localhost. */
+export const CI_OPTIONAL_GROUPS = ["e2e"];
+
+export function parseArguments(argv) {
   const mode = argv[0];
   const options = {
     mode,
     base: undefined,
     head: "HEAD",
     paytr: false,
+    tests: false,
+    groups: [],
   };
 
   for (let index = 1; index < argv.length; index += 1) {
@@ -49,6 +64,17 @@ function parseArguments(argv) {
       index += 1;
     } else if (argument === "--paytr") {
       options.paytr = true;
+    } else if (argument === "--tests") {
+      options.tests = true;
+    } else if (argument === "--group") {
+      const group = argv[index + 1];
+      if (![...CI_GROUPS, ...CI_OPTIONAL_GROUPS].includes(group)) {
+        throw new Error(
+          `Unknown group: ${group} (expected ${[...CI_GROUPS, ...CI_OPTIONAL_GROUPS].join(", ")})`,
+        );
+      }
+      options.groups.push(group);
+      index += 1;
     } else {
       throw new Error(`Unknown argument: ${argument}`);
     }
@@ -56,11 +82,32 @@ function parseArguments(argv) {
 
   if (!["watch", "push", "release", "ci"].includes(mode)) {
     throw new Error(
-      "Usage: node scripts/verify-local.mjs <watch|push|release|ci> [--base SHA] [--head SHA] [--paytr]",
+      "Usage: node scripts/verify-local.mjs <watch|push|release|ci> [--base SHA] [--head SHA] [--tests] [--group static|unit|release|e2e] [--paytr]",
     );
+  }
+  if (options.groups.length > 0 && mode !== "ci") {
+    throw new Error("--group is only valid with the ci mode.");
+  }
+  if (options.tests && mode !== "push") {
+    throw new Error("--tests is only valid with the push mode.");
+  }
+  if (mode === "ci" && options.groups.length === 0) {
+    options.groups = [...CI_GROUPS];
   }
 
   return options;
+}
+
+/**
+ * Changed files `jest --findRelatedTests` can map to API specs: TypeScript
+ * under apps/api (the jest roots) that still exists at HEAD. Package sources
+ * are outside the API's jest roots, so jest cannot relate them anyway.
+ */
+export function relatedApiTestFiles(files, exists = existsSync) {
+  return files
+    .filter((file) => /^apps\/api\/.+\.ts$/.test(file))
+    .map((file) => join(REPO_ROOT, file))
+    .filter((file) => exists(file));
 }
 
 function git(...args) {
@@ -102,15 +149,15 @@ function createRunDirectory(mode) {
   return { reportRoot, runDirectory };
 }
 
-function releaseMarkerPath(context) {
-  return join(context.reportRoot, "release-verification.json");
-}
-
-function writeReleaseMarker(context, marker) {
-  writeFileSync(
-    releaseMarkerPath(context),
-    `${JSON.stringify(marker, null, 2)}\n`,
-  );
+/** Shared by every worktree of the clone (`--git-common-dir`, not `--git-dir`). */
+function pushCachePath() {
+  const commonDirectory = git("rev-parse", "--git-common-dir");
+  const absolute = isAbsolute(commonDirectory)
+    ? commonDirectory
+    : resolve(REPO_ROOT, commonDirectory);
+  const reportRoot = join(absolute, "tarodan-test-results");
+  mkdirSync(reportRoot, { recursive: true });
+  return join(reportRoot, "push-verified-trees.json");
 }
 
 function testReportPath(context, stage, extension = "json") {
@@ -176,128 +223,201 @@ function playwrightStage(context, id, label, options = {}) {
   );
 }
 
-function buildPushStages(context, apps) {
+/**
+ * Local pre-push gate for `development` — typecheck (+ the web/admin API
+ * contract script) of the affected apps only, one process at a time. About a
+ * minute even when all three apps are affected, and never more than one tsc
+ * (~2.5 GB) in memory.
+ *
+ * Unit tests are NOT part of the hook: the full API suite runs in CI on every
+ * development push as an advisory run (Development Tests, ~2 min of jest on a
+ * clean runner) and is a required check on PRs to master. Running jest here is
+ * what froze 16 GB machines and pushed everyone to --no-verify. `--tests` (manual: `pnpm verify:push
+ * --tests`) adds the related API specs and the web/admin unit suites, capped
+ * at half the cores.
+ */
+function buildPushStages(context, apps, { changes, withTests }) {
   const stages = [];
+  // Each push stage carries its app so a passing app can be cached per tree.
+  const pushFor = (app, ...appStages) =>
+    stages.push(...appStages.map((stage) => ({ ...stage, app })));
 
   if (apps.includes("api")) {
-    stages.push(
+    pushFor(
+      "api",
       commandStage("api-types", "API Typecheck", [
         "--filter",
         "@tarodan/api",
         "typecheck",
       ]),
-      jestStage(context, "api-unit", "API Unit", []),
-      commandStage("api-build", "API Build", [
+    );
+    if (withTests) {
+      // Without a base (first push of a branch) there is no diff to relate:
+      // run the whole suite, still capped at half the cores.
+      const related = changes.fallbackAll
+        ? []
+        : relatedApiTestFiles(changes.files);
+      if (changes.fallbackAll || related.length > 0) {
+        pushFor(
+          "api",
+          jestStage(context, "api-unit", "API Unit (related)", [
+            "--maxWorkers=50%",
+            "--passWithNoTests",
+            ...(changes.fallbackAll ? [] : ["--findRelatedTests", ...related]),
+          ]),
+        );
+      }
+    }
+  }
+
+  for (const app of ["web", "admin"]) {
+    if (!apps.includes(app)) {
+      continue;
+    }
+    const label = app === "web" ? "Web" : "Admin";
+    pushFor(
+      app,
+      commandStage(`${app}-types`, `${label} Typecheck`, [
         "--filter",
-        "@tarodan/api...",
-        "build",
+        `@tarodan/${app}`,
+        "typecheck",
+      ]),
+      commandStage(`${app}-contract`, `${label} API Contract`, [
+        "--filter",
+        `@tarodan/${app}`,
+        "test:api",
+      ]),
+    );
+    if (withTests) {
+      pushFor(
+        app,
+        commandStage(
+          `${app}-unit`,
+          `${label} Unit`,
+          ["--filter", `@tarodan/${app}`, "test"],
+          { env: { NODE_ENV: "test" } },
+        ),
+      );
+    }
+  }
+
+  return stages;
+}
+
+/**
+ * CI gate stages, by group. The groups map 1:1 to the jobs of
+ * .github/workflows/verify.yml so CI and `pnpm verify:ci` cannot drift:
+ *
+ *   static   typecheck + lint (all workspaces) + verification-tool specs +
+ *            API contracts + API seed build
+ *   unit     the FULL API jest suite + every workspace's vitest suite
+ *   release  production build + dependency audit       (master gate only)
+ *   e2e      API e2e + full scenarios against local services (opt-in)
+ *
+ * Development pushes gate the staging deploy on static only and run unit as
+ * an advisory workflow; PRs to development run static + unit (nothing
+ * required); master PRs and the production release run all three default
+ * groups.
+ */
+function buildCiStages(context, groups = CI_GROUPS) {
+  const stages = [];
+
+  if (groups.includes("static")) {
+    stages.push(
+      commandStage("typecheck", "Workspace Typecheck", ["typecheck"]),
+      // Every workspace's `lint` reports without fixing, except the API's,
+      // which runs `eslint --fix` for developers: a fixable error would be
+      // rewritten on the runner and pass. The API is linted through its
+      // non-fixing `lint:ci` instead (a turbo task too, so it is cached).
+      commandStage("lint", "Workspace Lint", [
+        "exec",
+        "turbo",
+        "run",
+        "lint",
+        "--filter=!@tarodan/api",
+      ]),
+      commandStage("api-lint", "API Lint", [
+        "exec",
+        "turbo",
+        "run",
+        "lint:ci",
+        "--filter=@tarodan/api",
+      ]),
+      // node:test specs of these very scripts (affected-app detection, push
+      // cache, report parsing) — the pipeline checks its own tooling.
+      commandStage("verification-tools", "Verification Tools", [
+        "test:verification-tools",
+      ]),
+      commandStage("contracts", "Web/Admin API Contract", [
+        "--filter",
+        "@tarodan/web",
+        "--filter",
+        "@tarodan/admin",
+        "test:api",
       ]),
       // Ayrı bir tsconfig, ayrı bir çıktı ağacı: `nest build` bunu KAPSAMAZ.
       // Üretim boot'u derlenmiş seed'leri sabit yollardan çağırdığı için
       // (seed:prod, bootstrap:prod:admin, …) buradaki bir kayma konteyneri
       // MODULE_NOT_FOUND ile crash-loop'a sokar — ve bunu ancak deploy'da
-      // görürüz. Birkaç saniyelik derleme, o turu buraya çeker.
+      // görürüz. Staging deploy'u bu kapıyı beklediği için o tur buraya çekilir.
       commandStage("api-seed-build", "API Seed Build", [
         "--filter",
-        "@tarodan/api...",
+        "@tarodan/api",
         "build:seed",
       ]),
     );
   }
 
-  if (apps.includes("web")) {
+  if (groups.includes("unit")) {
     stages.push(
-      commandStage("web-types", "Web Typecheck", [
-        "--filter",
-        "@tarodan/web",
-        "typecheck",
-      ]),
-      commandStage("web-contract", "Web API Contract", [
-        "--filter",
-        "@tarodan/web",
-        "test:api",
-      ]),
-      commandStage("web-unit", "Web Unit", [
-        "--filter",
-        "@tarodan/web",
-        "test",
-      ]),
-      commandStage("web-build", "Web Build", [
-        "--filter",
-        "@tarodan/web...",
-        "build",
-      ]),
+      jestStage(context, "api-unit", "API Unit", []),
+      // Every non-API workspace with a `test` script (web, admin,
+      // listing-form, auth, logger), through turbo so the `^build`
+      // dependencies (types/i18n/logger dist) exist on a clean runner.
+      // NODE_ENV=test: under "production" react resolves to its production
+      // build, where `act()` throws and every component spec fails.
+      commandStage(
+        "workspace-unit",
+        "Workspace Unit (vitest)",
+        ["exec", "turbo", "run", "test", "--filter=!@tarodan/api"],
+        { env: { NODE_ENV: "test" } },
+      ),
     );
   }
 
-  if (apps.includes("admin")) {
+  if (groups.includes("release")) {
     stages.push(
-      commandStage("admin-types", "Admin Typecheck", [
-        "--filter",
-        "@tarodan/admin",
-        "typecheck",
-      ]),
-      commandStage("admin-contract", "Admin API Contract", [
-        "--filter",
-        "@tarodan/admin",
-        "test:api",
-      ]),
-      commandStage("admin-unit", "Admin Unit", [
-        "--filter",
-        "@tarodan/admin",
-        "test",
-      ]),
-      commandStage("admin-build", "Admin Build", [
-        "--filter",
-        "@tarodan/admin...",
+      commandStage("build", "Production Build", ["build"]),
+      commandStage("audit", "Dependency Audit", ["audit:prod"]),
+    );
+  }
+
+  if (groups.includes("e2e")) {
+    stages.push(
+      // The e2e jest config maps only @tarodan/types to source; i18n/logger
+      // resolve to their dist, which a clean runner does not have yet.
+      commandStage("api-deps-build", "API Dependency Build", [
+        "exec",
+        "turbo",
+        "run",
         "build",
+        "--filter=@tarodan/api^...",
       ]),
+      ...buildE2eStages(context, ["api-deps-build"]),
     );
   }
 
   return stages;
 }
 
-function buildCiStages(context) {
+/** API e2e + full scenarios against an already running test database. */
+function buildE2eStages(context, dependsOn = []) {
   return [
-    commandStage("typecheck", "Workspace Typecheck", ["typecheck"]),
-    // @tarodan/web excluded: pre-existing ESLint parsing error in
-    // apps/web/src/lib/userExperiencePolicy.d.mts, unrelated to any given
-    // change — same exclusion as .github/workflows/pr-checks.yml.
-    commandStage("lint", "Workspace Lint", [
-      "exec",
-      "turbo",
-      "run",
-      "lint",
-      "--filter=!@tarodan/web",
-    ]),
-    jestStage(context, "api-unit", "API Unit", []),
-    commandStage("build", "Production Build", ["build"]),
-    commandStage("audit", "Dependency Audit", ["audit:prod"]),
-  ];
-}
-
-function buildReleaseStages(context, paytr) {
-  const stages = [
-    ...buildCiStages(context),
-    commandStage("local-env", "Local Test Environment", ["dev:env"]),
-    commandStage("local-infra", "Local Test Infrastructure", ["dev:up"], {
-      dependsOn: ["local-env"],
-    }),
-    commandStage(
-      "test-db",
-      "Local Test Database",
-      [join(SCRIPT_DIR, "prepare-local-test-db.mjs")],
-      {
-        command: process.execPath,
-        dependsOn: ["local-infra"],
-      },
-    ),
     commandStage(
       "test-migrations",
       "Test Database Migrations",
       ["--filter", "@tarodan/api", "test:e2e:setup"],
-      { dependsOn: ["test-db"] },
+      { dependsOn },
     ),
     jestStage(
       context,
@@ -329,6 +449,32 @@ function buildReleaseStages(context, paytr) {
         dependsOn: ["test-migrations"],
       },
     ),
+  ];
+}
+
+/**
+ * Optional local release rehearsal (`pnpm verify:release:local`): the full CI
+ * gate plus the parts CI does not run yet — local Docker infra, API e2e, full
+ * scenarios and the Playwright suite. Not required for a master push any more;
+ * master is gated by the PR checks and the Release Production workflow.
+ */
+function buildReleaseStages(context, paytr) {
+  const stages = [
+    ...buildCiStages(context),
+    commandStage("local-env", "Local Test Environment", ["dev:env"]),
+    commandStage("local-infra", "Local Test Infrastructure", ["dev:up"], {
+      dependsOn: ["local-env"],
+    }),
+    commandStage(
+      "test-db",
+      "Local Test Database",
+      [join(SCRIPT_DIR, "prepare-local-test-db.mjs")],
+      {
+        command: process.execPath,
+        dependsOn: ["local-infra"],
+      },
+    ),
+    ...buildE2eStages(context, ["test-db"]),
     playwrightStage(context, "web-e2e", "Web Playwright", {
       dependsOn: ["local-infra"],
     }),
@@ -469,16 +615,6 @@ function writeRunReport(context, mode, affectedApps, stages, startedAt) {
     `${JSON.stringify(report, null, 2)}\n`,
   );
 
-  if (mode === "release") {
-    writeReleaseMarker(context, {
-      status,
-      commit: report.commit,
-      tree: report.tree,
-      verifiedAt: report.finishedAt,
-      reportPath,
-    });
-  }
-
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
@@ -614,18 +750,11 @@ async function run() {
 
   const startedAt = new Date();
   const context = createRunDirectory(options.mode);
-  if (options.mode === "release") {
-    writeReleaseMarker(context, {
-      status: "IN_PROGRESS",
-      commit: git("rev-parse", "HEAD"),
-      tree: git("rev-parse", "HEAD^{tree}"),
-      startedAt: startedAt.toISOString(),
-    });
-  }
   let apps = [...APP_ORDER];
   let stages;
   let continueOnFailure = false;
 
+  let pushTree;
   if (options.mode === "push") {
     const base = resolveBase(options.base);
     const changes = changedFilesBetween(base, options.head);
@@ -633,15 +762,54 @@ async function run() {
       ? [...APP_ORDER]
       : detectAffectedApps(changes.files);
     console.log(`Affected applications: ${apps.join(", ") || "none"}`);
-    stages = buildPushStages(context, apps);
+    // The stages run on the working tree, so the cache is only trusted when
+    // that IS the pushed tree: clean worktree and HEAD's tree == head's tree.
+    const headTree = git("rev-parse", `${options.head}^{tree}`);
+    const testedTree = git("status", "--porcelain")
+      ? undefined
+      : git("rev-parse", "HEAD^{tree}");
+    pushTree = testedTree === headTree ? headTree : undefined;
+    // A cached pass is typecheck-only, so a `--tests` run never trusts it.
+    const alreadyVerified =
+      !pushTree || options.tests
+        ? []
+        : verifiedAppsForTree(readPushCache(pushCachePath()), pushTree);
+    const pending = appsToVerify(apps, alreadyVerified);
+    if (pending.length < apps.length) {
+      const skipped = apps.filter((app) => !pending.includes(app));
+      console.log(
+        `Already verified for tree ${headTree.slice(0, 12)}: ${skipped.join(", ")} (skipped)`,
+      );
+    }
+    stages = buildPushStages(context, pending, {
+      changes,
+      withTests: options.tests,
+    });
   } else if (options.mode === "release") {
     stages = buildReleaseStages(context, options.paytr);
     continueOnFailure = true;
   } else {
-    stages = buildCiStages(context);
+    // CI reports every failing stage of its group in one run.
+    stages = buildCiStages(context, options.groups);
+    continueOnFailure = true;
   }
 
   const results = await runStages(stages, { continueOnFailure });
+  if (pushTree) {
+    const verified = passedApps(apps, results);
+    if (verified.length > 0) {
+      const cachePath = pushCachePath();
+      writePushCache(
+        cachePath,
+        recordVerifiedApps(
+          readPushCache(cachePath),
+          pushTree,
+          verified,
+          new Date().toISOString(),
+        ),
+      );
+    }
+  }
   console.log(`\n${formatTerminalSummary(results)}\n`);
   const { report, reportPath } = writeRunReport(
     context,
@@ -652,12 +820,25 @@ async function run() {
   );
   console.log(`Report: ${reportPath}`);
 
+  if (options.mode === "push" && !options.tests && report.status === "PASS") {
+    console.log(
+      "Unit tests run in CI after the push (Development Tests, advisory) and are required on PRs to master. " +
+        "Run them locally first with: pnpm verify:push --tests",
+    );
+  }
+
   if (report.status !== "PASS") {
     process.exitCode = 1;
   }
 }
 
-run().catch((error) => {
-  console.error(error instanceof Error ? error.stack : error);
-  process.exitCode = 1;
-});
+const isDirectExecution =
+  process.argv[1] &&
+  pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+
+if (isDirectExecution) {
+  run().catch((error) => {
+    console.error(error instanceof Error ? error.stack : error);
+    process.exitCode = 1;
+  });
+}

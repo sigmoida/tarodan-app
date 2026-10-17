@@ -396,7 +396,7 @@ export class UserService {
     data: {
       accountHolder: string;
       iban: string;
-      tcKimlikNo?: string;
+      tcKimlikNo?: string | null;
       taxId?: string;
     },
   ) {

@@ -22,7 +22,9 @@ export function ResourceListSearch({
   className?: string;
 }) {
   const t = useTranslations();
-  const { search, setSearch, onSearchSubmit } = useResourceList();
+  const { search, setSearch, onSearchSubmit, isPristineEmpty } =
+    useResourceList();
+  if (isPristineEmpty) return null;
   return (
     <div className={cn("relative w-full", className)}>
       <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-subtle" />

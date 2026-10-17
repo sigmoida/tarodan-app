@@ -5,6 +5,7 @@
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { Alert } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { useTimingPolicy, useTimingValues } from "@/hooks/useTimingPolicy";
 import {
   computePayoutDate,
   isMembershipOrder,
@@ -13,10 +14,13 @@ import {
 
 /**
  * Escrow bilgisi (teslim sonrası) — alıcı onayı artık payout tetiklemez.
- * Satıcıya ödeme: teslim + 14 gün iade penceresi + 1 gün grace ile otomatik.
+ * Satıcıya ödeme: sunucunun hold'a yazdığı tarihte (teslim + iade penceresi +
+ * payout grace) otomatik; tarih ve gün sayısı Süreler ve Kurallar'dan gelir.
  */
 export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
+  const policy = useTimingPolicy();
+  const timingValues = useTimingValues();
 
   if (
     !order.isBuyer ||
@@ -26,7 +30,7 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
     return null;
   }
 
-  const payoutDate = computePayoutDate(order);
+  const payoutDate = computePayoutDate(order, policy);
   const payoutDateStr = payoutDate?.toLocaleDateString(t("common.dateLocale"), {
     year: "numeric",
     month: "long",
@@ -41,8 +45,11 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
     >
       <p className="text-muted">
         {payoutDateStr
-          ? t("order.payoutReleaseWithDate", { date: payoutDateStr })
-          : t("order.payoutRelease")}
+          ? t("order.payoutReleaseWithDate", {
+              ...timingValues,
+              date: payoutDateStr,
+            })
+          : t("order.payoutRelease", timingValues)}
       </p>
       {order.activeRefundRequest && (
         <p className="mt-2 font-medium text-muted">

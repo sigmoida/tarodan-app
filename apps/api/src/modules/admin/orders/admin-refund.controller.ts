@@ -14,7 +14,10 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
+  StreamableFile,
 } from "@nestjs/common";
+import type { Response } from "express";
+import type { Locale } from "@tarodan/i18n";
 
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -71,7 +74,6 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -93,11 +95,15 @@ import {
   ForceCancelStuckDto,
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
+  RefundRequestCountsQueryDto,
   ApproveRefundRequestDto,
   RefundDecisionPreviewDto,
   RejectRefundRequestDto,
   AdminChangeMembershipDto,
 } from "../dto";
+import { ReqLocale } from "../../i18n";
+import { sendExport } from "../../../common/export";
+import { AdminRefundListService } from "./admin-refund-list.service";
 
 @ApiTags("admin")
 @Controller("admin")
@@ -105,19 +111,60 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminRefundController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly refundList: AdminRefundListService,
+  ) {}
 
   // ==================== REFUND REQUEST ADMIN ====================
 
+  // "İadeler" ekranı: liste / sayaçlar / Excel. Literal yollar `:id`'den ÖNCE
+  // tanımlı kalmalı — aksi halde "counts" / "export" talep id'si sanılır.
+  // Roller ve izin anahtarı (`refund-requests` → `refund_requests`) liste ile
+  // aynı; moderator URL-segment izin kapısında elenir.
+
   @Get("refund-requests")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "List refund requests for admin operations queue" })
+  @ApiOperation({
+    summary:
+      "Refunds screen: refund requests and trade refund sides by tab and status bucket",
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: "Paginated refund requests",
+    description: "{ data: AdminRefundRow[], meta }",
   })
   async listRefundRequests(@Query() query: RefundRequestQueryDto) {
-    return this.adminService.listRefundRequests(query);
+    return this.refundList.list(query);
+  }
+
+  @Get("refund-requests/counts")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Status bucket counts of one refunds tab, honoring the filters",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "AdminRefundCounts" })
+  async countRefundRequests(@Query() query: RefundRequestCountsQueryDto) {
+    return this.refundList.counts(query);
+  }
+
+  @Get("refund-requests/export")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Current refunds filter as an Excel file (trade = two rows)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "XLSX file" })
+  async exportRefundRequests(
+    @CurrentUser("id") adminId: string,
+    @Query() query: RefundRequestQueryDto,
+    @ReqLocale() locale: Locale,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // Dosya alıcı/satıcı kimliği ve tutar taşır: her indirme zorunlu denetim
+    // bırakır (`refund_requests_export`).
+    return sendExport(
+      res,
+      await this.refundList.export(query, adminId, locale),
+    );
   }
 
   @Get("refund-requests/:id")

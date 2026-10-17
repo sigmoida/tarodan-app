@@ -8,10 +8,11 @@ import {
   shipmentProviderConfig,
 } from "@tarodan/ui";
 import { payerLabel } from "../_lib/refund-guidance";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { RefundRequestDetail } from "../types";
 import { fmtDate, fmtTry } from "../_lib/format";
-import { Field } from "../_components/Field";
 import { statusConfig } from "@/lib/statusLabels";
 
 export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
@@ -37,7 +38,7 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
         {t("admin.operations.refundRequests.returnShippingIntro")}
       </p>
 
-      <div className="rounded-lg bg-surface-alt p-3 text-sm">
+      <Panel tone="muted" padding="sm" className="text-sm">
         <span className="font-medium text-body">
           {t("admin.operations.refundRequests.payerQuestion")}{" "}
         </span>
@@ -51,11 +52,11 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
             {t("admin.operations.refundRequests.payerNotSet")}
           </span>
         )}
-      </div>
+      </Panel>
 
       {rr.policyCode && rr.policyCode !== "legacy" && (
         <>
-          <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+          <DataList columns={2}>
             <Field label={t("admin.operations.refundRequests.policyCode")}>
               <span className="font-mono">{rr.policyCode}</span>
             </Field>
@@ -95,16 +96,16 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
                 {fmtTry(rr.amount)}
               </span>
             </Field>
-          </div>
+          </DataList>
 
           {/* Satıcı bacağı: alıcı iadesine girmeyen ama satıcının payout/escrow'una
               işlenen kalemler — komisyon iadesi/tutulan bedel + kargo borç/tazminleri. */}
-          <div className="rounded-lg bg-surface-alt p-3">
+          <Panel tone="muted" padding="sm">
             <p className="mb-2 text-xs font-medium text-muted">
               {t("admin.operations.refundRequests.sellerImpactTitle")} —{" "}
               {t("admin.operations.refundRequests.sellerImpactHint")}
             </p>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+            <DataList columns={2}>
               <Field
                 label={t("admin.operations.refundRequests.sellerFeeRefund")}
               >
@@ -148,13 +149,13 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
                   </span>
                 </Field>
               )}
-            </div>
-          </div>
+            </DataList>
+          </Panel>
         </>
       )}
 
       {rr.returnTrackingNumber ? (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+        <DataList columns={2}>
           <Field label={t("admin.operations.refundRequests.carrierCompany")}>
             {providerLabel}
           </Field>
@@ -182,7 +183,7 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
           <Field label={t("admin.operations.refundRequests.deliveredToSeller")}>
             {fmtDate(rr.returnDeliveredAt)}
           </Field>
-        </div>
+        </DataList>
       ) : (
         <div className="text-sm text-muted">
           {t("admin.operations.refundRequests.noReturnShipment")}

@@ -211,11 +211,11 @@ export const STATUS_KEY = {
 
 export const STATUS_VARIANT: Record<
   ShippingTariffStatus,
-  "success" | "warning" | "default"
+  "success" | "warning" | "outline"
 > = {
   active: "success",
   draft: "warning",
-  archived: "default",
+  archived: "outline",
 };
 
 /** "0–2 desi" / "5+ desi" — kademe aralığının okunabilir gösterimi (admin görür). */

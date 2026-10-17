@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,7 +8,6 @@ import {
 import { OfferStatus, OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { OrderService } from "../../order/order.service";
 import { NotificationService } from "../../notification/notification.service";
 import { AdminCancelOfferDto } from "../dto";
 import { AdminOfferQueryService } from "./admin-offer-query.service";
@@ -15,10 +15,15 @@ import { offerAdminCancelReason } from "../../trade/helpers/trade-cancel-reasons
 import { i18nMessage } from "../../i18n";
 
 /**
- * Admin teklif müdahalesi: iptal. Yalnız `pending` veya ödenmemiş `accepted`
- * teklif iptal edilir; bağlı ödeme bekleyen sipariş de aynı tx'te kapanır
- * (alıcı iptaliyle aynı yardımcı: rezervasyon, ledger, kupon). Ödenmiş sipariş
- * → 400 (iade akışı kullanılmalı).
+ * Admin teklif müdahalesi: SİPARİŞİ OLMAYAN teklifin iptali — bekleyen
+ * (`pending`) teklif ya da siparişi zaten kapanmış `accepted` /
+ * `payment_expired` anlaşma.
+ *
+ * Canlı bir siparişi olan teklif (ödeme bekleyen ya da ödenmiş) burada iptal
+ * EDİLMEZ: teklif siparişi sepet siparişiyle aynı uçtan, aynı kuraldan ve aynı
+ * çekirdeklerden geçer (`POST /admin/orders/:id/cancel`,
+ * AdminOrderCancelService); bağlı teklifi de o yol kapatır. İki ayrı iptal
+ * yolu, iki ayrı denetim/bildirim sözleşmesi demekti.
  */
 @Injectable()
 export class AdminOfferService {
@@ -27,7 +32,6 @@ export class AdminOfferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
-    private readonly orderService: OrderService,
     private readonly notificationService: NotificationService,
     private readonly query: AdminOfferQueryService,
   ) {}
@@ -50,18 +54,7 @@ export class AdminOfferService {
         where: { id: offerId },
         include: {
           product: { select: { id: true, title: true } },
-          order: {
-            select: {
-              id: true,
-              status: true,
-              version: true,
-              quantity: true,
-              productId: true,
-              offerId: true,
-              checkoutGroupId: true,
-              reservationReleasedAt: true,
-            },
-          },
+          order: { select: { id: true, status: true } },
         },
       });
       if (!offer) {
@@ -80,13 +73,9 @@ export class AdminOfferService {
           }),
         );
       }
-      if (
-        offer.order &&
-        offer.order.status !== OrderStatus.pending_payment &&
-        offer.order.status !== OrderStatus.cancelled
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.admin.offer.orderAlreadyPaid"),
+      if (offer.order && offer.order.status !== OrderStatus.cancelled) {
+        throw new ConflictException(
+          i18nMessage("server.admin.offer.useOrderCancel"),
         );
       }
 
@@ -106,43 +95,28 @@ export class AdminOfferService {
         },
       });
 
-      let cancelledOrderId: string | null = null;
-      if (offer.order?.status === OrderStatus.pending_payment) {
-        await this.orderService.cancelUnpaidOrderInTx(tx, offer.order, {
-          reason: reasonText,
-          ledgerReason: "admin_cancelled",
-          skipOfferUpdate: true,
-        });
-        cancelledOrderId = offer.order.id;
-      }
+      // Fail-closed ve AYNI işlemde: denetim yazılamazsa iptal de geri alınır.
+      await this.audit.createRequiredAuditLog(
+        adminId,
+        "offer_cancel",
+        "Offer",
+        offerId,
+        before,
+        {
+          status: OfferStatus.cancelled,
+          cancelReason: reasonText,
+          reason: dto.reason,
+        },
+        tx,
+      );
 
       return {
-        before,
         buyerId: offer.buyerId,
         sellerId: offer.sellerId,
         productId: offer.productId,
         productTitle: offer.product.title,
-        cancelledOrderId,
       };
     });
-
-    if (result.cancelledOrderId) {
-      await this.orderService.invalidateProductCaches(result.productId);
-    }
-
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "offer_cancel",
-      "Offer",
-      offerId,
-      result.before,
-      {
-        status: OfferStatus.cancelled,
-        cancelReason: reasonText,
-        reason: dto.reason,
-        cancelledOrderId: result.cancelledOrderId,
-      },
-    );
 
     try {
       const payload = {

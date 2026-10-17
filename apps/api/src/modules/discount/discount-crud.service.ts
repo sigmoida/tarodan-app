@@ -4,9 +4,16 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { sellerDiscountCreatedNotice } from "../mail-routing/helpers/mail-internal-notices";
 import { SearchService } from "../search/search.service";
 import { notifyWebRevalidate } from "../../common/helpers/revalidate";
 import { fulltextDiscountSearch } from "../../common/helpers/fulltext-search";
@@ -37,6 +44,27 @@ import {
 } from "./helpers/discount-authorization";
 import { toDiscountResponse } from "./helpers/discount-response.mapper";
 import { i18nMessage } from "../i18n";
+
+/**
+ * Bir batch'in kodları — listeleme ve Excel dökümü AYNI alanları ve sırayı
+ * okur. Toplu üretim `createMany` ile yazdığı için kodların `createdAt`'i
+ * çoğunlukla eşittir; `id` ikinci anahtar olmadan sıra belirsiz kalır ve
+ * sayfalı döküm sayfa sınırında kod atlayıp tekrarlayabilirdi.
+ */
+const VOUCHER_CODE_SELECT = {
+  id: true,
+  code: true,
+  isRedeemed: true,
+  redeemedById: true,
+  redeemedAt: true,
+  orderId: true,
+  createdAt: true,
+} satisfies Prisma.DiscountCodeSelect;
+
+const VOUCHER_CODE_ORDER: Prisma.DiscountCodeOrderByWithRelationInput[] = [
+  { createdAt: "asc" },
+  { id: "asc" },
+];
 
 /**
  * Adet koşullu türlerin (bogo / bulk_quantity) şekil doğrulaması. İkisi de
@@ -104,6 +132,8 @@ export class DiscountCrudService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -312,7 +342,52 @@ export class DiscountCrudService {
     await this.invalidateProductCaches(
       discount.scope === DiscountScope.product ? discount.targetProductIds : [],
     );
+    // Personel bildirimi (Mail Yönlendirme): yalnız SATICININ kendi
+    // ilanlarında açtığı indirim; admin indirimleri bildirilmez.
+    if (!isAdmin && actorId) {
+      void this.notifyStaffSellerDiscount(discount, actorId);
+    }
     return toDiscountResponse(discount);
+  }
+
+  /** `discount.createdBySeller` — commit sonrası, fırlatmaz; test hesabı atlanır. */
+  private async notifyStaffSellerDiscount(
+    discount: {
+      id: string;
+      code: string | null;
+      name: string;
+      type: string;
+      value: Prisma.Decimal;
+      targetProductIds: string[];
+      startDate: Date;
+      endDate: Date;
+    },
+    sellerId: string,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const seller = await this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { ...PUBLIC_NAME_SELECT, isTestAccount: true },
+      });
+      await this.mailNotifier.emit(
+        "discount.createdBySeller",
+        sellerDiscountCreatedNotice({
+          discountRef: discount.code ?? discount.name,
+          sellerName: publicName(seller),
+          type: discount.type,
+          value: discount.value,
+          productCount: discount.targetProductIds.length,
+          startDate: discount.startDate,
+          endDate: discount.endDate,
+        }),
+        { isTest: seller?.isTestAccount ?? false, dedupeKey: discount.id },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `discount.createdBySeller personel bildirimi hazırlanamadı (${discount.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -807,20 +882,12 @@ export class DiscountCrudService {
     return generateReferenceCode(prefix || REFERENCE_PREFIX.voucher);
   }
 
-  /** Bir batch'in kodları (admin listeleme + CSV export). */
+  /** Bir batch'in kodları (admin listeleme). */
   async listCodes(discountId: string) {
     const codes = await this.prisma.discountCode.findMany({
       where: { discountId },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        code: true,
-        isRedeemed: true,
-        redeemedById: true,
-        redeemedAt: true,
-        orderId: true,
-        createdAt: true,
-      },
+      orderBy: VOUCHER_CODE_ORDER,
+      select: VOUCHER_CODE_SELECT,
     });
     return {
       data: codes,
@@ -829,5 +896,16 @@ export class DiscountCrudService {
         redeemed: codes.filter((c) => c.isRedeemed).length,
       },
     };
+  }
+
+  /** Kodların bir sayfası — admin Excel dökümü, listeyle aynı sıra. */
+  listCodesPage(discountId: string, page: { skip: number; take: number }) {
+    return this.prisma.discountCode.findMany({
+      where: { discountId },
+      orderBy: VOUCHER_CODE_ORDER,
+      select: VOUCHER_CODE_SELECT,
+      skip: page.skip,
+      take: page.take,
+    });
   }
 }

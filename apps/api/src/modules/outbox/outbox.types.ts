@@ -83,3 +83,124 @@ export const OUTBOX_SAVED_CARD_PROVIDER_DELETE = "saved_card.provider_delete";
 export interface SavedCardProviderDeletePayload {
   savedCardId: string;
 }
+
+/**
+ * Hesap silmede Sign in with Apple refresh token'ını Apple'a iptal et (App
+ * Store 5.1.1(v)). Silme tx'iyle ATOMİK yazılır; Apple çağrısı commit sonrası
+ * drainer'dan, hata olursa geri çekilerek yeniden denenir — silmeyi engellemez.
+ * Payload yalnız yerel satır kimliğini taşır; şifreli token handler içinde
+ * taze okunur ve outbox tablosuna YAZILMAZ.
+ */
+export const OUTBOX_APPLE_TOKEN_REVOKE = "apple.token_revoke";
+
+export interface AppleTokenRevokePayload {
+  appleSignInTokenId: string;
+}
+
+/**
+ * Platform (admin) takas iptalinin taraf duyurusu. İptal ve zorunlu denetim
+ * kaydıyla AYNI tx'te yazılır: iptal commit olduysa duyuru kesin gider.
+ *
+ * Satır = TEK alıcı × TEK kanal (in-app ya da e-posta), `dedupeKey` de öyle:
+ * handler tek bir gönderim yapar, hata fırlatırsa outbox yalnız O gönderimi
+ * yeniden dener — kısmi başarıdan sonra başka bir alıcıya / kanala ikinci kez
+ * gidilmez. Tutar iptal anında politikadan hesaplanıp burada sabitlenir
+ * (iade yapıldıktan sonra satır "iade edilmiş" olur ve yeniden hesap 0 verir).
+ * Adminin iç notu payload'a YAZILMAZ.
+ */
+export const OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE =
+  "trade.platform_cancel_notice";
+
+export type TradePlatformCancelNoticeChannel = "in_app" | "email";
+
+export interface TradePlatformCancelNoticePayload {
+  tradeId: string;
+  userId: string;
+  refundAmount: number;
+  channel: TradePlatformCancelNoticeChannel;
+}
+
+/**
+ * Kargo öncesi iptalin commit SONRASI adımları (izlenen iade, ürün önbelleği,
+ * taşıyıcıya geçmemiş etiketlerin iptali — `settlePreShipmentCancellation`).
+ * İptal tx'iyle ATOMİK yazılır; anlık yol `OutboxService.runInline` ile satırın
+ * sahibi olarak hemen çalıştırır. Süreç commit ile anlık yol arasında ölürse
+ * satır pending kalır ve drainer işi tamamlar — iade hiçbir zaman "iptal
+ * edildi ama hiç denenmedi" durumunda kalmaz. Adımların hepsi idempotenttir.
+ */
+export const OUTBOX_TRADE_CANCEL_SETTLE = "trade.cancel_settle";
+
+export interface TradeCancelSettlePayload {
+  tradeId: string;
+}
+
+export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
+  `${OUTBOX_TRADE_CANCEL_SETTLE}:${tradeId}`;
+
+/**
+ * Takas tarafına duyuru (zil + push; tamamlanmada e-posta da): kullanıcı iptali
+ * (karşı tarafa), itiraz açıldı (karşı tarafa), itiraz sonuçlandı ve takas
+ * tamamlandı (iki tarafa). Olayın tx'iyle AYNI tx'te yazılır — olay commit olduysa
+ * duyuru kesin gider (apps/api/CLAUDE.md "Side effects go through the outbox": kaybı kullanıcıya görünen yan etki).
+ * Satır = TEK alıcı × TEK olay; `dedupeKey` aynı olayın ikinci kez duyurulmasını
+ * engeller.
+ */
+export const OUTBOX_TRADE_PARTY_NOTICE = "trade.party_notice";
+
+export type TradePartyNoticeKind =
+  "cancelled" | "dispute_opened" | "dispute_resolved" | "completed";
+
+export interface TradePartyNoticePayload {
+  tradeId: string;
+  userId: string;
+  kind: TradePartyNoticeKind;
+}
+
+export const tradePartyNoticeDedupeKey = (p: TradePartyNoticePayload): string =>
+  `${OUTBOX_TRADE_PARTY_NOTICE}:${p.kind}:${p.tradeId}:${p.userId}`;
+
+/**
+ * İPTAL EDİLMİŞ takasa sonradan tamamlanan ödemenin iadesi. İptal yolları
+ * iadeyi iptal anında tamamlanmış satırlara yapar; ödemesi o an yolda olan
+ * tarafın (PayTR callback'i iptalden sonra gelir) parası aksi halde hiçbir
+ * yoldan dönmez. Ödemeyi tamamlayan tx'le ATOMİK yazılır ve YALNIZ drainer
+ * işler: iade PayTR callback'inin içinden (ödeme henüz "siteye bildirilmeden")
+ * denenmez. Erken denemeyi PayTR reddederse handler satırı yeniden kuyruğa
+ * alır; son denemede iş `refundFailureReason` + retry cron'una devredilir.
+ * Tutar mevcut politikadan (`refundTradeCashTracked`, satırdaki
+ * `fullRefundEntitled` kararıyla) gelir — yeni hesap yok. Ödeme satırı başına
+ * tek satır.
+ */
+export const OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND =
+  "trade.cancelled_payment_refund";
+
+export interface TradeCancelledPaymentRefundPayload {
+  tradeId: string;
+  /** İade yalnız bu tarafın satırını kapsar (`refundTradeCashTracked` kapsamı). */
+  payerId: string;
+  tradeCashPaymentId: string;
+}
+
+export const tradeCancelledPaymentRefundDedupeKey = (
+  tradeCashPaymentId: string,
+): string => `${OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND}:${tradeCashPaymentId}`;
+
+/**
+ * Personele giden iç bildirim (Mail Yönlendirme, docs/MAIL_ROUTING.md). İş
+ * olayının yanında yazılır; handler alanın ayarına göre hemen gönderir ya da
+ * saatlik/günlük özete bırakır. SMTP hiçbir zaman iş transaction'ının içinde
+ * beklenmez. Yük: `MailInternalOutboxPayload` (mail-routing modülü).
+ */
+export const OUTBOX_MAIL_INTERNAL_EVENT = "mail.internal_event";
+
+/**
+ * Hesap silmede avatar nesnesini depolamadan sil (KVKK). Silme tx'iyle ATOMİK
+ * yazılır; depolama çağrısı commit SONRASI drainer'dadır ve silmeyi asla
+ * engellemez. Payload yalnız depolama anahtarını taşır (uuid dosya adı, kişisel
+ * veri değil). Tekrar silme zararsızdır: handler idempotenttir.
+ */
+export const OUTBOX_MEDIA_AVATAR_DELETE = "media.avatar_delete";
+
+export interface MediaAvatarDeletePayload {
+  key: string;
+}

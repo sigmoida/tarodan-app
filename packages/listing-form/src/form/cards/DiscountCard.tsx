@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
@@ -37,6 +37,8 @@ interface DiscountCardProps {
    * bu yüzden kart onu üretmez — verilmezse bölüm hiç çıkmaz.
    */
   manageDiscountsLink?: ReactNode;
+  /** İndirimli fiyat alt sınırın altındaysa satır içi hata (`salePriceLimitMessage`). */
+  salePriceError?: string | null;
 }
 
 export default function DiscountCard({
@@ -46,9 +48,15 @@ export default function DiscountCard({
   setShowDiscountSection,
   productDiscounts = [],
   manageDiscountsLink = null,
+  salePriceError = null,
 }: DiscountCardProps) {
   const t = useTranslations();
-  const { watch } = useFormContext();
+  const {
+    watch,
+    formState: { isSubmitted },
+  } = useFormContext();
+  // Alt sınır hatası yazarken değil, alandan çıkınca ya da gönderimde görünür.
+  const [saleBlurred, setSaleBlurred] = useState(false);
   const price = (watch("price") as string) || "";
   return (
     <div className="border border-border rounded-xl overflow-hidden">
@@ -64,7 +72,7 @@ export default function DiscountCard({
             {t("product.discountSectionTitle")}
           </span>
           {productDiscounts.length > 0 && (
-            <Badge variant="primary" size="sm">
+            <Badge variant="default" size="sm">
               {productDiscounts.length} aktif
             </Badge>
           )}
@@ -113,6 +121,12 @@ export default function DiscountCard({
                     setSaleData({ ...saleData, salePrice: e.target.value })
                   }
                   placeholder={t("product.discountedPricePlaceholder")}
+                  onBlur={() => setSaleBlurred(true)}
+                  error={
+                    saleBlurred || isSubmitted
+                      ? (salePriceError ?? undefined)
+                      : undefined
+                  }
                 />
               </div>
             </div>

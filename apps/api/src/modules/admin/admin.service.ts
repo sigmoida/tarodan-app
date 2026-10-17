@@ -22,7 +22,12 @@ import { AdminTaxService } from "./finance/admin-tax.service";
 import { AdminMembershipService } from "./finance/admin-membership.service";
 import { AdminCatalogService } from "./catalog/admin-catalog.service";
 import { AdminCollectionService } from "./catalog/admin-collection.service";
-import { AdminNotificationService } from "./ops/admin-notification.service";
+import {
+  AdminNotificationService,
+  type AdminBroadcastInput,
+  type AudienceCountInput,
+  type PreviewBroadcastEmailInput,
+} from "./ops/admin-notification.service";
 import { AdminLogsService } from "./analytics/admin-logs.service";
 import { AdminShippingService } from "./orders/admin-shipping.service";
 import { AdminReviewService } from "./ops/admin-review.service";
@@ -36,13 +41,13 @@ import {
   UpdateWarehouseAddressDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
+  AdminRemoveProductDto,
   AdminOrderQueryDto,
   AdminOrderCountsQueryDto,
   AdminTradeQueryDto,
   AdminMessageQueryDto,
   AdminShipmentQueryDto,
   TradeShipmentQueryDto,
-  RefundRequestQueryDto,
   ApproveRefundRequestDto,
   AuditLogQueryDto,
   ApproveProductDto,
@@ -57,11 +62,10 @@ import {
   AddOrderTrackingDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
-  ElogoInvoiceQueryDto,
+  FiscalInvoiceQueryDto,
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -374,14 +378,6 @@ export class AdminService {
     return this.productService.getProducts(query);
   }
 
-  async exportProducts(query: {
-    status?: string;
-    categoryId?: string;
-    sellerId?: string;
-  }) {
-    return this.productService.exportProducts(query);
-  }
-
   async uploadProductImages(productId: string, files: Express.Multer.File[]) {
     return this.productService.uploadProductImages(productId, files);
   }
@@ -430,8 +426,14 @@ export class AdminService {
     adminId: string,
     ids: string[] | undefined,
     reason: string,
+    violationCode?: string,
   ) {
-    return this.productService.bulkRejectProducts(adminId, ids, reason);
+    return this.productService.bulkRejectProducts(
+      adminId,
+      ids,
+      reason,
+      violationCode,
+    );
   }
 
   // ==================== ORDER MANAGEMENT ====================
@@ -725,10 +727,6 @@ export class AdminService {
     return this.payoutService.getPayoutsSchedule(query);
   }
 
-  async getPayoutsExport(query: PayoutExportQueryDto) {
-    return this.payoutService.getPayoutsExport(query);
-  }
-
   async releasePayout(
     adminId: string,
     orderId: string,
@@ -736,6 +734,10 @@ export class AdminService {
     force = false,
   ) {
     return this.payoutService.releasePayout(adminId, orderId, reason, force);
+  }
+
+  async settleHoldResidual(adminId: string, holdId: string, reason: string) {
+    return this.payoutService.settleHoldResidual(adminId, holdId, reason);
   }
 
   async releaseTradePaymentHold(
@@ -851,10 +853,6 @@ export class AdminService {
 
   // ==================== REFUND REQUEST ADMIN ====================
   // Taşındı: admin-refund.service.ts — imzalar aynen korunuyor (facade delege).
-
-  async listRefundRequests(query: RefundRequestQueryDto) {
-    return this.adminRefundService.listRefundRequests(query);
-  }
 
   async getRefundRequestDetail(refundRequestId: string) {
     return this.adminRefundService.getRefundRequestDetail(refundRequestId);
@@ -1255,8 +1253,8 @@ export class AdminService {
   // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
   // Taşındı: admin-tax.service.ts — imzalar aynen korunuyor (facade delege).
 
-  async getElogoInvoices(query: ElogoInvoiceQueryDto) {
-    return this.taxService.getElogoInvoices(query);
+  async getFiscalInvoices(query: FiscalInvoiceQueryDto) {
+    return this.taxService.getFiscalInvoices(query);
   }
 
   async getSellerUploadedInvoices(query: SellerUploadedInvoiceQueryDto) {
@@ -1302,8 +1300,14 @@ export class AdminService {
     adminId: string,
     productId: string,
     hardDelete: boolean = false,
+    removal?: AdminRemoveProductDto,
   ) {
-    return this.productService.deleteProduct(adminId, productId, hardDelete);
+    return this.productService.deleteProduct(
+      adminId,
+      productId,
+      hardDelete,
+      removal,
+    );
   }
 
   async restoreProduct(adminId: string, productId: string) {
@@ -1465,34 +1469,27 @@ export class AdminService {
     return this.adminNotificationService.getNotificationHistory(query);
   }
 
-  async sendNotification(
-    adminId: string,
-    dto: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      data?: Record<string, any>;
-    },
-  ) {
+  async sendNotification(adminId: string, dto: AdminBroadcastInput) {
     return this.adminNotificationService.sendNotification(adminId, dto);
   }
 
   async scheduleNotification(
     adminId: string,
-    dto: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      scheduledFor: string;
-    },
+    dto: AdminBroadcastInput & { scheduledFor: string },
   ) {
     return this.adminNotificationService.scheduleNotification(adminId, dto);
+  }
+
+  previewBroadcastEmail(dto: PreviewBroadcastEmailInput) {
+    return this.adminNotificationService.previewBroadcastEmail(dto);
+  }
+
+  countNotificationAudience(dto: AudienceCountInput) {
+    return this.adminNotificationService.countAudience(dto);
+  }
+
+  async uploadNotificationImage(file: Express.Multer.File | undefined) {
+    return this.adminNotificationService.uploadImage(file);
   }
 
   async getScheduledNotifications(query?: ScheduledNotificationQueryDto) {

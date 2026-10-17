@@ -8,6 +8,11 @@ import {
   paginate,
   resolveOrderBy,
 } from "../../../common/list";
+import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
+import {
+  resolvePaytrOidMatch,
+  tradePaytrOidClauses,
+} from "../../payment/helpers/paytr-oid-search";
 import { TradeQuoteService } from "../../trade/trade-quote.service";
 import { TRADE_PRICING_V2 } from "../../trade/helpers/trade.constants";
 import { readTradeCommissionRuleSnapshot } from "../../trade/helpers/trade-commission-snapshot";
@@ -76,12 +81,19 @@ export class AdminTradeQueryService {
       fromDate,
       toDate,
       search,
+      adminCancelReasonCode,
     } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
     if (status) {
       where.status = status;
+    }
+
+    // Platform iptallerini katalog koduna göre süz (kolon yalnız admin
+    // iptalinde dolu).
+    if (adminCancelReasonCode) {
+      where.adminCancelReasonCode = adminCancelReasonCode;
     }
 
     // AND koşulları: userId/initiatorId/receiverId filtresi ile search çakışmasın
@@ -97,6 +109,10 @@ export class AdminTradeQueryService {
     }
 
     if (search) {
+      // PayTR "sipariş no": istek başına bir kez çözülür
+      const paytrClauses = tradePaytrOidClauses(
+        await resolvePaytrOidMatch(this.prisma, search),
+      );
       // Takas no, başlatan displayName/email veya alıcı displayName/email araması
       and.push({
         OR: [
@@ -113,6 +129,8 @@ export class AdminTradeQueryService {
           },
           { initiator: { email: { contains: search, mode: "insensitive" } } },
           { receiver: { email: { contains: search, mode: "insensitive" } } },
+          // PayTR "sipariş no": takasın nakit ödemesi / takas numarası
+          ...paytrClauses,
         ],
       });
     }
@@ -318,7 +336,13 @@ export class AdminTradeQueryService {
             events: { orderBy: { eventTime: "asc" } },
           },
         },
-        cashPayments: true,
+        cashPayments: {
+          include: {
+            payment: {
+              select: { providerConversationId: true, metadata: true },
+            },
+          },
+        },
         dispute: true,
       },
     });
@@ -362,6 +386,12 @@ export class AdminTradeQueryService {
       }
     }
 
-    return { ...trade, paymentQuote, commissionRuleMatches };
+    // Ham `payment` (metadata JSON) istemciye gitmez; yalnız PayTR id'leri.
+    const cashPayments = trade.cashPayments.map(({ payment, ...row }) => ({
+      ...row,
+      ...paytrOidViewOf(payment),
+    }));
+
+    return { ...trade, cashPayments, paymentQuote, commissionRuleMatches };
   }
 }

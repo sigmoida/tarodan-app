@@ -4,6 +4,7 @@ import { Modal, Select, Textarea } from "@/components/ui";
 import { ModalFooter } from "@tarodan/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
+import { useTimingValues } from "@/hooks/useTimingPolicy";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -33,6 +34,7 @@ export default function RefundRequestModal({
   onSuccess,
 }: Props) {
   const t = useTranslations();
+  const timingValues = useTimingValues();
   const [reason, setReason] = useState<RefundReason>("changed_mind");
   const [description, setDescription] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
@@ -100,8 +102,8 @@ export default function RefundRequestModal({
     phase === "preparing"
       ? t("order.refundPhasePreparing")
       : phase === "in_cooling_off"
-        ? t("order.refundPhaseCoolingOff")
-        : t("order.refundPhasePastCoolingOff");
+        ? t("order.refundPhaseCoolingOff", timingValues)
+        : t("order.refundPhasePastCoolingOff", timingValues);
 
   return (
     <Modal

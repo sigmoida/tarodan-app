@@ -1,6 +1,11 @@
 import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
 import { CacheService } from "../cache/cache.service";
-import { CreateProductDto, UpdateProductDto, ProductQueryDto } from "./dto";
+import {
+  CreateProductDto,
+  DeleteProductDto,
+  UpdateProductDto,
+  ProductQueryDto,
+} from "./dto";
 import { ProductCreateService } from "./lifecycle/product-create.service";
 import { ProductUpdateService } from "./lifecycle/product-update.service";
 import { ProductQueryService } from "./query/product-query.service";
@@ -77,8 +82,12 @@ export class ProductService implements OnModuleInit {
     return this.updateService.updateAsAdmin(id, adminId, dto);
   }
 
-  async remove(id: string, sellerId: string): Promise<void> {
-    return this.updateService.remove(id, sellerId);
+  async remove(
+    id: string,
+    sellerId: string,
+    removal?: DeleteProductDto,
+  ): Promise<void> {
+    return this.updateService.remove(id, sellerId, removal);
   }
 
   async findSellerProductById(sellerId: string, productId: string) {

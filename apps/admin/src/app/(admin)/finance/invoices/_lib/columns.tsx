@@ -1,8 +1,8 @@
 /** @format */
 
 import { Badge, Button } from "@tarodan/ui";
-import Link from "next/link";
 import { col } from "@/components/table";
+import { CellLink } from "@/components/table/cells";
 import { fmtTry } from "@/lib/format";
 import { InvoicePdfButton } from "../_components/InvoicePdfButton";
 import { InvoiceDetailButton } from "../_components/InvoiceDetailButton";
@@ -13,6 +13,7 @@ import {
   type InvoiceParty,
   type SellerInvoice,
   documentTypeLabel,
+  invoiceProviderLabels,
   invoiceStatusConfig,
   invoiceTypeLabels,
 } from "./types";
@@ -34,13 +35,14 @@ const partyCell = (party: InvoiceParty | null) =>
       }
     : { name: "—" };
 
-export const elogoColumns = (
+export const fiscalInvoiceColumns = (
   t: T,
   // failed belgeler için retry aksiyonu (deneme sayacı sıfırlanır, cron alır).
   onRetry?: (invoice: Invoice) => void,
   retryingId?: string,
 ) => {
   const types = invoiceTypeLabels(t);
+  const providers = invoiceProviderLabels(t);
   return [
     col.user<Invoice>(
       t("admin.finance.common.seller"),
@@ -66,7 +68,7 @@ export const elogoColumns = (
           <p className="whitespace-nowrap font-mono font-medium text-heading">
             {i.invoiceNumber || "—"}
           </p>
-          <Badge variant={i.isReturn ? "danger" : "secondary"} size="sm">
+          <Badge variant={i.isReturn ? "danger" : "outline"} size="sm">
             {documentTypeLabel(t, i.documentType)}
           </Badge>
           {i.sourceReference && (
@@ -89,6 +91,17 @@ export const elogoColumns = (
         sortKey: "invoiceNumber",
         sortType: "text",
       },
+    ),
+    // Belgeyi kesen entegratör: iptal/iade ve PDF o sağlayıcıda yapılır,
+    // operatör belgeyi o portalda arar.
+    col.badge<Invoice>(
+      t("admin.finance.invoices.provider"),
+      (i) => (
+        <Badge variant="outline" size="sm">
+          {providers[i.provider]}
+        </Badge>
+      ),
+      { sortKey: "provider", sortType: "text", minWidth: 110 },
     ),
     // Açıklama = belgenin ÜSTÜNDE yazan metin; türün etiketi onun altında ikinci
     // satırdır. İkisi aynı şey değil: biri kayıt, öteki arayüz sözlüğü.
@@ -187,12 +200,10 @@ export const sellerColumns = (t: T) => [
     (s) => (
       <div className="text-sm">
         {s.orderId ? (
-          <Link
+          <CellLink
             href={`/operations/orders/${s.orderId}`}
-            className="whitespace-nowrap font-mono font-medium text-primary-600 hover:text-primary-700"
-          >
-            #{s.orderNumber}
-          </Link>
+            label={`#${s.orderNumber}`}
+          />
         ) : (
           <p className="whitespace-nowrap font-mono font-medium text-heading">
             {s.orderNumber || "—"}
@@ -202,9 +213,9 @@ export const sellerColumns = (t: T) => [
           {s.fileName}
         </p>
         {s.replacedAt && (
-          <span className="mt-1 inline-flex rounded bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-700">
+          <Badge variant="warning" size="sm" className="mt-1">
             {t("admin.finance.invoices.replaced")}
-          </span>
+          </Badge>
         )}
       </div>
     ),

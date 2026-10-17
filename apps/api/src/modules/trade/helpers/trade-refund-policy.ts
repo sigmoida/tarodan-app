@@ -27,6 +27,8 @@
  *   · kullanıcı iptali          → KARŞI taraf kusursuz (vazgeçen değil)
  *   · takılı takas çözümü       → kolisini kargoya vermiş taraf kusursuz
  *   · kayıp koli                → iki taraf da kusursuz (taşıyıcı kaynaklı)
+ *   · platform (admin) iptali   → iki taraf da kusursuz (kimsenin kusuru değil;
+ *                                 yalnız kargo öncesi aşamalarda açıktır)
  *   · depo reddi                → `faultySide` dışındaki taraf kusursuz
  *   · kargolama süresi aşımı, hiçbir koli verilmedi → iki taraf da kusurlu
  *
@@ -80,6 +82,16 @@ export function tradeServiceFeeOf(payment: RefundablePayment): number {
       Math.max(0, Number(payment.commissionAmount ?? 0) || 0) +
       Math.max(0, Number(payment.commissionTaxAmount ?? 0) || 0),
   );
+}
+
+/**
+ * Satırın iadesinde GERİ VERİLEN hizmet bedeli: yalnız kusursuz tarafın tam
+ * iadesinde bedelin tamamı, aksi halde 0 (bedel hiçbir kusurlu iptalde iade
+ * edilmez). `refundableAmountFor` ile aynı karar — admin İadeler ekranı
+ * "iade edilecek komisyon"u buradan okur.
+ */
+export function refundedServiceFeeOf(payment: RefundablePayment): number {
+  return payment.fullRefundEntitled ? tradeServiceFeeOf(payment) : 0;
 }
 
 /**

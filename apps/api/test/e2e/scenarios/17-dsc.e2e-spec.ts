@@ -26,12 +26,15 @@
  *    DELETE @HttpCode(204). Sahibin GET /:id → başkası → 403 "Bu indirimi görüntüleme yetkiniz yok".
  *  - POST /api/admin/discounts (@Roles super_admin,admin,moderator) — varsayılan 201; isAdmin=true → sellerId=null.
  *  - POST /api/admin/commission-rules (@Roles super_admin YALNIZ) — admin/moderator → 403.
- *  - GET /api/ads/active @Public → { id,title,imageUrl,linkUrl,content,altText,width,height,position,deviceType }
- *    (clickCount/impressionCount YOK). device=mobile → [mobile, all]; position filtrelenir; isActive=false hariç.
- *  - POST /api/ads/:id/click|impression @Public → varsayılan 201, { success:true }, sayaç +1; yok → 404 "Reklam bulunamadı".
- *  - GET /api/ads/iab-sizes → 10 öğe (IAB_STANDARD_SIZES).
+ *  - GET /api/ads/active?platform=web|app @Public → yuva başına en fazla 1 reklam:
+ *    { id,title,imageUrl,linkUrl,content,altText,width,height,position,platform,deviceType(türetilmiş),popupFrequency,popupVersion,hotspots }
+ *    (clickCount/impressionCount YOK). platform=app → [app, all] (parametresiz = app); position filtrelenir; isActive=false hariç.
+ *  - POST /api/ads/:id/click|impression @Public → 204 (gövdesiz, beacon dostu); yalnız yayındaki reklamda ve
+ *    IP+reklam başına pencerede bir kez sayılır (tık 10 sn, gösterim 30 dk); yok/yayında değil → 204, sayılmaz.
+ *    Görselli reklamda tık yalnız `?hotspot=<alanId>` ile (reklam + alan sayacı birlikte); görselsizde alansız.
+ *  - GET /api/ads/iab-sizes → 11 öğe (IAB_STANDARD_SIZES).
  *  - POST /api/admin/ads (@Roles) → varsayılan 201, toResponse iabCompliant/iabSize/ctr/clickCount/impressionCount.
- *    CreateAdvertisementDto width/height @Min(1)@Max(2000) → 2500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
+ *    CreateAdvertisementDto width/height @Min(1)@Max(4000) → 4500→400. IAB-uyumsuz boyut oluşur (yalnız uyarı).
  *  - PATCH /api/admin/ads/:id → 200; PATCH /api/admin/ads/reorder @HttpCode(200); DELETE @HttpCode(204).
  *  - POST /api/newsletter/subscribe @HttpCode(200) → mesajlar; e-posta lowercase+trim; idempotent güncelle;
  *    reaktivasyon. GET /unsubscribe?token= (yok→404); POST /unsubscribe (bulunmayan→200 nötr, idempotent).
@@ -244,7 +247,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     width: 728,
     height: 90,
     position: "header",
-    deviceType: "all",
+    platform: "all",
     ...over,
   });
 
@@ -255,8 +258,10 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       data: {
         title: "Seed Ad",
         imageUrl: "https://cdn.test/a.png",
-        linkUrl: "https://test.example/x",
+        // Görselli reklamın linkUrl'i kural gereği null; tıklama alanlardadır.
+        linkUrl: null,
         position: "header" as any,
+        platform: "all" as any,
         deviceType: "all" as any,
         isActive: true,
         displayOrder: 0,
@@ -1430,53 +1435,52 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     expect(ad).toHaveProperty("imageUrl");
     expect(ad).toHaveProperty("linkUrl");
     expect(ad).toHaveProperty("position");
+    expect(ad).toHaveProperty("platform");
     expect(ad).toHaveProperty("deviceType");
+    expect(ad).toHaveProperty("popupFrequency");
+    expect(ad).toHaveProperty("popupVersion");
     expect(ad).not.toHaveProperty("clickCount");
     expect(ad).not.toHaveProperty("impressionCount");
   });
 
   scenario("DSC-053", async () => {
-    // position=header filtresi; sidebar dışlanır; displayOrder asc.
+    // position=header filtresi; diğer yuvalar (topbar) dışlanır; yuvada tek
+    // reklam: displayOrder asc ile ilk olan (kural öncesi kalan çakışma).
     await seedAd({ title: "Header-A", position: "header", displayOrder: 1 });
     await seedAd({ title: "Header-B", position: "header", displayOrder: 0 });
-    await seedAd({ title: "Sidebar-X", position: "sidebar", displayOrder: 0 });
+    await seedAd({ title: "Topbar-X", position: "topbar", displayOrder: 0 });
     const res = await request(server())
-      .get("/api/ads/active?position=header")
+      .get("/api/ads/active?position=header&platform=web")
       .expect(200);
     const titles = res.body.map((a: any) => a.title);
-    expect(titles).toContain("Header-A");
-    expect(titles).toContain("Header-B");
-    expect(titles).not.toContain("Sidebar-X");
-    // displayOrder asc → Header-B (0) önce Header-A (1).
-    expect(titles.indexOf("Header-B")).toBeLessThan(titles.indexOf("Header-A"));
+    expect(titles).toEqual(["Header-B"]);
   });
 
   scenario("DSC-054", async () => {
-    // device=mobile → mobile + all döner; desktop dışlanır.
-    await seedAd({ title: "A-mobile", deviceType: "mobile" });
-    await seedAd({ title: "B-desktop", deviceType: "desktop" });
-    await seedAd({ title: "C-all", deviceType: "all" });
+    // platform=app → app + all döner; web dışlanır. Yuvalar ayrı (yuva başına 1).
+    await seedAd({ title: "A-app", platform: "app", position: "header" });
+    await seedAd({ title: "B-web", platform: "web", position: "footer" });
+    await seedAd({ title: "C-all", platform: "all", position: "popup" });
     const res = await request(server())
-      .get("/api/ads/active?device=mobile")
+      .get("/api/ads/active?platform=app")
       .expect(200);
     const titles = res.body.map((a: any) => a.title);
-    expect(titles).toContain("A-mobile");
+    expect(titles).toContain("A-app");
     expect(titles).toContain("C-all");
-    expect(titles).not.toContain("B-desktop");
+    expect(titles).not.toContain("B-web");
   });
 
   scenario("DSC-055", async () => {
-    // device=all → tüm cihaz tipleri döner.
-    await seedAd({ title: "D-mobile", deviceType: "mobile" });
-    await seedAd({ title: "D-desktop", deviceType: "desktop" });
-    await seedAd({ title: "D-all", deviceType: "all" });
-    const res = await request(server())
-      .get("/api/ads/active?device=all")
-      .expect(200);
-    const titles = res.body.map((a: any) => a.title);
-    expect(titles).toEqual(
-      expect.arrayContaining(["D-mobile", "D-desktop", "D-all"]),
+    // Parametresiz istek eski mobil sürümdür → app; deviceType platformdan
+    // türetilir (app → mobile, all → all) — eski sürüm all|mobile ile süzer.
+    await seedAd({ title: "D-app", platform: "app", position: "header" });
+    await seedAd({ title: "D-web", platform: "web", position: "footer" });
+    await seedAd({ title: "D-all", platform: "all", position: "popup" });
+    const res = await request(server()).get("/api/ads/active").expect(200);
+    const byTitle = Object.fromEntries(
+      res.body.map((a: any) => [a.title, a.deviceType]),
     );
+    expect(byTitle).toEqual({ "D-app": "mobile", "D-all": "all" });
   });
 
   scenario("DSC-056", async () => {
@@ -1494,24 +1498,56 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-058", async () => {
-    // Tık kaydı sayacı artırır (public).
-    const ad = await seedAd({ title: "Tık Reklam" });
-    const res = await request(server()).post(`/api/ads/${ad.id}/click`);
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.success).toBe(true);
-    const prisma = getPrisma();
-    const refreshed = await (prisma as any).advertisement.findUnique({
-      where: { id: ad.id },
+    // Tık kaydı sayacı artırır (public, 204 — sendBeacon yanıt okumaz).
+    // Metin reklam: alansız tık sayılır. Görselli reklam: yalnız alanına
+    // (`?hotspot=`) düşen tık sayılır; reklam ve alan sayacı birlikte artar.
+    const prisma = getPrisma() as any;
+    const clicks = async (id: string) =>
+      (await prisma.advertisement.findUnique({ where: { id } })).clickCount;
+
+    const text = await seedAd({
+      title: "Tık Metin",
+      imageUrl: null,
+      linkUrl: "https://test.example/x",
     });
-    expect(refreshed.clickCount).toBe(1);
+    await request(server())
+      .post(`/api/ads/${text.id}/click`)
+      .set("Content-Type", "text/plain")
+      .send("")
+      .expect(204);
+    expect(await clicks(text.id)).toBe(1);
+
+    const image = await seedAd({ title: "Tık Görsel" });
+    const hotspot = await prisma.adHotspot.create({
+      data: {
+        advertisementId: image.id,
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        label: "Tümü",
+        linkUrl: "/kategori/x",
+      },
+    });
+    await request(server()).post(`/api/ads/${image.id}/click`).expect(204);
+    expect(await clicks(image.id)).toBe(0);
+
+    await request(server())
+      .post(`/api/ads/${image.id}/click?hotspot=${hotspot.id}`)
+      .set("Content-Type", "text/plain")
+      .send("")
+      .expect(204);
+    expect(await clicks(image.id)).toBe(1);
+    const refreshedHotspot = await prisma.adHotspot.findUnique({
+      where: { id: hotspot.id },
+    });
+    expect(refreshedHotspot.clickCount).toBe(1);
   });
 
   scenario("DSC-059", async () => {
-    // Gösterim kaydı sayacı artırır (public).
+    // Gösterim kaydı sayacı artırır (public, 204).
     const ad = await seedAd({ title: "Gösterim Reklam" });
-    const res = await request(server()).post(`/api/ads/${ad.id}/impression`);
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.success).toBe(true);
+    await request(server()).post(`/api/ads/${ad.id}/impression`).expect(204);
     const prisma = getPrisma();
     const refreshed = await (prisma as any).advertisement.findUnique({
       where: { id: ad.id },
@@ -1520,21 +1556,26 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-060", async () => {
-    // Olmayan reklam tık/gösterim → 404.
-    const click = await request(server())
-      .post(`/api/ads/${ABSENT_UUID}/click`)
-      .expect(404);
-    expect(String(click.body.message)).toContain("Reklam bulunamadı");
+    // Olmayan ya da yayında olmayan reklam tık/gösterim → 204, sayılmaz
+    // (beacon yanıtı okumaz; 404 yalnız id yoklamaya yarardı).
+    await request(server()).post(`/api/ads/${ABSENT_UUID}/click`).expect(204);
     await request(server())
       .post(`/api/ads/${ABSENT_UUID}/impression`)
-      .expect(404);
+      .expect(204);
+    const passive = await seedAd({ title: "Pasif Sayım", isActive: false });
+    await request(server()).post(`/api/ads/${passive.id}/click`).expect(204);
+    const prisma = getPrisma();
+    const refreshed = await (prisma as any).advertisement.findUnique({
+      where: { id: passive.id },
+    });
+    expect(refreshed.clickCount).toBe(0);
   });
 
   scenario("DSC-061", async () => {
-    // IAB boyutları (public) — 10 öğe.
+    // IAB boyutları (public) — 11 öğe.
     const res = await request(server()).get("/api/ads/iab-sizes").expect(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body).toHaveLength(10);
+    expect(res.body).toHaveLength(11);
     const leaderboard = res.body.find((s: any) => s.name === "Leaderboard");
     expect(leaderboard).toEqual({
       name: "Leaderboard",
@@ -1576,14 +1617,14 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-064", async () => {
-    // Boyut sınırı 1-2000 dışında → 400.
+    // Boyut sınırı 1-4000 dışında → 400.
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc64@test.com",
     });
     await request(server())
       .post("/api/admin/ads")
       .set(authHeader(admin))
-      .send(iabAd({ width: 2500 }))
+      .send(iabAd({ width: 4500 }))
       .expect(400);
   });
 
@@ -1723,7 +1764,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-071", async () => {
-    // Reklam istatistikleri (CTR hesabı): impressions=0 → avgCTR=0; byPosition/byDeviceType döner.
+    // Reklam istatistikleri (CTR hesabı): impressions=0 → avgCTR=0; byPosition/byPlatform döner.
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc71@test.com",
     });
@@ -1740,9 +1781,178 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       .expect(200);
     expect(res.body).toHaveProperty("totalAds");
     expect(res.body).toHaveProperty("byPosition");
-    expect(res.body).toHaveProperty("byDeviceType");
+    expect(res.body).toHaveProperty("byPlatform");
     // 10/100*100 = 10.00.
     expect(res.body.avgCTR).toBeCloseTo(10, 2);
+  });
+
+  // ════════════════════════ Reklamlar — yuvada tek reklam ════════════════════════
+
+  const DAY_MS = 24 * 3_600_000;
+
+  scenario("DSC-107", async () => {
+    // Aynı yuva + çakışan platform + çakışan pencere → 409 slotTaken (başlıkla).
+    // web ile app çakışmaz; all ikisiyle de çakışır.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc107@test.com",
+    });
+    await seedAd({ title: "Dolu Popup", position: "popup", platform: "web" });
+
+    const res = await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Yeni", position: "popup", platform: "all" }))
+      .expect(409);
+    expect(res.body.i18nKey).toBe("server.ads.slotTaken");
+    expect(res.body.message).toContain("Dolu Popup");
+
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Uygulama", position: "popup", platform: "app" }))
+      .expect(201);
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Başka yuva", position: "footer", platform: "web" }))
+      .expect(201);
+  });
+
+  scenario("DSC-108", async () => {
+    // Güncelleme: pasif reklam yuvaya takılmadan oluşur; açılınca 409.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc108@test.com",
+    });
+    await seedAd({ title: "Canlı", position: "header", platform: "all" });
+    const draft = await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Taslak", isActive: false }))
+      .expect(201);
+    const res = await request(server())
+      .patch(`/api/admin/ads/${draft.body.id}`)
+      .set(authHeader(admin))
+      .send({ isActive: true })
+      .expect(409);
+    expect(res.body.i18nKey).toBe("server.ads.slotTaken");
+    // Yuvayı ilgilendirmeyen düzenleme serbest.
+    await request(server())
+      .patch(`/api/admin/ads/${draft.body.id}`)
+      .set(authHeader(admin))
+      .send({ title: "Taslak 2" })
+      .expect(200);
+  });
+
+  scenario("DSC-109", async () => {
+    // Pasif ve süresi geçmiş reklamlar yuvayı tutmaz; ayrık gelecek pencere serbest.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc109@test.com",
+    });
+    const now = Date.now();
+    await seedAd({ title: "Pasif", position: "popup", isActive: false });
+    await seedAd({
+      title: "Geçmiş",
+      position: "popup",
+      startDate: new Date(now - 30 * DAY_MS),
+      endDate: new Date(now - 2 * DAY_MS),
+    });
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Şimdi", position: "popup" }))
+      .expect(201);
+  });
+
+  scenario("DSC-110", async () => {
+    // Null tarih = sınırsız: tarihsiz canlı reklam gelecekteki her pencereyi engeller;
+    // pencereli reklamla ayrık pencere çakışmaz.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc110@test.com",
+    });
+    const now = Date.now();
+    await seedAd({
+      title: "Sınırsız",
+      position: "header",
+      startDate: null,
+      endDate: null,
+    });
+    const future = {
+      startDate: new Date(now + 60 * DAY_MS).toISOString(),
+      endDate: new Date(now + 70 * DAY_MS).toISOString(),
+    };
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Gelecek", position: "header", ...future }))
+      .expect(409);
+
+    await seedAd({
+      title: "Kasım",
+      position: "footer",
+      startDate: new Date(now + 10 * DAY_MS),
+      endDate: new Date(now + 20 * DAY_MS),
+    });
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Ayrık", position: "footer", ...future }))
+      .expect(201);
+    await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Bitişsiz", position: "footer", endDate: null }))
+      .expect(409);
+  });
+
+  scenario("DSC-111", async () => {
+    // Eski web istemcisi: platform yok ama device var → web sayılır (device süzmez).
+    await seedAd({ title: "W-web", platform: "web", position: "header" });
+    await seedAd({ title: "W-app", platform: "app", position: "footer" });
+    await seedAd({ title: "W-all", platform: "all", position: "popup" });
+    const res = await request(server())
+      .get("/api/ads/active?device=mobile")
+      .expect(200);
+    const titles = res.body.map((a: any) => a.title);
+    expect(titles).toEqual(expect.arrayContaining(["W-web", "W-all"]));
+    expect(titles).not.toContain("W-app");
+  });
+
+  scenario("DSC-112", async () => {
+    // popupVersion yalnız kreatif değişince artar; anahtar/sıra/tarih artırmaz.
+    const admin = await createAdminUser(ctx.module, {
+      email: "admin-dsc112@test.com",
+    });
+    const created = await request(server())
+      .post("/api/admin/ads")
+      .set(authHeader(admin))
+      .send(iabAd({ title: "Popup", position: "popup" }))
+      .expect(201);
+    expect(created.body.popupVersion).toBe(1);
+    const patch = (body: Record<string, unknown>) =>
+      request(server())
+        .patch(`/api/admin/ads/${created.body.id}`)
+        .set(authHeader(admin))
+        .send(body)
+        .expect(200);
+
+    expect((await patch({ isActive: false })).body.popupVersion).toBe(1);
+    expect(
+      (await patch({ isActive: true, displayOrder: 4 })).body.popupVersion,
+    ).toBe(1);
+    expect((await patch({ title: "Popup" })).body.popupVersion).toBe(1);
+    expect((await patch({ title: "Yeni Popup" })).body.popupVersion).toBe(2);
+    expect(
+      (await patch({ popupFrequency: "every_visit" })).body.popupVersion,
+    ).toBe(3);
+
+    // Tık/gösterim sayaçları da artırmaz.
+    await request(server())
+      .post(`/api/ads/${created.body.id}/impression`)
+      .expect(204);
+    const row = await (getPrisma() as any).advertisement.findUnique({
+      where: { id: created.body.id },
+    });
+    expect(row.popupVersion).toBe(3);
   });
 
   // ════════════════════════════ Bülten (newsletter) ════════════════════════════
@@ -2312,17 +2522,17 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-104", async () => {
-    // Reklam tık şişirme: aynı reklama çok kez POST /click → sayaç her seferinde +1 (koruma yok, RİSK).
+    // Reklam tık şişirme: aynı IP'den aynı reklama art arda 5 POST /click →
+    // 10 sn'lik tekilleştirme penceresi yalnız ilkini sayar.
     const ad = await seedAd({ title: "Şişirme Reklam" });
     for (let i = 0; i < 5; i++) {
-      const r = await request(server()).post(`/api/ads/${ad.id}/click`);
-      expect([200, 201]).toContain(r.status);
+      await request(server()).post(`/api/ads/${ad.id}/click`).expect(204);
     }
     const prisma = getPrisma();
     const refreshed = await (prisma as any).advertisement.findUnique({
       where: { id: ad.id },
     });
-    expect(refreshed.clickCount).toBe(5);
+    expect(refreshed.clickCount).toBe(1);
   });
 
   scenario("DSC-106", async () => {
@@ -2504,7 +2714,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   // DSC-102: Admin reklam sayfasının VERİ KAYNAKLARI API'den test edilir (UI render ayrı).
-  // GET /api/admin/ads (pozisyon/cihaz alanları), /api/admin/ads/statistics, /api/admin/ads/iab-sizes.
+  // GET /api/admin/ads (pozisyon/platform alanları), /api/admin/ads/statistics, /api/admin/ads/iab-sizes.
   scenario("DSC-102", async () => {
     const admin = await createAdminUser(ctx.module, {
       email: "admin-dsc102@test.com",
@@ -2525,6 +2735,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const ad = list.body.find((a: any) => a.title === "Panel Reklam");
     expect(ad).toBeTruthy();
     expect(ad).toHaveProperty("position");
+    expect(ad).toHaveProperty("platform");
     expect(ad).toHaveProperty("deviceType");
     expect(ad).toHaveProperty("iabCompliant");
     expect(ad).toHaveProperty("iabSize");
@@ -2535,13 +2746,13 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       .expect(200);
     expect(stats.body).toHaveProperty("totalAds");
     expect(stats.body).toHaveProperty("byPosition");
-    expect(stats.body).toHaveProperty("byDeviceType");
+    expect(stats.body).toHaveProperty("byPlatform");
     // IAB boyut kaynağı (admin).
     const iab = await request(server())
       .get("/api/admin/ads/iab-sizes")
       .set(authHeader(admin))
       .expect(200);
     expect(Array.isArray(iab.body)).toBe(true);
-    expect(iab.body).toHaveLength(10);
+    expect(iab.body).toHaveLength(11);
   });
 });

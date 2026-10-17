@@ -123,6 +123,20 @@ export const SHIPPABLE_ORDER_STATUSES: readonly OrderStatus[] = [
 ];
 
 /**
+ * Taşıyıcı teslimi gelse bile siparişi "teslim edildi"ye ÇEKMEYEN statüler:
+ * kapanmış ya da iadeye girmiş bir sipariş teslimle diriltilmez (escrow saati
+ * yeniden başlardı). Tek kaynak: teslim işleyicisi (`handleOrderDelivered`)
+ * bunu CAS koşulunda, Test Araçları kargo simülasyonu "teslim et" adımını
+ * sunup sunmamakta okur.
+ */
+export const NON_DELIVERABLE_ORDER_STATUSES: readonly OrderStatus[] = [
+  OrderStatus.completed,
+  OrderStatus.cancelled,
+  OrderStatus.refund_requested,
+  OrderStatus.refunded,
+];
+
+/**
  * Kullanıcı akışları için terminal statüler. `completed` kullanıcı statü
  * geçişleri için terminaldir; cayma penceresi içindeki SİSTEM iade akışı
  * (yukarıdaki system kenarları) bunun bilinçli istisnasıdır.

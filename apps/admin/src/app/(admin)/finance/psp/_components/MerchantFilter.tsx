@@ -46,7 +46,7 @@ export function MerchantFilter({
 export function MerchantBadge({ merchant }: { merchant: PaytrMerchant }) {
   const t = useTranslations();
   return (
-    <Badge variant={merchant === "membership" ? "info" : "default"}>
+    <Badge variant={merchant === "membership" ? "default" : "outline"}>
       {t(`admin.finance.psp.merchant.${merchant}`)}
     </Badge>
   );

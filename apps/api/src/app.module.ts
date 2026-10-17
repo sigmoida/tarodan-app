@@ -13,6 +13,7 @@ import {
   CsrfGuard,
 } from "./modules/auth";
 import { OutboxModule } from "./modules/outbox/outbox.module";
+import { MailRoutingModule } from "./modules/mail-routing/mail-routing.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { UserModule } from "./modules/user";
 import { ProductModule } from "./modules/product";
@@ -39,6 +40,8 @@ import { WishlistModule } from "./modules/wishlist";
 import { CollectionModule } from "./modules/collection";
 import { SupportModule } from "./modules/support";
 import { UserReportModule } from "./modules/user-report";
+import { ConsentModule } from "./modules/consent";
+import { LegalIdentityModule } from "./modules/legal-identity";
 
 // PHASE 3 - Security & Auth Hardening (AUDIT REMEDIATION)
 import { SecurityModule } from "./modules/security";
@@ -56,7 +59,7 @@ import { PaymentProvidersModule } from "./modules/payment-providers";
 import { InvoiceModule } from "./modules/invoice";
 
 // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
-import { ElogoModule } from "./modules/elogo";
+import { InvoicingModule } from "./modules/invoicing";
 
 // Marketing Email System
 import { MarketingModule } from "./modules/marketing/marketing.module";
@@ -83,6 +86,7 @@ import { HealthModule } from "./modules/health";
 
 // Public mobile bootstrap config (min supported app version / force-update gate)
 import { AppConfigModule } from "./modules/app-config";
+import { TimingRulesModule } from "./modules/timing-rules";
 
 // Media/File uploads (AWS S3)
 import { MediaModule } from "./modules/media";
@@ -92,6 +96,9 @@ import { EventModule } from "./modules/events";
 
 // Advertisement banners (public + admin)
 import { AdvertisementModule } from "./modules/advertisement/advertisement.module";
+
+// Storefront hero slides + trust badges (public + admin)
+import { HeroModule } from "./modules/hero/hero.module";
 
 // Discount & Promotion Engine
 import { DiscountModule } from "./modules/discount";
@@ -169,6 +176,9 @@ import { isTest } from "./config/environment";
     // Immutable double-entry ledger + drift reconciliation (Faz 6) — @Global
     LedgerModule,
 
+    // Mail Yönlendirme: gönderici kutuları + personel bildirimleri — @Global
+    MailRoutingModule,
+
     // Core Feature modules
     AuthModule,
     UserModule,
@@ -196,6 +206,8 @@ import { isTest } from "./config/environment";
     CollectionModule, // GAP-012: Collections System (MEDIUM)
     SupportModule, // GAP-013: Support Ticket System (MEDIUM)
     UserReportModule, // User-generated reports for products, users, collections
+    ConsentModule, // Hukuki onay kayıtları (KVKK, sözleşmeler, çerez, pazarlama)
+    LegalIdentityModule, // Yasal kimlik (ad, soyad, TCKN) + kimlik kapısı
 
     // PHASE 3 - Security Modules
     SecurityModule, // GAP-004 to GAP-009, GAP-017, GAP-018: Security & Auth
@@ -207,7 +219,7 @@ import { isTest } from "./config/environment";
 
     // PHASE 5 - Operations Modules
     InvoiceModule, // Invoice Generation & Delivery
-    ElogoModule, // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
+    InvoicingModule, // Gelir e-belgeleri (e-Arşiv / e-Fatura) — sağlayıcı portu + eLogo adaptörü
     MarketingModule, // Marketing Email Scheduler (weekly newsletter, monthly promotions)
 
     I18nModule, // GAP-L03: Multi-language Support
@@ -237,6 +249,9 @@ import { isTest } from "./config/environment";
     // Public mobile bootstrap config (#232): GET /app-config → minSupportedAppVersion
     AppConfigModule,
 
+    // Süreler ve Kurallar: GET /timing-rules (herkese açık politika süreleri)
+    TimingRulesModule,
+
     // Media/File uploads
     MediaModule, // Product images, Avatars, Documents
 
@@ -245,6 +260,9 @@ import { isTest } from "./config/environment";
 
     // Advertisement banners (public /api/ads + admin /api/admin/ads)
     AdvertisementModule,
+
+    // Storefront hero (public /api/hero-slides, /api/trust-badges + admin)
+    HeroModule,
 
     // Discount & Promotion Engine
     DiscountModule,

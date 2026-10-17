@@ -3,7 +3,10 @@
 import { enumLabel, paymentStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { DataList } from "@/components/detail/DataList";
+import { PaytrOidField } from "@/components/detail/PaytrOidField";
 import { fmtTry } from "@/lib/format";
+import { paytrOidDisplay } from "@/lib/paytr-oid";
 import type { TradeCashPayment, TradeDetail, TradeItem } from "../types";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -329,6 +332,23 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
               />
             </div>
           </div>
+          {payments
+            .filter((payment) => paytrOidDisplay(payment))
+            .map((payment) => (
+              <div key={payment.id ?? payment.payerId} className="mt-3">
+                <p className="mb-1 text-xs font-medium text-muted">
+                  {payment.payerId === trade.initiator.id
+                    ? trade.initiator.displayName
+                    : trade.receiver.displayName}
+                </p>
+                <DataList columns={1}>
+                  <PaytrOidField
+                    paytrOid={payment.paytrOid}
+                    paytrOidHistory={payment.paytrOidHistory}
+                  />
+                </DataList>
+              </div>
+            ))}
         </div>
       )}
     </SectionCard>

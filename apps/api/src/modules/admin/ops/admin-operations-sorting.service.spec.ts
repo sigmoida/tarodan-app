@@ -2,7 +2,6 @@
 
 import { AdminMessagingService } from "./admin-messaging.service";
 import { AdminPaymentService } from "../finance/admin-payment.service";
-import { AdminRefundService } from "../orders/admin-refund.service";
 import { AdminShippingService } from "../orders/admin-shipping.service";
 import { AdminTradeQueryService } from "../trade/admin-trade-query.service";
 
@@ -15,7 +14,8 @@ function createDelegate() {
 
 describe("admin operations list sorting", () => {
   // Sipariş listesi (sepet satırları, sekme/kova, birleşik sayfalama)
-  // orders/admin-order.service.spec.ts'te.
+  // orders/admin-order.service.spec.ts'te; İadeler listesi (iade anına göre
+  // birleşik sıralama) orders/admin-refund-list.service.spec.ts'te.
 
   it("sorts trades by a scalar field", async () => {
     const trade = createDelegate();
@@ -32,31 +32,6 @@ describe("admin operations list sorting", () => {
     expect(trade.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: { cashAmount: "asc" },
-        skip: 0,
-        take: 20,
-      }),
-    );
-  });
-
-  it("sorts refund requests by amount", async () => {
-    const refundRequest = createDelegate();
-    const service = new AdminRefundService(
-      { refundRequest } as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      undefined as any,
-    );
-
-    await service.listRefundRequests({
-      sortBy: "amount",
-      sortOrder: "desc",
-    });
-
-    expect(refundRequest.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderBy: { amount: "desc" },
         skip: 0,
         take: 20,
       }),

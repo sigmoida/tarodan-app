@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import {
@@ -33,6 +34,15 @@ import {
   generateUniqueReference,
 } from "../../common/helpers/generate-reference";
 import { i18nMessage } from "../i18n";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import {
+  guestMessageNotice,
+  supportTicketOpenedNotice,
+} from "../mail-routing/helpers/mail-internal-notices";
 
 /**
  * #291: sortable fields for the cache-backed guest-contacts list and their sort
@@ -56,6 +66,8 @@ export class SupportService {
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly notificationService: NotificationService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   // ==========================================================================
@@ -140,21 +152,21 @@ export class SupportService {
         `Guest contact form submitted: ${referenceNumber} from ${dto.email}`,
       );
 
-      // Destek ekibine bildirim maili (fire-and-forget): mail hatası mesajın
-      // kaydını bozmamalı — mesaj zaten Redis'e yazıldı ve panelde görünüyor.
-      this.notificationService
-        .sendGuestContactAdminEmail({
+      // Destek ekibine bildirim (Mail Yönlendirme, `support.guestMessage`):
+      // outbox üzerinden, mesajın kaydını hiçbir koşulda bozmaz — mesaj zaten
+      // Redis'e yazıldı ve panelde görünüyor. "guestMessage" alanının alıcısı
+      // yokken eski SUPPORT_NOTIFICATION_EMAIL adresine gider; "Yanıtla"
+      // misafire gider. E-postada mesajın kısa alıntısı vardır, tamamı panelde.
+      void this.mailNotifier?.emit(
+        "support.guestMessage",
+        guestMessageNotice({
           referenceNumber,
           name: dto.name,
           email: dto.email,
           subject: guestContactData.subject,
           message: dto.message,
-        })
-        .catch((err) =>
-          this.logger.error(
-            `Guest contact bildirim maili gönderilemedi (${referenceNumber}): ${err?.message ?? err}`,
-          ),
-        );
+        }),
+      );
 
       return {
         success: true,
@@ -312,7 +324,48 @@ export class SupportService {
       },
     });
 
+    void this.notifyStaffTicketOpened(ticket, userId);
     return this.getTicketById(ticket.id, userId);
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `support.ticketOpened`). Mesaj
+   * gövdesi e-postaya girmez (konu alıntısı yeter, tamamı panelde); test
+   * hesaplarının talepleri bildirilmez.
+   */
+  private async notifyStaffTicketOpened(
+    ticket: {
+      id: string;
+      ticketNumber: string;
+      category: TicketCategory;
+      priority: TicketPriority;
+      subject: string;
+    },
+    userId: string,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const creator = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { ...PUBLIC_NAME_SELECT, isTestAccount: true },
+      });
+      await this.mailNotifier.emit(
+        "support.ticketOpened",
+        supportTicketOpenedNotice({
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          userName: publicName(creator),
+          category: ticket.category,
+          priority: ticket.priority,
+          subject: ticket.subject,
+        }),
+        { isTest: creator?.isTestAccount ?? false },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `support.ticketOpened personel bildirimi hazırlanamadı (${ticket.ticketNumber}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   // ==========================================================================

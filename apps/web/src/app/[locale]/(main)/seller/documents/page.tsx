@@ -72,7 +72,7 @@ function DocSlot({
       </Badge>
     )
   ) : (
-    <Badge variant="default" size="sm">
+    <Badge variant="outline" size="sm">
       {t("seller.documents.notUploaded")}
     </Badge>
   );

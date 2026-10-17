@@ -48,7 +48,10 @@ export interface AdminOrderLine {
   unitPrice: number;
   subtotal: number;
   totalAmount: number;
+  /** Geçerli kargoya verme son tarihi — uzatıldıysa uzatılmış olanı. */
   preparingDeadline: string | null;
+  /** Tek seferlik hazırlık uzatmasının verildiği an; hiç uzatılmadıysa null. */
+  preparingExtendedAt: string | null;
   deliveredAt: string | null;
   hasActiveRefund: boolean;
   product: AdminOrderLineProduct;

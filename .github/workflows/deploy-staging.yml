@@ -2,6 +2,23 @@ name: Deploy Staging
 
 # Coolify Auto Deploy must be disabled for the staging API, web and admin
 # resources. This workflow is the only deployment trigger for development.
+#
+# development = staging = our area: pushes must be FAST and breakages are
+# fixed forward. The gate is typecheck + lint only (verify.yml with
+# `unit: false`, turbo-cached, ~1-2 min); the unit suites run on the same push
+# in the separate, advisory Development Tests workflow, which nothing waits
+# for. They live in their own workflow on purpose: a red unit run here would
+# mark this run failed, and deploy-targets only diffs against successful runs.
+# The full gate (all unit tests, production build, audit) runs on the
+# development -> master PR and before the production release.
+#
+# A newer push cancels an older run that is still verifying or waiting on
+# Coolify (concurrency below). The deploy job therefore diffs against the last
+# SUCCESSFUL run, not against `github.event.before`, so a cancelled run's apps
+# still ship (.github/actions/deploy-targets). A run counts as successful only
+# after Coolify reports every build finished (wait-for-result), and it never
+# triggers Coolify once development has moved past the verified commit
+# (Coolify always builds the branch HEAD; see expected-commit).
 
 on:
   push:
@@ -10,39 +27,38 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-staging
   cancel-in-progress: true
 
 jobs:
+  verify:
+    name: Staging gate
+    uses: ./.github/workflows/verify.yml
+    with:
+      unit: false
+
   deploy:
     name: Deploy affected staging apps
+    needs: verify
+    # A manual run from another branch would gate that branch's tree while
+    # Coolify builds development: never deploy from anything but development.
+    if: github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - id: affected
-        name: Detect affected applications
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            apps="api,web,admin"
-          else
-            apps="$(node scripts/detect-affected-apps.mjs \
-              --base "$BEFORE_SHA" \
-              --head "$AFTER_SHA" \
-              --format csv)"
-          fi
-          echo "apps=$apps" >> "$GITHUB_OUTPUT"
-          echo "Affected applications: ${apps:-none}"
+        name: Detect applications changed since the last successful deploy
+        uses: ./.github/actions/deploy-targets
+        with:
+          workflow: deploy-staging.yml
+          github-token: ${{ github.token }}
 
       - name: Trigger affected Coolify deployments
         if: ${{ steps.affected.outputs.apps != '' }}
@@ -52,7 +68,12 @@ jobs:
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
           all-uuids: ${{ secrets.COOLIFY_STAGING_UUIDS }}
           apps: ${{ steps.affected.outputs.apps }}
-          wait-for-result: "false"
+          expected-commit: ${{ github.sha }}
+          branch: development
+          # Wait for Coolify: a failed build must fail this run, or the next
+          # run would diff against a commit that never reached staging.
+          wait-for-result: "true"
+          timeout-seconds: "900"
 
       - name: Skip deployment
         if: ${{ steps.affected.outputs.apps == '' }}

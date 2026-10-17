@@ -1,11 +1,6 @@
-import {
-  ListBulletIcon,
-  CalendarDaysIcon,
-  BanknotesIcon,
-  ReceiptRefundIcon,
-} from "@heroicons/react/24/outline";
 import { payoutStatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
+import type { HoldReleaseFlags } from "./holdReason";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -62,7 +57,12 @@ export interface PayoutAdjustmentRow {
   createdAt: string;
 }
 
-export interface PayoutTransaction {
+/** Sunucunun hold satırına eklediği serbest bırakma kararı + sipariş durumu. */
+export interface HoldRowServerFlags extends HoldReleaseFlags {
+  orderStatus?: string;
+}
+
+export interface PayoutTransaction extends HoldRowServerFlags {
   id: string;
   orderId: string;
   orderNumber: string;
@@ -79,7 +79,7 @@ export interface PayoutTransaction {
   frozenByRefundId: string | null;
 }
 
-export interface ScheduleItem {
+export interface ScheduleItem extends HoldRowServerFlags {
   id: string;
   orderId: string;
   orderNumber: string;
@@ -99,23 +99,25 @@ export const payoutTabs = (t: T) => [
     // ikisini karıştırıyordu; sekme adı artık ne olduğunu söylüyor.
     key: "escrow",
     label: t("admin.finance.payouts.escrowTab"),
-    icon: ListBulletIcon,
   },
   {
     key: "transfers",
     label: t("admin.finance.payouts.transfersTab"),
-    icon: BanknotesIcon,
   },
   {
     key: "adjustments",
     label: t("admin.finance.payouts.adjustmentsTab"),
-    icon: ReceiptRefundIcon,
   },
   {
     key: "schedule",
     label: t("admin.finance.payouts.schedule"),
-    icon: CalendarDaysIcon,
   },
+];
+
+/** "Vadesi geçmiş" süzgeci — değer API'ye `overdue=true` gider (dashboard uyarısı). */
+export const overdueFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.payouts.filterAllDue") },
+  { value: "true", label: t("admin.finance.payouts.filterOverdueOnly") },
 ];
 
 export const payoutStatusFilterOptions = (t: T) => [
@@ -123,6 +125,12 @@ export const payoutStatusFilterOptions = (t: T) => [
   { value: "held", label: t("admin.finance.payouts.status.held") },
   { value: "released", label: t("admin.finance.payouts.status.released") },
   { value: "cancelled", label: t("admin.finance.payouts.status.cancelled") },
+];
+
+/** "Erken bırakılanlar" süzgeci — değer API'ye `earlyReleased=true` gider. */
+export const earlyReleaseFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.payouts.filterAllReleases") },
+  { value: "true", label: t("admin.finance.payouts.filterEarlyOnly") },
 ];
 
 /**

@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import MembershipSummary from "./_sections/MembershipSummary";
 import ProfileInfoSection from "./_sections/ProfileInfoSection";
+import LegalIdentitySection from "./_sections/LegalIdentitySection";
 import AddressesSection from "./_sections/AddressesSection";
 import BankAccountSection from "./_sections/BankAccountSection";
 import SecuritySection from "./_sections/SecuritySection";
@@ -33,6 +34,7 @@ export default function ProfilePage() {
     <div className="space-y-6 pb-16">
       <MembershipSummary />
       <ProfileInfoSection />
+      <LegalIdentitySection />
       <LanguagePreferenceSection />
       <AddressesSection />
       <BankAccountSection />

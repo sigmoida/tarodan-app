@@ -4,6 +4,7 @@
 
 import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/layout/PageShell";
+import BannerSlot from "@/components/marketing/BannerSlot";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ListingsProvider, useListings } from "./_context/ListingsContext";
 import ListingsControls, {
@@ -12,18 +13,19 @@ import ListingsControls, {
 import ListingsSidebar from "./_components/ListingsSidebar";
 import ListingsGrid from "./_components/ListingsGrid";
 import ListingsPagination from "./_components/ListingsPagination";
+import { getListingsTitle } from "./_lib/title";
 
 function ListingsLayout() {
   const t = useTranslations();
-  const { filters, currentSearch, pagination } = useListings();
+  const { filtersForSidebar, currentSearch, pagination } = useListings();
 
-  const title = currentSearch
-    ? t("product.searchResultsFor", { query: currentSearch })
-    : filters.brand || filters.category || t("seller.allListings");
+  // filtersForSidebar: canlı filtre durumu + slug'dan çözülmüş kategori adı.
+  const title = getListingsTitle(t, currentSearch, filtersForSidebar);
   const description = `${pagination.total} ${t("product.productsFound")}`;
 
   return (
     <PageShell>
+      <BannerSlot position="header" className="mb-4 space-y-3" />
       <PageHeader
         title={title}
         description={description}
@@ -41,6 +43,7 @@ function ListingsLayout() {
           <ListingsPagination />
         </div>
       </div>
+      <BannerSlot position="footer" className="mt-8 space-y-3" />
     </PageShell>
   );
 }

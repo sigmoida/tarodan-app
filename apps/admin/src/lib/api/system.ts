@@ -1,4 +1,13 @@
+import type { TimingRuleChange } from "@tarodan/types";
 import { api } from "./client";
+import type {
+  ShipmentSimulationResult,
+  SimulatableParcel,
+  SimulateShipmentPayload,
+  StartUatRefreshRequest,
+  UatRefreshRun,
+  UatRefreshStatus,
+} from "./system.types";
 
 /**
  * System domain: global settings, membership tiers, audit/error/security logs,
@@ -10,6 +19,13 @@ export const systemApi = {
   updateSettings: (data: any) => api.patch("/admin/settings", data),
   updateSetting: (key: string, value: string) =>
     api.patch(`/admin/settings/${key}`, { value }),
+
+  // Durations & rules (business durations + their expiry actions)
+  getTimingRules: () => api.get("/admin/timing-rules"),
+  updateTimingRules: (changes: TimingRuleChange[]) =>
+    api.patch("/admin/timing-rules", { changes }),
+  // Public policy values (return window, payout grace …) the screens quote
+  getTimingPolicy: () => api.get("/timing-rules"),
 
   // Early-access invite codes (pre-launch site lock)
   getSiteAccessPins: (params?: any) =>
@@ -135,4 +151,23 @@ export const systemApi = {
    * Yanıtın `x-admin-session-expires-at` başlığı yeni son tarihi getirir.
    */
   extendAdminSession: () => api.get("/auth/admin/profile"),
+
+  // Test Tools — carrier event simulation (UAT). Feeds a synthetic carrier
+  // reading into the real tracking path; on live only test-lane parcels.
+  searchSimulatableShipments: (q: string) =>
+    api.get<SimulatableParcel[]>("/admin/test-tools/shipments", {
+      params: { q },
+    }),
+  simulateShipment: (payload: SimulateShipmentPayload) =>
+    api.post<ShipmentSimulationResult>(
+      "/admin/test-tools/shipments/simulate",
+      payload,
+    ),
+
+  // Test Tools — staging refresh from a masked production copy (super admin;
+  // the API refuses on production). The run itself happens in GitHub Actions.
+  getUatRefreshStatus: () =>
+    api.get<UatRefreshStatus>("/admin/test-tools/uat-refresh"),
+  startUatRefresh: (payload: StartUatRefreshRequest) =>
+    api.post<UatRefreshRun>("/admin/test-tools/uat-refresh", payload),
 };

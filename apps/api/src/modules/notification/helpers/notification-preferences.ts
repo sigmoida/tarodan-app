@@ -14,8 +14,11 @@
  *    kanallarda (push + in-app/zil + email) açar/kapatır.
  *  - in-app (zil) için ayrı master yok: kategori kapalı değilse her zaman düşer.
  *  - ALWAYS_SEND tipleri (güvenlik/hesap/sistem) tercihten bağımsız gider.
+ *  - Admin duyurusu türüne göre ayrılır (`preferenceTypeFor`): duyuru
+ *    ALWAYS_SEND'dedir, pazarlama türü değildir.
  */
 import { NotificationType } from "../dto/notification.dto";
+import { isMarketingMailing } from "../../../common/helpers/broadcast-email";
 import {
   NotificationSettings,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -44,6 +47,18 @@ const ALWAYS_SEND = new Set<string>([
   NotificationType.SELLER_APPLICATION_REJECTED,
   "admin_broadcast",
 ]);
+
+/**
+ * Pazarlama türündeki admin duyurusunun tercih anahtarı (Apple 4.5.4, İYS).
+ *
+ * Push ve zil kanalı kampanya (PROMOTION) kategorisine bağlıdır: bu anahtar
+ * `categoryForType` ile `marketingEmails` düğmesine eşlenir. Düğmenin tek
+ * kaynağı `User.acceptsMarketingEmails` kolonudur (bkz. `resolveSettings`);
+ * kitle de aynı kolonla süzülür (`MARKETING_CONSENT_WHERE`), yani audience ile
+ * gönderim anı aynı kararı verir. Anahtar ALWAYS_SEND dışındadır;
+ * veritabanına yazılmaz, yalnız tercih kararı içindir.
+ */
+export const MARKETING_BROADCAST_PREFERENCE_TYPE = "admin_broadcast:marketing";
 
 /**
  * Admin OPERASYON alarmları: önek eşlemesinden açıkça muaftır. Bunlar tüketici
@@ -87,7 +102,8 @@ export function categoryForType(type: string): PreferenceCategory | null {
 
   if (
     type === NotificationType.PROMOTION ||
-    type === NotificationType.SPECIAL_OFFER
+    type === NotificationType.SPECIAL_OFFER ||
+    type === MARKETING_BROADCAST_PREFERENCE_TYPE
   ) {
     return "marketingEmails";
   }
@@ -106,12 +122,48 @@ export function categoryForType(type: string): PreferenceCategory | null {
   return null;
 }
 
-/** Ham notificationSettings (Json|null) → varsayılanlarla birleştirilmiş tam nesne. */
-export function resolveSettings(raw: unknown): NotificationSettings {
-  return {
+/**
+ * Tercih kararında kullanılacak tip. Bildirim verisindeki `type` aynen
+ * kullanılır; yalnız pazarlama türündeki admin duyurusu (`mailingType:
+ * "marketing"`) ALWAYS_SEND dışındaki anahtara çevrilir. İstemciye giden
+ * `type` değişmez (mobil yönlendirmesi `admin_broadcast` bekler).
+ */
+export function preferenceTypeFor(
+  data: { type?: unknown; mailingType?: unknown } | null | undefined,
+): string {
+  const type =
+    typeof data?.type === "string" && data.type ? data.type : "general";
+  if (
+    type === NotificationType.ADMIN_BROADCAST &&
+    isMarketingMailing(data?.mailingType)
+  ) {
+    return MARKETING_BROADCAST_PREFERENCE_TYPE;
+  }
+  return type;
+}
+
+/**
+ * Ham notificationSettings (Json|null) → varsayılanlarla birleştirilmiş tam nesne.
+ *
+ * Pazarlama izninin (`marketingEmails` kategorisi) TEK kaynağı
+ * `User.acceptsMarketingEmails` kolonudur (profil düğmesi, kayıt onayı ve
+ * bülten çıkışı onu yazar). Kolon geçilirse JSON'daki `marketingEmails`
+ * anahtarı (bayat kalabilir) yok sayılır ve kolon geçerli olur; her gönderim
+ * yolu kolonu bu parametreyle geçirmelidir. Kolon geçilmezse JSON/varsayılan
+ * kullanılır.
+ */
+export function resolveSettings(
+  raw: unknown,
+  acceptsMarketingEmails?: boolean | null,
+): NotificationSettings {
+  const settings = {
     ...DEFAULT_NOTIFICATION_SETTINGS,
     ...((raw as Partial<NotificationSettings> | null) ?? {}),
   };
+  if (typeof acceptsMarketingEmails === "boolean") {
+    settings.marketingEmails = acceptsMarketingEmails;
+  }
+  return settings;
 }
 
 /**

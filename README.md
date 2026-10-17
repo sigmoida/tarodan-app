@@ -97,7 +97,12 @@ sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları baş
 | `pnpm db:studio`                   | Prisma Studio                                        |
 | `pnpm db:migrate`                  | Yeni migration oluştur/uygula (`prisma migrate dev`) |
 | `pnpm lint` / `typecheck` / `test` | Kalite kontrolleri                                   |
+| `pnpm verify:push [--tests]`       | Push hook'unun kontrolü (typecheck; ops. testler)    |
+| `pnpm verify:quick` / `verify:ci`  | development / master CI kontrollerinin yerel kopyası |
 | `pnpm stack:up`                    | PM2 ile arka planda çalıştırma alternatifi           |
+
+Doğrulama hattı (yerel hook'lar, CI kapıları, deploy'lar):
+[`docs/OPERATIONS.md` §4](docs/OPERATIONS.md#4-doğrulama-hattı-cicd).
 
 ## Sorun giderme
 
@@ -108,3 +113,29 @@ sonra veritabanını siler, migrate + seed çalıştırır ve uygulamaları baş
 - **Arama sonuçları boş** → Elasticsearch hâlâ ısınıyor olabilir: `curl localhost:9200/_cluster/health`
 - **Giden e-postalar görünmüyor** → Mailpit UI: http://localhost:8025
 - **PayTR callback'i yerelde test** → `pnpm ngrok` (3001'i dışarı tünneler)
+
+## Contributing
+
+The engineering rules live in [`CLAUDE.md`](CLAUDE.md) (root) and the folder
+guides it links to. Cross-repo process (releases, API contracts, web/mobile
+parity, backlog) lives in the private hub repo **tarodan-ops**; the guides
+summarise what applies here.
+
+- **Setup:** Node 20 (`.nvmrc`), pnpm 10, Docker. `pnpm install`, then
+  `pnpm dev:seed` once (env files, docker, migrations, demo data).
+- **Run:** `pnpm dev` starts web (3000), API (3001) and admin (3002);
+  `pnpm dev:stop` stops everything.
+- **Test:** run only what you touched:
+  `cd apps/api && npx jest <paths> --maxWorkers=2`,
+  `pnpm --filter @tarodan/web exec vitest run <paths>` (or `@tarodan/admin`),
+  `node --test scripts/*.test.mjs`. `pnpm verify:push` repeats the pre-push
+  check; `pnpm verify:ci` repeats the master gate.
+- **Commits and branches:** Conventional Commits in English
+  (`fix(api): lock the offer row before a counter`), branches
+  `<type>/<kebab-description>`; commitlint and the pre-push hook enforce both.
+  Never `--no-verify`.
+- **Release:** pushes to `development` deploy staging after typecheck + lint.
+  `master` is production and changes only through a PR from `development` or
+  `hotfix/*`, which runs the full gate (unit tests, build, audit).
+- **Security:** this repo is public. Never commit secrets, real env values or
+  personal data.

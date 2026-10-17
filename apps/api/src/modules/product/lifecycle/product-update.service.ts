@@ -5,10 +5,14 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import { emitListingPendingApproval } from "../helpers/listing-pending-approval-notice";
 import type { ProductUpdateActor } from "../helpers/product-update-actor";
 import { resolveUpdatedStatus } from "../helpers/product-update-status";
+import { assertListingMayReopen } from "../helpers/product-reopen-gate";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
 import { CacheService } from "../../cache/cache.service";
@@ -17,8 +21,13 @@ import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { SmtpProvider } from "../../mail/smtp.provider";
-import { UpdateProductDto } from "../dto";
-import { OfferStatus, ProductStatus, Prisma } from "@prisma/client";
+import { DeleteProductDto, UpdateProductDto, removalInputOf } from "../dto";
+import {
+  ListingRemovalReason,
+  OfferStatus,
+  ProductStatus,
+  Prisma,
+} from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
@@ -37,10 +46,19 @@ import { CommissionRuleGuardService } from "../../commission/commission-rule-gua
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import {
+  assertProductPriceWithinLimits,
+  isStoredProductPrice,
   loadProductPriceLimits,
-  productPriceLimitViolation,
 } from "../helpers/product-price-limits";
 import { frontendUrl as resolveFrontendUrl } from "../../../config/app-urls";
+import {
+  recordListingRemovals,
+  type ListingRemovalEntry,
+} from "../helpers/listing-removal";
+import {
+  sellerRemovalFields,
+  type ListingRemovalReasonFields,
+} from "../helpers/listing-removal-input";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -65,6 +83,8 @@ export class ProductUpdateService {
     private readonly commissionGuard: CommissionRuleGuardService,
     // Düzenleme, oluşturma ile aynı içerik kapılarından geçer (L2).
     private readonly moderationAi: ModerationAiClient,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -201,35 +221,19 @@ export class ProductUpdateService {
       // kuralı burada denetlenir. Yönetici statü göndermez (politika onu
       // yok sayar), bu dal ona hiç işlemez.
       if (!isAdmin && dto.status === ProductStatus.active) {
-        const newQuantity =
-          dto.quantity != null ? Number(dto.quantity) : product.quantity;
-        if (newQuantity != null && newQuantity <= 0) {
-          throw new BadRequestException(
-            i18nMessage("server.product.setQuantityToReopen"),
-          );
-        }
-        // İlan limiti yeniden satışa açarken de geçerli: limit pending+active+
-        // reserved sayar, sold/inactive SAYILMAZ — kontrolsüz reaktivasyon,
-        // limiti aşmanın arka kapısıydı (create ile AYNI kaynak: canCreateListing).
-        // Zaten sayılan (aktif) ilanın normal düzenlemesi bu daldan geçmez.
-        // Karantina bypass'ında da GEÇERLİ: "admin onayı gerekmez" moderasyon
-        // içindir, üyelik/komisyon bir güvenlik/finans kapısıdır — atlanmaz.
-        const canReopen =
-          await this.membershipService.canCreateListing(sellerId);
-        if (!canReopen.allowed) {
-          const limits = await this.membershipService.getUserLimits(sellerId);
-          throw new ForbiddenException(
-            i18nMessage("server.product.listingLimitReached", {
-              tierName: limits.tierName,
-              maxListings: limits.maxTotalListings,
-            }),
-          );
-        }
-        await this.commissionGuard.assertListingRuleExists({
-          sellerId,
-          categoryId: product.categoryId,
-          amount: Number(product.price),
-        });
+        // Stok + üyelik limiti + komisyon kuralı: yenileme (ProductRenewalService)
+        // ile AYNI kapı. Zaten sayılan (aktif) ilanın normal düzenlemesi bu
+        // daldan geçmez. Karantina bypass'ında da GEÇERLİ: "admin onayı
+        // gerekmez" moderasyon içindir, üyelik/komisyon bir güvenlik/finans
+        // kapısıdır — atlanmaz.
+        await assertListingMayReopen(
+          {
+            membershipService: this.membershipService,
+            commissionGuard: this.commissionGuard,
+          },
+          product,
+          dto.quantity,
+        );
         // TEK karar yeri: return_quarantine + stok varsa `active` (bypass),
         // aksi hâlde eski davranış `pending`. Asla undefined dönmez burada
         // (requested=active, status sold/inactive ikisi de !==active), ama
@@ -240,11 +244,26 @@ export class ProductUpdateService {
           where: { id },
           data: {
             status: reopenedStatus,
+            // Doğrudan yayına dönen ilan taze bir ömür alır: aksi hâlde ömründen
+            // eski bir ilan ertesi gece yine pasife alınırdı (publishedAt yalnız
+            // onayda tazeleniyordu, bu yol onaydan geçmez). `pending` yolunda
+            // onay tazeler.
+            ...(reopenedStatus === ProductStatus.active
+              ? { publishedAt: new Date() }
+              : {}),
             ...(dto.quantity != null ? { quantity: Number(dto.quantity) } : {}),
           },
         });
         await this.cache.del(`products:detail:${id}`);
         await this.cache.delPattern("products:list:*");
+        if (reopenedStatus === ProductStatus.pending) {
+          void emitListingPendingApproval(
+            this.prisma,
+            this.mailNotifier,
+            id,
+            `reopened:${Date.now()}`,
+          );
+        }
         // NOT: back-in-stock bildirimi burada GÖNDERİLMEZ — `pending` yolunda
         // ilan henüz yayında değil (bildirim admin onayıyla active'e geçtiğinde
         // gider); `active` bypass yolunda da (bugünkü kapsam) gönderilmiyor.
@@ -343,35 +362,6 @@ export class ProductUpdateService {
       });
     }
 
-    // Platform min/max fiyat limiti düzenlemede de geçerli — onaylı ilan
-    // sonradan limit dışı fiyata çekilemesin (create ile aynı kaynak).
-    if (dto.price !== undefined || dto.salePrice != null) {
-      const priceLimits = await loadProductPriceLimits(this.prisma);
-      for (const candidate of [
-        dto.price !== undefined ? Number(dto.price) : null,
-        dto.salePrice != null && Number(dto.salePrice) > 0
-          ? Number(dto.salePrice)
-          : null,
-      ]) {
-        if (candidate == null) continue;
-        const violation = productPriceLimitViolation(candidate, priceLimits);
-        if (violation?.type === "minimum") {
-          throw new BadRequestException(
-            i18nMessage("server.product.priceBelowMinimum", {
-              minPrice: violation.limit,
-            }),
-          );
-        }
-        if (violation?.type === "maximum") {
-          throw new BadRequestException(
-            i18nMessage("server.product.priceAboveMaximum", {
-              maxPrice: violation.limit,
-            }),
-          );
-        }
-      }
-    }
-
     // Check membership for trade feature
     let canEnableTrade = false;
     if (dto.isTradeEnabled === true) {
@@ -455,7 +445,66 @@ export class ProductUpdateService {
           ? priceUpdate
           : dto.price;
 
+    // Platform min/max fiyat limiti düzenlemede de geçerli (create ile aynı
+    // kaynak) — ama GERİYE DÖNÜK DEĞİL: yalnız fiyat gerçekten DEĞİŞİYORSA ya
+    // da yeni bir indirim giriliyorsa denetlenir. Sınırın altında kalmış mevcut
+    // ilan yayında kalır ve fiyatına dokunmadan düzenlenebilir; formlar
+    // kayıtlı fiyatı olduğu gibi geri gönderir. Admin düzenlemesi muaf (ürün
+    // kararı): destek ekibi istisnai fiyat girebilir; toplu içe aktarma muaf değil.
+    //
+    // Denetlenen, istekteki ham alanlar değil YAZILACAK değerlerdir (yukarıdaki
+    // çözümleme): `originalPrice` ile yazılacak çizili fiyat da üst sınırı
+    // aşamaz, yok sayılan bir alan ise yanıltıcı hata vermez.
+    if (!isAdmin) {
+      const storedPrices = [
+        product.price,
+        product.oldPrice,
+        product.originalPrice,
+        product.salePrice,
+      ];
+      const candidates = [effectivePrice, oldPriceUpdate]
+        .map((value) => (value == null ? null : Number(value)))
+        .filter(
+          (candidate): candidate is number =>
+            candidate != null &&
+            Number.isFinite(candidate) &&
+            !isStoredProductPrice(candidate, storedPrices),
+        );
+      if (candidates.length > 0) {
+        const priceLimits = await loadProductPriceLimits(this.prisma);
+        for (const candidate of candidates) {
+          assertProductPriceWithinLimits(candidate, priceLimits);
+        }
+      }
+    }
+
     const resolvedStatus = resolveUpdatedStatus(product, dto, actor);
+    // Bu düzenleme ilanı vitrinden düşürüyorsa NEDENİ: satıcının pasife alması
+    // kendi seçtiği nedeni taşır (eski istemci → not_given); stoğun 0'a
+    // çekilmesi (satıcı ya da yönetici düzenlemesi) "stok tükendi"dir. Neden
+    // yazımdan ÖNCE doğrulanır — geçersiz neden hiçbir şey yazdırmaz.
+    //
+    // Buraya yalnız active / pending / rejected / suspended ilan ulaşır:
+    // reserved ve deleted yukarıda reddedilir; sold ve inactive ya yeniden
+    // satışa açma dalında döner (active/pending yazar — kaldırma değil) ya da
+    // `setQuantityToReopen` ile reddedilir. Yani zaten pasif bir ilanın yeniden
+    // kaydedilmesi bu satıra hiç gelmez; ikinci bir kaldırma kaydı oluşamaz.
+    // (`recordListingRemovals` ayrıca statü değişmeyen geçişi de yok sayar.)
+    // pending / rejected / suspended → inactive geçmişe kaydedilir ama ilan
+    // vitrinde değildi: "vitrinden düşüş" sayılmaz ve satıcının nedeni bir
+    // yönetici/sistem nedenini (ör. kural ihlali) ezmez — kuralın tek yeri
+    // `recordListingRemovals`.
+    const removal: ListingRemovalEntry | null =
+      resolvedStatus === ProductStatus.inactive
+        ? {
+            productId: id,
+            statusBefore: product.status,
+            statusAfter: ProductStatus.inactive,
+            actorUserId:
+              actor.kind === "seller" ? actor.sellerId : actor.adminId,
+            ...this.deactivationReason(actor, dto),
+          }
+        : null;
     const remainsListable =
       dto.status !== ProductStatus.inactive &&
       resolvedStatus !== ProductStatus.inactive;
@@ -630,7 +679,7 @@ export class ProductUpdateService {
             });
           }
         }
-        return tx.product.update({
+        const row = await tx.product.update({
           where: {
             id,
             version: product.version, // Optimistic lock check
@@ -671,6 +720,9 @@ export class ProductUpdateService {
             },
           },
         });
+        // Neden statüyle AYNI transaction'da: iyimser kilit düşerse kayıt da düşer.
+        if (removal) await recordListingRemovals(tx, [removal]);
+        return row;
       });
 
       // `attributesChanged` yerine çözülmüş sonucun kendisiyle daraltılır:
@@ -736,6 +788,19 @@ export class ProductUpdateService {
       // Web ISR'yi anında tazele: fiyat/indirim değişimi ana sayfa rail'lerine +
       // ürün sayfasına hemen yansısın (WEB_REVALIDATE_URL yoksa no-op).
       void notifyWebRevalidate(["products:list", `product:${id}`]);
+
+      // Düzenleme ilanı yeniden onaya gönderdiyse personel bildirimi.
+      if (
+        updated.status === ProductStatus.pending &&
+        product.status !== ProductStatus.pending
+      ) {
+        void emitListingPendingApproval(
+          this.prisma,
+          this.mailNotifier,
+          id,
+          `resubmitted:${updated.updatedAt.toISOString()}`,
+        );
+      }
 
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {
@@ -825,6 +890,22 @@ export class ProductUpdateService {
    */
 
   /**
+   * Düzenlemeyle pasife düşen ilanın nedeni. Satıcı `status: inactive`
+   * istediyse bu onun kararıdır (seçtiği neden; eski istemci → `not_given`);
+   * aksi hâlde pasife düşüşün tek sebebi stoğun 0'a çekilmesidir
+   * (`resolveUpdatedStatus`) — kimin düzenlediğinden bağımsız "stok tükendi".
+   */
+  private deactivationReason(
+    actor: ProductUpdateActor,
+    dto: UpdateProductDto,
+  ): ListingRemovalReasonFields {
+    if (actor.kind === "seller" && dto.status === ProductStatus.inactive) {
+      return sellerRemovalFields("deactivate", removalInputOf(dto));
+    }
+    return { reason: ListingRemovalReason.out_of_stock };
+  }
+
+  /**
    * Notify users who have this product in their wishlist about price change
    * Sends both in-app notifications and emails
    */
@@ -911,6 +992,8 @@ export class ProductUpdateService {
               to: user.email,
               subject: email.subject,
               html: email.html,
+              // EmailLog + Mail Yönlendirme alanı şablondan.
+              template: "wishlist-price-change",
             });
           }
         } catch (emailError: any) {
@@ -934,10 +1017,17 @@ export class ProductUpdateService {
   }
 
   /**
-   * Delete product (soft delete by setting inactive)
+   * Delete product (soft delete by setting `deleted`)
    * DELETE /products/:id
+   *
+   * `removal` satıcının nedenidir (opsiyonel gövde): neden gönderilmediyse
+   * (yayındaki mobil sürümler) silme yine yapılır ve `not_given` kaydedilir.
    */
-  async remove(id: string, sellerId: string): Promise<void> {
+  async remove(
+    id: string,
+    sellerId: string,
+    removal?: DeleteProductDto,
+  ): Promise<void> {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
@@ -963,12 +1053,26 @@ export class ProductUpdateService {
       );
     }
 
+    // Neden yazımdan ÖNCE doğrulanır: geçersiz neden ilanı silmez.
+    const reasonFields = sellerRemovalFields("delete", removalInputOf(removal));
+
     // Soft delete: set status to deleted (pasiften AYRI state — silinen ürün
     // yeniden aktive edilemez; "pasife alma"dan farklı). Tekrar satmak için
-    // satıcı yeni ilan açar.
-    await this.prisma.product.update({
-      where: { id },
-      data: { status: ProductStatus.deleted },
+    // satıcı yeni ilan açar. Neden statüyle aynı transaction'da kaydedilir.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: { status: ProductStatus.deleted },
+      });
+      await recordListingRemovals(tx, [
+        {
+          productId: id,
+          statusBefore: product.status,
+          statusAfter: ProductStatus.deleted,
+          actorUserId: sellerId,
+          ...reasonFields,
+        },
+      ]);
     });
 
     // Bekleyen teklifler ANINDA gerekçeyle kapatılır — eskiden açık kalıp

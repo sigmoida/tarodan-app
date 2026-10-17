@@ -1,6 +1,5 @@
 "use client";
 
-import { UsersIcon, ChartBarIcon, CubeIcon } from "@heroicons/react/24/outline";
 import { useResourceList } from "@/components/list";
 import { MetricCard } from "@/components/MetricCard";
 import { type Seller } from "../_lib/types";
@@ -19,14 +18,10 @@ export function SellerPerformanceSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <MetricCard
-        icon={UsersIcon}
-        tone="info"
         label={t("admin.accounts.sellerPerformance.totalSellers")}
         value={total}
       />
       <MetricCard
-        icon={ChartBarIcon}
-        tone="primary"
         label={t("admin.accounts.sellerPerformance.mostOrders")}
         value={
           topByOrders
@@ -36,8 +31,6 @@ export function SellerPerformanceSummary() {
         title={topByOrders?.displayName}
       />
       <MetricCard
-        icon={CubeIcon}
-        tone="success"
         label={t("admin.accounts.sellerPerformance.productsOnPage")}
         value={productsOnPage}
       />

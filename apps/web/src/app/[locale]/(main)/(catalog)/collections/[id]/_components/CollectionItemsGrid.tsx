@@ -6,15 +6,20 @@ import { TrashIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, IconButton } from "@tarodan/ui";
 import { ProductCard } from "@/components/ui";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
-import { itemToProduct, type CollectionItem } from "../_lib/types";
+import {
+  hasItemBadges,
+  itemToProduct,
+  type CollectionItem,
+} from "../_lib/types";
 
 /** Status badges shown at the top-left of a card (click-isolated slot). */
 function ItemBadges({ item }: { item: CollectionItem }) {
   const { t } = useCollectionDetail();
+  if (!hasItemBadges(item)) return null;
   return (
     <div className="flex flex-col items-start gap-1">
       {item.isCustom && (
-        <Badge variant="info" appearance="solid" size="sm">
+        <Badge variant="default" appearance="solid" size="sm">
           {t("collection.collection")}
         </Badge>
       )}
@@ -74,7 +79,9 @@ export default function CollectionItemsGrid() {
           index={index}
           showMeta={false}
           href={item.productId ? undefined : null}
-          overlayStart={<ItemBadges item={item} />}
+          overlayStart={
+            hasItemBadges(item) ? <ItemBadges item={item} /> : undefined
+          }
           overlay={isOwner ? <ItemRemove item={item} /> : undefined}
         />
       ))}

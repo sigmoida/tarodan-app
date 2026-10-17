@@ -1,4 +1,7 @@
-import { DASHBOARD_METRIC_KEYS } from "@tarodan/types";
+import {
+  DASHBOARD_METRIC_DESCRIPTION_KEYS,
+  DASHBOARD_METRIC_KEYS,
+} from "@tarodan/types";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
 import {
   istanbulDayEnd,
@@ -141,6 +144,23 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       expect(result.metrics[key]).not.toHaveProperty("previous");
       expect(result.metrics[key]).not.toHaveProperty("changePercent");
     }
+  });
+
+  it("explains the two easily-confused metrics with a catalog key, and only those", async () => {
+    const result = await service.getDashboardStats();
+
+    expect(result.metrics.paidOrders.description).toBe(
+      "admin.dashboard.metricDescriptions.paidOrders",
+    );
+    expect(result.metrics.sellerPayoutCount.description).toBe(
+      "admin.dashboard.metricDescriptions.sellerPayoutCount",
+    );
+    const described = DASHBOARD_METRIC_KEYS.filter(
+      (key) => result.metrics[key].description !== undefined,
+    );
+    expect(described.sort()).toEqual(
+      Object.keys(DASHBOARD_METRIC_DESCRIPTION_KEYS).sort(),
+    );
   });
 
   it("reads the period and the fixed trio in three separate transactions", async () => {

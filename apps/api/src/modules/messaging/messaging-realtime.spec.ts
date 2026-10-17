@@ -4,6 +4,7 @@ import { ContentFilterService } from "./content-filter.service";
 import { NotificationService } from "../notification/notification.service";
 import { RealtimeService } from "../websocket/realtime.service";
 import { StorageService } from "../storage/storage.service";
+import { MediaService } from "../media/media.service";
 import { PrismaService } from "../../prisma";
 import { UserBlockService } from "../user-block/user-block.service";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
@@ -26,6 +27,8 @@ describe("MessagingService realtime emit", () => {
   };
   const mockPrisma = {
     platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+    // Alıcı hesabı silinmemiş.
+    user: { findUnique: jest.fn().mockResolvedValue({ deletedAt: null }) },
     messageThread: {
       findUnique: jest.fn().mockResolvedValue({
         id: "t1",
@@ -70,6 +73,14 @@ describe("MessagingService realtime emit", () => {
         },
         { provide: RealtimeService, useValue: realtime },
         { provide: StorageService, useValue: { getPublicAssetUrl: jest.fn() } },
+        {
+          provide: MediaService,
+          useValue: {
+            findInvalidMessageAttachmentTargets: jest
+              .fn()
+              .mockResolvedValue([]),
+          },
+        },
       ],
     }).compile();
     service = module.get(MessagingService);

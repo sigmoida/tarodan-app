@@ -8,14 +8,26 @@ export {
   type RowAction,
   type RowActionItem,
 } from "./RowActionMenu";
+export { moveActions } from "./reorderActions";
 export { TruncatedText } from "./TruncatedText";
+export {
+  TableBadge,
+  TABLE_BADGE_SIZE,
+  type TableBadgeProps,
+} from "./TableBadge";
+export { STATUS_TONE, type TableBadgeVariant } from "@/lib/status-tone";
+export { COL_WIDTH, COL_SIZE, type ColWidthKind } from "./widths";
 export {
   Empty,
   CellText,
+  CellTitle,
+  CellStacked,
   CellMuted,
   CellMoney,
   CellNumber,
   CellDate,
+  CellDateRange,
+  CellToggle,
   CellCode,
   CellId,
   CellLink,

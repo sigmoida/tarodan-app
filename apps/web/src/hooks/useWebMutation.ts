@@ -18,6 +18,8 @@ export interface UseWebMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
+  /** Hata toast'ını bastırır (kullanıcının başlatmadığı arka plan yazmaları için). */
+  silentError?: boolean;
   onSuccess?: (data: TData, vars: TVars) => void;
   mutation?: Omit<
     UseMutationOptions<TData, unknown, TVars>,
@@ -52,6 +54,7 @@ export function useWebMutation<TData, TVars = void>(
     invalidates = [],
     successMessage,
     errorMessage,
+    silentError = false,
     onSuccess,
     mutation,
   }: UseWebMutationOptions<TData, TVars> = {},
@@ -69,7 +72,11 @@ export function useWebMutation<TData, TVars = void>(
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, vars);
     },
+    // Sentry raporu burada DEĞİL: `MutationCache` (lib/query/client) her
+    // mutation hatasını, kendi `onError`'ı olsa bile raporlar. Burada yalnız
+    // kullanıcıya gösterilen toast var; `silentError` raporu bastırmaz.
     onError: (error) => {
+      if (silentError) return;
       toast.error(
         apiErrorMessage(error) ?? errorMessage ?? t("common.operationFailed"),
       );

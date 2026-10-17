@@ -15,11 +15,15 @@ describe("TradeReconciliationService — iptal aktörü", () => {
       prisma: {
         trade: { findMany },
         $transaction: jest.fn((fn: any) => fn(tx)),
+        // Kayıp koli bekleme süresi ayardan okunur; satır yok → varsayılan.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       },
       paymentService: { refundTradeCashTracked: jest.fn() },
       tradeCommon: { invalidateProductCachesForTrade: jest.fn() },
       tradeShipment: { cancelSuratShipmentsForTrade: jest.fn() },
       eventService: undefined,
+      // extend_once kapalı (varsayılan eylem): iptal yolu değişmeden çalışır.
+      tradeExtension: { planForRun: jest.fn().mockResolvedValue({}) },
       // Bu spec yalnız iptal yazımına bakar; yan süpürmeler susturulur.
       autoResolveLostParcelTrades: jest.fn().mockResolvedValue(0),
       startPendingTradeConfirmationWindows: jest.fn().mockResolvedValue(0),

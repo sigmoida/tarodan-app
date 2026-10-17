@@ -24,12 +24,14 @@ import {
 } from "../dto";
 import {
   CancellationActor,
+  ListingRemovalReason,
   ProductStatus,
   OfferStatus,
   TradeStatus,
   AdminRole,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import {
   OFFER_CANCEL_REASON,
   TRADE_CANCEL_REASON,
@@ -37,6 +39,7 @@ import {
 import { tradeCancelledData } from "../../trade/helpers/trade-cancellation";
 import { randomInt } from "crypto";
 import { i18nMessage } from "../../i18n";
+import { PushTokenRevocationService } from "../../notification/push-token/push-token-revocation.service";
 
 /**
  * Admin personel/rol yönetimi (+ banner aralığındaki banUser) — AdminService'in
@@ -53,6 +56,7 @@ export class AdminStaffService {
     private readonly paymentService: PaymentService,
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
+    private readonly pushTokens: PushTokenRevocationService,
   ) {}
 
   /** Acting kullanıcının (User.id) AdminUser.id'sini çöz (audit/createdBy için). */
@@ -241,14 +245,20 @@ export class AdminStaffService {
    * Yeni admin hesabı için okunabilir geçici şifre üret.
    * `randomInt` (CSPRNG) şart: Math.random'ın iç durumu birkaç çıktıdan geri
    * hesaplanabilir; e-postayla giden bir admin şifresi tahmin edilebilir olamaz.
+   * Ortak şifre politikasına (büyük + küçük harf + rakam) her zaman uyar: her
+   * sınıftan en az bir karakter garanti edilir.
    */
   private generateTempPassword(): string {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghijkmnpqrstuvwxyz";
+    const digits = "23456789";
+    const all = upper + lower + digits;
+    const pick = (set: string) => set[randomInt(0, set.length)];
     let p = "";
     for (let i = 0; i < 10; i++) {
-      p += chars[randomInt(0, chars.length)];
+      p += pick(all);
     }
-    return p + "!9";
+    return p + pick(upper) + pick(lower) + pick(digits) + "!";
   }
 
   /** Tüm admin personeli + rol başına (aktif) sayıları döndür. */
@@ -611,6 +621,10 @@ export class AdminStaffService {
       });
 
       // 4. Bekleyen ürünleri rejected yap
+      const toReject = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.pending },
+        select: { id: true },
+      });
       await tx.product.updateMany({
         where: {
           sellerId: userId,
@@ -620,6 +634,25 @@ export class AdminStaffService {
           status: ProductStatus.rejected,
         },
       });
+
+      // Vitrinden düşen her ilanın nedeni: satıcının hesabı askıya alındı
+      // (sistem nedeni; işlemi yapan yönetici kayda geçer).
+      await recordListingRemovals(tx, [
+        ...toSuspend.map((p) => ({
+          productId: p.id,
+          statusBefore: ProductStatus.active,
+          statusAfter: ProductStatus.suspended,
+          reason: ListingRemovalReason.seller_suspended,
+          actorUserId: adminId,
+        })),
+        ...toReject.map((p) => ({
+          productId: p.id,
+          statusBefore: ProductStatus.pending,
+          statusAfter: ProductStatus.rejected,
+          reason: ListingRemovalReason.seller_suspended,
+          actorUserId: adminId,
+        })),
+      ]);
 
       // 5. Bekleyen teklifleri kapat — alıcı VE satıcı olarak. Yasaklı satıcının
       //    aldığı teklifler açık kalırsa alıcılar süre dolana dek "yanıt bekliyor"
@@ -635,7 +668,12 @@ export class AdminStaffService {
         },
       });
 
-      // 6. Audit log oluştur
+      // 6. Push token'larını pasifleştir — yasaklı hesabın cihazları bildirim
+      //    almasın. Yasak kalkıp kullanıcı uygulamayı açınca istemci token'ı
+      //    yeniden kaydeder (upsert → aktif).
+      await this.pushTokens.deactivateAllForUser(userId, tx);
+
+      // 7. Audit log oluştur
       await this.audit.createAuditLog(
         adminId,
         "user_ban",

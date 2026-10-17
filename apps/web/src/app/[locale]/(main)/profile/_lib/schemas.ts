@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { isValidIban } from "@tarodan/ui";
-import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
+import { newPasswordSchema, trPhone, trPhoneOptional } from "@tarodan/ui/form";
 import type { Translate } from "@/types/i18n";
 
 /**
@@ -48,11 +48,9 @@ export const bankAccountSchema = (t: Translate) =>
   z.object({
     accountHolder: z.string().trim().min(2, t("validation.accountHolderMin2")),
     iban: z.string().refine(isValidIban, t("validation.ibanInvalid")),
-    tcKimlikNo: z
-      .string()
-      .optional()
-      .or(z.literal(""))
-      .refine((v) => !v || /^\d{11}$/.test(v), t("validation.tcKimlik11")),
+    // TCKN burada SORULMAZ: tek kaynak üyenin yasal kimliği (kimlik kapısı /
+    // profildeki "Kimlik bilgileri"). Banka formunda ikinci, çelişebilen bir
+    // kopya tutulmaz; sunucu da gönderilmeyen numaraya dokunmaz.
     taxId: z
       .string()
       .trim()
@@ -68,12 +66,7 @@ export const changePasswordSchema = (t: Translate) =>
       currentPassword: z
         .string()
         .min(1, t("validation.currentPasswordRequired")),
-      newPassword: z
-        .string()
-        .min(8, t("validation.min8Chars"))
-        .regex(/[A-Z]/, t("validation.passwordNeedsUppercase"))
-        .regex(/[a-z]/, t("validation.passwordNeedsLowercase"))
-        .regex(/\d/, t("validation.passwordNeedsDigit")),
+      newPassword: newPasswordSchema(t),
       confirmPassword: z.string().min(1, t("validation.repeatNewPassword")),
     })
     .refine((d) => d.newPassword === d.confirmPassword, {

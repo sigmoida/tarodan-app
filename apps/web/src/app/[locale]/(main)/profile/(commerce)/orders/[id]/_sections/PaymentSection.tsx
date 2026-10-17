@@ -173,7 +173,7 @@ export default function PaymentSection({
                     </p>
                   </div>
                   {addr.isDefault && (
-                    <Badge variant="primary" size="sm">
+                    <Badge variant="default" size="sm">
                       {t("address.default")}
                     </Badge>
                   )}

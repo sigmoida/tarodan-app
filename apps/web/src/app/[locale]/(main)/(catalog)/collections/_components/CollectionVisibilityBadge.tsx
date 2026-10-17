@@ -16,7 +16,7 @@ export default function CollectionVisibilityBadge({
 }) {
   return (
     <Badge
-      variant={isPublic ? "success" : "default"}
+      variant={isPublic ? "success" : "outline"}
       appearance="solid"
       size="sm"
     >

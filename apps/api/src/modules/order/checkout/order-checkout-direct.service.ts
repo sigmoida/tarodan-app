@@ -45,6 +45,7 @@ import {
   PublicIdentityInput,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { lockActiveUsersShared } from "../../user/helpers/user-row-lock";
 
 /**
  * Grup dışı satın alma akışları: Hızlı Al (createDirectOrder), teklif→sipariş (create)
@@ -115,7 +116,12 @@ export class OrderCheckoutDirectService {
       throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
 
+    // Ödeme penceresi işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (eşzamanlı checkout'ta havuz tükenmesi).
+    const paymentExpiresAt = await paymentWindowEnd(this.prisma);
     const result = await this.prisma.$transaction(async (tx) => {
+      // Hesap silme ile serileşir (ilk kilit; bkz. user-row-lock).
+      await lockActiveUsersShared(tx, [buyerId]);
       const lockedRows = await tx.$queryRaw<{ id: string }[]>`
         SELECT p.id
         FROM products p
@@ -558,7 +564,6 @@ export class OrderCheckoutDirectService {
           buyerShippingAmount,
           sellerShippingAmount,
         });
-      const paymentExpiresAt = paymentWindowEnd();
 
       // Create order with discount info
       const order = await tx.order.create({

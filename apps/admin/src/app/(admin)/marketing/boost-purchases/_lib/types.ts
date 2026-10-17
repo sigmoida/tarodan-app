@@ -1,5 +1,6 @@
 import type { StatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
+import { STATUS_TONE } from "@/lib/status-tone";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -45,27 +46,27 @@ export interface BoostMetricValues {
 export const purchaseStatusConfig = (t: T): Record<string, StatusConfig> => ({
   pending: {
     label: t("admin.marketing.boostPurchases.status.pending"),
-    variant: "warning",
+    variant: STATUS_TONE.pending,
   },
   active: {
     label: t("admin.marketing.boostPurchases.status.active"),
-    variant: "success",
+    variant: STATUS_TONE.live,
   },
   paused: {
     label: t("admin.marketing.boostPurchases.status.paused"),
-    variant: "warning",
+    variant: STATUS_TONE.ended,
   },
   expired: {
     label: t("admin.marketing.boostPurchases.status.expired"),
-    variant: "secondary",
+    variant: STATUS_TONE.ended,
   },
   cancelled: {
     label: t("admin.marketing.boostPurchases.status.cancelled"),
-    variant: "secondary",
+    variant: STATUS_TONE.failed,
   },
   failed: {
     label: t("admin.marketing.boostPurchases.status.failed"),
-    variant: "danger",
+    variant: STATUS_TONE.failed,
   },
 });
 

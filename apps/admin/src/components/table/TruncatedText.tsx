@@ -32,13 +32,20 @@ const VIEWPORT_MARGIN = 12;
 export function TruncatedText({
   children,
   className,
+  fullText,
 }: {
   children: ReactNode;
   className?: string;
+  /**
+   * Text shown (tooltip / tap popover) when clipped, instead of the children —
+   * e.g. a short badge label whose full meaning is a longer sentence.
+   */
+  fullText?: string;
 }) {
   const isTouch = useMediaQuery(NO_HOVER_MEDIA_QUERY);
   const [truncated, setTruncated] = useState(false);
-  const title = typeof children === "string" ? children : undefined;
+  const title =
+    fullText ?? (typeof children === "string" ? children : undefined);
 
   const {
     open,

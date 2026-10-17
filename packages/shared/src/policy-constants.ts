@@ -1,25 +1,30 @@
 /**
- * Client-side mirrors of platform policy constants.
+ * FALLBACK copies of platform policy durations — not the source of truth.
  *
- * SOURCE OF TRUTH is the backend: `apps/api` `PAYMENT_CONFIG_KEYS`
- * (RETURN_WINDOW_DAYS / PAYOUT_GRACE_DAYS, env-backed). These mirrors exist so
- * web/admin/mobile don't keep drifting hardcoded copies — every client-side day
- * count comes from THIS module, and it is updated together with the backend
- * defaults when the policy changes.
+ * Every business duration is now an admin-editable Durations & Rules setting
+ * (registry: `@tarodan/types` TIMING_RULES; screen: admin System → Durations &
+ * Rules). The live values are served by the public endpoint
+ * `GET /api/timing-rules` (`PublicTimingPolicy`: value + unit per rule id).
+ * Clients should read that endpoint and use these constants ONLY while it is
+ * loading or unreachable.
  *
- * Trade escrow windows are NOT here: they are platform settings the admin can
- * change at runtime (`trade_confirmation_deadline_days`, `payment_hold_days`),
- * so a client-side mirror would be a lie. Show trade dates from API values.
+ * The numbers below equal the registry defaults (`returnWindowDays`,
+ * `payoutGraceDays`); an api contract spec (timing-rules.registry.spec) fails
+ * if they drift. They are NOT updated when an admin changes a value — that is
+ * exactly why they must not be shown as authoritative.
+ *
+ * Trade escrow windows were never mirrored here; show trade dates from the
+ * API values stamped on the trade.
  */
 
-/** Return (cooling-off) window after delivery, in days. */
+/** Fallback: return (cooling-off) window after delivery, in days. */
 export const REFUND_COOLING_OFF_DAYS = 14;
 
-/** Grace after the return window closes, before the seller payout, in days. */
+/** Fallback: grace after the return window closes, before the seller payout, in days. */
 export const PAYOUT_GRACE_DAYS = 1;
 
 /**
- * Escrow payout to the seller: delivery + the return window + the grace day.
- * Mirrors the backend payment-hold release schedule.
+ * Fallback: escrow payout to the seller = delivery + the return window + the
+ * grace day. The real release date is stamped on the hold at delivery.
  */
 export const ESCROW_RELEASE_DAYS = REFUND_COOLING_OFF_DAYS + PAYOUT_GRACE_DAYS;

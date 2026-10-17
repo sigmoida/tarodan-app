@@ -327,6 +327,7 @@ export class PaymentService {
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
   async handleExpiredPreparingOrders(): Promise<{
     warned: number;
+    extended: number;
     cancelled: number;
   }> {
     return this.paymentReconciliation.handleExpiredPreparingOrders();

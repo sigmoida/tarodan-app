@@ -1,5 +1,6 @@
-import type { StatusConfig } from "@tarodan/ui";
+import { paymentStatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -60,108 +61,14 @@ export interface Payment {
   paidAt?: string;
 }
 
-export const paymentStatusConfig = (t: T): Record<string, StatusConfig> => ({
-  pending: {
-    label: t("admin.finance.payments.status.pending"),
-    variant: "warning",
-  },
-  processing: {
-    label: t("admin.finance.payments.status.processing"),
-    variant: "info",
-  },
-  completed: {
-    label: t("admin.finance.payments.status.completed"),
-    variant: "success",
-  },
-  failed: {
-    label: t("admin.finance.payments.status.failed"),
-    variant: "danger",
-  },
-  refunded: {
-    label: t("admin.finance.payments.status.refunded"),
-    variant: "secondary",
-  },
-});
-
-export const tradePaymentStatusConfig = (
-  t: T,
-): Record<string, StatusConfig> => ({
-  pending: {
-    label: t("admin.finance.payments.tradeStatusLabels.pending"),
-    variant: "warning",
-  },
-  accepted: {
-    label: t("admin.finance.payments.tradeStatusLabels.accepted"),
-    variant: "success",
-  },
-  rejected: {
-    label: t("admin.finance.payments.tradeStatusLabels.rejected"),
-    variant: "danger",
-  },
-  awaiting_payment: {
-    label: t("admin.finance.payments.tradeStatusLabels.awaitingPayment"),
-    variant: "warning",
-  },
-  shipping_to_warehouse: {
-    label: t("admin.finance.payments.tradeStatusLabels.shippingToWarehouse"),
-    variant: "info",
-  },
-  at_warehouse: {
-    label: t("admin.finance.payments.tradeStatusLabels.atWarehouse"),
-    variant: "info",
-  },
-  admin_reviewing: {
-    label: t("admin.finance.payments.tradeStatusLabels.adminReviewing"),
-    variant: "info",
-  },
-  shipping_to_recipients: {
-    label: t("admin.finance.payments.tradeStatusLabels.shippingToRecipients"),
-    variant: "info",
-  },
-  returning: {
-    label: t("admin.finance.payments.tradeStatusLabels.returning"),
-    variant: "warning",
-  },
-  initiator_shipped: {
-    label: t("admin.finance.payments.tradeStatusLabels.initiatorShipped"),
-    variant: "info",
-  },
-  receiver_shipped: {
-    label: t("admin.finance.payments.tradeStatusLabels.receiverShipped"),
-    variant: "info",
-  },
-  both_shipped: {
-    label: t("admin.finance.payments.tradeStatusLabels.bothShipped"),
-    variant: "info",
-  },
-  initiator_received: {
-    label: t("admin.finance.payments.tradeStatusLabels.initiatorReceived"),
-    variant: "info",
-  },
-  receiver_received: {
-    label: t("admin.finance.payments.tradeStatusLabels.receiverReceived"),
-    variant: "info",
-  },
-  completed: {
-    label: t("admin.finance.payments.tradeStatusLabels.completed"),
-    variant: "success",
-  },
-  cancelled: {
-    label: t("admin.finance.payments.tradeStatusLabels.cancelled"),
-    variant: "danger",
-  },
-  disputed: {
-    label: t("admin.finance.payments.tradeStatusLabels.disputed"),
-    variant: "destructive",
-  },
-});
-
 export const paymentStatusFilterOptions = (t: T) => [
   { value: "all", label: t("admin.finance.common.allStatuses") },
-  ...Object.entries(paymentStatusConfig(t)).map(([value, config]) => ({
-    value,
-    label: config.label,
-  })),
+  ...Object.entries(statusConfig(paymentStatusConfig, t)).map(
+    ([value, config]) => ({
+      value,
+      label: config.label,
+    }),
+  ),
 ];
 
 export const providerFilterOptions = (t: T) => [

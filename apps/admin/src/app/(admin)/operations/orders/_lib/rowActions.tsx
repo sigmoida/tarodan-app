@@ -15,7 +15,12 @@ import { rowDetailHref, rowSingleLine } from "./rowView";
 export type OrderRowModal =
   | { type: "status"; orderId: string; status: string }
   | { type: "tracking"; orderId: string }
-  | { type: "cancel"; orderId: string; orderNumber: string };
+  | {
+      type: "cancel";
+      orderId: string;
+      orderNumber: string;
+      isOfferOrder: boolean;
+    };
 
 export interface OrderRowActions {
   open: (href: string) => void;
@@ -68,6 +73,7 @@ export function orderRowMenu(
             type: "cancel",
             orderId: cancellable.orderId,
             orderNumber: cancellable.orderNumber,
+            isOfferOrder: row.origin === "offer",
           }),
       },
     ];

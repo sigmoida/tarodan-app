@@ -59,6 +59,16 @@ export function parseExpiry(raw: string): { month: string; year: string } {
   return { month: d.slice(0, 2), year: d.slice(2, 4) };
 }
 
+/**
+ * Maskeli IBAN gösterimi: ilk 4 ve son 4 hane açık, ortası tek `****` grubu (`TR33 **** 1326`).
+ * Girdi boşluklu/küçük harfli olabilir; çok kısa girdi maskelenmeden gruplanır.
+ */
+export function maskIban(raw: string): string {
+  const v = raw.replace(/\s/g, "").toUpperCase();
+  if (v.length <= 8) return (v.match(/.{1,4}/g) || []).join(" ");
+  return `${v.slice(0, 4)} **** ${v.slice(-4)}`;
+}
+
 /** TR IBAN mod-97 validation (raw = uppercase, no spaces). */
 export function isValidIban(raw: string): boolean {
   const v = raw.replace(/\s/g, "").toUpperCase();

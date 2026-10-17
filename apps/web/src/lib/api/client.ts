@@ -12,8 +12,10 @@ import { getPublicApiOrigin } from "./origin";
 // must keep working untouched. Public SSR fetches use the absolute API directly
 // (not this client); server-side axios (rare) also goes direct.
 const API_ORIGIN = getPublicApiOrigin();
+/** Tarayıcıdan API'ye giden same-origin vekil kökü (axios dışı çağrılar da bunu kullanır). */
+export const GATEWAY_BASE = "/gateway";
 const baseURL =
-  typeof window !== "undefined" ? "/gateway" : `${API_ORIGIN}/api`;
+  typeof window !== "undefined" ? GATEWAY_BASE : `${API_ORIGIN}/api`;
 
 export const api = createApiClient({
   baseURL,

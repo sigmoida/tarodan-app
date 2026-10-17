@@ -9,8 +9,9 @@ import {
   MinLength,
   Min,
   Max,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { FormBoolean } from "../../../common/transforms";
 
 export class CreateCollectionDto {
   @IsString()
@@ -119,7 +120,9 @@ export class AddCollectionItemDto {
   @Min(0)
   sortOrder?: number;
 
+  // Multipart gövdede metin gelir ("false"); örtük dönüşüm bunu true yapardı.
   @IsOptional()
+  @FormBoolean()
   @IsBoolean()
   isFeatured?: boolean;
 }
@@ -139,6 +142,8 @@ export class CollectionItemResponseDto {
   productImage?: string;
   productPrice?: number;
   productStatus?: string;
+  // Ürünün satıcısı (özel öğede null) — istemci "kendi ilanında kalp yok" kuralı için.
+  sellerId?: string | null;
   sortOrder: number;
   isFeatured: boolean;
   // Ürünün KENDİ ilan öne çıkarması (boost) aktif mi — koleksiyon içi öne çıkarma değil.

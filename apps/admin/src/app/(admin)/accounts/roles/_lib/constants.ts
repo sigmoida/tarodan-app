@@ -1,6 +1,4 @@
-import { ShieldCheckIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import type { BadgeProps } from "@tarodan/ui";
 import {
   ADMIN_OFFERS_TAB_HREF,
   ADMIN_ORDERS_PATH,
@@ -37,16 +35,6 @@ export const getRoleMeta = (
     description: t("admin.roles.meta.moderator.description"),
   },
 });
-
-/**
- * Role badge in the staff table. Neutral by default — only the privileged
- * super_admin is tinted, so the column reads at a glance without a rainbow.
- */
-export const ROLE_BADGE_VARIANT: Record<RoleId, BadgeProps["variant"]> = {
-  super_admin: "primary",
-  admin: "default",
-  moderator: "default",
-};
 
 // Varsayılan izin listesinin önyüz kopyası BİLEREK yok: tek kaynak backend'in
 // DEFAULT_ROLE_PERMISSIONS'ı, "Varsayılanlara sıfırla" onu API'den okur
@@ -112,6 +100,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         description: t("admin.roles.permissions.refundRequests.description"),
         pages: [
           "/operations/cancellations-refunds",
+          "/operations/refunds",
           "/operations/refund-requests/:id",
         ],
       },
@@ -177,6 +166,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
           "/accounts/users",
           "/accounts/users/:id",
           "/accounts/deleted-identities",
+          "/accounts/consents",
         ],
       },
       {
@@ -245,7 +235,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "ads",
         label: t("admin.roles.permissions.ads.label"),
         description: t("admin.roles.permissions.ads.description"),
-        pages: ["/marketing/ads"],
+        pages: ["/marketing/ads", "/marketing/hero", "/marketing/trust-badges"],
       },
       {
         key: "notifications",
@@ -293,7 +283,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "tax",
         label: t("admin.roles.permissions.tax.label"),
         description: t("admin.roles.permissions.tax.description"),
-        pages: ["/finance/tax"],
+        pages: ["/finance/tax", "/finance/gib-report"],
       },
       {
         key: "invoices",
@@ -331,7 +321,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "settings",
         label: t("admin.roles.permissions.settings.label"),
         description: t("admin.roles.permissions.settings.description"),
-        pages: ["/system/settings"],
+        pages: ["/system/settings", "/system/timing-rules"],
       },
       {
         key: "logs",
@@ -353,10 +343,9 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
 
 /** Two tabs: permission matrix + user assignments. */
 export const getRoleTabs = (t: T) => [
-  { key: "matrix", label: t("admin.roles.tabs.matrix"), icon: ShieldCheckIcon },
+  { key: "matrix", label: t("admin.roles.tabs.matrix") },
   {
     key: "users",
     label: t("admin.roles.tabs.userAssignments"),
-    icon: UserGroupIcon,
   },
 ];

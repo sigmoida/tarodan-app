@@ -1,12 +1,14 @@
 /**
  * User Report Service
- * Handles user-generated reports for products, users, collections, and messages
+ * Handles user-generated reports for products, users, collections, messages
+ * and reviews (product reviews and seller ratings)
  */
 import {
   Injectable,
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import {
@@ -28,6 +30,8 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { productReportedNotice } from "../mail-routing/helpers/mail-internal-notices";
 
 @Injectable()
 export class UserReportService {
@@ -36,6 +40,8 @@ export class UserReportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -80,8 +86,51 @@ export class UserReportService {
     );
 
     await this.notifyAdmins(report.id, reporterId, dto);
+    if (dto.type === ReportType.PRODUCT) {
+      void this.notifyStaffProductReported(report.id, reporterId, dto);
+    }
 
     return this.mapToResponse(report);
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `report.productReported`). Şikayet
+   * açıklaması (serbest metin) e-postaya girmez; neden kodu ve panel linki
+   * yeter. Test hesabının şikayeti bildirilmez.
+   */
+  private async notifyStaffProductReported(
+    reportId: string,
+    reporterId: string,
+    dto: CreateReportDto,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const [reporter, product] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: reporterId },
+          select: { ...PUBLIC_NAME_SELECT, isTestAccount: true },
+        }),
+        this.prisma.product.findUnique({
+          where: { id: dto.targetId },
+          select: { productCode: true, title: true },
+        }),
+      ]);
+      await this.mailNotifier.emit(
+        "report.productReported",
+        productReportedNotice({
+          reportId,
+          productRef: product?.productCode ?? dto.targetId,
+          reporterName: publicName(reporter),
+          reason: dto.reason,
+          productTitle: product?.title,
+        }),
+        { isTest: reporter?.isTestAccount ?? false, dedupeKey: reportId },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `report.productReported personel bildirimi hazırlanamadı (${reportId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -421,6 +470,13 @@ export class UserReportService {
           );
         break;
 
+      case ReportType.REVIEW:
+        if (!(await this.getReviewTarget(targetId)))
+          throw new NotFoundException(
+            i18nMessage("server.rating.reviewNotFound"),
+          );
+        break;
+
       default:
         throw new BadRequestException(
           i18nMessage("server.userReport.invalidType"),
@@ -470,9 +526,77 @@ export class UserReportService {
           },
         });
 
+      case ReportType.REVIEW:
+        return this.getReviewTarget(targetId);
+
       default:
         return null;
     }
+  }
+
+  /**
+   * Şikayet edilen yorum — ürün yorumu (`ProductRating`) ya da satıcı
+   * değerlendirmesi (`Rating`). İstemci hangisi olduğunu göndermez (mobil ve
+   * web aynı "yorumu şikayet et" eylemini kullanır); kimlik iki tabloda
+   * aranır ve admin paneli için tek bir şekle çevrilir. Bulunamazsa null.
+   */
+  private async getReviewTarget(targetId: string): Promise<{
+    id: string;
+    reviewKind: "product" | "seller";
+    score: number;
+    /** Ürün yorumunun başlığı (satıcı değerlendirmesinde yok). */
+    title?: string | null;
+    comment: string | null;
+    status: string;
+    author: { id: string; displayName: string } | null;
+    product?: { id: string; title: string } | null;
+    receiver?: { id: string; displayName: string } | null;
+  } | null> {
+    const productReview = await this.prisma.productRating.findUnique({
+      where: { id: targetId },
+      select: {
+        id: true,
+        score: true,
+        title: true,
+        review: true,
+        status: true,
+        user: { select: { id: true, displayName: true } },
+        product: { select: { id: true, title: true } },
+      },
+    });
+    if (productReview) {
+      return {
+        id: productReview.id,
+        reviewKind: "product",
+        score: productReview.score,
+        title: productReview.title,
+        comment: productReview.review,
+        status: productReview.status,
+        author: productReview.user,
+        product: productReview.product,
+      };
+    }
+    const sellerReview = await this.prisma.rating.findUnique({
+      where: { id: targetId },
+      select: {
+        id: true,
+        score: true,
+        comment: true,
+        status: true,
+        giver: { select: { id: true, displayName: true } },
+        receiver: { select: { id: true, displayName: true } },
+      },
+    });
+    if (!sellerReview) return null;
+    return {
+      id: sellerReview.id,
+      reviewKind: "seller",
+      score: sellerReview.score,
+      comment: sellerReview.comment,
+      status: sellerReview.status,
+      author: sellerReview.giver,
+      receiver: sellerReview.receiver,
+    };
   }
 
   private mapToResponse(report: {

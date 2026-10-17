@@ -10,13 +10,20 @@ import { i18nMessage } from "../../i18n";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { isAdminOrderTransitionAllowed } from "../../order/helpers/order-state-machine";
 import { AddOrderTrackingDto, UpdateOrderStatusDto } from "../dto";
-import { OrderStatus, ProductStatus, ShipmentStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  Prisma,
+  ProductStatus,
+  RefundAttemptStatus,
+  ShipmentStatus,
+} from "@prisma/client";
 import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
 import { SearchService } from "../../search/search.service";
 import { CacheService } from "../../cache/cache.service";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../../order/order.service";
 import { PaymentService } from "../../payment/payment.service";
+import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
 import { NotificationService } from "../../notification/notification.service";
 import { sellerNetAmountOf } from "../../order/helpers/order-net.helper";
 import { storedProductBaseOf } from "../../order/helpers/order-charged-base.helper";
@@ -277,9 +284,13 @@ export class AdminAnalyticsOrderService {
     });
     const holdByOrderId = new Map(holds.map((h: any) => [h.orderId, h]));
 
-    const rawPayment: any = isGroup
-      ? (group as any)?.payment
-      : (orders[0] as any)?.payment;
+    type PaymentWithAttempts = Prisma.PaymentGetPayload<{
+      include: { refundAttempts: true };
+    }>;
+    type HoldsPayment = { payment?: PaymentWithAttempts | null };
+    const rawPayment: PaymentWithAttempts | null | undefined = isGroup
+      ? (group as HoldsPayment | null)?.payment
+      : (orders[0] as HoldsPayment | undefined)?.payment;
     const payment = rawPayment
       ? {
           id: rawPayment.id,
@@ -287,15 +298,19 @@ export class AdminAnalyticsOrderService {
           amount: Number(rawPayment.amount),
           provider: rawPayment.provider ?? null,
           providerPaymentId: rawPayment.providerPaymentId ?? null,
+          // PayTR panelindeki "sipariş no" (güncel + önceki denemeler).
+          ...paytrOidViewOf(rawPayment),
           paidAt: rawPayment.paidAt ?? null,
           // Grup ödemesi sepetin TAMAMINI kapsar — UI tek siparişin yanında
           // gösterirken bunu etiketlemek zorunda.
           coversWholeGroup: isGroup,
           refundedTotal: (rawPayment.refundAttempts ?? [])
             .filter(
-              (a: any) => a.status === "succeeded" || a.status === "finalized",
+              (a) =>
+                a.status === RefundAttemptStatus.succeeded ||
+                a.status === RefundAttemptStatus.finalized,
             )
-            .reduce((sum: number, a: any) => sum + Number(a.amount), 0),
+            .reduce((sum, a) => sum + Number(a.amount), 0),
         }
       : null;
 
@@ -329,11 +344,21 @@ export class AdminAnalyticsOrderService {
       status: o.status,
       cancellationType: o.cancellationType ?? null,
       cancelReason: o.cancelReason ?? null,
+      // Kim iptal etti + yönetici iptalinin katalog nedeni (dosyada etiketiyle).
+      cancelledBy: o.cancelledBy ?? null,
+      adminCancelReasonCode: o.adminCancelReasonCode ?? null,
+      // Teklif siparişi mi — iptal diyaloğu bağlı teklifin de kapanacağını söyler.
+      origin: o.origin,
       createdAt: o.createdAt,
       deliveredAt: o.deliveredAt ?? null,
       completedAt: o.completedAt ?? null,
       confirmationDeadline: o.confirmationDeadline ?? null,
       buyerConfirmedAt: o.buyerConfirmedAt ?? null,
+      // Geçerli kargoya verme son tarihi (uzatıldıysa uzatılmış olan) +
+      // tek seferlik uzatmanın kaydı: ne zaman verildi, önceki son tarih neydi.
+      preparingDeadline: o.preparingDeadline ?? null,
+      preparingExtendedAt: o.preparingExtendedAt ?? null,
+      originalPreparingDeadline: o.originalPreparingDeadline ?? null,
       product: {
         id: o.product?.id ?? o.productId,
         title: o.product?.title ?? null,
@@ -343,8 +368,8 @@ export class AdminAnalyticsOrderService {
       },
       quantity: o.quantity ?? 1,
       unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
-      // Siparişin KENDİ kargo satırı — panel kargo öncesi iptal uygunluğunu
-      // (preShipmentCancelBlocker) API ile aynı veriden hesaplar.
+      // Siparişin KENDİ kargo satırı — panel yönetici iptali uygunluğunu
+      // (adminOrderCancelEligibility) API ile aynı veriden hesaplar.
       shipment: o.shipment
         ? { status: o.shipment.status, shippedAt: o.shipment.shippedAt ?? null }
         : null,

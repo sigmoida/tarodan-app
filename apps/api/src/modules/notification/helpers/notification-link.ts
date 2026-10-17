@@ -112,11 +112,13 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.ORDER_DELIVERED]: BUYER_ORDER,
   [NotificationType.ORDER_COMPLETED]: BUYER_ORDER,
   [NotificationType.ORDER_CANCELLED]: BUYER_ORDER,
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM]: BUYER_ORDER,
   [NotificationType.ORDER_REFUNDED]: BUYER_ORDER,
   [NotificationType.ORDER_PREPARING_DEADLINE_WARNING]: byAudience(
     "/profile/orders/{{orderId}}",
     "/seller/orders/{{orderId}}",
   ),
+  [NotificationType.ORDER_PREPARING_EXTENDED]: BUYER_ORDER,
   [NotificationType.ORDER_RESERVATION_RELEASED]: BUYER_ORDER,
   [NotificationType.ORDER_DELIVERED_CONFIRM]: BUYER_ORDER,
   [NotificationType.ORDER_AUTO_COMPLETED]: byAudience(
@@ -128,10 +130,16 @@ export const NOTIFICATION_LINKS: Record<
     "/seller/orders/{{orderId}}",
   ),
   [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: BUYER_ORDER,
-  [NotificationType.RESERVATION_EXPIRED]: pattern("/profile/orders"),
+  // Ödeme süresi dolan sipariş: kimlik varsa o siparişin ekranı, yoksa liste.
+  [NotificationType.RESERVATION_EXPIRED]: pattern(
+    "/profile/orders/{{orderId}}",
+    "/profile/orders",
+  ),
 
   // ── Sipariş (satıcı) ─────────────────────────────────────────────────────
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER]: SELLER_ORDER,
+  [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: SELLER_ORDER,
   [NotificationType.PRODUCT_SOLD]: SELLER_ORDER,
   [NotificationType.CARGO_MOVEMENT_MISSING]: SELLER_ORDER,
   // Alıcıya VE satıcıya gider (order-scheduler ikisine de atar): hedef ekran
@@ -145,6 +153,9 @@ export const NOTIFICATION_LINKS: Record<
   // ekranı adminin oturumunda açılmaz — hedef admin panelindeki sipariş
   // dosyasıdır (serbest link, üretici verir).
   [NotificationType.ORDER_STUCK_IN_TRANSIT]: free("adminLink"),
+  // Sürat takip ağ hatası eskalasyonu — admin kargo ekranına gider (üretici
+  // tam linki verir, aynı desen).
+  [NotificationType.SURAT_TRACKING_NETWORK_FAILURE]: free("adminLink"),
   // Fatura alarmları admin Faturalar ekranına gider (üretici tam linki verir).
   [NotificationType.ELOGO_INVOICE_EXHAUSTED]: free("adminLink"),
   [NotificationType.SELLER_INVOICE_MISSING]: free("adminLink"),
@@ -174,9 +185,18 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.OFFER_COUNTER_DECLINED]: LISTING,
   [NotificationType.OFFER_EXPIRED]: LISTING,
   [NotificationType.OFFER_EXPIRED_SELLER]: LISTING,
+  // Sırası gelen tarafa gider: alıcıda karşı teklif (gönderilenler), satıcıda
+  // gelen teklif — hedef kitle `audience`tan seçilir.
+  [NotificationType.OFFER_EXTENDED]: byAudience(
+    "/profile/offers?tab=sent",
+    "/profile/offers?tab=received",
+  ),
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_BY_ADMIN]: LISTING,
+  [NotificationType.OFFER_CANCELLED_BUYER_DELETED]: pattern(
+    "/profile/offers?tab=received",
+  ),
 
   // ── Ürün / ilan ──────────────────────────────────────────────────────────
   [NotificationType.PRODUCT_APPROVED]: LISTING,
@@ -196,7 +216,14 @@ export const NOTIFICATION_LINKS: Record<
   // ── Ödeme (satıcıya) ─────────────────────────────────────────────────────
   // Hedef kitle TİPTEN belli: ikisi de satıcıya gider, `orderId` varlığına
   // bakılarak alıcı ekranı seçilmez.
-  [NotificationType.PAYMENT_RECEIVED]: pattern("/profile/payments"),
+  // PAYMENT_RECEIVED satıcının "Yeni Sipariş" bildirimidir (event.service
+  // order.paid): hedef kargoya hazırlanacak SATIŞ siparişi. Sipariş kimliği
+  // yoksa ödemeler ekranına düşer. Desen `/seller/orders/` ile başladığı için
+  // tip satıcı tipleri kümesine girer → `audience: "seller"` otomatik eklenir.
+  [NotificationType.PAYMENT_RECEIVED]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/payments",
+  ),
   [NotificationType.PAYMENT_RELEASED]: pattern("/profile/payments"),
 
   // ── Takas ────────────────────────────────────────────────────────────────
@@ -205,8 +232,15 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_COUNTER]: TRADE,
   [NotificationType.TRADE_SHIPPED]: TRADE,
   [NotificationType.TRADE_COMPLETED]: TRADE,
+  [NotificationType.TRADE_CANCELLED]: TRADE,
+  [NotificationType.TRADE_DISPUTE_OPENED]: TRADE,
+  [NotificationType.TRADE_DISPUTE_RESOLVED]: TRADE,
   [NotificationType.TRADE_REJECTED]: pattern("/profile/trades"),
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
+  [NotificationType.TRADE_CANCELLED_BY_PLATFORM]: TRADE,
+  [NotificationType.TRADE_RESPONSE_EXTENDED]: TRADE,
+  [NotificationType.TRADE_PAYMENT_EXTENDED]: TRADE,
+  [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: TRADE,
   [NotificationType.TRADE_AT_WAREHOUSE]: TRADE,
   // Admin alarmları: yalnız admin'lere gider — kullanıcı sitesindeki takas
   // listesi değil, admin panelindeki takas dosyası açılmalı (serbest link).
@@ -312,6 +346,52 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.PASSWORD_RESET]: none,
   [NotificationType.EMAIL_VERIFICATION]: none,
 };
+
+/** Satıcı sipariş ekranı yolu öneki (`SELLER_ORDER` ve fallback'li türevleri). */
+const SELLER_ORDER_PATH_PREFIX = "/seller/orders/";
+
+/**
+ * Hedefi satıcı sipariş ekranı olan tipler: `*_seller` sipariş/iade tipleri,
+ * PRODUCT_SOLD, CARGO_MOVEMENT_MISSING ve kendi kalıbıyla (`fallback`'li)
+ * `/seller/orders/…`a giden SELLER_ADDRESS_REQUIRED, CARGO_CODE_READY,
+ * OFFER_COUNTER_ACCEPTED. Bunlar yalnız satıcıya gider; hedef kitle TİPTEN
+ * bellidir. Kümeyi haritadan LİNK KALIBINA bakarak türetmek ("satıcı ekranına
+ * giden = satıcıya gider") ayrı bir liste tutmayı ve haritayla ayrışmasını önler.
+ * İki yöne giden tipler (`byAudience`) kasıtlı olarak dışarıdadır: onların
+ * `audience`ı üretici verir.
+ */
+const SELLER_ORDER_TYPES: ReadonlySet<NotificationType> = new Set(
+  (
+    Object.entries(NOTIFICATION_LINKS) as [
+      NotificationType,
+      NotificationLinkSpec,
+    ][]
+  )
+    .filter(
+      ([, spec]) =>
+        spec.kind === "pattern" &&
+        spec.pattern.startsWith(SELLER_ORDER_PATH_PREFIX),
+    )
+    .map(([type]) => type),
+);
+
+/**
+ * Satıcıya giden bildirimin verisine `audience: "seller"` ekler.
+ *
+ * Neden: push payload'ı `{ ...data, type }`'tir ve `link` yalnız zil kaydında
+ * durur; satıcı tipleri `audience` taşımadığı için mobil push dokunuşunda hedef
+ * kitleyi tip adından tahmin ediyordu. Üretici `audience` verdiyse ona dokunulmaz
+ * (açık değer kazanır); alıcıya giden hiçbir tipin verisi değişmez. Tek
+ * noktadan, dağıtım katmanında uygulanır — her üreticiye ayrı ayrı yazılmaz.
+ */
+export function withDefaultAudience(
+  type: NotificationType,
+  data?: Record<string, any>,
+): Record<string, any> | undefined {
+  if (!SELLER_ORDER_TYPES.has(type)) return data;
+  if (data?.audience !== undefined) return data;
+  return { ...data, audience: "seller" };
+}
 
 const KNOWN_TYPES = new Set<string>(Object.values(NotificationType));
 

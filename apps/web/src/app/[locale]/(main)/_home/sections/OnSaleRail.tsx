@@ -19,11 +19,6 @@ export default async function OnSaleRail({ items }: { items: Product[] }) {
       title={t("product.onSale")}
       viewAllHref="/listings?discountOnly=true"
       viewAllLabel={viewAllLabel}
-      badge={
-        <span className="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-semibold text-danger-700">
-          {t("home.deals")}
-        </span>
-      }
     >
       <ProductRail
         items={items}

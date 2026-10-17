@@ -6,6 +6,7 @@ import {
   orderListScopeOf,
   orderListSourceWheres,
 } from "./order-list-where";
+import { shippedBeforeWhere } from "./shipped-before-where";
 
 const contains = (term: string) => ({ contains: term, mode: "insensitive" });
 
@@ -64,6 +65,24 @@ describe("orderLineFilterWhere", () => {
     expect(where.AND[0].createdAt.lte.getHours()).toBe(23);
   });
 
+  it("shippedBefore keeps still-shipped lines handed over before the instant — the alert's own predicate", () => {
+    const iso = "2026-10-02T09:00:00.000Z";
+    expect(orderLineFilterWhere({ shippedBefore: iso })).toEqual({
+      AND: [shippedBeforeWhere(new Date(iso))],
+    });
+    expect(shippedBeforeWhere(new Date(iso))).toEqual({
+      status: "shipped",
+      shipment: { is: { shippedAt: { lt: new Date(iso) } } },
+    });
+  });
+
+  it("the request's shippedBefore reaches the filters", () => {
+    const iso = "2026-10-02T09:00:00.000Z";
+    expect(orderListScopeOf({ shippedBefore: iso }).filters.shippedBefore).toBe(
+      iso,
+    );
+  });
+
   it("the deep-link user filter narrows by role", () => {
     expect(orderLineScopeWhere({ userId: "u1", userRole: "seller" })).toEqual({
       AND: [{ sellerId: "u1" }],
@@ -89,6 +108,41 @@ describe("orderLineFilterWhere", () => {
         { product: { modelCode: contains("abc") } },
       ]),
     );
+  });
+
+  describe("PayTR sipariş no araması", () => {
+    const GROUP_OID = "GRPDBN4NPYYTZT790149";
+    const paytr = {
+      paymentIds: ["p1"],
+      orderIds: [],
+      groupIds: ["g1"],
+      tradeCashPaymentIds: [],
+      numbers: { order: [], group: ["GRP-DBN4NPYYTZ"], trade: [] },
+    };
+
+    it("a resolved PayTR match adds plain id clauses next to the column search", () => {
+      const where = orderLineFilterWhere({ search: GROUP_OID, paytr }) as {
+        AND: Array<{ OR: Array<{ OR?: unknown[] }> }>;
+      };
+      const [columns, ...extra] = where.AND[0].OR;
+      // kolon araması aynen korunur
+      expect(columns.OR).toContainEqual({ orderNumber: contains(GROUP_OID) });
+      expect(extra).toEqual([
+        { checkoutGroupId: { in: ["g1"] } },
+        { checkoutGroup: { groupNumber: { in: ["GRP-DBN4NPYYTZ"] } } },
+      ]);
+      expect(JSON.stringify(where)).not.toContain("merchantOidHistory");
+    });
+
+    it("without a resolved match the search is exactly the column-only search", () => {
+      const withNull = orderLineFilterWhere({ search: "abc", paytr: null });
+      expect(withNull).toEqual(orderLineFilterWhere({ search: "abc" }));
+    });
+
+    it("code filters (orderNumber, groupNumber...) never take the PayTR path", () => {
+      const where = orderLineFilterWhere({ orderNumber: GROUP_OID, paytr });
+      expect(JSON.stringify(where)).not.toContain("checkoutGroupId");
+    });
   });
 });
 

@@ -15,9 +15,22 @@ import {
   CorporateInvitationDto,
   RegisterResponseDto,
 } from "./dto";
-import { SellerType, OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import {
+  ConsentSource,
+  SellerType,
+  OrderStatus,
+  PaymentStatus,
+  Prisma,
+} from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { NewsletterService } from "../marketing/newsletter.service";
+import { ConsentService } from "../consent/consent.service";
+import { LegalIdentityService } from "../legal-identity/legal-identity.service";
+import {
+  isNationalIdUniqueViolation,
+  nationalIdUnavailable,
+  normalizeLegalIdentityInput,
+} from "../legal-identity/helpers/legal-identity-status";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { isUsernameAllowed, normalizeUsername } from "./utils/username.util";
@@ -63,6 +76,8 @@ export class AuthRegistrationService {
     private readonly newsletterService: NewsletterService,
     private readonly moduleRef: ModuleRef,
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
+    private readonly consents: ConsentService,
+    private readonly legalIdentity: LegalIdentityService,
   ) {}
 
   /**
@@ -77,6 +92,8 @@ export class AuthRegistrationService {
   }
 
   private rethrowUserUniqueConstraint(error: unknown): never {
+    // TCKN yarışı: ön-kontrolle AYNI yanıt (başka hesap hakkında bilgi yok).
+    if (isNationalIdUniqueViolation(error)) throw nationalIdUnavailable();
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
@@ -174,6 +191,18 @@ export class AuthRegistrationService {
     // 18+ kontrolü yalnız değer geldiğinde uygulanır; yaş gerçekten gerektiğinde
     // (satıcı olma / ödeme-KYC) orada zorunlu istenir.
 
+    // Yasal kimlik: gönderildiyse yazılır (DTO doğruladı), gönderilmediyse
+    // (eski mobil) hesap açılır ve kimlik kapısı ilk girişte ister. TCKN
+    // gönderildiyse kayıt ucu da bir "numara kayıtlı mı" kahinidir: kapıyla
+    // aynı IP bütçesinden harcar ve aynı genel yanıtı verir.
+    const legalIdentity = normalizeLegalIdentityInput(dto);
+    if (legalIdentity.nationalId) {
+      await this.legalIdentity.consumeLookupBudget(null);
+      await this.legalIdentity.assertNationalIdAvailable(
+        legalIdentity.nationalId,
+      );
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
     // Tek okuma noktası: hem user satırına hem bülten listesine aynı değer gider.
@@ -183,25 +212,48 @@ export class AuthRegistrationService {
     // Bireysel satıcı da bireysel hesaptır: önek satıcılığa göre değişmez.
     const adminCode = await this.nextAdminCode(ENTITY_PREFIX.individualUser);
 
-    // Create user
+    // Kullanıcı ve formdaki onaylar TEK transaction'da: onay kaydı yazılamazsa
+    // hesap da açılmaz — "kayıt oldu ama onayı yok" ara durumu oluşmaz.
     let user;
     try {
-      user = await this.prisma.user.create({
-        data: {
-          adminCode,
-          username,
-          usernameClaimedAt: new Date(),
-          email: dto.email,
-          phone: dto.phone,
-          passwordHash,
-          displayName: dto.displayName,
-          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
-          isSeller: dto.isSeller ?? false,
-          sellerType: dto.isSeller ? SellerType.individual : null,
-          isVerified: false, // Email verification required
-          isEmailVerified: false, // Will be true after email verification
-          acceptsMarketingEmails: marketingConsent,
-        },
+      user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            adminCode,
+            username,
+            usernameClaimedAt: new Date(),
+            email: dto.email,
+            phone: dto.phone,
+            passwordHash,
+            displayName: dto.displayName,
+            ...legalIdentity,
+            birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+            isSeller: dto.isSeller ?? false,
+            sellerType: dto.isSeller ? SellerType.individual : null,
+            isVerified: false, // Email verification required
+            isEmailVerified: false, // Will be true after email verification
+            acceptsMarketingEmails: marketingConsent,
+          },
+        });
+        // Terms, privacy ve KVKK ayrı satırlar. Göndermeyen (eski mobil)
+        // istemcide satır yok; yeniden-onay kapısı ilk girişte ister.
+        await this.consents.recordAccountConsents(
+          created.id,
+          dto.acceptedConsents,
+          ConsentSource.registration,
+          tx,
+        );
+        if (marketingConsent) {
+          await this.consents.recordMarketingChange(
+            {
+              userId: created.id,
+              granted: true,
+              source: ConsentSource.registration,
+            },
+            tx,
+          );
+        }
+        return created;
       });
     } catch (error) {
       this.rethrowUserUniqueConstraint(error);

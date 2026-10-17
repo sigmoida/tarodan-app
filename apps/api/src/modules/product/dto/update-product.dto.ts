@@ -1,4 +1,4 @@
-import { PartialType } from "@nestjs/swagger";
+import { IntersectionType, PartialType } from "@nestjs/swagger";
 import {
   IsEnum,
   IsOptional,
@@ -12,8 +12,17 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { ProductStatus } from "@prisma/client";
 import { CreateProductDto } from "./create-product.dto";
+import { ListingRemovalFieldsDto } from "./listing-removal.dto";
 
-export class UpdateProductDto extends PartialType(CreateProductDto) {
+/**
+ * `removalReason` / `removalPlatform` / `removalDetail` (ListingRemovalFieldsDto)
+ * yalnız `status: inactive` (satıcının pasife alması) ile anlamlıdır; başka bir
+ * düzenlemede yok sayılır.
+ */
+export class UpdateProductDto extends IntersectionType(
+  PartialType(CreateProductDto),
+  ListingRemovalFieldsDto,
+) {
   @ApiPropertyOptional({
     enum: ProductStatus,
     example: "active",

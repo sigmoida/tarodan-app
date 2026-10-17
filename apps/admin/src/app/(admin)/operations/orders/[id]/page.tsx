@@ -50,17 +50,15 @@ export default function OrderGroupFilePage() {
       )}
     >
       {(file) => (
-        <div className="space-y-6">
+        <>
           {/* Paket çatıları → her paketin altında sipariş dosyaları */}
-          <div className="space-y-6">
-            {file.packages.map((pkg) => (
-              <PackageFileSection
-                key={pkg.packageId ?? pkg.orders[0]?.id}
-                pkg={pkg}
-                showSellerHeading={file.group.isMultiSeller || !!pkg.seller}
-              />
-            ))}
-          </div>
+          {file.packages.map((pkg) => (
+            <PackageFileSection
+              key={pkg.packageId ?? pkg.orders[0]?.id}
+              pkg={pkg}
+              showSellerHeading={file.group.isMultiSeller || !!pkg.seller}
+            />
+          ))}
 
           {/* Grup seviyesi bilgiler ana sipariş dosyasının altında tam genişlikte. */}
           {file.buyer && (
@@ -82,7 +80,7 @@ export default function OrderGroupFilePage() {
           )}
           <GroupPaymentCard file={file} />
           <AddressSection address={file.shippingAddress} />
-        </div>
+        </>
       )}
     </DetailPage>
   );

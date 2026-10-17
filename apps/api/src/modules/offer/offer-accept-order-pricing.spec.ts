@@ -77,6 +77,8 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
         count: jest.fn().mockResolvedValue(0),
       },
       offer: { findUnique: jest.fn().mockResolvedValue({ ...offer }) },
+      // Ödeme penceresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const shippingTariff = {
       tariffId: "tariff-1",

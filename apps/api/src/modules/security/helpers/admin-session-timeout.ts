@@ -4,7 +4,7 @@
  * Neden ayardan okunuyor: bu süre bir güvenlik/kullanılabilirlik dengesidir ve
  * dengeyi kuran kişi admin panelinde oturur, terminalde değil — ortak bir
  * bilgisayardan girilen kurulumda kısa, tek kişilik ofiste uzun olmalı.
- * Kod sabiti olduğu sürece her değişiklik deploy gerektiriyordu (CLAUDE.md §12).
+ * Kod sabiti olduğu sürece her değişiklik deploy gerektiriyordu (apps/api/CLAUDE.md, "Configuration").
  *
  * Neden cache'li: `validateAdminSession` HER admin isteğinde çalışır. Ayarı her
  * seferinde okumak, en sıcak yola istek başına bir sorgu daha eklerdi.

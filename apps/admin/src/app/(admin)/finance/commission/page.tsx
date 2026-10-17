@@ -4,18 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Input, Select } from "@tarodan/ui";
-import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  PencilSquareIcon,
-  PlusIcon,
-} from "@heroicons/react/24/outline";
+import { PencilSquareIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
 import { clientListFetcher } from "@/lib/query/client-list";
 import { ResourceList } from "@/components/list";
 import { AdminTabs } from "@/components/AdminTabs";
+import { PageLoading } from "@/components/PageLoading";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
@@ -68,11 +66,11 @@ function RuleResolver({ ruleSet }: { ruleSet: CommissionRuleSet }) {
   });
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
+    <Panel className="space-y-3">
       <div>
-        <h2 className="font-semibold text-heading">
+        <SectionTitle as="h2">
           {t("admin.finance.commission.resolverTitle")}
-        </h2>
+        </SectionTitle>
         <p className="text-sm text-muted">
           {t("admin.finance.commission.resolverHint", {
             set:
@@ -137,7 +135,7 @@ function RuleResolver({ ruleSet }: { ruleSet: CommissionRuleSet }) {
           {t("admin.finance.commission.resolverNoMatchDescription")}
         </Alert>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -182,7 +180,6 @@ function CommissionRulesContent({
           title={t("admin.finance.commission.coverageIssuesTitle", {
             count: validation.errors.length,
           })}
-          icon={<ExclamationTriangleIcon className="h-5 w-5" />}
         >
           {validation.errors.slice(0, 8).map((error) => (
             <div
@@ -204,7 +201,6 @@ function CommissionRulesContent({
         <Alert
           variant="success"
           title={t("admin.finance.commission.coverageCompleteTitle")}
-          icon={<CheckCircleIcon className="h-5 w-5" />}
         >
           {t("admin.finance.commission.coverageCompleteDescription", {
             categories: validation.activeCategoryCount,
@@ -332,7 +328,7 @@ export default function CommissionPage() {
   };
 
   if (!selectedSet) {
-    return <div className="p-6 text-sm text-muted">{t("common.loading")}</div>;
+    return <PageLoading />;
   }
 
   const tabs = [

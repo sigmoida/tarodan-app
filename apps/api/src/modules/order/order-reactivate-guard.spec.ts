@@ -27,6 +27,8 @@ describe("order reactivate — ödenmiş/iade edilmiş sipariş kapısı", () =>
     const prisma = {
       order: { findUnique: jest.fn().mockResolvedValue(order) },
       $transaction: jest.fn((fn: any) => fn(tx)),
+      // Ödeme penceresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const productLock = { checkAndReserve: jest.fn().mockResolvedValue(true) };
     const orderQuery = { findOne: jest.fn().mockResolvedValue({ id: "o1" }) };

@@ -76,6 +76,8 @@ describe("RefundService policy integration", () => {
         // 0 → bu iade paketi kapatır (tek satırlık sipariş davranışı).
         count: jest.fn().mockResolvedValue(0),
       },
+      // Cayma penceresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       refundRequest: {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
@@ -119,7 +121,7 @@ describe("RefundService policy integration", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
       },
-      elogoInvoice: {
+      fiscalInvoice: {
         findUnique: jest.fn().mockResolvedValue(platformSaleInvoice),
       },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
@@ -331,6 +333,82 @@ describe("RefundService policy integration", () => {
         netAmount: 170,
       }),
     });
+  });
+
+  it("an earlier seller-fault refund forfeits the seller's shipping share on the line-completing refund (D20)", async () => {
+    // Two units, the first already refunded as seller fault. The second is a
+    // buyer-fault return that completes the line: the v2 calculation reads
+    // the finalized requests and emits no seller_refund share for the seller.
+    const twoUnits = {
+      ...baseOrder,
+      quantity: 2,
+      package: { ...baseOrder.package, sellerShippingAmount: 40 },
+    };
+    const { service, prisma } = makeService(twoUnits);
+    prisma.refundRequest.findMany.mockResolvedValue([
+      {
+        refundQuantity: 1,
+        faultParty: "seller",
+        policyCode: "v2_seller_return",
+      },
+    ]);
+
+    await service.createRefundRequest("order-1", "buyer-1", {
+      reason: RefundReason.damaged,
+      refundQuantity: 1,
+      evidencePhotoUrls: ["https://example.com/evidence.jpg"],
+    });
+    const preview = await service.previewRefundDecision(
+      "refund-1",
+      RefundReason.damaged,
+      "buyer",
+    );
+
+    const outbound = preview.financials.components.filter(
+      (c) => c.componentCode === "outbound_shipping",
+    );
+    expect(outbound.some((c) => c.treatment === "seller_refund")).toBe(false);
+    // The seller paid the share from the hold, so the buyer is not charged it.
+    expect(outbound.some((c) => c.treatment === "buyer_charge")).toBe(false);
+  });
+
+  it("without an earlier seller fault the same refund still gives the seller their share", async () => {
+    const twoUnits = {
+      ...baseOrder,
+      quantity: 2,
+      package: { ...baseOrder.package, sellerShippingAmount: 40 },
+    };
+    const { service, prisma } = makeService(twoUnits);
+    prisma.refundRequest.findMany.mockResolvedValue([
+      { refundQuantity: 1, faultParty: "buyer", policyCode: "v2_buyer_return" },
+    ]);
+
+    await service.createRefundRequest("order-1", "buyer-1", {
+      reason: RefundReason.damaged,
+      refundQuantity: 1,
+      evidencePhotoUrls: ["https://example.com/evidence.jpg"],
+    });
+    const preview = await service.previewRefundDecision(
+      "refund-1",
+      RefundReason.damaged,
+      "buyer",
+    );
+
+    expect(preview.financials.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          componentCode: "outbound_shipping",
+          treatment: "seller_refund",
+          netAmount: 40,
+        }),
+        // The buyer at fault bears the seller's share to make the seller whole.
+        expect.objectContaining({
+          componentCode: "outbound_shipping",
+          treatment: "buyer_charge",
+          netAmount: 40,
+        }),
+      ]),
+    );
   });
 
   it("derives platform-sale product VAT from the original invoice line", async () => {

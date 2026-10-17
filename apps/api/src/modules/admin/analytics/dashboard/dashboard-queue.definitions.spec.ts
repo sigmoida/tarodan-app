@@ -1,4 +1,5 @@
 import {
+  DASHBOARD_INFORMATIONAL_QUEUE_PARTS,
   DASHBOARD_QUEUE_KEYS,
   DASHBOARD_QUEUE_PARTS,
   DASHBOARD_QUEUE_PART_KEYS,
@@ -14,9 +15,15 @@ import {
   openAdjustmentsWhere,
   overdueHoldsWhere,
   uninvoicedDeliveredWhere,
+  upcomingHoldsWhere,
 } from "../../finance/finance-health.where";
+import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
+import { defaultTimingValues } from "../../../../common/timing-rules";
 
 const NOW = new Date("2026-09-18T12:00:00.000Z");
+
+/** Durations & Rules values a dashboard build resolves; registry defaults here. */
+const CTX: AlertThresholdContext = { timing: defaultTimingValues() };
 
 describe("dashboard queue definitions", () => {
   it("defines every catalogued line exactly once, under exactly one tile", () => {
@@ -38,7 +45,7 @@ describe("dashboard queue definitions", () => {
 
   describe("where clauses", () => {
     const whereOf = (key: keyof typeof QUEUE_PART_DEFINITIONS) =>
-      QUEUE_PART_DEFINITIONS[key].where(NOW) as Record<string, any>;
+      QUEUE_PART_DEFINITIONS[key].where(NOW, CTX) as Record<string, any>;
 
     it("reads refunds from the REQUEST's own status, not the order's", () => {
       expect(whereOf("refundsPendingReview")).toEqual({
@@ -110,18 +117,66 @@ describe("dashboard queue definitions", () => {
       expect(subsets).toEqual(["ticketsUrgent"]);
     });
 
+    it("counts the next 7 days of live, unfrozen releases — never an overdue hold", () => {
+      const weekLater = new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000);
+      expect(whereOf("holdsUpcoming")).toEqual(
+        upcomingHoldsWhere(NOW, weekLater),
+      );
+      expect(whereOf("holdsUpcoming")).toMatchObject({
+        payment: { isTest: false },
+        status: "held",
+        frozenByRefundId: null,
+        releaseAt: { gt: NOW, lte: weekLater },
+      });
+    });
+
+    it("flags only the upcoming-release line as informational, matching the shared list", () => {
+      const informational = DASHBOARD_QUEUE_PART_KEYS.filter(
+        (key) => QUEUE_PART_DEFINITIONS[key].informational,
+      );
+      expect(informational).toEqual([...DASHBOARD_INFORMATIONAL_QUEUE_PARTS]);
+      expect(informational).toEqual(["holdsUpcoming"]);
+      expect(DASHBOARD_QUEUE_PARTS.moneyOperations).toContain("holdsUpcoming");
+    });
+
     it("reuses the finance health definitions instead of restating them", () => {
       expect(whereOf("payoutsFailed")).toEqual(failedTransfersWhere);
       expect(whereOf("holdsOverdue")).toEqual(overdueHoldsWhere(NOW));
       expect(whereOf("adjustmentsOpen")).toEqual(openAdjustmentsWhere);
       expect(whereOf("invoicesExhausted")).toEqual(exhaustedInvoicesWhere);
       expect(whereOf("ordersUninvoiced")).toEqual(
-        uninvoicedDeliveredWhere(NOW),
+        uninvoicedDeliveredWhere(NOW, CTX),
+      );
+    });
+
+    it("ages the tracking and invoice queues by the Durations & Rules values", () => {
+      const ctx: AlertThresholdContext = {
+        timing: {
+          ...defaultTimingValues(),
+          missingTrackingAlertHours: 6,
+          invoiceDeadlineDays: 2,
+        },
+      };
+      const tracking = missingTrackingWhere(NOW, ctx) as Record<string, any>;
+      expect(NOW.getTime() - tracking.createdAt.lt.getTime()).toBe(
+        6 * 60 * 60 * 1000,
+      );
+      const uninvoiced = uninvoicedDeliveredWhere(NOW, ctx) as Record<
+        string,
+        any
+      >;
+      expect(NOW.getTime() - uninvoiced.deliveredAt.lt.getTime()).toBe(
+        2 * 24 * 60 * 60 * 1000,
+      );
+      // Admin değeri yokken bugünkü varsayılanlar (24 saat / 5 gün).
+      const base = missingTrackingWhere(NOW, CTX) as Record<string, any>;
+      expect(NOW.getTime() - base.createdAt.lt.getTime()).toBe(
+        24 * 60 * 60 * 1000,
       );
     });
 
     it("flags shipments that never got a carrier tracking id", () => {
-      const where = missingTrackingWhere(NOW) as Record<string, any>;
+      const where = missingTrackingWhere(NOW, CTX) as Record<string, any>;
       expect(where.providerTrackingId).toBeNull();
       expect(where.createdAt.lt.getTime()).toBeLessThan(NOW.getTime());
       // A finished shipment is not waiting on anyone.
@@ -141,7 +196,7 @@ describe("dashboard queue definitions", () => {
    */
   describe("test lane", () => {
     const whereOf = (key: keyof typeof QUEUE_PART_DEFINITIONS) =>
-      JSON.stringify(QUEUE_PART_DEFINITIONS[key].where(NOW));
+      JSON.stringify(QUEUE_PART_DEFINITIONS[key].where(NOW, CTX));
 
     it.each([
       "refundsPendingReview",
@@ -152,6 +207,7 @@ describe("dashboard queue definitions", () => {
       "tradeCompensationPending",
       "payoutsFailed",
       "holdsOverdue",
+      "holdsUpcoming",
       "ordersUninvoiced",
       "shipmentsWithoutTracking",
     ] as const)("%s excludes the test lane", (key) => {
@@ -162,7 +218,9 @@ describe("dashboard queue definitions", () => {
       expect(overdueHoldsWhere(NOW)).toMatchObject({
         payment: { isTest: false },
       });
-      expect(uninvoicedDeliveredWhere(NOW)).toMatchObject({ isTest: false });
+      expect(uninvoicedDeliveredWhere(NOW, CTX)).toMatchObject({
+        isTest: false,
+      });
       // Payout'ta damga yok: yalnız açıkça test olanlar NOT ile elenir.
       expect(JSON.stringify(failedTransfersWhere)).toContain('"NOT"');
     });
@@ -196,6 +254,15 @@ describe("dashboard queue definitions", () => {
         _sum: { remainingAmount: "125.456" },
       });
       expect(reading).toEqual({ count: 2, oldestAt: null, amount: 125.46 });
+    });
+
+    it("sums what will actually reach sellers for upcoming releases: amount − refundedAmount", () => {
+      const reading = QUEUE_PART_DEFINITIONS.holdsUpcoming.read({
+        _count: { _all: 3 },
+        _sum: { amount: "1000.10", refundedAmount: "150.05" },
+      });
+      // A calendar line has no waiting item to age.
+      expect(reading).toEqual({ count: 3, oldestAt: null, amount: 850.05 });
     });
 
     it("survives an empty aggregate without inventing a zero-age item", () => {

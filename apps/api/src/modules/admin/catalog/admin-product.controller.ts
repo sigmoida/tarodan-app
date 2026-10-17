@@ -18,7 +18,10 @@ import {
   ParseUUIDPipe,
   Headers,
   Res,
+  StreamableFile,
 } from "@nestjs/common";
+import type { Response } from "express";
+import type { Locale } from "@tarodan/i18n";
 
 import {
   FileFieldsInterceptor,
@@ -75,6 +78,11 @@ import {
   PRODUCT_BULK_IMPORT_MAX_IMAGES,
 } from "./admin-product-bulk-import.constants";
 import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
+import { AdminExpiredListingsService } from "./admin-expired-listings.service";
+import { AdminProductRenewalService } from "./admin-product-renewal.service";
+import { AdminVoucherCodeExportService } from "./admin-voucher-code-export.service";
+import { sendExport } from "../../../common/export";
+import { ReqLocale } from "../../i18n";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -83,6 +91,7 @@ import {
   PlatformSettingResponseDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
+  AdminRemoveProductDto,
   AdminOrderQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
@@ -101,7 +110,6 @@ import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
-  PayoutExportQueryDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -123,6 +131,8 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
+  ExpiredListingsMaintenanceDto,
+  BulkRenewListingsDto,
 } from "../dto";
 
 @ApiTags("admin")
@@ -135,6 +145,9 @@ export class AdminProductController {
     private readonly adminService: AdminService,
     private readonly discountService: DiscountService,
     private readonly productBulkImport: AdminProductBulkImportService,
+    private readonly expiredListings: AdminExpiredListingsService,
+    private readonly productRenewal: AdminProductRenewalService,
+    private readonly voucherCodeExports: AdminVoucherCodeExportService,
   ) {}
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -265,28 +278,6 @@ export class AdminProductController {
     return this.adminService.updateProduct(adminId, id, dto);
   }
 
-  @Get("products-export")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Export products to CSV" })
-  async exportProducts(
-    @Query("status") status?: string,
-    @Query("categoryId") categoryId?: string,
-    @Query("sellerId") sellerId?: string,
-    @Res() res?: any,
-  ) {
-    const result = await this.adminService.exportProducts({
-      status,
-      categoryId,
-      sellerId,
-    });
-    res.setHeader("Content-Type", result.mimeType);
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${result.filename}"`,
-    );
-    res.send(result.content);
-  }
-
   // ==================== DISCOUNT MANAGEMENT (admin token) ====================
 
   @Get("discounts")
@@ -367,31 +358,23 @@ export class AdminProductController {
   }
 
   @Get("discounts/:id/codes/export")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Export a discount's voucher codes as CSV (admin)" })
+  // Kodlar paraya denk: dökümü, kodu ÜRETEBİLEN rollerle aynı kapı.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary: "Export a discount's voucher codes as XLSX (admin)",
+  })
   @ApiParam({ name: "id", description: "Discount (template) ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "XLSX file" })
   async exportVoucherCodes(
     @Param("id") id: string,
-    @Res() res: import("express").Response,
-  ) {
-    const { data } = await this.discountService.listCodes(id);
-    const rows = [
-      "code,isRedeemed,redeemedAt,orderId",
-      ...data.map((c) =>
-        [
-          c.code,
-          c.isRedeemed ? "1" : "0",
-          c.redeemedAt ? new Date(c.redeemedAt).toISOString() : "",
-          c.orderId ?? "",
-        ].join(","),
-      ),
-    ].join("\n");
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="voucher-codes-${id}.csv"`,
+    @CurrentUser("id") adminId: string,
+    @ReqLocale() locale: Locale,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return sendExport(
+      res,
+      await this.voucherCodeExports.exportCodes(id, adminId, locale),
     );
-    res.send(rows);
   }
 
   @Post("products/:id/approve")
@@ -432,6 +415,69 @@ export class AdminProductController {
     return this.adminService.bulkApproveProducts(adminId, dto.ids, dto.note);
   }
 
+  /**
+   * Tek seferlik bakım: bu özellikten ÖNCE süresi dolmuş (işaretsiz) ilanları
+   * bulur ve işaretler/yeniden açar. Varsayılan: kuru çalıştırma + yalnız işaretleme.
+   * Literal rota (`products/expired-listings/…`) `products/:id/…` rotalarından
+   * önce tanımlı kalmalı.
+   */
+  @Post("products/expired-listings/maintenance")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Süresi dolmuş eski ilanları işaretle / yeniden aç (tek seferlik)",
+    description:
+      "dryRun=true (varsayılan) yalnız raporlar. mode=mark ilanları 'süresi doldu' olarak işaretler (satıcı tek tıkla yeniler); mode=reactivate ayrıca yönetici onayıyla yayına alır (stok, üyelik limiti ve komisyon kapıları geçerli).",
+  })
+  async maintainExpiredListings(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: ExpiredListingsMaintenanceDto,
+  ) {
+    return this.expiredListings.run(adminId, dto);
+  }
+
+  /**
+   * Süresi dolmuş ilanları toplu yeniden yayına alır. Literal rota
+   * (`products/:id/…` rotalarından önce). Sıralı; her ilan kendi sonucuyla döner.
+   */
+  @Post("products/bulk-renew")
+  // Moderatör hariç: ilanı onaysız yayına almak yönetici kararıdır.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Bulk re-publish expired listings",
+    description:
+      "Yalnız 'süresi doldu' nedeniyle kapanmış ilanlar; stok, üyelik limiti ve komisyon kapıları geçerli. Başarısız ilanlar errorKey ile raporlanır.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Per-item results with renewed/failed counts",
+  })
+  async bulkRenewExpiredListings(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: BulkRenewListingsDto,
+  ) {
+    return this.productRenewal.renewMany(adminId, dto.productIds);
+  }
+
+  @Post("products/:id/renew")
+  // Moderatör hariç: ilanı onaysız yayına almak yönetici kararıdır.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Re-publish an expired listing (admin)",
+    description:
+      "Yalnız 'süresi doldu' nedeniyle kapanmış ilan; ömrü bugünden yeniden başlar, yönetici kararı onay sayılır.",
+  })
+  @ApiParam({ name: "id", description: "Product ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Listing is active" })
+  async renewExpiredListing(
+    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.productRenewal.renew(adminId, id);
+  }
+
   @Post("products/bulk-reject")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
@@ -441,7 +487,12 @@ export class AdminProductController {
     @CurrentUser("id") adminId: string,
     @Body() dto: BulkRejectProductsDto,
   ) {
-    return this.adminService.bulkRejectProducts(adminId, dto.ids, dto.reason);
+    return this.adminService.bulkRejectProducts(
+      adminId,
+      dto.ids,
+      dto.reason,
+      dto.violationCode,
+    );
   }
 
   // ==================== PRODUCT DELETION (ADMIN) ====================
@@ -455,9 +506,15 @@ export class AdminProductController {
   async deleteProduct(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
+    @Body() dto: AdminRemoveProductDto,
     @Query("hardDelete") hardDelete?: string,
   ) {
-    return this.adminService.deleteProduct(adminId, id, hardDelete === "true");
+    return this.adminService.deleteProduct(
+      adminId,
+      id,
+      hardDelete === "true",
+      dto,
+    );
   }
 
   @Post("products/:id/restore")

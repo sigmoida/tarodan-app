@@ -5,7 +5,8 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 export type ReportStatus =
   "pending" | "under_review" | "resolved" | "dismissed";
-export type ReportType = "product" | "user" | "collection" | "message";
+export type ReportType =
+  "product" | "user" | "collection" | "message" | "review";
 
 export interface Report {
   id: string;
@@ -30,12 +31,12 @@ export function reportStatusConfig(t: T): Record<string, StatusConfig> {
     pending: { label: t("admin.reports.status.pending"), variant: "warning" },
     under_review: {
       label: t("admin.reports.status.underReview"),
-      variant: "info",
+      variant: "default",
     },
     resolved: { label: t("admin.reports.status.resolved"), variant: "success" },
     dismissed: {
       label: t("admin.reports.status.dismissed"),
-      variant: "default",
+      variant: "outline",
     },
   };
 }
@@ -46,6 +47,7 @@ export function reportTypeLabels(t: T): Record<string, string> {
     user: t("common.user"),
     collection: t("admin.reports.type.collection"),
     message: t("admin.reports.type.message"),
+    review: t("admin.reports.type.review"),
   };
 }
 
@@ -72,6 +74,7 @@ export function reportTypeOptions(t: T) {
     { value: "user", label: labels.user },
     { value: "collection", label: labels.collection },
     { value: "message", label: labels.message },
+    { value: "review", label: labels.review },
   ];
 }
 

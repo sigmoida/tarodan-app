@@ -1,7 +1,46 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
+import {
+  AD_POPUP_FREQUENCIES,
+  AD_POPUP_FREQUENCY_DEFAULT,
+  CONTENT_PLATFORMS,
+  validateAdHotspots,
+  type AdHotspotError,
+  type AdHotspotInput,
+  type AdPopupFrequency,
+  type ClientPlatform,
+  type ContentPlatform,
+} from "@tarodan/types";
+import {
+  endOfIstanbulDayIso,
+  istanbulDateOf,
+  startOfIstanbulDayIso,
+} from "@/lib/istanbul-dates";
+import { isValidLink } from "@/lib/links";
 
 type T = ReturnType<typeof useTranslations<never>>;
+
+/** Reklama bağlı kampanyanın yayın durumunu belirleyen alanlar. */
+export interface AdCampaign {
+  id: string;
+  name: string;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+}
+
+/** API'nin döndürdüğü tıklanabilir alan (konum görselin kesri, 0–1). */
+export interface AdHotspot extends AdHotspotInput {
+  id: string;
+  sortOrder: number;
+  clickCount: number;
+}
+
+/** Formdaki alan: kayıtlıysa `id` + `clickCount` taşır (güncellemede tıklama sayısı korunur). */
+export interface AdHotspotFormRow extends AdHotspotInput {
+  id?: string;
+  clickCount?: number;
+}
 
 export interface Ad {
   id: string;
@@ -13,7 +52,20 @@ export interface Ad {
   width: number | null;
   height: number | null;
   position: string;
-  deviceType: string;
+  discountId: string | null;
+  /** Bağlı kampanya (API ilişkiyi döndürürse); "Kampanya bitti" durumunu besler. */
+  discount?: AdCampaign | null;
+  /** Gösterildiği istemci: web (site), app (mobil uygulama), all (ikisi). */
+  platform: ContentPlatform;
+  /** Yalnız popup yuvasında anlamlı. */
+  popupFrequency: AdPopupFrequency;
+  /** Kreatif değişince artar; kapatılmış popup yeni sürümde yeniden açılır. */
+  popupVersion: number;
+  /**
+   * Yalnız liste yanıtında: yayında olduğu halde gösterilmediği istemciler
+   * (aynı yuvada önce gelen başka reklam yayında). Boş = sorun yok.
+   */
+  shadowedOn?: ClientPlatform[];
   displayOrder: number;
   isActive: boolean;
   startDate: string | null;
@@ -21,49 +73,69 @@ export interface Ad {
   clickCount: number;
   impressionCount: number;
   ctr: number;
+  /** Görselli reklamda tıklanabilir tek yer; yoksa/boşsa reklam tıklanamaz. */
+  hotspots?: AdHotspot[];
   iabCompliant: boolean;
   iabSize: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-/** IAB standard ad sizes. */
-export const IAB_SIZES = [
-  { name: "Leaderboard", width: 728, height: 90, device: "desktop" },
-  { name: "Medium Rectangle", width: 300, height: 250, device: "all" },
-  { name: "Wide Skyscraper", width: 160, height: 600, device: "desktop" },
-  { name: "Half Page", width: 300, height: 600, device: "desktop" },
-  { name: "Billboard", width: 970, height: 250, device: "desktop" },
-  { name: "Mobile Leaderboard", width: 320, height: 50, device: "mobile" },
-  { name: "Mobile Banner", width: 320, height: 100, device: "mobile" },
-  { name: "Large Mobile Banner", width: 320, height: 480, device: "mobile" },
-  { name: "Square", width: 250, height: 250, device: "all" },
-  { name: "Small Square", width: 200, height: 200, device: "all" },
-];
+/** API ile birebir: yan panel (sidebar) kaldırıldı, topbar eklendi. */
+export const AD_POSITIONS = [
+  "topbar",
+  "header",
+  "footer",
+  "inline",
+  "popup",
+] as const;
+export type AdPosition = (typeof AD_POSITIONS)[number];
 
-export const positionLabels = (t: T): Record<string, string> => ({
-  header: t("admin.marketing.ads.position.header"),
-  sidebar: t("admin.marketing.ads.position.sidebar"),
-  footer: t("admin.marketing.ads.position.footer"),
-  inline: t("admin.marketing.ads.position.inline"),
-  popup: t("admin.marketing.ads.position.popup"),
-});
+export const positionLabels = (t: T): Record<string, string> =>
+  Object.fromEntries(
+    AD_POSITIONS.map((p) => [p, t(`admin.marketing.ads.position.${p}`)]),
+  );
 
-export const deviceLabels = (t: T): Record<string, string> => ({
-  desktop: t("admin.marketing.ads.device.desktop"),
-  mobile: t("admin.marketing.ads.device.mobile"),
-  all: t("common.all"),
-});
+/** Formda pozisyon seçicinin altında gösterilen tek satırlık açıklama + önerilen boyutlar. */
+const isAdPosition = (value: string): value is AdPosition =>
+  (AD_POSITIONS as readonly string[]).includes(value);
+
+export const positionHint = (t: T, position: string): string | undefined =>
+  isAdPosition(position)
+    ? t(`admin.marketing.ads.positionHint.${position}`)
+    : undefined;
+
+/** Platform etiketleri; değerlerin tek kaynağı `CONTENT_PLATFORMS` (@tarodan/types). */
+export const platformLabels = (t: T): Record<string, string> =>
+  Object.fromEntries(
+    CONTENT_PLATFORMS.map((p) => [p, t(`admin.marketing.ads.platform.${p}`)]),
+  );
+
+/** Tabloya özel kısa platform etiketleri ("Web" / "Uygulama" / "Web + Uygulama"); form uzun etiketleri kullanır. */
+export const platformShortLabels = (t: T): Record<string, string> =>
+  Object.fromEntries(
+    CONTENT_PLATFORMS.map((p) => [
+      p,
+      t(`admin.marketing.ads.platformShort.${p}`),
+    ]),
+  );
+
+/** Popup gösterim sıklığı etiketleri (sıra = seçici sırası, varsayılan önce). */
+export const popupFrequencyOptions = (t: T) =>
+  AD_POPUP_FREQUENCIES.map((value) => ({
+    value,
+    label: t(`admin.marketing.ads.popupFrequency.${value}`),
+  }));
 
 /**
  * Filtre listelerinde "hepsi" seçeneğinin değeri BOŞ dizedir, `"all"` değil.
  *
- * `deviceLabels` içinde gerçek bir `all` cihaz hedefi var ("tüm cihazlarda
- * gösterilsin"). Filtrenin kendi "hepsi" seçeneği de `"all"` değerini
- * kullandığında iki sonuç doğuyordu: aynı `value` ile iki seçenek (React
- * tekrarlanan anahtar uyarısı) ve daha kötüsü, gerçekten "tüm cihazlar"
- * hedefli reklamları SÜZMENİN yolu kalmıyordu — o değer "filtre yok" anlamına
- * geliyordu.
+ * `platformLabels` içinde gerçek bir `all` platform hedefi var ("web ve
+ * uygulamada gösterilsin"). Filtrenin kendi "hepsi" seçeneği de `"all"`
+ * değerini kullandığında iki sonuç doğuyordu: aynı `value` ile iki seçenek
+ * (React tekrarlanan anahtar uyarısı) ve daha kötüsü, gerçekten "ikisi"
+ * hedefli reklamları SÜZMENİN yolu kalmıyordu — o değer "filtre yok"
+ * anlamına geliyordu.
  */
 export const FILTER_ALL = "";
 
@@ -75,9 +147,9 @@ export const positionFilterOptions = (t: T) => [
   })),
 ];
 
-export const deviceFilterOptions = (t: T) => [
-  { value: FILTER_ALL, label: t("admin.marketing.ads.allDevices") },
-  ...Object.entries(deviceLabels(t)).map(([value, label]) => ({
+export const platformFilterOptions = (t: T) => [
+  { value: FILTER_ALL, label: t("admin.marketing.ads.allPlatforms") },
+  ...Object.entries(platformLabels(t)).map(([value, label]) => ({
     value,
     label,
   })),
@@ -88,34 +160,135 @@ export const positionOptions = (t: T) =>
     value,
     label,
   }));
-export const deviceOptions = (t: T) =>
-  Object.entries(deviceLabels(t)).map(([value, label]) => ({
+export const platformOptions = (t: T) =>
+  Object.entries(platformLabels(t)).map(([value, label]) => ({
     value,
     label,
   }));
 
-export const isIabSize = (width?: number | null, height?: number | null) =>
-  !!width &&
-  !!height &&
-  IAB_SIZES.some((s) => s.width === width && s.height === height);
+/** Reklam bağlantısı kuralı (`@/lib/links` ile tek kaynak). */
+export const isValidAdLink = isValidLink;
+
+/** Paylaşılan alan kuralı hatası → form hata yolu + çevrilmiş mesaj. */
+export interface HotspotIssue {
+  path: (string | number)[];
+  message: string;
+}
+
+/** Hata kodunun satırdaki hangi alana yazılacağı ("" = satıra değil, listeye). */
+const HOTSPOT_ERROR_FIELD: Record<AdHotspotError["code"], string> = {
+  tooMany: "",
+  outOfBounds: "x",
+  tooSmall: "x",
+  overlap: "x",
+  labelRequired: "label",
+  labelTooLong: "label",
+  linkRequired: "linkUrl",
+};
+
+/**
+ * Alan listesinin TÜM hataları: paylaşılan `validateAdHotspots` + bağlantı
+ * biçimi (`isValidAdLink`). Şema ve satır içi hata gösterimi aynı çıktıyı kullanır.
+ */
+export function hotspotIssues(
+  t: T,
+  hotspots: readonly AdHotspotFormRow[],
+): HotspotIssue[] {
+  const issues: HotspotIssue[] = validateAdHotspots(hotspots).map((e) => ({
+    path:
+      e.index === undefined
+        ? ["hotspots"]
+        : ["hotspots", e.index, HOTSPOT_ERROR_FIELD[e.code]],
+    message: t(`admin.marketing.ads.hotspots.error.${e.code}`, {
+      index: (e.index ?? 0) + 1,
+      other: (e.otherIndex ?? 0) + 1,
+    }),
+  }));
+  hotspots.forEach((h, index) => {
+    if (h.linkUrl.trim() && !isValidAdLink(h.linkUrl)) {
+      issues.push({
+        path: ["hotspots", index, "linkUrl"],
+        message: t("admin.marketing.ads.validation.linkInvalid"),
+      });
+    }
+  });
+  return issues;
+}
+
+export const AD_CONTENT_MAX = 500;
+export const AD_DIMENSION_MAX = 4000;
+
+/**
+ * Alan satırı şeması. Admin tsconfig'inde `strictNullChecks` kapalı olduğu için
+ * zod çıkarımı her alanı opsiyonel gösterir; şema zorunlu kıldığından çıkış tipi
+ * `AdHotspotFormRow` olarak sabitlenir (paylaşılan kurallar zorunlu alan ister).
+ */
+const hotspotRowSchema = z.object({
+  id: z.string().optional(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  label: z.string(),
+  linkUrl: z.string(),
+  clickCount: z.number().optional(),
+}) as unknown as z.ZodType<AdHotspotFormRow>;
 
 /** Form schema (validation-only; numbers/nulls shaped in the mutationFn). */
 export const adSchema = (t: T) =>
-  z.object({
-    title: z.string().min(1, t("admin.marketing.ads.validation.titleRequired")),
-    imageUrl: z.string().optional().default(""),
-    linkUrl: z.string().optional().default(""),
-    altText: z.string().optional().default(""),
-    content: z.string().optional().default(""),
-    width: z.number().optional().default(0),
-    height: z.number().optional().default(0),
-    position: z.string().default("header"),
-    deviceType: z.string().default("all"),
-    displayOrder: z.string().optional().default("0"),
-    isActive: z.boolean().default(true),
-    startDate: z.string().optional().default(""),
-    endDate: z.string().optional().default(""),
-  });
+  z
+    .object({
+      title: z
+        .string()
+        .min(1, t("admin.marketing.ads.validation.titleRequired")),
+      imageUrl: z.string().optional().default(""),
+      linkUrl: z.string().optional().default(""),
+      altText: z.string().optional().default(""),
+      content: z
+        .string()
+        .max(AD_CONTENT_MAX, t("admin.marketing.ads.validation.contentMax"))
+        .optional()
+        .default(""),
+      width: z
+        .number()
+        .max(AD_DIMENSION_MAX, t("admin.marketing.ads.validation.sizeMax"))
+        .optional()
+        .default(0),
+      height: z
+        .number()
+        .max(AD_DIMENSION_MAX, t("admin.marketing.ads.validation.sizeMax"))
+        .optional()
+        .default(0),
+      position: z.string().default("header"),
+      platform: z.enum(CONTENT_PLATFORMS).default("all"),
+      popupFrequency: z
+        .enum(AD_POPUP_FREQUENCIES)
+        .default(AD_POPUP_FREQUENCY_DEFAULT),
+      displayOrder: z.string().optional().default("0"),
+      isActive: z.boolean().default(true),
+      startDate: z.string().optional().default(""),
+      endDate: z.string().optional().default(""),
+      discountId: z.string().optional().default(""),
+      hotspots: z.array(hotspotRowSchema).optional().default([]),
+    })
+    .superRefine((v, ctx) => {
+      // Reklam bağlantısı yalnız görselsiz reklamda görünür ve gider; görselli
+      // reklamda gizli alanın eski değeri gönderimi engellemesin.
+      if (!v.imageUrl?.trim() && !isValidAdLink(v.linkUrl)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["linkUrl"],
+          message: t("admin.marketing.ads.validation.linkInvalid"),
+        });
+      }
+      for (const issue of hotspotIssues(t, v.hotspots)) {
+        ctx.addIssue({ code: "custom", ...issue });
+      }
+    })
+    .refine((v) => !v.startDate || !v.endDate || v.endDate >= v.startDate, {
+      path: ["endDate"],
+      message: t("admin.marketing.ads.validation.endBeforeStart"),
+    });
 
 export type AdFormValues = z.infer<ReturnType<typeof adSchema>>;
 
@@ -128,11 +301,14 @@ export const emptyAdForm: AdFormValues = {
   width: 0,
   height: 0,
   position: "header",
-  deviceType: "all",
+  platform: "all",
+  popupFrequency: AD_POPUP_FREQUENCY_DEFAULT,
   displayOrder: "0",
   isActive: true,
   startDate: "",
   endDate: "",
+  discountId: "",
+  hotspots: [],
 };
 
 export function adToForm(ad: Ad): AdFormValues {
@@ -145,29 +321,72 @@ export function adToForm(ad: Ad): AdFormValues {
     width: ad.width ?? 0,
     height: ad.height ?? 0,
     position: ad.position,
-    deviceType: ad.deviceType ?? "all",
+    platform: ad.platform ?? "all",
+    popupFrequency: ad.popupFrequency ?? AD_POPUP_FREQUENCY_DEFAULT,
     displayOrder: String(ad.displayOrder ?? 0),
     isActive: ad.isActive,
-    startDate: ad.startDate ? ad.startDate.slice(0, 10) : "",
-    endDate: ad.endDate ? ad.endDate.slice(0, 10) : "",
+    startDate: istanbulDateOf(ad.startDate),
+    endDate: istanbulDateOf(ad.endDate),
+    discountId: ad.discountId ?? "",
+    hotspots: [...(ad.hotspots ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((h) => ({
+        id: h.id,
+        x: h.x,
+        y: h.y,
+        width: h.width,
+        height: h.height,
+        label: h.label,
+        linkUrl: h.linkUrl,
+        clickCount: h.clickCount,
+      })),
   };
 }
 
-/** Shape form values into the create/update API payload. */
-export function adFormToPayload(v: AdFormValues) {
+export type AdPayloadMode = "create" | "update";
+
+/**
+ * Form değerlerini API gövdesine çevirir.
+ * - create: boş alanlar gövdeden çıkarılır.
+ * - update: boşaltılan alanlar `null` gider (API `null`'ı temizler, atlananı
+ *   değiştirmez) — "Görseli kaldır" ve tarih/kampanya temizleme böyle çalışır.
+ */
+export function adFormToPayload(v: AdFormValues, mode: AdPayloadMode) {
+  const empty = mode === "update" ? null : undefined;
+  const text = (s?: string) => s?.trim() || empty;
+  const num = (n?: number) => n || empty;
+  // Görselli reklamda tıklama yalnız alanlardadır: reklam düzeyi bağlantı gitmez
+  // (API de null'a zorlar). Güncellemede açık null → eski bağlantı temizlenir.
+  const hasImage = Boolean(v.imageUrl?.trim());
+  const linkUrl = hasImage ? empty : text(v.linkUrl);
+  // Güncellemede dizi HER ZAMAN gider (tam küme değişimi; `id` tıklama sayısını
+  // korur). Oluşturmada yalnız alan varsa.
+  const hotspots = v.hotspots.map((h) => ({
+    ...(h.id ? { id: h.id } : {}),
+    x: h.x,
+    y: h.y,
+    width: h.width,
+    height: h.height,
+    label: h.label.trim(),
+    linkUrl: h.linkUrl.trim(),
+  }));
   return {
     title: v.title.trim(),
-    imageUrl: v.imageUrl?.trim() || undefined,
-    linkUrl: v.linkUrl?.trim() || undefined,
-    content: v.content?.trim() || undefined,
-    altText: v.altText?.trim() || undefined,
-    width: v.width || undefined,
-    height: v.height || undefined,
+    imageUrl: text(v.imageUrl),
+    linkUrl,
+    ...(mode === "update" || hotspots.length ? { hotspots } : {}),
+    content: text(v.content),
+    altText: text(v.altText),
+    width: num(v.width),
+    height: num(v.height),
     position: v.position,
-    deviceType: v.deviceType,
+    platform: v.platform,
+    // Yalnız popup'ta okunur; yuva değişince seçim kaybolmasın diye hep gider.
+    popupFrequency: v.popupFrequency,
     displayOrder: Number(v.displayOrder) || 0,
     isActive: v.isActive,
-    startDate: v.startDate || undefined,
-    endDate: v.endDate || undefined,
+    startDate: v.startDate ? startOfIstanbulDayIso(v.startDate) : empty,
+    endDate: v.endDate ? endOfIstanbulDayIso(v.endDate) : empty,
+    discountId: v.discountId || empty,
   };
 }

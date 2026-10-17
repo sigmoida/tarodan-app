@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Alert, Button, Spinner } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
+import { useTimingPolicy } from "@/hooks/useTimingPolicy";
 import { useReactivateOrder } from "../_hooks/useOrderDetail";
 import { getCancelMessage, type OrderDetail } from "../_lib/types";
 
@@ -20,6 +21,7 @@ import { getCancelMessage, type OrderDetail } from "../_lib/types";
 export default function OrderBanners({ order }: { order: OrderDetail }) {
   const t = useTranslations();
   const locale = useLocale();
+  const policy = useTimingPolicy();
   const reactivate = useReactivateOrder(order.id);
 
   return (
@@ -87,6 +89,7 @@ export default function OrderBanners({ order }: { order: OrderDetail }) {
                 order.isBuyer,
                 order.cancelReason,
                 locale,
+                policy,
               );
               return cancelMessage ? <p>{cancelMessage}</p> : null;
             })()}

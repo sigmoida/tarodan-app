@@ -1,8 +1,3 @@
-import {
-  CalculatorIcon,
-  ReceiptPercentIcon,
-  ChartBarIcon,
-} from "@heroicons/react/24/outline";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -61,13 +56,12 @@ export interface TaxReport {
 }
 
 export const taxTabs = (t: T) => [
-  { key: "kdv", label: t("admin.finance.common.vat"), icon: CalculatorIcon },
+  { key: "kdv", label: t("admin.finance.common.vat") },
   {
     key: "withholding",
     label: t("admin.finance.tax.withholding"),
-    icon: ReceiptPercentIcon,
   },
-  { key: "report", label: t("admin.finance.tax.report"), icon: ChartBarIcon },
+  { key: "report", label: t("admin.finance.tax.report") },
 ];
 
 export const months = (locale: string) =>

@@ -32,7 +32,7 @@ import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
 import { withSelectedReference } from "@tarodan/listing-form";
 import StatusBanners from "./_sections/StatusBanners";
-import DeleteListingModal from "./_modals/DeleteListingModal";
+import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
 
 const TERMINAL_STATUSES = ["sold", "reserved", "inactive", "deleted"];
 
@@ -49,6 +49,8 @@ export default function EditListingClient() {
     onSubmit,
     saleData,
     setSaleData,
+    salePriceError,
+    priceLimits,
     seedExistingImagesRef,
     imageSubmitBlockerRef,
     hasUserImageEditsRef,
@@ -185,6 +187,10 @@ export default function EditListingClient() {
     reactivating,
     showDeleteModal,
     setShowDeleteModal,
+    showDeactivateModal,
+    setShowDeactivateModal,
+    deleting,
+    deactivating,
     handleReactivate,
     handleDeactivate,
     handleActivate,
@@ -212,7 +218,7 @@ export default function EditListingClient() {
         <Button
           type="button"
           variant="secondary"
-          onClick={handleDeactivate}
+          onClick={() => setShowDeactivateModal(true)}
           disabled={isLoading}
         >
           {t("product.deactivateListingFull")}
@@ -303,6 +309,7 @@ export default function EditListingClient() {
           commissionPreviewEnabled={commissionPreviewEnabled}
           quantityPlaceholder={t("membership.unlimited")}
           quantityHelper={t("product.leaveEmptyUnlimitedStock")}
+          priceLimits={priceLimits}
         />
         <DiscountCard
           saleData={saleData}
@@ -310,6 +317,7 @@ export default function EditListingClient() {
           showDiscountSection={showDiscountSection}
           setShowDiscountSection={setShowDiscountSection}
           productDiscounts={productDiscounts}
+          salePriceError={salePriceError}
         />
         <ImagesCard
           maxImages={limits?.maxImagesPerListing || 3}
@@ -354,10 +362,21 @@ export default function EditListingClient() {
       </Form>
 
       {showDeleteModal && (
-        <DeleteListingModal
+        <ListingRemovalModal
+          action="delete"
+          open
           onClose={() => setShowDeleteModal(false)}
-          handleDelete={handleDelete}
-          isLoading={isLoading}
+          onSubmit={handleDelete}
+          isSubmitting={deleting}
+        />
+      )}
+      {showDeactivateModal && (
+        <ListingRemovalModal
+          action="deactivate"
+          open
+          onClose={() => setShowDeactivateModal(false)}
+          onSubmit={handleDeactivate}
+          isSubmitting={deactivating}
         />
       )}
     </PageShell>

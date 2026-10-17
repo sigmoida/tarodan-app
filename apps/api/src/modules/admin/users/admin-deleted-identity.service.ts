@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import * as ExcelJS from "exceljs";
-import { Prisma } from "@prisma/client";
+import { Prisma, type DeletedUserIdentity } from "@prisma/client";
+import { EXPORT_CATALOGS, type ExportCatalogKey } from "@tarodan/types";
 
 import { PrismaService } from "../../../prisma";
 import {
@@ -9,10 +9,15 @@ import {
   paginate,
   resolveOrderBy,
 } from "../../../common/list";
+import { archiveLegalFullName } from "../../../common/helpers/deleted-user-identity";
+import { istanbulMonthRange } from "../../../common/helpers/tr-calendar";
 import {
-  ARCHIVE_EXPORT_COLUMNS,
-  EXPORT_FORMAT_VERSION,
-} from "../../../common/helpers/deleted-user-identity";
+  ExportListService,
+  type ExportFile,
+  type ExportRecord,
+  type Translate,
+  type WorkbookSummaryRow,
+} from "../../../common/export";
 import type {
   DeletedUserIdentityExportQueryDto,
   DeletedUserIdentityQueryDto,
@@ -23,6 +28,8 @@ const SEARCH_FIELDS = [
   "email",
   "username",
   "displayName",
+  "legalFirstName",
+  "legalLastName",
   "phone",
   "nationalId",
   "taxId",
@@ -30,8 +37,12 @@ const SEARCH_FIELDS = [
   "adminCode",
 ] as const;
 
-/** Aylık bildirimde tek istekte üretilecek makul üst sınır. */
-const EXPORT_ROW_CAP = 5000;
+/**
+ * Aylık bildirim dosyasının biçim sürümü — müşteri dosyayı resmî bir portala
+ * yüklüyor; kolon kümesi ya da sayfa düzeni değişince artırılır ve Bilgi
+ * sayfasında görünür. 2: ilk sayfa Özet, tarihler İstanbul takviminde.
+ */
+export const EXPORT_FORMAT_VERSION = "2";
 
 /** Stopaj/fatura gibi geçmiş raporların silinen kullanıcı için okuduğu alanlar. */
 export interface ArchivedIdentity {
@@ -50,7 +61,10 @@ export interface ArchivedIdentity {
  */
 @Injectable()
 export class AdminDeletedIdentityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly exports: ExportListService,
+  ) {}
 
   async list(query: DeletedUserIdentityQueryDto) {
     const where: Prisma.DeletedUserIdentityWhereInput = {
@@ -81,94 +95,61 @@ export class AdminDeletedIdentityService {
   }
 
   /**
-   * Aylık bildirim dosyası (XLSX). Dönem zorunlu ve `deletedAt` üzerinden.
-   * Kolon sözleşmesi `ARCHIVE_EXPORT_COLUMNS` ile tek yerde tanımlı — müşteri
-   * bu dosyayı resmî bir portala yüklüyor, sıra sessizce değişmemeli.
+   * Aylık bildirim dosyası (XLSX). Dönem zorunlu ve `deletedAt` üzerinden; ay
+   * sınırları TÜRKİYE takviminde (ayın son gecesi 21:00'den sonra silinen hesap
+   * artık sonraki aya düşmez). Kolon sözleşmesi `EXPORT_CATALOGS.deletedIdentities`
+   * ile tek yerde — portal sırayı bekler. Başlıklar her zaman Türkçe (resmî
+   * biçim), kimlik/IBAN maskesiz: uç yalnız super_admin/admin'e açık.
    */
-  async exportPeriod(query: DeletedUserIdentityExportQueryDto): Promise<{
-    buffer: Buffer;
-    filename: string;
-    rowCount: number;
-    /** Dönem tavanı aştı: dosya eksik — denetim kaydına da düşer. */
-    truncated: boolean;
-    period: string;
-  }> {
-    const from = new Date(Date.UTC(query.year, query.month - 1, 1));
-    const to = new Date(Date.UTC(query.year, query.month, 1));
-
+  async exportPeriod(
+    query: DeletedUserIdentityExportQueryDto,
+    actorId: string,
+  ): Promise<ExportFile> {
+    const { gte, lt } = istanbulMonthRange(query.year, query.month);
     const where: Prisma.DeletedUserIdentityWhereInput = {
-      deletedAt: { gte: from, lt: to },
+      deletedAt: { gte, lt },
     };
     if (query.wasSeller !== undefined) where.wasSeller = query.wasSeller;
 
-    // Tavan + 1 çekilir: dosyanın SESSİZCE kırpılması, resmî bir bildirimde
-    // fark edilmeden eksik beyana dönüşürdü. Aşım Bilgi sayfasına yazılır.
-    const found = await this.prisma.deletedUserIdentity.findMany({
-      where,
-      orderBy: { deletedAt: "asc" },
-      take: EXPORT_ROW_CAP + 1,
-    });
-    const truncated = found.length > EXPORT_ROW_CAP;
-    const rows = truncated ? found.slice(0, EXPORT_ROW_CAP) : found;
-
     const period = `${query.year}-${String(query.month).padStart(2, "0")}`;
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = "Tarodan";
-    workbook.company = "Tarodan";
-    workbook.title = `Silinen Hesap Kimlik Bildirimi ${period}`;
-
-    const sheet = workbook.addWorksheet(`Bildirim ${period}`, {
-      views: [{ state: "frozen", ySplit: 1 }],
+    return this.exports.exportList({
+      catalog: EXPORT_CATALOGS.deletedIdentities,
+      locale: "tr",
+      slug: `tarodan-silinen-hesap-bildirimi-${period}`,
+      titleKey: "admin.deletedIdentities.export.title",
+      titleValues: { period },
+      sheetNameKey: "admin.deletedIdentities.export.sheetName",
+      unmask: true,
+      filters: [
+        { labelKey: "admin.deletedIdentities.export.period", value: period },
+        {
+          labelKey: "admin.deletedIdentities.filterWasSeller",
+          value: query.wasSeller,
+        },
+      ],
+      fetchPage: ({ skip, take }) =>
+        this.prisma.deletedUserIdentity.findMany({
+          where,
+          orderBy: [{ deletedAt: "asc" }, { id: "asc" }],
+          skip,
+          take,
+        }),
+      map: deletedIdentityExportRecord,
+      // Kolon kümesi ileride değişirse yükleyen taraf bunu görebilsin.
+      appendix: (t, result) => [
+        {
+          name: t("admin.deletedIdentities.export.infoSheet"),
+          rows: deletedIdentityInfoRows(t, period, result),
+        },
+      ],
+      audit: {
+        actorId,
+        action: "deleted_identity_export",
+        entityType: "DeletedUserIdentity",
+        entityId: period,
+        query,
+      },
     });
-    sheet.columns = ARCHIVE_EXPORT_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: 22,
-    }));
-    sheet.getRow(1).font = { bold: true };
-
-    for (const row of rows) {
-      sheet.addRow({
-        adminCode: row.adminCode ?? "",
-        username: row.username,
-        displayName: row.displayName ?? "",
-        email: row.email ?? "",
-        phone: row.phone ?? "",
-        nationalId: row.nationalId ?? "",
-        taxId: row.taxId ?? "",
-        taxOffice: row.taxOffice ?? "",
-        companyName: row.companyName ?? "",
-        addressCity: row.addressCity ?? "",
-        addressDistrict: row.addressDistrict ?? "",
-        addressLine: row.addressLine ?? "",
-        iban: row.iban ?? "",
-        wasSeller: row.wasSeller ? "Evet" : "Hayır",
-        registeredAt: row.registeredAt,
-        deletedAt: row.deletedAt,
-        retainUntil: row.retainUntil,
-      });
-    }
-
-    // Kolon kümesi ileride değişirse yükleyen taraf bunu görebilsin.
-    const meta = workbook.addWorksheet("Bilgi");
-    meta.addRow(["Dönem", period]);
-    meta.addRow(["Kayıt sayısı", rows.length]);
-    meta.addRow(["Biçim sürümü", EXPORT_FORMAT_VERSION]);
-    meta.addRow(["Oluşturulma", new Date()]);
-    if (truncated) {
-      meta.addRow([
-        "UYARI",
-        `Dönemde ${EXPORT_ROW_CAP}'den fazla kayıt var; dosya ilk ${EXPORT_ROW_CAP} kaydı içeriyor.`,
-      ]);
-    }
-
-    return {
-      buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
-      filename: `tarodan-silinen-hesap-bildirimi-${period}.xlsx`,
-      rowCount: rows.length,
-      truncated,
-      period,
-    };
   }
 
   /**
@@ -196,4 +177,64 @@ export class AdminDeletedIdentityService {
 
     return new Map(rows.map(({ userId, ...identity }) => [userId, identity]));
   }
+}
+
+/** Bildirim satırı — yasal ad önce (kimlik kapısı), yoksa silme anındaki ad. */
+export function deletedIdentityExportRecord(
+  row: DeletedUserIdentity,
+): ExportRecord<ExportCatalogKey<typeof EXPORT_CATALOGS.deletedIdentities>> {
+  return {
+    adminCode: row.adminCode,
+    username: row.username,
+    displayName: archiveLegalFullName(row),
+    email: row.email,
+    phone: row.phone,
+    nationalId: row.nationalId,
+    taxId: row.taxId,
+    taxOffice: row.taxOffice,
+    companyName: row.companyName,
+    addressCity: row.addressCity,
+    addressDistrict: row.addressDistrict,
+    addressLine: row.addressLine,
+    iban: row.iban,
+    wasSeller: row.wasSeller,
+    registeredAt: row.registeredAt,
+    deletedAt: row.deletedAt,
+    retainUntil: row.retainUntil,
+  };
+}
+
+/** Bilgi sayfası: dönem, kayıt sayısı, biçim sürümü, oluşturulma, kırpılma. */
+export function deletedIdentityInfoRows(
+  t: Translate,
+  period: string,
+  result: { rowCount: number; truncatedAt: number | null; generatedAt: Date },
+): WorkbookSummaryRow[] {
+  return [
+    { label: t("admin.deletedIdentities.export.period"), value: period },
+    {
+      label: t("server.export.summary.rowCount"),
+      value: result.rowCount,
+      type: "number",
+    },
+    {
+      label: t("admin.deletedIdentities.export.formatVersion"),
+      value: EXPORT_FORMAT_VERSION,
+    },
+    {
+      label: t("server.export.summary.generatedAt"),
+      value: result.generatedAt,
+      type: "datetime",
+    },
+    ...(result.truncatedAt !== null
+      ? [
+          {
+            label: t("server.export.summary.notes"),
+            value: t("server.export.summary.truncated", {
+              count: result.truncatedAt,
+            }),
+          },
+        ]
+      : []),
+  ];
 }

@@ -1,3 +1,4 @@
+import type { AdminGibReportRow } from "@tarodan/types";
 import { api } from "./client";
 
 /**
@@ -142,7 +143,7 @@ export const financeApi = {
   getFinanceOverview: () => api.get("/admin/finance/overview"),
   // eLogo invoice summary strip + exhausted-retry recovery
   getInvoicesSummary: () => api.get("/admin/invoices/summary"),
-  retryElogoInvoice: (id: string) => api.post(`/admin/invoices/${id}/retry`),
+  retryFiscalInvoice: (id: string) => api.post(`/admin/invoices/${id}/retry`),
 
   // Seller Payouts
   getPayoutsSummary: () => api.get("/admin/payouts/summary"),
@@ -196,6 +197,10 @@ export const financeApi = {
     status?: string;
     dateFrom?: string;
     dateTo?: string;
+    /** "true" = yalnız ERKEN bırakılanlar (releasedAt < releaseAt). */
+    earlyReleased?: string;
+    /** "true" = yalnız vadesi geçmiş (releaseAt < şimdi) bekleyen hold'lar. */
+    overdue?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -210,12 +215,6 @@ export const financeApi = {
     sortOrder?: "asc" | "desc";
     sortType?: "text" | "number" | "date";
   }) => api.get("/admin/payouts/schedule", { params }),
-  getPayoutsExport: (params?: {
-    sellerId?: string;
-    status?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }) => api.get("/admin/payouts/export", { params }),
   // force = erken bırakma: yalnız tarih şartını esnetir (teslim/iade/frozen
   // guard'ları backend'de aynen geçerli).
   releasePayout: (orderId: string, reason: string, force?: boolean) =>
@@ -247,4 +246,13 @@ export const financeApi = {
     api.patch("/admin/tax/withholding", { rate }),
   getWithholdingReport: (params: { year: number; month: number }) =>
     api.get("/admin/tax/withholding-report", { params }),
+  // GİB ilan / satıcı raporu. Kardeş literal segment (izin `tax`) —
+  // `finance/...` altında DEĞİL, çünkü o segment `payments` iznine bağlı.
+  getGibReport: (params?: Record<string, unknown>) =>
+    api.get<{ data: AdminGibReportRow[]; meta: { total: number } }>(
+      "/admin/gib-report",
+      { params },
+    ),
+  exportGibReport: (params?: Record<string, unknown>) =>
+    api.get("/admin/gib-report/export", { params, responseType: "blob" }),
 };

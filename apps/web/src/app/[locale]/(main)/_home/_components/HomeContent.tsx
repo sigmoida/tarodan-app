@@ -11,6 +11,7 @@ import TradeRail from "../sections/TradeRail";
 import TrustBadges from "../sections/TrustBadges";
 import HomeOnboardingTour from "./HomeOnboardingTour";
 import BannerSlot from "@/components/marketing/BannerSlot";
+import PopupAd from "@/components/marketing/PopupAd";
 
 export default function HomeContent({
   data,
@@ -31,10 +32,16 @@ export default function HomeContent({
   return (
     <PageShell>
       <HomeOnboardingTour hasProducts={hasProducts} />
-      <HeroSlider />
-      {/* Admin'in tanımladığı afişler ve platform kampanya duyuruları. Yuva
-          boşsa hiçbir şey çizilmez. */}
-      <BannerSlot position="header" className="mt-4 space-y-3" />
+      {/* Reklam popup'ı YALNIZ ana sayfada: her girişte yeniden değerlendirilir
+          (sıklık reklamın kendisinde), tüm katmanlar kapalıyken. */}
+      <PopupAd />
+      {/* Admin'in tanımladığı afiş ve platform kampanya duyurusu — hero'nun
+          ÜSTÜNDE. Yuva boşsa hiçbir şey çizilmez (yer ayrılmaz). */}
+      <BannerSlot position="header" className="mb-4 space-y-3" />
+      {/* Panelden yönetilen hero; web hero anahtarı kapalıyken API `[]` döner
+          ve bölüm çizilmez. Uygulama tanıtımı da bir admin slaytıdır (mağaza
+          bağlantılı CTA'lar koyu mağaza butonu olarak çizilir). */}
+      <HeroSlider slides={data.heroSlides} />
       <BrandsMarquee items={data.marqueeItems} />
       <FeaturedRail items={data.featured} />
       <OnSaleRail items={data.discounted} />
@@ -46,7 +53,7 @@ export default function HomeContent({
         featuredBusiness={data.featuredBusiness}
       />
       <BannerSlot position="footer" className="mt-8 space-y-3" />
-      <TrustBadges locale={locale} />
+      <TrustBadges badges={data.trustBadges} locale={locale} />
     </PageShell>
   );
 }

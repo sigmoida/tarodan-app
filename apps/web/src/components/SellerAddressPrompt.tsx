@@ -9,8 +9,10 @@ import { Button, Modal } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/authStore";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
+import { useRequiredSteps } from "@/hooks/useRequiredSteps";
 import { useListingLimits } from "@tarodan/listing-form";
 import ListingFormProvider from "@/components/listings/ListingFormProvider";
+import { gateReturnTarget, profileGateHref } from "@/lib/profileGate";
 import { shouldStartTour } from "@/lib/userExperiencePolicy.mjs";
 
 /**
@@ -67,6 +69,9 @@ function SellerAddressPromptInner() {
     completedVersion: user?.homeTourVersion,
     tour: "home",
   });
+  // Zorunlu bir adım (onay / kimlik penceresi) açıkken bu hatırlatma onun
+  // üstüne binmez; adım tamamlanınca sırası gelir.
+  const { active: requiredStep } = useRequiredSteps();
   const [dismissed, setDismissed] = useState(false);
 
   // Adres eklenince sorgu tazelenir ve kapı kendiliğinden kapanır; ama kullanıcı
@@ -87,6 +92,7 @@ function SellerAddressPromptInner() {
     !limitsLoading &&
     hasListings &&
     !homeTourPending &&
+    !requiredStep &&
     !hasDispatchAddress &&
     !dismissed &&
     !onAddressScreen;
@@ -114,7 +120,10 @@ function SellerAddressPromptInner() {
             {t("address.dispatchPromptLater")}
           </Button>
           <Button asChild className="w-full sm:w-auto">
-            <Link href="/profile" onClick={close}>
+            <Link
+              href={profileGateHref("address", gateReturnTarget(pathname))}
+              onClick={close}
+            >
               {needsFix
                 ? t("address.dispatchFixButton")
                 : t("address.dispatchAddButton")}

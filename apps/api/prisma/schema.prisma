@@ -16,6 +16,19 @@ model User {
   phone                   String?                  @unique
   passwordHash            String?                  @map("password_hash")
   displayName             String                   @map("display_name")
+  // Yasal kimlik (devlet bildirimi): ad, soyad ve TCKN. `displayName` takma ad
+  // olabildiği için kimlik SAYILMAZ. Boş (NULL) = üye henüz girmedi; web kapısı
+  // bir sonraki girişte ister (sunucu istekleri reddetmez, bkz. IDENTITY.md).
+  // Üye bir kez girer, sonra yalnız admin düzeltir (gerekçe + denetim kaydı).
+  // Hiçbiri herkese açık / karşı tarafa giden yüke, arama dizinine, bildirime
+  // ya da loga girmez. Hesap silmede arşive kopyalanıp NULL'lanır.
+  legalFirstName          String?                  @map("legal_first_name")
+  legalLastName           String?                  @map("legal_last_name")
+  // TCKN, yalnız rakam (11 hane, checksum'lı). Tekil: bir numara tek hesapta.
+  // Düz metin saklanır — taxId / SellerBankAccount.tcKimlikNo /
+  // DeletedUserIdentity.nationalId ile aynı uygulama (rapor ve arama düz değer
+  // ister); şifreleme kararı IDENTITY.md "Saklama" bölümünde.
+  nationalId              String?                  @unique @map("national_id")
   avatarUrl               String?                  @map("avatar_url")
   bio                     String?
   isVerified              Boolean                  @default(false) @map("is_verified")
@@ -76,8 +89,8 @@ model User {
   sellerOffers            Offer[]                  @relation("SellerOffers")
   buyerOrders             Order[]                  @relation("BuyerOrders")
   sellerOrders            Order[]                  @relation("SellerOrders")
-  elogoInvoicesAsSeller   ElogoInvoice[]           @relation("ElogoInvoiceSeller")
-  elogoInvoicesAsBuyer    ElogoInvoice[]           @relation("ElogoInvoiceBuyer")
+  fiscalInvoicesAsSeller  FiscalInvoice[]          @relation("FiscalInvoiceSeller")
+  fiscalInvoicesAsBuyer   FiscalInvoice[]          @relation("FiscalInvoiceBuyer")
   buyerCheckoutGroups     CheckoutGroup[]          @relation("BuyerCheckoutGroups")
   passwordResetTokens     PasswordResetToken[]
   paymentHolds            PaymentHold[]
@@ -108,9 +121,11 @@ model User {
   refundRequests          RefundRequest[]          @relation("UserRefundRequests")
   savedCards              SavedCard[]
   oauthAccounts           OAuthAccount[]
+  appleSignInTokens       AppleSignInToken[]
   reports                 Report[]                 @relation("ReporterReports")
   productBoosts           ProductBoost[]
   deletedIdentity         DeletedUserIdentity?
+  consentRecords          ConsentRecord[]
 
   @@index([email])
   @@index([adminCode])
@@ -131,16 +146,21 @@ model User {
 model DeletedUserIdentity {
   id                String          @id @default(uuid())
   /// Anonimleştirilmiş User satırıyla tek-tek bağ. Restrict: arşiv, kullanıcı
-  /// kaydının yanlışlıkla fiziksel silinmesini de engeller (CLAUDE.md §13).
+  /// kaydının yanlışlıkla fiziksel silinmesini de engeller (apps/api/prisma/CLAUDE.md).
   userId            String          @unique @map("user_id")
   /// Silme anındaki gerçek kimlik. Backfill satırlarında kaynak bulunamayan
   /// alanlar boş kalır — tahmin edilmez.
   email             String?
   username          String
   displayName       String?         @map("display_name")
+  /// Silme anındaki yasal ad / soyad (`User.legalFirstName/LastName`). Bu
+  /// alanlardan önce açılmış ve kapıyı hiç doldurmamış hesapta boş kalır.
+  legalFirstName    String?         @map("legal_first_name")
+  legalLastName     String?         @map("legal_last_name")
   phone             String?
   birthDate         DateTime?       @map("birth_date")
-  /// TCKN: bireysel satıcıda banka hesabından, kurumsalda ortak kaydından gelir.
+  /// TCKN: önce `User.nationalId`; boşsa bireysel satıcıda banka hesabından,
+  /// kurumsalda ortak kaydından gelir.
   nationalId        String?         @map("national_id")
   /// VKN: kurumsal satıcının User.taxId değeri (anonimleştirmede null'lanıyor).
   taxId             String?         @map("tax_id")
@@ -197,6 +217,97 @@ enum DeletionActor {
 enum IdentitySnapshotSource {
   live
   backfill
+}
+
+/// Hukuki onay kaydı — kim, hangi belgeyi, hangi sürümüyle, ne zaman ve
+/// nereden onayladı (ya da geri çekti). Müşterinin "kullanıcı KVKK'yı, mesafeli
+/// satış sözleşmesini, çerezleri kabul etti" ispatı bu tablodan okunur.
+///
+/// EKLEME-YALNIZ: satır güncellenmez, silinmez (DB tetikleyicisi zorlar). Onayın
+/// geri çekilmesi de yeni bir satırdır (`action = withdrawn`); bir belgenin
+/// güncel durumu, o belgenin EN SON satırıdır. Tek istisna aşağıdaki sipariş/
+/// sepet bağlarının `SET NULL` ile kopmasıdır (test şeridi temizliği).
+///
+/// Konu üç kimlikten biridir: üye (`userId`), misafir alıcı (`guestEmail` —
+/// misafir siparişinin alıcısı paylaşılan sistem hesabıdır, kişiyi göstermez)
+/// ya da giriş yapmamış ziyaretçi (`visitorId`, yalnız çerez tercihi).
+model ConsentRecord {
+  id              String         @id @default(uuid())
+  /// Belge anahtarı: `@tarodan/types` CONSENT_DOCUMENT_KEYS. Enum DEĞİL —
+  /// anahtar listesinin tek kaynağı o paket; müşteri yeni bir metin (ör. açık
+  /// rıza) verdiğinde şema göçü gerekmesin. Yazım yalnız ConsentService'ten,
+  /// anahtar doğrulanarak yapılır.
+  document        String
+  /// Onaylanan metnin sürümü — kayıt anında `CONSENT_DOCUMENTS[document]
+  /// .version`. Metin sonradan değişse de hangi metnin kabul edildiği kalır.
+  version         String
+  action          ConsentAction
+  source          ConsentSource
+  userId          String?        @map("user_id")
+  /// Giriş yapmamış ziyaretçinin tarayıcıda ürettiği kalıcı kimlik (UUID).
+  /// Yalnız çerez tercihinde dolar; üye girişliyse `userId` de yazılır.
+  visitorId       String?        @map("visitor_id")
+  /// Misafir checkout'ta alıcının e-postası (küçük harf).
+  guestEmail      String?        @map("guest_email")
+  /// Belgeye özgü ayrıntı: çerez kategorileri ({ functional, analytics,
+  /// marketing }) gibi. Hukuki metin buraya yazılmaz — sürüm yeter.
+  details         Json?
+  /// İstemci IP'si: web gateway'inden gelen istekte gateway'in taşıdığı
+  /// tarayıcı IP'si, doğrudan çağrıda (mobil) bağlantının IP'si.
+  ipAddress       String?        @map("ip_address")
+  userAgent       String?        @map("user_agent")
+  /// Mesafeli satış onayının ait olduğu sepet / tekil (teklif) sipariş.
+  /// SET NULL: kanıt, bağlı satır silinse bile (test şeridi temizliği) kalır.
+  checkoutGroupId String?        @map("checkout_group_id")
+  orderId         String?        @map("order_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  /// Restrict: üyeler fiziksel silinmez (anonimleşir); kanıt satırı, kullanıcı
+  /// kaydının yanlışlıkla silinmesini de engeller (apps/api/prisma/CLAUDE.md).
+  user            User?          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
+  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Yeniden-onay hesabı: üyenin belge başına en son satırı.
+  @@index([userId, document, createdAt])
+  // Admin listesi: belge filtresi + tarih sırası.
+  @@index([document, createdAt])
+  @@index([createdAt])
+  @@index([visitorId])
+  // Ödeme kapısı: "bu sepet/sipariş için onay var mı".
+  @@index([checkoutGroupId])
+  @@index([orderId])
+  @@map("consent_records")
+}
+
+/// Onayın yönü. Hesap için zorunlu belgeler yalnız `granted` alır; pazarlama
+/// izni ve çerez kategorileri geri çekilebilir.
+enum ConsentAction {
+  granted
+  withdrawn
+}
+
+/// Onayın alındığı yer — `@tarodan/types` CONSENT_SOURCES ile birebir.
+enum ConsentSource {
+  /// Kayıt formu (bireysel).
+  registration
+  /// Yeniden-onay kapısı: hiç onayı olmayan (eski üye, sosyal giriş, eski
+  /// mobil kaydı) ya da belge sürümü değişen üye.
+  consent_prompt
+  /// Sepet checkout'u (üye ve misafir).
+  checkout
+  /// Ödeme formu adımı (teklif siparişi, sepet dışı ödemeler).
+  payment
+  /// Çerez bandı / çerez tercih paneli.
+  cookie_banner
+  /// Profil bildirim ayarları (pazarlama izni).
+  account_settings
+  /// E-postadaki bülten çıkış bağlantısı / e-posta ile çıkış.
+  newsletter_unsubscribe
+  /// Hesap silme (pazarlama izni kapanır).
+  account_deletion
+  /// Bu tablodan önceki kayıtların geriye dönük aktarımı
+  /// (`checkout_groups.distance_sales_*`).
+  legacy_backfill
 }
 
 /// Kurumsal hesap, ön başvuru onaylanmadan User oluşturmaz. Başvuru onaylanınca
@@ -322,6 +433,42 @@ model OAuthAccount {
   @@unique([provider, providerUserId])
   @@index([userId])
   @@map("oauth_accounts")
+}
+
+/// Sign in with Apple refresh token'ı — YALNIZ hesap silmede Apple'a iptal
+/// (revoke) için tutulur (App Store 5.1.1(v)). Mobil giriş `authorizationCode`
+/// gönderdiğinde Apple'ın token uç noktasında refresh token'a çevrilir; kod
+/// göndermeyen eski istemci ve web girişi satır üretmez.
+///
+/// OAuthAccount'ta değil, ayrı tabloda: hesap silme transaction'ı OAuthAccount
+/// satırlarını siler, iptal ise commit SONRASI outbox'tan (yeniden denenerek)
+/// yapılır — token o ana kadar burada yaşar. Kullanıcı × client id başına tek
+/// CANLI satır (`revokeRequestedAt` boş) vardır; iptali istenmiş satırların
+/// üzerine yazılmaz, silmeyle yarışan bir giriş iptal-istenmiş yeni satır açar
+/// (bu yüzden unique değil, indeks).
+model AppleSignInToken {
+  id                    String    @id @default(uuid())
+  userId                String    @map("user_id")
+  /// Girişin yapıldığı client id = identity token'ın `aud`'u (com.tarodan.app,
+  /// staging'de com.tarodan.app.staging). Kod bu client id ile çevrildi; iptal
+  /// de AYNI client id ile yapılmak zorunda.
+  clientId              String    @map("client_id")
+  /// AES-256-GCM (common/security/secret-cipher, APPLE_TOKEN_ENCRYPTION_KEY).
+  /// İptal başarıyla bitince NULL'lanır — iptal edilmiş token tutulmaz.
+  refreshTokenEncrypted String?   @map("refresh_token_encrypted")
+  /// Hesap silme anı: iptal işi outbox'a yazıldı. Bu satır artık yeni bir
+  /// girişle güncellenmez (silinen kullanıcıya giriş yolu yok).
+  revokeRequestedAt     DateTime? @map("revoke_requested_at")
+  /// Apple iptali onayladı (claim damgası: handler tekrar çalışırsa no-op).
+  revokedAt             DateTime? @map("revoked_at")
+  /// Son başarısız deneme ya da no-op nedeni (teşhis; token içermez).
+  lastRevokeError       String?   @map("last_revoke_error")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, clientId])
+  @@map("apple_sign_in_tokens")
 }
 
 model TwoFactorSecret {
@@ -735,15 +882,37 @@ model Product {
   /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
   /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
   rejectionReason     String?                 @map("rejection_reason")
-  /// `inactive` statüsünün NEDENİ — yalnız `return_quarantine` değeri anlamlıdır:
-  /// teslim SONRASI bir iade yüzünden sistem tarafından pasife alındı (satıcı
-  /// hasar kontrolü yapmalı) ve bu satıcı DOĞRUDAN aktive edebilir (admin onayı
-  /// gerekmez). Diğer her pasif neden (elle pasife alma, stok=0) null bırakır →
-  /// eski davranış: yeniden aktifleştirme admin onayına düşer. Statü `inactive`
-  /// dışına çıkan HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
+  /// `inactive` statüsünün NEDENİ — iki değer anlamlıdır: `return_quarantine`
+  /// (teslim SONRASI bir iade yüzünden sistem pasife aldı; satıcı hasar kontrolü
+  /// yapmalı ve DOĞRUDAN aktive edebilir, admin onayı gerekmez) ve `expired`
+  /// (ilan ömrü doldu; satıcı tek eylemle yenileyebilir, içerik onaydan beri
+  /// değişmediyse moderasyona girmez — bkz. approvedContentFingerprint). Diğer
+  /// her pasif neden (elle pasife alma, stok=0) null bırakır → eski davranış:
+  /// yeniden aktifleştirme admin onayına düşer. Statü `inactive` dışına çıkan
+  /// HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
   /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
   /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
   inactiveReason      ProductInactiveReason?  @map("inactive_reason")
+  /// İlanın vitrinden düşmesinin GÜNCEL nedeni — liste/filtre ekranları
+  /// JOIN'siz okusun diye burada. Tek yazıcısı `recordListingRemovals`dır
+  /// (kaldırma olayıyla aynı anda). Genelde son olayın nedenidir; tek istisna:
+  /// vitrin dışındaki ilanda satıcının sonraki nedeni bir yönetici/sistem
+  /// nedenini ezmez (reddedilmiş ilanı pasife almak "kural ihlali"ni silmez —
+  /// kural @tarodan/types `replacesCurrentRemovalReason`). `inactiveReason`tan FARKI: o bir DAVRANIŞ işaretidir
+  /// (satıcı bu pasif ilanla ne yapabilir — yenile / doğrudan aç), bu ise
+  /// AÇIKLAMADIR (ilan neden vitrinde değil — dört kaldırma statüsünün hepsi
+  /// için). `expired` / `return_quarantine` ikisinde de aynı adla yazılır.
+  /// İlan kaldırma statülerinin (inactive/deleted/rejected/suspended) dışına
+  /// çıktığında PrismaService middleware'i temizler. null + kaldırma statüsü =
+  /// bu özellikten ÖNCE düşmüş ilan → "bilinmiyor" (geri doldurma yok).
+  removalReason       ListingRemovalReason?   @map("removal_reason")
+  /// Son ONAY anındaki moderasyona konu içeriğin parmak izi (başlık, açıklama,
+  /// kategori/marka/üretici, görseller — bkz. computeProductContentFingerprint).
+  /// Süresi dolan ilanın satıcı yenilemesinde güncel içeriğin izi bununla
+  /// eşleşiyorsa ilan moderasyona girmeden yeniden yayına alınır; eşleşmiyorsa
+  /// ya da null ise (onay izi yok: eski kayıt, toplu import) normal onay kuralı
+  /// geçerlidir. Her onay yolu (admin, AI oto-onay, admin reaktivasyonu) yazar.
+  approvedContentFingerprint String?          @map("approved_content_fingerprint")
   qualityScore        Int                     @default(0) @map("quality_score")
   rankTier            Int                     @default(0) @map("rank_tier")
   relevanceScore      Int?                    @map("relevance_score")
@@ -767,6 +936,7 @@ model Product {
   likes               ProductLike[]
   productRatings      ProductRating[]
   boosts              ProductBoost[]
+  removalEvents       ProductRemovalEvent[]
   brand               Brand?                  @relation(fields: [brandId], references: [id])
   carModel            CarModel?               @relation(fields: [carModelId], references: [id])
   category            Category                @relation(fields: [categoryId], references: [id])
@@ -796,7 +966,63 @@ model Product {
   @@index([boostedUntil, boostedAt(sort: Desc)])
   @@index([homeShowcaseUntil, boostedAt(sort: Desc)])
   @@index([relevanceScore(sort: Desc)])
+  // Admin ürün listesi: kaldırma nedeni / kaldıran filtresi.
+  @@index([removalReason])
   @@map("products")
+}
+
+/// İlanın vitrinden düşüşlerinin EKLEME-YALNIZ kaydı — her kaldırma (satıcı
+/// silmesi/pasife alması, sistem işi, yönetici reddi/kaldırması) bir satır.
+/// Kaldırılıp yeniden açılıp tekrar kaldırılan ilan İKİ satır taşır; dashboard
+/// dönem kırılımı bu satırları `createdAt` (olay anı) ile sayar. UPDATE bir
+/// tetikleyiciyle engellenir; tek yazıcı `recordListingRemovals`dır.
+/// Bkz. docs/LISTING_REMOVAL_REASONS.md.
+model ProductRemovalEvent {
+  id            String               @id @default(uuid())
+  /// CASCADE: yalnız siparişi/teklifi hiç olmamış ilanın yönetici "kalıcı
+  /// silmesi" (ve dev sıfırlaması) ürün satırını siler; bağlanacak ilanı
+  /// kalmayan kaldırma kaydının tutulacak bir anlamı yoktur.
+  productId     String               @map("product_id")
+  reason        ListingRemovalReason
+  /// `sold_elsewhere`de satışın gerçekleştiği platform — kod listesi
+  /// @tarodan/types `LISTING_REMOVAL_PLATFORMS` (enum değil: liste göçsüz
+  /// değişebilsin). Diğer nedenlerde null.
+  platform      String?
+  /// `policy_violation`da ihlal kodu — @tarodan/types `LISTING_VIOLATION_CODES`
+  /// (yer tutucu liste, göçsüz değişir). null = kodsuz (eski istemciden) red.
+  violationCode String?              @map("violation_code")
+  /// Serbest metin: satıcının notu ya da yöneticinin açıklaması. YALNIZ admin
+  /// uçları döndürür; vitrin ve satıcı yanıtları bu tabloyu hiç okumaz.
+  detail        String?
+  /// Geçişin iki ucu — aynı nedenin pasife alma mı silme mi olduğunu ayırır.
+  statusBefore  ProductStatus        @map("status_before")
+  statusAfter   ProductStatus        @map("status_after")
+  /// İlan bu olaydan önce VİTRİNDEYDİ (statusBefore = active ya da reserved —
+  /// rezerve, yayındaki ilanın geçici tutuluşudur). Dashboard'ın
+  /// "vitrinden düşen ilanlar" kırılımı yalnız bunları sayar; vitrin dışındaki
+  /// ilanın sonraki kaldırması (reddedilmiş ilanın pasife alınması, süresi
+  /// dolmuş ilanın silinmesi, bekleyen ilanın reddi) geçmişte kalır ama
+  /// sayılmaz. Kayıt anında yazılır (kural: @tarodan/types `wasOnStorefront`),
+  /// sorgular statülerden yeniden hesaplamaz.
+  fromStorefront Boolean             @map("from_storefront")
+  /// Vitrinden düşüş DEĞİL ama dashboard'ın PLATFORM kırılımına girer: ilan
+  /// zaten düşmüştü (ör. süresi dolmuştu), satıcı sonra "başka platformda
+  /// sattım" diye kaldırdı ve bu, ilanın son düşüşünden bu yana ilk platform
+  /// cevabı. Toplam sayıma girmez (ilk düşüş zaten sayıldı). Kayıt anında
+  /// yazılır (kural: @tarodan/types `isLateSoldElsewhere`).
+  lateSoldElsewhere Boolean          @default(false) @map("late_sold_elsewhere")
+  /// İşlemi yapan kullanıcı (satıcı ya da yönetici); sistem işlerinde null.
+  /// FK yok: denetim satırı kişinin hesabından bağımsız kalır.
+  actorUserId   String?              @map("actor_user_id")
+  /// Olay damgası — dashboard dönem sayımı buradan yapılır.
+  createdAt     DateTime             @default(now()) @map("created_at")
+  product       Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([fromStorefront, createdAt])
+  @@index([lateSoldElsewhere, createdAt])
+  @@index([productId, createdAt(sort: Desc)])
+  @@index([reason, createdAt])
+  @@map("product_removal_events")
 }
 
 /// Admin toplu ürün yüklemelerinin idempotency ve yeniden bağlanma kaydı.
@@ -990,7 +1216,13 @@ model Trade {
   initiatorAddressId        String?            @map("initiator_address_id")
   receiverAddressId         String?            @map("receiver_address_id")
   responseDeadline          DateTime           @map("response_deadline")
+  /// Yanıt süresinin extend_once ile uzatıldığı an (Süreler ve Kurallar →
+  /// tradeResponseHours). Dolu = bu aşamanın hakkı kullanıldı. Karşı teklif yanıt
+  /// aşamasını yeniden başlattığından sıfırlanır.
+  responseExtendedAt        DateTime?          @map("response_extended_at")
   paymentDeadline           DateTime?          @map("payment_deadline")
+  /// Ödeme süresinin extend_once ile uzatıldığı an (tradePaymentHours); aşama başına bir kez.
+  paymentExtendedAt         DateTime?          @map("payment_extended_at")
   shippingDeadline          DateTime?          @map("shipping_deadline")
   confirmationDeadline      DateTime?          @map("confirmation_deadline")
   acceptedAt                DateTime?          @map("accepted_at")
@@ -1005,6 +1237,12 @@ model Trade {
   /// null = bilinmiyor (göç öncesi, aktörü kesin olmayan iptaller).
   cancelledBy               CancellationActor? @map("cancelled_by")
   cancelReason              String?            @map("cancel_reason")
+  /// Platform (admin) iptalinin katalog kodu (`ADMIN_CANCEL_REASON_CODES`,
+  /// @tarodan/types). Admin ekranları iptal nedenini bu koddan gösterir ve
+  /// filtreler; taraflara kodun ETİKETİ gider. Adminin iç notu burada DEĞİL,
+  /// yalnız denetim kaydındadır. null = platform iptali değil (ya da bu kolondan
+  /// önceki bir iptal). Katalog tek kaynak olsun diye enum değil metin.
+  adminCancelReasonCode     String?            @map("admin_cancel_reason_code")
   // Stamped when the first to_warehouse shipment is delivered. Once non-null,
   // user-side cancel is locked: only admin reject/force-cancel can resolve.
   firstWarehouseArrivalAt   DateTime?          @map("first_warehouse_arrival_at")
@@ -1522,6 +1760,10 @@ model Offer {
   /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
   buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
   expiresAt       DateTime    @map("expires_at")
+  /// Geçerlilik süresinin ADMIN seçimiyle (Süreler ve Kurallar → offerExpiryHours
+  /// = extend_once) bir kez uzatıldığı an. Dolu = hak kullanıldı; ikinci dolumda
+  /// teklif her durumda expired olur. Karşı teklif yeni satırdır, kendi hakkıyla başlar.
+  extendedAt      DateTime?   @map("extended_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
   version         Int         @default(1)
@@ -1547,11 +1789,11 @@ model CheckoutGroup {
   idempotencyKey          String?        @unique @map("idempotency_key")
   totalAmount             Decimal        @map("total_amount") @db.Decimal(10, 2)
   isGuest                 Boolean        @default(false) @map("is_guest")
-  // Mesafeli satış sözleşmesi onayı. Alıcının ödeme ekranında verdiği kabul,
-  // ihtilafta kanıt olarak istendiği için ZAMANI ve o an yürürlükteki sözleşme
-  // SÜRÜMÜYLE saklanır; sözleşme sonradan güncellense de hangi metnin kabul
-  // edildiği belli kalır. Kabul göndermeyen istemcilerde (eski mobil sürümler)
-  // null'dır — alan doğrulama değil, kayıttır.
+  // ESKİ (yalnız okuma): mesafeli satış onayı artık `consent_records`'a
+  // (document = distance_sales, checkoutGroupId = bu grup) yazılıyor — tek
+  // kayıt, iki kopya değil. Bu iki kolon consent_records'tan önceki grupların
+  // onayını taşır; `backfill:prod:distance-sales-consents` onları oraya aktarır.
+  // Yeni satırda her zaman null'dır. Göç yalnız ekleme yaptığı için silinmedi.
   distanceSalesAcceptedAt DateTime?      @map("distance_sales_accepted_at")
   distanceSalesVersion    String?        @map("distance_sales_version")
   createdAt               DateTime       @default(now()) @map("created_at")
@@ -1560,6 +1802,7 @@ model CheckoutGroup {
   orders                  Order[]
   packages                OrderPackage[]
   payment                 Payment?
+  consentRecords          ConsentRecord[]
 
   @@index([buyerId, createdAt])
   @@map("checkout_groups")
@@ -1719,12 +1962,38 @@ model Order {
   /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
   /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
   cancelledBy                CancellationActor?       @map("cancelled_by")
+  /// Yönetici (platform) iptalinin katalog nedeni — `@tarodan/types`
+  /// `ADMIN_CANCEL_REASON_CODES` (uygulama doğrular; katalog göçsüz
+  /// büyüyebilsin diye enum değil metin). İptaller ekranı bununla süzer ve
+  /// taraflara bu kodun ETİKETİ söylenir. Yöneticinin iç notu burada DEĞİL,
+  /// yalnız denetim kaydındadır. Yönetici iptali dışındaki yollarda null.
+  adminCancelReasonCode      String?                  @map("admin_cancel_reason_code")
+  /// Satıcının kargoya verme son tarihi (ödemede damgalanır). Tek seferlik
+  /// uzatmada (Süreler ve Kurallar → `preparingDeadlineDays` = `extend_once`)
+  /// YENİ son tarih buraya yazılır: uyarı, süre dolumu, panel ve ekranlar hep
+  /// bu kolonu okur, uzatmayı ayrıca bilmeleri gerekmez.
   preparingDeadline          DateTime?                @map("preparing_deadline")
+  /// Son tarih uyarısının gittiği an. Uzatmada temizlenir: satıcı yeni son
+  /// tarihten önce yeniden uyarılır.
   preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
+  /// Tek seferlik hazırlık uzatmasının verildiği an — aynı zamanda CLAIM
+  /// damgası: doluysa sipariş bir daha uzatılmaz, sonraki dolumda iptal +
+  /// iade çalışır. null = hiç uzatılmadı.
+  preparingExtendedAt        DateTime?                @map("preparing_extended_at")
+  /// Uzatmadan ÖNCEKİ (ilk) son tarih — yalnız kayıt/görüntü için; hiçbir
+  /// karar bunu okumaz. Uzatılmamış siparişte null.
+  originalPreparingDeadline  DateTime?                @map("original_preparing_deadline")
   reservationReleasedAt      DateTime?                @map("reservation_released_at")
   stockRestoredAt            DateTime?                @map("stock_restored_at")
   paymentExpiresAt           DateTime                 @map("payment_expires_at")
   deliveredAt                DateTime?                @map("delivered_at")
+  /// Cayma (iade talep) penceresinin bittiği an — teslimde, o an geçerli
+  /// `returnWindowDays` (Süreler ve Kurallar) ile DAMGALANIR. İade uygunluğu,
+  /// teslim → tamamlandı geçişi ve escrow `releaseAt` (= bu + payout grace)
+  /// hep bu damgayı okur: admin pencereyi sonradan değiştirse de bir siparişte
+  /// iade hakkı ile satıcı ödemesi çakışamaz. null = damgadan önce teslim
+  /// edilmiş eski sipariş; o zaman bugünkü pencereyle hesaplanır.
+  returnWindowEndsAt         DateTime?                @map("return_window_ends_at")
   confirmationDeadline       DateTime?                @map("confirmation_deadline")
   buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
   buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")
@@ -1754,6 +2023,7 @@ model Order {
   checkoutGroup              CheckoutGroup?           @relation(fields: [checkoutGroupId], references: [id])
   package                    OrderPackage?            @relation(fields: [packageId], references: [id])
   couponReservation          CouponReservation?
+  consentRecords             ConsentRecord[]
 
   @@index([buyerId])
   @@index([sellerId])
@@ -1854,6 +2124,8 @@ model Payment {
   @@index([status, paidAt])
   @@index([status, createdAt])
   @@index([isTest])
+  // Admin sipariş araması PayTR "sipariş no"yu (merchant_oid) tam eşleşmeyle arar.
+  @@index([providerConversationId])
   @@map("payments")
 }
 
@@ -2319,87 +2591,104 @@ model Invoice {
 
 /// Tarodan'ın KENDİ gelir e-belgeleri (komisyon / hizmet bedeli / üyelik / boost / iade).
 /// Düzenleyen = platform firması (Serhatlar). Mevcut Invoice (sipariş makbuzu) ile
-/// KARIŞTIRILMAMALI — bu model yalnızca eLogo'ya gönderilen GİB e-Arşiv/e-Fatura'yı izler.
+/// KARIŞTIRILMAMALI — bu model yalnızca e-belge sağlayıcısına (eLogo / Netsis) gönderilen
+/// GİB e-Arşiv/e-Fatura'yı izler. Tablo eskiden `elogo_invoices` adını taşıyordu; tek
+/// sağlayıcı varken konmuş bir addı, kayıt sağlayıcıdan bağımsız olduğu için yeniden
+/// adlandırıldı (bkz. docs/INVOICING_PROVIDERS.md).
 /// İlişki (User/Order) bilerek eklenmedi (daha az invaziv); kimlikler düz alan olarak tutulur.
 /// Tutarlar olay anındaki KAYITLI snapshot'tan gelir (oran/fiyat sonradan değişse de etkilenmez).
-model ElogoInvoice {
-  id                        String             @id @default(uuid())
-  type                      ElogoInvoiceType
+model FiscalInvoice {
+  id                        String                @id @default(uuid())
+  type                      FiscalInvoiceType
   /// Kaynak kaydın id'si (orderId / membershipPaymentId / boostId). type+sourceId tekil → idempotency.
-  sourceId                  String             @map("source_id")
+  sourceId                  String                @map("source_id")
   /// FATURA KAYIT NO (ör. KYT-K7X9M2QF3N) — kesim anında snapshot'lanır. Koli/sipariş
   /// referansından türetilir (gövde aynı, önek KYT); faturaya "Kayıt No" olarak basılır
   /// ve hakediş dökümünün aynı adlı kolonunda durur. sourceId bir UUID, belgede yeri yok.
-  sourceReference           String?            @map("source_reference")
+  sourceReference           String?               @map("source_reference")
   /// İşlemin SATICI tarafı — belgenin MUHATABI değil (o `recipientUserId`),
   /// dayandığı işlemin satan tarafıdır. Üyelik/öne çıkarma gibi Tarodan'ın
   /// kendi satışlarında PLATFORM SATICISI kullanıcısıdır; takasta bedeli
   /// ödemeyen taraftır. Kaynak çözülemezse NULL kalır.
-  sellerUserId              String?            @map("seller_user_id")
+  sellerUserId              String?               @map("seller_user_id")
   /// İşlemin ALICI tarafı = bedeli ödeyen taraf. Takasta ödeyen taraftır.
-  buyerUserId               String?            @map("buyer_user_id")
+  buyerUserId               String?               @map("buyer_user_id")
   /// İşlemin GERÇEKLEŞME ŞEKLİ — belgenin hangi işlemden doğduğu (doğrudan
   /// satış / teklif / takas / platform hizmeti). Kaynak kayıttan kesim anında
   /// çözülür; çözülemeyen eski kayıtlarda NULL kalır.
-  context                   ElogoInvoiceContext? @map("context")
-  recipientUserId           String?            @map("recipient_user_id")
-  recipientVknTckn          String?            @map("recipient_vkn_tckn")
-  recipientName             String?            @map("recipient_name")
+  context                   FiscalInvoiceContext? @map("context")
+  recipientUserId           String?               @map("recipient_user_id")
+  recipientVknTckn          String?               @map("recipient_vkn_tckn")
+  recipientName             String?               @map("recipient_name")
   // Misafir siparişleri tek sistem kullanıcısını paylaşır; gönderim anında alıcıyı
   // kullanıcı kaydından çözmek faturayı sistem e-postasına/boş adrese yazıyordu.
   // Kesim anındaki GERÇEK iletişim bilgisi burada snapshot'lanır.
-  recipientEmail            String?            @map("recipient_email")
-  recipientCity             String?            @map("recipient_city")
-  recipientDistrict         String?            @map("recipient_district")
-  recipientStreet           String?            @map("recipient_street")
-  documentType              String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
-  sendType                  String             @default("ELEKTRONIK") @map("send_type")
-  invoiceNumber             String?            @unique @map("invoice_number")
-  ettn                      String?            @unique
-  netAmount                 Decimal            @map("net_amount") @db.Decimal(10, 2)
+  recipientEmail            String?               @map("recipient_email")
+  recipientCity             String?               @map("recipient_city")
+  recipientDistrict         String?               @map("recipient_district")
+  recipientStreet           String?               @map("recipient_street")
+  documentType              String                @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
+  sendType                  String                @default("ELEKTRONIK") @map("send_type")
+  invoiceNumber             String?               @unique @map("invoice_number")
+  ettn                      String?               @unique
+  netAmount                 Decimal               @map("net_amount") @db.Decimal(10, 2)
   /// Belgede gösterilen İSKONTO toplamı (KDV hariç). Kesinti kolonları indirim
   /// SONRASI tutarı taşır; brüt bedel = netAmount + discountTotal. Raporlama için
   /// kolon, kalem kırılımı lineItems'ta.
-  discountTotal             Decimal            @default(0) @map("discount_total") @db.Decimal(10, 2)
-  taxAmount                 Decimal            @map("tax_amount") @db.Decimal(10, 2)
-  total                     Decimal            @db.Decimal(10, 2)
+  discountTotal             Decimal               @default(0) @map("discount_total") @db.Decimal(10, 2)
+  taxAmount                 Decimal               @map("tax_amount") @db.Decimal(10, 2)
+  total                     Decimal               @db.Decimal(10, 2)
   /// İlk oluşturma anındaki brüt tutar. Pending belge iadede netleştirilse bile
   /// tekrarlı kısmi iadeler bu immutable baz üzerinden hesaplanır.
-  originalTotal             Decimal            @map("original_total") @db.Decimal(10, 2)
-  vatRate                   Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
-  status                    ElogoInvoiceStatus @default(pending)
-  elogoRefId                String?            @map("elogo_ref_id")
-  elogoResultCode           Int?               @map("elogo_result_code")
-  elogoResultMsg            String?            @map("elogo_result_msg")
+  originalTotal             Decimal               @map("original_total") @db.Decimal(10, 2)
+  vatRate                   Decimal               @default(20) @map("vat_rate") @db.Decimal(5, 2)
+  status                    FiscalInvoiceStatus   @default(pending)
+  /// Belgeyi KESEN e-belge sağlayıcısı. İptal / iade / PDF işlemleri belgeyi kesen
+  /// sağlayıcıda yapılmak zorunda: sağlayıcı değişse de eski belge eski
+  /// sağlayıcıda yaşar. Bu kolon eklenmeden önceki her kayıt eLogo'yla
+  /// kesildiği için varsayılan `elogo`dur — geriye doldurma gerekmez.
+  provider                  EInvoiceProviderName  @default(elogo)
+  /// Sağlayıcının belgeye verdiği referans (eLogo: SendDocument `refId`).
+  /// Durum sorgusu ve iptal bununla yapılır. DB kolonu bilerek eski adında
+  /// (`elogo_ref_id`): fiziksel ad değişikliği deploy penceresi ve geri dönüş
+  /// riski taşır; Prisma adı sağlayıcıdan bağımsızdır, kolon adı tarihseldir.
+  providerRef               String?               @map("elogo_ref_id")
+  /// Sağlayıcının son işlem sonuç kodu (eLogo: `resultCode` / GİB durum kodu).
+  /// Yalnız teşhis içindir; karar sınıflandırılmış port sonucundan verilir.
+  /// DB kolonu bilerek eski adında (`elogo_result_code`), bkz. providerRef.
+  providerResultCode        Int?                  @map("elogo_result_code")
+  /// Sağlayıcının son sonuç / hata metni — admin listesinde "Sonuç" olarak
+  /// gösterilir. DB kolonu bilerek eski adında (`elogo_result_msg`).
+  providerResultMsg         String?               @map("elogo_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
-  billingReference          String?            @map("billing_reference")
+  billingReference          String?               @map("billing_reference")
   /// İADE faturasında referans verilen orijinal faturanın düzenlenme tarihi.
   /// Retry sırasında "bugünün tarihi" kullanılmaması için immutable snapshot.
-  billingReferenceIssueDate DateTime?          @map("billing_reference_issue_date")
+  billingReferenceIssueDate DateTime?             @map("billing_reference_issue_date")
   /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
   /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
-  lineDescription           String?            @map("line_description")
+  lineDescription           String?               @map("line_description")
   /// ÇOK KALEMLİ belgenin satırları (ürün + kargo + hizmet bedeli), kesim anında
   /// snapshot'lanır: `[{ name, quantity, net, unitPrice, vatRate }]`. Yalnız ürün
   /// faturasında (platform satışı) dolar; hizmet faturaları tek kalemdir ve burası
   /// NULL kalır. Fiyat/oran/ürün adı sonradan değişse bile retry aynı belgeyi üretir.
-  lineItems                 Json?              @map("line_items")
-  /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
-  pdfUrl                    String?            @map("pdf_url")
+  lineItems                 Json?                 @map("line_items")
+  /// Sağlayıcıdan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
+  pdfUrl                    String?               @map("pdf_url")
   /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.
-  emailSentAt               DateTime?          @map("email_sent_at")
-  attemptCount              Int                @default(0) @map("attempt_count")
-  lastAttemptAt             DateTime?          @map("last_attempt_at")
+  emailSentAt               DateTime?             @map("email_sent_at")
+  attemptCount              Int                   @default(0) @map("attempt_count")
+  lastAttemptAt             DateTime?             @map("last_attempt_at")
   /// Pending/failed belgenin hangi refund finalize anına kadar netleştirildiği.
-  refundAdjustedAt          DateTime?          @map("refund_adjusted_at")
-  issuedAt                  DateTime?          @map("issued_at")
-  sentAt                    DateTime?          @map("sent_at")
-  cancelledAt               DateTime?          @map("cancelled_at")
-  cancelReason              String?            @map("cancel_reason")
-  createdAt                 DateTime           @default(now()) @map("created_at")
-  updatedAt                 DateTime           @updatedAt @map("updated_at")
-  seller                    User?              @relation("ElogoInvoiceSeller", fields: [sellerUserId], references: [id])
-  buyer                     User?              @relation("ElogoInvoiceBuyer", fields: [buyerUserId], references: [id])
+  refundAdjustedAt          DateTime?             @map("refund_adjusted_at")
+  issuedAt                  DateTime?             @map("issued_at")
+  sentAt                    DateTime?             @map("sent_at")
+  cancelledAt               DateTime?             @map("cancelled_at")
+  cancelReason              String?               @map("cancel_reason")
+  createdAt                 DateTime              @default(now()) @map("created_at")
+  updatedAt                 DateTime              @updatedAt @map("updated_at")
+  seller                    User?                 @relation("FiscalInvoiceSeller", fields: [sellerUserId], references: [id])
+  buyer                     User?                 @relation("FiscalInvoiceBuyer", fields: [buyerUserId], references: [id])
 
   @@unique([type, sourceId])
   @@index([status])
@@ -2407,11 +2696,15 @@ model ElogoInvoice {
   @@index([sellerUserId])
   @@index([buyerUserId])
   @@index([context])
+  // Tablo adı bilerek tarihsel (`elogo_invoices`): fiziksel yeniden adlandırma
+  // deploy penceresi + geri dönüş riski taşır; model adı sağlayıcıdan bağımsız.
   @@map("elogo_invoices")
 }
 
 /// Gap-free belge numarası sırası (prefix + yıl bazında). GİB zorunluluğu.
-model ElogoDocSequence {
+/// Yalnız numarayı BİZİM verdiğimiz (`local`) sağlayıcıda ilerler; tablo adı
+/// bilerek tarihsel (`elogo_doc_sequences`, bkz. FiscalInvoice).
+model FiscalDocSequence {
   id        String @id @default(uuid())
   prefix    String
   year      Int
@@ -2435,7 +2728,7 @@ model DocumentSequence {
 }
 
 /// Kurumsal (şirket) satıcının siparişe elle yüklediği ÜRÜN faturası PDF'i.
-/// Tarodan'ın eLogo gelir e-Arşivlerinden (komisyon/hizmet) AYRI; satıcının kendi
+/// Tarodan'ın kendi gelir e-belgelerinden (`FiscalInvoice` — komisyon/hizmet) AYRI; satıcının kendi
 /// sisteminden kestiği fatura. Sipariş başına TEK (orderId @unique); değiştirilebilir.
 model SellerUploadedInvoice {
   id          String    @id @default(uuid())
@@ -2457,7 +2750,7 @@ model SellerUploadedInvoice {
   @@map("seller_uploaded_invoices")
 }
 
-enum ElogoInvoiceType {
+enum FiscalInvoiceType {
   /// LEGACY birleşik satıcı belgesi (komisyon + platform hizmet bedeli). Yeni
   /// teslimatlarda kesilmez; kesinti kırılımı olmayan eski ledger'lar ve daha
   /// önce bu türle faturalanmış paketler için korunur.
@@ -2487,25 +2780,39 @@ enum ElogoInvoiceType {
   /// faturalanır. Hizmet bedeli platformda kalır (mevcut belgesi durur), komisyon
   /// ise iade faturasıyla geri verilir. Kaynak = RefundRequest.id.
   penalty
+
+  // DB tipi bilerek tarihsel adında (bkz. FiscalInvoice).
+  @@map("ElogoInvoiceType")
 }
 
 /// Faturanın dayandığı işlemin GERÇEKLEŞME ŞEKLİ. `OrderOrigin` ile aynı
 /// değerleri taşır, artı `trade`: takasın siparişi yoktur, dolayısıyla origin'i
 /// de yoktur — fatura ekranı ikisini tek kolonda gösterir.
-enum ElogoInvoiceContext {
+enum FiscalInvoiceContext {
   direct_sale
   offer
   trade
   platform_service
+
+  @@map("ElogoInvoiceContext")
 }
 
-enum ElogoInvoiceStatus {
+enum FiscalInvoiceStatus {
   pending
   processing
   sent
   signed
   failed
   cancelled
+
+  @@map("ElogoInvoiceStatus")
+}
+
+/// e-Belge sağlayıcısı (entegratör). Değerler `EInvoiceProvider.name` ile
+/// birebir aynıdır — port tipi bu enum'dan türer (tek kaynak).
+enum EInvoiceProviderName {
+  elogo
+  netsis
 }
 
 model Shipment {
@@ -3158,16 +3465,110 @@ model EmailLog {
   @@map("email_logs")
 }
 
+/// Mail Yönlendirme — gönderici posta kutusu (docs/MAIL_ROUTING.md). Kutular
+/// posta sunucusunda zaten vardır; admin burada adres + şifre girer ve alanlara
+/// atar. Sunucu From == oturum açan kullanıcı şartı koyduğu için her kutu kendi
+/// SMTP oturumuyla gönderir (SmtpProvider'daki kutu başına transport havuzu).
+model MailSenderAccount {
+  id          String   @id @default(uuid())
+  /// Posta kutusu adresi; küçük harfe çevrilmiş, benzersiz. From adresi budur.
+  address     String   @unique
+  /// From başlığındaki görünen ad ("Tarodan Sipariş"); alan kendi adını verebilir.
+  displayName String   @map("display_name")
+  /// null = env'deki varsayılan SMTP_HOST / SMTP_PORT / SMTP_SECURE.
+  host        String?
+  port        Int?
+  secure      Boolean?
+  /// SMTP oturum kullanıcısı; boş bırakılırsa adresin kendisi yazılır.
+  username    String
+  /// AES-256-GCM (`MAIL_ACCOUNT_ENCRYPTION_KEY`), `v1:iv:tag:ciphertext`.
+  /// Hiçbir yanıtta, logda ya da denetim kaydında dönmez.
+  passwordEncrypted String @map("password_encrypted")
+  /// Son deneme sonucu: admin "Test gönder" + gerçek gönderimde kutunun oturum /
+  /// bağlantı hatası (gönderim o an varsayılan kimliğe düşer ve burası işaretlenir).
+  lastTestAt    DateTime? @map("last_test_at")
+  lastTestOk    Boolean?  @map("last_test_ok")
+  lastTestError String?   @map("last_test_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  /// User.id (admin); FK yok ki personel silinse de geçmiş kalsın.
+  createdBy     String?   @map("created_by")
+  updatedBy     String?   @map("updated_by")
+
+  areas MailAreaSetting[]
+
+  @@map("mail_sender_accounts")
+}
+
+/// Mail Yönlendirme — alan başına ayar. Satır yoksa varsayılan: hesap yok
+/// (env kimliği), alıcı yok, her iç olay kapalı, teslim `instant`.
+model MailAreaSetting {
+  /// `@tarodan/types` MAIL_AREAS değeri (ör. "order", "cancellation").
+  areaId          String             @id @map("area_id")
+  /// Kullanımdaki hesap silinemez (RESTRICT; servis 409 döner).
+  senderAccountId String?            @map("sender_account_id")
+  senderAccount   MailSenderAccount? @relation(fields: [senderAccountId], references: [id], onDelete: Restrict)
+  /// Hesabın görünen adını bu alan için ezer; null = hesabın kendi adı.
+  displayName     String?            @map("display_name")
+  /// Bu alanın müşteri postalarına Reply-To; null = gönderen adres.
+  replyTo         String?            @map("reply_to")
+  /// İç bildirim alıcıları: küçük harf, tekil, en çok 20 adres (yazarken doğrulanır).
+  internalRecipients Json            @default("[]") @map("internal_recipients")
+  /// İç olay ayarları: `{ "<eventId>": { "enabled": bool, "delivery": "instant"|"hourly"|"daily" } }`
+  /// (yazarken doğrulanır; kayıtta olmayan olay = kapalı + instant).
+  events          Json               @default("{}")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  updatedBy       String?            @map("updated_by")
+
+  @@index([senderAccountId])
+  @@map("mail_area_settings")
+}
+
+/// Personele giden iç bildirimin kalıcı kaydı. Outbox handler'ı her olay için
+/// TEK satır yazar (`sourceKey` = outbox olay kimliği → yeniden deneme çift
+/// satır üretmez). `instant` satır hemen gönderilir; `hourly` / `daily` satırları
+/// özet işi (mail-digest-*) toplayıp alan başına TEK e-posta yapar.
+model MailInternalNotice {
+  id         String    @id @default(uuid())
+  sourceKey  String    @unique @map("source_key")
+  areaId     String    @map("area_id")
+  eventId    String    @map("event_id")
+  /// Olay anındaki teslim modu; sonradan değişen ayar bekleyen satırı taşımaz.
+  delivery   String
+  /// Render edilmiş içeriğin girdisi (iş numarası, kısa olgular, admin yolu).
+  /// Kimlik no / IBAN / tam adres / mesaj gövdesi YAZILMAZ (kısa alıntı hariç).
+  payload    Json
+  occurredAt DateTime  @map("occurred_at")
+  /// Özet işinin sahiplenmesi: iki koşu aynı satırı göndermesin. Bayat
+  /// sahiplenme (gönderilmemiş, 30 dk'dan eski) bir sonraki koşuda bırakılır.
+  claimId    String?   @map("claim_id")
+  claimedAt  DateTime? @map("claimed_at")
+  /// Gönderildi ya da (alıcısı kalmadığı için) bırakıldı.
+  sentAt     DateTime? @map("sent_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([delivery, sentAt, createdAt])
+  @@index([claimId])
+  @@map("mail_internal_notices")
+}
+
 model PushToken {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  token     String
-  platform  String
-  deviceId  String?  @map("device_id")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  token       String
+  platform    String
+  // STABLE per-install identifier (mobile >= 1.1.0: iOS identifierForVendor /
+  // Android ANDROID_ID or an install UUID). Older versions wrote the device
+  // MODEL here; those rows are fixed once the device registers with the new
+  // version.
+  deviceId    String?  @map("device_id")
+  // Cihaz modeli ("iPhone 15") — destek/teşhis içindir, kimlik değildir.
+  deviceModel String?  @map("device_model")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, token])
   @@index([userId])
@@ -3223,17 +3624,37 @@ model Advertisement {
   id              String       @id @default(uuid())
   title           String
   imageUrl        String?      @map("image_url")
+  /// Yalnız GÖRSELSİZ (metin) reklamın tek hedefi. Görselli reklamda daima
+  /// null: tıklama yalnız `hotspots` alanlarında olur, alan dışı bir yere gitmez.
   linkUrl         String?      @map("link_url")
   content         String?
   altText         String?      @map("alt_text")
   width           Int?
   height          Int?
+  /// Render yuvası — yerleşim anlamları `AdPosition` enum'unda.
   position        AdPosition   @default(header)
+  /// Reklamın gösterildiği istemci (`GET /ads/active?platform=web|app`).
+  platform        ContentPlatform @default(all)
+  /// DEPRECATED: `platform`'un öncülü. Kolon eski mobil sürümler için kalır;
+  /// değeri her yazımda `platform`'dan türetilir (`adDeviceTypeFor`), admin
+  /// formu artık göndermez.
   deviceType      AdDeviceType @default(all) @map("device_type")
+  /// Yalnız `popup` yuvasında anlamlı: kapatılınca bir daha açılmasın mı.
+  popupFrequency  AdPopupFrequency @default(until_dismissed) @map("popup_frequency")
+  /// Admin her güncellediğinde +1 (sayaç artışları dokunmaz — bu yüzden
+  /// `updatedAt` kullanılamaz). Kapatılan popup, yeni sürümde yeniden açılır.
+  popupVersion    Int          @default(1) @map("popup_version")
+  /// Aynı yuvadaki canlı reklamların sırası (küçük önce); rotasyonu web yapar.
   displayOrder    Int          @default(0) @map("display_order")
+  /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresi ve bağlı
+  /// kampanya da canlı olmalı (`isAdLive`, advertisement/helpers).
   isActive        Boolean      @default(true) @map("is_active")
+  /// Yayın penceresi; null = sınırsız. Admin İstanbul gününün 00:00 /
+  /// 23:59:59.999 anını ofsetli ISO olarak gönderir, olduğu gibi saklanır.
   startDate       DateTime?    @map("start_date")
   endDate         DateTime?    @map("end_date")
+  /// Yalnız canlı reklamda, IP+reklam başına tekilleştirilerek artar (tık
+  /// 10 sn, gösterim 30 dk) — ham sayaç değil, istatistik ekranının kaynağı.
   clickCount      Int          @default(0) @map("click_count")
   impressionCount Int          @default(0) @map("impression_count")
   /// Banner bir KAMPANYAYI duyuruyorsa ona bağlanır: şerit, kampanyanın adını ve
@@ -3241,13 +3662,129 @@ model Advertisement {
   /// kendiliğinden düşer).
   discountId      String?      @map("discount_id")
   discount        Discount?    @relation(fields: [discountId], references: [id], onDelete: SetNull)
+  /// Görsel üzerindeki tıklanabilir alanlar (sortOrder sırasıyla). Görselsiz
+  /// reklamda boş; görsel değişince (yeni oran) ya da kalkınca silinir.
+  hotspots        AdHotspot[]
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
   @@index([discountId])
-  @@index([position, deviceType, isActive])
+  @@index([position, platform, isActive])
   @@index([startDate, endDate])
   @@map("advertisements")
+}
+
+/// Görselli reklamın tıklanabilir dikdörtgeni. Kurallar (en çok 10 alan, en
+/// küçük boyut, çakışmazlık, taşmazlık) tek kaynaktan: `validateAdHotspots`
+/// (@tarodan/types) — admin formu ve API aynı fonksiyonu çalıştırır.
+model AdHotspot {
+  id              String        @id @default(uuid())
+  /// Reklam silinince alanları da gider: yalnız görsel düzeni + tık sayacı,
+  /// finansal/denetim izi değil (Cascade bilinçli).
+  advertisementId String        @map("advertisement_id")
+  advertisement   Advertisement @relation(fields: [advertisementId], references: [id], onDelete: Cascade)
+  /// Sol üst köşe + en/boy, görselin KESRİ (0–1): görsel hangi boyutta
+  /// çizilirse çizilsin (web, mobil, admin önizleme) alan aynı yere düşer.
+  x               Float
+  y               Float
+  width           Float
+  height          Float
+  /// Alanın hedefi; reklamın eski `linkUrl` kuralıyla aynı (`@IsAdLinkUrl`).
+  linkUrl         String        @map("link_url")
+  /// Admin'in alana verdiği ad: istatistikte alanı tanıtır, web'de
+  /// ekran okuyucu etiketi (aria-label) olur.
+  label           String
+  /// Admin'in çizim/liste sırası (0 tabanlı). Kayıtta payload dizisinin
+  /// sırasıyla yeniden yazılır; yanıtlar bu sırayla döner.
+  sortOrder       Int           @default(0) @map("sort_order")
+  /// Bu alana düşen tık; reklamın `clickCount`'u ile AYNI işlemde artar.
+  /// Reklam toplamı alanların toplamından büyük olabilir: alanlardan önceki ve
+  /// silinmiş alanlara düşen tıklar yalnız reklamda kalır.
+  clickCount      Int           @default(0) @map("click_count")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([advertisementId])
+  @@map("advertisement_hotspots")
+}
+
+/// Vitrin hero slaytı (ana sayfa slider'ı, giriş/kayıt ekranı görseli). Kodda
+/// yedek slayt YOK: web ve mobil yalnız bu tablodan okur. Referans seed ilk
+/// kurulumda bir ana sayfa slaytı kurar; sonrası admin'indir — yerleşim boş
+/// kalabilir (istemci slider'ı gizler). Kurallar ve sözleşme: docs/HERO_CMS.md.
+model HeroSlide {
+  id              String          @id @default(uuid())
+  placement       HeroPlacement
+  /// Admin anahtarı. Yayında olmak için yetmez: tarih penceresinin de içinde
+  /// olmalı (`isHeroSlideLive`, hero/helpers).
+  isActive        Boolean         @default(true) @map("is_active")
+  /// Aynı yerleşimdeki slaytların sırası (küçük önce).
+  displayOrder    Int             @default(0) @map("display_order")
+  /// Yayın penceresi; null = sınırsız. Reklamla aynı kural
+  /// (`withinScheduleWindow`): sınırlar dahil.
+  startDate       DateTime?       @map("start_date")
+  endDate         DateTime?       @map("end_date")
+  /// Geniş ekran görseli (public S3 URL, `hero/` klasörü).
+  imageUrl        String          @map("image_url")
+  /// Dar ekran/mobil uygulama görseli; null = `imageUrl` kullanılır.
+  mobileImageUrl  String?         @map("mobile_image_url")
+  imageSide       HeroImageSide   @default(right) @map("image_side")
+  /// Metinler `LocalizedText` JSON'u: `{ tr, en? }` — tr zorunlu, en boşsa
+  /// istemci tr'ye düşer (`pickLocalized`, @tarodan/types). Ayrı dil kolonları
+  /// yerine JSON: üçüncü dil şema değişikliği istemesin.
+  title           Json
+  subtitle        Json?
+  imageAlt        Json?           @map("image_alt")
+  /// Buton etiketi + hedefi çift olarak var ya da yok; hedef reklam
+  /// bağlantısıyla aynı kural (`@IsAdLinkUrl`: http(s) ya da `/yol`).
+  cta1Label       Json?           @map("cta1_label")
+  cta1Href        String?         @map("cta1_href")
+  cta2Label       Json?           @map("cta2_label")
+  cta2Href        String?         @map("cta2_href")
+  /// Mobil uygulama (iOS VE Android) bu slaytı göstermez — dijital satış
+  /// native'de kapalı (mağaza kuralları), ör. ödeme/üyelik çağrısı. Web yok
+  /// sayar. Ad tarihçe gereği "iOS" kaldı; API sözleşmesi (mobil) bu adı bekler.
+  hideOnIos       Boolean         @default(false) @map("hide_on_ios")
+  /// Slaytın gösterildiği istemci (`?platform=web|app`): istemci kendi
+  /// değerini ve `all`'ı görür. Ana sayfa hero'su istemci başına ayrıca
+  /// PlatformSetting anahtarıyla (`hero_home_enabled_web|app`) kapatılabilir.
+  platform        ContentPlatform @default(all)
+  /// Yalnız yayındaki slaytta, IP+slayt(+buton) başına tekilleştirilerek artar
+  /// (gösterim 30 dk, tık 10 sn) — reklam sayaçlarıyla aynı pencere.
+  impressionCount Int             @default(0) @map("impression_count")
+  /// Slayta yapılan TÜM tıklar (görsel + butonlar); buton sayaçları bunun
+  /// alt kırılımıdır ve aynı işlemde artar.
+  clickCount      Int             @default(0) @map("click_count")
+  cta1ClickCount  Int             @default(0) @map("cta1_click_count")
+  cta2ClickCount  Int             @default(0) @map("cta2_click_count")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([placement, isActive, displayOrder])
+  @@map("hero_slides")
+}
+
+/// Ana sayfa güven rozeti (güvenli alışveriş, iade, takas …). Kodda yedek
+/// liste yok; referans seed bugünkü altı rozeti kurar.
+model TrustBadge {
+  id           String   @id @default(uuid())
+  isActive     Boolean  @default(true) @map("is_active")
+  displayOrder Int      @default(0) @map("display_order")
+  /// Sabit ikon anahtarı (`TRUST_BADGE_ICONS`, @tarodan/types); istemci kendi
+  /// ikon setine eşler. Enum değil: ikon eklemek göç gerektirmesin.
+  icon         String
+  /// `LocalizedText` JSON'u. Metin herkese açık süre belirteci taşıyabilir
+  /// (`{returnWindowDays}`); public uç güncel değerle doldurur.
+  title        Json
+  description  Json?
+  /// Mobil uygulama (iOS VE Android) bu rozeti göstermez; web yok sayar. Slayttaki
+  /// `hideOnIos` ile aynı anlam ve ad (bkz. HeroSlide.hideOnIos).
+  hideOnIos    Boolean  @default(false) @map("hide_on_ios")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, displayOrder])
+  @@map("trust_badges")
 }
 
 model Discount {
@@ -3443,9 +3980,25 @@ model ScheduledNotification {
   title        String
   body         String
   channels     String[]
+  // Zil (uygulama içi bildirim kutusu) satırı yazılsın mı? Varsayılan true:
+  // bu kolondan önceki satırlar ve `inApp` göndermeyen çağıranlar her zaman
+  // zil satırı yazıyordu. Yeni admin formu kanalı açıkça seçer; false iken
+  // (ör. yalnız e-posta) zil satırı yazılmaz.
+  inApp        Boolean   @default(true) @map("in_app")
   targetType   String    @map("target_type")
   targetData   Json?     @map("target_data")
   scheduledFor DateTime  @map("scheduled_for")
+  // E-postaya özel içerik (HTML kanalı seçildiyse): konu + SÜZÜLMÜŞ HTML.
+  // Boşsa e-posta eski yolla push başlığı/metninden üretilir.
+  emailSubject String?   @map("email_subject")
+  emailHtml    String?   @map("email_html") @db.Text
+  // "announcement" | "marketing" — pazarlama yalnız izinli kullanıcılara gider.
+  mailingType  String    @default("announcement") @map("mailing_type")
+  // Bildirim verisi (ör. `{ link }` derin bağlantısı): anında gönderimle aynı
+  // `data` zamanlanmış gönderimde de push payload'ına ve zil satırına taşınır.
+  data         Json?
+  // pending → processing (atomik sahiplenme: çoklu worker'da tek işleyen)
+  // → sent | failed. sent/failed worker'ın dağıtım sonucundan yazılır.
   status       String    @default("pending")
   sentAt       DateTime? @map("sent_at")
   sentCount    Int       @default(0) @map("sent_count")
@@ -3470,14 +4023,39 @@ enum ProductStatus {
   suspended
 }
 
-/// `Product.inactiveReason`'ın tek değeri. `inactive` statüsü kendi başına NEDEN
+/// `Product.inactiveReason` değerleri. `inactive` statüsü kendi başına NEDEN
 /// pasif olunduğunu söylemez (satıcı elle pasife almış olabilir, stok bitmiş
-/// olabilir, ya da teslim SONRASI bir iade karantinaya almış olabilir) — bu enum
-/// yalnız "sistem karantinaya aldı, satıcı doğrudan aktive edebilir" durumunu
-/// işaretler. Diğer tüm pasif nedenleri (rejected zaten ayrı bir status; elle
-/// pasife alma, stok sıfırı) null bırakır ve eski admin-onay akışına düşer.
+/// olabilir, teslim SONRASI bir iade karantinaya almış olabilir ya da ilan ömrü
+/// dolmuş olabilir) — bu enum yalnız sistemin koyduğu iki işareti taşır:
+/// `return_quarantine` ("sistem karantinaya aldı, satıcı doğrudan aktive
+/// edebilir") ve `expired` ("ilan ömrü doldu, satıcı yenileyebilir"). Diğer tüm
+/// pasif nedenleri (rejected zaten ayrı bir status; elle pasife alma, stok
+/// sıfırı) null bırakır ve eski admin-onay akışına düşer.
 enum ProductInactiveReason {
   return_quarantine
+  expired
+}
+
+/// İlanın vitrinden düşme nedeni (`Product.removalReason`,
+/// `ProductRemovalEvent.reason`). Değerler ve aktör grupları @tarodan/types
+/// `LISTING_REMOVAL_REASONS` ile BİREBİR aynıdır (kontrat spec'i korur):
+/// satıcı (not_given = nedensiz eski istemci, changed_mind, sold_elsewhere,
+/// paused_temporarily), sistem (expired, out_of_stock, traded, return_quarantine,
+/// seller_suspended, account_deleted), yönetici (policy_violation).
+enum ListingRemovalReason {
+  not_given
+  changed_mind
+  sold_elsewhere
+  paused_temporarily
+  expired
+  out_of_stock
+  traded
+  return_quarantine
+  seller_suspended
+  /// Satıcı hesabını sildi: aktif ve onay bekleyen ilanları silme anında
+  /// pasife alındı (20261013110000_listing_removal_account_deleted).
+  account_deleted
+  policy_violation
 }
 
 enum ProductImportBatchStatus {
@@ -3907,18 +4485,63 @@ enum TaxRuleScope {
   product
 }
 
+/// DEPRECATED — yerini `ContentPlatform` aldı (Advertisement.deviceType).
 enum AdDeviceType {
   desktop
   mobile
   all
 }
 
+/// Reklamın web'de render edildiği yuva. Web her yuvayı kendi bileşeniyle
+/// okur (`GET /ads/active?position=`); burada olmayan bir yuva hiçbir sayfada
+/// görünmez — `sidebar` tam bu yüzden kaldırıldı (20261009120000).
 enum AdPosition {
+  /// Her sayfanın en üstündeki ince şerit (kampanya/duyuru metni).
+  topbar
+  /// Site başlığının altındaki büyük banner: anasayfa, ilan ve kategori
+  /// listelerinin tepesi.
   header
-  sidebar
+  /// Site alt bilgisinin hemen üstündeki banner.
   footer
+  /// İlan/arama/kategori ızgarasında ürün satırları arasındaki banner.
   inline
+  /// Ana sayfaya girişte açılan modal; ne sıklıkla açılacağı reklamın
+  /// `popupFrequency` alanında.
   popup
+}
+
+/// Popup reklamın ne sıklıkla açıldığı. İstemci "kapatıldı" bilgisini reklam
+/// başına `<id>:<popupVersion>` anahtarıyla saklar.
+enum AdPopupFrequency {
+  /// Ana sayfaya her girişte açılır; kapatmak bir şey saklamaz.
+  every_visit
+  /// Kullanıcı kapatana kadar her girişte açılır; kapatınca o sürüm bir daha
+  /// açılmaz (admin reklamı güncelleyince `popupVersion` artar, yeniden açılır).
+  until_dismissed
+}
+
+/// Hero slaytının gösterildiği yer (`HERO_PLACEMENTS`, @tarodan/types).
+enum HeroPlacement {
+  /// Ana sayfa slider'ı — boş kalabilir (istemci gizler).
+  home
+  /// Giriş, şifre sıfırlama vb. auth ekranlarının görsel paneli.
+  auth_default
+  /// Kayıt ekranlarının (bireysel + kurumsal) görsel paneli.
+  auth_register
+}
+
+/// Görselin geniş ekranda durduğu taraf; metin öbür tarafa yerleşir.
+enum HeroImageSide {
+  left
+  right
+}
+
+/// İçeriğin gösterildiği istemci: `web` = site, `app` = mobil uygulama,
+/// `all` = ikisi. Hero slaytı ve reklam ortak kullanır.
+enum ContentPlatform {
+  web
+  app
+  all
 }
 
 enum CommissionLedgerStatus {
@@ -4067,4 +4690,49 @@ enum LedgerAccount {
 enum LedgerDirection {
   debit
   credit
+}
+
+/// Staging "production'dan maskeli yenile" koşuları (docs/UAT_REFRESH.md).
+/// Yalnız staging'de dolar: admin düğmesi satırı açar ve GitHub workflow'unu
+/// tetikler, workflow aşamaları `POST /internal/uat-refresh/:id/report` ile
+/// bildirir. Yenileme staging veritabanını DEĞİŞTİRDİĞİ için workflow bu
+/// tabloyu takastan önce döker ve yeni veritabanına geri yükler — geçmiş
+/// yenilemeleri atlatır. Bu yüzden kullanıcıya FK YOK: isteyen personelin
+/// satırı takastan sonra var olmayabilir; adı satırda anlık görüntü olarak durur.
+model UatRefreshRun {
+  id                String          @id @default(uuid())
+  state             UatRefreshState @default(queued)
+  /// User.id; null = GitHub'dan elle başlatılmış koşu (workflow satırı kendisi açar).
+  requestedById     String?         @map("requested_by_id")
+  /// İsteyen personelin o anki görünen adı (FK yok, bkz. model notu).
+  requestedByName   String?         @map("requested_by_name")
+  requestedAt       DateTime        @default(now()) @map("requested_at")
+  startedAt         DateTime?       @map("started_at")
+  finishedAt        DateTime?       @map("finished_at")
+  dryRun            Boolean         @default(false) @map("dry_run")
+  /// Koşuya özel rapor token'ının SHA-256'sı (hex). Token yalnız dispatch
+  /// girdisinde yaşar; düz hali hiçbir yerde saklanmaz.
+  tokenHash         String          @unique @map("token_hash")
+  workflowRunUrl    String?         @map("workflow_run_url")
+  /// Production dökümünün alındığı an.
+  sourceSnapshotAt  DateTime?       @map("source_snapshot_at")
+  /// `[{ table, rows }]` — maskelenen/silinen satır sayıları.
+  masked            Json            @default("[]")
+  /// Import sonrası uygulanan (production'dan yeni) migration adları.
+  migrationsApplied String[]        @default([]) @map("migrations_applied")
+  /// Yenileme öncesi staging yedeğinin sunucudaki dosya adı.
+  backupFile        String?         @map("backup_file")
+  error             String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  @@index([requestedAt])
+  @@map("uat_refresh_runs")
+}
+
+enum UatRefreshState {
+  queued
+  running
+  succeeded
+  failed
 }

@@ -1,6 +1,7 @@
 import {
   OrderStatus,
   PayoutStatus,
+  ProductStatus,
   RefundRequestStatus,
   TradeStatus,
 } from "@prisma/client";
@@ -15,7 +16,7 @@ describe("UserProfileService account deletion obligations", () => {
       product: {
         findMany: jest
           .fn()
-          .mockResolvedValue([{ id: "product-1", status: "active" }]),
+          .mockResolvedValue([{ id: "product-1", status: "reserved" }]),
       },
       trade: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -39,9 +40,19 @@ describe("UserProfileService account deletion obligations", () => {
       {} as any,
       {} as any,
       {} as any,
+      { recordMarketingChange: jest.fn() } as never, // consents
+      { syncUserConsent: jest.fn() } as never, // newsletter
+      {} as never, // search
+      {} as never, // cache
+      {} as never, // notifications
     );
 
     await expect(service.deleteAccount("user-1")).rejects.toThrow();
+
+    // S3: yalnız süren satışa/takasa bağlı (rezerve) ilan engeldir.
+    expect(prisma.product.findMany.mock.calls[0][0].where.status.in).toEqual([
+      ProductStatus.reserved,
+    ]);
 
     const tradeStatuses =
       prisma.trade.findMany.mock.calls[0][0].where.status.in;
@@ -61,6 +72,11 @@ describe("UserProfileService account deletion obligations", () => {
       prisma.order.findMany.mock.calls[0][0].where.status.in;
     expect(orderStatuses).toEqual(
       expect.arrayContaining([
+        // Kabul edilmiş teklif siparişi pending_payment açılır: ödemesi
+        // beklenen kabul edilmiş teklif silmeyi engeller; ödenmişse paid ve
+        // sonrası engeller (P1 inceleme 7 doğrulaması).
+        OrderStatus.pending_payment,
+        OrderStatus.paid,
         OrderStatus.awaiting_buyer_confirmation,
         OrderStatus.refund_requested,
       ]),
@@ -95,5 +111,89 @@ describe("UserProfileService account deletion obligations", () => {
     );
     expect(prisma.paymentHold.findMany).toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  /**
+   * S3 — Apple 5.1.1(v), Play hesap silme: aktif ilan silmeyi engellemez
+   * (silme transaction'ında pasife alınır). Rezerve ilan engelin tek ilan
+   * türüdür; yanıt sözleşmesi (`errors[]` + `details.activeProducts`) aynen.
+   */
+  const makeBlockedService = (reserved: number) => {
+    const empty = { findMany: jest.fn().mockResolvedValue([]) };
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue({ id: "user-1" }) },
+      product: {
+        findMany: jest.fn().mockResolvedValue(
+          Array.from({ length: reserved }, (_, i) => ({
+            id: `product-${i}`,
+            status: ProductStatus.reserved,
+          })),
+        ),
+      },
+      trade: empty,
+      order: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "order-1", status: OrderStatus.paid }]),
+      },
+      refundRequest: empty,
+      payoutTransfer: empty,
+      paymentHold: empty,
+      $transaction: jest.fn(),
+    };
+    const service = new UserProfileService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never, // consents
+      {} as never, // newsletter
+      {} as never, // search
+      {} as never, // cache
+      {} as never, // notifications
+    );
+    return { service, prisma };
+  };
+
+  it("rezerve ilan engeli kendi metniyle döner; details.activeProducts onu sayar", async () => {
+    const { service, prisma } = makeBlockedService(2);
+
+    const error = (await service.deleteAccount("user-1").then(
+      () => {
+        throw new Error("deleteAccount reddedilmeliydi");
+      },
+      (e: unknown) => e,
+    )) as { getResponse(): any };
+
+    const body = error.getResponse();
+    expect(body.i18nKey).toBe("server.user.deleteAccountBlocked");
+    expect(body.errors).toEqual(
+      expect.arrayContaining([
+        {
+          i18nKey: "server.user.deleteBlockedReservedListings",
+          i18nParams: { count: 2 },
+        },
+      ]),
+    );
+    expect(body.details.activeProducts).toBe(2);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rezerve ilan yoksa ilan engeli yazılmaz (diğer engeller sürer)", async () => {
+    const { service } = makeBlockedService(0);
+
+    const error = (await service.deleteAccount("user-1").then(
+      () => {
+        throw new Error("deleteAccount reddedilmeliydi");
+      },
+      (e: unknown) => e,
+    )) as { getResponse(): any };
+
+    const body = error.getResponse();
+    expect(body.details.activeProducts).toBe(0);
+    expect(body.details.pendingOrders).toBe(1);
+    expect(
+      body.errors.map((entry: { i18nKey: string }) => entry.i18nKey),
+    ).toEqual(["server.user.deleteBlockedPendingOrders"]);
   });
 });

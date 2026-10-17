@@ -5,6 +5,7 @@ import { Badge } from "@tarodan/ui";
 import type { DashboardStockResponse } from "@tarodan/types";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtNumber, fmtTry } from "@/lib/format";
+import { ZoneHeader } from "./ZoneHeader";
 import { STOCK_CARDS } from "../_lib/zoneConfig";
 
 const FORMATTERS = {
@@ -28,15 +29,11 @@ export function StockZone({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold text-heading">
-        {t("admin.dashboard.zones.stock")}
-      </h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <ZoneHeader title={t("admin.dashboard.zones.stock")} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {STOCK_CARDS.map((card) => (
           <MetricCard
             key={card.key}
-            icon={card.icon}
-            tone={card.tone}
             label={t(card.labelKey)}
             loading={isLoading}
             value={
@@ -49,7 +46,7 @@ export function StockZone({
               stock?.membershipsByTier?.length ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {stock.membershipsByTier.map((tier) => (
-                    <Badge key={tier.tierType} variant="secondary" size="sm">
+                    <Badge key={tier.tierType} variant="outline" size="sm">
                       {tier.tierName} · {fmtNumber(tier.count)}
                     </Badge>
                   ))}

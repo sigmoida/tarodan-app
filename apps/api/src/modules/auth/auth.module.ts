@@ -23,11 +23,14 @@ import { StorageModule } from "../storage/storage.module";
 import { BannedUserGuard } from "./guards/banned-user.guard";
 import { GoogleAuthService } from "./social/google-auth.service";
 import { AppleAuthService } from "./social/apple-auth.service";
+import { AppleTokenModule } from "./social/apple-token.module";
 import { RolesGuard } from "./guards/roles.guard";
 import { PhoneVerificationService } from "./verification/phone-verification.service";
 import { EmailChangeService } from "./verification/email-change.service";
 import { SecurityModule } from "../security/security.module";
 import { MarketingModule } from "../marketing/marketing.module";
+import { ConsentModule } from "../consent/consent.module";
+import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
 
 @Module({
   imports: [
@@ -49,6 +52,15 @@ import { MarketingModule } from "../marketing/marketing.module";
     // Kayıtta pazarlama izni verilirse üye bülten listesine yazılır
     // (NewsletterService). MarketingModule Auth'a bağlı değil, döngü yok.
     MarketingModule,
+    // Kayıt formundaki onaylar (terms / privacy / KVKK / pazarlama) kayıtla
+    // aynı transaction'da yazılır. ConsentModule yaprak modül, döngü yok.
+    ConsentModule,
+    // Kayıt formundaki yasal kimlik (ad, soyad, TCKN): tekillik + hız bütçesi
+    // LegalIdentityService'te. Yaprak modül, döngü yok.
+    LegalIdentityModule,
+    // Apple girişindeki authorizationCode → şifreli refresh token (hesap
+    // silmede iptal için). Yaprak modül, döngü yok.
+    AppleTokenModule,
     // Toplu aktivasyon maili kuyruğa yazılır. Bull KÖK bağlantısı global
     // (BullRootModule), bu yüzden PROCESS_ROLE=web süreci de üretici olabilir;
     // işi tüketen worker ayrı rolde koşar.

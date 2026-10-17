@@ -2,34 +2,26 @@ import { OfferStatus, OrderStatus } from "@prisma/client";
 import { AdminOfferService } from "./admin-offer.service";
 
 /**
- * Admin teklif iptali: yalnız pending / ödenmemiş accepted; bağlı ödeme
- * bekleyen sipariş aynı tx'te alıcı-iptali yardımcısıyla kapanır; ödenmiş
- * sipariş 400; audit fail-closed; bildirim hatası yutulur.
+ * Admin teklif iptali: yalnız SİPARİŞİ OLMAYAN teklif (pending ya da siparişi
+ * kapanmış accepted / payment_expired). Canlı siparişi olan teklif sipariş
+ * iptal ucuna yönlendirilir (409) — teklif siparişinin tek iptal yolu
+ * AdminOrderCancelService'tir. Denetim fail-closed ve iptalle aynı işlemde;
+ * bildirim hatası yutulur.
  */
 describe("AdminOfferService.cancelOffer", () => {
   const baseOffer = {
     id: "of1",
-    status: OfferStatus.accepted,
+    status: OfferStatus.accepted as OfferStatus,
     version: 3,
     buyerId: "b1",
     sellerId: "s1",
     productId: "p1",
     cancelReason: null,
     product: { id: "p1", title: "Ürün" },
-    order: null as any,
-  };
-  const pendingOrder = {
-    id: "o1",
-    status: OrderStatus.pending_payment,
-    version: 1,
-    quantity: 1,
-    productId: "p1",
-    offerId: "of1",
-    checkoutGroupId: null,
-    reservationReleasedAt: null,
+    order: null as { id: string; status: OrderStatus } | null,
   };
 
-  const makeService = (offer: any) => {
+  const makeService = (offer: typeof baseOffer | null) => {
     const tx: any = {
       $queryRaw: jest.fn().mockResolvedValue(offer ? [{ id: offer.id }] : []),
       offer: {
@@ -41,10 +33,6 @@ describe("AdminOfferService.cancelOffer", () => {
     const audit = {
       createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
     };
-    const orderService = {
-      cancelUnpaidOrderInTx: jest.fn().mockResolvedValue({}),
-      invalidateProductCaches: jest.fn().mockResolvedValue(undefined),
-    };
     const notifications = {
       notifyOfferCancelledByAdmin: jest.fn().mockResolvedValue(undefined),
     };
@@ -54,15 +42,14 @@ describe("AdminOfferService.cancelOffer", () => {
     const service = new AdminOfferService(
       prisma,
       audit as any,
-      orderService as any,
       notifications as any,
       query as any,
     );
-    return { service, tx, audit, orderService, notifications, query };
+    return { service, tx, audit, notifications, query };
   };
 
-  it("pending teklif: gerekçeyle cancelled; sipariş yok → sipariş iptali çağrılmaz; audit + iki bildirim", async () => {
-    const { service, tx, audit, orderService, notifications } = makeService({
+  it("pending teklif: gerekçeyle cancelled; denetim aynı işlemde; iki bildirim", async () => {
+    const { service, tx, audit, notifications } = makeService({
       ...baseOffer,
       status: OfferStatus.pending,
     });
@@ -77,8 +64,6 @@ describe("AdminOfferService.cancelOffer", () => {
         version: { increment: 1 },
       },
     });
-    expect(orderService.cancelUnpaidOrderInTx).not.toHaveBeenCalled();
-    expect(orderService.invalidateProductCaches).not.toHaveBeenCalled();
     expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
       "admin-1",
       "offer_cancel",
@@ -88,8 +73,8 @@ describe("AdminOfferService.cancelOffer", () => {
       expect.objectContaining({
         status: OfferStatus.cancelled,
         reason: "spam",
-        cancelledOrderId: null,
       }),
+      tx,
     );
     expect(notifications.notifyOfferCancelledByAdmin).toHaveBeenCalledTimes(2);
     expect(notifications.notifyOfferCancelledByAdmin).toHaveBeenCalledWith(
@@ -99,54 +84,40 @@ describe("AdminOfferService.cancelOffer", () => {
     expect(res).toEqual({ offer: { id: "of1" } });
   });
 
-  it("accepted + ödeme bekleyen sipariş: sipariş aynı tx'te kapanır (teklif yazımı atlanır), önbellek düşer", async () => {
-    const { service, tx, orderService } = makeService({
-      ...baseOffer,
-      order: pendingOrder,
-    });
+  it.each([OrderStatus.pending_payment, OrderStatus.paid, OrderStatus.shipped])(
+    "canlı siparişi (%s) olan teklif sipariş iptaline yönlendirilir (409); hiçbir yazım yapılmaz",
+    async (status) => {
+      const { service, tx, audit, notifications } = makeService({
+        ...baseOffer,
+        order: { id: "o1", status },
+      });
 
-    await service.cancelOffer("admin-1", "of1", { reason: "hatalı ilan" });
+      await expect(
+        service.cancelOffer("admin-1", "of1", { reason: "x" }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { i18nKey: "server.admin.offer.useOrderCancel" },
+      });
+      expect(tx.offer.update).not.toHaveBeenCalled();
+      expect(audit.createRequiredAuditLog).not.toHaveBeenCalled();
+      expect(notifications.notifyOfferCancelledByAdmin).not.toHaveBeenCalled();
+    },
+  );
 
-    expect(orderService.cancelUnpaidOrderInTx).toHaveBeenCalledWith(
-      tx,
-      pendingOrder,
-      {
-        reason: "Yönetici tarafından iptal edildi: hatalı ilan",
-        ledgerReason: "admin_cancelled",
-        skipOfferUpdate: true,
-      },
-    );
-    expect(orderService.invalidateProductCaches).toHaveBeenCalledWith("p1");
-  });
-
-  it("bağlı sipariş ödendiyse 400 orderAlreadyPaid; hiçbir yazım yapılmaz", async () => {
+  it("payment_expired teklif (siparişi iptal, alıcı canlandırabilir) iptal edilir", async () => {
     const { service, tx, audit } = makeService({
       ...baseOffer,
-      order: { ...pendingOrder, status: OrderStatus.paid },
-    });
-
-    await expect(
-      service.cancelOffer("admin-1", "of1", { reason: "x" }),
-    ).rejects.toMatchObject({
-      response: { i18nKey: "server.admin.offer.orderAlreadyPaid" },
-    });
-    expect(tx.offer.update).not.toHaveBeenCalled();
-    expect(audit.createRequiredAuditLog).not.toHaveBeenCalled();
-  });
-
-  it("payment_expired teklif (siparişi iptal, alıcı canlandırabilir) iptal edilir; sipariş yeniden iptal edilmez", async () => {
-    const { service, tx, audit, orderService } = makeService({
-      ...baseOffer,
       status: OfferStatus.payment_expired,
-      order: { ...pendingOrder, status: OrderStatus.cancelled },
+      order: { id: "o1", status: OrderStatus.cancelled },
     });
+
     await service.cancelOffer("admin-1", "of1", { reason: "x" });
+
     expect(tx.offer.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: OfferStatus.cancelled }),
       }),
     );
-    expect(orderService.cancelUnpaidOrderInTx).not.toHaveBeenCalled();
     expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
       "admin-1",
       "offer_cancel",
@@ -156,8 +127,22 @@ describe("AdminOfferService.cancelOffer", () => {
         status: OfferStatus.payment_expired,
         orderStatus: OrderStatus.cancelled,
       }),
-      expect.objectContaining({ cancelledOrderId: null }),
+      expect.anything(),
+      tx,
     );
+  });
+
+  it("denetim yazılamazsa iptal de olmaz (fail-closed, aynı işlem); bildirim gitmez", async () => {
+    const { service, audit, notifications } = makeService({
+      ...baseOffer,
+      status: OfferStatus.pending,
+    });
+    audit.createRequiredAuditLog.mockRejectedValue(new Error("audit down"));
+
+    await expect(
+      service.cancelOffer("admin-1", "of1", { reason: "x" }),
+    ).rejects.toThrow("audit down");
+    expect(notifications.notifyOfferCancelledByAdmin).not.toHaveBeenCalled();
   });
 
   it.each([OfferStatus.rejected, OfferStatus.cancelled, OfferStatus.expired])(

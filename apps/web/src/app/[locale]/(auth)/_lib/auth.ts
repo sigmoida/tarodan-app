@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
-import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
+import { newPasswordSchema, trPhone, trPhoneOptional } from "@tarodan/ui/form";
+import type { ConsentDocumentKey } from "@tarodan/types";
+import { legalIdentityFields } from "@/lib/legalIdentity";
 
 /**
  * Auth form schemas — the single source of truth for validation AND types.
@@ -90,12 +92,7 @@ export const resetPasswordSchema = (locale: Locale) => {
   const t = translator(locale);
   return z
     .object({
-      password: z
-        .string()
-        .min(8, t("auth.pwReqMinLength"))
-        .regex(/[A-Z]/, t("validation.passwordUppercase"))
-        .regex(/[a-z]/, t("validation.passwordLowercase"))
-        .regex(/\d/, t("validation.passwordNumber")),
+      password: newPasswordSchema(t),
       confirmPassword: z.string().min(1, t("validation.confirmPassword")),
     })
     .refine((d) => d.password === d.confirmPassword, {
@@ -127,6 +124,12 @@ export const registerSchema = (locale: Locale) => {
   return z
     .object({
       displayName: z.string().trim().min(1, t("common.fillAllFields")),
+      // Yasal kimlik web'de ZORUNLU (sunucu DTO'su değil — eski mobil
+      // sürümler göndermiyor; onların üyelerini kimlik kapısı yakalar).
+      ...legalIdentityFields({
+        nameInvalid: t("identity.validation.nameInvalid"),
+        nationalIdInvalid: t("identity.validation.nationalIdInvalid"),
+      }),
       username: z
         .string()
         .trim()
@@ -141,12 +144,11 @@ export const registerSchema = (locale: Locale) => {
         .email(t("validation.invalidEmail")),
       phone: trPhoneOptional(t("validation.trPhoneOnly")),
       birthDate: z.string().min(1, t("validation.birthDateRequired")),
-      password: z
-        .string()
-        .min(8, t("validation.passwordMin8"))
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t("auth.passwordComplexity")),
+      password: newPasswordSchema(t),
       confirmPassword: z.string(),
       agreeTerms: z.boolean(),
+      // KVKK, kullanım şartlarından AYRI bir zorunlu onaydır ve ayrı kayıt olur.
+      agreeKvkk: z.boolean(),
       acceptsMarketingEmails: z.boolean(),
     })
     .refine((d) => d.password === d.confirmPassword, {
@@ -160,9 +162,28 @@ export const registerSchema = (locale: Locale) => {
     .refine((d) => d.agreeTerms === true, {
       message: t("auth.mustAcceptTerms"),
       path: ["agreeTerms"],
+    })
+    .refine((d) => d.agreeKvkk === true, {
+      message: t("auth.mustAcceptKvkk"),
+      path: ["agreeKvkk"],
     });
 };
 export type RegisterValues = z.infer<ReturnType<typeof registerSchema>>;
+
+/**
+ * Kayıt formundaki onay kutularının sunucuya giden belge listesi. İlk kutu
+ * (Kullanım Şartları + Gizlilik Politikası) İKİ belgedir, KVKK kutusu ayrı
+ * bir belgedir; her biri sunucuda ayrı bir onay kaydı olur.
+ */
+export function registrationConsentDocuments(values: {
+  agreeTerms: boolean;
+  agreeKvkk: boolean;
+}): ConsentDocumentKey[] {
+  return [
+    ...(values.agreeTerms ? (["terms", "privacy"] as const) : []),
+    ...(values.agreeKvkk ? (["kvkk"] as const) : []),
+  ];
+}
 
 export const businessRegisterSchema = (locale: Locale) => {
   const t = translator(locale);

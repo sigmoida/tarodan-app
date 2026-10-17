@@ -8,6 +8,7 @@ import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { WebSocketModule } from "../websocket/websocket.module";
+import { MediaModule } from "../media/media.module";
 
 @Module({
   imports: [
@@ -17,6 +18,8 @@ import { WebSocketModule } from "../websocket/websocket.module";
     ModerationModule,
     WebSocketModule,
     UserBlockModule,
+    // `[IMG:…]` işaretlerinin mesaj eki sahipliği doğrulaması.
+    MediaModule,
   ],
   controllers: [MessagingController],
   providers: [MessagingService, ContentFilterService],

@@ -25,6 +25,10 @@ describe("AdminStaffService.banUser — bekleyen teklifler", () => {
         findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      // Askıya alınan ilanların kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       offer: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
     };
     const prisma: any = {
@@ -37,6 +41,7 @@ describe("AdminStaffService.banUser — bekleyen teklifler", () => {
     const service = new AdminStaffService(
       prisma,
       audit as any,
+      anyMock(),
       anyMock(),
       anyMock(),
       anyMock(),

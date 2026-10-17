@@ -49,3 +49,14 @@ export {
 } from "./components/ConfirmProvider";
 export { useZodForm } from "./lib/use-zod-form";
 export { trPhone, trPhoneOptional } from "./lib/phone-schema";
+export {
+  newPasswordSchema,
+  newPasswordOptionalSchema,
+  type PasswordMessageKey,
+} from "./lib/password-schema";
+export {
+  legalName,
+  legalNameOptional,
+  tckn,
+  tcknOptional,
+} from "./lib/legal-identity-schema";

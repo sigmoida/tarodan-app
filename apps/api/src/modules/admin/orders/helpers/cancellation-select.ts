@@ -16,6 +16,7 @@ export const CANCELLATION_LINE_SELECT = {
   cancelledAt: true,
   cancelReason: true,
   cancellationReasonCode: true,
+  adminCancelReasonCode: true,
   payment: { select: { status: true } },
   checkoutGroup: {
     select: { payment: { select: { status: true } } },

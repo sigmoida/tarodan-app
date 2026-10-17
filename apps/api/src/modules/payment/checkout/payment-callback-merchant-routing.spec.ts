@@ -78,6 +78,8 @@ function setup(record: {
         user: { isTestAccount: record.ownerIsTest ?? false },
       }),
     },
+    // Fail penceresi Süreler ve Kurallar'dan; satır yok → env/varsayılan.
+    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
   };
   const fulfillment = {
     processSuccessfulPayment: jest.fn().mockResolvedValue(true),
@@ -245,6 +247,96 @@ describe("PaymentCallbackService — per-merchant routing", () => {
     expect(
       right.virtualOrder.completeRecurringMembershipPayment,
     ).toHaveBeenCalledWith("mp-1", "RENabc", expect.anything());
+  });
+
+  /**
+   * Staging aynı optimize derlemeyi `NODE_ENV=production` + `APP_ENV=staging`
+   * ile koşar ve PayTR TEST mağazasına bağlıdır (`PAYTR_TEST_MODE=true`): her
+   * bildirim test_mode=1, test hesabı olmayan alıcının ödemesi isTest=false.
+   * Şerit guard'ı yalnız canlıda uygulanır; staging'de ödeme tamamlanır ve
+   * kayıtlı kart senkronlanır (eskiden reddediliyor, kart hiç yazılmıyordu).
+   */
+  describe("test-mode callbacks on staging vs live", () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalAppEnv = process.env.APP_ENV;
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalAppEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = originalAppEnv;
+    });
+
+    const recurring = {
+      id: "mp-1",
+      provider: "paytr",
+      paytrMerchant: PaytrMerchant.membership,
+      status: PaymentStatus.processing,
+      amount: 199,
+      membershipId: "m-1",
+      metadata: {},
+    };
+    const renewal = { ...body, merchant_oid: "RENabc" };
+
+    it("staging: completes a test-mode payment of a non-test buyer and syncs the saved card", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.APP_ENV = "staging";
+      const { svc, fulfillment, reconciliation } = setup({
+        payment: { ...membershipPayment, isTest: false },
+      });
+      await expect(
+        svc.handlePayTRCallback(
+          {
+            ...signed(PaytrMerchant.membership, body),
+            test_mode: "1",
+            utoken: "ut-1",
+          },
+          PaytrMerchant.membership,
+        ),
+      ).resolves.toBe("OK");
+      expect(reconciliation.syncSavedCardsFromUtoken).toHaveBeenCalledWith(
+        "user-1",
+        "ut-1",
+        { ip: "85.100.1.2" },
+        PaytrMerchant.membership,
+      );
+      expect(fulfillment.processSuccessfulPayment).toHaveBeenCalledTimes(1);
+    });
+
+    it("staging: completes a test-mode renewal of a non-test owner", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.APP_ENV = "staging";
+      const { svc, virtualOrder } = setup({ recurring, ownerIsTest: false });
+      await svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, renewal), test_mode: "1" },
+        PaytrMerchant.membership,
+      );
+      expect(
+        virtualOrder.completeRecurringMembershipPayment,
+      ).toHaveBeenCalledWith("mp-1", "RENabc", expect.anything());
+    });
+
+    it.each([["production"], [undefined]])(
+      "live (APP_ENV=%s): still rejects a test-mode success of a non-test buyer, no card sync",
+      async (appEnvValue) => {
+        process.env.NODE_ENV = "production";
+        if (appEnvValue === undefined) delete process.env.APP_ENV;
+        else process.env.APP_ENV = appEnvValue;
+        const { svc, fulfillment, reconciliation } = setup({
+          payment: { ...membershipPayment, isTest: false },
+        });
+        await expect(
+          svc.handlePayTRCallback(
+            {
+              ...signed(PaytrMerchant.membership, body),
+              test_mode: "1",
+              utoken: "ut-1",
+            },
+            PaytrMerchant.membership,
+          ),
+        ).resolves.toBe("OK");
+        expect(reconciliation.syncSavedCardsFromUtoken).not.toHaveBeenCalled();
+        expect(fulfillment.processSuccessfulPayment).not.toHaveBeenCalled();
+      },
+    );
   });
 
   /**

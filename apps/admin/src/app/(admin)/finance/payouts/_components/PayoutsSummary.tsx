@@ -1,20 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import {
-  BanknotesIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SkeletonText } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { TextLink } from "@/components/TextLink";
+import { fmtDate, fmtTry } from "@/lib/format";
 import { type PayoutSummary } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -35,8 +29,6 @@ export function PayoutsSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <MetricCard
-        icon={BanknotesIcon}
-        tone="warning"
         label={t("admin.finance.payouts.pendingTotal")}
         value={data ? fmtTry(data.totalPending) : "—"}
         loading={isLoading}
@@ -51,15 +43,11 @@ export function PayoutsSummary() {
       {/* Escrow gerçeği: "released" para bankaya GİTMİŞ demek değil. Kartlar
           released-bekleyen / gerçekten transfer edilen / başarısız diye ayrışır. */}
       <MetricCard
-        icon={ClockIcon}
-        tone="info"
         label={t("admin.finance.payouts.releasedAwaiting")}
         value={data ? fmtTry(data.releasedAwaitingTransfer) : "—"}
         loading={isLoading}
       />
       <MetricCard
-        icon={CheckCircleIcon}
-        tone="success"
         label={t("admin.finance.payouts.transferredTotal")}
         value={data ? fmtTry(data.transferredTotal) : "—"}
         loading={isLoading}
@@ -72,8 +60,6 @@ export function PayoutsSummary() {
         }
       />
       <MetricCard
-        icon={ExclamationTriangleIcon}
-        tone={data?.failedTransferCount ? "danger" : "success"}
         label={t("admin.finance.payouts.failedTransfers")}
         value={data ? String(data.failedTransferCount) : "—"}
         loading={isLoading}
@@ -93,23 +79,18 @@ export function PayoutsSummary() {
                     key={r.id}
                     className="flex min-w-0 justify-between gap-2 text-sm text-muted"
                   >
-                    <Link
+                    <TextLink
                       href={`/operations/orders/${r.orderId}`}
-                      className="truncate text-primary-600 hover:text-primary-700"
+                      className="truncate"
                     >
                       {r.orderNumber
                         ? `#${r.orderNumber}`
                         : t("admin.finance.payouts.orderShort", {
                             id: r.orderId.slice(0, 8),
                           })}
-                    </Link>
+                    </TextLink>
                     <span className="shrink-0 whitespace-nowrap">
-                      {fmtTry(r.amount)} —{" "}
-                      {r.releaseAt
-                        ? new Date(r.releaseAt).toLocaleDateString(
-                            t("common.dateLocale"),
-                          )
-                        : "-"}
+                      {fmtTry(r.amount)} — {fmtDate(r.releaseAt) ?? "-"}
                     </span>
                   </li>
                 ))

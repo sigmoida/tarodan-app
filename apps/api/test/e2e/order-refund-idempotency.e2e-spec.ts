@@ -64,7 +64,7 @@ describe("Order refund idempotency (#85) [P0]", () => {
         issueCommissionInvoice: async () => {},
         issueServiceFeeInvoice: async () => {},
         issuePlatformSaleInvoice: async () => {},
-      } as any, // elogoInvoicing
+      } as any, // invoicing
       { cancelSuratShipmentIfExists: async () => {} } as any, // paymentCommon
       {} as any, // providerEvents
       {} as any, // holdRelease

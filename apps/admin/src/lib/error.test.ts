@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { extractErrorMessage, isNotFoundError } from "./error";
+import {
+  extractErrorI18nKey,
+  extractErrorMessage,
+  isNotFoundError,
+} from "./error";
 
 function axiosError(data: unknown, status?: number) {
   return { response: { data, status } };
@@ -61,5 +65,24 @@ describe("isNotFoundError", () => {
   it("returns false when there's no response at all", () => {
     expect(isNotFoundError(new Error("boom"))).toBe(false);
     expect(isNotFoundError(null)).toBe(false);
+  });
+});
+
+describe("extractErrorI18nKey", () => {
+  it("returns the catalog key the API exception filter adds", () => {
+    expect(
+      extractErrorI18nKey(
+        axiosError(
+          { message: "x", i18nKey: "server.admin.order.cancelKindChanged" },
+          409,
+        ),
+      ),
+    ).toBe("server.admin.order.cancelKindChanged");
+  });
+
+  it("returns null when the body carries no key", () => {
+    expect(extractErrorI18nKey(axiosError({ message: "x" }, 400))).toBeNull();
+    expect(extractErrorI18nKey(new Error("boom"))).toBeNull();
+    expect(extractErrorI18nKey(null)).toBeNull();
   });
 });

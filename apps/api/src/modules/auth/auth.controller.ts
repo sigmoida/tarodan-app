@@ -233,6 +233,7 @@ export class AuthController {
     const result = await this.authService.loginWithApple(
       dto.identityToken,
       dto.fullName,
+      dto.authorizationCode,
     );
     if (result?.tokens) {
       setAuthCookies(res, result.tokens, { admin: false });

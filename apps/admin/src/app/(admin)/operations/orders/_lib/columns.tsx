@@ -9,7 +9,6 @@ import { UnitPriceCell } from "../_components/cells/UnitPriceCell";
 import { CommissionCell } from "../_components/cells/CommissionCell";
 import { InvoiceCell } from "../_components/cells/InvoiceCell";
 import { CargoStatusCell } from "../_components/cells/CargoStatusCell";
-import { rowLines, sellerSlotsExport } from "./rowView";
 
 /**
  * Satır = sepet. Paket bazlı kolonlar (ürün, satıcı, birim fiyat, fatura,
@@ -34,7 +33,6 @@ export function orderColumns({
         minWidth: 180,
         sortKey: "createdAt",
         sortType: "date",
-        exportValue: (row) => row.number,
       },
     ),
     col.custom<AdminOrderListRow>(
@@ -44,7 +42,6 @@ export function orderColumns({
         minWidth: 230,
         sortKey: "buyer.displayName",
         sortType: "text",
-        exportValue: (row) => row.buyer.displayName,
       },
     ),
     col.custom<AdminOrderListRow>(
@@ -52,17 +49,12 @@ export function orderColumns({
       (row) => <ProductLinesCell row={row} />,
       {
         minWidth: 360,
-        exportValue: (row) =>
-          (row.packages.length
-            ? rowLines(row).map((line) => line.product.title)
-            : [row.offer?.product.title ?? ""]
-          ).join(" | "),
       },
     ),
     col.custom<AdminOrderListRow>(
       t("admin.operations.common.seller"),
       (row) => <SellerLinesCell row={row} />,
-      { minWidth: 200, exportValue: sellerSlotsExport },
+      { minWidth: 200 },
     ),
     col.custom<AdminOrderListRow>(
       t("admin.operations.orders.columns.unitPrice"),
@@ -77,7 +69,6 @@ export function orderColumns({
         fixed: true,
         sortKey: "totalAmount",
         sortType: "number",
-        exportValue: (row) => row.totalAmount,
       },
     ),
     col.custom<AdminOrderListRow>(

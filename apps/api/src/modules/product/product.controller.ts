@@ -30,13 +30,16 @@ import { Request } from "express";
 import { type Locale } from "@tarodan/i18n";
 import { ProductService } from "./product.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
+import { ProductRenewalService } from "./lifecycle/product-renewal.service";
 import {
   CreateProductDto,
+  DeleteProductDto,
   UpdateProductDto,
   ProductQueryDto,
   ProductResponseDto,
   PaginatedProductsDto,
   InitiateBoostDto,
+  RenewProductsDto,
 } from "./dto";
 import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
@@ -51,6 +54,7 @@ export class ProductController {
   constructor(
     private readonly productService: ProductService,
     private readonly productBoostService: ProductBoostService,
+    private readonly productRenewalService: ProductRenewalService,
     private readonly i18n: I18nService,
   ) {}
 
@@ -402,6 +406,63 @@ export class ProductController {
   }
 
   /**
+   * POST /products/my/renew
+   * Süresi dolmuş birden çok ilanı yenile. Her ilan kendi sonucuyla döner
+   * (kısmi başarı); "my/renew" `:id/renew`'den ÖNCE tanımlı kalmalı.
+   */
+  @Post("my/renew")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Süresi dolan ilanları yenile (toplu)",
+    description:
+      "İçeriği son onaydan beri değişmeyen ilan doğrudan yayına döner; değişen/onay izi olmayan ilan onaya düşer. Üyelik ilan limiti ve diğer kapılar aynen geçerlidir; başarısız ilanlar sonuç listesinde gerekçesiyle döner.",
+  })
+  @ApiResponse({ status: 201, description: "İlan başına sonuç" })
+  async renewMany(
+    @CurrentUser("id") sellerId: string,
+    @Body() dto: RenewProductsDto,
+  ) {
+    return this.productRenewalService.renewMany(sellerId, dto.ids);
+  }
+
+  /**
+   * POST /products/:id/renew
+   * Süresi dolmuş tek ilanı yenile (owner only).
+   */
+  @Post(":id/renew")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Süresi dolan ilanı yenile" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiResponse({
+    status: 201,
+    description: "Yenilendi (active) ya da onaya düştü (pending)",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "İlanın süresi dolmamış / stok yok",
+  })
+  @ApiResponse({ status: 403, description: "Yetkiniz yok / ilan limiti" })
+  @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
+  async renew(
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") sellerId: string,
+  ) {
+    return this.productRenewalService.renew(sellerId, id);
+  }
+
+  /**
    * PATCH /products/:id
    * Update product (owner only)
    */
@@ -484,15 +545,24 @@ export class ProductController {
 
   /**
    * DELETE /products/:id
-   * Delete product (owner only)
+   * Delete product (owner only). Opsiyonel gövde: silme nedeni
+   * (`removalReason`, `removalPlatform`, `removalDetail`) — gönderilmezse
+   * `not_given` kaydedilir (eski mobil sürümler).
    */
   @Delete(":id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Ürün sil" })
+  @ApiOperation({
+    summary: "Ürün sil",
+    description:
+      "Optional JSON body with the removal reason (DeleteProductDto). Omitted reason is recorded as not_given.",
+  })
   @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({ status: 200, description: "Ürün silindi" })
-  @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
+  @ApiResponse({
+    status: 400,
+    description: "Geçersiz ürün ID formatı ya da geçersiz silme nedeni",
+  })
   @ApiResponse({ status: 403, description: "Yetkiniz yok" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async remove(
@@ -509,8 +579,9 @@ export class ProductController {
     id: string,
     @CurrentUser("id") sellerId: string,
     @ReqLocale() locale: Locale,
+    @Body() dto: DeleteProductDto,
   ) {
-    await this.productService.remove(id, sellerId);
+    await this.productService.remove(id, sellerId, dto);
     return { message: this.i18n.translate("server.product.deleted", locale) };
   }
 

@@ -7,6 +7,7 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { extractImportErrors } from "@/lib/error";
+import { fmtFileSize } from "@/lib/format";
 
 export interface EligibleProductImportSeller {
   id: string;
@@ -70,12 +71,6 @@ function normalizedFilename(file: File): string {
 
 export function productImportFileKey(file: File): string {
   return `${normalizedFilename(file)}:${file.size}:${file.lastModified}`;
-}
-
-export function formatProductImportFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export function useProductBulkImport(open: boolean, onClose: () => void) {
@@ -172,7 +167,7 @@ export function useProductBulkImport(open: boolean, onClose: () => void) {
       issues.push(
         t("admin.catalog.products.bulkImportFileTooLarge", {
           name: oversized.name,
-          size: formatProductImportFileSize(limits.maxFileBytes),
+          size: fmtFileSize(limits.maxFileBytes),
         }),
       );
     }
@@ -187,7 +182,7 @@ export function useProductBulkImport(open: boolean, onClose: () => void) {
     if (totalBytes > limits.maxTotalBytes) {
       issues.push(
         t("admin.catalog.products.bulkImportTotalTooLarge", {
-          size: formatProductImportFileSize(limits.maxTotalBytes),
+          size: fmtFileSize(limits.maxTotalBytes),
         }),
       );
     }

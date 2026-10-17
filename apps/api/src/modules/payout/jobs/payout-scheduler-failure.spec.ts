@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { PayoutSchedulerService } from "./payout-scheduler.service";
 
 /**
@@ -33,6 +34,40 @@ describe("PayoutSchedulerService — failures reach Bull", () => {
     await expect(service.runCheckReturnedTransfers()).rejects.toThrow("boom");
   });
 
+  it("iade kontrolünden SONRA silinmiş hesapların banka hesaplarını temizler", async () => {
+    const payoutService = {
+      checkReturnedTransfers: jest
+        .fn()
+        .mockResolvedValue({ returned: 0, unmatched: 0 }),
+      purgeDeletedSellerBankAccounts: jest.fn().mockResolvedValue(2),
+    };
+    const service = makeService(payoutService);
+
+    const result = await service.runCheckReturnedTransfers();
+
+    expect(result.stats).toMatchObject({ purgedBankAccounts: 2 });
+    expect(
+      payoutService.checkReturnedTransfers.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      payoutService.purgeDeletedSellerBankAccounts.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("banka hesabı temizliği hatası da yükseltilir", async () => {
+    const service = makeService({
+      checkReturnedTransfers: jest
+        .fn()
+        .mockResolvedValue({ returned: 0, unmatched: 0 }),
+      purgeDeletedSellerBankAccounts: jest
+        .fn()
+        .mockRejectedValue(new Error("db down")),
+    });
+
+    await expect(service.runCheckReturnedTransfers()).rejects.toThrow(
+      "db down",
+    );
+  });
+
   it("başarılı tur özet döndürür (regresyon koruması)", async () => {
     const service = makeService({
       processRetryPayouts: jest.fn().mockResolvedValue(1),
@@ -46,5 +81,60 @@ describe("PayoutSchedulerService — failures reach Bull", () => {
     const result = await service.runProcessPayouts();
 
     expect(result.stats).toMatchObject({ processed: 3, failed: 0 });
+  });
+
+  /**
+   * Sentry evidence (release e9bcb90): one transient "fetch failed" produced
+   * THREE alarms for the same failure — service, scheduler and the cron
+   * tracker each logged `error` on the same rethrow. The tracker's log is
+   * the canonical alarm; the scheduler must not log a second time.
+   */
+  it("does not double-log on runProcessPayouts rethrow (tracker logs the canonical alarm)", async () => {
+    const errorSpy = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const service = makeService({
+      processRetryPayouts: jest.fn().mockResolvedValue(0),
+      requeueRefundVoidedPayouts: jest.fn().mockResolvedValue(0),
+      processPendingPayouts: jest
+        .fn()
+        .mockRejectedValue(new Error("paytr down")),
+      detectStuckProcessingPayouts: jest.fn().mockResolvedValue(0),
+    });
+
+    await expect(service.runProcessPayouts()).rejects.toThrow("paytr down");
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("does not double-log on runCheckReturnedTransfers rethrow", async () => {
+    const errorSpy = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const service = makeService({
+      checkReturnedTransfers: jest.fn().mockRejectedValue(new Error("boom")),
+    });
+
+    await expect(service.runCheckReturnedTransfers()).rejects.toThrow("boom");
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("still logs the unmatched-returned-transfer alarm (real alarm, kept as-is)", async () => {
+    const errorSpy = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const service = makeService({
+      checkReturnedTransfers: jest
+        .fn()
+        .mockResolvedValue({ returned: 1, unmatched: 2 }),
+      purgeDeletedSellerBankAccounts: jest.fn().mockResolvedValue(0),
+    });
+
+    await service.runCheckReturnedTransfers();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("2 geri dönen transfer satırı"),
+    );
+    errorSpy.mockRestore();
   });
 });

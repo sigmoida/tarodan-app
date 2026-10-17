@@ -1,4 +1,8 @@
-import { socialSignInWarnings, validateEnv } from "./env.validation";
+import {
+  appleTokenRevocationWarnings,
+  socialSignInWarnings,
+  validateEnv,
+} from "./env.validation";
 
 /**
  * Boot/unit guard for issues #62 + #68: a missing or placeholder secret under
@@ -557,6 +561,139 @@ describe("validateEnv", () => {
     ).toThrow(/distinct/i);
   });
 
+  describe("MAIL_ACCOUNT_ENCRYPTION_KEY", () => {
+    it("is optional (no sender account needs it yet)", () => {
+      expect(() => validateEnv(prodBase)).not.toThrow();
+    });
+
+    it("accepts a strong, distinct key", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
+        }),
+      ).not.toThrow();
+    });
+
+    it("rejects a short key in production", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, MAIL_ACCOUNT_ENCRYPTION_KEY: "short" }),
+      ).toThrow(/MAIL_ACCOUNT_ENCRYPTION_KEY/);
+    });
+
+    it("rejects reusing the two-factor key", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          MAIL_ACCOUNT_ENCRYPTION_KEY: strongSecrets.TWO_FACTOR_ENCRYPTION_KEY,
+        }),
+      ).toThrow(/MAIL_ACCOUNT_ENCRYPTION_KEY must differ/);
+    });
+
+    it("is kept in the validated config so an env file value reaches the app", () => {
+      const result = validateEnv({
+        ...prodBase,
+        MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
+      });
+      expect(result.MAIL_ACCOUNT_ENCRYPTION_KEY).toBe("m".repeat(40));
+    });
+  });
+
+  // Sign in with Apple refresh token'ları (App Store 5.1.1(v)) kendi
+  // anahtarıyla şifrelenir; posta kutusu anahtarıyla aynı kural.
+  describe("APPLE_TOKEN_ENCRYPTION_KEY", () => {
+    it("is optional", () => {
+      expect(() => validateEnv(prodBase)).not.toThrow();
+    });
+
+    it("rejects a short key in production", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, APPLE_TOKEN_ENCRYPTION_KEY: "short" }),
+      ).toThrow(/APPLE_TOKEN_ENCRYPTION_KEY/);
+    });
+
+    it("rejects reusing an authentication secret", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          APPLE_TOKEN_ENCRYPTION_KEY: strongSecrets.JWT_SECRET,
+        }),
+      ).toThrow(/APPLE_TOKEN_ENCRYPTION_KEY must differ/);
+    });
+
+    it("rejects sharing the mail account key", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
+          APPLE_TOKEN_ENCRYPTION_KEY: "m".repeat(40),
+        }),
+      ).toThrow(/APPLE_TOKEN_ENCRYPTION_KEY must differ/);
+    });
+
+    it("keeps the Apple keys in the validated config so env values reach the app", () => {
+      const result = validateEnv({
+        ...prodBase,
+        APPLE_TEAM_ID: "TEAM123456",
+        APPLE_KEY_ID: "KEY1234567",
+        APPLE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----",
+        APPLE_TOKEN_ENCRYPTION_KEY: "a".repeat(20) + "z".repeat(20),
+      });
+      expect(result.APPLE_TEAM_ID).toBe("TEAM123456");
+      expect(result.APPLE_KEY_ID).toBe("KEY1234567");
+      expect(result.APPLE_PRIVATE_KEY).toBe("-----BEGIN PRIVATE KEY-----");
+      expect(result.APPLE_TOKEN_ENCRYPTION_KEY).toBe(
+        "a".repeat(20) + "z".repeat(20),
+      );
+    });
+  });
+
+  describe("appleTokenRevocationWarnings", () => {
+    const appleKeys = {
+      APPLE_TEAM_ID: "TEAM123456",
+      APPLE_KEY_ID: "KEY1234567",
+      APPLE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----",
+      APPLE_TOKEN_ENCRYPTION_KEY: "t".repeat(40),
+    };
+
+    it("warns (does not throw) when revocation keys are missing in production", () => {
+      const warnings = appleTokenRevocationWarnings(prodBase);
+      expect(warnings).toEqual([expect.stringContaining("APPLE_TEAM_ID")]);
+      expect(warnings[0]).toContain("5.1.1(v)");
+      expect(() => validateEnv(prodBase)).not.toThrow();
+    });
+
+    it("names only the missing keys", () => {
+      expect(
+        appleTokenRevocationWarnings({
+          ...prodBase,
+          ...appleKeys,
+          APPLE_PRIVATE_KEY: "",
+        }),
+      ).toEqual([expect.stringMatching(/^APPLE_PRIVATE_KEY not set/)]);
+    });
+
+    it("is quiet when everything is configured", () => {
+      expect(
+        appleTokenRevocationWarnings({ ...prodBase, ...appleKeys }),
+      ).toEqual([]);
+    });
+
+    // APPLE_CLIENT_ID yoksa da Apple girişi açıktır (varsayılan bundle id
+    // kabul edilir); uyarı o durumda susmamalı.
+    it("still warns without APPLE_CLIENT_ID (default audience keeps Apple sign-in on)", () => {
+      expect(
+        appleTokenRevocationWarnings(without(prodBase, "APPLE_CLIENT_ID")),
+      ).toEqual([expect.stringContaining("APPLE_TEAM_ID")]);
+    });
+
+    it("is quiet outside production", () => {
+      expect(
+        appleTokenRevocationWarnings({ ...prodBase, NODE_ENV: "development" }),
+      ).toEqual([]);
+    });
+  });
+
   describe("PayTR membership merchant", () => {
     it("requires the membership merchant credentials in production", () => {
       for (const key of [
@@ -645,6 +782,332 @@ describe("validateEnv", () => {
         GUEST_CHECKOUT_OTP_SECRET: "dev",
       }),
     ).not.toThrow();
+  });
+
+  // UAT: staging'de telefon doğrulama sabit kodla yapılır, SMS gitmez. Canlıda
+  // tek bir sabit kod herkesin telefonunu doğrulanabilir kılar → açılış durur.
+  describe("SMS_FIXED_VERIFICATION_CODE", () => {
+    const devBase = {
+      NODE_ENV: "development",
+      DATABASE_URL: "postgresql://u:p@db:5432/app",
+      JWT_SECRET: "dev",
+      JWT_REFRESH_SECRET: "dev",
+      ADMIN_JWT_SECRET: "dev",
+      PAYMENT_CAPABILITY_SECRET: "dev",
+      TWO_FACTOR_ENCRYPTION_KEY: "dev",
+      GUEST_CHECKOUT_OTP_SECRET: "dev",
+    };
+
+    it("refuses the fixed code on the production deployment", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, SMS_FIXED_VERIFICATION_CODE: "123456" }),
+      ).toThrow(/SMS_FIXED_VERIFICATION_CODE.*production deployment/);
+    });
+
+    it("refuses it on APP_ENV=production even outside an optimized build", () => {
+      expect(() =>
+        validateEnv({
+          ...devBase,
+          APP_ENV: "production",
+          SMS_FIXED_VERIFICATION_CODE: "123456",
+        }),
+      ).toThrow(/SMS_FIXED_VERIFICATION_CODE/);
+    });
+
+    it("accepts it on staging and no longer requires NetGSM there", () => {
+      expect(() =>
+        validateEnv({
+          ...without(
+            stagingBase,
+            "NETGSM_USERCODE",
+            "NETGSM_PASSWORD",
+            "NETGSM_MSGHEADER",
+          ),
+          SMS_FIXED_VERIFICATION_CODE: "123456",
+        }),
+      ).not.toThrow();
+    });
+
+    it("still requires NetGSM on staging when the fixed code is not set", () => {
+      expect(() =>
+        validateEnv(
+          without(
+            stagingBase,
+            "NETGSM_USERCODE",
+            "NETGSM_PASSWORD",
+            "NETGSM_MSGHEADER",
+          ),
+        ),
+      ).toThrow(/NETGSM_USERCODE/);
+    });
+
+    it("rejects a value the verify endpoint could never accept", () => {
+      expect(() =>
+        validateEnv({ ...devBase, SMS_FIXED_VERIFICATION_CODE: "12345" }),
+      ).toThrow(/exactly 6 digits/);
+      expect(() =>
+        validateEnv({ ...devBase, SMS_FIXED_VERIFICATION_CODE: "12ab56" }),
+      ).toThrow(/exactly 6 digits/);
+    });
+
+    it("is allowed in local development and survives validation", () => {
+      const result = validateEnv({
+        ...devBase,
+        SMS_FIXED_VERIFICATION_CODE: "000000",
+      });
+      expect(result.SMS_FIXED_VERIFICATION_CODE).toBe("000000");
+    });
+  });
+
+  // UAT: staging tamamen sahte taşıyıcıyla koşabilir; koliyi tester Test
+  // Araçları'ndan ilerletir. Canlıda stub her koşulda reddedilir.
+  describe("full-stub cargo on staging", () => {
+    const stagingStub = {
+      ...without(
+        stagingBase,
+        "SURAT_KARGO_TEST_MODE",
+        "SURAT_KARGO_CARI_KODU",
+        "SURAT_KARGO_SIFRE",
+      ),
+      SURAT_CARGO_ENABLED: "true",
+      SURAT_SOAP_MODE: "stub",
+    };
+
+    it("accepts SURAT_SOAP_MODE=stub without credentials or test-mode flag", () => {
+      expect(() => validateEnv({ ...stagingStub })).not.toThrow();
+    });
+
+    it("does not ask for a FirmaId when the carrier is stubbed", () => {
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_CREATE_API_VERSION: "v2" }),
+      ).not.toThrow();
+    });
+
+    it("still rejects an unset or unknown mode on staging", () => {
+      expect(() =>
+        validateEnv(without(stagingStub, "SURAT_SOAP_MODE")),
+      ).toThrow(/SURAT_SOAP_MODE.*'stub'/);
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_SOAP_MODE: "live" }),
+      ).toThrow(/SURAT_SOAP_MODE/);
+    });
+
+    it("never accepts the stub on the production deployment", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, SURAT_SOAP_MODE: "stub" }),
+      ).toThrow(/SURAT_SOAP_MODE must be 'rest' in production/);
+    });
+
+    it("refuses the live-host flag on staging even in stub mode", () => {
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_KARGO_TEST_MODE: "false" }),
+      ).toThrow(/SURAT_KARGO_TEST_MODE must not be 'false' on staging/);
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_KARGO_TEST_MODE: "true" }),
+      ).not.toThrow();
+    });
+
+    it("keeps the test-host rules for staging on the real REST client", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, SURAT_KARGO_TEST_MODE: "false" }),
+      ).toThrow(/SURAT_KARGO_TEST_MODE/);
+    });
+  });
+
+  // Staging yenileme düğmesinin GitHub tetikleyicisi (docs/UAT_REFRESH.md).
+  describe("GITHUB_DISPATCH_*", () => {
+    const dispatch = {
+      GITHUB_DISPATCH_TOKEN: "github_pat_example",
+      GITHUB_DISPATCH_REPO: "sigmoida/tarodan-app",
+    };
+
+    it("accepts the trigger on staging", () => {
+      expect(() => validateEnv({ ...stagingBase, ...dispatch })).not.toThrow();
+    });
+
+    it("is optional (the button then shows 'not configured')", () => {
+      expect(() => validateEnv(stagingBase)).not.toThrow();
+    });
+
+    it("refuses half a configuration", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          GITHUB_DISPATCH_TOKEN: dispatch.GITHUB_DISPATCH_TOKEN,
+        }),
+      ).toThrow(/GITHUB_DISPATCH_REPO/);
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          GITHUB_DISPATCH_REPO: dispatch.GITHUB_DISPATCH_REPO,
+        }),
+      ).toThrow(/GITHUB_DISPATCH_TOKEN/);
+    });
+
+    it("refuses a repo that is not owner/repo", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          ...dispatch,
+          GITHUB_DISPATCH_REPO: "https://github.com/sigmoida/tarodan-app",
+        }),
+      ).toThrow(/owner\/repo/);
+    });
+
+    it("refuses the token on the production deployment", () => {
+      expect(() => validateEnv({ ...prodBase, ...dispatch })).toThrow(
+        /GITHUB_DISPATCH_TOKEN.*production deployment/,
+      );
+    });
+  });
+
+  describe("NETSIS_*", () => {
+    const netsisLive = {
+      NETSIS_ENABLED: "true",
+      NETSIS_MODE: "live",
+      NETSIS_BASE_URL: "https://netsis.customer.test:7070",
+      NETSIS_USERNAME: "NETSIS",
+      NETSIS_PASSWORD: "netsis-password",
+      NETSIS_DB_NAME: "TARODAN2026",
+      NETSIS_DB_USER: "TEMELSET",
+      NETSIS_DB_PASSWORD: "db-password",
+    };
+
+    it("is optional: production boots with Netsis disabled (the default)", () => {
+      expect(() => validateEnv({ ...prodBase })).not.toThrow();
+      expect(() =>
+        validateEnv({ ...prodBase, NETSIS_ENABLED: "false" }),
+      ).not.toThrow();
+    });
+
+    it("does not touch any eLogo guard", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, ELOGO_ENABLED: "false" }),
+      ).toThrow(/ELOGO_ENABLED/);
+    });
+
+    it("passes with a complete live configuration in production", () => {
+      expect(() => validateEnv({ ...prodBase, ...netsisLive })).not.toThrow();
+    });
+
+    it("refuses the stub (explicit or defaulted) on a production deployment", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, NETSIS_MODE: "stub" }),
+      ).toThrow(/NETSIS_MODE.*'live' in production/);
+      expect(() =>
+        validateEnv({ ...prodBase, NETSIS_ENABLED: "true" }),
+      ).toThrow(/NETSIS_MODE.*'live' in production/);
+    });
+
+    it("refuses an unknown mode instead of silently stubbing", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, ...netsisLive, NETSIS_MODE: "rest" }),
+      ).toThrow(/NETSIS_MODE must be 'stub' or 'live'/);
+    });
+
+    it("lets staging run the stub without any credentials", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          NETSIS_ENABLED: "true",
+          NETSIS_MODE: "stub",
+        }),
+      ).not.toThrow();
+    });
+
+    it("lets staging run live with a complete configuration", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, ...netsisLive }),
+      ).not.toThrow();
+    });
+
+    it("requires an HTTPS base URL whenever live", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          NETSIS_BASE_URL: "http://netsis.customer.test:7070",
+        }),
+      ).toThrow(/NETSIS_BASE_URL/);
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          ...without(netsisLive, "NETSIS_BASE_URL"),
+        }),
+      ).toThrow(/NETSIS_BASE_URL/);
+    });
+
+    it.each([
+      "NETSIS_USERNAME",
+      "NETSIS_PASSWORD",
+      "NETSIS_DB_NAME",
+      "NETSIS_DB_USER",
+      "NETSIS_DB_PASSWORD",
+    ])("requires %s when live", (key) => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...without(netsisLive, key) }),
+      ).toThrow(new RegExp(`${key} is required`));
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, [key]: "   " }),
+      ).toThrow(new RegExp(`${key} is required`));
+    });
+
+    it("rejects malformed numeric tuning values", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, NETSIS_TIMEOUT_MS: "0" }),
+      ).toThrow(/NETSIS_TIMEOUT_MS/);
+      expect(() =>
+        validateEnv({ ...prodBase, ...netsisLive, NETSIS_TIMEOUT_MS: "15s" }),
+      ).toThrow(/NETSIS_TIMEOUT_MS/);
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          NETSIS_TOKEN_SAFETY_SECONDS: "-1",
+        }),
+      ).toThrow(/NETSIS_TOKEN_SAFETY_SECONDS/);
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          ...netsisLive,
+          NETSIS_TIMEOUT_MS: "20000",
+          NETSIS_TOKEN_SAFETY_SECONDS: "0",
+        }),
+      ).not.toThrow();
+    });
+
+    it("keeps the declared keys (so .env-file values reach ConfigService)", () => {
+      const result = validateEnv({
+        ...prodBase,
+        ...netsisLive,
+        NETSIS_DB_TYPE: "vtMSSQL",
+        NETSIS_BRANCH_CODE: "0",
+        NETSIS_TIMEOUT_MS: "15000",
+        NETSIS_TOKEN_SAFETY_SECONDS: "60",
+      });
+      expect(result).toMatchObject({
+        ...netsisLive,
+        NETSIS_DB_TYPE: "vtMSSQL",
+        NETSIS_BRANCH_CODE: "0",
+        NETSIS_TIMEOUT_MS: "15000",
+        NETSIS_TOKEN_SAFETY_SECONDS: "60",
+      });
+    });
+
+    it("does not guard anything outside production builds", () => {
+      expect(() =>
+        validateEnv({
+          NODE_ENV: "development",
+          DATABASE_URL: "postgresql://u:p@db:5432/app",
+          JWT_SECRET: "dev",
+          JWT_REFRESH_SECRET: "dev",
+          ADMIN_JWT_SECRET: "dev",
+          GUEST_CHECKOUT_OTP_SECRET: "dev",
+          NETSIS_ENABLED: "true",
+          NETSIS_MODE: "stub",
+        }),
+      ).not.toThrow();
+    });
   });
 
   it("still requires presence of every secret outside production", () => {

@@ -19,17 +19,16 @@ import {
   failedTransfersWhere,
   openAdjustmentsWhere,
   overdueHoldsWhere,
+  UPCOMING_RELEASE_WINDOW_DAYS,
   uninvoicedDeliveredWhere,
+  upcomingHoldsWhere,
 } from "../../finance/finance-health.where";
 import {
   LIVE_ORDER,
   LIVE_REFUND_REQUEST,
   LIVE_TRADE,
 } from "../../../account-lane/live-lane.where";
-import {
-  missingTrackingAlertHours,
-  type ThresholdConfigReader,
-} from "../../../../config/alert-thresholds";
+import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
 
 /**
  * Zone A — "Bekleyen işler" kuyruklarının TEK tanımı.
@@ -63,11 +62,11 @@ interface AggregateRaw {
 
 export interface QueuePartDefinition {
   /** Kümeyi belirleyen where — spec bunu doğrudan doğrular. */
-  where: (now: Date, config?: ThresholdConfigReader) => unknown;
+  where: (now: Date, ctx: AlertThresholdContext) => unknown;
   query: (
     prisma: PrismaService,
     now: Date,
-    config?: ThresholdConfigReader,
+    ctx: AlertThresholdContext,
   ) => Prisma.PrismaPromise<unknown>;
   read: (raw: unknown) => QueuePartReading;
   /**
@@ -75,6 +74,12 @@ export interface QueuePartDefinition {
    * açık destek talebinin içindedir) — kutu toplamına eklenmez.
    */
   subsetOf?: DashboardQueuePartKey;
+  /**
+   * Bilgi satırı (yaklaşan serbest bırakmalar): bekleyen iş değil. Kutu
+   * toplamına ve yaşına girmez. Tanım `DASHBOARD_INFORMATIONAL_QUEUE_PARTS`
+   * ile birebir — spec ikisini eşler.
+   */
+  informational?: true;
 }
 
 /** `aggregate` sonucunu okuyan standart çevirici. */
@@ -95,6 +100,10 @@ function reader(
     return reading;
   };
 }
+
+/** Yaklaşan serbest bırakma penceresinin sonu. */
+const upcomingWindowEnd = (now: Date) =>
+  new Date(now.getTime() + UPCOMING_RELEASE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
 /** Yalnız SATIŞ ilanları — sanal ürünler (üyelik/boost) moderasyona girmez. */
 const LISTING = { kind: ProductKind.listing } as const;
@@ -347,12 +356,37 @@ export const QUEUE_PART_DEFINITIONS: Record<
       }),
     read: reader("createdAt", "remainingAmount"),
   },
+  holdsUpcoming: {
+    // Önümüzdeki 7 gün içinde tarihinde kendiliğinden açılacak escrow:
+    // tutar = Σ(amount − refundedAmount), satıcıya gerçekten gidecek kısım.
+    where: (now) => upcomingHoldsWhere(now, upcomingWindowEnd(now)),
+    query: (prisma, now) =>
+      prisma.paymentHold.aggregate({
+        where: upcomingHoldsWhere(now, upcomingWindowEnd(now)),
+        _count: { _all: true },
+        _sum: { amount: true, refundedAmount: true },
+      }),
+    read: (raw) => {
+      const row = raw as AggregateRaw;
+      const gross = new Prisma.Decimal(String(row?._sum?.amount ?? 0));
+      const refunded = new Prisma.Decimal(
+        String(row?._sum?.refundedAmount ?? 0),
+      );
+      return {
+        count: Number(row?._count?._all ?? 0),
+        // Takvim satırı yaşlanmaz: "en eski" bir bekleyen iş yok.
+        oldestAt: null,
+        amount: gross.minus(refunded).toDecimalPlaces(2).toNumber(),
+      };
+    },
+    informational: true,
+  },
 
   // ── Belgeler ──────────────────────────────────────────────────────────────
   invoicesExhausted: {
     where: () => exhaustedInvoicesWhere,
     query: (prisma) =>
-      prisma.elogoInvoice.aggregate({
+      prisma.fiscalInvoice.aggregate({
         where: exhaustedInvoicesWhere,
         _count: { _all: true },
         _min: { createdAt: true },
@@ -360,10 +394,10 @@ export const QUEUE_PART_DEFINITIONS: Record<
     read: reader("createdAt"),
   },
   ordersUninvoiced: {
-    where: (now, config) => uninvoicedDeliveredWhere(now, config),
-    query: (prisma, now, config) =>
+    where: (now, ctx) => uninvoicedDeliveredWhere(now, ctx),
+    query: (prisma, now, ctx) =>
       prisma.order.aggregate({
-        where: uninvoicedDeliveredWhere(now, config),
+        where: uninvoicedDeliveredWhere(now, ctx),
         _count: { _all: true },
         _min: { deliveredAt: true },
       }),
@@ -383,11 +417,11 @@ export const QUEUE_PART_DEFINITIONS: Record<
   },
   shipmentsWithoutTracking: {
     // Barkod hiç açılmamış gönderi takip edilemez ve sessizce askıda kalır.
-    // Yaş eşiği config'ten (MISSING_TRACKING_ALERT_HOURS) — sabit değil.
-    where: (now, config) => missingTrackingWhere(now, config),
-    query: (prisma, now, config) =>
+    // Yaş eşiği Süreler ve Kurallar'dan (missingTrackingAlertHours) — sabit değil.
+    where: (now, ctx) => missingTrackingWhere(now, ctx),
+    query: (prisma, now, ctx) =>
       prisma.shipment.aggregate({
-        where: missingTrackingWhere(now, config),
+        where: missingTrackingWhere(now, ctx),
         _count: { _all: true },
         _min: { createdAt: true },
       }),
@@ -398,10 +432,10 @@ export const QUEUE_PART_DEFINITIONS: Record<
 /** Taşıyıcı kodu oluşmamış, eşiği aşmış, hâlâ terminal olmayan gönderiler. */
 export function missingTrackingWhere(
   now: Date,
-  config?: ThresholdConfigReader,
+  ctx: AlertThresholdContext,
 ): Prisma.ShipmentWhereInput {
   const cutoff = new Date(
-    now.getTime() - missingTrackingAlertHours(config) * 60 * 60 * 1000,
+    now.getTime() - ctx.timing.missingTrackingAlertHours * 60 * 60 * 1000,
   );
   return {
     order: LIVE_ORDER,
