@@ -1,5 +1,9 @@
+// Loaders with open libvips/librsvg advisories on the pinned sharp 0.34.5
+// (docs/SHARP_HOST_UPGRADE.md). SVG is never a valid upload; blocking its
+// loader keeps librsvg (GHSA-wq5f-xc86-pv6w) out of reach of user content.
 const BLOCKED_SHARP_LOADERS = [
   "VipsForeignLoadNsgif",
+  "VipsForeignLoadSvg",
   "VipsForeignLoadTiff",
   "VipsForeignLoadVips",
 ] as const;
