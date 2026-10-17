@@ -685,8 +685,9 @@ set **at build time** (`apps/{web,admin}/sentry.build.js`); server and edge
 init run from `src/instrumentation.ts`, the browser init from
 `sentry.client.config.ts`. Every event passes the shared scrubber
 (`scrubSentryEvent` in `@tarodan/logger`): cookies dropped, credential
-headers and query parameters masked, user reduced to its id, card, IBAN,
-TR phone and e-mail values removed.
+headers, client-IP proxy headers (`x-forwarded-for`, `x-real-ip`, ...) and
+query parameters masked, user reduced to its id, card, IBAN, TCKN, TR phone
+and e-mail values removed.
 
 Per app (web -> project `tarodan-web`, admin -> project `tarodan-admin`, org
 `tarodan`) and per environment:
@@ -711,9 +712,16 @@ Coolify settings, per app (Advanced > Build):
   `docker history`; without the token the build still succeeds and only the
   source map upload is skipped. Check the first deploy log for `--secret` (if
   the build server has no BuildKit, Coolify silently falls back to build args).
+- `SENTRY_AUTH_TOKEN` is **build-time only**: untick "Available at runtime",
+  so the running container never holds it.
 - The Dockerfiles declare the public values as `ARG` only (no `ENV` re-export)
   and must not mount secrets themselves; Coolify skips `RUN` lines that already
   have a secret mount. `apps/*/src/sentry-build.test.ts` pins both rules.
+- In BuildKit secrets mode a secret's **value** is not part of the Docker layer
+  cache key. After changing only a variable's value (a new DSN, `staging` ->
+  `production`) on an already-built commit, deploy with **Force deploy
+  (without cache)**, or the cached `next build` layer keeps the old inlined
+  value. A new commit or a newly added variable rebuilds anyway.
 
 Sentry project settings (both projects): turn on "Prevent Storing of IP
 Addresses" and the server-side data scrubber; the client SDK does not send IPs
