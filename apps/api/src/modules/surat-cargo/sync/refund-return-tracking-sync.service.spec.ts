@@ -1,4 +1,5 @@
 import { ShipmentStatus } from "@prisma/client";
+import { Logger } from "@nestjs/common";
 import {
   ACTIVE_RETURN_REFUND_STATUSES,
   RefundReturnTrackingSyncService,
@@ -240,5 +241,28 @@ describe("RefundReturnTrackingSyncService", () => {
       ).resolves.toBe("ignored");
       expect(refundService.applyReturnTrackingUpdate).not.toHaveBeenCalled();
     });
+  });
+
+  it("logs a return the carrier rejects at warn and hands its id to the run summary", async () => {
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    const { service, prisma, client } = makeService(3);
+    prisma.refundRequest.findMany.mockResolvedValue([{ id: "refund-1" }]);
+    client.lookupTracking.mockRejectedValue(new Error("Sürat takip hatası"));
+
+    const result = await service.syncAllActiveRefundReturns();
+
+    expect(result).toMatchObject({
+      failed: 1,
+      failures: ["refund-1 (Sürat takip hatası)"],
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("refund-1"));
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
+    warn.mockRestore();
   });
 });

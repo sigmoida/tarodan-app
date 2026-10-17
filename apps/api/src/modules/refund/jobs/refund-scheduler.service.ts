@@ -5,6 +5,10 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { RefundService } from "../refund.service";
 import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 
 @Injectable()
 export class RefundSchedulerService implements OnModuleInit {
@@ -60,6 +64,9 @@ export class RefundSchedulerService implements OnModuleInit {
             ? [`finalize-returned-shipments: ${finalizeResult.failed} kayıt`]
             : []),
         ],
+        // Each failed refund was logged at error with its id below; the run
+        // summary carries only counts and must not be a second Sentry event.
+        true,
       );
     }
     return {
@@ -92,7 +99,8 @@ export class RefundSchedulerService implements OnModuleInit {
       } catch (e) {
         failed++;
         this.logger.error(
-          `Failed to open return shipment for ${id}: ${(e as Error).message}`,
+          `Failed to open return shipment for ${id}: ${errorMessage(e)}`,
+          errorStack(e),
         );
       }
     }
@@ -117,8 +125,11 @@ export class RefundSchedulerService implements OnModuleInit {
         processed++;
       } catch (e) {
         failed++;
+        // errorMessage renders a localized exception's catalog key; the raw
+        // `.message` read "Bad Request Exception" and hid the reason.
         this.logger.error(
-          `Failed to finalize refund ${id}: ${(e as Error).message}`,
+          `Failed to finalize refund ${id}: ${errorMessage(e)}`,
+          errorStack(e),
         );
       }
     }

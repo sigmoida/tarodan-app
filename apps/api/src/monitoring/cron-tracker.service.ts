@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { setCronTracker } from "./cron-tracker.holder";
-import { errorMessage } from "../common/helpers/error-message";
+import { errorMessage, errorStack } from "../common/helpers/error-message";
+import { isAlreadyReportedCronFailure } from "./cron-step-runner";
 
 export type CronStatus = "idle" | "running" | "success" | "failed";
 
@@ -124,9 +125,16 @@ export class CronTrackerService implements OnModuleInit {
       return result;
     } catch (e) {
       finalize("failed", e);
-      this.logger.error(
-        `Cron '${job}' FAILED (${rec.lastDurationMs}ms): ${rec.lastError}`,
-      );
+      const line = `Cron '${job}' FAILED (${rec.lastDurationMs}ms): ${rec.lastError}`;
+      if (isAlreadyReportedCronFailure(e)) {
+        // Each failed step already logged its own error (id + stack); a second
+        // error here made every failure two Sentry events. The run still fails
+        // (Bull retry, check-in "error"), this line only stops the duplicate.
+        this.logger.warn(line);
+      } else {
+        // The run summary is this failure's alarm; the stack says where.
+        this.logger.error(line, errorStack(e));
+      }
       throw e; // davranış korunur — hata yukarı aynen gider
     }
   }

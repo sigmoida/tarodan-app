@@ -108,4 +108,19 @@ describe("createCronStepRunner", () => {
 
     expect(value).toBeUndefined();
   });
+  it("marks its summary as already reported: each step logged its own error", async () => {
+    const { runner, logger } = makeRunner();
+
+    await runner.step("payout", async () => {
+      throw new Error("PayTR down");
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Step "payout" failed: PayTR down',
+      expect.stringContaining("PayTR down"),
+    );
+    expect(() => runner.assertAllStepsSucceeded()).toThrow(
+      expect.objectContaining({ alreadyReported: true }),
+    );
+  });
 });

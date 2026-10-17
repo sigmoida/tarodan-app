@@ -108,6 +108,7 @@ export class SuratTrackingService {
     synced: number;
     pending: number;
     failed: number;
+    failures: string[];
   }> {
     return this.refundSync.syncAllActiveRefundReturns();
   }
@@ -126,6 +127,7 @@ export class SuratTrackingService {
     synced: number;
     pending: number;
     failed: number;
+    failures: string[];
   }> {
     return this.tradeSync.syncAllActiveTradeShipments();
   }
