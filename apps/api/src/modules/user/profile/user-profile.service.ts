@@ -1084,8 +1084,9 @@ export class UserProfileService {
         ...i18nMessage("server.user.deleteAccountBlocked"),
         errors,
         details: {
-          // The name is kept for the contract (mobile 1.0.5 and 1.1.0 read it);
-          // it now counts only RESERVED listings, which block deletion.
+          // The name is kept for the contract (mobile >= 1.1.0 reads it; 1.0.5
+          // shows only the message); it now counts only RESERVED listings,
+          // which block deletion.
           activeProducts: activeProducts.length,
           activeTrades: activeTrades.length,
           pendingOrders: pendingOrders.length,

@@ -25,11 +25,11 @@ veritabanıdır. Sözleşme: `packages/types/src/hero.ts` + `localized-text.ts`.
   onu uygulamada yayında saymaz (görünürlük kartı ve "Yayında · uygulama gizli"). Uygulama tanıtımı da böylece tamamen admin'den yönetilen bir
   slayttır (kodda sabit tanıtım slaytı ve `NEXT_PUBLIC_APP_PROMO_ENABLED` kaldırıldı).
 - `auth_register` kayıt ekranlarında, `auth_default` diğer auth ekranlarında kullanılır.
-- `hideOnIos` = **"native uygulamada gizle"**: mobil uygulama bayraklı slaytı (ve güven rozetini)
-  iOS'ta da Android'de de göstermez; web yok sayar. Dijital satış native'de artık iki mağazada da
-  kapalı olduğundan bayrak platformdan bağımsızdır. API alan adı `hideOnIos` KALDI (mobil
-  sözleşmesi: 1.0.5/1.0.6 bu adı okur); yalnız anlam ve admin metni genişledi. Süzmeyi istemci yapar,
-  sunucu liste döndürürken bayraklıları çıkarmaz (web de aynı listeyi okur).
+- `hideOnIos` = **"hide in the native app"**: the mobile app hides a flagged slide (and the trust
+  badge) on both iOS and Android; web ignores it. Digital sales are now off in both native stores,
+  so the flag is platform-independent. The API field name `hideOnIos` STAYED (mobile contract:
+  1.1.0 reads this name); only its meaning and the admin copy widened. The client filters; the
+  server does not drop flagged slides from the list (web reads the same list).
 - **`platform`** (`ContentPlatform`, reklamla ortak enum): `web` yalnız sitede, `app` yalnız
   mobil uygulamada, `all` (varsayılan; göç öncesi slaytlar da) ikisinde. İstemci kendini
   `?platform=web|app` ile tanıtır ve kendi hedefini + `all`'ı görür.
