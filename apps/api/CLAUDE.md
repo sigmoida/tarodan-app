@@ -117,10 +117,18 @@ and `en` ([packages/i18n/CLAUDE.md](../../packages/i18n/CLAUDE.md)).
 
 ## Money
 
-Money modules follow [.claude/rules/money.md](../../.claude/rules/money.md)
-(loaded automatically for their paths): `Decimal`, one pricing formula, snapshot
-at charge, DB-level idempotency, append-only ledger, behaviour-pinning tests.
-The full domain spec is `docs/PAYMENTS.md`.
+Non-negotiable in every money path (payment, order, refund, payout, ledger,
+commission, discount, trade cash, membership, boost, tax, invoicing):
+
+- `Decimal` in schema and math; `.toNumber()` only at the response boundary.
+- **One formula, one place:** preview and charge call the same function.
+- **Snapshot at charge:** history renders from frozen columns, never today's rules.
+- **Idempotent at the database:** deterministic ledger keys, CAS claim stamps.
+- **Append-only ledger:** corrections are new entries.
+- **Tests are mandatory:** a behaviour-pinning spec before and after; senior work.
+
+Details: [.claude/rules/money.md](../../.claude/rules/money.md) (loaded for
+money paths); full spec: `docs/PAYMENTS.md`.
 
 ## AuthN and AuthZ
 

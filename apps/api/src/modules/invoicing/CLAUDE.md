@@ -2,8 +2,8 @@
 
 `invoicing/` issues Tarodan's own revenue and refund e-documents (e-Fatura /
 e-Arşiv) through an integrator. It is fiscal and irreversible once sent, so it
-is money work (`.claude/rules/money.md` applies in spirit; senior developer,
-tests mandatory). API rules: [apps/api/CLAUDE.md](../../../CLAUDE.md).
+is money work (`.claude/rules/money.md` applies; senior developer, tests
+mandatory). API rules: [apps/api/CLAUDE.md](../../../CLAUDE.md).
 Provider design: `docs/INVOICING_PROVIDERS.md`; Netsis plan: `docs/NETSIS.md`.
 
 Not this module: `modules/invoice/` makes the non-fiscal PDF order summary

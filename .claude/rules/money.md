@@ -9,13 +9,30 @@ paths:
   - "apps/api/src/modules/commission/**"
   - "apps/api/src/modules/discount/**"
   - "apps/api/src/modules/finance-reconciliation/**"
+  - "apps/api/src/modules/trade/**"
+  - "apps/api/src/modules/offer/**"
+  - "apps/api/src/modules/cart/**"
+  - "apps/api/src/modules/membership/**"
+  - "apps/api/src/modules/tax/**"
+  - "apps/api/src/modules/invoicing/**"
+  - "apps/api/src/modules/invoice/**"
+  - "apps/api/src/modules/netsis/**"
+  - "apps/api/src/modules/shipping/tariff/**"
+  - "apps/api/src/modules/shipping/helpers/shipping-tariff.helper.ts"
+  - "apps/api/src/modules/product/helpers/product-sale-window.ts"
   - "apps/api/src/modules/admin/finance/**"
+  - "apps/api/src/modules/admin/orders/**"
+  - "apps/api/src/config/paytr.ts"
   - "packages/types/src/paytr-merchant-oid.ts"
 ---
 
 # Money rules (digest)
 
-These files move money. The full domain spec is `docs/PAYMENTS.md`; the API
+These files move money: checkout and pricing, payments and PayTR, refunds,
+payouts, ledger, commission and discounts, trade escrow and trade cash
+(including cash refunds), membership recurring charges, boost purchases
+(virtual orders in `payment/fulfillment`, prices in `admin/finance`), tax,
+cart totals, sale-window prices, shipping tariffs and fiscal invoicing. The full domain spec is `docs/PAYMENTS.md`; the API
 rules are in `apps/api/CLAUDE.md`. A money change follows the "Money / payment"
 section of tarodan-ops: `docs/definition-of-done.md`: senior developer (Opus),
 behaviour-pinning test before and after, senior QA review, Sentry traceability
@@ -51,8 +68,13 @@ without PII, and an entry in tarodan-ops: `qa/critical-paths.md`.
   `Order.financialSnapshot` (pricing hash, tariff version, commission rule,
   taxes, totals). Render history from the snapshot, never by re-running
   today's rules.
-- Checkout requires `idempotencyKey`, `expectedPricingHash` and
-  `expectedShippingTariffVersion`; a mismatch is a 409, not a silent reprice.
+- Cart checkout (`order/dto/checkout.dto.ts`) requires `idempotencyKey`; on
+  direct buy and guest checkout (`direct-buy.dto.ts`, `guest-checkout.dto.ts`)
+  it is optional because old mobile versions do not send it. Do not make it
+  required there without a contract plan (hub contract delta, `compat.md`,
+  raised minimum app version). `expectedPricingHash` and
+  `expectedShippingTariffVersion` guard repricing: a mismatch is a 409, not a
+  silent reprice.
 
 ## Idempotency at the database
 
