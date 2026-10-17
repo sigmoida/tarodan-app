@@ -947,7 +947,9 @@ herkesi anında düşürmek için `SITE_UNLOCK_SECRET` rotate et.
 **Tam açılış:** Coolify'da `SITE_LOCKED=false` + web restart; smoke test
 (anasayfa, kategori gezinme, kayıt + giriş, `/api/health/ready` yeşil — ready
 kontrolü komisyon kapsamını ve depo adresini de doğrular). Arama motorlarına
-açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true`.
+açmak için web `NEXT_PUBLIC_ALLOW_INDEXING=true`. Mağaza sayfaları (App Store +
+Google Play) herkese açıldığında ana sayfadaki mobil uygulama tanıtım slaytı için
+web `NEXT_PUBLIC_APP_PROMO_ENABLED=true` + rebuild (staging'de zaten `true`).
 
 **İlanlar yayınlanmadan önceki görünüm** (hepsi bilinçli): kategori, üretici,
 marka ve ölçek menüleri katalog seed'lendiği için ÇIKAR; ama ilan listesi

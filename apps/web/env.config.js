@@ -46,6 +46,8 @@ function createSchema(isProduction) {
       API_INTERNAL_URL: optionalUrl,
       NEXT_PUBLIC_WS_URL: optionalUrl,
       NEXT_PUBLIC_GOOGLE_ADS_ID: optionalGoogleAdsId,
+      // Ana sayfa hero'sundaki mobil uygulama tanıtımı (varsayılan kapalı).
+      NEXT_PUBLIC_APP_PROMO_ENABLED: boolFromEnv,
       NEXT_PUBLIC_SENTRY_DSN: optionalUrl,
       SENTRY_DSN: optionalUrl,
       SENTRY_AUTH_TOKEN: z.string().optional(),
