@@ -21,7 +21,9 @@ Extra instruction (may be empty): $ARGUMENTS
 
 - **English**, always, even when the conversation is Turkish. ASCII header.
 - Format `type(scope): subject`.
-  - Types: `feat fix refactor perf docs test chore build ci`.
+  - Types: `feat fix refactor perf docs test chore build ci style revert`
+    (`style` = formatting only; git's own `Revert "..."` / `Reapply "..."`
+    messages are accepted as generated).
   - Scopes: `api`, `web`, `admin`, `ui`, `types`, `i18n`, `design-tokens`,
     `auth`, `shared`, `infra`, `ci`, `deps`, `release`, `scripts`. Join with
     commas when a change truly spans areas

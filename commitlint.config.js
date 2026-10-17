@@ -4,9 +4,11 @@
 // Single source of the rules: tarodan-ops docs/commit-and-branch-rules.md.
 // Runs only in the local commit-msg hook (.husky/commit-msg); CI does not lint
 // commit history, so tightening these rules never re-judges old commits.
-// Merge and revert commits are skipped by commitlint's default ignores.
+// Merge commits and git's own `Revert "..."` / `Reapply "..."` messages are
+// skipped (default ignores plus the explicit pattern below).
 module.exports = {
 	extends: ['@commitlint/config-conventional'],
+	ignores: [(message) => /^(Revert|Reapply) "/.test(message)],
 	plugins: [
 		{
 			rules: {
@@ -24,7 +26,7 @@ module.exports = {
 		'type-enum': [
 			2,
 			'always',
-			['feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'chore', 'build', 'ci'],
+			['feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'chore', 'build', 'ci', 'style', 'revert'],
 		],
 		// Lower-case subject: it must not start with a capital letter. Proper names
 		// and identifiers inside the subject (PayTR, CLAUDE.md, TableBadge) stay legal.

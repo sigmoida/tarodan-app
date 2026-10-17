@@ -105,7 +105,7 @@ Full rules: tarodan-ops: `docs/commit-and-branch-rules.md` (enforced by
 `commitlint.config.js` and the pre-push hook).
 
 - Conventional Commits, English, ASCII header.
-  Types: `feat fix refactor perf docs test chore build ci`.
+  Types: `feat fix refactor perf docs test chore build ci style revert`.
   Scopes: `api`, `web`, `admin`, `ui`, `types`, `i18n`, `design-tokens`,
   `auth`, `shared`, `infra`, `ci`, `deps`, `release`, `scripts`; comma-joined
   across areas (`fix(api,i18n): ...`).
@@ -113,8 +113,9 @@ Full rules: tarodan-ops: `docs/commit-and-branch-rules.md` (enforced by
   explains why. No `Co-Authored-By` trailer, no "Generated with" footer.
 - Focused commits, never `git add -A` blindly, never `--no-verify`, never
   `git stash` (use `git show HEAD:<path>`), never force-push.
-- Branches `<type>/<kebab-description>` (types above minus `build`, plus
-  `hotfix`). Merges are `--no-ff` merge commits, never squash.
+- Branches `<type>/<kebab-description>` with type `feat`, `fix`, `refactor`,
+  `perf`, `chore`, `ci`, `docs`, `test` or `hotfix`. Merges are `--no-ff`
+  merge commits, never squash.
 
 ## Verification
 
