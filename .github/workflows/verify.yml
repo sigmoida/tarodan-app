@@ -82,7 +82,10 @@ jobs:
         run: node scripts/verify-local.mjs ci --group unit
 
   release:
-    name: Build & audit
+    # On the quick gate the job is skipped under a DIFFERENT name: a skipped
+    # check counts as passed for a ruleset, so a development-level run must
+    # never produce the "Build & audit" name the master ruleset requires.
+    name: ${{ inputs.full && 'Build & audit' || 'Build & audit (master only)' }}
     if: inputs.full
     runs-on: ubuntu-latest
     timeout-minutes: 20

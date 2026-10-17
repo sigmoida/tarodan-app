@@ -1038,12 +1038,12 @@ Kapının içeriği tek yerde tanımlıdır: `scripts/verify-local.mjs`'in `ci`
 grupları. `.github/workflows/verify.yml` her grubu ayrı bir job olarak koşar;
 `pnpm verify:ci` yerelde aynı kapıyı koşar — ikisi ayrışamaz.
 
-| Grup      | İçerik                                                                                                                    |
-| --------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `static`  | Workspace typecheck + lint (web dahil) + doğrulama script'lerinin spec'leri + web/admin API kontratı + API seed build     |
-| `unit`    | **Tüm** API jest suite'i + jest dışı her workspace'in vitest suite'i (web, admin, listing-form, auth, logger)             |
-| `release` | Production build + bağımlılık denetimi (`audit:prod`) — yalnız master kapısında                                           |
-| `e2e`     | API e2e + full scenarios, yerel servislerle (Postgres/Redis/ES/Mailpit) — opsiyonel; CI'da `API E2E` workflow'u (tavsiye) |
+| Grup      | İçerik                                                                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `static`  | Workspace typecheck + lint (web dahil; API `--fix`'siz `lint:ci` ile) + doğrulama script'lerinin spec'leri + web/admin API kontratı + API seed build |
+| `unit`    | **Tüm** API jest suite'i + jest dışı her workspace'in vitest suite'i (web, admin, listing-form, auth, logger)                                        |
+| `release` | Production build + bağımlılık denetimi (`audit:prod`) — yalnız master kapısında                                                                      |
+| `e2e`     | API e2e + full scenarios, yerel servislerle (Postgres/Redis/ES/Mailpit) — opsiyonel; CI'da `API E2E` workflow'u (tavsiye)                            |
 
 ### Ne nerede koşar
 
@@ -1057,7 +1057,7 @@ Süreler 2026-10 ölçümleri: runner değerleri Release Production koşularınd
 | Yerel pre-push → `development`                   | Etkilenen app'lerin typecheck'i + web/admin API kontrat script'i, **sırayla** (tek seferde tek `tsc`, ~2,5 GB). Jest YOK. Tree önbelleği + kirli çalışma ağacı engeli korunur. | ~1 dk (api 27 sn, web 22 sn, admin 20 sn) | push                |
 | Yerel pre-push → `master`                        | Ağır bir şey koşmaz; PR yolunu hatırlatan bir not basar                                                                                                                        | —                                         | hiçbir şey          |
 | CI: `development` push (Deploy Staging)          | `Staging gate / Typecheck & lint` ∥ `Staging gate / Unit tests` (paralel)                                                                                                      | ~4-5 dk                                   | staging deploy      |
-| Staging deploy                                   | Kapı yeşilse, **son başarılı** Deploy Staging koşusundan beri değişen app'ler Coolify'a tetiklenir (sonuç beklenmez)                                                           | tetik saniyeler; Coolify build ~10 dk     | —                   |
+| Staging deploy                                   | Kapı yeşilse, **son başarılı** Deploy Staging koşusundan beri değişen app'ler Coolify'a tetiklenir ve sonucu beklenir                                                          | Coolify build ~10 dk                      | —                   |
 | CI: PR → `development` (PR Checks)               | `Verify / Typecheck & lint` ∥ `Verify / Unit tests`                                                                                                                            | ~4-5 dk                                   | (zorunlu değil)     |
 | CI: PR → `master` (PR Checks + diğerleri)        | `Verify / Typecheck & lint` ∥ `Verify / Unit tests` ∥ `Verify / Build & audit` + `Master source guard` + `API e2e` (tavsiye, zorunlu değil)                                    | ~5 dk (e2e henüz ölçülmedi)               | merge (ruleset ile) |
 | Production deploy (Release Production, `master`) | `Release gate / *` = tam kapı tekrar; yeşilse **son başarılı** release'ten beri değişen app'ler Coolify'a, sonuç beklenir                                                      | ~5 dk + ~10-15 dk rollout                 | production deploy   |
@@ -1074,8 +1074,19 @@ Notlar:
   Actions'ta "Re-run failed jobs". Sonraki başarılı koşu, iptal edilen/başarısız
   koşuların app'lerini de deploy eder: deploy job'ı `github.event.before`'a
   değil, aynı workflow'un son başarılı koşusunun commit'ine göre diff alır
-  (`.github/actions/deploy-targets`). Yeni push eski bir staging koşusunu
-  iptal eder (`concurrency`); production koşuları sıraya girer.
+  (`.github/actions/deploy-targets`). Koşu ancak Coolify her build'i bitirdi
+  dediğinde başarılı sayılır. Yeni push eski bir staging koşusunu iptal eder
+  (`concurrency`); production koşuları sıraya girer.
+- **Doğrulanan commit = deploy edilen commit:** Coolify'ın deploy API'sinde
+  commit/ref parametresi yok, her zaman dalın HEAD'ini build eder. Bu yüzden
+  deploy her tetiklemeden önce `git ls-remote` ile dalın hâlâ doğrulanan
+  commit'te olduğunu kontrol eder; dal ilerlemişse koşu kırmızı biter ve
+  deploy etmez — yeni commit'in koşusu kendi kapısından sonra ikisini birden
+  deploy eder. Elle tetikleme (`workflow_dispatch`) yalnız ilgili daldan
+  (`development` / `master`) deploy eder.
+- **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
+  ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
+  engeller: push ettiğin commit'i checkout et.
 - **Master yalnız PR ile:** `development` → `master` (sürüm) ya da `hotfix/*` →
   `master` (acil düzeltme; sonra `development`'a geri birleştir). Eski yerel
   "release marker" şartı kalktı; kapıyı ruleset'teki zorunlu check'ler ve
@@ -1084,7 +1095,9 @@ Notlar:
   (`node_modules/.cache/turbo`; eskiden yanlış dizin önbelleğe alınıyordu, her
   koşu ıskalıyordu), tam kapıda kapalı — master kapısı hiçbir sonucu önbellekten
   oynatmaz. API jest her zaman tam koşar. Build job'ı Next'in kendi derleme
-  önbelleğini (`.next/cache`) geri yükler.
+  önbelleğini (`.next/cache`) geri yükler. Yalnız yapılandırma taşıyan paketler
+  (`packages/tsconfig`, `eslint-config`, `eslint-plugin`) ve kök
+  yapılandırmalar turbo `globalDependencies`'te: değişince tüm önbellek düşer.
 - **Secret yok:** kapılar repo secret'ı kullanmaz (unit testler tüm
   sağlayıcıları mock'lar; `NEXT_PUBLIC_*` değerleri herkese açık yer
   tutuculardır). Deploy job'ları değişmedi: `COOLIFY_URL`, `COOLIFY_TOKEN`,

@@ -323,7 +323,22 @@ function buildCiStages(context, groups = CI_GROUPS) {
   if (groups.includes("static")) {
     stages.push(
       commandStage("typecheck", "Workspace Typecheck", ["typecheck"]),
-      commandStage("lint", "Workspace Lint", ["lint"]),
+      // Every workspace's `lint` reports without fixing, except the API's,
+      // which runs `eslint --fix` for developers: a fixable error would be
+      // rewritten on the runner and pass. The API is linted through its
+      // non-fixing `lint:ci` instead.
+      commandStage("lint", "Workspace Lint", [
+        "exec",
+        "turbo",
+        "run",
+        "lint",
+        "--filter=!@tarodan/api",
+      ]),
+      commandStage("api-lint", "API Lint", [
+        "--filter",
+        "@tarodan/api",
+        "lint:ci",
+      ]),
       // node:test specs of these very scripts (affected-app detection, push
       // cache, report parsing) — the pipeline checks its own tooling.
       commandStage("verification-tools", "Verification Tools", [

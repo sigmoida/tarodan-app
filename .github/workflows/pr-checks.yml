@@ -16,6 +16,10 @@ name: PR Checks
 on:
   pull_request:
     branches: [development, master]
+    # edited: switching a PR's base (development <-> master) must re-run the
+    # gate at the new level. It also re-runs on title/body edits — cheap on a
+    # public repo, and cancelling + restarting is harmless.
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read

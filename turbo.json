@@ -3,7 +3,13 @@
   "globalDependencies": [
     ".env.*local",
     "apps/*/.env.*local",
-    "packages/*/.env.*local"
+    "packages/*/.env.*local",
+    ".nvmrc",
+    ".eslintrc.cjs",
+    ".prettierrc",
+    "packages/tsconfig/**",
+    "packages/eslint-config/**",
+    "packages/eslint-plugin/**"
   ],
   "pipeline": {
     "build": {

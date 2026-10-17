@@ -55,6 +55,17 @@ export function masterPushes(pushes) {
   );
 }
 
+/**
+ * The local gate verifies the working tree, so the pushed commit must have the
+ * checked-out tree. Returns the block message, or undefined when they match.
+ */
+export function treeMismatchError(push, headTree, treeOf) {
+  if (treeOf(push.localSha) === headTree) {
+    return undefined;
+  }
+  return `Push blocked: ${push.remoteRef} would receive ${push.localSha.slice(0, 12)}, but the checked-out tree differs, so the local checks would verify the wrong code. Check out the commit you push (or push HEAD) and retry.`;
+}
+
 function git(...args) {
   return execFileSync("git", args, {
     cwd: REPO_ROOT,
@@ -108,6 +119,21 @@ function runCli() {
     );
     process.exitCode = 1;
     return;
+  }
+
+  // Same reason: the checks read the checked-out files, so pushing another
+  // commit (`git push origin other:development`) would verify the wrong tree.
+  const headTree =
+    development.length > 0 ? git("rev-parse", "HEAD^{tree}") : "";
+  for (const push of development) {
+    const error = treeMismatchError(push, headTree, (sha) =>
+      git("rev-parse", `${sha}^{tree}`),
+    );
+    if (error) {
+      console.error(`\n${error}\n`);
+      process.exitCode = 1;
+      return;
+    }
   }
 
   for (const push of development) {

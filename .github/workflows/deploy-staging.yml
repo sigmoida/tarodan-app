@@ -10,10 +10,13 @@ name: Deploy Staging
 # not part of it — Coolify builds the images anyway, and the full gate runs on
 # the development -> master PR.
 #
-# A newer push cancels an older run that is still verifying (concurrency
-# below). The deploy job therefore diffs against the last SUCCESSFUL run, not
-# against `github.event.before`, so a cancelled run's apps still ship
-# (.github/actions/deploy-targets).
+# A newer push cancels an older run that is still verifying or waiting on
+# Coolify (concurrency below). The deploy job therefore diffs against the last
+# SUCCESSFUL run, not against `github.event.before`, so a cancelled run's apps
+# still ship (.github/actions/deploy-targets). A run counts as successful only
+# after Coolify reports every build finished (wait-for-result), and it never
+# triggers Coolify once development has moved past the verified commit
+# (Coolify always builds the branch HEAD; see expected-commit).
 
 on:
   push:
@@ -38,8 +41,11 @@ jobs:
   deploy:
     name: Deploy affected staging apps
     needs: verify
+    # A manual run from another branch would gate that branch's tree while
+    # Coolify builds development: never deploy from anything but development.
+    if: github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
@@ -60,7 +66,12 @@ jobs:
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
           all-uuids: ${{ secrets.COOLIFY_STAGING_UUIDS }}
           apps: ${{ steps.affected.outputs.apps }}
-          wait-for-result: "false"
+          expected-commit: ${{ github.sha }}
+          branch: development
+          # Wait for Coolify: a failed build must fail this run, or the next
+          # run would diff against a commit that never reached staging.
+          wait-for-result: "true"
+          timeout-seconds: "900"
 
       - name: Skip deployment
         if: ${{ steps.affected.outputs.apps == '' }}

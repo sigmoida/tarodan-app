@@ -13,7 +13,9 @@ name: Release Production
 # The deploy job diffs against the last SUCCESSFUL release, not against
 # `github.event.before`: a release that failed (e.g. on the audit) would
 # otherwise leave its apps undeployed by the next one
-# (.github/actions/deploy-targets).
+# (.github/actions/deploy-targets). Coolify always builds the master HEAD, so
+# the deploy refuses to trigger once master has moved past the verified commit
+# (expected-commit); the newer commit's queued run deploys after its own gate.
 
 on:
   push:
@@ -38,6 +40,9 @@ jobs:
   deploy:
     name: Deploy affected production apps
     needs: verify
+    # A manual run from another branch would gate that branch's tree while
+    # Coolify builds master: never deploy from anything but master.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -60,6 +65,8 @@ jobs:
           coolify-token: ${{ secrets.COOLIFY_TOKEN }}
           all-uuids: ${{ secrets.COOLIFY_PROD_UUIDS }}
           apps: ${{ steps.affected.outputs.apps }}
+          expected-commit: ${{ github.sha }}
+          branch: master
           wait-for-result: "true"
 
       - name: Skip deployment
