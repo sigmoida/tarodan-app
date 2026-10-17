@@ -17,8 +17,8 @@
  *  - toggle    a compact on/off switch + its state text
  */
 export const COL_WIDTH = {
-  /** Thumbnail / preview image column. */
-  preview: 96,
+  /** Thumbnail / preview image column (80px image + cell padding). */
+  preview: 112,
   /** The row's main cell (`col.title`) — flexible. */
   title: 240,
   /** Free / secondary text (`col.text`, `col.muted`, codes with a badge) — flexible. */
@@ -32,8 +32,10 @@ export const COL_WIDTH = {
   date: 140,
   dateRange: 200,
   status: 160,
-  /** Status badge whose label carries a qualifier (`Görünmüyor · uygulama`). */
-  statusLong: 190,
+  /** Status badge whose label carries a qualifier (`Görünmüyor · uygulama`, `Yayında · web gizli`). */
+  statusLong: 220,
+  /** Two side-by-side content badges (`HTML e-posta` `Pazarlama`). */
+  badgeGroup: 220,
   amount: 120,
   /** Two amounts in one cell (`₺1.000 / ₺5.000`, a price range, old + campaign price). */
   amountRange: 200,

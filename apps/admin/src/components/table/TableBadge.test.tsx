@@ -45,6 +45,19 @@ describe("TableBadge", () => {
   });
 });
 
+describe("TableBadge overflow", () => {
+  it("clips a long label and shows it in full on the tooltip", () => {
+    const out = html(
+      <TableBadge variant="warning">
+        Yayında · web ve uygulama gizli
+      </TableBadge>,
+    );
+    expect(out).toContain("max-w-full");
+    expect(out).toContain('class="truncate"');
+    expect(out).toContain('title="Yayında · web ve uygulama gizli"');
+  });
+});
+
 describe("STATUS_TONE", () => {
   it("is the one status → colour rule", () => {
     expect(STATUS_TONE).toEqual({

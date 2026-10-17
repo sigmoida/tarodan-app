@@ -1,11 +1,10 @@
 import {
-  Badge,
   enumLabel,
   notificationChannelConfig,
   deliveryStatusConfig,
 } from "@tarodan/ui";
 import type { MailingType } from "@tarodan/types";
-import { col } from "@/components/table";
+import { COL_SIZE, COL_WIDTH, col, TableBadge } from "@/components/table";
 import { scheduledRowMenu } from "./rowActions";
 import {
   scheduledChannelKeys,
@@ -19,7 +18,8 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 /**
  * "HTML e-postası var" ve "pazarlama" rozetleri — geçmiş ve zamanlanmış liste
- * aynı görünümü kullanır (HTML'in kendisi tabloda gösterilmez).
+ * aynı görünümü kullanır (HTML'in kendisi tabloda gösterilmez). Durum değil
+ * içerik etiketi oldukları için ikisi de çerçeve (outline) rozet.
  */
 function EmailContentBadges({
   hasHtml,
@@ -32,16 +32,16 @@ function EmailContentBadges({
 }) {
   if (!hasHtml && mailingType !== "marketing") return null;
   return (
-    <span className="inline-flex gap-1">
+    <span className="inline-flex min-w-0 gap-1">
       {hasHtml && (
-        <Badge variant="default" size="sm">
+        <TableBadge variant="outline">
           {t("admin.marketing.notifications.htmlEmailBadge")}
-        </Badge>
+        </TableBadge>
       )}
       {mailingType === "marketing" && (
-        <Badge variant="warning" size="sm">
+        <TableBadge variant="outline">
           {t("admin.marketing.notifications.mailingType.marketing")}
-        </Badge>
+        </TableBadge>
       )}
     </span>
   );
@@ -60,12 +60,9 @@ export const historyColumns = (t: T) => [
   col.muted<NotificationLog>(
     t("admin.marketing.notifications.channelLabel"),
     (n) => enumLabel(statusConfig(notificationChannelConfig, t), n.channel),
-    { sortKey: "channel", sortType: "text" },
+    { ...COL_SIZE.label, sortKey: "channel", sortType: "text" },
   ),
-  col.text<NotificationLog>(t("common.title"), "title", {
-    grow: 3,
-    minWidth: 200,
-  }),
+  col.text<NotificationLog>(t("common.title"), "title"),
   col.badge<NotificationLog>(
     t("admin.marketing.notifications.contentColumn"),
     (n) => (
@@ -75,34 +72,38 @@ export const historyColumns = (t: T) => [
         t={t}
       />
     ),
+    COL_SIZE.badgeGroup,
   ),
-  col.badge<NotificationLog>(
+  col.status<NotificationLog>(
     t("common.status"),
-    (n) => (
-      <Badge status={n.status} config={statusConfig(deliveryStatusConfig, t)} />
-    ),
+    (n) => ({
+      status: n.status,
+      config: statusConfig(deliveryStatusConfig, t),
+    }),
     { sortKey: "status", sortType: "text" },
   ),
-  col.date<NotificationLog>(t("common.date"), "createdAt"),
+  col.date<NotificationLog>(t("common.date"), "createdAt", COL_SIZE.date),
 ];
 
 export function scheduledColumns(onCancel: (id: string) => void, t: T) {
   return [
-    col.text<ScheduledNotification>(t("common.title"), "title", {
-      grow: 3,
-      minWidth: 200,
-    }),
+    col.title<ScheduledNotification>(
+      t("common.title"),
+      (n) => ({ title: n.title }),
+      { sortKey: "title", sortType: "text" },
+    ),
     col.muted<ScheduledNotification>(
       t("admin.marketing.notifications.channels"),
       (n) =>
         scheduledChannelKeys(n)
           .map((c) => enumLabel(statusConfig(notificationChannelConfig, t), c))
           .join(", "),
-      { sortKey: "channels", sortType: "text" },
+      { minWidth: COL_WIDTH.text, sortKey: "channels", sortType: "text" },
     ),
     col.muted<ScheduledNotification>(
       t("admin.marketing.notifications.targetLabel"),
       "targetType",
+      COL_SIZE.label,
     ),
     col.badge<ScheduledNotification>(
       t("admin.marketing.notifications.contentColumn"),
@@ -113,16 +114,19 @@ export function scheduledColumns(onCancel: (id: string) => void, t: T) {
           t={t}
         />
       ),
+      COL_SIZE.badgeGroup,
     ),
-    col.date<ScheduledNotification>(t("common.date"), "scheduledFor"),
-    col.badge<ScheduledNotification>(
+    col.date<ScheduledNotification>(
+      t("common.date"),
+      "scheduledFor",
+      COL_SIZE.date,
+    ),
+    col.status<ScheduledNotification>(
       t("common.status"),
-      (n) => (
-        <Badge
-          status={n.status}
-          config={statusConfig(deliveryStatusConfig, t)}
-        />
-      ),
+      (n) => ({
+        status: n.status,
+        config: statusConfig(deliveryStatusConfig, t),
+      }),
       { sortKey: "status", sortType: "text" },
     ),
     col.rowMenu<ScheduledNotification>(scheduledRowMenu(onCancel, t)),

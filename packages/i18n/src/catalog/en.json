@@ -5550,11 +5550,6 @@
           "app": "App only",
           "all": "Both"
         },
-        "platformBadge": {
-          "web": "Web",
-          "app": "App",
-          "all": "Both"
-        },
         "visibility": {
           "updated": "Hero visibility updated"
         },

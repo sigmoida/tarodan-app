@@ -111,7 +111,9 @@ export function CellStacked({
         (typeof secondary === "string" ? (
           <TruncatedText className={SECONDARY_LINE}>{secondary}</TruncatedText>
         ) : (
-          <div className="mt-0.5 flex whitespace-nowrap">{secondary}</div>
+          <div className="mt-0.5 flex min-w-0 whitespace-nowrap">
+            {secondary}
+          </div>
         ))}
     </div>
   );
@@ -438,7 +440,7 @@ export function CellProduct({
 
 /** Badge — never wraps, never shrinks. */
 export function CellBadge({ children }: { children: ReactNode }) {
-  return <div className="flex whitespace-nowrap">{children}</div>;
+  return <div className="flex min-w-0 whitespace-nowrap">{children}</div>;
 }
 
 /** Action area — right-aligned, no wrap. Doesn't trigger the row click (DataTable closest check). */
