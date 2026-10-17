@@ -19,6 +19,7 @@ import { PspReconciliationService } from "./reconciliation/psp-reconciliation.se
 import { RefundReconciliationService } from "./refund/refund-reconciliation.service";
 import { MiscReconciliationService } from "./reconciliation/misc-reconciliation.service";
 import { PaymentInitiationService } from "./checkout/payment-initiation.service";
+import { PaymentOptionalAuthService } from "./checkout/payment-optional-auth.service";
 import { PaymentCallbackService } from "./checkout/payment-callback.service";
 import { PaymentFulfillmentService } from "./fulfillment/payment-fulfillment.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
@@ -86,6 +87,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   controllers: [PaymentController, PaytrCallbackAliasController],
   providers: [
     PaymentService,
+    PaymentOptionalAuthService,
     PaymentQueryService,
     PaymentCommonService,
     PaymentRefundService,

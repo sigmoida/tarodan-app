@@ -1,3 +1,5 @@
+import { isLiveDeployment } from "../../../config/environment";
+
 /**
  * PayTR bildirim hash'i `merchant_oid + salt + status + total_amount` üzerinden
  * hesaplanır; `test_mode` bu imzanın KAPSAMINDA DEĞİLDİR ve test modunda gerçek
@@ -14,15 +16,24 @@
  *     yanlış yapılandırma işaretidir)
  * Başarısızlık bildirimleri engellenmez; sipariş temizliği çalışabilsin.
  * `test_mode` bildirimde yoksa (undefined) mevcut davranış korunur.
+ *
+ * Yalnız CANLI dağıtımda uygulanır (`isLiveDeployment`): staging de
+ * `NODE_ENV=production` ile koşar ama `APP_ENV=staging` + zorunlu
+ * `PAYTR_TEST_MODE=true` ile PayTR TEST mağazasına bağlıdır — orada her
+ * bildirim `test_mode=1` gelir ve test hesabı olmayan alıcının ödemesi
+ * `isTest=false` damgalıdır; kural staging'de uygulanırsa her başarılı ödeme
+ * (ve kart kaydı) reddedilirdi. `APP_ENV` yoksa canlı sayılır (fail-closed).
  */
 export function isRejectableTestModeSuccess(params: {
   nodeEnv: string | undefined;
+  /** `APP_ENV`; `staging` değilse optimize derleme canlı sayılır. */
+  appEnv: string | undefined;
   status: string;
   testMode: boolean | undefined;
   /** Ödemenin şeridi; bilinmiyorsa (eski çağıranlar) canlı varsayılır. */
   paymentIsTest?: boolean;
 }): boolean {
-  if (params.nodeEnv !== "production") return false;
+  if (!isLiveDeployment(params.nodeEnv, params.appEnv)) return false;
   if (params.status !== "success") return false;
   if (params.testMode === undefined) return false;
   return params.testMode !== (params.paymentIsTest ?? false);

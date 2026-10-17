@@ -38,6 +38,13 @@ export class MiscReconciliationService {
     const cards = await this.paymentProviders
       .resolve(null, merchant)
       .capiListCards(utoken);
+    if (cards.length === 0) {
+      // capiListCards hata/zaman aşımı ve boş yanıtta da [] döner (sözleşme
+      // korunur); bildirim utoken taşıdığı halde kart yazılamadığı görünür olsun.
+      this.logger.warn(
+        `[saved-card-sync] utoken present but capi/list empty/failed user=${userId} merchant=${merchant}`,
+      );
+    }
     let saved = 0;
     for (const c of cards) {
       if (!c.ctoken) continue;

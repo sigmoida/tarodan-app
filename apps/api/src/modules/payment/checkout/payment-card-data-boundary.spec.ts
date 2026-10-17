@@ -44,6 +44,7 @@ describe("PaymentController card data boundary", () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(
