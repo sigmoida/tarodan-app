@@ -1106,11 +1106,15 @@ Notlar:
   `app-YYYY.MM.DD-N` tag keeps it. If the tag job fails (network, or the name
   was taken a moment before the push), the rollout still succeeded: use
   **Re-run failed jobs**, which retries only the tag job and takes the next
-  free `N`. Never "Re-run all jobs" (it redeploys production), and re-run
-  only while no other Release Production run is queued: the re-run joins the
-  `release-production` concurrency group, which cancels a pending run. Until
-  the tag job passes, the run stays failed; if it is the newest master run,
-  the next release also redeploys its apps. The tag ruleset allows creation
+  free `N`. Never "Re-run all jobs" (it redeploys production). Re-run only
+  while no other Release Production run is queued or in progress: the re-run
+  joins the `release-production` concurrency group, so it cancels a pending
+  run, or waits and is itself cancelled by the next push. Re-run only while
+  the run is still the newest production release; once a newer release is
+  tagged, leave the superseded run untagged (its changes are in the newer
+  tag, and a late tag would give the older commit the higher `N`). Until the
+  tag job passes, the run stays failed; if it is the newest master run, the
+  next release also redeploys its apps. The tag ruleset allows creation
   only: an `app-*` tag is never moved or deleted.
 - **Yerel hook doğru ağacı doğrular:** push edilen commit'in ağacı çalışma
   ağacıyla aynı değilse (ör. `git push origin baska-dal:development`) hook
@@ -1162,8 +1166,8 @@ fourth, "Code Quality Copilot review for default branch", is disabled.
 - Bypass: repository admins, "pull requests only" (an admin can merge a PR
   past failing checks, but nobody pushes to `master` directly).
 - Restrict deletions; block force pushes.
-- Require a pull request before merging, 0 approvals; allowed merge method:
-  **merge commit** only.
+- Require a pull request before merging, 0 approvals, extra approval for
+  unattributed changes on; allowed merge method: **merge commit** only.
 - Required status checks, each with source **GitHub Actions** so no other
   token or app can post a passing status under the same name (the live
   ruleset does not pin the source yet; set it when you next edit the

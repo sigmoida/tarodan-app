@@ -22,8 +22,9 @@ name: Release Production
 # `app-YYYY.MM.DD-N` on the deployed commit: the Europe/Istanbul day the tag
 # is pushed, N = the highest N of that day + 1, read from origin at push
 # time. A run that deployed nothing creates no tag. A commit that already has
-# an `app-*` tag keeps it (re-runs, manual redeploys). The tag ruleset on
-# `app-*` allows creation only: a tag is never moved, deleted or recreated.
+# an `app-YYYY.MM.DD-N` tag keeps it (re-runs, manual redeploys). The tag
+# ruleset on `app-*` allows creation only: a tag is never moved, deleted or
+# recreated. Re-run rules for a failed tag job: docs/OPERATIONS.md section 4.
 
 on:
   push:
