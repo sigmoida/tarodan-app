@@ -379,6 +379,8 @@ export function getEmailTemplateSubject(
     "trade-cancelled-platform": `Takasınız Tarodan Tarafından İptal Edildi - ${data?.tradeNumber || ""}`,
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
+    "account-security-notice":
+      data?.title || "Hesabınızın giriş yöntemleri değişti",
     "site-access-invite": "Tarodan Erken Erişim Davetiniz",
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
     "seller-invoice": `Satıcı Faturanız - Sipariş #${data?.orderNumber || ""}`,
@@ -1226,6 +1228,20 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Bu değişikliği siz talep etmediyseniz bu e-postayı görmezden gelebilirsiniz; hesabınız etkilenmez.</p>
     `,
       "E-posta Değişikliği Doğrulama Kodu",
+    ),
+
+    "account-security-notice": wrapEmail(
+      `
+      ${titleBlock(data?.title || "Hesabınızın giriş yöntemleri değişti")}
+      ${greeting(data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${data?.message || ""}</p>
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">${data?.warning || ""}</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Şifremi Sıfırla", data?.resetUrl || `${frontendUrl}/forgot-password`)}
+      </div>
+      <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">Yardıma mı ihtiyacınız var? <a href="${safeEmailUrl(data?.supportUrl || `${frontendUrl}/support`, frontendUrl)}" style="color: #d95700;">Destek ekibimize ulaşın</a>.</p>
+    `,
+      data?.title || "Hesabınızın giriş yöntemleri değişti",
     ),
 
     "site-access-invite": wrapEmail(

@@ -34,6 +34,12 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     area: "account",
   },
   {
+    key: "account-security-notice",
+    name: "Hesap güvenliği bildirimi",
+    group: "Hesap",
+    area: "account",
+  },
+  {
     key: "site-access-invite",
     name: "Erken erişim daveti",
     group: "Hesap",
