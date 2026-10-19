@@ -293,6 +293,9 @@ describe.each<SocialProvider>(["google", "apple"])(
     const apple = { verifyIdentityToken: jest.fn() };
     const newsletter = { syncUserConsent: jest.fn() };
     const sentry = { captureEvent: jest.fn() };
+    const notifications = {
+      sendAccountSecurityNotice: jest.fn().mockResolvedValue(undefined),
+    };
 
     /** Sign in with the provider, as the provider reports `email`. */
     const signIn = (email = VICTIM_EMAIL) => {
@@ -398,7 +401,7 @@ describe.each<SocialProvider>(["google", "apple"])(
               get: (k: string) => (k.includes("SECRET") ? "secret" : "15m"),
             },
           },
-          { provide: NotificationService, useValue: {} },
+          { provide: NotificationService, useValue: notifications },
           {
             provide: CacheService,
             useValue: { del: jest.fn(), set: jest.fn(), get: jest.fn() },
@@ -475,10 +478,24 @@ describe.each<SocialProvider>(["google", "apple"])(
         }),
       ]);
       expect(sentry.captureEvent).not.toHaveBeenCalled();
+      // The owner is told which provider was added; nothing else is sent.
+      expect(notifications.sendAccountSecurityNotice).toHaveBeenCalledTimes(1);
+      expect(notifications.sendAccountSecurityNotice).toHaveBeenCalledWith(
+        owner.id,
+        "providerLinked",
+        { provider },
+      );
       // The owner's password still works.
       await expect(
         auth.login({ email: VICTIM_EMAIL, password: "Owner-Pass-1" }),
       ).resolves.toHaveProperty("tokens");
+    });
+
+    it("sends no security notice for a take-over, a new account or an existing link", async () => {
+      await addUnverifiedRegistration();
+      await signIn();
+      await signIn();
+      expect(notifications.sendAccountSecurityNotice).not.toHaveBeenCalled();
     });
 
     it("an unverified match is taken over: every unproven credential and datum is cleared", async () => {

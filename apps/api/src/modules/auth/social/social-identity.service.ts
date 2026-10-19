@@ -6,6 +6,7 @@ import { getRequestClientInfo } from "../../../common/context/request-context";
 import { ConsentService } from "../../consent/consent.service";
 import { i18nMessage } from "../../i18n";
 import { NewsletterService } from "../../marketing/newsletter.service";
+import { NotificationService } from "../../notification/notification.service";
 import { SecurityService } from "../../security/security.service";
 import { SentryService } from "../../sentry/sentry.service";
 import {
@@ -189,6 +190,7 @@ export class SocialIdentityService {
     private readonly consents: ConsentService,
     private readonly newsletter: NewsletterService,
     private readonly sentry: SentryService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async resolveUser(
@@ -436,13 +438,27 @@ export class SocialIdentityService {
 
   /**
    * Side effects after the transaction committed; none of them may fail the
-   * sign-in. The account notice mail for a new link belongs here as well.
+   * sign-in.
+   *
+   * Notice mail: `linked` tells the owner a provider was added to their
+   * verified account. `tookOver` sends none: the provider just proved the
+   * inbox, so the person signing in is the inbox owner, and the only party
+   * a mail could reach is the unverified registrant, who never owned it.
    */
   private async afterResolved(
     identity: ProviderIdentity,
     resolution: Resolved,
   ): Promise<void> {
     const { userId, outcome } = resolution.result;
+    if (outcome === "linked") {
+      // Fire and forget: the notifier queues the mail and never throws.
+      void this.notifications.sendAccountSecurityNotice(
+        userId,
+        "providerLinked",
+        { provider: identity.provider },
+      );
+      return;
+    }
     if (outcome !== "tookOver") return;
     // The registrant's opt-in also put the address on the newsletter list.
     if (resolution.unsubscribe) {
