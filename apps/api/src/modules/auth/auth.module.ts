@@ -10,6 +10,7 @@ import { AuthRegistrationService } from "./auth-registration.service";
 import { AuthPasswordService } from "./auth-password.service";
 import { AuthLoginService } from "./auth-login.service";
 import { SocialLoginService } from "./social/social-login.service";
+import { SocialIdentityService } from "./social/social-identity.service";
 import { AuthController } from "./auth.controller";
 import { AdminAuthController } from "./admin-auth.controller";
 import {
@@ -74,6 +75,7 @@ import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
     AuthPasswordService,
     AuthLoginService,
     SocialLoginService,
+    SocialIdentityService,
     GoogleAuthService,
     AppleAuthService,
     JwtStrategy,

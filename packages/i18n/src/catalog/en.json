@@ -10952,6 +10952,7 @@
       "accountDeleted": "Account has been deleted",
       "accountSuspended": "Your account has been suspended",
       "staffAccountCustomerLogin": "Staff accounts cannot sign in to the web or mobile app; use the admin panel",
+      "socialTwoFactorPasswordRequired": "Accounts with two-factor authentication must sign in with their password, not with a provider",
       "adminAccountDeactivated": "Admin account has been deactivated",
       "adminAccountNotFoundOrInactive": "Admin account not found or inactive",
       "adminAuthRequired": "Admin authorization is required",

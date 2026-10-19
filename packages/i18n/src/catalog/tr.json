@@ -10952,6 +10952,7 @@
       "accountDeleted": "Hesap silinmiş",
       "accountSuspended": "Hesabınız askıya alınmış",
       "staffAccountCustomerLogin": "Personel hesabıyla web veya mobil uygulamaya giriş yapılamaz; yönetim paneline giriş yapın",
+      "socialTwoFactorPasswordRequired": "İki faktörlü doğrulama etkin hesaplar sağlayıcı girişi yerine şifre ile giriş yapmalıdır",
       "adminAccountDeactivated": "Admin hesabı deaktif edilmiş",
       "adminAccountNotFoundOrInactive": "Admin hesabı bulunamadı veya deaktif",
       "adminAuthRequired": "Admin yetkisi gerekiyor",

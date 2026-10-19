@@ -9179,6 +9179,7 @@ export type MessageKey =
   | "server.auth.roleRequired"
   | "server.auth.sessionNotCreated"
   | "server.auth.smsSendFailed"
+  | "server.auth.socialTwoFactorPasswordRequired"
   | "server.auth.staffAccountCustomerLogin"
   | "server.auth.taxIdAlreadyRegistered"
   | "server.auth.tooManyWrongAttempts"

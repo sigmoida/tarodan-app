@@ -1,4 +1,8 @@
-// apps/api/src/modules/auth/auth-apple.service.spec.ts
+// apps/api/src/modules/auth/social/auth-apple.service.spec.ts
+//
+// SocialLoginService.loginWithApple: token handling and the login response.
+// Identity -> account resolution (link, take-over, new account) is
+// SocialIdentityService's and is covered in social-identity.service.spec.ts.
 import { Test } from "@nestjs/testing";
 import { getQueueToken } from "@nestjs/bull";
 import { QUEUE_NAMES } from "../../../workers/constants";
@@ -10,6 +14,7 @@ import { AuthRegistrationService } from "../auth-registration.service";
 import { AuthPasswordService } from "../auth-password.service";
 import { AuthLoginService } from "../auth-login.service";
 import { SocialLoginService } from "./social-login.service";
+import { SocialIdentityService } from "./social-identity.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { AppleTokenService } from "./apple-token.service";
@@ -25,6 +30,11 @@ import { LegalIdentityService } from "../../legal-identity/legal-identity.servic
 describe("AuthService.loginWithApple", () => {
   let service: AuthService;
   const apple = { verifyIdentityToken: jest.fn() };
+  const socialIdentity = {
+    resolveUser: jest
+      .fn()
+      .mockResolvedValue({ userId: "u1", outcome: "existing" }),
+  };
   const appleTokens = {
     storeFromAuthorizationCode: jest.fn().mockResolvedValue(undefined),
   };
@@ -41,14 +51,8 @@ describe("AuthService.loginWithApple", () => {
     membership: null,
   };
   const prisma: any = {
-    oAuthAccount: {
-      findUnique: jest.fn(),
-      create: jest.fn().mockResolvedValue({ id: "oa1" }),
-    },
     user: {
       findUnique: jest.fn(),
-      findFirst: jest.fn(),
-      create: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
     },
     refreshToken: { create: jest.fn().mockResolvedValue({ id: "rt1" }) },
@@ -56,6 +60,10 @@ describe("AuthService.loginWithApple", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    socialIdentity.resolveUser.mockResolvedValue({
+      userId: "u1",
+      outcome: "existing",
+    });
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -64,6 +72,7 @@ describe("AuthService.loginWithApple", () => {
         AuthPasswordService,
         AuthLoginService,
         SocialLoginService,
+        { provide: SocialIdentityService, useValue: socialIdentity },
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,
@@ -116,110 +125,23 @@ describe("AuthService.loginWithApple", () => {
     service = moduleRef.get(AuthService);
   });
 
-  it("logs in via existing OAuthAccount (no new user)", async () => {
-    apple.verifyIdentityToken.mockResolvedValue({
-      sub: "ap1",
-      email: "a@b.com",
-      isPrivateEmail: false,
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue({
-      id: "oa1",
-      userId: "u1",
-    });
-    prisma.user.findUnique.mockResolvedValue(baseUser);
-    const res = await service.loginWithApple("tok");
-    expect(prisma.oAuthAccount.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          provider_providerUserId: { provider: "apple", providerUserId: "ap1" },
-        },
-      }),
-    );
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(res.tokens.accessToken).toBe("tok");
-  });
-
-  it("auto-links to existing user with same email", async () => {
-    apple.verifyIdentityToken.mockResolvedValue({
-      sub: "ap1",
-      email: "a@b.com",
-      isPrivateEmail: false,
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findFirst.mockResolvedValue(baseUser);
-    prisma.user.findUnique.mockResolvedValue(baseUser);
-    await service.loginWithApple("tok");
-    expect(prisma.user.create).not.toHaveBeenCalled();
-    expect(prisma.oAuthAccount.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          provider: "apple",
-          providerUserId: "ap1",
-          userId: "u1",
-        }),
-      }),
-    );
-  });
-
-  it("creates a new user (relay email) using fullName as displayName", async () => {
+  it("resolves the verified Apple identity and answers with the login response", async () => {
     apple.verifyIdentityToken.mockResolvedValue({
       sub: "ap1",
       email: "xyz@privaterelay.appleid.com",
       isPrivateEmail: true,
     });
-    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findFirst.mockResolvedValue(null);
-    prisma.user.findUnique.mockResolvedValue({
-      ...baseUser,
-      id: "u2",
-      email: "xyz@privaterelay.appleid.com",
-      displayName: "Yeni Kullanıcı",
-    });
-    prisma.user.create.mockResolvedValue({
-      id: "u2",
-      email: "xyz@privaterelay.appleid.com",
-      isSeller: false,
-    });
-    await service.loginWithApple("tok", "Yeni Kullanıcı");
-    expect(prisma.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          email: "xyz@privaterelay.appleid.com",
-          passwordHash: null,
-          isEmailVerified: true,
-          isSeller: false,
-          displayName: "Yeni Kullanıcı",
-        }),
-      }),
+    prisma.user.findUnique.mockResolvedValue(baseUser);
+    const res = await service.loginWithApple("tok", "Yeni Kullanıcı");
+    expect(socialIdentity.resolveUser).toHaveBeenCalledWith(
+      {
+        provider: "apple",
+        providerUserId: "ap1",
+        email: "xyz@privaterelay.appleid.com",
+      },
+      { displayName: "Yeni Kullanıcı" },
     );
-    expect(prisma.oAuthAccount.create).toHaveBeenCalled();
-  });
-
-  it("new user without fullName falls back to email prefix", async () => {
-    apple.verifyIdentityToken.mockResolvedValue({
-      sub: "ap1",
-      email: "new@b.com",
-      isPrivateEmail: false,
-    });
-    prisma.oAuthAccount.findUnique.mockResolvedValue(null);
-    prisma.user.findFirst.mockResolvedValue(null);
-    prisma.user.findUnique.mockResolvedValue({
-      ...baseUser,
-      id: "u3",
-      email: "new@b.com",
-      displayName: "new",
-    });
-    prisma.user.create.mockResolvedValue({
-      id: "u3",
-      email: "new@b.com",
-      isSeller: false,
-    });
-    await service.loginWithApple("tok");
-    expect(prisma.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ displayName: "new" }),
-      }),
-    );
+    expect(res.tokens.accessToken).toBe("tok");
   });
 
   // App Store 5.1.1(v): mobile 1.1.0 sends authorizationCode; the server exchanges
@@ -232,10 +154,6 @@ describe("AuthService.loginWithApple", () => {
         email: "a@b.com",
         isPrivateEmail: false,
         audience: "com.tarodan.app.staging",
-      });
-      prisma.oAuthAccount.findUnique.mockResolvedValue({
-        id: "oa1",
-        userId: "u1",
       });
       prisma.user.findUnique.mockResolvedValue(baseUser);
     });
@@ -252,7 +170,7 @@ describe("AuthService.loginWithApple", () => {
     });
 
     it("the login does not wait for Apple (exchange runs in the background)", async () => {
-      // Hiç bitmeyen takas: giriş yine de döner.
+      // An exchange that never finishes: the login still returns.
       appleTokens.storeFromAuthorizationCode.mockReturnValueOnce(
         new Promise(() => undefined),
       );
