@@ -4797,7 +4797,9 @@
           "suspiciousActivity": "Şüpheli Aktivite",
           "passwordReset": "Şifre Sıfırlama",
           "twoFactorEnabled": "2FA Aktif",
-          "accountLocked": "Hesap Kilitlendi"
+          "accountLocked": "Hesap Kilitlendi",
+          "socialLinked": "Sosyal Hesap Bağlandı",
+          "socialLinkReset": "Doğrulanmamış Hesap Sosyal Girişte Sıfırlandı"
         },
         "emailStatuses": {
           "sent": "Gönderildi",

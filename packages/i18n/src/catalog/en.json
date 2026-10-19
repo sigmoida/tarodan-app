@@ -4797,7 +4797,9 @@
           "suspiciousActivity": "Suspicious Activity",
           "passwordReset": "Password Reset",
           "twoFactorEnabled": "2FA Enabled",
-          "accountLocked": "Account Locked"
+          "accountLocked": "Account Locked",
+          "socialLinked": "Social Account Linked",
+          "socialLinkReset": "Unverified Account Reset on Social Sign-in"
         },
         "emailStatuses": {
           "sent": "Sent",
