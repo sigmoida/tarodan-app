@@ -163,6 +163,13 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
 
     const emit = (v: string) => {
+      // Radix's hidden bubble <select> (rendered inside a <form>) reports a raw
+      // "" when the controlled value changes before that value's native
+      // <option> has registered, e.g. async form data arriving with its
+      // options. An item never emits "" (Radix forbids it; our "" options are
+      // the EMPTY sentinel), so a raw "" is never a user choice: drop it
+      // instead of clearing the field.
+      if (v === "") return;
       const real = fromRadix(v);
       onChange?.({
         target: { value: real, name },
