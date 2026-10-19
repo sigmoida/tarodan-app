@@ -12,7 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   post: vi.fn(),
   logout: vi.fn(),
-  hasAuthMarker: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -20,10 +21,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("react-hot-toast", () => ({
-  default: { success: vi.fn(), error: vi.fn() },
+  default: { success: h.toastSuccess, error: h.toastError },
 }));
 vi.mock("@/lib/api", () => ({ api: { post: h.post } }));
-vi.mock("@/lib/authMarker", () => ({ hasAuthMarker: h.hasAuthMarker }));
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: (select: (s: { logout: () => Promise<void> }) => unknown) =>
     select({ logout: h.logout }),
@@ -64,7 +64,8 @@ async function submit(password: string) {
 beforeEach(() => {
   h.post.mockReset().mockResolvedValue({ data: {} });
   h.logout.mockReset().mockResolvedValue(undefined);
-  h.hasAuthMarker.mockReset();
+  h.toastSuccess.mockReset();
+  h.toastError.mockReset();
   container = document.createElement("div");
   root = createRoot(container);
 });
@@ -74,11 +75,12 @@ afterEach(() => {
 });
 
 describe("useResetPassword", () => {
-  it("clears a signed-in session before showing the success view", async () => {
-    h.hasAuthMarker.mockReturnValue(true);
-    const order: string[] = [];
+  it("clears the session before showing the success view", async () => {
+    let successDuringLogout: boolean | undefined;
     h.logout.mockImplementation(async () => {
-      order.push(`logout:success=${result.success}`);
+      // Let React flush anything the hook may have queued before awaiting.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      successDuringLogout = result.success;
     });
     render();
 
@@ -90,22 +92,25 @@ describe("useResetPassword", () => {
     });
     expect(h.logout).toHaveBeenCalledTimes(1);
     // Cleared first, so the success view's login link is not bounced home.
-    expect(order).toEqual(["logout:success=false"]);
+    expect(h.logout.mock.invocationCallOrder[0]).toBeLessThan(
+      h.toastSuccess.mock.invocationCallOrder[0],
+    );
+    expect(successDuringLogout).toBe(false);
     expect(result.success).toBe(true);
   });
 
-  it("does not call logout for a guest", async () => {
-    h.hasAuthMarker.mockReturnValue(false);
+  it("still shows success when the session cleanup throws", async () => {
+    h.logout.mockRejectedValue(new DOMException("blocked", "SecurityError"));
     render();
 
     expect(await submit("N3w-password!")).toBeNull();
 
-    expect(h.logout).not.toHaveBeenCalled();
+    expect(h.toastError).not.toHaveBeenCalled();
+    expect(h.toastSuccess).toHaveBeenCalledWith("auth.passwordChangedSuccess");
     expect(result.success).toBe(true);
   });
 
   it("keeps the session when the reset fails", async () => {
-    h.hasAuthMarker.mockReturnValue(true);
     h.post.mockRejectedValue({
       response: { data: { message: "Token expired" } },
     });
@@ -114,6 +119,7 @@ describe("useResetPassword", () => {
     expect(await submit("N3w-password!")).toBe("Token expired");
 
     expect(h.logout).not.toHaveBeenCalled();
+    expect(h.toastError).toHaveBeenCalledWith("Token expired");
     expect(result.success).toBe(false);
   });
 });

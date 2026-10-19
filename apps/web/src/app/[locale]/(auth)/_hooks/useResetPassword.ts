@@ -6,7 +6,6 @@ import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
-import { hasAuthMarker } from "@/lib/authMarker";
 import { useAuthStore } from "@/stores/authStore";
 
 /**
@@ -16,9 +15,11 @@ import { useAuthStore } from "@/stores/authStore";
  *
  * The page is open to signed-in visitors too (the mail link carries its own
  * token, see `middleware.ts`). A successful reset revokes every refresh token
- * on the API, so a session this browser still holds is dead: it is cleared
- * through the regular store `logout` BEFORE the success view shows, so the
- * view's login link is not bounced away by the guest-only `/login` gate.
+ * of that account on the API, so any session this browser holds is cleared
+ * through the regular store `logout` BEFORE the success view shows; otherwise
+ * the still-valid access cookie makes the guest-only `/login` gate bounce the
+ * view's login link home. JS cannot see the httpOnly session cookies, so the
+ * logout runs unconditionally (a no-op for a guest).
  */
 export function useResetPassword() {
   const t = useTranslations();
@@ -34,12 +35,6 @@ export function useResetPassword() {
   const submit = async (newPassword: string): Promise<string | null> => {
     try {
       await resetMutation.mutateAsync(newPassword);
-      // `logout` clears the httpOnly cookies through its server action and
-      // the client state (marker, user snapshot, store); it never throws.
-      if (hasAuthMarker()) await logout();
-      setSuccess(true);
-      toast.success(t("auth.passwordChangedSuccess"));
-      return null;
     } catch (error: unknown) {
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
@@ -51,6 +46,16 @@ export function useResetPassword() {
       toast.error(msg);
       return msg;
     }
+    // The password has changed: a cleanup failure (e.g. blocked storage) must
+    // not be reported as a failed reset, since the token is now used up.
+    try {
+      await logout();
+    } catch {
+      /* the session is revoked on the API either way */
+    }
+    setSuccess(true);
+    toast.success(t("auth.passwordChangedSuccess"));
+    return null;
   };
 
   return { token, success, submit };

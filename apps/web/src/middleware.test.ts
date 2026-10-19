@@ -42,7 +42,7 @@ describe("middleware: site lock (SITE_LOCKED) and /app/**", () => {
   });
 });
 
-describe("middleware: mail-link pages with a signed-in visitor", () => {
+describe("middleware: auth pages with a signed-in visitor", () => {
   it.each([
     [
       "/reset-password?token=x",
@@ -57,6 +57,8 @@ describe("middleware: mail-link pages with a signed-in visitor", () => {
       "/en/verify-email?token=x",
       "https://tarodan.test/en/verify-email?token=x",
     ],
+    ["/forgot-password", "https://tarodan.test/tr/forgot-password"],
+    ["/en/forgot-password", "https://tarodan.test/en/forgot-password"],
   ])("lets %s through to the page", async (path, target) => {
     const res = await run(path, sessionCookie());
 
@@ -65,9 +67,9 @@ describe("middleware: mail-link pages with a signed-in visitor", () => {
   });
 
   it.each([
-    ["/forgot-password", "https://tarodan.test/"],
-    ["/en/forgot-password", "https://tarodan.test/en"],
-  ])("still bounces %s home (guest-only)", async (path, home) => {
+    ["/login", "https://tarodan.test/"],
+    ["/en/register", "https://tarodan.test/en"],
+  ])("still bounces guest-only %s home", async (path, home) => {
     const res = await run(path, sessionCookie());
 
     expect(res.headers.get("location")).toBe(home);
