@@ -1,3 +1,5 @@
+import { getQueueToken } from "@nestjs/bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 // apps/api/src/modules/notification/notification-realtime.spec.ts
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
@@ -40,6 +42,10 @@ describe("NotificationService realtime emit", () => {
         I18nService,
         NotificationCommerceService,
         NotificationAccountService,
+        {
+          provide: getQueueToken(QUEUE_NAMES.EMAIL),
+          useValue: { add: jest.fn() },
+        },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: ExpoPushProvider, useValue: { isConfigured: () => false } },

@@ -4,13 +4,23 @@
  * senders. Delegates delivery to the shared NotificationDispatchService. (The
  * guest contact staff notice moved to Mail Routing: MailInternalNotifier.)
  */
+import { InjectQueue } from "@nestjs/bull";
 import { Injectable, Logger } from "@nestjs/common";
+import { Queue } from "bull";
 import { ConfigService } from "@nestjs/config";
 import { redactString } from "@tarodan/logger";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { NotificationDispatchService } from "./notification-dispatch.service";
+import { QUEUE_NAMES } from "../../workers/constants";
+import {
+  ACCOUNT_SECURITY_NOTICE_TEMPLATE,
+  buildAccountSecurityNoticeData,
+  type AccountSecurityNoticeDetails,
+  type AccountSecurityNoticeEvent,
+} from "../../common/helpers/account-security-notice-mail";
+import { getEmailTemplateSubject } from "../../common/helpers/email-template-renderer";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
 import {
   buildEmailVerificationTemplateData,
@@ -26,6 +36,7 @@ export class NotificationAccountService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly smtpProvider: SmtpProvider,
+    @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
   ) {}
 
   /**
@@ -176,6 +187,47 @@ export class NotificationAccountService {
     }
 
     return result;
+  }
+
+  /**
+   * Tells the account owner that a sign-in method changed (provider linked or
+   * unlinked, password set). Queued on the e-mail queue; it never throws and
+   * never waits for delivery, so a mail failure cannot fail or slow the
+   * security action that triggered it. Logs and Sentry get the user id only.
+   * The payload is kept out of `EmailLog.metadata` (`redactTemplateData`).
+   */
+  async sendAccountSecurityNotice(
+    userId: string,
+    event: AccountSecurityNoticeEvent,
+    details: AccountSecurityNoticeDetails = {},
+  ): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, displayName: true },
+      });
+      if (!user) return;
+
+      const templateData = buildAccountSecurityNoticeData({
+        event,
+        name: user.displayName,
+        ...details,
+      });
+      await this.emailQueue.add("send-template", {
+        to: user.email,
+        subject: getEmailTemplateSubject(
+          ACCOUNT_SECURITY_NOTICE_TEMPLATE,
+          templateData,
+        ),
+        template: ACCOUNT_SECURITY_NOTICE_TEMPLATE,
+        templateData: { ...templateData, userId },
+        redactTemplateData: true,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue account security notice (userId=${userId}, event=${event}): ${redactString(error instanceof Error ? error.message : String(error))}`,
+      );
+    }
   }
 
   /**

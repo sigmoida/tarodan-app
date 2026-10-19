@@ -28,6 +28,7 @@ describe("NotificationAccountService.sendPasswordResetEmail", () => {
       prisma as never,
       {} as never,
       smtpProvider as never,
+      { add: jest.fn() } as never,
     );
     return { service, smtpProvider, dispatch };
   };
