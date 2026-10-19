@@ -94,6 +94,7 @@ export const CONSENT_SOURCES = [
   "account_settings",
   "newsletter_unsubscribe",
   "account_deletion",
+  "social_link_reset",
   "legacy_backfill",
 ] as const;
 export type ConsentSource = (typeof CONSENT_SOURCES)[number];
@@ -132,6 +133,7 @@ export const CONSENT_SOURCE_I18N_KEYS = {
   account_settings: "admin.consents.sources.accountSettings",
   newsletter_unsubscribe: "admin.consents.sources.newsletterUnsubscribe",
   account_deletion: "admin.consents.sources.accountDeletion",
+  social_link_reset: "admin.consents.sources.socialLinkReset",
   legacy_backfill: "admin.consents.sources.legacyBackfill",
 } as const satisfies Record<ConsentSource, string>;
 

@@ -59,7 +59,18 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
 - 2FA lives in `modules/security/` (TOTP secret encrypted at rest, backup codes
   hashed and consumed by CAS). Social login never bypasses 2FA
   (`TWO_FACTOR_PASSWORD_REQUIRED`).
-- Google and Apple auto-link by verified e-mail, never to a deleted account.
+- `social/social-identity.service.ts` owns every OAuthAccount write for Google
+  and Apple: an existing link wins; else the e-mail is matched
+  case-insensitively (never a deleted row). A verified match is linked and
+  keeps its password and sessions. An unverified match is **taken over** in one
+  transaction: password, refresh and push tokens, pending reset/verify/change
+  and phone codes, 2FA, phone, birth date, legal identity and marketing opt-in
+  are cleared, the consents withdrawn (`social_link_reset`), then linked and
+  verified (SecurityLog `social_link_reset`, Sentry warning). A legacy link to
+  a still-unverified account only loses the password. The e-mail match is
+  `lower(email) = lower($1)`, never Prisma `mode: "insensitive"` (an unescaped
+  ILIKE). Staff and banned matches get nothing written. A lost P2002 race
+  resolves to the winner's link or is retried once.
 - Apple refresh tokens are stored encrypted (`APPLE_TOKEN_ENCRYPTION_KEY`);
   account deletion enqueues revocation in the deletion transaction (outbox).
   Permanent failures go to the DLQ; redrive with

@@ -1,5 +1,9 @@
 import { ConsentSource, Prisma } from "@prisma/client";
-import { ACCOUNT_REQUIRED_CONSENTS, type PendingConsent } from "@tarodan/types";
+import {
+  ACCOUNT_REQUIRED_CONSENTS,
+  type ConsentDocumentKey,
+  type PendingConsent,
+} from "@tarodan/types";
 import { toConsentRow } from "./consent-row";
 import {
   computePendingConsents,
@@ -32,6 +36,20 @@ export async function findPendingAccountConsents(
   userId: string,
 ): Promise<PendingConsent[]> {
   return computePendingConsents(await loadHistory(db, userId));
+}
+
+/**
+ * Required documents whose latest row is a grant (any version): what a
+ * withdrawal has to cover so the re-consent gate asks for every one of them.
+ */
+export async function findGrantedAccountConsents(
+  db: AccountConsentDb,
+  userId: string,
+): Promise<ConsentDocumentKey[]> {
+  const latest = latestByDocument(await loadHistory(db, userId));
+  return ACCOUNT_REQUIRED_CONSENTS.filter(
+    (document) => latest.get(document)?.action === "granted",
+  );
 }
 
 export interface AccountConsentGrantOptions {

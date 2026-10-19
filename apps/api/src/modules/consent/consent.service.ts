@@ -6,7 +6,6 @@ import {
   CONSENT_DOCUMENTS,
   OPTIONAL_COOKIE_CATEGORIES,
   isConsentDocumentKey,
-  type ConsentDocumentKey,
   type ConsentDocumentStatus,
   type OptionalCookieCategory,
   type PendingConsent,
@@ -14,7 +13,10 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { getRequestClientInfo } from "../../common/context/request-context";
-import { findPendingAccountConsents } from "./helpers/account-consents";
+import {
+  findGrantedAccountConsents,
+  findPendingAccountConsents,
+} from "./helpers/account-consents";
 import { toConsentRow, type ConsentEntry } from "./helpers/consent-row";
 import {
   computePendingConsents,
@@ -72,6 +74,32 @@ export class ConsentService {
     );
     return this.record(
       accepted.map((document) => ({ document, source, subject: { userId } })),
+      db,
+    );
+  }
+
+  /**
+   * Withdraws every required account consent that is currently granted, as
+   * new `withdrawn` rows (the table is append-only; the earlier grants stay as
+   * the record of what was accepted and by whom). The re-consent gate then
+   * asks the member again. Used when the person who gave the consents is not
+   * the account's owner (social take-over of an unverified registration).
+   *
+   * @returns the number of rows written.
+   */
+  async withdrawAccountConsents(
+    userId: string,
+    source: ConsentSource,
+    db: ConsentWriter = this.prisma,
+  ): Promise<number> {
+    const granted = await findGrantedAccountConsents(db, userId);
+    return this.record(
+      granted.map((document) => ({
+        document,
+        source,
+        action: ConsentAction.withdrawn,
+        subject: { userId },
+      })),
       db,
     );
   }

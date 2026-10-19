@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { ConsentAction, ConsentSource } from "@prisma/client";
 import {
@@ -70,9 +70,18 @@ describe("consent catalog contract", () => {
       );
     });
 
-    it("ConsentSource enum değerleri şemayla aynı", () => {
+    it("every ConsentSource value is created by a migration", () => {
+      // The enum is created here; later values arrive as `ADD VALUE` in their
+      // own migrations, so all migrations touching the type are read.
+      const migrationsDir = join(apiAppRoot(), "prisma/migrations");
+      const enumSql = readdirSync(migrationsDir)
+        .map((folder) => join(migrationsDir, folder, "migration.sql"))
+        .filter((file) => existsSync(file))
+        .map((file) => readFileSync(file, "utf8").replace(/--.*$/gm, ""))
+        .filter((text) => text.includes('"ConsentSource"'))
+        .join("\n");
       for (const source of CONSENT_SOURCES) {
-        expect(sql).toContain(`'${source}'`);
+        expect(enumSql).toContain(`'${source}'`);
       }
     });
   });
