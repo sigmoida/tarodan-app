@@ -10026,6 +10026,7 @@
         "accountSettings": "Bildirim ayarları",
         "newsletterUnsubscribe": "Bülten çıkış bağlantısı",
         "accountDeletion": "Hesap silme",
+        "socialLinkReset": "Doğrulanmamış hesabın sosyal girişte sıfırlanması",
         "legacyBackfill": "Geriye dönük aktarım"
       },
       "subjects": {

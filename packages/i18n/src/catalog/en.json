@@ -10026,6 +10026,7 @@
         "accountSettings": "Notification settings",
         "newsletterUnsubscribe": "Newsletter unsubscribe",
         "accountDeletion": "Account deletion",
+        "socialLinkReset": "Unverified account reset on social sign-in",
         "legacyBackfill": "Legacy import"
       },
       "subjects": {

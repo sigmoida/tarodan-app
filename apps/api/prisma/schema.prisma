@@ -305,6 +305,10 @@ enum ConsentSource {
   newsletter_unsubscribe
   /// Hesap silme (pazarlama izni kapanır).
   account_deletion
+  /// Social sign-in took over an unverified account: the registrant never
+  /// proved the inbox, so the consents they gave are withdrawn and the
+  /// re-consent gate asks the provider user again.
+  social_link_reset
   /// Bu tablodan önceki kayıtların geriye dönük aktarımı
   /// (`checkout_groups.distance_sales_*`).
   legacy_backfill

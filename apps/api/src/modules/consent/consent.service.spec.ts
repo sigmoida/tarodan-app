@@ -333,3 +333,57 @@ describe("ConsentService.getStatus", () => {
     expect(byDoc.get("marketing")).toMatchObject({ pending: false });
   });
 });
+
+describe("ConsentService.withdrawAccountConsents", () => {
+  const at = (iso: string) => new Date(iso);
+
+  it("withdraws only the required documents whose latest row is a grant", async () => {
+    const [first, second, third] = ACCOUNT_REQUIRED_CONSENTS;
+    const { service, prisma } = makeService([
+      {
+        document: first,
+        version: "old",
+        action: "granted",
+        createdAt: at("2026-01-01"),
+      },
+      {
+        document: second,
+        version: "v",
+        action: "granted",
+        createdAt: at("2026-01-01"),
+      },
+      {
+        document: second,
+        version: "v",
+        action: "withdrawn",
+        createdAt: at("2026-02-01"),
+      },
+    ]);
+
+    const written = await service.withdrawAccountConsents(
+      "u1",
+      ConsentSource.social_link_reset,
+    );
+
+    expect(written).toBe(1);
+    expect(rowsOf(prisma)).toEqual([
+      expect.objectContaining({
+        document: first,
+        action: ConsentAction.withdrawn,
+        source: ConsentSource.social_link_reset,
+        userId: "u1",
+      }),
+    ]);
+    // A document with no row at all is already pending: nothing to withdraw.
+    expect(rowsOf(prisma).map((r) => r.document)).not.toContain(third);
+  });
+
+  it("writes nothing for an account with no grants", async () => {
+    const { service, prisma } = makeService([]);
+
+    await expect(
+      service.withdrawAccountConsents("u1", ConsentSource.social_link_reset),
+    ).resolves.toBe(0);
+    expect(prisma.consentRecord.createMany).not.toHaveBeenCalled();
+  });
+});

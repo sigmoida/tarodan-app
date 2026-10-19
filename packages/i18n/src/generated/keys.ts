@@ -817,6 +817,7 @@ export type MessageKey =
   | "admin.consents.sources.newsletterUnsubscribe"
   | "admin.consents.sources.payment"
   | "admin.consents.sources.registration"
+  | "admin.consents.sources.socialLinkReset"
   | "admin.consents.subjects.guest"
   | "admin.consents.subjects.user"
   | "admin.consents.subjects.visitor"
