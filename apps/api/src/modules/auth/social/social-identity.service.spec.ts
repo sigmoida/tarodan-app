@@ -759,6 +759,114 @@ describe.each<SocialProvider>(["google", "apple"])(
       expect(linksOf(res.user.id)).toHaveLength(1);
     });
 
+    it("2FA on an unverified match goes with the take-over: the provider user signs in", async () => {
+      const attacker = await addUnverifiedRegistration();
+      fake.state.twoFactor = [
+        { userId: attacker.id, isEnabled: true, secret: "x" },
+      ];
+
+      const res = await signIn();
+
+      expect(res.user.id).toBe(attacker.id);
+      expect(res.tokens.accessToken).toBe("tok");
+      expect(fake.state.twoFactor).toEqual([]);
+    });
+
+    it("an existing link wins over an unverified registration of the provider address", async () => {
+      // The linked member changed their account e-mail; someone then
+      // registered the old (provider) address without verifying it.
+      const member = addUser({ email: "changed@example.com" });
+      fake.state.links.push({
+        provider,
+        providerUserId: SUB,
+        userId: member.id,
+      });
+      const attacker = await addUnverifiedRegistration();
+      const before = structuredClone(
+        fake.state.users.find((u) => u.id === attacker.id),
+      );
+
+      const res = await signIn();
+
+      expect(res.user.id).toBe(member.id);
+      expect(fake.state.users.find((u) => u.id === attacker.id)).toEqual(
+        before,
+      );
+      expect(linksOf(attacker.id)).toEqual([]);
+      expect(fake.state.securityLogs).toEqual([]);
+    });
+
+    /** Runs `change` on the matched row when the take-over takes its lock. */
+    const onRowLock = (change: (user: Row) => void) => {
+      const lookup = fake.db.$queryRaw.getMockImplementation();
+      fake.db.$queryRaw.mockImplementation(
+        async (strings: TemplateStringsArray, ...values: any[]) => {
+          if (strings.join("?").includes("FOR UPDATE")) {
+            change(fake.state.users.find((u) => u.id === values[0])!);
+          }
+          return lookup(strings, ...values);
+        },
+      );
+    };
+
+    it("decides on the locked row: verified meanwhile, it is linked and keeps its password", async () => {
+      // The inbox owner clicked the verification link between the e-mail
+      // lookup and the lock: the row is theirs now, so nothing is reset.
+      const row = await addUnverifiedRegistration();
+      onRowLock((user) => Object.assign(user, { isEmailVerified: true }));
+
+      const res = await signIn();
+
+      expect(res.user.id).toBe(row.id);
+      expect(fake.state.users[0].passwordHash).toBe(row.passwordHash);
+      expect(fake.state.refreshTokens[0].revokedAt).toBeNull();
+      expect(fake.state.securityLogs).toEqual([
+        expect.objectContaining({ eventType: "social_linked" }),
+      ]);
+    });
+
+    it("decides on the locked row: banned meanwhile, nothing is linked or reset", async () => {
+      await addUnverifiedRegistration();
+      onRowLock((user) => Object.assign(user, { isBanned: true }));
+
+      await expect(signIn()).rejects.toMatchObject({
+        response: { i18nKey: "server.auth.accountSuspended" },
+      });
+
+      expect(fake.state.links).toEqual([]);
+      expect(fake.state.users[0]).toMatchObject({
+        passwordHash: expect.any(String),
+        nationalId: "10000000146",
+        isEmailVerified: false,
+      });
+      expect(fake.state.securityLogs).toEqual([]);
+    });
+
+    if (provider === "apple") {
+      it("an Apple private relay address follows the same take-over rule", async () => {
+        const relay = "abc123xyz@privaterelay.appleid.com";
+        const attacker = await addUnverifiedRegistration();
+        Object.assign(attacker, { email: relay.toUpperCase() });
+
+        const res = await signIn(relay);
+
+        expect(res.user.id).toBe(attacker.id);
+        expect(fake.state.users[0]).toMatchObject({
+          passwordHash: null,
+          isEmailVerified: true,
+          nationalId: null,
+        });
+        await expect(
+          auth.login({
+            email: relay.toUpperCase(),
+            password: ATTACKER_PASSWORD,
+          }),
+        ).rejects.toMatchObject({
+          response: { i18nKey: "server.auth.invalidCredentials" },
+        });
+      });
+    }
+
     it("2FA on a verified match: linked, then the existing TWO_FACTOR_PASSWORD_REQUIRED", async () => {
       const owner = addUser({ email: VICTIM_EMAIL, passwordHash: "hash" });
       fake.state.twoFactor.push({ userId: owner.id, isEnabled: true });
