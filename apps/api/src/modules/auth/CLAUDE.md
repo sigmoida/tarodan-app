@@ -66,8 +66,11 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   transaction: password, refresh and push tokens, pending reset/verify/change
   and phone codes, 2FA, phone, birth date, legal identity and marketing opt-in
   are cleared, the consents withdrawn (`social_link_reset`), then linked and
-  verified (SecurityLog `social_link_reset`, Sentry warning). Staff and banned
-  matches get nothing written. A P2002 race resolves to the winner's link.
+  verified (SecurityLog `social_link_reset`, Sentry warning). A legacy link to
+  a still-unverified account only loses the password. The e-mail match is
+  `lower(email) = lower($1)`, never Prisma `mode: "insensitive"` (an unescaped
+  ILIKE). Staff and banned matches get nothing written. A lost P2002 race
+  resolves to the winner's link or is retried once.
 - Apple refresh tokens are stored encrypted (`APPLE_TOKEN_ENCRYPTION_KEY`);
   account deletion enqueues revocation in the deletion transaction (outbox).
   Permanent failures go to the DLQ; redrive with

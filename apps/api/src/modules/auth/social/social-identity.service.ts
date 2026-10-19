@@ -37,6 +37,7 @@ export interface NewSocialUserProfile {
  * - `linked`: linked to an account whose e-mail was already verified
  * - `tookOver`: linked to an account whose e-mail was never verified; the
  *   unproven credentials and data of that registration were cleared first
+ *   (for a legacy link, only the unproven password)
  * - `created`: a new account was opened for the identity
  */
 export type SocialIdentityOutcome =
@@ -72,6 +73,9 @@ type MatchedUser = Prisma.UserGetPayload<{ select: typeof MATCH_SELECT }>;
 /** Same-address rows that differ only in case; more than a few is not real. */
 const MAX_EMAIL_CANDIDATES = 5;
 
+/** A lost unique race is retried once: the next pass sees the winner's rows. */
+const MAX_RESOLVE_ATTEMPTS = 2;
+
 const CLEARED_LEGAL_IDENTITY = Object.fromEntries(
   LEGAL_IDENTITY_FIELDS.map((field) => [field, null]),
 ) as Record<LegalIdentityField, null>;
@@ -79,13 +83,17 @@ const CLEARED_LEGAL_IDENTITY = Object.fromEntries(
 /**
  * What a take-over clears on the user row: everything the unverified
  * registrant entered or could have set without proving the inbox. Kept: the
- * row id, `username` and `displayName` (not credentials, and the owner can
- * change them), the test-lane flag (a property of the row) and the consent
- * history (append-only; withdrawn separately so the gate asks again).
+ * row id, `username` and `displayName` (not credentials; `usernameClaimedAt`
+ * is cleared so the owner can change the registrant's username once), the
+ * test-lane flag (a property of the row) and the consent history
+ * (append-only; withdrawn separately so the gate asks again).
  */
 const TAKE_OVER_USER_DATA = {
   passwordHash: null,
   isEmailVerified: true,
+  usernameClaimedAt: null,
+  isSeller: false,
+  sellerType: null,
   phone: null,
   isPhoneVerified: false,
   birthDate: null,
@@ -93,6 +101,21 @@ const TAKE_OVER_USER_DATA = {
   acceptsMarketingEmails: false,
   fcmToken: null,
 } as const satisfies Prisma.UserUpdateManyMutationInput;
+
+/**
+ * The legacy-link heal clears only the credential nobody proved. The rest of
+ * such a row may already be the owner's: the old Apple path gave the owner
+ * sessions on it, so their sessions and data stay.
+ */
+const HEAL_USER_DATA = {
+  passwordHash: null,
+  isEmailVerified: true,
+} as const satisfies Prisma.UserUpdateManyMutationInput;
+
+/** `link`: create the link, then link or take over; `heal`: the link exists. */
+type ResolveMode = "link" | "heal";
+
+type Resolved = { result: SocialIdentityResolution; unsubscribe?: string };
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -153,7 +176,8 @@ function assertCanOpenSession(user: MatchedUser): void {
  * 3. Otherwise a new account.
  *
  * Staff, banned and deleted accounts get nothing written. A concurrent first
- * sign-in that loses the unique race resolves to the link the winner wrote.
+ * sign-in that loses a unique race resolves to the link the winner wrote, or
+ * is retried once (the winner wrote the same e-mail or username).
  */
 @Injectable()
 export class SocialIdentityService {
@@ -179,57 +203,82 @@ export class SocialIdentityService {
   private async resolve(
     identity: ProviderIdentity,
     newUser: NewSocialUserProfile,
-  ): Promise<{ result: SocialIdentityResolution; unsubscribe?: string }> {
-    const linked = await this.findLink(identity);
-    if (linked) return this.resolveExistingLink(identity, linked.userId);
-
-    try {
-      const candidates = await this.prisma.user.findMany({
-        where: {
-          email: { equals: identity.email.trim(), mode: "insensitive" },
-          deletedAt: null,
-        },
-        select: MATCH_SELECT,
-        take: MAX_EMAIL_CANDIDATES,
-      });
-      const match = pickCandidate(candidates, identity.email);
-      if (match) {
-        assertCanOpenSession(match);
-        return await this.linkOrTakeOver(identity, match.id, true);
+  ): Promise<Resolved> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.resolveOnce(identity, newUser);
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        // A concurrent writer won a unique race: the same identity (its link
+        // is now there), or the same e-mail or username (the next pass
+        // matches or avoids the winner's row).
+        const winner = await this.findLink(identity);
+        if (winner)
+          return { result: { userId: winner.userId, outcome: "existing" } };
+        if (attempt >= MAX_RESOLVE_ATTEMPTS) throw error;
       }
-      return {
-        result: {
-          userId: await this.create(identity, newUser),
-          outcome: "created",
-        },
-      };
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-      // A concurrent first sign-in with the same identity won the race.
-      const winner = await this.findLink(identity);
-      if (!winner) throw error;
-      return { result: { userId: winner.userId, outcome: "existing" } };
     }
+  }
+
+  private async resolveOnce(
+    identity: ProviderIdentity,
+    newUser: NewSocialUserProfile,
+  ): Promise<Resolved> {
+    const linked = await this.findLink(identity);
+    if (linked) return this.resolveExistingLink(identity, linked);
+
+    const match = pickCandidate(
+      await this.findByEmail(identity.email),
+      identity.email,
+    );
+    if (match) {
+      assertCanOpenSession(match);
+      return this.linkOrTakeOver(identity, match.id, "link");
+    }
+    return {
+      result: {
+        userId: await this.create(identity, newUser),
+        outcome: "created",
+      },
+    };
+  }
+
+  /**
+   * Non-deleted accounts with this address, ignoring case. `lower() = lower()`
+   * and not Prisma's `mode: "insensitive"`, which is an unescaped ILIKE where
+   * `_` and `%` in a provider address would match other people's rows.
+   */
+  private async findByEmail(email: string): Promise<MatchedUser[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM users
+      WHERE lower(email) = lower(${email.trim()}) AND deleted_at IS NULL
+      LIMIT ${MAX_EMAIL_CANDIDATES}
+    `;
+    if (rows.length === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: rows.map((row) => row.id) }, deletedAt: null },
+      select: MATCH_SELECT,
+    });
+    // Defence in depth: never act on a row whose address is not this one.
+    return users.filter((user) => sameAddress(user.email, email));
   }
 
   /**
    * An existing link is used as it is. One exception heals rows the old
    * Apple auto-link left behind: a link to an account whose e-mail is still
-   * unverified, where the provider now proves that same address, is a
-   * take-over that never happened. Accounts that cannot open a session are
-   * left to the login response check, which refuses them.
+   * unverified, where the provider now proves that same address. Its
+   * unproven password goes and the e-mail is verified; the sessions and data
+   * stay, because the owner may have been using the account through that
+   * link. Accounts that cannot open a session are left to the login response
+   * check, which refuses them.
    */
   private async resolveExistingLink(
     identity: ProviderIdentity,
-    userId: string,
-  ): Promise<{ result: SocialIdentityResolution; unsubscribe?: string }> {
+    link: { userId: string; user: MatchedUser },
+  ): Promise<Resolved> {
+    const { userId, user } = link;
     const existing = { result: { userId, outcome: "existing" as const } };
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: MATCH_SELECT,
-    });
     if (
-      !user ||
       user.isEmailVerified ||
       !sameAddress(user.email, identity.email) ||
       isStaffAccount(user) ||
@@ -238,7 +287,7 @@ export class SocialIdentityService {
     ) {
       return existing;
     }
-    const healed = await this.linkOrTakeOver(identity, userId, false);
+    const healed = await this.linkOrTakeOver(identity, userId, "heal");
     return healed.result.outcome === "tookOver" ? healed : existing;
   }
 
@@ -250,8 +299,8 @@ export class SocialIdentityService {
   private async linkOrTakeOver(
     identity: ProviderIdentity,
     userId: string,
-    createLink: boolean,
-  ): Promise<{ result: SocialIdentityResolution; unsubscribe?: string }> {
+    mode: ResolveMode,
+  ): Promise<Resolved> {
     const { ipAddress, userAgent } = getRequestClientInfo();
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
@@ -268,6 +317,7 @@ export class SocialIdentityService {
 
       // First write: a concurrent sign-in with the same identity fails here
       // (P2002) and rolls back before anything else changes.
+      const createLink = mode === "link";
       if (createLink) {
         await tx.oAuthAccount.create({
           data: {
@@ -287,7 +337,7 @@ export class SocialIdentityService {
             userId,
             ipAddress,
             userAgent,
-            details: { provider: identity.provider, flow: FLOW_TAG },
+            details: { provider: identity.provider, flow: FLOW_TAG, mode },
           },
         });
 
@@ -298,13 +348,20 @@ export class SocialIdentityService {
         };
       }
 
+      // Pending codes and links were issued for the unproven registration.
+      await tx.passwordResetToken.deleteMany({ where: { userId } });
+      await tx.emailVerificationToken.deleteMany({ where: { userId } });
+      await tx.emailChangeToken.deleteMany({ where: { userId } });
+      if (mode === "heal") {
+        await tx.user.update({ where: { id: userId }, data: HEAL_USER_DATA });
+        await securityLog(SOCIAL_SECURITY_EVENTS.linkReset, "high");
+        return { result: { userId, outcome: "tookOver" } };
+      }
+
       await tx.user.update({
         where: { id: userId },
         data: TAKE_OVER_USER_DATA,
       });
-      await tx.passwordResetToken.deleteMany({ where: { userId } });
-      await tx.emailVerificationToken.deleteMany({ where: { userId } });
-      await tx.emailChangeToken.deleteMany({ where: { userId } });
       await tx.phoneVerificationToken.deleteMany({ where: { userId } });
       await this.security.revokeAllUserTokens(userId, tx);
       await this.security.removeTwoFactorSecret(userId, tx);
@@ -373,7 +430,7 @@ export class SocialIdentityService {
           providerUserId: identity.providerUserId,
         },
       },
-      select: { userId: true },
+      select: { userId: true, user: { select: MATCH_SELECT } },
     });
   }
 
@@ -383,7 +440,7 @@ export class SocialIdentityService {
    */
   private async afterResolved(
     identity: ProviderIdentity,
-    resolution: { result: SocialIdentityResolution; unsubscribe?: string },
+    resolution: Resolved,
   ): Promise<void> {
     const { userId, outcome } = resolution.result;
     if (outcome !== "tookOver") return;

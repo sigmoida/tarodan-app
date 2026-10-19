@@ -105,7 +105,21 @@ function createFakeDb() {
       : null;
 
   const db: any = {
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    // Row lock (no rows needed) and the case-insensitive e-mail lookup.
+    $queryRaw: jest.fn(
+      async (strings: TemplateStringsArray, ...values: any[]) => {
+        if (!strings.join("?").includes("lower(email)")) return [];
+        const [email, limit] = values;
+        return state.users
+          .filter(
+            (u) =>
+              u.email.toLowerCase() === email.toLowerCase() &&
+              u.deletedAt === null,
+          )
+          .slice(0, limit)
+          .map((u) => ({ id: u.id }));
+      },
+    ),
     $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
       const snapshot = structuredClone(state);
       try {
@@ -118,13 +132,16 @@ function createFakeDb() {
     oAuthAccount: {
       findUnique: jest.fn(async ({ where }: any) => {
         const key = where.provider_providerUserId;
-        return (
-          state.links.find(
-            (l) =>
-              l.provider === key.provider &&
-              l.providerUserId === key.providerUserId,
-          ) ?? null
+        const link = state.links.find(
+          (l) =>
+            l.provider === key.provider &&
+            l.providerUserId === key.providerUserId,
         );
+        if (!link) return null;
+        return {
+          ...link,
+          user: decorate(state.users.find((u) => u.id === link.userId)),
+        };
       }),
       create: jest.fn(async ({ data }: any) => {
         if (
@@ -152,22 +169,16 @@ function createFakeDb() {
         );
         return decorate(user);
       }),
-      findMany: jest.fn(async ({ where, take }: any) =>
+      findMany: jest.fn(async ({ where }: any) =>
         state.users
-          .filter(
-            (u) =>
-              u.email.toLowerCase() === where.email.equals.toLowerCase() &&
-              where.email.mode === "insensitive" &&
-              u.deletedAt === null,
-          )
-          .slice(0, take)
+          .filter((u) => where.id.in.includes(u.id) && u.deletedAt === null)
           .map(decorate),
       ),
       create: jest.fn(async ({ data }: any) => {
         if (state.users.some((u) => u.email === data.email)) {
           throw uniqueViolation(["email"]);
         }
-        const row = { ...baseUserRow(nextId("u")), ...data };
+        const row = { ...baseUserRow(nextId("created-u")), ...data };
         state.users.push(row);
         return row;
       }),
@@ -317,7 +328,10 @@ describe.each<SocialProvider>(["google", "apple"])(
         id: "attacker-row",
         email: VICTIM_EMAIL,
         username: "attacker",
+        usernameClaimedAt: new Date("2026-01-01T00:00:00Z"),
         displayName: "Attacker",
+        isSeller: true,
+        sellerType: "individual",
         passwordHash: await bcrypt.hash(ATTACKER_PASSWORD, 4),
         isEmailVerified: false,
         phone: "+905551112233",
@@ -457,7 +471,7 @@ describe.each<SocialProvider>(["google", "apple"])(
           eventType: "social_linked",
           severity: "low",
           userId: owner.id,
-          details: { provider, flow: "social_login" },
+          details: { provider, flow: "social_login", mode: "link" },
         }),
       ]);
       expect(sentry.captureEvent).not.toHaveBeenCalled();
@@ -493,6 +507,9 @@ describe.each<SocialProvider>(["google", "apple"])(
         nationalId: null,
         acceptsMarketingEmails: false,
         fcmToken: null,
+        usernameClaimedAt: null,
+        isSeller: false,
+        sellerType: null,
         // Kept: the row identity and the public names.
         username: "attacker",
         displayName: "Attacker",
@@ -552,25 +569,40 @@ describe.each<SocialProvider>(["google", "apple"])(
       });
     });
 
-    it("heals a legacy link to a still-unverified account with the same address", async () => {
-      const attacker = await addUnverifiedRegistration();
-      fake.state.links.push({
-        provider,
-        providerUserId: SUB,
-        userId: attacker.id,
-      });
+    it("heals a legacy link to a still-unverified account: only the unproven password goes", async () => {
+      // The old Apple path linked without verifying and gave the owner
+      // sessions on this row, so what is on it now may be the owner's.
+      const row = await addUnverifiedRegistration();
+      fake.state.links.push({ provider, providerUserId: SUB, userId: row.id });
 
       await signIn();
 
       expect(fake.state.users[0]).toMatchObject({
         passwordHash: null,
         isEmailVerified: true,
-        nationalId: null,
+        phone: "+905551112233",
+        nationalId: "10000000146",
+        acceptsMarketingEmails: true,
       });
-      expect(fake.state.links).toHaveLength(1);
-      expect(fake.state.securityLogs).toEqual([
-        expect.objectContaining({ eventType: "social_link_reset" }),
+      const s = fake.state;
+      expect(s.refreshTokens.filter((t) => !t.revokedAt)).toHaveLength(2);
+      expect(s.pushTokens.every((t) => t.isActive)).toBe(true);
+      expect(s.consents.some((c) => c.action === "withdrawn")).toBe(false);
+      expect(s.resetTokens).toEqual([]);
+      expect(s.verifyTokens).toEqual([]);
+      expect(s.links).toHaveLength(1);
+      expect(s.securityLogs).toEqual([
+        expect.objectContaining({
+          eventType: "social_link_reset",
+          details: { provider, flow: "social_login", mode: "heal" },
+        }),
       ]);
+      expect(newsletter.syncUserConsent).not.toHaveBeenCalled();
+      await expect(
+        auth.login({ email: VICTIM_EMAIL, password: ATTACKER_PASSWORD }),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.auth.invalidCredentials" },
+      });
     });
 
     it.each([
@@ -648,7 +680,7 @@ describe.each<SocialProvider>(["google", "apple"])(
           userId: winner.id,
         });
         // No e-mail match was visible to the loser yet.
-        fake.db.user.findMany.mockResolvedValueOnce([]);
+        fake.db.$queryRaw.mockResolvedValueOnce([]);
         return null;
       });
 
@@ -657,6 +689,32 @@ describe.each<SocialProvider>(["google", "apple"])(
       expect(res.user.id).toBe("winner");
       expect(fake.state.users).toHaveLength(1);
       expect(fake.state.links).toHaveLength(1);
+    });
+
+    it("a lost e-mail race with another writer is retried and links to the winner", async () => {
+      // A password registration (or the other provider) created the address
+      // between this request's e-mail lookup and its account creation.
+      const winner = addUser({ id: "winner", email: VICTIM_EMAIL });
+      fake.db.$queryRaw.mockResolvedValueOnce([]);
+
+      const res = await signIn();
+
+      expect(res.user.id).toBe(winner.id);
+      expect(fake.state.users).toHaveLength(1);
+      expect(linksOf(winner.id)).toHaveLength(1);
+    });
+
+    it("never treats LIKE wildcards in the provider address as a match", async () => {
+      const owner = addUser({ email: "john.smith@example.com" });
+
+      const res = await signIn("john_smith@example.com");
+
+      expect(res.user.id).not.toBe(owner.id);
+      expect(linksOf(owner.id)).toEqual([]);
+      const lookup = fake.db.$queryRaw.mock.calls.find(([sql]: any) =>
+        sql.join("?").includes("lower(email)"),
+      );
+      expect(lookup[0].join("?")).toMatch(/lower\(email\) = lower\(\?\)/);
     });
 
     it("matches the e-mail case-insensitively", async () => {
