@@ -92,8 +92,9 @@ describe("TimingRuleRow with async form values", () => {
   });
 
   const lockedSelect = () => {
-    // One hidden native <select> per row, in row order.
-    const native = container.querySelectorAll("select")[ROWS.indexOf(LOCKED)];
+    // Radix's hidden native <select>, scoped to the locked row's element.
+    const row = container.querySelector("form")?.children[ROWS.indexOf(LOCKED)];
+    const native = row?.querySelector("select");
     if (!native) throw new Error("no native select for the locked row");
     return native;
   };
