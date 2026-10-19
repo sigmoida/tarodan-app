@@ -122,8 +122,9 @@ response envelopes with `lib/unwrapList.ts`.
 
 ## Layout and folders
 
-Route groups separate the storefront shell, the auth pages (minimal frame,
-"already logged in" redirect) and the private area (providers, `noindex`). A
+Route groups separate the storefront shell, the auth pages (minimal frame;
+login and register redirect a signed-in visitor at the edge, the mail-link
+pages do not) and the private area (providers, `noindex`). A
 page that swaps two flows by a mode flag becomes two routes.
 
 ```

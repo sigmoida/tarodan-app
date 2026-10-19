@@ -8,9 +8,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * Layout for unauthenticated pages (login, register, forgot/reset password,
- * verify email). Pure passthrough — deliberately NOT async.
+ * Layout for the auth pages (login, register, forgot/reset password, verify
+ * email). Pure passthrough — deliberately NOT async.
  *
+ * Only login and register are guest-only; the password and verification pages
+ * stay open to a signed-in visitor (see `isAuthRelevant` in `middleware.ts`).
  * The "already logged in → go home" bounce used to live here as
  * `await getSession(); if (session) redirect('/')`. That made this an async
  * layout that SUSPENDED on a network call, and after login the Server Action
