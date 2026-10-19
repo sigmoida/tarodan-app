@@ -214,8 +214,24 @@ function writeUserSnapshot(user: User) {
     /* ignore quota / serialization errors */
   }
 }
+/**
+ * Best-effort removal: `localStorage` throws (SecurityError) when site storage
+ * is blocked, and a sign-out must still reset the store after that.
+ */
+function removeStoredKeys(...keys: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    /* storage unavailable: nothing was stored either */
+  }
+}
 function clearUserSnapshot() {
-  if (typeof window !== "undefined") localStorage.removeItem(USER_SNAPSHOT_KEY);
+  removeStoredKeys(USER_SNAPSHOT_KEY);
+}
+/** One-time cleanup of the legacy token keys (tokens now live in cookies). */
+function clearLegacyTokenKeys() {
+  removeStoredKeys("auth_token", "refresh_token");
 }
 
 interface AuthState {
@@ -376,21 +392,19 @@ export const useAuthStore = create<AuthState>()(
           // await get().login(email, password);
         },
 
+        // Never throws: callers (reset password, banned, delete account, ...)
+        // rely on the local session always being reset.
         logout: async () => {
           try {
-            await logoutAction(); // Server Action: API'de revoke + web_at/web_rt temizle
-          } catch (e) {
+            await logoutAction(); // Server Action: revoke on the API + clear web_at/web_rt
+          } catch {
             // Ignore logout errors
           }
 
-          if (typeof window !== "undefined") {
-            // tarodan_authed cookie'sini logoutAction (server) sildi; yine de yerel
-            // olarak da süresini geçir ki bir sonraki okuma anında misafir görsün.
-            clearAuthMarker();
-            // Eski anahtarların tek seferlik temizliği (token artık cookie'de).
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("refresh_token");
-          }
+          // logoutAction (server) already deleted the tarodan_authed cookie;
+          // expire it locally too so the very next read sees a guest.
+          clearAuthMarker();
+          clearLegacyTokenKeys();
           clearUserSnapshot();
 
           set({
@@ -404,11 +418,7 @@ export const useAuthStore = create<AuthState>()(
         },
 
         checkAuth: async () => {
-          // Eski (güvensiz) token anahtarlarının tek seferlik temizliği — artık httpOnly cookie kullanıyoruz.
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("refresh_token");
-          }
+          clearLegacyTokenKeys();
           // Girişli olabilir miyiz? Server'ın yazdığı JS-okunabilir cookie. Yoksa profil
           // çağrısı yapmadan misafir say.
           const maybeAuthed = hasAuthMarker();

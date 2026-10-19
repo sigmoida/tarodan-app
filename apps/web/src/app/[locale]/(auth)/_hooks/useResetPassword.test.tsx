@@ -99,17 +99,6 @@ describe("useResetPassword", () => {
     expect(result.success).toBe(true);
   });
 
-  it("still shows success when the session cleanup throws", async () => {
-    h.logout.mockRejectedValue(new DOMException("blocked", "SecurityError"));
-    render();
-
-    expect(await submit("N3w-password!")).toBeNull();
-
-    expect(h.toastError).not.toHaveBeenCalled();
-    expect(h.toastSuccess).toHaveBeenCalledWith("auth.passwordChangedSuccess");
-    expect(result.success).toBe(true);
-  });
-
   it("keeps the session when the reset fails", async () => {
     h.post.mockRejectedValue({
       response: { data: { message: "Token expired" } },

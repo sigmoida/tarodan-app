@@ -77,9 +77,9 @@ function splitLocale(pathname: string): { locale: string; rest: string } {
  * page before the page could post the token, so the address was silently never
  * verified and the password never reset. (A successful reset revokes every
  * refresh token; the reset page then clears the local session itself.)
- * `/forgot-password` is open for the same reason: the reset page's "request a
- * new link" button leads there, and bouncing a signed-in visitor home left an
- * expired link with no way forward.
+ * `/forgot-password` is open too: it is where a signed-in visitor with a
+ * broken or expired reset link asks for a new one (the reset page's "request a
+ * new link" button leads there); bouncing them home left no way forward.
  */
 function isAuthRelevant(path: string): boolean {
   if (/^\/(profile|seller|products)(\/|$)/.test(path)) return true;

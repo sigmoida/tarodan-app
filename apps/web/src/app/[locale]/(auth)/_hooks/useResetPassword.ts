@@ -46,13 +46,10 @@ export function useResetPassword() {
       toast.error(msg);
       return msg;
     }
-    // The password has changed: a cleanup failure (e.g. blocked storage) must
-    // not be reported as a failed reset, since the token is now used up.
-    try {
-      await logout();
-    } catch {
-      /* the session is revoked on the API either way */
-    }
+    // Outside the try above: the password has changed and the token is used
+    // up, so nothing after this point may report a failed reset. The store
+    // `logout` never throws.
+    await logout();
     setSuccess(true);
     toast.success(t("auth.passwordChangedSuccess"));
     return null;
