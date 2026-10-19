@@ -6,15 +6,12 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { redactString } from "@tarodan/logger";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { NotificationDispatchService } from "./notification-dispatch.service";
-import {
-  frontendUrl as resolveFrontendUrl,
-  frontendUrlForEnvironment,
-  LOCAL_FRONTEND_URL,
-} from "../../config/app-urls";
+import { frontendUrlForEnvironment } from "../../config/app-urls";
 import {
   buildEmailVerificationTemplateData,
   EMAIL_VERIFICATION_TEMPLATE,
@@ -40,7 +37,7 @@ export class NotificationAccountService {
       select: { email: true, displayName: true },
     });
     if (!user) return { success: false, error: "User not found" };
-    const frontendUrl = resolveFrontendUrl();
+    const frontendUrl = frontendUrlForEnvironment();
     await this.dispatch.sendTemplateEmailToAddress(user.email, "welcome", {
       name: user.displayName || "",
       verifyUrl: `${frontendUrl}/listings`,
@@ -59,10 +56,10 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    const frontendUrl = resolveFrontendUrl(LOCAL_FRONTEND_URL);
+    const frontendUrl = frontendUrlForEnvironment();
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
     const displayName = user.displayName || "";
-    // displayName: name'in takma adı — legacy admin şablonları {{displayName}} kullanıyor.
+    // displayName: alias of name; legacy admin templates use {{displayName}}.
     const templateData = { name: displayName, displayName, resetUrl };
 
     const dbTemplate = await this.prisma.emailTemplate.findUnique({
@@ -75,18 +72,24 @@ export class NotificationAccountService {
       frontendUrl,
     );
 
+    const smtpConfigured = this.smtpProvider.isConfigured();
     let result;
-    if (this.smtpProvider.isConfigured()) {
+    if (smtpConfigured) {
       result = await this.smtpProvider.sendEmail({
         to: user.email,
         subject: email.subject,
         html: email.html,
-        // EmailLog satırı şablonu bilsin (filtre/denetim için). Bu noktada
-        // yalnız e-posta+ad taşınıyor; kullanıcı kimliği kapsamda değil.
+        // Lets the EmailLog row record the template and the user, so support
+        // can check per user whether a reset mail went out.
         template: "password-reset",
+        userId,
       });
     } else {
-      this.logger.warn("SMTP is not configured for password reset email");
+      // The caller still answers 200 (no account enumeration), so the dropped
+      // reset must surface here: error-level lines are forwarded to Sentry.
+      this.logger.error(
+        `Password reset email dropped, SMTP is not configured (userId=${userId})`,
+      );
       result = { success: false, error: "No email provider configured" };
     }
 
@@ -100,10 +103,12 @@ export class NotificationAccountService {
     );
 
     if (result.success) {
-      this.logger.log(`Password reset email sent to ${user.email}`);
-    } else {
+      this.logger.log(`Password reset email sent (userId=${userId})`);
+    } else if (smtpConfigured) {
       this.logger.error(
-        `Failed to send password reset email to ${user.email}: ${result.error}`,
+        // SMTP rejections often quote the recipient address; this line
+        // reaches Sentry, so the provider text is scrubbed first.
+        `Failed to send password reset email (userId=${userId}): ${redactString(result.error ?? "")}`,
       );
     }
 
@@ -121,8 +126,8 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    // Link ve süre metni kuyruklu yolla ORTAK helper'dan gelir; iki yolun
-    // farklı host'a işaret etmesi mümkün olmasın.
+    // The link and the expiry text come from the SAME helper as the queued
+    // path, so the two can never point at different hosts.
     const frontendUrl = frontendUrlForEnvironment();
     const templateData = buildEmailVerificationTemplateData(
       user.displayName,
@@ -146,6 +151,7 @@ export class NotificationAccountService {
         subject: email.subject,
         html: email.html,
         template: "email-verification",
+        userId,
       });
     } else {
       this.logger.warn("SMTP is not configured for email verification");
@@ -162,10 +168,10 @@ export class NotificationAccountService {
     );
 
     if (result.success) {
-      this.logger.log(`Email verification sent to ${user.email}`);
+      this.logger.log(`Email verification sent (userId=${userId})`);
     } else {
       this.logger.error(
-        `Failed to send email verification to ${user.email}: ${result.error}`,
+        `Failed to send email verification (userId=${userId}): ${redactString(result.error ?? "")}`,
       );
     }
 
