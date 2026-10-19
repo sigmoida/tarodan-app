@@ -40,6 +40,10 @@ export function frontendUrl(fallback: string = CANONICAL_FRONTEND_URL): string {
  * Storefront base URL for links rendered into e-mail: the canonical domain in
  * production, the local dev server anywhere else, so a developer's test mail
  * links back to their own machine instead of the live site.
+ *
+ * Caveat: staging also runs with `NODE_ENV=production`, so with `FRONTEND_URL`
+ * unset there its mail links point at the production domain. Set `FRONTEND_URL`
+ * on staging; this helper cannot tell the two apart.
  */
 export function frontendUrlForEnvironment(): string {
   return frontendUrl(
