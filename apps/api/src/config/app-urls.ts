@@ -42,8 +42,9 @@ export function frontendUrl(fallback: string = CANONICAL_FRONTEND_URL): string {
  * links back to their own machine instead of the live site.
  *
  * Caveat: staging also runs with `NODE_ENV=production`, so with `FRONTEND_URL`
- * unset there its mail links point at the production domain. Set `FRONTEND_URL`
- * on staging; this helper cannot tell the two apart.
+ * unset there its mail links point at the production domain. `appEnv()` tells
+ * the two apart, but there is no staging fallback host here: `FRONTEND_URL`
+ * must be set on staging (a boot-time check for it is still open).
  */
 export function frontendUrlForEnvironment(): string {
   return frontendUrl(

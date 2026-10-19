@@ -17,6 +17,7 @@ describe("NotificationAccountService.sendPasswordResetEmail", () => {
     };
     const dispatch = {
       logNotification: jest.fn().mockResolvedValue(undefined),
+      sendTemplateEmailToAddress: jest.fn().mockResolvedValue(undefined),
     };
     const smtpProvider = {
       isConfigured: jest.fn().mockReturnValue(smtpConfigured),
@@ -28,7 +29,7 @@ describe("NotificationAccountService.sendPasswordResetEmail", () => {
       {} as never,
       smtpProvider as never,
     );
-    return { service, smtpProvider };
+    return { service, smtpProvider, dispatch };
   };
 
   beforeEach(() => {
@@ -41,7 +42,8 @@ describe("NotificationAccountService.sendPasswordResetEmail", () => {
     jest.restoreAllMocks();
     if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
     else process.env.FRONTEND_URL = originalFrontendUrl;
-    process.env.NODE_ENV = originalNodeEnv;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
   });
 
   it("links to the canonical host in production when FRONTEND_URL is unset", async () => {
@@ -56,7 +58,39 @@ describe("NotificationAccountService.sendPasswordResetEmail", () => {
         html: expect.stringContaining(
           "https://tarodan.com.tr/reset-password?token=tok",
         ),
+        template: "password-reset",
+        userId: "user-1",
       }),
+    );
+  });
+
+  it("links to the local web server outside production when FRONTEND_URL is unset", async () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.FRONTEND_URL;
+    const { service, smtpProvider } = build(true);
+
+    await service.sendPasswordResetEmail("user-1", "tok");
+
+    expect(smtpProvider.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          "http://localhost:3000/reset-password?token=tok",
+        ),
+      }),
+    );
+  });
+
+  it("builds the welcome link with the same host rule", async () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.FRONTEND_URL;
+    const { service, dispatch } = build(true);
+
+    await service.sendWelcomeEmail("user-1");
+
+    expect(dispatch.sendTemplateEmailToAddress).toHaveBeenCalledWith(
+      "member@example.com",
+      "welcome",
+      expect.objectContaining({ verifyUrl: "http://localhost:3000/listings" }),
     );
   });
 
@@ -93,5 +127,23 @@ describe("NotificationAccountService.sendPasswordResetEmail", () => {
       ...(Logger.prototype.warn as jest.Mock).mock.calls,
     ]);
     expect(logged).not.toContain("member@example.com");
+  });
+
+  it("scrubs the recipient address from a provider rejection before logging it", async () => {
+    const { service, smtpProvider } = build(true);
+    smtpProvider.sendEmail.mockResolvedValue({
+      success: false,
+      error: "550 5.1.1 <member@example.com>: Recipient address rejected",
+    });
+
+    await service.sendPasswordResetEmail("user-1", "tok");
+
+    const errorSpy = Logger.prototype.error as jest.Mock;
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain("userId=user-1");
+    expect(errorSpy.mock.calls[0][0]).toContain("Recipient address rejected");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(
+      "member@example.com",
+    );
   });
 });

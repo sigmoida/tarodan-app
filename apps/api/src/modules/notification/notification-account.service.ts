@@ -6,6 +6,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { redactString } from "@tarodan/logger";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
@@ -78,9 +79,10 @@ export class NotificationAccountService {
         to: user.email,
         subject: email.subject,
         html: email.html,
-        // Lets the EmailLog row record the template (filtering/audit). Only
-        // the address and name are carried here; the user id is out of scope.
+        // Lets the EmailLog row record the template and the user, so support
+        // can check per user whether a reset mail went out.
         template: "password-reset",
+        userId,
       });
     } else {
       // The caller still answers 200 (no account enumeration), so the dropped
@@ -104,7 +106,9 @@ export class NotificationAccountService {
       this.logger.log(`Password reset email sent (userId=${userId})`);
     } else if (smtpConfigured) {
       this.logger.error(
-        `Failed to send password reset email (userId=${userId}): ${result.error}`,
+        // SMTP rejections often quote the recipient address; this line
+        // reaches Sentry, so the provider text is scrubbed first.
+        `Failed to send password reset email (userId=${userId}): ${redactString(result.error ?? "")}`,
       );
     }
 
@@ -122,8 +126,8 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    // Link ve süre metni kuyruklu yolla ORTAK helper'dan gelir; iki yolun
-    // farklı host'a işaret etmesi mümkün olmasın.
+    // The link and the expiry text come from the SAME helper as the queued
+    // path, so the two can never point at different hosts.
     const frontendUrl = frontendUrlForEnvironment();
     const templateData = buildEmailVerificationTemplateData(
       user.displayName,
@@ -147,6 +151,7 @@ export class NotificationAccountService {
         subject: email.subject,
         html: email.html,
         template: "email-verification",
+        userId,
       });
     } else {
       this.logger.warn("SMTP is not configured for email verification");
@@ -166,7 +171,7 @@ export class NotificationAccountService {
       this.logger.log(`Email verification sent (userId=${userId})`);
     } else {
       this.logger.error(
-        `Failed to send email verification (userId=${userId}): ${result.error}`,
+        `Failed to send email verification (userId=${userId}): ${redactString(result.error ?? "")}`,
       );
     }
 
