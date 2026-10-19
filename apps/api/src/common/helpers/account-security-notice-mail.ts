@@ -1,4 +1,5 @@
 import { frontendUrlForEnvironment } from "../../config/app-urls";
+import { TR_TIME_ZONE } from "./tr-calendar";
 
 /**
  * The account security notice mail: one managed template, one event
@@ -72,8 +73,10 @@ export interface AccountSecurityNoticeTemplateData {
   [key: string]: unknown;
 }
 
+/** The member's calendar day: the server runs in UTC (see tr-calendar). */
 function noticeDate(at: Date): string {
   return new Intl.DateTimeFormat("tr-TR", {
+    timeZone: TR_TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

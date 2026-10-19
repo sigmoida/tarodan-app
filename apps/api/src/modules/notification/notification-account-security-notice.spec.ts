@@ -79,6 +79,16 @@ describe("account security notice", () => {
     expect(JSON.stringify(job.templateData)).not.toContain(EMAIL);
   });
 
+  it("dates the notice on the Istanbul calendar, not the server clock", () => {
+    // 21:30 UTC on 19 October is 00:30 on 20 October in Istanbul.
+    const data = buildAccountSecurityNoticeData({
+      event: "providerLinked",
+      provider: "google",
+      at: new Date("2026-10-19T21:30:00Z"),
+    });
+    expect(data.message).toContain("20.10.2026");
+  });
+
   it("renders every event with its own copy and the reset and support links", () => {
     const subjects = new Set<string>();
     for (const event of ACCOUNT_SECURITY_NOTICE_EVENTS) {
