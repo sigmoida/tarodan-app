@@ -59,7 +59,7 @@ export default function ProductCardBadges({
             return (
               <ProductBadge
                 key="sponsored"
-                variant="sponsored"
+                variant="boosted"
                 className={cls}
                 aria-hidden="true"
               >

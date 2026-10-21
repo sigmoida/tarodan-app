@@ -9,7 +9,7 @@ export type ProductBadgeVariant =
   | "rare"
   | "preorder"
   | "limited"
-  | "sponsored"
+  | "boosted"
   | "default";
 
 export interface ProductBadgeProps extends Omit<
@@ -36,13 +36,13 @@ const TO_BADGE: Record<
   rare: { variant: "default", appearance: "solid" },
   preorder: { variant: "default", appearance: "solid" },
   limited: { variant: "warning", appearance: "solid" },
-  sponsored: { variant: "warning", appearance: "solid" },
+  boosted: { variant: "warning", appearance: "solid" },
   default: { variant: "outline", appearance: "soft" },
 };
 
 /**
  * Merchandising badge for product cards (sale / new / trade / rare / preorder /
- * limited / sponsored). A thin wrapper over the generic {@link Badge}: it maps
+ * limited / boosted). A thin wrapper over the generic {@link Badge}: it maps
  * each product variant to a Badge variant + the SOLID appearance (bold, readable
  * over product imagery), so the merchandising look lives in one place instead of
  * a forked `<span>`.
