@@ -127,6 +127,7 @@ model User {
   deletedIdentity         DeletedUserIdentity?
   consentRecords          ConsentRecord[]
   sellerTrustScore        SellerTrustScore?
+  savedSearches           SavedSearch[]
 
   @@index([email])
   @@index([adminCode])
@@ -675,6 +676,11 @@ model MembershipTier {
   isAdFree             Boolean             @default(false) @map("is_ad_free")
   featuredListingSlots Int                 @default(0) @map("featured_listing_slots")
   commissionDiscount   Decimal             @default(0) @map("commission_discount") @db.Decimal(5, 4)
+  /// Most saved searches a member of this tier may keep (`POST /saved-searches`
+  /// refuses the next one). Admin-editable; the post-deploy script
+  /// `set-saved-search-limits` sets basic 10, premium 20 and business 50. After
+  /// a downgrade existing searches stay, only new saves are refused.
+  maxSavedSearches     Int                 @default(5) @map("max_saved_searches")
   isActive             Boolean             @default(true) @map("is_active")
   sortOrder            Int                 @default(0) @map("sort_order")
   createdAt            DateTime            @default(now()) @map("created_at")
@@ -1602,6 +1608,35 @@ model WishlistItem {
   @@unique([wishlistId, productId])
   @@index([productId])
   @@map("wishlist_items")
+}
+
+/// A saved product search (`/saved-searches`, docs/SAVED_SEARCHES.md). The
+/// tier limit is `MembershipTier.maxSavedSearches`. Account deletion deletes
+/// the rows inside the deletion transaction: the user row is anonymised, not
+/// deleted, so the cascade alone would not.
+model SavedSearch {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  /// The user's name, else the default name derived at save time
+  /// (`savedSearchDefaultName`); null when neither exists (clients render
+  /// `savedSearch.untitled`).
+  name      String?
+  /// The canonical `GET /products` query (`canonicalizeSavedSearchQuery` in
+  /// `@tarodan/types`): allow-listed filters only, never `page` or `limit`.
+  query     Json
+  /// Display labels of the ids in `query` (category, brand, ...), a snapshot
+  /// at save time: a later rename does not update them.
+  labels    Json     @default("{}")
+  /// SHA-256 hex of the stable JSON of `query`; with `userId` it makes a
+  /// duplicate save a unique violation (409 `SAVED_SEARCH_DUPLICATE`).
+  queryHash String   @map("query_hash")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, queryHash])
+  @@index([userId, createdAt])
+  @@map("saved_searches")
 }
 
 model Collection {

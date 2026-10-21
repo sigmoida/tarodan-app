@@ -20,6 +20,7 @@ import { AdminSupportService } from "./ops/admin-support.service";
 import { AdminContentService } from "./catalog/admin-content.service";
 import { AdminTaxService } from "./finance/admin-tax.service";
 import { AdminMembershipService } from "./finance/admin-membership.service";
+import type { MembershipTierUpdateInput } from "../membership/membership-tier-update.service";
 import { AdminCatalogService } from "./catalog/admin-catalog.service";
 import { AdminCollectionService } from "./catalog/admin-collection.service";
 import {
@@ -1275,20 +1276,7 @@ export class AdminService {
   async updateMembershipTier(
     adminId: string,
     tierId: string,
-    dto: {
-      name?: string;
-      description?: string;
-      monthlyPrice?: number;
-      yearlyPrice?: number;
-      maxFreeListings?: number;
-      maxTotalListings?: number;
-      maxImagesPerListing?: number;
-      canCreateCollections?: boolean;
-      canTrade?: boolean;
-      isAdFree?: boolean;
-      isActive?: boolean;
-      sortOrder?: number;
-    },
+    dto: MembershipTierUpdateInput,
   ) {
     return this.membershipService.updateMembershipTier(adminId, tierId, dto);
   }

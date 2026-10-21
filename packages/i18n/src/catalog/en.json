@@ -11963,6 +11963,12 @@
       "notFound": "Wishlist not found",
       "itemNotFound": "The product is not in your wishlist"
     },
+    "savedSearch": {
+      "limitReached": "You have reached your saved-search limit ({limit} searches).",
+      "alreadySaved": "This search is already saved.",
+      "emptyQuery": "Search or pick a filter before saving.",
+      "notFound": "Saved search not found."
+    },
     "dev": {
       "userMissing": "No such user: {email}"
     },

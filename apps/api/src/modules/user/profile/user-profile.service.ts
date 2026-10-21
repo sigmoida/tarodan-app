@@ -76,6 +76,7 @@ import {
   resolveIdentityFields,
 } from "../../../common/helpers/deleted-user-identity";
 import { hideCollectionsForAccountDeletion } from "../../collection/helpers/account-deletion-collections";
+import { deleteSavedSearchesForAccountDeletion } from "../../saved-search/helpers/account-deletion-saved-searches";
 import { purgeSellerDataForAccountDeletion } from "../helpers/account-deletion-seller-data";
 import { enqueueAvatarDeletion } from "../../media/helpers/avatar-deletion";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -744,6 +745,10 @@ export class UserProfileService {
             tx,
             userId,
           );
+
+          // 3a2b) Saved searches are the user's own search texts: deleted
+          // (the anonymised user row never cascades).
+          await deleteSavedSearchesForAccountDeletion(tx, userId);
 
           // 3a3) Avatar nesnesi depolamadan silinir — iş outbox'a bu
           // transaction'la yazılır, depolama çağrısı commit SONRASI.

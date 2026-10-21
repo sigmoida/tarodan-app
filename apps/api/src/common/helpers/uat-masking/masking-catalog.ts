@@ -421,6 +421,17 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
     columns: { [column]: JSON_SCRUB },
   })),
   {
+    table: "saved_searches",
+    action: "mask",
+    reason:
+      "Saved search: the search text in the query and the labels are typed by the user and may carry contact data; the filters stay. The query hash is the SHA-256 of the original, unscrubbed query, so a short search text (a phone number) could be confirmed or brute-forced from it: it becomes a fake derived from the row id, unique per row and so per (user_id, query_hash).",
+    columns: {
+      query: JSON_SCRUB,
+      labels: JSON_SCRUB,
+      query_hash: fake("token", { unique: true }),
+    },
+  },
+  {
     table: "orders",
     action: "mask",
     reason:
@@ -517,6 +528,7 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
       ["ratings", ["comment"]],
       ["product_ratings", ["title", "review", "admin_reply"]],
       ["collections", ["name", "description"]],
+      ["saved_searches", ["name"]],
       ["collection_items", ["custom_title", "custom_description"]],
       ["addresses", ["title"]],
       ["messages", ["flagged_reason"]],

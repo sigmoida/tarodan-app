@@ -422,6 +422,31 @@ at 02:30 Europe/Istanbul in the worker role and writes only its own table,
   longer registered (remove the leftover one from Bull Board). The table is
   harmless if left.
 
+### One-off: saved-search tier limits
+
+Reference: `docs/SAVED_SEARCHES.md`. Migration `20261021174800_saved_searches`
+adds `membership_tiers.max_saved_searches` with DEFAULT 5 on every tier and
+the empty `saved_searches` table. Until the script below runs, every tier
+allows 5 saved searches. Run it once after the deploy, dry run first:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/set-saved-search-limits.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/set-saved-search-limits.js --apply'
+```
+
+The first command only prints the tiers and the planned changes (basic 10,
+premium 20, business 50; free keeps 5). Locally: `pnpm --filter @tarodan/api
+set:prod:saved-search-limits` (after `build:seed`). The script changes only
+tiers still at 5 whose launch value differs, so a re-run changes nothing and
+a value other than 5 set in **System -> Membership Tiers** stays. It cannot
+tell a paid tier deliberately set to 5 from an untouched one: run it right
+after the deploy, before anyone edits the field. If it reports fewer updated
+tiers than planned, a tier changed meanwhile; run the dry run again. In production this is a production write: only with the user's
+approval.
+
+Rollback: set the values back in the admin panel. The column and table are
+harmless if left; a later migration drops them.
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`

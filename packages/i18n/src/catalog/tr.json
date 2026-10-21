@@ -11963,6 +11963,12 @@
       "notFound": "İstek listesi bulunamadı",
       "itemNotFound": "Ürün istek listenizde değil"
     },
+    "savedSearch": {
+      "limitReached": "Kayıtlı arama limitinize ulaştınız ({limit} arama).",
+      "alreadySaved": "Bu arama zaten kayıtlı.",
+      "emptyQuery": "Kaydetmek için bir arama yapın veya filtre seçin.",
+      "notFound": "Kayıtlı arama bulunamadı."
+    },
     "dev": {
       "userMissing": "Kullanıcı yok: {email}"
     },

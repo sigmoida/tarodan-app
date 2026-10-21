@@ -1,5 +1,9 @@
-import { ForbiddenException } from "@nestjs/common";
-import { lockActiveUsersShared, lockUserForDeletion } from "./user-row-lock";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  lockActiveUserForQuota,
+  lockActiveUsersShared,
+  lockUserForDeletion,
+} from "./user-row-lock";
 
 /**
  * Hesap silme (alıcı tarafı TOCTOU): silme kullanıcı satırını FOR UPDATE,
@@ -67,6 +71,38 @@ describe("user row locks", () => {
       expect(sqlOf(tx)).toContain("FROM users WHERE id = ?");
       expect(sqlOf(tx)).toContain("FOR UPDATE");
       expect(tx.$queryRaw.mock.calls[0][1]).toBe("u1");
+    });
+  });
+
+  describe("lockActiveUserForQuota", () => {
+    it("locks the one user row FOR NO KEY UPDATE", async () => {
+      const tx = makeTx([{ id: "a", deleted_at: null }]);
+
+      await lockActiveUserForQuota(tx as never, "a");
+
+      expect(sqlOf(tx)).toContain("FROM users WHERE id = ? FOR NO KEY UPDATE");
+      expect(tx.$queryRaw.mock.calls[0][1]).toBe("a");
+    });
+
+    it("refuses a deleted account", async () => {
+      const tx = makeTx([{ id: "a", deleted_at: new Date() }]);
+
+      const error = await lockActiveUserForQuota(tx as never, "a").catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toMatchObject({
+        i18nKey: "server.auth.accountDeleted",
+      });
+    });
+
+    it("refuses a missing user", async () => {
+      const tx = makeTx([]);
+
+      await expect(
+        lockActiveUserForQuota(tx as never, "missing"),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
