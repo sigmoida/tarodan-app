@@ -4,11 +4,7 @@ import {
   Prisma,
   SubscriptionStatus,
 } from "@prisma/client";
-import { BoostTimelineService } from "./boost-timeline.service";
-import { BoostTimelineStore } from "./boost-timeline-store.service";
-import { BoostActivationService } from "./boost-activation.service";
-import { BoostStaffTimelineService } from "./boost-staff-timeline.service";
-import { BoostSystemPauseService } from "./boost-system-pause.service";
+import { newBoostTimeline } from "./boost-timeline.testing";
 import {
   RELEVANCE_BOOST_BONUS,
   RELEVANCE_PREMIUM_BONUS,
@@ -343,16 +339,8 @@ const boostRelevance = (p: ProductRow) =>
   p.popularityScore;
 
 /** The facade over its slices, as the module wires it. */
-function makeTimeline(outbox?: { enqueue: jest.Mock }) {
-  const store = new BoostTimelineStore(undefined, outbox as never);
-  const timeline = new BoostTimelineService(
-    store,
-    new BoostActivationService(store),
-    new BoostStaffTimelineService(store),
-    new BoostSystemPauseService(store),
-  );
-  return { timeline, store };
-}
+const makeTimeline = (outbox?: { enqueue: jest.Mock }) =>
+  newBoostTimeline({ outbox: outbox as never });
 
 describe("BoostTimelineService", () => {
   const service = makeTimeline().timeline;

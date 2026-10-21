@@ -1,20 +1,8 @@
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
-import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
-import { BoostTimelineStore } from "../../product/boost-timeline/boost-timeline-store.service";
-import { BoostActivationService } from "../../product/boost-timeline/boost-activation.service";
-import { BoostStaffTimelineService } from "../../product/boost-timeline/boost-staff-timeline.service";
-import { BoostSystemPauseService } from "../../product/boost-timeline/boost-system-pause.service";
+import { newBoostTimeline } from "../../product/boost-timeline/boost-timeline.testing";
 
 /** The real timeline facade over its slices (activation runs for real). */
-function newTimeline(): BoostTimelineService {
-  const store = new BoostTimelineStore();
-  return new BoostTimelineService(
-    store,
-    new BoostActivationService(store),
-    new BoostStaffTimelineService(store),
-    new BoostSystemPauseService(store),
-  );
-}
+const newTimeline = () => newBoostTimeline().timeline;
 import {
   CancellationActor,
   SubscriptionStatus,

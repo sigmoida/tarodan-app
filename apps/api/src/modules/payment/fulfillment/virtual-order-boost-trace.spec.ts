@@ -1,4 +1,4 @@
-import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
+import { newBoostTimeline } from "../../product/boost-timeline/boost-timeline.testing";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 
 /**
@@ -39,7 +39,7 @@ describe("VirtualOrderFulfillmentService.applyBoostInTx — Sentry trail", () =>
     const svc = new VirtualOrderFulfillmentService(
       {} as never,
       {} as never,
-      new BoostTimelineService(sentry as never),
+      newBoostTimeline({ sentry: sentry as never }).timeline,
       undefined,
       undefined,
       sentry as never,
