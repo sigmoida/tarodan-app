@@ -14,6 +14,7 @@ import {
   PaymentStatus,
   PaymentHoldStatus,
   OfferStatus,
+  OrderOrigin,
   OrderStatus,
   RefundAttemptStatus,
   RefundRequestStatus,
@@ -1130,9 +1131,16 @@ export class PaymentRefundService {
               buyerId: true,
               commissionAmount: true,
               withholdingTaxAmount: true,
+              origin: true,
             },
           });
-          if (ledgerOrder) {
+          // The platform's own service orders (membership, boost) never had a
+          // capture group (fulfilment skips the ledger for virtual orders):
+          // reversing one would credit the platform seller's escrow with money
+          // that never entered it.
+          const isPlatformService =
+            ledgerOrder?.origin === OrderOrigin.platform_service;
+          if (ledgerOrder && !isPlatformService) {
             await this.ledger?.recordRefund(tx, {
               orderId,
               paymentId: payment.id,
