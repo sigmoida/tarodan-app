@@ -105,7 +105,7 @@ describe("SellerTrustBadge", () => {
       "Güven skoru nasıl hesaplanır?",
     );
     expect(document.body.textContent).toContain(
-      "En az 5 tamamlanmış işlemi olmayan",
+      "En az 5 tamamlanmış işlemi ve 3 farklı alıcısı olmayan",
     );
   });
 });
