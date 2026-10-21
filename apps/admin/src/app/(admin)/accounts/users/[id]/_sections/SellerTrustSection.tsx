@@ -1,14 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Alert } from "@tarodan/ui";
 import {
   SELLER_TRUST_LEVEL_I18N_KEYS,
-  formatTrustRating,
   type AdminSellerTrustView,
 } from "@tarodan/types";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDateTime, fmtDecimal } from "@/lib/format";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
@@ -24,18 +23,16 @@ import { trustBreakdownColumns } from "../_lib/trustColumns";
  */
 export function SellerTrustSection({ trust }: { trust: AdminSellerTrustView }) {
   const t = useTranslations();
-  const locale = useLocale();
   const columns = useMemo(() => trustBreakdownColumns(t), [t]);
   const rows = useMemo(
-    () =>
-      trust.components ? trustBreakdownRows(trust.components, t, locale) : [],
-    [trust.components, t, locale],
+    () => (trust.components ? trustBreakdownRows(trust.components, t) : []),
+    [trust.components, t],
   );
 
   const computed = trust.computedAt !== null;
   const scoreText =
     trust.rating !== null
-      ? `${formatTrustRating(trust.rating, locale)} / 5`
+      ? `${fmtDecimal(trust.rating)} / 5`
       : computed
         ? t("admin.users.detail.trust.notEnoughData")
         : t("admin.users.detail.trust.notComputed");
@@ -51,9 +48,7 @@ export function SellerTrustSection({ trust }: { trust: AdminSellerTrustView }) {
           {t(SELLER_TRUST_LEVEL_I18N_KEYS[trust.level])}
         </Field>
         <Field label={t("admin.users.detail.trust.computedAt")}>
-          {computed
-            ? (fmtDateTime(trust.computedAt) ?? "-")
-            : t("admin.users.detail.trust.notComputed")}
+          {fmtDateTime(trust.computedAt) ?? "-"}
         </Field>
         <Field label={t("admin.users.detail.trust.formulaVersion")}>
           {trust.formulaVersion}

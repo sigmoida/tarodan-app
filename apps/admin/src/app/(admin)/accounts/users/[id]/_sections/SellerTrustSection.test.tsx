@@ -9,7 +9,6 @@ import type {
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
-  useLocale: () => "tr",
 }));
 vi.mock("@/hooks/useMediaQuery", () => ({ useMediaQuery: () => false }));
 

@@ -1,5 +1,5 @@
 import { type ColumnDef } from "@/components/DataTable";
-import { col } from "@/components/table";
+import { COL_WIDTH, col } from "@/components/table";
 import type { Translate } from "@/lib/statusLabels";
 import type { TrustBreakdownRow } from "./trustBreakdown";
 
@@ -18,17 +18,18 @@ export function trustBreakdownColumns(
     col.text<TrustBreakdownRow>(
       t("admin.users.detail.trust.colWeight"),
       (r) => r.weight,
-      { ...NOT_SORTABLE, grow: 1, minWidth: 100 },
+      { ...NOT_SORTABLE, grow: 1, minWidth: COL_WIDTH.count },
     ),
     col.text<TrustBreakdownRow>(
       t("admin.users.detail.trust.colSubScore"),
       (r) => r.subScore,
-      { ...NOT_SORTABLE, grow: 1, minWidth: 100 },
+      { ...NOT_SORTABLE, grow: 1, minWidth: COL_WIDTH.count },
     ),
-    col.text<TrustBreakdownRow>(
+    // One count per line, so each stays readable without wrapping.
+    col.stacked<TrustBreakdownRow>(
       t("admin.users.detail.trust.colDetail"),
       (r) => r.detail,
-      { ...NOT_SORTABLE, grow: 6, minWidth: 360 },
+      { ...NOT_SORTABLE, grow: 6, minWidth: COL_WIDTH.description },
     ),
   ];
 }
