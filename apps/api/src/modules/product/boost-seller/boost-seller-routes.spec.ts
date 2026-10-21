@@ -24,6 +24,17 @@ const ROUTES = [
   "setBoostReminder",
 ] as const;
 
+/** Whether an Express route pattern (`:param` segments) matches a concrete path. */
+const segments = (path: string) => path.split("/").filter(Boolean);
+const catches = (pattern: string, path: string) => {
+  const p = segments(pattern);
+  const c = segments(path);
+  return (
+    p.length === c.length &&
+    p.every((seg, i) => seg.startsWith(":") || seg === c[i])
+  );
+};
+
 const handler = (method: keyof ProductController) =>
   ProductController.prototype[method] as unknown as object;
 
@@ -42,8 +53,10 @@ describe("ProductController boost seller routes", () => {
     expect(Reflect.getMetadata(PATH_METADATA, handler(method))).toBe(path);
   });
 
-  it("declares the static boost routes before every `:id` route of the same method", () => {
-    // Nest matches routes in declaration order.
+  it("no route declared earlier with the same method catches a boost route", () => {
+    // Nest (Express) matches routes in declaration order: an earlier `:id`
+    // route would read "boost" as a listing id. Each boost route's concrete
+    // path is matched against every route declared before it.
     const routes = Object.getOwnPropertyNames(ProductController.prototype)
       .map((name) => {
         const fn = (
@@ -57,16 +70,28 @@ describe("ProductController boost seller routes", () => {
             number | undefined,
         };
       })
-      .filter((r) => r.path !== undefined);
-    const indexOf = (name: string) => routes.findIndex((r) => r.name === name);
-    for (const name of ROUTES) {
-      const route = routes[indexOf(name)];
-      const firstParamRoute = routes.findIndex(
-        (r) => r.method === route.method && r.path === ":id",
+      .filter((r): r is { name: string; path: string; method: number } =>
+        Boolean(r.path),
       );
-      if (firstParamRoute === -1) continue;
-      expect(indexOf(name)).toBeLessThan(firstParamRoute);
+    for (const name of ROUTES) {
+      const at = routes.findIndex((r) => r.name === name);
+      expect(at).toBeGreaterThanOrEqual(0);
+      const route = routes[at];
+      const concrete = route.path.replace(/:[^/]+/g, UUID);
+      const shadowing = routes
+        .slice(0, at)
+        .filter((r) => r.method === route.method && catches(r.path, concrete))
+        .map((r) => r.name);
+      expect({ name, shadowing }).toEqual({ name, shadowing: [] });
     }
+  });
+
+  it("the shadowing check catches a parameter route of the same length", () => {
+    // Guards the check above against passing vacuously.
+    expect(catches(":id", "boost")).toBe(true);
+    expect(catches(":id/boost/:what", `${UUID}/boost/reminder`)).toBe(true);
+    expect(catches(":id/stats", "boost/offers")).toBe(false);
+    expect(catches(":id", "boost/my")).toBe(false);
   });
 });
 

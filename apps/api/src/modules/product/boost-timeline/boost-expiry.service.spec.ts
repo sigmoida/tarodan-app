@@ -457,6 +457,42 @@ describe("BoostExpiryService.remindEndingSoon", () => {
     expect(outbox.enqueue).toHaveBeenCalledTimes(1);
   });
 
+  it("the switch is the listing's: a paused boost that asked keeps it on for the running tail", async () => {
+    // Staff paused the boost the seller turned the reminder on for; a later
+    // purchase without the flag runs and is the tail.
+    const { service, tx, outbox } = setup({
+      boosts: [
+        boost({
+          id: "held",
+          status: BoostStatus.paused,
+          endsAt: null,
+          autoRenew: true,
+        }),
+        boost({ id: "tail", endsAt: at(10 * HOUR), autoRenew: false }),
+      ],
+    });
+
+    await expect(
+      service.remindEndingSoon(tx as never, "prod-1", NOW),
+    ).resolves.toMatchObject({ boostId: "tail", kind: "ending_soon" });
+    expect(outbox.enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("an expired or cancelled boost that asked does not keep the switch on", async () => {
+    const { service, tx, outbox } = setup({
+      boosts: [
+        boost({ id: "old", status: BoostStatus.expired, autoRenew: true }),
+        boost({ id: "gone", status: BoostStatus.cancelled, autoRenew: true }),
+        boost({ id: "tail", endsAt: at(10 * HOUR), autoRenew: false }),
+      ],
+    });
+
+    await expect(
+      service.remindEndingSoon(tx as never, "prod-1", NOW),
+    ).resolves.toBeNull();
+    expect(outbox.enqueue).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       "the reminder is off",

@@ -278,6 +278,45 @@ describe("BoostSellerService.getMyBoosts", () => {
     });
   });
 
+  it("an active boost whose end passed before the cron ran is not running and has no time left", async () => {
+    const { service } = setup({
+      rows: [record({ id: "ended", endsAt: new Date(NOW - 60_000) })],
+    });
+
+    const { data } = await service.getMyBoosts(SELLER, {});
+
+    expect(data[0]).toMatchObject({
+      status: "active",
+      isActive: false,
+      remainingMs: 0,
+    });
+  });
+
+  it("a stacked boost counts until its own end, which includes the boost before it", async () => {
+    // MyBoostRow: remainingMs runs to `endsAt`; the page shows the listing's
+    // end (`product.boostedUntil`) as "remaining".
+    const first = new Date(NOW + 2 * 86_400_000);
+    const second = new Date(NOW + 9 * 86_400_000);
+    const { service } = setup({
+      rows: [
+        record({ id: "second", endsAt: second }),
+        record({ id: "first", endsAt: first }),
+      ],
+    });
+
+    const before = Date.now();
+    const { data } = await service.getMyBoosts(SELLER, {});
+    const after = Date.now();
+
+    const stacked = data.find((r) => r.id === "second");
+    expect(stacked?.isActive).toBe(true);
+    expect(stacked?.remainingMs).toBeLessThanOrEqual(second.getTime() - before);
+    expect(stacked?.remainingMs).toBeGreaterThanOrEqual(
+      second.getTime() - after,
+    );
+    expect(stacked?.endsAt).toBe(second.toISOString());
+  });
+
   it("marks the best performing boost of the page", async () => {
     const { service } = setup({
       rows: [
@@ -381,6 +420,53 @@ describe("BoostSellerService.setReminder", () => {
       service.setReminder(SELLER, "prod-1", false),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.productBoost.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("looks the listing up by id among listings only (a collection is never a boost target)", async () => {
+    const { service, prisma } = setup();
+
+    await service.setReminder(SELLER, "prod-1", false);
+
+    expect(prisma.product.findFirst).toHaveBeenCalledWith({
+      where: { id: "prod-1", kind: "listing" },
+      select: { sellerId: true },
+    });
+  });
+
+  it("someone else's listing gets the very same 404 as a missing one (no existence leak)", async () => {
+    const errorOf = async (product: { sellerId: string } | null) => {
+      const { service } = setup({ product });
+      return service.setReminder(SELLER, "prod-1", true).then(
+        () => null,
+        (error: NotFoundException) => ({
+          name: error.constructor.name,
+          status: error.getStatus(),
+          response: error.getResponse(),
+        }),
+      );
+    };
+
+    const foreign = await errorOf({ sellerId: "other-seller" });
+    const missing = await errorOf(null);
+
+    expect(missing).toMatchObject({
+      name: "NotFoundException",
+      status: 404,
+      response: { i18nKey: "server.product.notFound" },
+    });
+    expect(foreign).toEqual(missing);
+  });
+
+  it("someone else's listing is a 404 before the premium check (a free caller learns nothing)", async () => {
+    const { service, prisma } = setup({
+      product: { sellerId: "other-seller" },
+      membership: null,
+    });
+
+    await expect(
+      service.setReminder(SELLER, "prod-1", true),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.userMembership.findUnique).not.toHaveBeenCalled();
   });
 
   it("reports off when no boost of the listing runs", async () => {

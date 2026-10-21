@@ -209,6 +209,11 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
       expect(sql).toContain(
         'ORDER BY b."ends_at" ASC, b."product_id" ASC LIMIT ?',
       );
+      // The tail is still running and ends within the lead time: after now,
+      // at the horizon at the latest (isBoostReminderDue's window).
+      expect(sql).toContain(
+        'WHERE b."status" = ?::"BoostStatus" AND b."ends_at" > ? AND b."ends_at" <= ? AND (',
+      );
       const [status, now, horizon, leadMinutes, productStatus] = values as [
         string,
         Date,
@@ -222,6 +227,41 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
       expect(productStatus).toBe("active");
       expect(values[values.length - 1]).toBe(500);
     });
+  });
+
+  it("one listing whose reminder fails never stops the others", async () => {
+    const { service, prisma, timeline, notices } = make();
+    prisma.$queryRaw.mockResolvedValueOnce([
+      { productId: "p1" },
+      { productId: "p2" },
+    ]);
+    const notice = {
+      boostId: "b2",
+      kind: "ending_soon",
+      at: "2026-10-21T12:00:00.000Z",
+    };
+    timeline.remindEndingSoon
+      .mockRejectedValueOnce(new Error("lock timeout"))
+      .mockResolvedValueOnce(notice);
+
+    const result = await service.runExpireBoosts();
+
+    expect(timeline.remindEndingSoon).toHaveBeenCalledTimes(2);
+    expect(notices.flush).toHaveBeenCalledTimes(1);
+    expect(notices.flush).toHaveBeenCalledWith(notice);
+    expect(result.stats).toMatchObject({ reminded: 1 });
+  });
+
+  it("claims a listing once although two tails tie on their end", async () => {
+    const { service, prisma, timeline } = make();
+    prisma.$queryRaw.mockResolvedValueOnce([
+      { productId: "p1" },
+      { productId: "p1" },
+    ]);
+
+    await service.runExpireBoosts();
+
+    expect(timeline.remindEndingSoon).toHaveBeenCalledTimes(1);
   });
 
   const privateOf = (service: ProductSchedulerService) =>
