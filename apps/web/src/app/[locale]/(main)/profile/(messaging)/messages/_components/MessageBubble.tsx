@@ -1,6 +1,7 @@
 "use client";
 
 import { ClockIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import MessageTicks from "./MessageTicks";
 import { parseMessageContent, type Message } from "../_lib/messages";
 import { formatTime } from "@/lib/format";
@@ -12,6 +13,8 @@ export default function MessageBubble({
   message: Message;
   isFromMe: boolean;
 }) {
+  const t = useTranslations();
+  const metaTone = isFromMe ? "text-inverted/80" : "text-subtle";
   return (
     <div className={`flex ${isFromMe ? "justify-end" : "justify-start"}`}>
       <div
@@ -52,21 +55,21 @@ export default function MessageBubble({
           )}
         </div>
         <div className="flex items-center justify-end gap-1.5 mt-1">
-          <span
-            className={`text-xs ${isFromMe ? "text-inverted/80" : "text-subtle"}`}
-          >
+          <span className={`text-xs ${metaTone}`}>
             {formatTime(message.createdAt)}
           </span>
           {message.status === "pending" && (
             <ClockIcon
-              className={`size-3.5 ${isFromMe ? "text-inverted/80" : "text-subtle"}`}
-              aria-hidden
+              className={`size-3.5 ${metaTone}`}
+              role="img"
+              aria-label={t("page.messages.messageticks.incelemede")}
             />
           )}
           {message.status === "rejected" && (
             <XCircleIcon
-              className={`size-3.5 ${isFromMe ? "text-inverted/80" : "text-subtle"}`}
-              aria-hidden
+              className={`size-3.5 ${metaTone}`}
+              role="img"
+              aria-label={t("page.messages.messageticks.reddedildi")}
             />
           )}
           {isFromMe &&

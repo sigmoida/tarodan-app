@@ -13388,7 +13388,9 @@
       },
       "messageticks": {
         "okundu": "Okundu",
-        "iletildi": "İletildi"
+        "iletildi": "İletildi",
+        "incelemede": "İncelemede",
+        "reddedildi": "Reddedildi"
       }
     },
     "profile": {

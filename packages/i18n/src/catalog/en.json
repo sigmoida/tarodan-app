@@ -13387,8 +13387,10 @@
         "uyari": "Uyarı"
       },
       "messageticks": {
-        "okundu": "Okundu",
-        "iletildi": "İletildi"
+        "okundu": "Read",
+        "iletildi": "Delivered",
+        "incelemede": "In review",
+        "reddedildi": "Rejected"
       }
     },
     "profile": {
