@@ -13,8 +13,17 @@ import { ErrorBoundary } from "./ErrorBoundary";
  * whole subtree shows one spinner until data is ready, and any fetch error is
  * caught here with a retry. Subsequent updates (filter/search/page) should run
  * inside a React transition so they DON'T re-trigger this fallback.
+ *
+ * `errorTitle` names what failed when a page holds several boundaries (e.g.
+ * two sections of one detail page); the generic title is the default.
  */
-export function SuspenseBoundary({ children }: { children: ReactNode }) {
+export function SuspenseBoundary({
+  children,
+  errorTitle,
+}: {
+  children: ReactNode;
+  errorTitle?: ReactNode;
+}) {
   const t = useTranslations();
   return (
     <QueryErrorResetBoundary>
@@ -23,7 +32,7 @@ export function SuspenseBoundary({ children }: { children: ReactNode }) {
           fallback={(clear) => (
             <Alert
               variant="danger"
-              title={t("admin.shared.suspense.errorTitle")}
+              title={errorTitle ?? t("admin.shared.suspense.errorTitle")}
             >
               <div className="flex flex-col items-start gap-3">
                 <span>{t("admin.shared.suspense.errorDescription")}</span>
