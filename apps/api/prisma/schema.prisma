@@ -3465,6 +3465,9 @@ model SecurityLog {
   @@index([ipAddress])
   @@index([userId])
   @@index([createdAt])
+  // The per-user history, newest first (admin user detail: sign-in method
+  // events; system logs filtered by user). A backward scan serves DESC.
+  @@index([userId, createdAt])
   @@map("security_logs")
 }
 
