@@ -240,6 +240,44 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       );
   }
 
+  /**
+   * A boost package for everyone with 3, 7 and 30-day tiers at 29, 59 and 149
+   * TL for any listing price. ad_packages is not truncated between tests, so
+   * it is upserted by slug and its tiers are rewritten.
+   */
+  async function ensureBoostPackage(): Promise<string> {
+    const prisma = getPrisma();
+    const pkg = await prisma.adPackage.upsert({
+      where: { slug: "e2e-dsc-boost" },
+      update: {
+        isActive: true,
+        audienceMode: "everyone",
+        showcaseOnHome: false,
+      },
+      create: {
+        name: "E2E Boost",
+        slug: "e2e-dsc-boost",
+        audienceMode: "everyone",
+        showcaseOnHome: false,
+      },
+    });
+    await prisma.adPackageTier.deleteMany({ where: { packageId: pkg.id } });
+    await prisma.adPackageTier.createMany({
+      data: [
+        [3, 29],
+        [7, 59],
+        [30, 149],
+      ].map(([durationDays, price]) => ({
+        packageId: pkg.id,
+        durationDays,
+        minAmount: new Prisma.Decimal(0),
+        maxAmount: null,
+        price: new Prisma.Decimal(price),
+      })),
+    });
+    return pkg.id;
+  }
+
   const iabAd = (over: Record<string, unknown> = {}) => ({
     title: "Banner",
     imageUrl: "https://cdn.test/banner.png",
@@ -2415,6 +2453,55 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     expect(item).toHaveProperty("isActive");
     expect(item).toHaveProperty("remainingMs");
     expect(item).toHaveProperty("createdAt");
+  });
+
+  scenario("DSC-113", async () => {
+    // Two boost payments for one listing fulfilled at the same time (7 and 3
+    // days): the listing row lock serialises the activations, so the second
+    // stacks on the first and no duration is lost.
+    await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await makeProduct({
+      sellerId: seller.id,
+      status: "active",
+    });
+    const prisma = getPrisma();
+
+    const initiate = async (durationDays: number) => {
+      const res = await request(server())
+        .post(`/api/products/${product.id}/boost/initiate`)
+        .set(authHeader(seller))
+        .send({ packageId, durationDays })
+        .expect(201);
+      const boost = await prisma.productBoost.findUnique({
+        where: { id: res.body.boostId },
+      });
+      return boost!;
+    };
+    const seven = await initiate(7);
+    const three = await initiate(3);
+
+    const startedAt = Date.now();
+    await Promise.all([
+      completeBoostPayment(seven.orderId!),
+      completeBoostPayment(three.orderId!),
+    ]);
+
+    const [b7, b3, listing] = await Promise.all([
+      prisma.productBoost.findUnique({ where: { id: seven.id } }),
+      prisma.productBoost.findUnique({ where: { id: three.id } }),
+      prisma.product.findUnique({ where: { id: product.id } }),
+    ]);
+    expect(b7?.status).toBe("active");
+    expect(b3?.status).toBe("active");
+    const until = listing!.boostedUntil!.getTime();
+    // 10 days from the callbacks (a few seconds of tolerance).
+    expect(
+      Math.abs(until - (startedAt + 10 * 24 * 60 * 60 * 1000)),
+    ).toBeLessThan(60_000);
+    // The later of the two boosts ends with the listing.
+    expect(Math.max(b7!.endsAt!.getTime(), b3!.endsAt!.getTime())).toBe(until);
   });
 
   // ════════════════════════════ Sınır / para / güvenlik ════════════════════════════

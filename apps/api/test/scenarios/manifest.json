@@ -1,11 +1,11 @@
 {
   "meta": {
-    "total": 2296,
+    "total": 2297,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 700,
+      "P0": 701,
       "P1": 988,
       "P2": 608
     }
@@ -111,7 +111,7 @@
       "code": "17",
       "prefix": "DSC",
       "title": "17 — İndirim & Pazarlama",
-      "count": 112
+      "count": 113
     },
     {
       "code": "18",
@@ -21051,6 +21051,19 @@
       "pri": "P1",
       "steps": "1. Popup oluştur. 2. PATCH isActive / displayOrder / aynı başlık. 3. PATCH yeni başlık, sonra popupFrequency. 4. Gösterim kaydı.",
       "exp": "1: popupVersion 1. 2: 1 kalır. 3: 2, sonra 3. 4: sayaç artışı sürümü değiştirmez.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-113",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Two concurrent boost payments on one listing lose no time",
+      "tur": "Money / Concurrency",
+      "pri": "P0",
+      "steps": "1. Start a 7-day and a 3-day boost for one listing. 2. Send both PayTR callbacks at the same time.",
+      "exp": "Both boosts active; the listing's boostedUntil is the callback time + 10 days; the later boost's endsAt equals boostedUntil (BoostTimelineService.activate locks the listing row FOR UPDATE).",
       "gap": false,
       "gapRefs": []
     },

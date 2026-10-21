@@ -105,6 +105,8 @@ function fakeDb() {
   const lockOwner = new Map<string, number>();
   const lockWaiters = new Map<string, Array<() => void>>();
   const lockSql: string[] = [];
+  /** Order of the reads and locks, to prove the lock comes first. */
+  const events: string[] = [];
   let nextTx = 1;
 
   const acquire = async (productId: string, txId: number) => {
@@ -131,6 +133,7 @@ function fakeDb() {
         await tick();
         const sql = strings.join("?");
         lockSql.push(sql.replace(/\s+/g, " ").trim());
+        events.push(`lock:${String(values[0])}`);
         if (/FOR UPDATE/i.test(sql)) await acquire(String(values[0]), txId);
         return [];
       },
@@ -138,6 +141,7 @@ function fakeDb() {
     product: {
       findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
         await tick();
+        events.push("product.read");
         const row = products.get(where.id);
         return row ? structuredClone(row) : null;
       }),
@@ -154,6 +158,7 @@ function fakeDb() {
     productBoost: {
       findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
         await tick();
+        events.push("boost.read");
         const row = boosts.get(where.id);
         return row ? structuredClone(row) : null;
       }),
@@ -217,6 +222,7 @@ function fakeDb() {
     products,
     boosts,
     lockSql,
+    events,
     makeTx,
     /** Runs `fn` as one transaction: its row locks are held until it ends. */
     async transaction<T>(
@@ -638,6 +644,185 @@ describe("BoostTimelineService", () => {
         homeShowcaseUntil: at(33 * DAY),
         rankTier: 2,
       });
+    });
+  });
+
+  describe("activation is idempotent", () => {
+    it("does not stack an already active boost a second time", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(7 * DAY), rankTier: 2 }),
+        boostRow({ status: BoostStatus.active, endsAt: at(7 * DAY) }),
+      );
+
+      const result = await db.transaction((tx) =>
+        service.activate(tx, "boost-1", NOW),
+      );
+
+      expect(result).toBeNull();
+      expect(db.boosts.get("boost-1")?.endsAt).toEqual(at(7 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(7 * DAY));
+    });
+
+    it.each([BoostStatus.paused, BoostStatus.expired, BoostStatus.cancelled])(
+      "leaves a %s boost alone",
+      async (status) => {
+        const db = setup(productRow(), boostRow({ status }));
+
+        const result = await db.transaction((tx) =>
+          service.activate(tx, "boost-1", NOW),
+        );
+
+        expect(result).toBeNull();
+        expect(db.boosts.get("boost-1")?.status).toBe(status);
+        expect(db.products.get("prod-1")?.rankTier).toBe(0);
+      },
+    );
+
+    it("activates a late payment of a boost the sweep marked failed", async () => {
+      const db = setup(productRow(), boostRow({ status: BoostStatus.failed }));
+
+      const result = await db.transaction((tx) =>
+        service.activate(tx, "boost-1", NOW),
+      );
+
+      expect(result?.endsAt).toEqual(at(7 * DAY));
+      expect(db.boosts.get("boost-1")?.status).toBe(BoostStatus.active);
+    });
+  });
+
+  describe("listing row lock", () => {
+    it("is SELECT ... FOR UPDATE on the listing row", async () => {
+      const db = setup(productRow(), boostRow());
+
+      await db.transaction((tx) => service.activate(tx, "boost-1", NOW));
+
+      expect(db.lockSql[0]).toBe(
+        "SELECT id FROM products WHERE id = ? FOR UPDATE",
+      );
+    });
+
+    it("is taken before activation reads the boost status or the timeline", async () => {
+      const db = setup(productRow(), boostRow());
+
+      await db.transaction((tx) => service.activate(tx, "boost-1", NOW));
+
+      // The first boost read only finds the listing id; status and the
+      // listing's boostedUntil are read after the lock.
+      expect(db.events.slice(0, 4)).toEqual([
+        "boost.read",
+        "lock:prod-1",
+        "boost.read",
+        "product.read",
+      ]);
+    });
+
+    it.each([
+      [
+        "pause",
+        boostRow({ status: BoostStatus.active, endsAt: at(DAY) }),
+        (tx: Prisma.TransactionClient) => service.pause(tx, "boost-1", NOW),
+      ],
+      [
+        "resume",
+        boostRow({ status: BoostStatus.paused, pausedRemainingSeconds: 60 }),
+        (tx: Prisma.TransactionClient) => service.resume(tx, "boost-1", NOW),
+      ],
+      [
+        "extend",
+        boostRow({ status: BoostStatus.active, endsAt: at(DAY) }),
+        (tx: Prisma.TransactionClient) => service.extend(tx, "boost-1", 1, NOW),
+      ],
+      [
+        "refresh",
+        boostRow({ status: BoostStatus.active, endsAt: at(DAY) }),
+        (tx: Prisma.TransactionClient) =>
+          service.refreshProductPromotion(tx, "prod-1", NOW),
+      ],
+    ])("is taken by %s before it reads the boost", async (_name, row, run) => {
+      const db = setup(productRow(), row);
+
+      await db.transaction(run);
+
+      const firstLock = db.events.indexOf("lock:prod-1");
+      expect(firstLock).toBeGreaterThanOrEqual(0);
+      // At most the listing-id lookup happens before the lock.
+      expect(["", "boost.read"]).toContain(
+        db.events.slice(0, firstLock).join(","),
+      );
+    });
+  });
+
+  describe("concurrent writers on one listing", () => {
+    function twoPaidBoosts() {
+      // The listing is boosted for 5 more days; a 7-day and a 3-day boost are
+      // paid and fulfilled at the same moment.
+      return setup(
+        productRow({ boostedUntil: at(5 * DAY), rankTier: 2 }),
+        boostRow({ id: "boost-7", durationDays: 7 }),
+        boostRow({ id: "boost-3", durationDays: 3 }),
+      );
+    }
+
+    it("two fulfilments end with the summed time", async () => {
+      const db = twoPaidBoosts();
+
+      await Promise.all([
+        db.transaction((tx) => service.activate(tx, "boost-7", NOW)),
+        db.transaction((tx) => service.activate(tx, "boost-3", NOW)),
+      ]);
+
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(15 * DAY));
+      const ends = [
+        db.boosts.get("boost-7")?.endsAt,
+        db.boosts.get("boost-3")?.endsAt,
+      ].map((d) => d?.getTime());
+      // One stacked on the old end, the other on the first one's end.
+      expect(ends).toContain(at(15 * DAY).getTime());
+      expect(
+        ends.some(
+          (t) => t === at(12 * DAY).getTime() || t === at(8 * DAY).getTime(),
+        ),
+      ).toBe(true);
+    });
+
+    it("loses a duration without the lock (the race this guards)", async () => {
+      const db = twoPaidBoosts();
+      const unlocked = new BoostTimelineService();
+      jest.spyOn(unlocked, "lockProduct").mockResolvedValue(undefined);
+
+      await Promise.all([
+        db.transaction((tx) => unlocked.activate(tx, "boost-7", NOW)),
+        db.transaction((tx) => unlocked.activate(tx, "boost-3", NOW)),
+      ]);
+
+      // Both read boostedUntil = +5 days, so one duration is lost.
+      expect(db.products.get("prod-1")?.boostedUntil).not.toEqual(at(15 * DAY));
+    });
+
+    it("keeps both a fulfilment and a staff extension running at once", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(5 * DAY), rankTier: 2 }),
+        boostRow({
+          id: "running",
+          status: BoostStatus.active,
+          endsAt: at(5 * DAY),
+          purchasedAt: at(-DAY),
+        }),
+        boostRow({ id: "paid", durationDays: 3 }),
+      );
+
+      await Promise.all([
+        db.transaction((tx) => service.extend(tx, "running", 2, NOW)),
+        db.transaction((tx) => service.activate(tx, "paid", NOW)),
+      ]);
+
+      // Whichever ran first, the listing ends after both the extension and
+      // the new boost are counted from the timeline the other one left.
+      const until = db.products.get("prod-1")?.boostedUntil?.getTime();
+      // extend first: running -> +7d, paid stacks on +7d -> +10d.
+      // activate first: paid -> +8d, running extended to +7d, latest stays +8d.
+      expect([at(10 * DAY).getTime(), at(8 * DAY).getTime()]).toContain(until);
+      expect(db.boosts.get("running")?.endsAt).toEqual(at(7 * DAY));
     });
   });
 });
