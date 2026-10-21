@@ -81,6 +81,66 @@ describe("discountSchema — budgetLimit is mandatory for every discount type", 
   });
 });
 
+describe("discountSchema — typed TL amounts", () => {
+  const messagesAt = (values: Partial<DiscountFormValues>, path: string) => {
+    const result = schema.safeParse({ ...base, ...values });
+    return result.success
+      ? []
+      : result.error.issues
+          .filter((issue) => issue.path.join(".") === path)
+          .map((issue) => issue.message);
+  };
+
+  it.each(["budgetLimit", "minCartValue", "maxDiscountAmount"] as const)(
+    'refuses a grouped %s ("1.000" is not 1 TL)',
+    (path) => {
+      expect(messagesAt({ [path]: "1.000" }, path)).toEqual([
+        "validation.amountFormatRefused",
+      ]);
+    },
+  );
+
+  it("accepts comma amounts", () => {
+    expect(
+      schema.safeParse({
+        ...base,
+        budgetLimit: "1250,50",
+        minCartValue: "100,5",
+        maxDiscountAmount: "0",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("refuses a grouped fixed value with the format copy", () => {
+    expect(
+      messagesAt({ type: "fixed_amount", value: "1.000" }, "value"),
+    ).toEqual(["validation.amountFormatRefused"]);
+  });
+
+  it("refuses percent text with the generic copy", () => {
+    expect(messagesAt({ type: "percentage", value: "1.000" }, "value")).toEqual(
+      ["validation.enterValidValue"],
+    );
+  });
+
+  it.each(["percentage", "bogo", "bulk_quantity"] as const)(
+    "keeps the %s rate within 0..100",
+    (type) => {
+      expect(messagesAt({ type, value: "100" }, "value")).toEqual([]);
+      expect(messagesAt({ type, value: "12,5" }, "value")).toEqual([]);
+      expect(messagesAt({ type, value: "100,01" }, "value")).toEqual([
+        "validation.maxValue",
+      ]);
+    },
+  );
+
+  it("requires a value", () => {
+    expect(messagesAt({ value: "" }, "value")).toEqual([
+      "admin.marketing.discounts.validation.valueRequired",
+    ]);
+  });
+});
+
 describe("discountSchema — membership_tiers audience requires targetTierTypes", () => {
   it("rejects an empty targetTierTypes", () => {
     const result = schema.safeParse({

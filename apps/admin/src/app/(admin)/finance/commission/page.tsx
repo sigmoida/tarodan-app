@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Input, Select } from "@tarodan/ui";
+import { parseTlAmount } from "@tarodan/shared";
 import { PencilSquareIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
@@ -41,6 +42,9 @@ function RuleResolver({ ruleSet }: { ruleSet: CommissionRuleSet }) {
   const defaultCategoryResolved = useRef(false);
   const [sellerType, setSellerType] = useState<SellerType>("FREE");
   const [amount, setAmount] = useState("1000");
+  // The typed product price, read by the shared TL amount parser.
+  const parsedAmount = parseTlAmount(amount);
+  const amountRefused = parsedAmount.status === "refused";
 
   useEffect(() => {
     if (defaultCategoryResolved.current || categories.length === 0) return;
@@ -60,7 +64,7 @@ function RuleResolver({ ruleSet }: { ruleSet: CommissionRuleSet }) {
           ruleSetId: ruleSet.id,
           categoryId,
           sellerType,
-          amount: Number(amount),
+          amount: parsedAmount.status === "ok" ? parsedAmount.amount : 0,
         })
       ).data,
   });
@@ -100,18 +104,24 @@ function RuleResolver({ ruleSet }: { ruleSet: CommissionRuleSet }) {
           onChange={(event) => setSellerType(event.target.value as SellerType)}
           options={sellerTypes(t)}
         />
+        {/* Text, not type="number": "1.000" is one thousand, never 1 TL. */}
         <Input
           label={t("admin.finance.commission.productPrice")}
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
+          error={
+            amountRefused ? t("validation.amountFormatRefused") : undefined
+          }
         />
         <div className="flex items-end">
           <Button
             className="w-full"
-            disabled={!categoryId || !amount || preview.isPending}
+            disabled={
+              !categoryId || parsedAmount.status !== "ok" || preview.isPending
+            }
             onClick={() => preview.mutate()}
           >
             {t("admin.finance.commission.resolveRule")}

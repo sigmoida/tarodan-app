@@ -73,3 +73,41 @@ describe("tier form maxSavedSearches", () => {
     ).toBe(0);
   });
 });
+
+describe("tier form monthlyPrice", () => {
+  const priceMessages = (monthlyPrice: string, isFree = false) => {
+    const values = { ...tierToForm(tier), monthlyPrice };
+    const result = tierSchema(t, isFree).safeParse(values);
+    return result.success
+      ? []
+      : result.error.issues
+          .filter((issue) => issue.path[0] === "monthlyPrice")
+          .map((issue) => issue.message);
+  };
+
+  it("refuses 1.000 instead of reading it as 1 TL", () => {
+    expect(priceMessages("1.000")).toEqual(["validation.amountFormatRefused"]);
+  });
+
+  it("accepts comma prices and keeps the paid and free price rules", () => {
+    expect(priceMessages("99,90")).toEqual([]);
+    expect(priceMessages("1000")).toEqual([]);
+    expect(priceMessages("0")).toEqual([
+      "admin.tiers.validation.paidPricePositive",
+    ]);
+    expect(priceMessages("0", true)).toEqual([]);
+    expect(priceMessages("5", true)).toEqual([
+      "admin.tiers.validation.freePriceZero",
+    ]);
+  });
+
+  it("prefills with a decimal comma and sends the TL amount", () => {
+    const form = tierToForm({ ...tier, monthlyPrice: 1249.9 });
+    expect(form.monthlyPrice).toBe("1249,90");
+    expect(tierFormToPayload(form, 0).monthlyPrice).toBe(1249.9);
+    expect(
+      tierFormToPayload({ ...form, monthlyPrice: "1000" }, 0).monthlyPrice,
+    ).toBe(1000);
+    expect(tierToForm({ ...tier, monthlyPrice: 0 }).monthlyPrice).toBe("0");
+  });
+});

@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { useTranslations } from "next-intl";
 import { SAVED_SEARCH_TIER_LIMIT_MAX } from "@tarodan/types";
+import {
+  amountField,
+  amountInputValue,
+  amountOrNull,
+} from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -41,6 +46,18 @@ const numField = (check: (n: number) => boolean, message: string) =>
       return v.trim() !== "" && !Number.isNaN(n) && check(n);
     }, message);
 
+const monthlyPriceField = (t: T, isFree: boolean) => {
+  const message = isFree
+    ? t("admin.tiers.validation.freePriceZero")
+    : t("admin.tiers.validation.paidPricePositive");
+  return amountField(t, {
+    required: message,
+    check: { test: (n) => (isFree ? n === 0 : n > 0), message },
+  })
+    .optional()
+    .default("0");
+};
+
 /**
  * Form schema — validation-only; numbers are shaped in the mutationFn.
  *
@@ -67,12 +84,9 @@ export const tierSchema = (t: T, isFree = false) =>
         (v) => v.length <= 500,
         t("admin.tiers.validation.descriptionMax"),
       ),
-    monthlyPrice: numField(
-      (n) => (isFree ? n === 0 : n > 0),
-      isFree
-        ? t("admin.tiers.validation.freePriceZero")
-        : t("admin.tiers.validation.paidPricePositive"),
-    ),
+    // TL: the field text, read by the shared amount parser ("1.000" is
+    // refused, never 1 TL).
+    monthlyPrice: monthlyPriceField(t, isFree),
     maxFreeListings: numField(
       (n) => Number.isInteger(n) && n >= 0,
       t("admin.tiers.validation.nonNegativeInt"),
@@ -107,7 +121,7 @@ export function tierToForm(t: MembershipTier): TierFormValues {
   return {
     name: t.name,
     description: t.description ?? "",
-    monthlyPrice: String(t.monthlyPrice ?? 0),
+    monthlyPrice: amountInputValue(t.monthlyPrice ?? 0),
     maxFreeListings: String(t.maxFreeListings ?? 0),
     maxTotalListings: String(t.maxTotalListings ?? 0),
     maxImagesPerListing: String(t.maxImagesPerListing ?? 0),
@@ -121,14 +135,16 @@ export function tierToForm(t: MembershipTier): TierFormValues {
 }
 
 const int = (s: string) => parseInt(s, 10) || 0;
-const flt = (s: string) => parseFloat(s) || 0;
+
+/** The monthly price in TL from the field text (0 when blank). */
+export const monthlyPriceValue = (text: string) => amountOrNull(text) ?? 0;
 
 /** Shape form values into the updateMembershipTier payload (yearlyPrice injected by caller). */
 export function tierFormToPayload(v: TierFormValues, yearlyPrice: number) {
   return {
     name: v.name.trim(),
     description: v.description,
-    monthlyPrice: flt(v.monthlyPrice),
+    monthlyPrice: monthlyPriceValue(v.monthlyPrice),
     yearlyPrice,
     maxFreeListings: int(v.maxFreeListings),
     maxTotalListings: int(v.maxTotalListings),

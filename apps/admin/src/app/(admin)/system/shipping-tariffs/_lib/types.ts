@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { useTranslations } from "next-intl";
+import {
+  amountField,
+  amountInputValue,
+  amountOrNull,
+} from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -72,12 +77,16 @@ const optionalIntField = z
     "",
   );
 
-/** Form schema — validation only; strings are shaped to numbers in the mutationFn. */
+/**
+ * Form schema — validation only; strings are shaped to numbers in the
+ * mutationFn. The TL fields are text read by the shared amount parser
+ * (`@/lib/schemas/amount`): "1.000" is refused, never 1 TL; 0 is a real value.
+ */
 export const tariffSchema = (t: T) =>
   z.object({
     name: z.string().min(1, t("admin.shippingTariffs.nameRequired")),
     freeShippingEnabled: z.boolean().default(true),
-    freeShippingThreshold: z.string().optional().default("0"),
+    freeShippingThreshold: amountField(t).optional().default("0"),
     packageTiers: z
       .array(
         z.object({
@@ -93,12 +102,9 @@ export const tariffSchema = (t: T) =>
             ),
           // Boş = üst sınırsız; yalnız son boyut böyle olabilir.
           maxDesi: z.string().optional().default(""),
-          amount: z
-            .string()
-            .refine(
-              (value) => Number.isFinite(Number(value)) && Number(value) >= 0,
-              t("admin.shippingTariffs.invalidAmount"),
-            ),
+          amount: amountField(t, {
+            required: t("admin.shippingTariffs.invalidAmount"),
+          }),
           sampleWidth: optionalIntField,
           sampleHeight: optionalIntField,
           sampleLength: optionalIntField,
@@ -152,7 +158,6 @@ export const tariffSchema = (t: T) =>
 
 export type TariffFormValues = z.infer<ReturnType<typeof tariffSchema>>;
 
-const num = (v: number | string | undefined) => String(v ?? 0);
 const optNum = (v: number | null | undefined) => (v == null ? "" : String(v));
 
 export function tariffToForm(t: T, tariff?: ShippingTariff): TariffFormValues {
@@ -162,7 +167,7 @@ export function tariffToForm(t: T, tariff?: ShippingTariff): TariffFormValues {
   return {
     name: tariff?.name ?? "",
     freeShippingEnabled: tariff?.freeShippingEnabled ?? true,
-    freeShippingThreshold: num(tariff?.freeShippingThreshold),
+    freeShippingThreshold: amountInputValue(tariff?.freeShippingThreshold ?? 0),
     packageTiers: PACKAGE_TIER_CODES.map((code) => {
       const tier = byCode.get(code);
       const defaults = TIER_DEFAULTS[code];
@@ -171,7 +176,7 @@ export function tariffToForm(t: T, tariff?: ShippingTariff): TariffFormValues {
         label: tier?.label ?? t(TIER_LABEL_KEY[defaults.labelKey]),
         minDesi: tier ? String(tier.minDesi) : defaults.minDesi,
         maxDesi: tier ? optNum(tier.maxDesi) : defaults.maxDesi,
-        amount: num(tier?.amount),
+        amount: amountInputValue(tier?.amount ?? 0),
         sampleWidth: optNum(tier?.sampleWidth),
         sampleHeight: optNum(tier?.sampleHeight),
         sampleLength: optNum(tier?.sampleLength),
@@ -180,7 +185,7 @@ export function tariffToForm(t: T, tariff?: ShippingTariff): TariffFormValues {
   };
 }
 
-const flt = (s: string) => parseFloat(s) || 0;
+const tl = (s: string) => amountOrNull(s) ?? 0;
 const optInt = (s: string) => (s === "" ? null : Number(s));
 
 export function tariffFormToPayload(v: TariffFormValues) {
@@ -189,7 +194,7 @@ export function tariffFormToPayload(v: TariffFormValues) {
     label: tier.label.trim(),
     minDesi: Number(tier.minDesi),
     maxDesi: optInt(tier.maxDesi),
-    amount: flt(tier.amount),
+    amount: tl(tier.amount),
     sampleWidth: optInt(tier.sampleWidth),
     sampleHeight: optInt(tier.sampleHeight),
     sampleLength: optInt(tier.sampleLength),
@@ -197,7 +202,7 @@ export function tariffFormToPayload(v: TariffFormValues) {
   return {
     name: v.name.trim(),
     freeShippingEnabled: v.freeShippingEnabled,
-    freeShippingThreshold: flt(v.freeShippingThreshold),
+    freeShippingThreshold: tl(v.freeShippingThreshold),
     packageTiers,
   };
 }
