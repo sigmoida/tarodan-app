@@ -110,8 +110,10 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   (`REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING`, admin Settings >
   Security, off by default) is on. It covers `DELETE /users/me` and
   `POST /auth/email/request-change`, which mobile 1.0.5 calls without a
-  token. **Switch the setting on only after `min_supported_app_version_ios`
-  and `_android` are above 1.0.5** (tarodan-ops `compat.md`). The setting is
+  token, nor does web until it sends one. **Switch the setting on only after
+  the web release that sends the token is live and
+  `min_supported_app_version_ios` and `_android` are above 1.0.5**
+  (tarodan-ops `compat.md`). The setting is
   read uncached on each such request without a token, so switching it on
   applies at once; a failed read fails the request. The guard sets the
   route's `auth.flow` tag (`account_delete`, `email_change`) before it

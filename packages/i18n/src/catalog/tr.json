@@ -8889,7 +8889,7 @@
         "reauth": {
           "title": "Güvenlik doğrulaması",
           "label": "Hesap silme ve e-posta değişikliğinde güvenlik doğrulaması zorunlu",
-          "helper": "Açıkken, güvenlik doğrulaması olmadan gönderilen hesap silme ve e-posta değişikliği istekleri reddedilir. Doğrulama göndermeyen mobil sürümler (1.0.5 ve öncesi) bu işlemleri yapamaz; en düşük desteklenen uygulama sürümü iOS ve Android'de 1.0.5'in üzerine çıkarıldıktan sonra açın. Gönderilen bir doğrulama, ayar kapalıyken de her zaman kontrol edilir."
+          "helper": "Açıkken, güvenlik doğrulaması olmadan gönderilen hesap silme ve e-posta değişikliği istekleri reddedilir. Doğrulama göndermeyen web ve mobil sürümler (mobilde 1.0.5 ve öncesi) bu işlemleri yapamaz; doğrulamayı gönderen web sürümü yayına alındıktan ve en düşük desteklenen uygulama sürümü iOS ve Android'de 1.0.5'in üzerine çıkarıldıktan sonra açın. Gönderilen bir doğrulama, ayar kapalıyken de her zaman kontrol edilir."
         }
       }
     },
