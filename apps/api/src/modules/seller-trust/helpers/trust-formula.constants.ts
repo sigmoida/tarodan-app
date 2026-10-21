@@ -2,6 +2,7 @@ import {
   SELLER_TRUST_FORMULA_VERSION,
   SELLER_TRUST_MIN_COUNTERPARTIES,
   SELLER_TRUST_MIN_TRANSACTIONS,
+  SELLER_TRUST_WEIGHTS_V1,
 } from "@tarodan/types";
 
 /**
@@ -19,14 +20,8 @@ export const TRUST_FORMULA_V1 = {
     volumeDays: 730,
   },
 
-  /** Weights of the five sub-scores; they sum to 1. */
-  weights: {
-    rating: 0.4,
-    reliability: 0.25,
-    onTime: 0.15,
-    volume: 0.15,
-    tenure: 0.05,
-  },
+  /** Weights of the five sub-scores; they sum to 1 (shared with admin). */
+  weights: SELLER_TRUST_WEIGHTS_V1,
 
   /** Bayesian prior of the per-giver rating mean: `m` with weight `C`. */
   rating: { priorMean: 4.0, priorWeight: 5 },
