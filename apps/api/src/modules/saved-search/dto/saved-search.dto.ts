@@ -89,6 +89,31 @@ export class SavedSearchQueryDto extends PickType(
  * Null values and keys that are not in the canonical query are dropped by the
  * service.
  */
+/**
+ * A string of at most `max` code points: an emoji counts once, as in
+ * `savedSearchDefaultName` and the labels (`MaxLength` counts UTF-16 units).
+ */
+function MaxCodePoints(
+  max: number,
+  options?: ValidationOptions,
+): PropertyDecorator {
+  return (target: object, propertyName: string | symbol) =>
+    registerDecorator({
+      name: "maxCodePoints",
+      target: target.constructor,
+      propertyName: String(propertyName),
+      constraints: [max],
+      options: {
+        message: `$property must be at most ${max} characters`,
+        ...options,
+      },
+      validator: {
+        validate: (value: unknown): boolean =>
+          typeof value === "string" && Array.from(value).length <= max,
+      },
+    });
+}
+
 function IsSavedSearchLabels(options?: ValidationOptions): PropertyDecorator {
   return (target: object, propertyName: string | symbol) =>
     registerDecorator({
@@ -130,7 +155,7 @@ export class CreateSavedSearchDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value,
   )
-  @MaxLength(SAVED_SEARCH_NAME_MAX)
+  @MaxCodePoints(SAVED_SEARCH_NAME_MAX)
   name?: string;
 
   @ApiProperty({

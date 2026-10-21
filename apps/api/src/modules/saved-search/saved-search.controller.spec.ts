@@ -125,6 +125,17 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 
+  it("counts the name in code points, as the labels and default name do", async () => {
+    // 60 emoji are 120 UTF-16 units: still within the cap.
+    const name = "🏎".repeat(60);
+    await expect(
+      asBody({ name, query: { search: "x" } }),
+    ).resolves.toMatchObject({ name });
+    await expect(
+      asBody({ name: "🏎".repeat(61), query: { search: "x" } }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
   it.each([
     ["an array", ["Diecast"]],
     ["a non-string value", { categoryId: 5 }],
