@@ -1,11 +1,11 @@
 {
   "meta": {
-    "total": 2304,
+    "total": 2305,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 707,
+      "P0": 708,
       "P1": 989,
       "P2": 608
     }
@@ -33,7 +33,7 @@
       "code": "04",
       "prefix": "PRD",
       "title": "04 — Ürün/İlan & Katalog",
-      "count": 116
+      "count": 117
     },
     {
       "code": "05",

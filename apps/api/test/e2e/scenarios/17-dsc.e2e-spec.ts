@@ -2526,7 +2526,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${productId}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: days })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: days })
       .expect(201);
     const prisma = getPrisma();
     const pending = await prisma.productBoost.findUnique({
