@@ -308,6 +308,65 @@ describe("SellerTrustSchedulerService.runRefresh", () => {
     expect(lines).toContain("failedBatches=1");
   });
 
+  it("cleans nothing and fails the job when a batch's write fails", async () => {
+    const t = build(ids(1200));
+    t.sellerTrust.upsertBatch.mockImplementation(async (rows: unknown[]) => {
+      if ((rows[0] as { userId: string }).userId === "u1000") {
+        throw Object.assign(new Error("lock timeout"), { code: "P2010" });
+      }
+      return rows.length;
+    });
+
+    await expect(t.service.runRefresh(undefined, asOf)).rejects.toThrow(
+      "1 of 3 batches failed",
+    );
+    // The earlier batches were written; the failed one keeps yesterday's rows.
+    expect(t.sellerTrust.upsertBatch).toHaveBeenCalledTimes(3);
+    expect(t.sellerTrust.deleteStale).not.toHaveBeenCalled();
+    expect(t.cache.del).toHaveBeenCalledWith(SELLER_TRUST_LOCK_KEY);
+  });
+
+  it("stops at the run budget, cleans nothing and fails the job", async () => {
+    const t = build(ids(1200));
+    let now = 0;
+    const clock = jest.spyOn(Date, "now").mockImplementation(() => now);
+    // The first batch takes 91 minutes; the budget is 90.
+    t.sellerTrust.upsertBatch.mockImplementation(async (rows: unknown[]) => {
+      now += 91 * 60 * 1000;
+      return rows.length;
+    });
+    const log = jest.fn();
+
+    try {
+      await expect(t.service.runRefresh(log, asOf)).rejects.toThrow(
+        "2 of 3 batches failed",
+      );
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(t.sellerTrust.upsertBatch).toHaveBeenCalledTimes(1);
+    expect(t.sellerTrust.deleteStale).not.toHaveBeenCalled();
+    expect(t.cache.del).toHaveBeenCalledWith(SELLER_TRUST_LOCK_KEY);
+    expect(log.mock.calls.map((c) => String(c[0]))).toContain(
+      "run budget exhausted before batch 1",
+    );
+  });
+
+  it("writes nothing and releases the lock when the candidate read fails", async () => {
+    const t = build(ids(3));
+    t.orderStats.activeSellerIds.mockRejectedValue(
+      new Error("canceling statement due to statement timeout"),
+    );
+
+    await expect(t.service.runRefresh(undefined, asOf)).rejects.toThrow(
+      "statement timeout",
+    );
+    expect(t.sellerTrust.upsertBatch).not.toHaveBeenCalled();
+    expect(t.sellerTrust.deleteStale).not.toHaveBeenCalled();
+    expect(t.cache.del).toHaveBeenCalledWith(SELLER_TRUST_LOCK_KEY);
+  });
+
   it("keeps every row when a run writes nothing (no candidates)", async () => {
     const t = build([]);
     const result = await t.service.runRefresh(undefined, asOf);
