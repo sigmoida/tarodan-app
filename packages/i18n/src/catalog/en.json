@@ -8884,6 +8884,13 @@
           "label": "Require distance sales consent at payment",
           "helper": "When on, a purchase without a recorded distance sales consent is rejected at payment. Older mobile builds that do not send the checkbox will be unable to pay — turn this on once the mobile release that sends it has rolled out."
         }
+      },
+      "security": {
+        "reauth": {
+          "title": "Step-up confirmation",
+          "label": "Require step-up confirmation for account deletion and email change",
+          "helper": "When on, account deletion and email change requests without a step-up confirmation are rejected. Mobile builds that do not send it (1.0.5 and older) cannot do either; turn this on only after the minimum supported app version on iOS and Android is above 1.0.5. A confirmation that is sent is always checked, even while this is off."
+        }
       }
     },
     "shippingTariffs": {

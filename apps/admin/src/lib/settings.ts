@@ -1,7 +1,4 @@
-import {
-  DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
-  parseDistanceSalesConsentRequired,
-} from "@tarodan/types";
+import { isPlatformSettingOn } from "@tarodan/types";
 
 /**
  * Normalizes the platform_settings API response. The backend sometimes returns
@@ -41,12 +38,11 @@ export function readPspFeeRate(raw: unknown): number {
 }
 
 /**
- * Mesafeli satış onayı ödemede zorunlu mu (`distance_sales_consent_required`).
- * Anahtar ve "yalnız `true` açık" kuralı API ile aynı kaynaktan
- * (`@tarodan/types`) gelir; ayar yoksa kapalıdır.
+ * Whether an on/off setting is on (`distance_sales_consent_required`,
+ * `auth_require_reauth_for_sensitive_actions`, ...). The "only `true` is on"
+ * rule comes from `@tarodan/types`, the same one the API applies; a missing
+ * setting is off.
  */
-export function readDistanceSalesConsentRequired(raw: unknown): boolean {
-  return parseDistanceSalesConsentRequired(
-    readSetting(raw, DISTANCE_SALES_CONSENT_REQUIRED_SETTING),
-  );
+export function readSettingOn(raw: unknown, key: string): boolean {
+  return isPlatformSettingOn(readSetting(raw, key));
 }

@@ -65,6 +65,7 @@ export function useSettingsPage() {
     activeTab,
     isWarehouseTab,
     isLegalTab,
+    isSecurityTab: tab === "security",
     tabs: settingsTabs(t),
     title: tabTitle(t)[activeTab],
     fields: fieldsByTab[activeTab],

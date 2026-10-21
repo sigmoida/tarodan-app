@@ -12,6 +12,7 @@ import { useSettingsPage } from "./_lib/useSettingsPage";
 import { SearchReindexButton } from "./_components/SearchReindexButton";
 import { WarehouseAddressCard } from "./_components/WarehouseAddressCard";
 import { LegalSettingsCard } from "./_components/LegalSettingsCard";
+import { StepUpSettingsCard } from "./_components/StepUpSettingsCard";
 
 export default function SettingsPage() {
   const {
@@ -21,6 +22,7 @@ export default function SettingsPage() {
     activeTab,
     isWarehouseTab,
     isLegalTab,
+    isSecurityTab,
     tabs,
     title,
     fields,
@@ -87,6 +89,8 @@ export default function SettingsPage() {
               </Button>
             </div>
           </Form>
+          {/* On/off security settings save on toggle, outside the form. */}
+          {isSecurityTab && <StepUpSettingsCard />}
         </>
       )}
     </AdminPage>
