@@ -11,6 +11,7 @@ import { UserAnalyticsService } from "./stats/user-analytics.service";
 import { UserDiscoveryService } from "./social/user-discovery.service";
 import { UserBankService } from "./seller/user-bank.service";
 import { UserEngagementService } from "./stats/user-engagement.service";
+import { UserSellerTrustStatsService } from "./stats/user-seller-trust-stats.service";
 import { UserController } from "./user.controller";
 import { SellerDocumentController } from "./seller/seller-document.controller";
 import { SellerDocumentService } from "./seller/seller-document.service";
@@ -71,8 +72,10 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     UserEngagementService,
     FeaturedSchedulerService,
     UserBlockAdminListener,
+    UserSellerTrustStatsService,
     ...scheduledProcessors(FeaturedScheduledProcessor),
   ],
-  exports: [UserService],
+  // UserSellerTrustStatsService: account input of the seller trust batch.
+  exports: [UserService, UserSellerTrustStatsService],
 })
 export class UserModule {}

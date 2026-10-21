@@ -32,6 +32,7 @@ import { DiscountModule } from "../discount/discount.module";
 
 import { UserBlockModule } from "../user-block/user-block.module";
 import { MessagingModule } from "../messaging/messaging.module";
+import { TradeSellerTrustStatsService } from "./stats/trade-seller-trust-stats.service";
 
 @Module({
   imports: [
@@ -76,7 +77,9 @@ import { MessagingModule } from "../messaging/messaging.module";
     TradeSchedulerService,
     ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,
+    TradeSellerTrustStatsService,
   ],
-  exports: [TradeService, TradeQuoteService],
+  // TradeSellerTrustStatsService: trade input of the seller trust batch.
+  exports: [TradeService, TradeQuoteService, TradeSellerTrustStatsService],
 })
 export class TradeModule {}
