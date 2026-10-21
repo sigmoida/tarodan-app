@@ -156,8 +156,9 @@ export function redactSensitive(
  * A request body for logs and telemetry: `redactSensitive` plus the
  * body-only keys. Sentry keeps the body as a JSON string
  * (`event.request.data`), which a key-based pass cannot see into, so a JSON
- * string is parsed, redacted and serialised again. Any other string is left to
- * the PAN pass.
+ * string is parsed, redacted and serialised again. A string that is not JSON
+ * is treated as a form body (`password=...&code=...`). Run it on the raw body,
+ * before any other pass: the PAN pass can turn JSON into a non-JSON string.
  */
 export function redactRequestBody(body: unknown): unknown {
   if (typeof body !== "string") {
@@ -167,9 +168,23 @@ export function redactRequestBody(body: unknown): unknown {
   try {
     parsed = JSON.parse(body);
   } catch {
-    return redactPanStrings(body);
+    return redactPanStrings(redactFormBody(body));
   }
   return JSON.stringify(
     redactSensitive(parsed, 0, REQUEST_BODY_SENSITIVE_KEYS),
+  );
+}
+
+/** `a=1&password=x` -> `a=1&password=***`, by the request-body key rules. */
+function redactFormBody(body: string): string {
+  return body.replace(
+    /(^|&)([^=&#\s]+)=([^&#\s]*)/g,
+    (match, sep: string, key: string) => {
+      const normalized = normalizeKey(key);
+      return SENSITIVE_QUERY_KEYS.has(normalized) ||
+        REQUEST_BODY_SENSITIVE_KEYS.has(normalized)
+        ? `${sep}${key}=***`
+        : match;
+    },
   );
 }

@@ -43,10 +43,12 @@ describe("redactRequestBody", () => {
     expect(redacted).not.toContain("123456");
   });
 
-  it("leaves a non-JSON string body to the card-number pass", () => {
-    expect(redactRequestBody("merchant_oid=ABC&status=success")).toBe(
-      "merchant_oid=ABC&status=success",
-    );
+  it("redacts a form body by key and keeps the other fields", () => {
+    expect(
+      redactRequestBody(
+        "merchant_oid=ABC&password=hunter2&code=123456&status=success",
+      ),
+    ).toBe("merchant_oid=ABC&password=***&code=***&status=success");
   });
 
   it("does not touch a code outside a request body (error codes stay readable)", () => {

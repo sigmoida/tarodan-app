@@ -22,13 +22,13 @@ export function applySentryEventPolicy<T extends Event>(event: T): T | null {
     event.tags = { ...event.tags, requestId };
   }
 
-  const redacted = redactSensitive(event) as T;
   // The SDK stores the request body as a JSON string, out of reach of the
-  // key-based pass above (a failed login would carry its password).
-  if (redacted.request?.data !== undefined) {
-    redacted.request.data = redactRequestBody(redacted.request.data);
+  // key-based pass (a failed login would carry its password). It is redacted
+  // first, on the raw text: the generic pass below could break the JSON.
+  if (event.request?.data !== undefined) {
+    event.request.data = redactRequestBody(event.request.data);
   }
-  return redacted;
+  return redactSensitive(event) as T;
 }
 
 /**

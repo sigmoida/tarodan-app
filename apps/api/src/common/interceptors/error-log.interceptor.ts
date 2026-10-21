@@ -10,55 +10,7 @@ import { catchError } from "rxjs/operators";
 import { PrismaService } from "../../prisma/prisma.service";
 import { getRequestId } from "../context/request-context";
 import { errorMessage } from "../helpers/error-message";
-import { IDENTITY_LOG_KEYS } from "../security/redact-sensitive";
-
-const SENSITIVE_BODY_KEYS = new Set([
-  // Hatalı kimlik gönderimi (ör. tekillik reddi) gövdesiyle error_logs'a
-  // yazılır; TCKN ve yasal ad orada değer olarak durmamalı.
-  ...IDENTITY_LOG_KEYS,
-  "password",
-  "passwordHash",
-  "passwordConfirm",
-  "newPassword",
-  "oldPassword",
-  "currentPassword",
-  "token",
-  "accessToken",
-  "refreshToken",
-  "resetToken",
-  "verifyToken",
-  "confirmToken",
-  "idToken",
-  // Sign in with Apple, the step-up token and body codes (2FA, phone, e-mail
-  // change, Google auth code), as in `redactRequestBody`.
-  "identityToken",
-  "authorizationCode",
-  "reauthToken",
-  "code",
-  "secret",
-  "apiKey",
-  "apiSecret",
-  "clientSecret",
-  "signingKey",
-  "creditCard",
-  "cardNumber",
-  "cvv",
-  "cvc",
-  "pin",
-  "otp",
-]);
-
-function redactBody(obj: any, depth = 0): any {
-  if (depth > 5 || obj === null || obj === undefined || typeof obj !== "object")
-    return obj;
-  if (Array.isArray(obj)) return obj.map((v) => redactBody(v, depth + 1));
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [
-      k,
-      SENSITIVE_BODY_KEYS.has(k) ? "[GİZLİ]" : redactBody(v, depth + 1),
-    ]),
-  );
-}
+import { redactRequestBody } from "../security/redact-sensitive";
 
 @Injectable()
 export class ErrorLogInterceptor implements NestInterceptor {
@@ -130,7 +82,8 @@ export class ErrorLogInterceptor implements NestInterceptor {
             ...(responseDetail && { response: responseDetail }),
             ip: ipAddress,
             userAgent: headers?.["user-agent"],
-            body: method !== "GET" ? redactBody(body) : undefined,
+            // One body rule for error_logs and Sentry (normalised key match).
+            body: method !== "GET" ? redactRequestBody(body) : undefined,
           },
         },
       });
