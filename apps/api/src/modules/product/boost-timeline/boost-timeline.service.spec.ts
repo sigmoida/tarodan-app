@@ -5,6 +5,10 @@ import {
   SubscriptionStatus,
 } from "@prisma/client";
 import { BoostTimelineService } from "./boost-timeline.service";
+import { BoostTimelineStore } from "./boost-timeline-store.service";
+import { BoostActivationService } from "./boost-activation.service";
+import { BoostStaffTimelineService } from "./boost-staff-timeline.service";
+import { BoostSystemPauseService } from "./boost-system-pause.service";
 import {
   RELEVANCE_BOOST_BONUS,
   RELEVANCE_PREMIUM_BONUS,
@@ -29,6 +33,7 @@ const at = (ms: number) => new Date(NOW.getTime() + ms);
 type BoostRow = {
   id: string;
   productId: string;
+  userId?: string;
   orderId?: string | null;
   pausedBySystem?: boolean;
   durationDays: number;
@@ -36,10 +41,22 @@ type BoostRow = {
   status: BoostStatus;
   startsAt: Date | null;
   endsAt: Date | null;
+  showcaseEndsAt: Date | null;
   purchasedAt: Date | null;
   pausedAt: Date | null;
   pausedRemainingSeconds: number | null;
+  pausedShowcaseSeconds: number | null;
   extendedDays: number;
+  source?: string;
+  price?: number;
+  packageId?: string | null;
+  packageName?: string | null;
+  grantedById?: string | null;
+  grantReason?: string | null;
+  cancelledAt?: Date | null;
+  cancelledById?: string | null;
+  cancelReason?: string | null;
+  refundedAmount?: Prisma.Decimal | null;
   baselineViewCount: number | null;
   baselineLikeCount: number | null;
   baselineClickCount: number | null;
@@ -47,6 +64,9 @@ type BoostRow = {
 
 type ProductRow = {
   id: string;
+  kind: string;
+  status: string;
+  sellerId: string;
   boostedUntil: Date | null;
   boostedAt: Date | null;
   homeShowcaseUntil: Date | null;
@@ -70,6 +90,9 @@ type ProductRow = {
 };
 
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+/** A boost row copy (shallow: dates and decimals are never mutated in place). */
+const copy = <T extends object>(row: T): T => ({ ...row });
 
 type Where = Record<string, unknown>;
 
@@ -156,6 +179,16 @@ function fakeDb() {
           return structuredClone(row);
         },
       ),
+      updateMany: jest.fn(
+        async ({ where, data }: { where: Where; data: Where }) => {
+          await tick();
+          const rows = [...products.values()].filter((p) =>
+            matches(p as unknown as Record<string, unknown>, where),
+          );
+          rows.forEach((row) => applyData(row, data));
+          return { count: rows.length };
+        },
+      ),
     },
     productBoost: {
       findUnique: jest.fn(
@@ -165,7 +198,7 @@ function fakeDb() {
           const row = where.id
             ? boosts.get(where.id)
             : [...boosts.values()].find((b) => b.orderId === where.orderId);
-          return row ? structuredClone(row) : null;
+          return row ? copy(row) : null;
         },
       ),
       findFirst: jest.fn(
@@ -183,7 +216,7 @@ function fakeDb() {
               (a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0),
             );
           }
-          return rows[0] ? structuredClone(rows[0]) : null;
+          return rows[0] ? copy(rows[0]) : null;
         },
       ),
       findMany: jest.fn(
@@ -201,7 +234,7 @@ function fakeDb() {
               (a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0),
             );
           }
-          return rows.map((r) => structuredClone(r));
+          return rows.map((r) => copy(r));
         },
       ),
       update: jest.fn(
@@ -210,7 +243,7 @@ function fakeDb() {
           const row = boosts.get(where.id);
           if (!row) throw new Error(`no boost ${where.id}`);
           applyData(row, data);
-          return structuredClone(row);
+          return copy(row);
         },
       ),
       updateMany: jest.fn(
@@ -221,6 +254,12 @@ function fakeDb() {
           return { count: rows.length };
         },
       ),
+      create: jest.fn(async ({ data }: { data: Partial<BoostRow> }) => {
+        await tick();
+        const row = boostRow({ id: `boost-${boosts.size + 1}`, ...data });
+        boosts.set(row.id, row);
+        return copy(row);
+      }),
     },
   });
 
@@ -247,6 +286,9 @@ function fakeDb() {
 function productRow(over: Partial<ProductRow> = {}): ProductRow {
   return {
     id: "prod-1",
+    kind: "listing",
+    status: "active",
+    sellerId: "seller-1",
     boostedUntil: null,
     boostedAt: null,
     homeShowcaseUntil: null,
@@ -276,9 +318,11 @@ function boostRow(over: Partial<BoostRow> = {}): BoostRow {
     status: BoostStatus.pending,
     startsAt: null,
     endsAt: null,
+    showcaseEndsAt: null,
     purchasedAt: null,
     pausedAt: null,
     pausedRemainingSeconds: null,
+    pausedShowcaseSeconds: null,
     extendedDays: 0,
     baselineViewCount: null,
     baselineLikeCount: null,
@@ -298,8 +342,20 @@ const boostRelevance = (p: ProductRow) =>
   p.qualityScore * RELEVANCE_QUALITY_WEIGHT +
   p.popularityScore;
 
+/** The facade over its slices, as the module wires it. */
+function makeTimeline() {
+  const store = new BoostTimelineStore();
+  const timeline = new BoostTimelineService(
+    store,
+    new BoostActivationService(store),
+    new BoostStaffTimelineService(store),
+    new BoostSystemPauseService(store),
+  );
+  return { timeline, store };
+}
+
 describe("BoostTimelineService", () => {
-  const service = new BoostTimelineService();
+  const service = makeTimeline().timeline;
 
   function setup(product: ProductRow, ...rows: BoostRow[]) {
     const db = fakeDb();
@@ -619,36 +675,73 @@ describe("BoostTimelineService", () => {
       });
     });
 
-    it("takes the latest end, the latest activation and the showcase boost's end", async () => {
-      const db = setup(
-        productRow(),
+    // A 30-day search boost with a 3-day showcase boost stacked behind it: the
+    // showcase boost ends its search time at +33 days but its showcase at +3.
+    const stackedShowcase = (
+      vitrin: Partial<BoostRow>,
+      product = productRow(),
+    ) =>
+      setup(
+        product,
         boostRow({
           id: "econ",
           status: BoostStatus.active,
           endsAt: at(30 * DAY),
+          durationDays: 30,
           purchasedAt: at(-2 * DAY),
         }),
         boostRow({
           id: "vitrin",
           status: BoostStatus.active,
           showcaseOnHome: true,
+          durationDays: 3,
           endsAt: at(33 * DAY),
           purchasedAt: at(-DAY),
+          ...vitrin,
         }),
         boostRow({ id: "old", status: BoostStatus.expired, endsAt: at(-DAY) }),
+      );
+
+    it("takes the latest end, the latest activation and the showcase boost's own showcase end", async () => {
+      const db = stackedShowcase({ showcaseEndsAt: at(3 * DAY) });
+
+      await db.transaction((tx) =>
+        service.refreshProductPromotion(tx, "prod-1", NOW),
+      );
+
+      // The showcase boost's own 3 days, not its search end (+33 days): the
+      // gap LB1 pinned, where a staff action gave 30 free showcase days.
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: at(33 * DAY),
+        boostedAt: at(-DAY),
+        homeShowcaseUntil: at(3 * DAY),
+        rankTier: 2,
+      });
+    });
+
+    it("keeps the listing's showcase end for a row written before the column", async () => {
+      const db = stackedShowcase(
+        { showcaseEndsAt: null },
+        productRow({ homeShowcaseUntil: at(3 * DAY) }),
       );
 
       await db.transaction((tx) =>
         service.refreshProductPromotion(tx, "prod-1", NOW),
       );
 
-      // Pins the known gap: the stacked showcase boost's end (33 days), not
-      // the 3-day showcase window activation gave it.
+      expect(db.products.get("prod-1")?.homeShowcaseUntil).toEqual(at(3 * DAY));
+    });
+
+    it("ends the showcase once the showcase boost's own showcase time is over", async () => {
+      const db = stackedShowcase({ showcaseEndsAt: at(-HOUR) });
+
+      await db.transaction((tx) =>
+        service.refreshProductPromotion(tx, "prod-1", NOW),
+      );
+
       expect(db.products.get("prod-1")).toMatchObject({
         boostedUntil: at(33 * DAY),
-        boostedAt: at(-DAY),
-        homeShowcaseUntil: at(33 * DAY),
-        rankTier: 2,
+        homeShowcaseUntil: null,
       });
     });
   });
@@ -859,8 +952,8 @@ describe("BoostTimelineService", () => {
 
     it("loses a duration without the lock (the race this guards)", async () => {
       const db = twoPaidBoosts();
-      const unlocked = new BoostTimelineService();
-      jest.spyOn(unlocked, "lockProduct").mockResolvedValue(undefined);
+      const { timeline: unlocked, store } = makeTimeline();
+      jest.spyOn(store, "lockProduct").mockResolvedValue(undefined);
 
       await Promise.all([
         db.transaction((tx) => unlocked.activate(tx, "boost-7", NOW)),
@@ -902,8 +995,8 @@ describe("BoostTimelineService", () => {
         productRow({ boostedUntil: at(5 * DAY), rankTier: 2 }),
         boostRow({ durationDays: 7 }),
       );
-      const unlocked = new BoostTimelineService();
-      jest.spyOn(unlocked, "lockProduct").mockResolvedValue(undefined);
+      const { timeline: unlocked, store } = makeTimeline();
+      jest.spyOn(store, "lockProduct").mockResolvedValue(undefined);
 
       const results = await Promise.all([
         db.transaction((tx) => unlocked.activate(tx, "boost-1", NOW)),
@@ -931,13 +1024,341 @@ describe("BoostTimelineService", () => {
         db.transaction((tx) => service.activate(tx, "paid", NOW)),
       ]);
 
-      // Whichever ran first, the listing ends after both the extension and
-      // the new boost are counted from the timeline the other one left.
-      const until = db.products.get("prod-1")?.boostedUntil?.getTime();
+      // Whichever ran first, both the extension and the new boost count:
       // extend first: running -> +7d, paid stacks on +7d -> +10d.
-      // activate first: paid -> +8d, running extended to +7d, latest stays +8d.
-      expect([at(10 * DAY).getTime(), at(8 * DAY).getTime()]).toContain(until);
+      // activate first: paid -> +8d; the extension moves running to +7d and
+      // the paid boost queued behind it to +10d (it used to stay at +8d and
+      // the two days were lost).
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(10 * DAY));
       expect(db.boosts.get("running")?.endsAt).toEqual(at(7 * DAY));
+      expect(db.boosts.get("paid")?.endsAt).toEqual(at(10 * DAY));
+    });
+  });
+
+  /**
+   * The LB1 review gap: a stacked boost's `endsAt` already holds the time of
+   * the boosts before it, so reading "end minus now" as its remainder gave
+   * free days on every pause and resume. Example: 7 days, then 5 days stacked
+   * (12 paid days); pausing and resuming the stacked one gave 17.
+   */
+  describe("stacked boosts keep their own time", () => {
+    // Two days into a 7-day boost with a 5-day boost stacked behind it:
+    // the first has 5 days left (ends +5d), the second ends at +10d.
+    function sevenThenFive(over: Partial<ProductRow> = {}) {
+      return setup(
+        productRow({ boostedUntil: at(10 * DAY), rankTier: 2, ...over }),
+        boostRow({
+          id: "seven",
+          status: BoostStatus.active,
+          durationDays: 7,
+          endsAt: at(5 * DAY),
+          purchasedAt: at(-2 * DAY),
+        }),
+        boostRow({
+          id: "five",
+          status: BoostStatus.active,
+          durationDays: 5,
+          endsAt: at(10 * DAY),
+          purchasedAt: at(-2 * DAY + HOUR),
+        }),
+      );
+    }
+
+    it("pausing the stacked boost keeps its own 5 days, not 10", async () => {
+      const db = sevenThenFive();
+
+      await db.transaction((tx) => service.pause(tx, "five", NOW));
+
+      expect(db.boosts.get("five")?.pausedRemainingSeconds).toBe(5 * 86400);
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(5 * DAY));
+    });
+
+    it("pause and resume of the stacked boost end where the 12 paid days end", async () => {
+      const db = sevenThenFive();
+
+      await db.transaction((tx) => service.pause(tx, "five", NOW));
+      await db.transaction((tx) => service.resume(tx, "five", at(DAY)));
+
+      // Resumed behind the 7-day boost (+5d): +10d, the original end. It
+      // used to end at +5d + 10d = +15d, 17 days after the purchase.
+      expect(db.boosts.get("five")?.endsAt).toEqual(at(10 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(10 * DAY));
+    });
+
+    it("pausing the first boost moves the stacked one up, resume queues it behind", async () => {
+      const db = sevenThenFive();
+
+      await db.transaction((tx) => service.pause(tx, "seven", NOW));
+
+      expect(db.boosts.get("seven")?.pausedRemainingSeconds).toBe(5 * 86400);
+      // The 5-day boost runs now instead of after the paused one.
+      expect(db.boosts.get("five")?.endsAt).toEqual(at(5 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(5 * DAY));
+
+      await db.transaction((tx) => service.resume(tx, "seven", at(DAY)));
+
+      expect(db.boosts.get("seven")?.endsAt).toEqual(at(10 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(10 * DAY));
+    });
+
+    it("a system pause and resume of an offline listing keeps 12 days, not 17", async () => {
+      const db = sevenThenFive({ status: "inactive" });
+
+      const paused = await db.transaction((tx) =>
+        service.pauseForDelisting(tx, "prod-1", NOW),
+      );
+
+      expect(paused).toBe(2);
+      expect(db.boosts.get("seven")).toMatchObject({
+        status: BoostStatus.paused,
+        pausedBySystem: true,
+        pausedRemainingSeconds: 5 * 86400,
+      });
+      expect(db.boosts.get("five")?.pausedRemainingSeconds).toBe(5 * 86400);
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: null,
+        rankTier: 0,
+      });
+
+      db.products.get("prod-1")!.status = "active";
+      const resumed = await db.transaction((tx) =>
+        service.resumeSystemPaused(tx, "prod-1", at(3 * DAY)),
+      );
+
+      expect(resumed).toBe(2);
+      // 10 own days from the resume (+3d), in purchase order.
+      expect(db.boosts.get("seven")).toMatchObject({
+        status: BoostStatus.active,
+        endsAt: at(8 * DAY),
+        pausedBySystem: false,
+        pausedRemainingSeconds: null,
+      });
+      expect(db.boosts.get("five")?.endsAt).toEqual(at(13 * DAY));
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: at(13 * DAY),
+        rankTier: 2,
+        // Back online, it leads the boosted LIFO order again.
+        boostedAt: at(3 * DAY),
+      });
+    });
+
+    it("a system pause skips a listing that is live again under the lock", async () => {
+      const db = sevenThenFive();
+
+      await expect(
+        db.transaction((tx) => service.pauseForDelisting(tx, "prod-1", NOW)),
+      ).resolves.toBe(0);
+      expect(db.boosts.get("seven")?.status).toBe(BoostStatus.active);
+    });
+
+    it("a system resume leaves a staff pause and an offline listing alone", async () => {
+      const db = setup(
+        productRow(),
+        boostRow({
+          id: "staff",
+          status: BoostStatus.paused,
+          pausedBySystem: false,
+          pausedRemainingSeconds: 3600,
+        }),
+      );
+
+      await expect(
+        db.transaction((tx) => service.resumeSystemPaused(tx, "prod-1", NOW)),
+      ).resolves.toBe(0);
+      db.products.get("prod-1")!.status = "inactive";
+      db.boosts.get("staff")!.pausedBySystem = true;
+      await expect(
+        db.transaction((tx) => service.resumeSystemPaused(tx, "prod-1", NOW)),
+      ).resolves.toBe(0);
+      expect(db.boosts.get("staff")?.status).toBe(BoostStatus.paused);
+    });
+
+    it("a system resume queues behind a boost bought while the listing was offline", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(7 * DAY), rankTier: 2 }),
+        boostRow({
+          id: "new",
+          status: BoostStatus.active,
+          endsAt: at(7 * DAY),
+          purchasedAt: at(-HOUR),
+        }),
+        boostRow({
+          id: "old",
+          status: BoostStatus.paused,
+          pausedBySystem: true,
+          pausedRemainingSeconds: 3600,
+          purchasedAt: at(-3 * DAY),
+        }),
+      );
+
+      await db.transaction((tx) =>
+        service.resumeSystemPaused(tx, "prod-1", NOW),
+      );
+
+      expect(db.boosts.get("new")?.endsAt).toEqual(at(7 * DAY));
+      expect(db.boosts.get("old")?.endsAt).toEqual(at(7 * DAY + HOUR));
+    });
+
+    it("caps a remainder paused before the fix at the boost's bought days", async () => {
+      // An old pause stored 10 days for the stacked 5-day boost (its end
+      // minus now): it resumes with its own 5 days.
+      const db = setup(
+        productRow(),
+        boostRow({
+          status: BoostStatus.paused,
+          durationDays: 5,
+          pausedRemainingSeconds: 10 * 86400,
+        }),
+      );
+
+      await db.transaction((tx) => service.resume(tx, "boost-1", NOW));
+
+      expect(db.boosts.get("boost-1")?.endsAt).toEqual(at(5 * DAY));
+    });
+
+    it("an extension of the first boost moves the stacked one back", async () => {
+      const db = sevenThenFive();
+
+      await db.transaction((tx) => service.extend(tx, "seven", 2, NOW));
+
+      expect(db.boosts.get("seven")).toMatchObject({
+        endsAt: at(7 * DAY),
+        extendedDays: 2,
+      });
+      expect(db.boosts.get("five")?.endsAt).toEqual(at(12 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(12 * DAY));
+    });
+  });
+
+  describe("showcase boosts keep their own showcase time", () => {
+    // A 30-day search boost, then a 3-day showcase boost stacked behind it:
+    // search until +33d, showcase until +3d.
+    function econThenVitrin() {
+      return setup(
+        productRow({
+          boostedUntil: at(33 * DAY),
+          homeShowcaseUntil: at(3 * DAY),
+          rankTier: 2,
+        }),
+        boostRow({
+          id: "econ",
+          status: BoostStatus.active,
+          durationDays: 30,
+          endsAt: at(30 * DAY),
+          purchasedAt: at(-DAY),
+        }),
+        boostRow({
+          id: "vitrin",
+          status: BoostStatus.active,
+          showcaseOnHome: true,
+          durationDays: 3,
+          endsAt: at(33 * DAY),
+          showcaseEndsAt: at(3 * DAY),
+          purchasedAt: at(-DAY + HOUR),
+        }),
+      );
+    }
+
+    it("activation records the boost's own showcase end", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(30 * DAY) }),
+        boostRow({ durationDays: 3, showcaseOnHome: true }),
+      );
+
+      await db.transaction((tx) => service.activate(tx, "boost-1", NOW));
+
+      expect(db.boosts.get("boost-1")).toMatchObject({
+        endsAt: at(33 * DAY),
+        showcaseEndsAt: at(3 * DAY),
+      });
+    });
+
+    it("a staff action on the search boost leaves the showcase at +3d, not +33d", async () => {
+      const db = econThenVitrin();
+
+      await db.transaction((tx) => service.extend(tx, "econ", 1, NOW));
+
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: at(34 * DAY),
+        homeShowcaseUntil: at(3 * DAY),
+      });
+      expect(db.boosts.get("vitrin")).toMatchObject({
+        endsAt: at(34 * DAY),
+        showcaseEndsAt: at(3 * DAY),
+      });
+    });
+
+    it("pause and resume of the showcase boost keep its own showcase days", async () => {
+      const db = econThenVitrin();
+
+      await db.transaction((tx) => service.pause(tx, "vitrin", at(DAY)));
+
+      expect(db.boosts.get("vitrin")).toMatchObject({
+        pausedRemainingSeconds: 3 * 86400,
+        pausedShowcaseSeconds: 2 * 86400,
+      });
+      expect(db.products.get("prod-1")?.homeShowcaseUntil).toBeNull();
+
+      await db.transaction((tx) => service.resume(tx, "vitrin", at(5 * DAY)));
+
+      expect(db.boosts.get("vitrin")).toMatchObject({
+        status: BoostStatus.active,
+        endsAt: at(33 * DAY),
+        showcaseEndsAt: at(7 * DAY),
+        pausedShowcaseSeconds: null,
+      });
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: at(33 * DAY),
+        homeShowcaseUntil: at(7 * DAY),
+      });
+    });
+
+    it("an extension of a showcase boost adds the days to its showcase too", async () => {
+      const db = econThenVitrin();
+
+      await db.transaction((tx) => service.extend(tx, "vitrin", 2, NOW));
+
+      expect(db.boosts.get("vitrin")).toMatchObject({
+        endsAt: at(35 * DAY),
+        showcaseEndsAt: at(5 * DAY),
+      });
+      expect(db.products.get("prod-1")?.homeShowcaseUntil).toEqual(at(5 * DAY));
+    });
+
+    it("an extension of a paused showcase boost adds to both remainders", async () => {
+      const db = setup(
+        productRow(),
+        boostRow({
+          status: BoostStatus.paused,
+          showcaseOnHome: true,
+          pausedRemainingSeconds: 3 * 86400,
+          pausedShowcaseSeconds: 86400,
+        }),
+      );
+
+      await db.transaction((tx) => service.extend(tx, "boost-1", 2, NOW));
+
+      expect(db.boosts.get("boost-1")).toMatchObject({
+        pausedRemainingSeconds: 5 * 86400,
+        pausedShowcaseSeconds: 3 * 86400,
+      });
+    });
+
+    it("a showcase boost paused before the column resumes its showcase with its search remainder", async () => {
+      const db = setup(
+        productRow(),
+        boostRow({
+          status: BoostStatus.paused,
+          showcaseOnHome: true,
+          durationDays: 3,
+          pausedRemainingSeconds: 2 * 86400,
+          pausedShowcaseSeconds: null,
+        }),
+      );
+
+      await db.transaction((tx) => service.resume(tx, "boost-1", NOW));
+
+      expect(db.products.get("prod-1")?.homeShowcaseUntil).toEqual(at(2 * DAY));
     });
   });
 });
