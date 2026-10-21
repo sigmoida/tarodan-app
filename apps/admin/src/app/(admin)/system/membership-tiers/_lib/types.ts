@@ -19,7 +19,7 @@ export interface MembershipTier {
   canCreateCollections: boolean;
   canTrade: boolean;
   isAdFree: boolean;
-  /** DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı; API artık dönmüyor. */
+  /** Deprecated: paid boost packages replaced featured slots; the API no longer returns it. */
   featuredListingSlots?: number;
   isActive: boolean;
   sortOrder: number;
@@ -44,11 +44,14 @@ const numField = (check: (n: number) => boolean, message: string) =>
 /**
  * Form schema — validation-only; numbers are shaped in the mutationFn.
  *
- * Sınırlar API ile BİREBİR: ad/açıklama uzunlukları (100/500), negatif olmayan
- * sayaçlar ve `maxTotalListings ∈ {-1} ∪ [1,∞)` kuralı UpdateMembershipTierDto
- * + admin-membership.service'ten gelir. Eskiden istemci hiçbirini bilmiyordu ve
- * kullanıcı ham 400 mesajlarıyla karşılaşıyordu. `isFree`, ücretsiz katmanın
- * fiyatının 0 OLMAK ZORUNDA / ücretlinin 0'dan BÜYÜK olma kuralını ayırır.
+ * The bounds mirror UpdateMembershipTierDto and the tier update service: the
+ * name/description lengths (100/500), non-negative counters, the
+ * `maxTotalListings ∈ {-1} ∪ [1,∞)` rule and `maxSavedSearches` in
+ * 0..SAVED_SEARCH_TIER_LIMIT_MAX, so the admin sees a field error instead of a
+ * raw 400. Not yet mirrored: the API's `maxImagesPerListing` 1..MAX_PRODUCT_IMAGES
+ * and `sortOrder` <= 10000 caps (the image cap is API-only today). `isFree`
+ * selects the rule that the free tier's price must be 0 and a paid tier's must
+ * be greater than 0.
  */
 export const tierSchema = (t: T, isFree = false) =>
   z.object({
@@ -84,7 +87,9 @@ export const tierSchema = (t: T, isFree = false) =>
     ),
     maxSavedSearches: numField(
       (n) => Number.isInteger(n) && n >= 0 && n <= SAVED_SEARCH_TIER_LIMIT_MAX,
-      t("admin.tiers.validation.savedSearchLimitRange"),
+      t("admin.tiers.validation.savedSearchLimitRange", {
+        max: SAVED_SEARCH_TIER_LIMIT_MAX,
+      }),
     ),
     sortOrder: numField(
       (n) => Number.isInteger(n) && n >= 0,

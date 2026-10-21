@@ -8992,7 +8992,7 @@
         "freePriceZero": "The free tier's price must be 0",
         "paidPricePositive": "A paid tier's price must be greater than 0",
         "nonNegativeInt": "Enter a whole number of 0 or more",
-        "savedSearchLimitRange": "Enter a whole number from 0 to 1000",
+        "savedSearchLimitRange": "Enter a whole number from 0 to {max}",
         "totalListingsRange": "Enter -1 (unlimited) or at least 1"
       },
       "modal": {

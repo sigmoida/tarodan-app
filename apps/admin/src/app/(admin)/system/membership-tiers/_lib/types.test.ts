@@ -48,6 +48,19 @@ describe("tier form maxSavedSearches", () => {
     expect(parse("abc")).toBe(false);
   });
 
+  it("passes the shared maximum into the range message", () => {
+    const tWithParams = ((key: string, values?: { max?: number }) =>
+      values?.max != null ? `${key}:${values.max}` : key) as T;
+    const result = tierSchema(tWithParams).safeParse({
+      ...base,
+      maxSavedSearches: String(SAVED_SEARCH_TIER_LIMIT_MAX + 1),
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe(
+      `admin.tiers.validation.savedSearchLimitRange:${SAVED_SEARCH_TIER_LIMIT_MAX}`,
+    );
+  });
+
   it("seeds the form from the tier and sends an integer in the payload", () => {
     expect(base.maxSavedSearches).toBe("20");
     const payload = tierFormToPayload(
