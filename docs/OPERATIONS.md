@@ -447,6 +447,26 @@ approval.
 Rollback: set the values back in the admin panel. The column and table are
 harmless if left; a later migration drops them.
 
+### Listing boost settings
+
+Reference: tarodan-ops plan `2026-10-21-listing-boost`. Migration
+`20261021195258_boost_source_and_offer_dismissals` adds the boost source,
+grant, cancel, refund and reminder columns to `product_boosts` and the empty
+`boost_offer_dismissals` table. No data step: every existing boost is a
+`purchase`.
+
+- `boost_enabled` (on/off). Unlike the other toggles, a **missing** row means
+  **on** (`isBoostEnabled` in `@tarodan/types`); only `"false"` stops new
+  boost purchases. Running boosts continue either way.
+- `boost_offer_since` (ISO timestamp). Listings created after it get a
+  one-time boost offer once they are live. Empty or invalid means the offer
+  is off, the state after the release. No step yet: the offer ships with the
+  seller boost API. Setting it in production is a production write, after
+  the app release and with the user's approval.
+- Boost prices come only from the ad package tiers; the legacy
+  `boost_price_3d`, `boost_price_7d` and `boost_price_30d` settings are no
+  longer read.
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`
