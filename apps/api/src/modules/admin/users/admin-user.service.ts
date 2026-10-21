@@ -14,7 +14,12 @@ import { QUEUE_NAMES } from "../../../workers/constants";
 import { enqueueSellerListingReindex } from "../../membership/helpers/seller-listing-reindex";
 import { fulltextUserSearch } from "../../../common/helpers/fulltext-search";
 import { AdminUserQueryDto } from "../dto";
-import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";
+import {
+  Prisma,
+  MembershipTierType,
+  OrderStatus,
+  SubscriptionStatus,
+} from "@prisma/client";
 import {
   ADMIN_LIST_DEFAULT_LIMIT,
   ADMIN_LIST_DEFAULT_PAGE,
@@ -375,12 +380,12 @@ export class AdminUserService {
     const [asBuyer, asSeller] = await Promise.all([
       this.prisma.order.groupBy({
         by: ["buyerId"],
-        where: { status: "cancelled" as any, buyerId: { in: ids } },
+        where: { status: OrderStatus.cancelled, buyerId: { in: ids } },
         _count: { _all: true },
       }),
       this.prisma.order.groupBy({
         by: ["sellerId"],
-        where: { status: "cancelled" as any, sellerId: { in: ids } },
+        where: { status: OrderStatus.cancelled, sellerId: { in: ids } },
         _count: { _all: true },
       }),
     ]);

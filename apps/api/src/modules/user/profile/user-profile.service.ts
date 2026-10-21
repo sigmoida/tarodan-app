@@ -273,10 +273,10 @@ export class UserProfileService {
       user.avatarUrl,
     );
 
-    // Remove raw membership and hassas alanları yanıttan çıkar (passwordHash,
-    // fcmToken, ban metadata'sı asla client'a dönmemeli).
+    // Drop the raw membership and the sensitive fields from the response
+    // (passwordHash, fcmToken and ban metadata never reach a client).
     const {
-      membership: rawMembership,
+      membership: _rawMembership,
       passwordHash: _passwordHash,
       fcmToken: _fcmToken,
       bannedBy: _bannedBy,
@@ -565,13 +565,10 @@ export class UserProfileService {
     dto: UpdateNotificationSettingsDto,
   ): Promise<NotificationSettings> {
     const current = await this.getNotificationSettings(userId);
-    // Yalnızca tanımlı (undefined olmayan) anahtarları uygula.
-    const patch: Partial<NotificationSettings> = {};
-    for (const [key, value] of Object.entries(dto)) {
-      if (value !== undefined) {
-        (patch as any)[key] = value;
-      }
-    }
+    // Apply only the keys that were sent (not undefined).
+    const patch = Object.fromEntries(
+      Object.entries(dto).filter(([, value]) => value !== undefined),
+    ) as Partial<NotificationSettings>;
     const merged: NotificationSettings = { ...current, ...patch };
 
     // Pazarlama izninin ÖNCEKİ hâli: yalnız gerçek bir değişim (verdi / geri
@@ -826,13 +823,13 @@ export class UserProfileService {
       this.logger.log(`User account anonymized (soft-deleted): ${userId}`);
       // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
       // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
-    } catch (error: any) {
+    } catch (error: unknown) {
       // İşlem içi engel denetimi: istemci sözleşmesi aynı 400 (errors[]/details).
       if (isDeletionBlocked(error)) throw error;
       // Ayırt edilebilir işaret: "arşiv yazılamadı" ile "FK patladı" aynı 400'e
       // düşüyor; log'da ayrışmazsa kimlik kaybı riski taşıyan hata fark edilmez.
       this.logger.error(
-        `deleted-identity-archive-or-anonymize-failed userId=${userId}: ${error?.message}`,
+        `deleted-identity-archive-or-anonymize-failed userId=${userId}: ${errorMessage(error)}`,
       );
       throw new BadRequestException(
         i18nMessage("server.user.deleteAccountFailed"),
