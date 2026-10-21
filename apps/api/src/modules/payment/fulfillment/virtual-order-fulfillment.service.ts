@@ -26,6 +26,20 @@ import { BoostTimelineService } from "../../product/boost-timeline/boost-timelin
 import { traceBoost } from "../../product/helpers/boost-observability";
 import { SentryService } from "../../sentry/sentry.service";
 
+/** The fields of a paid payment that membership activation reads. */
+export interface MembershipOrderPayment {
+  id: string;
+  /** A membership is always paid for one order (never a cart or a trade). */
+  orderId: string;
+  amount: Prisma.Decimal | number;
+  providerPaymentId: string | null;
+  order: {
+    buyerId: string;
+    productId: string;
+    totalAmount: Prisma.Decimal | number;
+  };
+}
+
 /** The fields of a paid payment that boost activation reads. */
 export interface BoostOrderPayment {
   id: string;
@@ -81,7 +95,7 @@ export class VirtualOrderFulfillmentService {
    */
   async applyMembershipInTx(
     tx: Prisma.TransactionClient,
-    payment: any,
+    payment: MembershipOrderPayment,
     transactionId?: string,
   ): Promise<void> {
     const membership = await tx.userMembership.findUnique({
@@ -502,7 +516,7 @@ export class VirtualOrderFulfillmentService {
    * idempotent, retry cron'lu. membershipPayment kaydı varsa ondan, yoksa MEM- siparişten kes.
    */
   issueMembershipInvoice(
-    payment: any,
+    payment: Pick<MembershipOrderPayment, "providerPaymentId">,
     orderId: string,
     transactionId?: string,
   ): void {
