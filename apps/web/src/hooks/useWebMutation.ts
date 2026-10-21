@@ -18,7 +18,7 @@ export interface UseWebMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
-  /** Hata toast'ını bastırır (kullanıcının başlatmadığı arka plan yazmaları için). */
+  /** Suppresses the error toast (for background writes the user did not start). */
   silentError?: boolean;
   onSuccess?: (data: TData, vars: TVars) => void;
   mutation?: Omit<
@@ -35,6 +35,23 @@ export function apiErrorMessage(error: unknown): string | undefined {
   if (Array.isArray(message) && typeof message[0] === "string")
     return message[0];
   return undefined;
+}
+
+/** The API's machine-readable `errorCode` off an axios error, if any. */
+export function apiErrorCode(error: unknown): string | undefined {
+  const code = (error as { response?: { data?: { errorCode?: unknown } } })
+    ?.response?.data?.errorCode;
+  return typeof code === "string" ? code : undefined;
+}
+
+/**
+ * A cancelled request or a step the user backed out of (an `AbortError`, as
+ * the step-up's `ReauthCancelledError` is, or axios `ERR_CANCELED`). It is not
+ * a failure: no toast here, and no Sentry report (`shouldReportMutationError`).
+ */
+export function isCancellation(error: unknown): boolean {
+  const err = error as { name?: unknown; code?: unknown } | null;
+  return err?.name === "AbortError" || err?.code === "ERR_CANCELED";
 }
 
 /**
@@ -72,11 +89,11 @@ export function useWebMutation<TData, TVars = void>(
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, vars);
     },
-    // Sentry raporu burada DEĞİL: `MutationCache` (lib/query/client) her
-    // mutation hatasını, kendi `onError`'ı olsa bile raporlar. Burada yalnız
-    // kullanıcıya gösterilen toast var; `silentError` raporu bastırmaz.
+    // The Sentry report is NOT here: the `MutationCache` (lib/query/client)
+    // reports every mutation error, even one with its own `onError`. Only the
+    // user-facing toast lives here; `silentError` does not stop the report.
     onError: (error) => {
-      if (silentError) return;
+      if (silentError || isCancellation(error)) return;
       toast.error(
         apiErrorMessage(error) ?? errorMessage ?? t("common.operationFailed"),
       );
