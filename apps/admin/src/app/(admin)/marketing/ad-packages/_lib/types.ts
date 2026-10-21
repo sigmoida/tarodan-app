@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
+import {
+  amountField,
+  amountInputValue,
+  amountOrNull,
+  amountOrZero,
+} from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -48,18 +54,20 @@ export function packageDurations(pkg: AdPackage): number[] {
 }
 
 // ── Form schema (validation-only; strings→numbers/ISO shaped in toPayload) ──
+// The TL fields are text read by the shared TL amount parser
+// (`@/lib/schemas/amount`): "1.000" is refused, never 1 TL. 0 is a real value.
 
 const tierRowSchema = (t: T) =>
   z.object({
     durationDays: z
       .string()
       .min(1, t("admin.marketing.adPackages.validation.durationMin")),
-    minAmount: z.string().default("0"),
-    maxAmount: z.string().default(""),
-    price: z
-      .string()
-      .min(1, t("admin.marketing.adPackages.validation.priceMin")),
-    campaignPrice: z.string().default(""),
+    minAmount: amountField(t).default("0"),
+    maxAmount: amountField(t).default(""),
+    price: amountField(t, {
+      required: t("admin.marketing.adPackages.validation.priceMin"),
+    }),
+    campaignPrice: amountField(t).default(""),
     campaignStartsAt: z.string().default(""),
     campaignEndsAt: z.string().default(""),
     isActive: z.boolean().default(true),
@@ -172,11 +180,10 @@ export function packageToForm(pkg?: AdPackage): PackageFormValues {
     targetUserIds: pkg.targetUsers?.map((user) => user.id) ?? [],
     tiers: pkg.tiers.map((tier) => ({
       durationDays: String(tier.durationDays),
-      minAmount: String(tier.minAmount),
-      maxAmount: tier.maxAmount == null ? "" : String(tier.maxAmount),
-      price: String(tier.price),
-      campaignPrice:
-        tier.campaignPrice == null ? "" : String(tier.campaignPrice),
+      minAmount: amountInputValue(tier.minAmount),
+      maxAmount: amountInputValue(tier.maxAmount),
+      price: amountInputValue(tier.price),
+      campaignPrice: amountInputValue(tier.campaignPrice),
       campaignStartsAt: dateInput(tier.campaignStartsAt),
       campaignEndsAt: dateInput(tier.campaignEndsAt),
       isActive: tier.isActive,
@@ -204,12 +211,10 @@ export function packageFormToPayload(v: PackageFormValues) {
         : [],
     tiers: v.tiers.map((row) => ({
       durationDays: parseInt(row.durationDays, 10) || 1,
-      minAmount: parseFloat(row.minAmount) || 0,
-      maxAmount: row.maxAmount.trim() ? parseFloat(row.maxAmount) : null,
-      price: parseFloat(row.price) || 0,
-      campaignPrice: row.campaignPrice.trim()
-        ? parseFloat(row.campaignPrice)
-        : null,
+      minAmount: amountOrZero(row.minAmount),
+      maxAmount: amountOrNull(row.maxAmount),
+      price: amountOrZero(row.price),
+      campaignPrice: amountOrNull(row.campaignPrice),
       campaignStartsAt: row.campaignStartsAt
         ? new Date(row.campaignStartsAt).toISOString()
         : null,

@@ -13,6 +13,7 @@ import { adminApi } from "@/lib/api";
 import { Panel } from "@/components/detail/Panel";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { fmtTry } from "@/lib/format";
+import { amountOrZero } from "@/lib/schemas/amount";
 import {
   type MembershipTier,
   type TierFormValues,
@@ -39,7 +40,7 @@ export function TierFormModal({
   const form = useZodForm(tierSchema(t, isFree), {
     defaultValues: tierToForm(tier),
   });
-  const monthly = parseFloat(form.watch("monthlyPrice")) || 0;
+  const monthly = amountOrZero(form.watch("monthlyPrice"));
   const yearly = computedYearly(monthly, yearlyDiscount);
 
   const save = useAdminMutation(
@@ -48,7 +49,7 @@ export function TierFormModal({
         tier.id,
         tierFormToPayload(
           v,
-          computedYearly(parseFloat(v.monthlyPrice) || 0, yearlyDiscount),
+          computedYearly(amountOrZero(v.monthlyPrice), yearlyDiscount),
         ),
       );
     },
@@ -93,13 +94,14 @@ export function TierFormModal({
 
       {!isFree && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Text, not type="number" (see `@/lib/schemas/amount`). */}
           <FormInput
             name="monthlyPrice"
             label={t("admin.tiers.field.monthlyPrice")}
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="99.90"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="99,90"
           />
           <div>
             <span className="mb-1 block text-sm text-muted">

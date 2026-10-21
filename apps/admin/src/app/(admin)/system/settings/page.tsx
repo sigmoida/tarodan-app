@@ -73,7 +73,10 @@ export default function SettingsPage() {
                   <FormInput
                     key={f.key}
                     name={f.key}
-                    type="number"
+                    // TL amounts are text, not number fields (see
+                    // `@/lib/schemas/amount`).
+                    type={f.money ? "text" : "number"}
+                    inputMode={f.money ? "decimal" : undefined}
                     label={f.label}
                     helperText={f.helper}
                     min={f.min}

@@ -24,7 +24,7 @@ import {
   isTlAmountRefused,
   tlAmountInputValue,
   tlAmountValue,
-} from "@/lib/tlAmount";
+} from "@tarodan/shared";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -253,7 +253,7 @@ export function useCounterOfferEditor({
     if (!trade) return;
 
     if (counterCashRefused) {
-      toast.error(t("trade.cashFormatRefused"));
+      toast.error(t("validation.amountFormatRefused"));
       return;
     }
 

@@ -60,37 +60,38 @@ export function TierRowsEditor() {
                 label={t("admin.marketing.adPackages.durationDays")}
                 placeholder="7"
               />
+              {/* Amounts are text, not type="number" (see `@/lib/schemas/amount`). */}
               <FormInput
                 name={`tiers.${index}.minAmount`}
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 label={t("admin.marketing.adPackages.minAmount")}
                 placeholder="0"
               />
               <FormInput
                 name={`tiers.${index}.maxAmount`}
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 label={t("admin.marketing.adPackages.maxAmount")}
                 placeholder={t("admin.marketing.adPackages.unlimited")}
               />
               <FormInput
                 name={`tiers.${index}.price`}
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 label={t("admin.marketing.adPackages.price")}
-                placeholder="49.90"
+                placeholder="49,90"
               />
               <FormInput
                 name={`tiers.${index}.campaignPrice`}
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 label={t("admin.marketing.adPackages.campaignPrice")}
-                placeholder="39.90"
+                placeholder="39,90"
               />
               <FormDatePicker
                 name={`tiers.${index}.campaignStartsAt`}

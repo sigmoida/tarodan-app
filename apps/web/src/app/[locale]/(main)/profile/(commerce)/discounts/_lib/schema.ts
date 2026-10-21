@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Translate } from "@/types/i18n";
-import { parseTlAmount } from "@/lib/tlAmount";
+import { parseTlAmount } from "@tarodan/shared";
 
 /**
  * Validation for the discount create/edit form. `z.infer` is structurally the
@@ -52,7 +52,7 @@ export const discountSchema = (t: Translate) =>
             "value",
             isPercent
               ? t("validation.enterValidValue")
-              : t("trade.cashFormatRefused"),
+              : t("validation.amountFormatRefused"),
           );
         } else if (isPercent) {
           const percent = parsed.status === "ok" ? parsed.amount : 0;
@@ -65,7 +65,7 @@ export const discountSchema = (t: Translate) =>
       }
       for (const path of ["minCartValue", "maxDiscountAmount"] as const) {
         if (parseTlAmount(d[path]).status === "refused") {
-          refuse(path, t("trade.cashFormatRefused"));
+          refuse(path, t("validation.amountFormatRefused"));
         }
       }
     })

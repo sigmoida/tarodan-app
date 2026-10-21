@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
+import {
+  amountField,
+  amountInputValue,
+  amountOrNull,
+  amountOrZero,
+} from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -121,12 +127,19 @@ export const sellerTypeLabel = (value: SellerType, t: T) =>
 export const inclusiveCommissionMaximum = (maxAmount: number | null) =>
   maxAmount == null ? null : Math.max(0, maxAmount - 0.01);
 
+/** Rates (4 decimals) stay number inputs; see the TL fields below. */
 const numberString = z
   .string()
   .min(1)
   .refine((value) => Number.isFinite(Number(value)) && Number(value) >= 0);
-const optionalNumberString = z.string().optional().default("");
 const shareField = z.string().optional().default("");
+/**
+ * TL fields (amount range, fee caps, trade fees) are text read by the shared
+ * amount parser (`@/lib/schemas/amount`): "1.000" is refused, never 1 TL.
+ */
+const tlField = (t: T) =>
+  amountField(t, { required: t("validation.required") });
+const optionalTlField = (t: T) => amountField(t).optional().default("");
 
 export const commissionSchema = (t: T) =>
   z
@@ -136,32 +149,32 @@ export const commissionSchema = (t: T) =>
         .min(1, t("admin.finance.commission.validation.nameRequired")),
       categoryId: z.string().min(1, "Kategori zorunludur"),
       sellerType: z.enum(["FREE", "BASIC", "PREMIUM", "BUSINESS"]),
-      minAmount: numberString,
-      maxAmount: optionalNumberString,
+      minAmount: tlField(t),
+      maxAmount: optionalTlField(t),
       buyerCommissionRate: numberString,
-      buyerCommissionMin: optionalNumberString,
-      buyerCommissionMax: optionalNumberString,
+      buyerCommissionMin: optionalTlField(t),
+      buyerCommissionMax: optionalTlField(t),
       buyerServiceFeeRate: numberString,
-      buyerServiceFeeMin: optionalNumberString,
-      buyerServiceFeeMax: optionalNumberString,
+      buyerServiceFeeMin: optionalTlField(t),
+      buyerServiceFeeMax: optionalTlField(t),
       sellerCommissionRate: numberString,
-      sellerCommissionMin: optionalNumberString,
-      sellerCommissionMax: optionalNumberString,
+      sellerCommissionMin: optionalTlField(t),
+      sellerCommissionMax: optionalTlField(t),
       sellerPlatformFeeRate: numberString,
-      sellerPlatformFeeMin: optionalNumberString,
-      sellerPlatformFeeMax: optionalNumberString,
-      tradeFeeSellerAmount: numberString,
-      tradeFeeBuyerAmount: numberString,
+      sellerPlatformFeeMin: optionalTlField(t),
+      sellerPlatformFeeMax: optionalTlField(t),
+      tradeFeeSellerAmount: tlField(t),
+      tradeFeeBuyerAmount: tlField(t),
       shippingBuyerShare: numberString,
       shippingShareSmall: shareField,
       shippingShareMedium: shareField,
       shippingShareLarge: shareField,
     })
     .superRefine((value, context) => {
-      if (
-        value.maxAmount &&
-        Number(value.maxAmount) <= Number(value.minAmount)
-      ) {
+      // Refused TL text has its own field error; null skips the comparison.
+      const maxAmount = amountOrNull(value.maxAmount);
+      const minAmount = amountOrNull(value.minAmount);
+      if (maxAmount != null && minAmount != null && maxAmount <= minAmount) {
         context.addIssue({
           code: "custom",
           path: ["maxAmount"],
@@ -194,9 +207,11 @@ export const commissionSchema = (t: T) =>
         ],
       ] as const;
       for (const [rateKey, minKey, maxKey] of pairs) {
+        const min = amountOrNull(value[minKey]);
+        const max = amountOrNull(value[maxKey]);
         if (
           Number(value[rateKey]) === 0 &&
-          (Number(value[minKey] || 0) > 0 || Number(value[maxKey] || 0) > 0)
+          ((min ?? 0) > 0 || (max ?? 0) > 0)
         ) {
           context.addIssue({
             code: "custom",
@@ -204,11 +219,7 @@ export const commissionSchema = (t: T) =>
             message: t("admin.finance.commission.validation.zeroRateBounds"),
           });
         }
-        if (
-          value[minKey] &&
-          value[maxKey] &&
-          Number(value[maxKey]) < Number(value[minKey])
-        ) {
+        if (min != null && max != null && max < min) {
           context.addIssue({
             code: "custom",
             path: [maxKey],
@@ -254,27 +265,28 @@ const tierShare = (rule: CommissionRule, tierCode: PackageTierCode) => {
   return share ? String(share.buyerShare) : "";
 };
 
+/** A rule -> form values; TL fields get a decimal comma, as their fields read it. */
 export function ruleToForm(rule: CommissionRule): CommissionFormValues {
   return {
     name: rule.name,
     categoryId: rule.categoryId,
     sellerType: rule.sellerType,
-    minAmount: text(rule.minAmount),
-    maxAmount: text(rule.maxAmount),
+    minAmount: amountInputValue(rule.minAmount),
+    maxAmount: amountInputValue(rule.maxAmount),
     buyerCommissionRate: text(rule.buyerCommissionRate),
-    buyerCommissionMin: text(rule.buyerCommissionMin),
-    buyerCommissionMax: text(rule.buyerCommissionMax),
+    buyerCommissionMin: amountInputValue(rule.buyerCommissionMin),
+    buyerCommissionMax: amountInputValue(rule.buyerCommissionMax),
     buyerServiceFeeRate: text(rule.buyerServiceFeeRate),
-    buyerServiceFeeMin: text(rule.buyerServiceFeeMin),
-    buyerServiceFeeMax: text(rule.buyerServiceFeeMax),
+    buyerServiceFeeMin: amountInputValue(rule.buyerServiceFeeMin),
+    buyerServiceFeeMax: amountInputValue(rule.buyerServiceFeeMax),
     sellerCommissionRate: text(rule.sellerCommissionRate),
-    sellerCommissionMin: text(rule.sellerCommissionMin),
-    sellerCommissionMax: text(rule.sellerCommissionMax),
+    sellerCommissionMin: amountInputValue(rule.sellerCommissionMin),
+    sellerCommissionMax: amountInputValue(rule.sellerCommissionMax),
     sellerPlatformFeeRate: text(rule.sellerPlatformFeeRate),
-    sellerPlatformFeeMin: text(rule.sellerPlatformFeeMin),
-    sellerPlatformFeeMax: text(rule.sellerPlatformFeeMax),
-    tradeFeeSellerAmount: text(rule.tradeFeeSellerAmount),
-    tradeFeeBuyerAmount: text(rule.tradeFeeBuyerAmount),
+    sellerPlatformFeeMin: amountInputValue(rule.sellerPlatformFeeMin),
+    sellerPlatformFeeMax: amountInputValue(rule.sellerPlatformFeeMax),
+    tradeFeeSellerAmount: amountInputValue(rule.tradeFeeSellerAmount),
+    tradeFeeBuyerAmount: amountInputValue(rule.tradeFeeBuyerAmount),
     shippingBuyerShare: text(rule.shippingBuyerShare),
     shippingShareSmall: tierShare(rule, "small"),
     shippingShareMedium: tierShare(rule, "medium"),
@@ -287,13 +299,13 @@ const numberOrNull = (value: string) =>
 
 export function commissionFormToPayload(value: CommissionFormValues) {
   const bound = (rate: string, amount: string) =>
-    Number(rate) === 0 ? null : numberOrNull(amount);
+    Number(rate) === 0 ? null : amountOrNull(amount);
   return {
     name: value.name.trim(),
     categoryId: value.categoryId,
     sellerType: value.sellerType,
-    minAmount: Number(value.minAmount),
-    maxAmount: numberOrNull(value.maxAmount),
+    minAmount: amountOrZero(value.minAmount),
+    maxAmount: amountOrNull(value.maxAmount),
     buyerCommissionRate: Number(value.buyerCommissionRate),
     buyerCommissionMin: bound(
       value.buyerCommissionRate,
@@ -330,8 +342,8 @@ export function commissionFormToPayload(value: CommissionFormValues) {
       value.sellerPlatformFeeRate,
       value.sellerPlatformFeeMax,
     ),
-    tradeFeeSellerAmount: Number(value.tradeFeeSellerAmount),
-    tradeFeeBuyerAmount: Number(value.tradeFeeBuyerAmount),
+    tradeFeeSellerAmount: amountOrZero(value.tradeFeeSellerAmount),
+    tradeFeeBuyerAmount: amountOrZero(value.tradeFeeBuyerAmount),
     shippingBuyerShare: Number(value.shippingBuyerShare),
     shippingShares: PACKAGE_TIER_CODES.map((tierCode) => ({
       tierCode,

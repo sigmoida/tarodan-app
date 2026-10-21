@@ -3,6 +3,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { tlAmountValue } from "@tarodan/shared";
 import { useListingFormApi } from "./api-context";
 import type { PackageTierCode } from "./usePackageTiers";
 import {
@@ -203,23 +204,27 @@ export interface CommissionPreview {
   packageTierShipping: PackageTierShipping[];
 }
 
-/** Estimated platform fee / net for a price + category + package size. */
+/**
+ * Estimated platform fee / net for a price + category + package size. A string
+ * price is the field text, read by the shared `tlAmountValue` (empty or
+ * refused text asks nothing); the request always carries the parsed amount,
+ * never the typed text ("1250,50" is not a number to the API).
+ */
 export function useCommissionPreview(
   price: string | number,
   categoryId: string,
   packageTier: PackageTierCode = "small",
 ) {
-  const amount = Number(price);
-  const enabled =
-    !!price && !!categoryId && !Number.isNaN(amount) && amount > 0;
+  const amount = typeof price === "number" ? price : tlAmountValue(price);
+  const enabled = !!categoryId && Number.isFinite(amount) && amount > 0;
   const api = useListingFormApi();
   const query = useListingQuery<CommissionPreview>({
     resource: "listing-form-commission",
-    params: [String(price), categoryId, packageTier],
+    params: [String(amount), categoryId, packageTier],
     fetcher: async () => {
       const res = {
         data: await api.get<any>("/orders/commission-preview", {
-          amount: price,
+          amount,
           categoryId: categoryId || undefined,
           packageTier,
         }),

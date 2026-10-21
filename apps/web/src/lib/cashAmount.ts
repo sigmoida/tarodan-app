@@ -1,10 +1,10 @@
 /** @format */
 
-import { tlAmountValue } from "./tlAmount";
+import { tlAmountValue } from "@tarodan/shared";
 
 /**
  * The trade cash amount field. The typed text is read by the shared TL amount
- * parser (`./tlAmount`); this module adds only what is trade-specific.
+ * parser (`@tarodan/shared` `tlAmountValue`); this module adds only what is trade-specific.
  *
  * The signed `cashAmount` payload field: positive when I pay, negative when
  * they pay, `undefined` when there is no cash (empty, zero or refused text).

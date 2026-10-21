@@ -353,6 +353,16 @@ describe("buildListingFormData", () => {
     expect(newFormData.price).toBe("100");
   });
 
+  it("prefills the price with a decimal comma, as the field reads it", () => {
+    const { newFormData } = buildListingFormData(edit({ price: 1250.5 }));
+    // The refusal copy asks for a comma; the field shows what the seller is
+    // told to type.
+    expect(newFormData.price).toBe("1250,50");
+    expect(buildListingFormData(edit({ price: 1000 })).newFormData.price).toBe(
+      "1000",
+    );
+  });
+
   it("görsel önizlemeleri sıraya göre döner", () => {
     const { previewUrls } = buildListingFormData(
       edit({
@@ -411,6 +421,14 @@ describe("buildSaleDataFromListing", () => {
     expect(saleData.salePrice).toBe("80");
     expect(saleData.saleStartDate).toBe("2026-08-01");
     expect(saleData.saleEndDate).toBe("2026-08-31");
+  });
+
+  it("prefills the discount amounts with a decimal comma", () => {
+    const { saleData } = buildSaleDataFromListing(
+      edit({ price: 1099.9, oldPrice: 1250.5 }),
+    );
+    expect(saleData.originalPrice).toBe("1250,50");
+    expect(saleData.salePrice).toBe("1099,90");
   });
 
   it("indirim tarihleri boşsa bugünden bir haftalık varsayılan verir", () => {

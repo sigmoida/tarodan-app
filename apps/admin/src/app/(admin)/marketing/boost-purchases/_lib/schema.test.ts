@@ -28,6 +28,20 @@ describe("refundBoostSchema", () => {
     expect(ok("1.005")).toBe(false);
     expect(ok("1e2")).toBe(false);
   });
+
+  it.each(["0,00", ",", "50,", ",5", "1.000", "1.250,50"])(
+    "refuses %j, which must not read as blank (refund all) or as 0",
+    (amount) => {
+      expect(ok(amount)).toBe(false);
+    },
+  );
+
+  it("sends a comma amount exactly", () => {
+    expect(refundBoostPayload({ amount: "20,57", reason: "why" })).toEqual({
+      amount: 20.57,
+      reason: "why",
+    });
+  });
 });
 
 describe("refund payload", () => {

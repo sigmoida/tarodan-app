@@ -555,7 +555,7 @@ describe("useCounterOfferEditor, cash amount", () => {
     act(() => result.current.setCounterCashAmount("1.000"));
     expect(result.current.counterCashRefused).toBe(true);
     act(() => result.current.handleCounterSubmit());
-    expect(toastError).toHaveBeenCalledWith("trade.cashFormatRefused");
+    expect(toastError).toHaveBeenCalledWith("validation.amountFormatRefused");
     expect(counter).not.toHaveBeenCalled();
   });
 });

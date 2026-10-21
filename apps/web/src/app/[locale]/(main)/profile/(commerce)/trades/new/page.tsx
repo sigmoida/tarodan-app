@@ -1,7 +1,7 @@
 "use client";
 
 import { signedCashAmount } from "@/lib/cashAmount";
-import { isTlAmountRefused, tlAmountValue } from "@/lib/tlAmount";
+import { isTlAmountRefused, tlAmountValue } from "@tarodan/shared";
 import { useState, useEffect, Suspense } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -108,7 +108,7 @@ function NewTradeContent() {
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
       return toast.error(t("page.new.page.lutfenBirTeslimatAdresiSecinVeya"));
-    if (cashRefused) return toast.error(t("trade.cashFormatRefused"));
+    if (cashRefused) return toast.error(t("validation.amountFormatRefused"));
     const sellerId = getSellerId(target);
     if (!sellerId) return toast.error(t("trade.sellerNotFound"));
 
@@ -222,7 +222,9 @@ function NewTradeContent() {
               onChange={(e) => setCashAmount(e.target.value)}
               placeholder="0,00"
               helperText={t("trade.cashHelper")}
-              error={cashRefused ? t("trade.cashFormatRefused") : undefined}
+              error={
+                cashRefused ? t("validation.amountFormatRefused") : undefined
+              }
             />
           </div>
           {cash > 0 && (

@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
+import { tlAmountValue } from "@tarodan/shared";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { invalidateListingQueries } from "@/lib/query/invalidateListing";
@@ -13,8 +14,7 @@ import {
   buildListingUpdatePayload,
   createEmptySaleData,
   priceLimitMessages,
-  saleDataToPayload,
-  salePriceLimitMessage,
+  saleDataError,
   type ListingPriceRules,
   type SaleData,
 } from "@tarodan/listing-form";
@@ -209,11 +209,11 @@ export function useEditListingForm({
         ]
       : [],
   };
-  // İndirimli fiyat da alt sınırın altına inemez; form alanı olmadığı için
-  // şemada değil burada denetlenir (ekran satır içi gösterir, gönderim durur).
-  const salePriceError = salePriceLimitMessage(
+  // Refused discount text and a sale price below the floor block the submit
+  // (not form fields, so checked here; the card shows them inline).
+  const salePriceError = saleDataError(
     saleData,
-    Number(form.watch("price")),
+    tlAmountValue(form.watch("price")),
     priceRulesRef.current,
     PRICE_MESSAGES,
   );

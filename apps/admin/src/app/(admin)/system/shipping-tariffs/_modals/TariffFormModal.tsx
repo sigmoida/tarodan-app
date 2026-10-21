@@ -82,12 +82,13 @@ export function TariffFormModal({
       />
       <PackageTierRows />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Amounts are text, not type="number" (see `@/lib/schemas/amount`). */}
         <FormInput
           name="freeShippingThreshold"
           label={t("admin.shippingTariffs.thresholdLabel")}
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           placeholder="1000"
         />
       </div>
@@ -155,9 +156,9 @@ function PackageTierRows() {
               <FormInput
                 name={`packageTiers.${index}.amount`}
                 label={t("admin.shippingTariffs.amountLabel")}
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
                 placeholder="100"
               />
             </div>

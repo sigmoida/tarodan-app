@@ -323,7 +323,9 @@ describe("new trade page, cash amount field", () => {
     expect(container.textContent).toContain("trade.cashHelper");
     typeCash("12,50");
     expect(container.textContent).toContain("trade.cashHelper");
-    expect(container.textContent).not.toContain("trade.cashFormatRefused");
+    expect(container.textContent).not.toContain(
+      "validation.amountFormatRefused",
+    );
   });
 
   it.each(["12,50", "12.50"])("sends %s as 12.5", (value) => {
@@ -382,9 +384,9 @@ describe("new trade page, cash amount field", () => {
     render();
     typeCash("1.000");
     act(() => checkbox("a").click());
-    expect(container.textContent).toContain("trade.cashFormatRefused");
+    expect(container.textContent).toContain("validation.amountFormatRefused");
     act(() => sendButton().click());
-    expect(toast.error).toHaveBeenCalledWith("trade.cashFormatRefused");
+    expect(toast.error).toHaveBeenCalledWith("validation.amountFormatRefused");
     expect(h.mutate).not.toHaveBeenCalled();
   });
 });

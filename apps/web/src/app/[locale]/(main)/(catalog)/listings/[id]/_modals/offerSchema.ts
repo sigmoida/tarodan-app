@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
 import { formatTL } from "@tarodan/shared";
-import { parseTlAmount } from "@/lib/tlAmount";
+import { parseTlAmount } from "@tarodan/shared";
 
 /**
  * Make-offer form. `amount` stays the raw text of a `type="text"` field, read
@@ -33,7 +33,7 @@ export const offerSchema = (
           ctx.addIssue({ code: z.ZodIssueCode.custom, message });
         const parsed = parseTlAmount(v);
         if (parsed.status === "refused") {
-          return fail(t("trade.cashFormatRefused"));
+          return fail(t("validation.amountFormatRefused"));
         }
         if (parsed.status === "empty") {
           return fail(t("validation.enterValidAmount"));
