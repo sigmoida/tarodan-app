@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import appleSignin from "apple-signin-auth";
+import appleSignin, { type AppleIdTokenType } from "apple-signin-auth";
 import { i18nMessage } from "../../i18n";
 
 export interface AppleProfile {
@@ -31,7 +31,7 @@ export class AppleAuthService {
   }
 
   async verifyIdentityToken(identityToken: string): Promise<AppleProfile> {
-    let payload: any;
+    let payload: AppleIdTokenType;
     try {
       payload = await appleSignin.verifyIdToken(identityToken, {
         audience: this.audience(),

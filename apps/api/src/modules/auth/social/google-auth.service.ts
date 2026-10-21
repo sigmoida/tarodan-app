@@ -1,7 +1,7 @@
 // apps/api/src/modules/auth/google-auth.service.ts
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { OAuth2Client } from "google-auth-library";
+import { OAuth2Client, type TokenPayload } from "google-auth-library";
 import { i18nMessage } from "../../i18n";
 
 export interface GoogleProfile {
@@ -66,7 +66,7 @@ export class GoogleAuthService {
   }
 
   async verifyIdToken(idToken: string): Promise<GoogleProfile> {
-    let payload: any;
+    let payload: TokenPayload | undefined;
     try {
       const ticket = await this.client.verifyIdToken({
         idToken,
