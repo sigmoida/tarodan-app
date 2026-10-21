@@ -139,6 +139,28 @@ describe("discountSchema — typed TL amounts", () => {
       "admin.marketing.discounts.validation.valueRequired",
     ]);
   });
+
+  it.each(["percentage", "fixed_amount"] as const)(
+    "accepts a %s value of 0, as the API does (Min(0))",
+    (type) => {
+      expect(messagesAt({ type, value: "0" }, "value")).toEqual([]);
+    },
+  );
+
+  it("refuses a bare separator instead of reading it as 0 or blank", () => {
+    expect(messagesAt({ type: "fixed_amount", value: "," }, "value")).toEqual([
+      "validation.amountFormatRefused",
+    ]);
+    expect(messagesAt({ type: "percentage", value: "10," }, "value")).toEqual([
+      "validation.enterValidValue",
+    ]);
+  });
+
+  it("refuses a negative percent", () => {
+    expect(messagesAt({ type: "percentage", value: "-5" }, "value")).toEqual([
+      "validation.enterValidValue",
+    ]);
+  });
 });
 
 describe("discountSchema — membership_tiers audience requires targetTierTypes", () => {

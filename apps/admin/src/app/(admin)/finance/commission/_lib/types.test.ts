@@ -64,6 +64,27 @@ describe("commissionSchema TL fields", () => {
     ).toEqual(["admin.finance.commission.validation.maxBelowMin"]);
   });
 
+  it("refuses a range whose maximum equals the minimum", () => {
+    expect(
+      messagesAt({ minAmount: "1000", maxAmount: "1000,00" }, "maxAmount"),
+    ).toEqual(["admin.finance.commission.validation.strictRange"]);
+  });
+
+  it("refuses a comma fee bound on a 0 rate, but not a 0 bound", () => {
+    expect(
+      messagesAt(
+        { sellerCommissionRate: "0", sellerCommissionMin: "0,50" },
+        "sellerCommissionRate",
+      ),
+    ).toEqual(["admin.finance.commission.validation.zeroRateBounds"]);
+    expect(
+      messagesAt(
+        { sellerCommissionRate: "0", sellerCommissionMin: "0,00" },
+        "sellerCommissionRate",
+      ),
+    ).toEqual([]);
+  });
+
   it("requires the minimum amount and the trade fees", () => {
     expect(messagesAt({ minAmount: "" }, "minAmount")).toEqual([
       "validation.required",
@@ -75,6 +96,19 @@ describe("commissionSchema TL fields", () => {
 });
 
 describe("commissionFormToPayload TL fields", () => {
+  it("sends no fee bound for a 0 rate", () => {
+    const payload = commissionFormToPayload({
+      ...valid,
+      sellerCommissionRate: "0",
+      sellerCommissionMin: "5,25",
+      sellerCommissionMax: "10",
+    });
+    expect(payload).toMatchObject({
+      sellerCommissionMin: null,
+      sellerCommissionMax: null,
+    });
+  });
+
   it("sends typed amounts as TL", () => {
     const payload = commissionFormToPayload({
       ...valid,

@@ -147,6 +147,22 @@ describe("ilan fiyat sınırı ayarları — boş = kural yok", () => {
     ).toBe(false);
   });
 
+  it("reports refused limit text once, not also as a min above max", () => {
+    // "1.000" read as 1 would also put the 500 minimum above the maximum.
+    const result = settingsSchema(t).safeParse(
+      validForm({ minProductPrice: "500", maxProductPrice: "1.000" }),
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({
+          path: ["maxProductPrice"],
+          message: "validation.amountFormatRefused",
+        }),
+      ]);
+    }
+  });
+
   it("alt sınır üst sınırdan büyükse alt sınır alanında hata verir", () => {
     const result = settingsSchema(t).safeParse(
       validForm({ minProductPrice: "500", maxProductPrice: "100" }),
