@@ -16,6 +16,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
+import SellerTrustBadge from "./SellerTrustBadge";
 
 interface SellerHeaderProps {
   seller: Seller;
@@ -27,7 +28,7 @@ interface SellerHeaderProps {
   onMessage: () => void;
   onFollow: () => void;
   onReport: () => void;
-  /** Giriş kapısı (engelleme için); false dönerse modal çağıranda açılır. */
+  /** Auth gate (used for blocking); on false the caller opens the modal. */
   onRequireAuth: () => boolean;
 }
 
@@ -51,6 +52,7 @@ export default function SellerHeader({
   const averageRating = stats?.averageRating ?? 0;
   const hasRatings = totalRatings > 0;
   const followersCount = seller.followersCount ?? 0;
+  const isPlatform = seller.sellerType === "platform";
 
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-5 md:p-6">
@@ -70,18 +72,22 @@ export default function SellerHeader({
               </h1>
               {seller.isPremium && (
                 <Badge variant="default" size="sm">
-                  Premium
+                  {t("seller.premiumBadge")}
                 </Badge>
               )}
-              {seller.isVerified && (
+              {isPlatform ? (
                 <Badge variant="success" size="sm">
-                  ✓ {t("seller.verified")}
+                  {t("seller.officialAccount")}
                 </Badge>
-              )}
-              {seller.isPremium && typeof seller.trustScore === "number" && (
-                <Badge variant="warning" size="sm">
-                  {t("seller.trust")} {seller.trustScore}/100
-                </Badge>
+              ) : (
+                <>
+                  {seller.isVerified && (
+                    <Badge variant="success" size="sm">
+                      ✓ {t("seller.verified")}
+                    </Badge>
+                  )}
+                  <SellerTrustBadge trust={seller.trust} />
+                </>
               )}
             </div>
             <p className="mt-1 text-xs text-subtle">
