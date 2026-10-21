@@ -6,25 +6,16 @@ import { useRouter } from "@/i18n/navigation";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { api, listingsApi, userApi } from "@/lib/api";
-import { useWebList } from "@/hooks/useWebResource";
+import { useWebInfiniteList, useWebList } from "@/hooks/useWebResource";
+import { flattenPages, toPagedResult } from "@/lib/pagedList";
+import {
+  TRADE_PICKER_PAGE_SIZE,
+  TRADE_PICKER_QUERY_OPTIONS,
+} from "@/lib/query/tradePicker";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import type { TradeProduct } from "../_lib/types";
-
-/**
- * Both sides of the trade change outside this page: the user's own listings
- * (created, edited, approved by a moderator with no client mutation) and the
- * listing they want (edited, sold, deactivated). The global 60 s `staleTime`
- * would serve a cached, possibly empty or outdated, list, so the page refetches
- * on every open and whenever the tab regains focus (the user created or edited
- * a listing in another tab). Same rule as the mobile pickers.
- */
-const TRADE_PICKER_QUERY_OPTIONS = {
-  staleTime: 0,
-  refetchOnMount: "always",
-  refetchOnWindowFocus: true,
-} as const;
 
 /** The listing the user wants (target of the trade). */
 export function useTradeTarget(listingId: string | null, enabled: boolean) {
@@ -45,12 +36,17 @@ export function useTradeTarget(listingId: string | null, enabled: boolean) {
 }
 
 /**
- * The user's active, trade-enabled products (excluding the target).
+ * The user's active, trade-enabled products (excluding the target), paged: the
+ * server filters (`tradeOnly`, `tradeEligible`) so every page is full and
+ * `meta.totalPages` counts only eligible rows; "Show more" loads the next page.
+ * The only client filter is the target exclusion (at most one row).
  *
  * Fresh on open and on tab focus (`TRADE_PICKER_QUERY_OPTIONS`) so a listing
- * created, edited or approved since the last visit shows up. The key carries the
- * user id so a user switch can never serve another user's list (the logout
- * cache clear does not cover a same-tab account switch).
+ * created, edited or approved since the last visit shows up; a refetch reloads
+ * every loaded page. The key carries the user id so a user switch can never
+ * serve another user's list (the logout cache clear does not cover a same-tab
+ * account switch). The page number is the infinite query's page param, not part
+ * of the key.
  *
  * `isLoading` wins over the empty state until this page's own fetch settles:
  * react-query's `isLoading` covers only the very first fetch, so a cached empty
@@ -64,18 +60,18 @@ export function useTradeableProducts(
   enabled: boolean,
 ) {
   const userId = useAuthStore((s) => s.user?.id);
-  const query = useWebList<TradeProduct[]>({
+  const query = useWebInfiniteList<TradeProduct>({
     resource: queryKeys.tradeEligible.resource,
     params: { userId, listingId },
-    fetcher: async () => {
+    fetchPage: async (page) => {
       const res = await userApi.getMyProducts({
         status: "active",
         tradeEligible: true,
+        tradeOnly: true,
+        page,
+        limit: TRADE_PICKER_PAGE_SIZE,
       });
-      const products: TradeProduct[] = res.data.data || res.data.products || [];
-      return products.filter(
-        (p) => p.status === "active" && p.isTradeEnabled && p.id !== listingId,
-      );
+      return toPagedResult<TradeProduct>(res.data, page);
     },
     enabled: enabled && !!listingId && !!userId,
     query: {
@@ -83,12 +79,19 @@ export function useTradeableProducts(
       meta: { page: "trades-new-products" },
     },
   });
-  const products = query.data ?? [];
+  const products = flattenPages(query.data?.pages).filter(
+    (p) => p.id !== listingId,
+  );
   return {
     products,
     isLoading:
       query.isLoading ||
       (query.isFetching && !query.isFetchedAfterMount && products.length === 0),
+    hasMore: !!query.hasNextPage,
+    isLoadingMore: query.isFetchingNextPage,
+    loadMore: () => {
+      void query.fetchNextPage();
+    },
   };
 }
 

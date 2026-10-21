@@ -62,10 +62,13 @@ function NewTradeContent() {
     listingId,
     enabled,
   );
-  const { products, isLoading: productsLoading } = useTradeableProducts(
-    listingId,
-    enabled,
-  );
+  const {
+    products,
+    isLoading: productsLoading,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+  } = useTradeableProducts(listingId, enabled);
   const createTrade = useCreateTrade();
 
   // The picker refetches on open and on tab focus: a pick that is no longer
@@ -195,6 +198,9 @@ function NewTradeContent() {
           <TradeProductPicker
             products={products}
             isLoading={productsLoading}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMore}
             selectedIds={selectedIds}
             onToggle={toggle}
           />

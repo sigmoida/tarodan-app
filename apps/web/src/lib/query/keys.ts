@@ -3,6 +3,9 @@ const BANK_ACCOUNT_RESOURCE = "bank-account";
 const BANK_ACCOUNT_ID = "me";
 // The trade picker's own-listings list (a `useWebList` resource).
 const TRADE_ELIGIBLE_RESOURCE = "trade-eligible-products";
+// The counter-offer editor's two paged pickers (`useWebInfiniteList` resources).
+const COUNTER_MY_PRODUCTS_RESOURCE = "counter-offer-my-products";
+const COUNTER_THEIR_PRODUCTS_RESOURCE = "counter-offer-their-products";
 // The signed-in account's sign-in methods (password yes/no, linked providers).
 const SIGN_IN_METHODS_RESOURCE = "profile-sign-in-methods";
 // The signed-in user's server-side saved searches (a `useWebList` resource).
@@ -237,6 +240,11 @@ export const queryKeys = {
     resource: TRADE_ELIGIBLE_RESOURCE,
     all: () => webKeys.all(TRADE_ELIGIBLE_RESOURCE),
   },
+  /** The counter-offer editor's pickers (my side, their side), paged. */
+  counterOffer: {
+    myResource: COUNTER_MY_PRODUCTS_RESOURCE,
+    theirResource: COUNTER_THEIR_PRODUCTS_RESOURCE,
+  },
   boost: {
     pricing: () => ["boost-pricing"] as const,
     options: (productId: string) => ["boost-options", productId] as const,
@@ -296,4 +304,7 @@ export const webKeys = {
       ? ([resource, "list"] as const)
       : ([resource, "list", params] as const),
   detail: (resource: string, id: string) => [resource, "detail", id] as const,
+  /** A paged list (`useInfiniteQuery`): one entry holds every loaded page. */
+  infinite: (resource: string, params?: unknown) =>
+    [resource, "infinite", params] as const,
 };

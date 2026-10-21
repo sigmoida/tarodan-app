@@ -239,6 +239,153 @@ describe("useTradeableProducts", () => {
     expect(result.current.products[0].id).toBe("b");
   });
 
+  describe("paging", () => {
+    const ids = (from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, i) => item(`p${from + i}`));
+    /** 45 eligible rows, served 20 per page by the server. */
+    const serve = (all = ids(1, 45)) =>
+      getMyProducts.mockImplementation(
+        async (params: { page: number; limit: number }) => ({
+          data: {
+            data: all.slice(
+              (params.page - 1) * params.limit,
+              params.page * params.limit,
+            ),
+            meta: {
+              total: all.length,
+              page: params.page,
+              limit: params.limit,
+              totalPages: Math.ceil(all.length / params.limit),
+            },
+          },
+        }),
+      );
+
+    it("sends the server filters and the page size, with no client eligibility filter", async () => {
+      const { wrapper } = setup();
+      // The server decides eligibility: rows are shown as returned.
+      getMyProducts.mockResolvedValue({
+        data: {
+          data: [{ ...item("a"), isTradeEnabled: false, status: "reserved" }],
+          meta: { totalPages: 1 },
+        },
+      });
+      const { result } = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.products).toHaveLength(1));
+      expect(getMyProducts).toHaveBeenCalledWith({
+        status: "active",
+        tradeEligible: true,
+        tradeOnly: true,
+        page: 1,
+        limit: 20,
+      });
+      expect(result.current.hasMore).toBe(false);
+    });
+
+    it("loads 20, then 20, then 5, and stops offering more", async () => {
+      const { wrapper } = setup();
+      serve();
+      const { result } = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.products).toHaveLength(20));
+      expect(result.current.hasMore).toBe(true);
+
+      act(() => result.current.loadMore());
+      await waitFor(() => expect(result.current.products).toHaveLength(40));
+      expect(result.current.hasMore).toBe(true);
+
+      act(() => result.current.loadMore());
+      await waitFor(() => expect(result.current.products).toHaveLength(45));
+      expect(result.current.hasMore).toBe(false);
+      expect(getMyProducts.mock.calls.map((c) => c[0].page)).toEqual([1, 2, 3]);
+      const all = result.current.products.map((p) => p.id);
+      expect(new Set(all).size).toBe(45);
+    });
+
+    it("keeps the target excluded on every page", async () => {
+      const { wrapper } = setup();
+      serve([...ids(1, 19), item("t1"), ...ids(21, 30)]);
+      const { result } = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.products).toHaveLength(19));
+      act(() => result.current.loadMore());
+      await waitFor(() => expect(result.current.products).toHaveLength(29));
+      expect(result.current.products.some((p) => p.id === "t1")).toBe(false);
+    });
+
+    it("drops a duplicate row when a refetch shifts one across a page boundary", async () => {
+      const { wrapper } = setup();
+      const all = ids(1, 30);
+      serve(all);
+      const { result } = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.products).toHaveLength(20));
+      act(() => result.current.loadMore());
+      await waitFor(() => expect(result.current.products).toHaveLength(30));
+
+      // Page 1 now also holds p21 (a new listing pushed rows down).
+      getMyProducts.mockImplementation(async (params: { page: number }) => ({
+        data: {
+          data: params.page === 1 ? [item("p21"), ...ids(1, 19)] : ids(21, 30),
+          meta: { totalPages: 2 },
+        },
+      }));
+      await act(async () => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await waitFor(() => expect(result.current.products).toHaveLength(30));
+      const seen = result.current.products.map((p) => p.id);
+      expect(new Set(seen).size).toBe(seen.length);
+    });
+
+    it("refetches every loaded page on reopen", async () => {
+      const { wrapper } = setup();
+      serve();
+      const first = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() =>
+        expect(first.result.current.products).toHaveLength(20),
+      );
+      act(() => first.result.current.loadMore());
+      await waitFor(() =>
+        expect(first.result.current.products).toHaveLength(40),
+      );
+      first.unmount();
+      getMyProducts.mockClear();
+
+      const second = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() =>
+        expect(getMyProducts.mock.calls.map((c) => c[0].page)).toEqual([1, 2]),
+      );
+      await waitFor(() =>
+        expect(second.result.current.products).toHaveLength(40),
+      );
+    });
+
+    it("keeps the list on screen and stops the more-spinner when loading more fails", async () => {
+      const { wrapper } = setup();
+      serve();
+      const { result } = renderHook(() => useTradeableProducts("t1", true), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.products).toHaveLength(20));
+      getMyProducts.mockRejectedValue(new Error("boom"));
+      act(() => result.current.loadMore());
+      await waitFor(() => expect(result.current.isLoadingMore).toBe(false));
+      expect(result.current.products).toHaveLength(20);
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
   it("keys the cache by user so a switch never shows another user's list", async () => {
     const { client, wrapper } = setup();
     getMyProducts.mockResolvedValue({ data: { data: [item("a")] } });
