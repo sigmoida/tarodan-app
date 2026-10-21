@@ -15,6 +15,8 @@ import { ProductEngagementService } from "./ranking/product-engagement.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
 import { BoostNoticeService } from "./ranking/boost-notice.service";
 import { BoostAudienceService } from "./boost-seller/boost-audience.service";
+import { BoostSellerService } from "./boost-seller/boost-seller.service";
+import { BoostOfferService } from "./boost-seller/boost-offer.service";
 import { ProductController } from "./product.controller";
 import { ProductSchedulerService } from "./jobs/product-scheduler.service";
 import { BoostScheduledProcessor } from "./jobs/boost-scheduled.processor";
@@ -72,8 +74,10 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductBoostService,
     // Seller notices of a boost (outbox handler + immediate send).
     BoostNoticeService,
-    // Who may buy which boost package (audience, premium).
+    // The seller's side: who may buy what, "My boosts" and the offers.
     BoostAudienceService,
+    BoostSellerService,
+    BoostOfferService,
     ProductSchedulerService,
     ...scheduledProcessors(BoostScheduledProcessor),
   ],

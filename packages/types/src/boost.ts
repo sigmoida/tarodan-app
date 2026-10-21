@@ -102,19 +102,142 @@ export interface BoostOptionsResponse {
   packages: BoostPackage[];
 }
 
-/** A listing that is due a one-time boost offer. */
+/**
+ * A listing that is due a one-time boost offer: the seller's live listing,
+ * created after `boost_offer_since` and in the last `BOOST_OFFER_WINDOW_DAYS`
+ * days, never boosted, not dismissed, with a package for its price.
+ */
 export interface BoostOffer {
   productId: string;
   title: string;
+  /** Storage key of the first image (card size), or null. */
   image: string | null;
   price: number;
   createdAt: string;
 }
 
-/** `GET /products/boost/offers`. */
+/** `GET /products/boost/offers`: newest first, at most `BOOST_OFFER_MAX`. */
 export interface BoostOffersResponse {
+  /** `isBoostEnabled`; when false, `offers` is empty. */
   enabled: boolean;
   offers: BoostOffer[];
+}
+
+/**
+ * `POST /products/boost/offers/dismiss` body (204): the offers the dialog
+ * showed. Only the caller's own listings are recorded; once dismissed, a
+ * listing is never offered again, on any device.
+ */
+export interface DismissBoostOffersRequest {
+  /** 1 to `BOOST_OFFER_MAX` listing ids. */
+  productIds: string[];
+}
+
+/** The two sections of "My boosts" (`GET /products/boost/my?state=`). */
+export const MY_BOOST_STATES = ["current", "history"] as const;
+export type MyBoostState = (typeof MY_BOOST_STATES)[number];
+
+/**
+ * The boost statuses each section shows. `pending` and `failed` (abandoned
+ * checkouts) are never shown.
+ */
+export const MY_BOOST_STATE_STATUSES: Record<
+  MyBoostState,
+  readonly BoostStatus[]
+> = {
+  current: ["active", "paused"],
+  history: ["expired", "cancelled"],
+};
+
+/** Default page size per section; `limit` goes up to `MY_BOOSTS_MAX_LIMIT`. */
+export const MY_BOOSTS_DEFAULT_LIMIT: Record<MyBoostState, number> = {
+  current: 100,
+  history: 20,
+};
+export const MY_BOOSTS_MAX_LIMIT = 100;
+
+/** A listing's counters: views, favourites and clicks. */
+export interface BoostMetricCounts {
+  views: number;
+  likes: number;
+  clicks: number;
+}
+
+/** One boost in "My boosts" (`GET /products/boost/my`). */
+export interface MyBoostRow {
+  id: string;
+  productId: string;
+  product: {
+    id: string;
+    title: string;
+    /** The listing's status (`ProductStatus`). */
+    status: string;
+    /** Storage key of the first image (card size), or null. */
+    image: string | null;
+    /**
+     * The listing's real promotion end (ISO), the last end of its stacked
+     * boosts: what "remaining" shows. Null when it is not boosted now.
+     */
+    boostedUntil: string | null;
+    /** The listing's home showcase end (ISO), or null. */
+    homeShowcaseUntil: string | null;
+  };
+  /** `purchase` or a free `admin_grant` ("Tarodan hediyesi"). */
+  source: BoostSource;
+  packageName: string | null;
+  /** The package placed the listing in the home showcase ("Vitrin"). */
+  showcaseOnHome: boolean;
+  durationDays: number;
+  extendedDays: number;
+  /** What was paid (TL, VAT included); 0 for a grant. */
+  price: number;
+  /** Refunded so far (TL); > 0 on a `cancelled` boost means "refunded". */
+  refundedAmount: number;
+  status: BoostStatus;
+  /** The ending-soon reminder is on (premium; no automatic charge). */
+  autoRenew: boolean;
+  startsAt: string | null;
+  /** End of this boost's own stretch (ISO); see `product.boostedUntil`. */
+  endsAt: string | null;
+  /** When staff stopped it (revoke, or refund and stop), else null. */
+  cancelledAt: string | null;
+  /** The boost order (invoice link); null for a grant. */
+  orderId: string | null;
+  orderNumber: string | null;
+  /** Running now (`active` and not ended). */
+  isActive: boolean;
+  /** This boost's own time left (ms); for `paused`, its paused remainder. */
+  remainingMs: number;
+  metrics: {
+    /** The listing's counters when the boost started; null before. */
+    before: BoostMetricCounts | null;
+    current: BoostMetricCounts;
+    gain: BoostMetricCounts | null;
+    performanceScore: number | null;
+  };
+  createdAt: string;
+  /** The best performing boost on this page. */
+  isBest: boolean;
+}
+
+/** `GET /products/boost/my` response: `{ data, meta }` (common list envelope). */
+export interface MyBoostsResponse {
+  data: MyBoostRow[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
+
+/**
+ * `PATCH /products/:id/boost/reminder` body: the ending-soon reminder for the
+ * listing's running and paused boosts. Turning it on needs premium (400
+ * `server.product.boostReminderPremiumOnly`).
+ */
+export interface BoostReminderRequest {
+  enabled: boolean;
+}
+
+/** `PATCH /products/:id/boost/reminder` response: false when nothing runs. */
+export interface BoostReminderResponse {
+  enabled: boolean;
 }
 
 /**

@@ -575,6 +575,43 @@ without money by `POST /admin/ad-packages/purchases/:id/revoke`. Boost
 revenue, counts and uplift in analytics read bought boosts only
 (`admin/analytics/sold-boost.predicate.ts`).
 
+### Boost end, reminder and the seller's view
+
+No money moves here; these rules only read and announce the boost timeline
+(`BoostTimelineService`, product domain).
+
+- **End of a boost** (`expire-boosts` cron, every 15 minutes, one
+  transaction per listing under its lock, `BoostExpiryService`): the ended
+  `active` boosts become `expired` with the listing's final counters, the
+  listing's promotion is rebuilt, and `BOOST_EXPIRED` goes out **once per
+  listing**, when no running boost of it ends later (stacked boosts used to
+  send one per boost). The notice is an outbox row (`boost.notice`, kind
+  `expired`, keyed by the boost that ended last) written with the change.
+- **Ending-soon reminder** (premium only, decision D7; a reminder, never an
+  automatic charge): when the listing's last running boost (its "tail") asked
+  for it (`autoRenew`) and ends within `BOOST_REMINDER_LEAD_HOURS` (24), the
+  cron claims it with a compare-and-set on `reminderSentAt` and queues
+  `BOOST_ENDING_SOON` (outbox kind `ending_soon`, keyed by the stamp). It is
+  due again only when that end moves past the window the reminder announced
+  (a stacked purchase is a new tail; a staff extension or a resume moves the
+  end). A seller who is no longer premium gets none; the handler drops a
+  reminder delivered after the boost stopped.
+- **My boosts** (`GET /products/boost/my?state=current|history`, web only,
+  ADR 0015): the caller's `active` and `paused` boosts, or the `expired` and
+  `cancelled` ones, in the `{ data, meta }` envelope, with the order number,
+  source, refunded amount and the listing's real end (`boostedUntil`).
+  `pending` and `failed` rows (abandoned checkouts) are never shown. There is
+  no seller cancel. `PATCH /products/:id/boost/reminder` sets `autoRenew` on
+  the owner's running and paused boosts of the listing; turning it on needs
+  premium (`server.product.boostReminderPremiumOnly`).
+- **New-listing offer** (`GET /products/boost/offers`,
+  `POST /products/boost/offers/dismiss`): computed, never stored, for the
+  seller's live listings created after `boost_offer_since` and in the last 30
+  days, never boosted (`pending`/`failed` do not count), not dismissed, with a
+  package tier for the price (`boostTierBasePrice`) and the seller's
+  audience; at most 20, newest first. Only dismissals are stored
+  (`boost_offer_dismissals`, own listings only, idempotent).
+
 ---
 
 ## 8. Takas ödemeleri (v2)
