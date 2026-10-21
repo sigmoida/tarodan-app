@@ -1,13 +1,14 @@
 /**
- * Hukuki onay kayıtları — belge anahtarları ve YÜRÜRLÜKTEKİ sürümler için TEK
- * kaynak. API (kayıt damgası, yeniden-onay hesabı), web (onay kutuları, çerez
- * bandı) ve admin (Onay Kayıtları ekranı) bu dosyayı okur.
+ * Legal consent records: the ONE source of the document keys and their
+ * CURRENT versions. The API (version stamp, re-consent rule), web (checkboxes,
+ * cookie banner) and admin (Consent records screen) read this file.
  *
- * Sürüm, metnin değiştiği günün tarihidir (YYYY-MM-DD). Bir belgenin metni
- * değiştiğinde BURADAKİ sürüm de güncellenmelidir: hesap için zorunlu bir
- * belgede sürüm değişince her üye bir sonraki girişinde yeniden onaya
- * çağrılır; güncellenmezse yeni metin eski sürüm numarasıyla kabul edilmiş
- * görünür.
+ * A version is the date the text changed (YYYY-MM-DD), optionally followed by
+ * `-draft` (`DRAFT_CONSENT_VERSION_SUFFIX`) while the text waits for legal
+ * sign-off. When a document's text changes, its version here must change too:
+ * for a document required for every account, every member is asked to accept
+ * again at the next sign-in; without the change the new text looks accepted
+ * under the old version.
  */
 
 import { isPlatformSettingOn } from "./platform-setting";
@@ -19,20 +20,37 @@ export const CONSENT_DOCUMENT_KEYS = [
   "distance_sales",
   "cookies",
   "marketing",
+  "platform_service_sales",
+  "withdrawal_waiver",
 ] as const;
 
 export type ConsentDocumentKey = (typeof CONSENT_DOCUMENT_KEYS)[number];
 
 export interface ConsentDocumentDefinition {
-  /** Yürürlükteki metnin sürümü. */
+  /** The version of the current text (`YYYY-MM-DD`, or with `-draft`). */
   version: string;
   /**
-   * Hesap açmak (ve kullanmaya devam etmek) için zorunlu mu. Zorunlu belgenin
-   * kaydı yoksa ya da eski sürümdeyse üye yeniden onaya çağrılır.
+   * Whether opening (and keeping) an account needs it. A member without a
+   * record of a required document, or with an old version, is asked again.
    */
   requiredForAccount: boolean;
-  /** Metnin yayımlandığı storefront yolu; metni olmayan belgede null. */
+  /** The storefront path of the text; null for a document without a page. */
   path: string | null;
+}
+
+/**
+ * Suffix of a version whose text is a draft that legal has not signed off.
+ * A consent recorded against it carries the suffix in its own row
+ * (`consent_records.version`), so the evidence never passes a draft off as
+ * the signed text. Before the release that relies on the document, replace
+ * the text and set the date of the signed text without the suffix. A
+ * document required for every account is never a draft (contract spec).
+ */
+export const DRAFT_CONSENT_VERSION_SUFFIX = "-draft";
+
+/** Whether a recorded or current version is a draft (`-draft`). */
+export function isDraftConsentVersion(version: string): boolean {
+  return version.endsWith(DRAFT_CONSENT_VERSION_SUFFIX);
 }
 
 export const CONSENT_DOCUMENTS: Record<
@@ -45,11 +63,13 @@ export const CONSENT_DOCUMENTS: Record<
     requiredForAccount: true,
     path: "/privacy",
   },
-  // AYRI bir KVKK sayfası henüz yok: /privacy sayfası "KVKK Aydınlatma Metni"
-  // başlığını taşıyor, bağlantı oraya gider. Müşteri ayrı bir metin verdiğinde
-  // yol ve sürüm burada güncellenir (bkz. docs/CONSENTS.md "Açık konular").
+  // There is no SEPARATE KVKK page yet: the /privacy page carries the title
+  // "KVKK Aydınlatma Metni", so the link goes there. When the customer gives a
+  // separate text, the path and version change here (docs/CONSENTS.md, "Open
+  // points").
   kvkk: { version: "2026-08-04", requiredForAccount: true, path: "/privacy" },
-  // Mesafeli satış onayı hesap değil SİPARİŞ başınadır; ödeme adımında alınır.
+  // Distance sales consent is per ORDER, not per account; taken at checkout
+  // or at the payment step.
   distance_sales: {
     version: "2026-08-03",
     requiredForAccount: false,
@@ -60,8 +80,28 @@ export const CONSENT_DOCUMENTS: Record<
     requiredForAccount: false,
     path: "/cookies",
   },
-  // Ticari elektronik ileti izni: ayrı bir metni yok, onay kutusunun kendisi.
+  // Commercial electronic message consent: no text of its own, the checkbox
+  // is the statement.
   marketing: { version: "2026-10-05", requiredForAccount: false, path: null },
+  // Platform services (listing boost today, membership later): the
+  // pre-contract information form and the distance service contract,
+  // accepted per ORDER in the purchase dialog and recorded with the order
+  // (`PlatformServiceConsentService`). DRAFT: legal has not signed the text
+  // off (tarodan-ops plan 2026-10-21-listing-boost, D15, D17); the release
+  // that sells boost waits for the signed text and its dated version.
+  platform_service_sales: {
+    version: "2026-10-21-draft",
+    requiredForAccount: false,
+    path: "/platform-service-sales",
+  },
+  // The statement that the service starts at once with the buyer's approval
+  // and the right of withdrawal therefore does not apply. No page of its own:
+  // the statement is the checkbox text. DRAFT, like platform_service_sales.
+  withdrawal_waiver: {
+    version: "2026-10-21-draft",
+    requiredForAccount: false,
+    path: null,
+  },
 };
 
 /** Hesap için zorunlu belgeler — kayıt formu ve yeniden-onay kapısı bunları ister. */
@@ -108,9 +148,10 @@ export type ConsentSource = (typeof CONSENT_SOURCES)[number];
 export const CONSENT_SUBJECT_TYPES = ["user", "guest", "visitor"] as const;
 export type ConsentSubjectType = (typeof CONSENT_SUBJECT_TYPES)[number];
 
-// ── Katalog anahtarları (admin ekranı, web onay kapısı, Excel dökümü) ────────
-// Belge adları, yasal sayfaların mevcut başlık anahtarlarıdır (aynı metin iki
-// ad altında yaşamasın); kaynak / aksiyon / sahip türü yalnız admin'e aittir.
+// ── Catalog keys (admin screen, web consent gate, Excel export) ─────────────
+// A document's name is the title key of its legal page (one text, one name);
+// a document without a page has its own title key. Source, action and
+// subject type labels belong to admin only.
 
 export const CONSENT_DOCUMENT_I18N_KEYS = {
   terms: "legal.termsTitle",
@@ -119,6 +160,8 @@ export const CONSENT_DOCUMENT_I18N_KEYS = {
   distance_sales: "legal.distanceSalesTitle",
   cookies: "legal.cookiesTitle",
   marketing: "legal.marketingConsentTitle",
+  platform_service_sales: "legal.platformServiceSales.title",
+  withdrawal_waiver: "legal.withdrawalWaiverTitle",
 } as const satisfies Record<ConsentDocumentKey, string>;
 
 export const CONSENT_ACTION_I18N_KEYS = {

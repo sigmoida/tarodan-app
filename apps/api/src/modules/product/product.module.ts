@@ -28,6 +28,7 @@ import { PaymentModule } from "../payment";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { CommissionModule } from "../commission/commission.module";
 import { SellerTrustModule } from "../seller-trust";
+import { ConsentModule } from "../consent/consent.module";
 
 import { UserBlockModule } from "../user-block/user-block.module";
 
@@ -51,6 +52,8 @@ import { UserBlockModule } from "../user-block/user-block.module";
     CommissionModule,
     // Ranking reads the stored seller trust score. A leaf, no cycle.
     SellerTrustModule,
+    // The boost purchase records its consents with the order. A leaf.
+    ConsentModule,
   ],
   controllers: [ProductController],
   providers: [

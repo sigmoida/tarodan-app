@@ -24,9 +24,9 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from "@nestjs/swagger";
 import { Request } from "express";
+import { engagementClientIp } from "./helpers/engagement-client-ip";
 import { type Locale } from "@tarodan/i18n";
 import { ProductService } from "./product.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
@@ -496,25 +496,27 @@ export class ProductController {
 
   /**
    * POST /products/:id/boost/initiate
-   * İlanı öne çıkar (boost): süre seç → ödeme başlat. Sahiplik + aktiflik doğrulanır.
+   * Boost a listing: package, duration and both purchase consents, then the
+   * payment intent. Ownership and the active status are checked.
    */
   @Post(":id/boost/initiate")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "İlanı öne çıkar (boost satın al)" })
+  @ApiOperation({ summary: "Boost a listing (buy a boost)" })
   @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({
     status: 201,
-    description: "Boost ödemesi başlatıldı (paymentUrl döner)",
+    description:
+      "Boost payment started (paymentId; card entry via /payments/direct-form)",
   })
   @ApiResponse({
     status: 400,
     description:
-      "No package, a package or duration without a tier for the listing's price, or the listing is not active",
+      "A consent is not true (server.product.boostConsentRequired), no package, a package or duration without a tier for the listing's price, or the listing is not active",
   })
   @ApiResponse({
     status: 403,
-    description: "Sadece kendi ilanınızı öne çıkarabilirsiniz",
+    description: "Only your own listing can be boosted",
   })
   async initiateBoost(
     @Param(
@@ -540,6 +542,8 @@ export class ProductController {
         durationDays: dto.durationDays,
         provider: dto.provider ?? PaymentProvider.paytr,
         autoRenew: dto.autoRenew ?? false,
+        preInformationAccepted: dto.preInformationAccepted,
+        withdrawalWaiverAccepted: dto.withdrawalWaiverAccepted,
       },
       req,
     );
@@ -703,18 +707,12 @@ export class ProductController {
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
     @Headers("user-agent") userAgent?: string,
-    @Req() req?: any,
+    @Req() req?: Request,
   ) {
-    // Get real IP from headers if behind proxy
-    const clientIp =
-      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req?.headers?.["x-real-ip"] ||
-      ip ||
-      "unknown";
     return this.productService.incrementViewCount(
       id,
       userId,
-      clientIp,
+      engagementClientIp(req, ip),
       userAgent,
     );
   }
@@ -742,17 +740,12 @@ export class ProductController {
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
     @Headers("user-agent") userAgent?: string,
-    @Req() req?: any,
+    @Req() req?: Request,
   ) {
-    const clientIp =
-      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req?.headers?.["x-real-ip"] ||
-      ip ||
-      "unknown";
     return this.productService.incrementClickCount(
       id,
       userId,
-      clientIp,
+      engagementClientIp(req, ip),
       userAgent,
     );
   }

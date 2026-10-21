@@ -19,7 +19,25 @@ function makeService(history: Record<string, unknown>[] = []) {
       findMany: jest.fn().mockResolvedValue(history),
     },
   };
-  return { service: new ConsentService(prisma as never), prisma };
+  const withQuery = {
+    ...prisma,
+    // getStatus: the latest row per document (`DISTINCT ON`).
+    $queryRaw: jest.fn().mockImplementation(() => {
+      const latest = new Map<unknown, Record<string, unknown>>();
+      for (const row of history) {
+        const current = latest.get(row.document);
+        if (
+          !current ||
+          (row.createdAt as Date).getTime() >
+            (current.createdAt as Date).getTime()
+        ) {
+          latest.set(row.document, row);
+        }
+      }
+      return Promise.resolve([...latest.values()]);
+    }),
+  };
+  return { service: new ConsentService(withQuery as never), prisma: withQuery };
 }
 
 /** Servisi gerçek bir HTTP isteğinin bağlamında çalıştırır (kanıt alanları). */
@@ -331,6 +349,46 @@ describe("ConsentService.getStatus", () => {
     expect(byDoc.get("kvkk")).toMatchObject({ pending: true, latest: null });
     // Zorunlu olmayan belge hiçbir zaman "bekliyor" sayılmaz.
     expect(byDoc.get("marketing")).toMatchObject({ pending: false });
+  });
+
+  it("reads the latest row of each document, however many per-order rows follow it", async () => {
+    // A seller with many boost purchases: hundreds of newer per-order rows
+    // must not hide the account consent given at registration.
+    const perOrder = Array.from({ length: 600 }, (_, i) => ({
+      document: "platform_service_sales",
+      version: CONSENT_DOCUMENTS.platform_service_sales.version,
+      action: "granted",
+      source: "checkout",
+      createdAt: new Date(Date.UTC(2026, 9, 1, 0, 0, i)),
+    }));
+    const { service, prisma } = makeService([
+      {
+        document: "terms",
+        version: CONSENT_DOCUMENTS.terms.version,
+        action: "granted",
+        source: "registration",
+        createdAt: new Date("2026-09-01T00:00:00Z"),
+      },
+      ...perOrder,
+    ]);
+
+    const status = await service.getStatus("u1");
+    const byDoc = new Map(status.map((s) => [s.document, s]));
+
+    expect(byDoc.get("terms")).toMatchObject({
+      pending: false,
+      latest: { source: "registration" },
+    });
+    expect(byDoc.get("platform_service_sales")).toMatchObject({
+      pending: false,
+      latest: { createdAt: perOrder[599].createdAt.toISOString() },
+    });
+    // One query for every document, bound to the user.
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [sql, ...values] = prisma.$queryRaw.mock.calls[0];
+    expect(sql.join("?")).toMatch(/DISTINCT ON \(document\)/);
+    expect(values).toEqual(["u1"]);
+    expect(prisma.consentRecord.findMany).not.toHaveBeenCalled();
   });
 });
 

@@ -23,11 +23,30 @@ import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
+import { boostBreadcrumb } from "../../product/helpers/boost-observability";
+import { membershipTierIdOf } from "../helpers/virtual-order-kind";
+import { SentryService } from "../../sentry/sentry.service";
+
+/** The fields of a paid payment that membership activation reads. */
+export interface MembershipOrderPayment {
+  id: string;
+  /** A membership is always paid for one order (never a cart or a trade). */
+  orderId: string;
+  amount: Prisma.Decimal | number;
+  providerPaymentId: string | null;
+  order: {
+    buyerId: string;
+    productId: string;
+    totalAmount: Prisma.Decimal | number;
+  };
+}
 
 /** The fields of a paid payment that boost activation reads. */
 export interface BoostOrderPayment {
   id: string;
   orderId: string | null;
+  /** The order as the caller loaded it; only its number is read (Sentry trail). */
+  order?: { orderNumber?: string | null; [field: string]: unknown } | null;
 }
 
 /**
@@ -53,6 +72,7 @@ export class VirtualOrderFulfillmentService {
     @Optional()
     @InjectQueue(QUEUE_NAMES.SEARCH)
     private readonly searchQueue?: Queue,
+    @Optional() private readonly sentry?: SentryService,
   ) {}
 
   /**
@@ -76,7 +96,7 @@ export class VirtualOrderFulfillmentService {
    */
   async applyMembershipInTx(
     tx: Prisma.TransactionClient,
-    payment: any,
+    payment: MembershipOrderPayment,
     transactionId?: string,
   ): Promise<void> {
     const membership = await tx.userMembership.findUnique({
@@ -110,11 +130,7 @@ export class VirtualOrderFulfillmentService {
       // Activation MUST honor the PAID tier — never whatever the live row happens to
       // point to now. Otherwise paying an older, cheaper pending order could activate
       // a pricier tier the membership was switched to by a later subscribe call.
-      const paidTierId =
-        typeof payment.order.productId === "string" &&
-        payment.order.productId.startsWith("membership-")
-          ? payment.order.productId.slice("membership-".length)
-          : null;
+      const paidTierId = membershipTierIdOf(payment.order);
 
       const paidTier = intent?.targetTier
         ? intent.targetTier
@@ -312,8 +328,14 @@ export class VirtualOrderFulfillmentService {
       ? await this.boostTimeline.activateForOrder(tx, orderId)
       : null;
     if (!orderId || !result?.found) {
+      // Money was taken for a boost that does not exist: an event, not only
+      // a log line, so it is seen and settled (refund or manual grant).
       this.logger.warn(
         `Boost order ${orderId} paid but no matching ProductBoost found`,
+      );
+      this.sentry?.captureMessage(
+        `Boost order ${orderId ?? "-"} paid by payment ${payment.id} has no ProductBoost`,
+        "error",
       );
       return null;
     }
@@ -323,6 +345,19 @@ export class VirtualOrderFulfillmentService {
     });
     this.logger.log(
       `Boost order ${orderId} completed after payment ${payment.id}`,
+    );
+    // Breadcrumbs only (this also runs in worker jobs, where a tag would
+    // stick to the process scope). The timeline's own breadcrumb
+    // (`boost.activate`) carries the boost id; a skipped activation is also
+    // reported by the timeline with the boost's status.
+    boostBreadcrumb(
+      this.sentry,
+      result.activation ? "activated" : "activation_skipped",
+      {
+        orderId,
+        orderNumber: payment.order?.orderNumber,
+        productId: result.activation?.productId,
+      },
     );
     return result.activation?.productId ?? null;
   }
@@ -487,7 +522,7 @@ export class VirtualOrderFulfillmentService {
    * idempotent, retry cron'lu. membershipPayment kaydı varsa ondan, yoksa MEM- siparişten kes.
    */
   issueMembershipInvoice(
-    payment: any,
+    payment: Pick<MembershipOrderPayment, "providerPaymentId">,
     orderId: string,
     transactionId?: string,
   ): void {

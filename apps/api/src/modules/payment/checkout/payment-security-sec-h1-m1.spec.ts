@@ -47,6 +47,7 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
         {} as any, // paymentLifecycle
         { record: jest.fn() } as any, // providerEvents
         { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
+        { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
       );
       return { service, processSuccessfulPayment, prisma, configService };
     };

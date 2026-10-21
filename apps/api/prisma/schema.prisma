@@ -298,7 +298,8 @@ enum ConsentSource {
   /// Yeniden-onay kapısı: hiç onayı olmayan (eski üye, sosyal giriş, eski
   /// mobil kaydı) ya da belge sürümü değişen üye.
   consent_prompt
-  /// Sepet checkout'u (üye ve misafir).
+  /// The checkout step of a purchase: the cart checkout (member and guest)
+  /// and the boost purchase dialog (platform service consents).
   checkout
   /// Ödeme formu adımı (teklif siparişi, sepet dışı ödemeler).
   payment

@@ -732,8 +732,13 @@ export class PayTRService implements IPaymentProvider {
     basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      /** e.g. "paymentId=...&type=membership" — success sayfası verify için kullanır */
-      successQueryParams?: string;
+      /**
+       * The query of BOTH return URLs, e.g. "paymentId=...&type=boost"
+       * (`paymentReturnQuery`): the success page verifies the payment with it,
+       * the fail page shows the right purchase and releases a still pending
+       * payment (`confirm-failed`).
+       */
+      returnQueryParams?: string;
       /** CAPI: kartı PayTR'da sakla → callback'te utoken döner. */
       storeCard?: boolean;
       /** Kullanıcının zaten bir utoken'ı varsa yeni kart eklerken birlikte gönderilir. */
@@ -781,11 +786,12 @@ export class PayTRService implements IPaymentProvider {
     // ayrı recurring akışında, açık mağaza yetkisiyle sunucudan kullanılır.
     const non3d = "0";
 
-    const successBase = `${this.configService.get("FRONTEND_URL")}/payment/success`;
-    const merchantOkUrl = options?.successQueryParams
-      ? `${successBase}?${options.successQueryParams}`
-      : successBase;
-    const merchantFailUrl = `${this.configService.get("FRONTEND_URL")}/payment/fail`;
+    const frontendUrl = this.configService.get("FRONTEND_URL");
+    const returnQuery = options?.returnQueryParams
+      ? `?${options.returnQueryParams}`
+      : "";
+    const merchantOkUrl = `${frontendUrl}/payment/success${returnQuery}`;
+    const merchantFailUrl = `${frontendUrl}/payment/fail${returnQuery}`;
 
     // Direkt API token:
     // hashStr = merchant_id + user_ip + merchant_oid + email + payment_amount

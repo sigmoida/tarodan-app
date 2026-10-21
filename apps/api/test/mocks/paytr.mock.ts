@@ -366,7 +366,7 @@ export class MockPayTRService {
     _basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      successQueryParams?: string;
+      returnQueryParams?: string;
       storeCard?: boolean;
       utoken?: string;
       savedCard?: {

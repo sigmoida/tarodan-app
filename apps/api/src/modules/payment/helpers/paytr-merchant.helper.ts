@@ -1,15 +1,17 @@
 import { PaytrMerchant } from "@prisma/client";
 import { asPaymentMetadata } from "./payment-metadata.types";
+import { virtualOrderKind } from "./virtual-order-kind";
 
 /**
- * Üyelik siparişi mi? Üyelik ödemesi için açılan sanal sipariş, hedef katmanın
- * sanal ürününe (`membership-<tierId>`) bağlanır — bkz.
- * MembershipSubscriptionService.initiateMembershipPayment.
+ * Whether the order is a membership purchase: the virtual order opened for a
+ * membership payment points at the target tier's virtual product
+ * (`membership-<tierId>`, see
+ * MembershipSubscriptionService.initiateMembershipPayment).
  */
 export function isMembershipOrder(
   order: { productId?: string | null } | null | undefined,
 ): boolean {
-  return order?.productId?.startsWith("membership-") ?? false;
+  return virtualOrderKind(order) === "membership";
 }
 
 /**

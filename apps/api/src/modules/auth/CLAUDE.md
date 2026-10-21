@@ -196,6 +196,10 @@ the spec pins it with `perClientIp`.
 - `consent_records` is append-only (DB trigger). Withdrawals are new rows.
 - The `distance_sales_consent_required` setting stays **off** until the mobile
   version in production sends `distanceSalesAccepted`.
+- A boost purchase records `platform_service_sales` and `withdrawal_waiver`
+  with its order (`PlatformServiceConsentService`), closed and without a
+  setting; the card form checks them again. A text legal has not signed off
+  has a `-draft` version, never on an account-required document.
 
 ## Blocking and reports (`modules/user-block/`, `docs/USER_BLOCKING.md`)
 
