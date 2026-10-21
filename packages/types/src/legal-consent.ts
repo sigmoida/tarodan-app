@@ -10,6 +10,8 @@
  * görünür.
  */
 
+import { isPlatformSettingOn } from "./platform-setting";
+
 export const CONSENT_DOCUMENT_KEYS = [
   "terms",
   "privacy",
@@ -221,9 +223,9 @@ export type OptionalCookieCategory =
   (typeof OPTIONAL_COOKIE_CATEGORIES)[number];
 
 /**
- * Mesafeli satış onayını ödeme adımında ZORUNLU kılan platform ayarı.
- * Varsayılan kapalı: onay kutusunu göndermeyen eski mobil sürümler ödeme
- * yapabilmeye devam eder. Yalnız "true" açık sayılır.
+ * The platform setting that makes the distance sales consent REQUIRED at the
+ * payment step. Off by default, so older mobile builds that do not send the
+ * checkbox can still pay. An on/off setting (`isPlatformSettingOn`).
  */
 export const DISTANCE_SALES_CONSENT_REQUIRED_SETTING =
   "distance_sales_consent_required";
@@ -231,7 +233,7 @@ export const DISTANCE_SALES_CONSENT_REQUIRED_SETTING =
 export function parseDistanceSalesConsentRequired(
   value: string | null | undefined,
 ): boolean {
-  return value?.trim().toLowerCase() === "true";
+  return isPlatformSettingOn(value);
 }
 
 /**

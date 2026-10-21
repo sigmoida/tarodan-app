@@ -106,6 +106,8 @@ export interface ApiError {
 
 // Legal consent records: document keys + current versions (API, web, admin)
 export * from "./legal-consent";
+// On/off platform settings: the one "is it on" rule (API and admin toggles)
+export * from "./platform-setting";
 
 // GIB listing/seller report: row contract + legal-name source catalog (API + admin)
 export * from "./gib-report";

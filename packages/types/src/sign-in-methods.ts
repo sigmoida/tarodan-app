@@ -5,8 +5,14 @@
  * - `GET /auth/sign-in-methods` answers `SignInMethods`.
  * - `POST /auth/reauth` takes a `ReauthRequest` and answers `ReauthResponse`.
  *   The token is short-lived and opaque; clients keep it in memory only.
- * - Sensitive writes (`POST /auth/password/set`) take the token in the body as
- *   `reauthToken`.
+ * - Sensitive writes take the token as `reauthToken` in the body or, when the
+ *   body has no `reauthToken`, in the `X-Reauth-Token` header
+ *   (`REAUTH_TOKEN_HEADER`; use the header on `DELETE`). The sign-in method
+ *   writes (`POST /auth/password/set`) always need it. Account deletion
+ *   (`DELETE /users/me`) and the e-mail change request
+ *   (`POST /auth/email/request-change`) check a token whenever one is sent,
+ *   and need one only while the setting
+ *   `REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING` is on.
  *
  * A step-up problem is never a 401 (both clients treat 401 as an expired
  * session): a missing or expired token is `403` with
@@ -58,6 +64,24 @@ export interface ReauthResponse {
   /** ISO 8601. The token can be used for several writes until then. */
   expiresAt: string;
 }
+
+/**
+ * Request header that carries the step-up token when the body has no
+ * `reauthToken` (lower case, as Node reports it). The web gateway forwards it
+ * (`FORWARDED_REQUEST_HEADERS` in `@tarodan/auth`).
+ */
+export const REAUTH_TOKEN_HEADER = "x-reauth-token";
+
+/**
+ * On/off platform setting (`isPlatformSettingOn`): while on, account deletion
+ * and the e-mail change request are refused without a step-up token
+ * (`403 REAUTH_REQUIRED`). Off by default, because mobile 1.0.5 and older send
+ * none. Switch it on only after `min_supported_app_version_ios` and
+ * `min_supported_app_version_android` are above 1.0.5 (tarodan-ops
+ * `compat.md`). A token that is sent is checked even while it is off.
+ */
+export const REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING =
+  "auth_require_reauth_for_sensitive_actions";
 
 /** `POST /auth/password/set`: only for an account that has no password yet. */
 export interface SetPasswordRequest {
