@@ -82,6 +82,29 @@ describe("authStore.logout", () => {
   });
 });
 
+describe("authStore legacy storage", () => {
+  it("discards the device-local saved searches on the session check", async () => {
+    localStorage.setItem(
+      "diecast_saved_searches",
+      JSON.stringify([{ id: "old", query: "porsche" }]),
+    );
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(localStorage.getItem("diecast_saved_searches")).toBeNull();
+  });
+
+  it("discards them on sign-out too", async () => {
+    signedIn();
+    h.logoutAction.mockResolvedValue(undefined);
+    localStorage.setItem("diecast_saved_searches", "[]");
+
+    await useAuthStore.getState().logout();
+
+    expect(localStorage.getItem("diecast_saved_searches")).toBeNull();
+  });
+});
+
 describe("authStore query cache per session", () => {
   const key = ["notifications", "unread-count"];
   const seedCache = () => getQueryClient().setQueryData(key, 3);

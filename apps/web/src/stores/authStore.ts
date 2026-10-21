@@ -248,9 +248,14 @@ function removeStoredKeys(...keys: string[]) {
 function clearUserSnapshot() {
   removeStoredKeys(USER_SNAPSHOT_KEY);
 }
-/** One-time cleanup of the legacy token keys (tokens now live in cookies). */
-function clearLegacyTokenKeys() {
-  removeStoredKeys("auth_token", "refresh_token");
+/**
+ * Cleanup of retired localStorage keys, on every session check and sign-out:
+ * the old token keys (tokens now live in cookies) and the device-local saved
+ * searches (`diecast_saved_searches`; the list is on the server now and the
+ * old one is discarded, not imported, so it must not linger undisclosed).
+ */
+function clearLegacyStorageKeys() {
+  removeStoredKeys("auth_token", "refresh_token", "diecast_saved_searches");
 }
 
 interface AuthState {
@@ -351,7 +356,7 @@ export const useAuthStore = create<AuthState>()(
       const runSessionCheck = async () => {
         const generation = sessionGeneration;
         const superseded = () => generation !== sessionGeneration || rerunCheck;
-        clearLegacyTokenKeys();
+        clearLegacyStorageKeys();
         // Could we be signed in? The server writes a JS-readable marker
         // cookie with the session. Without it a guest stays a guest with no
         // profile call; a signed-in store asks the server first, because
@@ -511,7 +516,7 @@ export const useAuthStore = create<AuthState>()(
           // logoutAction (server) already deleted the tarodan_authed cookie;
           // expire it locally too so the very next read sees a guest.
           clearAuthMarker();
-          clearLegacyTokenKeys();
+          clearLegacyStorageKeys();
           get().clearSession();
         },
 
