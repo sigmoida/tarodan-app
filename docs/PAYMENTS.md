@@ -578,8 +578,12 @@ order that carries a boost, before any money moves (decision D16):
   no staff "order cancelled" mail and no shipment cancel for a boost order,
   whichever path finalizes it (the platform's own services never ship).
 - **Audit and notice**: one `boost_refund` audit row with the real outcome
-  (`refunded`, `failed`, `pending_reconciliation`), written only when that
-  call refunded; a failed audit write after the money went back is reported
+  (`refunded`, `failed`, `pending_reconciliation` when this call's own
+  attempt may have reached PayTR, `in_flight_elsewhere` when the attempt
+  claim turned it away before anything was sent because another attempt is
+  unresolved: `RefundAttemptInFlightException`, still a 503
+  `RefundPendingReconciliationException` for the admin); `refunded` is written
+  only when that call refunded; a failed audit write after the money went back is reported
   (`BOOST_REFUND_AUDIT_MISSING`, Sentry) and not turned into an error. The
   seller gets `BOOST_REFUNDED` through the outbox. Sentry: tag `flow=boost`,
   boost id and order number.

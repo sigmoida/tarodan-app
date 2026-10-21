@@ -3,7 +3,9 @@ import { PrismaService } from "../../../prisma";
 import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { i18nMessage } from "../../i18n";
-import { RefundPendingReconciliationException } from "../../payment-providers/refund-errors";
+// Every refusal here comes before anything is sent: the call is turned away
+// because an attempt is in flight, never because its own outcome is unknown.
+import { RefundAttemptInFlightException } from "../../payment-providers/refund-errors";
 
 /**
  * Dayanıklı iade denemesi defteri — PaymentRefundService'ten birebir taşındı.
@@ -96,7 +98,7 @@ export class PaymentRefundAttemptService {
           attempt.status === RefundAttemptStatus.submitting ||
           attempt.status === RefundAttemptStatus.manual_review
         ) {
-          throw new RefundPendingReconciliationException(
+          throw new RefundAttemptInFlightException(
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
@@ -129,7 +131,7 @@ export class PaymentRefundAttemptService {
         },
       });
       if (unresolved) {
-        throw new RefundPendingReconciliationException(
+        throw new RefundAttemptInFlightException(
           i18nMessage("server.payment.refundInitiationFailed"),
         );
       }
@@ -158,7 +160,7 @@ export class PaymentRefundAttemptService {
       },
     });
     if (started.count !== 1) {
-      throw new RefundPendingReconciliationException(
+      throw new RefundAttemptInFlightException(
         i18nMessage("server.payment.refundInitiationFailed"),
       );
     }
@@ -205,7 +207,7 @@ export class PaymentRefundAttemptService {
           attempt.status === RefundAttemptStatus.submitting ||
           attempt.status === RefundAttemptStatus.manual_review
         ) {
-          throw new RefundPendingReconciliationException(
+          throw new RefundAttemptInFlightException(
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
@@ -237,7 +239,7 @@ export class PaymentRefundAttemptService {
         },
       });
       if (unresolved) {
-        throw new RefundPendingReconciliationException(
+        throw new RefundAttemptInFlightException(
           i18nMessage("server.payment.refundInitiationFailed"),
         );
       }
