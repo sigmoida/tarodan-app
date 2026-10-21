@@ -1,0 +1,46 @@
+/** @format */
+
+import { tlAmountValue } from "@/lib/tlAmount";
+import type { DiscountFormData } from "./types";
+
+/** An optional TL amount field: omitted when empty (the schema refused bad text). */
+const optionalAmount = (raw: string): number | undefined =>
+  raw.trim() ? tlAmountValue(raw) : undefined;
+
+/** The create/update request body from the validated form values. */
+export function buildPayload(form: DiscountFormData) {
+  const isQuantityType = form.type === "bogo" || form.type === "bulk_quantity";
+  return {
+    // A quantity campaign has no code: the cart applies it automatically.
+    code: isQuantityType ? undefined : form.code.trim() || undefined,
+    name: form.name,
+    description: form.description || undefined,
+    type: form.type,
+    // bogo has no value; the free quantity comes from buy/get.
+    value: form.type === "bogo" ? 0 : tlAmountValue(form.value),
+    buyQuantity:
+      form.type === "bogo"
+        ? parseInt(form.buyQuantity) || undefined
+        : undefined,
+    getQuantity:
+      form.type === "bogo"
+        ? parseInt(form.getQuantity) || undefined
+        : undefined,
+    minQuantity:
+      form.type === "bulk_quantity"
+        ? parseInt(form.minQuantity) || undefined
+        : undefined,
+    scope: form.scope,
+    targetProductIds: form.scope === "product" ? form.targetProductIds : [],
+    minCartValue: optionalAmount(form.minCartValue),
+    maxDiscountAmount: optionalAmount(form.maxDiscountAmount),
+    usageLimitTotal: form.usageLimitTotal
+      ? parseInt(form.usageLimitTotal)
+      : undefined,
+    usageLimitPerUser: parseInt(form.usageLimitPerUser) || 1,
+    isStackable: form.isStackable,
+    isActive: form.isActive,
+    startDate: new Date(form.startDate).toISOString(),
+    endDate: new Date(form.endDate + "T23:59:59").toISOString(),
+  };
+}
