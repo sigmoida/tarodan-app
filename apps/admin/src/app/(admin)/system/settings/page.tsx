@@ -13,6 +13,7 @@ import { SearchReindexButton } from "./_components/SearchReindexButton";
 import { WarehouseAddressCard } from "./_components/WarehouseAddressCard";
 import { LegalSettingsCard } from "./_components/LegalSettingsCard";
 import { StepUpSettingsCard } from "./_components/StepUpSettingsCard";
+import { BoostSettingsCard } from "./_components/BoostSettingsCard";
 
 export default function SettingsPage() {
   const {
@@ -89,8 +90,9 @@ export default function SettingsPage() {
               </Button>
             </div>
           </Form>
-          {/* On/off security settings save on toggle, outside the form. */}
+          {/* On/off settings save on their own, outside the numeric form. */}
           {isSecurityTab && <StepUpSettingsCard />}
+          {activeTab === "listing" && <BoostSettingsCard />}
         </>
       )}
     </AdminPage>

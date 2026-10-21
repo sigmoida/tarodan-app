@@ -14,6 +14,12 @@ interface SettingToggleProps {
   settingKey: string;
   label: string;
   helper: string;
+  /**
+   * Reads the raw settings response, for a setting with its own on/off rule
+   * (`readBoostEnabled`: missing is on). Default `readSettingOn` (missing is
+   * off). Must be a module-level function (it is the query's `select`).
+   */
+  read?: (raw: unknown) => boolean;
 }
 
 /**
@@ -24,12 +30,13 @@ export function SettingToggle({
   settingKey,
   label,
   helper,
+  read,
 }: SettingToggleProps) {
   const t = useTranslations();
   // `select` must be stable (see usePlatformSettings).
   const select = useCallback(
-    (raw: unknown) => readSettingOn(raw, settingKey),
-    [settingKey],
+    (raw: unknown) => (read ? read(raw) : readSettingOn(raw, settingKey)),
+    [read, settingKey],
   );
   const { data: on = false, isLoading } = usePlatformSettings(select);
 
