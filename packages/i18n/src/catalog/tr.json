@@ -11062,6 +11062,17 @@
       "tradeDisputeResolved": {
         "title": "Takas İtirazı Sonuçlandı",
         "message": "Takas itirazı Tarodan ekibi tarafından sonuçlandırıldı ve takas tamamlandı."
+      },
+      "boostGranted": {
+        "title": "Öne çıkarma tanımlandı",
+        "message": "Tarodan, \"{productTitle}\" ilanınızı {days} gün ücretsiz öne çıkardı."
+      },
+      "boostCancelled": {
+        "title": "Öne çıkarma durduruldu",
+        "message": "\"{productTitle}\" ilanının öne çıkarması Tarodan tarafından durduruldu."
+      },
+      "boostRefunded": {
+        "message": "\"{productTitle}\" ilanının öne çıkarması durduruldu ve {amount} TL iade edildi. İadenin kartınıza yansıması bankanıza göre birkaç gün sürebilir."
       }
     },
     "auth": {
@@ -11920,6 +11931,13 @@
           "preparingWarningBeforeDeadline": "Satıcı hazırlık uyarısı (saat), satıcı hazırlık süresinden (gün × 24 saat) kısa olmalıdır."
         },
         "conflict": "Süreler aynı anda başka bir yönetici tarafından değiştirildi. Sayfayı yenileyip tekrar deneyin."
+      },
+      "boost": {
+        "refundNotAllowed": "Bu öne çıkarma için iade yapılamaz",
+        "refundAmountInvalid": "İade tutarı 0'dan büyük olmalı ve iade edilebilir tutarı ({max}) aşmamalı",
+        "revokeGrantOnly": "İadesiz iptal yalnız ücretsiz tanımlar içindir",
+        "grantListingNotActive": "Yalnız yayındaki ilanlara öne çıkarma tanımlanabilir",
+        "stopActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış öne çıkarma durdurulabilir"
       }
     },
     "advertisement": {

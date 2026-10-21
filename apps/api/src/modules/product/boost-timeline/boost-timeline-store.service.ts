@@ -1,6 +1,13 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { BoostStatus, Prisma, ProductBoost } from "@prisma/client";
 import { SentryService } from "../../sentry/sentry.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import {
+  OUTBOX_BOOST_NOTICE,
+  boostNoticeDedupeKey,
+  type BoostNoticeKind,
+  type BoostNoticePayload,
+} from "../../outbox/outbox.types";
 import { isPremiumEntitled } from "../../membership/helpers/membership.util";
 import { computeRelevanceScore } from "../helpers/relevance-score";
 import {
@@ -55,12 +62,17 @@ export const RESUMED: Prisma.ProductBoostUncheckedUpdateInput = {
 /**
  * The shared mechanics of the listing boost timeline (`BoostTimelineService`
  * is the facade): the listing row lock, reading and laying out the two lanes,
- * the single writer of the listing's promotion columns and the Sentry
- * breadcrumb. Every method runs in the caller's transaction.
+ * the single writer of the listing's promotion columns, the seller notice and
+ * the Sentry breadcrumb. Every method runs in the caller's transaction.
  */
 @Injectable()
 export class BoostTimelineStore {
-  constructor(@Optional() private readonly sentry?: SentryService) {}
+  constructor(
+    @Optional() private readonly sentry?: SentryService,
+    // The seller notice of a grant or a stop is written with it (lossless).
+    // Global in the app; unit tests may leave it out.
+    @Optional() private readonly outbox?: OutboxService,
+  ) {}
 
   /**
    * Locks the listing row until the transaction ends. Every timeline mutation
@@ -104,6 +116,20 @@ export class BoostTimelineStore {
   /** A warning with ids only (no PII). */
   warn(message: string): void {
     this.sentry?.captureMessage(message, "warning");
+  }
+
+  /** The seller notice, in the caller's transaction (sent after commit). */
+  async enqueueNotice(
+    tx: Prisma.TransactionClient,
+    boostId: string,
+    kind: BoostNoticeKind,
+  ): Promise<void> {
+    const payload: BoostNoticePayload = { boostId, kind };
+    await this.outbox?.enqueue(tx, {
+      type: OUTBOX_BOOST_NOTICE,
+      payload: { ...payload },
+      dedupeKey: boostNoticeDedupeKey(payload),
+    });
   }
 
   /**

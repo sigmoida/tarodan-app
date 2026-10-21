@@ -7,6 +7,7 @@ import {
   AdPackage,
   AdPackageAudienceMode,
   AdPackageTier,
+  BoostSource,
   BoostStatus,
   MembershipTierType,
   Prisma,
@@ -20,9 +21,18 @@ import {
 } from "../dto/ad-package.dto";
 import { paginate } from "../../../common/list";
 import { i18nMessage } from "../../i18n";
+import { boostRefundableAmount } from "./boost/boost-refund-policy";
 
 const isBoostStatus = (value: string): value is BoostStatus =>
   (Object.values(BoostStatus) as string[]).includes(value);
+const isBoostSource = (value: string): value is BoostSource =>
+  (Object.values(BoostSource) as string[]).includes(value);
+
+/** The staff user who granted or stopped a boost, by name only. */
+const STAFF_SELECT = {
+  id: true,
+  displayName: true,
+} satisfies Prisma.UserSelect;
 
 /** A package as the admin reads it: the row plus whichever relations it loaded. */
 type PackageRow = AdPackage & {
@@ -96,7 +106,22 @@ const PURCHASE_INCLUDE = {
       clickCount: true,
     },
   },
+  grantedBy: { select: STAFF_SELECT },
+  cancelledBy: { select: STAFF_SELECT },
 } satisfies Prisma.ProductBoostInclude;
+
+/** The boost order and its payment (a boost row has no relation to them). */
+const PURCHASE_ORDER_SELECT = {
+  id: true,
+  orderNumber: true,
+  payment: {
+    select: { id: true, status: true, amount: true, metadata: true },
+  },
+} satisfies Prisma.OrderSelect;
+
+type PurchaseOrder = Prisma.OrderGetPayload<{
+  select: typeof PURCHASE_ORDER_SELECT;
+}>;
 
 type PurchaseRow = Prisma.ProductBoostGetPayload<{
   include: typeof PURCHASE_INCLUDE;
@@ -239,7 +264,26 @@ export class AdminAdPackageService {
     return { before, current, gain, performanceScore };
   }
 
-  private serializePurchase(boost: PurchaseRow, bestScore?: number) {
+  /** The orders of these boosts, in one query (no N+1 on the list). */
+  private async purchaseOrders(
+    boosts: Array<{ orderId: string | null }>,
+  ): Promise<Map<string, PurchaseOrder>> {
+    const ids = [
+      ...new Set(boosts.flatMap((b) => (b.orderId ? [b.orderId] : []))),
+    ];
+    if (ids.length === 0) return new Map();
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+      select: PURCHASE_ORDER_SELECT,
+    });
+    return new Map(orders.map((order) => [order.id, order]));
+  }
+
+  private serializePurchase(
+    boost: PurchaseRow,
+    order: PurchaseOrder | undefined,
+    bestScore?: number,
+  ) {
     const now = Date.now();
     const metrics = this.purchaseMetrics(boost);
     const remainingSeconds =
@@ -281,6 +325,27 @@ export class AdminAdPackageService {
       pausedAt: boost.pausedAt,
       purchasedAt: boost.purchasedAt,
       remainingSeconds,
+      showcaseEndsAt: boost.showcaseEndsAt,
+      /** `purchase` or a free `admin_grant` (no order, payment or invoice). */
+      source: boost.source,
+      grantedBy: boost.grantedBy
+        ? { id: boost.grantedBy.id, name: boost.grantedBy.displayName }
+        : null,
+      grantReason: boost.grantReason,
+      cancelledAt: boost.cancelledAt,
+      cancelledBy: boost.cancelledBy
+        ? { id: boost.cancelledBy.id, name: boost.cancelledBy.displayName }
+        : null,
+      cancelReason: boost.cancelReason,
+      refundedAmount: Number(boost.refundedAmount ?? 0),
+      /** The most "refund and stop" may return now; 0 when it is not allowed. */
+      refundableAmount: boostRefundableAmount({
+        ...boost,
+        payment: order?.payment ?? null,
+      }).toNumber(),
+      orderId: boost.orderId,
+      orderNumber: order?.orderNumber ?? null,
+      paymentId: order?.payment?.id ?? null,
       metrics,
       isBestForBuyer:
         bestScore != null &&
@@ -436,13 +501,15 @@ export class AdminAdPackageService {
     limit?: number;
     packageId?: string;
     status?: string;
+    source?: string;
     search?: string;
   }) {
-    const { page = 1, limit = 20, packageId, status, search } = query;
+    const { page = 1, limit = 20, packageId, status, source, search } = query;
     const where: Prisma.ProductBoostWhereInput = {};
     if (packageId) where.packageId = packageId;
     // An unknown status filters nothing (it used to reach Prisma and 500).
     if (status && isBoostStatus(status)) where.status = status;
+    if (source && isBoostSource(source)) where.source = source;
     const term = search?.trim();
     if (term) {
       where.OR = [
@@ -463,9 +530,15 @@ export class AdminAdPackageService {
       { page, limit },
     );
 
+    const orders = await this.purchaseOrders(result.data);
     return {
       ...result,
-      data: result.data.map((boost) => this.serializePurchase(boost)),
+      data: result.data.map((boost) =>
+        this.serializePurchase(
+          boost,
+          boost.orderId ? orders.get(boost.orderId) : undefined,
+        ),
+      ),
     };
   }
 
@@ -496,7 +569,12 @@ export class AdminAdPackageService {
         Math.max(best, this.purchaseMetrics(item).performanceScore ?? -1),
       -1,
     );
-    return this.serializePurchase(boost, bestScore);
+    const orders = await this.purchaseOrders([boost]);
+    return this.serializePurchase(
+      boost,
+      boost.orderId ? orders.get(boost.orderId) : undefined,
+      bestScore,
+    );
   }
 
   /** Pause, resume and extend change the listing timeline: its owner does it. */

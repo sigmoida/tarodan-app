@@ -204,3 +204,23 @@ export const OUTBOX_MEDIA_AVATAR_DELETE = "media.avatar_delete";
 export interface MediaAvatarDeletePayload {
   key: string;
 }
+
+/**
+ * Listing boost notice to its seller after a staff action: a free grant, a
+ * stop without a refund (revoke) or a stop with a refund. Written in the
+ * transaction that changes the boost (`BoostTimelineService`), so a committed
+ * grant or stop is always announced. One row per boost and kind; the handler
+ * (`BoostNoticeService`) reads the boost when it sends, so the payload holds
+ * ids only.
+ */
+export const OUTBOX_BOOST_NOTICE = "boost.notice";
+
+export type BoostNoticeKind = "granted" | "cancelled" | "refunded";
+
+export interface BoostNoticePayload {
+  boostId: string;
+  kind: BoostNoticeKind;
+}
+
+export const boostNoticeDedupeKey = (p: BoostNoticePayload): string =>
+  `${OUTBOX_BOOST_NOTICE}:${p.kind}:${p.boostId}`;

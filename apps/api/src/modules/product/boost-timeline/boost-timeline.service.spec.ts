@@ -343,8 +343,8 @@ const boostRelevance = (p: ProductRow) =>
   p.popularityScore;
 
 /** The facade over its slices, as the module wires it. */
-function makeTimeline() {
-  const store = new BoostTimelineStore();
+function makeTimeline(outbox?: { enqueue: jest.Mock }) {
+  const store = new BoostTimelineStore(undefined, outbox as never);
   const timeline = new BoostTimelineService(
     store,
     new BoostActivationService(store),
@@ -1359,6 +1359,419 @@ describe("BoostTimelineService", () => {
       await db.transaction((tx) => service.resume(tx, "boost-1", NOW));
 
       expect(db.products.get("prod-1")?.homeShowcaseUntil).toEqual(at(2 * DAY));
+    });
+  });
+
+  describe("cancel (revoke, refund and stop)", () => {
+    const stop = { actorId: "admin-user", reason: "Seller asked for it" };
+
+    function headAndStacked() {
+      return setup(
+        productRow({ boostedUntil: at(10 * DAY), rankTier: 2 }),
+        boostRow({
+          id: "head",
+          status: BoostStatus.active,
+          durationDays: 7,
+          endsAt: at(5 * DAY),
+          purchasedAt: at(-2 * DAY),
+          price: 59,
+        }),
+        boostRow({
+          id: "stacked",
+          status: BoostStatus.active,
+          durationDays: 5,
+          endsAt: at(10 * DAY),
+          purchasedAt: at(-DAY),
+        }),
+      );
+    }
+
+    it("drops the head boost's unused time and moves the stacked one up by it", async () => {
+      const db = headAndStacked();
+
+      const result = await db.transaction((tx) =>
+        service.cancel(tx, "head", stop, NOW),
+      );
+
+      expect(result).toEqual({
+        stopped: true,
+        boostId: "head",
+        productId: "prod-1",
+        unconsumedSeconds: 5 * 86400,
+      });
+      expect(db.boosts.get("head")).toMatchObject({
+        status: BoostStatus.cancelled,
+        cancelledAt: NOW,
+        cancelledById: "admin-user",
+        cancelReason: "Seller asked for it",
+        endsAt: NOW,
+      });
+      // A revoke records no refund.
+      expect(db.boosts.get("head")?.refundedAmount).toBeUndefined();
+      expect(db.boosts.get("stacked")?.endsAt).toEqual(at(5 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(5 * DAY));
+    });
+
+    it("drops a stacked boost's own days and leaves the head boost alone", async () => {
+      const db = headAndStacked();
+
+      const result = await db.transaction((tx) =>
+        service.cancel(tx, "stacked", stop, NOW),
+      );
+
+      expect(result).toMatchObject({ unconsumedSeconds: 5 * 86400 });
+      expect(db.boosts.get("head")?.endsAt).toEqual(at(5 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(5 * DAY));
+    });
+
+    it("a refund records its amount on the stopped boost", async () => {
+      const db = headAndStacked();
+
+      await db.transaction((tx) =>
+        service.cancel(tx, "head", { ...stop, refundedAmount: 20 }, NOW),
+      );
+
+      expect(Number(db.boosts.get("head")?.refundedAmount)).toBe(20);
+      expect(db.boosts.get("head")?.status).toBe(BoostStatus.cancelled);
+    });
+
+    it("stops a showcase boost's showcase with it", async () => {
+      const db = setup(
+        productRow({
+          boostedUntil: at(33 * DAY),
+          homeShowcaseUntil: at(3 * DAY),
+          rankTier: 2,
+        }),
+        boostRow({
+          id: "econ",
+          status: BoostStatus.active,
+          durationDays: 30,
+          endsAt: at(30 * DAY),
+          purchasedAt: at(-DAY),
+        }),
+        boostRow({
+          id: "vitrin",
+          status: BoostStatus.active,
+          showcaseOnHome: true,
+          durationDays: 3,
+          endsAt: at(33 * DAY),
+          showcaseEndsAt: at(3 * DAY),
+          purchasedAt: at(-DAY + HOUR),
+        }),
+      );
+
+      await db.transaction((tx) => service.cancel(tx, "vitrin", stop, NOW));
+
+      expect(db.boosts.get("vitrin")).toMatchObject({
+        endsAt: NOW,
+        showcaseEndsAt: NOW,
+      });
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: at(30 * DAY),
+        homeShowcaseUntil: null,
+      });
+    });
+
+    it("stops a paused boost without touching the running ones", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(DAY), rankTier: 2 }),
+        boostRow({
+          id: "paused",
+          status: BoostStatus.paused,
+          pausedRemainingSeconds: 7200,
+        }),
+        boostRow({
+          id: "running",
+          status: BoostStatus.active,
+          endsAt: at(DAY),
+          purchasedAt: at(-DAY),
+        }),
+      );
+
+      const result = await db.transaction((tx) =>
+        service.cancel(tx, "paused", stop, NOW),
+      );
+
+      expect(result).toMatchObject({ stopped: true, unconsumedSeconds: 7200 });
+      expect(db.boosts.get("paused")?.status).toBe(BoostStatus.cancelled);
+      expect(db.boosts.get("running")?.endsAt).toEqual(at(DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(DAY));
+    });
+
+    it("records a refund on a boost that ended a moment ago, but a revoke refuses it", async () => {
+      const ended = () =>
+        setup(
+          productRow(),
+          boostRow({ status: BoostStatus.expired, endsAt: at(-HOUR) }),
+        );
+
+      const revoked = ended();
+      await expect(
+        revoked.transaction((tx) => service.cancel(tx, "boost-1", stop, NOW)),
+      ).resolves.toEqual({ stopped: false, status: BoostStatus.expired });
+      expect(revoked.boosts.get("boost-1")?.status).toBe(BoostStatus.expired);
+
+      const refunded = ended();
+      await refunded.transaction((tx) =>
+        service.cancel(tx, "boost-1", { ...stop, refundedAmount: 59 }, NOW),
+      );
+      expect(refunded.boosts.get("boost-1")).toMatchObject({
+        status: BoostStatus.cancelled,
+        cancelledById: "admin-user",
+      });
+      expect(Number(refunded.boosts.get("boost-1")?.refundedAmount)).toBe(59);
+    });
+
+    it.each([BoostStatus.cancelled, BoostStatus.pending, BoostStatus.failed])(
+      "leaves a %s boost alone, so a replay never records a refund twice",
+      async (status) => {
+        const db = setup(
+          productRow(),
+          boostRow({ status, refundedAmount: new Prisma.Decimal(59) }),
+        );
+
+        await expect(
+          db.transaction((tx) =>
+            service.cancel(tx, "boost-1", { ...stop, refundedAmount: 59 }, NOW),
+          ),
+        ).resolves.toEqual({ stopped: false, status });
+        expect(Number(db.boosts.get("boost-1")?.refundedAmount)).toBe(59);
+      },
+    );
+
+    it("is idempotent: a second stop changes nothing", async () => {
+      const db = headAndStacked();
+
+      await db.transaction((tx) =>
+        service.cancel(tx, "head", { ...stop, refundedAmount: 59 }, NOW),
+      );
+      const again = await db.transaction((tx) =>
+        service.cancel(tx, "head", { ...stop, refundedAmount: 59 }, at(HOUR)),
+      );
+
+      expect(again).toEqual({ stopped: false, status: BoostStatus.cancelled });
+      expect(Number(db.boosts.get("head")?.refundedAmount)).toBe(59);
+      expect(db.boosts.get("stacked")?.endsAt).toEqual(at(5 * DAY));
+    });
+
+    it("takes the listing lock before it reads the boost status", async () => {
+      const db = headAndStacked();
+
+      await db.transaction((tx) => service.cancel(tx, "head", stop, NOW));
+
+      expect(db.events.slice(0, 3)).toEqual([
+        "boost.read",
+        "lock:prod-1",
+        "boost.read",
+      ]);
+    });
+
+    it("stopForRefund finds the boost of the refunded order", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(DAY), rankTier: 2 }),
+        boostRow({
+          orderId: "ord-1",
+          status: BoostStatus.active,
+          endsAt: at(DAY),
+          purchasedAt: at(-DAY),
+        }),
+      );
+
+      await expect(
+        db.transaction((tx) =>
+          service.stopForRefund(
+            tx,
+            "ord-2",
+            { actorId: null, reason: null, refundedAmount: 59 },
+            NOW,
+          ),
+        ),
+      ).resolves.toBeNull();
+      await expect(
+        db.transaction((tx) =>
+          service.stopForRefund(
+            tx,
+            "ord-1",
+            { actorId: null, reason: null, refundedAmount: 59 },
+            NOW,
+          ),
+        ),
+      ).resolves.toMatchObject({ stopped: true, boostId: "boost-1" });
+      expect(db.boosts.get("boost-1")).toMatchObject({
+        status: BoostStatus.cancelled,
+        cancelledById: null,
+      });
+      expect(db.products.get("prod-1")?.boostedUntil).toBeNull();
+    });
+  });
+
+  describe("grant", () => {
+    const grant = {
+      productId: "prod-1",
+      packageId: "pkg-1",
+      packageName: "Vitrin",
+      showcaseOnHome: true,
+      durationDays: 7,
+      grantedById: "admin-user",
+      reason: "Compensation for a listing outage",
+    };
+
+    it("creates a free, active boost stacked on the running one", async () => {
+      const db = setup(
+        productRow({ boostedUntil: at(5 * DAY), rankTier: 2 }),
+        boostRow({
+          id: "paid",
+          status: BoostStatus.active,
+          endsAt: at(5 * DAY),
+          purchasedAt: at(-DAY),
+        }),
+      );
+
+      const result = await db.transaction((tx) =>
+        service.grant(tx, grant, NOW),
+      );
+
+      expect(result).toEqual({
+        boostId: "boost-2",
+        productId: "prod-1",
+        endsAt: at(12 * DAY),
+      });
+      expect(db.boosts.get("boost-2")).toMatchObject({
+        source: "admin_grant",
+        price: 0,
+        userId: "seller-1",
+        packageId: "pkg-1",
+        packageName: "Vitrin",
+        showcaseOnHome: true,
+        durationDays: 7,
+        grantedById: "admin-user",
+        grantReason: "Compensation for a listing outage",
+        status: BoostStatus.active,
+        endsAt: at(12 * DAY),
+        showcaseEndsAt: at(7 * DAY),
+      });
+      // No order: a grant is not a sale.
+      expect(db.boosts.get("boost-2")?.orderId).toBeUndefined();
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(12 * DAY));
+    });
+
+    it("locks the listing before it reads it", async () => {
+      const db = setup(productRow());
+
+      await db.transaction((tx) => service.grant(tx, grant, NOW));
+
+      expect(db.events[0]).toBe("lock:prod-1");
+    });
+
+    it.each([
+      ["an inactive listing", { status: "inactive" }],
+      ["a sold listing", { status: "sold" }],
+      ["a virtual product", { kind: "boost" }],
+    ])("refuses %s", async (_label, over) => {
+      const db = setup(productRow(over));
+
+      await expect(
+        db.transaction((tx) => service.grant(tx, grant, NOW)),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.boost.grantListingNotActive" },
+      });
+      expect(db.boosts.size).toBe(0);
+    });
+
+    it("answers 404 for an unknown listing", async () => {
+      const db = setup(productRow());
+
+      await expect(
+        db.transaction((tx) =>
+          service.grant(tx, { ...grant, productId: "missing" }, NOW),
+        ),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+  });
+
+  describe("seller notices go out with the change", () => {
+    function withOutbox() {
+      const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+      return {
+        outbox,
+        service: makeTimeline(outbox).timeline,
+      };
+    }
+
+    it.each([
+      ["a revoke", undefined, "cancelled"],
+      ["a refund", 59, "refunded"],
+    ] as const)(
+      "%s queues one notice in the stop's transaction",
+      async (_label, refundedAmount, kind) => {
+        const { outbox, service: withNotices } = withOutbox();
+        const db = setup(
+          productRow(),
+          boostRow({ status: BoostStatus.active, endsAt: at(DAY) }),
+        );
+
+        await db.transaction((tx) =>
+          withNotices.cancel(
+            tx,
+            "boost-1",
+            { actorId: "admin-user", reason: "reason", refundedAmount },
+            NOW,
+          ),
+        );
+
+        expect(outbox.enqueue).toHaveBeenCalledTimes(1);
+        expect(outbox.enqueue).toHaveBeenCalledWith(expect.anything(), {
+          type: "boost.notice",
+          payload: { boostId: "boost-1", kind },
+          dedupeKey: `boost.notice:${kind}:boost-1`,
+        });
+      },
+    );
+
+    it("a grant queues the granted notice", async () => {
+      const { outbox, service: withNotices } = withOutbox();
+      const db = setup(productRow());
+
+      await db.transaction((tx) =>
+        withNotices.grant(
+          tx,
+          {
+            productId: "prod-1",
+            packageId: null,
+            packageName: null,
+            showcaseOnHome: false,
+            durationDays: 3,
+            grantedById: "admin-user",
+            reason: "Compensation for a listing outage",
+          },
+          NOW,
+        ),
+      );
+
+      expect(outbox.enqueue).toHaveBeenCalledWith(expect.anything(), {
+        type: "boost.notice",
+        payload: { boostId: "boost-1", kind: "granted" },
+        dedupeKey: "boost.notice:granted:boost-1",
+      });
+    });
+
+    it("a stop that changes nothing queues nothing", async () => {
+      const { outbox, service: withNotices } = withOutbox();
+      const db = setup(
+        productRow(),
+        boostRow({ status: BoostStatus.cancelled }),
+      );
+
+      await db.transaction((tx) =>
+        withNotices.cancel(
+          tx,
+          "boost-1",
+          { actorId: null, reason: null, refundedAmount: 59 },
+          NOW,
+        ),
+      );
+
+      expect(outbox.enqueue).not.toHaveBeenCalled();
     });
   });
 });

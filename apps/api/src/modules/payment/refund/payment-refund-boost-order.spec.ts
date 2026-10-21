@@ -8,18 +8,21 @@ import {
 } from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
+import { ProviderRefundRejectedException } from "../../payment-providers/refund-errors";
 
 /**
  * Behaviour pin of `processRefund` on a boost order (`BST-`, a
  * `platform_service` order of the platform seller for a virtual
- * `boost-<id>` product):
+ * `boost-<id>` product), the money path of the admin "refund and stop" tool:
  *
  * - PayTR refunds on the store the boost was paid on (the payment's
- *   `paytrMerchant`), the amount asked for, once per attempt key.
+ *   `paytrMerchant`), the amount the admin entered, once per attempt key.
  * - No ledger reversal: fulfilment never wrote a capture group for a virtual
  *   order, so a `refund_issued` group would credit the platform seller's
  *   escrow with money that never entered it. No hold, no seller debt, no
  *   stock on the virtual product (its quantity is null).
+ * - The boost stops in the same finalize transaction, with the amount, the
+ *   staff user and the reason; a failed PayTR call stops nothing.
  * - The e-Arşiv reversal goes through the outbox (ratio of the payment).
  */
 describe("PaymentRefundService.processRefund on a boost order", () => {
@@ -30,6 +33,9 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
     over: {
       origin?: OrderOrigin;
       refundedBefore?: number;
+      paytrRejects?: boolean;
+      /** What the timeline finds for the order: null for a membership order. */
+      boostStop?: { stopped: boolean } | null;
     } = {},
   ) => {
     let metadata: Record<string, unknown> = over.refundedBefore
@@ -39,7 +45,7 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       id: "attempt-1",
       paymentId: "pay-1",
       orderId: ORDER_ID,
-      idempotencyKey: "refund-key-1",
+      idempotencyKey: "boost-refund:boost-1:0",
       amount: 0,
       status: RefundAttemptStatus.prepared,
       providerRefundId: null,
@@ -58,6 +64,13 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       offerId: null,
       cancelledBy: null,
       deliveredAt: null,
+      cancellationType: "iptal",
+      buyer: { id: "seller-1", email: "seller@test.local", displayName: "S" },
+      seller: {
+        id: "platform-seller",
+        email: "p@test.local",
+        displayName: "P",
+      },
       commissionAmount: 0,
       withholdingTaxAmount: 0,
       totalAmount: PAID,
@@ -131,36 +144,78 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
     };
     const paytr = {
-      createRefund: jest.fn().mockResolvedValue({ status: "success" }),
+      createRefund: over.paytrRejects
+        ? jest
+            .fn()
+            .mockRejectedValue(
+              new ProviderRefundRejectedException("refund rejected"),
+            )
+        : jest.fn().mockResolvedValue({ status: "success" }),
     };
     const registry = { resolve: jest.fn(() => paytr) };
     const ledger = { recordRefund: jest.fn().mockResolvedValue(null) };
     const outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    const boostTimeline = {
+      stopForRefund: jest
+        .fn()
+        .mockResolvedValue(
+          over.boostStop === undefined ? { stopped: true } : over.boostStop,
+        ),
+    };
+    const events = { emitPaymentRefunded: jest.fn() };
+    const notifications = { notifyOrderCancelledParties: jest.fn() };
+    const common = { cancelSuratShipmentIfExists: jest.fn() };
     const service = new PaymentRefundService(
       prisma as never,
       { get: jest.fn().mockReturnValue(undefined) } as never,
       registry as never,
-      { emitPaymentRefunded: jest.fn() } as never,
-      { notifyOrderCancelledParties: jest.fn() } as never,
+      events as never,
+      notifications as never,
       {
         applyRefund: jest.fn().mockResolvedValue({ updated: false }),
       } as never,
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as never,
-      { cancelSuratShipmentIfExists: jest.fn() } as never,
+      common as never,
       { record: jest.fn().mockResolvedValue(undefined) } as never,
       {} as never, // holdRelease
       new PaymentRefundAttemptService(prisma as never),
       {} as never, // tradeRefunds
       outbox as never,
       ledger as never,
+      undefined, // discounts
+      undefined, // staff mail
+      boostTimeline as never,
     );
-    return { service, tx, prisma, paytr, registry, ledger, outbox };
+    // Spied, not run: the staff mail itself is the mail module's business.
+    const staffNotice = jest
+      .spyOn(
+        service as unknown as {
+          notifyStaffOrderCancelled: () => Promise<void>;
+        },
+        "notifyStaffOrderCancelled",
+      )
+      .mockResolvedValue(undefined);
+    return {
+      service,
+      tx,
+      prisma,
+      paytr,
+      registry,
+      ledger,
+      outbox,
+      boostTimeline,
+      events,
+      notifications,
+      common,
+      staffNotice,
+    };
   };
 
   const opts = {
-    idempotencyKey: "refund-key-1",
+    idempotencyKey: "boost-refund:boost-1:0",
     cancelledBy: CancellationActor.platform,
     skipRefundEvent: true,
+    boostStop: { actorId: "admin-user", reason: "Seller asked for a refund" },
   } as const;
 
   it("refunds the full amount on the store it was paid on, once", async () => {
@@ -177,6 +232,22 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       PAID,
       "attempt-1",
     );
+  });
+
+  it("stops the boost in the finalize transaction with the amount, the admin and the reason", async () => {
+    const { service, tx, boostTimeline } = make();
+
+    await service.processRefund(ORDER_ID, PAID, opts);
+
+    expect(boostTimeline.stopForRefund).toHaveBeenCalledWith(tx, ORDER_ID, {
+      actorId: "admin-user",
+      reason: "Seller asked for a refund",
+      refundedAmount: PAID,
+    });
+    // Before the attempt is finalized: one transaction, both or neither.
+    expect(
+      boostTimeline.stopForRefund.mock.invocationCallOrder[0],
+    ).toBeLessThan(tx.refundAttempt.update.mock.invocationCallOrder[0]);
   });
 
   it("writes no ledger reversal, hold, seller debt or stock for the platform seller", async () => {
@@ -228,8 +299,26 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
     });
   });
 
+  it("a partial refund keeps the order and the payment open and stops the boost with its amount", async () => {
+    const { service, tx, boostTimeline } = make();
+
+    await service.processRefund(ORDER_ID, 20, opts);
+
+    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(tx.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: PaymentStatus.completed }),
+      }),
+    );
+    expect(boostTimeline.stopForRefund).toHaveBeenCalledWith(
+      tx,
+      ORDER_ID,
+      expect.objectContaining({ refundedAmount: 20 }),
+    );
+  });
+
   it("refuses more than the payment has left before PayTR", async () => {
-    const { service, paytr } = make({ refundedBefore: 50 });
+    const { service, paytr, boostTimeline } = make({ refundedBefore: 50 });
 
     await expect(
       service.processRefund(ORDER_ID, 10, opts),
@@ -237,13 +326,101 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       response: { i18nKey: "server.payment.refundAmountExceedsLimit" },
     });
     expect(paytr.createRefund).not.toHaveBeenCalled();
+    expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
   });
 
-  it("an ordinary order keeps its ledger reversal", async () => {
-    const { service, ledger } = make({ origin: OrderOrigin.direct_sale });
+  it("a rejected PayTR refund stops nothing", async () => {
+    const { service, boostTimeline, prisma } = make({ paytrRejects: true });
+
+    await expect(service.processRefund(ORDER_ID, PAID, opts)).rejects.toThrow(
+      "refund rejected",
+    );
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1); // the attempt claim only
+    expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
+  });
+
+  it("an ordinary order keeps its ledger reversal and stops no boost", async () => {
+    const { service, ledger, boostTimeline } = make({
+      origin: OrderOrigin.direct_sale,
+    });
 
     await service.processRefund(ORDER_ID, PAID, opts);
 
     expect(ledger.recordRefund).toHaveBeenCalledTimes(1);
+    expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
+  });
+
+  describe("the seller hears it from the boost notice only", () => {
+    // No skipRefundEvent: the recovery cron and the auto-refund sweep never
+    // pass it, so processRefund decides from the boost order itself.
+    const recovery = {
+      idempotencyKey: "boost-refund:boost-1:0",
+      cancelledBy: CancellationActor.platform,
+    };
+
+    it("sends no order refund or cancel notice, no staff mail and no shipment cancel", async () => {
+      const { service, events, notifications, staffNotice, common, outbox } =
+        make();
+
+      await service.processRefund(ORDER_ID, PAID, recovery);
+
+      expect(events.emitPaymentRefunded).not.toHaveBeenCalled();
+      expect(notifications.notifyOrderCancelledParties).not.toHaveBeenCalled();
+      expect(staffNotice).not.toHaveBeenCalled();
+      expect(common.cancelSuratShipmentIfExists).not.toHaveBeenCalled();
+      expect(outbox.enqueue).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: "shipment.cancel" }),
+      );
+    });
+
+    it("a membership order (no boost) keeps its order notices and staff mail, with no shipment cancel", async () => {
+      const { service, notifications, staffNotice, common } = make({
+        boostStop: null,
+      });
+
+      await service.processRefund(ORDER_ID, PAID, recovery);
+
+      expect(notifications.notifyOrderCancelledParties).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(staffNotice).toHaveBeenCalledWith(ORDER_ID, PAID);
+      expect(common.cancelSuratShipmentIfExists).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the claim guard", () => {
+    it("runs under the payment lock before a new attempt is written", async () => {
+      const { service, tx } = make();
+      const guard = jest.fn().mockResolvedValue(undefined);
+
+      await service.processRefund(ORDER_ID, PAID, {
+        ...opts,
+        claimGuard: guard,
+      });
+
+      expect(guard).toHaveBeenCalledWith(tx);
+      expect(guard.mock.invocationCallOrder[0]).toBeGreaterThan(
+        tx.$queryRaw.mock.invocationCallOrder[0],
+      );
+      expect(guard.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.refundAttempt.create.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("a refusing guard writes no attempt and calls no PayTR", async () => {
+      const { service, tx, paytr, boostTimeline } = make();
+      const refusal = new Error("boost already stopped");
+
+      await expect(
+        service.processRefund(ORDER_ID, PAID, {
+          ...opts,
+          claimGuard: jest.fn().mockRejectedValue(refusal),
+        }),
+      ).rejects.toBe(refusal);
+      expect(tx.refundAttempt.create).not.toHaveBeenCalled();
+      expect(paytr.createRefund).not.toHaveBeenCalled();
+      expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
+    });
   });
 });

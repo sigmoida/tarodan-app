@@ -28,6 +28,12 @@ export class PaymentRefundAttemptService {
     idempotencyKey: string,
     provider: string,
     providerReference: string,
+    /**
+     * The caller's own precondition, checked under the payment lock right
+     * before an attempt is (re)prepared to go to the provider; it throws to
+     * refuse. Not run for an attempt that only finishes (already sent).
+     */
+    guard?: (tx: Prisma.TransactionClient) => Promise<void>,
   ): Promise<{
     action: "submit" | "finalize" | "done";
     attempt: {
@@ -94,6 +100,7 @@ export class PaymentRefundAttemptService {
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
+        await guard?.(tx);
         if (attempt.status === RefundAttemptStatus.failed) {
           attempt = await tx.refundAttempt.update({
             where: { id: attempt.id },
@@ -126,6 +133,7 @@ export class PaymentRefundAttemptService {
           i18nMessage("server.payment.refundInitiationFailed"),
         );
       }
+      await guard?.(tx);
 
       attempt = await tx.refundAttempt.create({
         data: {

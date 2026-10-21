@@ -4,20 +4,32 @@ import { BoostTimelineStore } from "./boost-timeline-store.service";
 import { BoostActivationService } from "./boost-activation.service";
 import { BoostStaffTimelineService } from "./boost-staff-timeline.service";
 import { BoostSystemPauseService } from "./boost-system-pause.service";
-import type { BoostActivation } from "./boost-timeline.types";
+import type {
+  BoostActivation,
+  BoostGrant,
+  BoostGrantInput,
+  BoostStopInput,
+  BoostStopResult,
+} from "./boost-timeline.types";
 
-export type { BoostActivation } from "./boost-timeline.types";
+export type {
+  BoostActivation,
+  BoostGrant,
+  BoostGrantInput,
+  BoostStopInput,
+  BoostStopResult,
+} from "./boost-timeline.types";
 
 /**
  * The one owner of a listing's boost timeline: the `product_boosts` rows of a
  * listing and the promotion columns they drive on the product (`boostedUntil`,
  * `boostedAt`, `homeShowcaseUntil`, `rankTier`, `relevanceScore`). A facade:
- * it only delegates, by responsibility, to activation, staff changes (pause,
- * resume, extend) and the system pause of offline listings; the store holds
- * the shared lock, lanes and refresh.
+ * it only delegates, by responsibility, to activation (paid boost, free
+ * grant), staff changes (pause, resume, extend, stop) and the system pause of
+ * offline listings; the store holds the shared lock, lanes and refresh.
  *
- * Payment fulfilment (activation), the admin boost screen and the
- * expire-boosts cron call it. Every method runs inside the caller's
+ * Payment fulfilment (activation), refunds (stop), the admin boost screen and
+ * the expire-boosts cron call it. Every method runs inside the caller's
  * transaction (`tx`), so the change commits with the business event that
  * caused it.
  *
@@ -34,9 +46,9 @@ export type { BoostActivation } from "./boost-timeline.types";
  * already locked the payment and then the order (`payment-order-lock.ts`);
  * the listing comes after them, and boost rows are only touched under it.
  *
- * A leaf: Prisma and pure helpers only, no Payment or Admin import, so both
- * can import it without a cycle (`ProductModule` already imports
- * `PaymentModule`).
+ * A leaf: Prisma, the global outbox and pure helpers only, no Payment or Admin
+ * import, so both can import it without a cycle (`ProductModule` already
+ * imports `PaymentModule`).
  */
 @Injectable()
 export class BoostTimelineService {
@@ -75,6 +87,14 @@ export class BoostTimelineService {
     return this.activation.activate(tx, boostId, now);
   }
 
+  grant(
+    tx: Prisma.TransactionClient,
+    input: BoostGrantInput,
+    now?: Date,
+  ): Promise<BoostGrant> {
+    return this.activation.grant(tx, input, now);
+  }
+
   pause(tx: Prisma.TransactionClient, boostId: string, now?: Date) {
     return this.staff.pause(tx, boostId, now);
   }
@@ -90,6 +110,24 @@ export class BoostTimelineService {
     now?: Date,
   ) {
     return this.staff.extend(tx, boostId, days, now);
+  }
+
+  cancel(
+    tx: Prisma.TransactionClient,
+    boostId: string,
+    input: BoostStopInput,
+    now?: Date,
+  ): Promise<BoostStopResult> {
+    return this.staff.cancel(tx, boostId, input, now);
+  }
+
+  stopForRefund(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    input: BoostStopInput & { refundedAmount: Prisma.Decimal.Value },
+    now?: Date,
+  ): Promise<BoostStopResult | null> {
+    return this.staff.stopForRefund(tx, orderId, input, now);
   }
 
   pauseForDelisting(

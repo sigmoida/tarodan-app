@@ -1,9 +1,25 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { BoostStatus, Prisma } from "@prisma/client";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  BoostSource,
+  BoostStatus,
+  Prisma,
+  ProductKind,
+  ProductStatus,
+} from "@prisma/client";
+import { i18nMessage } from "../../i18n";
 import { computeRelevanceScore } from "../helpers/relevance-score";
 import { DAY_MS } from "./boost-lanes";
 import { BoostTimelineStore } from "./boost-timeline-store.service";
-import type { BoostActivation } from "./boost-timeline.types";
+import type {
+  BoostActivation,
+  BoostGrant,
+  BoostGrantInput,
+} from "./boost-timeline.types";
 
 /**
  * A paid boost activates from `pending`, or from `failed` when the payment
@@ -17,8 +33,8 @@ const ACTIVATABLE_STATUSES: BoostStatus[] = [
 ];
 
 /**
- * Starting a paid boost on a listing's timeline when its payment is
- * fulfilled. Part of `BoostTimelineService`.
+ * Starting a boost on a listing's timeline: a paid boost when its payment is
+ * fulfilled, and a free staff grant. Part of `BoostTimelineService`.
  */
 @Injectable()
 export class BoostActivationService {
@@ -142,5 +158,58 @@ export class BoostActivationService {
       productId: boost.productId,
     });
     return { productId: boost.productId, endsAt };
+  }
+
+  /**
+   * Free staff grant (`source = admin_grant`, price 0): no order, no payment,
+   * no invoice and no revenue. The listing must be a live listing, checked
+   * under its lock; the grant is created `pending` and activated in the same
+   * transaction, so it stacks like a purchase. Queues the seller notice.
+   */
+  async grant(
+    tx: Prisma.TransactionClient,
+    input: BoostGrantInput,
+    now: Date = new Date(),
+  ): Promise<BoostGrant> {
+    await this.store.lockProduct(tx, input.productId);
+    const product = await tx.product.findUnique({
+      where: { id: input.productId },
+      select: { id: true, kind: true, status: true, sellerId: true },
+    });
+    if (!product) {
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+    if (
+      product.kind !== ProductKind.listing ||
+      product.status !== ProductStatus.active
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.boost.grantListingNotActive"),
+      );
+    }
+    const row = await tx.productBoost.create({
+      data: {
+        productId: product.id,
+        userId: product.sellerId,
+        packageId: input.packageId,
+        packageName: input.packageName,
+        showcaseOnHome: input.showcaseOnHome,
+        durationDays: input.durationDays,
+        price: 0,
+        status: BoostStatus.pending,
+        source: BoostSource.admin_grant,
+        grantedById: input.grantedById,
+        grantReason: input.reason,
+      },
+      select: { id: true },
+    });
+    const activation = await this.activate(tx, row.id, now);
+    // A pending row created under the lock always activates.
+    if (!activation) {
+      throw new Error(`Boost grant ${row.id} did not activate`);
+    }
+    await this.store.enqueueNotice(tx, row.id, "granted");
+    this.store.breadcrumb("grant", { boostId: row.id, productId: product.id });
+    return { boostId: row.id, ...activation };
   }
 }

@@ -7,10 +7,10 @@ import { BoostSystemPauseService } from "./boost-system-pause.service";
 
 /**
  * Leaf module of the listing boost timeline (`BoostTimelineService`, a facade
- * over its slices). Payment (activation) and Admin (staff actions) import it
- * directly instead of the whole `ProductModule`, which
+ * over its slices). Payment (activation, refund stop) and Admin (staff
+ * actions) import it directly instead of the whole `ProductModule`, which
  * already imports `PaymentModule`; importing that back would close a cycle.
- * `PrismaModule` is global.
+ * `PrismaModule` and `OutboxModule` are global.
  */
 @Module({
   providers: [

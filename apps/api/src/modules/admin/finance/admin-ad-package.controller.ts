@@ -20,14 +20,19 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminAdPackageService } from "./admin-ad-package.service";
+import { AdminBoostOperationsService } from "./boost/admin-boost-operations.service";
 import { AdminJwtAuthGuard } from "../../auth/guards/admin-jwt-auth.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
+import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { AdminRole } from "@prisma/client";
 import {
   CreateAdPackageDto,
   ExtendBoostDto,
+  GrantBoostDto,
+  RefundBoostDto,
+  RevokeBoostDto,
   UpdateAdPackageDto,
 } from "../dto/ad-package.dto";
 
@@ -37,7 +42,10 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminAdPackageController {
-  constructor(private readonly service: AdminAdPackageService) {}
+  constructor(
+    private readonly service: AdminAdPackageService,
+    private readonly boostOperations: AdminBoostOperationsService,
+  ) {}
 
   // ==================== BOOST PURCHASES (tracking) ====================
   // NOTE: declared before ":id" routes so "purchases" is not captured as an id param.
@@ -49,6 +57,11 @@ export class AdminAdPackageController {
   @ApiQuery({ name: "limit", required: false })
   @ApiQuery({ name: "packageId", required: false })
   @ApiQuery({ name: "status", required: false })
+  @ApiQuery({
+    name: "source",
+    required: false,
+    enum: ["purchase", "admin_grant"],
+  })
   @ApiQuery({ name: "search", required: false })
   @ApiResponse({ status: HttpStatus.OK, description: "Paginated purchases" })
   async listPurchases(
@@ -56,6 +69,7 @@ export class AdminAdPackageController {
     @Query("limit") limit?: string,
     @Query("packageId") packageId?: string,
     @Query("status") status?: string,
+    @Query("source") source?: string,
     @Query("search") search?: string,
   ) {
     return this.service.listPurchases({
@@ -63,8 +77,32 @@ export class AdminAdPackageController {
       limit: limit ? Number(limit) : undefined,
       packageId,
       status,
+      source,
       search,
     });
+  }
+
+  // Declared before the ":id" routes so "grant" is never read as an id.
+  @Post("purchases/grant")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary:
+      "Grant a free boost to a live listing (no order, payment or invoice)",
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, description: "The new grant" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "server.admin.boost.grantListingNotActive or validation",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "server.product.notFound, server.admin.adPackage.notFound",
+  })
+  async grantBoost(
+    @CurrentUser("id") adminUserId: string,
+    @Body() dto: GrantBoostDto,
+  ) {
+    return this.boostOperations.grant(adminUserId, dto);
   }
 
   @Get("purchases/:id")
@@ -93,6 +131,45 @@ export class AdminAdPackageController {
   @ApiOperation({ summary: "Extend an active or paused boost purchase" })
   async extendPurchase(@Param("id") id: string, @Body() dto: ExtendBoostDto) {
     return this.service.extendPurchase(id, dto.days);
+  }
+
+  @Post("purchases/:id/refund")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Refund a paid active or paused boost (all or part) and stop it at once",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "The stopped purchase" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "server.admin.boost.refundNotAllowed, server.admin.boost.refundAmountInvalid, or a PayTR refusal",
+  })
+  async refundBoost(
+    @Param("id") id: string,
+    @CurrentUser("id") adminUserId: string,
+    @Body() dto: RefundBoostDto,
+  ) {
+    return this.boostOperations.refund(adminUserId, id, dto);
+  }
+
+  @Post("purchases/:id/revoke")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Stop a free grant early, without a refund" })
+  @ApiResponse({ status: HttpStatus.OK, description: "The stopped grant" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "server.admin.boost.revokeGrantOnly, server.admin.boost.stopActiveOrPausedOnly",
+  })
+  async revokeBoost(
+    @Param("id") id: string,
+    @CurrentUser("id") adminUserId: string,
+    @Body() dto: RevokeBoostDto,
+  ) {
+    return this.boostOperations.revoke(adminUserId, id, dto);
   }
 
   // ==================== PACKAGE MANAGEMENT ====================

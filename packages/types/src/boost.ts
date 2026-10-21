@@ -45,6 +45,17 @@ export function boostOfferSince(value: string | null | undefined): Date | null {
   return Number.isNaN(at.getTime()) ? null : at;
 }
 
+/** A free staff grant runs for this many days at least and at most. */
+export const BOOST_GRANT_MIN_DAYS = 1;
+export const BOOST_GRANT_MAX_DAYS = 90;
+
+/**
+ * Length of the reason staff give for a grant, a revoke or a refund and stop
+ * (written on the boost and to the audit log).
+ */
+export const BOOST_ADMIN_REASON_MIN_LENGTH = 10;
+export const BOOST_ADMIN_REASON_MAX_LENGTH = 500;
+
 /** Where a boost came from (`ProductBoost.source`). */
 export const BOOST_SOURCES = ["purchase", "admin_grant"] as const;
 export type BoostSource = (typeof BOOST_SOURCES)[number];

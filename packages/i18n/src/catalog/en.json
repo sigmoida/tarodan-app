@@ -11062,6 +11062,17 @@
       "tradeDisputeResolved": {
         "title": "Trade Dispute Resolved",
         "message": "The Tarodan team resolved the trade dispute and the trade has been completed."
+      },
+      "boostGranted": {
+        "title": "Feature added",
+        "message": "Tarodan featured \"{productTitle}\" for {days, plural, one {# day} other {# days}} at no cost."
+      },
+      "boostCancelled": {
+        "title": "Feature stopped",
+        "message": "Tarodan stopped the feature for \"{productTitle}\"."
+      },
+      "boostRefunded": {
+        "message": "The feature for \"{productTitle}\" was stopped and {amount} TL was refunded. It can take a few days to reach your card, depending on your bank."
       }
     },
     "auth": {
@@ -11920,6 +11931,13 @@
           "preparingWarningBeforeDeadline": "The seller preparation warning (hours) must be shorter than the seller preparation time (days × 24 hours)."
         },
         "conflict": "Another admin changed the durations at the same time. Reload the page and try again."
+      },
+      "boost": {
+        "refundNotAllowed": "This boost cannot be refunded",
+        "refundAmountInvalid": "The refund amount must be above 0 and at most the refundable amount ({max})",
+        "revokeGrantOnly": "Only free grants can be cancelled without a refund",
+        "grantListingNotActive": "A boost can only be granted to a live listing",
+        "stopActiveOrPausedOnly": "Only an active or paused boost can be stopped"
       }
     },
     "advertisement": {

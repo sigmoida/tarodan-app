@@ -189,6 +189,11 @@ export enum NotificationType {
   BOOST_EXPIRED = "boost_expired",
   // Öne çıkarma ödemesi tamamlandı ve boost aktifleşti — satın alana gider.
   BOOST_ACTIVATED = "boost_activated",
+  // Staff actions on a boost, to the listing's seller: a free grant, a stop
+  // without a refund (revoke) and a stop with a refund.
+  BOOST_GRANTED = "boost_granted",
+  BOOST_CANCELLED = "boost_cancelled",
+  BOOST_REFUNDED = "boost_refunded",
 
   // Promotion notifications
   PROMOTION = "promotion",
