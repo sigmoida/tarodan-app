@@ -355,6 +355,23 @@ describe("InitiateBoostDto", () => {
     },
   );
 
+  it.each(["preInformationAccepted", "withdrawalWaiverAccepted"])(
+    'rejects the text "false" in %s alone, next to a JSON true',
+    async (field) => {
+      // Each field carries its own JsonBoolean: losing it on one would read
+      // "false" as true for that statement only.
+      await expect(
+        asBody({
+          packageId: "pkg-1",
+          durationDays: 7,
+          preInformationAccepted: true,
+          withdrawalWaiverAccepted: true,
+          [field]: "false",
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+    },
+  );
+
   it("keeps a JSON false for the service to refuse", async () => {
     await expect(
       asBody({

@@ -151,6 +151,56 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
         expect(h.payment.initiatePayment).not.toHaveBeenCalled();
       },
     );
+
+    it.each(["true", 1, "yes", null])(
+      "refuses a non-boolean %p from a caller that skipped the DTO",
+      async (value) => {
+        // The DTO already turns these into a 400; the service rule is still
+        // `=== true`, so no other caller can pass evidence that is not a
+        // real JSON true.
+        const h = harness();
+
+        await expect(
+          h.service.initiateBoost(
+            OWNER,
+            "listing-1",
+            input({
+              preInformationAccepted: value,
+              withdrawalWaiverAccepted: value,
+            }) as never,
+          ),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostConsentRequired" },
+        });
+        expect(h.prisma.$transaction).not.toHaveBeenCalled();
+      },
+    );
+
+    it("answers a stranger without consents with the consent 400, not the ownership 403", async () => {
+      // Checked first: the refusal tells nothing about whose listing it is or
+      // whether boost sales are on.
+      const h = harness();
+      h.prisma.product.findFirst.mockResolvedValue({
+        id: "listing-1",
+        sellerId: "someone-else",
+        status: ProductStatus.inactive,
+      });
+      h.prisma.platformSetting.findUnique.mockResolvedValue({
+        settingValue: "false",
+      });
+
+      await expect(
+        h.service.initiateBoost(
+          "stranger",
+          "listing-1",
+          input({ preInformationAccepted: false }),
+        ),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { i18nKey: "server.product.boostConsentRequired" },
+      });
+    });
   });
 
   describe("with both consents", () => {
@@ -316,6 +366,37 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
       // The transaction rolled the boost back: nothing to mark failed.
       expect(h.prisma.productBoost.update).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ["the boost", "productBoost", "create"],
+      ["the virtual product", "product", "create"],
+      // A unique order number taken between the check and the write.
+      ["the order", "order", "create"],
+      ["the order link", "productBoost", "update"],
+    ] as const)(
+      "commits nothing and starts no payment when writing %s fails",
+      async (_label, model, method) => {
+        const h = harness();
+        const failure = new Error(`${model}.${method} failed`);
+        (h.tx[model] as Record<string, jest.Mock>)[
+          method
+        ].mockRejectedValueOnce(failure);
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input()),
+        ).rejects.toBe(failure);
+        expect(h.calls).not.toContain("$transaction:commit");
+        // No consent row is written for an order that is not there.
+        expect(h.consents.recordForOrder).not.toHaveBeenCalled();
+        expect(h.payment.initiatePayment).not.toHaveBeenCalled();
+        // Nothing committed, so nothing to mark failed outside the transaction.
+        expect(h.prisma.productBoost.update).not.toHaveBeenCalled();
+        const crumbs = h.sentry.addBreadcrumb.mock.calls.map(
+          ([crumb]: [{ message: string }]) => crumb.message,
+        );
+        expect(crumbs).not.toContain("boost.order_created");
+      },
+    );
 
     it("marks the committed boost failed when the payment cannot start, and rethrows", async () => {
       const h = harness();
