@@ -62,6 +62,15 @@ describe("AdminPaymentService.manualRefund refuses boost payments", () => {
     expect(prisma.productBoost.findUnique).not.toHaveBeenCalled();
   });
 
+  it("refunds a membership order payment, without a boost lookup", async () => {
+    const { service, prisma, payments } = make(null, "membership-tier-1");
+
+    await service.manualRefund("admin-1", "pay-1", 59, "reason", "key-1");
+
+    expect(payments.processRefund).toHaveBeenCalledTimes(1);
+    expect(prisma.productBoost.findUnique).not.toHaveBeenCalled();
+  });
+
   it("refunds a paid boost order whose boost row is missing (nothing to stop, the boost screen cannot see it)", async () => {
     const { service, payments } = make(null);
 

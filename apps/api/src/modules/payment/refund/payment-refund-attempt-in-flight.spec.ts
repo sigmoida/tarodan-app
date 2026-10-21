@@ -35,6 +35,7 @@ describe("PaymentRefundAttemptService: an attempt in flight", () => {
         ),
         findFirst: jest.fn().mockResolvedValue(rows.unresolved ?? null),
         create: jest.fn(),
+        update: jest.fn(),
       },
     };
     const prisma = {
@@ -98,6 +99,52 @@ describe("PaymentRefundAttemptService: an attempt in flight", () => {
     );
     await expect(refusal).rejects.not.toBeInstanceOf(
       RefundAttemptInFlightException,
+    );
+  });
+
+  // The trade cash refund has one key per payment; a different attempt on
+  // the same trade (an older key) is someone else's money question too.
+  describe("trade cash refund claim", () => {
+    const tradeAttempt = (status: RefundAttemptStatus) => ({
+      id: "attempt-t",
+      paymentId: "pay-1",
+      tradeId: "trade-1",
+      amount: 59,
+      status,
+    });
+    const claimTrade = (service: PaymentRefundAttemptService) =>
+      service.claimTradeRefundAttempt("pay-1", "trade-1", 59, "paytr", "oid-1");
+
+    it("refuses while another attempt of the trade is unresolved as in flight elsewhere", async () => {
+      const { service, tx } = make({ unresolved: { id: "attempt-0" } });
+
+      const refusal = claimTrade(service);
+      await expect(refusal).rejects.toBeInstanceOf(
+        RefundAttemptInFlightException,
+      );
+      await expect(refusal).rejects.toBeInstanceOf(
+        RefundPendingReconciliationException,
+      );
+      expect(tx.refundAttempt.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      RefundAttemptStatus.submitting,
+      RefundAttemptStatus.manual_review,
+    ])(
+      "refuses its own key while %s as pending, not in flight elsewhere",
+      async (status) => {
+        const { service, tx } = make({});
+        tx.refundAttempt.findUnique.mockResolvedValue(tradeAttempt(status));
+
+        const refusal = claimTrade(service);
+        await expect(refusal).rejects.toBeInstanceOf(
+          RefundPendingReconciliationException,
+        );
+        await expect(refusal).rejects.not.toBeInstanceOf(
+          RefundAttemptInFlightException,
+        );
+      },
     );
   });
 });

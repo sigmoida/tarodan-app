@@ -384,6 +384,24 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       expect(payment.processRefund).not.toHaveBeenCalled();
     });
 
+    // Ownership comes first: someone else's boost order is a 403, so the
+    // service-order answer never tells a stranger what the order is.
+    it("refuses someone else's boost order as not theirs, before the service-order answer", async () => {
+      const { creation, payment } = makeService({
+        productId: "boost-b1",
+        status: OrderStatus.completed,
+      });
+
+      await expect(
+        creation.createCancellationRefund(
+          "order-1",
+          "someone-else",
+          OrderCancellationReason.changed_mind,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(payment.processRefund).not.toHaveBeenCalled();
+    });
+
     // A platform service order has no pre-shipment phase; even in a paid
     // status (a boost order whose boost row is missing stays `preparing`)
     // the buyer gets the completed-order answer and no money moves (D16).
