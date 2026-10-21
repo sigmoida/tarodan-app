@@ -136,14 +136,28 @@ describe("SavedSearchService", () => {
 
       await service.create("u1", dto());
 
-      const sql = (tx.$queryRaw.mock.calls[0][0] as string[]).join("?");
-      expect(sql).toContain("FOR NO KEY UPDATE");
-      expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
-        tx.savedSearch.count.mock.invocationCallOrder[0],
-      );
+      const sql = (tx.$queryRaw.mock.calls[0][0] as string[])
+        .join("?")
+        .replace(/\s+/g, " ");
+      expect(sql).toContain("FROM users WHERE id = ? FOR NO KEY UPDATE");
+      // The caller's own row: a lock on any other row serialises nothing.
+      expect(tx.$queryRaw.mock.calls[0][1]).toBe("u1");
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+      // The transaction's first statement: before the duplicate lookup, the
+      // count and the insert (so no other row lock can come before it).
+      const lockAt = tx.$queryRaw.mock.invocationCallOrder[0];
+      for (const step of [
+        tx.savedSearch.findUnique,
+        tx.savedSearch.count,
+        tx.savedSearch.create,
+      ]) {
+        expect(lockAt).toBeLessThan(step.mock.invocationCallOrder[0]);
+      }
       expect(tx.savedSearch.count).toHaveBeenCalledWith({
         where: { userId: "u1" },
       });
+      // Count and insert on the transaction client, never on the pool.
+      expect(prisma.savedSearch.count).not.toHaveBeenCalled();
       // The limit is read before the transaction, outside the lock.
       expect(
         membership.getSavedSearchLimit.mock.invocationCallOrder[0],
