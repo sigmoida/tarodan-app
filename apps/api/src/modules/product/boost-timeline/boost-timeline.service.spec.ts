@@ -867,8 +867,51 @@ describe("BoostTimelineService", () => {
         db.transaction((tx) => unlocked.activate(tx, "boost-3", NOW)),
       ]);
 
-      // Both read boostedUntil = +5 days, so one duration is lost.
-      expect(db.products.get("prod-1")?.boostedUntil).not.toEqual(at(15 * DAY));
+      // Both read boostedUntil = +5 days, so exactly one duration is lost:
+      // the listing ends at +12 days (7 kept) or +8 days (3 kept).
+      expect([at(12 * DAY).getTime(), at(8 * DAY).getTime()]).toContain(
+        db.products.get("prod-1")?.boostedUntil?.getTime(),
+      );
+    });
+
+    it("activates one boost once when two callbacks fulfil it at the same time", async () => {
+      // A duplicate PayTR callback that got past the payment claim: the
+      // second activation waits for the listing lock, then sees `active`.
+      const db = setup(
+        productRow({ boostedUntil: at(5 * DAY), rankTier: 2 }),
+        boostRow({ durationDays: 7 }),
+      );
+
+      const results = await Promise.all([
+        db.transaction((tx) => service.activate(tx, "boost-1", NOW)),
+        db.transaction((tx) => service.activate(tx, "boost-1", NOW)),
+      ]);
+
+      expect(results.filter((r) => r !== null)).toEqual([
+        { productId: "prod-1", endsAt: at(12 * DAY) },
+      ]);
+      expect(db.boosts.get("boost-1")?.endsAt).toEqual(at(12 * DAY));
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(12 * DAY));
+    });
+
+    it("the status compare-and-set alone still stops a second activation", async () => {
+      // The database-level guard: even when both activations read `pending`,
+      // only the one whose update claims the row writes the listing (Postgres
+      // re-checks the WHERE of an UPDATE that waited for the row).
+      const db = setup(
+        productRow({ boostedUntil: at(5 * DAY), rankTier: 2 }),
+        boostRow({ durationDays: 7 }),
+      );
+      const unlocked = new BoostTimelineService();
+      jest.spyOn(unlocked, "lockProduct").mockResolvedValue(undefined);
+
+      const results = await Promise.all([
+        db.transaction((tx) => unlocked.activate(tx, "boost-1", NOW)),
+        db.transaction((tx) => unlocked.activate(tx, "boost-1", NOW)),
+      ]);
+
+      expect(results.filter((r) => r !== null)).toHaveLength(1);
+      expect(db.products.get("prod-1")?.boostedUntil).toEqual(at(12 * DAY));
     });
 
     it("keeps both a fulfilment and a staff extension running at once", async () => {
