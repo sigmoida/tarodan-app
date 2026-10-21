@@ -28,6 +28,7 @@ import {
   NoSymbolIcon,
   ArrowRightOnRectangleIcon,
   SparklesIcon,
+  RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
@@ -105,6 +106,11 @@ export default function ProfileSidebar({
           icon: ShoppingBagIcon,
           label: t("nav.myListings"),
           href: "/profile/listings",
+        },
+        {
+          icon: RocketLaunchIcon,
+          label: t("nav.myBoosts"),
+          href: "/profile/boosts",
         },
         { icon: TagIcon, label: t("order.myOrders"), href: "/profile/orders" },
         {
