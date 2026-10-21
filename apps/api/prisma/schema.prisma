@@ -126,6 +126,7 @@ model User {
   productBoosts           ProductBoost[]
   deletedIdentity         DeletedUserIdentity?
   consentRecords          ConsentRecord[]
+  sellerTrustScore        SellerTrustScore?
 
   @@index([email])
   @@index([adminCode])
@@ -423,6 +424,31 @@ model FeaturedSnapshot {
   computedAt DateTime @default(now()) @map("computed_at")
 
   @@map("featured_snapshots")
+}
+
+/// Stored seller trust score (ADR 0014, `docs/SELLER_TRUST.md`): written only
+/// by the nightly `seller-trust-refresh` batch, read by primary key. A table of
+/// its own so the nightly write never touches the hot `users` row. Only the
+/// primary key is indexed and the table has `fillfactor = 90` (raw SQL in the
+/// migration), so the nightly updates stay HOT. Derived data, so it cascades
+/// with the user; a missing row reads as "new seller".
+model SellerTrustScore {
+  userId         String   @id @map("user_id")
+  /// Score in hundredths of a point, 0 to 500 (a `CHECK` in the migration):
+  /// exactly two decimals and no Decimal on the read path. Not money. Null =
+  /// below the minimum data rule (5 counted transactions, 3 counterparties).
+  scoreX100      Int?     @map("score_x100") @db.SmallInt
+  /// `SELLER_TRUST_FORMULA_VERSION` that produced the row.
+  formulaVersion Int      @map("formula_version") @db.SmallInt
+  /// `SellerTrustComponentsV1`: counts and sub-scores for admin support. No
+  /// ids, names or other personal data.
+  components     Json
+  /// The run's single `asOf` instant (every window ends there). The cleanup
+  /// after a fully successful run deletes rows older than it.
+  computedAt     DateTime @map("computed_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_trust_scores")
 }
 
 model OAuthAccount {
