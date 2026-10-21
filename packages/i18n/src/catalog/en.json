@@ -8891,7 +8891,7 @@
         "reauth": {
           "title": "Step-up confirmation",
           "label": "Require step-up confirmation for account deletion and email change",
-          "helper": "When on, account deletion and email change requests without a step-up confirmation are rejected. Web and mobile builds that do not send it (1.0.5 and older on mobile) cannot do either; turn this on only after the web release that sends it is live and the minimum supported app version on iOS and Android is above 1.0.5. A confirmation that is sent is always checked, even while this is off."
+          "helper": "When on, account deletion and email change requests without a step-up confirmation are rejected. Web and mobile builds that do not send it (on mobile, every version up to 1.1.1) cannot do either; turn this on only after the web release that sends it is live and the minimum supported app version on iOS and Android is at least the first mobile version that sends it. A confirmation that is sent is always checked, even while this is off."
         }
       }
     },

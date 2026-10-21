@@ -7,10 +7,11 @@ import { SettingToggle } from "./SettingToggle";
 
 /**
  * Whether account deletion and the e-mail change request need a step-up
- * confirmation even when the client sends none. Off by default: mobile 1.0.5
- * and older, and web until its step-up release, send none. Switch it on only
- * after that web release is live and the minimum supported app version is
- * above 1.0.5 (tarodan-ops `compat.md`).
+ * confirmation even when the client sends none. Off by default: no mobile
+ * version sends one yet (not 1.0.5, 1.1.0 or 1.1.1), nor web until its
+ * step-up release. Switch it on only after that web release is live and the
+ * minimum supported app version (iOS and Android) is at least the first
+ * mobile version that sends it (tarodan-ops `compat.md`).
  */
 export function StepUpSettingsCard() {
   const t = useTranslations();
