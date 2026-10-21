@@ -21,6 +21,14 @@ interface SidebarFiltersProps {
   onClearFilters: () => void;
 }
 
+// Boolean catalog flags shown after trade-only in the "options" group; the
+// same keys feed the URL, the API params and the toolbar chips.
+const FLAG_OPTIONS = [
+  { key: "preOrder", labelKey: "product.preOrder" },
+  { key: "limited", labelKey: "product.limitedEdition" },
+  { key: "set", labelKey: "product.sets" },
+] as const;
+
 export default function SidebarFilters({
   filters,
   onFilterChange,
@@ -388,6 +396,23 @@ export default function SidebarFilters({
                 </p>
               </div>
             </label>
+            {FLAG_OPTIONS.map(({ key, labelKey }) => (
+              <label
+                key={key}
+                className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-surface"
+              >
+                <Checkbox
+                  checked={filters[key]}
+                  onChange={(e) =>
+                    onFilterChange({ ...filters, [key]: e.target.checked })
+                  }
+                  className="h-5 w-5"
+                />
+                <span className="text-sm font-medium text-body">
+                  {t(labelKey)}
+                </span>
+              </label>
+            ))}
           </AccordionContent>
         </AccordionItem>
       </Accordion>
