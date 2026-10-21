@@ -82,6 +82,8 @@ describe("AdminOrderCancelService", () => {
     };
     const prisma = {
       order: { findUnique: jest.fn().mockResolvedValue(plain) },
+      // The order's boost row (D16); none unless a test sets one.
+      productBoost: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn((fn: (client: typeof tx) => unknown) => fn(tx)),
     };
     const audit = {
@@ -935,6 +937,117 @@ describe("AdminOrderCancelService", () => {
           i18nParams: { refundNumber: "RFD-1" },
         },
       });
+      expect(
+        refundService.createPlatformCancellationRefund,
+      ).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * Decision D16: a paid order that carries a boost is refunded only on the
+   * boost screen, which stops the boost with the money. The order screen
+   * refuses it before any blocker, money or audit gate.
+   */
+  describe("boost order", () => {
+    const boost = {
+      orderNumber: "BST-1",
+      origin: "platform_service",
+      productId: "boost-b1",
+      quantity: 1,
+    };
+    const useBoostScreen = {
+      status: 400,
+      response: { i18nKey: "server.admin.payment.boostRefundUseBoostScreen" },
+    };
+    const withBoost = (order: Partial<Order>, locked?: Partial<Order>) => {
+      const built = makeService(order, locked);
+      built.prisma.productBoost.findUnique.mockResolvedValue({ id: "b1" });
+      return built;
+    };
+
+    it.each([
+      ["paid", OrderStatus.paid],
+      ["completed (how a paid boost order rests)", OrderStatus.completed],
+    ])(
+      "%s: cancel answers boostRefundUseBoostScreen, no money moves",
+      async (_label, status) => {
+        const { service, prisma, refundService, audit } = withBoost({
+          ...boost,
+          status,
+        });
+
+        await expect(
+          service.cancelOrder("admin-1", "order-1", request()),
+        ).rejects.toMatchObject(useBoostScreen);
+        expect(prisma.productBoost.findUnique).toHaveBeenCalledWith({
+          where: { orderId: "order-1" },
+          select: { id: true },
+        });
+        expect(
+          refundService.createPlatformCancellationRefund,
+        ).not.toHaveBeenCalled();
+        expect(audit.createRequiredAuditLog).not.toHaveBeenCalled();
+      },
+    );
+
+    it("paid: the preview refuses too, without computing a refund", async () => {
+      const { service, refundService } = withBoost({
+        ...boost,
+        status: OrderStatus.completed,
+      });
+
+      await expect(service.previewCancel("order-1")).rejects.toMatchObject(
+        useBoostScreen,
+      );
+      expect(
+        refundService.previewPlatformCancellationRefund,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("paid while the admin confirmed an unpaid cancel: refused under the lock, nothing cancelled", async () => {
+      const { service, orderService } = withBoost(
+        { ...boost, status: OrderStatus.pending_payment },
+        { ...boost, status: OrderStatus.completed },
+      );
+
+      await expect(
+        service.cancelOrder(
+          "admin-1",
+          "order-1",
+          request({ expectedKind: "unpaid" }),
+        ),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.order.cancelAfterCompletion" },
+      });
+      expect(orderService.cancelUnpaidOrderInTx).not.toHaveBeenCalled();
+    });
+
+    it("unpaid: cancels like any order without looking up the boost", async () => {
+      const { service, prisma, orderService } = withBoost({
+        ...boost,
+        status: OrderStatus.pending_payment,
+      });
+
+      await expect(
+        service.cancelOrder(
+          "admin-1",
+          "order-1",
+          request({ expectedKind: "unpaid" }),
+        ),
+      ).resolves.toMatchObject({ kind: "unpaid" });
+      expect(orderService.cancelUnpaidOrderInTx).toHaveBeenCalledTimes(1);
+      expect(prisma.productBoost.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("paid boost order without its boost row: cancels and refunds as any paid order", async () => {
+      const { service, refundService } = makeService({
+        ...boost,
+        status: OrderStatus.preparing,
+      });
+
+      await expect(
+        service.cancelOrder("admin-1", "order-1", request()),
+      ).resolves.toMatchObject({ kind: "paid_pre_handover" });
       expect(
         refundService.createPlatformCancellationRefund,
       ).toHaveBeenCalledTimes(1);

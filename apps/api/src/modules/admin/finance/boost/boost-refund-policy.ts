@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import {
   BoostSource,
   BoostStatus,
@@ -5,6 +6,36 @@ import {
   Prisma,
 } from "@prisma/client";
 import { asPaymentMetadata } from "../../../payment/helpers/payment-metadata.types";
+import { i18nMessage } from "../../../i18n";
+
+/**
+ * Decision D16 (tarodan-ops plan 2026-10-21-listing-boost): an order that
+ * carries a boost is refunded only by "refund and stop" on the boost screen,
+ * which applies the boost's own rules and amount and is the one admin path
+ * that needs `ads` and `payments`. Every other admin refund path (manual
+ * refund, order cancel, refund request approval) calls this before any money
+ * moves.
+ *
+ * The signal is the boost row itself (`ProductBoost.orderId`), not the
+ * `BST-` number or the `boost-` product: a boost order paid without its boost
+ * row (fulfilment reports it to Sentry) has nothing to stop and must stay
+ * refundable here, since the boost screen cannot see it.
+ */
+export async function assertNotBoostOrderRefund(
+  db: Pick<Prisma.TransactionClient, "productBoost">,
+  orderId: string | null | undefined,
+): Promise<void> {
+  if (!orderId) return;
+  const boost = await db.productBoost.findUnique({
+    where: { orderId },
+    select: { id: true },
+  });
+  if (boost) {
+    throw new BadRequestException(
+      i18nMessage("server.admin.payment.boostRefundUseBoostScreen"),
+    );
+  }
+}
 
 /**
  * A paid boost can be refunded (and stopped) while it runs or is paused.

@@ -51,6 +51,7 @@ import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { storedComponentsOf } from "./helpers/stored-refund-components";
 import { RefundShipmentService } from "./refund-shipment.service";
+import { virtualOrderKind } from "../payment/helpers/virtual-order-kind";
 
 /** Kargo öncesi iptalin okuduğu sipariş yükü (alıcı + platform iptali ortak). */
 const CANCELLATION_ORDER_INCLUDE = {
@@ -120,16 +121,19 @@ export class RefundCreationService {
     if (!order) {
       throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
     }
-    // Sanal siparişler (üyelik MEM-, öne çıkarma BST-) genel iade akışına
-    // girmez: teslimatı olmayan dijital hizmetlerdir. BST- eskiden muaf
-    // değildi — boost siparişi completed + teslimatsız olduğundan cayma
-    // penceresinde sayılıp API'den iade talebi açılabiliyordu.
-    if (
-      order.orderNumber?.startsWith("MEM-") ||
-      order.orderNumber?.startsWith("BST-")
-    ) {
+    // Platform service orders (membership, boost) never enter the order
+    // refund flow: they are digital services without a delivery. A boost
+    // order used to slip through (completed and undelivered, so it counted
+    // as inside the cooling-off window); its refund is the boost screen's
+    // "refund and stop" (D16).
+    const serviceKind = virtualOrderKind(order);
+    if (serviceKind) {
       throw new BadRequestException(
-        i18nMessage("server.refund.membershipOrderNotEligible"),
+        i18nMessage(
+          serviceKind === "membership"
+            ? "server.refund.membershipOrderNotEligible"
+            : "server.refund.orderStatusNotEligible",
+        ),
       );
     }
     if (order.buyerId !== requesterId) {
@@ -246,6 +250,15 @@ export class RefundCreationService {
     if (order.buyerId !== requesterId) {
       throw new ForbiddenException(
         i18nMessage("server.refund.onlyBuyerCanRequest"),
+      );
+    }
+    // A platform service order (membership, boost) has no pre-shipment
+    // phase to cancel in; the buyer gets the answer a completed order gets.
+    // The boost screen refunds a boost (D16); an admin can still settle a
+    // paid service order that lost its boost or membership row.
+    if (virtualOrderKind(order)) {
+      throw new BadRequestException(
+        i18nMessage("server.refund.cancelPaidPreShipmentOnly"),
       );
     }
     return this.executePreShipmentCancellation(
