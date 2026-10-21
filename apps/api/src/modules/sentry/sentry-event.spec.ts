@@ -6,6 +6,7 @@ import {
   resolveSentryEnvironment,
   resolveSentryRelease,
 } from "./sentry-event";
+import type { Event } from "@sentry/node";
 import { runWithRequestId } from "../../common/context/request-context";
 
 /**
@@ -178,6 +179,23 @@ describe("applySentryEventPolicy", () => {
     expect(JSON.stringify(event)).not.toContain("hunter2");
     expect(JSON.stringify(event)).not.toContain("g-code");
     expect(event?.extra?.code).toBe("P2002");
+  });
+
+  it("redacts the step-up token header (X-Reauth-Token)", () => {
+    const event = applySentryEventPolicy({
+      request: {
+        url: "https://api/users/me",
+        method: "DELETE",
+        headers: {
+          "x-reauth-token": "opaque-step-up-token",
+          "X-Reauth-Token": "opaque-step-up-token",
+          accept: "application/json",
+        },
+      },
+    } satisfies Event);
+
+    expect(JSON.stringify(event)).not.toContain("opaque-step-up-token");
+    expect(event?.request?.headers?.accept).toBe("application/json");
   });
 
   it("redacts the body before a card-number pass could break its JSON", () => {

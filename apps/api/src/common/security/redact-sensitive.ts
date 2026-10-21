@@ -31,8 +31,10 @@ const SENSITIVE_KEYS = new Set([
   "identitytoken",
   "authorizationcode",
   "refreshtokenencrypted",
-  // Step-up token (`POST /auth/reauth`), sent back in sensitive write bodies.
+  // Step-up token (`POST /auth/reauth`), sent back in sensitive write bodies
+  // or in the `X-Reauth-Token` request header.
   "reauthtoken",
+  "xreauthtoken",
   "authorization",
   "cookie",
   "setcookie",

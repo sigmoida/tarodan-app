@@ -94,11 +94,29 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   Sentry warning). Attempts are counted before the proof is checked, so
   parallel requests cannot pass the limit. Redis down fails closed (no proof
   checked and no token issued: 503; none accepted: 403).
-- A sensitive write takes `reauthToken` in its body and `@RequireReauth()`
-  (`ReauthGuard`, after the global JWT guard). Declare `reauthToken` in its
-  DTO too. **No step-up problem is a 401**: clients treat 401 as an expired
-  session. Missing or expired token: `403 REAUTH_REQUIRED`; wrong proof:
+- A sensitive write takes `@RequireReauth()` (`ReauthGuard`, after the
+  global JWT guard; one guard, one rule in `reauth/reauth-policy.ts`). The
+  token is the body field `reauthToken`; only when the body has none
+  (`undefined`, or no body as on `DELETE`) the `X-Reauth-Token` header.
+  Anything present counts as sent and is checked (an empty string or `null`
+  is refused). Declare `reauthToken` in the DTO when the route has a body.
+  **No step-up problem is a 401**: clients treat 401 as an expired session.
+  Missing or expired token: `403 REAUTH_REQUIRED`; wrong proof:
   `403 REAUTH_FAILED`.
+- Two policies. `@RequireReauth()`: a token is always required (the sign-in
+  method writes). `@RequireReauth({ required: "setting", flow })`: a token
+  that is sent is always checked, and a request without one is refused only
+  while the platform setting `auth_require_reauth_for_sensitive_actions`
+  (`REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING`, admin Settings >
+  Security, off by default) is on. It covers `DELETE /users/me` and
+  `POST /auth/email/request-change`, which mobile 1.0.5 calls without a
+  token. **Switch the setting on only after `min_supported_app_version_ios`
+  and `_android` are above 1.0.5** (tarodan-ops `compat.md`). The setting is
+  read uncached on each such request without a token, so switching it on
+  applies at once; a failed read fails the request. The guard sets the
+  route's `auth.flow` tag (`account_delete`, `email_change`) before it
+  checks, so refusals are traceable. A guard refusal writes no SecurityLog
+  row; failed proofs are logged by `POST /auth/reauth`.
 - Writes decide and write in one transaction under the user row lock
   (`SELECT ... FOR UPDATE`), log a SecurityLog row, send the T5 account
   security notice after commit and keep the sessions. `setPassword` lives in
@@ -149,7 +167,8 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
 `UserProfileService.deleteAccount` (`modules/user/profile/`) blocks on open
 money, archives identity into `DeletedUserIdentity` (admin-only, undeletable)
 before anonymising, frees the national id, and revokes Apple tokens and push
-tokens in the same transaction.
+tokens in the same transaction. `DELETE /users/me` takes the setting-gated
+step-up (see "Sign-in methods and step-up"); the admin deletion path does not.
 
 ## Contract
 

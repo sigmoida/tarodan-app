@@ -44,6 +44,7 @@ import {
   VerifyEmailChangeDto,
 } from "./dto";
 import { JwtAuthGuard, JwtRefreshGuard } from "./guards";
+import { RequireReauth } from "./reauth/require-reauth.decorator";
 import { Public, CurrentUser } from "./decorators";
 import { RequestUser } from "./interfaces";
 import {
@@ -446,14 +447,18 @@ export class AuthController {
 
   /**
    * POST /auth/email/request-change
-   * Kullanıcının e-postasını değiştirmek için YENİ adrese aktivasyon kodu gönderir.
-   * Mevcut e-posta doğrulanana kadar aktif kalır.
+   * Sends a verification code to the NEW address. The current e-mail stays
+   * active until the code is verified. Step-up: a `reauthToken` that is sent
+   * is checked; without one the request passes while the setting
+   * `auth_require_reauth_for_sensitive_actions` is off (mobile 1.0.5 sends
+   * none).
    */
   @Post("email/request-change")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @ApiOperation({ summary: "E-posta değişikliği kodu gönder" })
+  @RequireReauth({ required: "setting", flow: "email_change" })
+  @ApiOperation({ summary: "Send an e-mail change code to the new address" })
   async requestEmailChange(
     @CurrentUser() user: RequestUser,
     @Body() dto: RequestEmailChangeDto,

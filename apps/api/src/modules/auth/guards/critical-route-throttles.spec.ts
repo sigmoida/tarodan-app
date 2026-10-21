@@ -5,6 +5,7 @@ import { OrderController } from "../../order/order.controller";
 import { PaymentController } from "../../payment/payment.controller";
 import { ConsentController } from "../../consent/consent.controller";
 import { SignInMethodsController } from "../sign-in-methods/sign-in-methods.controller";
+import { UserController } from "../../user/user.controller";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -69,6 +70,17 @@ describe("critical public route throttles", () => {
       controller: NewsletterController,
       method: "subscribe",
       limit: 5,
+    },
+    // Routes with the setting-gated step-up (sign-in methods plan, T8b).
+    {
+      controller: UserController,
+      method: "deleteAccount",
+      limit: 5,
+    },
+    {
+      controller: AuthController,
+      method: "requestEmailChange",
+      limit: 3,
     },
     // Step-up and the writes it guards (sign-in methods plan, 2026-10-21).
     {
