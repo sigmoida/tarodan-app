@@ -12,10 +12,11 @@
 const LEGAL_MARKS = "©®™";
 
 /**
- * Emoji, pictographs and the joiners that only exist to compose them
- * (variation selector 16, zero-width joiner).
+ * Emoji, pictographs and the emoji parts Extended_Pictographic leaves out:
+ * regional indicators (flags), skin-tone modifiers, the keycap mark, and the
+ * joiners that only exist to compose emoji (variation selector 16, ZWJ).
  */
-const PICTOGRAPH_SOURCE = `(?![${LEGAL_MARKS}])\\p{Extended_Pictographic}|[\\uFE0F\\u200D]`;
+const PICTOGRAPH_SOURCE = `(?![${LEGAL_MARKS}])\\p{Extended_Pictographic}|\\p{Regional_Indicator}|\\p{Emoji_Modifier}|\\u20E3|\\uFE0F|\\u200D`;
 
 /** Tests whether a text holds a pictograph (non-global, safe to reuse). */
 export const PICTOGRAPH = new RegExp(PICTOGRAPH_SOURCE, "u");

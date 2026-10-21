@@ -15,14 +15,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const load = (f) => JSON.parse(readFileSync(resolve(here, '../src/catalog', f), 'utf8'));
 
 // Extended_Pictographic covers emoji (also the dingbats like check/cross/warning
-// and the high-voltage sign); the rest are text-style symbols, the Arrows block
+// and the high-voltage sign); the class adds the emoji parts it leaves out
+// (flags, skin tones, keycap, VS16, ZWJ); the rest are text-style symbols, the Arrows block
 // and ASCII arrows. The legal marks (c), (r) and (tm) are Extended_Pictographic
 // too but are typography, so they stay allowed. A navigation path is written
 // with " > " ("Profile > Addresses"), a pairing in words ("2 items for 3 items").
 // The API applies the same rule to server-rendered text in
 // apps/api/src/common/helpers/pictograph.ts.
 const FORBIDDEN_GLYPH =
-  /(?![\u00A9\u00AE\u2122])\p{Extended_Pictographic}|[\u2605\u2606\u2713\u2714\u2715\u2717\u2190-\u21FF\uFE0F]|->|<-|=>/u;
+  /(?![\u00A9\u00AE\u2122])\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier}|\u20E3|\uFE0F|\u200D|[\u2605\u2606\u2713\u2714\u2715\u2717\u2190-\u21FF]|->|<-|=>/u;
 
 let failed = false;
 
