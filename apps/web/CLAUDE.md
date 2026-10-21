@@ -101,6 +101,11 @@ response envelopes with `lib/unwrapList.ts`.
 - Favourite = the card's built-in heart (`ProductCardFavorite`), state from
   `hooks/useWishlist` over the one `GET /wishlist` query. Never add a second
   favourite query; pass `showFavorite={false}` where the card has its own control.
+- Card action = the card's built-in price-row button (`ProductCardPriceRow`):
+  the cart toggle, or "Öne Çıkar" / "Süre Ekle" on the viewer's own listing,
+  always from `productCardAction` (`@tarodan/types`). The title is the card's
+  one stretched link, so buttons sit beside it, never inside an `<a>`. Do not
+  add a second card button; a card with its own control passes `footer`.
 - Loading = `SkeletonCard` matching the card footprint (never a bare spinner in
   a grid); empty = `EmptyStateCard` / `EmptyState` with the action that resolves
   it; paging = `Pagination` or an infinite rail, one per surface. Pickers inside
