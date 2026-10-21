@@ -10,7 +10,6 @@ export interface Notification {
   type: string;
   title: string;
   message: string;
-  icon?: string;
   link?: string;
   isRead: boolean;
   createdAt: string;

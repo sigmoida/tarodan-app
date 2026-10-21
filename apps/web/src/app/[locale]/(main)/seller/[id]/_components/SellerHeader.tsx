@@ -7,6 +7,7 @@ import {
   TruckIcon,
   ArrowsRightLeftIcon,
   StarIcon,
+  CheckIcon,
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
@@ -76,15 +77,24 @@ export default function SellerHeader({
               )}
               {seller.isVerified && (
                 <Badge variant="success" size="sm">
-                  ✓ {t("seller.verified")}
+                  <CheckIcon className="mr-1 inline size-3" aria-hidden />
+                  {t("seller.verified")}
                 </Badge>
               )}
               <SellerTrustBadge trust={seller.trust} />
             </div>
             <p className="mt-1 text-xs text-subtle">
               {membershipDuration}
-              {hasRatings &&
-                ` · ★ ${averageRating.toFixed(1)} (${totalRatings})`}
+              {hasRatings && (
+                <>
+                  {" · "}
+                  <StarIcon
+                    className="mb-0.5 inline size-3.5 text-warning-500"
+                    aria-hidden
+                  />{" "}
+                  {`${averageRating.toFixed(1)} (${totalRatings})`}
+                </>
+              )}
               {` · ${followersCount} ${t("profile.followers")}`}
             </p>
           </div>

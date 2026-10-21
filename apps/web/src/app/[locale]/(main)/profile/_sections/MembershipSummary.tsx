@@ -10,6 +10,8 @@ import {
   ArrowsRightLeftIcon,
   HeartIcon,
   CameraIcon,
+  CheckIcon,
+  StarIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, Spinner } from "@tarodan/ui";
 import MembershipBadge from "@/components/membership/MembershipBadge";
@@ -101,13 +103,15 @@ export default function MembershipSummary() {
               <MembershipBadge tier={tierType} name={tierName} />
               {profile?.isVerified && (
                 <Badge variant="success" size="sm">
-                  ✓ {t("profile.verifiedBadge")}
+                  <CheckIcon className="mr-1 inline size-3" aria-hidden />
+                  {t("profile.verifiedBadge")}
                 </Badge>
               )}
             </div>
             <p className="truncate text-sm text-muted">{profile?.email}</p>
             {stats && stats.rating > 0 && (
-              <p className="mt-0.5 text-xs text-subtle">
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-subtle">
+                <StarIcon className="size-3.5 text-warning-500" aria-hidden />
                 {t("profile.ratingSummary", {
                   rating: stats.rating.toFixed(1),
                   count: stats.reviewsCount,

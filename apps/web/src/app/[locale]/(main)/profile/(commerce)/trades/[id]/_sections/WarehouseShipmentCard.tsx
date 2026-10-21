@@ -1,5 +1,6 @@
 /** @format */
 
+import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import SectionCard from "@/components/ui/SectionCard";
 import ShipmentStatusChip from "../_components/ShipmentStatusChip";
@@ -76,6 +77,7 @@ export default function WarehouseShipmentCard({
           if (s === "delivered") {
             return (
               <span className="inline-flex items-center gap-2 text-success-700">
+                <CheckCircleIcon className="size-4" aria-hidden />
                 {t("trade.warehouseShipping.counterpartyDelivered")}
               </span>
             );
