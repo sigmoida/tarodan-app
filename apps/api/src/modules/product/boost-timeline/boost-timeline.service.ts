@@ -4,6 +4,11 @@ import { BoostTimelineStore } from "./boost-timeline-store.service";
 import { BoostActivationService } from "./boost-activation.service";
 import { BoostStaffTimelineService } from "./boost-staff-timeline.service";
 import { BoostSystemPauseService } from "./boost-system-pause.service";
+import {
+  BoostExpiryService,
+  type BoostExpiryResult,
+} from "./boost-expiry.service";
+import type { BoostNoticePayload } from "../../outbox/outbox.types";
 import type {
   BoostActivation,
   BoostGrant,
@@ -19,14 +24,16 @@ export type {
   BoostStopInput,
   BoostStopResult,
 } from "./boost-timeline.types";
+export type { BoostExpiryResult } from "./boost-expiry.service";
 
 /**
  * The one owner of a listing's boost timeline: the `product_boosts` rows of a
  * listing and the promotion columns they drive on the product (`boostedUntil`,
  * `boostedAt`, `homeShowcaseUntil`, `rankTier`, `relevanceScore`). A facade:
  * it only delegates, by responsibility, to activation (paid boost, free
- * grant), staff changes (pause, resume, extend, stop) and the system pause of
- * offline listings; the store holds the shared lock, lanes and refresh.
+ * grant), staff changes (pause, resume, extend, stop), the system pause of
+ * offline listings and the end of a listing's boosts (expiry and the
+ * ending-soon reminder); the store holds the shared lock, lanes and refresh.
  *
  * Payment fulfilment (activation), refunds (stop), the admin boost screen and
  * the expire-boosts cron call it. Every method runs inside the caller's
@@ -57,6 +64,7 @@ export class BoostTimelineService {
     private readonly activation: BoostActivationService,
     private readonly staff: BoostStaffTimelineService,
     private readonly system: BoostSystemPauseService,
+    private readonly expiry: BoostExpiryService,
   ) {}
 
   lockProduct(tx: Prisma.TransactionClient, productId: string) {
@@ -144,5 +152,21 @@ export class BoostTimelineService {
     now?: Date,
   ): Promise<number> {
     return this.system.resumeSystemPaused(tx, productId, now);
+  }
+
+  expireEnded(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    now?: Date,
+  ): Promise<BoostExpiryResult> {
+    return this.expiry.expireEnded(tx, productId, now);
+  }
+
+  remindEndingSoon(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    now?: Date,
+  ): Promise<BoostNoticePayload | null> {
+    return this.expiry.remindEndingSoon(tx, productId, now);
   }
 }

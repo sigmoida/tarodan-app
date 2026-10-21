@@ -10911,7 +10911,11 @@
       },
       "boostExpired": {
         "title": "🚀 Öne çıkarma süresi doldu",
-        "message": "\"{productTitle}\" ilanının öne çıkarması sona erdi. Dilerseniz ilanınızı yeniden öne çıkarabilirsiniz."
+        "message": "\"{productTitle}\" ilanının öne çıkarma süresi sona erdi."
+      },
+      "boostEndingSoon": {
+        "title": "Öne çıkarma süresi bitiyor",
+        "message": "\"{productTitle}\" ilanının öne çıkarma süresi 24 saat içinde bitiyor."
       },
       "boostActivated": {
         "title": "🚀 Öne Çıkarma Aktif",
@@ -11458,7 +11462,6 @@
       "imageLimitExceeded": "Üyeliğiniz ({tierName}) ile ilan başına maksimum {maxImages} görsel yükleyebilirsiniz. {sentCount} görsel gönderdiniz.",
       "imageNotAppropriate": "Yüklediğiniz resim uygun değildir. Lütfen uygun bir ürün görseli yükleyin.",
       "insufficientStock": "Bu ürün stokta bulunmamaktadır (müsait={available}, istenen={requested})",
-      "invalidBoostDuration": "Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)",
       "invalidBrandModelManufacturer": "Seçilen marka, model veya üretici geçersiz. Lütfen listeden tekrar seçin.",
       "invalidCategory": "Geçersiz kategori",
       "invalidIdFormat": "Geçersiz ürün ID formatı",
@@ -11485,6 +11488,7 @@
       "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
       "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil",
       "boostConsentRequired": "Ön bilgilendirme ve cayma hakkı onayları gereklidir",
+      "boostReminderPremiumOnly": "Hatırlatma yalnız Premium üyeler içindir",
       "duplicateImage": "Aynı görsel birden fazla kez gönderildi",
       "imageNotOwned": "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
       "imageKeyEmpty": "Görsel anahtarı boş olamaz",

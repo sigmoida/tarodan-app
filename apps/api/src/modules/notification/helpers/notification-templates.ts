@@ -376,6 +376,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.boostExpired.message",
     icon: "🚀",
   },
+  // No icon: user-facing copy carries no emoji or pictographs.
+  [NotificationType.BOOST_ENDING_SOON]: {
+    titleKey: "server.notification.boostEndingSoon.title",
+    messageKey: "server.notification.boostEndingSoon.message",
+  },
   [NotificationType.BOOST_ACTIVATED]: {
     titleKey: "server.notification.boostActivated.title",
     messageKey: "server.notification.boostActivated.message",

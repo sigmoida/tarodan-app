@@ -1,14 +1,27 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsEnum,
+  IsIn,
   IsOptional,
   IsInt,
   IsBoolean,
   IsNotEmpty,
   IsString,
+  IsUUID,
+  Max,
   Min,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  BOOST_OFFER_MAX,
+  MY_BOOST_STATES,
+  MY_BOOSTS_DEFAULT_LIMIT,
+  MY_BOOSTS_MAX_LIMIT,
+  type MyBoostState,
+} from "@tarodan/types";
 import { PaymentProvider } from "../../payment/dto";
 import { JsonBoolean } from "../../../common/transforms";
 
@@ -72,4 +85,65 @@ export class InitiateBoostDto {
   @JsonBoolean()
   @IsBoolean()
   withdrawalWaiverAccepted?: boolean;
+}
+
+/** `GET /products/boost/my` query: the section and its page. */
+export class MyBoostsQueryDto {
+  @ApiPropertyOptional({
+    enum: MY_BOOST_STATES,
+    default: "current",
+    description:
+      "current: active and paused boosts; history: expired and cancelled. Pending and failed (abandoned checkouts) are never returned.",
+  })
+  @IsOptional()
+  @IsIn(MY_BOOST_STATES)
+  state?: MyBoostState;
+
+  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: MY_BOOSTS_MAX_LIMIT,
+    description: `Default ${MY_BOOSTS_DEFAULT_LIMIT.current} for current, ${MY_BOOSTS_DEFAULT_LIMIT.history} for history`,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MY_BOOSTS_MAX_LIMIT)
+  limit?: number;
+}
+
+/** `PATCH /products/:id/boost/reminder` body. */
+export class BoostReminderDto {
+  @ApiProperty({
+    example: true,
+    description:
+      "The ending-soon reminder for the listing's running and paused boosts (premium to turn on; no automatic charge)",
+  })
+  // A JSON boolean only: implicit conversion would read "false" as true.
+  @JsonBoolean()
+  @IsBoolean()
+  enabled: boolean;
+}
+
+/** `POST /products/boost/offers/dismiss` body. */
+export class DismissBoostOffersDto {
+  @ApiProperty({
+    type: [String],
+    description:
+      "Listing ids of the offers shown; only the caller's own listings are recorded",
+    minItems: 1,
+    maxItems: BOOST_OFFER_MAX,
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(BOOST_OFFER_MAX)
+  @IsUUID("all", { each: true })
+  productIds: string[];
 }
