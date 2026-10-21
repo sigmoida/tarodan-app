@@ -14,7 +14,6 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { getProductEffectivePrice } from "@/lib/productPrice";
-import { tlAmountInputValue } from "@/lib/tlAmount";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { useSaveDiscount } from "../_hooks/useDiscounts";
 import {
@@ -24,36 +23,13 @@ import {
   type SellerProduct,
 } from "../_lib/types";
 import { discountSchema } from "../_lib/schema";
+import { fromDiscount } from "../_lib/payload";
 
 interface DiscountFormModalProps {
   open: boolean;
   onClose: () => void;
   editing: Discount | null;
   products: SellerProduct[];
-}
-
-function fromDiscount(d: Discount): DiscountFormData {
-  return {
-    code: d.code || "",
-    name: d.name,
-    description: d.description || "",
-    type: d.type,
-    // Comma decimals, no grouping: the text the amount parser reads back.
-    value: tlAmountInputValue(Number(d.value)),
-    buyQuantity: d.buyQuantity?.toString() || "",
-    getQuantity: d.getQuantity?.toString() || "",
-    minQuantity: d.minQuantity?.toString() || "",
-    scope: d.scope === "product" ? "product" : "seller",
-    targetProductIds: d.targetProductIds || [],
-    minCartValue: tlAmountInputValue(Number(d.minCartValue)),
-    maxDiscountAmount: tlAmountInputValue(Number(d.maxDiscountAmount)),
-    usageLimitTotal: d.usageLimitTotal?.toString() || "",
-    usageLimitPerUser: d.usageLimitPerUser.toString(),
-    isStackable: d.isStackable,
-    isActive: d.isActive,
-    startDate: d.startDate.split("T")[0],
-    endDate: d.endDate.split("T")[0],
-  };
 }
 
 /** Create/edit discount — its own RHF+zod form + save mutation, framed by the

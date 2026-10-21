@@ -1,7 +1,7 @@
 /** @format */
 
-import { tlAmountValue } from "@/lib/tlAmount";
-import type { DiscountFormData } from "./types";
+import { tlAmountInputValue, tlAmountValue } from "@/lib/tlAmount";
+import type { Discount, DiscountFormData } from "./types";
 
 /**
  * An optional TL amount field: omitted when the parser reads no amount (empty,
@@ -48,5 +48,30 @@ export function buildPayload(form: DiscountFormData) {
     isActive: form.isActive,
     startDate: new Date(form.startDate).toISOString(),
     endDate: new Date(form.endDate + "T23:59:59").toISOString(),
+  };
+}
+
+/** The edit form values from a saved discount (the inverse of `buildPayload`). */
+export function fromDiscount(d: Discount): DiscountFormData {
+  return {
+    code: d.code || "",
+    name: d.name,
+    description: d.description || "",
+    type: d.type,
+    // Comma decimals, no grouping: the text the amount parser reads back.
+    value: tlAmountInputValue(Number(d.value)),
+    buyQuantity: d.buyQuantity?.toString() || "",
+    getQuantity: d.getQuantity?.toString() || "",
+    minQuantity: d.minQuantity?.toString() || "",
+    scope: d.scope === "product" ? "product" : "seller",
+    targetProductIds: d.targetProductIds || [],
+    minCartValue: tlAmountInputValue(Number(d.minCartValue)),
+    maxDiscountAmount: tlAmountInputValue(Number(d.maxDiscountAmount)),
+    usageLimitTotal: d.usageLimitTotal?.toString() || "",
+    usageLimitPerUser: d.usageLimitPerUser.toString(),
+    isStackable: d.isStackable,
+    isActive: d.isActive,
+    startDate: d.startDate.split("T")[0],
+    endDate: d.endDate.split("T")[0],
   };
 }
