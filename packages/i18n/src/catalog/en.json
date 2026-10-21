@@ -11833,7 +11833,8 @@
         "refundAttemptNotFound": "Refund attempt not found",
         "resolveManualReviewOnly": "Only refund attempts awaiting manual review can be resolved",
         "cancelCompleted": "A completed payment cannot be cancelled; issue a refund instead",
-        "escrowReasonRequired": "A reason is required to release escrow"
+        "escrowReasonRequired": "A reason is required to release escrow",
+        "boostRefundUseBoostScreen": "Refund boost payments from the Boost purchases screen"
       },
       "payout": {
         "transferNotFound": "Payout transfer not found",

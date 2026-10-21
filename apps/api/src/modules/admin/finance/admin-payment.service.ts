@@ -843,6 +843,21 @@ export class AdminPaymentService {
       );
     }
 
+    // A boost payment is refunded only by "refund and stop" on the boost
+    // screen, which stops the boost with the money. Refunded here, the money
+    // went back and the boost kept running.
+    if (
+      payment.orderId &&
+      (await this.prisma.productBoost.findUnique({
+        where: { orderId: payment.orderId },
+        select: { id: true },
+      }))
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.payment.boostRefundUseBoostScreen"),
+      );
+    }
+
     if (payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(
         i18nMessage("server.admin.payment.refundCompletedOnly"),

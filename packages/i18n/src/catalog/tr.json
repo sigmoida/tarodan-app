@@ -11833,7 +11833,8 @@
         "refundAttemptNotFound": "İade denemesi bulunamadı",
         "resolveManualReviewOnly": "Yalnız manuel inceleme bekleyen iade denemeleri çözülebilir",
         "cancelCompleted": "Tamamlanmış ödemeler iptal edilemez, iade yapın",
-        "escrowReasonRequired": "Escrow serbest bırakma için sebep (reason) zorunludur"
+        "escrowReasonRequired": "Escrow serbest bırakma için sebep (reason) zorunludur",
+        "boostRefundUseBoostScreen": "Öne çıkarma ödemeleri Paket Satın Alımları ekranından iade edilir"
       },
       "payout": {
         "transferNotFound": "Payout transfer bulunamadı",
