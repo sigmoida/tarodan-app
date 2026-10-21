@@ -35,6 +35,7 @@ import {
   type LedgerNetSums,
 } from "../../commission/ledger-net";
 import { paidOrderWhere } from "./paid-order.predicate";
+import { SOLD_BOOST } from "./sold-boost.predicate";
 import {
   completedPayoutAmountSql,
   completedPayoutWhere,
@@ -115,11 +116,12 @@ const membershipPaymentWhere = (
   createdAt: window,
 });
 
-/** Geçerli (başarısız olmayan) öne çıkarmanın ortak yüklemi. */
+/** The shared predicate of a boost sale: not failed, and bought (no free grant). */
 const boostWhere = (
   window: DashboardDateWindow | undefined,
 ): Prisma.ProductBoostWhereInput => ({
   ...LIVE_PRODUCT_BOOST,
+  ...SOLD_BOOST,
   purchasedAt: stamped(window),
   status: { not: BoostStatus.failed },
 });
