@@ -37,7 +37,8 @@ describe("canUnlinkProvider", () => {
     ],
     ["google only: google", methods(false, "google"), "google", false],
     ["apple only: apple", methods(false, "apple"), "apple", false],
-    // Two rows of one provider (no unique constraint yet): both go.
+    // Legacy data only: new writes keep one link per provider, but rows from
+    // before that rule may hold two; the unlink removes both, so judge both.
     [
       "two google rows, no password",
       methods(false, "google", "google"),

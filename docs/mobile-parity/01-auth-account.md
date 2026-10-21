@@ -278,6 +278,11 @@ The server resolves a provider identity to an account in this order
 
 Staff, banned and deleted accounts are refused and nothing is written.
 
+An account has **at most one link per provider** (one Google, one Apple). When
+the matched account already has another identity of the provider (for example
+a work Google account connected by hand), the sign-in still opens the account
+by its verified e-mail but adds no second link and sends no notice mail.
+
 ### Connecting and disconnecting providers (account settings)
 
 | Method | Path                            | Auth              | Body                                                            |

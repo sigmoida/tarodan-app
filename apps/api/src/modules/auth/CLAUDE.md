@@ -70,7 +70,12 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   a still-unverified account only loses the password. The e-mail match is
   `lower(email) = lower($1)`, never Prisma `mode: "insensitive"` (an unescaped
   ILIKE). Staff and banned matches get nothing written. A lost P2002 race
-  resolves to the winner's link or is retried once. SecurityLog: an
+  resolves to the winner's link or is retried once. **At most one link per
+  provider** (one Google, one Apple): every writer checks it under the user
+  row lock. A sign-in whose verified e-mail matches an account that already
+  has another identity of the provider opens it (or takes it over) without a
+  second link, writes no `social_linked_auto` row and sends no notice (a
+  Sentry breadcrumb only). SecurityLog: an
   auto-link is `social_linked_auto`, a take-over or heal `social_link_reset`
   (`details.source: "login"`).
 - Apple refresh tokens are stored encrypted (`APPLE_TOKEN_ENCRYPTION_KEY`);

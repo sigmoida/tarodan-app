@@ -313,7 +313,7 @@ describe.each<SocialProvider>(["google", "apple"])(
     const google = { verifyIdToken: jest.fn() };
     const apple = { verifyIdentityToken: jest.fn() };
     const newsletter = { syncUserConsent: jest.fn() };
-    const sentry = { captureEvent: jest.fn() };
+    const sentry = { captureEvent: jest.fn(), addBreadcrumb: jest.fn() };
     const notifications = {
       sendAccountSecurityNotice: jest.fn().mockResolvedValue(undefined),
     };
@@ -500,6 +500,7 @@ describe.each<SocialProvider>(["google", "apple"])(
             flow: "social_login",
             mode: "link",
             source: "login",
+            linked: true,
           },
         }),
       ]);
@@ -642,6 +643,7 @@ describe.each<SocialProvider>(["google", "apple"])(
             flow: "social_login",
             mode: "heal",
             source: "login",
+            linked: false,
           },
         }),
       ]);
@@ -915,6 +917,79 @@ describe.each<SocialProvider>(["google", "apple"])(
       });
     }
 
+    // At most one link per provider (user decision, sign-in methods T9).
+    it("a verified match that already has another identity of the provider signs in without a second link", async () => {
+      const owner = addUser({ email: VICTIM_EMAIL, passwordHash: "hash" });
+      fake.state.links.push({
+        provider,
+        providerUserId: "owner-other-sub",
+        email: "work@corp.example",
+        userId: owner.id,
+      });
+
+      const res = await signIn();
+
+      expect(res.user.id).toBe(owner.id);
+      expect(linksOf(owner.id)).toEqual([
+        expect.objectContaining({ providerUserId: "owner-other-sub" }),
+      ]);
+      // Nothing linked: no social_linked_auto row and no "linked" notice.
+      expect(fake.state.securityLogs).toEqual([]);
+      expect(notifications.sendAccountSecurityNotice).not.toHaveBeenCalled();
+      expect(sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({ category: "social_login", level: "info" }),
+      );
+      expect(sentry.captureEvent).not.toHaveBeenCalled();
+
+      // The next sign-in does the same; still one link.
+      await signIn();
+      expect(linksOf(owner.id)).toHaveLength(1);
+    });
+
+    it("an account linked to the other provider still gets this provider's link", async () => {
+      const other = provider === "google" ? "apple" : "google";
+      const owner = addUser({ email: VICTIM_EMAIL, passwordHash: "hash" });
+      fake.state.links.push({
+        provider: other,
+        providerUserId: "other-provider-sub",
+        userId: owner.id,
+      });
+
+      await signIn();
+
+      expect(
+        linksOf(owner.id)
+          .map((l) => l.provider)
+          .sort(),
+      ).toEqual([provider, other].sort());
+    });
+
+    it("a take-over of an account that has another identity of the provider adds no second link", async () => {
+      const attacker = await addUnverifiedRegistration();
+      fake.state.links.push({
+        provider,
+        providerUserId: "legacy-sub",
+        userId: attacker.id,
+      });
+
+      const res = await signIn();
+
+      expect(res.user.id).toBe(attacker.id);
+      expect(fake.state.users[0]).toMatchObject({
+        passwordHash: null,
+        isEmailVerified: true,
+      });
+      expect(linksOf(attacker.id)).toEqual([
+        expect.objectContaining({ providerUserId: "legacy-sub" }),
+      ]);
+      expect(fake.state.securityLogs).toEqual([
+        expect.objectContaining({
+          eventType: "social_link_reset",
+          details: expect.objectContaining({ mode: "link", linked: false }),
+        }),
+      ]);
+    });
+
     it("2FA on a verified match: linked, then the existing TWO_FACTOR_PASSWORD_REQUIRED", async () => {
       const owner = addUser({ email: VICTIM_EMAIL, passwordHash: "hash" });
       fake.state.twoFactor.push({ userId: owner.id, isEnabled: true });
@@ -934,7 +1009,7 @@ describe.each<SocialProvider>(["google", "apple"])(
 describe("SocialIdentityService manual link and unlink", () => {
   let identities: SocialIdentityService;
   let fake: ReturnType<typeof createFakeDb>;
-  const sentry = { captureEvent: jest.fn() };
+  const sentry = { captureEvent: jest.fn(), addBreadcrumb: jest.fn() };
   const notifications = {
     sendAccountSecurityNotice: jest.fn().mockResolvedValue(undefined),
   };
@@ -1073,16 +1148,42 @@ describe("SocialIdentityService manual link and unlink", () => {
       expect(linksOf(OWNER)).toHaveLength(1);
     });
 
-    it("answers 409 providerAlreadyLinked when this account has another identity of the provider", async () => {
-      addUser({});
-      link(OWNER, "google", "an-older-google-sub");
+    it.each<SocialProvider>(["google", "apple"])(
+      "answers 409 providerAlreadyLinked when this account already has another %s identity",
+      async (provider) => {
+        addUser({});
+        link(OWNER, provider, `an-older-${provider}-sub`);
 
-      await expect(identities.linkToUser(OWNER, GOOGLE)).rejects.toMatchObject({
-        status: 409,
-        response: { errorCode: "PROVIDER_ALREADY_LINKED" },
+        await expect(
+          identities.linkToUser(OWNER, {
+            provider,
+            providerUserId: `new-${provider}-sub`,
+            email: "x@example.com",
+          }),
+        ).rejects.toMatchObject({
+          status: 409,
+          response: { errorCode: "PROVIDER_ALREADY_LINKED" },
+        });
+        expect(linksOf(OWNER)).toHaveLength(1);
+        expect(fake.state.securityLogs).toEqual([]);
+      },
+    );
+
+    it("links Apple next to Google: one link of each provider is fine", async () => {
+      addUser({});
+      link(OWNER, "google");
+
+      await identities.linkToUser(OWNER, {
+        provider: "apple",
+        providerUserId: "apple-sub",
+        email: "relay@privaterelay.appleid.com",
       });
-      expect(linksOf(OWNER)).toHaveLength(1);
-      expect(fake.state.securityLogs).toEqual([]);
+
+      expect(
+        linksOf(OWNER)
+          .map((l) => l.provider)
+          .sort(),
+      ).toEqual(["apple", "google"]);
     });
 
     /**
@@ -1129,25 +1230,55 @@ describe("SocialIdentityService manual link and unlink", () => {
       });
     });
 
-    it("stores one link for two concurrent links of one provider", async () => {
-      addUser({});
-      serialiseTransactions();
+    it.each<SocialProvider>(["google", "apple"])(
+      "stores one %s link for two concurrent links of that provider",
+      async (provider) => {
+        addUser({});
+        serialiseTransactions();
 
-      const results = await Promise.allSettled([
-        identities.linkToUser(OWNER, GOOGLE),
-        identities.linkToUser(OWNER, {
-          ...GOOGLE,
-          providerUserId: "second-google-sub",
-        }),
-      ]);
+        const results = await Promise.allSettled(
+          ["first-sub", "second-sub"].map((sub) =>
+            identities.linkToUser(OWNER, {
+              provider,
+              providerUserId: sub,
+              email: "x@example.com",
+            }),
+          ),
+        );
 
-      expect(results.map((r) => r.status).sort()).toEqual([
-        "fulfilled",
-        "rejected",
-      ]);
-      expect(linksOf(OWNER)).toHaveLength(1);
-      expect(fake.state.securityLogs).toHaveLength(1);
-    });
+        expect(results.map((r) => r.status).sort()).toEqual([
+          "fulfilled",
+          "rejected",
+        ]);
+        expect(linksOf(OWNER)).toHaveLength(1);
+        expect(fake.state.securityLogs).toHaveLength(1);
+      },
+    );
+
+    it.each<SocialProvider>(["google", "apple"])(
+      "a sign-in racing a manual %s link with another identity leaves one link (the link locks first)",
+      async (provider) => {
+        addUser({ email: "owner@example.com" });
+        serialiseTransactions();
+
+        await Promise.all([
+          identities.linkToUser(OWNER, {
+            provider,
+            providerUserId: "manual-sub",
+            email: "work@corp.example",
+          }),
+          identities.resolveUser({
+            provider,
+            providerUserId: "login-sub",
+            email: "owner@example.com",
+          }),
+        ]);
+
+        expect(linksOf(OWNER)).toEqual([
+          expect.objectContaining({ providerUserId: "manual-sub" }),
+        ]);
+      },
+    );
 
     it.each([
       ["banned", { isBanned: true }, "server.auth.accountSuspended"],

@@ -206,4 +206,35 @@ describe("Social identity resolution (E2E, real DB)", () => {
       await prisma.user.findUniqueOrThrow({ where: { id: lookalike.id } }),
     ).toMatchObject({ isEmailVerified: false, nationalId: "10000000146" });
   });
+
+  it("keeps one Google link when two different Google identities of one address sign in at once", async () => {
+    const owner = await prisma.user.create({
+      data: {
+        email: "owner@example.com",
+        displayName: "Owner",
+        isEmailVerified: true,
+      },
+    });
+
+    const results = await Promise.all([
+      identities.resolveUser(identity("owner@example.com", "sub-a")),
+      identities.resolveUser(identity("owner@example.com", "sub-b")),
+    ]);
+
+    expect(results.map((r) => r.userId)).toEqual([owner.id, owner.id]);
+    expect(results.map((r) => r.outcome).sort()).toEqual([
+      "emailMatch",
+      "linked",
+    ]);
+    expect(
+      await prisma.oAuthAccount.count({
+        where: { userId: owner.id, provider: "google" },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.securityLog.count({
+        where: { userId: owner.id, eventType: "social_linked_auto" },
+      }),
+    ).toBe(1);
+  });
 });

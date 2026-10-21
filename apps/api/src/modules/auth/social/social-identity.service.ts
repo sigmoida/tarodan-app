@@ -59,9 +59,12 @@ export interface NewSocialUserProfile {
  *   unproven credentials and data of that registration were cleared first
  *   (for a legacy link, only the unproven password)
  * - `created`: a new account was opened for the identity
+ * - `emailMatch`: signed in by the verified e-mail match without a link,
+ *   because the account already has another identity of this provider
+ *   (at most one link per provider; nothing written)
  */
 export type SocialIdentityOutcome =
-  "existing" | "linked" | "tookOver" | "created";
+  "existing" | "linked" | "tookOver" | "created" | "emailMatch";
 
 export interface SocialIdentityResolution {
   userId: string;
@@ -230,6 +233,11 @@ function assertCanOpenSession(user: MatchedUser): void {
  * sign-in that loses a unique race resolves to the link the winner wrote, or
  * is retried once (the winner wrote the same e-mail or username).
  *
+ * An account has at most one link per provider (one Google, one Apple). Every
+ * writer checks it under the user row lock: when the matched account already
+ * has another identity of the provider, a sign-in still opens it by the
+ * verified e-mail (or takes it over) but adds no second link.
+ *
  * The owner can also link and unlink providers by hand from account settings
  * (`linkToUser`, `unlinkFromUser`, behind the step-up).
  */
@@ -371,9 +379,19 @@ export class SocialIdentityService {
       }
       assertCanOpenSession(user);
 
+      // At most one link per provider: an account that already has another
+      // identity of this provider gets no second link (decided on the
+      // locked row, so a concurrent link or sign-in is seen).
+      const sameProvider =
+        mode === "link"
+          ? await tx.oAuthAccount.findFirst({
+              where: { userId, provider: identity.provider },
+              select: { id: true },
+            })
+          : null;
+      const createLink = mode === "link" && !sameProvider;
       // First write: a concurrent sign-in with the same identity fails here
       // (P2002) and rolls back before anything else changes.
-      const createLink = mode === "link";
       if (createLink) {
         await tx.oAuthAccount.create({
           data: {
@@ -398,6 +416,9 @@ export class SocialIdentityService {
               flow: FLOW_TAG,
               mode,
               source: SOCIAL_LINK_SOURCES.login,
+              // Whether this sign-in added the link (a heal finds it, and a
+              // second identity of the provider is never linked).
+              linked: createLink,
             },
           },
         });
@@ -405,9 +426,11 @@ export class SocialIdentityService {
       if (user.isEmailVerified) {
         if (createLink) {
           await securityLog(SOCIAL_SECURITY_EVENTS.linkedAuto, "low");
+          return { result: { userId, outcome: "linked" } };
         }
+        // Nothing linked, so no `social_linked_auto` row and no notice mail.
         return {
-          result: { userId, outcome: createLink ? "linked" : "existing" },
+          result: { userId, outcome: sameProvider ? "emailMatch" : "existing" },
         };
       }
 
@@ -588,6 +611,8 @@ export class SocialIdentityService {
         });
       }
 
+      // One link per provider is the rule; `deleteMany` stays so legacy rows
+      // from before it go together (canUnlinkProvider judges them so).
       await tx.oAuthAccount.deleteMany({ where: { userId, provider } });
       if (provider === "apple") {
         await this.appleTokens.requestRevocation(tx, userId);
@@ -680,6 +705,16 @@ export class SocialIdentityService {
     resolution: Resolved,
   ): Promise<void> {
     const { userId, outcome } = resolution.result;
+    if (outcome === "emailMatch") {
+      // Context only: the sign-in opened the account by its verified e-mail
+      // and wrote nothing. Ids only, no e-mail.
+      this.sentry.addBreadcrumb({
+        category: FLOW_TAG,
+        message: `signed in by e-mail match, not linked: the account already has a ${identity.provider} link`,
+        level: "info",
+      });
+      return;
+    }
     if (outcome === "linked") {
       // Fire and forget: the notifier queues the mail and never throws.
       void this.notifications.sendAccountSecurityNotice(

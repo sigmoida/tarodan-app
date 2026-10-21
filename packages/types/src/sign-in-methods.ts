@@ -101,7 +101,9 @@ export interface UnlinkProviderRequest {
  * count, because Apple sign-in is iOS-only on mobile (ADR 0012) and an
  * Apple-only account could not sign in on Android.
  *
- * True only when `provider` is linked and removing it keeps the rule. The API
+ * True only when `provider` is linked and removing it keeps the rule. An
+ * account has at most one link per provider; the rule still judges every row
+ * of the provider as removed, so legacy data with two rows stays safe. The API
  * applies it under the user row lock; the clients use it to disable the
  * Disconnect button. Never re-implement it.
  */
