@@ -11,8 +11,8 @@ import { queryKeys } from "@/lib/query/keys";
  * unread counts, thread-list freshness) — mirrors mobile's _layout.tsx behaviour.
  *
  * Registers ONLY the global socket events:
- *   - notification:new → bildirim sayacı + listesi
- *   - thread:updated    → mesaj listesi + okunmamış sayacı
+ *   - notification:new → notification badge + list
+ *   - thread:updated    → thread list + unread message count
  *
  * Thread-scoped events (message:new / message:read / typing) stay in
  * useMessagingSocket so they only fire on the messages page.
@@ -62,8 +62,8 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.trades.pendingCount(),
         });
-        // Sipariş bildirimleri (kargoya verildi / teslim edildi / kargo kodu
-        // hazır) açık grup listesini ve grup ekranını da tazelesin.
+        // Order notifications (shipped / delivered / shipping code ready)
+        // also refresh the open order list and order screen.
         queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
         queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail() });
       };

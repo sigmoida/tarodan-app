@@ -10,10 +10,7 @@ import {
 } from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
 import { getQueryClient } from "@/lib/query/getQueryClient";
-import {
-  clearQueryCacheOnSessionChange,
-  resetQueryCacheForNewSession,
-} from "@/lib/query/sessionCache";
+import { syncQueryCacheWithSession } from "@/lib/query/sessionCache";
 
 // Membership tier types
 export type MembershipTier = "free" | "basic" | "premium" | "business";
@@ -319,8 +316,8 @@ export const useAuthStore = create<AuthState>()(
       /**
        * Shared tail of every sign-in action. The server action already wrote
        * the httpOnly session cookies and the `tarodan_authed` marker; the
-       * client never writes them. Loads the user, then refetches the cache
-       * for the new session.
+       * client never writes them. The guest cache is dropped by the session
+       * listener below once checkAuth sets the user.
        */
       const completeSignIn = async (result: WebLoginResult) => {
         if (result.status === "error") {
@@ -330,7 +327,6 @@ export const useAuthStore = create<AuthState>()(
         }
         if (result.status === "2fa") throw twoFactorRequired();
         await get().checkAuth();
-        void resetQueryCacheForNewSession(getQueryClient());
       };
 
       return {
@@ -554,10 +550,13 @@ export const useAuthStore = create<AuthState>()(
   ),
 );
 
-// User-scoped cache: on sign-out or an account change the previous user's
-// queries must not stay in the tab-wide QueryClient (see lib/query/sessionCache).
+// User-scoped cache: on sign-in, sign-out or an account change the previous
+// visitor's queries must not stay in the tab-wide QueryClient
+// (see lib/query/sessionCache).
 if (typeof window !== "undefined") {
-  useAuthStore.subscribe(clearQueryCacheOnSessionChange(getQueryClient));
+  useAuthStore.subscribe(
+    syncQueryCacheWithSession(getQueryClient, useAuthStore.getState()),
+  );
 }
 
 export default useAuthStore;

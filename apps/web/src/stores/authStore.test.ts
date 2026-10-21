@@ -46,8 +46,13 @@ afterEach(() => {
   h.logoutAction.mockReset();
   h.getProfile.mockReset();
   h.hasAuthMarker.mockReset().mockReturnValue(false);
-  useAuthStore.setState({ user: null, isAuthenticated: false });
+  useAuthStore.setState({
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+  });
   getQueryClient().clear();
+  localStorage.clear();
 });
 
 describe("authStore.logout", () => {
@@ -101,7 +106,7 @@ describe("authStore query cache per session", () => {
     expect(cached()).toBeUndefined();
   });
 
-  it("refetches the guest cache for a fresh sign-in", async () => {
+  it("drops the guest cache on a sign-in in this tab", async () => {
     seedCache();
     h.loginAction.mockResolvedValue({ status: "ok", user: null });
     h.hasAuthMarker.mockReturnValue(true);
@@ -113,8 +118,7 @@ describe("authStore query cache per session", () => {
     expect(cached()).toBeUndefined();
   });
 
-  it("keeps the cache when the session is restored on load", async () => {
-    useAuthStore.setState({ isLoading: true });
+  it("drops the guest cache when checkAuth sees a sign-in from another tab", async () => {
     seedCache();
     h.hasAuthMarker.mockReturnValue(true);
     h.getProfile.mockResolvedValue({ data: { id: "u1" } });
@@ -122,7 +126,50 @@ describe("authStore query cache per session", () => {
     await useAuthStore.getState().checkAuth();
 
     expect(useAuthStore.getState().user?.id).toBe("u1");
-    expect(cached()).toBe(3);
+    expect(cached()).toBeUndefined();
+  });
+
+  it("keeps the server-seeded cache when the session is restored on load", async () => {
+    // A fresh page load with the session marker: the store starts unresolved.
+    vi.resetModules();
+    h.hasAuthMarker.mockReturnValue(true);
+    h.getProfile.mockResolvedValue({ data: { id: "u1" } });
+    const { getQueryClient: loadClient } =
+      await import("@/lib/query/getQueryClient");
+    const { useAuthStore: loadStore } = await import("./authStore");
+    loadClient().setQueryData(key, 3);
+
+    await loadStore.getState().checkAuth();
+
+    expect(loadStore.getState().user?.id).toBe("u1");
+    expect(loadClient().getQueryData(key)).toBe(3);
+  });
+
+  it("clears the cache when the profile replaces a stale snapshot", async () => {
+    localStorage.setItem("tarodan_user_snapshot", JSON.stringify({ id: "u1" }));
+    useAuthStore.setState({ isLoading: true });
+    h.hasAuthMarker.mockReturnValue(true);
+    h.getProfile.mockImplementation(async () => {
+      seedCache(); // fetched while the u1 snapshot was shown
+      return { data: { id: "u2" } };
+    });
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+    expect(cached()).toBeUndefined();
+  });
+
+  it("clears the cache when checkAuth finds the session gone", async () => {
+    signedIn();
+    seedCache();
+    h.hasAuthMarker.mockReturnValueOnce(true).mockReturnValue(false);
+    h.getProfile.mockRejectedValue({ response: { status: 401 } });
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(cached()).toBeUndefined();
   });
 
   it("keeps the cache when the same user is updated", () => {
@@ -130,7 +177,6 @@ describe("authStore query cache per session", () => {
     seedCache();
 
     useAuthStore.getState().setUser({ id: "u1", displayName: "New" } as never);
-    useAuthStore.setState({ isLoading: false });
 
     expect(cached()).toBe(3);
   });
