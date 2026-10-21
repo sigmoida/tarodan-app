@@ -328,7 +328,9 @@ describe("useTradeableProducts", () => {
       act(() => result.current.loadMore());
       await waitFor(() => expect(result.current.products).toHaveLength(30));
 
-      // Page 1 now also holds p21 (a new listing pushed rows down).
+      // The refetched page 1 now also holds p21 (renewed to the top; p20 left),
+      // while page 2 still starts at p21.
+      getMyProducts.mockClear();
       getMyProducts.mockImplementation(async (params: { page: number }) => ({
         data: {
           data: params.page === 1 ? [item("p21"), ...ids(1, 19)] : ids(21, 30),
@@ -339,9 +341,18 @@ describe("useTradeableProducts", () => {
         focusManager.setFocused(false);
         focusManager.setFocused(true);
       });
-      await waitFor(() => expect(result.current.products).toHaveLength(30));
-      const seen = result.current.products.map((p) => p.id);
-      expect(new Set(seen).size).toBe(seen.length);
+      // Wait for the refetch of both pages to land, not for the stale 30 rows
+      // (asserting a length of 30 passed on the pre-refetch list).
+      await waitFor(() =>
+        expect(getMyProducts.mock.calls.map((c) => c[0].page)).toEqual([1, 2]),
+      );
+      await waitFor(() => expect(result.current.products[0]?.id).toBe("p21"));
+      // p21 is listed once, at its first occurrence; nothing else is lost.
+      expect(result.current.products.map((p) => p.id)).toEqual([
+        "p21",
+        ...ids(1, 19).map((p) => p.id),
+        ...ids(22, 30).map((p) => p.id),
+      ]);
     });
 
     it("refetches every loaded page on reopen", async () => {
