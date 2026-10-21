@@ -104,6 +104,49 @@ describe("ilan fiyat sınırı ayarları — boş = kural yok", () => {
     );
   });
 
+  it("reads the price limits as TL amounts, never a grouped dot as a decimal", () => {
+    const grouped = settingsSchema(t).safeParse(
+      validForm({ minProductPrice: "1.000" }),
+    );
+    expect(grouped.success).toBe(false);
+    if (!grouped.success) {
+      expect(grouped.error.issues).toEqual([
+        expect.objectContaining({
+          path: ["minProductPrice"],
+          message: "validation.amountFormatRefused",
+        }),
+      ]);
+    }
+    expect(
+      settingsSchema(t).safeParse(
+        validForm({ minProductPrice: "1250,50", maxProductPrice: "100000" }),
+      ).success,
+    ).toBe(true);
+    expect(settingPayloadValue(field("minProductPrice"), "1250,50")).toBe(
+      "1250.5",
+    );
+    expect(settingPayloadValue(field("maxProductPrice"), "1000")).toBe("1000");
+  });
+
+  it("prefills the price limits with a decimal comma", () => {
+    const values = toFormValues(
+      parseSettings([
+        { settingKey: "min_product_price", settingValue: "250.5" },
+        { settingKey: "max_product_price", settingValue: "100000" },
+      ]),
+    );
+    expect(values.minProductPrice).toBe("250,50");
+    expect(values.maxProductPrice).toBe("100000");
+  });
+
+  it("compares comma limits as TL", () => {
+    expect(
+      settingsSchema(t).safeParse(
+        validForm({ minProductPrice: "100,01", maxProductPrice: "100" }),
+      ).success,
+    ).toBe(false);
+  });
+
   it("alt sınır üst sınırdan büyükse alt sınır alanında hata verir", () => {
     const result = settingsSchema(t).safeParse(
       validForm({ minProductPrice: "500", maxProductPrice: "100" }),
