@@ -22,7 +22,14 @@ describe("ErrorLogInterceptor body redaction", () => {
     code: "google-auth-code",
   };
 
-  const run = async (method: string, body: unknown) => {
+  /** The whole `error_logs` row of the last `run`. */
+  let lastRow: unknown;
+
+  const run = async (
+    method: string,
+    body: unknown,
+    headers: Record<string, string> = { "user-agent": "jest" },
+  ) => {
     const create = jest.fn().mockResolvedValue({});
     const interceptor = new ErrorLogInterceptor({
       errorLog: { create },
@@ -34,7 +41,7 @@ describe("ErrorLogInterceptor body redaction", () => {
           url: "/api/auth/reauth",
           body,
           user: { id: "u1" },
-          headers: { "user-agent": "jest" },
+          headers,
           ip: "127.0.0.1",
         }),
       }),
@@ -50,6 +57,7 @@ describe("ErrorLogInterceptor body redaction", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(create).toHaveBeenCalledTimes(1);
+    lastRow = create.mock.calls[0][0].data;
     return create.mock.calls[0][0].data.metadata as { body?: unknown };
   };
 
@@ -76,6 +84,18 @@ describe("ErrorLogInterceptor body redaction", () => {
     const stored = JSON.stringify(metadata.body);
     expect(stored).not.toContain("Fresh-Pass-1");
     expect(stored).not.toContain("opaque");
+  });
+
+  // A step-up refusal is a 403, so every refused `DELETE /users/me` writes a
+  // row; the token there travels in the X-Reauth-Token header (T8b).
+  it("never stores the X-Reauth-Token header", async () => {
+    await run(
+      "DELETE",
+      {},
+      { "user-agent": "jest", "x-reauth-token": "opaque-header-token" },
+    );
+
+    expect(JSON.stringify(lastRow)).not.toContain("opaque-header-token");
   });
 
   it("stores no body for a GET", async () => {

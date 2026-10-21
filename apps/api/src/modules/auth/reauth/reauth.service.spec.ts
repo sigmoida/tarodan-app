@@ -76,6 +76,7 @@ describe("ReauthService", () => {
     user: { findUnique: jest.Mock };
     oAuthAccount: { findUnique: jest.Mock };
     securityLog: { create: jest.Mock };
+    platformSetting: { findUnique: jest.Mock };
   };
   const google = {
     exchangeCodeForIdToken: jest.fn(),
@@ -109,6 +110,7 @@ describe("ReauthService", () => {
         }),
       },
       securityLog: { create: jest.fn().mockResolvedValue({}) },
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     service = new ReauthService(
       prisma as never,
@@ -488,6 +490,48 @@ describe("ReauthService", () => {
         i18nKey: "server.auth.reauthUnavailable",
         errorCode: "REAUTH_UNAVAILABLE",
       });
+    });
+  });
+
+  describe("requirement setting for account deletion and e-mail change", () => {
+    const withSetting = (settingValue: string | null) =>
+      prisma.platformSetting.findUnique.mockResolvedValue(
+        settingValue === null ? null : { settingValue },
+      );
+
+    it("is off without a row (the default, mobile 1.0.5 sends no token)", async () => {
+      withSetting(null);
+
+      expect(await service.isRequiredForSensitiveActions()).toBe(false);
+      expect(prisma.platformSetting.findUnique).toHaveBeenCalledWith({
+        where: { settingKey: "auth_require_reauth_for_sensitive_actions" },
+        select: { settingValue: true },
+      });
+    });
+
+    it.each(["true", " TRUE ", "True"])("is on for %p", async (value) => {
+      withSetting(value);
+      expect(await service.isRequiredForSensitiveActions()).toBe(true);
+    });
+
+    it.each(["false", "", "1", "yes", "on"])("is off for %p", async (value) => {
+      withSetting(value);
+      expect(await service.isRequiredForSensitiveActions()).toBe(false);
+    });
+
+    it("reads the setting on every call, so switching it on applies at once", async () => {
+      withSetting("false");
+      expect(await service.isRequiredForSensitiveActions()).toBe(false);
+      withSetting("true");
+      expect(await service.isRequiredForSensitiveActions()).toBe(true);
+    });
+
+    it("throws when the setting cannot be read (never an implicit off)", async () => {
+      prisma.platformSetting.findUnique.mockRejectedValue(new Error("db down"));
+
+      await expect(service.isRequiredForSensitiveActions()).rejects.toThrow(
+        "db down",
+      );
     });
   });
 });

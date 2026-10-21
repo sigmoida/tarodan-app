@@ -10,6 +10,8 @@ import {
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import {
+  isPlatformSettingOn,
+  REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING,
   SIGN_IN_METHODS_ERROR_CODES,
   type ReauthResponse,
   type SignInProvider,
@@ -157,6 +159,21 @@ export class ReauthService {
     }
     const stored = await this.cache.get<StoredReauth>(tokenKey(token));
     return stored?.userId === userId;
+  }
+
+  /**
+   * Whether account deletion and the e-mail change request need a token even
+   * when none is sent (`REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING`, off
+   * by default). Read on every such request, uncached: both routes are rare,
+   * and switching the setting on takes effect at once. A failed read throws,
+   * so the request fails instead of passing without a step-up.
+   */
+  async isRequiredForSensitiveActions(): Promise<boolean> {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { settingKey: REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING },
+      select: { settingValue: true },
+    });
+    return isPlatformSettingOn(row?.settingValue);
   }
 
   /**

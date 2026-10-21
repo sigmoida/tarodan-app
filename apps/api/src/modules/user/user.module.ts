@@ -26,6 +26,7 @@ import { ConsentModule } from "../consent/consent.module";
 import { MarketingModule } from "../marketing/marketing.module";
 import { SearchModule } from "../search/search.module";
 import { AppleTokenModule } from "../auth/social/apple-token.module";
+import { AuthModule } from "../auth/auth.module";
 import { WebSocketModule } from "../websocket/websocket.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
 
@@ -49,6 +50,10 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     // Hesap silmede açık soketler kapatılır (commit sonrası). WebSocketModule
     // User'a bağlı değil, döngü yok.
     WebSocketModule,
+    // Account deletion takes the step-up (`@RequireReauth`): the guard and
+    // its service are exported by AuthModule. AuthModule does not import
+    // UserModule, so there is no cycle.
+    AuthModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],

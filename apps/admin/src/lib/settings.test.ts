@@ -1,29 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { readDistanceSalesConsentRequired } from "./settings";
+import {
+  DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
+  REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING,
+} from "@tarodan/types";
+import { readSettingOn } from "./settings";
 
-describe("readDistanceSalesConsentRequired", () => {
-  it("ayar yoksa kapalıdır (eski mobil sürümler ödeyebilsin)", () => {
-    expect(readDistanceSalesConsentRequired([])).toBe(false);
+describe("readSettingOn", () => {
+  it.each([
+    DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
+    REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING,
+  ])("is off when %s is missing (older mobile builds keep working)", (key) => {
+    expect(readSettingOn([], key)).toBe(false);
+    expect(readSettingOn({}, key)).toBe(false);
   });
 
-  it("yalnız 'true' açık sayılır — iki yanıt şekli de okunur", () => {
+  it("is on only for 'true', in both response shapes", () => {
+    const key = REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING;
     expect(
-      readDistanceSalesConsentRequired([
-        {
-          settingKey: "distance_sales_consent_required",
-          settingValue: "true",
-        },
-      ]),
+      readSettingOn([{ settingKey: key, settingValue: "true" }], key),
     ).toBe(true);
+    expect(readSettingOn({ [key]: " TRUE " }, key)).toBe(true);
+    expect(readSettingOn({ [key]: "false" }, key)).toBe(false);
+    expect(readSettingOn({ [key]: "1" }, key)).toBe(false);
+  });
+
+  it("reads only its own key", () => {
     expect(
-      readDistanceSalesConsentRequired({
-        distance_sales_consent_required: "false",
-      }),
-    ).toBe(false);
-    expect(
-      readDistanceSalesConsentRequired({
-        distance_sales_consent_required: "1",
-      }),
+      readSettingOn(
+        { [DISTANCE_SALES_CONSENT_REQUIRED_SETTING]: "true" },
+        REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING,
+      ),
     ).toBe(false);
   });
 });

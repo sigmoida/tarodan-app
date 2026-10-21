@@ -8884,6 +8884,13 @@
           "label": "Ödemede mesafeli satış onayı zorunlu",
           "helper": "Açıkken, mesafeli satış onayı alınmamış bir satın alma ödeme adımında reddedilir. Onay kutusunu göndermeyen eski mobil sürümler ödeme yapamaz — mobilin onayı gönderen sürümü yayıldıktan sonra açın."
         }
+      },
+      "security": {
+        "reauth": {
+          "title": "Güvenlik doğrulaması",
+          "label": "Hesap silme ve e-posta değişikliğinde güvenlik doğrulaması zorunlu",
+          "helper": "Açıkken, güvenlik doğrulaması olmadan gönderilen hesap silme ve e-posta değişikliği istekleri reddedilir. Doğrulama göndermeyen web ve mobil sürümler (mobilde 1.0.5 ve öncesi) bu işlemleri yapamaz; doğrulamayı gönderen web sürümü yayına alındıktan ve en düşük desteklenen uygulama sürümü iOS ve Android'de 1.0.5'in üzerine çıkarıldıktan sonra açın. Gönderilen bir doğrulama, ayar kapalıyken de her zaman kontrol edilir."
+        }
       }
     },
     "shippingTariffs": {
