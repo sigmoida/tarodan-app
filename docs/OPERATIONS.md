@@ -366,6 +366,24 @@ yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte
 yeniden-onay penceresini görür. Belge metni değiştiğinde
 `packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
 
+### One-off: require the step-up for account deletion and e-mail change
+
+`DELETE /users/me` and `POST /auth/email/request-change` check a step-up token
+(`POST /auth/reauth`) whenever the client sends one, but by default they do
+not require one: mobile 1.0.5 and older send none. Switch the requirement on
+only when both are true:
+
+1. A mobile version that sends the token is live, and
+   `min_supported_app_version_ios` and `min_supported_app_version_android` are
+   above 1.0.5 (tarodan-ops `compat.md`).
+2. The web release that sends the token is live.
+
+Then, in the admin panel, **Settings -> Security**, turn on "Require step-up
+confirmation for account deletion and email change" (platform setting
+`auth_require_reauth_for_sensitive_actions = "true"`; no deploy). It applies
+on the next request. While it is on, a request without a token gets
+`403 REAUTH_REQUIRED`. To roll back, turn it off.
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`
