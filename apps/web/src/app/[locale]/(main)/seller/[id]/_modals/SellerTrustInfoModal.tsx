@@ -3,7 +3,10 @@
 "use client";
 
 import { Button, Modal } from "@tarodan/ui";
-import { SELLER_TRUST_MIN_TRANSACTIONS } from "@tarodan/types";
+import {
+  SELLER_TRUST_MIN_COUNTERPARTIES,
+  SELLER_TRUST_MIN_TRANSACTIONS,
+} from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
 interface SellerTrustInfoModalProps {
@@ -51,6 +54,7 @@ export default function SellerTrustInfoModal({
         <p>
           {t("seller.trustScore.info.newSeller", {
             count: SELLER_TRUST_MIN_TRANSACTIONS,
+            counterparties: SELLER_TRUST_MIN_COUNTERPARTIES,
           })}
         </p>
         <p className="text-muted">{t("seller.trustScore.info.updated")}</p>

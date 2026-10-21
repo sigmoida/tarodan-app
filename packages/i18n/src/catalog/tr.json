@@ -3090,7 +3090,7 @@
         "onTime": "Siparişleri süresi içinde kargoya verme",
         "volume": "Tamamlanan satış ve takas sayısı",
         "tenure": "Tarodan'daki hesap yaşı",
-        "newSeller": "En az {count} tamamlanmış işlemi olmayan satıcılar \"Yeni satıcı\" olarak görünür.",
+        "newSeller": "En az {count} tamamlanmış işlemi ve {counterparties} farklı alıcısı olmayan satıcılar \"Yeni satıcı\" olarak görünür.",
         "updated": "Skor her gün güncellenir."
       }
     }

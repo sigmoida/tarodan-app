@@ -3090,7 +3090,7 @@
         "onTime": "Handing orders to the carrier on time",
         "volume": "Number of completed sales and trades",
         "tenure": "Account age on Tarodan",
-        "newSeller": "Sellers with fewer than {count} completed transactions are shown as \"New seller\".",
+        "newSeller": "Sellers without at least {count} completed transactions with {counterparties} different buyers are shown as \"New seller\".",
         "updated": "The score is updated every day."
       }
     }
