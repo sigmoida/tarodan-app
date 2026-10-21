@@ -102,6 +102,31 @@ describe("DistanceSalesConsentService.ensureForPayment", () => {
     expect(prisma.consentRecord.createMany).not.toHaveBeenCalled();
   });
 
+  // The parser delegates to the shared `isPlatformSettingOn` (T8b): pin the
+  // values it read before, so a change to the shared rule cannot silently
+  // open or close the payment gate.
+  it.each(["true", " TRUE ", "True"])(
+    "treats %p as on and refuses the payment without a consent",
+    async (setting) => {
+      const { service } = makeService({ setting });
+
+      await expect(
+        service.ensureForPayment(offerOrder, undefined),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
+
+  it.each(["", "1", "yes", "on", "TRUE!"])(
+    "treats %p as off and lets an old client pay",
+    async (setting) => {
+      const { service } = makeService({ setting });
+
+      await expect(
+        service.ensureForPayment(offerOrder, undefined),
+      ).resolves.toBe("unrecorded");
+    },
+  );
+
   it("ayar açıkken checkout'ta alınmış onay ödemeyi geçirir", async () => {
     const { service } = makeService({ existing: true, setting: "true" });
 
