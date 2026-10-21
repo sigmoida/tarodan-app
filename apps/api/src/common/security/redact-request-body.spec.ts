@@ -51,6 +51,51 @@ describe("redactRequestBody", () => {
     ).toBe("merchant_oid=ABC&password=***&code=***&status=success");
   });
 
+  describe("a string that is neither valid JSON nor a form body", () => {
+    it("masks the credentials of a truncated JSON body and keeps the rest", () => {
+      expect(
+        redactRequestBody('{"password":"hunter2","otp": 123456,"email":"a@b.c'),
+      ).toBe('{"password":"[REDACTED]","otp": "[REDACTED]","email":"a@b.c');
+    });
+
+    it("masks a value cut off inside its string", () => {
+      expect(redactRequestBody('{"email":"a@b.c","password":"hunt')).toBe(
+        '{"email":"a@b.c","password":"[REDACTED]"',
+      );
+    });
+
+    it("masks a nested credential key and a body code", () => {
+      const redacted = redactRequestBody(
+        '{"user":{"currentPassword":"hunter2","code":"654321"},"provider":"go',
+      );
+
+      expect(redacted).toBe(
+        '{"user":{"currentPassword":"[REDACTED]","code":"[REDACTED]"},"provider":"go',
+      );
+    });
+
+    it("drops the whole string when a credential holds an object or array", () => {
+      expect(
+        redactRequestBody('{"card":{"number":"4111","holder":"A B"},"x":'),
+      ).toBe("[REDACTED]");
+    });
+
+    it("drops the whole string when a key has escapes a parser would decode", () => {
+      expect(redactRequestBody('{"pass\\u0077ord":"hunter2",')).toBe(
+        "[REDACTED]",
+      );
+    });
+
+    it("keeps a plain string without credentials as it is", () => {
+      expect(redactRequestBody("not json, not a form")).toBe(
+        "not json, not a form",
+      );
+      expect(redactRequestBody('{"email":"a@b.c","items":[1,2')).toBe(
+        '{"email":"a@b.c","items":[1,2',
+      );
+    });
+  });
+
   it("does not touch a code outside a request body (error codes stay readable)", () => {
     const redacted = redactSensitive({
       code: "P2002",

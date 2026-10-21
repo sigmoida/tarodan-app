@@ -56,6 +56,9 @@ const SENSITIVE_KEYS = new Set([
   "expiryyear",
 ]);
 
+/** What a redacted value is replaced with. */
+const REDACTED = "[REDACTED]";
+
 const normalizeKey = (key: string) =>
   key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -79,7 +82,7 @@ function passesLuhn(candidate: string): boolean {
 
 function redactPanStrings(value: string): string {
   return value.replace(/(?:\d[ -]?){13,19}/g, (candidate) =>
-    passesLuhn(candidate) ? "[REDACTED]" : candidate,
+    passesLuhn(candidate) ? REDACTED : candidate,
   );
 }
 
@@ -145,7 +148,7 @@ export function redactSensitive(
       return [
         key,
         SENSITIVE_KEYS.has(normalized) || extraKeys?.has(normalized)
-          ? "[REDACTED]"
+          ? REDACTED
           : redactSensitive(nested, depth + 1, extraKeys),
       ];
     }),
@@ -156,9 +159,11 @@ export function redactSensitive(
  * A request body for logs and telemetry: `redactSensitive` plus the
  * body-only keys. Sentry keeps the body as a JSON string
  * (`event.request.data`), which a key-based pass cannot see into, so a JSON
- * string is parsed, redacted and serialised again. A string that is not JSON
- * is treated as a form body (`password=...&code=...`). Run it on the raw body,
- * before any other pass: the PAN pass can turn JSON into a non-JSON string.
+ * string is parsed, redacted and serialised again. A string that is not valid
+ * JSON (a form body, or JSON cut off by a size limit) gets both text passes:
+ * `key=value` pairs and `"key": value` pairs are masked by the same key rules.
+ * Run it on the raw body, before any other pass: the PAN pass can turn JSON
+ * into a non-JSON string.
  */
 export function redactRequestBody(body: unknown): unknown {
   if (typeof body !== "string") {
@@ -168,7 +173,10 @@ export function redactRequestBody(body: unknown): unknown {
   try {
     parsed = JSON.parse(body);
   } catch {
-    return redactPanStrings(redactFormBody(body));
+    const jsonRedacted = redactJsonPairs(body);
+    return jsonRedacted === null
+      ? REDACTED
+      : redactPanStrings(redactFormBody(jsonRedacted));
   }
   return JSON.stringify(
     redactSensitive(parsed, 0, REQUEST_BODY_SENSITIVE_KEYS),
@@ -187,4 +195,41 @@ function redactFormBody(body: string): string {
         : match;
     },
   );
+}
+
+const isRequestBodySensitiveKey = (normalized: string) =>
+  SENSITIVE_KEYS.has(normalized) || REQUEST_BODY_SENSITIVE_KEYS.has(normalized);
+
+/**
+ * `"key": value` in JSON that does not parse. The value is a (possibly
+ * unterminated) string, a scalar, or the start of an object or array.
+ */
+const JSON_PAIR =
+  /"((?:[^"\\]|\\.)*)"(\s*:\s*)("(?:[^"\\]|\\.)*(?:"|\\?$)|[{[]|[^,}\]\s]*)/g;
+
+/**
+ * `{"password":"x","email":"a@b.c` -> `{"password":"[REDACTED]","email":...`,
+ * by the request-body key rules. Fails closed with `null` (the caller drops the
+ * whole string) when a value cannot be bounded without a parser: a sensitive
+ * key holding an object or array, or a key with escapes that a parser would
+ * decode into a different name.
+ */
+function redactJsonPairs(body: string): string | null {
+  let unsafe = false;
+  const redacted = body.replace(
+    JSON_PAIR,
+    (match, key: string, colon: string, value: string) => {
+      if (key.includes("\\")) {
+        unsafe = true;
+        return match;
+      }
+      if (!isRequestBodySensitiveKey(normalizeKey(key))) return match;
+      if (value === "{" || value === "[") {
+        unsafe = true;
+        return match;
+      }
+      return `"${key}"${colon}"${REDACTED}"`;
+    },
+  );
+  return unsafe ? null : redacted;
 }
