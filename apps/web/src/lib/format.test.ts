@@ -1,7 +1,24 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
-import { formatPrice, formatPriceNumber, formatTL } from "./format";
+import {
+  formatDayMonth,
+  formatPrice,
+  formatPriceNumber,
+  formatTL,
+} from "./format";
+
+describe("formatDayMonth", () => {
+  it("is the day and short month, without the year (a boost's end)", () => {
+    expect(formatDayMonth("2026-11-12T10:00:00.000Z")).toBe("12 Kas");
+  });
+
+  it("is empty for a missing or invalid date", () => {
+    expect(formatDayMonth(null)).toBe("");
+    expect(formatDayMonth("")).toBe("");
+    expect(formatDayMonth("not a date")).toBe("");
+  });
+});
 
 /**
  * Para biçimi UYGULAMADA TEK olmalı.

@@ -20,6 +20,10 @@ const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const dayMonthFmt = new Intl.DateTimeFormat("tr-TR", {
+  day: "numeric",
+  month: "short",
+});
 
 type DateLike = string | number | Date | null | undefined;
 
@@ -42,6 +46,16 @@ export function formatDateTime(value: DateLike): string {
   if (value === null || value === undefined || value === "") return "";
   const d = value instanceof Date ? value : new Date(value);
   return isNaN(d.getTime()) ? "" : dateTimeFmt.format(d);
+}
+
+/**
+ * Day and short month without the year ("12 Kas"): for dates that are close
+ * and must fit a narrow card (a boost's end, at most a few months ahead).
+ */
+export function formatDayMonth(value: DateLike): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? "" : dayMonthFmt.format(d);
 }
 
 /**
