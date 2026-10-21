@@ -11,6 +11,10 @@ import {
 import { Alert, Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { adminCancelReasonOptions } from "@/lib/admin-cancel-reasons";
 import { Panel } from "@/components/detail/Panel";
+import {
+  BoostRefundRedirectAlert,
+  isBoostRefundRedirect,
+} from "@/components/finance/BoostRefundRedirectAlert";
 import { fmtTry } from "@/lib/format";
 import { useOrderCancel } from "../_hooks/useOrderCancel";
 import {
@@ -100,17 +104,22 @@ export function CancelOrderModal({
             ? t("admin.operations.orders.cancel.warningUnpaid")
             : t("admin.operations.orders.cancel.warning")}
         </Alert>
-        <Panel tone="muted" className="text-sm">
-          {preview.data ? (
-            <CancelPreviewSummary preview={preview.data} />
-          ) : (
-            <p className="text-muted">
-              {preview.isError
-                ? t("admin.operations.orders.cancel.previewUnavailable")
-                : t("admin.operations.orders.cancel.previewLoading")}
-            </p>
-          )}
-        </Panel>
+        {/* A boost order is not cancelled here: say where, not "unavailable". */}
+        {isBoostRefundRedirect(preview.error) ? (
+          <BoostRefundRedirectAlert />
+        ) : (
+          <Panel tone="muted" className="text-sm">
+            {preview.data ? (
+              <CancelPreviewSummary preview={preview.data} />
+            ) : (
+              <p className="text-muted">
+                {preview.isError
+                  ? t("admin.operations.orders.cancel.previewUnavailable")
+                  : t("admin.operations.orders.cancel.previewLoading")}
+              </p>
+            )}
+          </Panel>
+        )}
         {isOfferOrder && (
           <p className="text-sm text-muted">
             {t("admin.operations.orders.cancel.offerOrder")}

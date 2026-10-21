@@ -21,8 +21,11 @@ export interface UseAdminMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
-  /** Show the shared error toast on failure. Disable when the caller renders the error inline. */
-  showErrorToast?: boolean;
+  /**
+   * Show the shared error toast on failure. Disable when the caller renders
+   * the error inline; a function decides per error (false = inline).
+   */
+  showErrorToast?: boolean | ((error: unknown) => boolean);
   onSuccess?: (data: TData, vars: TVars) => void;
   /** Immediately patch matching resource caches and restore them if the request fails. */
   optimistic?: {
@@ -135,7 +138,11 @@ export function useAdminMutation<TData, TVars = void>(
       context?.snapshots.forEach(([queryKey, cached]) => {
         queryClient.setQueryData(queryKey, cached);
       });
-      if (showErrorToast) toast.error(extractErrorMessage(error, errorMessage));
+      const toastIt =
+        typeof showErrorToast === "function"
+          ? showErrorToast(error)
+          : showErrorToast;
+      if (toastIt) toast.error(extractErrorMessage(error, errorMessage));
     },
     onSettled: (data, error, vars, context, mutationContext) =>
       mutation?.onSettled?.(

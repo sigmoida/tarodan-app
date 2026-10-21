@@ -6420,6 +6420,46 @@
           "expired": "Expired",
           "cancelled": "Cancelled",
           "failed": "Failed"
+        },
+        "source": {
+          "purchase": "Purchase",
+          "adminGrant": "Free grant"
+        },
+        "sourceLabel": "Source",
+        "allSources": "All sources",
+        "refund": {
+          "action": "Refund and Stop",
+          "title": "Refund and stop the boost",
+          "amount": "Refund amount",
+          "amountHelper": "At most {max}. Leave empty to refund the full remaining amount.",
+          "reason": "Reason",
+          "confirm": "The amount is refunded to the card, the boost stops at once, and its invoice is cancelled or a return invoice is issued. This cannot be undone.",
+          "partialStops": "A partial refund also stops the boost; the remaining amount cannot be refunded later.",
+          "done": "Refunded and stopped"
+        },
+        "revoke": {
+          "action": "Cancel Grant",
+          "confirm": "The free boost stops at once.",
+          "done": "Grant cancelled"
+        },
+        "grant": {
+          "action": "Grant Free Boost",
+          "listing": "Listing (ID or listing code)",
+          "package": "Package (optional)",
+          "noPackage": "No package (search priority only)",
+          "days": "Days",
+          "reason": "Reason (written to the audit log)",
+          "noInvoiceHint": "A free grant has no invoice and is not revenue.",
+          "done": "Boost granted"
+        },
+        "detail": {
+          "grantedBy": "Granted by",
+          "grantReason": "Grant reason",
+          "cancelledBy": "Stopped by",
+          "cancelledAt": "Stopped at",
+          "cancelReason": "Stop reason",
+          "refundedAmount": "Refunded",
+          "showcaseEndsAt": "Showcase ends"
         }
       }
     },
@@ -6904,7 +6944,8 @@
           "note": "Reconciliation Note",
           "notePlaceholder": "Describe the reconciliation result and verification source",
           "confirm": "Save Reconciliation",
-          "resolved": "Refund reconciliation saved"
+          "resolved": "Refund reconciliation saved",
+          "outcomeUnknown": "The refund outcome is not confirmed yet. Do not retry; check it on the Refund Reconciliation screen."
         },
         "status": {
           "pending": "Pending",
@@ -8980,6 +9021,13 @@
           "label": "Require step-up confirmation for account deletion and email change",
           "helper": "When on, account deletion and email change requests without a step-up confirmation are rejected. Web and mobile builds that do not send it cannot do either; turn this on only after the web release that sends it is live and the minimum supported app version on iOS and Android is at least the first mobile version that sends it. A confirmation that is sent is always checked, even while this is off."
         }
+      },
+      "boost": {
+        "title": "Boost",
+        "enabled": "Boost sales enabled",
+        "enabledHint": "When off, sellers cannot buy boosts; running boosts continue.",
+        "offerSince": "New-listing offer start",
+        "offerSinceHint": "Sellers see a one-time boost offer for listings created after this date once they go live. Empty turns the offer off."
       }
     },
     "shippingTariffs": {
