@@ -149,6 +149,7 @@
     "favorites": "Favorites",
     "cart": "Cart",
     "myListings": "My Listings",
+    "myBoosts": "My Boosts",
     "myOrders": "My Orders",
     "settings": "Settings",
     "help": "Help",
@@ -2421,9 +2422,50 @@
       "disconnectSuccess": "{provider} disconnected."
     },
     "boosts": {
+      "title": "My Boosts",
+      "sections": {
+        "current": "Active",
+        "history": "History"
+      },
+      "empty": {
+        "title": "No boosts yet",
+        "description": "You can feature your listings from My listings.",
+        "action": "Go to My listings"
+      },
+      "status": {
+        "active": "Active",
+        "paused": "Paused",
+        "expired": "Ended",
+        "cancelled": "Cancelled",
+        "refunded": "Refunded"
+      },
+      "remaining": "{days} d {hours} h left",
+      "remainingHours": "{hours} h left",
+      "pausedHint": "Paused because the listing is not live. It resumes when the listing is live again.",
+      "extended": "+{days} days added",
+      "purchasedAt": "Purchased: {date}",
+      "period": "{start} – {end}",
+      "source": {
+        "adminGrant": "Gift from Tarodan"
+      },
+      "performance": {
+        "title": "Performance (since the boost started)",
+        "views": "Views",
+        "likes": "Favourites",
+        "clicks": "Clicks",
+        "pending": "Measurement starts when the boost starts."
+      },
+      "best": "Best performing",
       "reminder": {
-        "premiumOnly": "Reminders are for Premium members."
-      }
+        "label": "Remind me 24 hours before it ends",
+        "hint": "This is only a reminder. You are not charged automatically.",
+        "premiumOnly": "Reminders are for Premium members.",
+        "saved": "Reminder setting saved"
+      },
+      "loadFailed": "Boosts could not be loaded",
+      "refundedAmount": "Refunded: {amount}",
+      "invoice": "Invoice",
+      "support": "Something wrong? Contact Support."
     }
   },
   "review": {

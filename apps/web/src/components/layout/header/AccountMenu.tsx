@@ -17,11 +17,13 @@ import {
   ChevronDownIcon,
   BellIcon,
   SparklesIcon,
+  RocketLaunchIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import MembershipBadge from "@/components/membership/MembershipBadge";
 import UserAvatar from "@/components/UserAvatar";
 import { membershipNavLabel } from "@/lib/membership";
+import { MY_BOOSTS_PATH } from "@/lib/paymentKind";
 import { useLocale, useTranslations } from "next-intl";
 import type { HeaderData } from "./_hooks/useHeaderData";
 
@@ -239,6 +241,14 @@ export default function AccountMenu({
               >
                 <ShoppingBagIcon className="w-5 h-5" />
                 {t("nav.myListings")}
+              </Link>
+              <Link
+                href={MY_BOOSTS_PATH}
+                onClick={close}
+                className={MENU_LINK_CLASS}
+              >
+                <RocketLaunchIcon className="w-5 h-5" />
+                {t("nav.myBoosts")}
               </Link>
               <Link
                 href="/profile/orders"

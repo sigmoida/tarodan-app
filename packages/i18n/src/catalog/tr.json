@@ -149,6 +149,7 @@
     "favorites": "Favoriler",
     "cart": "Sepet",
     "myListings": "İlanlarım",
+    "myBoosts": "Öne Çıkarmalarım",
     "myOrders": "Siparişlerim",
     "settings": "Ayarlar",
     "help": "Yardım",
@@ -2421,9 +2422,50 @@
       "disconnectSuccess": "{provider} bağlantısı kaldırıldı."
     },
     "boosts": {
+      "title": "Öne Çıkarmalarım",
+      "sections": {
+        "current": "Aktif",
+        "history": "Geçmiş"
+      },
+      "empty": {
+        "title": "Henüz öne çıkarma yok",
+        "description": "İlanlarınızı İlanlarım sayfasından öne çıkarabilirsiniz.",
+        "action": "İlanlarıma git"
+      },
+      "status": {
+        "active": "Aktif",
+        "paused": "Duraklatıldı",
+        "expired": "Süresi doldu",
+        "cancelled": "İptal edildi",
+        "refunded": "İade edildi"
+      },
+      "remaining": "{days} gün {hours} saat kaldı",
+      "remainingHours": "{hours} saat kaldı",
+      "pausedHint": "İlan yayında olmadığı için süre duraklatıldı; ilan yeniden yayına girince devam eder.",
+      "extended": "+{days} gün uzatma",
+      "purchasedAt": "Satın alma: {date}",
+      "period": "{start} – {end}",
+      "source": {
+        "adminGrant": "Tarodan hediyesi"
+      },
+      "performance": {
+        "title": "Performans (öne çıkarma başladığından beri)",
+        "views": "Görüntülenme",
+        "likes": "Favori",
+        "clicks": "Tıklama",
+        "pending": "Ölçüm, öne çıkarma başlayınca başlar."
+      },
+      "best": "En başarılı",
       "reminder": {
-        "premiumOnly": "Hatırlatma Premium üyeler içindir."
-      }
+        "label": "Bitmeden 24 saat önce hatırlat",
+        "hint": "Bu yalnızca bir hatırlatmadır, otomatik ödeme alınmaz.",
+        "premiumOnly": "Hatırlatma Premium üyeler içindir.",
+        "saved": "Hatırlatma ayarı kaydedildi"
+      },
+      "loadFailed": "Öne çıkarmalar yüklenemedi",
+      "refundedAmount": "İade edildi: {amount}",
+      "invoice": "Fatura",
+      "support": "Bir sorun mu var? Destek ile iletişime geçin."
     }
   },
   "review": {

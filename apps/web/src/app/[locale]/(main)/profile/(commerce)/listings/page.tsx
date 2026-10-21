@@ -20,6 +20,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
 import { useBoostLauncher } from "@/components/boost/useBoostLauncher";
+import { useBoostDeepLink } from "./_hooks/useBoostDeepLink";
 import type { SellerRemovalAction } from "@/components/listings/listingRemovalSchema";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import {
@@ -52,6 +53,8 @@ export default function ProfileListingsPage() {
     searchParams.get("status") || "all",
   );
   const boost = useBoostLauncher();
+  // `?boost=<productId>` (payment-fail "Tekrar dene") opens the dialog once.
+  useBoostDeepLink(ready, boost.open);
   // Silme ve pasife alma önce NEDEN sorar; hangi ilan, hangi eylem.
   const [removalTarget, setRemovalTarget] = useState<{
     id: string;

@@ -1,5 +1,9 @@
 import type {
   BoostOffersResponse,
+  BoostReminderRequest,
+  BoostReminderResponse,
+  MyBoostsResponse,
+  MyBoostState,
   BoostOptionsResponse,
   InitiateBoostRequest,
   InitiateBoostResponse,
@@ -30,4 +34,19 @@ export const boostApi = {
    * the caller's listings due the one-time boost offer. Signed-in only.
    */
   offers: () => api.get<BoostOffersResponse>("/products/boost/offers"),
+  /**
+   * "My boosts": `current` (running and paused, up to `limit`) or `history`
+   * (ended and cancelled, paged). Signed-in only.
+   */
+  my: (params: { state: MyBoostState; page?: number; limit?: number }) =>
+    api.get<MyBoostsResponse>("/products/boost/my", { params }),
+  /**
+   * The ending-soon reminder of the owner's listing. Turning it on needs
+   * premium: 400 `server.product.boostReminderPremiumOnly`.
+   */
+  reminder: (productId: string, body: BoostReminderRequest) =>
+    api.patch<BoostReminderResponse>(
+      `/products/${productId}/boost/reminder`,
+      body,
+    ),
 };
