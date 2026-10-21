@@ -2,6 +2,8 @@ import { BadRequestException, ValidationPipe } from "@nestjs/common";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../../common/validators/global-validation-pipe-options";
 import { ReauthDto } from "../reauth/dto/reauth.dto";
 import { GoogleLinkDto } from "../sign-in-methods/dto/link-provider.dto";
+import { SignInMethodsController } from "../sign-in-methods/sign-in-methods.controller";
+import { AuthController } from "../auth.controller";
 import { GoogleAuthDto } from "./google-auth.dto";
 import { PROVIDER_PROOF_MAX_LENGTH } from "./google-proof.validator";
 
@@ -19,17 +21,30 @@ const TOO_LONG = "x".repeat(PROVIDER_PROOF_MAX_LENGTH + 1);
 const routes: Array<{
   name: string;
   metatype: new () => object;
+  /** The handler whose body the global pipe validates with `metatype`. */
+  controller: { prototype: object };
+  method: string;
   base: Record<string, unknown>;
 }> = [
-  { name: "POST /auth/google", metatype: GoogleAuthDto, base: {} },
+  {
+    name: "POST /auth/google",
+    metatype: GoogleAuthDto,
+    controller: AuthController,
+    method: "google",
+    base: {},
+  },
   {
     name: "POST /auth/social/google/link",
     metatype: GoogleLinkDto,
+    controller: SignInMethodsController,
+    method: "linkGoogle",
     base: { reauthToken: "step-up-token" },
   },
   {
     name: "POST /auth/reauth (google)",
     metatype: ReauthDto,
+    controller: SignInMethodsController,
+    method: "reauthenticate",
     base: { provider: "google" },
   },
 ];
@@ -129,6 +144,33 @@ describe.each(routes)("Google proof on $name", ({ metatype, base }) => {
     );
   });
 });
+
+// The global pipe validates a body only by its declared class: a route that
+// typed it as an interface would skip every rule above and pass any proof,
+// oversized or doubled, on to Google.
+describe.each(routes)(
+  "Google proof binding on $name",
+  ({ metatype, controller, method, base }) => {
+    it("is the class the route declares for its body", () => {
+      const params = Reflect.getMetadata(
+        "design:paramtypes",
+        controller.prototype,
+        method,
+      ) as unknown[];
+
+      expect(params).toContain(metatype);
+    });
+
+    // The bound is new on the public `POST /auth/google`: a live proof at it
+    // still passes (a real Google code or id_token is far shorter).
+    it.each(["code", "idToken"])("accepts a %s at the bound", async (field) => {
+      const atBound = "x".repeat(PROVIDER_PROOF_MAX_LENGTH);
+      expect(await validate(metatype, { ...base, [field]: atBound })).toEqual(
+        [],
+      );
+    });
+  },
+);
 
 describe("Google proof on POST /auth/reauth without provider google", () => {
   it("ignores Google fields on a password proof (the service never reads them)", async () => {
