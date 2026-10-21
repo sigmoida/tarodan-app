@@ -481,6 +481,14 @@ grant, cancel, refund and reminder columns to `product_boosts` and the empty
   (`server.product.boostConsentRequired`); the seller starts the purchase
   again from My listings.
 
+Migration `20261021211736_boost_own_showcase_window` adds each boost's own
+showcase end (`showcase_ends_at`) and its paused showcase remainder
+(`paused_showcase_seconds`). No data step: a row written before it reads the
+listing's `home_showcase_until` (capped by its own end) until its next
+timeline change writes the column, and a remainder paused before it is capped
+at the boost's bought and extended days on resume. Rollback: revert the API;
+the columns are harmless if left.
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`

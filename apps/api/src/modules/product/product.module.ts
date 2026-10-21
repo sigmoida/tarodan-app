@@ -13,6 +13,7 @@ import { ProductRankingService } from "./ranking/product-ranking.service";
 import { ProductStatsService } from "./ranking/product-stats.service";
 import { ProductEngagementService } from "./ranking/product-engagement.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
+import { BoostNoticeService } from "./ranking/boost-notice.service";
 import { ProductController } from "./product.controller";
 import { ProductSchedulerService } from "./jobs/product-scheduler.service";
 import { BoostScheduledProcessor } from "./jobs/boost-scheduled.processor";
@@ -68,6 +69,8 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductStatsService,
     ProductEngagementService,
     ProductBoostService,
+    // Seller notices of staff boost actions (outbox handler + immediate send).
+    BoostNoticeService,
     ProductSchedulerService,
     ...scheduledProcessors(BoostScheduledProcessor),
   ],
@@ -78,6 +81,7 @@ import { UserBlockModule } from "../user-block/user-block.module";
     ProductCommonService,
     ProductRankingService,
     ProductBoostService,
+    BoostNoticeService,
     ProductSchedulerService,
     // Admin bakım işlemi (süresi dolmuş ilanları işaretle/reaktive et) yazmayı
     // alan servisten yapar — doğrudan Prisma yazımı değil.

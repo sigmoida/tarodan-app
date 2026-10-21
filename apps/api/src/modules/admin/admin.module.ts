@@ -123,6 +123,7 @@ import { AdminShippingTariffService } from "./orders/admin-shipping-tariff.servi
 import { AdminReviewService } from "./ops/admin-review.service";
 import { AdminSellerApplicationService } from "./users/admin-seller-application.service";
 import { AdminAdPackageService } from "./finance/admin-ad-package.service";
+import { AdminBoostOperationsService } from "./finance/boost/admin-boost-operations.service";
 import { ScheduledNotificationScheduler } from "./jobs/scheduled-notification.scheduler";
 import { LogRetentionService } from "./jobs/log-retention.service";
 import {
@@ -336,6 +337,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminReviewService,
     AdminSellerApplicationService,
     AdminAdPackageService,
+    AdminBoostOperationsService,
     AdminHeroService,
     ScheduledNotificationScheduler,
     ...scheduledProcessors(ScheduledNotificationProcessor),

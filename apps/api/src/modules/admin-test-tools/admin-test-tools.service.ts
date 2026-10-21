@@ -391,8 +391,8 @@ export class AdminTestToolsService {
           where: { id },
           data: {
             boostedUntil: target,
-            // Vitrin penceresi de kaydırılır — aksi halde Vitrin dolum testi
-            // yanıltıcı olur (boost dolar, vitrin eski tarihte kalırdı).
+            // The showcase window moves too, or a showcase expiry test would
+            // mislead (the boost ends while the showcase keeps its old date).
             ...(before.homeShowcaseUntil ? { homeShowcaseUntil: target } : {}),
           },
         });
@@ -400,6 +400,14 @@ export class AdminTestToolsService {
           where: { productId: id, status: "active" },
           data: { endsAt: target },
         });
+        // Each showcase boost keeps its own showcase end, which the timeline
+        // rebuilds `homeShowcaseUntil` from: it moves with the listing's.
+        if (before.homeShowcaseUntil) {
+          await this.prisma.productBoost.updateMany({
+            where: { productId: id, status: "active", showcaseOnHome: true },
+            data: { showcaseEndsAt: target },
+          });
+        }
         return {
           type,
           id,

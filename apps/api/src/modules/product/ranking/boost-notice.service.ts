@@ -1,0 +1,94 @@
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { PrismaService } from "../../../prisma";
+import { OutboxService } from "../../outbox/outbox.service";
+import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
+import {
+  OUTBOX_BOOST_NOTICE,
+  boostNoticeDedupeKey,
+  type BoostNoticeKind,
+  type BoostNoticePayload,
+} from "../../outbox/outbox.types";
+import { NotificationService } from "../../notification/notification.service";
+import { NotificationType } from "../../notification/dto";
+import { errorMessage } from "../../../common/helpers/error-message";
+
+const KIND_TO_TYPE: Record<BoostNoticeKind, NotificationType> = {
+  granted: NotificationType.BOOST_GRANTED,
+  cancelled: NotificationType.BOOST_CANCELLED,
+  refunded: NotificationType.BOOST_REFUNDED,
+};
+
+/**
+ * Seller notices of staff boost actions (grant, revoke, refund and stop),
+ * through the outbox (apps/api/CLAUDE.md, "Side effects go through the
+ * outbox"). `BoostTimelineService` writes the row in the transaction that
+ * changes the boost; the staff action then sends it at once (`flush`), and the
+ * drainer sends it if the process stops in between, or when the change
+ * committed elsewhere (a boost refund finalized by the recovery cron).
+ */
+@Injectable()
+export class BoostNoticeService implements OnModuleInit {
+  private readonly logger = new Logger(BoostNoticeService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly outbox: OutboxService,
+    private readonly outboxHandlers: OutboxHandlerRegistry,
+    private readonly notificationService: NotificationService,
+  ) {}
+
+  onModuleInit(): void {
+    this.outboxHandlers.register(OUTBOX_BOOST_NOTICE, async (payload) =>
+      this.send(payload as BoostNoticePayload),
+    );
+  }
+
+  /** After commit: sends the queued notice now; a failure leaves it to the drainer. */
+  async flush(notice: BoostNoticePayload): Promise<void> {
+    try {
+      await this.outbox.runInline(
+        this.prisma,
+        boostNoticeDedupeKey(notice),
+        () => this.send(notice),
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `boost notice deferred to the outbox (${notice.kind} ${notice.boostId}): ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  /**
+   * The outbox handler: one notice to the boost's seller, read when it is
+   * sent (the refunded amount is final by then). A boost that no longer
+   * exists (deleted with its listing) has nobody to tell.
+   */
+  async send(notice: BoostNoticePayload): Promise<void> {
+    const boost = await this.prisma.productBoost.findUnique({
+      where: { id: notice.boostId },
+      select: {
+        userId: true,
+        productId: true,
+        durationDays: true,
+        refundedAmount: true,
+        product: { select: { title: true } },
+      },
+    });
+    if (!boost) return;
+    // The record must exist before the push: a retry then pushes once.
+    await this.notificationService.createInAppNotification(
+      boost.userId,
+      KIND_TO_TYPE[notice.kind],
+      {
+        // Identity: a mobile tap opens the listing itself.
+        productId: boost.productId,
+        productTitle: boost.product.title,
+        ...(notice.kind === "granted" ? { days: boost.durationDays } : {}),
+        ...(notice.kind === "refunded"
+          ? { amount: Number(boost.refundedAmount ?? 0) }
+          : {}),
+      },
+      { pushRequiresRecord: true },
+    );
+  }
+}

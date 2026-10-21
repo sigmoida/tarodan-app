@@ -11066,6 +11066,17 @@
       "tradeDisputeResolved": {
         "title": "Takas İtirazı Sonuçlandı",
         "message": "Takas itirazı Tarodan ekibi tarafından sonuçlandırıldı ve takas tamamlandı."
+      },
+      "boostGranted": {
+        "title": "Öne çıkarma tanımlandı",
+        "message": "Tarodan, \"{productTitle}\" ilanınızı {days} gün ücretsiz öne çıkardı."
+      },
+      "boostCancelled": {
+        "title": "Öne çıkarma durduruldu",
+        "message": "\"{productTitle}\" ilanının öne çıkarması Tarodan tarafından durduruldu."
+      },
+      "boostRefunded": {
+        "message": "\"{productTitle}\" ilanının öne çıkarması durduruldu ve {amount} TL iade edildi. İadenin kartınıza yansıması bankanıza göre birkaç gün sürebilir."
       }
     },
     "auth": {
@@ -11772,7 +11783,8 @@
         "pauseActiveOnly": "Yalnızca süresi devam eden aktif paket duraklatılabilir",
         "resumePausedOnly": "Yalnızca duraklatılmış paket devam ettirilebilir",
         "extendActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış paketin süresi uzatılabilir",
-        "extensionRange": "Uzatma süresi 1-365 gün olmalıdır"
+        "extensionRange": "Uzatma süresi 1-365 gün olmalıdır",
+        "slugTaken": "Bu slug ile bir paket zaten var"
       },
       "fileMissing": "Dosya gönderilmedi",
       "commission": {
@@ -11826,7 +11838,8 @@
         "refundAttemptNotFound": "İade denemesi bulunamadı",
         "resolveManualReviewOnly": "Yalnız manuel inceleme bekleyen iade denemeleri çözülebilir",
         "cancelCompleted": "Tamamlanmış ödemeler iptal edilemez, iade yapın",
-        "escrowReasonRequired": "Escrow serbest bırakma için sebep (reason) zorunludur"
+        "escrowReasonRequired": "Escrow serbest bırakma için sebep (reason) zorunludur",
+        "boostRefundUseBoostScreen": "Öne çıkarma ödemeleri Paket Satın Alımları ekranından iade edilir"
       },
       "payout": {
         "transferNotFound": "Payout transfer bulunamadı",
@@ -11924,6 +11937,13 @@
           "preparingWarningBeforeDeadline": "Satıcı hazırlık uyarısı (saat), satıcı hazırlık süresinden (gün × 24 saat) kısa olmalıdır."
         },
         "conflict": "Süreler aynı anda başka bir yönetici tarafından değiştirildi. Sayfayı yenileyip tekrar deneyin."
+      },
+      "boost": {
+        "refundNotAllowed": "Bu öne çıkarma için iade yapılamaz",
+        "refundAmountInvalid": "İade tutarı 0'dan büyük olmalı ve iade edilebilir tutarı ({max}) aşmamalı",
+        "revokeGrantOnly": "İadesiz iptal yalnız ücretsiz tanımlar içindir",
+        "grantListingNotActive": "Yalnız yayındaki ilanlara öne çıkarma tanımlanabilir",
+        "stopActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış öne çıkarma durdurulabilir"
       }
     },
     "advertisement": {

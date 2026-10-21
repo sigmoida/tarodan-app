@@ -1,25 +1,19 @@
 import { ProductSchedulerService } from "./product-scheduler.service";
 
 /**
- * The expire-boosts cron writes a listing's promotion columns under the same
- * listing lock as BoostTimelineService, so a boost activated while the cron
- * runs is never overwritten (a downgrade wiping a fresh boost, a system
- * resume replacing a fresh boost's end with the paused remainder).
+ * The expire-boosts cron changes a listing's boost timeline only through
+ * BoostTimelineService, one transaction per listing under its lock, so a boost
+ * activated while the cron runs is never overwritten (a downgrade wiping a
+ * fresh boost, a system resume replacing a fresh boost's end with the paused
+ * remainder) and stacked boosts keep their own time across a system pause.
  */
 describe("ProductSchedulerService expire-boosts under the listing lock", () => {
   const NOW = new Date("2026-10-21T12:00:00.000Z");
   const HOUR = 60 * 60 * 1000;
-  const at = (ms: number) => new Date(NOW.getTime() + ms);
-
-  const makeTx = () => ({
-    product: { findUnique: jest.fn(), update: jest.fn() },
-    productBoost: {
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-    },
-  });
 
   const make = () => {
-    const tx = makeTx();
+    // Passed through to the timeline untouched; the cron never writes on it.
+    const tx = { marker: "tx" };
     const prisma = {
       $transaction: jest.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
       product: { findMany: jest.fn().mockResolvedValue([]) },
@@ -31,6 +25,8 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
     const timeline = {
       lockProduct: jest.fn().mockResolvedValue(undefined),
       refreshProductPromotion: jest.fn().mockResolvedValue(undefined),
+      pauseForDelisting: jest.fn().mockResolvedValue(0),
+      resumeSystemPaused: jest.fn().mockResolvedValue(0),
     };
     const service = new ProductSchedulerService(
       prisma as never,
@@ -63,123 +59,102 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
     );
   });
 
-  it("system pause locks the listing, pauses only rows still active and rebuilds the columns", async () => {
+  const privateOf = (service: ProductSchedulerService) =>
+    service as unknown as {
+      pauseBoostsOfDelistedProducts(now: Date): Promise<number>;
+      resumeSystemPausedBoosts(now: Date): Promise<number>;
+    };
+
+  it("system pause runs per offline listing through the timeline, one transaction each", async () => {
+    // The timeline keeps each boost's own remaining time; the cron only
+    // finds the listings (BoostTimelineService.pauseForDelisting).
     const { service, prisma, tx, timeline } = make();
     prisma.productBoost.findMany.mockResolvedValueOnce([
-      { id: "b1", productId: "p1", endsAt: at(2 * HOUR) },
+      { productId: "p1" },
+      { productId: "p2" },
     ]);
+    timeline.pauseForDelisting
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1);
 
-    const count = await (
-      service as unknown as {
-        pauseBoostsOfDelistedProducts(now: Date): Promise<number>;
-      }
-    ).pauseBoostsOfDelistedProducts(NOW);
+    const count = await privateOf(service).pauseBoostsOfDelistedProducts(NOW);
 
-    expect(count).toBe(1);
-    expect(timeline.lockProduct).toHaveBeenCalledWith(tx, "p1");
-    expect(tx.productBoost.updateMany).toHaveBeenCalledWith({
-      where: { id: "b1", status: "active" },
-      data: expect.objectContaining({
-        status: "paused",
-        pausedBySystem: true,
-        pausedRemainingSeconds: 7200,
-      }),
+    expect(count).toBe(3);
+    expect(prisma.productBoost.findMany).toHaveBeenCalledWith({
+      where: {
+        status: "active",
+        endsAt: { gt: NOW },
+        product: { status: { not: "active" } },
+      },
+      select: { productId: true },
+      distinct: ["productId"],
+      orderBy: { productId: "asc" },
+      take: 200,
     });
-    expect(timeline.refreshProductPromotion).toHaveBeenCalledWith(
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(timeline.pauseForDelisting).toHaveBeenNthCalledWith(
+      1,
       tx,
       "p1",
       NOW,
     );
-    const lockOrder = timeline.lockProduct.mock.invocationCallOrder[0];
-    expect(lockOrder).toBeLessThan(
-      tx.productBoost.updateMany.mock.invocationCallOrder[0],
+    expect(timeline.pauseForDelisting).toHaveBeenNthCalledWith(
+      2,
+      tx,
+      "p2",
+      NOW,
     );
   });
 
-  const resume = (service: ProductSchedulerService) =>
-    (
-      service as unknown as {
-        resumeSystemPausedBoosts(now: Date): Promise<number>;
-      }
-    ).resumeSystemPausedBoosts(NOW);
+  it("one listing that fails never stops the others", async () => {
+    const { service, prisma, timeline } = make();
+    prisma.productBoost.findMany.mockResolvedValueOnce([
+      { productId: "p1" },
+      { productId: "p2" },
+    ]);
+    timeline.pauseForDelisting
+      .mockRejectedValueOnce(new Error("lock timeout"))
+      .mockResolvedValueOnce(1);
 
-  const pausedRow = {
-    id: "b1",
-    productId: "p1",
-    showcaseOnHome: false,
-    pausedRemainingSeconds: 3600,
-    product: { qualityScore: 10, popularityScore: 1 },
-  };
+    await expect(
+      privateOf(service).pauseBoostsOfDelistedProducts(NOW),
+    ).resolves.toBe(1);
+    expect(timeline.pauseForDelisting).toHaveBeenCalledTimes(2);
+  });
 
-  it("system resume stacks the remainder after a boost activated while the listing was offline", async () => {
+  it("system resume runs per live listing through the timeline", async () => {
     const { service, prisma, tx, timeline } = make();
-    prisma.productBoost.findMany.mockResolvedValueOnce([pausedRow]);
-    tx.product.findUnique.mockResolvedValue({
-      boostedUntil: at(7 * 24 * HOUR),
-      homeShowcaseUntil: null,
-    });
+    prisma.productBoost.findMany.mockResolvedValueOnce([{ productId: "p1" }]);
+    timeline.resumeSystemPaused.mockResolvedValueOnce(2);
 
-    await resume(service);
+    await expect(
+      privateOf(service).resumeSystemPausedBoosts(NOW),
+    ).resolves.toBe(2);
 
-    expect(timeline.lockProduct).toHaveBeenCalledWith(tx, "p1");
-    // The listing's running end is read under the lock, never before it.
-    expect(timeline.lockProduct.mock.invocationCallOrder[0]).toBeLessThan(
-      tx.product.findUnique.mock.invocationCallOrder[0],
+    expect(timeline.resumeSystemPaused).toHaveBeenCalledWith(tx, "p1", NOW);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("system resume takes at most 200 distinct listings a run, in a stable order", async () => {
+    const { service, prisma } = make();
+
+    await privateOf(service).resumeSystemPausedBoosts(NOW);
+
+    expect(prisma.productBoost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { productId: true },
+        distinct: ["productId"],
+        orderBy: { productId: "asc" },
+        take: 200,
+      }),
     );
-    expect(tx.productBoost.updateMany).toHaveBeenCalledWith({
-      where: { id: "b1", status: "paused", pausedBySystem: true },
-      data: expect.objectContaining({
-        status: "active",
-        endsAt: at(7 * 24 * HOUR + HOUR),
-      }),
-    });
-    expect(tx.product.update).toHaveBeenCalledWith({
-      where: { id: "p1" },
-      data: expect.objectContaining({
-        boostedUntil: at(7 * 24 * HOUR + HOUR),
-        rankTier: 2,
-      }),
-    });
-  });
-
-  it("system resume runs the remainder from now on an unboosted listing", async () => {
-    const { service, prisma, tx } = make();
-    prisma.productBoost.findMany.mockResolvedValueOnce([pausedRow]);
-    tx.product.findUnique.mockResolvedValue({
-      boostedUntil: null,
-      homeShowcaseUntil: null,
-    });
-
-    await resume(service);
-
-    expect(tx.product.update).toHaveBeenCalledWith({
-      where: { id: "p1" },
-      data: expect.objectContaining({
-        boostedUntil: at(HOUR),
-        homeShowcaseUntil: null,
-      }),
-    });
-  });
-
-  it("system resume writes nothing when staff changed the row meanwhile", async () => {
-    const { service, prisma, tx } = make();
-    prisma.productBoost.findMany.mockResolvedValueOnce([pausedRow]);
-    tx.product.findUnique.mockResolvedValue({
-      boostedUntil: null,
-      homeShowcaseUntil: null,
-    });
-    tx.productBoost.updateMany.mockResolvedValue({ count: 0 });
-
-    await resume(service);
-
-    expect(tx.product.update).not.toHaveBeenCalled();
   });
 
   it("system resume only picks boosts the system paused, on live listings", async () => {
     // A staff pause has pausedBySystem=false: the cron never resumes it.
     const { service, prisma } = make();
 
-    await resume(service);
+    await privateOf(service).resumeSystemPausedBoosts(NOW);
 
     expect(prisma.productBoost.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

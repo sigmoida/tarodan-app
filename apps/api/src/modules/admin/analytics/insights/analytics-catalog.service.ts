@@ -17,6 +17,7 @@ import {
   col,
   liveUserRefSql,
 } from "../../../account-lane/live-lane.where";
+import { SOLD_BOOST, soldBoostSql } from "../sold-boost.predicate";
 import { AnalyticsTabService } from "./analytics-tab.service";
 import {
   toAnalyticsRange,
@@ -151,6 +152,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
           _count: { _all: true },
           where: {
             ...LIVE_PRODUCT_BOOST,
+            ...SOLD_BOOST,
             purchasedAt: window,
             status: { not: BoostStatus.failed },
           },
@@ -235,6 +237,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         AND "purchased_at" <= ${window.lte}
         AND "final_view_count" IS NOT NULL
         AND "baseline_view_count" IS NOT NULL
+        AND ${soldBoostSql("product_boosts")}
         AND ${liveUserRefSql(col("product_boosts", "user_id"))}`;
 
     return round2(num(rows[0]?.value));
@@ -267,6 +270,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         WHERE "purchased_at" >= ${range.current.gte}
           AND "purchased_at" <= ${range.current.lte}
           AND "status" <> ${BoostStatus.failed}::"BoostStatus"
+          AND ${soldBoostSql("product_boosts")}
           AND ${liveUserRefSql(col("product_boosts", "user_id"))}
         GROUP BY 1`,
     ]);
@@ -355,6 +359,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
       WHERE b."purchased_at" >= ${window.gte}
         AND b."purchased_at" <= ${window.lte}
         AND b."status" <> ${BoostStatus.failed}::"BoostStatus"
+        AND ${soldBoostSql("b")}
         AND ${liveUserRefSql(col("b", "user_id"))}
       GROUP BY 1, 2`;
 

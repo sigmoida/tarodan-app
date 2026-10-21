@@ -212,6 +212,9 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.LISTING_VIEWS_MILESTONE]: LISTING,
   [NotificationType.BOOST_EXPIRED]: pattern("/profile/listings"),
   [NotificationType.BOOST_ACTIVATED]: pattern("/profile/listings"),
+  [NotificationType.BOOST_GRANTED]: pattern("/profile/listings"),
+  [NotificationType.BOOST_CANCELLED]: pattern("/profile/listings"),
+  [NotificationType.BOOST_REFUNDED]: pattern("/profile/listings"),
 
   // ── Ödeme (satıcıya) ─────────────────────────────────────────────────────
   // Hedef kitle TİPTEN belli: ikisi de satıcıya gider, `orderId` varlığına

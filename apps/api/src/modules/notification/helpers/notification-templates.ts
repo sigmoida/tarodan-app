@@ -381,6 +381,22 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.boostActivated.message",
     icon: "🚀",
   },
+  [NotificationType.BOOST_GRANTED]: {
+    titleKey: "server.notification.boostGranted.title",
+    messageKey: "server.notification.boostGranted.message",
+    icon: "🚀",
+  },
+  [NotificationType.BOOST_CANCELLED]: {
+    titleKey: "server.notification.boostCancelled.title",
+    messageKey: "server.notification.boostCancelled.message",
+    icon: "⏹️",
+  },
+  // Same title as a stop without a refund; the message adds the amount.
+  [NotificationType.BOOST_REFUNDED]: {
+    titleKey: "server.notification.boostCancelled.title",
+    messageKey: "server.notification.boostRefunded.message",
+    icon: "⏹️",
+  },
   [NotificationType.TRADE_CANCELLED]: {
     titleKey: "server.notification.tradeCancelled.title",
     messageKey: "server.notification.tradeCancelled.message",

@@ -22,6 +22,12 @@ describe("refundAttemptCancelActor", () => {
     ).toBe(CancellationActor.platform);
   });
 
+  it("attributes a boost refund to the platform (only staff start one)", () => {
+    expect(refundAttemptCancelActor("boost-refund:boost-1:0")).toBe(
+      CancellationActor.platform,
+    );
+  });
+
   it.each([
     ["full-refund:pay-1:ord-1"],
     ["stock-shortage-refund:pay-1:ord-1"],

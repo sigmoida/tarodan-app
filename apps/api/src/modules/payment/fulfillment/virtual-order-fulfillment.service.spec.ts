@@ -1,5 +1,8 @@
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
-import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
+import { newBoostTimeline } from "../../product/boost-timeline/boost-timeline.testing";
+
+/** The real timeline facade over its slices (activation runs for real). */
+const newTimeline = () => newBoostTimeline().timeline;
 import {
   CancellationActor,
   SubscriptionStatus,
@@ -93,7 +96,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
@@ -141,7 +144,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
@@ -169,7 +172,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       await svc.applyMembershipInTx(tx, {
@@ -188,7 +191,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       await svc.applyMembershipInTx(tx, payment);
@@ -218,7 +221,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       await expect(
@@ -258,7 +261,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       const productId = await svc.applyBoostInTx(tx, payment);
@@ -293,7 +296,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       const productId = await svc.applyBoostInTx(tx, payment);
@@ -313,7 +316,7 @@ describe("VirtualOrderFulfillmentService", () => {
       const svc = new VirtualOrderFulfillmentService(
         {} as any,
         {} as any,
-        new BoostTimelineService(),
+        newTimeline(),
       );
 
       const productId = await svc.applyBoostInTx(tx, payment);

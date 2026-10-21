@@ -517,6 +517,64 @@ ayrıdır; belirsizler `manual_review`'a park eder ve
 listesini `referenceNo` ile eşleyip CAS ile `succeeded`'a çevirir; referanssız
 ama tutarı tutan dönüş **belirsiz** bırakılır (insan kararı).
 
+### Boost refund and stop (admin)
+
+A boost (`BST-` order, `origin = platform_service`, the platform seller sells
+the virtual `boost-<id>` product) is refunded only from the admin Boost
+purchases screen: `POST /admin/ad-packages/purchases/:id/refund
+{ amount?, reason }` (`super_admin`, `admin`; `ads` permission). The generic
+`POST /admin/payments/:id/manual-refund` refuses a boost payment
+(`server.admin.payment.boostRefundUseBoostScreen`), and buyer refund requests
+never covered boosts.
+
+- **Refundable**: a paid (`source = purchase`) boost that is `active` or
+  `paused` with a `completed` payment; not an ended boost (decision D2). The
+  maximum is `boostRefundableAmount` (`admin/finance/boost/`): the price minus
+  `refundedAmount`, never above what the payment still holds. The admin may
+  enter less (D1); empty means the maximum.
+- **Order of operations**: `processRefund` runs as for any order (the attempt
+  is written before PayTR, the refund goes to the store the boost was paid on,
+  the payment and the order record it, a full refund cancels the order with
+  `cancelledBy = platform`). Its finalize transaction also stops the boost
+  (`BoostTimelineService.stopForRefund`): status `cancelled`, the amount added
+  to `refundedAmount`, the admin and reason written, the boost's unused time
+  taken off the listing and the boosts queued behind it moved up. If PayTR
+  refuses or the outcome is uncertain, the boost is unchanged. Whichever path
+  finalizes the attempt (the admin call, a retry, the stuck-refund recovery
+  cron) stops the boost with the money.
+- **No ledger lines**: a virtual order never had a capture group, so the
+  refund writes no `refund_issued` group, no hold change, no seller debt and no
+  stock on the virtual product (this holds for membership orders too).
+- **Invoice**: the boost e-Arşiv is reversed through the outbox like any order
+  refund (`OUTBOX_INVOICE_REFUND_REVERSE`): cancelled within 8 days for a full,
+  unadjusted refund, otherwise a RETURN invoice per attempt in the refund's
+  ratio.
+- **Never twice**: every try gets a fresh attempt key
+  (`boost-refund:<boostId>:<n>`, `n` = the boost's earlier attempts), so a try
+  PayTR refused can be repeated with another amount. The attempt claim refuses
+  a new attempt while an earlier one is unresolved, and the claim guard
+  (`claimGuard`, under the payment lock) refuses a boost that a finished
+  refund stopped meanwhile. A retry after a finished refund answers with the
+  stopped boost.
+- **Notices**: `processRefund` itself sends no order refund or cancel notice,
+  no staff "order cancelled" mail and no shipment cancel for a boost order,
+  whichever path finalizes it (the platform's own services never ship).
+- **Audit and notice**: one `boost_refund` audit row with the real outcome
+  (`refunded`, `failed`, `pending_reconciliation`), written only when that
+  call refunded; a failed audit write after the money went back is reported
+  (`BOOST_REFUND_AUDIT_MISSING`, Sentry) and not turned into an error. The
+  seller gets `BOOST_REFUNDED` through the outbox. Sentry: tag `flow=boost`,
+  boost id and order number.
+- **One refund per boost**: the refund stops the boost, and a stopped boost
+  is not refundable again, so a partial refund leaves the rest of the payment
+  with no admin path (open product decision).
+
+A free grant (`source = admin_grant`, `POST /admin/ad-packages/purchases/grant`)
+has no order, payment or invoice and is not revenue (D3); it is stopped
+without money by `POST /admin/ad-packages/purchases/:id/revoke`. Boost
+revenue, counts and uplift in analytics read bought boosts only
+(`admin/analytics/sold-boost.predicate.ts`).
+
 ---
 
 ## 8. Takas ödemeleri (v2)
