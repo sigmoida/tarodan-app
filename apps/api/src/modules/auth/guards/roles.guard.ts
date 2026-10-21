@@ -21,12 +21,12 @@ import {
 import { i18nMessage } from "../../i18n";
 import { isTest } from "../../../config/environment";
 
-// ── URL → izin anahtarı eşleşmesi ──────────────────────────────────────────
+// ── URL -> permission key map ──────────────────────────────────────────────
 //
-// İstek URL'inin ilk path segmenti kullanılır: /api/admin/<segment>/...
-// GET ve yazma isteklerinin ikisi de aynı izni gerektirir — sayfa erişim modeli.
-// @RequirePermission / @RequireAllPermissions bu tabloyu override eder
-// (bkz. requiredPermissions).
+// The request URL's first admin segment is used: /api/admin/<segment>/...
+// GET and write requests need the same permission (page access model).
+// @RequirePermission and @RequireAllPermissions replace this map (see
+// declaredPermissions).
 //
 export const PERMISSION_MAP: Record<string, string[]> = {
   dashboard: ["dashboard"],
@@ -156,33 +156,33 @@ function isCanonicalAdminUrl(url: string): boolean {
   return p[0] === "admin";
 }
 
-function resolveUrlPermissions(url: string): string[] | null {
-  const seg = extractSegment(url);
-  if (!seg) return null;
-  return PERMISSION_MAP[seg] ?? null;
-}
-
 /**
  * What the permission matrix must grant: `any` of the keys (the URL map, or
  * the one `@RequirePermission` key) or `all` of them (`@RequireAllPermissions`
  * plus a `@RequirePermission` declared next to it, so no declared key is
- * dropped). The decorators replace the URL map; null when nothing applies.
+ * dropped). A declared requirement replaces the URL map.
  */
 export interface PermissionRequirement {
   keys: string[];
   match: "any" | "all";
 }
 
-export function requiredPermissions(
-  declared: { one?: string; all?: string[] },
-  url: string,
-): PermissionRequirement | null {
+/** The requirement the decorators declare; null when they declare none. */
+export function declaredPermissions(declared: {
+  one?: string;
+  all?: string[];
+}): PermissionRequirement | null {
   if (declared.all && declared.all.length > 0) {
     const keys = declared.one ? [...declared.all, declared.one] : declared.all;
     return { keys: [...new Set(keys)], match: "all" };
   }
-  if (declared.one) return { keys: [declared.one], match: "any" };
-  const keys = resolveUrlPermissions(url);
+  return declared.one ? { keys: [declared.one], match: "any" } : null;
+}
+
+/** The URL segment's entry in `PERMISSION_MAP`; null when unmapped. */
+function urlPermissions(url: string): PermissionRequirement | null {
+  const seg = extractSegment(url);
+  const keys = seg ? PERMISSION_MAP[seg] : undefined;
   return keys && keys.length > 0 ? { keys, match: "any" } : null;
 }
 
@@ -230,20 +230,23 @@ export class RolesGuard implements CanActivate {
       ALL_PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
-    const declaresAll = !!allPermissions && allPermissions.length > 0;
 
-    // @BypassPermissionMatrix — izin matrisi sorgulanmaz; rol kontrolü yeterli.
+    // @BypassPermissionMatrix: the role check is enough, no matrix lookup.
     const bypassMatrix = this.reflector.getAllAndOverride<boolean>(
       BYPASS_PERMISSION_MATRIX_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    // Ne rol ne izin tanımlanmışsa — geçir (public gibi davran).
-    if (
-      (!requiredRoles || requiredRoles.length === 0) &&
-      !explicitPermission &&
-      !declaresAll
-    ) {
+    // Resolved once: the bypass and early-return decisions read the same rule
+    // the matrix check enforces.
+    const declared = declaredPermissions({
+      one: explicitPermission,
+      all: allPermissions,
+    });
+    const declaresAll = declared?.match === "all";
+
+    // Neither a role nor a declared permission: pass (treated as public).
+    if ((!requiredRoles || requiredRoles.length === 0) && !declared) {
       return true;
     }
 
@@ -271,24 +274,20 @@ export class RolesGuard implements CanActivate {
     // ── 2. super_admin her zaman geçer ────────────────────────────────────
     if (user.role === "super_admin") return true;
 
-    // ── 2b. @BypassPermissionMatrix — rol kontrolü yeterli, matris sorgulanmaz ──
+    // ── 2b. @BypassPermissionMatrix: the role check is enough ──────────────
     // An explicit all-of requirement is never bypassed silently.
     if (bypassMatrix && !declaresAll) return true;
 
-    // ── 3. İzin matrisi kontrolü ──────────────────────────────────────────
+    // ── 3. Permission matrix check ─────────────────────────────────────────
     const url = req.originalUrl ?? req.url ?? "";
-    const requirement = requiredPermissions(
-      { one: explicitPermission, all: allPermissions },
-      url,
-    );
-
+    const requirement = declared ?? urlPermissions(url);
     if (!requirement) {
-      // Fail-closed: kanonik bir /api/admin/<segment> route'u PERMISSION_MAP'te
-      // eşlenmemişse (ve bilinen rol-only istisnalardan biri değilse) erişimi
-      // reddet. Aksi halde yeni eklenen ve izin haritasına yazılması unutulan
-      // bir admin route'u sessizce sadece-rol kontrolüne düşer ve moderator gibi
-      // roller izin matrisini atlayarak erişebilir. Kanonik olmayan
-      // (/module/admin/...) ve bilinen rol-only admin route'ları fail-open kalır.
+      // Fail closed: a canonical /api/admin/<segment> route whose segment is
+      // not in PERMISSION_MAP (and not a known role-only exception) is
+      // refused. Otherwise a new admin route someone forgot to map would fall
+      // back to the role check alone and roles such as moderator would skip
+      // the matrix. Non-canonical (/module/admin/...) and known role-only
+      // admin routes stay open to the role check.
       const seg = extractSegment(url);
       if (
         seg &&
@@ -299,7 +298,7 @@ export class RolesGuard implements CanActivate {
           i18nMessage("server.auth.noPermissionDefined"),
         );
       }
-      return true; // Bilinmeyen route — sadece rol yeterli
+      return true; // Unknown route: the role is enough
     }
 
     const perms = await this.loadPermissions();

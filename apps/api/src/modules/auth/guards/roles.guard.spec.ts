@@ -1,6 +1,6 @@
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { PERMISSION_MAP, RolesGuard, requiredPermissions } from "./roles.guard";
+import { PERMISSION_MAP, RolesGuard, declaredPermissions } from "./roles.guard";
 import { Roles, ROLES_KEY } from "../decorators/roles.decorator";
 import {
   PERMISSION_KEY,
@@ -561,16 +561,14 @@ describe("RolesGuard — @RequireAllPermissions (all-of)", () => {
 
   it("joins a class-level @RequirePermission into the all-of set", () => {
     expect(
-      requiredPermissions({ one: "trades", all: ["ads", "payments"] }, ""),
+      declaredPermissions({ one: "trades", all: ["ads", "payments"] }),
     ).toEqual({ keys: ["ads", "payments", "trades"], match: "all" });
-    expect(requiredPermissions({ one: "trades" }, "")).toEqual({
+    expect(declaredPermissions({ one: "trades" })).toEqual({
       keys: ["trades"],
       match: "any",
     });
-    expect(requiredPermissions({}, "/api/admin/users/1")).toEqual({
-      keys: ["users", "seller_performance"],
-      match: "any",
-    });
+    expect(declaredPermissions({})).toBeNull();
+    expect(declaredPermissions({ all: [] })).toBeNull();
   });
 
   it("passes only when the role has every key", async () => {
