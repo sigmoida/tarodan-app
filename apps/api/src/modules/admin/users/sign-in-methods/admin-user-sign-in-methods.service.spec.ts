@@ -5,6 +5,7 @@ import {
   toAdminSignInMethodEvent,
   type SignInMethodEventRow,
 } from "./admin-user-sign-in-methods.service";
+import { SIGN_IN_METHODS_SELECT } from "../../../auth/sign-in-methods/sign-in-methods.mapper";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const AT = new Date("2026-10-21T10:00:00.000Z");
@@ -40,37 +41,53 @@ function setup(
       findMany: jest.fn().mockResolvedValue(opts.rows ?? []),
     },
   };
-  const methods: SignInMethods = {
-    hasPassword: true,
-    providers: [
-      {
-        provider: "google",
-        email: "g@example.test",
-        linkedAt: AT.toISOString(),
-      },
-    ],
-  };
-  const signInMethods = {
-    getSignInMethods: jest.fn().mockResolvedValue(methods),
-  };
-  const service = new AdminUserSignInMethodsService(
-    prisma as never,
-    signInMethods as never,
-  );
-  return { service, prisma, signInMethods, methods };
+  const service = new AdminUserSignInMethodsService(prisma as never);
+  return { service, prisma };
 }
 
 describe("AdminUserSignInMethodsService", () => {
   describe("getSignInMethods", () => {
-    it("answers the auth read model unchanged (one implementation)", async () => {
-      const { service, signInMethods, methods } = setup();
-      await expect(service.getSignInMethods(USER_ID)).resolves.toBe(methods);
-      expect(signInMethods.getSignInMethods).toHaveBeenCalledWith(USER_ID);
+    it("uses the auth read model's select and mapper: hasPassword, never the hash", async () => {
+      const { service, prisma } = setup();
+      prisma.user.findUnique.mockResolvedValue({
+        passwordHash: "$2b$12$secret-hash-value",
+        oauthAccounts: [
+          { provider: "google", email: "g@example.test", createdAt: AT },
+          { provider: "legacy", email: null, createdAt: AT },
+        ],
+      });
+      const result = await service.getSignInMethods(USER_ID);
+      expect(result).toEqual<SignInMethods>({
+        hasPassword: true,
+        providers: [
+          {
+            provider: "google",
+            email: "g@example.test",
+            linkedAt: AT.toISOString(),
+          },
+        ],
+      });
+      expect(JSON.stringify(result)).not.toContain("secret-hash-value");
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: USER_ID },
+        select: SIGN_IN_METHODS_SELECT,
+      });
     });
 
-    it("passes the 404 of an unknown user through", async () => {
-      const { service, signInMethods } = setup();
-      signInMethods.getSignInMethods.mockRejectedValue(new NotFoundException());
+    it("answers hasPassword false for a social-only account", async () => {
+      const { service, prisma } = setup();
+      prisma.user.findUnique.mockResolvedValue({
+        passwordHash: null,
+        oauthAccounts: [],
+      });
+      await expect(service.getSignInMethods(USER_ID)).resolves.toEqual({
+        hasPassword: false,
+        providers: [],
+      });
+    });
+
+    it("answers 404 for an unknown user", async () => {
+      const { service } = setup({ userExists: false });
       await expect(service.getSignInMethods(USER_ID)).rejects.toBeInstanceOf(
         NotFoundException,
       );

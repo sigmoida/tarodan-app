@@ -105,8 +105,6 @@ import { SignInMethodsService } from "./sign-in-methods/sign-in-methods.service"
     // e-mail change, plan T8b) resolves the guard and its service from here.
     ReauthService,
     ReauthGuard,
-    // The admin user detail shows the same read model (plan T16).
-    SignInMethodsService,
   ],
 })
 export class AuthModule {}

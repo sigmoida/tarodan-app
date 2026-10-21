@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
+  isSignInProvider,
   REAUTH_METHODS,
   SIGN_IN_METHOD_EVENT_FLOWS,
   SIGN_IN_METHOD_EVENT_SOURCES,
   SIGN_IN_METHOD_EVENT_TYPES,
-  SIGN_IN_PROVIDERS,
   type AdminSignInMethodEvent,
   type AdminSignInMethodEventList,
   type SignInMethods,
@@ -13,7 +13,10 @@ import {
 import { PrismaService } from "../../../../prisma";
 import { paginate, type ListQuery } from "../../../../common/list";
 import { i18nMessage } from "../../../i18n";
-import { SignInMethodsService } from "../../../auth/sign-in-methods/sign-in-methods.service";
+import {
+  SIGN_IN_METHODS_SELECT,
+  toSignInMethods,
+} from "../../../auth/sign-in-methods/sign-in-methods.mapper";
 
 /**
  * The only columns read for the history. The IP address, the user agent, the
@@ -74,7 +77,7 @@ export function toAdminSignInMethodEvent(
     id: row.id,
     eventType,
     occurredAt: row.createdAt.toISOString(),
-    provider: oneOf(SIGN_IN_PROVIDERS, details.provider),
+    provider: isSignInProvider(details.provider) ? details.provider : null,
     source: oneOf(SOURCES, details.source),
     method: oneOf(REAUTH_METHODS, details.method),
     flow: oneOf(FLOWS, details.flow),
@@ -83,20 +86,25 @@ export function toAdminSignInMethodEvent(
 
 /**
  * Admin user detail: a user's sign-in methods and the history of their
- * sign-in method events. Read-only. The methods come from the auth read model
- * (`SignInMethodsService`), so admin and the user see the same view; the
- * history is an admin read model over `security_logs`.
+ * sign-in method events. Read-only admin read models. The methods use the
+ * auth read model's select and mapper (`sign-in-methods.mapper.ts`), so admin
+ * and the user see the same view; the auth service with its credential writes
+ * is deliberately not injected here.
  */
 @Injectable()
 export class AdminUserSignInMethodsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly signInMethods: SignInMethodsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /** `hasPassword` (never the hash) and the linked providers; 404 for an unknown user. */
-  getSignInMethods(userId: string): Promise<SignInMethods> {
-    return this.signInMethods.getSignInMethods(userId);
+  async getSignInMethods(userId: string): Promise<SignInMethods> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: SIGN_IN_METHODS_SELECT,
+    });
+    if (!row) {
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+    }
+    return toSignInMethods(row);
   }
 
   /**
