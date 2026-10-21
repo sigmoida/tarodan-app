@@ -109,7 +109,7 @@ describe("savedSearchChips", () => {
       "Hot Wheels",
       "black",
       "red",
-      "₺10 - ₺∞",
+      "10,00 TL - ∞",
       "product.tradeAvailable",
     ]);
   });

@@ -3,6 +3,7 @@
  * chips on `/listings` and the saved-search cards, so a filter reads the
  * same wherever it is shown. Pure (no React).
  */
+import { formatPrice } from "@/lib/format";
 import type { Translate } from "@/types/i18n";
 
 /** A catalog colour option (`GET /products/filters` `colors`). */
@@ -30,13 +31,13 @@ export function colorLabel(
   return options?.find((option) => option.slug === slug)?.label ?? slug;
 }
 
-const present = (value: string | number | undefined): string | undefined =>
-  value === undefined || value === "" ? undefined : String(value);
+const isSet = (value: string | number | undefined): value is string | number =>
+  value !== undefined && value !== "";
 
-/** The price range chip (an open bound reads 0 or ∞). */
+/** The price range chip, money through `formatPrice` (an open top reads ∞). */
 export function priceRangeLabel(
   min: string | number | undefined,
   max: string | number | undefined,
 ): string {
-  return `₺${present(min) ?? "0"} - ₺${present(max) ?? "∞"}`;
+  return `${formatPrice(isSet(min) ? min : 0)} - ${isSet(max) ? formatPrice(max) : "∞"}`;
 }
