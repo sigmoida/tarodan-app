@@ -8,8 +8,7 @@ import { useTranslations } from "next-intl";
 import { SAVED_SEARCH_ERROR_CODES, type SavedSearch } from "@tarodan/types";
 import { savedSearchesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { useRouter } from "@/i18n/navigation";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuthGate } from "@/hooks/useAuthGate";
 import {
   apiErrorCode,
   apiErrorMessage,
@@ -34,12 +33,13 @@ function refusalLimit(error: unknown): number | null {
 
 /**
  * "Save this search" on the listings page: the canonical draft of the live
- * filters, the guest redirect, and the save mutation with its 409 / 403 states.
+ * filters, the sign-in prompt for a guest (the shared `useAuthGate`, which
+ * returns them here after sign-in), and the save mutation with its 409 / 403
+ * states. Render `authModal` next to the button.
  */
 export function useSaveSearch() {
   const t = useTranslations();
-  const router = useRouter();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { requireAuth, authModal } = useAuthGate();
   const { filtersForSidebar } = useListings();
   const [open, setOpen] = useState(false);
   const [refusal, setRefusal] = useState<SaveSearchRefusal | null>(null);
@@ -69,15 +69,16 @@ export function useSaveSearch() {
     },
   );
 
-  /** The toolbar button: guests sign in and come back, signed-in users get the modal. */
+  /** The toolbar button: guests get the sign-in prompt, signed-in users the modal. */
   const start = () => {
     if (draft.isEmpty) return;
-    if (!isAuthenticated) {
-      toast(t("savedSearch.signInToSave"));
-      const back = window.location.pathname + window.location.search;
-      router.push(`/login?redirect=${encodeURIComponent(back)}`);
+    if (
+      !requireAuth({
+        title: t("savedSearch.saveTitle"),
+        message: t("savedSearch.signInToSave"),
+      })
+    )
       return;
-    }
     setRefusal(null);
     setOpen(true);
   };
@@ -103,6 +104,7 @@ export function useSaveSearch() {
     open,
     refusal,
     isSaving: mutation.isPending,
+    authModal,
     start,
     save,
     close,

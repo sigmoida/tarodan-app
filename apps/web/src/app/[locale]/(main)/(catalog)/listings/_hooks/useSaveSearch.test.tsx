@@ -12,14 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   create: vi.fn(),
-  push: vi.fn(),
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }),
   auth: { isAuthenticated: true },
   filters: {} as unknown,
 }));
 
 vi.mock("@/lib/api", () => ({ savedSearchesApi: { create: h.create } }));
-vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ push: h.push }) }));
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: (sel: (s: typeof h.auth) => unknown) => sel(h.auth),
 }));
@@ -89,18 +87,17 @@ describe("useSaveSearch", () => {
     expect(api.draft.isEmpty).toBe(true);
     act(() => api.start());
     expect(api.open).toBe(false);
-    expect(h.push).not.toHaveBeenCalled();
+    expect(api.authModal).toBeNull();
   });
 
-  it("sends a guest to sign in with a return URL", () => {
+  it("gives a guest the shared sign-in prompt instead of the modal", () => {
     h.auth.isAuthenticated = false;
-    window.history.replaceState(null, "", "/listings?search=mustang");
     mount();
+    expect(api.authModal).toBeNull();
     act(() => api.start());
     expect(api.open).toBe(false);
-    expect(h.push).toHaveBeenCalledWith(
-      `/login?redirect=${encodeURIComponent("/listings?search=mustang")}`,
-    );
+    expect(api.authModal).not.toBeNull();
+    expect(h.create).not.toHaveBeenCalled();
   });
 
   it("saves, closes, and invalidates the saved-search list", async () => {

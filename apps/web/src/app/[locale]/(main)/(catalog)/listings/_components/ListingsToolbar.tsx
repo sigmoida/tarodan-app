@@ -74,6 +74,7 @@ export default function ListingsControls() {
         isSaving={saveSearch.isSaving}
         onSave={saveSearch.save}
       />
+      {saveSearch.authModal}
       <ProductLayoutSelector
         layout={productLayout}
         onLayoutChange={setProductLayout}
