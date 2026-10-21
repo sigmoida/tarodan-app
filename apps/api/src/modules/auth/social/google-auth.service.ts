@@ -70,6 +70,26 @@ export class GoogleAuthService {
     }
   }
 
+  /**
+   * One verified profile from either client shape: web sends the popup
+   * `code` (exchanged here), native sends the `idToken`. Neither is a 401
+   * `googleSessionInvalid`, like every other verification failure here.
+   */
+  async verifyProof(proof: {
+    code?: string;
+    idToken?: string;
+  }): Promise<GoogleProfile> {
+    const idToken = proof.code
+      ? await this.exchangeCodeForIdToken(proof.code)
+      : proof.idToken;
+    if (!idToken) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleSessionInvalid"),
+      );
+    }
+    return this.verifyIdToken(idToken);
+  }
+
   async verifyIdToken(idToken: string): Promise<GoogleProfile> {
     let payload: TokenPayload | undefined;
     try {

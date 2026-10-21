@@ -1,3 +1,4 @@
+import type { SignInProvider } from "@tarodan/types";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
 import { TR_TIME_ZONE } from "./tr-calendar";
 
@@ -17,7 +18,8 @@ export const ACCOUNT_SECURITY_NOTICE_EVENTS = [
 export type AccountSecurityNoticeEvent =
   (typeof ACCOUNT_SECURITY_NOTICE_EVENTS)[number];
 
-export type AccountSecurityNoticeProvider = "google" | "apple";
+/** Alias kept for the mail callers; the one list is `SignInProvider`. */
+export type AccountSecurityNoticeProvider = SignInProvider;
 
 const PROVIDER_LABELS: Record<AccountSecurityNoticeProvider, string> = {
   google: "Google",

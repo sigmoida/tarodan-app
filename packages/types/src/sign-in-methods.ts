@@ -8,8 +8,12 @@
  * - Sensitive writes take the token as `reauthToken` in the body or, when the
  *   body has no `reauthToken`, in the `X-Reauth-Token` header
  *   (`REAUTH_TOKEN_HEADER`; use the header on `DELETE`). The sign-in method
- *   writes (`POST /auth/password/set`) always need it. Account deletion
- *   (`DELETE /users/me`) and the e-mail change request
+ *   writes always need it, and each answers the fresh `SignInMethods`:
+ *   `POST /auth/password/set` (`SetPasswordRequest`),
+ *   `POST /auth/social/google/link` (`GoogleLinkRequest`),
+ *   `POST /auth/social/apple/link` (`AppleLinkRequest`) and
+ *   `POST /auth/social/:provider/unlink` (`UnlinkProviderRequest`).
+ *   Account deletion (`DELETE /users/me`) and the e-mail change request
  *   (`POST /auth/email/request-change`) check a token whenever one is sent,
  *   and need one only while the setting
  *   `REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING` is on.
@@ -90,6 +94,60 @@ export interface SetPasswordRequest {
   reauthToken: string;
 }
 
+/**
+ * `POST /auth/social/google/link`: web sends the popup `code`, native sends
+ * the `idToken` (one of them, as on `POST /auth/google`).
+ */
+export interface GoogleLinkRequest {
+  code?: string;
+  idToken?: string;
+  reauthToken: string;
+}
+
+/**
+ * `POST /auth/social/apple/link`. Mobile also sends `authorizationCode`, as on
+ * `POST /auth/apple`, so the Apple token can be revoked on unlink and on
+ * account deletion; web sends none.
+ */
+export interface AppleLinkRequest {
+  identityToken: string;
+  authorizationCode?: string;
+  reauthToken: string;
+}
+
+/** `POST /auth/social/:provider/unlink`. */
+export interface UnlinkProviderRequest {
+  reauthToken: string;
+}
+
+/**
+ * The last-method rule (sign-in methods plan, decision D1): after an unlink
+ * the account must keep a password or a Google link. Apple alone does not
+ * count, because Apple sign-in is iOS-only on mobile (ADR 0012) and an
+ * Apple-only account could not sign in on Android.
+ *
+ * True only when `provider` is linked and removing it keeps the rule. An
+ * account has at most one link per provider; the rule still judges every row
+ * of the provider as removed, so legacy data with two rows stays safe. The API
+ * applies it under the user row lock; the clients use it to disable the
+ * Disconnect button. Never re-implement it.
+ */
+export function canUnlinkProvider(
+  methods: SignInMethods,
+  provider: SignInProvider,
+): boolean {
+  if (!methods.providers.some((linked) => linked.provider === provider)) {
+    return false;
+  }
+  const remaining = methods.providers.filter(
+    (linked) => linked.provider !== provider,
+  );
+  return (
+    methods.hasPassword ||
+    remaining.some((linked) => linked.provider === "google")
+  );
+}
+
 /** `errorCode` values of the sign-in methods and step-up routes. */
 export const SIGN_IN_METHODS_ERROR_CODES = {
   /** 403: missing, expired or foreign `reauthToken`; confirm again. */
@@ -104,6 +162,16 @@ export const SIGN_IN_METHODS_ERROR_CODES = {
   reauthUnavailable: "REAUTH_UNAVAILABLE",
   /** 409: `POST /auth/password/set` on an account that has a password. */
   passwordAlreadySet: "PASSWORD_ALREADY_SET",
+  /** 400: the provider token of a link could not be verified (never 401). */
+  providerTokenInvalid: "PROVIDER_TOKEN_INVALID",
+  /** 409: the account already has a link for this provider. */
+  providerAlreadyLinked: "PROVIDER_ALREADY_LINKED",
+  /** 409: the provider account is linked to another account (not named). */
+  providerLinkedToOtherAccount: "PROVIDER_LINKED_TO_OTHER_ACCOUNT",
+  /** 404: unlink of a provider that is not linked (a stale list). */
+  providerNotLinked: "PROVIDER_NOT_LINKED",
+  /** 409: the unlink would break the last-method rule (`canUnlinkProvider`). */
+  lastSignInMethod: "LAST_SIGN_IN_METHOD",
 } as const;
 
 export type SignInMethodsErrorCode =

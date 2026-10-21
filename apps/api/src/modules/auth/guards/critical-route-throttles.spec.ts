@@ -93,6 +93,21 @@ describe("critical public route throttles", () => {
       method: "setPassword",
       limit: 5,
     },
+    {
+      controller: SignInMethodsController,
+      method: "linkGoogle",
+      limit: 10,
+    },
+    {
+      controller: SignInMethodsController,
+      method: "linkApple",
+      limit: 10,
+    },
+    {
+      controller: SignInMethodsController,
+      method: "unlinkProvider",
+      limit: 10,
+    },
     // Anonim çerez tercihi kaydı: tablo sınırsız büyümesin.
     {
       controller: ConsentController,

@@ -70,9 +70,17 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   a still-unverified account only loses the password. The e-mail match is
   `lower(email) = lower($1)`, never Prisma `mode: "insensitive"` (an unescaped
   ILIKE). Staff and banned matches get nothing written. A lost P2002 race
-  resolves to the winner's link or is retried once.
+  resolves to the winner's link or is retried once. **At most one link per
+  provider** (one Google, one Apple): every writer checks it under the user
+  row lock. A sign-in whose verified e-mail matches an account that already
+  has another identity of the provider opens it (or takes it over) without a
+  second link, writes no `social_linked_auto` row and sends no notice (a
+  Sentry breadcrumb only). SecurityLog: an
+  auto-link is `social_linked_auto`, a take-over or heal `social_link_reset`
+  (`details.source: "login"`).
 - Apple refresh tokens are stored encrypted (`APPLE_TOKEN_ENCRYPTION_KEY`);
-  account deletion enqueues revocation in the deletion transaction (outbox).
+  account deletion and an Apple unlink enqueue revocation in their
+  transaction (outbox).
   Permanent failures go to the DLQ; redrive with
   `maintenance/redrive-apple-token-revocations.ts` (dry run, then `--apply`;
   `docs/OPERATIONS.md`).
@@ -125,8 +133,27 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   `auth-password.service.ts` (409 `passwordAlreadySet` when one exists);
   changing a password stays in `security/`.
 - The step-up and every write set the Sentry tag `auth.flow` (`reauth`,
-  `password_set`, ...); add new step-up routes to
-  `guards/critical-route-throttles.spec.ts`. Never log the token or its hash.
+  `password_set`, `provider_link`, `provider_unlink`); a 404/409 refusal is
+  a breadcrumb, not an error. Add new step-up routes to
+  `guards/critical-route-throttles.spec.ts` and
+  `sign-in-methods.controller.spec.ts`. Never log the token or its hash.
+- Link and unlink (`POST /auth/social/{google,apple}/link`,
+  `POST /auth/social/:provider/unlink`) are `SocialIdentityService`'s
+  `linkToUser`/`unlinkFromUser`, the only OAuthAccount writers besides
+  sign-in. A link keys on the provider `sub`; the provider e-mail may differ; an
+  account with an unverified e-mail gets `403 EMAIL_NOT_VERIFIED`.
+  A provider token the provider services refuse (their 401) answers
+  `400 PROVIDER_TOKEN_INVALID`. 409 `PROVIDER_ALREADY_LINKED` (this account
+  has the provider) or `PROVIDER_LINKED_TO_OTHER_ACCOUNT` (never says
+  which; also a lost P2002 race). Unlink keeps the **last-method rule**
+  `canUnlinkProvider` (`@tarodan/types`): a password or a Google link must
+  remain, Apple alone does not count; refused as `409 LAST_SIGN_IN_METHOD`,
+  `404 PROVIDER_NOT_LINKED` for a provider that is not there. An Apple link
+  stores the mobile `authorizationCode` after commit, as login does; a
+  token that lands after an unlink is stored revoke-requested.
+  SecurityLog `social_linked` / `social_unlinked` with `details.source:
+"manual"`. A later sign-in may link an unlinked provider again through
+  the verified e-mail rule (with the notice mail), by design.
 
 ## Registration
 

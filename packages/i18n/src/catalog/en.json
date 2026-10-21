@@ -4800,9 +4800,11 @@
           "accountLocked": "Account Locked",
           "socialLinked": "Social Account Linked",
           "socialLinkReset": "Unverified Account Reset on Social Sign-in",
+          "socialLinkedAuto": "Linked Automatically on Social Sign-in",
+          "socialUnlinked": "Social Account Unlinked",
           "passwordSet": "Password Set",
-          "reauthFailed": "Re-authentication Failed",
-          "reauthLocked": "Re-authentication Locked"
+          "reauthFailed": "Step-up Confirmation Failed",
+          "reauthLocked": "Step-up Confirmation Locked"
         },
         "emailStatuses": {
           "sent": "Sent",
@@ -11036,12 +11038,16 @@
       "usernameInvalid": "Invalid username.",
       "usernameAlreadyTaken": "This username has already been taken.",
       "sessionNotCreated": "The session could not be created securely",
-      "reauthRequired": "Please confirm it's you to continue",
-      "reauthFailed": "We could not confirm it's you",
-      "reauthMethodNotAllowed": "Confirm with your password",
-      "reauthLocked": "Too many attempts. Try again in a few minutes",
-      "reauthUnavailable": "We can't confirm it's you right now. Try again in a few minutes",
-      "passwordAlreadySet": "This account already has a password"
+      "reauthRequired": "Please confirm it's you to continue.",
+      "reauthFailed": "We could not confirm it's you. Please try again.",
+      "reauthMethodNotAllowed": "Confirm with your password.",
+      "reauthLocked": "Too many attempts. Please try again in a few minutes.",
+      "reauthUnavailable": "We can't confirm it's you right now. Please try again in a few minutes.",
+      "passwordAlreadySet": "This account already has a password.",
+      "providerAlreadyLinked": "This sign-in method is already connected.",
+      "providerLinkedToOtherAccount": "This Google or Apple account is connected to another Tarodan account.",
+      "providerNotLinked": "This sign-in method is not connected to your account.",
+      "lastSignInMethod": "Your account must keep a password or a connected Google account. Set a password first."
     },
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",
