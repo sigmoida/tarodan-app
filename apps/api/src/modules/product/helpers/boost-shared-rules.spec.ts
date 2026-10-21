@@ -24,21 +24,34 @@ describe("isBoostEnabled", () => {
     ["true", true],
     ["TRUE", true],
     ["anything", true],
+    // Only the word "false" turns sales off: other "off-looking" values do not.
+    ["0", true],
+    ["off", true],
+    ["no", true],
+    ["falsey", true],
     ["false", false],
     ["FALSE", false],
+    ["False", false],
     [" false ", false],
+    ["\tfalse\n", false],
   ])("%p -> %p", (value, expected) => {
     expect(isBoostEnabled(value)).toBe(expected);
   });
 
-  it("differs from the standard toggle rule only for a missing value", () => {
-    // A missing row keeps boost on (today's production behaviour), where the
-    // standard rule would read it as off.
-    expect(isBoostEnabled(undefined)).toBe(true);
-    expect(isPlatformSettingOn(undefined)).toBe(false);
+  it("agrees with the standard toggle rule on the values the admin toggle writes", () => {
     expect(isBoostEnabled("false")).toBe(isPlatformSettingOn("false"));
     expect(isBoostEnabled("true")).toBe(isPlatformSettingOn("true"));
   });
+
+  it.each([undefined, null, "", "0"])(
+    "differs from the standard toggle rule for %p (boost stays on)",
+    (value) => {
+      // A missing row keeps boost on (today's production behaviour), where the
+      // standard rule would read it as off.
+      expect(isBoostEnabled(value)).toBe(true);
+      expect(isPlatformSettingOn(value)).toBe(false);
+    },
+  );
 });
 
 describe("boostOfferSince", () => {
@@ -112,6 +125,61 @@ describe("productCardAction", () => {
       });
     },
   );
+
+  it("shows nothing on the own boosted listing on mobile (no extend either)", () => {
+    // CAN_BUY_DIGITAL is off on mobile: no boost and no extend button.
+    expect(
+      productCardAction(product({ isBoosted: true }), {
+        userId: "seller-1",
+        canBoost: false,
+      }),
+    ).toEqual({ kind: "none" });
+  });
+
+  it("shows nothing on the own boosted listing once it is not active", () => {
+    expect(
+      productCardAction(
+        product({ isBoosted: true, status: "inactive" }),
+        owner,
+      ),
+    ).toEqual({ kind: "none" });
+  });
+
+  it.each([0, null, undefined])(
+    "offers boost on the own active listing whatever its stock (%p)",
+    (availableQuantity) => {
+      // Stock decides "add to cart" for buyers only; the owner never buys.
+      expect(productCardAction(product({ availableQuantity }), owner)).toEqual({
+        kind: "boost",
+        extend: false,
+      });
+    },
+  );
+
+  it.each([null, undefined])(
+    "reads an unknown boost state (%p) as not boosted",
+    (isBoosted) => {
+      expect(productCardAction(product({ isBoosted }), owner)).toEqual({
+        kind: "boost",
+        extend: false,
+      });
+    },
+  );
+
+  it("shows a guest nothing on an out-of-stock listing", () => {
+    expect(
+      productCardAction(product({ availableQuantity: 0 }), guest).kind,
+    ).toBe("none");
+  });
+
+  it("does not show cart on another seller's boosted listing out of stock", () => {
+    expect(
+      productCardAction(
+        product({ isBoosted: true, availableQuantity: 0 }),
+        other,
+      ).kind,
+    ).toBe("none");
+  });
 
   it("offers add to cart on another seller's active listing in stock", () => {
     expect(productCardAction(product(), other)).toEqual({
