@@ -61,6 +61,16 @@ export function paymentPurpose(kind: PaymentKind): PaymentPurpose {
   return kind === "membership" ? "membership" : "checkout";
 }
 
+/**
+ * Whether the pay page asks for the distance sales contract: a sale of goods
+ * only. A platform service (membership, boost) is not one and has its own
+ * purchase consents; the API skips the distance sales gate for it
+ * (`DistanceSalesConsentService.ensureForPayment` gets no subject).
+ */
+export function takesDistanceSalesConsent(kind: PaymentKind): boolean {
+  return kind === "checkout";
+}
+
 export interface PaymentReturnContext {
   paymentId: string | null;
   /** A guest order or cart (`guest=true`). */

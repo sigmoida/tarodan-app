@@ -12,11 +12,14 @@ import CardPaymentSection from "@/components/payment/CardPaymentSection";
 import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
 import { useCardPayment, type PaymentTarget } from "@/hooks/useCardPayment";
 import type { PaymentPurpose } from "@/lib/api";
+import { takesDistanceSalesConsent, type PaymentKind } from "@/lib/paymentKind";
 import AmountSummaryCard, { type TradePricingLines } from "./AmountSummaryCard";
 
 interface PaymentReadyProps {
   target: PaymentTarget;
   paymentId: string;
+  /** The loaded payment's kind (its API flags, not only the URL `type`). */
+  kind: PaymentKind;
   amount?: number;
   pricing?: TradePricingLines | null;
   cardStorageEnabled?: boolean;
@@ -28,15 +31,16 @@ interface PaymentReadyProps {
 }
 
 /**
- * Ödemeye hazır ekran — checkout ile AYNI iskelet: solda kart bilgileri,
- * sağda yapışkan özet sütunu (tutar + sözleşme onayı + "Ödeme Yap" + vazgeç).
- * İki ekranın tek farkı verinin yönü: burada sipariş ve ödeme kaydı ZATEN
- * vardır, hedef çözücü hazır id'leri döndürür; checkout'ta aynı bölüm siparişi
- * submit anında oluşturur.
+ * The ready-to-pay view, the SAME layout as checkout: card details on the
+ * left, a sticky summary column on the right (amount, contract consent for a
+ * sale of goods, pay, cancel). The only difference is the direction of the
+ * data: here the order and the payment row already exist and the resolver
+ * returns their ids; checkout creates the order at submit.
  */
 export default function PaymentReady({
   target,
   paymentId,
+  kind,
   amount,
   pricing,
   cardStorageEnabled = false,
@@ -51,15 +55,20 @@ export default function PaymentReady({
     async () => ({ paymentId, target }),
     [paymentId, target],
   );
-  // Checkout ile aynı ön koşul: sözleşme onaylanmadan tahsilat başlatılmaz.
-  // Onay ödeme formu isteğiyle sunucuya gider — teklif siparişinin checkout
-  // adımı yok, onayın kaydedildiği yer burası.
+  // A sale of goods takes the same precondition as checkout: no charge
+  // without the distance sales contract. The consent goes to the server with
+  // the payment form request (an offer order has no checkout step, so this is
+  // where it is recorded). A platform service (membership, boost) has its own
+  // consents: no checkbox, and nothing is sent.
+  const needsDistanceSales = takesDistanceSalesConsent(kind);
   const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);
   const card = useCardPayment({
     purpose,
     cardStorageEnabled,
     resolvePayment,
-    distanceSalesAccepted,
+    distanceSalesAccepted: needsDistanceSales
+      ? distanceSalesAccepted
+      : undefined,
   });
   const { processing, loadingCards, submit } = card;
 
@@ -92,13 +101,19 @@ export default function PaymentReady({
 
           {hasTarget && (
             <div className="space-y-3">
-              <DistanceSalesConsent
-                checked={distanceSalesAccepted}
-                onChange={setDistanceSalesAccepted}
-              />
+              {needsDistanceSales && (
+                <DistanceSalesConsent
+                  checked={distanceSalesAccepted}
+                  onChange={setDistanceSalesAccepted}
+                />
+              )}
               <Button
                 onClick={submit}
-                disabled={processing || loadingCards || !distanceSalesAccepted}
+                disabled={
+                  processing ||
+                  loadingCards ||
+                  (needsDistanceSales && !distanceSalesAccepted)
+                }
                 isLoading={processing}
                 size="lg"
                 className="w-full"

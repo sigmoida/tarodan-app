@@ -82,6 +82,7 @@ export default function PaymentPageClient() {
       <PaymentReady
         target={directTarget}
         paymentId={payment.id}
+        kind={kind}
         amount={payment.amount}
         // Kalemler yalnız takas ödemesinde döner (grup/sipariş ödemesinin
         // kendi özeti sepet ekranındadır).
