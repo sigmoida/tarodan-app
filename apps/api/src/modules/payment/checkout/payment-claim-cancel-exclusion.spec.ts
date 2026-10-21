@@ -75,6 +75,7 @@ describe("PaymentInitiationService — claim iptal edilmiş siparişte başlamaz
       {} as never,
       {} as never,
       { ensureForPayment: jest.fn().mockResolvedValue("record") } as never,
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     return { service, prisma, calls };
   };

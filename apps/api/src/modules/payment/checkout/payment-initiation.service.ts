@@ -44,6 +44,8 @@ import {
   DistanceSalesConsentService,
   type DistanceSalesSubject,
 } from "../../consent/distance-sales-consent.service";
+import { PlatformServiceConsentService } from "../../consent/platform-service-consent.service";
+import { virtualOrderKind } from "../helpers/virtual-order-kind";
 
 /** Misafir siparişinin alıcı e-postası — `shippingAddress` JSON'ında saklanır. */
 function guestEmailOf(shippingAddress: Prisma.JsonValue | null): string | null {
@@ -72,6 +74,7 @@ export class PaymentInitiationService {
     private readonly paymentLifecycle: PaymentLifecycleService,
     private readonly providerEvents: PaymentProviderEventService,
     private readonly distanceSalesConsent: DistanceSalesConsentService,
+    private readonly platformServiceConsent: PlatformServiceConsentService,
   ) {}
 
   /**
@@ -735,6 +738,8 @@ export class PaymentInitiationService {
     // Mesafeli satış onayının ait olduğu satın alma. Satın alma olmayan
     // hedeflerde (takas ücreti, üyelik / öne çıkarma) null kalır.
     let distanceSalesSubject: DistanceSalesSubject | null = null;
+    // A boost order: charged only with its purchase consents on record.
+    let platformServiceConsentOrderId: string | null = null;
 
     if (dto.orderId && !dto.checkoutGroupId) {
       const order = await this.prisma.order.findUnique({
@@ -846,7 +851,11 @@ export class PaymentInitiationService {
       ];
       baseOid = String(order.orderNumber || order.id).replace(/-/g, "");
       paytrMerchant = resolvePaytrMerchant({ order });
-      // Sepete bağlı olmayan tekil satın alma: teklif siparişi.
+      const kind = virtualOrderKind(order);
+      // A single purchase outside a cart (an offer order) takes the distance
+      // sales consent. A platform service (membership, boost) is not a sale
+      // of goods; a boost has its own purchase consents instead.
+      if (kind === "boost") platformServiceConsentOrderId = order.id;
       if (order.origin !== OrderOrigin.platform_service) {
         distanceSalesSubject = {
           orderId: order.id,
@@ -1065,6 +1074,21 @@ export class PaymentInitiationService {
       distanceSalesSubject,
       dto.distanceSalesAccepted,
     );
+
+    // PLATFORM SERVICE CONSENT GATE, before the claim as well: a boost order
+    // is created together with both purchase consents (initiateBoost, one
+    // transaction), so a boost order without them (one made before the rule)
+    // is never charged. No setting: the rule is closed.
+    if (
+      platformServiceConsentOrderId &&
+      !(await this.platformServiceConsent.isRecordedForOrder(
+        platformServiceConsentOrderId,
+      ))
+    ) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostConsentRequired"),
+      );
+    }
 
     // ÇİFT-ÇEKİM KORUMASI: bu ödemenin önceki bir denemesi (providerConversationId) varsa,
     // YENİ çekimden ÖNCE PayTR'a durum-sorgu yap. Callback gecikmiş/ulaşmamış (ör. tünel ölü)

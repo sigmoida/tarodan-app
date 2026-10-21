@@ -49,6 +49,7 @@ describe("PaymentInitiationService — direct-form mesafeli satış kapısı", (
       {} as never,
       {} as never,
       { ensureForPayment: gate } as never,
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     return { service, prisma, gate };
   };

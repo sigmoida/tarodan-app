@@ -60,6 +60,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — merchant scope", (
       {} as never,
       events as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     const ctx = {
       payment: {
@@ -214,6 +215,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
       {} as never,
       events as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never,
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     const ctx = {
       payment: {

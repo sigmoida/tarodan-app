@@ -28,6 +28,7 @@ import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { PaymentLifecycleService } from "../checkout/payment-lifecycle.service";
 import { PrismaService } from "../../../prisma";
 import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
+import { PlatformServiceConsentService } from "../../consent/platform-service-consent.service";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import {
@@ -185,6 +186,10 @@ describe("PaymentService trade cash refund idempotency", () => {
         {
           provide: DistanceSalesConsentService,
           useValue: { ensureForPayment: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: PlatformServiceConsentService,
+          useValue: { isRecordedForOrder: jest.fn().mockResolvedValue(true) },
         },
         { provide: CacheService, useValue: { del: jest.fn() } },
         {
