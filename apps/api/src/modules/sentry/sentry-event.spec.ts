@@ -165,6 +165,32 @@ describe("applySentryEventPolicy", () => {
     } as any);
     expect(JSON.stringify(event)).not.toContain("hunter2");
   });
+
+  it("redacts the JSON string body the SDK stores on the request", () => {
+    const event = applySentryEventPolicy({
+      request: {
+        url: "https://api/auth/reauth",
+        data: JSON.stringify({ password: "hunter2", code: "g-code" }),
+      },
+      extra: { code: "P2002" },
+    } as any);
+
+    expect(JSON.stringify(event)).not.toContain("hunter2");
+    expect(JSON.stringify(event)).not.toContain("g-code");
+    expect(event?.extra?.code).toBe("P2002");
+  });
+
+  it("redacts the body before a card-number pass could break its JSON", () => {
+    const event = applySentryEventPolicy({
+      request: {
+        url: "https://api/auth/login",
+        data: '{"ref":4111111111111111,"password":"hunter2"}',
+      },
+    } as any);
+
+    expect(JSON.stringify(event)).not.toContain("hunter2");
+    expect(JSON.stringify(event)).not.toContain("4111111111111111");
+  });
 });
 
 /**

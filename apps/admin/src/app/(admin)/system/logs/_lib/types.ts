@@ -134,6 +134,9 @@ export const eventTypeLabels = (t: T): Record<string, string> => ({
   account_locked: t("admin.system.logs.events.accountLocked"),
   social_linked: t("admin.system.logs.events.socialLinked"),
   social_link_reset: t("admin.system.logs.events.socialLinkReset"),
+  password_set: t("admin.system.logs.events.passwordSet"),
+  reauth_failed: t("admin.system.logs.events.reauthFailed"),
+  reauth_locked: t("admin.system.logs.events.reauthLocked"),
 });
 
 export const actionLabels = (t: T): Record<string, string> => ({

@@ -28,7 +28,7 @@
  *     OPS-046..050 skip. ErrorLogInterceptor ise global → error_logs (OPS-052/53/54) aktif.
  *   - Test harness helmet()/enableCors()/BullBoard/setGlobalPrefix-callback-exclude UYGULAMAZ
  *     (create-app.ts ≠ main.ts) → OPS-066/070..075/078/079/081/082 harness-dışı → skip.
- *   - error_logs redaction anahtarı `[GİZLİ]` (interceptor), Sentry `[REDACTED]` değil.
+ *   - error_logs and Sentry share one body redaction rule (`redactRequestBody`, marker `[REDACTED]`).
  *   - CacheService @Global + exported → ctx.module.get(CacheService) ile Redis'e doğrudan erişim.
  */
 import * as request from "supertest";
@@ -503,13 +503,11 @@ describe("23 — Platform: i18n, Sağlık, Cache, GraphQL, Monitoring (OPS)", ()
 
     scenario("OPS-068", async () => {
       // forbidNonWhitelisted=false: ekstra alan 400 vermez, kırpılır; iş mantığına göre 401.
-      const res = await request(server())
-        .post("/api/auth/login")
-        .send({
-          email: "nobody@test.local",
-          password: "SomePass123!",
-          hacker: "x",
-        });
+      const res = await request(server()).post("/api/auth/login").send({
+        email: "nobody@test.local",
+        password: "SomePass123!",
+        hacker: "x",
+      });
       expect(res.status).not.toBe(400); // fazla alan reddedilmez
       expect([200, 401]).toContain(res.status); // kullanıcı yok → 401
     });
@@ -578,7 +576,7 @@ describe("23 — Platform: i18n, Sağlık, Cache, GraphQL, Monitoring (OPS)", ()
     });
 
     scenario("OPS-053", async () => {
-      // 401 → severity=warning, GET gövdesi loglanmaz. POST hata gövdesinde password redakte ([GİZLİ]).
+      // 401 -> severity=warning, a GET body is not logged. A failed POST body has its password redacted.
       const prisma = getPrisma();
 
       // (1) Korumalı uca token'sız GET → 401.
@@ -597,7 +595,7 @@ describe("23 — Platform: i18n, Sağlık, Cache, GraphQL, Monitoring (OPS)", ()
       // GET → body undefined (metadata.body yazılmaz).
       expect((warn!.metadata as any).body).toBeUndefined();
 
-      // (2) password taşıyan POST'ta hata → metadata.body.password === '[GİZLİ]'.
+      // (2) A failed POST carrying a password -> metadata.body.password === '[REDACTED]'.
       // Geçersiz body → ValidationPipe 400; body redakte edilerek loglanır.
       await request(server())
         .post("/api/auth/register")
@@ -614,7 +612,7 @@ describe("23 — Platform: i18n, Sağlık, Cache, GraphQL, Monitoring (OPS)", ()
       expect(postLog).not.toBeNull();
       const body = (postLog!.metadata as any).body;
       expect(body).toBeDefined();
-      expect(body.password).toBe("[GİZLİ]"); // düz metin parola loglanmaz
+      expect(body.password).toBe("[REDACTED]"); // never a plain-text password
     });
 
     scenario("OPS-054", async () => {

@@ -4,6 +4,7 @@ import { NewsletterController } from "../../marketing/newsletter.controller";
 import { OrderController } from "../../order/order.controller";
 import { PaymentController } from "../../payment/payment.controller";
 import { ConsentController } from "../../consent/consent.controller";
+import { SignInMethodsController } from "../sign-in-methods/sign-in-methods.controller";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -12,7 +13,7 @@ const THROTTLER_TTL_DEFAULT = "THROTTLER:TTLdefault";
 
 describe("critical public route throttles", () => {
   const cases: Array<{
-    controller: any;
+    controller: { name: string; prototype: object };
     method: string;
     limit: number;
   }> = [
@@ -69,6 +70,17 @@ describe("critical public route throttles", () => {
       method: "subscribe",
       limit: 5,
     },
+    // Step-up and the writes it guards (sign-in methods plan, 2026-10-21).
+    {
+      controller: SignInMethodsController,
+      method: "reauthenticate",
+      limit: 5,
+    },
+    {
+      controller: SignInMethodsController,
+      method: "setPassword",
+      limit: 5,
+    },
     // Anonim çerez tercihi kaydı: tablo sınırsız büyümesin.
     {
       controller: ConsentController,
@@ -80,7 +92,7 @@ describe("critical public route throttles", () => {
   it.each(cases)(
     "limits $controller.name.$method to $limit requests per minute",
     ({ controller, method, limit }) => {
-      const handler = controller.prototype[method];
+      const handler = (controller.prototype as Record<string, object>)[method];
 
       expect(Reflect.getMetadata(THROTTLER_LIMIT_DEFAULT, handler)).toBe(limit);
       expect(Reflect.getMetadata(THROTTLER_TTL_DEFAULT, handler)).toBe(60000);

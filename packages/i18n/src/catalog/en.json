@@ -4799,7 +4799,10 @@
           "twoFactorEnabled": "2FA Enabled",
           "accountLocked": "Account Locked",
           "socialLinked": "Social Account Linked",
-          "socialLinkReset": "Unverified Account Reset on Social Sign-in"
+          "socialLinkReset": "Unverified Account Reset on Social Sign-in",
+          "passwordSet": "Password Set",
+          "reauthFailed": "Re-authentication Failed",
+          "reauthLocked": "Re-authentication Locked"
         },
         "emailStatuses": {
           "sent": "Sent",
@@ -11025,7 +11028,13 @@
       "invitationInvalid": "The invitation link is invalid or has expired.",
       "usernameInvalid": "Invalid username.",
       "usernameAlreadyTaken": "This username has already been taken.",
-      "sessionNotCreated": "The session could not be created securely"
+      "sessionNotCreated": "The session could not be created securely",
+      "reauthRequired": "Please confirm it's you to continue",
+      "reauthFailed": "We could not confirm it's you",
+      "reauthMethodNotAllowed": "Confirm with your password",
+      "reauthLocked": "Too many attempts. Try again in a few minutes",
+      "reauthUnavailable": "We can't confirm it's you right now. Try again in a few minutes",
+      "passwordAlreadySet": "This account already has a password"
     },
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",

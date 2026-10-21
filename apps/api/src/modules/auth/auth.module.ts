@@ -32,6 +32,10 @@ import { SecurityModule } from "../security/security.module";
 import { MarketingModule } from "../marketing/marketing.module";
 import { ConsentModule } from "../consent/consent.module";
 import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
+import { ReauthService } from "./reauth/reauth.service";
+import { ReauthGuard } from "./reauth/reauth.guard";
+import { SignInMethodsController } from "./sign-in-methods/sign-in-methods.controller";
+import { SignInMethodsService } from "./sign-in-methods/sign-in-methods.service";
 
 @Module({
   imports: [
@@ -67,7 +71,7 @@ import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
     // işi tüketen worker ayrı rolde koşar.
     BullModule.registerQueue({ name: QUEUE_NAMES.EMAIL }),
   ],
-  controllers: [AuthController, AdminAuthController],
+  controllers: [AuthController, AdminAuthController, SignInMethodsController],
   providers: [
     AuthService,
     AuthTokenService,
@@ -85,7 +89,22 @@ import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
     RolesGuard,
     PhoneVerificationService,
     EmailChangeService,
+    // Step-up (re-authentication) and the sign-in methods read model. They
+    // live here, not in SecurityModule: AuthModule imports SecurityModule,
+    // so the other way round would be a cycle.
+    ReauthService,
+    ReauthGuard,
+    SignInMethodsService,
   ],
-  exports: [AuthService, JwtModule, BannedUserGuard, RolesGuard],
+  exports: [
+    AuthService,
+    JwtModule,
+    BannedUserGuard,
+    RolesGuard,
+    // `@RequireReauth()` on routes of other modules (account deletion and
+    // e-mail change, plan T8b) resolves the guard and its service from here.
+    ReauthService,
+    ReauthGuard,
+  ],
 })
 export class AuthModule {}
