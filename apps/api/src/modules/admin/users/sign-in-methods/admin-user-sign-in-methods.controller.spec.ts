@@ -1,9 +1,13 @@
 import {
+  BadRequestException,
   ExecutionContext,
   ForbiddenException,
+  ParseUUIDPipe,
   UnauthorizedException,
+  ValidationPipe,
+  type PipeTransform,
 } from "@nestjs/common";
-import { GUARDS_METADATA } from "@nestjs/common/constants";
+import { GUARDS_METADATA, ROUTE_ARGS_METADATA } from "@nestjs/common/constants";
 import { Reflector } from "@nestjs/core";
 import { AdminRole } from "@prisma/client";
 import { IS_ADMIN_ROUTE_KEY } from "../../../auth/decorators/admin-route.decorator";
@@ -12,6 +16,8 @@ import { PERMISSION_KEY } from "../../../auth/decorators/require-permission.deco
 import { ROLES_KEY } from "../../../auth/decorators/roles.decorator";
 import { AdminJwtAuthGuard } from "../../../auth/guards/admin-jwt-auth.guard";
 import { RolesGuard } from "../../../auth/guards/roles.guard";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../../../common/validators/global-validation-pipe-options";
+import { AdminSignInMethodEventsQueryDto } from "../../dto/admin-sign-in-method-events-query.dto";
 import { AdminUserSignInMethodsController } from "./admin-user-sign-in-methods.controller";
 
 /**
@@ -144,4 +150,91 @@ describe("AdminUserSignInMethodsController authorization", () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     },
   );
+});
+
+/** Request validation in front of the service: the id and the paging query. */
+describe("AdminUserSignInMethodsController request validation", () => {
+  const USER_ID = "00000000-0000-4000-8000-000000000001";
+  const handlerNames = ["getSignInMethods", "listEvents"] as const;
+
+  /** The pipes Nest runs on the `:id` route parameter of a handler. */
+  const idPipes = (handler: (typeof handlerNames)[number]): PipeTransform[] => {
+    const args: Record<string, { data?: string; pipes: PipeTransform[] }> =
+      Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        AdminUserSignInMethodsController,
+        handler,
+      ) ?? {};
+    return Object.values(args).find((arg) => arg.data === "id")?.pipes ?? [];
+  };
+
+  it.each(handlerNames)(
+    "%s refuses a non-UUID id with 400 before the service runs",
+    async (handler) => {
+      const pipes = idPipes(handler);
+      expect(pipes).toHaveLength(1);
+      expect(pipes[0]).toBeInstanceOf(ParseUUIDPipe);
+      const metadata = { type: "param", data: "id" } as const;
+      await expect(
+        pipes[0].transform("not-a-uuid", metadata),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        pipes[0].transform("1 OR 1=1", metadata),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(pipes[0].transform(USER_ID, metadata)).resolves.toBe(
+        USER_ID,
+      );
+    },
+  );
+
+  describe("events query (the global ValidationPipe settings)", () => {
+    const pipe = new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS);
+    const parse = (query: Record<string, string>) =>
+      pipe.transform(query, {
+        type: "query",
+        metatype: AdminSignInMethodEventsQueryDto,
+        data: "",
+      });
+
+    it("is the query type of listEvents", () => {
+      const paramTypes: unknown[] = Reflect.getMetadata(
+        "design:paramtypes",
+        AdminUserSignInMethodsController.prototype,
+        "listEvents",
+      );
+      expect(paramTypes[1]).toBe(AdminSignInMethodEventsQueryDto);
+    });
+
+    it("defaults to page 1 and 20 rows", async () => {
+      await expect(parse({})).resolves.toEqual({ page: 1, limit: 20 });
+    });
+
+    it("keeps only page and limit: sort, search and date filters are dropped", async () => {
+      await expect(
+        parse({
+          page: "2",
+          limit: "500",
+          sortBy: "ipAddress",
+          sortOrder: "asc",
+          sortType: "text",
+          search: "203.0.113.7",
+          startDate: "2026-01-01",
+          endDate: "2026-12-31",
+          eventType: "failed_login",
+        }),
+      ).resolves.toEqual({ page: 2, limit: 500 });
+    });
+
+    it.each([
+      ["limit", "501"],
+      ["limit", "0"],
+      ["limit", "abc"],
+      ["page", "0"],
+      ["page", "-1"],
+    ])("refuses %s=%s with 400", async (key, value) => {
+      await expect(parse({ [key]: value })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+  });
 });

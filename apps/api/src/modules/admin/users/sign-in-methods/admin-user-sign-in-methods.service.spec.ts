@@ -52,7 +52,15 @@ describe("AdminUserSignInMethodsService", () => {
       prisma.user.findUnique.mockResolvedValue({
         passwordHash: "$2b$12$secret-hash-value",
         oauthAccounts: [
-          { provider: "google", email: "g@example.test", createdAt: AT },
+          {
+            provider: "google",
+            email: "g@example.test",
+            createdAt: AT,
+            // Columns a broader select would have loaded.
+            id: "oauth-row-1",
+            userId: USER_ID,
+            providerUserId: SECRETS.sub,
+          },
           { provider: "legacy", email: null, createdAt: AT },
         ],
       });
@@ -68,6 +76,7 @@ describe("AdminUserSignInMethodsService", () => {
         ],
       });
       expect(JSON.stringify(result)).not.toContain("secret-hash-value");
+      expect(JSON.stringify(result)).not.toContain(SECRETS.sub);
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: USER_ID },
         select: SIGN_IN_METHODS_SELECT,
@@ -88,9 +97,11 @@ describe("AdminUserSignInMethodsService", () => {
 
     it("answers 404 for an unknown user", async () => {
       const { service } = setup({ userExists: false });
-      await expect(service.getSignInMethods(USER_ID)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      const error = await service.getSignInMethods(USER_ID).catch((e) => e);
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.getResponse()).toEqual({
+        i18nKey: "server.auth.userNotFound",
+      });
     });
   });
 
@@ -185,11 +196,107 @@ describe("AdminUserSignInMethodsService", () => {
 
     it("answers 404 for an unknown user and reads no log", async () => {
       const { service, prisma } = setup({ userExists: false });
-      await expect(service.listEvents(USER_ID, {})).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      const error = await service.listEvents(USER_ID, {}).catch((e) => e);
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.getResponse()).toEqual({
+        i18nKey: "server.auth.userNotFound",
+      });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: USER_ID },
+        select: { id: true },
+      });
       expect(prisma.securityLog.findMany).not.toHaveBeenCalled();
       expect(prisma.securityLog.count).not.toHaveBeenCalled();
+    });
+
+    it("checks the user before it reads any log", async () => {
+      const { service, prisma } = setup();
+      await service.listEvents(USER_ID, {});
+      const userCheck = prisma.user.findUnique.mock.invocationCallOrder[0];
+      expect(userCheck).toBeLessThan(
+        prisma.securityLog.findMany.mock.invocationCallOrder[0],
+      );
+      expect(userCheck).toBeLessThan(
+        prisma.securityLog.count.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("answers only allow-listed fields for every row, whatever the rows hold", async () => {
+      const planted = {
+        ipAddress: SECRETS.ip,
+        userAgent: SECRETS.ua,
+        email: SECRETS.email,
+        location: "Istanbul, TR",
+        severity: "high",
+        userId: USER_ID,
+      };
+      const rows = [
+        {
+          ...row(
+            "reauth_failed",
+            {
+              method: "password",
+              flow: "reauth",
+              password: "Planted-Pass-1",
+              reauthToken: SECRETS.token,
+              ip: SECRETS.ip,
+            },
+            { id: "e1" },
+          ),
+          ...planted,
+        },
+        {
+          ...row(
+            "social_linked_auto",
+            {
+              provider: "google",
+              source: "login",
+              flow: "social_login",
+              mode: "link",
+              linked: true,
+              providerUserId: SECRETS.sub,
+              email: SECRETS.email,
+            },
+            { id: "e2" },
+          ),
+          ...planted,
+        },
+      ];
+      const { service } = setup({ rows, total: 2 });
+
+      const result = await service.listEvents(USER_ID, {});
+
+      expect(result).toEqual({
+        data: [
+          {
+            id: "e1",
+            eventType: "reauth_failed",
+            occurredAt: AT.toISOString(),
+            provider: null,
+            source: null,
+            method: "password",
+            flow: "reauth",
+          },
+          {
+            id: "e2",
+            eventType: "social_linked_auto",
+            occurredAt: AT.toISOString(),
+            provider: "google",
+            source: "login",
+            method: null,
+            flow: "social_login",
+          },
+        ],
+        meta: { total: 2, page: 1, limit: 20, totalPages: 1 },
+      });
+      const json = JSON.stringify(result);
+      for (const secret of [
+        ...Object.values(SECRETS),
+        "Planted-Pass-1",
+        "Istanbul",
+      ]) {
+        expect(json).not.toContain(secret);
+      }
     });
   });
 });
