@@ -16,7 +16,7 @@ import {
 /** Bounds only: a current password is checked as typed, never re-validated. */
 const PASSWORD_PROOF_MAX_LENGTH = 1024;
 /** Google auth codes and id tokens, Apple identity tokens. */
-const PROVIDER_PROOF_MAX_LENGTH = 4096;
+export const PROVIDER_PROOF_MAX_LENGTH = 4096;
 
 /**
  * Proof for `POST /auth/reauth` (`ReauthRequest` in `@tarodan/types`).

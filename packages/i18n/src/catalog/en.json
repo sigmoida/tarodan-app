@@ -4800,6 +4800,8 @@
           "accountLocked": "Account Locked",
           "socialLinked": "Social Account Linked",
           "socialLinkReset": "Unverified Account Reset on Social Sign-in",
+          "socialLinkedAuto": "Linked Automatically on Social Sign-in",
+          "socialUnlinked": "Social Account Unlinked",
           "passwordSet": "Password Set",
           "reauthFailed": "Re-authentication Failed",
           "reauthLocked": "Re-authentication Locked"
@@ -11034,7 +11036,11 @@
       "reauthMethodNotAllowed": "Confirm with your password",
       "reauthLocked": "Too many attempts. Try again in a few minutes",
       "reauthUnavailable": "We can't confirm it's you right now. Try again in a few minutes",
-      "passwordAlreadySet": "This account already has a password"
+      "passwordAlreadySet": "This account already has a password",
+      "providerAlreadyLinked": "This sign-in method is already connected.",
+      "providerLinkedToOtherAccount": "This Google or Apple account is connected to another Tarodan account.",
+      "providerNotLinked": "This sign-in method is not connected to your account.",
+      "lastSignInMethod": "Your account must keep a password or a connected Google account. Set a password first."
     },
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",

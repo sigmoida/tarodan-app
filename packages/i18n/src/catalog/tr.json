@@ -4800,6 +4800,8 @@
           "accountLocked": "Hesap Kilitlendi",
           "socialLinked": "Sosyal Hesap Bağlandı",
           "socialLinkReset": "Doğrulanmamış Hesap Sosyal Girişte Sıfırlandı",
+          "socialLinkedAuto": "Sosyal Girişte Otomatik Bağlandı",
+          "socialUnlinked": "Sosyal Hesap Bağlantısı Kaldırıldı",
           "passwordSet": "Şifre Belirlendi",
           "reauthFailed": "Kimlik Doğrulama Başarısız",
           "reauthLocked": "Kimlik Doğrulama Kilitlendi"
@@ -11034,7 +11036,11 @@
       "reauthMethodNotAllowed": "Şifrenizle doğrulayın",
       "reauthLocked": "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin",
       "reauthUnavailable": "Kimliğinizi şu anda doğrulayamıyoruz. Birkaç dakika sonra tekrar deneyin",
-      "passwordAlreadySet": "Bu hesabın zaten bir şifresi var"
+      "passwordAlreadySet": "Bu hesabın zaten bir şifresi var",
+      "providerAlreadyLinked": "Bu giriş yöntemi zaten bağlı.",
+      "providerLinkedToOtherAccount": "Bu Google veya Apple hesabı başka bir Tarodan hesabına bağlı.",
+      "providerNotLinked": "Bu giriş yöntemi hesabınıza bağlı değil.",
+      "lastSignInMethod": "Hesabınızda bir şifre ya da bağlı bir Google hesabı kalmalı. Önce bir şifre belirleyin."
     },
     "offer": {
       "alreadyInStatus": "Bu teklif zaten {status} durumunda",

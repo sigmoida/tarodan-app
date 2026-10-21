@@ -1,6 +1,18 @@
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConsentSource, Prisma } from "@prisma/client";
-import { LEGAL_IDENTITY_FIELDS, type LegalIdentityField } from "@tarodan/types";
+import {
+  canUnlinkProvider,
+  LEGAL_IDENTITY_FIELDS,
+  SIGN_IN_METHODS_ERROR_CODES,
+  type LegalIdentityField,
+  type SignInProvider,
+} from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { getRequestClientInfo } from "../../../common/context/request-context";
 import { ConsentService } from "../../consent/consent.service";
@@ -10,13 +22,19 @@ import { NotificationService } from "../../notification/notification.service";
 import { SecurityService } from "../../security/security.service";
 import { SentryService } from "../../sentry/sentry.service";
 import {
+  SIGN_IN_METHODS_SELECT,
+  toSignInMethods,
+} from "../sign-in-methods/sign-in-methods.mapper";
+import {
   isStaffAccount,
   STAFF_ACCOUNT_SELECT,
   staffAccountCustomerLoginError,
 } from "../utils/staff-account";
 import { allocateUsernameFromEmail } from "../utils/username.util";
+import { AppleTokenService } from "./apple-token.service";
 
-export type SocialProvider = "google" | "apple";
+/** Alias kept for the sign-in paths; the one list is `SignInProvider`. */
+export type SocialProvider = SignInProvider;
 
 /** A provider identity whose e-mail the provider has verified. */
 export interface ProviderIdentity {
@@ -49,13 +67,44 @@ export interface SocialIdentityResolution {
   outcome: SocialIdentityOutcome;
 }
 
-/** Security log event types written here (admin system logs label them). */
+/**
+ * Security log event types written here (admin system logs and the admin
+ * user history label them). Every row carries the user id and
+ * `details.provider`; link rows also carry `details.source`.
+ */
 export const SOCIAL_SECURITY_EVENTS = {
+  /** Linked by the owner in account settings (`source: manual`). */
   linked: "social_linked",
+  /** Linked at social sign-in to the account with that verified e-mail. */
+  linkedAuto: "social_linked_auto",
+  /** An unverified registration taken over (or healed) at social sign-in. */
   linkReset: "social_link_reset",
+  /** Unlinked by the owner in account settings (`source: manual`). */
+  unlinked: "social_unlinked",
+} as const;
+
+/** `details.source` of the link events: who made the link. */
+export const SOCIAL_LINK_SOURCES = {
+  manual: "manual",
+  login: "login",
 } as const;
 
 const FLOW_TAG = "social_login";
+
+function providerAlreadyLinkedError(): ConflictException {
+  return new ConflictException({
+    ...i18nMessage("server.auth.providerAlreadyLinked"),
+    errorCode: SIGN_IN_METHODS_ERROR_CODES.providerAlreadyLinked,
+  });
+}
+
+/** Never says which account holds the link. */
+function providerLinkedToOtherAccountError(): ConflictException {
+  return new ConflictException({
+    ...i18nMessage("server.auth.providerLinkedToOtherAccount"),
+    errorCode: SIGN_IN_METHODS_ERROR_CODES.providerLinkedToOtherAccount,
+  });
+}
 
 /** Enough of a matched account to decide between link and take-over. */
 const MATCH_SELECT = {
@@ -179,6 +228,9 @@ function assertCanOpenSession(user: MatchedUser): void {
  * Staff, banned and deleted accounts get nothing written. A concurrent first
  * sign-in that loses a unique race resolves to the link the winner wrote, or
  * is retried once (the winner wrote the same e-mail or username).
+ *
+ * The owner can also link and unlink providers by hand from account settings
+ * (`linkToUser`, `unlinkFromUser`, behind the step-up).
  */
 @Injectable()
 export class SocialIdentityService {
@@ -191,6 +243,7 @@ export class SocialIdentityService {
     private readonly newsletter: NewsletterService,
     private readonly sentry: SentryService,
     private readonly notifications: NotificationService,
+    private readonly appleTokens: AppleTokenService,
   ) {}
 
   async resolveUser(
@@ -339,12 +392,19 @@ export class SocialIdentityService {
             userId,
             ipAddress,
             userAgent,
-            details: { provider: identity.provider, flow: FLOW_TAG, mode },
+            details: {
+              provider: identity.provider,
+              flow: FLOW_TAG,
+              mode,
+              source: SOCIAL_LINK_SOURCES.login,
+            },
           },
         });
 
       if (user.isEmailVerified) {
-        if (createLink) await securityLog(SOCIAL_SECURITY_EVENTS.linked, "low");
+        if (createLink) {
+          await securityLog(SOCIAL_SECURITY_EVENTS.linkedAuto, "low");
+        }
         return {
           result: { userId, outcome: createLink ? "linked" : "existing" },
         };
@@ -384,6 +444,164 @@ export class SocialIdentityService {
         unsubscribe: user.acceptsMarketingEmails ? user.email : undefined,
       };
     });
+  }
+
+  /**
+   * Links a provider identity to the signed-in owner by hand (account
+   * settings, behind the step-up). The identity key is the provider `sub`;
+   * the provider e-mail may differ from the account e-mail (plan D3).
+   *
+   * Decided and written in one transaction under the user row lock, so two
+   * concurrent links for one provider store one. 409 `providerAlreadyLinked`
+   * when this account already has the identity or another identity of the
+   * provider; 409 `providerLinkedToOtherAccount` when another account holds
+   * it, also for a lost unique race. Staff, banned and deleted accounts get
+   * the sign-in refusals and nothing is written. Sessions stay; the notice
+   * mail goes out after commit and never fails the request.
+   */
+  async linkToUser(userId: string, identity: ProviderIdentity): Promise<void> {
+    const { ipAddress, userAgent } = getRequestClientInfo();
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: MATCH_SELECT,
+        });
+        if (!user) {
+          throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+        }
+        assertCanOpenSession(user);
+
+        const holder = await tx.oAuthAccount.findUnique({
+          where: {
+            provider_providerUserId: {
+              provider: identity.provider,
+              providerUserId: identity.providerUserId,
+            },
+          },
+          select: { userId: true },
+        });
+        if (holder) {
+          throw holder.userId === userId
+            ? providerAlreadyLinkedError()
+            : providerLinkedToOtherAccountError();
+        }
+        const sameProvider = await tx.oAuthAccount.findFirst({
+          where: { userId, provider: identity.provider },
+          select: { id: true },
+        });
+        if (sameProvider) throw providerAlreadyLinkedError();
+
+        await tx.oAuthAccount.create({
+          data: {
+            provider: identity.provider,
+            providerUserId: identity.providerUserId,
+            email: identity.email,
+            userId,
+          },
+        });
+        await tx.securityLog.create({
+          data: {
+            eventType: SOCIAL_SECURITY_EVENTS.linked,
+            severity: "low",
+            userId,
+            ipAddress,
+            userAgent,
+            details: {
+              provider: identity.provider,
+              flow: "provider_link",
+              source: SOCIAL_LINK_SOURCES.manual,
+            },
+          },
+        });
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // A concurrent writer stored the identity first: another account's
+      // link or sign-in, or this owner's own sign-in with it.
+      const winner = await this.findLink(identity);
+      throw winner?.userId === userId
+        ? providerAlreadyLinkedError()
+        : providerLinkedToOtherAccountError();
+    }
+
+    // Fire and forget: the notifier queues the mail and never throws.
+    void this.notifications.sendAccountSecurityNotice(
+      userId,
+      "providerLinked",
+      { provider: identity.provider },
+    );
+  }
+
+  /**
+   * Removes the owner's links of `provider` (account settings, behind the
+   * step-up). The last-method rule (`canUnlinkProvider`, plan D1) is checked
+   * on the locked row in the same transaction as the delete, so two
+   * concurrent unlinks cannot leave the account without a usable method.
+   *
+   * 404 `providerNotLinked` for a provider that is not linked; 409
+   * `lastSignInMethod` when the rule refuses. An Apple unlink also queues the
+   * revocation of the stored Apple tokens in the same transaction (outbox),
+   * as account deletion does. A later sign-in with the provider can link it
+   * again through the verified e-mail rule (plan D2).
+   */
+  async unlinkFromUser(
+    userId: string,
+    provider: SignInProvider,
+  ): Promise<void> {
+    const { ipAddress, userAgent } = getRequestClientInfo();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { ...MATCH_SELECT, ...SIGN_IN_METHODS_SELECT },
+      });
+      if (!user) {
+        throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+      }
+      assertCanOpenSession(user);
+
+      const methods = toSignInMethods(user);
+      if (!methods.providers.some((linked) => linked.provider === provider)) {
+        throw new NotFoundException({
+          ...i18nMessage("server.auth.providerNotLinked"),
+          errorCode: SIGN_IN_METHODS_ERROR_CODES.providerNotLinked,
+        });
+      }
+      if (!canUnlinkProvider(methods, provider)) {
+        throw new ConflictException({
+          ...i18nMessage("server.auth.lastSignInMethod"),
+          errorCode: SIGN_IN_METHODS_ERROR_CODES.lastSignInMethod,
+        });
+      }
+
+      await tx.oAuthAccount.deleteMany({ where: { userId, provider } });
+      if (provider === "apple") {
+        await this.appleTokens.requestRevocation(tx, userId);
+      }
+      await tx.securityLog.create({
+        data: {
+          eventType: SOCIAL_SECURITY_EVENTS.unlinked,
+          severity: "medium",
+          userId,
+          ipAddress,
+          userAgent,
+          details: {
+            provider,
+            flow: "provider_unlink",
+            source: SOCIAL_LINK_SOURCES.manual,
+          },
+        },
+      });
+    });
+
+    // Fire and forget: the notifier queues the mail and never throws.
+    void this.notifications.sendAccountSecurityNotice(
+      userId,
+      "providerUnlinked",
+      { provider },
+    );
   }
 
   /** New account and its link in one transaction (no half-created account). */
