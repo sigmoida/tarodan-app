@@ -131,7 +131,7 @@ export class PaymentSchedulerService implements OnModuleInit {
       matched: match.matched,
     });
     return {
-      summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
+      summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · UYARI: ${match.mismatched + match.missingInPaytr} fark` : ""}`,
       stats: {
         fetched: result.fetched,
         upserted: result.upserted,
@@ -175,7 +175,7 @@ export class PaymentSchedulerService implements OnModuleInit {
       upserted: result.settlements,
     });
     return {
-      summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · ⚠ ${verify.mismatches} fark` : ""}`,
+      summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · UYARI: ${verify.mismatches} fark` : ""}`,
       stats: {
         settlements: result.settlements,
         itemsFetchedFor: result.itemsFetchedFor,

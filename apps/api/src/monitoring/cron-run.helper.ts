@@ -44,10 +44,10 @@ export async function runTrackedJob(
     try {
       const res = (await fn(log)) || {};
       const durationMs = Date.now() - started;
-      log(`✓ bitti (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
+      log(`bitti (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
       return { ok: true, durationMs, summary: res.summary, stats: res.stats };
     } catch (e: any) {
-      log(`✗ HATA (${Date.now() - started}ms): ${e?.message ?? e}`);
+      log(`HATA (${Date.now() - started}ms): ${e?.message ?? e}`);
       throw e; // Bull job'u "failed" yapsın, Hata sekmesi stack göstersin.
     }
   };

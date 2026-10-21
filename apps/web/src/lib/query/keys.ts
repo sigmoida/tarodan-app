@@ -11,6 +11,8 @@ const COUNTER_THEIR_PRODUCTS_RESOURCE = "counter-offer-their-products";
 const SIGN_IN_METHODS_RESOURCE = "profile-sign-in-methods";
 // The signed-in user's server-side saved searches (a `useWebList` resource).
 const SAVED_SEARCHES_RESOURCE = "profile-saved-searches";
+// The signed-in seller's "My boosts" sections (a `useWebList` resource).
+const BOOST_MY_RESOURCE = "boost-my";
 
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
@@ -249,6 +251,10 @@ export const queryKeys = {
   boost: {
     /** The owner's package and price matrix for one listing. */
     options: (productId: string) => ["boost-options", productId] as const,
+    /** The signed-in seller's boost switch and due offers (one per session). */
+    offers: () => ["boost-offers"] as const,
+    /** "My boosts": `resource` is the `useWebList` resource (also what writes invalidate). */
+    my: { resource: BOOST_MY_RESOURCE },
   },
   // Hesap alanındaki tek öğe: `useWebItem` anahtarıyla BİREBİR aynı
   // (`webKeys.detail(resource, id)`), böylece `invalidates: ['bank-account']`

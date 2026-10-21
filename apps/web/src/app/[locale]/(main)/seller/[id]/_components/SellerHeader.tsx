@@ -9,6 +9,7 @@ import {
   StarIcon,
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
+import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import UserActionsMenu from "@/components/UserActionsMenu";
 import { useTranslations } from "next-intl";
@@ -75,16 +76,28 @@ export default function SellerHeader({
                 </Badge>
               )}
               {seller.isVerified && (
-                <Badge variant="success" size="sm">
-                  ✓ {t("seller.verified")}
+                <Badge
+                  variant="success"
+                  size="sm"
+                  icon={<CheckBadgeIcon className="size-3.5" aria-hidden />}
+                >
+                  {t("seller.verified")}
                 </Badge>
               )}
               <SellerTrustBadge trust={seller.trust} />
             </div>
             <p className="mt-1 text-xs text-subtle">
               {membershipDuration}
-              {hasRatings &&
-                ` · ★ ${averageRating.toFixed(1)} (${totalRatings})`}
+              {hasRatings && (
+                <>
+                  {" · "}
+                  <StarIcon
+                    className="mb-0.5 inline size-3.5 text-warning-500"
+                    aria-hidden
+                  />{" "}
+                  {`${averageRating.toFixed(1)} (${totalRatings})`}
+                </>
+              )}
               {` · ${followersCount} ${t("profile.followers")}`}
             </p>
           </div>

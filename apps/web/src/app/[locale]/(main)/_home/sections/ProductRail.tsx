@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import SkeletonCard from "@/components/ui/SkeletonCard";
+import { productBadgeLabels } from "@/lib/productCardBadges";
 import type { Product } from "@/types/product";
 import HomeProductCard from "./HomeProductCard";
 
@@ -34,6 +35,7 @@ export default async function ProductRail({
   emptyState?: ReactNode;
 }) {
   const t = await getTranslations();
+  const badgeLabels = productBadgeLabels(t);
   const displayItems = limit != null ? items.slice(0, limit) : items;
 
   if (variant === "scroll") {
@@ -51,9 +53,7 @@ export default async function ProductRail({
                   product={product}
                   index={index}
                   priority={index < 4}
-                  sponsoredLabel={t("product.sponsored")}
-                  tradeLabel={t("faq.trade")}
-                  discountLabel={t("product.discount")}
+                  badgeLabels={badgeLabels}
                   outOfStockLabel={t("product.stockFinished")}
                 />
               </div>
@@ -75,9 +75,7 @@ export default async function ProductRail({
             product={product}
             index={index}
             priority={index < 4}
-            sponsoredLabel={t("product.sponsored")}
-            tradeLabel={t("faq.trade")}
-            discountLabel={t("product.discount")}
+            badgeLabels={badgeLabels}
             outOfStockLabel={t("product.stockFinished")}
           />
         ))

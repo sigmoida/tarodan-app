@@ -2,10 +2,12 @@
 
 import { describe, expect, it } from "vitest";
 import type { Product } from "@/types/product";
+import type { Translate } from "@/types/i18n";
 import {
   describeProductBadges,
   isProductTradeBadgeVisible,
   isProductTradeEnabled,
+  productBadgeLabels,
   selectProductCardBadges,
 } from "./productCardBadges";
 
@@ -19,7 +21,7 @@ describe("selectProductCardBadges", () => {
   });
 
   it("tek rozeti olduğu gibi döner", () => {
-    expect(kinds({ ...base, isBoosted: true })).toEqual(["sponsored"]);
+    expect(kinds({ ...base, isBoosted: true })).toEqual(["boosted"]);
     expect(kinds({ ...base, tradeAvailable: true })).toEqual(["trade"]);
     expect(kinds({ ...base, feeCampaigns: ["Komisyonsuz"] })).toEqual([
       "campaign",
@@ -98,13 +100,13 @@ describe("selectProductCardBadges", () => {
       tradeAvailable: true,
       feeCampaigns: ["Komisyonsuz"],
     };
-    expect(kinds(all)).toEqual(["sale", "sponsored"]);
+    expect(kinds(all)).toEqual(["sale", "boosted"]);
     expect(kinds({ ...all, isBoosted: false })).toEqual(["sale", "trade"]);
     expect(kinds({ ...all, isBoosted: false, tradeAvailable: false })).toEqual([
       "sale",
       "campaign",
     ]);
-    expect(kinds({ ...all, oldPrice: null })).toEqual(["sponsored", "trade"]);
+    expect(kinds({ ...all, oldPrice: null })).toEqual(["boosted", "trade"]);
     expect(kinds({ ...all, oldPrice: null, isBoosted: false })).toEqual([
       "trade",
       "campaign",
@@ -165,17 +167,41 @@ describe("isProductTradeBadgeVisible", () => {
 });
 
 describe("describeProductBadges", () => {
-  it("rozetleri 'yüzde indirim, etiket' biçiminde birleştirir", () => {
+  const labels = {
+    discount: "indirim",
+    boosted: "Öne Çıkan",
+    boostedHint: "Satıcı bu ilanı ücretli olarak öne çıkardı",
+    trade: "Takas",
+  };
+
+  it("joins the badges as 'percent discount, label'", () => {
     expect(
       describeProductBadges(
         [
           { kind: "sale", percent: 38 },
-          { kind: "sponsored" },
           { kind: "trade" },
           { kind: "campaign", label: "Komisyonsuz" },
         ],
-        { discount: "indirim", sponsored: "Sponsorlu", trade: "Takas" },
+        labels,
       ),
-    ).toBe("%38 indirim, Sponsorlu, Takas, Komisyonsuz");
+    ).toBe("%38 indirim, Takas, Komisyonsuz");
+  });
+
+  it("reads the paid-placement hint for the boosted badge", () => {
+    expect(describeProductBadges([{ kind: "boosted" }], labels)).toBe(
+      labels.boostedHint,
+    );
+  });
+});
+
+describe("productBadgeLabels", () => {
+  it("takes the boosted badge copy, never the ads' 'Sponsorlu'", () => {
+    const t = ((key: string) => key) as unknown as Translate;
+    expect(productBadgeLabels(t)).toEqual({
+      discount: "product.discount",
+      boosted: "product.boostedBadge",
+      boostedHint: "product.boostedBadgeHint",
+      trade: "faq.trade",
+    });
   });
 });

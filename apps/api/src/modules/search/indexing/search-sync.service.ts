@@ -48,7 +48,7 @@ export class SearchSyncService {
         this.logger.warn(
           `ES/DB count mismatch: DB=${dbCount}, ES=${esCount}. Running delta sync...`,
         );
-        log("Fark > 2 → delta sync çalıştırılıyor");
+        log("Fark 2'den büyük, delta sync çalıştırılıyor");
         await this.deltaSync();
         return {
           summary: `Senkron yapıldı (DB=${dbCount}, ES=${esCount})`,

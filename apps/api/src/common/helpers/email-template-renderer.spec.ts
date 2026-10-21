@@ -1,12 +1,15 @@
 import { Prisma } from "@prisma/client";
+import { EMAIL_TEMPLATE_DEFINITIONS } from "../email/email-template-registry";
 import {
   EMAIL_CONTENT_END,
   EMAIL_CONTENT_START,
   extractEmailTemplateContent,
   formatEmailPrice,
+  getEmailTemplateSubject,
   renderEmailTemplate,
   renderStoredEmailTemplate,
 } from "./email-template-renderer";
+import { DECORATIVE_GLYPH, PICTOGRAPH } from "./pictograph";
 
 describe("email template renderer", () => {
   it("renders the shared light layout with the login logo and no decorative icons", () => {
@@ -26,10 +29,87 @@ describe("email template renderer", () => {
     expect(html).toContain(EMAIL_CONTENT_END);
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)</script>");
-    expect(html).not.toMatch(
-      /🎉|📦|🚚|🔐|✅|💰|💎|⭐|⚠️|❌|📧|🔄|📋|🎯|💳|📍|🛍️|📄|🧾|🔔|📉|📈|⏳|⏰|🏪|📝|👥/u,
-    );
+    expect(html).not.toMatch(PICTOGRAPH);
     expect(html).not.toContain("linear-gradient");
+  });
+
+  describe("no emoji or pictographs in any template", () => {
+    // Every registered template plus the ones rendered outside the admin
+    // registry and the generic fallback for an unknown key.
+    const templates = [
+      ...EMAIL_TEMPLATE_DEFINITIONS.map((definition) => definition.key),
+      "seller-invoice-reminder",
+      "unknown-template",
+    ];
+    const product = {
+      title: "Model araba",
+      price: 100,
+      productUrl: "https://tarodan.com.tr/listings/1",
+    };
+    // Both branches of the optional blocks: every field set, then none.
+    const filled = {
+      name: "Ali",
+      buyerName: "Ali",
+      sellerName: "Ayşe",
+      userName: "Ali",
+      to: "user@example.com",
+      orderNumber: "ORD-1",
+      orderId: "o1",
+      groupNumber: "GRP-1",
+      productTitle: "Model araba",
+      amount: 100,
+      totalAmount: 120,
+      refundAmount: 100,
+      oldPrice: 150,
+      newPrice: 100,
+      isPriceDrop: true,
+      paid: true,
+      isGuestOrder: false,
+      reason: "Stok hatası",
+      trackingNumber: "TR123",
+      trackingUrl: "https://tarodan.com.tr/track",
+      returnTrackingNumber: "RT123",
+      cargoCompany: "Sürat Kargo",
+      estimatedDelivery: "10 Ekim 2026",
+      expirationDate: "10 Ekim 2026",
+      expiresAt: "10 Ekim 2026",
+      daysRemaining: 3,
+      invitationUrl: "https://tarodan.com.tr/invite",
+      companyName: "Örnek Ltd.",
+      comment: "Güzel ürün",
+      failureReason: "Kart reddedildi",
+      payoutDate: "10 Ekim 2026",
+      code: "123456",
+      items: [{ productTitle: "Model araba", quantity: 2, totalAmount: 200 }],
+      sellerShipments: [{ sellerName: "Ayşe", shippingCost: 0 }],
+      trendingProducts: [product],
+      featuredProducts: [product],
+      benefits: ["Sınırsız ilan"],
+    };
+    const variants = { filled, empty: {} } as const;
+
+    /** Visible text only: markup (an HTML comment ends in "-->") is not copy. */
+    const visibleText = (html: string) =>
+      html
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ");
+
+    describe.each(Object.entries(variants))("with %s data", (_, data) => {
+      it.each(templates)("%s", (template) => {
+        const subject = getEmailTemplateSubject(template, data);
+        const text = visibleText(
+          renderEmailTemplate(template, data, {
+            frontendUrl: "https://tarodan.com.tr",
+          }),
+        );
+
+        expect(subject).not.toMatch(PICTOGRAPH);
+        expect(subject).not.toMatch(DECORATIVE_GLYPH);
+        expect(text).not.toMatch(PICTOGRAPH);
+        expect(text).not.toMatch(DECORATIVE_GLYPH);
+      });
+    });
   });
 
   it("safely substitutes nested variables in stored templates", () => {
