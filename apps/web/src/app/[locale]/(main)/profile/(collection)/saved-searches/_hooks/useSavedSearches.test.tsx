@@ -34,6 +34,7 @@ vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
+import toast from "react-hot-toast";
 import { makeQueryClient } from "@/lib/query/client";
 import { useSavedSearches } from "./useSavedSearches";
 
@@ -200,6 +201,58 @@ describe("useSavedSearches", () => {
     });
     expect(h.remove).toHaveBeenCalledWith("s1");
     expect(api.savedSearches).toEqual([]);
+  });
+
+  it("treats a 404 delete as deleted: success toast, list refetched", async () => {
+    h.confirm.mockResolvedValue(true);
+    h.remove.mockRejectedValue({
+      response: {
+        status: 404,
+        data: { i18nKey: "server.savedSearch.notFound" },
+      },
+    });
+    await mount();
+    h.list.mockResolvedValue({ data: { data: [], meta: { total: 0 } } });
+    await act(async () => {
+      await api.remove(search);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(toast.success).toHaveBeenCalledWith("savedSearch.deleted");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(api.savedSearches).toEqual([]);
+  });
+
+  it("still fails a 404 that is not the saved-search not-found key", async () => {
+    h.confirm.mockResolvedValue(true);
+    h.remove.mockRejectedValue({ response: { status: 404, data: {} } });
+    await mount();
+    await act(async () => {
+      await api.remove(search);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(toast.error).toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("still fails a delete on other errors", async () => {
+    h.confirm.mockResolvedValue(true);
+    h.remove.mockRejectedValue({ response: { status: 500 } });
+    await mount();
+    await act(async () => {
+      await api.remove(search);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(toast.error).toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("reports isSuccess only once the list has loaded", async () => {
+    await mount();
+    expect(api.isSuccess).toBe(true);
+    h.list.mockRejectedValue(new Error("boom"));
+    client.clear();
+    await mount(false);
+    expect(api.isSuccess).toBe(false);
   });
 
   it("does not delete when the confirm is declined", async () => {
