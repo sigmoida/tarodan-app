@@ -371,7 +371,7 @@ yeniden-onay penceresini görür. Belge metni değiştiğinde
 `DELETE /users/me` and `POST /auth/email/request-change` check a step-up token
 (`POST /auth/reauth`) whenever the client sends one, but by default they do
 not require one: mobile versions without the step-up send none (which ones:
-tarodan-ops `compat.md`). Switch the requirement on only when both are true:
+tarodan-ops `compat.md`). Switch the requirement on only when all three are true:
 
 1. A mobile version that sends the token is live, and
    `min_supported_app_version_ios` and `min_supported_app_version_android` are
@@ -379,6 +379,11 @@ tarodan-ops `compat.md`). Switch the requirement on only when both are true:
    version live today is not enough: a later version without the step-up
    would lose account deletion and e-mail change.
 2. The web release that sends the token is live.
+3. Google sign-in on Android is live. Until then the setting stays off
+   (user decision, 2026-10-21): Apple-only accounts on Android, and
+   Google-only accounts while Google is off on Android, cannot pass the
+   step-up in the app, so in-app account deletion would need a password set by
+   e-mail first (App Store 5.1.1(v) and Play account-deletion risk).
 
 Then, in the admin panel, **Settings -> Security**, turn on "Require step-up
 confirmation for account deletion and email change" (platform setting
