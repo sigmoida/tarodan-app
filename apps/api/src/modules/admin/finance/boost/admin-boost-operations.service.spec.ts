@@ -417,6 +417,34 @@ describe("AdminBoostOperationsService", () => {
       );
     });
 
+    it("keeps kurus exact in the amount it sends to the refund", async () => {
+      const { service, payments, prisma } = make({
+        boost: paidBoost({ price: D("59.90") }),
+      });
+      prisma.order.findUnique.mockResolvedValue({
+        id: "order-1",
+        orderNumber: "BST-100",
+        payment: {
+          status: PaymentStatus.completed,
+          amount: D("59.90"),
+          metadata: {},
+        },
+      });
+
+      await service.refund(ADMIN, "boost-1", { reason: REASON });
+      prisma.productBoost.findUnique.mockResolvedValueOnce(
+        paidBoost({ price: D("59.90") }),
+      );
+      await service.refund(ADMIN, "boost-1", {
+        reason: REASON,
+        amount: 20.55,
+      });
+
+      expect(payments.processRefund.mock.calls.map((c) => c[1])).toEqual([
+        59.9, 20.55,
+      ]);
+    });
+
     it("caps at what is left of the price after an earlier refund on the boost", async () => {
       const { service, payments } = make({
         boost: paidBoost({ refundedAmount: D("9.00") }),

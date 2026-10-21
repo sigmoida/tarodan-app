@@ -82,12 +82,17 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       refundAttempt: {
         // By id (finalize, after PayTR): the succeeded attempt; by key (the
         // claim): none yet, a fresh refund.
-        findUnique: jest.fn(({ where }: { where: { id?: string } }) =>
-          Promise.resolve(
-            where.id
-              ? { ...attempt, status: RefundAttemptStatus.succeeded }
-              : null,
-          ),
+        findUnique: jest.fn(
+          ({
+            where,
+          }: {
+            where: { id?: string };
+          }): Promise<Record<string, unknown> | null> =>
+            Promise.resolve(
+              where.id
+                ? { ...attempt, status: RefundAttemptStatus.succeeded }
+                : null,
+            ),
         ),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(({ data }: { data: Record<string, unknown> }) =>
@@ -339,16 +344,21 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
     expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
   });
 
-  it("an ordinary order keeps its ledger reversal and stops no boost", async () => {
-    const { service, ledger, boostTimeline } = make({
-      origin: OrderOrigin.direct_sale,
-    });
+  it.each([OrderOrigin.direct_sale, OrderOrigin.offer])(
+    "an ordinary %s order keeps its ledger reversal and stops no boost",
+    async (origin) => {
+      const { service, ledger, boostTimeline } = make({ origin });
 
-    await service.processRefund(ORDER_ID, PAID, opts);
+      await service.processRefund(ORDER_ID, PAID, opts);
 
-    expect(ledger.recordRefund).toHaveBeenCalledTimes(1);
-    expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
-  });
+      expect(ledger.recordRefund).toHaveBeenCalledTimes(1);
+      expect(ledger.recordRefund).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orderId: ORDER_ID, refundAmount: PAID }),
+      );
+      expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
+    },
+  );
 
   describe("the seller hears it from the boost notice only", () => {
     // No skipRefundEvent: the recovery cron and the auto-refund sweep never
@@ -419,6 +429,68 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
         }),
       ).rejects.toBe(refusal);
       expect(tx.refundAttempt.create).not.toHaveBeenCalled();
+      expect(paytr.createRefund).not.toHaveBeenCalled();
+      expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The claim finds this key's earlier try, which PayTR refused, and
+     * prepares it again; the finalize then reads it as succeeded.
+     */
+    const withFailedTry = (tx: ReturnType<typeof make>["tx"]) => {
+      const tried = (status: RefundAttemptStatus) => ({
+        id: "attempt-1",
+        paymentId: "pay-1",
+        orderId: ORDER_ID,
+        idempotencyKey: opts.idempotencyKey,
+        amount: PAID,
+        status,
+        providerRefundId: null,
+        providerResponse: null,
+      });
+      tx.refundAttempt.findUnique.mockImplementation(({ where }) =>
+        Promise.resolve(
+          tried(
+            where.id
+              ? RefundAttemptStatus.succeeded
+              : RefundAttemptStatus.failed,
+          ),
+        ),
+      );
+      tx.refundAttempt.update.mockResolvedValueOnce(
+        tried(RefundAttemptStatus.prepared),
+      );
+    };
+
+    it("also runs before a refused try of the same key is sent again", async () => {
+      const { service, tx, paytr } = make();
+      withFailedTry(tx);
+      const guard = jest.fn().mockResolvedValue(undefined);
+
+      await service.processRefund(ORDER_ID, PAID, {
+        ...opts,
+        claimGuard: guard,
+      });
+
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(guard.mock.invocationCallOrder[0]).toBeLessThan(
+        tx.refundAttempt.update.mock.invocationCallOrder[0],
+      );
+      expect(paytr.createRefund).toHaveBeenCalledTimes(1);
+    });
+
+    it("a refusing guard leaves a refused try refused and calls no PayTR", async () => {
+      const { service, tx, paytr, boostTimeline } = make();
+      withFailedTry(tx);
+      const refusal = new Error("boost already stopped");
+
+      await expect(
+        service.processRefund(ORDER_ID, PAID, {
+          ...opts,
+          claimGuard: jest.fn().mockRejectedValue(refusal),
+        }),
+      ).rejects.toBe(refusal);
+      expect(tx.refundAttempt.update).not.toHaveBeenCalled();
       expect(paytr.createRefund).not.toHaveBeenCalled();
       expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
     });

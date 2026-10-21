@@ -135,6 +135,21 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it("system resume takes at most 200 distinct listings a run, in a stable order", async () => {
+    const { service, prisma } = make();
+
+    await privateOf(service).resumeSystemPausedBoosts(NOW);
+
+    expect(prisma.productBoost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { productId: true },
+        distinct: ["productId"],
+        orderBy: { productId: "asc" },
+        take: 200,
+      }),
+    );
+  });
+
   it("system resume only picks boosts the system paused, on live listings", async () => {
     // A staff pause has pausedBySystem=false: the cron never resumes it.
     const { service, prisma } = make();

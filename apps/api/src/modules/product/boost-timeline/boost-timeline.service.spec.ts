@@ -1161,6 +1161,31 @@ describe("BoostTimelineService", () => {
       expect(db.boosts.get("staff")?.status).toBe(BoostStatus.paused);
     });
 
+    it("a system resume with no time left leaves the LIFO key of an unboosted listing alone", async () => {
+      // A row paused before the remainder was kept may hold nothing: it
+      // resumes and ends at once, and the listing is not boosted. A stale
+      // boostedAt there would never be swept.
+      const db = setup(
+        productRow(),
+        boostRow({
+          id: "empty",
+          status: BoostStatus.paused,
+          pausedBySystem: true,
+          pausedRemainingSeconds: 0,
+          purchasedAt: at(-3 * DAY),
+        }),
+      );
+
+      await expect(
+        db.transaction((tx) => service.resumeSystemPaused(tx, "prod-1", NOW)),
+      ).resolves.toBe(1);
+
+      expect(db.products.get("prod-1")).toMatchObject({
+        boostedUntil: null,
+        boostedAt: null,
+      });
+    });
+
     it("a system resume queues behind a boost bought while the listing was offline", async () => {
       const db = setup(
         productRow({ boostedUntil: at(7 * DAY), rankTier: 2 }),
@@ -1421,6 +1446,17 @@ describe("BoostTimelineService", () => {
 
       expect(Number(db.boosts.get("head")?.refundedAmount)).toBe(20);
       expect(db.boosts.get("head")?.status).toBe(BoostStatus.cancelled);
+    });
+
+    it("adds the refund to what was refunded on the boost before", async () => {
+      const db = headAndStacked();
+      db.boosts.get("head")!.refundedAmount = new Prisma.Decimal("9.10");
+
+      await db.transaction((tx) =>
+        service.cancel(tx, "head", { ...stop, refundedAmount: "20.45" }, NOW),
+      );
+
+      expect(db.boosts.get("head")?.refundedAmount?.toString()).toBe("29.55");
     });
 
     it("stops a showcase boost's showcase with it", async () => {
