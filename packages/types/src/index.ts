@@ -180,3 +180,7 @@ export * from "./password-policy";
 // Sign-in methods and step-up: providers, the read model, the reauth token and
 // its error codes (API, web, mobile)
 export * from "./sign-in-methods";
+
+// Seller trust score: formula version, levels, read shapes and the formatter
+// (API, web, admin, mobile)
+export * from "./seller-trust";
