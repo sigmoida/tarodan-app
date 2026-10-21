@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PickType } from "@nestjs/swagger";
-import { Transform, Type } from "class-transformer";
+import { Transform, Type, type TransformFnParams } from "class-transformer";
 import {
   IsDefined,
   IsInt,
@@ -24,7 +24,11 @@ import {
 } from "@tarodan/types";
 import { ProductQueryDto } from "../../product/dto/product-query.dto";
 
-/** Storage caps on the free-text filters (GET /products has none; a URL does). */
+/**
+ * Storage caps on the free-text filters (GET /products has none; a URL does).
+ * `@MaxLength` (validator.js `isLength`) counts a surrogate pair once and
+ * does not count a variation selector (U+FE0E/U+FE0F) after a character.
+ */
 const SEARCH_TEXT_MAX = 200;
 const FILTER_TEXT_MAX = 120;
 const COLOR_LIST_MAX = 500;
@@ -36,62 +40,86 @@ const ATTR_GROUPS_MAX = 2000;
  * here too. Keys outside the allow-list (`page`, `sellerId`, `status`, ...)
  * are dropped by the global whitelist before the service sees them.
  *
- * The fields below are redeclared only to add a storage cap. class-validator
- * then drops the inherited validators of the same kind, so each one repeats
- * the parent's `@IsString()`; `saved-search.dto.spec.ts` fails if a parent
- * validator goes missing here.
+ * The fields below are redeclared to add a storage cap and `RawObject`.
+ * class-validator then drops the inherited validators of the same kind, so
+ * each one repeats the parent's `@IsString()`; `saved-search.dto.spec.ts`
+ * fails if a parent validator goes missing here. `@IsOptional()` is not of
+ * that kind and stays inherited.
  */
+/**
+ * A JSON body can carry an object where a string filter belongs, and
+ * `enableImplicitConversion` turns it into "[object Object]" before
+ * `@IsString()` runs, which accepts it: the text would be stored as the
+ * search, or, for `attrGroups`, dropped silently as malformed JSON (a saved
+ * search broader than the one the user saw). This hands the raw object or
+ * array back, so `@IsString()` refuses it with 400. A number or boolean still
+ * becomes text, as it would in a `GET /products` query string.
+ */
+const RawObject = (): PropertyDecorator =>
+  Transform(({ obj, key, value }: TransformFnParams): unknown => {
+    const raw: unknown = (obj as Record<string, unknown>)[key];
+    return typeof raw === "object" && raw !== null ? raw : value;
+  });
+
 export class SavedSearchQueryDto extends PickType(
   ProductQueryDto,
   SAVED_SEARCH_QUERY_KEYS,
 ) {
+  @RawObject()
   @IsString()
   @MaxLength(SEARCH_TEXT_MAX)
   search?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   brandId?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   brand?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   manufacturer?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   scale?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   material?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(COLOR_LIST_MAX)
   color?: string;
 
-  @IsString()
+  /** JSON text, as `GET /products` takes it; an object or array is a 400. */
+  @RawObject()
+  @IsString({
+    message:
+      "$property must be JSON text (a string), as GET /products takes it",
+  })
   @MaxLength(ATTR_GROUPS_MAX)
   attrGroups?: string;
 
+  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   sortBy?: ProductQueryDto["sortBy"];
 }
 
 /**
- * `labels`: a plain object of at most `SAVED_SEARCH_LABELS_MAX` entries whose
- * values are strings of at most `SAVED_SEARCH_LABEL_MAX` characters (trimmed,
- * counted in code points, as `canonicalizeSavedSearchLabels` counts) or null.
- * Null values and keys that are not in the canonical query are dropped by the
- * service.
- */
-/**
- * A string of at most `max` code points: an emoji counts once, as in
- * `savedSearchDefaultName` and the labels (`MaxLength` counts UTF-16 units).
+ * A string of at most `max` code points (`Array.from`), the unit
+ * `savedSearchDefaultName` and `canonicalizeSavedSearchLabels` cut at, so a
+ * value that passes is never cut. `@MaxLength` is close but not the same: it
+ * does not count a variation selector, which `Array.from` does.
  */
 function MaxCodePoints(
   max: number,
@@ -114,6 +142,12 @@ function MaxCodePoints(
     });
 }
 
+/**
+ * `labels`: a plain object of at most `SAVED_SEARCH_LABELS_MAX` entries whose
+ * values are strings of at most `SAVED_SEARCH_LABEL_MAX` code points after
+ * trimming (as `MaxCodePoints` counts) or null. Null values and keys that are
+ * not in the canonical query are dropped by the service.
+ */
 function IsSavedSearchLabels(options?: ValidationOptions): PropertyDecorator {
   return (target: object, propertyName: string | symbol) =>
     registerDecorator({

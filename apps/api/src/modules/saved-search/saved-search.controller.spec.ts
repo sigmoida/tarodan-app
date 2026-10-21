@@ -110,6 +110,58 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     await expect(asBody({ query })).rejects.toMatchObject({ status: 400 });
   });
 
+  it("refuses attrGroups sent as an object, not dropping it silently", async () => {
+    // Implicit conversion would turn it into "[object Object]", which the
+    // canonical form drops as malformed JSON: a broader saved search.
+    const refusal = asBody({
+      query: { search: "x", attrGroups: { "hw-rarity": ["th"] } },
+    });
+    await expect(refusal).rejects.toMatchObject({ status: 400 });
+    await expect(refusal).rejects.toMatchObject({
+      response: {
+        message: expect.arrayContaining([
+          "query.attrGroups must be JSON text (a string), as GET /products takes it",
+        ]),
+      },
+    });
+    await expect(
+      asBody({ query: { search: "x", attrGroups: ["th"] } }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it.each([
+    "search",
+    "brandId",
+    "brand",
+    "manufacturer",
+    "scale",
+    "material",
+    "color",
+    "sortBy",
+  ])("refuses an object as %s instead of storing its text", async (key) => {
+    await expect(
+      asBody({ query: { search: "x", [key]: { a: 1 } } }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("reads a number in a text filter as text, as a query string would", async () => {
+    const dto = await asBody({ query: { search: 1, scale: 18 } });
+    expect({ ...dto.query }).toEqual({ search: "1", scale: "18" });
+  });
+
+  it("counts the storage caps in code points, a variation selector not at all", async () => {
+    // 200 single-code-point emoji are 400 UTF-16 units: within the cap.
+    await expect(
+      asBody({ query: { search: "🏎".repeat(200) } }),
+    ).resolves.toBeDefined();
+    await expect(
+      asBody({ query: { search: "🏎️".repeat(200) } }),
+    ).resolves.toBeDefined();
+    await expect(
+      asBody({ query: { search: "🏎".repeat(201) } }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
   it("requires a query object", async () => {
     await expect(asBody({})).rejects.toMatchObject({ status: 400 });
     await expect(asBody({ query: "search=x" })).rejects.toMatchObject({

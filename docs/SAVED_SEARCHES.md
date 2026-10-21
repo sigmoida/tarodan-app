@@ -27,6 +27,9 @@ Refusals of `POST`, in this order:
 
 1. An invalid filter value: `400`, the same validation as `GET /products`
    (`PickType(ProductQueryDto, SAVED_SEARCH_QUERY_KEYS)`, plus length caps).
+   The text filters take strings, as in a query string: an object or array
+   there (`attrGroups` included, which is JSON text) is a `400`, never turned
+   into "[object Object]" by the implicit conversion.
 2. Nothing but a sort left after canonicalising: `400 server.savedSearch.emptyQuery`.
 3. The same canonical query already saved: `409 server.savedSearch.alreadySaved`,
    `errorCode: "SAVED_SEARCH_DUPLICATE"`. A duplicate needs no free slot, so it
