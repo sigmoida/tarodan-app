@@ -194,6 +194,16 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 
+  it("refuses an object as the name instead of storing its text", async () => {
+    await expect(
+      asBody({ name: { a: 1 }, query: { search: "x" } }),
+    ).rejects.toMatchObject({ status: 400 });
+    // A number is read as text, as in the query filters.
+    await expect(
+      asBody({ name: 5, query: { search: "x" } }),
+    ).resolves.toMatchObject({ name: "5" });
+  });
+
   it("counts the name in code points, as the labels and default name do", async () => {
     // 60 emoji are 120 UTF-16 units: still within the cap.
     const name = "🏎".repeat(60);

@@ -177,6 +177,7 @@ export class CreateSavedSearchDto {
       "Trimmed. Blank or missing: the API derives the default name (or stores null).",
   })
   @IsOptional()
+  @RawObject()
   @IsString()
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value,
