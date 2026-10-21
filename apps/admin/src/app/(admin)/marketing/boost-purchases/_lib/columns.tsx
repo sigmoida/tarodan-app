@@ -1,11 +1,16 @@
 import { CellLink, COL_SIZE, col, TableBadge } from "@/components/table";
-import { type BoostPurchase, purchaseStatusConfig } from "./types";
+import {
+  type BoostPurchase,
+  purchaseSourceConfig,
+  purchaseStatusConfig,
+} from "./types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
 export function purchaseColumns(t: T) {
   const statusConfig = purchaseStatusConfig(t);
+  const sourceConfig = purchaseSourceConfig(t);
   return [
     col.user<BoostPurchase>(
       t("admin.marketing.boostPurchases.buyer"),
@@ -53,10 +58,19 @@ export function purchaseColumns(t: T) {
         t("admin.marketing.boostPurchases.daysValue", { days: p.durationDays }),
       COL_SIZE.count,
     ),
+    col.status<BoostPurchase>(
+      t("admin.marketing.boostPurchases.sourceLabel"),
+      (p) => ({ status: p.source, config: sourceConfig }),
+    ),
     col.money<BoostPurchase>(
       t("admin.marketing.boostPurchases.price"),
       (p) => p.price,
       COL_SIZE.amount,
+    ),
+    col.money<BoostPurchase>(
+      t("admin.marketing.boostPurchases.detail.refundedAmount"),
+      (p) => (p.refundedAmount > 0 ? p.refundedAmount : null),
+      { ...COL_SIZE.amount, sortable: false, tone: "negative" },
     ),
     col.status<BoostPurchase>(t("common.status"), (p) => ({
       status: p.status,

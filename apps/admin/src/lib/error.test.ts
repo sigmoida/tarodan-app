@@ -3,6 +3,7 @@ import {
   extractErrorI18nKey,
   extractErrorMessage,
   isNotFoundError,
+  isRefundPendingReconciliation,
 } from "./error";
 
 function axiosError(data: unknown, status?: number) {
@@ -84,5 +85,24 @@ describe("extractErrorI18nKey", () => {
     expect(extractErrorI18nKey(axiosError({ message: "x" }, 400))).toBeNull();
     expect(extractErrorI18nKey(new Error("boom"))).toBeNull();
     expect(extractErrorI18nKey(null)).toBeNull();
+  });
+});
+
+describe("isRefundPendingReconciliation", () => {
+  it("is true for a 503, whatever the body says", () => {
+    expect(
+      isRefundPendingReconciliation(
+        axiosError({ i18nKey: "server.payment.refundInitiationFailed" }, 503),
+      ),
+    ).toBe(true);
+    expect(isRefundPendingReconciliation(axiosError(undefined, 503))).toBe(
+      true,
+    );
+  });
+
+  it("is false for a refusal, a network error or nothing", () => {
+    expect(isRefundPendingReconciliation(axiosError({}, 400))).toBe(false);
+    expect(isRefundPendingReconciliation(new Error("network"))).toBe(false);
+    expect(isRefundPendingReconciliation(undefined)).toBe(false);
   });
 });
