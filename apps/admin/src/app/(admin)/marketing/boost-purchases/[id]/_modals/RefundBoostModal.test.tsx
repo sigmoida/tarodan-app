@@ -39,7 +39,7 @@ import { RefundBoostModal } from "./RefundBoostModal";
 const ACTION = "admin.marketing.boostPurchases.refund.action";
 const CONFIRM_TEXT = "admin.marketing.boostPurchases.refund.confirm";
 const PARTIAL = "admin.marketing.boostPurchases.refund.partialStops";
-const PENDING = "admin.marketing.boostPurchases.refund.pendingReconciliation";
+const PENDING = "admin.finance.payments.refundReconciliation.outcomeUnknown";
 const REASON = "Seller asked, listing sold elsewhere";
 
 const PURCHASE = {
@@ -97,7 +97,7 @@ describe("RefundBoostModal", () => {
     expect(h.refundBoost).not.toHaveBeenCalled();
   });
 
-  it.each(["59.01", "60", "0", "-5", "12.345"])(
+  it.each(["59.01", "60", "0", "-5", "12.345", "1.250,50", "abc", "50,"])(
     "refuses the amount %s without calling the API",
     async (value) => {
       await type(amount(), value);
@@ -152,6 +152,19 @@ describe("RefundBoostModal", () => {
     });
   });
 
+  it("reads a Turkish decimal comma as a partial amount, never as 'all'", async () => {
+    await type(amount(), "50,25");
+    await type(reason(), REASON);
+    await submit("none");
+    expect(topDialog().textContent).toContain(PARTIAL);
+    await click(button(ACTION, topDialog()));
+
+    expect(h.refundBoost).toHaveBeenCalledWith("boost-1", {
+      amount: 50.25,
+      reason: REASON,
+    });
+  });
+
   it("leaves the amount out when it is emptied (the server refunds all)", async () => {
     await type(amount(), "");
     await type(reason(), REASON);
@@ -194,5 +207,42 @@ describe("RefundBoostModal", () => {
 
     await click(button("common.close", topDialog()));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("refetches the boost, payment and order screens after an unknown outcome", async () => {
+    const invalidate = vi.spyOn(view.client, "invalidateQueries");
+    h.refundBoost.mockRejectedValue(apiError(503));
+    await type(reason(), REASON);
+    await submit();
+
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).toEqual(
+      expect.arrayContaining([["boost-purchases"], ["payments"], ["orders"]]),
+    );
+  });
+
+  it("refreshes the payment and order screens after a refund too", async () => {
+    const invalidate = vi.spyOn(view.client, "invalidateQueries");
+    await type(reason(), REASON);
+    await submit();
+
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).toEqual(
+      expect.arrayContaining([["boost-purchases"], ["payments"], ["orders"]]),
+    );
+  });
+
+  it.each([
+    ["a gateway timeout", apiError(504)],
+    ["a proxy error", apiError(500)],
+    ["no response at all", new Error("Network Error")],
+  ])("treats %s as an unknown outcome too", async (_label, error) => {
+    h.refundBoost.mockRejectedValue(error);
+    await type(reason(), REASON);
+    await submit();
+
+    expect(bodyText()).toContain(PENDING);
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(findButton(ACTION)).toBeUndefined();
   });
 });

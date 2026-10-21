@@ -6,6 +6,11 @@ import {
   BOOST_GRANT_MAX_DAYS,
   BOOST_GRANT_MIN_DAYS,
 } from "@tarodan/types";
+import {
+  isOptionalTlAmountWithin,
+  optionalTlAmountPayload,
+  parseTlAmount,
+} from "@/lib/amount-input";
 import { fmtTry } from "@/lib/format";
 import type {
   GrantBoostRequest,
@@ -16,9 +21,6 @@ type T = ReturnType<typeof useTranslations<never>>;
 
 /** The grant DTO caps the listing reference (id or listing code) at this. */
 const LISTING_REF_MAX_LENGTH = 64;
-
-/** TL with at most two decimals (the refund DTO's `maxDecimalPlaces: 2`). */
-const AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
 
 /** The reason staff give for a grant, a revoke or a refund (shared limits). */
 const boostReasonField = (t: T) =>
@@ -45,12 +47,7 @@ export const refundBoostSchema = (t: T, max: number) =>
       .string()
       .trim()
       .refine(
-        (v) => {
-          if (!v) return true;
-          if (!AMOUNT_PATTERN.test(v)) return false;
-          const n = Number(v);
-          return n > 0 && n <= max;
-        },
+        (v) => isOptionalTlAmountWithin(v, max),
         t("admin.finance.payments.refundAmountInvalid", { max: fmtTry(max) }),
       ),
     reason: boostReasonField(t),
@@ -59,9 +56,9 @@ export type RefundBoostValues = z.infer<ReturnType<typeof refundBoostSchema>>;
 
 /** The refund body: an empty amount is left out (the server refunds all). */
 export function refundBoostPayload(v: RefundBoostValues): RefundBoostRequest {
-  const amount = v.amount.trim();
+  const amount = optionalTlAmountPayload(v.amount);
   return {
-    ...(amount ? { amount: Number(amount) } : {}),
+    ...(amount !== undefined ? { amount } : {}),
     reason: v.reason.trim(),
   };
 }
@@ -71,8 +68,8 @@ export function refundBoostPayload(v: RefundBoostValues): RefundBoostRequest {
  * the boost still stops, and that rest cannot be refunded later.
  */
 export function isPartialRefund(v: RefundBoostValues, max: number): boolean {
-  const amount = v.amount.trim();
-  return !!amount && Number(amount) < max;
+  const amount = parseTlAmount(v.amount);
+  return amount !== null && amount < max;
 }
 
 export const revokeBoostSchema = (t: T) =>

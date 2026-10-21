@@ -6399,7 +6399,6 @@
           "reason": "Reason",
           "confirm": "The amount is refunded to the card, the boost stops at once, and its invoice is cancelled or a return invoice is issued. This cannot be undone.",
           "partialStops": "A partial refund also stops the boost; the remaining amount cannot be refunded later.",
-          "pendingReconciliation": "The refund outcome is not confirmed yet. Do not retry; check it on the Refund Reconciliation screen.",
           "done": "Refunded and stopped"
         },
         "revoke": {
@@ -6909,7 +6908,8 @@
           "note": "Reconciliation Note",
           "notePlaceholder": "Describe the reconciliation result and verification source",
           "confirm": "Save Reconciliation",
-          "resolved": "Refund reconciliation saved"
+          "resolved": "Refund reconciliation saved",
+          "outcomeUnknown": "The refund outcome is not confirmed yet. Do not retry; check it on the Refund Reconciliation screen."
         },
         "status": {
           "pending": "Pending",

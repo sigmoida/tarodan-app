@@ -59,12 +59,14 @@ export function isNotFoundError(error: unknown): boolean {
 }
 
 /**
- * A refund whose outcome is not known yet: the API answers 503
+ * A refund call whose outcome the screen cannot know. The API answers 503
  * (`RefundPendingReconciliationException`) when PayTR may have moved the
- * money or another attempt of the order is unresolved. The screen must say
+ * money or another attempt of the order is unresolved; a 5xx from the
+ * gateway or proxy (a timeout during the PayTR call) or no response at all
+ * leaves the same doubt. Only a 4xx is a clean refusal. The screen must say
  * so and send staff to the refund reconciliation, never offer a blind retry.
- * Any 503 counts: if the gateway itself is down, not retrying is still right.
  */
-export function isRefundPendingReconciliation(error: unknown): boolean {
-  return statusOf(error) === 503;
+export function isRefundOutcomeUnknown(error: unknown): boolean {
+  const status = statusOf(error);
+  return status === undefined || status >= 500;
 }

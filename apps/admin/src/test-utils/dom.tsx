@@ -24,6 +24,8 @@ export const apiError = (
 ) => ({ response: { status, data: { i18nKey, message } } });
 
 export interface Mounted {
+  /** The query client the tree renders in (spy on invalidations). */
+  client: QueryClient;
   rerender: (node: ReactNode) => void;
   unmount: () => void;
 }
@@ -43,6 +45,7 @@ export function mount(node: ReactNode): Mounted {
   );
   act(() => root.render(wrap(node)));
   return {
+    client,
     rerender: (next) => act(() => root.render(wrap(next))),
     unmount: () => {
       act(() => root.unmount());

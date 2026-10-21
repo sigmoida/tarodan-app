@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Alert } from "@tarodan/ui";
 import {
   FormModal,
@@ -14,7 +15,11 @@ import {
   BoostRefundRedirectAlert,
   isBoostRefundRedirect,
 } from "@/components/finance/BoostRefundRedirectAlert";
+import { RefundOutcomeUnknownModal } from "@/components/finance/RefundOutcomeUnknownModal";
+import { optionalTlAmountPayload } from "@/lib/amount-input";
+import { isRefundOutcomeUnknown } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
+import { adminKeys } from "@/lib/query/keys";
 import { useTranslations } from "next-intl";
 import { refundPaymentSchema, type RefundPaymentValues } from "../_lib/schema";
 
@@ -38,32 +43,46 @@ export function RefundPaymentModal({
     },
   );
 
+  const queryClient = useQueryClient();
   const refund = useAdminMutation(
     (v: RefundPaymentValues) =>
       adminApi.manualRefund(paymentId, {
-        amount: v.amount ? parseFloat(v.amount) : undefined,
+        amount: optionalTlAmountPayload(v.amount ?? ""),
         reason: v.reason || undefined,
         idempotencyKey,
       }),
     {
       invalidates: ["payments"],
       successMessage: t("admin.finance.payments.refundStarted"),
-      // A boost payment is refused with a pointer to the boost screen,
-      // shown inline with its link instead of a toast.
-      showErrorToast: (error) => !isBoostRefundRedirect(error),
+      // Shown inline instead of a toast: a boost payment is refused with a
+      // pointer to the boost screen, and an unknown outcome replaces the form.
+      showErrorToast: (error) =>
+        !isBoostRefundRedirect(error) && !isRefundOutcomeUnknown(error),
       onSuccess: onClose,
+      mutation: {
+        onSettled: (_data, error) => {
+          if (error && isRefundOutcomeUnknown(error)) {
+            queryClient.invalidateQueries({
+              queryKey: adminKeys.all("payments"),
+            });
+          }
+        },
+      },
     },
   );
+  const title = trade
+    ? t("admin.finance.payments.refundWholeTrade")
+    : t("admin.finance.payments.manualRefund");
+
+  if (refund.error && isRefundOutcomeUnknown(refund.error)) {
+    return <RefundOutcomeUnknownModal title={title} onClose={onClose} />;
+  }
 
   return (
     <FormModal
       open
       onClose={onClose}
-      title={
-        trade
-          ? t("admin.finance.payments.refundWholeTrade")
-          : t("admin.finance.payments.manualRefund")
-      }
+      title={title}
       size="md"
       form={form}
       onSubmit={(v) => refund.mutate(v)}
@@ -88,12 +107,12 @@ export function RefundPaymentModal({
           <p className="text-muted">
             {t("admin.finance.payments.totalPaymentAmount")}: {fmtTry(amount)}
           </p>
+          {/* Text, not type="number" (see lib/amount-input). */}
           <FormInput
             name="amount"
-            type="number"
-            min="0.01"
-            max={amount}
-            step="0.01"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
             label={t("admin.finance.payments.refundAmountLabel")}
             placeholder={t("admin.finance.payments.refundAmountPlaceholder")}
           />

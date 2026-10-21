@@ -1,7 +1,8 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { Alert, Button, Modal } from "@tarodan/ui";
+import { Alert } from "@tarodan/ui";
 import {
   FormInput,
   FormModal,
@@ -12,10 +13,11 @@ import {
 import { BOOST_ADMIN_REASON_MAX_LENGTH } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { isRefundPendingReconciliation } from "@/lib/error";
+import { isRefundOutcomeUnknown } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
+import { adminKeys } from "@/lib/query/keys";
 import { DataList, Field } from "@/components/detail/DataList";
-import { TextLink } from "@/components/TextLink";
+import { RefundOutcomeUnknownModal } from "@/components/finance/RefundOutcomeUnknownModal";
 import {
   isPartialRefund,
   refundBoostPayload,
@@ -24,16 +26,20 @@ import {
 } from "../../_lib/schema";
 import type { BoostPurchase } from "../../_lib/types";
 
-/** Where staff settle a refund whose PayTR outcome is not known yet. */
-const REFUND_RECONCILIATION_HREF = "/finance/payments?tab=reconciliation";
+/**
+ * What a refund and stop changes: the boost, and the payment and order it
+ * refunds (their amounts and refund actions).
+ */
+const REFUND_RESOURCES = ["boost-purchases", "payments", "orders"];
 
 /**
  * Refund a paid boost (all or part of what is left) and stop it at once. The
  * amount defaults to `refundableAmount`; a partial refund stops the boost
  * too and the rest can never be refunded, so the form and the confirm step
- * both say so. The server derives the idempotency key per attempt; a 503
- * (outcome unknown) replaces the form with a pointer to the reconciliation,
- * with no way to resubmit.
+ * both say so. The server derives the idempotency key per attempt. When the
+ * outcome is unknown (503, a gateway 5xx, no response) the form is replaced
+ * by a pointer to the reconciliation, with no way to resubmit, and the
+ * screens refetch what the refund may have changed.
  */
 export function RefundBoostModal({
   purchase,
@@ -47,6 +53,7 @@ export function RefundBoostModal({
 }) {
   const t = useTranslations();
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
   const max = purchase.refundableAmount;
   const form = useZodForm(refundBoostSchema(t, max), {
     defaultValues: { amount: String(max), reason: "" },
@@ -58,15 +65,30 @@ export function RefundBoostModal({
         .refundBoost(purchase.id, refundBoostPayload(v))
         .then((response) => response.data),
     {
-      invalidates: ["boost-purchases"],
+      invalidates: REFUND_RESOURCES,
       successMessage: t("admin.marketing.boostPurchases.refund.done"),
-      showErrorToast: (error) => !isRefundPendingReconciliation(error),
+      showErrorToast: (error) => !isRefundOutcomeUnknown(error),
       onSuccess: onClose,
+      mutation: {
+        onSettled: (_data, error) => {
+          if (!error || !isRefundOutcomeUnknown(error)) return;
+          REFUND_RESOURCES.forEach((resource) =>
+            queryClient.invalidateQueries({
+              queryKey: adminKeys.all(resource),
+            }),
+          );
+        },
+      },
     },
   );
 
-  if (refund.error && isRefundPendingReconciliation(refund.error)) {
-    return <RefundPendingNotice onClose={onClose} />;
+  if (refund.error && isRefundOutcomeUnknown(refund.error)) {
+    return (
+      <RefundOutcomeUnknownModal
+        title={t("admin.marketing.boostPurchases.refund.title")}
+        onClose={onClose}
+      />
+    );
   }
 
   const submit = async (v: RefundBoostValues) => {
@@ -120,13 +142,15 @@ export function RefundBoostModal({
       <Alert variant="warning">
         {t("admin.marketing.boostPurchases.refund.partialStops")}
       </Alert>
+      {/*
+        A text field, not type="number": a number input turns "50,25" (a
+        Turkish decimal comma) into "", which here would mean "refund all".
+      */}
       <FormInput
         name="amount"
-        type="number"
+        type="text"
         inputMode="decimal"
-        min="0.01"
-        max={max}
-        step="0.01"
+        autoComplete="off"
         label={t("admin.marketing.boostPurchases.refund.amount")}
         helperText={t("admin.marketing.boostPurchases.refund.amountHelper", {
           max: fmtTry(max),
@@ -139,35 +163,5 @@ export function RefundBoostModal({
         label={t("admin.marketing.boostPurchases.refund.reason")}
       />
     </FormModal>
-  );
-}
-
-/** The refund may have moved money: no resubmit, only the reconciliation. */
-function RefundPendingNotice({ onClose }: { onClose: () => void }) {
-  const t = useTranslations();
-  return (
-    <Modal
-      isOpen
-      onClose={onClose}
-      title={t("admin.marketing.boostPurchases.refund.title")}
-      size="md"
-      closeLabel={t("common.close")}
-      footer={
-        <Button variant="secondary" onClick={onClose}>
-          {t("common.close")}
-        </Button>
-      }
-    >
-      <Alert
-        variant="warning"
-        action={
-          <TextLink href={REFUND_RECONCILIATION_HREF}>
-            {t("admin.finance.payments.refundReconciliation.action")}
-          </TextLink>
-        }
-      >
-        {t("admin.marketing.boostPurchases.refund.pendingReconciliation")}
-      </Alert>
-    </Modal>
   );
 }

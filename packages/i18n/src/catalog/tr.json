@@ -6399,7 +6399,6 @@
           "reason": "Gerekçe",
           "confirm": "Tutar karta iade edilecek, öne çıkarma hemen duracak ve faturası iptal edilecek ya da iade faturası kesilecek. Bu işlem geri alınamaz.",
           "partialStops": "Kısmi iade de öne çıkarmayı durdurur; kalan tutar daha sonra iade edilemez.",
-          "pendingReconciliation": "İadenin sonucu henüz kesinleşmedi. Tekrar denemeyin; sonucu İade Mutabakatı ekranından kontrol edin.",
           "done": "İade yapıldı, öne çıkarma durduruldu"
         },
         "revoke": {
@@ -6909,7 +6908,8 @@
           "note": "Mutabakat Notu",
           "notePlaceholder": "Mutabakat sonucunu ve doğrulama kaynağını yazın",
           "confirm": "Mutabakatı Kaydet",
-          "resolved": "İade mutabakatı kaydedildi"
+          "resolved": "İade mutabakatı kaydedildi",
+          "outcomeUnknown": "İadenin sonucu henüz kesinleşmedi. Tekrar denemeyin; sonucu İade Mutabakatı ekranından kontrol edin."
         },
         "status": {
           "pending": "Bekliyor",
