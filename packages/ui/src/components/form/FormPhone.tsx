@@ -44,8 +44,8 @@ export function FormPhone({
   legacyMessage,
   className,
 }: FormPhoneProps) {
-  const { control, formState } = useFormContext();
-  const error = formState.errors[name]?.message as string | undefined;
+  const { control, formState, getFieldState } = useFormContext();
+  const error = getFieldState(name, formState).error?.message;
 
   return (
     <Controller

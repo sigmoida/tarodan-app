@@ -61,8 +61,9 @@ export interface FormInputProps extends Omit<InputProps, "name" | "error"> {
 
 /** Text input wired to the form by `name`. */
 export function FormInput({ name, ...props }: FormInputProps) {
-  const { register, formState } = useFormContext();
-  const error = formState.errors[name]?.message as string | undefined;
+  const { register, formState, getFieldState } = useFormContext();
+  // By path, so a field in an array ("tiers.0.price") shows its error too.
+  const error = getFieldState(name, formState).error?.message;
   return <Input error={error} {...props} {...register(name)} />;
 }
 
