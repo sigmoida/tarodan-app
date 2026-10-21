@@ -14,16 +14,15 @@ import {
   ProductStatus,
   OrderOrigin,
   OrderStatus,
-  MembershipTierType,
-  Prisma,
 } from "@prisma/client";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../../common/helpers/generate-reference";
 import { boostTierBasePrice } from "../helpers/product-sale-window";
 import {
-  effectiveMembershipTierType,
-  isPremiumEntitled,
-} from "../../membership/helpers/membership.util";
+  BoostAudienceService,
+  eligibleAudienceWhere,
+  tierCoversPriceWhere,
+} from "../boost-seller/boost-audience.service";
 import { PaymentService } from "../../payment/payment.service";
 import { PaymentProvider } from "../../payment/dto";
 import { boostVirtualProductId } from "../../payment/helpers/virtual-order-kind";
@@ -69,6 +68,7 @@ export class ProductBoostService {
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
     private readonly platformServiceConsents: PlatformServiceConsentService,
+    private readonly audience: BoostAudienceService,
     @Optional() private readonly sentry?: SentryService,
   ) {}
 
@@ -96,73 +96,19 @@ export class ProductBoostService {
     return Number(tier.campaignPrice);
   }
 
-  /**
-   * Alıcının EFEKTİF üyelik katmanı — paket hedeflemesi GEÇERLİ üyelik ister.
-   * Tek doğruluk kaynağı `effectiveMembershipTierType`: durum + dönem sonu +
-   * tier.isActive + business için KYC şartı; hak yoksa "free". (Eskiden burada
-   * yalnız status+dönem türetiliyordu: KYC'si iptal edilmiş business üye veya
-   * pasifleştirilmiş tier hâlâ hedefli paketleri açabiliyordu.)
-   */
-  private async resolveAudienceTierType(
-    userId: string,
-  ): Promise<MembershipTierType> {
-    const membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-      select: {
-        status: true,
-        currentPeriodEnd: true,
-        tier: { select: { type: true, isActive: true } },
-        user: {
-          select: {
-            businessStatus: true,
-            companyName: true,
-            taxId: true,
-          },
-        },
-      },
-    });
-    return effectiveMembershipTierType(membership, membership?.user);
-  }
-
-  private eligibleAudienceWhere(
-    userId: string,
-    tierType: MembershipTierType,
-  ): Prisma.AdPackageWhereInput {
-    return {
-      OR: [
-        { audienceMode: "everyone" },
-        {
-          audienceMode: "membership_tiers",
-          targetTiers: { some: { tierType } },
-        },
-        {
-          audienceMode: "specific_users",
-          targetUsers: { some: { userId } },
-        },
-        {
-          audienceMode: "tiers_or_users",
-          OR: [
-            { targetTiers: { some: { tierType } } },
-            { targetUsers: { some: { userId } } },
-          ],
-        },
-      ],
-    };
-  }
-
-  /** Ürün fiyatına göre (paket, süre) için aktif kademeyi çöz → efektif fiyat. */
+  /** The active tier of (package, duration) for the listing price, and its price now. */
   private async resolvePackagePrice(
     packageId: string,
     durationDays: number,
     productPrice: number,
     userId: string,
   ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
-    const tierType = await this.resolveAudienceTierType(userId);
+    const tierType = await this.audience.audienceTierType(userId);
     const pkg = await this.prisma.adPackage.findFirst({
       where: {
         id: packageId,
         isActive: true,
-        ...this.eligibleAudienceWhere(userId, tierType),
+        ...eligibleAudienceWhere(userId, tierType),
       },
       select: { id: true, name: true, showcaseOnHome: true },
     });
@@ -176,8 +122,7 @@ export class ProductBoostService {
         packageId,
         durationDays,
         isActive: true,
-        minAmount: { lte: productPrice },
-        OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+        ...tierCoversPriceWhere(productPrice),
       },
     });
     if (!tier) {
@@ -224,21 +169,17 @@ export class ProductBoostService {
     }
     const productPrice = boostTierBasePrice(product);
     const enabled = await this.isBoostEnabled();
-    const tierType = await this.resolveAudienceTierType(userId);
+    const tierType = await this.audience.audienceTierType(userId);
 
     const packages = await this.prisma.adPackage.findMany({
       where: {
         isActive: true,
-        ...this.eligibleAudienceWhere(userId, tierType),
+        ...eligibleAudienceWhere(userId, tierType),
       },
       orderBy: { sortOrder: "asc" },
       include: {
         tiers: {
-          where: {
-            isActive: true,
-            minAmount: { lte: productPrice },
-            OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
-          },
+          where: { isActive: true, ...tierCoversPriceWhere(productPrice) },
           orderBy: { durationDays: "asc" },
         },
       },
@@ -359,25 +300,9 @@ export class ProductBoostService {
     }
 
     // The reminder flag (`autoRenew`) is kept only for premium members
-    let effectiveAutoRenew = false;
-    if (autoRenew) {
-      const membership = await this.prisma.userMembership.findUnique({
-        where: { userId },
-        select: {
-          status: true,
-          currentPeriodEnd: true,
-          tier: { select: { type: true, isActive: true } },
-          user: {
-            select: {
-              businessStatus: true,
-              companyName: true,
-              taxId: true,
-            },
-          },
-        },
-      });
-      effectiveAutoRenew = isPremiumEntitled(membership, membership?.user);
-    }
+    const effectiveAutoRenew = autoRenew
+      ? await this.audience.isPremium(userId)
+      : false;
 
     // Reads stay outside the transaction; `order_number` is unique, so a
     // code taken in between fails the write instead of being shared.
@@ -481,95 +406,5 @@ export class ProductBoostService {
         .catch(() => undefined);
       throw error;
     }
-  }
-
-  /** Kullanıcının boost'ları (en yeni önce) + ürün özeti. */
-  async getMyBoosts(userId: string) {
-    const boosts = await this.prisma.productBoost.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            viewCount: true,
-            likeCount: true,
-            clickCount: true,
-            images: { orderBy: { sortOrder: "asc" }, take: 1 },
-          },
-        },
-      },
-    });
-
-    const now = new Date();
-    const rows = boosts.map((b) => {
-      const current = {
-        views: b.finalViewCount ?? b.product?.viewCount ?? 0,
-        likes: b.finalLikeCount ?? b.product?.likeCount ?? 0,
-        clicks: b.finalClickCount ?? b.product?.clickCount ?? 0,
-      };
-      const before =
-        b.baselineViewCount == null
-          ? null
-          : {
-              views: b.baselineViewCount,
-              likes: b.baselineLikeCount ?? 0,
-              clicks: b.baselineClickCount ?? 0,
-            };
-      const gain = before
-        ? {
-            views: current.views - before.views,
-            likes: current.likes - before.likes,
-            clicks: current.clicks - before.clicks,
-          }
-        : null;
-      const performanceScore = gain
-        ? Math.max(0, gain.views) +
-          Math.max(0, gain.likes) * 5 +
-          Math.max(0, gain.clicks) * 3
-        : null;
-
-      return {
-        id: b.id,
-        productId: b.productId,
-        product: b.product
-          ? {
-              id: b.product.id,
-              title: b.product.title,
-              status: b.product.status,
-              image: b.product.images[0]?.cardKey ?? null,
-            }
-          : null,
-        packageName: b.packageName,
-        durationDays: b.durationDays,
-        extendedDays: b.extendedDays,
-        price: Number(b.price),
-        status: b.status,
-        autoRenew: b.autoRenew,
-        startsAt: b.startsAt?.toISOString() ?? null,
-        endsAt: b.endsAt?.toISOString() ?? null,
-        isActive: b.status === "active" && b.endsAt != null && b.endsAt > now,
-        remainingMs:
-          b.status === "active" && b.endsAt != null && b.endsAt > now
-            ? b.endsAt.getTime() - now.getTime()
-            : b.status === "paused"
-              ? (b.pausedRemainingSeconds ?? 0) * 1000
-              : 0,
-        metrics: { before, current, gain, performanceScore },
-        createdAt: b.createdAt.toISOString(),
-      };
-    });
-    const bestScore = rows.reduce(
-      (best, row) => Math.max(best, row.metrics.performanceScore ?? -1),
-      -1,
-    );
-    return rows.map((row) => ({
-      ...row,
-      isBest:
-        row.metrics.performanceScore != null &&
-        row.metrics.performanceScore === bestScore,
-    }));
   }
 }

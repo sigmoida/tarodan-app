@@ -3,6 +3,7 @@ import { ProductKind, ProductStatus } from "@prisma/client";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../../common/validators/global-validation-pipe-options";
 import { InitiateBoostDto } from "../dto/boost.dto";
 import { PaymentProvider } from "../../payment/dto";
+import { BoostAudienceService } from "../boost-seller/boost-audience.service";
 import { ProductBoostService } from "./product-boost.service";
 
 /**
@@ -114,6 +115,7 @@ describe("ProductBoostService access and settings", () => {
       prisma as never,
       payment as never,
       consents as never,
+      new BoostAudienceService(prisma as never),
     );
     return { prisma, service, consents };
   };

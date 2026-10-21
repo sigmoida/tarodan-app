@@ -119,6 +119,20 @@ describe("bildirim hedefleri", () => {
     it.each(cases)("%s → %j = %s", (type, data, expected) => {
       expect(resolveWebNotificationLink(type, data)).toBe(expected);
     });
+
+    // Every boost notice opens "My boosts", a path the web resolver accepts.
+    it.each([
+      NotificationType.BOOST_ACTIVATED,
+      NotificationType.BOOST_ENDING_SOON,
+      NotificationType.BOOST_EXPIRED,
+      NotificationType.BOOST_GRANTED,
+      NotificationType.BOOST_CANCELLED,
+      NotificationType.BOOST_REFUNDED,
+    ])("%s opens /profile/boosts", (type) => {
+      const link = resolveWebNotificationLink(type, { productId: "p1" });
+      expect(link).toBe("/profile/boosts");
+      expect(isSafeFreeLink(link as string)).toBe(true);
+    });
   });
 
   describe("hedef kitle (audience)", () => {
