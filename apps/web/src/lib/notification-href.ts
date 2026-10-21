@@ -12,11 +12,12 @@
  * API artık hedefi tip+data'dan yeniden çözüyor; bu yardımcı istemci tarafının
  * son savunması ve iki ekranın AYNI hedefi açmasının garantisi.
  *
- * Kurallar sunucudaki `apps/api/src/modules/notification/
- * notification-link-safety.ts` ile birebir aynı tutulur. İkisi ağın iki
- * yakasında durduğu için tek modüle indirilemiyor; bu yüzden aşağıdaki
- * `INTERNAL_ROUTES` listesi değişince oradaki liste de değişmelidir.
+ * The allowed in-site paths come from `@tarodan/types`
+ * (`NOTIFICATION_INTERNAL_PATHS`), the list the API and the admin broadcast
+ * form validate with, so a new notification target is added in one place.
  */
+
+import { NOTIFICATION_INTERNAL_PATHS } from "@tarodan/types";
 
 export interface NotificationLike {
   link?: string | null;
@@ -31,28 +32,6 @@ export const NOTIFICATION_FALLBACK_HREF = "/profile/notifications";
  * BAŞKA bir origin'e kaçmadığını ölçmek için sabit bir tabana çözülür.
  */
 const REFERENCE_ORIGIN = "https://tarodan.internal";
-
-/**
- * Site içinde gerçekten var olan canonical yollar (locale öneki hariç —
- * `@/i18n/navigation` onu kendisi ekler).
- *
- * `/` ile başlayan her şeyi kabul etmek yetmiyordu: eski satırlardaki
- * `/olmayan-bir-sayfa` de geçiyor ve tıklayan kullanıcı 404 görüyordu.
- */
-const INTERNAL_ROUTES: RegExp[] = [
-  /^\/$/,
-  /^\/listings(\/[^/]+)?$/,
-  /^\/products\/unavailable\/[^/]+$/,
-  /^\/collections(\/[^/]+)?$/,
-  /^\/seller\/[^/]+$/,
-  /^\/seller\/orders\/[^/]+$/,
-  /^\/membership$/,
-  /^\/profile$/,
-  // Alt segmenti GERÇEKTEN olan iki bölüm (`[id]` route'u var).
-  /^\/profile\/(orders|trades)(\/[^/]+)?$/,
-  // Kalanlar yalnız liste ekranı: `/profile/offers/x` diye bir sayfa yok.
-  /^\/profile\/(offers|messages|listings|favorites|payments|notifications)$/,
-];
 
 /** Eski yolların bugünkü karşılıkları (API düzeltmeyi kaçırırsa diye). */
 const LEGACY_REWRITES: Array<[RegExp, string]> = [
@@ -132,7 +111,10 @@ export function resolveNotificationHref(
     }
     // Göreli çözüm başka bir origin'e kaçtıysa iç link değildir.
     if (url.origin !== REFERENCE_ORIGIN) return FALLBACK;
-    if (!INTERNAL_ROUTES.some((route) => route.test(url.pathname))) {
+    // Canonical paths without the locale prefix (`@/i18n/navigation` adds it).
+    if (
+      !NOTIFICATION_INTERNAL_PATHS.some((route) => route.test(url.pathname))
+    ) {
       return FALLBACK;
     }
 

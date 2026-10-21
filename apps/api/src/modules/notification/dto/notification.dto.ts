@@ -186,7 +186,10 @@ export enum NotificationType {
   LISTING_EXPIRING = "listing_expiring",
   LISTING_EXPIRED = "listing_expired",
   LISTING_VIEWS_MILESTONE = "listing_views_milestone",
+  // A listing's promotion really ended (once per listing, not per stacked boost).
   BOOST_EXPIRED = "boost_expired",
+  // The listing's promotion ends within 24 hours (the premium reminder).
+  BOOST_ENDING_SOON = "boost_ending_soon",
   // Öne çıkarma ödemesi tamamlandı ve boost aktifleşti — satın alana gider.
   BOOST_ACTIVATED = "boost_activated",
   // Staff actions on a boost, to the listing's seller: a free grant, a stop

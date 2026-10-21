@@ -118,18 +118,26 @@ export class BoostTimelineStore {
     this.sentry?.captureMessage(message, "warning");
   }
 
-  /** The seller notice, in the caller's transaction (sent after commit). */
+  /**
+   * The seller notice, in the caller's transaction (sent after commit).
+   * `at` is the reminder's claim stamp (`ending_soon` only).
+   * @returns the queued payload, for the caller's immediate send (`flush`).
+   */
   async enqueueNotice(
     tx: Prisma.TransactionClient,
     boostId: string,
     kind: BoostNoticeKind,
-  ): Promise<void> {
-    const payload: BoostNoticePayload = { boostId, kind };
+    at?: Date,
+  ): Promise<BoostNoticePayload> {
+    const payload: BoostNoticePayload = at
+      ? { boostId, kind, at: at.toISOString() }
+      : { boostId, kind };
     await this.outbox?.enqueue(tx, {
       type: OUTBOX_BOOST_NOTICE,
       payload: { ...payload },
       dedupeKey: boostNoticeDedupeKey(payload),
     });
+    return payload;
   }
 
   /**

@@ -53,6 +53,7 @@ describe("ProductSchedulerService.runUpdatePopularityScores: trust rating", () =
       {} as never, // search
       sellerTrust as never,
       {} as never, // boost timeline
+      {} as never, // boost notices
     );
     return { service, prisma, sellerTrust, rows };
   };

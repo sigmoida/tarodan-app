@@ -17,6 +17,8 @@ import {
   Req,
   Logger,
   Header,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -30,6 +32,8 @@ import { engagementClientIp } from "./helpers/engagement-client-ip";
 import { type Locale } from "@tarodan/i18n";
 import { ProductService } from "./product.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
+import { BoostSellerService } from "./boost-seller/boost-seller.service";
+import { BoostOfferService } from "./boost-seller/boost-offer.service";
 import { ProductRenewalService } from "./lifecycle/product-renewal.service";
 import {
   CreateProductDto,
@@ -39,8 +43,16 @@ import {
   ProductResponseDto,
   PaginatedProductsDto,
   InitiateBoostDto,
+  MyBoostsQueryDto,
+  BoostReminderDto,
+  DismissBoostOffersDto,
   RenewProductsDto,
 } from "./dto";
+import type {
+  BoostOffersResponse,
+  BoostReminderResponse,
+  MyBoostsResponse,
+} from "@tarodan/types";
 import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
@@ -54,6 +66,8 @@ export class ProductController {
   constructor(
     private readonly productService: ProductService,
     private readonly productBoostService: ProductBoostService,
+    private readonly boostSellerService: BoostSellerService,
+    private readonly boostOfferService: BoostOfferService,
     private readonly productRenewalService: ProductRenewalService,
     private readonly i18n: I18nService,
   ) {}
@@ -171,16 +185,105 @@ export class ProductController {
   }
 
   /**
-   * GET /products/boost/my
-   * Kullanıcının boost (öne çıkarma) geçmişi ve aktif boost'ları
+   * GET /products/boost/my?state=current|history&page&limit
+   * "My boosts": the caller's running and paused boosts, or the ended and
+   * cancelled ones, newest first, in the list envelope `{ data, meta }`.
+   * The `boost/...` routes stay before the `:id` routes.
    */
   @Get("boost/my")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Boost geçmişim" })
-  @ApiResponse({ status: 200, description: "Kullanıcının boost kayıtları" })
-  async getMyBoosts(@CurrentUser("id") userId: string) {
-    return this.productBoostService.getMyBoosts(userId);
+  @ApiOperation({ summary: "My boosts (current or history)" })
+  @ApiResponse({
+    status: 200,
+    description: "{ data: MyBoostRow[], meta } (pending and failed never)",
+  })
+  async getMyBoosts(
+    @CurrentUser("id") userId: string,
+    @Query() query: MyBoostsQueryDto,
+  ): Promise<MyBoostsResponse> {
+    return this.boostSellerService.getMyBoosts(userId, query);
+  }
+
+  /**
+   * GET /products/boost/offers
+   * The caller's listings due the one-time boost offer (web dialog).
+   */
+  @Get("boost/offers")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Listings due the one-time boost offer" })
+  @ApiResponse({
+    status: 200,
+    description: "{ enabled, offers } newest first, at most 20",
+  })
+  async getBoostOffers(
+    @CurrentUser("id") userId: string,
+  ): Promise<BoostOffersResponse> {
+    return this.boostOfferService.getOffers(userId);
+  }
+
+  /**
+   * POST /products/boost/offers/dismiss
+   * The offers shown are never shown again (own listings only).
+   */
+  @Post("boost/offers/dismiss")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Dismiss boost offers (once per listing)" })
+  @ApiResponse({
+    status: 204,
+    description:
+      "Recorded for the caller's own listings; other ids are ignored",
+  })
+  @ApiResponse({ status: 400, description: "1 to 20 listing UUIDs" })
+  async dismissBoostOffers(
+    @CurrentUser("id") userId: string,
+    @Body() dto: DismissBoostOffersDto,
+  ): Promise<void> {
+    await this.boostOfferService.dismissOffers(userId, dto.productIds);
+  }
+
+  /**
+   * PATCH /products/:id/boost/reminder
+   * The ending-soon reminder of the owner's running and paused boosts of the
+   * listing (premium to turn on; never a charge).
+   */
+  @Patch(":id/boost/reminder")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Turn the boost ending-soon reminder on or off" })
+  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiResponse({
+    status: 200,
+    description: "{ enabled } (false when no boost of the listing runs)",
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Turning it on without premium (server.product.boostReminderPremiumOnly)",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "No such listing, or not the caller's listing",
+  })
+  async setBoostReminder(
+    @Param(
+      "id",
+      new ParseUUIDPipe({
+        errorHttpStatusCode: 400,
+        exceptionFactory: () =>
+          new BadRequestException(
+            i18nMessage("server.product.invalidIdFormat"),
+          ),
+      }),
+    )
+    id: string,
+    @CurrentUser("id") userId: string,
+    @Body() dto: BoostReminderDto,
+  ): Promise<BoostReminderResponse> {
+    return this.boostSellerService.setReminder(userId, id, dto.enabled);
   }
 
   /**

@@ -5,6 +5,7 @@ import {
   ProductStatus,
 } from "@prisma/client";
 import { PaymentProvider } from "../../payment/dto";
+import { BoostAudienceService } from "../boost-seller/boost-audience.service";
 import { ProductBoostService } from "./product-boost.service";
 
 /**
@@ -106,6 +107,7 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
       prisma as never,
       payment as never,
       consents as never,
+      new BoostAudienceService(prisma as never),
       sentry as never,
     );
     return { service, prisma, tx, consents, payment, sentry, calls };
