@@ -195,7 +195,10 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
       await service.runExpireBoosts();
 
       const { sql, values } = sqlOf(prisma);
-      expect(sql).toContain('b."auto_renew" = true');
+      // The reminder is the listing's: any running or paused boost asked.
+      expect(sql).toMatch(
+        /AND EXISTS \( SELECT 1 FROM "product_boosts" asked WHERE asked\."product_id" = b\."product_id" AND asked\."status" IN \(\?::"BoostStatus", \?::"BoostStatus"\) AND asked\."auto_renew" = true \)/,
+      );
       expect(sql).toContain(
         'b."reminder_sent_at" IS NULL OR b."reminder_sent_at" < b."ends_at" - make_interval(mins => ?::int)',
       );

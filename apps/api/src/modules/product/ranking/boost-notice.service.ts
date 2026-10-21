@@ -12,6 +12,7 @@ import {
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { errorMessage } from "../../../common/helpers/error-message";
+import { BOOST_REMINDER_LEAD_MS } from "../boost-timeline/boost-expiry.service";
 
 const KIND_TO_TYPE: Record<BoostNoticeKind, NotificationType> = {
   granted: NotificationType.BOOST_GRANTED,
@@ -66,8 +67,8 @@ export class BoostNoticeService implements OnModuleInit {
    * The outbox handler: one notice to the boost's seller, read when it is
    * sent (the refunded amount is final by then). A boost that no longer
    * exists (deleted with its listing) has nobody to tell, and an ending-soon
-   * reminder delivered late (the drainer) is dropped once the boost no longer
-   * runs: "ends within 24 hours" would then be wrong.
+   * reminder delivered late (the drainer) is dropped once it is no longer
+   * true (`reminderStillHolds`).
    */
   async send(
     notice: BoostNoticePayload,
@@ -88,9 +89,7 @@ export class BoostNoticeService implements OnModuleInit {
     if (!boost) return;
     if (
       notice.kind === "ending_soon" &&
-      (boost.status !== BoostStatus.active ||
-        !boost.endsAt ||
-        boost.endsAt <= now)
+      !(await this.reminderStillHolds(boost, now))
     ) {
       return;
     }
@@ -109,5 +108,28 @@ export class BoostNoticeService implements OnModuleInit {
       },
       { pushRequiresRecord: true },
     );
+  }
+
+  /**
+   * "Ends within 24 hours" still holds when the boost runs, ends within the
+   * lead time and is still the listing's last running boost: a reminder the
+   * drainer delivers after a stacked purchase, an extension or a stop would
+   * otherwise tell the seller the listing ends while it stays featured.
+   */
+  private async reminderStillHolds(
+    boost: { productId: string; status: BoostStatus; endsAt: Date | null },
+    now: Date,
+  ): Promise<boolean> {
+    if (boost.status !== BoostStatus.active || !boost.endsAt) return false;
+    const left = boost.endsAt.getTime() - now.getTime();
+    if (left <= 0 || left > BOOST_REMINDER_LEAD_MS) return false;
+    const later = await this.prisma.productBoost.count({
+      where: {
+        productId: boost.productId,
+        status: BoostStatus.active,
+        endsAt: { gt: boost.endsAt },
+      },
+    });
+    return later === 0;
   }
 }

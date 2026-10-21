@@ -584,18 +584,21 @@ No money moves here; these rules only read and announce the boost timeline
   transaction per listing under its lock, `BoostExpiryService`): the ended
   `active` boosts become `expired` with the listing's final counters, the
   listing's promotion is rebuilt, and `BOOST_EXPIRED` goes out **once per
-  listing**, when no running boost of it ends later (stacked boosts used to
-  send one per boost). The notice is an outbox row (`boost.notice`, kind
-  `expired`, keyed by the boost that ended last) written with the change.
+  listing**, when no running boost of it ends later and none waits paused
+  (stacked boosts used to send one per boost). The notice is an outbox row
+  (`boost.notice`, kind `expired`, keyed by the boost that ended last)
+  written with the change.
 - **Ending-soon reminder** (premium only, decision D7; a reminder, never an
-  automatic charge): when the listing's last running boost (its "tail") asked
-  for it (`autoRenew`) and ends within `BOOST_REMINDER_LEAD_HOURS` (24), the
+  automatic charge): the switch is the listing's (on while any running or
+  paused boost of it has `autoRenew`). When the listing's last running boost
+  (its "tail") ends within `BOOST_REMINDER_LEAD_HOURS` (24), the
   cron claims it with a compare-and-set on `reminderSentAt` and queues
   `BOOST_ENDING_SOON` (outbox kind `ending_soon`, keyed by the stamp). It is
   due again only when that end moves past the window the reminder announced
   (a stacked purchase is a new tail; a staff extension or a resume moves the
   end). A seller who is no longer premium gets none; the handler drops a
-  reminder delivered after the boost stopped.
+  late reminder that no longer holds (the boost stopped, is no longer the
+  tail, or its end moved past the lead time).
 - **My boosts** (`GET /products/boost/my?state=current|history`, web only,
   ADR 0015): the caller's `active` and `paused` boosts, or the `expired` and
   `cancelled` ones, in the `{ data, meta }` envelope, with the order number,

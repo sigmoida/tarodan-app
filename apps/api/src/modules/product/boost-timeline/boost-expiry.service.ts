@@ -11,8 +11,9 @@ export const BOOST_REMINDER_LEAD_MS =
 
 /**
  * Whether the listing's last running boost (its "tail") is due the
- * ending-soon reminder at `now`: the seller asked for it (`autoRenew`), the
- * end is within the lead time, and no reminder announced this end yet.
+ * ending-soon reminder at `now`: the reminder is on for the listing
+ * (`reminderOn`, see `remindEndingSoon`), the end is within the lead time,
+ * and no reminder announced this end yet.
  *
  * A reminder sent at `reminderSentAt` announced an end within the lead time
  * of that moment. When the end has since moved past that window (a staff
@@ -20,10 +21,10 @@ export const BOOST_REMINDER_LEAD_MS =
  * is due again; a new tail row (the seller bought more time) has no stamp.
  */
 export function isBoostReminderDue(
-  tail: { endsAt: Date; autoRenew: boolean; reminderSentAt: Date | null },
+  tail: { endsAt: Date; reminderOn: boolean; reminderSentAt: Date | null },
   now: Date,
 ): boolean {
-  if (!tail.autoRenew) return false;
+  if (!tail.reminderOn) return false;
   const end = tail.endsAt.getTime();
   const armedFrom = end - BOOST_REMINDER_LEAD_MS;
   if (now.getTime() >= end || now.getTime() < armedFrom) return false;
@@ -57,8 +58,10 @@ export class BoostExpiryService {
   /**
    * Marks the listing's ended boosts `expired` (with the listing's final
    * counters for the performance view) and rebuilds its promotion. When no
-   * running boost of the listing ends later, its promotion really ended:
-   * queues one `expired` notice, keyed by the boost that ended last.
+   * running boost of the listing ends later and none waits paused (a paused
+   * boost resumes, by the system once the listing is live again or by staff),
+   * its promotion really ended: queues one `expired` notice, keyed by the
+   * boost that ended last.
    */
   async expireEnded(
     tx: Prisma.TransactionClient,
@@ -95,10 +98,16 @@ export class BoostExpiryService {
     await this.store.refreshProductPromotion(tx, productId, now);
     if (expired === 0) return { expired, notice: null };
 
-    const runningLater = await tx.productBoost.count({
-      where: { productId, status: BoostStatus.active, endsAt: { gt: now } },
+    const stillToCome = await tx.productBoost.count({
+      where: {
+        productId,
+        OR: [
+          { status: BoostStatus.active, endsAt: { gt: now } },
+          { status: BoostStatus.paused },
+        ],
+      },
     });
-    if (runningLater > 0) return { expired, notice: null };
+    if (stillToCome > 0) return { expired, notice: null };
 
     const last = ended.reduce((a, b) =>
       (b.endsAt?.getTime() ?? 0) > (a.endsAt?.getTime() ?? 0) ? b : a,
@@ -113,8 +122,11 @@ export class BoostExpiryService {
    * boost (the running boost that ends last) must be due
    * (`isBoostReminderDue`) and its seller still premium (the reminder is a
    * premium feature; the flag was only accepted from a premium member). The
-   * claim is a compare-and-set on `reminderSentAt`, so two cron runs never
-   * send it twice.
+   * switch is the listing's: it is on while any running or paused boost of
+   * the listing has `autoRenew` (`PATCH /products/:id/boost/reminder` sets
+   * them all), so a later grant or a purchase without the flag, which becomes
+   * the tail, does not silently drop it. The claim is a compare-and-set on
+   * the tail's `reminderSentAt`, so two cron runs never send it twice.
    * @returns the queued notice, or null when nothing is due.
    */
   async remindEndingSoon(
@@ -151,10 +163,19 @@ export class BoostExpiryService {
     if (!tail?.endsAt || tail.product.status !== ProductStatus.active) {
       return null;
     }
+    const reminderOn =
+      tail.autoRenew ||
+      (await tx.productBoost.count({
+        where: {
+          productId,
+          status: { in: [BoostStatus.active, BoostStatus.paused] },
+          autoRenew: true,
+        },
+      })) > 0;
     const due = isBoostReminderDue(
       {
         endsAt: tail.endsAt,
-        autoRenew: tail.autoRenew,
+        reminderOn,
         reminderSentAt: tail.reminderSentAt,
       },
       now,

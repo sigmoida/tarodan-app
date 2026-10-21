@@ -211,7 +211,8 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.LISTING_EXPIRED]: pattern("/profile/listings"),
   [NotificationType.LISTING_VIEWS_MILESTONE]: LISTING,
   // Boost notices open "My boosts" on web. Mobile has no such screen (ADR
-  // 0015): an unmapped link falls back to the listing (`data.productId`).
+  // 0015): its router opens the listing from `data.productId`, which every
+  // boost notice carries and which it reads before the link (1.0.5 too).
   [NotificationType.BOOST_EXPIRED]: pattern("/profile/boosts"),
   [NotificationType.BOOST_ENDING_SOON]: pattern("/profile/boosts"),
   [NotificationType.BOOST_ACTIVATED]: pattern("/profile/boosts"),

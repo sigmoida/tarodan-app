@@ -433,9 +433,12 @@ export class ProductSchedulerService implements OnModuleInit {
   /**
    * Ending-soon reminders, per listing (`BoostTimelineService.remindEndingSoon`,
    * which decides and claims under the listing lock). The candidates are the
-   * live listings whose last running boost ends within the lead time, asked
-   * for the reminder and has not announced this end yet (`isBoostReminderDue`
-   * in SQL), so reminded listings never crowd out the batch.
+   * live listings whose last running boost ends within the lead time and has
+   * not announced this end yet, with the reminder on for the listing
+   * (`isBoostReminderDue` in SQL), so reminded listings never crowd out the
+   * batch. Premium is checked per listing in the timeline: a seller whose
+   * premium lapsed stays a candidate until the end passes (at most a day), a
+   * small set ordered after the sooner ends.
    */
   private async remindEndingPromotions(now: Date): Promise<number> {
     const horizon = new Date(now.getTime() + BOOST_REMINDER_LEAD_MS);
@@ -445,7 +448,6 @@ export class ProductSchedulerService implements OnModuleInit {
       FROM "product_boosts" b
       JOIN "products" p ON p."id" = b."product_id"
       WHERE b."status" = ${BoostStatus.active}::"BoostStatus"
-        AND b."auto_renew" = true
         AND b."ends_at" > ${now}
         AND b."ends_at" <= ${horizon}
         AND (
@@ -458,6 +460,12 @@ export class ProductSchedulerService implements OnModuleInit {
           WHERE later."product_id" = b."product_id"
             AND later."status" = ${BoostStatus.active}::"BoostStatus"
             AND later."ends_at" > b."ends_at"
+        )
+        AND EXISTS (
+          SELECT 1 FROM "product_boosts" asked
+          WHERE asked."product_id" = b."product_id"
+            AND asked."status" IN (${BoostStatus.active}::"BoostStatus", ${BoostStatus.paused}::"BoostStatus")
+            AND asked."auto_renew" = true
         )
       ORDER BY b."ends_at" ASC, b."product_id" ASC
       LIMIT ${BOOST_REMINDER_BATCH}`;

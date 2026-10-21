@@ -42,6 +42,9 @@ type Where = Record<string, unknown>;
 
 function matches(row: Record<string, unknown>, where: Where): boolean {
   return Object.entries(where).every(([key, cond]) => {
+    if (key === "OR") {
+      return (cond as Where[]).some((branch) => matches(row, branch));
+    }
     const value = row[key];
     if (cond === null) return value == null;
     if (cond instanceof Date) {
@@ -273,12 +276,29 @@ describe("BoostExpiryService.expireEnded", () => {
       BoostStatus.pending,
     ]);
   });
+
+  it("a boost waiting paused keeps the promotion alive: no 'ended' notice yet", async () => {
+    // Staff paused it, or the system did while the listing was offline: it
+    // runs again later, so the feature period has not ended.
+    const { service, tx, boosts, outbox } = setup({
+      boosts: [
+        boost({ id: "a", endsAt: at(-HOUR) }),
+        boost({ id: "b", status: BoostStatus.paused, endsAt: null }),
+      ],
+    });
+
+    await expect(
+      service.expireEnded(tx as never, "prod-1", NOW),
+    ).resolves.toEqual({ expired: 1, notice: null });
+    expect(boosts.get("a")?.status).toBe(BoostStatus.expired);
+    expect(outbox.enqueue).not.toHaveBeenCalled();
+  });
 });
 
 describe("isBoostReminderDue", () => {
   const tail = (over: Partial<Parameters<typeof isBoostReminderDue>[0]>) => ({
     endsAt: at(10 * HOUR),
-    autoRenew: true,
+    reminderOn: true,
     reminderSentAt: null,
     ...over,
   });
@@ -287,7 +307,7 @@ describe("isBoostReminderDue", () => {
     ["within 24 h, asked for, never sent", tail({}), true],
     ["exactly 24 h before the end", tail({ endsAt: at(24 * HOUR) }), true],
     ["more than 24 h before the end", tail({ endsAt: at(25 * HOUR) }), false],
-    ["the seller did not ask", tail({ autoRenew: false }), false],
+    ["the seller did not ask", tail({ reminderOn: false }), false],
     ["already ended", tail({ endsAt: NOW }), false],
     [
       "sent for this end already",
@@ -421,10 +441,35 @@ describe("BoostExpiryService.remindEndingSoon", () => {
     expect(outbox.enqueue).not.toHaveBeenCalled();
   });
 
+  it("the switch is the listing's: a later tail without the flag (a grant) is still reminded", async () => {
+    // The seller turned the reminder on (PATCH sets the running rows); a
+    // free grant stacked afterwards has autoRenew false and is the tail.
+    const { service, tx, outbox } = setup({
+      boosts: [
+        boost({ id: "b1", endsAt: at(2 * HOUR), autoRenew: true }),
+        boost({ id: "grant", endsAt: at(10 * HOUR), autoRenew: false }),
+      ],
+    });
+
+    await expect(
+      service.remindEndingSoon(tx as never, "prod-1", NOW),
+    ).resolves.toMatchObject({ boostId: "grant", kind: "ending_soon" });
+    expect(outbox.enqueue).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     [
       "the reminder is off",
       { boosts: [boost({ id: "b1", endsAt: at(10 * HOUR) })] },
+    ],
+    [
+      "the reminder is off on every running boost of the listing",
+      {
+        boosts: [
+          boost({ id: "b1", endsAt: at(2 * HOUR) }),
+          boost({ id: "b2", endsAt: at(10 * HOUR) }),
+        ],
+      },
     ],
     [
       "the seller is no longer premium",

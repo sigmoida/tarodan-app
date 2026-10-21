@@ -18,7 +18,11 @@ describe("BoostNoticeService", () => {
     },
   ) => {
     const prisma = {
-      productBoost: { findUnique: jest.fn().mockResolvedValue(boost) },
+      productBoost: {
+        findUnique: jest.fn().mockResolvedValue(boost),
+        // No running boost of the listing ends later (a reminder still holds).
+        count: jest.fn().mockResolvedValue(0),
+      },
     };
     const outbox = {
       runInline: jest.fn(
@@ -119,6 +123,39 @@ describe("BoostNoticeService", () => {
         expect(notifications.createInAppNotification).not.toHaveBeenCalled();
       },
     );
+
+    it("drops a reminder delivered after the end moved past the window (an extension)", async () => {
+      const { service, notifications } = make({
+        ...running,
+        endsAt: new Date("2026-10-24T12:00:00.000Z"),
+      });
+
+      await service.send(
+        { boostId: "boost-1", kind: "ending_soon", at: NOW.toISOString() },
+        NOW,
+      );
+
+      expect(notifications.createInAppNotification).not.toHaveBeenCalled();
+    });
+
+    it("drops a reminder delivered after a stacked purchase (no longer the tail)", async () => {
+      const { service, prisma, notifications } = make(running);
+      prisma.productBoost.count.mockResolvedValueOnce(1);
+
+      await service.send(
+        { boostId: "boost-1", kind: "ending_soon", at: NOW.toISOString() },
+        NOW,
+      );
+
+      expect(prisma.productBoost.count).toHaveBeenCalledWith({
+        where: {
+          productId: "prod-1",
+          status: "active",
+          endsAt: { gt: running.endsAt },
+        },
+      });
+      expect(notifications.createInAppNotification).not.toHaveBeenCalled();
+    });
 
     it("an expiry notice is sent although the boost no longer runs", async () => {
       const { service, notifications } = make({
