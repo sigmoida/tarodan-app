@@ -32,6 +32,24 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/hooks/useMediaQuery", () => ({ useMediaQuery: () => false }));
+// The Radix select of the "Rows per page" control cannot be driven in jsdom;
+// the stand-in keeps its `onChange(e)` contract and lets a test pick a size.
+const pageSizeSelect = vi.hoisted(() => ({
+  choose: undefined as ((value: string) => void) | undefined,
+}));
+vi.mock("@tarodan/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tarodan/ui")>()),
+  Select: ({
+    value,
+    onChange,
+  }: {
+    value?: string;
+    onChange?: (e: { target: { value: string } }) => void;
+  }) => {
+    pageSizeSelect.choose = (next) => onChange?.({ target: { value: next } });
+    return <span data-testid="page-size">{value}</span>;
+  },
+}));
 vi.mock("@/lib/logger", () => ({
   logger: { captureException: vi.fn() },
 }));
@@ -281,6 +299,26 @@ describe("SignInMethodsSection history", () => {
     expect(text()).toContain("admin.users.signInMethods.historyEmpty");
   });
 
+  it("retries only the history from its own Retry", async () => {
+    getUserSignInMethodEvents
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValue(eventsPage(eventRows()));
+    await render(withUsers);
+    expect(text()).toContain("admin.users.signInMethods.historyLoadError");
+
+    const retry = [...container.querySelectorAll("button")].filter(
+      (button) => button.textContent === "admin.shared.suspense.retry",
+    );
+    expect(retry).toHaveLength(1);
+    await act(async () => retry[0].click());
+    await flush();
+
+    expect(text()).not.toContain("admin.users.signInMethods.historyLoadError");
+    expect(text()).toContain("admin.system.logs.events.socialLinked");
+    // The methods kept their data: the history's Retry did not refetch them.
+    expect(getUserSignInMethods).toHaveBeenCalledTimes(1);
+  });
+
   it("shows its own load error and still shows the methods", async () => {
     getUserSignInMethodEvents.mockRejectedValue(new Error("boom"));
     await render(withUsers);
@@ -311,6 +349,36 @@ describe("SignInMethodsSection history", () => {
     expect(getUserSignInMethodEvents).toHaveBeenLastCalledWith(USER_ID, {
       page: 2,
       limit: 20,
+    });
+  });
+
+  it("asks for the chosen page size, from the first page", async () => {
+    getUserSignInMethodEvents.mockImplementation(
+      async (_id: string, params: { page: number; limit: number }) =>
+        eventsPage(eventRows().slice(0, 2), {
+          total: 600,
+          page: params.page,
+          limit: params.limit,
+          totalPages: Math.ceil(600 / params.limit),
+        }),
+    );
+    await render(withUsers);
+
+    const choose = async (size: string) => {
+      expect(pageSizeSelect.choose).toBeDefined();
+      await act(async () => pageSizeSelect.choose!(size));
+      await flush();
+    };
+
+    await choose("50");
+    expect(getUserSignInMethodEvents).toHaveBeenLastCalledWith(USER_ID, {
+      page: 1,
+      limit: 50,
+    });
+    await choose("500");
+    expect(getUserSignInMethodEvents).toHaveBeenLastCalledWith(USER_ID, {
+      page: 1,
+      limit: 500,
     });
   });
 });
