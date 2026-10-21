@@ -400,7 +400,8 @@ export class ProductBoostService {
           shippingCost: 0,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          shippingAddress: { type: "boost", boostId: boost.id } as any,
+          // A virtual order ships nothing; the marker links it to its boost.
+          shippingAddress: { type: "boost", boostId: boost.id },
         },
       });
 
@@ -429,10 +430,12 @@ export class ProductBoostService {
           (paymentResult as { useBypass?: boolean }).useBypass === true,
       };
     } catch (error) {
-      // If the payment cannot start, mark the pending boost failed
+      // If the payment cannot start, mark the pending boost failed. A failure
+      // here must not hide the original error, and the expiry sweep marks a
+      // stale pending boost failed anyway.
       await this.prisma.productBoost
         .update({ where: { id: boost.id }, data: { status: "failed" } })
-        .catch(() => {});
+        .catch(() => undefined);
       throw error;
     }
   }
