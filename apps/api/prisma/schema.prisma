@@ -1103,15 +1103,31 @@ model ProductBoost {
   status                 BoostStatus @default(pending)
   autoRenew              Boolean     @default(false) @map("auto_renew")
   startsAt               DateTime?   @map("starts_at")
+  /// End of this boost's own stretch of the listing's search priority. The
+  /// running boosts of a listing lie end to end in `endsAt` order, so a stacked
+  /// boost ends after the ones before it; its own remaining time is `endsAt`
+  /// minus the later of now and the previous boost's `endsAt`
+  /// (`BoostTimelineService`).
   endsAt                 DateTime?   @map("ends_at")
+  /// End of this boost's own home showcase stretch (showcase packages only).
+  /// The showcase runs a queue of its own: a showcase boost stacked behind a
+  /// search-only boost is in the showcase at once, for its own days only.
+  /// Null on rows written before the column; the timeline then reads the
+  /// listing's `homeShowcaseUntil`, capped by `endsAt`.
+  showcaseEndsAt         DateTime?   @map("showcase_ends_at")
   /// Set on activation — the LIFO ordering key for search + home showcase.
   purchasedAt            DateTime?   @map("purchased_at")
   pausedAt               DateTime?   @map("paused_at")
+  /// The boost's own unused search-priority seconds while it is paused, never
+  /// the time of the boosts stacked before it (that gave free days on resume).
   pausedRemainingSeconds Int?        @map("paused_remaining_seconds")
-  /// SİSTEM duraklatması: ürün yayından düşünce (süre dolumu, satış, pasife
-  /// alma, red, askı) cron boost'u otomatik duraklatır ve ürün yayına dönünce
-  /// otomatik sürdürür. Admin'in elle duraklattığı boost (false) otomatik
-  /// SÜRDÜRÜLMEZ — admin kararı korunur.
+  /// The boost's own unused showcase seconds while it is paused (showcase
+  /// packages only); a resume queues them behind the running showcase boosts.
+  pausedShowcaseSeconds  Int?        @map("paused_showcase_seconds")
+  /// System pause: when the listing goes offline (expiry, sale, deactivation,
+  /// rejection, suspension) the cron pauses its boosts and resumes them once
+  /// it is live again. A boost staff paused by hand (false) is never resumed
+  /// automatically: the staff decision stands.
   pausedBySystem         Boolean     @default(false) @map("paused_by_system")
   extendedDays           Int         @default(0) @map("extended_days")
   baselineViewCount      Int?        @map("baseline_view_count")
