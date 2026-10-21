@@ -62,7 +62,10 @@ function NewTradeContent() {
     listingId,
     enabled,
   );
-  const { products } = useTradeableProducts(listingId, enabled);
+  const { products, isLoading: productsLoading } = useTradeableProducts(
+    listingId,
+    enabled,
+  );
   const createTrade = useCreateTrade();
 
   const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
@@ -180,6 +183,7 @@ function NewTradeContent() {
         >
           <TradeProductPicker
             products={products}
+            isLoading={productsLoading}
             selectedIds={selectedIds}
             onToggle={toggle}
           />
