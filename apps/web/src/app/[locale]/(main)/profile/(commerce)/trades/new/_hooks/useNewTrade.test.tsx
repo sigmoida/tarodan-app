@@ -4,11 +4,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  QueryClient,
-  QueryClientProvider,
-  focusManager,
-} from "@tanstack/react-query";
+import { QueryClientProvider, focusManager } from "@tanstack/react-query";
+import { makeQueryClient } from "@/lib/query/client";
 import { queryKeys } from "@/lib/query/keys";
 
 (
@@ -28,6 +25,7 @@ vi.mock("@/stores/authStore", () => ({
   useAuthStore: (sel: (s: unknown) => unknown) =>
     sel({ user: mockUserId ? { id: mockUserId } : null }),
 }));
+vi.mock("@/lib/logger", () => ({ logger: { captureException: vi.fn() } }));
 vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
 vi.mock("react-hot-toast", () => ({
@@ -88,11 +86,13 @@ async function waitFor(assertion: () => void) {
 }
 
 function setup() {
-  const client = new QueryClient({
-    // The app's defaults (lib/query/client.ts): 60 s fresh, no focus refetch.
-    defaultOptions: {
-      queries: { retry: false, staleTime: 60_000, refetchOnWindowFocus: false },
-    },
+  // The app's real client (60 s fresh, no focus refetch, ...), so the picker's
+  // own options are proven against the defaults they override. Only the retry
+  // is off: a failure settles without the app's 1.5 s retry delay.
+  const client = makeQueryClient();
+  client.setDefaultOptions({
+    ...client.getDefaultOptions(),
+    queries: { ...client.getDefaultOptions().queries, retry: false },
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -152,6 +152,57 @@ describe("useTradeableProducts", () => {
     // The cached [] must not read as "no listings" while the reopen refetch runs.
     expect(second.result.current.products).toEqual([]);
     expect(second.result.current.isLoading).toBe(true);
+  });
+
+  it("shows a listing approved since a cached empty visit on reopen (the reported bug)", async () => {
+    const { wrapper } = setup();
+    getMyProducts.mockResolvedValue({ data: { data: [] } });
+    const first = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+    expect(first.result.current.products).toEqual([]);
+    first.unmount();
+
+    // Approved by a moderator: no client mutation, the cached [] is still fresh.
+    let resolveRefetch: (v: unknown) => void = () => {};
+    getMyProducts.mockReturnValue(
+      new Promise((r) => {
+        resolveRefetch = r;
+      }),
+    );
+    const second = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(2));
+    expect(second.result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      resolveRefetch({ data: { data: [item("approved")] } });
+    });
+    await waitFor(() =>
+      expect(second.result.current.products.map((p) => p.id)).toEqual([
+        "approved",
+      ]),
+    );
+    expect(second.result.current.isLoading).toBe(false);
+  });
+
+  it("settles when the reopen refetch over a cached empty list fails", async () => {
+    const { wrapper } = setup();
+    getMyProducts.mockResolvedValue({ data: { data: [] } });
+    const first = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+    first.unmount();
+
+    getMyProducts.mockRejectedValue(new Error("boom"));
+    const second = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(second.result.current.isLoading).toBe(false));
   });
 
   it("stays idle until the user id is known", async () => {
