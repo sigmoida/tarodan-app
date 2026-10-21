@@ -250,6 +250,34 @@ describe("toScoreX100 (round half up, clamped)", () => {
   ])("%p -> %p", (score, x100) => {
     expect(toScoreX100(score)).toBe(x100);
   });
+
+  // Every exact .xx5 between 0 and 5 rounds up, and the value just below it
+  // rounds down. A plain Math.round(score * 100) gets 35 of these 500
+  // boundaries wrong (binary noise), so this sweep is what pins the epsilon.
+  it("rounds every .xx5 boundary in 0..5 up and the value below it down", () => {
+    const wrong: string[] = [];
+    for (let k = 0; k < 500; k++) {
+      const half = Number(((2 * k + 1) / 200).toFixed(3));
+      const below = Number((k / 100 + 0.00499).toFixed(5));
+      if (toScoreX100(half) !== k + 1) wrong.push(`${half} -> ${k + 1}`);
+      if (toScoreX100(below) !== k) wrong.push(`${below} -> ${k}`);
+    }
+    expect(wrong).toEqual([]);
+  });
+});
+
+describe("minimum data boundary (D2)", () => {
+  it.each([
+    [4, 4, null],
+    [5, 2, null],
+    [5, 3, "scored"],
+    [6, 3, "scored"],
+  ])("%p transactions from %p counterparties -> %p", (tx, cp, expected) => {
+    const { scoreX100 } = computeSellerTrust(
+      inputs({ transactions: tx, counterparties: cp }),
+    );
+    expect(scoreX100 === null ? null : "scored").toBe(expected);
+  });
 });
 
 describe("sellerTrustLevel thresholds (D3)", () => {
