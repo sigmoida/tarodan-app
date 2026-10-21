@@ -238,3 +238,30 @@ export const SIGN_IN_METHOD_EVENT_FLOWS = {
 
 export type SignInMethodEventFlow =
   (typeof SIGN_IN_METHOD_EVENT_FLOWS)[keyof typeof SIGN_IN_METHOD_EVENT_FLOWS];
+
+/**
+ * One row of a user's sign-in method history (admin only). Only these fields
+ * are exposed: never the IP address, the user agent, the e-mail column, a
+ * token or the raw `details`. A field the event does not carry, or a value
+ * outside its known set, is `null`.
+ */
+export interface AdminSignInMethodEvent {
+  id: string;
+  eventType: SignInMethodEventType;
+  /** ISO 8601. */
+  occurredAt: string;
+  provider: SignInProvider | null;
+  source: SignInMethodEventSource | null;
+  /** The step-up proof (`reauth_failed`, `reauth_locked`). */
+  method: ReauthMethod | null;
+  flow: SignInMethodEventFlow | null;
+}
+
+/**
+ * `GET /admin/users/:id/sign-in-methods/events?page&limit`: newest first,
+ * the standard admin list envelope. Covers the security log retention window.
+ */
+export interface AdminSignInMethodEventList {
+  data: AdminSignInMethodEvent[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
