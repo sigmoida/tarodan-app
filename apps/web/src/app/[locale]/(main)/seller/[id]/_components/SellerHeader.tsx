@@ -16,6 +16,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
+import SellerTrustBadge from "./SellerTrustBadge";
 
 interface SellerHeaderProps {
   seller: Seller;
@@ -27,7 +28,7 @@ interface SellerHeaderProps {
   onMessage: () => void;
   onFollow: () => void;
   onReport: () => void;
-  /** Giriş kapısı (engelleme için); false dönerse modal çağıranda açılır. */
+  /** Auth gate (used for blocking); on false the caller opens the modal. */
   onRequireAuth: () => boolean;
 }
 
@@ -70,7 +71,7 @@ export default function SellerHeader({
               </h1>
               {seller.isPremium && (
                 <Badge variant="default" size="sm">
-                  Premium
+                  {t("seller.premiumBadge")}
                 </Badge>
               )}
               {seller.isVerified && (
@@ -78,11 +79,7 @@ export default function SellerHeader({
                   ✓ {t("seller.verified")}
                 </Badge>
               )}
-              {seller.isPremium && typeof seller.trustScore === "number" && (
-                <Badge variant="warning" size="sm">
-                  {t("seller.trust")} {seller.trustScore}/100
-                </Badge>
-              )}
+              <SellerTrustBadge trust={seller.trust} />
             </div>
             <p className="mt-1 text-xs text-subtle">
               {membershipDuration}

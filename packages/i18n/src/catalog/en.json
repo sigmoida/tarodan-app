@@ -2952,7 +2952,6 @@
     "noActiveListings": "This seller has no active listings yet.",
     "viewProfile": "View Profile",
     "premiumBadge": "Premium",
-    "trust": "Trust",
     "noReviewsDesc": "This seller has no reviews yet.",
     "totalReviews": "reviews",
     "noCollections": "No collections yet",
@@ -3072,6 +3071,28 @@
       "newDiscount": "New Discount",
       "emptyFiltered": "No discounts match this filter",
       "emptyDescription": "Create discounts and campaigns for your customers"
+    },
+    "trustScore": {
+      "badge": "Trust score {rating}/5 · {level}",
+      "badgeNew": "Trust score: New seller",
+      "levels": {
+        "excellent": "Excellent",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "developing": "Developing",
+        "new": "New seller"
+      },
+      "info": {
+        "title": "How is the trust score calculated?",
+        "intro": "The trust score is calculated from the seller's real activity on Tarodan, on a scale from 0 to 5:",
+        "ratings": "Ratings from buyers and trade partners (each person counts once)",
+        "reliability": "Completing orders without cancellations or returns caused by the seller",
+        "onTime": "Handing orders to the carrier on time",
+        "volume": "Number of completed sales and trades",
+        "tenure": "Account age on Tarodan",
+        "newSeller": "Sellers with fewer than {count} completed transactions are shown as \"New seller\".",
+        "updated": "The score is updated every day."
+      }
     }
   },
   "sellerDashboard": {
