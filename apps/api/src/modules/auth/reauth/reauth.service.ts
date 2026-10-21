@@ -12,8 +12,12 @@ import * as crypto from "crypto";
 import {
   isPlatformSettingOn,
   REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING,
+  SIGN_IN_METHOD_EVENT_FLOWS,
+  SIGN_IN_METHOD_EVENTS,
   SIGN_IN_METHODS_ERROR_CODES,
+  type ReauthMethod,
   type ReauthResponse,
+  type SignInMethodEventType,
   type SignInProvider,
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
@@ -41,14 +45,6 @@ const REAUTH_TOKEN_BYTES = 32;
 
 /** Sentry tag that names the sign-in methods flow of a request. */
 export const AUTH_FLOW_TAG = "auth.flow";
-
-/** Security log event types written here (admin system logs label them). */
-export const REAUTH_SECURITY_EVENTS = {
-  failed: "reauth_failed",
-  locked: "reauth_locked",
-} as const;
-
-export type ReauthMethod = "password" | SignInProvider;
 
 interface StoredReauth {
   userId: string;
@@ -269,19 +265,19 @@ export class ReauthService {
     method: ReauthMethod,
     attempt: number,
   ): Promise<void> {
-    await this.writeSecurityLog(REAUTH_SECURITY_EVENTS.failed, "medium", {
+    await this.writeSecurityLog(SIGN_IN_METHOD_EVENTS.reauthFailed, "medium", {
       userId,
       method,
     });
     // Attempt numbers are unique, so exactly one failure reaches the limit.
     if (attempt === REAUTH_MAX_FAILURES) {
-      await this.writeSecurityLog(REAUTH_SECURITY_EVENTS.locked, "high", {
+      await this.writeSecurityLog(SIGN_IN_METHOD_EVENTS.reauthLocked, "high", {
         userId,
         method,
       });
       this.logger.warn(`Reauth locked (user=${userId}, method=${method})`);
       this.sentry.captureEvent({
-        message: REAUTH_SECURITY_EVENTS.locked,
+        message: SIGN_IN_METHOD_EVENTS.reauthLocked,
         level: "warning",
         tags: { [AUTH_FLOW_TAG]: "reauth", method },
         user: { id: userId },
@@ -309,7 +305,7 @@ export class ReauthService {
 
   /** Ids and the method only: never a token, a password or its hash. */
   private async writeSecurityLog(
-    eventType: string,
+    eventType: SignInMethodEventType,
     severity: "medium" | "high",
     details: { userId: string; method: ReauthMethod },
   ): Promise<void> {
@@ -322,7 +318,10 @@ export class ReauthService {
           userId: details.userId,
           ipAddress,
           userAgent,
-          details: { method: details.method, flow: "reauth" },
+          details: {
+            method: details.method,
+            flow: SIGN_IN_METHOD_EVENT_FLOWS.reauth,
+          },
         },
       });
     } catch (error) {

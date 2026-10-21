@@ -50,6 +50,8 @@ import { AdminConsentService } from "./users/admin-consent.service";
 import { AdminConsentController } from "./users/admin-consent.controller";
 import { AdminLegalIdentityService } from "./users/admin-legal-identity.service";
 import { AdminLegalIdentityController } from "./users/admin-legal-identity.controller";
+import { AdminUserSignInMethodsService } from "./users/sign-in-methods/admin-user-sign-in-methods.service";
+import { AdminUserSignInMethodsController } from "./users/sign-in-methods/admin-user-sign-in-methods.controller";
 import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
 import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
 import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
@@ -217,6 +219,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDeletedIdentityController,
     AdminConsentController,
     AdminLegalIdentityController,
+    AdminUserSignInMethodsController,
     AdminGibReportController,
     AdminProductController,
     AdminOrderController,
@@ -268,6 +271,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDeletedIdentityService,
     AdminConsentService,
     AdminLegalIdentityService,
+    AdminUserSignInMethodsService,
     AdminGibReportService,
     AdminStaffService,
     AdminProductService,

@@ -182,9 +182,13 @@ describe("ReauthService", () => {
       expect(cache.setIfAbsent).not.toHaveBeenCalled();
       expect(prisma.securityLog.create).toHaveBeenCalledTimes(1);
       const logged = prisma.securityLog.create.mock.calls[0][0].data;
-      expect(logged).toMatchObject({
+      // Exact stored row: the admin user history reads eventType, method and flow.
+      expect(logged).toEqual({
         eventType: "reauth_failed",
+        severity: "medium",
         userId: USER,
+        ipAddress: null,
+        userAgent: null,
         details: { method: "password", flow: "reauth" },
       });
       expect(JSON.stringify(logged)).not.toContain("Wrong-Pass-1");
@@ -326,6 +330,17 @@ describe("ReauthService", () => {
       );
       expect(events.filter((e) => e === "reauth_failed")).toHaveLength(5);
       expect(events.filter((e) => e === "reauth_locked")).toHaveLength(1);
+      const locked = prisma.securityLog.create.mock.calls
+        .map(([arg]) => arg.data)
+        .find((data) => data.eventType === "reauth_locked");
+      expect(locked).toEqual({
+        eventType: "reauth_locked",
+        severity: "high",
+        userId: USER,
+        ipAddress: null,
+        userAgent: null,
+        details: { method: "password", flow: "reauth" },
+      });
       expect(sentry.captureEvent).toHaveBeenCalledTimes(1);
       expect(sentry.captureEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -440,6 +455,37 @@ describe("ReauthService", () => {
       expectFailed(error);
       expect(cache.incr).toHaveBeenCalledTimes(1);
     });
+
+    it.each(["google", "apple"] as const)(
+      "logs a failed %s proof with the provider as the method, without the token",
+      async (provider) => {
+        socialOnly(provider);
+        google.verifyIdToken.mockRejectedValue(new UnauthorizedException());
+        apple.verifyIdentityToken.mockRejectedValue(
+          new UnauthorizedException(),
+        );
+
+        expectFailed(
+          await failure(
+            provider === "google"
+              ? { provider, idToken: "planted-id-token" }
+              : { provider, identityToken: "planted-id-token" },
+          ),
+        );
+
+        expect(prisma.securityLog.create).toHaveBeenCalledTimes(1);
+        const logged = prisma.securityLog.create.mock.calls[0][0].data;
+        expect(logged).toEqual({
+          eventType: "reauth_failed",
+          severity: "medium",
+          userId: USER,
+          ipAddress: null,
+          userAgent: null,
+          details: { method: provider, flow: "reauth" },
+        });
+        expect(JSON.stringify(logged)).not.toContain("planted-id-token");
+      },
+    );
   });
 
   describe("token check", () => {

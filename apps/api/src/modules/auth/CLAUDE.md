@@ -159,6 +159,15 @@ the spec pins it with `perClientIp`.
   SecurityLog `social_linked` / `social_unlinked` with `details.source:
 "manual"`. A later sign-in may link an unlinked provider again through
   the verified e-mail rule (with the notice mail), by design.
+- SecurityLog event names, `details.source` and `details.flow` values come
+  from `SIGN_IN_METHOD_EVENTS`, `SIGN_IN_METHOD_EVENT_SOURCES` and
+  `SIGN_IN_METHOD_EVENT_FLOWS` (`@tarodan/types`); admin labels key on the
+  same constants. Every row carries the user id. A new sign-in method event
+  is added there, or the admin user history
+  (`GET /admin/users/:id/sign-in-methods/events`, `admin/users/sign-in-methods/`)
+  will not list it. That history allow-lists `provider`, `source`, `method`
+  and `flow` by key and value and never reads the IP, user agent or e-mail
+  columns; anything else in `details` stays internal.
 
 ## Registration
 
