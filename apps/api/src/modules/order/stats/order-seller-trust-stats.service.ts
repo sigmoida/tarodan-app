@@ -72,6 +72,11 @@ export class OrderSellerTrustStatsService {
    * Sellers with a paid order since `since` (`preparing_deadline` is stamped
    * at payment). Range scan on `orders(preparing_deadline)`. Ordered so the
    * caller's batches are stable.
+   *
+   * An oversold-after-payment cancel has no deadline, so a seller whose only
+   * orders are such cancels is not a candidate (unless they trade). That
+   * seller has no completed sale, so they could not reach the minimum data
+   * rule anyway: they are `new` with or without a row.
    */
   async activeSellerIds(
     tx: Prisma.TransactionClient,

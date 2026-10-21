@@ -7,7 +7,7 @@ import type { SellerTrustLevel, SellerTrustView } from "@tarodan/types";
  *
  * @deprecated Remove with `trustScore`/`trustLevel` once
  * `min_supported_app_version_*` passes the last version that reads them
- * (tarodan-ops `compat.md`).
+ * (tarodan-ops `compat.md`) and the web seller header reads `trust`.
  */
 export const LEGACY_TRUST_LEVEL_LABELS = {
   excellent: "Çok Güvenilir",
@@ -32,6 +32,10 @@ export interface LegacyTrustFields {
  * score (decision D7). Both are null when the view is gated (`null`) or the
  * seller has no score: 1.0.5 then shows no badge, and the old `Yeni` label is
  * never sent.
+ *
+ * The label follows the new level (plan section 7), not the old 0-100
+ * thresholds, so 1.0.5 shows the same level word as web and new mobile
+ * (4.37 is "87/100 · Güvenilir").
  *
  * `rating × 20` is `score_x100 / 5`, whose fraction is a multiple of 0.2, so
  * the rounding never meets a .5 tie or a float edge.

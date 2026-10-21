@@ -16,7 +16,9 @@ stored; a profile read is a primary-key lookup. Decision record: tarodan-ops
 | Aggregates, one per owning domain                   | `order/stats/`, `refund/stats/`, `rating/stats/`, `trade/stats/`, `user/stats/` (`*-seller-trust-stats.service.ts`) |
 
 Any change to a definition or a constant below is a product decision and bumps
-`SELLER_TRUST_FORMULA_VERSION`.
+`SELLER_TRUST_FORMULA_VERSION`. Until the first production release, v1 may
+still be changed by the user's decision without a bump (the staging
+calibration, and the oversold-after-payment failure added on 2026-10-21).
 
 ## Data rules (apply everywhere)
 

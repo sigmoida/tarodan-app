@@ -59,9 +59,12 @@ export function toAdminSellerTrustView(
 }
 
 /**
- * Narrows the stored JSON to the v1 breakdown. The batch is the only writer,
- * so a mismatch means a later formula version wrote the row: return null
- * rather than show the admin a shape it cannot read.
+ * Narrows the stored JSON to the v1 breakdown. `components.version` is the
+ * formula version that wrote the row (`computeSellerTrust`), and the batch is
+ * the only writer, so another value means a later formula wrote it: return
+ * null rather than show the admin a shape it may not read. A version bump
+ * stops compiling at `computeSellerTrust` (`version: 1` in
+ * `SellerTrustComponentsV1`); accept the new version here in the same change.
  */
 export function parseTrustComponents(
   json: Prisma.JsonValue,

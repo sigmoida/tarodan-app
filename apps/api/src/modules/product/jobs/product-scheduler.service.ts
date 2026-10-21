@@ -177,8 +177,10 @@ export class ProductSchedulerService implements OnModuleInit {
 
       this.logger.log(`Processing ${products.length} products...`);
 
-      // The sellers' stored trust scores in one query (no N+1). The
-      // seller-trust-refresh run (02:30) has finished before this job (03:00).
+      // The sellers' stored trust scores in one query (no N+1).
+      // seller-trust-refresh (02:30) normally finishes before this job
+      // (03:00); if it is late or failed, this run ranks with the previous
+      // night's scores and the next night catches up.
       const sellerIds = [...new Set(products.map((p) => p.sellerId))];
       const sellerTrust = await this.sellerTrust.getForUsers(sellerIds);
 
