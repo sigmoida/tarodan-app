@@ -17,6 +17,7 @@ import { ProductController } from "./product.controller";
 import { ProductSchedulerService } from "./jobs/product-scheduler.service";
 import { BoostScheduledProcessor } from "./jobs/boost-scheduled.processor";
 import { ProductLockModule } from "./lock/product-lock.module";
+import { BoostTimelineModule } from "./boost-timeline/boost-timeline.module";
 import { MembershipModule } from "../membership/membership.module";
 import { SearchModule } from "../search/search.module";
 import { WishlistModule } from "../wishlist/wishlist.module";
@@ -41,6 +42,8 @@ import { UserBlockModule } from "../user-block/user-block.module";
     StorageModule,
     PaymentModule,
     ProductLockModule,
+    // The expire-boosts cron changes listing timelines through their owner.
+    BoostTimelineModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
     // Pilot: cron-tipi işler için 'scheduled' kuyruğu (Bull Board otomatik gösterir).
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),

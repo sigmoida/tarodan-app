@@ -35,6 +35,7 @@ import {
 import { isRenewableInPlace } from "../helpers/product-renewal";
 import { refreshProductVisibility } from "../helpers/product-visibility";
 import { recordListingRemovals } from "../helpers/listing-removal";
+import { BoostTimelineService } from "../boost-timeline/boost-timeline.service";
 
 /**
  * Product Scheduler Service
@@ -71,6 +72,7 @@ export class ProductSchedulerService implements OnModuleInit {
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
     private readonly sellerTrust: SellerTrustService,
+    private readonly boostTimeline: BoostTimelineService,
   ) {}
 
   /**
@@ -327,12 +329,7 @@ export class ProductSchedulerService implements OnModuleInit {
           boostedAt: { not: null },
           boostedUntil: { lt: now },
         },
-        select: {
-          id: true,
-          sellerId: true,
-          qualityScore: true,
-          popularityScore: true,
-        },
+        select: { id: true },
       });
 
       // Şimdi sona eren aktif boost'lar (otomatik yenileme hatırlatması için)
@@ -355,61 +352,14 @@ export class ProductSchedulerService implements OnModuleInit {
         },
       });
 
-      // İlgili tüm satıcıların premium durumunu tek sorguda topla
-      const sellerIds = [
-        ...new Set([
-          ...expiredProducts.map((p) => p.sellerId),
-          ...(expiringBoosts
-            .map((b) => b.product?.sellerId)
-            .filter(Boolean) as string[]),
-        ]),
-      ];
-      const premiumSet = new Set<string>();
-      if (sellerIds.length > 0) {
-        const premiumMemberships = await this.prisma.userMembership.findMany({
-          where: {
-            userId: { in: sellerIds },
-            status: { in: ["active", "cancelled"] },
-            currentPeriodEnd: { gt: now },
-            tier: {
-              type: { not: MembershipTierType.free },
-              isActive: true,
-            },
-            OR: [
-              { tier: { type: { not: MembershipTierType.business } } },
-              {
-                tier: { type: MembershipTierType.business },
-                user: {
-                  businessStatus: "approved",
-                  companyName: { not: null },
-                  taxId: { not: null },
-                },
-              },
-            ],
-          },
-          select: { userId: true },
-        });
-        premiumMemberships.forEach((m) => premiumSet.add(m.userId));
-      }
-
-      // rankTier'ı premium(1)/standart(0)'a indir + relevanceScore'u yeniden hesapla
+      // Downgrade each listing whose promotion ended, through the timeline
+      // owner under the listing lock: a boost activated between the read above
+      // and this write (the seller re-boosted) is seen and kept, instead of
+      // being overwritten with rank tier 0/1 and a cleared LIFO key.
       for (const p of expiredProducts) {
-        const newRankTier = premiumSet.has(p.sellerId) ? 1 : 0;
-        await this.prisma.product.update({
-          where: { id: p.id },
-          data: {
-            rankTier: newRankTier,
-            // Clear the LIFO key + home-showcase window so an expired boost no
-            // longer ranks by recency or shows in the home showcase area.
-            boostedAt: null,
-            homeShowcaseUntil: null,
-            relevanceScore: computeRelevanceScore({
-              rankTier: newRankTier,
-              qualityScore: p.qualityScore ?? 0,
-              popularityScore: p.popularityScore,
-            }),
-          },
-        });
+        await this.prisma.$transaction((tx) =>
+          this.boostTimeline.refreshProductPromotion(tx, p.id, now),
+        );
       }
       if (expiredProducts.length > 0) {
         this.logger.log(
@@ -507,28 +457,40 @@ export class ProductSchedulerService implements OnModuleInit {
     });
     if (!rows.length) return 0;
 
+    const byProduct = new Map<string, typeof rows>();
     for (const row of rows) {
-      // Unreachable: the query above filters `endsAt: { gt: now }`. The column
-      // is nullable, so the compiler cannot see that from here.
-      if (!row.endsAt) continue;
-      await this.prisma.productBoost.update({
-        where: { id: row.id },
-        data: {
-          status: "paused",
-          pausedAt: now,
-          pausedBySystem: true,
-          pausedRemainingSeconds: Math.max(
-            1,
-            Math.ceil((row.endsAt.getTime() - now.getTime()) / 1000),
-          ),
-        },
+      byProduct.set(row.productId, [
+        ...(byProduct.get(row.productId) ?? []),
+        row,
+      ]);
+    }
+    // Per listing, under its lock (the boost timeline's lock order): pause
+    // the rows still running, then rebuild the promotion columns from what is
+    // left active (nothing, for a delisted listing).
+    for (const [productId, productRows] of byProduct) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.boostTimeline.lockProduct(tx, productId);
+        for (const row of productRows) {
+          // Unreachable: the query above filters `endsAt: { gt: now }`. The
+          // column is nullable, so the compiler cannot see that from here.
+          if (!row.endsAt) continue;
+          await tx.productBoost.updateMany({
+            where: { id: row.id, status: "active" },
+            data: {
+              status: "paused",
+              pausedAt: now,
+              pausedBySystem: true,
+              pausedRemainingSeconds: Math.max(
+                1,
+                Math.ceil((row.endsAt.getTime() - now.getTime()) / 1000),
+              ),
+            },
+          });
+        }
+        await this.boostTimeline.refreshProductPromotion(tx, productId, now);
       });
     }
-    const productIds = [...new Set(rows.map((row) => row.productId))];
-    await this.prisma.product.updateMany({
-      where: { id: { in: productIds } },
-      data: { boostedUntil: null, boostedAt: null, homeShowcaseUntil: null },
-    });
+    const productIds = [...byProduct.keys()];
     this.logger.log(
       `Sistem duraklatması: ${rows.length} boost (${productIds.length} yayın dışı ürün)`,
     );
@@ -566,42 +528,62 @@ export class ProductSchedulerService implements OnModuleInit {
       ]);
     }
     for (const [productId, productRows] of byProduct) {
-      // Kalan süreler satın alma sırasıyla arka arkaya dizilir (stacking).
-      let base = now;
-      let showcaseBase = now;
-      let showcaseEnd: Date | null = null;
-      for (const row of productRows) {
-        const remainingMs = (row.pausedRemainingSeconds ?? 0) * 1000;
-        const endsAt = new Date(base.getTime() + remainingMs);
-        base = endsAt;
-        if (row.showcaseOnHome) {
-          showcaseEnd = new Date(showcaseBase.getTime() + remainingMs);
-          showcaseBase = showcaseEnd;
+      await this.prisma.$transaction(async (tx) => {
+        // Under the listing lock, the remaining times queue up in purchase
+        // order after whatever runs now: a boost activated while the listing
+        // was offline keeps its time, the resumed ones stack behind it.
+        await this.boostTimeline.lockProduct(tx, productId);
+        const current = await tx.product.findUnique({
+          where: { id: productId },
+          select: { boostedUntil: true, homeShowcaseUntil: true },
+        });
+        let base =
+          current?.boostedUntil && current.boostedUntil > now
+            ? current.boostedUntil
+            : now;
+        let showcaseBase =
+          current?.homeShowcaseUntil && current.homeShowcaseUntil > now
+            ? current.homeShowcaseUntil
+            : now;
+        let showcaseEnd: Date | null = showcaseBase > now ? showcaseBase : null;
+        let resumedAny = false;
+        for (const row of productRows) {
+          const remainingMs = (row.pausedRemainingSeconds ?? 0) * 1000;
+          const endsAt = new Date(base.getTime() + remainingMs);
+          const resumed = await tx.productBoost.updateMany({
+            where: { id: row.id, status: "paused", pausedBySystem: true },
+            data: {
+              status: "active",
+              endsAt,
+              pausedAt: null,
+              pausedBySystem: false,
+              pausedRemainingSeconds: null,
+            },
+          });
+          if (resumed.count !== 1) continue;
+          resumedAny = true;
+          base = endsAt;
+          if (row.showcaseOnHome) {
+            showcaseEnd = new Date(showcaseBase.getTime() + remainingMs);
+            showcaseBase = showcaseEnd;
+          }
         }
-        await this.prisma.productBoost.update({
-          where: { id: row.id },
+        // Staff changed every row meanwhile: nothing resumed, nothing to write.
+        if (!resumedAny) return;
+        await tx.product.update({
+          where: { id: productId },
           data: {
-            status: "active",
-            endsAt,
-            pausedAt: null,
-            pausedBySystem: false,
-            pausedRemainingSeconds: null,
+            boostedUntil: base,
+            boostedAt: now,
+            homeShowcaseUntil: showcaseEnd,
+            rankTier: 2,
+            relevanceScore: computeRelevanceScore({
+              rankTier: 2,
+              qualityScore: productRows[0].product?.qualityScore ?? 0,
+              popularityScore: productRows[0].product?.popularityScore,
+            }),
           },
         });
-      }
-      await this.prisma.product.update({
-        where: { id: productId },
-        data: {
-          boostedUntil: base,
-          boostedAt: now,
-          homeShowcaseUntil: showcaseEnd,
-          rankTier: 2,
-          relevanceScore: computeRelevanceScore({
-            rankTier: 2,
-            qualityScore: productRows[0].product?.qualityScore ?? 0,
-            popularityScore: productRows[0].product?.popularityScore,
-          }),
-        },
       });
     }
     this.logger.log(
