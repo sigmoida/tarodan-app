@@ -14,6 +14,7 @@ import {
   type MembershipLimits,
 } from "@/hooks/useMembershipLimits";
 import { useSavedSearchUpgrade } from "@/hooks/useSavedSearchUpgrade";
+import { useListingFiltersQuery } from "@/hooks/useListingFiltersQuery";
 import { useRouter } from "@/i18n/navigation";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { savedSearchRunHref } from "../_lib/runHref";
@@ -65,6 +66,12 @@ export function useSavedSearches(enabled: boolean) {
   const limit =
     useMembershipLimits(selectSavedSearchLimit, { enabled }).data ?? null;
   const canUpgrade = useSavedSearchUpgrade(limit);
+  // The colour names of the chips: one read of the shared filter catalog,
+  // only when a saved search filters by colour.
+  const needsColors = !!list.data?.items.some((search) => search.query.color);
+  const colorOptions = useListingFiltersQuery({
+    enabled: enabled && needsColors,
+  }).data?.colors;
 
   const deleteMutation = useWebMutation(
     (id: string) => savedSearchesApi.remove(id),
@@ -95,6 +102,7 @@ export function useSavedSearches(enabled: boolean) {
     total: list.data?.total ?? 0,
     limit,
     canUpgrade,
+    colorOptions,
     isLoading: list.isLoading,
     isError: list.isError,
     refetch: list.refetch,

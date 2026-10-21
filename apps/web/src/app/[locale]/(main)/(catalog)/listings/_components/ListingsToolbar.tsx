@@ -15,13 +15,13 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatCondition } from "@/lib/format";
 import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
-import { useListingFiltersQuery } from "../_hooks/useListingFiltersQuery";
+import { useListingFiltersQuery } from "@/hooks/useListingFiltersQuery";
 import { useSaveSearch } from "../_hooks/useSaveSearch";
 import {
   colorLabel,
   materialLabel,
   priceRangeLabel,
-} from "../_lib/filterLabels";
+} from "@/lib/listingFilterLabels";
 import SaveSearchModal from "../_modals/SaveSearchModal";
 
 /**

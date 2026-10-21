@@ -24,6 +24,7 @@ export default function SavedSearchesPage() {
     total,
     limit,
     canUpgrade,
+    colorOptions,
     isLoading,
     isError,
     refetch,
@@ -89,6 +90,7 @@ export default function SavedSearchesPage() {
             <SavedSearchCard
               key={search.id}
               search={search}
+              colorOptions={colorOptions}
               onDelete={remove}
               onRun={runSearch}
             />

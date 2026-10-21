@@ -7,22 +7,23 @@ import { Badge, Button, IconButton } from "@tarodan/ui";
 import type { SavedSearch } from "@tarodan/types";
 import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
-import { useListingFiltersQuery } from "@/app/[locale]/(main)/(catalog)/listings/_hooks/useListingFiltersQuery";
+import type { ColorOption } from "@/lib/listingFilterLabels";
 import { savedSearchChips } from "../_lib/chips";
 
 export default function SavedSearchCard({
   search,
+  colorOptions,
   onDelete,
   onRun,
 }: {
   search: SavedSearch;
+  /** The listings filter catalog's colours, to name colour chips. */
+  colorOptions?: readonly ColorOption[];
   onDelete: (search: SavedSearch) => void;
   onRun: (search: SavedSearch) => void;
 }) {
   const t = useTranslations();
   const locale = useLocale();
-  // The listings filter catalog (one shared, long-lived query) names the colours.
-  const colorOptions = useListingFiltersQuery().data?.colors;
   const chips = savedSearchChips(search, t, locale, colorOptions);
 
   return (

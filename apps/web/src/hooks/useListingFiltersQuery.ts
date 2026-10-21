@@ -6,14 +6,14 @@ import { listingsApi } from "@/lib/api";
 import type { AttributeGroup } from "@tarodan/listing-form";
 
 /**
- * Özel attribute grubu — genel özel (üreticisiz, her ilanda) ya da üreticiye
- * bağlı; `/products/attribute-groups` ile aynı şekil, ilan formu paketinin
- * tipi yeniden kullanılır. `/products/filters` üreticisiz çağrıda yalnız genel
- * grupları döner.
+ * A custom attribute group: general (no manufacturer, on every listing) or
+ * bound to a manufacturer; the same shape as `/products/attribute-groups`,
+ * reusing the listing-form package type. Without a manufacturer,
+ * `/products/filters` returns only the general groups.
  */
 export type CustomAttributeGroup = AttributeGroup;
 
-/** `/products/filters` yanıtı — kenar çubuğunun beslendiği katalog metadatası. */
+/** The `/products/filters` answer: the catalog metadata the filters read. */
 export interface FiltersData {
   scales?: string[];
   materials?: Array<{ slug: string; label: string }>;
@@ -28,21 +28,23 @@ export interface FiltersData {
   customAttributes?: CustomAttributeGroup[];
 }
 
-/** Katalog metadatası oturum boyunca değişmez sayılır. */
+/** Catalog metadata is treated as fixed for the session. */
 const STALE = 60 * 60 * 1000;
 
 /**
- * Filtre metadatası — TEK sorgu tanımı.
+ * The filter metadata: the ONE query definition.
  *
- * Hem kenar çubuğu (seçenekleri listeler) hem de aktif filtre çipleri (seçilen
- * slug'ı etikete çevirir) buna bağlıdır. Aynı `queryKey` paylaşıldığı için iki
- * tüketici tek istek yapar; tanım iki yere kopyalansaydı biri `staleTime`
- * değiştirdiğinde diğeri sessizce ikinci bir istek atardı.
+ * The listings sidebar (lists the options), the active-filter chips and the
+ * saved-search cards (turn a selected slug into its label) all read it. They
+ * share the `queryKey`, so they make one request; a second copy of the
+ * definition would silently send a second request once its `staleTime`
+ * drifted.
  */
-export function useListingFiltersQuery() {
+export function useListingFiltersQuery({ enabled = true } = {}) {
   return useQuery({
     queryKey: queryKeys.listings.filters(),
     queryFn: async () => (await listingsApi.getFilters()).data as FiltersData,
     staleTime: STALE,
+    enabled,
   });
 }

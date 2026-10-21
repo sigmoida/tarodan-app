@@ -6,12 +6,12 @@ import {
   materialLabel,
   priceRangeLabel,
   type ColorOption,
-} from "@/app/[locale]/(main)/(catalog)/listings/_lib/filterLabels";
+} from "@/lib/listingFilterLabels";
 
 /**
  * The summary chips of a saved search, read from its canonical `query` and the
  * display-name `labels` snapshot (ids never reach the user). Values read as
- * the `/listings` filter chips do (`filterLabels`), flags reuse its copy.
+ * the `/listings` filter chips do (`lib/listingFilterLabels`), flags reuse its copy.
  * `colorOptions` is the listings filter catalog; a slug shows until it loads.
  */
 export function savedSearchChips(
