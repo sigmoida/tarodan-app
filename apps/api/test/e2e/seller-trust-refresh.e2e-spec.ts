@@ -50,6 +50,7 @@ function buildRunner() {
   const cache = {
     setIfAbsent: async (key: string) =>
       locks.has(key) ? false : (locks.add(key), true),
+    exists: async (key: string) => locks.has(key),
     del: async (key: string) => void locks.delete(key),
   };
   const service = new SellerTrustSchedulerService(
@@ -398,14 +399,25 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
       });
 
     // Failures:
+    // - the seller cancelled after payment
+    await cancelled({ cancelledBy: CancellationActor.seller });
     // - legacy not-shipped-in-time auto-cancel (no actor before 2026-09-18)
     await cancelled({
       cancelReason: ORDER_CANCEL_REASON.sellerShipDeadlineExpired,
     });
-    // - platform cancel for a seller-fault code
+    // - the same auto-cancel today (actor system): any actor counts
+    await cancelled({
+      cancelledBy: CancellationActor.system,
+      cancelReason: ORDER_CANCEL_REASON.sellerShipDeadlineExpired,
+    });
+    // - platform cancels for the two seller-fault codes
     await cancelled({
       cancelledBy: CancellationActor.platform,
       adminCancelReasonCode: "stock_error",
+    });
+    await cancelled({
+      cancelledBy: CancellationActor.platform,
+      adminCancelReasonCode: "listing_violation",
     });
     // - reviewed seller-fault refund that was paid out
     const faulty = await order({
@@ -426,6 +438,15 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
       adminCancelReasonCode: "user_request",
     });
     await cancelled({}); // legacy cancellation with no actor and no known reason
+    // Unknown or neutral causes never count against the seller:
+    await cancelled({ cancelReason: "free text from an old admin tool" });
+    await cancelled({ adminCancelReasonCode: "stock_error" }); // code, no actor
+    // A system cancel after payment for stock is not on ADR 0014's list.
+    await cancelled({
+      cancelledBy: CancellationActor.system,
+      cancelReason: ORDER_CANCEL_REASON.oversoldAfterPayment,
+    });
+    await cancelled({ cancelledBy: CancellationActor.buyer });
     // Successes, even with a claim against the seller that was not upheld:
     const claimed = await order({ sellerId: seller, buyerId: buyer });
     await refund(
@@ -449,9 +470,11 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
 
     await buildRunner().service.runRefresh(undefined, asOf);
 
+    // 6 failures + the 2 orders with a claim that did not count; the 7
+    // unknown or neutral cancellations are in neither E nor F.
     expect(components(await scoreOf(seller)).reliability).toMatchObject({
-      eligibleOrders: 5,
-      failures: 3,
+      eligibleOrders: 8,
+      failures: 6,
     });
   });
 
@@ -546,6 +569,88 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
     expect(c.reliability.eligibleOrders).toBe(3);
     expect(c.rating.raters).toBe(1);
     expect(c.tenure).toMatchObject({ days: 1000, subScore: 1 });
+  });
+
+  it("treats every window as half-open: since included, asOf excluded", async () => {
+    const seller = await user({ createdAt: ago(1000 * DAY) });
+    const [b1, b2, b3, b4] = [
+      await user(),
+      await user(),
+      await user(),
+      await user(),
+    ];
+    // Completed exactly at the volume window's start: counted.
+    const atStart = await order({
+      sellerId: seller,
+      buyerId: b1,
+      deadline: ago(735 * DAY),
+      completedAt: ago(730 * DAY),
+    });
+    // Completed exactly at asOf: not yet counted (and outside E).
+    await order({
+      sellerId: seller,
+      buyerId: b2,
+      deadline: ago(400 * DAY),
+      completedAt: asOf,
+    });
+    // First deadline exactly at the operations window's start: in E.
+    const atOpsStart = await order({
+      sellerId: seller,
+      buyerId: b3,
+      deadline: ago(365 * DAY),
+      completedAt: ago(300 * DAY),
+    });
+    // First deadline exactly at asOf: not passed yet, not in E.
+    await order({
+      sellerId: seller,
+      buyerId: b4,
+      status: OrderStatus.preparing,
+      deadline: asOf,
+      completedAt: null,
+      shippedAt: null,
+    });
+    // Ratings exactly at the window's start (counted) and at asOf (not).
+    await rate(b1, seller, 5, { orderId: atStart }, ago(730 * DAY));
+    await rate(b3, seller, 1, { orderId: atOpsStart }, asOf);
+
+    await buildRunner().service.runRefresh(undefined, asOf);
+
+    const c = components(await scoreOf(seller));
+    expect(c.volume).toMatchObject({ transactions: 2, counterparties: 2 });
+    expect(c.reliability.eligibleOrders).toBe(1);
+    expect(c.rating).toMatchObject({
+      raters: 1,
+      smoothed: expect.closeTo(25 / 6, 4),
+    });
+  });
+
+  it("never writes to users or any source table", async () => {
+    const seller = await user();
+    await caseD(seller);
+    const trader = await user();
+    await trade(trader, await user());
+    // `xmin` changes on every UPDATE, even one that writes the same values.
+    const snapshot = async () => {
+      const out: Record<string, unknown> = {};
+      for (const table of [
+        "users",
+        "orders",
+        "ratings",
+        "trades",
+        "shipments",
+      ]) {
+        out[table] = await getPrisma().$queryRawUnsafe(
+          `SELECT "id", xmin::text AS "xmin" FROM "${table}" ORDER BY "id"`,
+        );
+      }
+      return out;
+    };
+    const before = await snapshot();
+
+    await buildRunner().service.runRefresh(undefined, asOf);
+
+    expect(await scoreOf(seller)).not.toBeNull();
+    expect(await snapshot()).toEqual(before);
   });
 
   it("includes completed trades for both sides and their ratings", async () => {
