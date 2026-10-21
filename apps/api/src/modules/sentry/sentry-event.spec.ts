@@ -165,6 +165,20 @@ describe("applySentryEventPolicy", () => {
     } as any);
     expect(JSON.stringify(event)).not.toContain("hunter2");
   });
+
+  it("redacts the JSON string body the SDK stores on the request", () => {
+    const event = applySentryEventPolicy({
+      request: {
+        url: "https://api/auth/reauth",
+        data: JSON.stringify({ password: "hunter2", code: "g-code" }),
+      },
+      extra: { code: "P2002" },
+    } as any);
+
+    expect(JSON.stringify(event)).not.toContain("hunter2");
+    expect(JSON.stringify(event)).not.toContain("g-code");
+    expect(event?.extra?.code).toBe("P2002");
+  });
 });
 
 /**

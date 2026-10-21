@@ -29,6 +29,12 @@ const SENSITIVE_BODY_KEYS = new Set([
   "verifyToken",
   "confirmToken",
   "idToken",
+  // Sign in with Apple, the step-up token and body codes (2FA, phone, e-mail
+  // change, Google auth code), as in `redactRequestBody`.
+  "identityToken",
+  "authorizationCode",
+  "reauthToken",
+  "code",
   "secret",
   "apiKey",
   "apiSecret",

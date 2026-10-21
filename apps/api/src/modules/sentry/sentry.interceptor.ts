@@ -13,7 +13,10 @@ import { Observable, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
 import * as Sentry from "@sentry/node";
 import { getAppLogger } from "../../common/logging/logger";
-import { redactSensitive } from "../../common/security/redact-sensitive";
+import {
+  redactRequestBody,
+  redactSensitive,
+} from "../../common/security/redact-sensitive";
 
 @Injectable()
 export class SentryInterceptor implements NestInterceptor {
@@ -34,7 +37,7 @@ export class SentryInterceptor implements NestInterceptor {
       url,
       params: redactSensitive(params),
       query: redactSensitive(query),
-      body: redactSensitive(body),
+      body: redactRequestBody(body),
     });
 
     return next.handle().pipe(

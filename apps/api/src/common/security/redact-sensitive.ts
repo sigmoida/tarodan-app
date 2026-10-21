@@ -31,6 +31,8 @@ const SENSITIVE_KEYS = new Set([
   "identitytoken",
   "authorizationcode",
   "refreshtokenencrypted",
+  // Step-up token (`POST /auth/reauth`), sent back in sensitive write bodies.
+  "reauthtoken",
   "authorization",
   "cookie",
   "setcookie",
@@ -109,11 +111,24 @@ export function redactUrlQuery(value: string): string {
 }
 
 /**
+ * Keys that are credentials only inside a request body. There `code` is a 2FA,
+ * phone or e-mail change code or a Google auth code; elsewhere in an event it
+ * is a Prisma or Node error code (`P2002`, `ECONNREFUSED`) that must stay
+ * readable, so it is not in `SENSITIVE_KEYS`.
+ */
+const REQUEST_BODY_SENSITIVE_KEYS: ReadonlySet<string> = new Set(["code"]);
+
+/**
  * Produces a serializable copy suitable for logs and telemetry. Sensitive keys
  * are matched case/format-insensitively and PAN-looking strings are removed
- * even when nested under an unexpected key.
+ * even when nested under an unexpected key. `extraKeys` (normalised) adds keys
+ * for one context, such as a request body.
  */
-export function redactSensitive(value: unknown, depth = 0): unknown {
+export function redactSensitive(
+  value: unknown,
+  depth = 0,
+  extraKeys?: ReadonlySet<string>,
+): unknown {
   if (depth > 10) return "[TRUNCATED]";
   if (typeof value === "string") return redactPanStrings(value);
   if (value === null || value === undefined || typeof value !== "object") {
@@ -121,15 +136,40 @@ export function redactSensitive(value: unknown, depth = 0): unknown {
   }
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) {
-    return value.map((item) => redactSensitive(item, depth + 1));
+    return value.map((item) => redactSensitive(item, depth + 1, extraKeys));
   }
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, nested]) => [
-      key,
-      SENSITIVE_KEYS.has(normalizeKey(key))
-        ? "[REDACTED]"
-        : redactSensitive(nested, depth + 1),
-    ]),
+    Object.entries(value).map(([key, nested]) => {
+      const normalized = normalizeKey(key);
+      return [
+        key,
+        SENSITIVE_KEYS.has(normalized) || extraKeys?.has(normalized)
+          ? "[REDACTED]"
+          : redactSensitive(nested, depth + 1, extraKeys),
+      ];
+    }),
+  );
+}
+
+/**
+ * A request body for logs and telemetry: `redactSensitive` plus the
+ * body-only keys. Sentry keeps the body as a JSON string
+ * (`event.request.data`), which a key-based pass cannot see into, so a JSON
+ * string is parsed, redacted and serialised again. Any other string is left to
+ * the PAN pass.
+ */
+export function redactRequestBody(body: unknown): unknown {
+  if (typeof body !== "string") {
+    return redactSensitive(body, 0, REQUEST_BODY_SENSITIVE_KEYS);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return redactPanStrings(body);
+  }
+  return JSON.stringify(
+    redactSensitive(parsed, 0, REQUEST_BODY_SENSITIVE_KEYS),
   );
 }
