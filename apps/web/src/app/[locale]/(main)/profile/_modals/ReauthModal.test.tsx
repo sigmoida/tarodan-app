@@ -284,6 +284,21 @@ describe("ReauthModal: account without a password", () => {
     expect(dialog()).not.toBeNull();
   });
 
+  it("cannot be closed while the provider popup is open", async () => {
+    h.request.mockReturnValue(new Promise(() => {}));
+    render();
+    await flush();
+    await click(button('{"provider":"Google"}'));
+
+    expect(button("common.cancel").disabled).toBe(true);
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it("falls back to the set-password mail when no linked provider can be shown", async () => {
     h.available = new Set();
     render();

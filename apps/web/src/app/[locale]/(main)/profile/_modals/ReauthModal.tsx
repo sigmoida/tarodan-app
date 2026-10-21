@@ -20,8 +20,7 @@ import {
   apiErrorMessage,
   useWebMutation,
 } from "@/hooks/useWebMutation";
-import { GoogleIcon } from "@/components/auth/GoogleIcon";
-import { AppleIcon } from "@/components/auth/AppleIcon";
+import { SIGN_IN_PROVIDER_ICONS } from "@/components/auth/providerIcons";
 import {
   SIGN_IN_PROVIDER_NAMES,
   providerCredentialErrorKey,
@@ -35,11 +34,7 @@ import {
   useRefreshSignInMethods,
   useSignInMethods,
 } from "../_hooks/useSecurity";
-
-const PROVIDER_ICONS: Record<SignInProvider, typeof GoogleIcon> = {
-  google: GoogleIcon,
-  apple: AppleIcon,
-};
+import LoadErrorAlert from "../_components/LoadErrorAlert";
 
 interface ReauthModalProps {
   open: boolean;
@@ -52,7 +47,8 @@ interface ReauthModalProps {
  * with a password confirms with it (the only proof the API accepts then);
  * one without confirms with a fresh sign-in of a provider linked to it.
  * Errors stay in the dialog: `403 REAUTH_FAILED`, `429 REAUTH_LOCKED` and
- * `503 REAUTH_UNAVAILABLE` never end the session.
+ * `503 REAUTH_UNAVAILABLE` never end the session. It cannot be closed while
+ * a provider popup is open or the proof is being checked.
  */
 export default function ReauthModal({
   open,
@@ -60,7 +56,8 @@ export default function ReauthModal({
   onCancel,
 }: ReauthModalProps) {
   const t = useTranslations();
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [opening, setOpening] = useState(false);
   return (
     <Modal
       isOpen={open}
@@ -68,14 +65,15 @@ export default function ReauthModal({
       title={t("auth.reauth.title")}
       size="sm"
       closeLabel={t("common.close")}
-      dismissDisabled={busy}
+      dismissDisabled={pending || opening}
     >
       {/* Mounted only while open, so every opening starts clean. */}
       {open && (
         <ReauthBody
           onConfirmed={onConfirmed}
           onCancel={onCancel}
-          onBusyChange={setBusy}
+          onPendingChange={setPending}
+          onOpeningChange={setOpening}
         />
       )}
     </Modal>
@@ -85,9 +83,11 @@ export default function ReauthModal({
 function ReauthBody({
   onConfirmed,
   onCancel,
-  onBusyChange,
+  onPendingChange,
+  onOpeningChange,
 }: Omit<ReauthModalProps, "open"> & {
-  onBusyChange: (busy: boolean) => void;
+  onPendingChange: (pending: boolean) => void;
+  onOpeningChange: (opening: boolean) => void;
 }) {
   const t = useTranslations();
   const { methods, isLoading, isError, refetch } = useSignInMethods();
@@ -101,9 +101,9 @@ function ReauthBody({
     gcTime: 0,
     onMutate: () => {
       setError(null);
-      onBusyChange(true);
+      onPendingChange(true);
     },
-    onSettled: () => onBusyChange(false),
+    onSettled: () => onPendingChange(false),
     onSuccess: (response) => onConfirmed(response),
     onError: (e) => {
       // The account gained a password elsewhere: show the password variant.
@@ -132,22 +132,10 @@ function ReauthBody({
         <div className="flex justify-center py-4">
           <Spinner size="md" />
         </div>
-      ) : isError || !methods ? (
-        <Alert
-          variant="danger"
-          action={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void refetch()}
-            >
-              {t("common.tryAgain")}
-            </Button>
-          }
-        >
-          {t("error.somethingWrongDesc")}
-        </Alert>
+      ) : !methods ? (
+        // A failed background refetch keeps the cached methods: only a
+        // first load that failed shows the error.
+        isError && <LoadErrorAlert onRetry={() => void refetch()} />
       ) : methods.hasPassword ? (
         <PasswordProof
           isPending={reauth.isPending}
@@ -160,6 +148,7 @@ function ReauthBody({
           isPending={reauth.isPending}
           onCredential={(credential) => reauth.mutate(credential)}
           onError={setError}
+          onOpeningChange={onOpeningChange}
           onCancel={onCancel}
         />
       )}
@@ -216,12 +205,14 @@ function ProviderProof({
   isPending,
   onCredential,
   onError,
+  onOpeningChange,
   onCancel,
 }: {
   methods: SignInMethods;
   isPending: boolean;
   onCredential: (credential: ReauthRequest) => void;
   onError: (message: string | null) => void;
+  onOpeningChange: (opening: boolean) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations();
@@ -235,6 +226,7 @@ function ProviderProof({
   const confirmWith = async (provider: SignInProvider) => {
     onError(null);
     setOpening(provider);
+    onOpeningChange(true);
     try {
       const credential = await credentials.request(provider);
       if (credential) onCredential(credential);
@@ -242,6 +234,7 @@ function ProviderProof({
       onError(t(providerCredentialErrorKey(e) ?? "server.auth.reauthFailed"));
     } finally {
       setOpening(null);
+      onOpeningChange(false);
     }
   };
 
@@ -249,7 +242,7 @@ function ProviderProof({
     <div className="space-y-3">
       {providers.length > 0 ? (
         providers.map((provider) => {
-          const Icon = PROVIDER_ICONS[provider];
+          const Icon = SIGN_IN_PROVIDER_ICONS[provider];
           return (
             <Button
               key={provider}
@@ -275,7 +268,7 @@ function ProviderProof({
         variant="ghost"
         className="w-full"
         onClick={onCancel}
-        disabled={isPending}
+        disabled={isPending || opening !== null}
       >
         {t("common.cancel")}
       </Button>

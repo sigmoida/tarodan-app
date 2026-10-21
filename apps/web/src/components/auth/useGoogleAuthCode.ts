@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { useGoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin, useGoogleOAuth } from "@react-oauth/google";
 
 /** Google sign-in is offered only when the web client id is configured. */
 export const isGoogleSignInAvailable = (): boolean =>
   !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
-/** Google answered the popup with an OAuth error (not a cancellation). */
+/**
+ * Google answered the popup with an OAuth error (not a cancellation), or its
+ * script is not loaded yet (or was blocked), so no popup can open.
+ */
 export class GoogleAuthCodeError extends Error {
-  constructor() {
-    super("google_auth_code_failed");
+  constructor(message = "google_auth_code_failed") {
+    super(message);
     this.name = "GoogleAuthCodeError";
   }
 }
@@ -28,7 +31,8 @@ interface Pending {
  *
  * `requestCode()` opens the popup and resolves with the code, or with `null`
  * when the user closes it (or the browser blocks it); it rejects with
- * `GoogleAuthCodeError` on an OAuth error. Call it straight from a click
+ * `GoogleAuthCodeError` on an OAuth error, and at once when Google's script
+ * has not loaded (the library would otherwise never call back). Call it straight from a click
  * handler: browsers block a popup opened after an `await`.
  *
  * `selectAccount` shows Google's account chooser even when one account is
@@ -39,6 +43,7 @@ export function useGoogleAuthCode({
   selectAccount = false,
 }: { selectAccount?: boolean } = {}) {
   const pending = useRef<Pending | null>(null);
+  const { scriptLoadedSuccessfully } = useGoogleOAuth();
 
   const settle = (apply: (p: Pending) => void) => {
     const current = pending.current;
@@ -58,12 +63,16 @@ export function useGoogleAuthCode({
   const requestCode = useCallback(
     () =>
       new Promise<string | null>((resolve, reject) => {
+        if (!scriptLoadedSuccessfully) {
+          reject(new GoogleAuthCodeError("google_script_not_loaded"));
+          return;
+        }
         // A second click while a popup is open supersedes the first request.
         pending.current?.resolve(null);
         pending.current = { resolve, reject };
         login();
       }),
-    [login],
+    [login, scriptLoadedSuccessfully],
   );
 
   return { isAvailable: isGoogleSignInAvailable(), requestCode };

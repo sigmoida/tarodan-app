@@ -17,7 +17,7 @@ import { apiErrorCode } from "@/hooks/useWebMutation";
 /**
  * The user closed the confirm step. Named `AbortError` on purpose: the shared
  * mutation layer treats it as a cancellation, so there is no error toast and
- * no Sentry report (`isCancellation`, `shouldReportMutationError`).
+ * no Sentry report (`isCancellation` in `lib/query/client`).
  */
 export class ReauthCancelledError extends Error {
   constructor() {
@@ -114,22 +114,26 @@ export function useReauthController(): ReauthController {
       } catch (error) {
         if (!isReauthRequired(error)) throw error;
         if (tokenRef.current?.token === token) tokenRef.current = null;
-        return action(await requestToken());
+        // Another write may have confirmed meanwhile: use its token.
+        return action(liveToken() ?? (await requestToken()));
       }
     },
     [liveToken, requestToken],
   );
 
   const confirm = useCallback((response: ReauthResponse) => {
+    const pending = pendingRef.current;
+    // Nobody is waiting (the user closed the step while a provider popup was
+    // still open): a step-up they cancelled is never kept.
+    if (!pending) return;
     const expiresAt = Date.parse(response.expiresAt);
     // An unreadable expiry is used for this request only, never cached.
     tokenRef.current = Number.isFinite(expiresAt)
       ? { token: response.reauthToken, expiresAt }
       : null;
-    const pending = pendingRef.current;
     pendingRef.current = null;
     setIsOpen(false);
-    pending?.resolve(response.reauthToken);
+    pending.resolve(response.reauthToken);
   }, []);
 
   const cancel = useCallback(() => {

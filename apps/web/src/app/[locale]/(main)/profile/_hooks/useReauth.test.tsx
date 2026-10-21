@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isCancellation } from "@/hooks/useWebMutation";
+import { isCancellation } from "@/lib/query/client";
 import {
   REAUTH_EXPIRY_MARGIN_MS,
   ReauthCancelledError,
@@ -179,6 +179,59 @@ describe("useReauthController", () => {
 
     expect(await result).toBe(error);
     expect(ctl.isOpen).toBe(false);
+  });
+
+  it("drops a confirmation that arrives after the user closed the step", async () => {
+    let result: Promise<unknown> | undefined;
+    act(() => {
+      result = ctl.withReauth(vi.fn()).catch((e) => e);
+    });
+    act(() => ctl.cancel());
+    expect(await result).toBeInstanceOf(ReauthCancelledError);
+
+    // The provider popup finished late and the step-up answered anyway.
+    act(() =>
+      ctl.confirm({ reauthToken: "late", expiresAt: iso(NOW + 300_000) }),
+    );
+    const next = vi.fn(async (token: string) => token);
+    act(() => void ctl.withReauth(next).catch(() => {}));
+    expect(ctl.isOpen).toBe(true);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("on a 403 retries with a token another write confirmed meanwhile", async () => {
+    act(() => void ctl.withReauth(async () => "seed"));
+    confirm("t1");
+    await flush();
+
+    let rejectB!: (e: unknown) => void;
+    const b = vi
+      .fn<(token: string) => Promise<string>>()
+      .mockImplementationOnce(
+        () => new Promise((_, reject) => (rejectB = reject)),
+      )
+      .mockImplementation(async (token) => `b:${token}`);
+    const a = vi
+      .fn<(token: string) => Promise<string>>()
+      .mockRejectedValueOnce(apiError(403, "REAUTH_REQUIRED"))
+      .mockImplementation(async (token) => `a:${token}`);
+
+    let resultA: Promise<string> | undefined;
+    let resultB: Promise<string> | undefined;
+    act(() => {
+      resultB = ctl.withReauth(b);
+      resultA = ctl.withReauth(a);
+    });
+    await flush();
+    confirm("t2");
+    await flush();
+    await expect(resultA).resolves.toBe("a:t2");
+
+    // B's 403 lands after A re-confirmed: no second prompt.
+    await act(async () => rejectB(apiError(403, "REAUTH_REQUIRED")));
+    await flush();
+    expect(ctl.isOpen).toBe(false);
+    await expect(resultB).resolves.toBe("b:t2");
   });
 
   it("shares one confirm step between two writes that ask at once", async () => {

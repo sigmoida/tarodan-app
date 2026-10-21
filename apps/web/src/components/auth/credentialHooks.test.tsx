@@ -24,9 +24,11 @@ type GoogleConfig = {
 const h = vi.hoisted(() => ({
   config: null as GoogleConfig | null,
   login: vi.fn(),
+  scriptLoaded: true,
 }));
 
 vi.mock("@react-oauth/google", () => ({
+  useGoogleOAuth: () => ({ scriptLoadedSuccessfully: h.scriptLoaded }),
   useGoogleLogin: (config: GoogleConfig) => {
     h.config = config;
     return h.login;
@@ -54,6 +56,7 @@ function render(selectAccount?: boolean) {
 beforeEach(() => {
   h.config = null;
   h.login.mockReset();
+  h.scriptLoaded = true;
   delete window.AppleID;
   container = document.createElement("div");
   root = createRoot(container);
@@ -94,6 +97,15 @@ describe("useGoogleAuthCode", () => {
     const pending = google.requestCode();
     h.config!.onError();
     await expect(pending).rejects.toBeInstanceOf(GoogleAuthCodeError);
+  });
+
+  it("rejects at once, without a popup, while Google's script is not loaded", async () => {
+    h.scriptLoaded = false;
+    render();
+    await expect(google.requestCode()).rejects.toBeInstanceOf(
+      GoogleAuthCodeError,
+    );
+    expect(h.login).not.toHaveBeenCalled();
   });
 
   it("a second request supersedes a pending one", async () => {
