@@ -4799,7 +4799,10 @@
           "twoFactorEnabled": "2FA Aktif",
           "accountLocked": "Hesap Kilitlendi",
           "socialLinked": "Sosyal Hesap Bağlandı",
-          "socialLinkReset": "Doğrulanmamış Hesap Sosyal Girişte Sıfırlandı"
+          "socialLinkReset": "Doğrulanmamış Hesap Sosyal Girişte Sıfırlandı",
+          "passwordSet": "Şifre Belirlendi",
+          "reauthFailed": "Kimlik Doğrulama Başarısız",
+          "reauthLocked": "Kimlik Doğrulama Kilitlendi"
         },
         "emailStatuses": {
           "sent": "Gönderildi",
@@ -11025,7 +11028,13 @@
       "invitationInvalid": "Davet bağlantısı geçersiz veya süresi dolmuş.",
       "usernameInvalid": "Geçersiz kullanıcı adı.",
       "usernameAlreadyTaken": "Bu kullanıcı adı daha önce alınmış.",
-      "sessionNotCreated": "Oturum güvenli şekilde oluşturulamadı"
+      "sessionNotCreated": "Oturum güvenli şekilde oluşturulamadı",
+      "reauthRequired": "Devam etmek için kimliğinizi doğrulayın",
+      "reauthFailed": "Kimliğinizi doğrulayamadık",
+      "reauthMethodNotAllowed": "Şifrenizle doğrulayın",
+      "reauthLocked": "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin",
+      "reauthUnavailable": "Kimliğinizi şu anda doğrulayamıyoruz. Birkaç dakika sonra tekrar deneyin",
+      "passwordAlreadySet": "Bu hesabın zaten bir şifresi var"
     },
     "offer": {
       "alreadyInStatus": "Bu teklif zaten {status} durumunda",
