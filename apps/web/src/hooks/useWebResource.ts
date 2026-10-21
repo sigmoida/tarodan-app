@@ -75,7 +75,7 @@ export function useWebItem<T>({
 }
 
 export interface UseWebInfiniteListOptions<T> {
-  /** Resource name; the key is [resource, 'infinite', params]. */
+  /** Resource name; the key is `webKeys.infinite(resource, params)`. */
   resource: string;
   /** Key discriminators (user, filters). The page is NOT part of the key: one entry holds every loaded page. */
   params?: unknown;

@@ -18,6 +18,7 @@ import {
 import type { Trade, TradeItem } from "../_lib/types";
 import { mergeTradeItems, type CounterProduct } from "../_lib/counterProducts";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
+import { usePagedPicks } from "@/hooks/usePagedPicks";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -38,11 +39,9 @@ export function useCounterOfferEditor({
   const t = useTranslations();
   const userId = useAuthStore((s) => s.user?.id);
   const [isCounterMode, setIsCounterMode] = useState(false);
-  const [selectedCounterProducts, setSelectedCounterProducts] = useState<
-    string[]
-  >([]);
-  const [selectedCounterTargetProducts, setSelectedCounterTargetProducts] =
-    useState<string[]>([]);
+  // When the editor was last opened: the lists count as loading until data
+  // fetched after this moment arrives (the cache may hold an older open's).
+  const [openedAt, setOpenedAt] = useState(0);
   const [counterCashAmount, setCounterCashAmount] = useState<string>("");
   const [counterCashPayer, setCounterCashPayer] = useState<"me" | "them">("me");
   const [counterMessage, setCounterMessage] = useState("");
@@ -91,9 +90,14 @@ export function useCounterOfferEditor({
   // the trade. Fresh on every open (`TRADE_PICKER_QUERY_OPTIONS`).
   const queriesEnabled = isCounterMode && !!trade;
   const myQuery = useWebInfiniteList<CounterProduct>({
-    resource: queryKeys.counterOffer.myResource,
-    params: { userId },
+    // The user's own tradeable listings live under the trade-eligible resource,
+    // so every listing write that refreshes the new-trade picker
+    // (`invalidateListingQueries`, the `invalidates` of the listing mutations)
+    // refreshes this side too. The `picker` param keeps its own entry.
+    resource: queryKeys.tradeEligible.resource,
+    params: { userId, picker: "counter" },
     // Counter validation accepts any own active item, so no `tradeEligible`.
+    // `tradeOnly` is the product choice (B-D1): only listings open to trade.
     fetchPage: async (page) => {
       const res = await userApi.getMyProducts({
         status: "active",
@@ -111,12 +115,18 @@ export function useCounterOfferEditor({
   });
   const theirQuery = useWebInfiniteList<CounterProduct>({
     resource: queryKeys.counterOffer.theirResource,
-    params: { sellerId: trade?.initiatorId },
+    // The public list depends on the viewer (blocked sellers are hidden), so the
+    // key carries the user id like every other picker key.
+    params: { userId, sellerId: trade?.initiatorId },
     fetchPage: async (page) => {
       const res = await listingsApi.getAll({
         sellerId: trade?.initiatorId,
         status: "active",
         tradeOnly: true,
+        // The default (relevance) order moves with view counts between page
+        // fetches, which can skip a listing at a page boundary; newest first is
+        // stable (the same order as `GET /products/my`).
+        sortBy: "created_desc",
         page,
         limit: TRADE_PICKER_PAGE_SIZE,
       });
@@ -149,16 +159,21 @@ export function useCounterOfferEditor({
     [trade, theirQuery.data],
   );
 
-  // Spinner only until each query's first result of this open settles; later
-  // background refetches keep the lists on screen.
+  // Spinner until each query's first result of this open settles (data newer
+  // than the open, or a settled error); later background refetches keep the
+  // lists on screen. The hooks stay mounted with the page, so
+  // `isFetchedAfterMount` would only cover the first open.
   const isPending = (q: typeof myQuery) =>
-    q.isLoading || (q.isFetching && !q.isFetchedAfterMount);
+    q.isLoading ||
+    (q.dataUpdatedAt < openedAt && !(q.isError && !q.isFetching));
   const isLoadingCounterData =
     queriesEnabled && (isPending(myQuery) || isPending(theirQuery));
 
-  // A failed first load closes the editor with an error, as before.
+  // A failed first load (nothing to show) closes the editor with an error, as
+  // before. A failed background refetch or "Show more" keeps the loaded lists
+  // and the user's picks: `isError` is set then too, so require no data.
   // (`isError` stays set while a reopen refetches, so wait for it to settle.)
-  const failed = (q: typeof myQuery) => q.isError && !q.isFetching;
+  const failed = (q: typeof myQuery) => q.isError && !q.isFetching && !q.data;
   const loadFailed = queriesEnabled && (failed(myQuery) || failed(theirQuery));
   useEffect(() => {
     if (!loadFailed) return;
@@ -167,36 +182,36 @@ export function useCounterOfferEditor({
   }, [loadFailed, t]);
 
   // A pick that left a refreshed list (sold, deactivated, offered elsewhere)
-  // drops out of the selection instead of being sent and rejected by the API.
-  useEffect(() => {
-    if (!queriesEnabled || isLoadingCounterData) return;
-    const prune = (prev: string[], list: CounterProduct[]) => {
-      const next = prev.filter((id) => list.some((p) => p.id === id));
-      return next.length === prev.length ? prev : next;
-    };
-    setSelectedCounterProducts((prev) => prune(prev, counterProducts));
-    setSelectedCounterTargetProducts((prev) =>
-      prune(prev, counterTargetProducts),
-    );
-  }, [
-    queriesEnabled,
-    isLoadingCounterData,
-    counterProducts,
-    counterTargetProducts,
-  ]);
+  // drops out of the selection instead of being sent and rejected by the API;
+  // one that only moved onto a page not loaded yet stays (`usePagedPicks`).
+  const picksReady = queriesEnabled && !isLoadingCounterData;
+  const myPicks = usePagedPicks({
+    loaded: counterProducts,
+    complete: !myQuery.hasNextPage,
+    ready: picksReady,
+  });
+  const theirPicks = usePagedPicks({
+    loaded: counterTargetProducts,
+    complete: !theirQuery.hasNextPage,
+    ready: picksReady,
+  });
+  const selectedCounterProducts = myPicks.pickedIds;
+  const selectedCounterTargetProducts = theirPicks.pickedIds;
 
   // Open the editor: pre-fill the selections and cash terms from the current
   // trade (swapped); the product lists load through the queries above.
   const handleOpenCounterModal = () => {
     if (!trade) return;
     setIsCounterMode(true);
+    setOpenedAt(Date.now());
 
+    // The trade's own items are always in the lists (`mergeTradeItems`).
     // What the receiver is offered (initiatorItems) is what they want in the counter.
-    setSelectedCounterTargetProducts(
+    theirPicks.select(
       trade.initiatorItems.map((item: TradeItem) => item.productId),
     );
     // What the receiver currently offers (receiverItems) stays offered.
-    setSelectedCounterProducts(
+    myPicks.select(
       trade.receiverItems.map((item: TradeItem) => item.productId),
     );
 
@@ -215,30 +230,15 @@ export function useCounterOfferEditor({
 
   const handleExitCounterMode = () => {
     setIsCounterMode(false);
-    setSelectedCounterProducts([]);
-    setSelectedCounterTargetProducts([]);
+    myPicks.clear();
+    theirPicks.clear();
     setCounterCashAmount("");
     setCounterCashPayer("me");
     setCounterMessage("");
   };
 
-  const toggleCounterProduct = (productId: string) => {
-    setSelectedCounterProducts((prev) => {
-      if (prev.includes(productId)) {
-        return prev.filter((id) => id !== productId);
-      }
-      return [...prev, productId];
-    });
-  };
-
-  const toggleCounterTargetProduct = (productId: string) => {
-    setSelectedCounterTargetProducts((prev) => {
-      if (prev.includes(productId)) {
-        return prev.filter((id) => id !== productId);
-      }
-      return [...prev, productId];
-    });
-  };
+  const toggleCounterProduct = myPicks.toggle;
+  const toggleCounterTargetProduct = theirPicks.toggle;
 
   const handleCounterSubmit = () => {
     if (!trade) return;
@@ -316,8 +316,8 @@ export function useCounterOfferEditor({
     costPreviewFailed: previewFailed,
     isCounterMode,
     isLoadingCounterData,
-    counterProducts,
-    counterTargetProducts,
+    counterProducts: myPicks.rows,
+    counterTargetProducts: theirPicks.rows,
     counterProductsHasMore: !!myQuery.hasNextPage,
     counterProductsLoadingMore: myQuery.isFetchingNextPage,
     loadMoreCounterProducts: () => void myQuery.fetchNextPage(),

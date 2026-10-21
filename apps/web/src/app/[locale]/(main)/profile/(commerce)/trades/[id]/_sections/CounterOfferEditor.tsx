@@ -8,6 +8,7 @@ import {
 import { Button, Checkbox, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
+import { formatTL } from "@/lib/format";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { getProductImage } from "../_lib/types";
 import type { TradeDetailVM } from "../_hooks/useTradeDetail";
@@ -133,13 +134,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                                   {product.title}
                                 </h3>
                                 <p className="text-base font-bold text-primary-500">
-                                  {getProductEffectivePrice(
-                                    product,
-                                  ).toLocaleString("tr-TR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}{" "}
-                                  TL
+                                  {formatTL(getProductEffectivePrice(product))}
                                 </p>
                               </div>
                             </div>
@@ -228,13 +223,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                                   {product.title}
                                 </h3>
                                 <p className="text-base font-bold text-primary-500">
-                                  {getProductEffectivePrice(
-                                    product,
-                                  ).toLocaleString("tr-TR", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}{" "}
-                                  TL
+                                  {formatTL(getProductEffectivePrice(product))}
                                 </p>
                               </div>
                             </div>

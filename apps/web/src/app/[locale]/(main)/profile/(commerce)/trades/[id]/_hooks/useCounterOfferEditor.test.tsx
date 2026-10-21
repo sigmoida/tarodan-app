@@ -4,8 +4,13 @@
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QueryClientProvider } from "@tanstack/react-query";
+import {
+  focusManager,
+  QueryClientProvider,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { makeQueryClient } from "@/lib/query/client";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import type { Trade } from "../_lib/types";
 
 (
@@ -111,8 +116,9 @@ async function waitFor(assertion: () => void) {
   throw last;
 }
 
+let client: QueryClient;
 function setup() {
-  const client = makeQueryClient();
+  client = makeQueryClient();
   client.setDefaultOptions({
     ...client.getDefaultOptions(),
     queries: { ...client.getDefaultOptions().queries, retry: false },
@@ -163,10 +169,12 @@ describe("useCounterOfferEditor, paged pickers", () => {
       page: 1,
       limit: 20,
     });
+    // Their side: a stable order, so paging never skips a listing.
     expect(getAll).toHaveBeenCalledWith({
       sellerId: "other",
       status: "active",
       tradeOnly: true,
+      sortBy: "created_desc",
       page: 1,
       limit: 20,
     });
@@ -256,20 +264,159 @@ describe("useCounterOfferEditor, paged pickers", () => {
     expect(toastError).toHaveBeenCalledWith("collection.productsLoadFailed");
   });
 
-  it("prunes a picked listing that is gone after a refetch, never sending it", async () => {
+  it("prunes a picked listing that is gone after a focus refetch, never sending it", async () => {
     getMyProducts.mockImplementation(serve(rows("m", 1, 3)));
-    getAll.mockImplementation(serve([]));
+    getAll.mockImplementation(serve(rows("t", 1, 2)));
     const result = setup();
     act(() => result.current.handleOpenCounterModal());
     await waitFor(() => expect(result.current.counterProducts).toHaveLength(4));
     act(() => result.current.toggleCounterProduct("m2"));
+    act(() => result.current.toggleCounterTargetProduct("t2"));
     expect(result.current.selectedCounterProducts).toContain("m2");
 
-    // Reopen: m2 was sold meanwhile.
+    // m2 and t2 were sold meanwhile; the tab regains focus with the editor open.
     getMyProducts.mockImplementation(serve([row("m1"), row("m3")]));
+    getAll.mockImplementation(serve([row("t1")]));
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await waitFor(() => expect(result.current.counterProducts).toHaveLength(3));
+    await waitFor(() =>
+      expect(result.current.selectedCounterProducts).toEqual(["mine1"]),
+    );
+    expect(result.current.selectedCounterTargetProducts).toEqual(["want1"]);
+
+    counter.mockResolvedValue({});
+    act(() => result.current.toggleCounterProduct("m3"));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].initiatorItems).toEqual([
+      { productId: "mine1", quantity: 1 },
+      { productId: "m3", quantity: 1 },
+    ]);
+    expect(counter.mock.calls[0][1].receiverItems).toEqual([
+      { productId: "want1", quantity: 1 },
+    ]);
+  });
+
+  it("keeps a pick that slid past the loaded pages on refetch, pinned and sent", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 25)));
+    getAll.mockImplementation(serve([]));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() =>
+      expect(result.current.counterProducts).toHaveLength(21),
+    );
+    act(() => result.current.toggleCounterProduct("m20"));
+
+    // A new listing pushes m20 onto page 2 (not loaded); the tab regains focus.
+    getMyProducts.mockImplementation(serve([row("new"), ...rows("m", 1, 25)]));
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await waitFor(() =>
+      expect(result.current.counterProducts.map((p) => p.id)).toContain("new"),
+    );
+    expect(result.current.selectedCounterProducts).toEqual(["mine1", "m20"]);
+    // Not on a loaded page any more, so pinned above the loaded rows.
+    expect(result.current.counterProducts[0].id).toBe("m20");
+
+    counter.mockResolvedValue({});
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].initiatorItems).toEqual([
+      { productId: "mine1", quantity: 1 },
+      { productId: "m20", quantity: 1 },
+    ]);
+  });
+
+  it("shows the spinner again on a reopen until this open's data arrives", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve([]));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() =>
+      expect(result.current.isLoadingCounterData).toBe(false),
+    );
     act(() => result.current.handleExitCounterMode());
+
+    let release: () => void = () => {};
+    getMyProducts.mockImplementation(
+      (params: { page: number; limit: number }) =>
+        new Promise((resolve) => {
+          release = () => resolve(serve(rows("m", 1, 3))(params));
+        }),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    act(() => result.current.handleOpenCounterModal());
+    expect(result.current.isLoadingCounterData).toBe(true);
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(2));
+    await act(async () => release());
+    await waitFor(() =>
+      expect(result.current.isLoadingCounterData).toBe(false),
+    );
+    expect(result.current.counterProducts).toHaveLength(4);
+  });
+
+  it("keeps the editor, lists and picks when Show more fails", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 25)));
+    getAll.mockImplementation(serve([]));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() =>
+      expect(result.current.counterProducts).toHaveLength(21),
+    );
+    act(() => result.current.toggleCounterProduct("m5"));
+
+    getMyProducts.mockRejectedValue(new Error("boom"));
+    act(() => result.current.loadMoreCounterProducts());
+    await waitFor(() =>
+      expect(result.current.counterProductsLoadingMore).toBe(false),
+    );
+    await act(async () => {});
+    expect(result.current.isCounterMode).toBe(true);
+    expect(result.current.counterProducts).toHaveLength(21);
+    expect(result.current.selectedCounterProducts).toEqual(["mine1", "m5"]);
+    expect(result.current.counterProductsHasMore).toBe(true);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("keeps the editor open when a background refetch fails", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 3)));
+    getAll.mockImplementation(serve(rows("t", 1, 3)));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() => expect(result.current.counterProducts).toHaveLength(4));
+
+    getAll.mockRejectedValue(new Error("boom"));
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await waitFor(() => expect(getAll).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(result.current.isCounterMode).toBe(true);
+    expect(result.current.counterTargetProducts).toHaveLength(4);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("refreshes my side on a listing write (shared trade-eligible invalidation)", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve([]));
+    const result = setup();
     act(() => result.current.handleOpenCounterModal());
     await waitFor(() => expect(result.current.counterProducts).toHaveLength(3));
-    expect(result.current.selectedCounterProducts).not.toContain("m2");
+
+    getMyProducts.mockImplementation(serve(rows("m", 1, 3)));
+    await act(async () => {
+      await invalidateListingQueries(client);
+    });
+    await waitFor(() => expect(result.current.counterProducts).toHaveLength(4));
   });
 });
