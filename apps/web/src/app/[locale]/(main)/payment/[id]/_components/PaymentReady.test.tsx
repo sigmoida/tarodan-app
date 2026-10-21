@@ -77,7 +77,6 @@ function render(kind: PaymentKind) {
         kind={kind}
         amount={100}
         cardStorageEnabled
-        purpose={kind === "membership" ? "membership" : "checkout"}
         hasTarget
         onCancel={vi.fn()}
         cancelling={false}
@@ -143,6 +142,10 @@ describe("PaymentReady distance sales consent", () => {
       render(kind);
       await flush();
 
+      // The saved cards come from the kind's PayTR store.
+      expect(h.listCards).toHaveBeenCalledWith(
+        kind === "membership" ? "membership" : "checkout",
+      );
       expect(checkboxes()).toHaveLength(0);
       expect(container.textContent).not.toContain(
         "checkout.distanceSalesConsent",

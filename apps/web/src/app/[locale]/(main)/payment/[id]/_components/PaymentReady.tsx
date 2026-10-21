@@ -11,19 +11,24 @@ import { SectionCard } from "@/components/ui";
 import CardPaymentSection from "@/components/payment/CardPaymentSection";
 import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
 import { useCardPayment, type PaymentTarget } from "@/hooks/useCardPayment";
-import type { PaymentPurpose } from "@/lib/api";
-import { takesDistanceSalesConsent, type PaymentKind } from "@/lib/paymentKind";
+import {
+  paymentPurpose,
+  takesDistanceSalesConsent,
+  type PaymentKind,
+} from "@/lib/paymentKind";
 import AmountSummaryCard, { type TradePricingLines } from "./AmountSummaryCard";
 
 interface PaymentReadyProps {
   target: PaymentTarget;
   paymentId: string;
-  /** The loaded payment's kind (its API flags, not only the URL `type`). */
+  /**
+   * The loaded payment's kind (its API flags, not only the URL `type`). It
+   * decides the PayTR store (saved cards) and the distance sales consent.
+   */
   kind: PaymentKind;
   amount?: number;
   pricing?: TradePricingLines | null;
   cardStorageEnabled?: boolean;
-  purpose: PaymentPurpose;
   hasTarget: boolean;
   onCancel: () => void;
   cancelling: boolean;
@@ -44,7 +49,6 @@ export default function PaymentReady({
   amount,
   pricing,
   cardStorageEnabled = false,
-  purpose,
   hasTarget,
   onCancel,
   cancelling,
@@ -63,7 +67,7 @@ export default function PaymentReady({
   const needsDistanceSales = takesDistanceSalesConsent(kind);
   const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);
   const card = useCardPayment({
-    purpose,
+    purpose: paymentPurpose(kind),
     cardStorageEnabled,
     resolvePayment,
     distanceSalesAccepted: needsDistanceSales
