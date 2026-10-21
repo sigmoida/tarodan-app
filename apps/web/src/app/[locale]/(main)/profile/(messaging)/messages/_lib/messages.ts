@@ -70,7 +70,7 @@ export function parseMessageContent(
 }
 
 /**
- * Thread-list preview: shows "📷 Photo" for image messages instead of the raw
+ * Thread-list preview: shows "Photo" for image messages instead of the raw
  * link, even when the content filter has mangled the presigned URL inside
  * `[IMG:...]` (leftover X-Amz / %2F / http fragments).
  */
@@ -94,7 +94,7 @@ export function getThreadPreview(content: string, locale: string): string {
       .trim();
   }
   if (hadImage && urlLike.test(text)) text = "";
-  if (hadImage) return text ? `📷 ${text}` : photoLabel;
+  if (hadImage) return text ? `${photoLabel}: ${text}` : photoLabel;
   return text;
 }
 

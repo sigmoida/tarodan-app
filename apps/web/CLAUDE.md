@@ -118,6 +118,7 @@ response envelopes with `lib/unwrapList.ts`.
 
 ## Components and forms
 
+- No emoji or pictographs in copy; use design-system icons.
 - Marketplace composites built from `@tarodan/ui` (`ProductCard`, `BrandCard`,
   `SectionHeader`, ...) live in `src/components/ui/`, which also re-exports the
   `@tarodan/ui` surface the app uses. Feature composites go in

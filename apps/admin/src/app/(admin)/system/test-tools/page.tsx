@@ -23,7 +23,7 @@ export default function TestToolsPage() {
       >
         {env && (
           <Badge variant={env.isProd ? "danger" : "outline"}>
-            {env.isProd ? "⚠ PROD" : env.env}
+            {env.isProd ? "PROD" : env.env}
           </Badge>
         )}
       </PageHeader>

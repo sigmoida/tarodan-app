@@ -363,7 +363,7 @@ export class InvoicePdfService {
       <h4>Ödeme Bilgileri</h4>
       <p>Ödeme Yöntemi: ${data.paymentMethod}</p>
       ${data.paymentDate ? `<p>Ödeme Tarihi: ${formatDate(data.paymentDate)}</p>` : ""}
-      <p style="margin-top: 10px;"><span class="badge">✓ Ödendi</span></p>
+      <p style="margin-top: 10px;"><span class="badge">Ödendi</span></p>
     </div>
 
     <div class="footer">

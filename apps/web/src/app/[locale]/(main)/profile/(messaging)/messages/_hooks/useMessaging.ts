@@ -461,7 +461,7 @@ export function useMessaging(enabled: boolean) {
 
       // Check if message was filtered by backend
       if (sentMessage.isFiltered || sentMessage.status === "pending") {
-        toast(t("message.sentForReview"), { icon: "⚠️" });
+        toast(t("message.sentForReview"));
       }
 
       setDraftsByThreadId((prev) => {
@@ -490,7 +490,7 @@ export function useMessaging(enabled: boolean) {
       setTimeout(scrollChatToBottom, 80);
     } catch (error: any) {
       if (error.response?.data?.requiresApproval) {
-        toast(t("message.sentForReview"), { icon: "⚠️" });
+        toast(t("message.sentForReview"));
       } else if (error.response?.data?.filtered) {
         toast.error(t("message.blockedContent"));
       } else {
