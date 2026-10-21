@@ -8,20 +8,15 @@ import {
   type SignInMethods,
   type SignInProvider,
 } from "@tarodan/types";
-import { Alert, Badge, Button, Skeleton } from "@tarodan/ui";
+import { Badge, Button, Skeleton } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { GoogleIcon } from "@/components/auth/GoogleIcon";
-import { AppleIcon } from "@/components/auth/AppleIcon";
+import { SIGN_IN_PROVIDER_ICONS } from "@/components/auth/providerIcons";
 import { SIGN_IN_PROVIDER_NAMES } from "@/components/auth/useProviderCredential";
 import { useAuthStore } from "@/stores/authStore";
 import { useSignInMethods } from "../_hooks/useSecurity";
 import { useConnectedAccounts } from "../_hooks/useConnectedAccounts";
-
-const PROVIDER_ICONS: Record<SignInProvider, typeof GoogleIcon> = {
-  google: GoogleIcon,
-  apple: AppleIcon,
-};
+import LoadErrorAlert from "../_components/LoadErrorAlert";
 
 /**
  * Connected accounts: Google and Apple, each connected or not, with Connect or
@@ -40,30 +35,17 @@ export default function ConnectedAccountsSection() {
       <p className="mb-4 text-sm text-muted">
         {t("profile.connectedAccounts.description")}
       </p>
-      {isLoading || (!methods && !isError) ? (
+      {methods ? (
+        // Cached methods stay on screen when a background refetch fails.
+        <ProviderRows methods={methods} />
+      ) : isError && !isLoading ? (
+        <LoadErrorAlert onRetry={() => void refetch()} />
+      ) : (
         <div className="space-y-3">
           {SIGN_IN_PROVIDERS.map((provider) => (
             <Skeleton key={provider} className="h-14 w-full" />
           ))}
         </div>
-      ) : isError || !methods ? (
-        <Alert
-          variant="danger"
-          action={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void refetch()}
-            >
-              {t("common.tryAgain")}
-            </Button>
-          }
-        >
-          {t("error.somethingWrongDesc")}
-        </Alert>
-      ) : (
-        <ProviderRows methods={methods} />
       )}
     </SectionCard>
   );
@@ -137,7 +119,7 @@ function ProviderRow({
   onDisconnect: () => void;
 }) {
   const t = useTranslations();
-  const Icon = PROVIDER_ICONS[provider];
+  const Icon = SIGN_IN_PROVIDER_ICONS[provider];
   const name = SIGN_IN_PROVIDER_NAMES[provider];
   const hintId = `connected-${provider}-hint`;
 

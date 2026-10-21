@@ -8,7 +8,7 @@ import {
   DevicePhoneMobileIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
-import { Alert, Badge, Button, Skeleton } from "@tarodan/ui";
+import { Badge, Button, Skeleton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
@@ -22,6 +22,7 @@ import {
 } from "../_lib/schemas";
 import { PASSWORD_SECTION_ID } from "../_lib/anchors";
 import PhoneVerificationModal from "../_modals/PhoneVerificationModal";
+import LoadErrorAlert from "../_components/LoadErrorAlert";
 import {
   useChangePassword,
   useSetPassword,
@@ -134,29 +135,13 @@ function SetPasswordForm() {
 
 /** The password block: "Change password", or "Set a password" without one. */
 function PasswordBlock({ enabled }: { enabled: boolean }) {
-  const t = useTranslations();
   const { methods, isLoading, isError, refetch } = useSignInMethods(enabled);
 
-  if (isError) {
-    return (
-      <Alert
-        variant="danger"
-        action={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void refetch()}
-          >
-            {t("common.tryAgain")}
-          </Button>
-        }
-      >
-        {t("error.somethingWrongDesc")}
-      </Alert>
-    );
+  // Cached methods stay on screen when a background refetch fails.
+  if (!methods && isError && !isLoading) {
+    return <LoadErrorAlert onRetry={() => void refetch()} />;
   }
-  if (isLoading || !methods) {
+  if (!methods) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-10 w-full" />

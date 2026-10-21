@@ -249,6 +249,10 @@ export const queryKeys = {
     resource: SIGN_IN_METHODS_RESOURCE,
     list: () => webKeys.list(SIGN_IN_METHODS_RESOURCE),
   },
+  /** The 2FA page's status query (`GET /security/2fa/status`). */
+  twoFactor: {
+    status: () => ["2fa-status"] as const,
+  },
   sellerDocuments: {
     all: () => ["seller-documents"] as const,
   },

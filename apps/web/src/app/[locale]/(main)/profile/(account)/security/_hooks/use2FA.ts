@@ -7,12 +7,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 import { useRefreshSignInMethods } from "../../../_hooks/useSecurity";
+import { queryKeys } from "@/lib/query/keys";
 import type { TwoFactorStatus, SetupResponse } from "../_lib/types";
 
 /** The API refuses 2FA for an account without a password (this catalog key). */
 const PASSWORD_REQUIRED_KEY = "server.security.passwordRequiredFor2fa";
 
-const STATUS_KEY = ["2fa-status"];
+/** The API error body (`message`, `i18nKey`) of a failed request, if any. */
+const errorBody = (e: unknown) =>
+  (e as { response?: { data?: { message?: string; i18nKey?: string } } })
+    ?.response?.data;
 
 /**
  * Two-factor (TOTP) status query + the enable / verify / disable / regenerate
@@ -33,30 +37,28 @@ export function use2FA() {
   const [showBackupCodes, setShowBackupCodes] = useState(false);
 
   const statusQuery = useQuery({
-    queryKey: STATUS_KEY,
+    queryKey: queryKeys.twoFactor.status(),
     queryFn: async (): Promise<TwoFactorStatus> =>
       (await api.get("/security/2fa/status")).data,
   });
 
   const invalidateStatus = () =>
-    queryClient.invalidateQueries({ queryKey: STATUS_KEY });
+    queryClient.invalidateQueries({ queryKey: queryKeys.twoFactor.status() });
 
   const enable = useMutation({
     mutationFn: async (): Promise<SetupResponse> =>
       (await api.post("/security/2fa/enable")).data,
     onMutate: () => setError(""),
     onSuccess: (data) => setSetupData(data),
-    onError: (e: any) => {
+    onError: (e: unknown) => {
       // No password (a stale page): the page shows the "set a password
       // first" hint instead of the raw error, and the methods refresh.
-      if (e?.response?.data?.i18nKey === PASSWORD_REQUIRED_KEY) {
+      if (errorBody(e)?.i18nKey === PASSWORD_REQUIRED_KEY) {
         setPasswordRequired(true);
         void refreshSignInMethods();
         return;
       }
-      setError(
-        e?.response?.data?.message || t("profile.twoFactor.setupFailed"),
-      );
+      setError(errorBody(e)?.message || t("profile.twoFactor.setupFailed"));
     },
   });
 
@@ -70,10 +72,8 @@ export function use2FA() {
       setSetupData(null);
       invalidateStatus();
     },
-    onError: (e: any) =>
-      setError(
-        e?.response?.data?.message || t("profile.twoFactor.verifyFailed"),
-      ),
+    onError: (e: unknown) =>
+      setError(errorBody(e)?.message || t("profile.twoFactor.verifyFailed")),
   });
 
   const disable = useMutation({
@@ -81,10 +81,8 @@ export function use2FA() {
       (await api.post("/security/2fa/disable", { code })).data,
     onMutate: () => setError(""),
     onSuccess: () => invalidateStatus(),
-    onError: (e: any) =>
-      setError(
-        e?.response?.data?.message || t("profile.twoFactor.disableFailed"),
-      ),
+    onError: (e: unknown) =>
+      setError(errorBody(e)?.message || t("profile.twoFactor.disableFailed")),
   });
 
   const regenerateBackupCodes = useMutation({
@@ -96,9 +94,9 @@ export function use2FA() {
       setShowBackupCodes(true);
       invalidateStatus();
     },
-    onError: (e: any) =>
+    onError: (e: unknown) =>
       setError(
-        e?.response?.data?.message || t("profile.twoFactor.regenerateFailed"),
+        errorBody(e)?.message || t("profile.twoFactor.regenerateFailed"),
       ),
   });
 

@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
+import { isCancellation } from "@/lib/query/client";
 
 export interface UseWebMutationOptions<TData, TVars> {
   /**
@@ -42,16 +43,6 @@ export function apiErrorCode(error: unknown): string | undefined {
   const code = (error as { response?: { data?: { errorCode?: unknown } } })
     ?.response?.data?.errorCode;
   return typeof code === "string" ? code : undefined;
-}
-
-/**
- * A cancelled request or a step the user backed out of (an `AbortError`, as
- * the step-up's `ReauthCancelledError` is, or axios `ERR_CANCELED`). It is not
- * a failure: no toast here, and no Sentry report (`shouldReportMutationError`).
- */
-export function isCancellation(error: unknown): boolean {
-  const err = error as { name?: unknown; code?: unknown } | null;
-  return err?.name === "AbortError" || err?.code === "ERR_CANCELED";
 }
 
 /**

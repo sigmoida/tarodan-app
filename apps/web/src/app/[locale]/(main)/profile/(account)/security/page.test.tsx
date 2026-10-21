@@ -97,6 +97,13 @@ describe("2FA page", () => {
     expect(container.textContent).not.toContain("passwordFirstFor2fa");
   });
 
+  it("waits for the sign-in methods before offering the setup", async () => {
+    h.getMethods.mockReturnValue(new Promise(() => {}));
+    await render();
+    expect(container.textContent).not.toContain("profile.twoFactor.startSetup");
+    expect(container.textContent).not.toContain("passwordFirstFor2fa");
+  });
+
   it("turns the API's no-password refusal into the hint, not the raw error", async () => {
     h.getMethods.mockRejectedValue(new Error("network"));
     h.post.mockRejectedValue({

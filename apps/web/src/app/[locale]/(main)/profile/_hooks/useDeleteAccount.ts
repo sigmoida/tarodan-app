@@ -9,7 +9,7 @@ import { REAUTH_TOKEN_HEADER } from "@tarodan/types";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
-import { isCancellation } from "@/hooks/useWebMutation";
+import { isCancellation } from "@/lib/query/client";
 import { useReauth } from "./useReauth";
 
 interface DeleteAccountErrorBody {
