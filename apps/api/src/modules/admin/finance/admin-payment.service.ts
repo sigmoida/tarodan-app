@@ -845,7 +845,7 @@ export class AdminPaymentService {
 
     // A boost payment is refunded only by "refund and stop" on the boost
     // screen (decision D16).
-    await assertNotBoostOrderRefund(this.prisma, payment.orderId);
+    await assertNotBoostOrderRefund(this.prisma, payment.order);
 
     if (payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(

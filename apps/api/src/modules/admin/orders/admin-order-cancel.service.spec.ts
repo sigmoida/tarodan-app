@@ -1052,6 +1052,20 @@ describe("AdminOrderCancelService", () => {
         refundService.createPlatformCancellationRefund,
       ).toHaveBeenCalledTimes(1);
     });
+
+    it.each([OrderStatus.cancelled, OrderStatus.refunded])(
+      "closed (%s): keeps the already-closed answer, no boost lookup",
+      async (status) => {
+        const { service, prisma } = withBoost({ ...boost, status });
+
+        await expect(
+          service.cancelOrder("admin-1", "order-1", request()),
+        ).rejects.toMatchObject({
+          response: { i18nKey: "server.admin.order.cancelAlreadyClosed" },
+        });
+        expect(prisma.productBoost.findUnique).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("bildirim hatası iptali bozmaz", () => {

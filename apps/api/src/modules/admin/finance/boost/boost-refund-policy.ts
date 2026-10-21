@@ -6,6 +6,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { asPaymentMetadata } from "../../../payment/helpers/payment-metadata.types";
+import { virtualOrderKind } from "../../../payment/helpers/virtual-order-kind";
 import { i18nMessage } from "../../../i18n";
 
 /**
@@ -16,18 +17,20 @@ import { i18nMessage } from "../../../i18n";
  * refund, order cancel, refund request approval) calls this before any money
  * moves.
  *
- * The signal is the boost row itself (`ProductBoost.orderId`), not the
- * `BST-` number or the `boost-` product: a boost order paid without its boost
- * row (fulfilment reports it to Sentry) has nothing to stop and must stay
- * refundable here, since the boost screen cannot see it.
+ * A boost order is one `virtualOrderKind` calls `boost` (the `boost-`
+ * virtual product; the buyer refusals use the same predicate), so an
+ * ordinary order costs no query. Only one that still has its boost row
+ * (`ProductBoost.orderId`) is refused: a boost order paid without its row
+ * (fulfilment reports it to Sentry) has nothing to stop, the boost screen
+ * cannot see it, and these paths must still settle it.
  */
 export async function assertNotBoostOrderRefund(
   db: Pick<Prisma.TransactionClient, "productBoost">,
-  orderId: string | null | undefined,
+  order: { id: string; productId?: string | null } | null | undefined,
 ): Promise<void> {
-  if (!orderId) return;
+  if (!order || virtualOrderKind(order) !== "boost") return;
   const boost = await db.productBoost.findUnique({
-    where: { orderId },
+    where: { orderId: order.id },
     select: { id: true },
   });
   if (boost) {

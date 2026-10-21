@@ -529,12 +529,14 @@ order that carries a boost, before any money moves (decision D16):
 - admin, `400 server.admin.payment.boostRefundUseBoostScreen`: the manual
   refund (`POST /admin/payments/:id/manual-refund`), the order cancel and its
   preview (`POST /admin/orders/:id/cancel`, `GET .../cancel-preview`; an
-  unpaid boost order still cancels, no money moves), and approving or
-  force-finalizing a refund request (`POST /admin/refund-requests/:id/approve`,
-  `.../force-finalize`). The signal is the boost row
-  (`assertNotBoostOrderRefund`, `ProductBoost.orderId`): a boost order paid
-  without its boost row has nothing to stop, the boost screen cannot see it,
-  so these paths still settle it.
+  unpaid boost order still cancels, no money moves, and a closed one keeps
+  `cancelAlreadyClosed`), and approving or force-finalizing a refund request
+  (`POST /admin/refund-requests/:id/approve`, `.../force-finalize`). One
+  gate, `assertNotBoostOrderRefund`: a boost order (`virtualOrderKind`, so an
+  ordinary order costs no query) that still has its boost row
+  (`ProductBoost.orderId`). A boost order paid without its boost row has
+  nothing to stop and the boost screen cannot see it, so these paths still
+  settle it.
 - buyer: a refund request on any platform service order (`virtualOrderKind`)
   answers `400 server.refund.orderStatusNotEligible` for a boost
   (`membershipOrderNotEligible` for a membership). An order cancel is refused
@@ -579,11 +581,13 @@ order that carries a boost, before any money moves (decision D16):
   whichever path finalizes it (the platform's own services never ship).
 - **Audit and notice**: one `boost_refund` audit row with the real outcome
   (`refunded`, `failed`, `pending_reconciliation` when this call's own
-  attempt may have reached PayTR, `in_flight_elsewhere` when the attempt
-  claim turned it away before anything was sent because another attempt is
-  unresolved: `RefundAttemptInFlightException`, still a 503
-  `RefundPendingReconciliationException` for the admin); `refunded` is written
-  only when that call refunded; a failed audit write after the money went back is reported
+  attempt, its key, may be moving money, also when the stuck-refund recovery
+  took it over; `in_flight_elsewhere` when the attempt claim turned it away
+  before anything was sent because another attempt of the order, another
+  key, is unresolved: `RefundAttemptInFlightException`, still a 503
+  `RefundPendingReconciliationException` for the admin); `refunded` is
+  written only when that call refunded; a failed audit write after the
+  money went back is reported
   (`BOOST_REFUND_AUDIT_MISSING`, Sentry) and not turned into an error. The
   seller gets `BOOST_REFUNDED` through the outbox. Sentry: tag `flow=boost`,
   boost id and order number.

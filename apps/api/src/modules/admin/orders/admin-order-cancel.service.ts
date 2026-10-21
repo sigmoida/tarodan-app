@@ -424,14 +424,18 @@ export class AdminOrderCancelService {
 
   /**
    * A paid order that carries a boost is refunded (and its boost stopped)
-   * only on the boost screen (D16). Checked before any blocker so the admin
-   * is sent there; an unpaid one cancels like any order (no money moves, and
-   * a payment landing meanwhile is caught as a changed kind under the lock).
+   * only on the boost screen (D16). Checked before the other blockers so the
+   * admin is sent there. Skipped for an unpaid order, which cancels like any
+   * order (no money moves; a payment landing meanwhile is caught under the
+   * lock), and for a closed one, which keeps its own "already closed" answer.
    */
   private async refuseBoostRefund(order: CancelOrderRow): Promise<void> {
     const eligibility = eligibilityOf(order);
-    if (eligibility.allowed && eligibility.kind === "unpaid") return;
-    await assertNotBoostOrderRefund(this.prisma, order.id);
+    const noMoneyPath = eligibility.allowed
+      ? eligibility.kind === "unpaid"
+      : eligibility.blocker === "closed";
+    if (noMoneyPath) return;
+    await assertNotBoostOrderRefund(this.prisma, order);
   }
 
   private auditAfter(
