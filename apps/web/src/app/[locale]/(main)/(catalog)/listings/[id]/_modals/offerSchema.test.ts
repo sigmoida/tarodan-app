@@ -59,4 +59,46 @@ describe("offerSchema, amount text", () => {
   it("refuses an amount at the listing price", () => {
     expect(amountIssue(schema, "2000")).toBe("Teklif fiyattan düşük olmalı");
   });
+
+  it("holds each bound to the kurus", () => {
+    // The 50% minimum is inclusive, the price is exclusive.
+    expect(amountIssue(schema, "999,99")).toBe(
+      "Teklif en az 1.000,00 TL olmalıdır.",
+    );
+    expect(amountIssue(schema, "1000,00")).toBeNull();
+    expect(amountIssue(schema, "1999,99")).toBeNull();
+    expect(amountIssue(schema, "2000,00")).toBe("Teklif fiyattan düşük olmalı");
+    expect(amountIssue(schema, "2500")).toBe("Teklif fiyattan düşük olmalı");
+  });
+
+  it("reads separator-only text as no amount", () => {
+    expect(amountIssue(schema, ",")).toBe("Geçerli bir tutar girin");
+    expect(amountIssue(schema, "0,00")).toBe("Geçerli bir tutar girin");
+  });
+});
+
+describe("offerSchema, rule order", () => {
+  // One issue per field, in order: refused, empty, 50%, floor, below price.
+  const schema = offerSchema(500, 1000, "tr", 600);
+  const issues = (amount: string) => {
+    const result = schema.safeParse({ amount });
+    return result.success
+      ? []
+      : result.error.issues.map((issue) => issue.message);
+  };
+
+  it("names the 50% minimum before a higher platform floor", () => {
+    expect(issues("400")).toEqual(["Teklif en az 500,00 TL olmalıdır."]);
+  });
+
+  it("refuses the format before any bound", () => {
+    // "1.000" read by parseFloat was 1 TL: below every bound.
+    expect(issues("1.000")).toEqual([
+      "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
+    ]);
+  });
+
+  it("refuses at the price even when the floor passes", () => {
+    expect(issues("1000")).toEqual(["Teklif fiyattan düşük olmalı"]);
+  });
 });

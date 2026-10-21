@@ -18,14 +18,19 @@ import type { Offer } from "../_lib/types";
  * must send the amount the shared TL parser reads, and refuse grouping
  * without calling the API.
  */
-const h = vi.hoisted(() => ({ post: vi.fn() }));
+const h = vi.hoisted(() => ({
+  post: vi.fn(),
+  floor: null as number | null,
+}));
 
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
 vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@/lib/api", () => ({ api: { post: h.post } }));
-vi.mock("@/hooks/usePublicSettings", () => ({ useOfferFloor: () => null }));
+vi.mock("@/hooks/usePublicSettings", () => ({
+  useOfferFloor: () => h.floor,
+}));
 vi.mock("@/hooks/useTimingPolicy", () => ({ useTimingValues: () => ({}) }));
 vi.mock("@/components/ConfirmProvider", () => ({ useConfirm: () => vi.fn() }));
 
@@ -44,28 +49,29 @@ const offer = {
 
 let root: Root;
 let container: HTMLDivElement;
+let client: QueryClient;
+
+/** Render (or re-render) the modal; the floor mock is read on render. */
+const mount = (mode: "buyer" | "seller") =>
+  act(() =>
+    root.render(
+      <QueryClientProvider client={client}>
+        <CounterOfferModal open onClose={() => {}} offer={offer} mode={mode} />
+      </QueryClientProvider>,
+    ),
+  );
 
 beforeEach(() => {
   h.post.mockReset().mockResolvedValue({ data: {} });
+  h.floor = null;
   vi.mocked(toast.error).mockClear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  const client = new QueryClient({
+  client = new QueryClient({
     defaultOptions: { mutations: { retry: false } },
   });
-  act(() =>
-    root.render(
-      <QueryClientProvider client={client}>
-        <CounterOfferModal
-          open
-          onClose={() => {}}
-          offer={offer}
-          mode="seller"
-        />
-      </QueryClientProvider>,
-    ),
-  );
+  mount("seller");
 });
 
 afterEach(() => {
@@ -124,4 +130,70 @@ describe("CounterOfferModal amount", () => {
       expect(h.post).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("CounterOfferModal bounds", () => {
+  // Every refused bound shows its copy and never reaches the API.
+  const refusedWith = (key: string) => {
+    expect(toast.error).toHaveBeenCalledWith(key);
+    expect(h.post).not.toHaveBeenCalled();
+  };
+
+  it("asks for an amount when the text reads as zero", async () => {
+    type("0,00");
+    expect(sendButton().disabled).toBe(false);
+    await send();
+    refusedWith("offer.counterModal.gecerliBirTutarGirin");
+  });
+
+  it("keeps Send disabled for blank text", () => {
+    type("   ");
+    expect(sendButton().disabled).toBe(true);
+  });
+
+  it("asks a seller counter to be above the buyer offer", async () => {
+    type("800");
+    await send();
+    refusedWith(
+      "offer.counterModal.karsiTeklifinizAlicininTeklifindenBaseLabelYuksek",
+    );
+  });
+
+  it("sends a seller counter one kurus above the buyer offer", async () => {
+    type("800,01");
+    await send();
+    expect(h.post).toHaveBeenCalledWith("/offers/o1/counter", {
+      amount: 800.01,
+    });
+  });
+
+  it("asks a buyer counter to be below the seller counter", async () => {
+    mount("buyer");
+    type("800");
+    await send();
+    refusedWith(
+      "offer.counterModal.saticininKarsiTeklifindenBaseLabelDusukOlmalidir",
+    );
+  });
+
+  it("sends a buyer counter one kurus below the seller counter", async () => {
+    mount("buyer");
+    type("799,99");
+    await send();
+    expect(h.post).toHaveBeenCalledWith("/offers/o1/buyer-counter", {
+      amount: 799.99,
+    });
+  });
+
+  it("holds the platform floor", async () => {
+    h.floor = 900;
+    mount("seller");
+    type("899,99");
+    await send();
+    refusedWith("offer.counterBelowFloor");
+
+    type("900");
+    await send();
+    expect(h.post).toHaveBeenCalledWith("/offers/o1/counter", { amount: 900 });
+  });
 });

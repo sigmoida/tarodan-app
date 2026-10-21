@@ -126,4 +126,28 @@ describe("OfferModal amount", () => {
       expect(h.create).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    ["999,99", "Teklif en az 1.000,00 TL olmalıdır."],
+    ["2000", "Teklif fiyattan düşük olmalı"],
+  ])(
+    "holds the listing bounds: %j shows %j and makes no API call",
+    async (text, issue) => {
+      type(text);
+      await send();
+      expect(document.body.textContent).toContain(issue);
+      expect(h.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["1000", 1000],
+    ["1999,99", 1999.99],
+  ])("sends the bound amount %j as %j", async (text, amount) => {
+    type(text);
+    await send();
+    expect(h.create).toHaveBeenCalledWith(
+      expect.objectContaining({ productId: "p1", amount }),
+    );
+  });
 });

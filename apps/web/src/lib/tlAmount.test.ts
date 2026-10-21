@@ -61,6 +61,11 @@ describe("parseTlAmount", () => {
     "0,005",
     "1.005",
     "1,2,3",
+    // One separator only, also when two sit side by side.
+    "12,,5",
+    "1.,50",
+    "1,.5",
+    "..",
     "abc",
     "1e3",
     "-5",
