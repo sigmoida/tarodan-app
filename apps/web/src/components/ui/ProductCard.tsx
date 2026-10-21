@@ -69,14 +69,6 @@ import { PRODUCT_PLACEHOLDER } from "@/lib/productPlaceholder";
  * stays beside the price.
  */
 
-/**
- * Görselsiz ilan için YEREL placeholder (`_home/lib/helpers.ts` ile aynı dosya).
- * Burada bir zamanlar harici placehold.co URL'lerinden oluşan bir liste vardı ve
- * üzerlerinde "Hot Wheels", "Premium", "Rare Model" yazıyordu: her görselsiz
- * ilan hem üçüncü parti bir servise istek atıyor hem de taşımadığı bir marka
- * iddiasını taşıyordu.
- */
-
 function cardImageUrl(image: ProductImage | string | undefined): string {
   const url =
     typeof image === "string"

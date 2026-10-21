@@ -12,9 +12,12 @@ const OFFERS_STALE_MS = 5 * 60_000;
 
 /**
  * `GET /products/boost/offers`: the boost switch (`enabled`) and the
- * signed-in seller's listings due the one-time offer. One query per session,
- * shared by every listing card and the offer dialog; never sent for a guest.
- * `live` makes this observer refetch on focus (the offer dialog host).
+ * signed-in seller's listings due the one-time offer. One query shared by
+ * every listing card and the offer dialog; never sent for a guest. The cards
+ * keep a five-minute window; `live` (the offer dialog host only) makes that
+ * observer refetch on mount and on every window focus, and the host also
+ * refetches on each route change, so the request repeats while a seller
+ * browses.
  * `enabled: false` keeps a caller that does not need it (a card that is not
  * the viewer's own) from sending it.
  */
