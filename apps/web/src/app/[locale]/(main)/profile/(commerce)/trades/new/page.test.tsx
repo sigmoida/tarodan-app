@@ -266,13 +266,33 @@ describe("new trade page, paged picker", () => {
     ]);
   });
 
-  it("prunes a pick that left page 2 after a refetch", () => {
+  it("keeps a pick that slid onto a page not loaded yet, shown and sent", () => {
+    // Pages 1-2 loaded, more exist; "c" is the last loaded row.
+    h.products = [item("a"), item("c")];
+    h.hasMore = true;
+    render();
+    act(() => checkbox("c").click());
+
+    // A new listing pushed "c" onto page 3 (not loaded): it may still be
+    // eligible, so it stays picked, pinned on top and checked.
+    h.products = [item("new"), item("a")];
+    render();
+    expect(checkbox("c").checked).toBe(true);
+    expect(lastPreviewIds()).toEqual(["c"]);
+    act(() => sendButton().click());
+    expect(h.mutate.mock.calls[0][0].initiatorItems).toEqual([
+      { productId: "c", quantity: 1 },
+    ]);
+  });
+
+  it("prunes a pick missing once every page is loaded", () => {
     h.products = [item("a"), item("c")];
     h.hasMore = true;
     render();
     act(() => checkbox("c").click());
 
     h.products = [item("a")];
+    h.hasMore = false;
     render();
     expect(lastPreviewIds()).toEqual([]);
     expect(sendButton().disabled).toBe(true);

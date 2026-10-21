@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -79,8 +80,10 @@ export function useTradeableProducts(
       meta: { page: "trades-new-products" },
     },
   });
-  const products = flattenPages(query.data?.pages).filter(
-    (p) => p.id !== listingId,
+  // Stable between renders: the page prunes the selection when it changes.
+  const products = useMemo(
+    () => flattenPages(query.data?.pages).filter((p) => p.id !== listingId),
+    [query.data, listingId],
   );
   return {
     products,
