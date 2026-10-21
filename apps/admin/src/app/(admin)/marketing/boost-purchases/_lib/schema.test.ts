@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { BOOST_GRANT_MAX_DAYS, BOOST_GRANT_MIN_DAYS } from "@tarodan/types";
 import {
   grantBoostPayload,
+  grantBoostSchema,
   isPartialRefund,
   refundBoostPayload,
   refundBoostSchema,
@@ -43,6 +45,38 @@ describe("refund payload", () => {
     expect(isPartialRefund({ amount: "20", reason: "" }, 59)).toBe(true);
     expect(isPartialRefund({ amount: "59", reason: "" }, 59)).toBe(false);
     expect(isPartialRefund({ amount: "", reason: "" }, 59)).toBe(false);
+  });
+});
+
+describe("grantBoostSchema", () => {
+  const schema = grantBoostSchema(t);
+  const valid = {
+    productId: "U010001",
+    packageId: "",
+    durationDays: "7",
+    reason: "Outage compensation",
+  };
+  const ok = (over: Partial<typeof valid>) =>
+    schema.safeParse({ ...valid, ...over }).success;
+
+  it("accepts the shared day limits themselves", () => {
+    expect(BOOST_GRANT_MIN_DAYS).toBe(1);
+    expect(BOOST_GRANT_MAX_DAYS).toBe(90);
+    expect(ok({ durationDays: "1" })).toBe(true);
+    expect(ok({ durationDays: "90" })).toBe(true);
+  });
+
+  it.each(["0", "91", "1.5", "-3", "", "abc", "1e1"])(
+    "refuses %j days",
+    (durationDays) => {
+      expect(ok({ durationDays })).toBe(false);
+    },
+  );
+
+  it("caps the listing reference at the DTO's 64 characters", () => {
+    expect(ok({ productId: "x".repeat(64) })).toBe(true);
+    expect(ok({ productId: "x".repeat(65) })).toBe(false);
+    expect(ok({ productId: "   " })).toBe(false);
   });
 });
 

@@ -34,6 +34,7 @@ import {
   type,
   type Mounted,
 } from "@/test-utils/dom";
+import { fmtTry } from "@/lib/format";
 import { RefundBoostModal } from "./RefundBoostModal";
 
 const ACTION = "admin.marketing.boostPurchases.refund.action";
@@ -97,19 +98,24 @@ describe("RefundBoostModal", () => {
     expect(h.refundBoost).not.toHaveBeenCalled();
   });
 
-  it.each(["59.01", "60", "0", "-5", "12.345", "1.250,50", "abc", "50,"])(
-    "refuses the amount %s without calling the API",
-    async (value) => {
-      await type(amount(), value);
-      await type(reason(), REASON);
-      await submit("none");
-      expect(bodyText()).toContain(
-        "admin.finance.payments.refundAmountInvalid",
-      );
-      expect(dialogs()).toHaveLength(1);
-      expect(h.refundBoost).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "59.01",
+    "60",
+    "0",
+    "-5",
+    "12.345",
+    "1.250,50",
+    "abc",
+    "50,",
+    "50,2,5",
+  ])("refuses the amount %s without calling the API", async (value) => {
+    await type(amount(), value);
+    await type(reason(), REASON);
+    await submit("none");
+    expect(bodyText()).toContain("admin.finance.payments.refundAmountInvalid");
+    expect(dialogs()).toHaveLength(1);
+    expect(h.refundBoost).not.toHaveBeenCalled();
+  });
 
   it("asks for confirmation and sends nothing when it is declined", async () => {
     await type(reason(), REASON);
@@ -230,6 +236,57 @@ describe("RefundBoostModal", () => {
     expect(keys).toEqual(
       expect.arrayContaining([["boost-purchases"], ["payments"], ["orders"]]),
     );
+  });
+
+  describe("after an earlier partial refund (refundable below the price)", () => {
+    const PARTLY_REFUNDED = {
+      id: "boost-1",
+      price: 59,
+      refundedAmount: 20,
+      refundableAmount: 39,
+    };
+
+    beforeEach(() => {
+      view.unmount();
+      view = mount(
+        <RefundBoostModal purchase={PARTLY_REFUNDED} onClose={onClose} />,
+      );
+    });
+
+    it("defaults to what is left, not the price, and shows what was refunded", () => {
+      expect(amount().value).toBe("39");
+      expect(bodyText()).toContain(
+        "admin.marketing.boostPurchases.detail.refundedAmount",
+      );
+      expect(bodyText()).toContain(
+        `admin.marketing.boostPurchases.refund.amountHelper|${JSON.stringify({ max: fmtTry(39) })}`,
+      );
+    });
+
+    it.each(["39.01", "59"])(
+      "refuses %s, above what is left, without calling the API",
+      async (value) => {
+        await type(amount(), value);
+        await type(reason(), REASON);
+        await submit("none");
+        expect(bodyText()).toContain(
+          "admin.finance.payments.refundAmountInvalid",
+        );
+        expect(h.refundBoost).not.toHaveBeenCalled();
+      },
+    );
+
+    it("sends the default (all that is left) with no partial warning in the confirm", async () => {
+      await type(reason(), REASON);
+      await submit("none");
+      expect(topDialog().textContent).not.toContain(PARTIAL);
+      await click(button(ACTION, topDialog()));
+
+      expect(h.refundBoost).toHaveBeenCalledWith("boost-1", {
+        amount: 39,
+        reason: REASON,
+      });
+    });
   });
 
   it.each([
