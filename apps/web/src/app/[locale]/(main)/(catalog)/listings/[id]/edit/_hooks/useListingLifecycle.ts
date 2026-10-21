@@ -6,7 +6,7 @@ import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { listingsApi, type ListingRemovalPayload } from "@/lib/api";
-import { queryKeys } from "@/lib/query/keys";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import { useAuthStore } from "@/stores/authStore";
 import type { EditListingValues } from "@tarodan/listing-form";
 
@@ -25,9 +25,10 @@ export function useListingLifecycle({
   const router = useRouter();
   const { refreshUserData } = useAuthStore();
   const queryClient = useQueryClient();
-  // Any status change moves the listing in or out of the trade picker.
-  const refreshTradePicker = () =>
-    queryClient.invalidateQueries({ queryKey: queryKeys.tradeEligible.all() });
+  // Any status change moves the listing in or out of my listings, the public
+  // grids and the trade picker.
+  const refreshListingQueries = () =>
+    void invalidateListingQueries(queryClient, id);
 
   const [reactivateQuantity, setReactivateQuantity] = useState("1");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -58,7 +59,7 @@ export function useListingLifecycle({
     // apps/api). İki yolda da "incelemeye gönderildi" demek ikinci durumda
     // yanlış olurdu — statik toast yerine yanıtı okuyoruz.
     onSuccess: (response: any) => {
-      refreshTradePicker();
+      refreshListingQueries();
       const resultStatus = response?.data?.status;
       toast.success(
         resultStatus === "active"
@@ -91,7 +92,7 @@ export function useListingLifecycle({
     },
     onSuccess: () => {
       form.setValue("status", "inactive");
-      refreshTradePicker();
+      refreshListingQueries();
       toast.success(t("product.listingDeactivated"));
       setShowDeactivateModal(false);
     },
@@ -114,7 +115,7 @@ export function useListingLifecycle({
     },
     onSuccess: () => {
       form.setValue("status", "pending");
-      refreshTradePicker();
+      refreshListingQueries();
       toast.success(t("product.sentForReview"));
     },
     onError: (error: any) => {
@@ -136,7 +137,7 @@ export function useListingLifecycle({
     onSuccess: async () => {
       // Dialog yalnız başarıda kapanır: reddedilen istekte seçilen neden kaybolmaz.
       setShowDeleteModal(false);
-      refreshTradePicker();
+      refreshListingQueries();
       toast.success(t("product.listingRemoved"));
       // Refresh user data to update listing count
       await refreshUserData();

@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import { usePriceLimits } from "@/hooks/usePublicSettings";
 import {
   toEditListingValues,
@@ -223,14 +224,7 @@ export function useEditListingForm({
     onMutate: () => setIsLoading(true),
     onSuccess: () => {
       toast.success(t("product.listingUpdated"));
-      queryClient.invalidateQueries({ queryKey: queryKeys.product.detail(id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.listings.all() });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.profileListings.all(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.tradeEligible.all(),
-      });
+      void invalidateListingQueries(queryClient, id);
       router.push(`/listings/${id}`);
     },
     onError: (error: any) =>

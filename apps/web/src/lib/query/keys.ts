@@ -1,7 +1,7 @@
 // Banka hesabı hesap alanında tek öğedir (`useWebItem` kaynağı + sabit id).
 const BANK_ACCOUNT_RESOURCE = "bank-account";
 const BANK_ACCOUNT_ID = "me";
-// Takas seçicisinin kendi ilanları listesi (`useWebList` kaynağı).
+// The trade picker's own-listings list (a `useWebList` resource).
 const TRADE_ELIGIBLE_RESOURCE = "trade-eligible-products";
 
 /**
@@ -219,8 +219,11 @@ export const queryKeys = {
   },
   /**
    * The trade picker's own-listings list (`useTradeableProducts`). `resource` is
-   * the `useWebList` resource; `all()` is its prefix, so ONE invalidate after any
-   * listing create/edit/delete/renew refreshes every picker (per user + target).
+   * the `useWebList` resource; `all()` is its prefix and matches every picker
+   * (per user + target). The picker refetches on open and on tab focus anyway;
+   * listing writes still mark it stale (`invalidateListingQueries`, or the
+   * resource in `useWebMutation({ invalidates })`) so a cached list is never
+   * served as fresh.
    */
   tradeEligible: {
     resource: TRADE_ELIGIBLE_RESOURCE,

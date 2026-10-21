@@ -20,7 +20,7 @@ import { listingsApi } from "@/lib/api";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
 import { usePriceLimits } from "@/hooks/usePublicSettings";
-import { queryKeys } from "@/lib/query/keys";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -295,9 +295,7 @@ function useNewListingValue() {
       };
 
       await listingsApi.create(payload as any);
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.tradeEligible.all(),
-      });
+      void invalidateListingQueries(queryClient);
       toast.success(t("product.listingCreated"));
       await refreshUser();
       await refetchLimits();
