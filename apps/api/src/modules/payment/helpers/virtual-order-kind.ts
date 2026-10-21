@@ -6,6 +6,18 @@ export const VIRTUAL_PRODUCT_ID_PREFIX = {
   boost: "boost-",
 } as const satisfies Record<VirtualOrderKind, string>;
 
+/**
+ * The tier a membership order was bought for, read from its virtual product
+ * (`membership-<tierId>`); null for any other order.
+ */
+export function membershipTierIdOf(
+  order: { productId?: string | null } | null | undefined,
+): string | null {
+  return virtualOrderKind(order) === "membership" && order?.productId
+    ? order.productId.slice(VIRTUAL_PRODUCT_ID_PREFIX.membership.length)
+    : null;
+}
+
 /** The virtual product of a boost purchase: `boost-<boostId>`. */
 export function boostVirtualProductId(boostId: string): string {
   return `${VIRTUAL_PRODUCT_ID_PREFIX.boost}${boostId}`;

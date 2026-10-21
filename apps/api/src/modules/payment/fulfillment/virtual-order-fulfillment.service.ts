@@ -24,6 +24,7 @@ import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 import { boostBreadcrumb } from "../../product/helpers/boost-observability";
+import { membershipTierIdOf } from "../helpers/virtual-order-kind";
 import { SentryService } from "../../sentry/sentry.service";
 
 /** The fields of a paid payment that membership activation reads. */
@@ -129,11 +130,7 @@ export class VirtualOrderFulfillmentService {
       // Activation MUST honor the PAID tier — never whatever the live row happens to
       // point to now. Otherwise paying an older, cheaper pending order could activate
       // a pricier tier the membership was switched to by a later subscribe call.
-      const paidTierId =
-        typeof payment.order.productId === "string" &&
-        payment.order.productId.startsWith("membership-")
-          ? payment.order.productId.slice("membership-".length)
-          : null;
+      const paidTierId = membershipTierIdOf(payment.order);
 
       const paidTier = intent?.targetTier
         ? intent.targetTier

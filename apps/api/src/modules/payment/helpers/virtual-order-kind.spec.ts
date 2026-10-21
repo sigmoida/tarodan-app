@@ -1,5 +1,9 @@
 import { isVirtualOrderKind } from "@tarodan/types";
-import { boostVirtualProductId, virtualOrderKind } from "./virtual-order-kind";
+import {
+  boostVirtualProductId,
+  membershipTierIdOf,
+  virtualOrderKind,
+} from "./virtual-order-kind";
 
 describe("virtualOrderKind", () => {
   it("reads membership and boost orders from the virtual product id", () => {
@@ -31,5 +35,14 @@ describe("virtualOrderKind", () => {
     expect(isVirtualOrderKind("boost")).toBe(true);
     expect(isVirtualOrderKind("order")).toBe(false);
     expect(isVirtualOrderKind(undefined)).toBe(false);
+  });
+
+  it("reads the tier a membership order was bought for", () => {
+    expect(membershipTierIdOf({ productId: "membership-tier-1" })).toBe(
+      "tier-1",
+    );
+    expect(membershipTierIdOf({ productId: "boost-b1" })).toBeNull();
+    expect(membershipTierIdOf({ productId: "listing-1" })).toBeNull();
+    expect(membershipTierIdOf(null)).toBeNull();
   });
 });
