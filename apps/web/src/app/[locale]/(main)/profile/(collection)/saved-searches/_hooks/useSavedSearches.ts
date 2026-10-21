@@ -62,7 +62,15 @@ async function fetchAllSavedSearches(): Promise<SavedSearchList> {
  */
 const removeSavedSearch = (id: string): Promise<unknown> =>
   savedSearchesApi.remove(id).catch((error: unknown) => {
-    if ((error as { response?: { status?: number } })?.response?.status === 404)
+    const response = (
+      error as {
+        response?: { status?: number; data?: { i18nKey?: string } };
+      }
+    )?.response;
+    if (
+      response?.status === 404 &&
+      response.data?.i18nKey === "server.savedSearch.notFound"
+    )
       return undefined;
     throw error;
   });

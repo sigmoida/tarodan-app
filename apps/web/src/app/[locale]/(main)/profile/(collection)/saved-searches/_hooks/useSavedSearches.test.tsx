@@ -205,7 +205,12 @@ describe("useSavedSearches", () => {
 
   it("treats a 404 delete as deleted: success toast, list refetched", async () => {
     h.confirm.mockResolvedValue(true);
-    h.remove.mockRejectedValue({ response: { status: 404 } });
+    h.remove.mockRejectedValue({
+      response: {
+        status: 404,
+        data: { i18nKey: "server.savedSearch.notFound" },
+      },
+    });
     await mount();
     h.list.mockResolvedValue({ data: { data: [], meta: { total: 0 } } });
     await act(async () => {
@@ -215,6 +220,18 @@ describe("useSavedSearches", () => {
     expect(toast.success).toHaveBeenCalledWith("savedSearch.deleted");
     expect(toast.error).not.toHaveBeenCalled();
     expect(api.savedSearches).toEqual([]);
+  });
+
+  it("still fails a 404 that is not the saved-search not-found key", async () => {
+    h.confirm.mockResolvedValue(true);
+    h.remove.mockRejectedValue({ response: { status: 404, data: {} } });
+    await mount();
+    await act(async () => {
+      await api.remove(search);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(toast.error).toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("still fails a delete on other errors", async () => {
