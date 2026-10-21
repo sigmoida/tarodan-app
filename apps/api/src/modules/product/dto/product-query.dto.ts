@@ -140,7 +140,8 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: "Filter only trade-enabled products",
+    description:
+      "Only listings marked open to trade (isTradeEnabled). GET /products also hides sellers whose membership cannot trade. GET /products/my (the caller's own listings) checks only isTradeEnabled, because trade permission is checked per user when a trade is created; there it is ANDed with the other filters (tradeEligible forces status=active).",
   })
   @IsOptional()
   @QueryBoolean()
