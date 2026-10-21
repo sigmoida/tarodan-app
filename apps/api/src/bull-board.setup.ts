@@ -242,8 +242,8 @@ function renderCronHtml(records: CronRunRecord[]): string {
   th{font-size:12px;text-transform:uppercase;color:#57606a} code{background:#f6f8fa;padding:1px 5px;border-radius:4px}
   a{color:#0969da}
 </style></head><body>
-<h1>⏱️ Cron Jobs — Tarodan</h1>
-<div class="sub">${records.length} izlenen iş • 3 sn'de bir otomatik yenilenir • <a href="/admin/queues">Kuyruklar (Bull Board) →</a></div>
+<h1>Cron Jobs — Tarodan</h1>
+<div class="sub">${records.length} izlenen iş • 3 sn'de bir otomatik yenilenir • <a href="/admin/queues">Kuyruklar (Bull Board)</a></div>
 <table>
   <tr><th>İş</th><th>Schedule</th><th>Durum</th><th>Son çalışma</th><th>Süre</th><th>Çalışma</th><th>Hata</th><th>Son hata mesajı</th></tr>
   ${rows}${empty}

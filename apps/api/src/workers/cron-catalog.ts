@@ -225,7 +225,7 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     key: "search-periodic-sync",
     label: "ES periyodik senkron",
     description:
-      "DB↔Elasticsearch sayı farkını kontrol eder, gerekirse delta senkron",
+      "DB ile Elasticsearch arasındaki sayı farkını kontrol eder, gerekirse delta senkron",
     triggerable: false,
   },
   {

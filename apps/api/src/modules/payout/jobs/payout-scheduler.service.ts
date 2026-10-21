@@ -70,7 +70,7 @@ export class PayoutSchedulerService implements OnModuleInit {
       // 3) Y3: 'processing'te takılı (zombie) payout'ları tespit et ve alarm ver.
       const stuck = await this.payoutService.detectStuckProcessingPayouts();
       if (stuck > 0) {
-        log(`⚠ ${stuck} payout 'processing'te takılı`);
+        log(`UYARI: ${stuck} payout 'processing'te takılı`);
         this.logger.error(
           `${stuck} payout 'processing'te takılı — manuel inceleme gerekir`,
         );
