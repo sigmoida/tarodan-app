@@ -1,4 +1,8 @@
-import type { AccountStatus, LegalIdentityField } from "@tarodan/types";
+import type {
+  AccountStatus,
+  AdminSellerTrustView,
+  LegalIdentityField,
+} from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -102,6 +106,8 @@ export interface UserDetail {
     scheduledTierType?: string | null;
     scheduledBillingPeriod?: string | null;
   };
+  /** Seller trust score and its stored breakdown; never null from the API. */
+  trust?: AdminSellerTrustView;
   createdAt: string;
   lastLoginAt?: string;
   lastActivityAt?: string;
