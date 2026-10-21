@@ -15,6 +15,7 @@ import {
   SIGN_IN_METHOD_EVENTS,
   SIGN_IN_METHODS_ERROR_CODES,
   type LegalIdentityField,
+  type SignInMethodEventType,
   type SignInProvider,
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
@@ -387,7 +388,10 @@ export class SocialIdentityService {
         });
       }
 
-      const securityLog = (eventType: string, severity: "low" | "high") =>
+      const securityLog = (
+        eventType: SignInMethodEventType,
+        severity: "low" | "high",
+      ) =>
         tx.securityLog.create({
           data: {
             eventType,

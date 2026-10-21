@@ -17,6 +17,7 @@ import {
   SIGN_IN_METHODS_ERROR_CODES,
   type ReauthMethod,
   type ReauthResponse,
+  type SignInMethodEventType,
   type SignInProvider,
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
@@ -304,7 +305,7 @@ export class ReauthService {
 
   /** Ids and the method only: never a token, a password or its hash. */
   private async writeSecurityLog(
-    eventType: string,
+    eventType: SignInMethodEventType,
     severity: "medium" | "high",
     details: { userId: string; method: ReauthMethod },
   ): Promise<void> {
