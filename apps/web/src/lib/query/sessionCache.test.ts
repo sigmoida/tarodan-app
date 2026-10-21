@@ -120,20 +120,22 @@ describe("syncQueryCacheWithSession", () => {
     unsubscribe();
   });
 
-  it("drops a fetch of the previous user that resolves after logout", async () => {
-    const client = new QueryClient();
+  it("does not leave a refetch of the previous user on a mounted observer", async () => {
+    const client = seeded();
     let resolve!: (rows: unknown) => void;
     const observer = new QueryObserver(client, {
       queryKey: key,
       queryFn: () => new Promise((r) => (resolve = r)),
     });
+    // Mounting a stale query starts a background refetch, as on focus.
     const unsubscribe = observer.subscribe(() => undefined);
+    expect(observer.getCurrentResult().isFetching).toBe(true);
 
     syncQueryCacheWithSession(() => client, signedIn("u1"))(
       guest,
       signedIn("u1"),
     );
-    resolve([{ id: "o1" }]);
+    resolve([{ id: "o2" }]);
     await new Promise((r) => setTimeout(r, 0));
 
     expect(observer.getCurrentResult().data).toBeUndefined();
