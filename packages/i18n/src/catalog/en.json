@@ -11035,7 +11035,7 @@
       "reauthFailed": "We could not confirm it's you. Please try again.",
       "reauthMethodNotAllowed": "Confirm with your password.",
       "reauthLocked": "Too many attempts. Please try again in a few minutes.",
-      "reauthUnavailable": "We can't confirm it's you right now. Try again in a few minutes",
+      "reauthUnavailable": "We can't confirm it's you right now. Please try again in a few minutes.",
       "passwordAlreadySet": "This account already has a password.",
       "providerAlreadyLinked": "This sign-in method is already connected.",
       "providerLinkedToOtherAccount": "This Google or Apple account is connected to another Tarodan account.",

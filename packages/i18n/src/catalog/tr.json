@@ -11035,7 +11035,7 @@
       "reauthFailed": "Güvenlik doğrulaması başarısız oldu. Lütfen tekrar deneyin.",
       "reauthMethodNotAllowed": "Bu hesap için doğrulama şifreyle yapılmalıdır.",
       "reauthLocked": "Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.",
-      "reauthUnavailable": "Kimliğinizi şu anda doğrulayamıyoruz. Birkaç dakika sonra tekrar deneyin",
+      "reauthUnavailable": "Güvenlik doğrulaması şu anda yapılamıyor. Lütfen birkaç dakika sonra tekrar deneyin.",
       "passwordAlreadySet": "Bu hesabın zaten bir şifresi var.",
       "providerAlreadyLinked": "Bu giriş yöntemi zaten bağlı.",
       "providerLinkedToOtherAccount": "Bu Google veya Apple hesabı başka bir Tarodan hesabına bağlı.",
