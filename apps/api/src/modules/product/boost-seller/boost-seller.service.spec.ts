@@ -107,12 +107,24 @@ function setup(
   const service = new BoostSellerService(
     prisma as never,
     new BoostAudienceService(prisma as never),
+    { getPublicAssetUrl: (k: string) => `https://cdn.test/${k}` } as never,
     sentry as never,
   );
   return { service, prisma, sentry };
 }
 
 describe("BoostSellerService.getMyBoosts", () => {
+  it("returns a null product image when the listing has no image", async () => {
+    const base = record();
+    const { service } = setup({
+      rows: [{ ...base, product: { ...base.product, images: [] } }],
+    });
+
+    const { data } = await service.getMyBoosts(SELLER, { state: "history" });
+
+    expect(data[0].product.image).toBeNull();
+  });
+
   it.each([
     ["current", ["active", "paused"], 100],
     ["history", ["expired", "cancelled"], 20],
@@ -199,7 +211,7 @@ describe("BoostSellerService.getMyBoosts", () => {
       product: {
         id: "prod-1",
         title: "Hot Wheels 1:64",
-        image: "products/p1/card.webp",
+        image: "https://cdn.test/products/p1/card.webp",
         boostedUntil: "2026-11-02T10:00:00.000Z",
         homeShowcaseUntil: "2026-10-28T10:00:00.000Z",
       },

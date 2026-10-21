@@ -18,6 +18,7 @@ import { PrismaService } from "../../../prisma";
 import { paginate } from "../../../common/list";
 import { i18nMessage } from "../../i18n";
 import { SentryService } from "../../sentry/sentry.service";
+import { StorageService } from "../../storage/storage.service";
 import {
   boostBreadcrumb,
   tagBoostRequest,
@@ -89,6 +90,7 @@ function toMyBoostRow(
   b: MyBoostRecord,
   orderNumber: string | null,
   now: Date,
+  imageUrl: string | null,
 ): Omit<MyBoostRow, "isBest"> {
   const current: BoostMetricCounts = {
     views: b.finalViewCount ?? b.product.viewCount ?? 0,
@@ -125,7 +127,7 @@ function toMyBoostRow(
       id: b.product.id,
       title: b.product.title,
       status: b.product.status,
-      image: b.product.images[0]?.cardKey ?? null,
+      image: imageUrl,
       boostedUntil: b.product.boostedUntil?.toISOString() ?? null,
       homeShowcaseUntil: b.product.homeShowcaseUntil?.toISOString() ?? null,
     },
@@ -165,8 +167,14 @@ export class BoostSellerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audience: BoostAudienceService,
+    private readonly storage: StorageService,
     @Optional() private readonly sentry?: SentryService,
   ) {}
+
+  /** Public URL of a card-size image key, or null when there is none. */
+  private cardImageUrl(key: string | undefined): string | null {
+    return key ? this.storage.getPublicAssetUrl(key) : null;
+  }
 
   /**
    * One section of "My boosts", newest first: `current` (active, paused) or
@@ -202,6 +210,7 @@ export class BoostSellerService {
         b,
         b.orderId ? (orderNumbers.get(b.orderId) ?? null) : null,
         now,
+        this.cardImageUrl(b.product.images[0]?.cardKey),
       ),
     );
     // One "best performing" row at most: the first with the highest score

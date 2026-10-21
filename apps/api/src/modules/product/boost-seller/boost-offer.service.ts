@@ -11,6 +11,7 @@ import {
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { SentryService } from "../../sentry/sentry.service";
+import { StorageService } from "../../storage/storage.service";
 import { boostTierBasePrice } from "../helpers/product-sale-window";
 import {
   boostBreadcrumb,
@@ -52,6 +53,7 @@ export class BoostOfferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audience: BoostAudienceService,
+    private readonly storage: StorageService,
     @Optional() private readonly sentry?: SentryService,
   ) {}
 
@@ -122,7 +124,9 @@ export class BoostOfferService {
       .map((product) => ({
         productId: product.id,
         title: product.title,
-        image: product.images[0]?.cardKey ?? null,
+        image: product.images[0]?.cardKey
+          ? this.storage.getPublicAssetUrl(product.images[0].cardKey)
+          : null,
         price: product.price.toNumber(),
         createdAt: product.createdAt.toISOString(),
       }));

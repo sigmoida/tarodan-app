@@ -110,7 +110,7 @@ export interface BoostOptionsResponse {
 export interface BoostOffer {
   productId: string;
   title: string;
-  /** Storage key of the first image (card size), or null. */
+  /** Public URL of the first image (card size), or null. */
   image: string | null;
   price: number;
   createdAt: string;
@@ -172,7 +172,7 @@ export interface MyBoostRow {
     title: string;
     /** The listing's status (`ProductStatus`). */
     status: string;
-    /** Storage key of the first image (card size), or null. */
+    /** Public URL of the first image (card size), or null. */
     image: string | null;
     /**
      * The listing's real promotion end (ISO), the last end of its stacked
