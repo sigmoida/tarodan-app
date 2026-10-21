@@ -134,9 +134,16 @@ describe("authStore query cache per session", () => {
     vi.resetModules();
     h.hasAuthMarker.mockReturnValue(true);
     h.getProfile.mockResolvedValue({ data: { id: "u1" } });
+    // The second store instance adds its own window listeners; they must
+    // not outlive this test, or its `storage` listener answers the later
+    // cross-tab tests with extra profile requests.
+    const added = vi.spyOn(window, "addEventListener");
     const { getQueryClient: loadClient } =
       await import("@/lib/query/getQueryClient");
     const { useAuthStore: loadStore } = await import("./authStore");
+    for (const [type, listener] of added.mock.calls) {
+      window.removeEventListener(type, listener);
+    }
     loadClient().setQueryData(key, 3);
 
     await loadStore.getState().checkAuth();
@@ -218,19 +225,22 @@ describe("authStore query cache per session", () => {
   it("resolves login with the user when a newer check starts meanwhile", async () => {
     h.hasAuthMarker.mockReturnValue(true);
     let answerLogin!: (v: unknown) => void;
+    let answerNewer!: (v: unknown) => void;
     h.getProfile
       .mockReturnValueOnce(new Promise((r) => (answerLogin = r)))
-      // The newer check answers 10 ms after it starts.
-      .mockImplementationOnce(
-        () =>
-          new Promise((r) => setTimeout(() => r({ data: { id: "u2" } }), 10)),
-      );
+      .mockReturnValueOnce(new Promise((r) => (answerNewer = r)));
     h.loginAction.mockResolvedValue({ status: "ok", user: null });
 
     const login = useAuthStore.getState().login("a@b.c", "secret");
+    let loginSettled = false;
+    void login.then(() => (loginSettled = true));
     await vi.waitFor(() => expect(h.getProfile).toHaveBeenCalledTimes(1));
     void useAuthStore.getState().checkAuth(); // e.g. the Header remounting
     answerLogin({ data: { id: "u2" } });
+    // The login's answer is dropped for the newer run, which login awaits.
+    await vi.waitFor(() => expect(h.getProfile).toHaveBeenCalledTimes(2));
+    expect(loginSettled).toBe(false);
+    answerNewer({ data: { id: "u2" } });
     await login;
 
     expect(useAuthStore.getState().user?.id).toBe("u2");
@@ -251,6 +261,75 @@ describe("authStore query cache per session", () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(localStorage.getItem("tarodan_user_snapshot")).toBeNull();
   });
+
+  // A failed answer normally keeps a signed-in store signed in (transient
+  // error); after logout that would mark the guest signed in again.
+  it.each([
+    ["a server error", { response: { status: 503 } }],
+    ["a 401 while the marker still reads", { response: { status: 401 } }],
+    ["a timeout", { code: "ECONNABORTED" }],
+  ])(
+    "does not sign the guest back in when a check fails with %s after logout",
+    async (_label, failure) => {
+      signedIn();
+      h.hasAuthMarker.mockReturnValue(true);
+      let fail!: (reason: unknown) => void;
+      h.getProfile.mockReturnValueOnce(
+        new Promise((_resolve, reject) => (fail = reject)),
+      );
+      h.logoutAction.mockResolvedValue(undefined);
+
+      const pending = useAuthStore.getState().checkAuth();
+      await useAuthStore.getState().logout();
+      fail(failure);
+      await pending;
+
+      expect(useAuthStore.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+      expect(h.getProfile).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("keeps a live user on a 401 whose marker survived (racing refresh)", async () => {
+    signedIn();
+    seedCache();
+    h.hasAuthMarker.mockReturnValue(true);
+    h.getProfile.mockRejectedValue({ response: { status: 401 } });
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(useAuthStore.getState()).toMatchObject({
+      user: { id: "u1" },
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    expect(cached()).toBe(3);
+  });
+
+  it.each([
+    ["times out", { code: "ECONNABORTED" }],
+    ["fails", { response: { status: 503 } }],
+    ["throws without a response", new Error("network")],
+  ])(
+    "releases the single flight when the profile request %s",
+    async (_label, failure) => {
+      signedIn();
+      h.hasAuthMarker.mockReturnValue(true);
+      h.getProfile
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce({ data: { id: "u1", displayName: "Live" } });
+
+      await useAuthStore.getState().checkAuth();
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      await useAuthStore.getState().checkAuth();
+
+      expect(h.getProfile).toHaveBeenCalledTimes(2);
+      expect(useAuthStore.getState().user?.displayName).toBe("Live");
+    },
+  );
 
   it("keeps the full profile when a re-check of the same user fails", async () => {
     useAuthStore.setState({
@@ -319,7 +398,7 @@ describe("authStore query cache per session", () => {
     });
   });
 
-  it("retries a missing profile without showing the loading state", () => {
+  it("retries a missing profile without showing the loading state", async () => {
     useAuthStore.setState({
       user: null,
       isAuthenticated: true,
@@ -333,7 +412,9 @@ describe("authStore query cache per session", () => {
 
     expect(h.getProfile).toHaveBeenCalledTimes(1);
     expect(useAuthStore.getState().isLoading).toBe(false);
+    // Let the check finish here, not after the next test's reset.
     answer({ data: { id: "u1" } });
+    await vi.waitFor(() => expect(useAuthStore.getState().user?.id).toBe("u1"));
   });
 
   it("re-runs a pending load check when another tab writes a snapshot", async () => {
@@ -342,7 +423,7 @@ describe("authStore query cache per session", () => {
     let answerOld!: (v: unknown) => void;
     h.getProfile
       .mockReturnValueOnce(new Promise((r) => (answerOld = r)))
-      .mockResolvedValueOnce({ data: { id: "u2" } });
+      .mockResolvedValueOnce({ data: { id: "u2", displayName: "U2 live" } });
     const check = useAuthStore.getState().checkAuth();
 
     localStorage.setItem("tarodan_user_snapshot", JSON.stringify({ id: "u2" }));
@@ -352,7 +433,9 @@ describe("authStore query cache per session", () => {
     answerOld({ data: { id: "u1" } });
     await check;
 
-    expect(useAuthStore.getState().user?.id).toBe("u2");
-    expect(localStorage.getItem("tarodan_user_snapshot")).toContain('"u2"');
+    // The re-run's live profile, not just the other tab's snapshot.
+    expect(h.getProfile).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().user?.displayName).toBe("U2 live");
+    expect(localStorage.getItem("tarodan_user_snapshot")).toContain("U2 live");
   });
 });
