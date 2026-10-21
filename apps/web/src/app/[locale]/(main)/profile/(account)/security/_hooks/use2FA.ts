@@ -6,7 +6,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import api from "@/lib/api";
+import { useRefreshSignInMethods } from "../../../_hooks/useSecurity";
 import type { TwoFactorStatus, SetupResponse } from "../_lib/types";
+
+/** The API refuses 2FA for an account without a password (this catalog key). */
+const PASSWORD_REQUIRED_KEY = "server.security.passwordRequiredFor2fa";
 
 const STATUS_KEY = ["2fa-status"];
 
@@ -20,6 +24,7 @@ const STATUS_KEY = ["2fa-status"];
 export function use2FA() {
   const t = useTranslations();
   const queryClient = useQueryClient();
+  const refreshSignInMethods = useRefreshSignInMethods();
   const [error, setError] = useState("");
   const [setupData, setSetupData] = useState<SetupResponse | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
@@ -39,10 +44,17 @@ export function use2FA() {
       (await api.post("/security/2fa/enable")).data,
     onMutate: () => setError(""),
     onSuccess: (data) => setSetupData(data),
-    onError: (e: any) =>
+    onError: (e: any) => {
+      // No password (a stale page): refetch the sign-in methods, and the page
+      // shows the "set a password first" hint instead of the raw error.
+      if (e?.response?.data?.i18nKey === PASSWORD_REQUIRED_KEY) {
+        void refreshSignInMethods();
+        return;
+      }
       setError(
         e?.response?.data?.message || t("profile.twoFactor.setupFailed"),
-      ),
+      );
+    },
   });
 
   const verify = useMutation({

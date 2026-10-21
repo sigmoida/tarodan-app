@@ -10,10 +10,13 @@
  */
 
 import { useTranslations } from "next-intl";
-import { Alert, Spinner } from "@tarodan/ui";
+import { Alert, Button, Spinner } from "@tarodan/ui";
 import { XCircleIcon } from "@heroicons/react/24/outline";
+import { Link } from "@/i18n/navigation";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useSignInMethods } from "../../_hooks/useSecurity";
+import { PASSWORD_SECTION_ID } from "../../_lib/anchors";
 import { use2FA } from "./_hooks/use2FA";
 import StatusCard from "./_sections/StatusCard";
 import SetupIntro from "./_sections/SetupIntro";
@@ -39,6 +42,10 @@ export default function SecuritySettingsPage() {
     disable,
     regenerateBackupCodes,
   } = use2FA();
+  const { methods } = useSignInMethods();
+  // 2FA needs a password (the API refuses it without one): an account that
+  // signs in only with Google or Apple is sent to set one first.
+  const needsPassword = methods?.hasPassword === false;
 
   if (isLoading && !setupData) {
     return (
@@ -58,7 +65,7 @@ export default function SecuritySettingsPage() {
       {error && (
         <Alert
           variant="danger"
-          title="Hata"
+          title={t("common.error")}
           icon={<XCircleIcon className="h-5 w-5 text-danger-600" />}
           className="mb-6"
         >
@@ -69,7 +76,22 @@ export default function SecuritySettingsPage() {
       <div className="space-y-6">
         <StatusCard isEnabled={status.isEnabled} />
 
-        {!status.isEnabled && !setupData && (
+        {!status.isEnabled && !setupData && needsPassword && (
+          <Alert
+            variant="warning"
+            action={
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/profile#${PASSWORD_SECTION_ID}`}>
+                  {t("auth.setPassword")}
+                </Link>
+              </Button>
+            }
+          >
+            {t("profile.security.passwordFirstFor2fa")}
+          </Alert>
+        )}
+
+        {!status.isEnabled && !setupData && !needsPassword && (
           <SetupIntro
             onStart={() => enable.mutate()}
             isLoading={enable.isPending}
