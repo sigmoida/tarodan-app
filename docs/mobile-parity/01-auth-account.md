@@ -260,6 +260,51 @@ formu) · `no-token` (bilgi + yeniden gönderme formu).
   `invalid_client`) iş DLQ'ya düşer ve şifreli token silinmez; aynı script geri getirir.
 - Yanıt normal login ile aynı: `{ user, tokens }`.
 
+### Which account a provider sign-in opens (auto-link)
+
+The server resolves a provider identity to an account in this order
+(`SocialIdentityService`):
+
+1. An existing link (provider + `sub`) wins.
+2. Otherwise a non-deleted account with the same e-mail, ignoring case:
+   - a **verified** e-mail: the provider is linked to it automatically; its
+     password and sessions stay and the owner gets the account security
+     notice mail;
+   - an **unverified** e-mail: the account is taken over. The provider proved
+     the inbox, so the unproven registration's password, sessions, 2FA, phone,
+     legal identity and consents are cleared before the link (the consent gate
+     asks again).
+3. Otherwise a new account without a password.
+
+Staff, banned and deleted accounts are refused and nothing is written.
+
+### Connecting and disconnecting providers (account settings)
+
+| Method | Path                            | Auth              | Body                                                            |
+| ------ | ------------------------------- | ----------------- | --------------------------------------------------------------- |
+| `POST` | `/auth/social/google/link`      | session + step-up | Web `{ code, reauthToken }` · native `{ idToken, reauthToken }` |
+| `POST` | `/auth/social/apple/link`       | session + step-up | `{ identityToken, authorizationCode?, reauthToken }`            |
+| `POST` | `/auth/social/:provider/unlink` | session + step-up | `{ reauthToken }`                                               |
+
+- Each answers the fresh `SignInMethods` (`GET /auth/sign-in-methods`). The
+  `reauthToken` comes from `POST /auth/reauth`; shapes and `errorCode` values
+  are in `packages/types/src/sign-in-methods.ts`.
+- A link may use a provider account with a different e-mail. A refused
+  provider token is `400 PROVIDER_TOKEN_INVALID` (never 401). A provider
+  account linked elsewhere is `409 PROVIDER_LINKED_TO_OTHER_ACCOUNT`; a second
+  link of the same provider is `409 PROVIDER_ALREADY_LINKED`.
+- **Last-method rule** (`canUnlinkProvider`): after an unlink the account
+  keeps a password or a Google link; Apple alone does not count, because
+  Apple sign-in is iOS-only on mobile. The server answers
+  `409 LAST_SIGN_IN_METHOD`; the clients disable Disconnect with the same rule.
+  A provider that is not linked is `404 PROVIDER_NOT_LINKED`.
+- An Apple unlink revokes the stored Apple token (outbox). An Apple link from
+  mobile sends `authorizationCode`, as login does.
+- After a disconnect, a later "Continue with Google/Apple" with the same
+  verified e-mail links the provider again (rule 2 above) and the notice mail
+  is sent; the disconnect confirmation says so.
+- Sessions stay after link and unlink; each one sends the notice mail.
+
 ### Kabul kriterleri
 
 - [ ] Google ile giriş `idToken` ile çalışıyor.
