@@ -1,7 +1,9 @@
 import { ValidationPipe, type ArgumentMetadata } from "@nestjs/common";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../common/validators/global-validation-pipe-options";
 import { IS_PUBLIC_KEY } from "../auth/decorators/public.decorator";
+import { canonicalizeSavedSearchQuery } from "@tarodan/types";
 import { CreateSavedSearchDto, SavedSearchListQueryDto } from "./dto";
+import { savedSearchQueryHash } from "./helpers/saved-search-hash";
 import { SavedSearchController } from "./saved-search.controller";
 
 const THROTTLER_LIMIT_DEFAULT = "THROTTLER:LIMITdefault";
@@ -65,6 +67,36 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     expect(dto.query.tradeOnly).toBe(true);
     expect(dto.query.preOrder).toBe(false);
     expect(dto.query.minPrice).toBe(100);
+  });
+
+  it("gives the stored form and hash of the plain query, whatever the value types", async () => {
+    // The service canonicalises the pipe's output (a DTO instance), not the
+    // raw body: a client sending strings must not get a second, distinct row.
+    const plain = {
+      search: "f40",
+      tradeOnly: true,
+      minPrice: 100,
+      maxPrice: 0,
+      color: "red,black",
+      attrGroups: '{"hw-rarity":["th"]}',
+    };
+    const typed = await asBody({ query: plain });
+    const strings = await asBody({
+      query: {
+        ...plain,
+        tradeOnly: "true",
+        minPrice: "100",
+        maxPrice: "0",
+        preOrder: "false",
+      },
+    });
+
+    const expected = canonicalizeSavedSearchQuery(plain);
+    expect(canonicalizeSavedSearchQuery(typed.query)).toEqual(expected);
+    expect(canonicalizeSavedSearchQuery(strings.query)).toEqual(expected);
+    expect(
+      savedSearchQueryHash(canonicalizeSavedSearchQuery(strings.query)),
+    ).toBe(savedSearchQueryHash(expected));
   });
 
   it.each([
