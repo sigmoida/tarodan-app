@@ -2063,7 +2063,7 @@
       "showcaseHint": "Shown in the home showcase and at the top of search",
       "searchHint": "Shown at the top of search",
       "activeBoostInfo": "This listing already has an active boost: ~{days} days left. Your selected duration is added on top of the remaining time.",
-      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days → total ~{total} days",
+      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days; total ~{total} days",
       "daysValue": "{days} days",
       "campaign": "Campaign",
       "unavailable": "Boosting is currently unavailable.",

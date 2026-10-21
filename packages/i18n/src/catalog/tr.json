@@ -2063,7 +2063,7 @@
       "showcaseHint": "Ana sayfa vitrininde ve aramada üst sıralarda gösterilir",
       "searchHint": "Aramada üst sıralarda gösterilir",
       "activeBoostInfo": "Bu ilanda aktif öne çıkarma var: ~{days} gün kaldı. Seçtiğiniz süre kalan sürenin üstüne eklenir.",
-      "extendSummary": "Kalan {remaining} günün üstüne {selected} gün eklenecektir → toplam ~{total} gün",
+      "extendSummary": "Kalan {remaining} günün üstüne {selected} gün eklenecektir; toplam ~{total} gün",
       "daysValue": "{days} gün",
       "campaign": "Kampanya",
       "unavailable": "Öne çıkarma şu anda kullanılamıyor.",
