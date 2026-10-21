@@ -190,14 +190,12 @@ function parseAttrGroups(value: unknown): Record<string, string[]> | undefined {
   }
   if (!isRecord(raw)) return undefined;
   const groups: Record<string, string[]> = {};
-  for (const group of Object.keys(raw)
-    .map((k) => k.trim())
-    .sort(compare)) {
+  // Same reading as GET /products (`buildProductWhere`): the group key as it
+  // is, each slug as trimmed text, groups without a slug skipped.
+  for (const group of Object.keys(raw).sort(compare)) {
     const slugs = raw[group];
-    if (!group || !Array.isArray(slugs)) continue;
-    const clean = sortedUnique(
-      slugs.filter((s): s is string => typeof s === "string"),
-    );
+    if (!Array.isArray(slugs)) continue;
+    const clean = sortedUnique(slugs.map((slug) => String(slug)));
     if (clean.length > 0) groups[group] = clean;
   }
   return Object.keys(groups).length > 0 ? groups : undefined;
@@ -230,7 +228,8 @@ export function canonicalizeSavedSearchQuery(raw: unknown): SavedSearchQuery {
   const minPrice = finiteNumber(input.minPrice);
   if (minPrice !== undefined && minPrice > 0) out.minPrice = minPrice;
   const maxPrice = finiteNumber(input.maxPrice);
-  if (maxPrice !== undefined && maxPrice >= 0) out.maxPrice = maxPrice;
+  // Any maxPrice filters (a negative one leaves nothing), so it is kept.
+  if (maxPrice !== undefined) out.maxPrice = maxPrice;
 
   for (const key of FLAG_KEYS) {
     if (input[key] === true || input[key] === "true") out[key] = true;

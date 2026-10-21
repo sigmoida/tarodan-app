@@ -76,6 +76,21 @@ describe("canonicalizeSavedSearchQuery", () => {
     });
   });
 
+  it("reads attrGroups exactly as GET /products does", () => {
+    // The group key as it is (GET /products does not trim it), slugs as text.
+    expect(
+      canonicalizeSavedSearchQuery({
+        attrGroups: JSON.stringify({ " hw-rarity": ["th"], "hw-year": [2024] }),
+      }),
+    ).toEqual({ attrGroups: '{" hw-rarity":["th"],"hw-year":["2024"]}' });
+  });
+
+  it("keeps a negative maxPrice: GET /products applies it", () => {
+    expect(canonicalizeSavedSearchQuery({ maxPrice: -1 })).toEqual({
+      maxPrice: -1,
+    });
+  });
+
   it("drops malformed attrGroups, as GET /products ignores it", () => {
     expect(canonicalizeSavedSearchQuery({ attrGroups: "{nope" })).toEqual({});
     expect(canonicalizeSavedSearchQuery({ attrGroups: "[1]" })).toEqual({});
