@@ -11,6 +11,10 @@ import {
 import { Alert, Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { adminCancelReasonOptions } from "@/lib/admin-cancel-reasons";
 import { Panel } from "@/components/detail/Panel";
+import {
+  BoostRefundRedirectAlert,
+  isBoostRefundRedirect,
+} from "@/components/finance/BoostRefundRedirectAlert";
 import { fmtTry } from "@/lib/format";
 import { useOrderCancel } from "../_hooks/useOrderCancel";
 import {
@@ -100,6 +104,7 @@ export function CancelOrderModal({
             ? t("admin.operations.orders.cancel.warningUnpaid")
             : t("admin.operations.orders.cancel.warning")}
         </Alert>
+        {isBoostRefundRedirect(preview.error) && <BoostRefundRedirectAlert />}
         <Panel tone="muted" className="text-sm">
           {preview.data ? (
             <CancelPreviewSummary preview={preview.data} />

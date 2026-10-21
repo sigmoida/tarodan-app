@@ -10,6 +10,10 @@ import {
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import {
+  BoostRefundRedirectAlert,
+  isBoostRefundRedirect,
+} from "@/components/finance/BoostRefundRedirectAlert";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import { refundPaymentSchema, type RefundPaymentValues } from "../_lib/schema";
@@ -44,6 +48,9 @@ export function RefundPaymentModal({
     {
       invalidates: ["payments"],
       successMessage: t("admin.finance.payments.refundStarted"),
+      // A boost payment is refused with a pointer to the boost screen,
+      // shown inline with its link instead of a toast.
+      showErrorToast: (error) => !isBoostRefundRedirect(error),
       onSuccess: onClose,
     },
   );
@@ -64,6 +71,7 @@ export function RefundPaymentModal({
       submitLabel={t("admin.finance.payments.refundConfirm")}
       destructive
     >
+      {isBoostRefundRedirect(refund.error) && <BoostRefundRedirectAlert />}
       {trade ? (
         <Alert
           variant="warning"
