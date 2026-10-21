@@ -1,20 +1,31 @@
-import { BOOST_SENTRY_TAG, traceBoost } from "./boost-observability";
+import {
+  BOOST_SENTRY_TAG,
+  boostBreadcrumb,
+  tagBoostRequest,
+} from "./boost-observability";
 
-describe("traceBoost", () => {
+describe("boost observability", () => {
   const sentry = () => ({ setTag: jest.fn(), addBreadcrumb: jest.fn() });
 
-  it("tags the scope flow=boost and leaves a breadcrumb with the known ids", () => {
+  it("tags a request flow=boost", () => {
     const s = sentry();
 
-    traceBoost(s, "order_created", {
+    tagBoostRequest(s);
+
+    expect(s.setTag).toHaveBeenCalledWith("flow", "boost");
+    expect(BOOST_SENTRY_TAG).toEqual({ key: "flow", value: "boost" });
+  });
+
+  it("leaves a breadcrumb with the known ids only, and sets no tag", () => {
+    const s = sentry();
+
+    boostBreadcrumb(s, "order_created", {
       boostId: "b1",
       orderId: "order-1",
       orderNumber: "BST-K7X9M2QF3N",
       productId: null,
     });
 
-    expect(s.setTag).toHaveBeenCalledWith("flow", "boost");
-    expect(BOOST_SENTRY_TAG).toEqual({ key: "flow", value: "boost" });
     expect(s.addBreadcrumb).toHaveBeenCalledWith({
       category: "boost",
       message: "boost.order_created",
@@ -26,9 +37,13 @@ describe("traceBoost", () => {
         orderNumber: "BST-K7X9M2QF3N",
       },
     });
+    expect(s.setTag).not.toHaveBeenCalled();
   });
 
   it("is a no-op without Sentry", () => {
-    expect(() => traceBoost(undefined, "x", { boostId: "b1" })).not.toThrow();
+    expect(() => {
+      tagBoostRequest(undefined);
+      boostBreadcrumb(undefined, "x", { boostId: "b1" });
+    }).not.toThrow();
   });
 });

@@ -33,7 +33,10 @@ import {
   type PlatformServiceConsentInput,
 } from "../../consent/platform-service-consent.service";
 import { SentryService } from "../../sentry/sentry.service";
-import { traceBoost } from "../helpers/boost-observability";
+import {
+  boostBreadcrumb,
+  tagBoostRequest,
+} from "../helpers/boost-observability";
 import {
   BOOST_ENABLED_SETTING,
   type BoostOptionsResponse,
@@ -286,7 +289,8 @@ export class ProductBoostService {
     req?: Request,
   ) {
     const { packageId, durationDays, provider, autoRenew } = input;
-    traceBoost(this.sentry, "initiate", { productId });
+    tagBoostRequest(this.sentry);
+    boostBreadcrumb(this.sentry, "initiate", { productId });
     if (!platformServiceConsentsAccepted(input)) {
       throw new BadRequestException(
         i18nMessage("server.product.boostConsentRequired"),
@@ -441,7 +445,7 @@ export class ProductBoostService {
       });
       return { boost, order };
     });
-    traceBoost(this.sentry, "order_created", {
+    boostBreadcrumb(this.sentry, "order_created", {
       boostId: boost.id,
       orderId: order.id,
       orderNumber: order.orderNumber,

@@ -23,7 +23,7 @@ import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
-import { traceBoost } from "../../product/helpers/boost-observability";
+import { boostBreadcrumb } from "../../product/helpers/boost-observability";
 import { SentryService } from "../../sentry/sentry.service";
 
 /** The fields of a paid payment that membership activation reads. */
@@ -331,8 +331,14 @@ export class VirtualOrderFulfillmentService {
       ? await this.boostTimeline.activateForOrder(tx, orderId)
       : null;
     if (!orderId || !result?.found) {
+      // Money was taken for a boost that does not exist: an event, not only
+      // a log line, so it is seen and settled (refund or manual grant).
       this.logger.warn(
         `Boost order ${orderId} paid but no matching ProductBoost found`,
+      );
+      this.sentry?.captureMessage(
+        `Boost order ${orderId ?? "-"} paid by payment ${payment.id} has no ProductBoost`,
+        "error",
       );
       return null;
     }
@@ -343,10 +349,13 @@ export class VirtualOrderFulfillmentService {
     this.logger.log(
       `Boost order ${orderId} completed after payment ${payment.id}`,
     );
-    // The timeline's own breadcrumb (`boost.activate`) carries the boost id.
-    traceBoost(
+    // Breadcrumbs only (this also runs in worker jobs, where a tag would
+    // stick to the process scope). The timeline's own breadcrumb
+    // (`boost.activate`) carries the boost id; a skipped activation is also
+    // reported by the timeline with the boost's status.
+    boostBreadcrumb(
       this.sentry,
-      result.activation ? "activated" : "already_active",
+      result.activation ? "activated" : "activation_skipped",
       {
         orderId,
         orderNumber: payment.order?.orderNumber,

@@ -2,8 +2,10 @@ import { BoostTimelineService } from "../../product/boost-timeline/boost-timelin
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 
 /**
- * Boost activation is traceable in Sentry (`flow=boost`, ids only): the
- * order and its number here, the boost id in the timeline's own breadcrumb.
+ * Boost activation is traceable in Sentry with ids only: the order and its
+ * number here, the boost id in the timeline's own breadcrumb. Breadcrumbs,
+ * no tag: this also runs in worker jobs, which share the process scope. A
+ * paid boost order without its boost is an error event.
  */
 describe("VirtualOrderFulfillmentService.applyBoostInTx — Sentry trail", () => {
   const makeTx = (boost: Record<string, unknown> | null) => ({
@@ -56,12 +58,12 @@ describe("VirtualOrderFulfillmentService.applyBoostInTx — Sentry trail", () =>
       ([crumb]: [{ message: string; data: unknown }]) => crumb,
     );
 
-  it("leaves the boost, the order and its number on activation", async () => {
+  it("leaves the boost, the order and its number on activation, without a tag", async () => {
     const { svc, sentry } = make();
 
     await svc.applyBoostInTx(makeTx(boostRow) as never, payment);
 
-    expect(sentry.setTag).toHaveBeenCalledWith("flow", "boost");
+    expect(sentry.setTag).not.toHaveBeenCalled();
     expect(messages(sentry)).toEqual([
       expect.objectContaining({
         message: "boost.activate",
@@ -78,7 +80,7 @@ describe("VirtualOrderFulfillmentService.applyBoostInTx — Sentry trail", () =>
     ]);
   });
 
-  it("marks a repeated activation (already active) without a listing", async () => {
+  it("marks a skipped activation (the boost already ran) without a listing", async () => {
     const { svc, sentry } = make();
 
     await svc.applyBoostInTx(
@@ -88,9 +90,21 @@ describe("VirtualOrderFulfillmentService.applyBoostInTx — Sentry trail", () =>
 
     expect(messages(sentry)).toContainEqual(
       expect.objectContaining({
-        message: "boost.already_active",
+        message: "boost.activation_skipped",
         data: { orderId: "order-1", orderNumber: "BST-K7X9M2QF3N" },
       }),
+    );
+  });
+
+  it("reports a paid boost order without its boost as an error event", async () => {
+    const { svc, sentry } = make();
+
+    const productId = await svc.applyBoostInTx(makeTx(null) as never, payment);
+
+    expect(productId).toBeNull();
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      "Boost order order-1 paid by payment pay-1 has no ProductBoost",
+      "error",
     );
   });
 });

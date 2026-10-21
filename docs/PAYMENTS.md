@@ -124,9 +124,11 @@ endsAt }` for a boost payment (`endsAt` null until activation;
   transaction; `direct-form` refuses a boost order without them
   (`400 server.product.boostConsentRequired`). Details and the legal release
   blocker: `CONSENTS.md`, "Platform services (boost)".
-- **Tracing.** The boost purchase and activation tag Sentry `flow=boost`
-  with `boost.*` breadcrumbs (boost, order, order number, listing ids; no
-  personal data).
+- **Tracing.** The boost purchase start tags its request `flow=boost`;
+  the purchase and the activation leave `boost.*` breadcrumbs with ids only
+  (boost, order, order number, listing). Activation sets no tag because it
+  also runs in worker jobs, which share the process scope. A paid boost
+  order without its boost row is a Sentry error event.
 
 ---
 
