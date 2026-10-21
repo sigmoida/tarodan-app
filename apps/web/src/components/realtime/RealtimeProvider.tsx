@@ -30,7 +30,9 @@ import { queryKeys } from "@/lib/query/keys";
  * cookie session can hand out (tracked in the tarodan-ops backlog).
  *
  * The query cache is NOT cleared here: that is keyed on the session owner in
- * the auth store (`lib/query/sessionCache`), which sees every sign-out path.
+ * the auth store (`lib/query/sessionCache`). It sees what the store learns:
+ * its own sign-in and sign-out actions, `checkAuth`, an ended session the API
+ * client reports, and another tab's change picked up by `reconcileSession`.
  */
 export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
   const queryClient = useQueryClient();

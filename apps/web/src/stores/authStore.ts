@@ -11,6 +11,7 @@ import {
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
 import { getQueryClient } from "@/lib/query/getQueryClient";
 import { syncQueryCacheWithSession } from "@/lib/query/sessionCache";
+import { setSessionGoneHandler } from "@/lib/sessionGone";
 
 // Membership tier types
 export type MembershipTier = "free" | "basic" | "premium" | "business";
@@ -260,7 +261,18 @@ interface AuthState {
     acceptMarketing?: boolean,
   ) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Resets the store to a guest without calling the server, for a session
+   * the server already ended (expired, or signed out in another tab).
+   */
+  clearSession: () => void;
   checkAuth: () => Promise<void>;
+  /**
+   * Re-runs `checkAuth` when the store disagrees with the session another
+   * tab or the server may have changed: the marker appeared or disappeared,
+   * or the stored snapshot belongs to another user.
+   */
+  reconcileSession: () => void;
   setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
   refreshUserData: () => Promise<void>; // Alias for refreshUser
@@ -398,8 +410,11 @@ export const useAuthStore = create<AuthState>()(
           // expire it locally too so the very next read sees a guest.
           clearAuthMarker();
           clearLegacyTokenKeys();
-          clearUserSnapshot();
+          get().clearSession();
+        },
 
+        clearSession: () => {
+          clearUserSnapshot();
           set({
             user: null,
             token: null,
@@ -412,20 +427,10 @@ export const useAuthStore = create<AuthState>()(
 
         checkAuth: async () => {
           clearLegacyTokenKeys();
-          // Girişli olabilir miyiz? Server'ın yazdığı JS-okunabilir cookie. Yoksa profil
-          // çağrısı yapmadan misafir say.
-          const maybeAuthed = hasAuthMarker();
-
-          if (!maybeAuthed) {
-            clearUserSnapshot();
-            set({
-              user: null,
-              token: null,
-              refreshToken: null,
-              isAuthenticated: false,
-              limits: null,
-              isLoading: false,
-            });
+          // Could we be signed in? The server writes a JS-readable marker
+          // cookie with the session. Without it we are a guest, no profile call.
+          if (!hasAuthMarker()) {
+            get().clearSession();
             return;
           }
 
@@ -445,12 +450,13 @@ export const useAuthStore = create<AuthState>()(
           }
 
           try {
-            // /users/me — 401 olursa api interceptor'ı cookie ile sessiz refresh deneyip tekrarlar.
+            // /users/me: on a 401 the gateway proxy first tries a silent
+            // refresh from the session cookie.
             const response = await userApi.getProfile();
             const apiUser = response.data.user || response.data;
             const user = mapApiUser(apiUser);
             const limits = getMembershipLimitsForUser(user);
-            // tarodan_authed cookie'sini server yönetir; client yazmaz.
+            // The server owns the tarodan_authed marker; the client never writes it.
             writeUserSnapshot(user);
             set({
               user,
@@ -469,14 +475,7 @@ export const useAuthStore = create<AuthState>()(
             // refresh failure (API redeploy / 5xx) — don't eject the user. The server
             // owns marker clearing now, so we no longer clear it here.
             if (isUnauthorized && !hasAuthMarker()) {
-              clearUserSnapshot();
-              set({
-                user: null,
-                token: null,
-                refreshToken: null,
-                isAuthenticated: false,
-                limits: null,
-              });
+              get().clearSession();
             } else {
               // Transient error (API unreachable / 5xx / network, or a 401 that didn't
               // kill the session) — the token may still be valid. Stay authenticated
@@ -487,6 +486,16 @@ export const useAuthStore = create<AuthState>()(
           } finally {
             set({ isLoading: false });
           }
+        },
+
+        reconcileSession: () => {
+          const { isAuthenticated, user } = get();
+          const marker = hasAuthMarker();
+          const snapshotId = readUserSnapshot()?.id;
+          const stale = isAuthenticated
+            ? !marker || (!!user && !!snapshotId && snapshotId !== user.id)
+            : marker;
+          if (stale) void get().checkAuth();
         },
 
         setUser: (user) => {
@@ -557,6 +566,12 @@ if (typeof window !== "undefined") {
   useAuthStore.subscribe(
     syncQueryCacheWithSession(getQueryClient, useAuthStore.getState()),
   );
+  // The API client saw the server end the session (a 401 with the marker
+  // gone): drop to a guest here too, also on public pages it does not leave.
+  setSessionGoneHandler(() => {
+    const { isAuthenticated, user, clearSession } = useAuthStore.getState();
+    if (isAuthenticated || user) clearSession();
+  });
 }
 
 export default useAuthStore;

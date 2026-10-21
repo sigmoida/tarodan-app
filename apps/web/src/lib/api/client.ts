@@ -2,6 +2,7 @@
 
 import { createApiClient, type AxiosError } from "@tarodan/api-client";
 import { hasAuthMarker } from "@/lib/authMarker";
+import { reportSessionGone } from "@/lib/sessionGone";
 import { getPublicApiOrigin } from "./origin";
 
 // Browser → same-origin gateway proxy (`/gateway`): the proxy adds the `Bearer`
@@ -93,6 +94,9 @@ async function handleApiError(error: AxiosError) {
   if (error.response?.status === 401 && typeof window !== "undefined") {
     const sessionGone = !hasAuthMarker();
     if (sessionGone && !shouldPreserveAuthTokenOn401()) {
+      // The store and its query cache must not stay with the ended session,
+      // including on the public pages that are not redirected below.
+      reportSessionGone();
       const currentPath = window.location?.pathname || "";
       const publicPathsNoRedirect = [
         "/track-order",
