@@ -12,6 +12,7 @@ import {
 } from "@/lib/membershipSettle";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
+import { fetchMembershipLimits } from "./useMembershipLimits";
 
 /**
  * Satın alma / değişiklik sonrası üyelik sorgularını SUNUCU yansıtana kadar
@@ -51,13 +52,13 @@ export function useMembershipSettle(options: {
       try {
         const [me, limits] = await Promise.all([
           membershipApi.getCurrentMembership(),
-          membershipApi.getLimits(),
+          fetchMembershipLimits(),
         ]);
         if (cancelled) return;
-        queryClient.setQueryData(queryKeys.membership.limits(), {
-          isAdFree: limits.data?.isAdFree === true,
-        });
-        // Diğer tüketiciler (üyelik sayfası) kendi biçimlerinde yeniden okur.
+        // The whole body, as `useMembershipLimits` caches it: the ad slots
+        // and the saved-search limit both follow the new tier at once.
+        queryClient.setQueryData(queryKeys.membership.limits(), limits);
+        // Other consumers (the membership page) re-read in their own shape.
         void queryClient.invalidateQueries({
           queryKey: queryKeys.membership.me(),
         });

@@ -2320,19 +2320,6 @@
       "saticilariTakipEderekYeniIlanlarindanHaberdar": "Satıcıları takip ederek yeni ilanlarından haberdar olun",
       "ilanlariKesfet": "İlanları Keşfet"
     },
-    "savedSearches": {
-      "failedToLoadSavedSearches": "Failed to load saved searches:",
-      "aramayiSil": "Aramayı sil",
-      "buAramayiSilmekIstediginizdenEminMisiniz": "Bu aramayı silmek istediğinizden emin misiniz?",
-      "aramaSilindi": "Arama silindi",
-      "bildirimlerAcildi": "Bildirimler açıldı",
-      "bildirimlerKapatildi": "Bildirimler kapatıldı"
-    },
-    "savedSearchCard": {
-      "tumIlanlar": "Tüm ilanlar",
-      "bildirimleriKapat": "Bildirimleri kapat",
-      "bildirimleriAc": "Bildirimleri aç"
-    },
     "bankHooks": {
       "bankaHesabiKaydedildi": "Banka hesabı kaydedildi",
       "kaydetmeBasarisiz": "Kaydetme başarısız",
@@ -2558,13 +2545,30 @@
     "savedLimitReached": "Kayıtlı arama limitinize ulaştınız ({limit} arama).",
     "premiumMoreSearches": "Premium üyelikle daha fazla arama kaydedin",
     "savedTitle": "Kayıtlı Aramalarım",
-    "savedDescription": "Kayıtlı aramalarınızı buradan yönetebilir, bildirim tercihlerini değiştirebilirsiniz.",
+    "savedDescription": "Kayıtlı aramalarınızı buradan yeniden çalıştırabilir veya silebilirsiniz.",
     "savedEmptyTitle": "Kayıtlı Arama Yok",
-    "savedEmptyDescription": "İlanları ararken sonuç sayfasındaki \"Bu aramayı kaydet\" butonuyla aramanı kaydet; buradan yönetip yeni sonuçlarda bildirim alabilirsin.",
+    "savedEmptyDescription": "İlanları ararken sonuç sayfasındaki \"Bu aramayı kaydet\" düğmesiyle aramanızı kaydedin, sonra buradan yeniden çalıştırın.",
     "countOfLimit": "{count} / {limit} arama",
     "searchListings": "İlan Ara",
     "runThisSearch": "Bu Aramayı Çalıştır",
     "priceLabel": "Fiyat:"
+  },
+  "savedSearch": {
+    "save": "Bu aramayı kaydet",
+    "saveTitle": "Aramayı kaydet",
+    "nameLabel": "Arama adı",
+    "saved": "Arama kaydedildi",
+    "saveFailed": "Arama kaydedilemedi",
+    "nothingToSave": "Kaydetmek için bir arama yapın veya filtre seçin",
+    "signInToSave": "Aramanızı kaydetmek için giriş yapın",
+    "untitled": "Kayıtlı arama",
+    "savedOn": "Kaydedildi: {date}",
+    "limitTitle": "Kayıtlı arama limiti",
+    "deleteTitle": "Aramayı sil",
+    "deleteConfirm": "\"{name}\" aramasını silmek istediğinize emin misiniz?",
+    "deleted": "Arama silindi",
+    "deleteFailed": "Arama silinemedi",
+    "loadFailed": "Kayıtlı aramalar yüklenemedi"
   },
   "error": {
     "pageNotFound": "Sayfa Bulunamadı",
@@ -3843,7 +3847,6 @@
         "guestCart": "Misafir sepeti içeriği",
         "recentSearches": "Son aramalarınız ve filtreleriniz",
         "listingLayout": "Ürün listesi görünüm tercihi",
-        "savedSearches": "Kaydettiğiniz aramalar",
         "dismissedBanners": "Kapattığınız duyuruların tekrar gösterilmemesi",
         "youtubeEmbed": "İlan sayfalarına gömülü YouTube videolarının oynatımı",
         "googleAnalytics": "Google Analytics — ziyaretçi ve oturum ayrımı",
@@ -13152,11 +13155,6 @@
       "usefollowing": {
         "takipBirakildi": "Takip bırakıldı",
         "takipBirakilamadi": "Takip bırakılamadı"
-      }
-    },
-    "savedSearches": {
-      "savedsearchcard": {
-        "sil": "Sil"
       }
     },
     "offers": {

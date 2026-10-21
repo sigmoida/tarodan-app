@@ -197,7 +197,15 @@ function useListingsValue(): ListingsContextValue {
     setFilters((prev) => mergeUrlFilters(prev, sp));
   }, [searchString]);
 
-  const categorySlug = filters.category || searchParams.get("category") || "";
+  // The slug lookup is only for a category that arrives as a name/slug (nav
+  // link). With an id in hand (sidebar pick, saved-search run) `category` is
+  // just the display name, and looking it up as a slug would 404 every time.
+  const hasCategoryId = !!(
+    filters.categoryId || searchParams.get("categoryId")
+  );
+  const categorySlug = hasCategoryId
+    ? ""
+    : filters.category || searchParams.get("category") || "";
   const { data: categoryBySlug } = useQuery({
     queryKey: queryKeys.category.bySlug(categorySlug),
     queryFn: async () => {
