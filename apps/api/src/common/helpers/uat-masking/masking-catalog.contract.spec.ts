@@ -146,6 +146,11 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
       ["products", "description"],
       ["seller_uploaded_invoices", "file_name"],
       ["media_files", "filename"],
+      // Saved searches: the user's own name and search words, and the
+      // display labels typed with them.
+      ["saved_searches", "name"],
+      ["saved_searches", "query"],
+      ["saved_searches", "labels"],
     ]) {
       expect([`${table}.${column}`, isCoveredByCatalog(table, column)]).toEqual(
         [`${table}.${column}`, true],
