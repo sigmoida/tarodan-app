@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
+import { asPaymentMetadata } from "../helpers/payment-metadata.types";
 import { i18nMessage } from "../../i18n";
 // Every refusal here comes before anything is sent: the call is turned away
 // because an attempt is in flight, never because its own outcome is unknown.
@@ -51,9 +52,8 @@ export class PaymentRefundAttemptService {
         where: { id: paymentId },
         select: { metadata: true },
       });
-      const meta = (fresh?.metadata as Record<string, any>) || {};
       const refundedOrders =
-        (meta.refundedOrders as Record<string, number>) || {};
+        asPaymentMetadata(fresh?.metadata).refundedOrders ?? {};
 
       if (isGroupPayment && refundedOrders[orderId]) {
         throw new BadRequestException(

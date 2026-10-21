@@ -52,6 +52,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { storedComponentsOf } from "./helpers/stored-refund-components";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { virtualOrderKind } from "../payment/helpers/virtual-order-kind";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /** Kargo öncesi iptalin okuduğu sipariş yükü (alıcı + platform iptali ortak). */
 const CANCELLATION_ORDER_INCLUDE = {
@@ -155,8 +156,7 @@ export class RefundCreationService {
         i18nMessage("server.refund.orderAlreadyCancelledOrRefunded"),
       );
     }
-    const payment =
-      order.payment ?? (order as any).checkoutGroup?.payment ?? null;
+    const payment = order.payment ?? order.checkoutGroup?.payment ?? null;
     if (!payment || payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(
         i18nMessage("server.refund.completedPaymentNotFound"),
@@ -171,7 +171,7 @@ export class RefundCreationService {
     }
 
     // Adet bazlı kısmi iade: istenen adet (verilmezse tümü), sipariş adediyle sınırlı.
-    const orderQty = (order as any).quantity ?? 1;
+    const orderQty = order.quantity ?? 1;
     const reqQty = Math.min(
       Math.max(dto.refundQuantity ?? orderQty, 1),
       orderQty,
@@ -1112,9 +1112,9 @@ export class RefundCreationService {
       // yeniden dener (findPendingDeliveryToOpenReturn bu durumu kapsar).
       try {
         await this.shipments.openReturnShipment(created.id);
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.error(
-          `openReturnShipment failed inline for ${created.id} (${refundNumber}): ${e?.message}. Scheduler will retry.`,
+          `openReturnShipment failed inline for ${created.id} (${refundNumber}): ${errorMessage(e)}. Scheduler will retry.`,
         );
       }
       return this.prisma.refundRequest.findUnique({

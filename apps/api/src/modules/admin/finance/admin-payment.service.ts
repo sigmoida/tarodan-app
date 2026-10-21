@@ -25,7 +25,6 @@ import {
   Prisma,
   PaymentStatus,
   RefundAttemptStatus,
-  RefundRequestStatus,
   TradeStatus,
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
