@@ -78,10 +78,13 @@ the effective tier only, by the same `isPremiumEntitled` rule as every other
 gate, without the self-heal or the usage counts of `getUserLimits`, so a
 database error stays a 5xx). A past-due member is on the free limit until
 the membership heals. `GET /membership/me/limits` and `GET /membership/me`
-run that heal and persist it, so once a client has read the limit it shows,
-the gate reads the same tier. Only a save sent before any such read, after a
-paid renewal whose callback was lost, gets the free `limit` in its `403`,
-until the next read or the reconciliation job heals the membership.
+run that heal and persist it, so the heal never makes the shown and the
+enforced limit differ for longer than until the client's next read: a save
+sent before any such read, after a paid renewal whose callback was lost, gets
+the free `limit` in its `403` until a read or the reconciliation job heals
+the membership. (A tier that really changes between a cached read and a save,
+such as a period that ends, is enforced at once; the `403` carries the
+enforced `limit`.)
 
 The transaction then locks the user row `FOR NO KEY UPDATE`
 (`lockActiveUserForQuota`), checks the duplicate, counts and inserts. Two
