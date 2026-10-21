@@ -16,7 +16,7 @@ import { computeQualityScore } from "../helpers/quality-score";
 import { computeRelevanceScore } from "../helpers/relevance-score";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
-import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
+import { SellerTrustService } from "../../seller-trust";
 import {
   frontendUrl as resolveFrontendUrl,
   adminUrl,
@@ -28,7 +28,10 @@ import {
 } from "../../../common/timing-rules";
 import { CacheService } from "../../cache/cache.service";
 import { SearchService } from "../../search/search.service";
-import { errorMessage } from "../../../common/helpers/error-message";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 import { isRenewableInPlace } from "../helpers/product-renewal";
 import { refreshProductVisibility } from "../helpers/product-visibility";
 import { recordListingRemovals } from "../helpers/listing-removal";
@@ -67,6 +70,7 @@ export class ProductSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    private readonly sellerTrust: SellerTrustService,
   ) {}
 
   /**
@@ -132,13 +136,15 @@ export class ProductSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Update popularity scores + İlan Kalite Skoru (qualityScore) + rankTier reconcile
-   * for all active products. Runs every night at 03:00.
+   * Update popularity scores + listing quality score (qualityScore) + rankTier
+   * reconcile for all active products. Runs every night at 03:00.
    *
-   * - popularityScore: mevcut ağırlıklı skor (popularityScore kolonuna yazılır)
-   * - qualityScore: foto sayısı + açıklama + satıcı güven puanı (sıralamada kullanılır)
-   * - rankTier reconcile: aktif boost → 2; ücretli (free olmayan) üyeli satıcı → 1; standart → 0
-   * Gerçek iş — Bull processor 'update-popularity' buradan çağırır.
+   * - popularityScore: the weighted engagement score
+   * - qualityScore: photos + description + the seller's stored trust rating
+   *   (`computeQualityScore`, used in ranking)
+   * - rankTier reconcile: active boost → 2; paid (non-free) member seller → 1;
+   *   standard → 0
+   * The real work: the Bull processor 'update-popularity' calls this.
    */
   async runUpdatePopularityScores(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting popularity + quality score update...");
@@ -159,7 +165,6 @@ export class ProductSchedulerService implements OnModuleInit {
           description: true,
           boostedUntil: true,
           sellerId: true,
-          seller: { select: { isVerified: true } },
           _count: {
             select: {
               images: true,
@@ -172,20 +177,12 @@ export class ProductSchedulerService implements OnModuleInit {
 
       this.logger.log(`Processing ${products.length} products...`);
 
-      // Satıcı güven puanlarını tek sorguda topla (N+1 önlemek için)
+      // The sellers' stored trust scores in one query (no N+1).
+      // seller-trust-refresh (02:30) normally finishes before this job
+      // (03:00); if it is late or failed, this run ranks with the previous
+      // night's scores and the next night catches up.
       const sellerIds = [...new Set(products.map((p) => p.sellerId))];
-      const ratingGroups = sellerIds.length
-        ? await this.prisma.rating.groupBy({
-            by: ["receiverId"],
-            where: publicUserRatingWhere({ receiverId: { in: sellerIds } }),
-            _avg: { score: true },
-          })
-        : [];
-      const sellerRatingMap = new Map<string, number>();
-      for (const g of ratingGroups) {
-        if (g._avg?.score != null)
-          sellerRatingMap.set(g.receiverId, Number(g._avg.score));
-      }
+      const sellerTrust = await this.sellerTrust.getForUsers(sellerIds);
 
       // Ücretli (free olmayan) aktif üyeli satıcılar → rankTier 1
       const premiumMemberships = sellerIds.length
@@ -226,8 +223,7 @@ export class ProductSchedulerService implements OnModuleInit {
         : [];
       const messageCountMap = new Map<string, number>();
       for (const g of messageGroups) {
-        if (g.productId)
-          messageCountMap.set(g.productId, (g as any)._count ?? 0);
+        if (g.productId) messageCountMap.set(g.productId, g._count ?? 0);
       }
 
       let updatedCount = 0;
@@ -244,8 +240,7 @@ export class ProductSchedulerService implements OnModuleInit {
         const qualityScore = computeQualityScore({
           photoCount: product._count.images,
           description: product.description,
-          sellerRating: sellerRatingMap.get(product.sellerId) ?? null,
-          isVerifiedSeller: product.seller?.isVerified ?? false,
+          sellerTrustRating: sellerTrust.get(product.sellerId)?.rating ?? null,
         });
 
         // rankTier reconcile
@@ -271,7 +266,7 @@ export class ProductSchedulerService implements OnModuleInit {
             qualityScore,
             rankTier,
             relevanceScore,
-          } as any,
+          },
         });
 
         updatedCount++;
@@ -285,9 +280,12 @@ export class ProductSchedulerService implements OnModuleInit {
         summary: `${updatedCount} ürün skoru güncellendi`,
         stats: { updated: updatedCount },
       };
-    } catch (error: any) {
-      this.logger.error(`Error updating scores: ${error.message}`, error.stack);
-      log(`HATA: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Error updating scores: ${errorMessage(error)}`,
+        errorStack(error),
+      );
+      log(`HATA: ${errorMessage(error)}`);
       // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
       // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
       // "başarılı" görünür ve hata yalnız log satırında kalır).
@@ -304,7 +302,7 @@ export class ProductSchedulerService implements OnModuleInit {
     const count = await this.prisma.product.count({
       where: {
         status: ProductStatus.active,
-      } as any,
+      },
     });
     return { updated: count };
   }
@@ -481,9 +479,12 @@ export class ProductSchedulerService implements OnModuleInit {
           systemResumed: resumed,
         },
       };
-    } catch (error: any) {
-      this.logger.error(`Error expiring boosts: ${error.message}`, error.stack);
-      log(`HATA: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Error expiring boosts: ${errorMessage(error)}`,
+        errorStack(error),
+      );
+      log(`HATA: ${errorMessage(error)}`);
       // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
       // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
       // "başarılı" görünür ve hata yalnız log satırında kalır).
@@ -783,12 +784,12 @@ export class ProductSchedulerService implements OnModuleInit {
         summary: `${expired.length} eski ilan pasif yapıldı · ${renewed.length} yenilendi`,
         stats: { expired: expired.length, renewed: renewed.length },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Error expiring listings: ${error.message}`,
-        error.stack,
+        `Error expiring listings: ${errorMessage(error)}`,
+        errorStack(error),
       );
-      log(`HATA: ${error.message}`);
+      log(`HATA: ${errorMessage(error)}`);
       // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
       // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
       // "başarılı" görünür ve hata yalnız log satırında kalır).
@@ -833,9 +834,9 @@ export class ProductSchedulerService implements OnModuleInit {
             adminLink: `${adminBaseUrl}/catalog/products?status=pending`,
           },
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.logger.warn(
-          `pending-moderation-digest bildirimi başarısız (${admin.userId}): ${err?.message}`,
+          `pending-moderation-digest bildirimi başarısız (${admin.userId}): ${errorMessage(err)}`,
         );
       }
     }
@@ -852,7 +853,7 @@ export class ProductSchedulerService implements OnModuleInit {
    * Get listings that will expire soon (within the warning lead time)
    * Can be used to send notifications to sellers
    */
-  async getExpiringListings(daysUntilExpiry?: number): Promise<any[]> {
+  async getExpiringListings(daysUntilExpiry?: number) {
     const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
     const leadDays =
       daysUntilExpiry ??
@@ -986,9 +987,9 @@ export class ProductSchedulerService implements OnModuleInit {
               listingUrl: `${frontendUrl}/profile/listings`,
             },
           );
-        } catch (err: any) {
+        } catch (err: unknown) {
           this.logger.warn(
-            `listing-expiring email failed for ${listing.id}: ${err?.message}`,
+            `listing-expiring email failed for ${listing.id}: ${errorMessage(err)}`,
           );
         }
       }
@@ -1002,12 +1003,12 @@ export class ProductSchedulerService implements OnModuleInit {
         summary: `${sellerCount} satıcı · ${expiringListings.length} ilan`,
         stats: { sellers: sellerCount, listings: expiringListings.length },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Error sending expiration warnings: ${error.message}`,
-        error.stack,
+        `Error sending expiration warnings: ${errorMessage(error)}`,
+        errorStack(error),
       );
-      log(`HATA: ${error.message}`);
+      log(`HATA: ${errorMessage(error)}`);
       // Yutmadan yükselt: Bull job'ı "failed" olsun ki attempts/backoff ve Sentry
       // Cron alarmı gerçekten devreye girsin (aksi halde başarısız tur bile
       // "başarılı" görünür ve hata yalnız log satırında kalır).

@@ -50,6 +50,15 @@ export const SELLER_FAULT_ADMIN_CANCEL_CODES = [
 ] as const satisfies readonly AdminCancelReasonCode[];
 
 /**
+ * The automatic cancellation right after payment when the physical stock
+ * could not cover the order: a seller-caused failure (the listed stock is the
+ * seller's responsibility). Only payment fulfilment writes this text, with
+ * actor `system` since 2026-09-18 and no actor before, so the text is the
+ * evidence.
+ */
+const OVERSOLD_AFTER_PAYMENT = Prisma.sql`o."cancel_reason" = ${ORDER_CANCEL_REASON.oversoldAfterPayment}`;
+
+/**
  * Order-side aggregates of the seller trust score (ADR 0014,
  * `docs/SELLER_TRUST.md`). Reporting SQL in the owning domain: parameterised,
  * set-based over a batch of seller ids, and run inside the caller's read-only
@@ -63,6 +72,11 @@ export class OrderSellerTrustStatsService {
    * Sellers with a paid order since `since` (`preparing_deadline` is stamped
    * at payment). Range scan on `orders(preparing_deadline)`. Ordered so the
    * caller's batches are stable.
+   *
+   * An oversold-after-payment cancel has no deadline, so a seller whose only
+   * orders are such cancels is not a candidate (unless they trade). That
+   * seller has no completed sale, so they could not reach the minimum data
+   * rule anyway: they are `new` with or without a row.
    */
   async activeSellerIds(
     tx: Prisma.TransactionClient,
@@ -87,11 +101,19 @@ export class OrderSellerTrustStatsService {
    *   A cancellation whose cause is unknown or neutral (buyer, system,
    *   platform for a neutral reason, or no recorded actor) is left out: it is
    *   neither a success nor counted against the seller.
+   *   Plus the orders cancelled right after payment because the stock could
+   *   not cover them (`oversoldAfterPayment`). Payment fulfilment clears
+   *   their `preparing_deadline` in the same write, so they have no deadline
+   *   and are anchored at the cancellation (`cancelled_at`, or `created_at`
+   *   for rows from before 2026-09-18; payment follows creation within the
+   *   24 h payment window).
    * - **F**: a cancellation by the seller; the not-shipped-in-time automatic
-   *   cancellation, recognised by its fixed reason text because rows from
-   *   before 2026-09-18 carry no `cancelled_by`; a platform cancellation with
-   *   a seller-fault code; or an order in `sellerFaultOrderIds` (reviewed
-   *   refunds with `fault_party = seller`, from the refund domain).
+   *   cancellation and the oversold-after-payment cancellation (stock is the
+   *   seller's responsibility), both recognised by their fixed reason text
+   *   because rows from before 2026-09-18 carry no `cancelled_by`; a platform
+   *   cancellation with a seller-fault code; or an order in
+   *   `sellerFaultOrderIds` (reviewed refunds with `fault_party = seller`,
+   *   from the refund domain).
    * - **S / L**: `shipments.shipped_at` is the first physical carrier
    *   handoff. Late means after the first deadline plus `lateGraceMinutes`,
    *   so an extension does not help (decision D4).
@@ -119,6 +141,7 @@ export class OrderSellerTrustStatsService {
               AND (
                 o."cancelled_by" = ${CancellationActor.seller}::"CancellationActor"
                 OR o."cancel_reason" = ${ORDER_CANCEL_REASON.sellerShipDeadlineExpired}
+                OR ${OVERSOLD_AFTER_PAYMENT}
                 OR (
                   o."cancelled_by" = ${CancellationActor.platform}::"CancellationActor"
                   AND o."admin_cancel_reason_code" = ANY(${[...SELLER_FAULT_ADMIN_CANCEL_CODES]}::text[])
@@ -129,11 +152,21 @@ export class OrderSellerTrustStatsService {
           ) AS "failed"
         FROM "orders" o
         WHERE o."seller_id" = ANY(${sellerIds}::text[])
-          AND o."preparing_deadline" IS NOT NULL
           AND ${liveRowSql("o")}
           AND o."origin" <> ${OrderOrigin.platform_service}::"OrderOrigin"
-          AND COALESCE(o."original_preparing_deadline", o."preparing_deadline") >= ${window.since}
-          AND COALESCE(o."original_preparing_deadline", o."preparing_deadline") < ${window.until}
+          AND (
+            (
+              o."preparing_deadline" IS NOT NULL
+              AND COALESCE(o."original_preparing_deadline", o."preparing_deadline") >= ${window.since}
+              AND COALESCE(o."original_preparing_deadline", o."preparing_deadline") < ${window.until}
+            )
+            OR (
+              o."status" = ${OrderStatus.cancelled}::"OrderStatus"
+              AND ${OVERSOLD_AFTER_PAYMENT}
+              AND COALESCE(o."cancelled_at", o."created_at") >= ${window.since}
+              AND COALESCE(o."cancelled_at", o."created_at") < ${window.until}
+            )
+          )
       ),
       counted AS (
         SELECT b.*, s."shipped_at"

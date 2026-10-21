@@ -35,6 +35,7 @@ describe("AdminUserService.getUsers giriş durumu", () => {
     const service = new AdminUserService(
       prisma as any,
       { createAuditLog: jest.fn() } as any,
+      {} as never, // sellerTrust
       undefined as any,
     );
     return { service, prisma };

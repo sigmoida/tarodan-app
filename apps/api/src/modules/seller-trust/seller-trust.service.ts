@@ -1,11 +1,19 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type { SellerTrustComponentsV1 } from "@tarodan/types";
+import type {
+  AdminSellerTrustView,
+  SellerTrustComponentsV1,
+  SellerTrustView,
+} from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import {
   inBoundedWrite,
   type BoundedWriteLimits,
 } from "../../common/helpers/bounded-transaction";
+import {
+  toAdminSellerTrustView,
+  toSellerTrustView,
+} from "./helpers/trust-view";
 
 export interface SellerTrustScoreRow {
   userId: string;
@@ -24,14 +32,54 @@ const WRITE_LIMITS: BoundedWriteLimits = {
   transactionTimeoutMs: 15_000,
 };
 
+const SCORE_SELECT = {
+  scoreX100: true,
+  formulaVersion: true,
+} as const satisfies Prisma.SellerTrustScoreSelect;
+
 /**
  * Owner of `seller_trust_scores` (ADR 0014). A leaf: Prisma only, so every
  * domain that reads the score can import it without a cycle. Only the nightly
- * batch writes; profiles will read by primary key (ST2).
+ * batch writes; reads are primary-key lookups and never compute.
  */
 @Injectable()
 export class SellerTrustService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** One seller's stored score (one primary-key lookup). No row is `new`. */
+  async getForUser(userId: string): Promise<SellerTrustView> {
+    const row = await this.prisma.sellerTrustScore.findUnique({
+      where: { userId },
+      select: SCORE_SELECT,
+    });
+    return toSellerTrustView(row);
+  }
+
+  /**
+   * Many sellers in one query, for lists and the ranking job. The map has an
+   * entry for every requested id; ids without a row map to `new`.
+   */
+  async getForUsers(userIds: string[]): Promise<Map<string, SellerTrustView>> {
+    const ids = [...new Set(userIds)];
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.sellerTrustScore.findMany({
+      where: { userId: { in: ids } },
+      select: { userId: true, ...SCORE_SELECT },
+    });
+    const byId = new Map(rows.map((r) => [r.userId, r]));
+    return new Map(
+      ids.map((id) => [id, toSellerTrustView(byId.get(id) ?? null)]),
+    );
+  }
+
+  /** Admin support: the view plus the stored breakdown and its time. */
+  async getAdminView(userId: string): Promise<AdminSellerTrustView> {
+    const row = await this.prisma.sellerTrustScore.findUnique({
+      where: { userId },
+      select: { ...SCORE_SELECT, components: true, computedAt: true },
+    });
+    return toAdminSellerTrustView(row);
+  }
 
   /** True when the table has no row at all (first deploy: enqueue a run). */
   async isEmpty(): Promise<boolean> {

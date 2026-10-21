@@ -72,7 +72,8 @@ const makeService = (user: Record<string, unknown> = detailRow()) => {
   const service = new AdminUserService(
     prisma as never,
     { createAuditLog: jest.fn() } as never,
-    undefined as never,
+    { getAdminView: jest.fn().mockResolvedValue(null) } as never,
+    undefined as never, // storage
   );
   return { service, prisma };
 };

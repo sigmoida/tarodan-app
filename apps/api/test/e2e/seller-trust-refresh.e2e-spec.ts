@@ -119,6 +119,8 @@ interface OrderFixture {
   cancelledBy?: CancellationActor | null;
   cancelReason?: string | null;
   adminCancelReasonCode?: string | null;
+  cancelledAt?: Date | null;
+  createdAt?: Date;
   shippingAddress?: Prisma.InputJsonValue;
 }
 
@@ -146,6 +148,8 @@ async function order(f: OrderFixture): Promise<string> {
             : null
           : f.completedAt,
       cancelledBy: f.cancelledBy ?? null,
+      cancelledAt: f.cancelledAt ?? null,
+      ...(f.createdAt ? { createdAt: f.createdAt } : {}),
       cancelReason: f.cancelReason ?? null,
       adminCancelReasonCode: f.adminCancelReasonCode ?? null,
       shippingAddress: f.shippingAddress,
@@ -441,10 +445,35 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
     // Unknown or neutral causes never count against the seller:
     await cancelled({ cancelReason: "free text from an old admin tool" });
     await cancelled({ adminCancelReasonCode: "stock_error" }); // code, no actor
-    // A system cancel after payment for stock is not on ADR 0014's list.
+    // - oversold right after payment (stock is the seller's responsibility;
+    //   plan section 16). Payment fulfilment clears the deadline in the same
+    //   write, so the row is anchored at its cancellation...
     await cancelled({
       cancelledBy: CancellationActor.system,
       cancelReason: ORDER_CANCEL_REASON.oversoldAfterPayment,
+      deadline: null,
+      cancelledAt: ago(30 * DAY),
+    });
+    //   ...or, before 2026-09-18 (no actor, no cancelled_at), at creation.
+    await cancelled({
+      cancelReason: ORDER_CANCEL_REASON.oversoldAfterPayment,
+      deadline: null,
+      createdAt: ago(200 * DAY),
+    });
+    // An oversold cancel outside the 365-day window does not count.
+    await cancelled({
+      cancelledBy: CancellationActor.system,
+      cancelReason: ORDER_CANCEL_REASON.oversoldAfterPayment,
+      deadline: null,
+      createdAt: ago(400 * DAY),
+      cancelledAt: ago(400 * DAY),
+    });
+    // A neutral stock cancel of an unpaid order is not a failure.
+    await cancelled({
+      cancelledBy: CancellationActor.system,
+      cancelReason: ORDER_CANCEL_REASON.stockDepleted,
+      deadline: null,
+      cancelledAt: ago(30 * DAY),
     });
     await cancelled({ cancelledBy: CancellationActor.buyer });
     // Successes, even with a claim against the seller that was not upheld:
@@ -470,11 +499,12 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
 
     await buildRunner().service.runRefresh(undefined, asOf);
 
-    // 6 failures + the 2 orders with a claim that did not count; the 7
-    // unknown or neutral cancellations are in neither E nor F.
+    // 8 failures + the 2 orders with a claim that did not count; the
+    // unknown or neutral cancellations and the oversold cancel outside the
+    // window are in neither E nor F.
     expect(components(await scoreOf(seller)).reliability).toMatchObject({
-      eligibleOrders: 8,
-      failures: 6,
+      eligibleOrders: 10,
+      failures: 8,
     });
   });
 

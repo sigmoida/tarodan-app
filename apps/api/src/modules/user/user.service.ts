@@ -152,13 +152,6 @@ export class UserService {
   }
 
   /**
-   * Mark user as verified
-   */
-  async verifyUser(userId: string) {
-    return this.profile.verifyUser(userId);
-  }
-
-  /**
    * Upgrade user to seller
    */
   async upgradToSeller(userId: string) {

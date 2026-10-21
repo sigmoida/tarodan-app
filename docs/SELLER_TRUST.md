@@ -16,7 +16,9 @@ stored; a profile read is a primary-key lookup. Decision record: tarodan-ops
 | Aggregates, one per owning domain                   | `order/stats/`, `refund/stats/`, `rating/stats/`, `trade/stats/`, `user/stats/` (`*-seller-trust-stats.service.ts`) |
 
 Any change to a definition or a constant below is a product decision and bumps
-`SELLER_TRUST_FORMULA_VERSION`.
+`SELLER_TRUST_FORMULA_VERSION`. Until the first production release, v1 may
+still be changed by the user's decision without a bump (the staging
+calibration, and the oversold-after-payment failure added on 2026-10-21).
 
 ## Data rules (apply everywhere)
 
@@ -50,12 +52,18 @@ score_x100 = round half up (score × 100), clamped to 0..500
 
 The definition rests only on fields that are populated for old and new rows:
 
-| Counts as a failure                                            | Evidence                                                                                                                                        |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Automatic cancellation because the seller did not ship in time | `cancel_reason` is the fixed text `ORDER_CANCEL_REASON.sellerShipDeadlineExpired`, written since 2026-04-22; any `cancelled_by`, including NULL |
-| Cancellation by the seller                                     | `cancelled_by = seller` (no order path writes it today; kept for when a seller cancel exists)                                                   |
-| Platform cancellation for a seller-fault reason                | `cancelled_by = platform` and `admin_cancel_reason_code` in `stock_error`, `listing_violation`                                                  |
-| A refund the seller was found at fault for                     | a `refund_requests` row with `fault_party = seller` and `status = refunded` (the reviewed fact; `reason` is only the buyer's claim)             |
+| Counts as a failure                                                                                                    | Evidence                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Automatic cancellation because the seller did not ship in time                                                         | `cancel_reason` is the fixed text `ORDER_CANCEL_REASON.sellerShipDeadlineExpired`, written since 2026-04-22; any `cancelled_by`, including NULL                                                |
+| Automatic cancellation right after payment: the stock could not cover the order (stock is the seller's responsibility) | `cancel_reason` is the fixed text `ORDER_CANCEL_REASON.oversoldAfterPayment`, written only by payment fulfilment since 2026-07-28; any `cancelled_by` (`system` since 2026-09-18, NULL before) |
+| Cancellation by the seller                                                                                             | `cancelled_by = seller` (no order path writes it today; kept for when a seller cancel exists)                                                                                                  |
+| Platform cancellation for a seller-fault reason                                                                        | `cancelled_by = platform` and `admin_cancel_reason_code` in `stock_error`, `listing_violation`                                                                                                 |
+| A refund the seller was found at fault for                                                                             | a `refund_requests` row with `fault_party = seller` and `status = refunded` (the reviewed fact; `reason` is only the buyer's claim)                                                            |
+
+Payment fulfilment clears `preparing_deadline` in the same write that cancels
+an oversold order, so these orders have no deadline. They join `E` anchored at
+the cancellation instead: `cancelled_at`, or `created_at` for rows from before
+2026-09-18 (payment follows creation within the 24-hour payment window).
 
 Every other cancellation is **left out of `E`**: it is neither a success nor
 counted against the seller. That covers buyer and system cancellations,
@@ -143,6 +151,25 @@ No new index on a hot table. Each query uses an existing one:
 At production size on 2026-10-21 (12 sellers to score, the largest with 67
 orders) a run reads a few hundred rows. Revisit the indexes if a seller grows
 past tens of thousands of orders (`orders (seller_id, preparing_deadline)`).
+
+## Read path
+
+Nothing is computed per request. Every read goes through
+`SellerTrustService` (`getForUser`: one primary-key lookup; `getForUsers`: one
+query for a list; `getAdminView`: with the breakdown). A missing row is the
+`new` level with the current formula version.
+
+| Surface                  | Field                                                              | Rule                                                                                                                                                                                                                                               |
+| ------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /users/:id/profile` | `trust: { rating, level, formulaVersion } \| null`                 | Premium sellers only (decision D6); null otherwise. The platform account is scored and shown like every seller (D5)                                                                                                                                |
+| `GET /users/me`          | `trust: { rating, level, formulaVersion }`                         | Always, premium or not: the owner sees their own score                                                                                                                                                                                             |
+| both                     | `trustScore`, `trustLevel` (deprecated)                            | For live mobile 1.0.5 (D7): `round(rating × 20)` and the old Turkish label (`Çok Güvenilir`, `Güvenilir`, `Orta`, `Gelişmekte`); both null when `trust` is null or has no score (`Yeni` is no longer sent). `seller-trust/helpers/legacy-trust.ts` |
+| `GET /admin/users/:id`   | `trust: { rating, level, formulaVersion, components, computedAt }` | `components` is the stored `SellerTrustComponentsV1`; `computedAt` null means not computed yet                                                                                                                                                     |
+| Listing ranking          | `qualityScore` rating part                                         | `round(rating × 4)`, 0 to 20; 0 without a score. No verified-seller bonus (D8). `product/helpers/quality-score.ts`, read by `ProductRankingService` and the nightly `update-popularity` (03:00, after this run)                                    |
+
+The profile counters (`stats.totalSales`, `totalTrades`, `averageRating`,
+`totalRatings`) stay live counts and are not the score's inputs.
+`users.show_trust_score` is still accepted from old clients and has no effect.
 
 ## Operations
 

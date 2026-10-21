@@ -23,6 +23,22 @@ import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
 import { scenario } from "../../test-utils/scenario";
 
+/**
+ * Stores a nightly trust score row (ADR 0014) as `seller-trust-refresh`
+ * would write it. The breakdown is not read by the profile endpoints.
+ */
+async function storeTrustScore(userId: string, scoreX100: number | null) {
+  await getPrisma().sellerTrustScore.create({
+    data: {
+      userId,
+      scoreX100,
+      formulaVersion: 1,
+      components: { version: 1 },
+      computedAt: new Date(),
+    },
+  });
+}
+
 describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
@@ -100,6 +116,14 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
       expect(res.body.membership.tier.type).toBeTruthy();
       expect(typeof res.body.listingCount).toBe("number");
       expect(typeof res.body.isPremium).toBe("boolean");
+      // Not scored yet: the owner still gets `trust`, as `new`.
+      expect(res.body.trust).toEqual({
+        rating: null,
+        level: "new",
+        formulaVersion: 1,
+      });
+      expect(res.body.trustScore).toBeNull();
+      expect(res.body.trustLevel).toBeNull();
       expect(res.body.stats).toEqual(
         expect.objectContaining({
           totalListings: expect.any(Number),
@@ -373,8 +397,10 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
     });
 
     scenario("USR-049", async () => {
-      // showTrustScore DB'ye yazılır; premium üyede public profilde trustScore yine dolu döner.
+      // showTrustScore is stored but has no effect: a premium seller's
+      // public profile still shows the score.
       const user = await createUser(ctx.module, { premium: true });
+      await storeTrustScore(user.id, 437);
       await request(server())
         .patch("/api/users/me")
         .set(authHeader(user))
@@ -382,12 +408,17 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
         .expect(200);
       const db = await getPrisma().user.findUnique({ where: { id: user.id } });
       expect(db?.showTrustScore).toBe(false);
-      // Misafir gözüyle public profil → premium olduğu için trustScore yine dolu.
+      // The public profile as a guest: premium, so the score is shown.
       const pub = await request(server())
         .get(`/api/users/${user.id}/profile`)
         .expect(200);
       expect(pub.body.isPremium).toBe(true);
-      expect(typeof pub.body.trustScore).toBe("number");
+      expect(pub.body.trust).toEqual({
+        rating: 4.37,
+        level: "trusted",
+        formulaVersion: 1,
+      });
+      expect(pub.body.trustScore).toBe(87);
     });
   });
 
@@ -1113,26 +1144,61 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
     });
 
     scenario("USR-058", async () => {
+      // A premium seller's stored score, plus the deprecated 0-100 fields
+      // live mobile 1.0.5 reads (round(rating x 20) and the old label).
       const user = await createUser(ctx.module, { premium: true });
+      await storeTrustScore(user.id, 374);
       const res = await request(server())
         .get(`/api/users/${user.id}/profile`)
         .expect(200);
       expect(res.body.isPremium).toBe(true);
-      expect(typeof res.body.trustScore).toBe("number");
-      expect(res.body.trustScore).toBeGreaterThanOrEqual(0);
-      expect(res.body.trustScore).toBeLessThanOrEqual(100);
-      expect(res.body.trustLevel).toBeTruthy();
+      expect(res.body.trust).toEqual({
+        rating: 3.74,
+        level: "fair",
+        formulaVersion: 1,
+      });
+      expect(res.body.trustScore).toBe(75);
+      expect(res.body.trustLevel).toBe("Orta");
+
+      // A premium seller below the minimum data rule: `new`, no legacy score.
+      const fresh = await createUser(ctx.module, { premium: true });
+      await storeTrustScore(fresh.id, null);
+      const newRes = await request(server())
+        .get(`/api/users/${fresh.id}/profile`)
+        .expect(200);
+      expect(newRes.body.trust).toEqual({
+        rating: null,
+        level: "new",
+        formulaVersion: 1,
+      });
+      expect(newRes.body.trustScore).toBeNull();
+      expect(newRes.body.trustLevel).toBeNull();
     });
 
     scenario("USR-059", async () => {
-      // Üyeliksiz (free) → trustScore/trustLevel gizli (null).
+      // No paid membership: the public trust fields are hidden (D6), but the
+      // owner still sees their own score on /users/me.
       const user = await createUser(ctx.module);
+      await storeTrustScore(user.id, 374);
       const res = await request(server())
         .get(`/api/users/${user.id}/profile`)
         .expect(200);
       expect(res.body.isPremium).toBe(false);
+      expect(res.body.trust).toBeNull();
       expect(res.body.trustScore).toBeNull();
       expect(res.body.trustLevel).toBeNull();
+
+      const me = await request(server())
+        .get("/api/users/me")
+        .set(authHeader(user))
+        .expect(200);
+      expect(me.body.isPremium).toBe(false);
+      expect(me.body.trust).toEqual({
+        rating: 3.74,
+        level: "fair",
+        formulaVersion: 1,
+      });
+      expect(me.body.trustScore).toBe(75);
     });
 
     scenario("USR-060", async () => {
@@ -1153,11 +1219,17 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
           autoRenew: false,
         },
       });
+      await storeTrustScore(user.id, 291);
       const res = await request(server())
         .get(`/api/users/${user.id}/profile`)
         .expect(200);
       expect(res.body.isPremium).toBe(true);
-      expect(typeof res.body.trustScore).toBe("number");
+      expect(res.body.trust).toMatchObject({
+        rating: 2.91,
+        level: "developing",
+      });
+      expect(res.body.trustScore).toBe(58);
+      expect(res.body.trustLevel).toBe("Gelişmekte");
     });
 
     scenario("USR-061", async () => {

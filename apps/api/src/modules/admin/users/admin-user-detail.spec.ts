@@ -1,3 +1,7 @@
+import {
+  SELLER_TRUST_FORMULA_VERSION,
+  type AdminSellerTrustView,
+} from "@tarodan/types";
 import { AdminUserService } from "./admin-user.service";
 
 /**
@@ -75,14 +79,27 @@ describe("AdminUserService.getUserById", () => {
     },
   };
 
-  const makeService = (user: Record<string, unknown> | null = row) => {
+  const NOT_COMPUTED: AdminSellerTrustView = {
+    rating: null,
+    level: "new",
+    formulaVersion: SELLER_TRUST_FORMULA_VERSION,
+    components: null,
+    computedAt: null,
+  };
+
+  const makeService = (
+    user: Record<string, unknown> | null = row,
+    trust: AdminSellerTrustView = NOT_COMPUTED,
+  ) => {
     const prisma = { user: { findUnique: jest.fn().mockResolvedValue(user) } };
+    const sellerTrust = { getAdminView: jest.fn().mockResolvedValue(trust) };
     const service = new AdminUserService(
       prisma as any,
       { createAuditLog: jest.fn() } as any,
-      undefined as any,
+      sellerTrust as never,
+      undefined as any, // storage
     );
-    return { service, prisma };
+    return { service, prisma, sellerTrust };
   };
 
   it("yalnız ekranın okuduğu alanları seçer — passwordHash/fcmToken çekilmez", async () => {
@@ -151,10 +168,66 @@ describe("AdminUserService.getUserById", () => {
   });
 
   it("olmayan kullanıcıda 404", async () => {
-    const { service } = makeService(null);
+    const { service, sellerTrust } = makeService(null);
 
     await expect(service.getUserById("yok")).rejects.toMatchObject({
       response: { i18nKey: "server.auth.userNotFound" },
+    });
+    expect(sellerTrust.getAdminView).not.toHaveBeenCalled();
+  });
+
+  describe("trust score (ADR 0014)", () => {
+    it("adds the stored score with its breakdown from SellerTrustService", async () => {
+      const scored: AdminSellerTrustView = {
+        rating: 4.37,
+        level: "trusted",
+        formulaVersion: 1,
+        components: {
+          version: 1,
+          rating: { raters: 25, smoothed: 4.6667, subScore: 0.9167 },
+          reliability: { eligibleOrders: 45, failures: 1, subScore: 0.9127 },
+          onTime: { shipped: 44, late: 3, subScore: 0.8704 },
+          volume: { transactions: 40, counterparties: 30, subScore: 0.8047 },
+          tenure: { days: 400, subScore: 0.5479 },
+        },
+        computedAt: "2026-10-21T23:30:00.000Z",
+      };
+      const { service, prisma, sellerTrust } = makeService(row, scored);
+
+      const result = await service.getUserById("u1");
+
+      expect(sellerTrust.getAdminView).toHaveBeenCalledWith("u1");
+      expect(result.trust).toEqual(scored);
+      // The table is read through its owner, never selected here.
+      const select = prisma.user.findUnique.mock.calls[0][0].select;
+      expect(select.sellerTrustScore).toBeUndefined();
+    });
+
+    it("says `not computed` (no breakdown, no time) when there is no row", async () => {
+      const { service } = makeService();
+
+      const result = await service.getUserById("u1");
+
+      expect(result.trust).toEqual(NOT_COMPUTED);
+    });
+
+    it("scores the platform account like everyone else (D5)", async () => {
+      const scored: AdminSellerTrustView = {
+        rating: 2.5,
+        level: "developing",
+        formulaVersion: 1,
+        components: null,
+        computedAt: "2026-10-21T23:30:00.000Z",
+      };
+      const { service } = makeService(
+        { ...row, sellerType: "platform" },
+        scored,
+      );
+
+      const result = await service.getUserById("u1");
+
+      expect(result.sellerType).toBe("platform");
+      expect(result.trust).toEqual(scored);
     });
   });
 });

@@ -102,8 +102,34 @@ describe("seller trust SQL contract", () => {
         `o."cancelled_by" = 'platform'::"CancellationActor" AND o."admin_cancel_reason_code" = ANY(ARRAY['stock_error','listing_violation']::text[])`,
       );
       expect(sql).toContain(`OR o."id" = ANY(ARRAY['o-fault']::text[])`);
+      // Oversold right after payment: stock is the seller's responsibility
+      // (user sign-off, plan section 16). Any actor, like the deadline cancel.
+      expect(sql).toContain(
+        `OR o."cancel_reason" = '${ORDER_CANCEL_REASON.oversoldAfterPayment}' OR (`,
+      );
       // No other actor or reason is a failure.
       expect(sql).not.toMatch(/'(buyer|system)'::"CancellationActor"/);
+      for (const neutral of [
+        ORDER_CANCEL_REASON.buyerCancelled,
+        ORDER_CANCEL_REASON.paymentWindowExpired,
+        ORDER_CANCEL_REASON.stockDepleted,
+        ORDER_CANCEL_REASON.stockReservedForTrade,
+        ORDER_CANCEL_REASON.replacedByNewCheckout,
+      ]) {
+        expect(sql).not.toContain(`'${neutral}'`);
+      }
+    });
+
+    it("brings oversold-after-payment cancels into E, anchored at the cancellation", () => {
+      // Payment fulfilment clears `preparing_deadline` when it cancels an
+      // oversold order, so the deadline branch can never see one.
+      expect(sql).toContain(
+        `OR ( o."status" = 'cancelled'::"OrderStatus" AND o."cancel_reason" = '${ORDER_CANCEL_REASON.oversoldAfterPayment}' AND COALESCE(o."cancelled_at", o."created_at") >= '${since.toISOString()}' AND COALESCE(o."cancelled_at", o."created_at") < '${asOf.toISOString()}' )`,
+      );
+      // The paid-order branch keeps its own anchor.
+      expect(sql).toContain(
+        `( o."preparing_deadline" IS NOT NULL AND COALESCE(o."original_preparing_deadline", o."preparing_deadline") >= '${since.toISOString()}'`,
+      );
     });
 
     it("leaves a cancellation that is not a failure out of E (never against the seller)", () => {

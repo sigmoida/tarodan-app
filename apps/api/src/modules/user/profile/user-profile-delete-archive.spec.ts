@@ -205,6 +205,7 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       search as never,
       cache as never,
       notifications as never,
+      {} as never, // sellerTrust
       undefined, // appleTokens
       outbox as never,
       realtime as never,
