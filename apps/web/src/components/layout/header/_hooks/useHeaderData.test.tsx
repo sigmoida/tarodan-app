@@ -180,7 +180,7 @@ describe("useHeaderData session reconcile", () => {
     expect(getQueryClient().getQueryData(ORDERS)).toEqual(["u1-order"]);
   });
 
-  it("sends one profile request for a burst of reconcile triggers", async () => {
+  it("answers a burst of reconcile triggers with one check and one re-run", async () => {
     await mountSignedInAsU1();
 
     h.hasAuthMarker.mockReturnValue(false);
@@ -196,6 +196,51 @@ describe("useHeaderData session reconcile", () => {
     expect(h.getProfile).toHaveBeenCalledTimes(1);
     answer(profileOf("u1"));
     await flush();
+    expect(h.getProfile).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes in a switch that another tab makes while a check is pending", async () => {
+    await mountSignedInAsU1();
+
+    // A route-change check is in flight with u1's cookie...
+    let answerOld!: (v: unknown) => void;
+    h.getProfile
+      .mockReturnValueOnce(new Promise((r) => (answerOld = r)))
+      .mockResolvedValueOnce(profileOf("u2"));
+    void useAuthStore.getState().checkAuth();
+    // ...when another tab signs in as u2.
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ id: "u2" }));
+    act(
+      () =>
+        void window.dispatchEvent(
+          new StorageEvent("storage", { key: SNAPSHOT_KEY }),
+        ),
+    );
+    answerOld(profileOf("u1"));
+    await flush();
+
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+    expect(localStorage.getItem(SNAPSHOT_KEY)).toContain('"u2"');
+    expect(getQueryClient().getQueryData(ORDERS)).toBeUndefined();
+  });
+
+  it("takes in another tab's account switch on a payment page too", async () => {
+    await mountSignedInAsU1();
+    window.history.replaceState(null, "", "/payment/abc");
+
+    h.getProfile.mockResolvedValue(profileOf("u2"));
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ id: "u2" }));
+    act(
+      () =>
+        void window.dispatchEvent(
+          new StorageEvent("storage", { key: SNAPSHOT_KEY }),
+        ),
+    );
+    await flush();
+    window.history.replaceState(null, "", "/");
+
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+    expect(getQueryClient().getQueryData(ORDERS)).toBeUndefined();
   });
 
   it("leaves the session alone on a payment page, as the API client does", async () => {

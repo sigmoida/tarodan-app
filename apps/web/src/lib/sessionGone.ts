@@ -19,16 +19,20 @@ export function reportSessionGone(): void {
   handler?.();
 }
 
+/** Route segments of the checkout, cart and payment flows (any locale). */
+const PRESERVED_SEGMENTS = new Set([
+  "checkout",
+  "cart",
+  "payment",
+  "payment-options",
+]);
+
 /**
  * Checkout, cart and payment pages keep their session through a 401 or a
  * missing marker: dropping it would break the PayTR return and the
- * `/payments/status` check that follows it.
+ * `/payments/status` check that follows it. Matches whole path segments,
+ * so `/profile/payments` or a listing slug starting with "cart" do not.
  */
 export function isSessionPreservedPath(pathname: string): boolean {
-  return (
-    pathname === "/checkout" ||
-    pathname.endsWith("/checkout") ||
-    pathname.includes("/cart") ||
-    pathname.includes("/payment")
-  );
+  return pathname.split("/").some((segment) => PRESERVED_SEGMENTS.has(segment));
 }

@@ -2,7 +2,7 @@ import { api } from "./client";
 
 // User Profile
 export const userApi = {
-  getProfile: () => api.get("/users/me"),
+  getProfile: (options?: { timeout?: number }) => api.get("/users/me", options),
   updateProfile: (data: {
     displayName?: string;
     phone?: string;

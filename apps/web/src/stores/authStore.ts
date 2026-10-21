@@ -205,10 +205,14 @@ const mapApiUser = (apiUser: any): User => ({
  */
 const USER_SNAPSHOT_KEY = "tarodan_user_snapshot";
 
-/** Orders `checkAuth` calls; see `checkAuth`. */
-let authCheckGeneration = 0;
-/** True while the latest `checkAuth` waits for the profile. */
-let checkInFlight = false;
+/** Bumped by `clearSession`; a check of an older session never writes. */
+let sessionGeneration = 0;
+/** The pending `checkAuth` run, if any (single flight). */
+let activeCheck: Promise<void> | null = null;
+/** Set while a check is pending to ask for one more run after it. */
+let rerunCheck = false;
+/** A hung `/users/me` must not hold the single flight forever. */
+const PROFILE_TIMEOUT_MS = 15_000;
 function readUserSnapshot(): User | null {
   if (typeof window === "undefined") return null;
   try {
@@ -337,6 +341,84 @@ export const useAuthStore = create<AuthState>()(
       const initial = getInitialAuthFromStorage();
 
       /**
+       * One session check: the marker, the snapshot fast path, then
+       * `/users/me`. Its answer is dropped when the session ended meanwhile
+       * (`clearSession`) or another run was asked for (`rerunCheck`), which
+       * then answers with the current cookies.
+       */
+      const runSessionCheck = async () => {
+        const generation = sessionGeneration;
+        const superseded = () => generation !== sessionGeneration || rerunCheck;
+        clearLegacyTokenKeys();
+        // Could we be signed in? The server writes a JS-readable marker
+        // cookie with the session. Without it a guest stays a guest with no
+        // profile call; a signed-in store asks the server first, because
+        // the marker can be missing for a moment while two refreshes race.
+        if (!hasAuthMarker() && !isSignedIn(get())) {
+          get().clearSession();
+          return;
+        }
+
+        // FAST PATH: hydrate the account from the cached snapshot instantly (no
+        // network) so the header renders authed within one frame; the request
+        // below then refreshes the full, live user.
+        const snapshot = readUserSnapshot();
+        if (snapshot) {
+          set({
+            user: snapshot,
+            isAuthenticated: true,
+            limits: getMembershipLimitsForUser(snapshot),
+            isLoading: false,
+          });
+        } else {
+          set({ isLoading: true });
+        }
+
+        try {
+          // /users/me: on a 401 the gateway proxy first tries a silent
+          // refresh from the session cookie.
+          const response = await userApi.getProfile({
+            timeout: PROFILE_TIMEOUT_MS,
+          });
+          if (superseded()) return;
+          const apiUser = response.data.user || response.data;
+          const user = mapApiUser(apiUser);
+          const limits = getMembershipLimitsForUser(user);
+          // The server owns the tarodan_authed marker; the client never writes it.
+          writeUserSnapshot(user);
+          set({
+            user,
+            token: null,
+            refreshToken: null,
+            isAuthenticated: true,
+            limits,
+          });
+        } catch (error: unknown) {
+          if (superseded()) return;
+          const status = (error as { response?: { status?: number } })?.response
+            ?.status;
+          const isUnauthorized = status === 401 || status === 403;
+          // The BFF proxy expires the `tarodan_authed` marker ONLY when the session
+          // is genuinely dead (refresh token rejected). So a 401 whose marker is
+          // now gone is a real logout; a 401 whose marker SURVIVED was a transient
+          // refresh failure (API redeploy / 5xx) — don't eject the user. The server
+          // owns marker clearing now, so we no longer clear it here.
+          if (isUnauthorized && !hasAuthMarker()) {
+            get().clearSession();
+          } else {
+            // Transient error (API unreachable / 5xx / network / timeout, or a
+            // 401 that didn't kill the session) — the session may still be
+            // valid. Stay authenticated (user data fills on the next
+            // refreshUser/checkAuth). Otherwise an API hiccup — notably on the
+            // payment return refresh — ejected the user.
+            set({ isAuthenticated: true });
+          }
+        } finally {
+          if (!superseded()) set({ isLoading: false });
+        }
+      };
+
+      /**
        * Shared tail of every sign-in action. The server action already wrote
        * the httpOnly session cookies and the `tarodan_authed` marker; the
        * client never writes them. The guest cache is dropped by the session
@@ -425,6 +507,9 @@ export const useAuthStore = create<AuthState>()(
         },
 
         clearSession: () => {
+          // Answers of checks started before this point belong to the ended
+          // session and must not write it back (see runSessionCheck).
+          sessionGeneration++;
           clearUserSnapshot();
           set({
             user: null,
@@ -436,97 +521,46 @@ export const useAuthStore = create<AuthState>()(
           });
         },
 
-        checkAuth: async () => {
-          // Only the latest check may write: an older profile response must
-          // not overwrite a newer one (e.g. another tab switched account).
-          const generation = ++authCheckGeneration;
-          const isLatest = () => generation === authCheckGeneration;
-          clearLegacyTokenKeys();
-          // Could we be signed in? The server writes a JS-readable marker
-          // cookie with the session. Without it a guest stays a guest with no
-          // profile call; a signed-in store asks the server first, because
-          // the marker can be missing for a moment while two refreshes race.
-          if (!hasAuthMarker() && !isSignedIn(get())) {
-            checkInFlight = false;
-            get().clearSession();
-            return;
+        // Single flight: a call while a check is pending asks for one more run
+        // and resolves after it, so `await checkAuth()` (e.g. after a sign-in)
+        // always sees an answer for the cookies set before the call.
+        checkAuth: () => {
+          if (activeCheck) {
+            rerunCheck = true;
+            return activeCheck;
           }
-
-          // FAST PATH: hydrate the account from the cached snapshot instantly (no
-          // network) so the header renders authed within one frame; the request
-          // below then refreshes the full, live user.
-          const snapshot = readUserSnapshot();
-          if (snapshot) {
-            set({
-              user: snapshot,
-              isAuthenticated: true,
-              limits: getMembershipLimitsForUser(snapshot),
-              isLoading: false,
-            });
-          } else {
-            set({ isLoading: true });
-          }
-
-          checkInFlight = true;
-          try {
-            // /users/me: on a 401 the gateway proxy first tries a silent
-            // refresh from the session cookie.
-            const response = await userApi.getProfile();
-            if (!isLatest()) return;
-            const apiUser = response.data.user || response.data;
-            const user = mapApiUser(apiUser);
-            const limits = getMembershipLimitsForUser(user);
-            // The server owns the tarodan_authed marker; the client never writes it.
-            writeUserSnapshot(user);
-            set({
-              user,
-              token: null,
-              refreshToken: null,
-              isAuthenticated: true,
-              limits,
-            });
-          } catch (error: unknown) {
-            if (!isLatest()) return;
-            const status = (error as { response?: { status?: number } })
-              ?.response?.status;
-            const isUnauthorized = status === 401 || status === 403;
-            // The BFF proxy expires the `tarodan_authed` marker ONLY when the session
-            // is genuinely dead (refresh token rejected). So a 401 whose marker is
-            // now gone is a real logout; a 401 whose marker SURVIVED was a transient
-            // refresh failure (API redeploy / 5xx) — don't eject the user. The server
-            // owns marker clearing now, so we no longer clear it here.
-            if (isUnauthorized && !hasAuthMarker()) {
-              get().clearSession();
-            } else {
-              // Transient error (API unreachable / 5xx / network, or a 401 that didn't
-              // kill the session) — the token may still be valid. Stay authenticated
-              // (user data fills on the next refreshUser/checkAuth). Otherwise an API
-              // hiccup — notably on the payment return refresh — ejected the user.
-              set({ isAuthenticated: true });
-            }
-          } finally {
-            if (isLatest()) {
-              checkInFlight = false;
-              set({ isLoading: false });
-            }
-          }
+          activeCheck = (async () => {
+            do {
+              rerunCheck = false;
+              await runSessionCheck();
+            } while (rerunCheck);
+          })().finally(() => {
+            activeCheck = null;
+          });
+          return activeCheck;
         },
 
         reconcileSession: () => {
-          // A pending check already answers with the latest session.
-          if (checkInFlight) return;
+          // A pending check may already be answering for the old session
+          // (another tab just changed it): run it once more instead.
+          if (activeCheck) {
+            rerunCheck = true;
+            return;
+          }
           const state = get();
           const marker = hasAuthMarker();
           if (!isSignedIn(state)) {
             if (marker) void get().checkAuth();
             return;
           }
-          // Checkout and payment pages keep their session (as on a 401).
-          if (isSessionPreservedPath(window.location.pathname)) return;
           const snapshotId = readUserSnapshot()?.id;
           const otherUser =
             !!state.user && !!snapshotId && snapshotId !== state.user.id;
-          if (!marker || otherUser) void get().checkAuth();
+          // A missing marker on checkout and payment pages keeps the session,
+          // as on a 401 there; another account taking over never does.
+          const markerGone =
+            !marker && !isSessionPreservedPath(window.location.pathname);
+          if (otherUser || markerGone) void get().checkAuth();
         },
 
         setUser: (user) => {
@@ -600,7 +634,11 @@ if (typeof window !== "undefined") {
   // The API client saw a 401 with the marker gone: re-check with the server
   // and drop to a guest if the session really ended, also on the public
   // pages the client does not redirect away from.
-  setSessionGoneHandler(() => useAuthStore.getState().reconcileSession());
+  // Ignored while a check is pending: that check meets the same 401 itself
+  // (and reporting it would only queue another run of that check).
+  setSessionGoneHandler(() => {
+    if (!activeCheck) useAuthStore.getState().reconcileSession();
+  });
   // Another tab signed in, signed out or switched account: it wrote or
   // removed the user snapshot. Covers every route, with or without Header.
   window.addEventListener("storage", (event) => {

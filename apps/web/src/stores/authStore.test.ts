@@ -181,7 +181,7 @@ describe("authStore query cache per session", () => {
     expect(cached()).toBe(3);
   });
 
-  it("lets the latest checkAuth win when profile answers cross", async () => {
+  it("answers overlapping checks once more and keeps the newer user", async () => {
     signedIn();
     h.hasAuthMarker.mockReturnValue(true);
     let answerFirst!: (v: unknown) => void;
@@ -190,10 +190,65 @@ describe("authStore query cache per session", () => {
       .mockResolvedValueOnce({ data: { id: "u2" } });
 
     const first = useAuthStore.getState().checkAuth();
-    await useAuthStore.getState().checkAuth();
+    const second = useAuthStore.getState().checkAuth();
     answerFirst({ data: { id: "u1" } });
-    await first;
+    await second;
+
+    expect(first).toBe(second);
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+    expect(localStorage.getItem("tarodan_user_snapshot")).toContain('"u2"');
+  });
+
+  it("resolves login with the signed-in user while an older check is pending", async () => {
+    h.hasAuthMarker.mockReturnValue(true);
+    let answerOld!: (v: unknown) => void;
+    h.getProfile
+      .mockReturnValueOnce(new Promise((r) => (answerOld = r)))
+      .mockResolvedValueOnce({ data: { id: "u2" } });
+    h.loginAction.mockResolvedValue({ status: "ok", user: null });
+
+    void useAuthStore.getState().checkAuth(); // e.g. a focus reconcile
+    const login = useAuthStore.getState().login("a@b.c", "secret");
+    answerOld({ data: { id: "u1" } });
+    await login;
 
     expect(useAuthStore.getState().user?.id).toBe("u2");
+  });
+
+  it("resolves login with the user when a newer check starts meanwhile", async () => {
+    h.hasAuthMarker.mockReturnValue(true);
+    let answerLogin!: (v: unknown) => void;
+    h.getProfile
+      .mockReturnValueOnce(new Promise((r) => (answerLogin = r)))
+      // The newer check answers 10 ms after it starts.
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => setTimeout(() => r({ data: { id: "u2" } }), 10)),
+      );
+    h.loginAction.mockResolvedValue({ status: "ok", user: null });
+
+    const login = useAuthStore.getState().login("a@b.c", "secret");
+    await vi.waitFor(() => expect(h.getProfile).toHaveBeenCalledTimes(1));
+    void useAuthStore.getState().checkAuth(); // e.g. the Header remounting
+    answerLogin({ data: { id: "u2" } });
+    await login;
+
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+  });
+
+  it("does not write the old user back when a check answers after logout", async () => {
+    signedIn();
+    h.hasAuthMarker.mockReturnValue(true);
+    let answer!: (v: unknown) => void;
+    h.getProfile.mockReturnValueOnce(new Promise((r) => (answer = r)));
+    h.logoutAction.mockResolvedValue(undefined);
+
+    const pending = useAuthStore.getState().checkAuth();
+    await useAuthStore.getState().logout();
+    answer({ data: { id: "u1" } });
+    await pending;
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(localStorage.getItem("tarodan_user_snapshot")).toBeNull();
   });
 });
