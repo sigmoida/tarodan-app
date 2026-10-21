@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
-import { isOptionalTlAmountWithin } from "@/lib/amount-input";
+import { isOptionalTlAmountWithin } from "@tarodan/shared";
 import { fmtTry } from "@/lib/format";
 import { optionalReasonField, reasonField } from "@/lib/schemas/common";
 

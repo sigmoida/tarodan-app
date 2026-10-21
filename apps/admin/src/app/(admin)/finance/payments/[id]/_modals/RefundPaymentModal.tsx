@@ -16,7 +16,7 @@ import {
   isBoostRefundRedirect,
 } from "@/components/finance/BoostRefundRedirectAlert";
 import { RefundOutcomeUnknownModal } from "@/components/finance/RefundOutcomeUnknownModal";
-import { optionalTlAmountPayload } from "@/lib/amount-input";
+import { optionalTlAmountPayload } from "@tarodan/shared";
 import { isRefundOutcomeUnknown } from "@/lib/error";
 import { fmtTry } from "@/lib/format";
 import { adminKeys } from "@/lib/query/keys";
@@ -107,7 +107,7 @@ export function RefundPaymentModal({
           <p className="text-muted">
             {t("admin.finance.payments.totalPaymentAmount")}: {fmtTry(amount)}
           </p>
-          {/* Text, not type="number" (see lib/amount-input). */}
+          {/* Text, not type="number" (see `@tarodan/shared` `parseTlAmount`). */}
           <FormInput
             name="amount"
             type="text"

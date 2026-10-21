@@ -44,7 +44,7 @@ export interface DiscountFormData {
   name: string;
   description: string;
   type: "percentage" | "fixed_amount" | "bogo" | "bulk_quantity";
-  /** Raw field text (percent or TL), read by `lib/tlAmount` like the amounts. */
+  /** Raw field text (percent or TL), read by the shared `parseTlAmount` like the amounts. */
   value: string;
   /** bogo: "buy X" / "get Y free"; bulk_quantity: minimum quantity. Raw field text. */
   buyQuantity: string;
@@ -52,7 +52,7 @@ export interface DiscountFormData {
   minQuantity: string;
   scope: "product" | "seller";
   targetProductIds: string[];
-  /** TL amounts as raw field text, read by `lib/tlAmount`. */
+  /** TL amounts as raw field text, read by the shared `parseTlAmount`. */
   minCartValue: string;
   maxDiscountAmount: string;
   usageLimitTotal: string;

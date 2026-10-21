@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The preview prices the offer the form would send: the cash comes from the
- * same parser as the submit (`@/lib/tlAmount`), so a comma amount is priced
+ * same parser as the submit (`@tarodan/shared` `tlAmountValue`), so a comma amount is priced
  * with its kuruş and a refused or empty field is priced without cash.
  */
 const h = vi.hoisted(() => ({ preview: vi.fn() }));

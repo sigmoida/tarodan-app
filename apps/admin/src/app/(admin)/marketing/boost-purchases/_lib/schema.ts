@@ -10,7 +10,8 @@ import {
   isOptionalTlAmountWithin,
   optionalTlAmountPayload,
   parseTlAmount,
-} from "@/lib/amount-input";
+  STRICT_TL_AMOUNT,
+} from "@tarodan/shared";
 import { fmtTry } from "@/lib/format";
 import type {
   GrantBoostRequest,
@@ -68,8 +69,8 @@ export function refundBoostPayload(v: RefundBoostValues): RefundBoostRequest {
  * the boost still stops, and that rest cannot be refunded later.
  */
 export function isPartialRefund(v: RefundBoostValues, max: number): boolean {
-  const amount = parseTlAmount(v.amount);
-  return amount !== null && amount < max;
+  const parsed = parseTlAmount(v.amount, STRICT_TL_AMOUNT);
+  return parsed.status === "ok" && parsed.amount < max;
 }
 
 export const revokeBoostSchema = (t: T) =>

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { tlAmountValue } from "@/lib/tlAmount";
+import { tlAmountValue } from "@tarodan/shared";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesApi } from "@/lib/api";

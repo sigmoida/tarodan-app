@@ -268,7 +268,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                     helperText={t("trade.cashHelper")}
                     error={
                       counterCashRefused
-                        ? t("trade.cashFormatRefused")
+                        ? t("validation.amountFormatRefused")
                         : undefined
                     }
                     className="pr-4 h-12 rounded-xl"

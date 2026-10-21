@@ -1,6 +1,6 @@
 /** @format */
 
-import { tlAmountInputValue, tlAmountValue } from "@/lib/tlAmount";
+import { tlAmountInputValue, tlAmountValue } from "@tarodan/shared";
 import type { Discount, DiscountFormData } from "./types";
 
 /**

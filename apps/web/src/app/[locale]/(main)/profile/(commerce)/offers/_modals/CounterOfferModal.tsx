@@ -11,7 +11,7 @@ import type { Offer } from "../_lib/types";
 import { formatTL } from "@/lib/format";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { useOfferFloor } from "@/hooks/usePublicSettings";
-import { parseTlAmount } from "@/lib/tlAmount";
+import { parseTlAmount } from "@tarodan/shared";
 
 interface CounterOfferModalProps {
   open: boolean;
@@ -43,13 +43,13 @@ export default function CounterOfferModal({
   const base = Number(offer.amount);
   const baseLabel = formatTL(base);
   // "1.000" is one thousand to a Turkish user: grouping is refused, never read
-  // as a decimal (see `lib/tlAmount`).
+  // as a decimal (see `@tarodan/shared` `parseTlAmount`).
   const parsed = parseTlAmount(amount);
   const refused = parsed.status === "refused";
 
   const submit = () => {
     if (parsed.status === "refused") {
-      toast.error(t("trade.cashFormatRefused"));
+      toast.error(t("validation.amountFormatRefused"));
       return;
     }
     if (parsed.status === "empty") {
@@ -123,7 +123,7 @@ export default function CounterOfferModal({
         placeholder={t("offer.counterModal.tutar")}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        error={refused ? t("trade.cashFormatRefused") : undefined}
+        error={refused ? t("validation.amountFormatRefused") : undefined}
         helperText={
           floor != null
             ? t("listing.priceMinHint", { minPrice: formatTL(floor) })

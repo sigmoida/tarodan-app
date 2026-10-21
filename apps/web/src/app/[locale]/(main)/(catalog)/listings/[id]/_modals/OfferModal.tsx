@@ -16,7 +16,7 @@ import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { offerSchema, type OfferValues } from "./offerSchema";
 import { formatTL } from "@/lib/format";
-import { tlAmountValue } from "@/lib/tlAmount";
+import { tlAmountValue } from "@tarodan/shared";
 
 /**
  * Make-offer dialog — owns its RHF+zod form and the create-offer mutation, framed

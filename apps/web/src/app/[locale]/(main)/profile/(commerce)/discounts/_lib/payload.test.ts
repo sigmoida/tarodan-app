@@ -94,9 +94,9 @@ describe("discount amounts, refusal", () => {
           }),
         ),
       ).toEqual({
-        value: "trade.cashFormatRefused",
-        minCartValue: "trade.cashFormatRefused",
-        maxDiscountAmount: "trade.cashFormatRefused",
+        value: "validation.amountFormatRefused",
+        minCartValue: "validation.amountFormatRefused",
+        maxDiscountAmount: "validation.amountFormatRefused",
       });
     },
   );

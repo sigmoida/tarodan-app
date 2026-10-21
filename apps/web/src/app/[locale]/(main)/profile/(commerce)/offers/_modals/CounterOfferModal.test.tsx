@@ -124,7 +124,9 @@ describe("CounterOfferModal amount", () => {
     "refuses %j with the shared copy and no API call",
     async (text) => {
       type(text);
-      expect(document.body.textContent).toContain("trade.cashFormatRefused");
+      expect(document.body.textContent).toContain(
+        "validation.amountFormatRefused",
+      );
       expect(sendButton().disabled).toBe(true);
       await send();
       expect(h.post).not.toHaveBeenCalled();
