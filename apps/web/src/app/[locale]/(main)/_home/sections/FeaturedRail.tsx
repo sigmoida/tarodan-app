@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { productBadgeLabels } from "@/lib/productCardBadges";
 import type { Product } from "@/types/product";
 import HomeSection from "./HomeSection";
 import FeaturedRailClient from "./FeaturedRailClient";
@@ -15,9 +16,7 @@ export default async function FeaturedRail({ items }: { items: Product[] }) {
     >
       <FeaturedRailClient
         initialItems={items}
-        sponsoredLabel={t("product.sponsored")}
-        tradeLabel={t("faq.trade")}
-        discountLabel={t("product.discount")}
+        badgeLabels={productBadgeLabels(t)}
         outOfStockLabel={t("product.stockFinished")}
       />
     </HomeSection>

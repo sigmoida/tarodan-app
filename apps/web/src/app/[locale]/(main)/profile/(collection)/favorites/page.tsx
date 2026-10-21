@@ -21,8 +21,6 @@ export default function FavoritesPage() {
     isLoading,
     isSharedView,
     handleRemove,
-    handleCartToggle,
-    isInCart,
     isPending,
   } = useFavorites();
 
@@ -60,8 +58,6 @@ export default function FavoritesPage() {
           pendingCount={pendingCount}
           isSharedView={isSharedView}
           onRemove={handleRemove}
-          onCartToggle={handleCartToggle}
-          isInCart={isInCart}
           isPending={isPending}
         />
       )}

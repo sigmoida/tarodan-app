@@ -5,14 +5,11 @@
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import { listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { wishlistItemsQuery } from "@/lib/wishlist";
 import { useToggleWishlist, useWishlistPendingIds } from "@/hooks/useWishlist";
 import { useAuthStore } from "@/stores/authStore";
-import { useCart } from "@/hooks/useCart";
-import { useLocale, useTranslations } from "next-intl";
 import type { WishlistItem } from "@/components/favorites/types";
 import { selectFavoritesView } from "@/components/favorites/select";
 import { MAX_SHARED_FAVORITES } from "@/lib/share";
@@ -20,7 +17,8 @@ import { publicNameOf } from "@/lib/public-name";
 
 /**
  * Favorites data: the user's wishlist OR a shared read-only list (`?ids=`), plus
- * the remove action and add-to-cart handler. The list is the shared
+ * the remove action (each card's cart toggle is the shared
+ * `ProductCardCartButton`). The list is the shared
  * `wishlistItemsQuery` (same cache as the header badge and the card hearts) and
  * removal goes through the shared `useToggleWishlist` (optimistic + rollback).
  *
@@ -32,14 +30,6 @@ import { publicNameOf } from "@/lib/public-name";
 export function useFavorites() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
-  const {
-    addToCart,
-    removeFromCart,
-    removeFromOfflineCart,
-    items: cartItems,
-    offlineItems,
-  } = useCart();
-  const t = useTranslations();
 
   const sharedIds = useMemo(() => {
     const ids = searchParams.get("ids");
@@ -106,40 +96,6 @@ export function useFavorites() {
   const toggleWishlist = useToggleWishlist();
   const pendingIds = useWishlistPendingIds();
 
-  const inCartIds = useMemo(
-    () =>
-      new Set<string>([
-        ...cartItems.map((ci) => ci.productId),
-        ...offlineItems.map((ci) => ci.productId),
-      ]),
-    [cartItems, offlineItems],
-  );
-  const isInCart = (productId: string) => inCartIds.has(productId);
-
-  // Toggle like the product detail page: add when absent, remove (from the
-  // authed or the guest cart, whichever holds it) when present.
-  const handleCartToggle = async (item: WishlistItem) => {
-    try {
-      if (isInCart(item.productId)) {
-        if (cartItems.some((ci) => ci.productId === item.productId)) {
-          await removeFromCart(item.productId);
-        } else {
-          removeFromOfflineCart(item.productId);
-        }
-        toast.success(t("product.removedFromCart"));
-      } else {
-        await addToCart(item.productId);
-        toast.success(t("product.addedToCart"));
-      }
-    } catch (error: any) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to update cart:", error);
-      toast.error(
-        error?.response?.data?.message || t("common.operationFailed"),
-      );
-    }
-  };
-
   return {
     items,
     pendingCount,
@@ -150,7 +106,5 @@ export function useFavorites() {
     isPending: (productId: string) => pendingIds.has(productId),
     /** `false` = aynı ürün için istek sürüyor, tıklama yok sayıldı. */
     handleRemove: (productId: string) => toggleWishlist(productId, true),
-    handleCartToggle,
-    isInCart,
   };
 }

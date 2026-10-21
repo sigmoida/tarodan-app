@@ -2,11 +2,12 @@
 
 "use client";
 
-import { TrashIcon, ShoppingCartIcon } from "@heroicons/react/24/outline";
-import { Button, IconButton } from "@tarodan/ui";
+import { TrashIcon } from "@heroicons/react/24/outline";
+import { IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
+import ProductCardCartButton from "@/components/ui/ProductCardCartButton";
 import { useTranslations } from "next-intl";
 import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
 import { wishlistItemToProduct, type WishlistItem } from "./types";
@@ -17,8 +18,6 @@ export default function FavoritesGrid({
   pendingCount,
   isSharedView,
   onRemove,
-  onCartToggle,
-  isInCart,
   isPending,
 }: {
   items: WishlistItem[];
@@ -26,8 +25,6 @@ export default function FavoritesGrid({
   pendingCount: number;
   isSharedView: boolean;
   onRemove: (productId: string) => void;
-  onCartToggle: (item: WishlistItem) => void;
-  isInCart: (productId: string) => boolean;
   /** Bu ürün için favori isteği sürüyor mu? (kaldır düğmesi meşgul) */
   isPending: (productId: string) => boolean;
 }) {
@@ -53,43 +50,39 @@ export default function FavoritesGrid({
       {Array.from({ length: pendingCount }, (_, i) => (
         <FavoriteTileSkeleton key={`pending-${i}`} />
       ))}
-      {items.map((item, index) => {
-        const inCart = isInCart(item.productId);
-        return (
-          <ProductCard
-            key={item.id || index}
-            product={wishlistItemToProduct(item)}
-            index={index}
-            showMeta={false}
-            // Kartın kendi "kaldır" düğmesi var — ikinci bir kalp çizilmez.
-            showFavorite={false}
-            overlay={
-              !isSharedView ? (
-                <IconButton
-                  variant="secondary"
-                  onClick={() => onRemove(item.productId)}
-                  {...favoriteBusyProps(isPending(item.productId))}
-                  className={`rounded-full bg-surface-elevated shadow-md hover:bg-danger-50 ${FAVORITE_BUSY_CLASS}`}
-                  title={t("favorites.removeFromFavorites")}
-                  aria-label={t("favorites.removeFromFavorites")}
-                >
-                  <TrashIcon className="h-4 w-4 text-danger-500 sm:h-5 sm:w-5" />
-                </IconButton>
-              ) : undefined
-            }
-            footer={
-              <Button
-                variant={inCart ? "danger" : "primary"}
-                onClick={() => onCartToggle(item)}
-                className="flex w-full gap-1.5 py-1.5 text-xs sm:gap-2 sm:py-2 sm:text-sm"
+      {items.map((item, index) => (
+        <ProductCard
+          key={item.id || index}
+          product={wishlistItemToProduct(item)}
+          index={index}
+          showMeta={false}
+          // Kartın kendi "kaldır" düğmesi var — ikinci bir kalp çizilmez.
+          showFavorite={false}
+          overlay={
+            !isSharedView ? (
+              <IconButton
+                variant="secondary"
+                onClick={() => onRemove(item.productId)}
+                {...favoriteBusyProps(isPending(item.productId))}
+                className={`rounded-full bg-surface-elevated shadow-md hover:bg-danger-50 ${FAVORITE_BUSY_CLASS}`}
+                title={t("favorites.removeFromFavorites")}
+                aria-label={t("favorites.removeFromFavorites")}
               >
-                <ShoppingCartIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                {inCart ? t("product.removeFromCart") : t("product.addToCart")}
-              </Button>
-            }
-          />
-        );
-      })}
+                <TrashIcon className="h-4 w-4 text-danger-500 sm:h-5 sm:w-5" />
+              </IconButton>
+            ) : undefined
+          }
+          // The shared cart toggle, full width with its text (the footer
+          // replaces the card's own price-row action).
+          footer={
+            <ProductCardCartButton
+              productId={item.productId}
+              title={item.productTitle}
+              presentation="full"
+            />
+          }
+        />
+      ))}
     </div>
   );
 }

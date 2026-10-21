@@ -759,8 +759,16 @@
       "ruleCoverText": "Kapak görseli ürünü düz açıdan sade göstersin; farklı açı, ölçü ve kutu fotoğrafları yardımcı görsellerde yer alsın."
     },
     "boostedBadge": "Öne Çıkan",
+    "boostedBadgeHint": "Satıcı bu ilanı ücretli olarak öne çıkardı",
+    "boostEndsAt": "Bitiş: {date}",
     "boostListing": "Öne Çıkar",
     "extendBoost": "Süre Ekle",
+    "cardAction": {
+      "addToCartAria": "{title} ürününü sepete ekle",
+      "removeFromCartAria": "{title} ürününü sepetten çıkar",
+      "boostAria": "{title} ilanını öne çıkar",
+      "extendAria": "{title} ilanının öne çıkarma süresini uzat"
+    },
     "estimatedNet": "Tahmini net kazanç: {amount}",
     "relist": "Yeniden Satışa Aç",
     "deactivateListing": "Pasife Al",
