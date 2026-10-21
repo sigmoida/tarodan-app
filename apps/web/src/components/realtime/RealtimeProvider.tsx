@@ -23,6 +23,14 @@ import { queryKeys } from "@/lib/query/keys";
  * import would ship socket.io in that bundle even though only signed-in users
  * ever open a connection. An anonymous visitor (token === null) never triggers
  * the import, so the chunk stays out of the critical path.
+ *
+ * Dormant today: since tokens moved to httpOnly cookies, `authStore.token` is
+ * always null and the API socket only accepts a bearer token in the handshake,
+ * so neither effect below connects. Restoring it needs a socket credential the
+ * cookie session can hand out (tracked in the tarodan-ops backlog).
+ *
+ * The query cache is NOT cleared here: that is keyed on the session owner in
+ * the auth store (`lib/query/sessionCache`), which sees every sign-out path.
  */
 export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -83,18 +91,13 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
     };
   }, [token, queryClient]);
 
-  // Logout: socket'i kapat + React Query cache'ini temizle. Aksi halde aynı
-  // QueryClient bir sonraki hesaba taşınır ve önceki kullanıcının bildirim/
-  // sayaç verisi görünür. Tüm logout yolları için çalışır (buton, 401, token).
+  // Logout: close the socket. Only reach for the socket module if we actually
+  // opened one, which keeps the socket.io chunk out of a guest's bundle.
   useEffect(() => {
-    if (token) return;
-    queryClient.clear();
-    // Only reach for the socket module if we actually opened one — keeps the
-    // socket.io chunk out of an anonymous visitor's bundle.
-    if (!connectedRef.current) return;
+    if (token || !connectedRef.current) return;
     connectedRef.current = false;
     import("@/lib/socket").then(({ disconnectSocket }) => disconnectSocket());
-  }, [token, queryClient]);
+  }, [token]);
 
   return <>{children ?? null}</>;
 }
