@@ -44,10 +44,11 @@ const AUDIT_ENTITY = "ProductBoost";
 /**
  * The `boost_refund` audit outcome of a refund call that threw:
  * `in_flight_elsewhere` when the attempt claim turned it away before it sent
- * anything (another refund attempt on the order is unresolved, typically a
- * concurrent try of this boost, which records its own outcome),
- * `pending_reconciliation` when this call's own attempt may have reached
- * PayTR, `failed` otherwise.
+ * anything because another attempt on the order (another key, typically an
+ * earlier try of this boost, which records its own outcome) is unresolved;
+ * `pending_reconciliation` when this call's own attempt (its key) may be
+ * moving money, including one the stuck-refund recovery took over;
+ * `failed` otherwise.
  */
 export function boostRefundFailureOutcome(
   error: unknown,

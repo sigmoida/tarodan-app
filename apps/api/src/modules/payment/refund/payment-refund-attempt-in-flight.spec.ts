@@ -7,10 +7,10 @@ import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 
 /**
  * The attempt claim turns a call away, before anything goes to PayTR, while
- * another attempt is unresolved. That refusal is `RefundAttemptInFlight`: a
- * `RefundPendingReconciliation` for every caller (same 503), but one a caller
- * recording outcomes can tell from its own uncertain attempt (the boost
- * refund audit does).
+ * another attempt (another key) is unresolved. That refusal is
+ * `RefundAttemptInFlight`: a `RefundPendingReconciliation` for every caller
+ * (same 503), but one a caller recording outcomes can tell from its own
+ * uncertain attempt (the boost refund audit does).
  */
 describe("PaymentRefundAttemptService: an attempt in flight", () => {
   const make = (rows: {
@@ -71,22 +71,33 @@ describe("PaymentRefundAttemptService: an attempt in flight", () => {
     expect(tx.refundAttempt.create).not.toHaveBeenCalled();
   });
 
+  // The same key is this intent's own attempt: its money may be moving (a
+  // concurrent identical call, or the stuck-refund recovery submitting it),
+  // so the refusal is a plain pending reconciliation, never "elsewhere".
   it.each([RefundAttemptStatus.submitting, RefundAttemptStatus.manual_review])(
-    "refuses the same key while its attempt is %s",
+    "refuses the same key while its attempt is %s as pending, not in flight elsewhere",
     async (status) => {
       const { service } = make({ byKey: { status } });
 
-      await expect(claim(service)).rejects.toBeInstanceOf(
+      const refusal = claim(service);
+      await expect(refusal).rejects.toBeInstanceOf(
+        RefundPendingReconciliationException,
+      );
+      await expect(refusal).rejects.not.toBeInstanceOf(
         RefundAttemptInFlightException,
       );
     },
   );
 
-  it("refuses to start a submission another call already started", async () => {
+  it("a submission another call (the recovery cron) already started is pending, not in flight elsewhere", async () => {
     const { service } = make({ started: 0 });
 
-    await expect(
-      service.startRefundSubmission("attempt-1"),
-    ).rejects.toBeInstanceOf(RefundAttemptInFlightException);
+    const refusal = service.startRefundSubmission("attempt-1");
+    await expect(refusal).rejects.toBeInstanceOf(
+      RefundPendingReconciliationException,
+    );
+    await expect(refusal).rejects.not.toBeInstanceOf(
+      RefundAttemptInFlightException,
+    );
   });
 });

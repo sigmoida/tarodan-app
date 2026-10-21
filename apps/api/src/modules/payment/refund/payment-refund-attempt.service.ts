@@ -4,9 +4,15 @@ import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
 import { asPaymentMetadata } from "../helpers/payment-metadata.types";
 import { i18nMessage } from "../../i18n";
-// Every refusal here comes before anything is sent: the call is turned away
-// because an attempt is in flight, never because its own outcome is unknown.
-import { RefundAttemptInFlightException } from "../../payment-providers/refund-errors";
+// Two refusals, both before this call sends anything: a different attempt of
+// the order is unresolved (`RefundAttemptInFlight`, this call's intent has no
+// attempt), or this key's own attempt is in flight or uncertain
+// (`RefundPendingReconciliation`: the money of this intent may be moving,
+// for example the stuck-refund recovery submitting it).
+import {
+  RefundAttemptInFlightException,
+  RefundPendingReconciliationException,
+} from "../../payment-providers/refund-errors";
 
 /**
  * Dayanıklı iade denemesi defteri — PaymentRefundService'ten birebir taşındı.
@@ -98,7 +104,7 @@ export class PaymentRefundAttemptService {
           attempt.status === RefundAttemptStatus.submitting ||
           attempt.status === RefundAttemptStatus.manual_review
         ) {
-          throw new RefundAttemptInFlightException(
+          throw new RefundPendingReconciliationException(
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
@@ -160,7 +166,9 @@ export class PaymentRefundAttemptService {
       },
     });
     if (started.count !== 1) {
-      throw new RefundAttemptInFlightException(
+      // This attempt (this key) was started by another call, possibly the
+      // stuck-refund recovery: its money is in flight, so it is pending.
+      throw new RefundPendingReconciliationException(
         i18nMessage("server.payment.refundInitiationFailed"),
       );
     }
@@ -207,7 +215,7 @@ export class PaymentRefundAttemptService {
           attempt.status === RefundAttemptStatus.submitting ||
           attempt.status === RefundAttemptStatus.manual_review
         ) {
-          throw new RefundAttemptInFlightException(
+          throw new RefundPendingReconciliationException(
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
