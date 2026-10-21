@@ -1,8 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { BoostOffersResponse } from "@tarodan/types";
 import { boostApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { useWebMutation } from "@/hooks/useWebMutation";
 import { useAuthStore } from "@/stores/authStore";
 
 const OFFERS_STALE_MS = 5 * 60_000;
@@ -11,16 +14,24 @@ const OFFERS_STALE_MS = 5 * 60_000;
  * `GET /products/boost/offers`: the boost switch (`enabled`) and the
  * signed-in seller's listings due the one-time offer. One query per session,
  * shared by every listing card and the offer dialog; never sent for a guest.
+ * `live` makes this observer refetch on focus (the offer dialog host).
  * `enabled: false` keeps a caller that does not need it (a card that is not
  * the viewer's own) from sending it.
  */
-export function useBoostOffers({ enabled = true }: { enabled?: boolean } = {}) {
+export function useBoostOffers({
+  enabled = true,
+  live = false,
+}: { enabled?: boolean; live?: boolean } = {}) {
   const signedIn = useAuthStore((s) => s.isAuthenticated);
   return useQuery({
     queryKey: queryKeys.boost.offers(),
     queryFn: async () => (await boostApi.offers()).data,
     enabled: signedIn && enabled,
-    staleTime: OFFERS_STALE_MS,
+    // The offer dialog (`live`) asks again on every window focus, and on
+    // every page it mounts on: realtime is dormant, so this is how an
+    // approval reaches the seller. The shared observers keep the long window.
+    staleTime: live ? 0 : OFFERS_STALE_MS,
+    refetchOnWindowFocus: live,
     meta: { page: "boost-offers" },
   });
 }
@@ -39,4 +50,35 @@ export function useBoostEnabled({
 }: { enabled?: boolean } = {}): boolean {
   const { data } = useBoostOffers({ enabled });
   return data ? data.enabled : true;
+}
+
+/**
+ * Dismisses the offers a dialog listed. The cache drops them at once (so
+ * the dialog closes and does not come back on a refetch that races the
+ * request); a failed request is silent and not retried (the host keeps its
+ * own session list of dismissed ids, so a refetch cannot reopen them).
+ */
+export function useDismissBoostOffers() {
+  const queryClient = useQueryClient();
+  const mutation = useWebMutation(
+    (productIds: string[]) => boostApi.dismissOffers({ productIds }),
+    { silentError: true },
+  );
+  const { mutate } = mutation;
+  return useCallback(
+    (productIds: string[]) => {
+      if (productIds.length === 0) return;
+      const gone = new Set(productIds);
+      queryClient.setQueryData<BoostOffersResponse>(
+        queryKeys.boost.offers(),
+        (old) =>
+          old && {
+            ...old,
+            offers: old.offers.filter((o) => !gone.has(o.productId)),
+          },
+      );
+      mutate(productIds);
+    },
+    [queryClient, mutate],
+  );
 }

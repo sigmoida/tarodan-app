@@ -35,6 +35,7 @@ import {
 import type { Product, ProductImage } from "@/types/product";
 import { formatTL } from "@/lib/format";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
+import { PRODUCT_PLACEHOLDER } from "@/lib/productPlaceholder";
 
 /**
  * The single product/listing card for the whole marketplace (grid + list). It is
@@ -75,7 +76,6 @@ import { IMAGE_SIZES } from "@/lib/imageSizes";
  * ilan hem üçüncü parti bir servise istek atıyor hem de taşımadığı bir marka
  * iddiasını taşıyordu.
  */
-const PRODUCT_PLACEHOLDER = "/product-placeholder.svg";
 
 function cardImageUrl(image: ProductImage | string | undefined): string {
   const url =

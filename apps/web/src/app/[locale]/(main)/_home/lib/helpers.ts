@@ -2,6 +2,7 @@ import {
   manufacturersWithListings,
   type ManufacturerRef,
 } from "@/components/layout/header/nav/config";
+import { PRODUCT_PLACEHOLDER } from "@/lib/productPlaceholder";
 import type { BrandMarqueeItem } from "./types";
 
 /**
@@ -9,7 +10,6 @@ import type { BrandMarqueeItem } from "./types";
  * servisleri (placehold.co/picsum) tamamen kaldırıldı; gerçek görseller
  * her zaman API'nin verdiği mutlak URL'den (S3/CDN) gelir.
  */
-const PRODUCT_PLACEHOLDER = "/product-placeholder.svg";
 
 export const getImageUrl = (
   image: any,

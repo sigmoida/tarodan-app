@@ -1,5 +1,6 @@
 import type {
   BoostOffersResponse,
+  DismissBoostOffersRequest,
   BoostReminderRequest,
   BoostReminderResponse,
   MyBoostsResponse,
@@ -34,6 +35,12 @@ export const boostApi = {
    * the caller's listings due the one-time boost offer. Signed-in only.
    */
   offers: () => api.get<BoostOffersResponse>("/products/boost/offers"),
+  /**
+   * Records the offers the dialog showed as seen (204, idempotent, own
+   * listings only); a dismissed listing is never offered again.
+   */
+  dismissOffers: (body: DismissBoostOffersRequest) =>
+    api.post<void>("/products/boost/offers/dismiss", body),
   /**
    * "My boosts": `current` (running and paused, up to `limit`) or `history`
    * (ended and cancelled, paged). Signed-in only.
