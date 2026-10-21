@@ -308,20 +308,15 @@ export class VirtualOrderFulfillmentService {
     payment: BoostOrderPayment,
   ): Promise<string | null> {
     const orderId = payment.orderId;
-    const boost = orderId
-      ? await tx.productBoost.findUnique({
-          where: { orderId },
-          select: { id: true },
-        })
+    const result = orderId
+      ? await this.boostTimeline.activateForOrder(tx, orderId)
       : null;
-    if (!orderId || !boost) {
+    if (!orderId || !result?.found) {
       this.logger.warn(
         `Boost order ${orderId} paid but no matching ProductBoost found`,
       );
       return null;
     }
-
-    const activation = await this.boostTimeline.activate(tx, boost.id);
     await tx.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.completed, preparingDeadline: null },
@@ -329,7 +324,7 @@ export class VirtualOrderFulfillmentService {
     this.logger.log(
       `Boost order ${orderId} completed after payment ${payment.id}`,
     );
-    return activation?.productId ?? null;
+    return result.activation?.productId ?? null;
   }
 
   async completeRecurringMembershipPayment(

@@ -34,8 +34,8 @@ export interface BoostActivation {
  * listing and the promotion columns they drive on the product (`boostedUntil`,
  * `boostedAt`, `homeShowcaseUntil`, `rankTier`, `relevanceScore`).
  *
- * Payment fulfilment (activation) and the admin boost screen (pause, resume,
- * extend) call it; nothing else writes these columns for a boost. Every method
+ * Payment fulfilment (activation), the admin boost screen (pause, resume,
+ * extend) and the expire-boosts cron call it or take its lock. Every method
  * runs inside the caller's transaction (`tx`), so the change commits with the
  * business event that caused it.
  *
@@ -96,6 +96,24 @@ export class BoostTimelineService {
       level: "info",
       data,
     });
+  }
+
+  /**
+   * Activates the boost bought by a paid boost order (see `activate`).
+   * `found: false` when the order has no boost row at all; otherwise
+   * `activation` is null when the boost was already activated.
+   */
+  async activateForOrder(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    now: Date = new Date(),
+  ): Promise<{ found: boolean; activation: BoostActivation | null }> {
+    const boost = await tx.productBoost.findUnique({
+      where: { orderId },
+      select: { id: true },
+    });
+    if (!boost) return { found: false, activation: null };
+    return { found: true, activation: await this.activate(tx, boost.id, now) };
   }
 
   /**
@@ -219,6 +237,9 @@ export class BoostTimelineService {
       data: {
         status: BoostStatus.paused,
         pausedAt: now,
+        // A staff pause: the cron never resumes it on its own, even when the
+        // system had paused this boost before.
+        pausedBySystem: false,
         pausedRemainingSeconds: Math.max(
           1,
           Math.ceil((boost.endsAt.getTime() - now.getTime()) / 1000),
@@ -265,6 +286,7 @@ export class BoostTimelineService {
         status: BoostStatus.active,
         endsAt,
         pausedAt: null,
+        pausedBySystem: false,
         pausedRemainingSeconds: null,
       },
     });
@@ -336,44 +358,43 @@ export class BoostTimelineService {
     now: Date = new Date(),
   ): Promise<void> {
     await this.lockProduct(tx, productId);
-    const [product, activeBoosts] = await Promise.all([
-      tx.product.findUnique({
-        where: { id: productId },
-        select: {
-          sellerId: true,
-          qualityScore: true,
-          popularityScore: true,
-          seller: {
-            select: {
-              businessStatus: true,
-              companyName: true,
-              taxId: true,
-              membership: {
-                select: {
-                  status: true,
-                  currentPeriodEnd: true,
-                  tier: { select: { type: true, isActive: true } },
-                },
+    // One after the other: an interactive transaction has one connection.
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+      select: {
+        sellerId: true,
+        qualityScore: true,
+        popularityScore: true,
+        seller: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+            membership: {
+              select: {
+                status: true,
+                currentPeriodEnd: true,
+                tier: { select: { type: true, isActive: true } },
               },
             },
           },
         },
-      }),
-      tx.productBoost.findMany({
-        where: {
-          productId,
-          status: BoostStatus.active,
-          endsAt: { gt: now },
-        },
-        select: {
-          endsAt: true,
-          purchasedAt: true,
-          showcaseOnHome: true,
-        },
-        orderBy: { endsAt: "desc" },
-      }),
-    ]);
+      },
+    });
     if (!product) return;
+    const activeBoosts = await tx.productBoost.findMany({
+      where: {
+        productId,
+        status: BoostStatus.active,
+        endsAt: { gt: now },
+      },
+      select: {
+        endsAt: true,
+        purchasedAt: true,
+        showcaseOnHome: true,
+      },
+      orderBy: { endsAt: "desc" },
+    });
 
     const promotedUntil = activeBoosts[0]?.endsAt ?? null;
     const latestPurchase = activeBoosts.reduce<Date | null>(

@@ -29,6 +29,8 @@ const at = (ms: number) => new Date(NOW.getTime() + ms);
 type BoostRow = {
   id: string;
   productId: string;
+  orderId?: string | null;
+  pausedBySystem?: boolean;
   durationDays: number;
   showcaseOnHome: boolean;
   status: BoostStatus;
@@ -156,12 +158,16 @@ function fakeDb() {
       ),
     },
     productBoost: {
-      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
-        await tick();
-        events.push("boost.read");
-        const row = boosts.get(where.id);
-        return row ? structuredClone(row) : null;
-      }),
+      findUnique: jest.fn(
+        async ({ where }: { where: { id?: string; orderId?: string } }) => {
+          await tick();
+          events.push("boost.read");
+          const row = where.id
+            ? boosts.get(where.id)
+            : [...boosts.values()].find((b) => b.orderId === where.orderId);
+          return row ? structuredClone(row) : null;
+        },
+      ),
       findFirst: jest.fn(
         async ({
           where,
@@ -643,6 +649,72 @@ describe("BoostTimelineService", () => {
         boostedAt: at(-DAY),
         homeShowcaseUntil: at(33 * DAY),
         rankTier: 2,
+      });
+    });
+  });
+
+  describe("activateForOrder", () => {
+    it("activates the boost of a paid order", async () => {
+      const db = setup(productRow(), boostRow({ orderId: "ord-1" }));
+
+      const result = await db.transaction((tx) =>
+        service.activateForOrder(tx, "ord-1", NOW),
+      );
+
+      expect(result).toEqual({
+        found: true,
+        activation: { productId: "prod-1", endsAt: at(7 * DAY) },
+      });
+    });
+
+    it("tells an order without a boost from an already active boost", async () => {
+      const db = setup(
+        productRow(),
+        boostRow({ orderId: "ord-1", status: BoostStatus.active }),
+      );
+
+      await expect(
+        db.transaction((tx) => service.activateForOrder(tx, "ord-2", NOW)),
+      ).resolves.toEqual({ found: false, activation: null });
+      await expect(
+        db.transaction((tx) => service.activateForOrder(tx, "ord-1", NOW)),
+      ).resolves.toEqual({ found: true, activation: null });
+    });
+  });
+
+  describe("staff pause and resume own the pause", () => {
+    it("a staff pause of a boost the system paused before is never auto-resumed", async () => {
+      // The system paused it once (listing offline), staff resumed it, and
+      // now staff pause it on purpose: the cron must leave it paused.
+      const db = setup(
+        productRow(),
+        boostRow({
+          status: BoostStatus.active,
+          endsAt: at(DAY),
+          pausedBySystem: true,
+        }),
+      );
+
+      await db.transaction((tx) => service.pause(tx, "boost-1", NOW));
+
+      expect(db.boosts.get("boost-1")?.pausedBySystem).toBe(false);
+    });
+
+    it("a staff resume clears the system pause flag", async () => {
+      const db = setup(
+        productRow(),
+        boostRow({
+          status: BoostStatus.paused,
+          pausedRemainingSeconds: 60,
+          pausedBySystem: true,
+        }),
+      );
+
+      await db.transaction((tx) => service.resume(tx, "boost-1", NOW));
+
+      expect(db.boosts.get("boost-1")).toMatchObject({
+        status: BoostStatus.active,
+        pausedBySystem: false,
       });
     });
   });

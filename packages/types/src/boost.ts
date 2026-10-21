@@ -12,7 +12,8 @@ export const BOOST_ENABLED_SETTING = "boost_enabled";
  * (`isPlatformSettingOn`, where a missing value is off), a missing or empty
  * `boost_enabled` means **on**: boost shipped before the setting existed and
  * production never wrote the row. Only "false" (any case, trimmed) turns it
- * off. The API and the admin toggle read the setting through this rule.
+ * off. The API reads the setting through this rule; the admin toggle must use
+ * it too, never `isPlatformSettingOn`, or it shows boost off while it is on.
  */
 export function isBoostEnabled(value: string | null | undefined): boolean {
   return value?.trim().toLowerCase() !== "false";
