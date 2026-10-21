@@ -194,19 +194,34 @@ export interface MyBoostRow {
   /** Refunded so far (TL); > 0 on a `cancelled` boost means "refunded". */
   refundedAmount: number;
   status: BoostStatus;
-  /** The ending-soon reminder is on (premium; no automatic charge). */
+  /**
+   * The reminder flag of this row (premium; no automatic charge). The
+   * reminder is the listing's: it is on while any running or paused boost of
+   * the listing has it, and the switch sets them all.
+   */
   autoRenew: boolean;
   startsAt: string | null;
-  /** End of this boost's own stretch (ISO); see `product.boostedUntil`. */
+  /**
+   * End of this boost's stretch (ISO). Stacked boosts lie end to end, so a
+   * later boost's end includes the time of the boosts before it; the
+   * listing's end is `product.boostedUntil`.
+   */
   endsAt: string | null;
   /** When staff stopped it (revoke, or refund and stop), else null. */
   cancelledAt: string | null;
   /** The boost order (invoice link); null for a grant. */
   orderId: string | null;
   orderNumber: string | null;
-  /** Running now (`active` and not ended). */
+  /**
+   * `active` and its end not reached. A stacked boost counts as active
+   * before its own stretch starts (its time is reserved behind the others).
+   */
   isActive: boolean;
-  /** This boost's own time left (ms); for `paused`, its paused remainder. */
+  /**
+   * Until `endsAt` (ms), so for a stacked boost it includes the boosts before
+   * it; show "remaining" from `product.boostedUntil`. For `paused`, the
+   * boost's own paused remainder.
+   */
   remainingMs: number;
   metrics: {
     /** The listing's counters when the boost started; null before. */
@@ -216,7 +231,10 @@ export interface MyBoostRow {
     performanceScore: number | null;
   };
   createdAt: string;
-  /** The best performing boost on this page. */
+  /**
+   * The best performing boost on this page: at most one row, the first with
+   * the highest score above zero.
+   */
   isBest: boolean;
 }
 

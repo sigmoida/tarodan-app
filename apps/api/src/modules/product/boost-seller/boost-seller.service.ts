@@ -204,17 +204,18 @@ export class BoostSellerService {
         now,
       ),
     );
-    const bestScore = rows.reduce(
-      (best, row) => Math.max(best, row.metrics.performanceScore ?? -1),
-      -1,
+    // One "best performing" row at most: the first with the highest score
+    // above zero (a tie of zeros, all freshly started, marked every row).
+    const best = rows.reduce<(typeof rows)[number] | null>(
+      (top, row) =>
+        (row.metrics.performanceScore ?? 0) >
+        (top?.metrics.performanceScore ?? 0)
+          ? row
+          : top,
+      null,
     );
     return {
-      data: rows.map((row) => ({
-        ...row,
-        isBest:
-          row.metrics.performanceScore != null &&
-          row.metrics.performanceScore === bestScore,
-      })),
+      data: rows.map((row) => ({ ...row, isBest: row === best })),
       meta: page.meta,
     };
   }

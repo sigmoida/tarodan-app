@@ -21,8 +21,7 @@ import {
   eligibleAudienceWhere,
   tierCoversPrice,
 } from "./boost-audience.service";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { DAY_MS } from "../boost-timeline/boost-lanes";
 
 /**
  * Candidate listings read at most per call, newest first. The price filter

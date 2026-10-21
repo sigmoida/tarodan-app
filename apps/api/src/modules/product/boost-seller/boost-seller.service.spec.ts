@@ -295,6 +295,24 @@ describe("BoostSellerService.getMyBoosts", () => {
       ["unmeasured", false],
     ]);
   });
+
+  it("marks no row best when nothing gained yet, and one row on a tie", async () => {
+    const fresh = {
+      baselineViewCount: 160,
+      baselineLikeCount: 5,
+      baselineClickCount: 14,
+    };
+    const none = setup({
+      rows: [record({ id: "a", ...fresh }), record({ id: "b", ...fresh })],
+    });
+    const tie = setup({ rows: [record({ id: "a" }), record({ id: "b" })] });
+
+    const { data: zeros } = await none.service.getMyBoosts(SELLER, {});
+    const { data: tied } = await tie.service.getMyBoosts(SELLER, {});
+
+    expect(zeros.map((r) => r.isBest)).toEqual([false, false]);
+    expect(tied.map((r) => r.isBest)).toEqual([true, false]);
+  });
 });
 
 describe("BoostSellerService.setReminder", () => {
