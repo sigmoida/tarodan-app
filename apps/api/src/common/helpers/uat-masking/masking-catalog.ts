@@ -1043,6 +1043,8 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "search_indexes.settings",
       "mail_area_settings.events",
       "elogo_invoices.line_items",
+      // Seller trust inputs: counts, means and sub-scores only (SellerTrustComponentsV1).
+      "seller_trust_scores.components",
     ],
   },
 ];
