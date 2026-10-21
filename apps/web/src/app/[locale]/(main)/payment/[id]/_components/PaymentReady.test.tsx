@@ -170,6 +170,7 @@ describe("PaymentReady distance sales consent", () => {
     render("checkout");
     await flush();
 
+    expect(h.listCards).toHaveBeenCalledWith("checkout");
     expect(checkboxes()).toHaveLength(1);
     expect(container.textContent).toContain("checkout.distanceSalesConsent");
     expect(payButton().disabled).toBe(true);
