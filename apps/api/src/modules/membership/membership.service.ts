@@ -124,6 +124,7 @@ export class MembershipService {
         remainingTotalListings: membership.remainingTotalListings, // Already calculated correctly by getUserUsageStats
         tierName: membership.tier.name,
         tierType: membership.tier.type,
+        maxSavedSearches: membership.tier.maxSavedSearches,
       };
     } catch (error) {
       this.logger.warn("getUserLimits failed");

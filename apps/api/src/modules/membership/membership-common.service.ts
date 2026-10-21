@@ -32,6 +32,7 @@ export type MembershipTierRow = Pick<
   | "canCreateCollections"
   | "canTrade"
   | "isActive"
+  | "maxSavedSearches"
 > & {
   monthlyPrice: Prisma.Decimal | number;
   yearlyPrice: Prisma.Decimal | number;
@@ -316,6 +317,7 @@ export class MembershipCommonService {
       // featuredListingSlots is RETIRED: paid boost packages took over
       // featuring, so it is neither promised nor returned.
       isAdFree: tier.isAdFree === true,
+      maxSavedSearches: tier.maxSavedSearches,
       isActive: tier.isActive,
     };
   }

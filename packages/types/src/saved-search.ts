@@ -141,6 +141,9 @@ export const SAVED_SEARCH_LABEL_MAX = 80;
 /** Most label entries in one save. */
 export const SAVED_SEARCH_LABELS_MAX = 20;
 
+/** Highest `MembershipTier.maxSavedSearches` an admin can set. */
+export const SAVED_SEARCH_TIER_LIMIT_MAX = 1000;
+
 /** `errorCode` values of the saved-search routes. */
 export const SAVED_SEARCH_ERROR_CODES = {
   /** 403: the tier's `maxSavedSearches` is reached; the body carries `limit`. */
