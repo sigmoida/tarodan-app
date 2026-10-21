@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import {
   SIGN_IN_METHODS_ERROR_CODES,
+  SIGN_IN_PROVIDER_NAMES,
   type ReauthRequest,
   type ReauthResponse,
   type SignInMethods,
@@ -22,7 +23,6 @@ import {
 } from "@/hooks/useWebMutation";
 import { SIGN_IN_PROVIDER_ICONS } from "@/components/auth/providerIcons";
 import {
-  SIGN_IN_PROVIDER_NAMES,
   providerCredentialErrorKey,
   useProviderCredential,
 } from "@/components/auth/useProviderCredential";

@@ -29,6 +29,15 @@ export const SIGN_IN_PROVIDERS = ["google", "apple"] as const;
 
 export type SignInProvider = (typeof SIGN_IN_PROVIDERS)[number];
 
+/**
+ * Brand names of the providers, shown as they are (never translated): the
+ * `{provider}` value in the copy, and the provider label in admin.
+ */
+export const SIGN_IN_PROVIDER_NAMES: Record<SignInProvider, string> = {
+  google: "Google",
+  apple: "Apple",
+};
+
 export function isSignInProvider(value: unknown): value is SignInProvider {
   return (
     typeof value === "string" &&

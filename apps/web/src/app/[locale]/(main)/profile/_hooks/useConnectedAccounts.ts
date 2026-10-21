@@ -5,12 +5,12 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import {
   SIGN_IN_METHODS_ERROR_CODES,
+  SIGN_IN_PROVIDER_NAMES,
   type SignInProvider,
 } from "@tarodan/types";
 import { signInMethodsApi } from "@/lib/api";
 import { apiErrorCode, useWebMutation } from "@/hooks/useWebMutation";
 import {
-  SIGN_IN_PROVIDER_NAMES,
   providerCredentialErrorKey,
   useProviderCredential,
   type ProviderCredential,

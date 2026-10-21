@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import {
   SIGN_IN_PROVIDERS,
+  SIGN_IN_PROVIDER_NAMES,
   canUnlinkProvider,
   type LinkedSignInProvider,
   type SignInMethods,
@@ -12,7 +13,6 @@ import { Badge, Button, Skeleton } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { SIGN_IN_PROVIDER_ICONS } from "@/components/auth/providerIcons";
-import { SIGN_IN_PROVIDER_NAMES } from "@/components/auth/useProviderCredential";
 import { useAuthStore } from "@/stores/authStore";
 import { useSignInMethods } from "../_hooks/useSecurity";
 import { useConnectedAccounts } from "../_hooks/useConnectedAccounts";

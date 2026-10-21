@@ -6,12 +6,6 @@ import type { MessageKey } from "@tarodan/i18n";
 import { GoogleAuthCodeError, useGoogleAuthCode } from "./useGoogleAuthCode";
 import { AppleCredentialError, useAppleCredential } from "./useAppleCredential";
 
-/** Brand names, shown as `{provider}` in the copy (never translated). */
-export const SIGN_IN_PROVIDER_NAMES: Record<SignInProvider, string> = {
-  google: "Google",
-  apple: "Apple",
-};
-
 /** A fresh provider sign-in, in the shape the step-up and link routes take. */
 export type ProviderCredential =
   | { provider: "google"; code: string }
