@@ -38,8 +38,9 @@
  *  - PATCH /api/admin/ads/:id → 200; PATCH /api/admin/ads/reorder @HttpCode(200); DELETE @HttpCode(204).
  *  - POST /api/newsletter/subscribe @HttpCode(200) → mesajlar; e-posta lowercase+trim; idempotent güncelle;
  *    reaktivasyon. GET /unsubscribe?token= (yok→404); POST /unsubscribe (bulunmayan→200 nötr, idempotent).
- *  - GET /api/products/boost/pricing @Public → { enabled, options:[{durationDays,price,label}] }; 3→29,7→59,30→149.
- *  - POST /api/products/:id/boost/initiate (@UseGuards) → durationDays @IsIn([3,7,30]); 15→400;
+ *  - GET /api/products/boost/pricing is retired (404); prices come from the package tiers.
+ *  - POST /api/products/:id/boost/initiate (@UseGuards) → packageId required; a duration the
+ *    package has no tier for (15) → 400;
  *    başkası→403; pasif→400; UUID değil→400 "Geçersiz ürün ID formatı". Platform seller (platform@tarodan.com,
  *    sellerType=platform) + aktif kategori gerekir → INLINE seed edilir.
  *  - Boost ödemesi PayTR callback (PAYMENT_BYPASS=false) ile tamamlanır → ProductBoost.status=active,
@@ -2172,23 +2173,14 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   // ════════════════════════════ Boost (öne çıkarma) ════════════════════════════
 
   scenario("DSC-082", async () => {
-    // Boost fiyat/süre listesi → 200, { enabled, options:[...] }; varsayılan 3→29, 7→59, 30→149.
-    const res = await request(server())
-      .get("/api/products/boost/pricing")
-      .expect(200);
-    expect(res.body).toHaveProperty("enabled");
-    expect(Array.isArray(res.body.options)).toBe(true);
-    const byDuration = new Map(
-      res.body.options.map((o: any) => [o.durationDays, o.price]),
-    );
-    expect(byDuration.get(3)).toBe(29);
-    expect(byDuration.get(7)).toBe(59);
-    expect(byDuration.get(30)).toBe(149);
+    // The legacy flat-price list is retired: 404.
+    await request(server()).get("/api/products/boost/pricing").expect(404);
   });
 
   scenario("DSC-083", async () => {
     // Geçerli ilan için boost başlatma → 201 + alanlar; DB'de ProductBoost(pending) + boost order.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2197,7 +2189,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({ packageId, durationDays: 7 })
       .expect(201);
     expect(res.body.boostId).toBeTruthy();
     expect(res.body.productId).toBe(product.id);
@@ -2223,8 +2215,9 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-084", async () => {
-    // Geçersiz süre (15) → 400.
+    // A duration the package has no tier for (15) → 400.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2233,20 +2226,21 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 15 })
+      .send({ packageId, durationDays: 15 })
       .expect(400);
   });
 
   scenario("DSC-085", async () => {
     // Başkasının ilanını boost → 403.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const owner = await createUser(ctx.module, { isSeller: true });
     const other = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({ sellerId: owner.id, status: "active" });
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(other))
-      .send({ durationDays: 3 })
+      .send({ packageId, durationDays: 3 })
       .expect(403);
     expect(String(res.body.message)).toContain(
       "Sadece kendi ilanınızı öne çıkarabilirsiniz",
@@ -2256,6 +2250,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-086", async () => {
     // Pasif (yayında olmayan) ilanı boost → 400.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2264,7 +2259,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({ packageId, durationDays: 7 })
       .expect(400);
     expect(String(res.body.message)).toContain(
       "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
@@ -2280,7 +2275,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     });
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
-      .send({ durationDays: 7 })
+      .send({ packageId: "pkg-any", durationDays: 7 })
       .expect(401);
   });
 
@@ -2290,7 +2285,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post("/api/products/abc/boost/initiate")
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({ packageId: "pkg-any", durationDays: 7 })
       .expect(400);
     expect(String(res.body.message)).toContain("Geçersiz ürün ID formatı");
   });
@@ -2298,6 +2293,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-089", async () => {
     // Boost ödemesi tamamlanınca → ProductBoost.active, ürün rankTier=2, boostedUntil dolu, order completed.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2306,7 +2302,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({ packageId, durationDays: 7 })
       .expect(201);
 
     const prisma = getPrisma();
@@ -2337,6 +2333,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-090", async () => {
     // Aktif boost üstüne ikinci boost süreyi yığar (stacking): endsAt = mevcut boostedUntil + yeni süre.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2348,7 +2345,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init1 = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({ packageId, durationDays: 7 })
       .expect(201);
     const boost1 = await prisma.productBoost.findUnique({
       where: { id: init1.body.boostId },
@@ -2363,7 +2360,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init2 = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 30 })
+      .send({ packageId, durationDays: 30 })
       .expect(201);
     const boost2 = await prisma.productBoost.findUnique({
       where: { id: init2.body.boostId },
@@ -2384,6 +2381,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-091", async () => {
     // Oto-yenileme premium olmayan kullanıcıda zorla false.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2392,7 +2390,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7, autoRenew: true })
+      .send({ packageId, durationDays: 7, autoRenew: true })
       .expect(201);
     const prisma = getPrisma();
     const boost = await prisma.productBoost.findUnique({
@@ -2404,6 +2402,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-092", async () => {
     // Premium satıcıda oto-yenileme etkin.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, {
       isSeller: true,
       premium: true,
@@ -2415,7 +2414,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 30, autoRenew: true })
+      .send({ packageId, durationDays: 30, autoRenew: true })
       .expect(201);
     const prisma = getPrisma();
     const boost = await prisma.productBoost.findUnique({
@@ -2427,6 +2426,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-093", async () => {
     // Boost geçmişim listesi → 200, dizi, alanlar; en yeni önce.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2435,7 +2435,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({ packageId, durationDays: 7 })
       .expect(201);
     const res = await request(server())
       .get("/api/products/boost/my")

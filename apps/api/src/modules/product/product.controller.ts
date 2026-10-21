@@ -148,25 +148,21 @@ export class ProductController {
   }
 
   /**
-   * GET /products/boost/pricing
-   * Boost (öne çıkarma) süreleri ve fiyatları (admin'den ayarlanabilir)
-   * NOTE: ':id' rotasından önce tanımlanmalı (statik segment çakışmasını önlemek için)
-   */
-  @Get("boost/pricing")
-  @Public()
-  @ApiOperation({ summary: "Boost süre/fiyat listesi (eski düz-fiyat)" })
-  @ApiResponse({ status: 200, description: "Boost fiyatlandırması" })
-  async getBoostPricing() {
-    return this.productBoostService.getPricing();
-  }
-
-  /**
    * GET /products/:id/boost/options
-   * İlanın fiyatına göre satın alınabilir paket/süre/fiyat seçenekleri (yeni model).
+   * The packages, durations and prices the owner can buy for the listing,
+   * matched to its price. Owner of an active listing only.
    */
   @Get(":id/boost/options")
-  @ApiOperation({ summary: "İlan için boost paket seçenekleri" })
-  @ApiResponse({ status: 200, description: "Paket + süre + fiyat listesi" })
+  @ApiOperation({ summary: "Boost package options for the owner's listing" })
+  @ApiResponse({
+    status: 200,
+    description: "Packages with durations and prices",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "No such listing, or not the caller's listing",
+  })
+  @ApiResponse({ status: 400, description: "The listing is not active" })
   async getBoostOptions(
     @Param("id") id: string,
     @CurrentUser("id") userId: string,
@@ -511,7 +507,11 @@ export class ProductController {
     status: 201,
     description: "Boost ödemesi başlatıldı (paymentUrl döner)",
   })
-  @ApiResponse({ status: 400, description: "Geçersiz süre / ilan uygun değil" })
+  @ApiResponse({
+    status: 400,
+    description:
+      "No package, a package or duration without a tier for the listing's price, or the listing is not active",
+  })
   @ApiResponse({
     status: 403,
     description: "Sadece kendi ilanınızı öne çıkarabilirsiniz",
@@ -535,11 +535,13 @@ export class ProductController {
     return this.productBoostService.initiateBoost(
       userId,
       id,
-      dto.durationDays,
-      dto.provider ?? PaymentProvider.paytr,
-      dto.autoRenew ?? false,
+      {
+        packageId: dto.packageId,
+        durationDays: dto.durationDays,
+        provider: dto.provider ?? PaymentProvider.paytr,
+        autoRenew: dto.autoRenew ?? false,
+      },
       req,
-      dto.packageId,
     );
   }
 

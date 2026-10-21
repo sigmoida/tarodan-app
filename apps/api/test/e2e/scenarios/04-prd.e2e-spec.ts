@@ -12,8 +12,9 @@
  *   - product.service.ts: create/update/remove/findOne/findMyProductById/like/unlike/
  *     incrementViewCount/getProductStats/getSellerListingStats + Türkçe hata mesajları
  *     + resolveUpdatedStatus() statü politikası + formatProductResponse (isOnSale/oldPrice).
- *   - product-boost.service.ts: getPricing (DEFAULT_PRICES 3→29,7→59,30→149) +
- *     initiateBoost (sahiplik 403 / aktif değil 400 / kapalı 400 / autoRenew premium).
+ *   - product-boost.service.ts: getBoostOptions (owner and active only) +
+ *     initiateBoost (package required, owner 403, not active 400, off 400,
+ *     autoRenew premium). The legacy flat-price GET /products/boost/pricing is gone.
  *   - dto/create-product.dto.ts + update-product.dto.ts + boost.dto.ts + product-query.dto.ts:
  *     ValidationPipe(whitelist,transform) → 400 mesajları + sınır değerler.
  *   - admin.controller.ts + admin.service.ts: products/:id/approve|reject + bulk-approve.
@@ -158,6 +159,44 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       },
     });
     return { id: p.id };
+  }
+
+  /**
+   * A boost package for everyone with 3, 7 and 30-day tiers at 29, 59 and 149
+   * TL for any listing price. ad_packages is not truncated between tests, so
+   * it is upserted by slug and its tiers are rewritten.
+   */
+  async function ensureBoostPackage(): Promise<string> {
+    const prisma = getPrisma();
+    const pkg = await prisma.adPackage.upsert({
+      where: { slug: "e2e-prd-boost" },
+      update: {
+        isActive: true,
+        audienceMode: "everyone",
+        showcaseOnHome: false,
+      },
+      create: {
+        name: "E2E Boost",
+        slug: "e2e-prd-boost",
+        audienceMode: "everyone",
+        showcaseOnHome: false,
+      },
+    });
+    await prisma.adPackageTier.deleteMany({ where: { packageId: pkg.id } });
+    await prisma.adPackageTier.createMany({
+      data: [
+        [3, 29],
+        [7, 59],
+        [30, 149],
+      ].map(([durationDays, price]) => ({
+        packageId: pkg.id,
+        durationDays,
+        minAmount: new Prisma.Decimal(0),
+        maxAmount: null,
+        price: new Prisma.Decimal(price),
+      })),
+    });
+    return pkg.id;
   }
 
   /** Bir satıcı (isSeller=true) üret. */
@@ -1413,19 +1452,14 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
     }
 
     scenario("PRD-120", async () => {
-      const res = await request(server())
-        .get("/api/products/boost/pricing")
-        .expect(200);
-      expect(res.body.enabled).toBe(true);
-      const byDur: Record<number, number> = {};
-      for (const o of res.body.options) byDur[o.durationDays] = o.price;
-      expect(byDur[3]).toBe(29);
-      expect(byDur[7]).toBe(59);
-      expect(byDur[30]).toBe(149);
+      // The legacy flat-price list is retired; prices come per listing from
+      // GET /products/:id/boost/options.
+      await request(server()).get("/api/products/boost/pricing").expect(404);
     });
 
     scenario("PRD-121", async () => {
       await ensurePlatformSeller();
+      const packageId = await ensureBoostPackage();
       const seller = await mkSeller();
       const p = await mkProduct({
         sellerId: seller.id,
@@ -1434,7 +1468,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ durationDays: 7 })
+        .send({ packageId, durationDays: 7 })
         .expect(201);
       expect(res.body.productId).toBe(p.id);
       expect(res.body.durationDays).toBe(7);
@@ -1455,24 +1489,34 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
     });
 
     scenario("PRD-122", async () => {
+      await ensurePlatformSeller();
+      const packageId = await ensureBoostPackage();
       const seller = await mkSeller();
       const p = await mkProduct({
         sellerId: seller.id,
         status: ProductStatus.active,
       });
-      const bad = await request(server())
-        .post(`/api/products/${p.id}/boost/initiate`)
-        .set(authHeader(seller))
-        .send({ durationDays: 5 })
-        .expect(400);
-      expect(JSON.stringify(bad.body.message)).toContain(
-        "Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)",
-      );
+      // Without a package: 400 (the flat-price request is retired).
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ durationDays: 0 })
+        .send({ durationDays: 7 })
         .expect(400);
+      // A duration the package has no tier for: 400.
+      const bad = await request(server())
+        .post(`/api/products/${p.id}/boost/initiate`)
+        .set(authHeader(seller))
+        .send({ packageId, durationDays: 5 })
+        .expect(400);
+      expect(bad.body.i18nKey).toBe("server.product.boostPriceUndefined");
+      await request(server())
+        .post(`/api/products/${p.id}/boost/initiate`)
+        .set(authHeader(seller))
+        .send({ packageId, durationDays: 0 })
+        .expect(400);
+      expect(
+        await getPrisma().productBoost.count({ where: { productId: p.id } }),
+      ).toBe(0);
     });
 
     scenario("PRD-123", async () => {
@@ -1485,7 +1529,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(attacker))
-        .send({ durationDays: 7 })
+        .send({ packageId: "pkg-any", durationDays: 7 })
         .expect(403);
       expect(JSON.stringify(res.body.message)).toContain(
         "Sadece kendi ilanınızı öne çıkarabilirsiniz",
@@ -1501,7 +1545,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ durationDays: 7 })
+        .send({ packageId: "pkg-any", durationDays: 7 })
         .expect(400);
       expect(JSON.stringify(res.body.message)).toContain(
         "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
@@ -1528,7 +1572,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ durationDays: 7 })
+        .send({ packageId: "pkg-any", durationDays: 7 })
         .expect(400);
       expect(JSON.stringify(res.body.message)).toContain(
         "Öne çıkarma şu anda kullanılamıyor",
@@ -1538,6 +1582,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
     scenario("PRD-126", async () => {
       // autoRenew yalnız premium (aktif ücretli üyelik) etkili.
       await ensurePlatformSeller();
+      const packageId = await ensureBoostPackage();
       const prisma = getPrisma();
       // Premium olmayan satıcı → autoRenew=false.
       const plain = await mkSeller();
@@ -1548,7 +1593,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const r1 = await request(server())
         .post(`/api/products/${p1.id}/boost/initiate`)
         .set(authHeader(plain))
-        .send({ durationDays: 7, autoRenew: true })
+        .send({ packageId, durationDays: 7, autoRenew: true })
         .expect(201);
       const b1 = await prisma.productBoost.findUnique({
         where: { id: r1.body.boostId },
@@ -1567,7 +1612,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const r2 = await request(server())
         .post(`/api/products/${p2.id}/boost/initiate`)
         .set(authHeader(prem))
-        .send({ durationDays: 7, autoRenew: true })
+        .send({ packageId, durationDays: 7, autoRenew: true })
         .expect(201);
       const b2 = await prisma.productBoost.findUnique({
         where: { id: r2.body.boostId },
@@ -1578,6 +1623,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
     scenario("PRD-127", async () => {
       // Boost geçmişim (auth) → 200 liste; misafir → 401.
       await ensurePlatformSeller();
+      const packageId = await ensureBoostPackage();
       const seller = await mkSeller();
       const p = await mkProduct({
         sellerId: seller.id,
@@ -1586,7 +1632,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ durationDays: 3 })
+        .send({ packageId, durationDays: 3 })
         .expect(201);
       const my = await request(server())
         .get("/api/products/boost/my")
@@ -1604,6 +1650,59 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       await request(server()).get("/api/products/boost/my").expect(401);
     });
 
+    scenario("PRD-266", async () => {
+      // Boost options: the owner of an active listing only. Another user gets
+      // 404 (no existence leak, no prices of targeted packages); the owner of
+      // an inactive listing 400; a guest 401.
+      const packageId = await ensureBoostPackage();
+      const seller = await mkSeller();
+      const other = await createUser(ctx.module);
+      const active = await mkProduct({
+        sellerId: seller.id,
+        status: ProductStatus.active,
+      });
+      const inactive = await mkProduct({
+        sellerId: seller.id,
+        status: ProductStatus.inactive,
+      });
+
+      const ok = await request(server())
+        .get(`/api/products/${active.id}/boost/options`)
+        .set(authHeader(seller))
+        .expect(200);
+      expect(ok.body.enabled).toBe(true);
+      const pkg = ok.body.packages.find(
+        (p: { id: string }) => p.id === packageId,
+      );
+      expect(
+        pkg.options.map((o: { durationDays: number; price: number }) => [
+          o.durationDays,
+          o.price,
+        ]),
+      ).toEqual([
+        [3, 29],
+        [7, 59],
+        [30, 149],
+      ]);
+
+      const foreign = await request(server())
+        .get(`/api/products/${active.id}/boost/options`)
+        .set(authHeader(other))
+        .expect(404);
+      expect(foreign.body.i18nKey).toBe("server.product.notFound");
+      expect(foreign.body.packages).toBeUndefined();
+
+      const notLive = await request(server())
+        .get(`/api/products/${inactive.id}/boost/options`)
+        .set(authHeader(seller))
+        .expect(400);
+      expect(notLive.body.i18nKey).toBe("server.product.boostActiveOnly");
+
+      await request(server())
+        .get(`/api/products/${active.id}/boost/options`)
+        .expect(401);
+    });
+
     scenario("PRD-128", async () => {
       const seller = await mkSeller();
       const p = await mkProduct({
@@ -1612,7 +1711,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       });
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
-        .send({ durationDays: 7 })
+        .send({ packageId: "pkg-any", durationDays: 7 })
         .expect(401);
     });
   });
@@ -2308,6 +2407,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
           isSeller: true,
           sellerType: "platform",
         });
+      const packageId = await ensureBoostPackage();
       const seller = await mkSeller();
       const p = await mkProduct({
         sellerId: seller.id,
@@ -2317,11 +2417,11 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
         request(server())
           .post(`/api/products/${p.id}/boost/initiate`)
           .set(authHeader(seller))
-          .send({ durationDays: 7 }),
+          .send({ packageId, durationDays: 7 }),
         request(server())
           .post(`/api/products/${p.id}/boost/initiate`)
           .set(authHeader(seller))
-          .send({ durationDays: 7 }),
+          .send({ packageId, durationDays: 7 }),
       ]);
       // En az biri başarılı; tekillik olmadığından iki pending boost mümkün.
       const okCount = [a.status, b.status].filter((s) => s === 201).length;
@@ -2461,8 +2561,13 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(attacker))
-        .send({ durationDays: 7 })
+        .send({ packageId: "pkg-any", durationDays: 7 })
         .expect(403);
+      // Boost prices of someone else's listing: 404, as for a missing one.
+      await request(server())
+        .get(`/api/products/${p.id}/boost/options`)
+        .set(authHeader(attacker))
+        .expect(404);
       await request(server())
         .get(`/api/products/${p.id}/stats`)
         .set(authHeader(attacker))
