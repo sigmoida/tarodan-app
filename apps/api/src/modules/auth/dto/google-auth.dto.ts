@@ -1,20 +1,16 @@
-import { IsString, IsNotEmpty, ValidateIf } from "class-validator";
+import { IsGoogleProof } from "./google-proof.validator";
 
 /**
- * Google auth kabul iki biçim alır:
- *  - `code`    : Web'in OAuth 2.0 auth-code flow'undan gelen yetki kodu (GSI popup).
- *                Backend bunu Google ile takas edip id_token'ı elde eder.
- *  - `idToken` : Mobil/native GSI'nin doğrudan verdiği id_token (credential).
- * En az biri zorunlu; her alan yalnız diğeri yokken doğrulanır.
+ * `POST /auth/google` takes one of two proofs (`IsGoogleProof`):
+ *  - `code`: the authorization code of the web OAuth 2.0 auth-code flow (GSI
+ *    popup); the API exchanges it with Google for the id_token.
+ *  - `idToken`: the id_token (credential) native GSI returns on mobile.
+ * Exactly one is required; both together are a 400.
  */
 export class GoogleAuthDto {
-  @ValidateIf((o) => !o.idToken)
-  @IsString()
-  @IsNotEmpty()
+  @IsGoogleProof("code")
   code?: string;
 
-  @ValidateIf((o) => !o.code)
-  @IsString()
-  @IsNotEmpty()
+  @IsGoogleProof("idToken")
   idToken?: string;
 }

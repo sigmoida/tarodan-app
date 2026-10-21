@@ -59,6 +59,7 @@ export interface SignInMethods {
  */
 export type ReauthRequest =
   | { password: string }
+  /** Exactly one of `code` (web) and `idToken` (native); both: 400. */
   | { provider: "google"; code?: string; idToken?: string }
   | { provider: "apple"; identityToken: string };
 
@@ -98,7 +99,8 @@ export interface SetPasswordRequest {
 
 /**
  * `POST /auth/social/google/link`: web sends the popup `code`, native sends
- * the `idToken` (one of them, as on `POST /auth/google`).
+ * the `idToken`. Exactly one of them, as on `POST /auth/google` and the
+ * Google step-up; both together answer 400.
  */
 export interface GoogleLinkRequest {
   code?: string;
