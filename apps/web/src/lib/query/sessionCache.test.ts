@@ -77,6 +77,24 @@ describe("syncQueryCacheWithSession", () => {
     expect(client.getQueryData(key)).toBeUndefined();
   });
 
+  it.each([
+    ["logout", guest],
+    ["an account switch", signedIn("u2")],
+  ])("drops the previous user's mutations on %s", (_case, next) => {
+    const client = seeded();
+    const mutation = new MutationObserver(client, {
+      mutationFn: (_vars: { iban: string }) => new Promise(() => undefined),
+    });
+    void mutation.mutate({ iban: "TR-u1" });
+
+    syncQueryCacheWithSession(() => client, signedIn("u1"))(
+      next,
+      signedIn("u1"),
+    );
+
+    expect(client.getMutationCache().getAll()).toHaveLength(0);
+  });
+
   it("drops the guest cache on sign-in but keeps a guest mutation", async () => {
     const client = seeded();
     const mutation = new MutationObserver(client, {
