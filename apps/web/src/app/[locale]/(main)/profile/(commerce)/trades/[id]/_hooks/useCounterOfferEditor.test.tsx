@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-query";
 import { makeQueryClient } from "@/lib/query/client";
 import { invalidateListingQueries } from "@/lib/query/invalidateListing";
+import { queryKeys, webKeys } from "@/lib/query/keys";
 import type { Trade } from "../_lib/types";
 
 (
@@ -360,6 +361,92 @@ describe("useCounterOfferEditor, paged pickers", () => {
       expect(result.current.isLoadingCounterData).toBe(false),
     );
     expect(result.current.counterProducts).toHaveLength(4);
+  });
+
+  it("settles the spinner and stays open when a reopen refetch fails over the last open's lists", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve(rows("t", 1, 2)));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() =>
+      expect(result.current.isLoadingCounterData).toBe(false),
+    );
+    act(() => result.current.handleExitCounterMode());
+
+    // The cached lists are older than the reopen, and its refetch fails.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    getMyProducts.mockRejectedValue(new Error("boom"));
+    act(() => result.current.handleOpenCounterModal());
+    expect(result.current.isLoadingCounterData).toBe(true);
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(2));
+    // No endless spinner: the error settles onto the last lists, and the editor
+    // stays open because there is data to show.
+    await waitFor(() =>
+      expect(result.current.isLoadingCounterData).toBe(false),
+    );
+    expect(result.current.isCounterMode).toBe(true);
+    expect(result.current.counterProducts.map((p) => p.id)).toEqual([
+      "mine1",
+      "m1",
+      "m2",
+    ]);
+    expect(result.current.selectedCounterProducts).toEqual(["mine1"]);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("loads again on a reopen after a failed first load closed the editor", async () => {
+    getMyProducts.mockRejectedValue(new Error("boom"));
+    getAll.mockImplementation(serve([]));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() => expect(result.current.isCounterMode).toBe(false));
+    toastError.mockReset();
+
+    // The stale error must not close the reopened editor before it refetches.
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() =>
+      expect(result.current.isLoadingCounterData).toBe(false),
+    );
+    expect(result.current.isCounterMode).toBe(true);
+    expect(result.current.counterProducts.map((p) => p.id)).toEqual([
+      "mine1",
+      "m1",
+      "m2",
+    ]);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("keys both pickers by the signed-in user", async () => {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve(rows("t", 1, 2)));
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() =>
+      expect(result.current.isLoadingCounterData).toBe(false),
+    );
+    const cached = (queryKey: readonly unknown[]) =>
+      client.getQueryCache().find({ queryKey, exact: true });
+    // My side shares the trade-eligible resource (listing writes refresh it).
+    expect(
+      cached(
+        webKeys.infinite(queryKeys.tradeEligible.resource, {
+          userId: "me",
+          picker: "counter",
+        }),
+      ),
+    ).toBeDefined();
+    // Their side depends on the viewer (blocked sellers are hidden).
+    expect(
+      cached(
+        webKeys.infinite(queryKeys.counterOffer.theirResource, {
+          userId: "me",
+          sellerId: "other",
+        }),
+      ),
+    ).toBeDefined();
   });
 
   it("keeps the editor, lists and picks when Show more fails", async () => {

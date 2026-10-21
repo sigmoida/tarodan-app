@@ -1,7 +1,8 @@
 /** @format */
 
 import { describe, expect, it, vi } from "vitest";
-import { QueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
+import { makeQueryClient } from "./client";
 import { invalidateListingQueries } from "./invalidateListing";
 import { queryKeys, webKeys } from "./keys";
 
@@ -32,14 +33,22 @@ describe("invalidateListingQueries", () => {
     ]);
   });
 
-  it("reaches the trade picker's per-user, per-target key by prefix", async () => {
-    const client = new QueryClient();
-    const pickerKey = webKeys.list(queryKeys.tradeEligible.resource, {
+  it("reaches both paged pickers of my listings by prefix", async () => {
+    const client = makeQueryClient();
+    // The new-trade picker (per user + target) and the counter offer's own side.
+    const newTradeKey = webKeys.infinite(queryKeys.tradeEligible.resource, {
       userId: "u1",
       listingId: "t1",
     });
-    client.setQueryData(pickerKey, []);
+    const counterMineKey = webKeys.infinite(queryKeys.tradeEligible.resource, {
+      userId: "u1",
+      picker: "counter",
+    });
+    const pages = { pages: [], pageParams: [] };
+    client.setQueryData(newTradeKey, pages);
+    client.setQueryData(counterMineKey, pages);
     await invalidateListingQueries(client);
-    expect(client.getQueryState(pickerKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(newTradeKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(counterMineKey)?.isInvalidated).toBe(true);
   });
 });
