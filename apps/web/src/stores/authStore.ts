@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { authApi, userApi } from "@/lib/api";
+import { authApi, userApi, USER_PROFILE_PATH } from "@/lib/api";
 import {
   loginAction,
   googleLoginAction,
@@ -361,16 +361,18 @@ export const useAuthStore = create<AuthState>()(
 
         // FAST PATH: hydrate the account from the cached snapshot instantly (no
         // network) so the header renders authed within one frame; the request
-        // below then refreshes the full, live user.
+        // below then refreshes the full, live user. Skipped when the store
+        // already holds that user: the snapshot lacks phone and taxId.
         const snapshot = readUserSnapshot();
-        if (snapshot) {
+        const current = get().user;
+        if (snapshot && snapshot.id !== current?.id) {
           set({
             user: snapshot,
             isAuthenticated: true,
             limits: getMembershipLimitsForUser(snapshot),
             isLoading: false,
           });
-        } else {
+        } else if (!current) {
           set({ isLoading: true });
         }
 
@@ -541,26 +543,31 @@ export const useAuthStore = create<AuthState>()(
         },
 
         reconcileSession: () => {
-          // A pending check may already be answering for the old session
-          // (another tab just changed it): run it once more instead.
-          if (activeCheck) {
-            rerunCheck = true;
-            return;
-          }
           const state = get();
           const marker = hasAuthMarker();
+          const pending = activeCheck !== null;
+          let stale: boolean;
           if (!isSignedIn(state)) {
-            if (marker) void get().checkAuth();
-            return;
+            // A pending check already answers a guest store with a marker.
+            stale = marker && !pending;
+          } else {
+            const snapshotId = readUserSnapshot()?.id;
+            const otherUser =
+              !!state.user && !!snapshotId && snapshotId !== state.user.id;
+            // A missing marker on checkout and payment pages keeps the
+            // session, as on a 401 there; another account taking over never
+            // does.
+            const markerGone =
+              !marker && !isSessionPreservedPath(window.location.pathname);
+            // Signed in without a profile (a failed or timed-out check): retry.
+            const noProfile = !state.user && !pending;
+            stale = otherUser || markerGone || noProfile;
           }
-          const snapshotId = readUserSnapshot()?.id;
-          const otherUser =
-            !!state.user && !!snapshotId && snapshotId !== state.user.id;
-          // A missing marker on checkout and payment pages keeps the session,
-          // as on a 401 there; another account taking over never does.
-          const markerGone =
-            !marker && !isSessionPreservedPath(window.location.pathname);
-          if (otherUser || markerGone) void get().checkAuth();
+          if (!stale) return;
+          // A pending check may be answering for the old session: it is
+          // dropped and runs once more with the current cookies.
+          if (pending) rerunCheck = true;
+          else void get().checkAuth();
         },
 
         setUser: (user) => {
@@ -634,10 +641,12 @@ if (typeof window !== "undefined") {
   // The API client saw a 401 with the marker gone: re-check with the server
   // and drop to a guest if the session really ended, also on the public
   // pages the client does not redirect away from.
-  // Ignored while a check is pending: that check meets the same 401 itself
-  // (and reporting it would only queue another run of that check).
-  setSessionGoneHandler(() => {
-    if (!activeCheck) useAuthStore.getState().reconcileSession();
+  // A pending check meets its own /users/me 401 itself; queueing a re-run
+  // for it would loop. A 401 of any other request is reconciled, so a check
+  // answered just before the session ended does not keep its user.
+  setSessionGoneHandler((url) => {
+    if (activeCheck && url === USER_PROFILE_PATH) return;
+    useAuthStore.getState().reconcileSession();
   });
   // Another tab signed in, signed out or switched account: it wrote or
   // removed the user snapshot. Covers every route, with or without Header.

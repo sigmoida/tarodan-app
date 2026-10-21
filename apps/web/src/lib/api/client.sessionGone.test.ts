@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   authApi: {},
   userApi: { getProfile: h.getProfile },
+  USER_PROFILE_PATH: "/users/me",
 }));
 
 vi.mock("@/lib/authMarker", () => ({
@@ -123,5 +124,25 @@ describe("api client 401 with the session gone", () => {
 
     expect(h.getProfile).not.toHaveBeenCalled();
     expect(useAuthStore.getState().user?.id).toBe("u1");
+  });
+
+  it("re-checks when another request 401s while a check is answering", async () => {
+    window.history.replaceState(null, "", "/listings/abc");
+    signedInAsU1WithCache();
+    let answer!: (v: unknown) => void;
+    h.getProfile
+      .mockReturnValueOnce(new Promise((r) => (answer = r)))
+      .mockRejectedValueOnce({ response: { status: 401 } });
+    const check = useAuthStore.getState().checkAuth();
+
+    await expect(
+      api.get("/wishlist", { adapter: unauthorized }),
+    ).rejects.toBeTruthy();
+    answer({ data: { id: "u1" } }); // answered just before the session ended
+    await check;
+
+    expect(h.getProfile).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(getQueryClient().getQueryData(ORDERS)).toBeUndefined();
   });
 });

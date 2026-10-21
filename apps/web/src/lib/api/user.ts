@@ -1,8 +1,12 @@
 import { api } from "./client";
 
+/** The signed-in user's profile; also the auth store's session check. */
+export const USER_PROFILE_PATH = "/users/me";
+
 // User Profile
 export const userApi = {
-  getProfile: (options?: { timeout?: number }) => api.get("/users/me", options),
+  getProfile: (options?: { timeout?: number }) =>
+    api.get(USER_PROFILE_PATH, options),
   updateProfile: (data: {
     displayName?: string;
     phone?: string;

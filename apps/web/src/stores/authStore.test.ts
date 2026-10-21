@@ -251,4 +251,71 @@ describe("authStore query cache per session", () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(localStorage.getItem("tarodan_user_snapshot")).toBeNull();
   });
+
+  it("keeps the full profile when a re-check of the same user fails", async () => {
+    useAuthStore.setState({
+      user: { id: "u1", phone: "+90 5xx" } as never,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    localStorage.setItem("tarodan_user_snapshot", JSON.stringify({ id: "u1" }));
+    h.hasAuthMarker.mockReturnValue(true);
+    h.getProfile.mockRejectedValue({ response: { status: 503 } });
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(useAuthStore.getState().user?.phone).toBe("+90 5xx");
+  });
+
+  it("retries a signed-in store that has no profile yet", async () => {
+    useAuthStore.setState({ user: null, isAuthenticated: true });
+    h.hasAuthMarker.mockReturnValue(true);
+    h.getProfile.mockResolvedValue({ data: { id: "u1" } });
+
+    useAuthStore.getState().reconcileSession();
+    await vi.waitFor(() => expect(useAuthStore.getState().user?.id).toBe("u1"));
+
+    expect(h.getProfile).toHaveBeenCalledTimes(1);
+  });
+
+  describe("reconcile during a pending check", () => {
+    const pendingCheck = () => {
+      let answer!: (v: unknown) => void;
+      h.getProfile.mockReturnValueOnce(new Promise((r) => (answer = r)));
+      const done = useAuthStore.getState().checkAuth();
+      return { answer: (id: string) => answer({ data: { id } }), done };
+    };
+
+    afterEach(() => window.history.replaceState(null, "", "/"));
+
+    it("adds no request when nothing changed", async () => {
+      signedIn();
+      localStorage.setItem(
+        "tarodan_user_snapshot",
+        JSON.stringify({ id: "u1" }),
+      );
+      h.hasAuthMarker.mockReturnValue(true);
+      const check = pendingCheck();
+
+      useAuthStore.getState().reconcileSession();
+      check.answer("u1");
+      await check.done;
+
+      expect(h.getProfile).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the payment-page rule for a missing marker", async () => {
+      window.history.replaceState(null, "", "/payment/abc");
+      signedIn();
+      h.hasAuthMarker.mockReturnValue(false);
+      const check = pendingCheck();
+
+      useAuthStore.getState().reconcileSession();
+      check.answer("u1");
+      await check.done;
+
+      expect(h.getProfile).toHaveBeenCalledTimes(1);
+      expect(useAuthStore.getState().user?.id).toBe("u1");
+    });
+  });
 });
