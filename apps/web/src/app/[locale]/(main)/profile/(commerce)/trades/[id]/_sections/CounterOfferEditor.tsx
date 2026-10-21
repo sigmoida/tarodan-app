@@ -257,13 +257,11 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                 {t("trade.cashBalanceHint")}
               </p>
               <div className="space-y-4">
-                <div className="relative max-w-xs">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">
-                    ₺
-                  </span>
+                <div className="max-w-xs">
                   <Input
                     type="text"
                     inputMode="decimal"
+                    leftAdornment="₺"
                     value={counterCashAmount}
                     onChange={(e) => setCounterCashAmount(e.target.value)}
                     placeholder="0,00"
@@ -273,7 +271,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                         ? t("trade.cashFormatRefused")
                         : undefined
                     }
-                    className="pl-10 pr-4 h-12 rounded-xl"
+                    className="pr-4 h-12 rounded-xl"
                   />
                 </div>
                 {counterCashValue > 0 && (

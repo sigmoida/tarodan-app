@@ -104,8 +104,8 @@ function NewTradeContent() {
   });
 
   const submit = () => {
-    // API en az 1 teklif edilen ürün ister (CreateTradeDto initiatorItems ArrayMinSize(1));
-    // yalnız nakitle teklif sunucuda reddedilirdi.
+    // The API wants at least one offered item (CreateTradeDto initiatorItems
+    // ArrayMinSize(1)); a cash-only offer would be refused on the server.
     if (offeredIds.length === 0)
       return toast.error(t("trade.selectAtLeastOneOffer"));
     if (!target) return toast.error(t("trade.targetNotFound"));
@@ -216,19 +216,16 @@ function NewTradeContent() {
           {t("page.new.page.takasDegeriniDengelemekIcinNakitFark")}
         </p>
         <div className="space-y-4">
-          <div className="relative max-w-xs">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">
-              ₺
-            </span>
+          <div className="max-w-xs">
             <Input
               type="text"
               inputMode="decimal"
+              leftAdornment="₺"
               value={cashAmount}
               onChange={(e) => setCashAmount(e.target.value)}
               placeholder="0,00"
               helperText={t("trade.cashHelper")}
               error={cashRefused ? t("trade.cashFormatRefused") : undefined}
-              className="pl-10"
             />
           </div>
           {cash > 0 && (
