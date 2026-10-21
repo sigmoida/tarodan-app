@@ -297,3 +297,154 @@ describe("savedSearchToRouteParams", () => {
     expect(canonicalizeSavedSearchQuery(params)).toEqual(query);
   });
 });
+
+/**
+ * Web `/listings` and mobile `/search` build their `GET /products` params with
+ * the same builder rules (`buildListApiParams` on web, its mirror in mobile
+ * `productFilters.ts`): numbers for prices, `true` for set flags, `color` as a
+ * comma list, `attrGroups` as the JSON of the selected groups in selection
+ * order, plus `page` and `limit`. Both clients send that object as the saved
+ * query and use the canonical form for the disabled state and the default
+ * name, so these are the inputs the canonicaliser must agree on.
+ */
+describe("the inputs web and mobile send", () => {
+  const CAR_MODEL = "6a1d2c3b-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+  const hashOf = (raw: Record<string, unknown>) =>
+    savedSearchQueryHash(canonicalizeSavedSearchQuery(raw));
+
+  const fromBuilder = (
+    over: Record<string, unknown> = {},
+  ): Record<string, unknown> => ({
+    limit: 48,
+    page: 2,
+    search: "f40",
+    categoryId: UUID,
+    condition: "very_good",
+    minPrice: 100,
+    maxPrice: 2500,
+    brandId: "b1",
+    carModelId: CAR_MODEL,
+    scale: "1:18",
+    color: "red,black",
+    manufacturerId: UUID,
+    tradeOnly: true,
+    preOrder: true,
+    sortBy: "price_asc",
+    attrGroups: JSON.stringify({
+      "hw-segment": ["premium", "mainline"],
+      "hw-rarity": ["treasure-hunt"],
+    }),
+    ...over,
+  });
+
+  it("keeps every filter of a full builder object, without page and limit", () => {
+    expect(canonicalizeSavedSearchQuery(fromBuilder())).toEqual({
+      attrGroups:
+        '{"hw-rarity":["treasure-hunt"],"hw-segment":["mainline","premium"]}',
+      brandId: "b1",
+      carModelId: CAR_MODEL,
+      categoryId: UUID,
+      color: "black,red",
+      condition: "very_good",
+      manufacturerId: UUID,
+      maxPrice: 2500,
+      minPrice: 100,
+      preOrder: true,
+      scale: "1:18",
+      search: "f40",
+      sortBy: "price_asc",
+      tradeOnly: true,
+    });
+  });
+
+  it("hashes the same search equal whatever order the user picked the filters in", () => {
+    const picked = fromBuilder({
+      page: 1,
+      color: "black,red",
+      attrGroups: JSON.stringify({
+        "hw-rarity": ["treasure-hunt"],
+        "hw-segment": ["mainline", "premium"],
+      }),
+    });
+    expect(hashOf(picked)).toBe(hashOf(fromBuilder()));
+  });
+
+  it("tells apart searches that differ in one attribute slug", () => {
+    expect(
+      hashOf(
+        fromBuilder({ attrGroups: JSON.stringify({ "hw-rarity": ["sth"] }) }),
+      ),
+    ).not.toBe(
+      hashOf(
+        fromBuilder({ attrGroups: JSON.stringify({ "hw-rarity": ["th"] }) }),
+      ),
+    );
+  });
+
+  it("drops a price a client could not parse (NaN, or null after JSON)", () => {
+    expect(
+      canonicalizeSavedSearchQuery({
+        search: "x",
+        minPrice: Number("1,5"),
+        maxPrice: Infinity,
+      }),
+    ).toEqual({ search: "x" });
+    expect(
+      canonicalizeSavedSearchQuery(
+        JSON.parse(JSON.stringify({ search: "x", minPrice: Number.NaN })),
+      ),
+    ).toEqual({ search: "x" });
+  });
+
+  it("sees nothing to save in the builder object of a bare listings page", () => {
+    // `/listings` with only the default sort: page and limit, nothing else.
+    expect(
+      isEmptySavedSearchQuery(
+        canonicalizeSavedSearchQuery({ limit: 48, page: 1 }),
+      ),
+    ).toBe(true);
+    expect(
+      isEmptySavedSearchQuery(
+        canonicalizeSavedSearchQuery({
+          limit: 48,
+          page: 1,
+          sortBy: "created_desc",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("is idempotent: a canonical query (a stored row, a re-save) stays byte-equal", () => {
+    const once = canonicalizeSavedSearchQuery(fromBuilder());
+    const twice = canonicalizeSavedSearchQuery(
+      JSON.parse(JSON.stringify(once)),
+    );
+    expect(JSON.stringify(twice)).toBe(JSON.stringify(once));
+    expect(savedSearchQueryHash(twice)).toBe(savedSearchQueryHash(once));
+  });
+
+  it("round-trips attrGroups through the attr.<group> route params", () => {
+    const query = canonicalizeSavedSearchQuery(fromBuilder());
+    const params = savedSearchToRouteParams(query);
+
+    // What both listings pages do with the URL: `attr.<group>=a,b` back into
+    // groups, then `attrGroups` as their JSON (web `parseCustomAttrs`).
+    const groups: Record<string, string[]> = {};
+    const rest: Record<string, string> = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (key.startsWith("attr.")) {
+        groups[key.slice("attr.".length)] = value.split(",");
+      } else {
+        rest[key] = value;
+      }
+    }
+    expect(Object.keys(groups).sort()).toEqual(["hw-rarity", "hw-segment"]);
+    expect(
+      canonicalizeSavedSearchQuery({
+        ...rest,
+        attrGroups: JSON.stringify(groups),
+      }),
+    ).toEqual(query);
+  });
+});
