@@ -1481,6 +1481,8 @@
     "noProductsAvailable": "No products available",
     "goToMyListings": "Go to My Listings",
     "cashBalanceHint": "You can add cash to balance the trade value.",
+    "cashHelper": "Use a comma for kuruş, for example 1250,50",
+    "cashFormatRefused": "This amount was not accepted. Do not use thousands separators; use a comma for kuruş, for example 1250,50",
     "whoPaysCash": "Who will pay the cash difference?",
     "theyWillPay": "They will pay",
     "totalWithCommission": "Total with commission:",

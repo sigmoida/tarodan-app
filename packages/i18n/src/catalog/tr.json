@@ -1481,6 +1481,8 @@
     "noProductsAvailable": "Kullanılabilir ürün yok",
     "goToMyListings": "İlanlarıma Git",
     "cashBalanceHint": "Takas değerini dengelemek için nakit fark ekleyebilirsiniz.",
+    "cashHelper": "Kuruş için virgül kullanın, örn. 1250,50",
+    "cashFormatRefused": "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
     "whoPaysCash": "Nakit farkı kim ödeyecek?",
     "theyWillPay": "Karşı taraf ödeyecek",
     "totalWithCommission": "Komisyon dahil toplam:",
