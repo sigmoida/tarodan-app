@@ -500,7 +500,6 @@ export class NotificationDispatchService implements OnModuleDestroy {
       `[saveInAppNotification] Saving for userId=${userId}, type=${type}`,
     );
     try {
-      const template = NOTIFICATION_TEMPLATES[type];
       // Hedef TEK yerden gelir (notification-link.ts). Eskiden şablon linki
       // enterpole ediliyordu ve eksik değişken `{{orderId}}` olarak linkin
       // İÇİNDE kaydediliyordu → tıklanınca 404.
@@ -536,7 +535,6 @@ export class NotificationDispatchService implements OnModuleDestroy {
               data: {
                 ...(data || {}),
                 messageCount,
-                icon: template?.icon,
                 link,
               },
               sentAt: now,
@@ -563,7 +561,6 @@ export class NotificationDispatchService implements OnModuleDestroy {
           body: message,
           data: {
             ...(data || {}),
-            icon: template?.icon,
             link,
           },
           status: "sent",
@@ -839,13 +836,15 @@ export class NotificationDispatchService implements OnModuleDestroy {
 
     // Format notifications with proper structure
     const formattedNotifications = notifications.map((n) => {
-      const data = (n.data as Record<string, any>) || {};
+      // Rows saved before the icon was dropped still carry an emoji `icon` in
+      // their data; no client renders it, so strip it from the response.
+      const { icon: _legacyIcon, ...data } =
+        (n.data as Record<string, any>) || {};
       return {
         id: n.id,
         type: n.type,
         title: n.title,
         message: n.body,
-        icon: data.icon || this.getDefaultIcon(n.type),
         // Kaydedilmiş link körlemesine döndürülmez: önce tip+data'dan yeniden
         // çözülür, olmazsa eski yol bugünkü route'a çevrilir. Böylece
         // veritabanındaki bozuk eski kayıtlar migration olmadan düzelir.
@@ -868,14 +867,6 @@ export class NotificationDispatchService implements OnModuleDestroy {
         pages: Math.ceil(total / limit),
       },
     };
-  }
-
-  /**
-   * Get default icon for notification type
-   */
-  private getDefaultIcon(type: string): string {
-    const template = NOTIFICATION_TEMPLATES[type as NotificationType];
-    return template?.icon || "🔔";
   }
 
   /**

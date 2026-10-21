@@ -30,6 +30,8 @@ describe("NotificationService realtime emit", () => {
         .fn()
         .mockResolvedValue({ id: "log-1", createdAt: new Date() }),
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
   };
 
@@ -79,5 +81,33 @@ describe("NotificationService realtime emit", () => {
     expect(payload.type).toBe(NotificationType.NEW_MESSAGE);
     expect(payload.title).toBeTruthy();
     expect(payload.id).toBe("log-1");
+  });
+
+  it("stores no icon on a new in-app row", async () => {
+    await service.createInAppNotification("u1", NotificationType.NEW_MESSAGE, {
+      senderName: "Ali",
+      messagePreview: "selam",
+      threadId: "t1",
+    });
+    const { data } = mockPrisma.notificationLog.create.mock.calls[0][0];
+    expect(data.data).not.toHaveProperty("icon");
+  });
+
+  it("omits the icon from the list, including rows saved with an emoji", async () => {
+    mockPrisma.notificationLog.findMany.mockResolvedValueOnce([
+      {
+        id: "n1",
+        type: NotificationType.NEW_MESSAGE,
+        title: "t",
+        body: "b",
+        status: "sent",
+        createdAt: new Date(),
+        data: { icon: "\u{1F4AC}", threadId: "t1" },
+      },
+    ]);
+    const result = await service.getInAppNotifications("u1");
+    const [item] = result.notifications;
+    expect(item).not.toHaveProperty("icon");
+    expect(item?.data).toEqual({ threadId: "t1" });
   });
 });
