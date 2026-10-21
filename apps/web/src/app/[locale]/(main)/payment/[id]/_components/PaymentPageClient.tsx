@@ -10,6 +10,15 @@ import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentStatus } from "../_hooks/usePaymentStatus";
 import PaymentReady from "./PaymentReady";
 import { useTranslations } from "next-intl";
+import type { MessageKey } from "@tarodan/i18n";
+import type { PaymentKind } from "@/lib/paymentKind";
+
+/** The not-found button: back to the purchase's own list. */
+const BACK_LABEL: Record<PaymentKind, MessageKey> = {
+  checkout: "page.payment.paymentpageclient.siparislerimeDon",
+  membership: "page.payment.paymentpageclient.uyelikSayfasinaDon",
+  boost: "payment.boost.toBoosts",
+};
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -36,7 +45,8 @@ export default function PaymentPageClient() {
     retry,
     directTarget,
     hasTarget,
-    isMembershipPayment,
+    kind,
+    routes,
     purpose,
   } = usePaymentStatus();
 
@@ -60,14 +70,8 @@ export default function PaymentPageClient() {
         <p className="mb-4 text-muted">
           {t("page.payment.paymentpageclient.odemeBulunamadi")}
         </p>
-        <Button
-          onClick={() =>
-            router.push(isMembershipPayment ? "/membership" : "/profile/orders")
-          }
-        >
-          {isMembershipPayment
-            ? t("page.payment.paymentpageclient.uyelikSayfasinaDon")
-            : t("page.payment.paymentpageclient.siparislerimeDon")}
+        <Button onClick={() => router.push(routes.back)}>
+          {t(BACK_LABEL[kind])}
         </Button>
       </Centered>
     );

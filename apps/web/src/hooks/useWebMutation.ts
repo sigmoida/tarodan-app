@@ -46,6 +46,17 @@ export function apiErrorCode(error: unknown): string | undefined {
 }
 
 /**
+ * The catalog key of a localized API error (`i18nKey`, e.g.
+ * `server.product.boostConsentRequired`), if any: the stable way to tell one
+ * rejection from another, since `message` is already translated.
+ */
+export function apiErrorI18nKey(error: unknown): string | undefined {
+  const key = (error as { response?: { data?: { i18nKey?: unknown } } })
+    ?.response?.data?.i18nKey;
+  return typeof key === "string" ? key : undefined;
+}
+
+/**
  * The web analogue of admin's `useAdminMutation` — the one way account-area
  * pages should perform writes. Wraps `useMutation` with the shared success/error
  * toast and resource invalidation, so the ~85 hand-rolled mutation hooks stop

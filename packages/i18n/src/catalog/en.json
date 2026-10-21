@@ -2063,7 +2063,7 @@
       "showcaseHint": "Shown in the home showcase and at the top of search",
       "searchHint": "Shown at the top of search",
       "activeBoostInfo": "This listing already has an active boost: ~{days} days left. Your selected duration is added on top of the remaining time.",
-      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days → total ~{total} days",
+      "extendSummary": "{selected} days will be added on top of the remaining {remaining} days; total ~{total} days",
       "daysValue": "{days} days",
       "campaign": "Campaign",
       "unavailable": "Boosting is currently unavailable.",
@@ -2071,10 +2071,24 @@
       "pricingLoadError": "Failed to load prices",
       "paymentStartFailed": "Failed to start payment",
       "initiateFailed": "Failed to start boost",
-      "autoRenewLabel": "Get an auto-renew reminder when it expires (Premium)",
+      "autoRenewLabel": "Remind me 24 hours before it ends (Premium). You are not charged automatically.",
       "redirecting": "Redirecting",
       "extendAndPay": "Extend and Pay",
-      "featureAndPay": "Feature and Pay"
+      "featureAndPay": "Feature and Pay",
+      "reminderUpgrade": "Upgrade to Premium",
+      "preInfo": {
+        "title": "Pre-contract information",
+        "provider": "Service provider: {company}",
+        "service": "Service: featuring \"{listing}\" for {days} days with the {package} package",
+        "price": "Total price (VAT included): <amount>{price}</amount>",
+        "start": "The service starts as soon as your payment is confirmed.",
+        "noCancel": "A boost cannot be cancelled once it has started."
+      },
+      "consent": {
+        "contract": "I have read and accept the <preInfo>Pre-contract Information Form</preInfo> and the <contract>Distance Service Contract</contract>.",
+        "waiver": "I agree that the service starts immediately with my approval and that I therefore have no right of withdrawal.",
+        "required": "Please accept both statements to continue."
+      }
     },
     "bank": {
       "title": "Bank Account / IBAN",
@@ -2395,6 +2409,11 @@
       "lastMethodHint": "Your account must keep a password or a connected Google account. Set a password first.",
       "connectSuccess": "{provider} account connected.",
       "disconnectSuccess": "{provider} disconnected."
+    },
+    "boosts": {
+      "reminder": {
+        "premiumOnly": "Reminders are for Premium members."
+      }
     }
   },
   "review": {
@@ -2932,7 +2951,22 @@
     "invoiceByEmail": "Your invoice is emailed to you once it is issued; you can also download it from Orders.",
     "individualSellerNoInvoice": "This is an individual seller, so no product invoice is issued. Tarodan's service fee invoice is sent to you by email.",
     "sellerInvoicePending": "The seller has not uploaded the product invoice yet. You will be notified by email once they do.",
-    "downloading": "Downloading..."
+    "downloading": "Downloading...",
+    "boost": {
+      "success": {
+        "title": "Your boost has started",
+        "description": "\"{listing}\" is featured until {date}.",
+        "pending": "Payment received. Your boost will start within a few minutes."
+      },
+      "toBoosts": "My Boosts",
+      "toListings": "My Listings",
+      "fail": {
+        "title": "The boost payment was not completed",
+        "description": "The payment could not be completed. You can try again.",
+        "retry": "Try again"
+      },
+      "cancelled": "The boost payment was cancelled."
+    }
   },
   "bankAccount": {
     "savedBadge": "Saved",
