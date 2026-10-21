@@ -2953,6 +2953,15 @@
     "viewProfile": "View Profile",
     "premiumBadge": "Premium",
     "trust": "Trust",
+    "trustScore": {
+      "levels": {
+        "excellent": "Excellent",
+        "trusted": "Trusted",
+        "fair": "Fair",
+        "developing": "Developing",
+        "new": "New seller"
+      }
+    },
     "noReviewsDesc": "This seller has no reviews yet.",
     "totalReviews": "reviews",
     "noCollections": "No collections yet",
@@ -9188,7 +9197,39 @@
         "blocksTab": "Blocks",
         "blocksGivenTitle": "Blocked by this user",
         "blocksReceivedTitle": "Blocked this user",
-        "blocksEmpty": "No block records"
+        "blocksEmpty": "No block records",
+        "trust": {
+          "title": "Trust score",
+          "score": "Score",
+          "level": "Level",
+          "notComputed": "Not computed yet",
+          "notEnoughData": "Not enough data",
+          "computedAt": "Last computed",
+          "formulaVersion": "Formula version",
+          "unavailable": "The breakdown is not available for this formula version",
+          "colComponent": "Component",
+          "colWeight": "Weight",
+          "colSubScore": "Sub-score",
+          "colDetail": "Detail",
+          "smoothed": "Smoothed average",
+          "components": {
+            "rating": "Rating",
+            "reliability": "Order reliability",
+            "onTime": "On-time shipping",
+            "volume": "Volume",
+            "tenure": "Account age"
+          },
+          "counts": {
+            "raters": "Raters",
+            "eligibleOrders": "Orders counted",
+            "failures": "Seller-caused cancellations or refunds",
+            "shipped": "Shipped",
+            "late": "Shipped late",
+            "transactions": "Completed transactions",
+            "counterparties": "Distinct counterparties",
+            "tenureDays": "Account age (days)"
+          }
+        }
       },
       "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
       "resendVerification": "Send Activation Email",
