@@ -274,7 +274,6 @@
     "appleScriptFailed": "Apple sign-in could not be loaded",
     "emailNotRegistered": "This email address is not registered.",
     "useDifferentEmail": "Use a different email",
-    "googleOnlyAccount": "This account was created with Google. Sign in with Google, or set a password.",
     "setPassword": "Set a password",
     "setPasswordEmailSent": "A link to set your password was sent to your email.",
     "or": "or",
@@ -349,7 +348,8 @@
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
     "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
     "kvkkAgreeRich": "I have read and accept the <kvkk>KVKK Privacy Notice</kvkk>.",
-    "mustAcceptKvkk": "You must accept the KVKK privacy notice"
+    "mustAcceptKvkk": "You must accept the KVKK privacy notice",
+    "noPasswordAccount": "This account has no password. Sign in with the method connected to it, or set a password."
   },
   "brands": {
     "title": "Brands",

@@ -274,7 +274,6 @@
     "appleScriptFailed": "Apple girişi yüklenemedi",
     "emailNotRegistered": "Bu e-posta adresi kayıtlı değil.",
     "useDifferentEmail": "Farklı e-posta kullan",
-    "googleOnlyAccount": "Bu hesap Google ile oluşturulmuş. Google ile giriş yapın ya da bir şifre belirleyin.",
     "setPassword": "Şifre belirle",
     "setPasswordEmailSent": "Şifre belirleme bağlantısı e-postanıza gönderildi.",
     "or": "veya",
@@ -349,7 +348,8 @@
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
     "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
     "kvkkAgreeRich": "<kvkk>KVKK Aydınlatma Metni</kvkk>'ni okudum ve kabul ediyorum.",
-    "mustAcceptKvkk": "KVKK Aydınlatma Metni'ni onaylamalısınız"
+    "mustAcceptKvkk": "KVKK Aydınlatma Metni'ni onaylamalısınız",
+    "noPasswordAccount": "Bu hesabın şifresi yok. Hesabınıza bağlı yöntemle giriş yapın ya da bir şifre belirleyin."
   },
   "brands": {
     "title": "Markalar",
