@@ -18,13 +18,14 @@ import type { WishlistItem } from "./types";
 
 const h = vi.hoisted(() => ({
   inCart: new Set<string>(),
+  pending: new Set<string>(),
   toggles: [] as string[],
 }));
 
 vi.mock("@/hooks/useCartToggle", () => ({
   useCartToggle: (productId: string) => ({
     inCart: h.inCart.has(productId),
-    isPending: false,
+    isPending: h.pending.has(productId),
     toggle: () => h.toggles.push(productId),
   }),
 }));
@@ -92,6 +93,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   h.inCart = new Set(["b"]);
+  h.pending = new Set();
   h.toggles = [];
   onRemove.mockReset();
 });
@@ -119,6 +121,16 @@ describe("FavoritesGrid", () => {
     expect(remove.className).toContain("bg-danger-600");
     // Only the remove control and the footer: no price-row action.
     expect(container.querySelectorAll("button")).toHaveLength(4);
+  });
+
+  it("the footer looks busy while its write runs, without native disabled", () => {
+    h.pending = new Set(["a"]);
+    render();
+    const [busy, idle] = cartButtons();
+
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(busy.disabled).toBe(false);
+    expect(idle.hasAttribute("aria-busy")).toBe(false);
   });
 
   it("the footer toggles that listing's cart line", () => {

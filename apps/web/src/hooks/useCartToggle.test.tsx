@@ -100,6 +100,31 @@ describe("useCartToggle", () => {
     expect(h.toast.success).toHaveBeenCalledWith("product.removedFromCart");
   });
 
+  it("only this listing's line counts as in the cart", async () => {
+    h.lines = [{ productId: "other" }];
+    render();
+    expect(cart.inCart).toBe(false);
+
+    act(() => cart.toggle());
+    await flush();
+
+    expect(h.addToCart).toHaveBeenCalledWith("p1");
+    expect(h.removeFromCart).not.toHaveBeenCalled();
+  });
+
+  it("shows no error for a cancelled write", async () => {
+    h.addToCart.mockRejectedValue(
+      Object.assign(new Error("canceled"), { code: "ERR_CANCELED" }),
+    );
+    render();
+
+    act(() => cart.toggle());
+    await flush();
+
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(h.toast.success).not.toHaveBeenCalled();
+  });
+
   it("ignores a second click while the write runs", async () => {
     let finish!: () => void;
     h.addToCart.mockReturnValue(

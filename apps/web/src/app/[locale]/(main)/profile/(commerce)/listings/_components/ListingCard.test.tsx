@@ -105,6 +105,8 @@ describe("ListingCard boost action", () => {
     )!;
     act(() => boost.click());
     expect(onBoost).toHaveBeenCalledWith(base);
+    // The action row sits above the card's stretched title link.
+    expect(boost.parentElement!.className).toContain("z-10");
   });
 
   it("a boosted listing: Süre Ekle, the boosted badge with its hint, the end date", () => {
@@ -133,7 +135,13 @@ describe("ListingCard boost action", () => {
   });
 
   it("an offline listing (paused boost): no boost button, no end date", () => {
-    render({ ...base, status: "inactive", isBoosted: false });
+    // A paused boost keeps its end; the card must not show it.
+    render({
+      ...base,
+      status: "inactive",
+      isBoosted: false,
+      boostedUntil: "2026-11-12T10:00:00.000Z",
+    });
 
     expect(buttonTexts()).not.toContain("product.boostListing");
     expect(buttonTexts()).not.toContain("product.extendBoost");

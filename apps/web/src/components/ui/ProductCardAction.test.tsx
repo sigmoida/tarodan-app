@@ -203,11 +203,35 @@ describe("card action matrix (grid)", () => {
     h.userId = "me";
     render(
       <ProductCard
-        product={{ ...own, status: "inactive", isBoosted: false }}
+        product={{
+          ...own,
+          status: "inactive",
+          isBoosted: false,
+          // A paused boost keeps its end; the card must not show it.
+          boostedUntil: BOOST_END,
+        }}
       />,
     );
     expect(buttons()).toHaveLength(0);
     expect(container.textContent).not.toContain("product.boostEndsAt");
+  });
+
+  it("an own active listing whose boost ended: Öne Çıkar, no end date", () => {
+    h.userId = "me";
+    render(
+      <ProductCard
+        product={{ ...own, isBoosted: false, boostedUntil: BOOST_END }}
+      />,
+    );
+    expect(textButton()!.textContent).toBe("product.boostListing");
+    expect(container.textContent).not.toContain("product.boostEndsAt");
+  });
+
+  it("a listing without a quantity (unlimited stock): the cart action", () => {
+    h.userId = "buyer";
+    const { availableQuantity: _omit, ...unlimited } = listing;
+    render(<ProductCard product={unlimited} />);
+    expect(textButton()!.textContent).toBe("product.addToCart");
   });
 
   it("boost sales off: no action on an own listing, the cart stays for others", () => {
@@ -264,6 +288,8 @@ describe("cart toggle", () => {
 
     expect(icon.getAttribute("aria-pressed")).toBe("false");
     expect(icon.getAttribute("title")).toBe(icon.getAttribute("aria-label"));
+    // Not in the cart: the outline icon.
+    expect(icon.querySelector("svg")!.getAttribute("fill")).toBe("none");
     expect(icon.className).toContain("@card-wide:hidden");
     expect(textButton()!.className).toContain("hidden");
     expect(textButton()!.className).toContain("@card-wide:inline-flex");
@@ -283,6 +309,10 @@ describe("cart toggle", () => {
     );
     expect(icon.getAttribute("aria-pressed")).toBe("true");
     expect(icon.className).toContain("text-danger-600");
+    // In the cart: the solid icon, so colour is not the only cue.
+    expect(icon.querySelector("svg")!.getAttribute("fill")).toBe(
+      "currentColor",
+    );
     expect(textButton()!.textContent).toBe("product.removeFromCart");
   });
 
@@ -311,6 +341,8 @@ describe("cart toggle", () => {
     expect(iconButton()!.className).toContain("xs:hidden");
     expect(textButton()!.className).toContain("xs:inline-flex");
     expect(container.querySelector("a")!.contains(iconButton()!)).toBe(false);
+    // The action sits above the row's stretched link.
+    expect(iconButton()!.parentElement!.className).toContain("z-10");
   });
 });
 
@@ -328,6 +360,20 @@ describe("boost entry", () => {
       id: "p1",
       title: TITLE,
       boostedUntil: BOOST_END,
+    });
+    expect(h.linkClick).not.toHaveBeenCalled();
+  });
+
+  it("the icon-only button on a narrow card opens it too", () => {
+    h.userId = "me";
+    render(<ProductCard product={own} />);
+    act(() => iconButton()!.click());
+
+    expect(h.openBoost).toHaveBeenCalledTimes(1);
+    expect(h.openBoost).toHaveBeenCalledWith({
+      id: "p1",
+      title: TITLE,
+      boostedUntil: null,
     });
     expect(h.linkClick).not.toHaveBeenCalled();
   });
