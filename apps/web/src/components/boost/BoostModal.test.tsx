@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   initiate: vi.fn(),
   push: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn() },
+  /** The pay button's `disabled` on every render of the footer, in order. */
+  footerDisabled: [] as boolean[],
 }));
 
 // The key comes back instead of the text (with its values), and rich tags
@@ -44,6 +46,16 @@ vi.mock("next-intl", () => {
   return { useTranslations: () => t };
 });
 vi.mock("react-hot-toast", () => ({ default: h.toast }));
+// The real footer, with each render's pay state recorded: a state the DOM
+// only holds between two commits is still a render that offered pay.
+vi.mock("@tarodan/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tarodan/ui")>();
+  const ModalFooter = (props: Parameters<typeof actual.ModalFooter>[0]) => {
+    h.footerDisabled.push(!!props.disabled);
+    return createElement(actual.ModalFooter, props);
+  };
+  return { ...actual, ModalFooter };
+});
 vi.mock("@/lib/api", () => ({
   boostApi: { options: h.options, initiate: h.initiate },
 }));
@@ -354,6 +366,123 @@ describe("BoostModal consent reset", () => {
     expect(h.options).toHaveBeenCalledTimes(2);
     expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
     expect(payButton().disabled).toBe(false);
+  });
+
+  /** The matrix with the pre-selected option (Ekonomik, 7 days) changed. */
+  const withEconomy = (
+    pkg: Partial<BoostOptionsResponse["packages"][number]>,
+    option: Partial<
+      BoostOptionsResponse["packages"][number]["options"][number]
+    > = {},
+  ): BoostOptionsResponse => ({
+    ...OPTIONS,
+    packages: [
+      {
+        ...OPTIONS.packages[0],
+        ...pkg,
+        options: [
+          OPTIONS.packages[0].options[0],
+          { ...OPTIONS.packages[0].options[1], ...option },
+        ],
+      },
+      OPTIONS.packages[1],
+    ],
+  });
+
+  it("unticks both consents for a sub-kuruş reprice: the shown price is compared exactly", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    await refetchWith(withEconomy({}, { price: 59.004 }));
+
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("unticks both consents when a refetch renames the chosen package", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    await refetchWith(withEconomy({ name: "Ekonomik Plus" }));
+
+    expect(text()).toContain(
+      `profile.boost.preInfo.service|${JSON.stringify({ listing: LISTING.title, package: "Ekonomik Plus", days: 7 })}`,
+    );
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("unticks both consents when a refetch puts another package behind the same name, duration and price", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    // The order is opened for the package id: a replaced package is another
+    // offer even when everything shown reads the same.
+    await refetchWith(withEconomy({ id: "pkg-eco-v2" }));
+
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("unticks both consents for another duration at the same price", async () => {
+    // Ekonomik offers 3 days at the same 59 as its 7 days.
+    const samePrice = withEconomy({});
+    samePrice.packages[0].options[0] = {
+      ...samePrice.packages[0].options[1],
+      durationDays: 3,
+      label: "3",
+    };
+    h.options.mockResolvedValue({ data: samePrice });
+    render();
+    await flush();
+    await acceptBoth();
+
+    click(durationRow("Ekonomik", 3).querySelector("input")!);
+
+    expect(text()).toContain(
+      `profile.boost.preInfo.service|${JSON.stringify({ listing: LISTING.title, package: "Ekonomik", days: 3 })}`,
+    );
+    expect(text()).toContain(
+      `profile.boost.preInfo.price|${JSON.stringify({ price: formatTL(59) })}`,
+    );
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("never renders pay enabled on new terms, not even for one render", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+    expect(payButton().disabled).toBe(false);
+
+    // Another duration: the very render that shows it has pay disabled.
+    h.footerDisabled.length = 0;
+    click(durationRow("Ekonomik", 3).querySelector("input")!);
+    expect(h.footerDisabled.length).toBeGreaterThan(0);
+    expect(h.footerDisabled).not.toContain(false);
+
+    await acceptBoth();
+    expect(payButton().disabled).toBe(false);
+
+    // A refetch that reprices the chosen 3 days: disabled while it runs and
+    // still disabled on the render that shows the new price.
+    const repriced = withEconomy({});
+    repriced.packages[0].options[0] = {
+      ...repriced.packages[0].options[0],
+      price: 45,
+    };
+    h.footerDisabled.length = 0;
+    await refetchWith(repriced);
+
+    expect(text()).toContain(
+      `profile.boost.preInfo.price|${JSON.stringify({ price: formatTL(45) })}`,
+    );
+    expect(h.footerDisabled.length).toBeGreaterThan(0);
+    expect(h.footerDisabled).not.toContain(false);
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
   });
 });
 
