@@ -2320,19 +2320,6 @@
       "saticilariTakipEderekYeniIlanlarindanHaberdar": "Satıcıları takip ederek yeni ilanlarından haberdar olun",
       "ilanlariKesfet": "İlanları Keşfet"
     },
-    "savedSearches": {
-      "failedToLoadSavedSearches": "Failed to load saved searches:",
-      "aramayiSil": "Aramayı sil",
-      "buAramayiSilmekIstediginizdenEminMisiniz": "Bu aramayı silmek istediğinizden emin misiniz?",
-      "aramaSilindi": "Arama silindi",
-      "bildirimlerAcildi": "Bildirimler açıldı",
-      "bildirimlerKapatildi": "Bildirimler kapatıldı"
-    },
-    "savedSearchCard": {
-      "tumIlanlar": "Tüm ilanlar",
-      "bildirimleriKapat": "Bildirimleri kapat",
-      "bildirimleriAc": "Bildirimleri aç"
-    },
     "bankHooks": {
       "bankaHesabiKaydedildi": "Banka hesabı kaydedildi",
       "kaydetmeBasarisiz": "Kaydetme başarısız",
@@ -2558,13 +2545,30 @@
     "savedLimitReached": "You have reached your saved-search limit ({limit} searches).",
     "premiumMoreSearches": "Save more searches with Premium",
     "savedTitle": "My Saved Searches",
-    "savedDescription": "Manage your saved searches and change notification preferences here.",
+    "savedDescription": "Run your saved searches again or delete them here.",
     "savedEmptyTitle": "No Saved Searches",
-    "savedEmptyDescription": "While browsing listings, save a search with the \"Save this search\" button on the results page; manage it here and get notified about new results.",
+    "savedEmptyDescription": "While browsing listings, save a search with the \"Save this search\" button on the results page, then run it again from here.",
     "countOfLimit": "{count} / {limit} searches",
     "searchListings": "Search Listings",
     "runThisSearch": "Run This Search",
     "priceLabel": "Price:"
+  },
+  "savedSearch": {
+    "save": "Save this search",
+    "saveTitle": "Save search",
+    "nameLabel": "Search name",
+    "saved": "Search saved",
+    "saveFailed": "Could not save the search",
+    "nothingToSave": "Search or pick a filter to save",
+    "signInToSave": "Sign in to save your search",
+    "untitled": "Saved search",
+    "savedOn": "Saved on {date}",
+    "limitTitle": "Saved search limit",
+    "deleteTitle": "Delete search",
+    "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+    "deleted": "Search deleted",
+    "deleteFailed": "Could not delete the search",
+    "loadFailed": "Could not load your saved searches"
   },
   "error": {
     "pageNotFound": "Page Not Found",
@@ -3822,7 +3826,6 @@
         "guestCart": "Guest cart contents",
         "recentSearches": "Your recent searches and filters",
         "listingLayout": "Product list layout preference",
-        "savedSearches": "Your saved searches",
         "dismissedBanners": "Stops announcements you dismissed from reappearing",
         "youtubeEmbed": "Playback of YouTube videos embedded in listing pages",
         "googleAnalytics": "Google Analytics — visitor and session distinction",
@@ -13094,11 +13097,6 @@
       "usefollowing": {
         "takipBirakildi": "Takip bırakıldı",
         "takipBirakilamadi": "Takip bırakılamadı"
-      }
-    },
-    "savedSearches": {
-      "savedsearchcard": {
-        "sil": "Sil"
       }
     },
     "offers": {

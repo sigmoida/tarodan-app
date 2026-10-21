@@ -5,6 +5,8 @@ const BANK_ACCOUNT_ID = "me";
 const TRADE_ELIGIBLE_RESOURCE = "trade-eligible-products";
 // The signed-in account's sign-in methods (password yes/no, linked providers).
 const SIGN_IN_METHODS_RESOURCE = "profile-sign-in-methods";
+// The signed-in user's server-side saved searches (a `useWebList` resource).
+const SAVED_SEARCHES_RESOURCE = "profile-saved-searches";
 
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
@@ -110,6 +112,12 @@ export const queryKeys = {
     me: () => ["membership", "me"] as const,
     /** The current user's permissions/limits, incl. the tier's `isAdFree` flag. */
     limits: () => ["membership", "limits"] as const,
+    /**
+     * `maxSavedSearches` of the effective tier. Nested under `limits()` so the
+     * membership invalidation that refreshes the limits refreshes it too; a
+     * separate entry because `limits()` holds the narrower `{ isAdFree }` view.
+     */
+    savedSearchLimit: () => ["membership", "limits", "saved-search"] as const,
   },
   // NOTE: every factory below returns the SAME array a call site used inline
   // before the registry existed — do NOT change the string values, or an
@@ -248,6 +256,10 @@ export const queryKeys = {
   signInMethods: {
     resource: SIGN_IN_METHODS_RESOURCE,
     list: () => webKeys.list(SIGN_IN_METHODS_RESOURCE),
+  },
+  /** Saved searches: `resource` is the `useWebList` resource (also what writes invalidate). */
+  savedSearches: {
+    resource: SAVED_SEARCHES_RESOURCE,
   },
   /** The 2FA page's status query (`GET /security/2fa/status`). */
   twoFactor: {

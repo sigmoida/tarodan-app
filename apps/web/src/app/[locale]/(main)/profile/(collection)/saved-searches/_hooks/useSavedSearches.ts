@@ -2,88 +2,99 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "@/i18n/navigation";
-import toast from "react-hot-toast";
-import { useConfirm } from "@/components/ConfirmProvider";
-import { STORAGE_KEY, type SavedSearch } from "../_lib/types";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import type { SavedSearch } from "@tarodan/types";
+import { membershipApi, savedSearchesApi } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
+import { useWebList } from "@/hooks/useWebResource";
+import { useWebMutation } from "@/hooks/useWebMutation";
+import { useRouter } from "@/i18n/navigation";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { savedSearchRunHref } from "../_lib/runHref";
+
+/** The device-local list the page kept before the server list. Discarded, not imported. */
+const LEGACY_STORAGE_KEY = "diecast_saved_searches";
+
+interface SavedSearchList {
+  items: SavedSearch[];
+  total: number;
+}
 
 /**
- * localStorage-backed saved searches: load on mount, delete (with confirm),
- * toggle notifications, and run a saved search by building the listings URL.
+ * The server list of saved searches (`GET /saved-searches`) with the tier
+ * limit, delete (with confirm) and run. The first call also discards the old
+ * localStorage list, once and without importing it.
  */
 export function useSavedSearches(enabled: boolean) {
   const t = useTranslations();
   const router = useRouter();
   const confirm = useConfirm();
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!enabled) return;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setSavedSearches(JSON.parse(stored));
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error(
-          t("profile.savedSearches.failedToLoadSavedSearches"),
-          error,
-        );
-    } finally {
-      setIsLoading(false);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } catch {
+      // Storage can be blocked (private window); nothing to discard then.
     }
   }, [enabled]);
 
-  const persist = (searches: SavedSearch[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
-    setSavedSearches(searches);
+  const list = useWebList<SavedSearchList>({
+    resource: queryKeys.savedSearches.resource,
+    fetcher: async () => {
+      const body = (await savedSearchesApi.list()).data;
+      const items: SavedSearch[] = body?.data ?? [];
+      return { items, total: body?.meta?.total ?? items.length };
+    },
+    enabled,
+    query: { meta: { page: "profile-saved-searches" } },
+  });
+
+  // Always the server's value for the effective tier: 0 is a valid limit.
+  const limit = useQuery({
+    queryKey: queryKeys.membership.savedSearchLimit(),
+    queryFn: async (): Promise<number | null> => {
+      const value = (await membershipApi.getLimits()).data?.maxSavedSearches;
+      return typeof value === "number" ? value : null;
+    },
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const deleteMutation = useWebMutation(
+    (id: string) => savedSearchesApi.remove(id),
+    {
+      invalidates: [queryKeys.savedSearches.resource],
+      successMessage: t("savedSearch.deleted"),
+      errorMessage: t("savedSearch.deleteFailed"),
+    },
+  );
+
+  const remove = async (search: SavedSearch) => {
+    const confirmed = await confirm({
+      title: t("savedSearch.deleteTitle"),
+      description: t("savedSearch.deleteConfirm", {
+        name: search.name ?? t("savedSearch.untitled"),
+      }),
+      confirmLabel: t("common.delete"),
+      destructive: true,
+    });
+    if (confirmed) deleteMutation.mutate(search.id);
   };
 
-  const remove = async (id: string) => {
-    if (
-      !(await confirm({
-        title: t("profile.savedSearches.aramayiSil"),
-        description: t(
-          "profile.savedSearches.buAramayiSilmekIstediginizdenEminMisiniz",
-        ),
-        confirmLabel: "Sil",
-        destructive: true,
-      }))
-    )
-      return;
-    persist(savedSearches.filter((s) => s.id !== id));
-    toast.success(t("profile.savedSearches.aramaSilindi"));
-  };
+  const runSearch = (search: SavedSearch) =>
+    router.push(savedSearchRunHref(search));
 
-  const toggleNotify = (id: string) => {
-    const updated = savedSearches.map((s) =>
-      s.id === id ? { ...s, notifyEnabled: !s.notifyEnabled } : s,
-    );
-    persist(updated);
-    const search = updated.find((s) => s.id === id);
-    toast.success(
-      search?.notifyEnabled
-        ? t("profile.savedSearches.bildirimlerAcildi")
-        : t("profile.savedSearches.bildirimlerKapatildi"),
-    );
+  return {
+    savedSearches: list.data?.items ?? [],
+    total: list.data?.total ?? 0,
+    limit: limit.data ?? null,
+    isLoading: list.isLoading,
+    isError: list.isError,
+    refetch: list.refetch,
+    remove,
+    runSearch,
   };
-
-  const runSearch = (search: SavedSearch) => {
-    const params = new URLSearchParams();
-    if (search.query) params.set("q", search.query);
-    if (search.filters?.category)
-      params.set("category", search.filters.category);
-    if (search.filters?.brand) params.set("brand", search.filters.brand);
-    if (search.filters?.minPrice)
-      params.set("minPrice", String(search.filters.minPrice));
-    if (search.filters?.maxPrice)
-      params.set("maxPrice", String(search.filters.maxPrice));
-    if (search.filters?.condition)
-      params.set("condition", search.filters.condition);
-    router.push(`/listings?${params.toString()}`);
-  };
-
-  return { savedSearches, isLoading, remove, toggleNotify, runSearch };
 }

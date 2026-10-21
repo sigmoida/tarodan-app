@@ -9,6 +9,7 @@ export * from "./offers";
 export * from "./orders";
 export * from "./payments";
 export * from "./wishlist";
+export * from "./saved-searches";
 export * from "./cart";
 export * from "./user";
 export * from "./membership";

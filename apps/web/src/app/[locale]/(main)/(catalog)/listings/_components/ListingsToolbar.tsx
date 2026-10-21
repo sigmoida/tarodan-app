@@ -5,18 +5,25 @@
 import type { ReactNode } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
-import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  BookmarkIcon,
+  FunnelIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { Button, Chip, Select } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { formatCondition } from "@/lib/format";
 import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
 import { useListingFiltersQuery } from "../_hooks/useListingFiltersQuery";
+import { useSaveSearch } from "../_hooks/useSaveSearch";
+import SaveSearchModal from "../_modals/SaveSearchModal";
 import type { Translate } from "@/types/i18n";
 
 /**
  * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
- * the mobile "Filtreler" button, the product-layout selector and the sort Select.
+ * the mobile "Filters" button, "Save this search", the product-layout selector
+ * and the sort Select.
  * The title + result count live in the PageHeader itself (see ListingsClient).
  */
 export default function ListingsControls() {
@@ -29,6 +36,7 @@ export default function ListingsControls() {
     setShowMobileSidebar,
     handleFiltersChange,
   } = useListings();
+  const saveSearch = useSaveSearch();
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
@@ -45,6 +53,27 @@ export default function ListingsControls() {
           </span>
         )}
       </Button>
+      <Button
+        variant="secondary"
+        onClick={saveSearch.start}
+        disabled={saveSearch.draft.isEmpty}
+        title={
+          saveSearch.draft.isEmpty ? t("savedSearch.nothingToSave") : undefined
+        }
+        aria-label={t("savedSearch.save")}
+        className="flex flex-shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-xs sm:text-sm"
+      >
+        <BookmarkIcon className="w-4 h-4" />
+        <span className="hidden sm:inline">{t("savedSearch.save")}</span>
+      </Button>
+      <SaveSearchModal
+        open={saveSearch.open}
+        onClose={saveSearch.close}
+        defaultName={saveSearch.draft.defaultName}
+        refusal={saveSearch.refusal}
+        isSaving={saveSearch.isSaving}
+        onSave={saveSearch.save}
+      />
       <ProductLayoutSelector
         layout={productLayout}
         onLayoutChange={setProductLayout}

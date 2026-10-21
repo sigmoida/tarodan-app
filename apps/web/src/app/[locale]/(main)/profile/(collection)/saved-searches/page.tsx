@@ -10,7 +10,6 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { EmptyStateCard } from "@/components/ui";
-import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useSavedSearches } from "./_hooks/useSavedSearches";
 import SavedSearchCard from "./_components/SavedSearchCard";
@@ -19,19 +18,17 @@ import { useTranslations } from "next-intl";
 export default function SavedSearchesPage() {
   const t = useTranslations();
   const { ready } = useRequireAuth();
-  const user = useAuthStore((s) => s.user);
 
-  const { savedSearches, isLoading, remove, toggleNotify, runSearch } =
-    useSavedSearches(ready);
-
-  const searchLimit =
-    user?.membershipTier === "free"
-      ? 5
-      : user?.membershipTier === "basic"
-        ? 10
-        : user?.membershipTier === "premium"
-          ? 20
-          : 50;
+  const {
+    savedSearches,
+    total,
+    limit,
+    isLoading,
+    isError,
+    refetch,
+    remove,
+    runSearch,
+  } = useSavedSearches(ready);
 
   if (!ready) return <AuthLoadingScreen />;
 
@@ -54,16 +51,25 @@ export default function SavedSearchesPage() {
         title={t("search.savedTitle")}
         description={t("search.savedDescription")}
         actions={
-          <span className="text-sm text-muted">
-            {t("search.countOfLimit", {
-              count: savedSearches.length,
-              limit: searchLimit,
-            })}
-          </span>
+          limit !== null && (
+            <span className="text-sm text-muted">
+              {t("search.countOfLimit", { count: total, limit })}
+            </span>
+          )
         }
       />
 
-      {savedSearches.length === 0 ? (
+      {isError ? (
+        <Alert
+          variant="danger"
+          title={t("savedSearch.loadFailed")}
+          action={
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              {t("common.tryAgain")}
+            </Button>
+          }
+        />
+      ) : savedSearches.length === 0 ? (
         <EmptyStateCard
           title={t("search.savedEmptyTitle")}
           description={t("search.savedEmptyDescription")}
@@ -82,7 +88,6 @@ export default function SavedSearchesPage() {
             <SavedSearchCard
               key={search.id}
               search={search}
-              onToggleNotify={toggleNotify}
               onDelete={remove}
               onRun={runSearch}
             />
@@ -90,20 +95,18 @@ export default function SavedSearchesPage() {
         </div>
       )}
 
-      {savedSearches.length >= searchLimit && (
+      {limit !== null && total >= limit && (
         <Alert
           variant="warning"
           icon={
             <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
           }
-          title="Limit doldu"
+          title={t("savedSearch.limitTitle")}
         >
-          {t("search.savedLimitReached", { limit: searchLimit })}{" "}
-          {user?.membershipTier === "free" && (
-            <Link href="/membership" className="font-medium underline">
-              {t("search.premiumMoreSearches")}
-            </Link>
-          )}
+          {t("search.savedLimitReached", { limit })}{" "}
+          <Link href="/membership" className="font-medium underline">
+            {t("search.premiumMoreSearches")}
+          </Link>
         </Alert>
       )}
     </PageShell>
