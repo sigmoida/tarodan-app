@@ -174,3 +174,7 @@ export * from "./hero";
 
 // Password policy (API validators, web schemas and the live requirement list)
 export * from "./password-policy";
+
+// Sign-in methods and step-up: providers, the read model, the reauth token and
+// its error codes (API, web, mobile)
+export * from "./sign-in-methods";
