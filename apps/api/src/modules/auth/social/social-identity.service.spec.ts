@@ -595,6 +595,15 @@ describe.each<SocialProvider>(["google", "apple"])(
           eventType: "social_link_reset",
           severity: "high",
           userId: attacker.id,
+          // Exact: the admin user history reads provider, source and flow.
+          // A take-over runs in the "link" mode (only a heal is "heal").
+          details: {
+            provider,
+            flow: "social_login",
+            mode: "link",
+            source: "login",
+            linked: true,
+          },
         }),
       ]);
       expect(sentry.captureEvent).toHaveBeenCalledWith({
@@ -985,7 +994,15 @@ describe.each<SocialProvider>(["google", "apple"])(
       expect(fake.state.securityLogs).toEqual([
         expect.objectContaining({
           eventType: "social_link_reset",
-          details: expect.objectContaining({ mode: "link", linked: false }),
+          severity: "high",
+          userId: attacker.id,
+          details: {
+            provider,
+            flow: "social_login",
+            mode: "link",
+            source: "login",
+            linked: false,
+          },
         }),
       ]);
     });

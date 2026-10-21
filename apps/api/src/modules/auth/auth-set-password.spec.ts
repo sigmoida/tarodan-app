@@ -67,8 +67,17 @@ describe("AuthPasswordService.setPassword", () => {
     expect(
       await bcrypt.compare("New-Pass-1", db.state.user!.passwordHash!),
     ).toBe(true);
+    // Exact stored row: the admin user history reads eventType and flow.
     expect(db.state.securityLogs).toEqual([
-      expect.objectContaining({ eventType: "password_set", userId: "u1" }),
+      {
+        eventType: "password_set",
+        severity: "low",
+        userId: "u1",
+        // Outside a request context the client info is null.
+        ipAddress: null,
+        userAgent: null,
+        details: { flow: "password_set" },
+      },
     ]);
     expect(JSON.stringify(db.state.securityLogs)).not.toContain("New-Pass-1");
     expect(notifications.sendAccountSecurityNotice).toHaveBeenCalledWith(
