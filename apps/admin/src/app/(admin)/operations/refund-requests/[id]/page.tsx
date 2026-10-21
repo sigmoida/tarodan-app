@@ -12,6 +12,10 @@ import { DetailPage } from "@/components/detail/DetailPage";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
+import {
+  BoostRefundRedirectAlert,
+  isBoostRefundRedirect,
+} from "@/components/finance/BoostRefundRedirectAlert";
 import { RefundStatusStepper } from "./_components/RefundStatusStepper";
 import { FinancialComponentsTable } from "./_components/FinancialComponentsTable";
 import { FinancialTotalsBlock } from "./_components/FinancialTotalsBlock";
@@ -159,6 +163,11 @@ export default function RefundRequestDetailPage() {
         return (
           <>
             <RefundStatusStepper status={rr.status} />
+
+            {(isBoostRefundRedirect(approveReview.error) ||
+              isBoostRefundRedirect(forceFinalize.error)) && (
+              <BoostRefundRedirectAlert />
+            )}
 
             <RefundNextActionPanel
               status={rr.status}

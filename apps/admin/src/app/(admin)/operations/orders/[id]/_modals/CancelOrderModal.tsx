@@ -104,18 +104,22 @@ export function CancelOrderModal({
             ? t("admin.operations.orders.cancel.warningUnpaid")
             : t("admin.operations.orders.cancel.warning")}
         </Alert>
-        {isBoostRefundRedirect(preview.error) && <BoostRefundRedirectAlert />}
-        <Panel tone="muted" className="text-sm">
-          {preview.data ? (
-            <CancelPreviewSummary preview={preview.data} />
-          ) : (
-            <p className="text-muted">
-              {preview.isError
-                ? t("admin.operations.orders.cancel.previewUnavailable")
-                : t("admin.operations.orders.cancel.previewLoading")}
-            </p>
-          )}
-        </Panel>
+        {/* A boost order is not cancelled here: say where, not "unavailable". */}
+        {isBoostRefundRedirect(preview.error) ? (
+          <BoostRefundRedirectAlert />
+        ) : (
+          <Panel tone="muted" className="text-sm">
+            {preview.data ? (
+              <CancelPreviewSummary preview={preview.data} />
+            ) : (
+              <p className="text-muted">
+                {preview.isError
+                  ? t("admin.operations.orders.cancel.previewUnavailable")
+                  : t("admin.operations.orders.cancel.previewLoading")}
+              </p>
+            )}
+          </Panel>
+        )}
         {isOfferOrder && (
           <p className="text-sm text-muted">
             {t("admin.operations.orders.cancel.offerOrder")}
