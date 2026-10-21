@@ -424,8 +424,12 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
     table: "saved_searches",
     action: "mask",
     reason:
-      "Saved search: the search text in the query and the labels are typed by the user and may carry contact data; the filters stay.",
-    columns: { query: JSON_SCRUB, labels: JSON_SCRUB },
+      "Saved search: the search text in the query and the labels are typed by the user and may carry contact data; the filters stay. The query hash is the SHA-256 of the original, unscrubbed query, so a short search text (a phone number) could be confirmed or brute-forced from it: it becomes a fake derived from the row id, unique per row and so per (user_id, query_hash).",
+    columns: {
+      query: JSON_SCRUB,
+      labels: JSON_SCRUB,
+      query_hash: fake("token", { unique: true }),
+    },
   },
   {
     table: "orders",
@@ -1005,11 +1009,6 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "refund_requests.evidence_photo_urls",
       "ticket_messages.attachments",
     ],
-  },
-  {
-    reason:
-      "Dedupe key: the SHA-256 of a query that is itself scrubbed; it reveals nothing readable and staging only needs it to stay unique per user.",
-    columns: ["saved_searches.query_hash"],
   },
   {
     reason:
