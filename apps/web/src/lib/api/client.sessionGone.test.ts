@@ -6,7 +6,11 @@
  * public page the client does not redirect, so nothing else would.
  */
 
-import type { AxiosAdapter } from "axios";
+import type {
+  AxiosAdapter,
+  AxiosRequestConfig,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -123,6 +127,51 @@ describe("api client 401 with the session gone", () => {
 
     expect(h.getProfile).not.toHaveBeenCalled();
     expect(useAuthStore.getState().user?.id).toBe("u1");
+  });
+
+  describe("with the session check on the real client", () => {
+    // `userApi.getProfile` as in `./user`, so the check's own request runs
+    // through the client's 401 handler like in the browser.
+    const realGetProfile = (options?: AxiosRequestConfig) =>
+      api.get("/users/me", options);
+    const defaultAdapter = api.defaults.adapter;
+    afterEach(() => {
+      api.defaults.adapter = defaultAdapter;
+    });
+
+    it("ends the session with one profile request and no re-check loop", async () => {
+      window.history.replaceState(null, "", "/listings/abc");
+      signedInAsU1WithCache();
+      h.getProfile.mockImplementation(realGetProfile);
+      const profileRequests: InternalAxiosRequestConfig[] = [];
+      api.defaults.adapter = (config) => {
+        if (config.url !== "/users/me") return unauthorized(config);
+        profileRequests.push(config);
+        // A loop would keep asking; stop it after a few rounds with a live
+        // answer so the test fails on the count instead of hanging.
+        if (profileRequests.length > 3) {
+          return Promise.resolve({
+            data: { id: "u1" },
+            status: 200,
+            statusText: "OK",
+            headers: {},
+            config,
+          });
+        }
+        return unauthorized(config);
+      };
+
+      await expect(api.get("/wishlist")).rejects.toBeTruthy();
+      await flush();
+
+      expect(profileRequests).toHaveLength(1);
+      expect(profileRequests[0]).toMatchObject({
+        timeout: 15_000,
+        signal: expect.any(AbortSignal),
+      });
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
+      expect(getQueryClient().getQueryData(ORDERS)).toBeUndefined();
+    });
   });
 
   it.each(["/wishlist", "/users/me"])(
