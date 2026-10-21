@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { AdminAdPackageService } from "./admin-ad-package.service";
 
 describe("AdminAdPackageService audience targets", () => {
-  const service = new AdminAdPackageService({} as any, {} as any);
+  const service = new AdminAdPackageService({} as any, {} as never);
   const normalize = (
     mode: "everyone" | "membership_tiers" | "specific_users" | "tiers_or_users",
     tiers: Array<"free" | "basic" | "premium" | "business"> = [],
