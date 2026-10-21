@@ -471,6 +471,15 @@ grant, cancel, refund and reminder columns to `product_boosts` and the empty
 - Boost prices come only from the ad package tiers; the legacy
   `boost_price_3d`, `boost_price_7d` and `boost_price_30d` settings are no
   longer read.
+- **Release blocker (boost purchase consents).** A boost purchase records
+  the `platform_service_sales` and `withdrawal_waiver` consents with its
+  order (`CONSENTS.md`, "Platform services (boost)"). Both texts are drafts
+  (versions ending in `-draft`) until legal signs them off; do not release
+  the boost purchase to production before the signed texts and their dated
+  versions are merged. No data step: a boost order created before the
+  release and still unpaid is refused at the card form
+  (`server.product.boostConsentRequired`); the seller starts the purchase
+  again from My listings.
 
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
