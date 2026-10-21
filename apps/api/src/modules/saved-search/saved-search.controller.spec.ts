@@ -110,22 +110,39 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     await expect(asBody({ query })).rejects.toMatchObject({ status: 400 });
   });
 
-  it("refuses attrGroups sent as an object, not dropping it silently", async () => {
-    // Implicit conversion would turn it into "[object Object]", which the
-    // canonical form drops as malformed JSON: a broader saved search.
-    const refusal = asBody({
-      query: { search: "x", attrGroups: { "hw-rarity": ["th"] } },
+  it("takes attrGroups as an object or its JSON text, as the same search", async () => {
+    // Implicit conversion alone would make the object "[object Object]",
+    // which the canonical form drops as malformed JSON: a broader search.
+    const asObject = await asBody({
+      query: { search: "x", attrGroups: { "hw-rarity": ["th", "sth"] } },
     });
+    const asText = await asBody({
+      query: { search: "x", attrGroups: '{"hw-rarity":["sth","th"]}' },
+    });
+    const canonical = canonicalizeSavedSearchQuery(asObject.query);
+    expect(canonical.attrGroups).toBe('{"hw-rarity":["sth","th"]}');
+    expect(savedSearchQueryHash(canonical)).toBe(
+      savedSearchQueryHash(canonicalizeSavedSearchQuery(asText.query)),
+    );
+  });
+
+  it("refuses attrGroups sent as an array, with a clear message", async () => {
+    const refusal = asBody({ query: { search: "x", attrGroups: ["th"] } });
     await expect(refusal).rejects.toMatchObject({ status: 400 });
     await expect(refusal).rejects.toMatchObject({
       response: {
         message: expect.arrayContaining([
-          "query.attrGroups must be JSON text (a string), as GET /products takes it",
+          "query.attrGroups must be a group -> slugs object or its JSON text",
         ]),
       },
     });
+  });
+
+  it("caps attrGroups sent as an object by its JSON text", async () => {
     await expect(
-      asBody({ query: { search: "x", attrGroups: ["th"] } }),
+      asBody({
+        query: { search: "x", attrGroups: { g: ["s".repeat(2000)] } },
+      }),
     ).rejects.toMatchObject({ status: 400 });
   });
 

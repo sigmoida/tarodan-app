@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PickType } from "@nestjs/swagger";
-import { Transform, Type, type TransformFnParams } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsDefined,
   IsInt,
@@ -22,6 +22,7 @@ import {
   type SavedSearchLabels,
   type SavedSearchQuery,
 } from "@tarodan/types";
+import { JsonObjectAsText, RawObject } from "../../../common/transforms";
 import { ProductQueryDto } from "../../product/dto/product-query.dto";
 
 /**
@@ -40,27 +41,20 @@ const ATTR_GROUPS_MAX = 2000;
  * here too. Keys outside the allow-list (`page`, `sellerId`, `status`, ...)
  * are dropped by the global whitelist before the service sees them.
  *
- * The fields below are redeclared to add a storage cap and `RawObject`.
- * class-validator then drops the inherited validators of the same kind, so
- * each one repeats the parent's `@IsString()`; `saved-search.dto.spec.ts`
- * fails if a parent validator goes missing here. `@IsOptional()` is not of
- * that kind and stays inherited.
+ * The fields below are redeclared to add a storage cap and the JSON-body
+ * text rule. class-validator then drops the inherited validators of the same
+ * kind, so each one repeats the parent's `@IsString()`;
+ * `saved-search.dto.spec.ts` fails if a parent validator goes missing here.
+ * `@IsOptional()` is not of that kind and stays inherited.
+ *
+ * The text rule: under `enableImplicitConversion` an object in a JSON body
+ * would pass `@IsString()` as "[object Object]" and be stored as the search
+ * text. `RawObject` makes it a 400. `attrGroups` takes the group -> slugs
+ * object as well as its JSON text (`JsonObjectAsText`), as
+ * `canonicalizeSavedSearchQuery` does, so both forms are the same search.
+ * `sortBy` needs neither: its type is not `string` to the metadata, so it is
+ * never converted.
  */
-/**
- * A JSON body can carry an object where a string filter belongs, and
- * `enableImplicitConversion` turns it into "[object Object]" before
- * `@IsString()` runs, which accepts it: the text would be stored as the
- * search, or, for `attrGroups`, dropped silently as malformed JSON (a saved
- * search broader than the one the user saw). This hands the raw object or
- * array back, so `@IsString()` refuses it with 400. A number or boolean still
- * becomes text, as it would in a `GET /products` query string.
- */
-const RawObject = (): PropertyDecorator =>
-  Transform(({ obj, key, value }: TransformFnParams): unknown => {
-    const raw: unknown = (obj as Record<string, unknown>)[key];
-    return typeof raw === "object" && raw !== null ? raw : value;
-  });
-
 export class SavedSearchQueryDto extends PickType(
   ProductQueryDto,
   SAVED_SEARCH_QUERY_KEYS,
@@ -100,16 +94,14 @@ export class SavedSearchQueryDto extends PickType(
   @MaxLength(COLOR_LIST_MAX)
   color?: string;
 
-  /** JSON text, as `GET /products` takes it; an object or array is a 400. */
-  @RawObject()
+  /** JSON text or the group -> slugs object; the cap counts the JSON text. */
+  @JsonObjectAsText()
   @IsString({
-    message:
-      "$property must be JSON text (a string), as GET /products takes it",
+    message: "$property must be a group -> slugs object or its JSON text",
   })
   @MaxLength(ATTR_GROUPS_MAX)
   attrGroups?: string;
 
-  @RawObject()
   @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   sortBy?: ProductQueryDto["sortBy"];
