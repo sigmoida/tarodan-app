@@ -112,6 +112,54 @@ describe("usePaymentFail", () => {
     expect(result.phase).toBe("loading");
   });
 
+  it.each([
+    [true, "paymentId=p1", "/payment/success?paymentId=p1"],
+    [
+      false,
+      "paymentId=p1&guest=true",
+      "/payment/success?paymentId=p1&guest=true",
+    ],
+  ])(
+    "checkout completed after all (session %s) goes to %s, nothing released",
+    async (isAuthenticated, query, href) => {
+      h.auth = { isAuthenticated, isLoading: false };
+      await mount(query, { status: "completed", orderId: "o1" });
+
+      expect(h.replace).toHaveBeenCalledWith(href);
+      expect(h.confirmFailed).not.toHaveBeenCalled();
+      expect(result.phase).toBe("loading");
+    },
+  );
+
+  it("membership completed after all goes to the membership success page", async () => {
+    await mount("paymentId=p1&type=membership", {
+      status: "completed",
+      isMembershipOrder: true,
+    });
+    expect(h.replace).toHaveBeenCalledWith("/membership/success");
+    expect(h.confirmFailed).not.toHaveBeenCalled();
+  });
+
+  it("boost whose payment cannot be loaded still retries from My listings", async () => {
+    h.search = new URLSearchParams("paymentId=p1&type=boost");
+    window.history.replaceState(
+      null,
+      "",
+      "/payment/fail?paymentId=p1&type=boost",
+    );
+    h.getStatusLight.mockRejectedValue(new Error("down"));
+    act(() => root.render(<Probe />));
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(result.phase).toBe("ready");
+    expect(result.kind).toBe("boost");
+    expect(result.routes.retry).toBe("/profile/listings");
+    expect(result.routes.back).toBe("/profile/boosts");
+    expect(h.confirmFailed).not.toHaveBeenCalled();
+  });
+
   it("checkout: releases a pending payment and keeps the orders routes (no regression)", async () => {
     await mount("paymentId=p1", { status: "pending", orderId: "o1" });
 

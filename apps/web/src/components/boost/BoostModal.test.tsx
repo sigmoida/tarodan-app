@@ -467,6 +467,123 @@ describe("BoostModal price integrity", () => {
   });
 });
 
+describe("BoostModal purchase safety", () => {
+  it("keeps pay disabled while a cached matrix is being refetched", async () => {
+    // A previous opening left the matrix in the cache; it is never paid on
+    // until this opening's own fetch has succeeded.
+    client.setQueryData(queryKeys.boost.options(LISTING.id), OPTIONS);
+    let resolve!: (value: { data: BoostOptionsResponse }) => void;
+    h.options.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
+    render();
+    await flush();
+
+    expect(h.options).toHaveBeenCalledTimes(1);
+    await acceptBoth();
+    expect(payButton().disabled).toBe(true);
+    click(payButton());
+    expect(h.initiate).not.toHaveBeenCalled();
+
+    await act(async () => resolve({ data: OPTIONS }));
+    await flush();
+    expect(payButton().disabled).toBe(false);
+  });
+
+  it("opens one order for a double click", async () => {
+    let resolve!: (value: { data: InitiateBoostResponse }) => void;
+    h.initiate.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+    click(payButton());
+    await flush();
+
+    expect(h.initiate).toHaveBeenCalledTimes(1);
+    await act(async () => resolve({ data: STARTED }));
+    await flush();
+    expect(h.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not leave the dialog when the server opened no payment", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, paymentId: "" } });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "profile.boost.paymentStartFailed",
+    );
+    expect(h.push).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("treats a one-kuruş difference as a different price", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 59.01 } });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.push).not.toHaveBeenCalled();
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+  });
+
+  it("after a price change, pays on the reloaded price once both consents are given again", async () => {
+    const repriced: BoostOptionsResponse = {
+      ...OPTIONS,
+      packages: [
+        {
+          ...OPTIONS.packages[0],
+          options: [
+            OPTIONS.packages[0].options[0],
+            { ...OPTIONS.packages[0].options[1], price: 79 },
+          ],
+        },
+        OPTIONS.packages[1],
+      ],
+    };
+    h.options
+      .mockResolvedValueOnce({ data: OPTIONS })
+      .mockResolvedValue({ data: repriced });
+    h.initiate
+      .mockResolvedValueOnce({ data: { ...STARTED, price: 79 } })
+      .mockResolvedValue({
+        data: { ...STARTED, price: 79, paymentId: "pay-2" },
+      });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.push).not.toHaveBeenCalled();
+    expect(text()).toContain(
+      `profile.boost.preInfo.price|${JSON.stringify({ price: formatTL(79) })}`,
+    );
+    expect(payButton().disabled).toBe(true);
+
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.initiate).toHaveBeenCalledTimes(2);
+    expect(h.push).toHaveBeenCalledTimes(1);
+    expect(h.push).toHaveBeenCalledWith("/payment/pay-2?type=boost");
+  });
+});
+
 describe("BoostModal states", () => {
   it("offers nothing to buy while boost sales are off", async () => {
     h.options.mockResolvedValue({ data: { ...OPTIONS, enabled: false } });

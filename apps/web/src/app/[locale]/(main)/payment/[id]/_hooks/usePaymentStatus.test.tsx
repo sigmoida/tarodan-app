@@ -174,6 +174,102 @@ describe("usePaymentStatus routing", () => {
   });
 });
 
+describe("usePaymentStatus guest and membership routing", () => {
+  it("guest checkout completed keeps guest=true on the success page", async () => {
+    h.auth = { isAuthenticated: false, isLoading: false };
+    await mount("guest=true", { status: "completed", orderId: "o1" });
+
+    expect(h.getStatusLightGuest).toHaveBeenCalledWith("pay-1");
+    expect(h.getStatusLight).not.toHaveBeenCalled();
+    expect(h.push).toHaveBeenCalledWith(
+      "/payment/success?paymentId=pay-1&guest=true",
+    );
+  });
+
+  it("guest checkout failed keeps guest=true on the fail page", async () => {
+    h.auth = { isAuthenticated: false, isLoading: false };
+    await mount("guest=true", { status: "failed", orderId: "o1" });
+    expect(h.push).toHaveBeenCalledWith(
+      "/payment/fail?paymentId=pay-1&guest=true",
+    );
+  });
+
+  it.each([
+    [true, "", "/payment/success?paymentId=pay-1"],
+    [false, "guest=true", "/payment/success?paymentId=pay-1&guest=true"],
+  ])(
+    "the dev bypass sends a checkout (session %s) to %s",
+    async (isAuthenticated, query, href) => {
+      h.auth = { isAuthenticated, isLoading: false };
+      h.getConfig.mockResolvedValue({
+        data: { ...CONFIG, bypassEnabled: true },
+      });
+      await mount(query, { status: "pending", orderId: "o1" });
+
+      expect(h.bypassComplete).toHaveBeenCalledWith("pay-1");
+      expect(h.push).toHaveBeenCalledWith(href);
+      expect(h.toast.success).toHaveBeenCalledWith(
+        "page.payment.usepaymentstatus.odemeBasarili",
+      );
+    },
+  );
+
+  it("the dev bypass sends a membership to its success page with the change kind", async () => {
+    h.getConfig.mockResolvedValue({
+      data: { ...CONFIG, bypassEnabled: true },
+    });
+    await mount("type=membership&kind=renew", {
+      status: "pending",
+      orderId: "o1",
+      isMembershipOrder: true,
+    });
+    expect(h.push).toHaveBeenCalledWith("/membership/success?kind=renew");
+  });
+
+  it("membership without `type` in the URL takes card storage from its own store", async () => {
+    await mount("", {
+      status: "pending",
+      orderId: "o1",
+      isMembershipOrder: true,
+    });
+
+    expect(result.kind).toBe("membership");
+    expect(result.purpose).toBe("membership");
+    expect(result.cardStorageEnabled).toBe(false);
+    expect(result.routes.back).toBe("/membership");
+  });
+
+  it("membership without `type` in the URL goes to its success page once completed", async () => {
+    await mount("", {
+      status: "completed",
+      orderId: "o1",
+      isMembershipOrder: true,
+    });
+    expect(h.replace).toHaveBeenCalledWith("/membership/success");
+    expect(h.push).not.toHaveBeenCalledWith(
+      expect.stringContaining("/payment/success"),
+    );
+  });
+
+  it("membership failed goes to the fail page that names it", async () => {
+    await mount("type=membership", {
+      status: "failed",
+      orderId: "o1",
+      isMembershipOrder: true,
+    });
+    expect(h.push).toHaveBeenCalledWith(
+      "/payment/fail?paymentId=pay-1&type=membership",
+    );
+  });
+
+  it("a guest never gets card storage, whatever the store allows", async () => {
+    h.auth = { isAuthenticated: false, isLoading: false };
+    await mount("guest=true", { status: "pending", orderId: "o1" });
+    expect(result.purpose).toBe("checkout");
+    expect(result.cardStorageEnabled).toBe(false);
+  });
+});
+
 describe("usePaymentStatus cancel", () => {
   it("checkout: cancels, says the goods are back on sale and returns to the cart (no regression)", async () => {
     await mount("", { status: "pending", orderId: "o1" });

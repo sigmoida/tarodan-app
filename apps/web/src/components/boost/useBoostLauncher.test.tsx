@@ -88,6 +88,14 @@ describe("useBoostLauncher", () => {
     expect(h.mounts).toBe(2);
   });
 
+  it("mounts a fresh dialog when another listing is opened over an open one", () => {
+    render();
+    act(() => launcher.open(LISTING));
+    act(() => launcher.open({ ...LISTING, id: "listing-2" }));
+    expect(h.props?.listing.id).toBe("listing-2");
+    expect(h.mounts).toBe(2);
+  });
+
   it.each([
     ["free", false],
     [undefined, false],
