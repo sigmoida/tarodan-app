@@ -48,6 +48,17 @@ describe("computeQualityScore", () => {
     ).toBe(points);
   });
 
+  it("gives round(score_x100 / 25) points for every stored hundredth", () => {
+    // rating × 4 is score_x100 / 25: its fraction is a multiple of 0.04, so
+    // there is no .5 tie and no float edge on the two-decimal rating.
+    for (let x100 = 0; x100 <= 500; x100++) {
+      expect([
+        x100,
+        computeQualityScore({ photoCount: 0, sellerTrustRating: x100 / 100 }),
+      ]).toEqual([x100, Math.round(x100 / 25)]);
+    }
+  });
+
   it("gives no rating points to a seller without a score (`new`)", () => {
     expect(
       computeQualityScore({ photoCount: 0, sellerTrustRating: null }),

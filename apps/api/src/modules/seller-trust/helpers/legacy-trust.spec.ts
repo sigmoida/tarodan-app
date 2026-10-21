@@ -44,6 +44,25 @@ describe("legacyTrustFields", () => {
     }
   });
 
+  it("labels every hundredth by the ADR 0014 thresholds, never `Yeni`", () => {
+    // Independent oracle: the D3 thresholds written out, not read from
+    // `SELLER_TRUST_LEVEL_MIN_X100`, so a moved threshold or label fails.
+    const expected = (x100: number) =>
+      x100 >= 450
+        ? "Çok Güvenilir"
+        : x100 >= 400
+          ? "Güvenilir"
+          : x100 >= 300
+            ? "Orta"
+            : "Gelişmekte";
+    for (let x100 = 0; x100 <= 500; x100++) {
+      expect([x100, legacyTrustFields(view(x100)).trustLevel]).toEqual([
+        x100,
+        expected(x100),
+      ]);
+    }
+  });
+
   it("is null for a seller without a score; `Yeni` is never sent", () => {
     expect(legacyTrustFields(view(null))).toEqual({
       trustScore: null,
