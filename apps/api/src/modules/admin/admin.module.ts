@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { BoostTimelineModule } from "../product/boost-timeline/boost-timeline.module";
 import { BullModule } from "@nestjs/bull";
 import { AdminCommissionController } from "./finance/admin-commission.controller";
 import { AdminUserController } from "./users/admin-user.controller";
@@ -204,6 +205,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     CommissionModule,
     MembershipModule,
     ProductModule,
+    // Boost pause, resume and extend go through the listing timeline owner.
+    BoostTimelineModule,
     SiteAccessModule,
     // Onay Kayıtları ekranı: üye durumu domain servisinden okunur.
     ConsentModule,

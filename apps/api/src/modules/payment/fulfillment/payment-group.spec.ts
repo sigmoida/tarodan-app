@@ -24,6 +24,7 @@ import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
 import { EscrowHoldService } from "./escrow-hold.service";
 import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 import { PaymentLifecycleService } from "../checkout/payment-lifecycle.service";
 import { PrismaService } from "../../../prisma";
 import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
@@ -227,6 +228,7 @@ describe("PaymentService group payment (checkout group)", () => {
         // Gerçek stok servisi → product.update / invalidate kaskad assertion'ları için.
         FulfillmentStockService,
         VirtualOrderFulfillmentService,
+        BoostTimelineService,
         {
           provide: FulfillmentNotifier,
           useValue: {

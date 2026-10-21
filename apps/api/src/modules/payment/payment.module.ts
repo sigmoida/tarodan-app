@@ -44,6 +44,7 @@ import { EventModule } from "../events";
 import { RawBodyMiddleware } from "./middleware/raw-body.middleware";
 import { InvoiceModule } from "../invoice/invoice.module";
 import { ProductLockModule } from "../product/lock/product-lock.module";
+import { BoostTimelineModule } from "../product/boost-timeline/boost-timeline.module";
 import { NotificationModule } from "../notification/notification.module";
 import { PayoutModule } from "../payout/payout.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
@@ -68,6 +69,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     CommissionModule,
     StorageModule,
     ProductLockModule,
+    // Boost activation writes the listing timeline (a product-domain leaf).
+    BoostTimelineModule,
     InvoicingModule,
     DiscountModule,
     // Ödeme formu kapısı: mesafeli satış onayı (consent_records).

@@ -1,11 +1,11 @@
 {
   "meta": {
-    "total": 2296,
+    "total": 2298,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 700,
+      "P0": 702,
       "P1": 988,
       "P2": 608
     }
@@ -33,7 +33,7 @@
       "code": "04",
       "prefix": "PRD",
       "title": "04 — Ürün/İlan & Katalog",
-      "count": 115
+      "count": 116
     },
     {
       "code": "05",
@@ -111,7 +111,7 @@
       "code": "17",
       "prefix": "DSC",
       "title": "17 — İndirim & Pazarlama",
-      "count": 112
+      "count": 113
     },
     {
       "code": "18",
@@ -4796,11 +4796,11 @@
       "code": "04",
       "prefix": "PRD",
       "domTitle": "04 — Ürün/İlan & Katalog",
-      "title": "Boost fiyat listesi (public)",
-      "tur": "Happy path",
+      "title": "Legacy flat boost price list is retired",
+      "tur": "Contract",
       "pri": "P2",
       "steps": "GET /api/products/boost/pricing.",
-      "exp": "200 {enabled:true, options:[{durationDays:3,price:29,...},{7,59},{30,149}]} (varsayılan fiyat, product-boost.service.ts:31-35,67-75).",
+      "exp": "404: the flat 3/7/30-day prices are gone; prices come per listing from GET /api/products/:id/boost/options (package tiers).",
       "gap": false,
       "gapRefs": []
     },
@@ -4809,11 +4809,11 @@
       "code": "04",
       "prefix": "PRD",
       "domTitle": "04 — Ürün/İlan & Katalog",
-      "title": "Boost başlatma happy path (paymentUrl döner)",
-      "tur": "Happy path / Para",
+      "title": "Boost initiate happy path with a package",
+      "tur": "Happy path / Money",
       "pri": "P1",
-      "steps": "POST /api/products/:id/boost/initiate body { \"durationDays\":7 }.",
-      "exp": "201 {boostId, productId, durationDays:7, price:59, paymentId, provider, ...}; ProductBoost(pending) + boost- sanal ürün + Order(pending_payment) oluşur (product-boost.service.ts:141-211).",
+      "steps": "POST /api/products/:id/boost/initiate body { \"packageId\": <package>, \"durationDays\": 7 }.",
+      "exp": "201 {boostId, productId, durationDays:7, price:59 (the package tier), paymentId, provider, ...}; ProductBoost(pending), the boost- virtual product and an Order(pending_payment) are created.",
       "gap": false,
       "gapRefs": []
     },
@@ -4822,11 +4822,11 @@
       "code": "04",
       "prefix": "PRD",
       "domTitle": "04 — Ürün/İlan & Katalog",
-      "title": "Geçersiz boost süresi (400)",
-      "tur": "Sınır değer",
+      "title": "Boost initiate without a package or with a duration the package lacks (400)",
+      "tur": "Boundary",
       "pri": "P1",
-      "steps": "durationDays:5 gönder; ardından durationDays:0.",
-      "exp": "400 \"Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)\" (dto/boost.dto.ts:17-20).",
+      "steps": "Send { durationDays: 7 } without packageId; then { packageId, durationDays: 5 }; then { packageId, durationDays: 0 }.",
+      "exp": "400 each time (DTO: packageId required; service: server.product.boostPriceUndefined; DTO: @Min(1)); no ProductBoost is created.",
       "gap": false,
       "gapRefs": []
     },
@@ -5425,6 +5425,19 @@
       "pri": "P0",
       "steps": "1. Aynı satıcıdan N(=4) aktif ürün seed et. 2. userMembership.findUnique/findMany spy'la. 3. GET /api/products?limit=20.",
       "exp": "N ürün döner; yanıt şekli/değeri DEĞİŞMEZ; per-ürün userMembership.findUnique HİÇ çağrılmaz (batch findMany 1 kez). Eskiden ürün başına 4 per-seller + 1 discount sorgu vardı → 20'lik sayfa 80+ sorgu. — product-common.service.ts formatProductResponseMany; discount.service.ts getEffectiveDisplayPriceMany",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-266",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "Boost options only for the owner of an active listing",
+      "tur": "Authorization",
+      "pri": "P0",
+      "steps": "GET /api/products/:id/boost/options as the owner of an active listing, as another user, as the owner of an inactive listing, and as a guest.",
+      "exp": "Owner: 200 with the package tiers for the listing's price. Other user: 404 server.product.notFound and no package data. Inactive listing: 400 server.product.boostActiveOnly. Guest: 401.",
       "gap": false,
       "gapRefs": []
     },
@@ -20656,11 +20669,11 @@
       "code": "17",
       "prefix": "DSC",
       "domTitle": "17 — İndirim & Pazarlama",
-      "title": "Boost fiyat/süre listesi",
-      "tur": "Happy path",
+      "title": "Legacy flat boost price list is retired",
+      "tur": "Contract",
       "pri": "P1",
       "steps": "1. GET /api/products/boost/pricing.",
-      "exp": "HTTP 200, { enabled, options:[{durationDays:3,price},{7,...},{30,...}] }; varsayılan fiyatlar 3→29, 7→59, 30→149 (PlatformSetting yoksa).",
+      "exp": "HTTP 404.",
       "gap": false,
       "gapRefs": []
     },
@@ -20672,7 +20685,7 @@
       "title": "Geçerli ilan için boost başlatma (PAYMENT_BYPASS)",
       "tur": "Happy path / Para",
       "pri": "P0",
-      "steps": "1. POST /api/products/ /boost/initiate ahmet ile body { \"durationDays\": 7 }.",
+      "steps": "1. POST /api/products/:id/boost/initiate body { \"packageId\": <package>, \"durationDays\": 7 }.",
       "exp": "HTTP 201, yanıt { boostId, productId, durationDays:7, price, paymentId, provider, expiresIn, useBypass:true }; DB'de ProductBoost(status=pending) + boost- sanal ürün + Order(BOOST-..., status=pending_payment).",
       "gap": false,
       "gapRefs": []
@@ -20682,11 +20695,11 @@
       "code": "17",
       "prefix": "DSC",
       "domTitle": "17 — İndirim & Pazarlama",
-      "title": "Geçersiz süre → 400",
+      "title": "Duration without a package tier → 400",
       "tur": "Negatif/Doğrulama",
       "pri": "P0",
-      "steps": "1. POST /api/products/ /boost/initiate body { \"durationDays\": 15 }.",
-      "exp": "HTTP 400 (DTO @IsIn veya service mesajı \"Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)\").",
+      "steps": "1. POST /api/products/:id/boost/initiate body { \"packageId\": <package>, \"durationDays\": 15 }.",
+      "exp": "HTTP 400 (server.product.boostPriceUndefined).",
       "gap": false,
       "gapRefs": []
     },
@@ -21051,6 +21064,19 @@
       "pri": "P1",
       "steps": "1. Popup oluştur. 2. PATCH isActive / displayOrder / aynı başlık. 3. PATCH yeni başlık, sonra popupFrequency. 4. Gösterim kaydı.",
       "exp": "1: popupVersion 1. 2: 1 kalır. 3: 2, sonra 3. 4: sayaç artışı sürümü değiştirmez.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-113",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Two concurrent boost payments on one listing lose no time",
+      "tur": "Money / Concurrency",
+      "pri": "P0",
+      "steps": "1. Start a 7-day and a 3-day boost for one listing. 2. Send both PayTR callbacks at the same time.",
+      "exp": "Both boosts active; the listing's boostedUntil is the callback time + 10 days; the later boost's endsAt equals boostedUntil (BoostTimelineService.activate locks the listing row FOR UPDATE).",
       "gap": false,
       "gapRefs": []
     },
