@@ -38,7 +38,9 @@ export class PayoutSchedulerService implements OnModuleInit {
     try {
       // 1) Move retry_pending → pending if nextRetryAt has passed
       const retried = await this.payoutService.processRetryPayouts();
-      log(`${retried} payout retry_pending → pending taşındı`);
+      log(
+        `${retried} payout retry_pending durumundan pending durumuna taşındı`,
+      );
       if (retried > 0) {
         this.logger.log(
           `Moved ${retried} payout(s) from retry_pending to pending`,
