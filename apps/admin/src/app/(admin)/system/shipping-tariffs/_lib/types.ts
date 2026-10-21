@@ -3,7 +3,7 @@ import { useTranslations } from "next-intl";
 import {
   amountField,
   amountInputValue,
-  amountOrNull,
+  amountOrZero,
 } from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -185,7 +185,6 @@ export function tariffToForm(t: T, tariff?: ShippingTariff): TariffFormValues {
   };
 }
 
-const tl = (s: string) => amountOrNull(s) ?? 0;
 const optInt = (s: string) => (s === "" ? null : Number(s));
 
 export function tariffFormToPayload(v: TariffFormValues) {
@@ -194,7 +193,7 @@ export function tariffFormToPayload(v: TariffFormValues) {
     label: tier.label.trim(),
     minDesi: Number(tier.minDesi),
     maxDesi: optInt(tier.maxDesi),
-    amount: tl(tier.amount),
+    amount: amountOrZero(tier.amount),
     sampleWidth: optInt(tier.sampleWidth),
     sampleHeight: optInt(tier.sampleHeight),
     sampleLength: optInt(tier.sampleLength),
@@ -202,7 +201,7 @@ export function tariffFormToPayload(v: TariffFormValues) {
   return {
     name: v.name.trim(),
     freeShippingEnabled: v.freeShippingEnabled,
-    freeShippingThreshold: tl(v.freeShippingThreshold),
+    freeShippingThreshold: amountOrZero(v.freeShippingThreshold),
     packageTiers,
   };
 }

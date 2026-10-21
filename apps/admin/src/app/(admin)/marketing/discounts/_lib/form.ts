@@ -1,4 +1,8 @@
-import { amountInputValue, amountOrNull } from "@/lib/schemas/amount";
+import {
+  amountInputValue,
+  amountOrNull,
+  amountOrZero,
+} from "@/lib/schemas/amount";
 import { userOptionLabel } from "../_hooks/useUserOptions";
 import type { DiscountFormValues } from "./schema";
 import type { Discount } from "./types";
@@ -101,7 +105,7 @@ export function discountFormToPayload(v: DiscountFormValues) {
     name: v.name,
     description: v.description || undefined,
     type: v.type,
-    value: amountOrNull(v.value) ?? 0,
+    value: amountOrZero(v.value),
     scope: v.scope,
     categoryId: v.scope === "category" ? v.categoryId : undefined,
     minCartValue: amountOrNull(v.minCartValue) ?? undefined,

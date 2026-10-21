@@ -4,6 +4,7 @@ import {
   amountField,
   amountInputValue,
   amountOrNull,
+  amountOrZero,
 } from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -171,9 +172,8 @@ export const commissionSchema = (t: T) =>
     })
     .superRefine((value, context) => {
       // Refused TL text has its own field error; null skips the comparison.
-      const tl = (text: string) => amountOrNull(text);
-      const maxAmount = tl(value.maxAmount);
-      const minAmount = tl(value.minAmount);
+      const maxAmount = amountOrNull(value.maxAmount);
+      const minAmount = amountOrNull(value.minAmount);
       if (maxAmount != null && minAmount != null && maxAmount <= minAmount) {
         context.addIssue({
           code: "custom",
@@ -207,8 +207,8 @@ export const commissionSchema = (t: T) =>
         ],
       ] as const;
       for (const [rateKey, minKey, maxKey] of pairs) {
-        const min = tl(value[minKey]);
-        const max = tl(value[maxKey]);
+        const min = amountOrNull(value[minKey]);
+        const max = amountOrNull(value[maxKey]);
         if (
           Number(value[rateKey]) === 0 &&
           ((min ?? 0) > 0 || (max ?? 0) > 0)
@@ -304,7 +304,7 @@ export function commissionFormToPayload(value: CommissionFormValues) {
     name: value.name.trim(),
     categoryId: value.categoryId,
     sellerType: value.sellerType,
-    minAmount: amountOrNull(value.minAmount) ?? 0,
+    minAmount: amountOrZero(value.minAmount),
     maxAmount: amountOrNull(value.maxAmount),
     buyerCommissionRate: Number(value.buyerCommissionRate),
     buyerCommissionMin: bound(
@@ -342,8 +342,8 @@ export function commissionFormToPayload(value: CommissionFormValues) {
       value.sellerPlatformFeeRate,
       value.sellerPlatformFeeMax,
     ),
-    tradeFeeSellerAmount: amountOrNull(value.tradeFeeSellerAmount) ?? 0,
-    tradeFeeBuyerAmount: amountOrNull(value.tradeFeeBuyerAmount) ?? 0,
+    tradeFeeSellerAmount: amountOrZero(value.tradeFeeSellerAmount),
+    tradeFeeBuyerAmount: amountOrZero(value.tradeFeeBuyerAmount),
     shippingBuyerShare: Number(value.shippingBuyerShare),
     shippingShares: PACKAGE_TIER_CODES.map((tierCode) => ({
       tierCode,

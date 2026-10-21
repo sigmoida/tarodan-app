@@ -4,6 +4,7 @@ import {
   amountField,
   amountInputValue,
   amountOrNull,
+  amountOrZero,
 } from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -210,9 +211,9 @@ export function packageFormToPayload(v: PackageFormValues) {
         : [],
     tiers: v.tiers.map((row) => ({
       durationDays: parseInt(row.durationDays, 10) || 1,
-      minAmount: amountOrNull(row.minAmount) ?? 0,
+      minAmount: amountOrZero(row.minAmount),
       maxAmount: amountOrNull(row.maxAmount),
-      price: amountOrNull(row.price) ?? 0,
+      price: amountOrZero(row.price),
       campaignPrice: amountOrNull(row.campaignPrice),
       campaignStartsAt: row.campaignStartsAt
         ? new Date(row.campaignStartsAt).toISOString()

@@ -4,7 +4,7 @@ import { SAVED_SEARCH_TIER_LIMIT_MAX } from "@tarodan/types";
 import {
   amountField,
   amountInputValue,
-  amountOrNull,
+  amountOrZero,
 } from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -136,15 +136,12 @@ export function tierToForm(t: MembershipTier): TierFormValues {
 
 const int = (s: string) => parseInt(s, 10) || 0;
 
-/** The monthly price in TL from the field text (0 when blank). */
-export const monthlyPriceValue = (text: string) => amountOrNull(text) ?? 0;
-
 /** Shape form values into the updateMembershipTier payload (yearlyPrice injected by caller). */
 export function tierFormToPayload(v: TierFormValues, yearlyPrice: number) {
   return {
     name: v.name.trim(),
     description: v.description,
-    monthlyPrice: monthlyPriceValue(v.monthlyPrice),
+    monthlyPrice: amountOrZero(v.monthlyPrice),
     yearlyPrice,
     maxFreeListings: int(v.maxFreeListings),
     maxTotalListings: int(v.maxTotalListings),

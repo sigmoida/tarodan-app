@@ -15,7 +15,8 @@ type T = ReturnType<typeof useTranslations<never>>;
  * read as 1). A `type="number"` input hands "1.000" over as 1 before any
  * parser sees it. Unless a field says otherwise, 0 is a real value here
  * (`ZERO_TL_AMOUNT`): settings and lower bounds, where admins type 0 on
- * purpose. Refunds use `isOptionalTlAmountWithin` instead.
+ * purpose; a bare separator (",", "50,") is refused. Refunds use
+ * `isOptionalTlAmountWithin` instead.
  */
 export interface AmountFieldOptions {
   /** Parser rules; default `ZERO_TL_AMOUNT`. */
@@ -54,6 +55,14 @@ export function amountOrNull(
 ): number | null {
   const parsed = parseTlAmount(text, rules);
   return parsed.status === "ok" ? parsed.amount : null;
+}
+
+/** The amount to send where a blank field means 0. */
+export function amountOrZero(
+  text: string,
+  rules: TlAmountRules = ZERO_TL_AMOUNT,
+): number {
+  return amountOrNull(text, rules) ?? 0;
 }
 
 /** The field text for an amount on record: a decimal comma, "" for none. */

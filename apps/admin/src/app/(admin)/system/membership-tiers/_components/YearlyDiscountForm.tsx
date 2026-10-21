@@ -6,7 +6,7 @@ import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { amountInputValue, amountOrNull } from "@/lib/schemas/amount";
+import { amountInputValue, amountOrZero } from "@/lib/schemas/amount";
 import { yearlyDiscountSchema } from "../_lib/schema";
 
 /**
@@ -60,7 +60,7 @@ export function YearlyDiscountForm({
     >
       <Form
         form={form}
-        onSubmit={(v) => save.mutate(amountOrNull(v.discount) ?? 0)}
+        onSubmit={(v) => save.mutate(amountOrZero(v.discount))}
         className="flex items-end gap-4"
       >
         {/* Text, not type="number" (see `@/lib/schemas/amount`). */}

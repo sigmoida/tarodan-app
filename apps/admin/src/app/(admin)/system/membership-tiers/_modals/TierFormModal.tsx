@@ -13,6 +13,7 @@ import { adminApi } from "@/lib/api";
 import { Panel } from "@/components/detail/Panel";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { fmtTry } from "@/lib/format";
+import { amountOrZero } from "@/lib/schemas/amount";
 import {
   type MembershipTier,
   type TierFormValues,
@@ -20,7 +21,6 @@ import {
   tierToForm,
   tierFormToPayload,
   computedYearly,
-  monthlyPriceValue,
 } from "../_lib/types";
 
 /** Edit a membership tier. Mount with `key={tier.id}` so defaults seed fresh. */
@@ -40,7 +40,7 @@ export function TierFormModal({
   const form = useZodForm(tierSchema(t, isFree), {
     defaultValues: tierToForm(tier),
   });
-  const monthly = monthlyPriceValue(form.watch("monthlyPrice"));
+  const monthly = amountOrZero(form.watch("monthlyPrice"));
   const yearly = computedYearly(monthly, yearlyDiscount);
 
   const save = useAdminMutation(
@@ -49,7 +49,7 @@ export function TierFormModal({
         tier.id,
         tierFormToPayload(
           v,
-          computedYearly(monthlyPriceValue(v.monthlyPrice), yearlyDiscount),
+          computedYearly(amountOrZero(v.monthlyPrice), yearlyDiscount),
         ),
       );
     },

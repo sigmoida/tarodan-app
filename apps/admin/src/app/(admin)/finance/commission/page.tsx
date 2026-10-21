@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Input, Select } from "@tarodan/ui";
-import { parseTlAmount } from "@tarodan/shared";
+import { ZERO_TL_AMOUNT, parseTlAmount } from "@tarodan/shared";
 import { PencilSquareIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
@@ -42,8 +42,9 @@ function RuleResolver({ ruleSet }: { ruleSet: CommissionRuleSet }) {
   const defaultCategoryResolved = useRef(false);
   const [sellerType, setSellerType] = useState<SellerType>("FREE");
   const [amount, setAmount] = useState("1000");
-  // The typed product price, read by the shared TL amount parser.
-  const parsedAmount = parseTlAmount(amount);
+  // The typed product price, read by the shared TL amount parser; 0 is a
+  // real price here (rules start at a 0 lower bound).
+  const parsedAmount = parseTlAmount(amount, ZERO_TL_AMOUNT);
   const amountRefused = parsedAmount.status === "refused";
 
   useEffect(() => {
