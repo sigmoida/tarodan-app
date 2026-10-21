@@ -8992,6 +8992,7 @@
         "freePriceZero": "The free tier's price must be 0",
         "paidPricePositive": "A paid tier's price must be greater than 0",
         "nonNegativeInt": "Enter a whole number of 0 or more",
+        "savedSearchLimitRange": "Enter a whole number from 0 to {max}",
         "totalListingsRange": "Enter -1 (unlimited) or at least 1"
       },
       "modal": {
@@ -9011,6 +9012,8 @@
         "maxTotalListings": "Total Listings",
         "maxTotalListingsHelper": "-1 = unlimited",
         "maxImagesPerListing": "Images/Listing",
+        "maxSavedSearches": "Saved search limit",
+        "maxSavedSearchesHelper": "0 = saving searches is off",
         "featuredListingSlots": "Featured Listing Slots",
         "commissionDiscount": "Commission Discount (%)",
         "canCreateCollections": "Can Create Collections",
@@ -9024,6 +9027,8 @@
         "totalListings": "Total Listings:",
         "unlimited": "Unlimited",
         "imagesPerListing": "Images/Listing:",
+        "savedSearches": "Saved searches:",
+        "savedSearchesOff": "Off",
         "userCount": "User Count:",
         "collectionsPill": "Collections",
         "tradePill": "Trade"
