@@ -126,12 +126,21 @@ describe("parseTlAmount with STRICT_TL_AMOUNT (refunds)", () => {
 });
 
 describe("parseTlAmount with ZERO_TL_AMOUNT (0 is a real value)", () => {
-  it.each(["0", "0,00", ",", "0,"])("reads %j as the amount 0", (raw) => {
+  it.each(["0", "0,00", "0.0"])("reads %j as the amount 0", (raw) => {
     expect(parseTlAmount(raw, ZERO_TL_AMOUNT)).toEqual({
       status: "ok",
       amount: 0,
     });
   });
+
+  it.each([",", ".", "0,", ",5", "50,"])(
+    "refuses the bare separator %j, so it cannot pass as 0",
+    (raw) => {
+      expect(parseTlAmount(raw, ZERO_TL_AMOUNT)).toEqual({
+        status: "refused",
+      });
+    },
+  );
 
   it("keeps blank text empty and grouping refused", () => {
     expect(parseTlAmount("", ZERO_TL_AMOUNT)).toEqual({ status: "empty" });
@@ -156,6 +165,13 @@ describe("tlAmountInputValue", () => {
     [Number.POSITIVE_INFINITY, ""],
   ])("shows %j as %j", (amount, text) => {
     expect(tlAmountInputValue(amount)).toBe(text);
+  });
+
+  it("shows more than two decimals as they are, so the parser refuses them", () => {
+    // Rounding to "12,35" would save 12.35 over 12.345 without a word.
+    expect(tlAmountInputValue(12.345)).toBe("12,345");
+    expect(isTlAmountRefused(tlAmountInputValue(12.345))).toBe(true);
+    expect(tlAmountInputValue(0.57)).toBe("0,57");
   });
 
   it("shows 0 only where 0 is a real value", () => {

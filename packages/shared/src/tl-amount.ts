@@ -1,7 +1,8 @@
 /**
  * The one parser for a TL amount typed into a text field, for web, admin and
- * the shared listing form (mobile vendors this file: tarodan-mobile
- * `app/trade/_lib/cash.ts`).
+ * the shared listing form. Mobile still has its own parser (tarodan-mobile
+ * `app/trade/_lib/cash.ts`); it is to be replaced by a vendored copy of this
+ * file, so a change here is a mobile sync too.
  *
  * A Turkish user writes "1.000" meaning one thousand, so a dot cannot be
  * trusted as a thousands separator and grouping is refused instead of being
@@ -49,9 +50,14 @@ export const STRICT_TL_AMOUNT: Readonly<TlAmountRules> = Object.freeze({
   bareSeparator: false,
 });
 
-/** Rules for a field where 0 is a real value (prices, fees, lower bounds). */
+/**
+ * Rules for a field where 0 is a real value (admin prices, fees, lower
+ * bounds). A bare separator is refused, so "," cannot pass a required field
+ * as 0.
+ */
 export const ZERO_TL_AMOUNT: Readonly<TlAmountRules> = Object.freeze({
   zero: "amount",
+  bareSeparator: false,
 });
 
 const SHAPE = /^\d*[.,]?\d{0,2}$/;
@@ -93,6 +99,8 @@ export function isTlAmountRefused(raw: string, rules?: TlAmountRules): boolean {
  * The field text for an amount already on record (edit or counter prefill): a
  * decimal comma, as the refusal copy asks, and no grouping. A negative or
  * non-finite amount is empty, and so is 0 unless `rules.zero` is `"amount"`.
+ * An amount with more than two decimals is shown as it is (and then refused
+ * by the parser) rather than rounded, so a save never moves it silently.
  */
 export function tlAmountInputValue(
   amount: number,
@@ -100,8 +108,9 @@ export function tlAmountInputValue(
 ): string {
   if (!Number.isFinite(amount) || amount < 0) return "";
   if (amount === 0 && rules.zero !== "amount") return "";
-  const text = Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
-  return text.replace(".", ",");
+  if (Number.isInteger(amount)) return String(amount);
+  const fixed = amount.toFixed(2);
+  return (Number(fixed) === amount ? fixed : String(amount)).replace(".", ",");
 }
 
 /**
