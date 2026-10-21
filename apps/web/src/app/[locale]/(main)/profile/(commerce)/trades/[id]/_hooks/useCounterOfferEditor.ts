@@ -19,12 +19,12 @@ import type { Trade, TradeItem } from "../_lib/types";
 import { mergeTradeItems, type CounterProduct } from "../_lib/counterProducts";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 import { usePagedPicks } from "@/hooks/usePagedPicks";
+import { signedCashAmount } from "@/lib/cashAmount";
 import {
-  cashAmountValue,
-  cashInputValue,
-  isCashRefused,
-  signedCashAmount,
-} from "@/lib/cashAmount";
+  isTlAmountRefused,
+  tlAmountInputValue,
+  tlAmountValue,
+} from "@/lib/tlAmount";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -52,8 +52,8 @@ export function useCounterOfferEditor({
   const [counterCashPayer, setCounterCashPayer] = useState<"me" | "them">("me");
   const [counterMessage, setCounterMessage] = useState("");
 
-  const counterCashValue = cashAmountValue(counterCashAmount);
-  const counterCashRefused = isCashRefused(counterCashAmount);
+  const counterCashValue = tlAmountValue(counterCashAmount);
+  const counterCashRefused = isTlAmountRefused(counterCashAmount);
 
   const counterMutation = useMutation({
     mutationFn: (data: {
@@ -225,7 +225,7 @@ export function useCounterOfferEditor({
     );
 
     if (trade.cashAmount && trade.cashAmount > 0) {
-      setCounterCashAmount(cashInputValue(trade.cashAmount));
+      setCounterCashAmount(tlAmountInputValue(trade.cashAmount));
       // If the receiver was the cash payer they stay the payer by default.
       setCounterCashPayer(
         trade.cashPayerId === trade.receiverId ? "me" : "them",
