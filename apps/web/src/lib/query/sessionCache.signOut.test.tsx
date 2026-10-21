@@ -67,6 +67,7 @@ import { useAuthStore } from "@/stores/authStore";
 import ConsentGate from "@/components/legal/ConsentGate";
 import LegalIdentityGate from "@/components/identity/LegalIdentityGate";
 import { useDeleteAccount } from "@/app/[locale]/(main)/profile/_hooks/useDeleteAccount";
+import { ReauthContext } from "@/app/[locale]/(main)/profile/_hooks/useReauth";
 
 const ORDERS = ["orders", "list"];
 const DRAFT = ["listings", "draft"];
@@ -93,9 +94,22 @@ function Draft() {
   return <Button onClick={() => mutate({ iban: "TR-u1" })}>save-draft</Button>;
 }
 
-function DeleteAccount() {
+function DeleteButton() {
   const del = useDeleteAccount();
   return <Button onClick={() => del.mutate()}>delete-account</Button>;
+}
+
+/** The profile page's step-up, already confirmed (it has its own tests). */
+const confirmedStepUp = <T,>(
+  request: (reauthToken: string) => Promise<{ data: T }>,
+) => request("step-up-token").then((res) => res.data);
+
+function DeleteAccount() {
+  return (
+    <ReauthContext.Provider value={confirmedStepUp}>
+      <DeleteButton />
+    </ReauthContext.Provider>
+  );
 }
 
 const identityStatus: LegalIdentityStatus = {
@@ -230,7 +244,9 @@ describe("signing out with the (main) page still mounted", () => {
     await click("delete-account");
     await until(() => h.routerPush.mock.calls.length > 0);
 
-    expect(h.deleteMe).toHaveBeenCalledWith("/users/me");
+    expect(h.deleteMe).toHaveBeenCalledWith("/users/me", {
+      headers: { "x-reauth-token": "step-up-token" },
+    });
     expect(h.logoutAction).toHaveBeenCalledTimes(1);
     expect(h.routerPush).toHaveBeenCalledWith("/");
   });

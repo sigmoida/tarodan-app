@@ -3,6 +3,8 @@ const BANK_ACCOUNT_RESOURCE = "bank-account";
 const BANK_ACCOUNT_ID = "me";
 // The trade picker's own-listings list (a `useWebList` resource).
 const TRADE_ELIGIBLE_RESOURCE = "trade-eligible-products";
+// The signed-in account's sign-in methods (password yes/no, linked providers).
+const SIGN_IN_METHODS_RESOURCE = "profile-sign-in-methods";
 
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
@@ -240,6 +242,16 @@ export const queryKeys = {
     resource: BANK_ACCOUNT_RESOURCE,
     id: BANK_ACCOUNT_ID,
     detail: () => webKeys.detail(BANK_ACCOUNT_RESOURCE, BANK_ACCOUNT_ID),
+  },
+  // Same key as `useWebList({ resource })`, so the writes can put their fresh
+  // `SignInMethods` answer straight into the cache.
+  signInMethods: {
+    resource: SIGN_IN_METHODS_RESOURCE,
+    list: () => webKeys.list(SIGN_IN_METHODS_RESOURCE),
+  },
+  /** The 2FA page's status query (`GET /security/2fa/status`). */
+  twoFactor: {
+    status: () => ["2fa-status"] as const,
   },
   sellerDocuments: {
     all: () => ["seller-documents"] as const,

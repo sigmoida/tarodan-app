@@ -44,11 +44,13 @@ iş gerekçesidir.
 | Next.js satır içi hidrasyon script'leri | Satır içi (`self.__next_f`)           | RSC yükünün hidrasyonu               | Yalnız `'nonce-<istek>'` ile             |
 | Sentry SDK (hata raporlama)             | Bundle içinde, kendi origin'imiz      | Ödeme hatalarının teşhisi            | `'self'`; ingest'e `connect-src`         |
 
-**Üçüncü taraf `<script src>` YOKTUR.** Sayfada Google Tag Manager, analytics,
-chat widget, A/B testi veya reklam script'i bulunmaz. Sitenin başka yerlerinde
-yüklenen tek harici script Apple ile Giriş
-(`https://appleid.cdn-apple.com/...appleid.auth.js`, yalnız `(auth)` rotaları) —
-CSP ödeme profilinde bu origin **bilinçli olarak dışarıda bırakılmıştır**.
+**There is NO third-party `<script src>`.** The page carries no Google Tag
+Manager, analytics, chat widget, A/B testing or ad script. The only external
+script loaded elsewhere on the site is Sign in with Apple
+(`https://appleid.cdn-apple.com/...appleid.auth.js`, only on the `(auth)` routes
+and the account dashboard `/profile`, for the step-up and Connected accounts;
+`AppleSdkScript`) — the payment CSP profile **deliberately leaves this origin
+out**.
 
 ### Sentry Session Replay — ödeme sayfasında KAPALI
 

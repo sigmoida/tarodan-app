@@ -1,7 +1,8 @@
 /**
- * Resmi Google "G" marka logosu. Renkler Google'ın marka kılavuzuyla sabittir —
- * bunlar tema/tasarım tokenı DEĞİL, marka varlığıdır; bu yüzden hardcoded hex
- * bu dosyaya özel ve bilinçli bir istisnadır (bkz. Button/Logo marka istisnaları).
+ * The official Google "G" logo. Its colours are fixed by Google's brand
+ * guidelines: they are a brand asset, not theme tokens, so the hex values are
+ * a deliberate exception scoped to this file (as the Button/Logo brand
+ * exceptions are).
  */
 export function GoogleIcon({ className }: { className?: string }) {
   return (

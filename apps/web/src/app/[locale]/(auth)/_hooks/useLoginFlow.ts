@@ -8,16 +8,18 @@ import { authApi } from "@/lib/api";
 import { useLogin } from "./useLogin";
 
 /**
- * Identifier-first login akışı. Tek ekranda:
- *   1. `identify` : e-posta + Google. "Devam et" → e-postayı kontrol eder.
- *        - kayıtlı değil        → `notice = "notRegistered"` (kayıt ol mesajı)
- *        - kayıtlı + parolalı    → `password` adımı (parola iste, "Giriş yap")
- *        - kayıtlı + Google-only → `googleOnly` adımı (Google / şifre belirle)
- *   2. `password`  : mevcut useLogin.submit ile normal parola girişi.
- * Parola girişinin tüm mantığı (business tier yönlendirmesi, doğrulama banner'ı,
- * Google sonrası redirect) `useLogin`'de kalır — burada yalnızca adımları sürüyoruz.
+ * Identifier-first login flow, on one screen:
+ *   1. `identify`: e-mail plus Google and Apple. "Continue" checks the e-mail:
+ *        - not registered         -> `notRegistered` (the sign-up hint)
+ *        - registered, password   -> the `password` step
+ *        - registered, no password -> the `noPassword` step (Google, Apple, or
+ *          the set-password mail)
+ *   2. `password`: the normal password sign-in through `useLogin.submit`.
+ * All password sign-in logic (business tier redirect, verification banner,
+ * the redirect after a social sign-in) stays in `useLogin`; this only drives
+ * the steps.
  */
-export type LoginStep = "identify" | "password" | "googleOnly";
+export type LoginStep = "identify" | "password" | "noPassword";
 
 export function useLoginFlow() {
   const t = useTranslations();
@@ -46,7 +48,7 @@ export function useLoginFlow() {
       setNotRegistered(true);
       return;
     }
-    setStep(res.hasPassword ? "password" : "googleOnly");
+    setStep(res.hasPassword ? "password" : "noPassword");
   };
 
   const back = () => {

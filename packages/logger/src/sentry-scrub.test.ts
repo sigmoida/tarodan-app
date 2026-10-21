@@ -27,6 +27,61 @@ describe("scrubSentryEvent", () => {
     });
   });
 
+  it("masks the step-up token header and the provider credentials of a sign-in method write", () => {
+    const out = scrubSentryEvent({
+      request: {
+        headers: { "x-reauth-token": "opaque-token", accept: "*/*" },
+        data: JSON.stringify({
+          reauthToken: "opaque-token",
+          code: "google-auth-code",
+          idToken: "jwt",
+          identityToken: "jwt",
+          authorizationCode: "apple-code",
+          newPassword: "Secret123",
+          password: "Secret123",
+          provider: "google",
+        }),
+      },
+    });
+    expect(out.request?.headers).toEqual({
+      "x-reauth-token": REDACTED,
+      accept: "*/*",
+    });
+    expect(JSON.parse(out.request?.data as string)).toEqual({
+      reauthToken: REDACTED,
+      code: REDACTED,
+      idToken: REDACTED,
+      identityToken: REDACTED,
+      authorizationCode: REDACTED,
+      newPassword: REDACTED,
+      password: REDACTED,
+      provider: "google",
+    });
+  });
+
+  it("keeps a `code` outside the request body readable (error codes)", () => {
+    const out = scrubSentryEvent({
+      request: { data: { code: "123456", nested: { code: "E_X" } } },
+      extra: { code: "ERR_NETWORK", reauthToken: "opaque-token" },
+    });
+    expect(out.request?.data).toEqual({
+      code: REDACTED,
+      nested: { code: "E_X" },
+    });
+    expect(out.extra).toEqual({ code: "ERR_NETWORK", reauthToken: REDACTED });
+  });
+
+  it("keeps a `code` readable in contexts, tags and breadcrumbs", () => {
+    const out = scrubSentryEvent({
+      contexts: { AxiosError: { code: "ERR_BAD_REQUEST" } },
+      tags: { code: "REAUTH_REQUIRED" },
+      breadcrumbs: [{ message: "api", data: { code: "LAST_SIGN_IN_METHOD" } }],
+    });
+    expect(out.contexts).toEqual({ AxiosError: { code: "ERR_BAD_REQUEST" } });
+    expect(out.tags).toEqual({ code: "REAUTH_REQUIRED" });
+    expect(out.breadcrumbs?.[0].data).toEqual({ code: "LAST_SIGN_IN_METHOD" });
+  });
+
   it("masks the client IP that the proxy headers carry (KVKK personal data)", () => {
     // `onRequestError` attaches the raw request headers; behind the reverse
     // proxy they hold the visitor's IP even with `sendDefaultPii: false`.

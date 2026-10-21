@@ -1,7 +1,7 @@
 /**
- * Resmi Apple logosu. `currentColor` kullanır — Apple'ın marka kılavuzu logonun
- * düz siyah veya düz beyaz olmasını istiyor, bu da butonun `outline` varyantının
- * metin rengiyle zaten sağlanıyor (GoogleIcon'un aksine sabit renk gerekmez).
+ * The official Apple logo. It uses `currentColor`: Apple's guidelines want a
+ * plain black or plain white logo, which the text colour of the button's
+ * `outline` variant already gives (unlike GoogleIcon, no fixed colour).
  */
 export function AppleIcon({ className }: { className?: string }) {
   return (

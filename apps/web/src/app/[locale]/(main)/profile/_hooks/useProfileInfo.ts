@@ -8,6 +8,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
+import { useReauth } from "./useReauth";
 
 export interface ProfileMe {
   displayName?: string;
@@ -69,14 +70,20 @@ export function useUpdateProfile() {
  * Email change with an activation code: `sendCode` mails a 6-digit code to the
  * NEW address (the current email stays active until verified), then `verify`
  * commits the change. Server error messages (email taken, same as current, …)
- * surface via useWebMutation.
+ * surface via useWebMutation. The request carries a step-up token in the body
+ * (`reauthToken`): the API checks a sent token, and requires one once the
+ * `auth_require_reauth_for_sensitive_actions` setting is on.
  */
 export function useEmailChange() {
   const t = useTranslations();
   const refreshUser = useAuthStore((s) => s.refreshUser);
+  const withReauth = useReauth();
 
   const sendCode = useWebMutation(
-    (newEmail: string) => api.post("/auth/email/request-change", { newEmail }),
+    (newEmail: string) =>
+      withReauth((reauthToken) =>
+        api.post("/auth/email/request-change", { newEmail, reauthToken }),
+      ),
     {
       errorMessage: t("profile.sendCodeFailed"),
       onSuccess: () => toast.success(t("profile.emailChangeCodeSent")),

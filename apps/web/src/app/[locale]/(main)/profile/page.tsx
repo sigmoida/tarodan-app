@@ -7,9 +7,11 @@ import LegalIdentitySection from "./_sections/LegalIdentitySection";
 import AddressesSection from "./_sections/AddressesSection";
 import BankAccountSection from "./_sections/BankAccountSection";
 import SecuritySection from "./_sections/SecuritySection";
+import ConnectedAccountsSection from "./_sections/ConnectedAccountsSection";
 import NotificationsSection from "./_sections/NotificationsSection";
 import DangerZoneSection from "./_sections/DangerZoneSection";
 import LanguagePreferenceSection from "./_sections/LanguagePreferenceSection";
+import ReauthProvider from "./_context/ReauthProvider";
 import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,20 +29,25 @@ export async function generateMetadata(): Promise<Metadata> {
  * Profile dashboard — a thin Server Component shell. Each section below is an
  * independent Client island that owns its own TanStack Query fetch + form, so
  * they render and refresh independently (the account overview card reads the
- * shared ProfileContext provided by the layout).
+ * shared ProfileContext provided by the layout). `ReauthProvider` gives the
+ * sensitive writes (password, connected accounts, e-mail change, deletion) one
+ * shared step-up dialog and in-memory token.
  */
 export default function ProfilePage() {
   return (
-    <div className="space-y-6 pb-16">
-      <MembershipSummary />
-      <ProfileInfoSection />
-      <LegalIdentitySection />
-      <LanguagePreferenceSection />
-      <AddressesSection />
-      <BankAccountSection />
-      <SecuritySection />
-      <NotificationsSection />
-      <DangerZoneSection />
-    </div>
+    <ReauthProvider>
+      <div className="space-y-6 pb-16">
+        <MembershipSummary />
+        <ProfileInfoSection />
+        <LegalIdentitySection />
+        <LanguagePreferenceSection />
+        <AddressesSection />
+        <BankAccountSection />
+        <SecuritySection />
+        <ConnectedAccountsSection />
+        <NotificationsSection />
+        <DangerZoneSection />
+      </div>
+    </ReauthProvider>
   );
 }

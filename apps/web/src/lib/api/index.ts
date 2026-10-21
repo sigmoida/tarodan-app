@@ -24,5 +24,6 @@ export * from "./consents";
 export * from "./legal-identity";
 export * from "./timing-rules";
 export * from "./settings";
+export * from "./sign-in-methods";
 import api from "./client";
 export default api;

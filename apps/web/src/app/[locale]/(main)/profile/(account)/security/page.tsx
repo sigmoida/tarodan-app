@@ -12,8 +12,11 @@
 import { useTranslations } from "next-intl";
 import { Alert, Spinner } from "@tarodan/ui";
 import { XCircleIcon } from "@heroicons/react/24/outline";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useSignInMethods } from "../../_hooks/useSecurity";
+import { PASSWORD_SECTION_ID } from "../../_lib/anchors";
 import { use2FA } from "./_hooks/use2FA";
 import StatusCard from "./_sections/StatusCard";
 import SetupIntro from "./_sections/SetupIntro";
@@ -25,6 +28,7 @@ import WhyItMatters from "./_sections/WhyItMatters";
 export default function SecuritySettingsPage() {
   const t = useTranslations();
   const {
+    passwordRequired,
     status,
     isLoading,
     error,
@@ -39,6 +43,12 @@ export default function SecuritySettingsPage() {
     disable,
     regenerateBackupCodes,
   } = use2FA();
+  const { methods, isError: methodsFailed } = useSignInMethods();
+  // 2FA needs a password (the API refuses it without one): an account that
+  // signs in only with Google or Apple is sent to set one first. The setup
+  // start waits for the methods, so such an account never sees it flash.
+  const needsPassword = methods?.hasPassword === false || passwordRequired;
+  const canStartSetup = !needsPassword && (!!methods || methodsFailed);
 
   if (isLoading && !setupData) {
     return (
@@ -58,7 +68,7 @@ export default function SecuritySettingsPage() {
       {error && (
         <Alert
           variant="danger"
-          title="Hata"
+          title={t("common.error")}
           icon={<XCircleIcon className="h-5 w-5 text-danger-600" />}
           className="mb-6"
         >
@@ -69,7 +79,24 @@ export default function SecuritySettingsPage() {
       <div className="space-y-6">
         <StatusCard isEnabled={status.isEnabled} />
 
-        {!status.isEnabled && !setupData && (
+        {!status.isEnabled && !setupData && needsPassword && (
+          <Alert
+            variant="warning"
+            action={
+              <ButtonLink
+                href={`/profile#${PASSWORD_SECTION_ID}`}
+                variant="outline"
+                size="sm"
+              >
+                {t("auth.setPassword")}
+              </ButtonLink>
+            }
+          >
+            {t("profile.security.passwordFirstFor2fa")}
+          </Alert>
+        )}
+
+        {!status.isEnabled && !setupData && canStartSetup && (
           <SetupIntro
             onStart={() => enable.mutate()}
             isLoading={enable.isPending}

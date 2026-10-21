@@ -274,7 +274,6 @@
     "appleScriptFailed": "Apple sign-in could not be loaded",
     "emailNotRegistered": "This email address is not registered.",
     "useDifferentEmail": "Use a different email",
-    "googleOnlyAccount": "This account was created with Google. Sign in with Google, or set a password.",
     "setPassword": "Set a password",
     "setPasswordEmailSent": "A link to set your password was sent to your email.",
     "or": "or",
@@ -349,7 +348,14 @@
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
     "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
     "kvkkAgreeRich": "I have read and accept the <kvkk>KVKK Privacy Notice</kvkk>.",
-    "mustAcceptKvkk": "You must accept the KVKK privacy notice"
+    "mustAcceptKvkk": "You must accept the KVKK privacy notice",
+    "reauth": {
+      "title": "Confirm it's you",
+      "body": "Before we continue, we need to confirm this account is yours.",
+      "withPassword": "Confirm with your password",
+      "withProvider": "Confirm with {provider}"
+    },
+    "noPasswordAccount": "This account has no password. Sign in with the method connected to it, or set a password."
   },
   "brands": {
     "title": "Brands",
@@ -2105,10 +2111,6 @@
       "changePassword": "Change Password",
       "currentPassword": "Current Password",
       "newPasswordRepeat": "New Password (Repeat)",
-      "ruleMin8": "At least 8 characters",
-      "ruleUppercase": "Uppercase letter",
-      "ruleLowercase": "Lowercase letter",
-      "ruleDigit": "Digit",
       "phoneVerification": "Phone Verification",
       "phoneVerified": "Your phone is verified",
       "phoneVerifyPrompt": "Verify your phone by SMS",
@@ -2120,7 +2122,12 @@
       "twoFactorOn": "Your account is protected with TOTP",
       "twoFactorOff": "Add an app-based extra layer of security",
       "manage": "Manage",
-      "setUp": "Set up"
+      "setUp": "Set up",
+      "setPasswordTitle": "Set a Password",
+      "setPasswordIntro": "You can currently sign in only with Google or Apple. Set a password to sign in with your email address too.",
+      "setPasswordAction": "Set Password",
+      "setPasswordSuccess": "Your password has been set.",
+      "passwordFirstFor2fa": "You need to set a password before you can turn on two-factor authentication."
     },
     "changePhotoAction": "Change photo",
     "verifiedBadge": "Verified",
@@ -2385,6 +2392,21 @@
       "failedItem": "{title}: {reason}",
       "empty": "You have no expired listings.",
       "emptyDescription": "Your expired listings are listed here."
+    },
+    "connectedAccounts": {
+      "title": "Connected Accounts",
+      "description": "Manage which accounts you can use to sign in to Tarodan.",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connectedAs": "Connected as {email}",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect {provider}?",
+      "disconnectConfirm": "You will no longer be able to sign in to this account with {provider}.",
+      "relinkNote": "If you later choose \"Continue with {provider}\" with the same verified email address, this sign-in method is connected to your account again automatically and we send you a notice by email.",
+      "lastMethodHint": "Your account must keep a password or a connected Google account. Set a password first.",
+      "connectSuccess": "{provider} account connected.",
+      "disconnectSuccess": "{provider} disconnected."
     }
   },
   "review": {

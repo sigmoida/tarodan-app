@@ -8,106 +8,163 @@ import {
   DevicePhoneMobileIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge, Button, Skeleton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
+import { PasswordChecklist } from "@/components/auth/PasswordChecklist";
 import { useAuthStore } from "@/stores/authStore";
 import {
   changePasswordSchema,
+  setPasswordSchema,
   type ChangePasswordValues,
+  type SetPasswordValues,
 } from "../_lib/schemas";
+import { PASSWORD_SECTION_ID } from "../_lib/anchors";
 import PhoneVerificationModal from "../_modals/PhoneVerificationModal";
-import { useChangePassword, use2faStatus } from "../_hooks/useSecurity";
+import LoadErrorAlert from "../_components/LoadErrorAlert";
+import {
+  useChangePassword,
+  useSetPassword,
+  useSignInMethods,
+  use2faStatus,
+} from "../_hooks/useSecurity";
 
-const EMPTY: ChangePasswordValues = {
+const EMPTY_CHANGE: ChangePasswordValues = {
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
 };
 
-/** Şifre kuralları — etiket katalogdan gelir, bu yüzden anahtar taşınır. */
-const RULES = [
-  { test: (p: string) => p.length >= 8, key: "profile.security.ruleMin8" },
-  {
-    test: (p: string) => /[A-Z]/.test(p),
-    key: "profile.security.ruleUppercase",
-  },
-  {
-    test: (p: string) => /[a-z]/.test(p),
-    key: "profile.security.ruleLowercase",
-  },
-  { test: (p: string) => /\d/.test(p), key: "profile.security.ruleDigit" },
-] as const;
+const EMPTY_SET: SetPasswordValues = { newPassword: "", confirmPassword: "" };
 
-/** Security: change password (RHF+zod) + SMS phone verification. */
-export default function SecuritySection() {
+/** Change the password of an account that has one. */
+function ChangePasswordForm() {
   const t = useTranslations();
-  const { user, isAuthenticated } = useAuthStore();
   const changePassword = useChangePassword();
-  const { is2faEnabled } = use2faStatus(isAuthenticated);
-  const [phoneOpen, setPhoneOpen] = useState(false);
-
-  const form = useZodForm(changePasswordSchema(t), { defaultValues: EMPTY });
+  const form = useZodForm(changePasswordSchema(t), {
+    defaultValues: EMPTY_CHANGE,
+  });
   const newPassword = form.watch("newPassword") ?? "";
 
   const onSubmit = (values: ChangePasswordValues) =>
-    changePassword.mutate(values, { onSuccess: () => form.reset(EMPTY) });
+    changePassword.mutate(values, {
+      onSuccess: () => form.reset(EMPTY_CHANGE),
+    });
 
   return (
-    <SectionCard
-      title={t("profile.security.title")}
-      action={
-        <Button
-          type="button"
-          size="sm"
-          onClick={form.handleSubmit(onSubmit)}
-          isLoading={changePassword.isPending}
-        >
+    <Form form={form} onSubmit={onSubmit} className="space-y-4">
+      <FormInput
+        name="currentPassword"
+        type="password"
+        label={t("profile.security.currentPassword")}
+        placeholder="••••••••"
+        autoComplete="current-password"
+      />
+      <FormInput
+        name="newPassword"
+        type="password"
+        label={t("auth.newPassword")}
+        placeholder="••••••••"
+        autoComplete="new-password"
+      />
+      <PasswordChecklist password={newPassword} />
+      <FormInput
+        name="confirmPassword"
+        type="password"
+        label={t("profile.security.newPasswordRepeat")}
+        placeholder="••••••••"
+        autoComplete="new-password"
+      />
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" isLoading={changePassword.isPending}>
           {t("profile.security.changePassword")}
         </Button>
-      }
-    >
-      <Form form={form} onSubmit={onSubmit} className="space-y-4">
-        <FormInput
-          name="currentPassword"
-          type="password"
-          label={t("profile.security.currentPassword")}
-          placeholder="••••••••"
-          autoComplete="current-password"
-        />
-        <FormInput
-          name="newPassword"
-          type="password"
-          label={t("auth.newPassword")}
-          placeholder="••••••••"
-          autoComplete="new-password"
-        />
-        <div className="flex flex-wrap gap-2">
-          {RULES.map((r) => {
-            const met = r.test(newPassword);
-            return (
-              <span
-                key={r.key}
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  met
-                    ? "bg-surface-alt text-success-700"
-                    : "bg-surface-alt text-subtle"
-                }`}
-              >
-                {met ? "✓" : "○"} {t(r.key)}
-              </span>
-            );
-          })}
-        </div>
-        <FormInput
-          name="confirmPassword"
-          type="password"
-          label={t("profile.security.newPasswordRepeat")}
-          placeholder="••••••••"
-          autoComplete="new-password"
-        />
-      </Form>
+      </div>
+    </Form>
+  );
+}
+
+/**
+ * Set the first password of an account without one (Google or Apple only).
+ * The step-up asks for a fresh provider sign-in; on success the methods
+ * answer flips `hasPassword` and the section shows "Change password".
+ */
+function SetPasswordForm() {
+  const t = useTranslations();
+  const setPassword = useSetPassword();
+  const form = useZodForm(setPasswordSchema(t), { defaultValues: EMPTY_SET });
+  const newPassword = form.watch("newPassword") ?? "";
+
+  const onSubmit = (values: SetPasswordValues) =>
+    setPassword.mutate(values, { onSuccess: () => form.reset(EMPTY_SET) });
+
+  return (
+    <Form form={form} onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <p className="text-sm font-medium text-heading">
+          {t("profile.security.setPasswordTitle")}
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          {t("profile.security.setPasswordIntro")}
+        </p>
+      </div>
+      <FormInput
+        name="newPassword"
+        type="password"
+        label={t("auth.newPassword")}
+        placeholder="••••••••"
+        autoComplete="new-password"
+      />
+      <PasswordChecklist password={newPassword} />
+      <FormInput
+        name="confirmPassword"
+        type="password"
+        label={t("profile.security.newPasswordRepeat")}
+        placeholder="••••••••"
+        autoComplete="new-password"
+      />
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" isLoading={setPassword.isPending}>
+          {t("profile.security.setPasswordAction")}
+        </Button>
+      </div>
+    </Form>
+  );
+}
+
+/** The password block: "Change password", or "Set a password" without one. */
+function PasswordBlock({ enabled }: { enabled: boolean }) {
+  const { methods, isLoading, isError, refetch } = useSignInMethods(enabled);
+
+  // Cached methods stay on screen when a background refetch fails.
+  if (!methods && isError && !isLoading) {
+    return <LoadErrorAlert onRetry={() => void refetch()} />;
+  }
+  if (!methods) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    );
+  }
+  return methods.hasPassword ? <ChangePasswordForm /> : <SetPasswordForm />;
+}
+
+/** Security: the password (change or set), SMS phone verification and 2FA. */
+export default function SecuritySection() {
+  const t = useTranslations();
+  const { user, isAuthenticated } = useAuthStore();
+  const { is2faEnabled } = use2faStatus(isAuthenticated);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+
+  return (
+    <SectionCard title={t("profile.security.title")}>
+      <div id={PASSWORD_SECTION_ID} className="scroll-mt-24">
+        <PasswordBlock enabled={isAuthenticated} />
+      </div>
 
       <div className="mt-6 flex items-center justify-between border-t border-border-subtle pt-5">
         <div className="flex items-center gap-3">

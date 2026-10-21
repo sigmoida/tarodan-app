@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
+import { isCancellation } from "@/lib/query/client";
 
 export interface UseWebMutationOptions<TData, TVars> {
   /**
@@ -18,7 +19,7 @@ export interface UseWebMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
-  /** Hata toast'ını bastırır (kullanıcının başlatmadığı arka plan yazmaları için). */
+  /** Suppresses the error toast (for background writes the user did not start). */
   silentError?: boolean;
   onSuccess?: (data: TData, vars: TVars) => void;
   mutation?: Omit<
@@ -35,6 +36,13 @@ export function apiErrorMessage(error: unknown): string | undefined {
   if (Array.isArray(message) && typeof message[0] === "string")
     return message[0];
   return undefined;
+}
+
+/** The API's machine-readable `errorCode` off an axios error, if any. */
+export function apiErrorCode(error: unknown): string | undefined {
+  const code = (error as { response?: { data?: { errorCode?: unknown } } })
+    ?.response?.data?.errorCode;
+  return typeof code === "string" ? code : undefined;
 }
 
 /**
@@ -72,11 +80,11 @@ export function useWebMutation<TData, TVars = void>(
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, vars);
     },
-    // Sentry raporu burada DEĞİL: `MutationCache` (lib/query/client) her
-    // mutation hatasını, kendi `onError`'ı olsa bile raporlar. Burada yalnız
-    // kullanıcıya gösterilen toast var; `silentError` raporu bastırmaz.
+    // The Sentry report is NOT here: the `MutationCache` (lib/query/client)
+    // reports every mutation error, even one with its own `onError`. Only the
+    // user-facing toast lives here; `silentError` does not stop the report.
     onError: (error) => {
-      if (silentError) return;
+      if (silentError || isCancellation(error)) return;
       toast.error(
         apiErrorMessage(error) ?? errorMessage ?? t("common.operationFailed"),
       );

@@ -25,6 +25,7 @@ vi.mock("next-intl", () => ({
 
 import { useWebMutation, type UseWebMutationOptions } from "./useWebMutation";
 import { makeQueryClient } from "@/lib/query/client";
+import { webKeys } from "@/lib/query/keys";
 
 /**
  * useWebMutation kendi `onError`'ını (toast) verir. Sentry raporu uygulamanın
@@ -120,6 +121,17 @@ describe("useWebMutation — hata", () => {
     expect(h.capture).toHaveBeenCalledTimes(1);
   });
 
+  it("shows no toast and sends no report for a cancellation (a closed step-up)", async () => {
+    const cancelled = Object.assign(new Error("reauth_cancelled"), {
+      name: "AbortError",
+    });
+    render(() => Promise.reject(cancelled), { errorMessage: "olmadı" });
+    await run();
+
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+
   it("sunucu mesajı yoksa çağıranın metnine, o da yoksa genel metne düşer", async () => {
     render(() => Promise.reject(new Error("ağ")), { errorMessage: "olmadı" });
     await run();
@@ -142,7 +154,9 @@ describe("useWebMutation — başarı", () => {
     });
     await run();
 
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["addresses"] });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: webKeys.all("addresses"),
+    });
     expect(h.toast.success).toHaveBeenCalledWith("kaydedildi");
     expect(onSuccess).toHaveBeenCalledWith("ok", undefined);
     expect(h.capture).not.toHaveBeenCalled();
