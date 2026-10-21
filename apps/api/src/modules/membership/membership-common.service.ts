@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import {
+  MembershipTier,
   MembershipTierType,
+  Prisma,
   SubscriptionStatus,
   ProductStatus,
   OrderStatus,
@@ -13,6 +15,28 @@ import { PaymentProvider } from "../payment/dto";
 import { i18nMessage } from "../i18n";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { isPremiumEntitled } from "./helpers/membership.util";
+
+/**
+ * The tier columns the tier response reads; a full `MembershipTier` row fits.
+ * Prices may arrive as a Prisma `Decimal` (a row) or a number (a fixture).
+ */
+export type MembershipTierRow = Pick<
+  MembershipTier,
+  | "id"
+  | "type"
+  | "name"
+  | "description"
+  | "maxFreeListings"
+  | "maxTotalListings"
+  | "maxImagesPerListing"
+  | "canCreateCollections"
+  | "canTrade"
+  | "isActive"
+> & {
+  monthlyPrice: Prisma.Decimal | number;
+  yearlyPrice: Prisma.Decimal | number;
+  isAdFree?: boolean | null;
+};
 
 /**
  * MembershipCommonService — üyelik alt-servislerinin paylaştığı çekirdek okuma/
@@ -274,23 +298,23 @@ export class MembershipCommonService {
     };
   }
 
-  mapTierToDto(tier: any): MembershipTierResponseDto {
+  mapTierToDto(tier: MembershipTierRow): MembershipTierResponseDto {
     return {
       id: tier.id,
       type: tier.type,
       name: tier.name,
       description: tier.description || undefined,
-      monthlyPrice: parseFloat(tier.monthlyPrice),
-      yearlyPrice: parseFloat(tier.yearlyPrice),
+      monthlyPrice: Number(tier.monthlyPrice),
+      yearlyPrice: Number(tier.yearlyPrice),
       maxFreeListings: tier.maxFreeListings,
       maxTotalListings: tier.maxTotalListings,
       maxImagesPerListing: tier.maxImagesPerListing,
       canCreateCollections: tier.canCreateCollections,
       canTrade: tier.canTrade,
-      // Reklamsızlık admin'in katman formundaki kutusundan gelir (tek kaynak
-      // MembershipTier.isAdFree); web BannerSlot ve mobil buna uyar.
-      // featuredListingSlots DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı
-      // — vaat edilmez, dönülmez.
+      // Ad-free comes from the box on the admin tier form (single source
+      // MembershipTier.isAdFree); web BannerSlot and mobile follow it.
+      // featuredListingSlots is RETIRED: paid boost packages took over
+      // featuring, so it is neither promised nor returned.
       isAdFree: tier.isAdFree === true,
       isActive: tier.isActive,
     };
