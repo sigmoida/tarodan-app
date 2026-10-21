@@ -38,6 +38,7 @@ import {
 } from "./dto";
 import { errorMessage } from "../../common/helpers/error-message";
 import { Throttle } from "@nestjs/throttler";
+import { clientIpThrottle } from "../../common/helpers/client-ip";
 import { BlockUserDto } from "./dto/block-user.dto";
 import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
@@ -144,7 +145,8 @@ export class UserController {
   @Delete("me")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  // Per client IP: web deletions arrive from the gateway's one address.
+  @Throttle(clientIpThrottle(5))
   @RequireReauth({ required: "setting", flow: "account_delete" })
   @ApiOperation({
     summary: "Delete the account",

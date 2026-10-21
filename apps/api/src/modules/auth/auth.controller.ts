@@ -47,6 +47,7 @@ import { JwtAuthGuard, JwtRefreshGuard } from "./guards";
 import { RequireReauth } from "./reauth/require-reauth.decorator";
 import { Public, CurrentUser } from "./decorators";
 import { RequestUser } from "./interfaces";
+import { clientIpThrottle } from "../../common/helpers/client-ip";
 import {
   setAuthCookies,
   clearAuthCookies,
@@ -456,7 +457,8 @@ export class AuthController {
   @Post("email/request-change")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  // Per client IP: web requests arrive from the gateway's one address.
+  @Throttle(clientIpThrottle(3))
   @RequireReauth({ required: "setting", flow: "email_change" })
   @ApiOperation({ summary: "Send an e-mail change code to the new address" })
   async requestEmailChange(

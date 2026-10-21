@@ -80,3 +80,13 @@ export async function clientIpThrottleTracker(
 ): Promise<string> {
   return resolveClientIp(req as ClientIpRequest) ?? "unknown";
 }
+
+/**
+ * `@Throttle(clientIpThrottle(limit))`: a strict per-route limit counted per
+ * real client IP (`clientIpThrottleTracker`). Use it on every route the web
+ * calls through the gateway; the default `req.ip` bucket would put every web
+ * user into the one bucket of the web server and let one user lock out all.
+ */
+export function clientIpThrottle(limit: number, ttl = 60_000) {
+  return { default: { limit, ttl, getTracker: clientIpThrottleTracker } };
+}

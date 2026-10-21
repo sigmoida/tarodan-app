@@ -6,17 +6,21 @@ import { PaymentController } from "../../payment/payment.controller";
 import { ConsentController } from "../../consent/consent.controller";
 import { SignInMethodsController } from "../sign-in-methods/sign-in-methods.controller";
 import { UserController } from "../../user/user.controller";
+import { clientIpThrottleTracker } from "../../../common/helpers/client-ip";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const THROTTLER_LIMIT_DEFAULT = "THROTTLER:LIMITdefault";
 const THROTTLER_TTL_DEFAULT = "THROTTLER:TTLdefault";
+const THROTTLER_TRACKER_DEFAULT = "THROTTLER:TRACKERdefault";
 
 describe("critical public route throttles", () => {
   const cases: Array<{
     controller: { name: string; prototype: object };
     method: string;
     limit: number;
+    /** Counted per client IP (`clientIpThrottle`), not per `req.ip`. */
+    perClientIp?: boolean;
   }> = [
     {
       controller: AuthController,
@@ -76,43 +80,51 @@ describe("critical public route throttles", () => {
       controller: UserController,
       method: "deleteAccount",
       limit: 5,
+      perClientIp: true,
     },
     {
       controller: AuthController,
       method: "requestEmailChange",
       limit: 3,
+      perClientIp: true,
     },
     // Step-up and the writes it guards (sign-in methods plan, 2026-10-21).
     {
       controller: SignInMethodsController,
       method: "reauthenticate",
       limit: 5,
+      perClientIp: true,
     },
     {
       controller: SignInMethodsController,
       method: "setPassword",
       limit: 5,
+      perClientIp: true,
     },
     {
       controller: SignInMethodsController,
       method: "linkGoogle",
       limit: 10,
+      perClientIp: true,
     },
     {
       controller: SignInMethodsController,
       method: "linkApple",
       limit: 10,
+      perClientIp: true,
     },
     {
       controller: SignInMethodsController,
       method: "unlinkProvider",
       limit: 10,
+      perClientIp: true,
     },
     // Anonim çerez tercihi kaydı: tablo sınırsız büyümesin.
     {
       controller: ConsentController,
       method: "recordCookies",
       limit: 10,
+      perClientIp: true,
     },
   ];
 
@@ -123,6 +135,19 @@ describe("critical public route throttles", () => {
 
       expect(Reflect.getMetadata(THROTTLER_LIMIT_DEFAULT, handler)).toBe(limit);
       expect(Reflect.getMetadata(THROTTLER_TTL_DEFAULT, handler)).toBe(60000);
+    },
+  );
+
+  // Web calls these through the gateway: a `req.ip` bucket would be the web
+  // server's one address, so one web user could lock out every other.
+  it.each(cases.filter((c) => c.perClientIp))(
+    "counts $controller.name.$method per client IP",
+    ({ controller, method }) => {
+      const handler = (controller.prototype as Record<string, object>)[method];
+
+      expect(Reflect.getMetadata(THROTTLER_TRACKER_DEFAULT, handler)).toBe(
+        clientIpThrottleTracker,
+      );
     },
   );
 

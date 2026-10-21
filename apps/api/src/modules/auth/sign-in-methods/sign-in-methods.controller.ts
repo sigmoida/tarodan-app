@@ -15,6 +15,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import type { ReauthResponse, SignInMethods } from "@tarodan/types";
+import { clientIpThrottle } from "../../../common/helpers/client-ip";
 import { CurrentUser } from "../decorators";
 import { ReauthDto, ReauthResponseDto } from "../reauth/dto/reauth.dto";
 import { ReauthService } from "../reauth/reauth.service";
@@ -34,6 +35,12 @@ import { SignInMethodsService } from "./sign-in-methods.service";
  * to them. Every route needs a session (global `JwtAuthGuard`); the writes
  * also need a `reauthToken`. No step-up or provider token problem answers
  * 401: both clients read 401 as an expired session.
+ *
+ * The strict limits count per client IP (`clientIpThrottle`), not per
+ * `req.ip`: web traffic arrives from the gateway, and one shared bucket
+ * would let one web user exhaust the step-up for every other web user.
+ * The throttler runs before the session guard, so a per-user bucket is not
+ * available here; the step-up lockout is per user (`ReauthService`).
  */
 @ApiTags("auth")
 @ApiBearerAuth()
@@ -53,7 +60,7 @@ export class SignInMethodsController {
 
   @Post("reauth")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle(clientIpThrottle(5))
   @ApiOperation({ summary: "Confirm it's you; returns a short-lived token" })
   @ApiResponse({ status: 200, type: ReauthResponseDto })
   @ApiResponse({
@@ -72,7 +79,7 @@ export class SignInMethodsController {
 
   @Post("password/set")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle(clientIpThrottle(5))
   @RequireReauth()
   @ApiOperation({ summary: "Set a first password (account without one)" })
   @ApiResponse({ status: 200, type: SignInMethodsDto })
@@ -89,7 +96,7 @@ export class SignInMethodsController {
 
   @Post("social/google/link")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle(clientIpThrottle(10))
   @RequireReauth()
   @ApiOperation({ summary: "Connect a Google account to this account" })
   @ApiResponse({ status: 200, type: SignInMethodsDto })
@@ -110,7 +117,7 @@ export class SignInMethodsController {
 
   @Post("social/apple/link")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle(clientIpThrottle(10))
   @RequireReauth()
   @ApiOperation({ summary: "Connect an Apple account to this account" })
   @ApiResponse({ status: 200, type: SignInMethodsDto })
@@ -132,7 +139,7 @@ export class SignInMethodsController {
   /** A POST, not a DELETE with a body: some clients and proxies drop it. */
   @Post("social/:provider/unlink")
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle(clientIpThrottle(10))
   @RequireReauth()
   @ApiOperation({ summary: "Disconnect a provider from this account" })
   @ApiResponse({ status: 200, type: SignInMethodsDto })

@@ -52,7 +52,11 @@ Sensitive routes add a strict `@Throttle` on top of the global limit (login 5/mi
 is the pattern; forgot-password 3/min; refresh 60/min).
 `guards/critical-route-throttles.spec.ts` pins them; keep it green and add new
 sensitive routes to it. Known gap (hub backlog): the throttler counts by
-`req.ip`, so web BFF traffic shares one bucket.
+`req.ip`, so web BFF traffic shares one bucket. A new strict limit on a route
+the web calls takes `@Throttle(clientIpThrottle(n))`
+(`common/helpers/client-ip.ts`, the real client IP the gateway forwards), as
+the step-up, sign-in method, account deletion and e-mail change routes do;
+the spec pins it with `perClientIp`.
 
 ## 2FA and social login
 
