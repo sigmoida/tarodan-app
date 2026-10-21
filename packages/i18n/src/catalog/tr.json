@@ -9209,7 +9209,39 @@
         "blocksTab": "Engellemeler",
         "blocksGivenTitle": "Engelledikleri",
         "blocksReceivedTitle": "Onu Engelleyenler",
-        "blocksEmpty": "Engelleme kaydı yok"
+        "blocksEmpty": "Engelleme kaydı yok",
+        "trust": {
+          "title": "Güven skoru",
+          "score": "Puan",
+          "level": "Seviye",
+          "notComputed": "Henüz hesaplanmadı",
+          "notEnoughData": "Yeterli veri yok",
+          "computedAt": "Son hesaplama",
+          "formulaVersion": "Formül sürümü",
+          "unavailable": "Döküm bu formül sürümüyle gösterilemiyor",
+          "colComponent": "Bileşen",
+          "colWeight": "Ağırlık",
+          "colSubScore": "Alt skor",
+          "colDetail": "Detay",
+          "smoothed": "Düzeltilmiş ortalama",
+          "components": {
+            "rating": "Değerlendirme",
+            "reliability": "Sipariş güvenilirliği",
+            "onTime": "Zamanında kargo",
+            "volume": "İşlem hacmi",
+            "tenure": "Hesap yaşı"
+          },
+          "counts": {
+            "raters": "Değerlendiren kişi",
+            "eligibleOrders": "Değerlendirilen sipariş",
+            "failures": "Satıcı kaynaklı iptal veya iade",
+            "shipped": "Kargolanan",
+            "late": "Geç kargolanan",
+            "transactions": "Tamamlanan işlem",
+            "counterparties": "Farklı karşı taraf",
+            "tenureDays": "Hesap yaşı (gün)"
+          }
+        }
       },
       "unbanConfirmDesc": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?",
       "resendVerification": "Aktivasyon Maili Gönder",

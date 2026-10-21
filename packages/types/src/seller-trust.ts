@@ -4,8 +4,9 @@
  * The API computes it nightly (`seller-trust-refresh`) and stores it in integer
  * hundredths (`score_x100`, 0 to 500, null when there is not enough data). The
  * formula itself is an API helper; this file holds what every client must agree
- * on: the version, the levels and their thresholds, the read shapes and the
- * formatter. Durable reference: `docs/SELLER_TRUST.md`.
+ * on: the version, the components and their weights (the API computes with
+ * them, admin shows them), the levels and their thresholds, the read shapes and
+ * the formatter. Durable reference: `docs/SELLER_TRUST.md`.
  */
 
 /** Bumped by any change to a constant or a definition of the formula. */
@@ -32,6 +33,30 @@ export const SELLER_TRUST_MIN_TRANSACTIONS = 5;
 
 /** ...and from this many distinct counterparties. */
 export const SELLER_TRUST_MIN_COUNTERPARTIES = 3;
+
+/** The five components of formula v1, in formula (and display) order. */
+export const SELLER_TRUST_COMPONENTS_V1 = [
+  "rating",
+  "reliability",
+  "onTime",
+  "volume",
+  "tenure",
+] as const;
+export type SellerTrustComponentKey =
+  (typeof SELLER_TRUST_COMPONENTS_V1)[number];
+
+/**
+ * Weight of each formula v1 sub-score; they sum to 1. The single source: the
+ * API formula computes with it and admin shows it in the breakdown. Changing a
+ * value bumps `SELLER_TRUST_FORMULA_VERSION`.
+ */
+export const SELLER_TRUST_WEIGHTS_V1 = {
+  rating: 0.4,
+  reliability: 0.25,
+  onTime: 0.15,
+  volume: 0.15,
+  tenure: 0.05,
+} as const satisfies Record<SellerTrustComponentKey, number>;
 
 /** The level is derived, never stored: one function for every surface. */
 export function sellerTrustLevel(scoreX100: number | null): SellerTrustLevel {

@@ -1,4 +1,10 @@
-import { sellerTrustLevel, SELLER_TRUST_FORMULA_VERSION } from "@tarodan/types";
+import {
+  sellerTrustLevel,
+  SELLER_TRUST_COMPONENTS_V1,
+  SELLER_TRUST_FORMULA_VERSION,
+  SELLER_TRUST_WEIGHTS_V1,
+} from "@tarodan/types";
+import { TRUST_FORMULA_V1 } from "./trust-formula.constants";
 import {
   computeSellerTrust,
   toScoreX100,
@@ -293,5 +299,19 @@ describe("sellerTrustLevel thresholds (D3)", () => {
     [0, "developing"],
   ])("%p -> %p", (x100, level) => {
     expect(sellerTrustLevel(x100 as number | null)).toBe(level);
+  });
+});
+
+describe("formula v1 weights (shared with admin)", () => {
+  it("computes with the shared weights, one per component, summing to 1", () => {
+    expect(TRUST_FORMULA_V1.weights).toBe(SELLER_TRUST_WEIGHTS_V1);
+    expect(Object.keys(SELLER_TRUST_WEIGHTS_V1)).toEqual([
+      ...SELLER_TRUST_COMPONENTS_V1,
+    ]);
+    const sum = SELLER_TRUST_COMPONENTS_V1.reduce(
+      (acc, key) => acc + SELLER_TRUST_WEIGHTS_V1[key],
+      0,
+    );
+    expect(sum).toBeCloseTo(1, 10);
   });
 });

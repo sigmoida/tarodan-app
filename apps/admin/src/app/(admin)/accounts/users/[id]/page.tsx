@@ -16,6 +16,7 @@ import { LegalIdentitySection } from "./_sections/LegalIdentitySection";
 import { MembershipSection } from "./_sections/MembershipSection";
 import { UserActivityTabs } from "./_sections/UserActivityTabs";
 import { ConsentsSection } from "./_sections/ConsentsSection";
+import { SellerTrustSection } from "./_sections/SellerTrustSection";
 import { SignInMethodsSection } from "./_sections/SignInMethodsSection";
 import { UserSidebar } from "./_sections/UserSidebar";
 import { actionsFor, type UserAccountAction } from "../_lib/bulkEligibility";
@@ -105,6 +106,7 @@ export default function UserDetailPage() {
                 <MembershipSection userId={u.id} membership={u.membership} />
                 <UserActivityTabs userId={u.id} user={u} />
                 <ConsentsSection userId={u.id} />
+                {u.trust && <SellerTrustSection trust={u.trust} />}
                 <SignInMethodsSection userId={u.id} />
               </>
             }
