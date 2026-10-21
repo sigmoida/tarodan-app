@@ -19,6 +19,8 @@ import type { TradeProduct } from "./_lib/types";
 const h = vi.hoisted(() => ({
   products: [] as TradeProduct[],
   productsLoading: false,
+  hasMore: false,
+  loadMore: vi.fn(),
   mutate: vi.fn(),
   previewIds: [] as string[][],
   summaryIds: [] as string[][],
@@ -93,6 +95,9 @@ vi.mock("./_hooks/useNewTrade", () => ({
   useTradeableProducts: () => ({
     products: h.products,
     isLoading: h.productsLoading,
+    hasMore: h.hasMore,
+    isLoadingMore: false,
+    loadMore: h.loadMore,
   }),
   useCreateTrade: () => ({ mutate: h.mutate, isPending: false }),
 }));
@@ -135,6 +140,8 @@ const lastSummaryIds = () => h.summaryIds[h.summaryIds.length - 1];
 beforeEach(() => {
   h.products = [];
   h.productsLoading = false;
+  h.hasMore = false;
+  h.loadMore.mockReset();
   h.mutate.mockReset();
   h.previewIds = [];
   h.summaryIds = [];
@@ -216,5 +223,78 @@ describe("new trade page, picker loading versus empty", () => {
     render();
     expect(container.querySelector(".animate-spin")).toBeNull();
     expect(checkbox("a")).toBeDefined();
+  });
+});
+
+describe("new trade page, paged picker", () => {
+  const moreButton = () =>
+    [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("common.loadMore"),
+    );
+
+  it("shows Show more only while the server has more pages, and asks for the next page", () => {
+    h.products = [item("a")];
+    render();
+    expect(moreButton()).toBeUndefined();
+
+    h.hasMore = true;
+    render();
+    act(() => moreButton()!.click());
+    expect(h.loadMore).toHaveBeenCalledTimes(1);
+
+    h.hasMore = false;
+    render();
+    expect(moreButton()).toBeUndefined();
+  });
+
+  it("keeps picks from earlier pages checked and sent after more pages load", () => {
+    h.products = [item("a"), item("b")];
+    h.hasMore = true;
+    render();
+    act(() => checkbox("a").click());
+
+    h.products = [item("a"), item("b"), item("c"), item("d")];
+    render();
+    act(() => checkbox("d").click());
+    expect(checkbox("a").checked).toBe(true);
+    expect(lastPreviewIds()).toEqual(["a", "d"]);
+
+    act(() => sendButton().click());
+    expect(h.mutate.mock.calls[0][0].initiatorItems).toEqual([
+      { productId: "a", quantity: 1 },
+      { productId: "d", quantity: 1 },
+    ]);
+  });
+
+  it("keeps a pick that slid onto a page not loaded yet, shown and sent", () => {
+    // Pages 1-2 loaded, more exist; "c" is the last loaded row.
+    h.products = [item("a"), item("c")];
+    h.hasMore = true;
+    render();
+    act(() => checkbox("c").click());
+
+    // A new listing pushed "c" onto page 3 (not loaded): it may still be
+    // eligible, so it stays picked, pinned on top and checked.
+    h.products = [item("new"), item("a")];
+    render();
+    expect(checkbox("c").checked).toBe(true);
+    expect(lastPreviewIds()).toEqual(["c"]);
+    act(() => sendButton().click());
+    expect(h.mutate.mock.calls[0][0].initiatorItems).toEqual([
+      { productId: "c", quantity: 1 },
+    ]);
+  });
+
+  it("prunes a pick missing once every page is loaded", () => {
+    h.products = [item("a"), item("c")];
+    h.hasMore = true;
+    render();
+    act(() => checkbox("c").click());
+
+    h.products = [item("a")];
+    h.hasMore = false;
+    render();
+    expect(lastPreviewIds()).toEqual([]);
+    expect(sendButton().disabled).toBe(true);
   });
 });

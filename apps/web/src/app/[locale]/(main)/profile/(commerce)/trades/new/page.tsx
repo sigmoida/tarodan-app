@@ -26,6 +26,7 @@ import TradeProductPicker from "./_components/TradeProductPicker";
 import TradeSummary from "./_components/TradeSummary";
 import TradeCostPreview from "@/components/trade/TradeCostPreview";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
+import { usePagedPicks } from "@/hooks/usePagedPicks";
 
 function NewTradeContent() {
   const router = useRouter();
@@ -41,7 +42,6 @@ function NewTradeContent() {
 
   const canTrade = Boolean(limits?.canTrade);
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [cashAmount, setCashAmount] = useState("");
   const [cashPayer, setCashPayer] = useState<"me" | "them">("me");
   const [message, setMessage] = useState("");
@@ -62,24 +62,27 @@ function NewTradeContent() {
     listingId,
     enabled,
   );
-  const { products, isLoading: productsLoading } = useTradeableProducts(
-    listingId,
-    enabled,
-  );
+  const {
+    products,
+    isLoading: productsLoading,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+  } = useTradeableProducts(listingId, enabled);
   const createTrade = useCreateTrade();
 
   // The picker refetches on open and on tab focus: a pick that is no longer
   // eligible (deactivated, sold, offered elsewhere) drops out of the offer
   // instead of being sent and rejected by the API, and is pruned from the
   // selection so it does not come back checked if the listing returns later.
-  const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
-  const offeredIds = selectedProducts.map((p) => p.id);
-  useEffect(() => {
-    setSelectedIds((prev) => {
-      const next = prev.filter((id) => products.some((p) => p.id === id));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [products]);
+  // A pick that only moved onto a page not loaded yet stays (`usePagedPicks`).
+  const picks = usePagedPicks({
+    loaded: products,
+    complete: !hasMore,
+    ready: !productsLoading,
+  });
+  const selectedProducts = picks.picked;
+  const offeredIds = picks.pickedIds;
   const cash = parseFloat(cashAmount) || 0;
 
   const {
@@ -93,11 +96,6 @@ function NewTradeContent() {
     cashPayer,
     enabled,
   });
-
-  const toggle = (id: string) =>
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
 
   const submit = () => {
     // API en az 1 teklif edilen ürün ister (CreateTradeDto initiatorItems ArrayMinSize(1));
@@ -193,10 +191,13 @@ function NewTradeContent() {
           className="flex-1"
         >
           <TradeProductPicker
-            products={products}
+            products={picks.rows}
             isLoading={productsLoading}
-            selectedIds={selectedIds}
-            onToggle={toggle}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMore}
+            selectedIds={offeredIds}
+            onToggle={picks.toggle}
           />
         </SectionCard>
       </div>
