@@ -349,6 +349,12 @@
     "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
     "kvkkAgreeRich": "<kvkk>KVKK Aydınlatma Metni</kvkk>'ni okudum ve kabul ediyorum.",
     "mustAcceptKvkk": "KVKK Aydınlatma Metni'ni onaylamalısınız",
+    "reauth": {
+      "title": "Güvenlik doğrulaması",
+      "body": "Bu işlemi yapmadan önce hesabınızın size ait olduğunu doğrulamamız gerekiyor.",
+      "withPassword": "Şifrenizle doğrulayın",
+      "withProvider": "{provider} ile doğrula"
+    },
     "noPasswordAccount": "Bu hesabın şifresi yok. Hesabınıza bağlı yöntemle giriş yapın ya da bir şifre belirleyin."
   },
   "brands": {
@@ -2105,10 +2111,6 @@
       "changePassword": "Şifreyi Değiştir",
       "currentPassword": "Mevcut Şifre",
       "newPasswordRepeat": "Yeni Şifre (Tekrar)",
-      "ruleMin8": "En az 8 karakter",
-      "ruleUppercase": "Büyük harf",
-      "ruleLowercase": "Küçük harf",
-      "ruleDigit": "Rakam",
       "phoneVerification": "Telefon Doğrulama",
       "phoneVerified": "Telefonunuz doğrulandı",
       "phoneVerifyPrompt": "Telefonunuzu SMS ile doğrulayın",
@@ -2116,11 +2118,16 @@
       "phoneUnverifiedBadge": "Doğrulanmadı",
       "phoneCodeSentTo": "<b>{phone}</b> numarasına gönderilen 6 haneli kodu girin.",
       "phoneNumber": "Telefon numarası",
-      "twoFactor": "İki Adımlı Doğrulama (2FA)",
+      "twoFactor": "İki Faktörlü Doğrulama (2FA)",
       "twoFactorOn": "Hesabınız TOTP ile korunuyor",
       "twoFactorOff": "Uygulama tabanlı ek güvenlik katmanı ekleyin",
       "manage": "Yönet",
-      "setUp": "Ayarla"
+      "setUp": "Ayarla",
+      "setPasswordTitle": "Şifre Belirle",
+      "setPasswordIntro": "Hesabınıza şu an yalnızca Google veya Apple ile giriş yapabiliyorsunuz. Bir şifre belirleyerek e-posta adresinizle de giriş yapabilirsiniz.",
+      "setPasswordAction": "Şifreyi Belirle",
+      "setPasswordSuccess": "Şifreniz belirlendi.",
+      "passwordFirstFor2fa": "İki faktörlü doğrulamayı açmak için önce bir şifre belirlemelisiniz."
     },
     "changePhotoAction": "Fotoğrafı değiştir",
     "verifiedBadge": "Onaylı",
@@ -2385,6 +2392,21 @@
       "failedItem": "{title}: {reason}",
       "empty": "Süresi dolan ilanınız yok.",
       "emptyDescription": "Süresi dolan ilanlarınız burada listelenir."
+    },
+    "connectedAccounts": {
+      "title": "Bağlı Hesaplar",
+      "description": "Tarodan hesabınıza hangi hesaplarla giriş yapabileceğinizi yönetin.",
+      "connected": "Bağlı",
+      "notConnected": "Bağlı değil",
+      "connectedAs": "{email} olarak bağlı",
+      "connect": "Bağla",
+      "disconnect": "Bağlantıyı Kaldır",
+      "disconnectTitle": "{provider} bağlantısı kaldırılsın mı?",
+      "disconnectConfirm": "Bu hesapla artık {provider} üzerinden giriş yapamazsınız.",
+      "relinkNote": "Daha sonra aynı doğrulanmış e-posta adresiyle \"{provider} ile devam et\" seçeneğini kullanırsanız bu giriş yöntemi hesabınıza otomatik olarak yeniden bağlanır ve size bir bilgilendirme e-postası gönderilir.",
+      "lastMethodHint": "Hesabınızda bir şifre ya da bağlı bir Google hesabı kalmalı. Önce bir şifre belirleyin.",
+      "connectSuccess": "{provider} hesabı bağlandı.",
+      "disconnectSuccess": "{provider} bağlantısı kaldırıldı."
     }
   },
   "review": {
@@ -4383,7 +4405,7 @@
     "tipChangePassword": "Şifreni düzenli olarak değiştir",
     "tipReportSuspicious": "Şüpheli durumları bize bildir",
     "tipStrongPassword": "En az 8 karakter, büyük/küçük harf ve rakam kullan",
-    "tipTwoFactor": "İki adımlı doğrulamayı etkinleştir",
+    "tipTwoFactor": "İki faktörlü doğrulamayı etkinleştir",
     "tokenInvalid": "Geçersiz veya süresi dolmuş bağlantı",
     "verify": "Doğrula",
     "verifyEmailFailed": "E-posta doğrulanamadı",
