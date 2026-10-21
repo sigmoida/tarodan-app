@@ -310,6 +310,39 @@ describe("BoostModal consent reset", () => {
     expect(payButton().disabled).toBe(true);
   });
 
+  it("unticks both consents for a one-kurus reprice", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    await refetchWith({
+      ...OPTIONS,
+      packages: [
+        {
+          ...OPTIONS.packages[0],
+          options: [
+            OPTIONS.packages[0].options[0],
+            { ...OPTIONS.packages[0].options[1], price: 59.01 },
+          ],
+        },
+        OPTIONS.packages[1],
+      ],
+    });
+
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+  });
+
+  it("unticks both consents when the listing title shown changes", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    render({ listing: { ...LISTING, title: "1:18 Ferrari F50" } });
+
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
   it("keeps both consents when a refetch returns the same price", async () => {
     render();
     await flush();
