@@ -28,6 +28,7 @@ export default function SavedSearchesPage() {
     colorOptions,
     isLoading,
     isError,
+    isSuccess,
     refetch,
     remove,
     runSearch,
@@ -54,6 +55,7 @@ export default function SavedSearchesPage() {
         title={t("search.savedTitle")}
         description={t("search.savedDescription")}
         actions={
+          isSuccess &&
           limit !== null && (
             <span className="text-sm text-muted">
               {t("search.countOfLimit", { count: total, limit })}
