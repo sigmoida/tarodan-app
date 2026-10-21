@@ -88,6 +88,12 @@ describe("critical public route throttles", () => {
       limit: 3,
       perClientIp: true,
     },
+    {
+      controller: AuthController,
+      method: "verifyEmailChange",
+      limit: 10,
+      perClientIp: true,
+    },
     // Step-up and the writes it guards (sign-in methods plan, 2026-10-21).
     {
       controller: SignInMethodsController,
@@ -119,7 +125,7 @@ describe("critical public route throttles", () => {
       limit: 10,
       perClientIp: true,
     },
-    // Anonim çerez tercihi kaydı: tablo sınırsız büyümesin.
+    // Anonymous cookie preference record: keeps the table from growing unbounded.
     {
       controller: ConsentController,
       method: "recordCookies",

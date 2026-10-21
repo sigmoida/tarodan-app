@@ -72,8 +72,8 @@ export function resolveUserAgent(req: ClientIpRequest): string | null {
 }
 
 /**
- * `@Throttle` için iz sürücü: gateway trafiği tek bir web sunucusu IP'sinde
- * toplanmasın, her tarayıcı kendi kovasına düşsün (yukarıdaki güven kuralıyla).
+ * `@Throttle` tracker: gateway traffic does not collect in the web server's
+ * one IP; each browser gets its own bucket (with the trust rule above).
  */
 export async function clientIpThrottleTracker(
   req: Record<string, unknown>,

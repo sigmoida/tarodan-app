@@ -474,12 +474,14 @@ export class AuthController {
 
   /**
    * POST /auth/email/verify-change
-   * Aktivasyon kodunu doğrular ve e-postayı yeni adresle değiştirir.
+   * Checks the code and changes the e-mail to the new address. Counted per
+   * client IP, like the request half; each code also allows only
+   * `EmailChangeService.MAX_ATTEMPTS` tries.
    */
   @Post("email/verify-change")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle(clientIpThrottle(10))
   @ApiOperation({ summary: "E-posta değişikliği kodunu doğrula" })
   async verifyEmailChange(
     @CurrentUser() user: RequestUser,
