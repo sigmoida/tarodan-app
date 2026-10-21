@@ -210,11 +210,14 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.LISTING_EXPIRING]: LISTING,
   [NotificationType.LISTING_EXPIRED]: pattern("/profile/listings"),
   [NotificationType.LISTING_VIEWS_MILESTONE]: LISTING,
-  [NotificationType.BOOST_EXPIRED]: pattern("/profile/listings"),
-  [NotificationType.BOOST_ACTIVATED]: pattern("/profile/listings"),
-  [NotificationType.BOOST_GRANTED]: pattern("/profile/listings"),
-  [NotificationType.BOOST_CANCELLED]: pattern("/profile/listings"),
-  [NotificationType.BOOST_REFUNDED]: pattern("/profile/listings"),
+  // Boost notices open "My boosts" on web. Mobile has no such screen (ADR
+  // 0015): an unmapped link falls back to the listing (`data.productId`).
+  [NotificationType.BOOST_EXPIRED]: pattern("/profile/boosts"),
+  [NotificationType.BOOST_ENDING_SOON]: pattern("/profile/boosts"),
+  [NotificationType.BOOST_ACTIVATED]: pattern("/profile/boosts"),
+  [NotificationType.BOOST_GRANTED]: pattern("/profile/boosts"),
+  [NotificationType.BOOST_CANCELLED]: pattern("/profile/boosts"),
+  [NotificationType.BOOST_REFUNDED]: pattern("/profile/boosts"),
 
   // ── Ödeme (satıcıya) ─────────────────────────────────────────────────────
   // Hedef kitle TİPTEN belli: ikisi de satıcıya gider, `orderId` varlığına
