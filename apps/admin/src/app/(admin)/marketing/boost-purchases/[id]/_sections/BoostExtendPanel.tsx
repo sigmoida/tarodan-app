@@ -12,6 +12,14 @@ const EXTEND_MIN_DAYS = 1;
 const EXTEND_MAX_DAYS = 365;
 const EXTEND_DEFAULT_DAYS = 7;
 
+/** Whole days within the range, or null (the extend button stays off). */
+export function extendDays(text: string): number | null {
+  const v = text.trim();
+  if (!/^\d+$/.test(v)) return null;
+  const days = Number(v);
+  return days >= EXTEND_MIN_DAYS && days <= EXTEND_MAX_DAYS ? days : null;
+}
+
 /** Add days to a running or paused boost (staff only, no money moves). */
 export function BoostExtendPanel({
   onExtend,
@@ -21,7 +29,10 @@ export function BoostExtendPanel({
   isPending: boolean;
 }) {
   const t = useTranslations();
-  const [days, setDays] = useState(EXTEND_DEFAULT_DAYS);
+  // The typed text, read on submit: clamping each keystroke made the field
+  // impossible to clear ("" became 1, so typing 30 gave 130).
+  const [text, setText] = useState(String(EXTEND_DEFAULT_DAYS));
+  const days = extendDays(text);
 
   return (
     <Panel className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -40,21 +51,16 @@ export function BoostExtendPanel({
             type="number"
             min={EXTEND_MIN_DAYS}
             max={EXTEND_MAX_DAYS}
-            value={days}
-            onChange={(event) =>
-              setDays(
-                Math.min(
-                  EXTEND_MAX_DAYS,
-                  Math.max(EXTEND_MIN_DAYS, Number(event.target.value)),
-                ),
-              )
-            }
+            step={1}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
           />
         </div>
         <Button
           variant="primary"
           leftIcon={<ArrowPathIcon className="h-4 w-4" />}
-          onClick={() => onExtend(days)}
+          onClick={() => days !== null && onExtend(days)}
+          disabled={days === null}
           isLoading={isPending}
         >
           {t("admin.marketing.boostPurchases.extend")}
