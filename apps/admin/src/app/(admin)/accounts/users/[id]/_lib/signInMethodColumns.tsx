@@ -18,6 +18,8 @@ import {
  * provider list has at most one row per provider.
  */
 
+const NOT_SORTABLE = { sortable: false } as const;
+
 /** The linked providers: brand, the e-mail the provider reported, link date. */
 export function linkedProviderColumns(
   t: Translate,
@@ -26,15 +28,17 @@ export function linkedProviderColumns(
     col.text<LinkedSignInProvider>(
       t("admin.users.signInMethods.columnProvider"),
       (p) => SIGN_IN_PROVIDER_NAMES[p.provider],
+      NOT_SORTABLE,
     ),
     col.text<LinkedSignInProvider>(
       t("admin.users.signInMethods.providerEmail"),
       (p) => p.email,
+      NOT_SORTABLE,
     ),
     col.date<LinkedSignInProvider>(
       t("admin.users.signInMethods.linkedAt"),
       (p) => p.linkedAt,
-      { withTime: true },
+      { ...NOT_SORTABLE, withTime: true },
     ),
   ];
 }
@@ -52,20 +56,22 @@ export function signInMethodEventColumns(
   return [
     col.text<AdminSignInMethodEvent>(
       t("admin.users.signInMethods.columnEvent"),
-      (e) => eventLabels[e.eventType] ?? e.eventType,
+      (e) => eventLabels[e.eventType],
+      NOT_SORTABLE,
     ),
     col.text<AdminSignInMethodEvent>(
       t("admin.users.signInMethods.columnProvider"),
       (e) => signInMethodEventProviderLabel(e, t),
+      NOT_SORTABLE,
     ),
     col.text<AdminSignInMethodEvent>(
       t("admin.users.signInMethods.columnSource"),
       (e) => (e.source ? sourceLabels[e.source] : null),
+      NOT_SORTABLE,
     ),
-    col.date<AdminSignInMethodEvent>(
-      t("admin.users.signInMethods.columnDate"),
-      (e) => e.occurredAt,
-      { withTime: true },
-    ),
+    col.date<AdminSignInMethodEvent>(t("common.date"), (e) => e.occurredAt, {
+      ...NOT_SORTABLE,
+      withTime: true,
+    }),
   ];
 }

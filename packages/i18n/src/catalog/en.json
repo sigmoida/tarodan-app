@@ -9246,7 +9246,6 @@
         "columnEvent": "Event",
         "columnProvider": "Provider",
         "columnSource": "Source",
-        "columnDate": "Date",
         "sourceManual": "From account settings",
         "sourceLogin": "Automatic at sign-in"
       }

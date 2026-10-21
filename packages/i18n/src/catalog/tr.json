@@ -9246,7 +9246,6 @@
         "columnEvent": "Olay",
         "columnProvider": "Sağlayıcı",
         "columnSource": "Kaynak",
-        "columnDate": "Tarih",
         "sourceManual": "Hesap ayarlarından",
         "sourceLogin": "Girişte otomatik"
       }
