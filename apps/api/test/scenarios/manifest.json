@@ -1,12 +1,12 @@
 {
   "meta": {
-    "total": 2298,
+    "total": 2304,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
-      "P0": 702,
-      "P1": 988,
+      "P0": 707,
+      "P1": 989,
       "P2": 608
     }
   },
@@ -111,7 +111,7 @@
       "code": "17",
       "prefix": "DSC",
       "title": "17 — İndirim & Pazarlama",
-      "count": 113
+      "count": 119
     },
     {
       "code": "18",
@@ -21077,6 +21077,84 @@
       "pri": "P0",
       "steps": "1. Start a 7-day and a 3-day boost for one listing. 2. Send both PayTR callbacks at the same time.",
       "exp": "Both boosts active; the listing's boostedUntil is the callback time + 10 days; the later boost's endsAt equals boostedUntil (BoostTimelineService.activate locks the listing row FOR UPDATE).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-120",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Pausing and resuming a stacked boost keeps its own paid time",
+      "tur": "Money / Timeline",
+      "pri": "P0",
+      "steps": "1. Buy a 7-day boost, then a 3-day boost stacked behind it. 2. Admin pauses the 3-day boost. 3. Admin resumes it.",
+      "exp": "2: the paused boost keeps 3 days (259200 s), not the 10 days until its end. 3: the listing's boostedUntil is the purchase time + 10 days and equals the resumed boost's endsAt (it used to end at + 17 days).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-121",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Admin grants a free boost: stacked, audited, no order or invoice",
+      "tur": "Admin / Money",
+      "pri": "P0",
+      "steps": "1. A listing with a running 3-day boost. 2. POST /api/admin/ad-packages/purchases/grant with the listing code, a package, 7 days and a reason. 3. Repeat for an inactive listing. 4. Repeat as a moderator.",
+      "exp": "2: 201; source admin_grant, price 0, grantedBy the admin, no order, payment or boost invoice; stacked behind the running boost; one boost_grant audit row; one boost.notice outbox row. 3: 400 server.admin.boost.grantListingNotActive. 4: 403.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-122",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Refund and stop a paid boost in full",
+      "tur": "Money / Refund",
+      "pri": "P0",
+      "steps": "1. Buy a 7-day boost (59 TL), then a 3-day boost stacked behind it. 2. POST /api/admin/ad-packages/purchases/:id/refund on the 7-day boost with a reason. 3. Send the same request again.",
+      "exp": "2: 200; one PayTR refund of 59 TL on the marketplace store; the boost is cancelled with refundedAmount 59 and the admin and reason; the 3-day boost and the listing end about 3 days from now; the order is cancelled and the payment refunded; no ledger entry for the order; one invoice.refund_reverse outbox row; one boost_refund audit row. 3: 200, no second PayTR refund.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-123",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "Partial boost refund stops the boost and keeps the order open",
+      "tur": "Money / Refund",
+      "pri": "P1",
+      "steps": "1. Buy a 7-day boost (59 TL). 2. Refund 20 TL. 3. Buy a 3-day boost (29 TL) and ask to refund 30 TL.",
+      "exp": "2: one PayTR refund of 20 TL; the boost is cancelled with refundedAmount 20; the order stays completed and the payment completed; the invoice reversal ratio is 20/59. 3: 400 server.admin.boost.refundAmountInvalid, no PayTR call.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-124",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "The generic manual refund refuses a boost payment",
+      "tur": "Money / Guard",
+      "pri": "P0",
+      "steps": "1. Buy a boost. 2. POST /api/admin/payments/:id/manual-refund on its payment.",
+      "exp": "400 server.admin.payment.boostRefundUseBoostScreen; no PayTR refund.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "DSC-125",
+      "code": "17",
+      "prefix": "DSC",
+      "domTitle": "17 — İndirim & Pazarlama",
+      "title": "A failed boost refund leaves the boost running",
+      "tur": "Money / Refund",
+      "pri": "P0",
+      "steps": "1. Buy a 7-day boost. 2. Make the next PayTR refund fail. 3. Refund and stop the boost.",
+      "exp": "3: an error reaches the admin; the boost stays active with no refundedAmount; the failed attempt is audited (boost_refund, outcome pending_reconciliation).",
       "gap": false,
       "gapRefs": []
     },
