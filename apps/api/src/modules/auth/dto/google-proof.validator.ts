@@ -18,9 +18,12 @@ const OTHER_FIELD: Record<GoogleProofField, GoogleProofField> = {
   idToken: "code",
 };
 
-/** `null` counts as not sent, as the services read it (`proof.code ? ...`). */
+/**
+ * `undefined`, `null` and `""` count as not sent, as the services read the
+ * proof (`proof.code ? exchange(code) : idToken`).
+ */
 function isSent(value: unknown): boolean {
-  return value !== undefined && value !== null;
+  return value !== undefined && value !== null && value !== "";
 }
 
 function otherValue(

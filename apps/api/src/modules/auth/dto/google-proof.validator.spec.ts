@@ -59,9 +59,12 @@ describe.each(routes)("Google proof on $name", ({ metatype, base }) => {
     );
   });
 
-  it("treats a null partner as not sent", async () => {
+  it.each([null, ""])("treats a partner of %p as not sent", async (partner) => {
     expect(
-      await validate(metatype, { ...base, code: null, idToken: ID_TOKEN }),
+      await validate(metatype, { ...base, code: partner, idToken: ID_TOKEN }),
+    ).toEqual([]);
+    expect(
+      await validate(metatype, { ...base, code: CODE, idToken: partner }),
     ).toEqual([]);
   });
 
@@ -109,9 +112,20 @@ describe.each(routes)("Google proof on $name", ({ metatype, base }) => {
     ]);
   });
 
-  it.each(["code", "idToken"])("refuses an empty %s", async (field) => {
+  it.each(["code", "idToken"])("refuses an empty %s alone", async (field) => {
     expect(await validate(metatype, { ...base, [field]: "" })).toEqual(
       expect.arrayContaining([`${field} should not be empty`]),
+    );
+  });
+
+  it("refuses two empty proofs", async () => {
+    expect(
+      await validate(metatype, { ...base, code: "", idToken: "" }),
+    ).toEqual(
+      expect.arrayContaining([
+        "code should not be empty",
+        "idToken should not be empty",
+      ]),
     );
   });
 });

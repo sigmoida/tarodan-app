@@ -20,7 +20,7 @@ import {
 /** Bounds only: a current password is checked as typed, never re-validated. */
 const PASSWORD_PROOF_MAX_LENGTH = 1024;
 
-const isGoogleProof = (body: Record<string, unknown>) =>
+const hasGoogleProvider = (body: Record<string, unknown>) =>
   body.provider === "google";
 
 /**
@@ -48,14 +48,14 @@ export class ReauthDto {
     description:
       "Google auth code from the web popup (google; never with idToken)",
   })
-  @IsGoogleProof("code", isGoogleProof)
+  @IsGoogleProof("code", hasGoogleProvider)
   code?: string;
 
   @ApiPropertyOptional({
     description:
       "Google id_token from native sign-in (google; never with code)",
   })
-  @IsGoogleProof("idToken", isGoogleProof)
+  @IsGoogleProof("idToken", hasGoogleProvider)
   idToken?: string;
 
   @ApiPropertyOptional({ description: "Apple identity token (apple)" })
