@@ -21,6 +21,7 @@ import { NewsletterService } from "../marketing/newsletter.service";
 import { SearchService } from "../search/search.service";
 import { AccountLaneService } from "../account-lane/account-lane.service";
 import { accountLaneServiceStub } from "../account-lane/account-lane.testing";
+import { SellerTrustService } from "../seller-trust";
 
 describe("UserService deleteAddress (edge case 1.11)", () => {
   let service: UserService;
@@ -66,6 +67,7 @@ describe("UserService deleteAddress (edge case 1.11)", () => {
         { provide: SearchService, useValue: {} },
         { provide: RatingService, useValue: {} },
         { provide: UserBlockService, useValue: {} },
+        { provide: SellerTrustService, useValue: {} },
         {
           provide: ConsentService,
           useValue: { recordMarketingChange: jest.fn() },

@@ -119,6 +119,7 @@ describe("UserProfileService.deleteAccount — Apple token iptali", () => {
         notifyOfferCancelledListingRemoved: jest.fn(),
         notifyOfferCancelledBuyerDeleted: jest.fn(),
       } as never, // notifications
+      {} as never, // sellerTrust
       appleTokens as never,
     );
     return { service, tx, prisma };

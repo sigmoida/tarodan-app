@@ -45,6 +45,7 @@ describe("UserProfileService account deletion obligations", () => {
       {} as never, // search
       {} as never, // cache
       {} as never, // notifications
+      {} as never, // sellerTrust
     );
 
     await expect(service.deleteAccount("user-1")).rejects.toThrow();
@@ -151,6 +152,7 @@ describe("UserProfileService account deletion obligations", () => {
       {} as never, // search
       {} as never, // cache
       {} as never, // notifications
+      {} as never, // sellerTrust
     );
     return { service, prisma };
   };

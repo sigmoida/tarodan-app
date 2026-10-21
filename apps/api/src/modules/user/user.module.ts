@@ -30,6 +30,7 @@ import { AppleTokenModule } from "../auth/social/apple-token.module";
 import { AuthModule } from "../auth/auth.module";
 import { WebSocketModule } from "../websocket/websocket.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
+import { SellerTrustModule } from "../seller-trust";
 
 @Module({
   imports: [
@@ -55,6 +56,8 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     // its service are exported by AuthModule. AuthModule does not import
     // UserModule, so there is no cycle.
     AuthModule,
+    // Profiles read the stored trust score. A leaf (Prisma only), no cycle.
+    SellerTrustModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],

@@ -25,7 +25,7 @@ import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { ConsentService } from "../../consent/consent.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
 import { AppleTokenService } from "../../auth/social/apple-token.service";
-import { computeTrustScore } from "../helpers/trust-score";
+import { SellerTrustService, legacyTrustFields } from "../../seller-trust";
 import { ACCOUNT_DELETION_TX_TIMEOUT_MS } from "../helpers/account-deletion.constants";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
@@ -93,10 +93,12 @@ export interface DeleteAccountOptions {
 }
 
 /**
- * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
- * findByIdWithAddresses, updateProfile, bildirim tercihleri, deleteAccount
- * (anonimleştirme), verifyUser, upgradToSeller, getPublicProfile. Avatar
- * çözümü için common'a delege eder (this.common.resolveAvatarUrl).
+ * UserProfileService: the profile, lookup and account group: avatar
+ * redirect, find*, findByIdWithAddresses, updateProfile, notification
+ * preferences, deleteAccount (anonymisation), upgradToSeller and
+ * getPublicProfile. Avatar resolution is delegated to
+ * `this.common.resolveAvatarUrl`; the trust score is read from
+ * `SellerTrustService` (stored nightly, never computed here).
  */
 /** Silme engeli istisnası mı? (işlem içinden yeniden fırlatılır, sarılmaz) */
 function isDeletionBlocked(error: unknown): error is BadRequestException {
@@ -124,6 +126,7 @@ export class UserProfileService {
     private readonly searchService: SearchService,
     private readonly cache: CacheService,
     private readonly notifications: NotificationService,
+    private readonly sellerTrust: SellerTrustService,
     // Sign in with Apple token iptali (App Store 5.1.1(v)). UserModule
     // AppleTokenModule'ü içe aktarır; dar test kurulumlarında yok.
     @Optional() private readonly appleTokens?: AppleTokenService,
@@ -204,8 +207,9 @@ export class UserProfileService {
       },
     });
 
-    // Güven Skoru için ek istatistikler (puan, satış, takas)
-    const [ratingAgg, salesCount, tradesCount] = await Promise.all([
+    // Live profile counters (rating, sales, trades) and the stored trust
+    // score: one primary-key lookup, nothing is computed per request.
+    const [ratingAgg, salesCount, tradesCount, trust] = await Promise.all([
       this.prisma.rating.aggregate({
         where: publicUserRatingWhere({ receiverId: id }),
         _avg: { score: true },
@@ -218,6 +222,7 @@ export class UserProfileService {
           status: "completed",
         },
       }),
+      this.sellerTrust.getForUser(id),
     ]);
     const isPremium = isPremiumEntitled(user.membership, user);
     const freeTier = await this.prisma.membershipTier.findUnique({
@@ -232,14 +237,6 @@ export class UserProfileService {
       user.membership && (user.membership.tier.type === "free" || isPremium)
         ? user.membership.tier
         : freeTier;
-    const trust = computeTrustScore({
-      averageRating: ratingAgg._avg?.score || 0,
-      totalRatings: ratingAgg._count,
-      totalSales: salesCount,
-      totalTrades: tradesCount,
-      isVerified: user.isVerified,
-    });
-
     // Format membership info for frontend — EFFECTIVE view. The web gates its UI
     // (Takas / Koleksiyon / limits) off this payload, so it must match the backend's
     // own gates: an unpaid (past_due) or expired membership grants NO premium
@@ -292,8 +289,11 @@ export class UserProfileService {
       membership: membershipInfo,
       listingCount,
       isPremium,
-      trustScore: trust.score,
-      trustLevel: trust.level,
+      // The owner always sees their own score, premium or not (D6 gates only
+      // the public profile). `trustScore`/`trustLevel` are the deprecated
+      // fields of live mobile 1.0.5.
+      trust,
+      ...legacyTrustFields(trust),
       stats: {
         totalListings: listingCount,
         totalSales: salesCount,
@@ -1255,16 +1255,6 @@ export class UserProfileService {
   }
 
   /**
-   * Mark user as verified
-   */
-  async verifyUser(userId: string) {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { isVerified: true },
-    });
-  }
-
-  /**
    * Upgrade user to seller
    */
   async upgradToSeller(userId: string) {
@@ -1336,18 +1326,18 @@ export class UserProfileService {
         };
     const collectionWhere = isOwner ? { userId } : { userId, isPublic: true };
 
-    // Get seller stats + followers count + membership
-    // completedTrades: güven skoru için sabit metrik (viewer'dan bağımsız).
-    // allTrades: sahip görünümünde gösterilen "tüm takaslar" sayısı.
+    // Seller stats, followers, membership and the stored trust score (one
+    // primary-key lookup; nothing is computed per request). Trades: the owner
+    // sees all of theirs, anyone else only the completed ones.
     const [
       totalListings,
       totalSales,
-      completedTrades,
-      allTrades,
+      totalTrades,
       ratings,
       followersCount,
       membership,
       totalCollections,
+      storedTrust,
     ] = await Promise.all([
       this.prisma.product.count({ where: listingWhere }),
       this.prisma.order.count({
@@ -1356,12 +1346,7 @@ export class UserProfileService {
       this.prisma.trade.count({
         where: {
           OR: [{ initiatorId: userId }, { receiverId: userId }],
-          status: "completed",
-        },
-      }),
-      this.prisma.trade.count({
-        where: {
-          OR: [{ initiatorId: userId }, { receiverId: userId }],
+          ...(isOwner ? {} : { status: TradeStatus.completed }),
         },
       }),
       this.prisma.rating.aggregate({
@@ -1386,10 +1371,8 @@ export class UserProfileService {
         },
       }),
       this.prisma.collection.count({ where: collectionWhere }),
+      this.sellerTrust.getForUser(userId),
     ]);
-
-    // Gösterilecek takas sayısı: sahip → tümü, başkası → yalnızca tamamlanmış.
-    const totalTrades = isOwner ? allTrades : completedTrades;
 
     // Resolve avatar URL (S3 key → presigned URL)
     const resolvedAvatarUrl = await this.common.resolveAvatarUrl(
@@ -1403,16 +1386,10 @@ export class UserProfileService {
       membership?.user,
     );
 
-    // Güven Skoru (0..100) — premium avantajı
-    const trust = computeTrustScore({
-      averageRating: ratings._avg?.score || 0,
-      totalRatings: ratings._count,
-      totalSales,
-      totalTrades: completedTrades,
-      isVerified: user.isVerified,
-    });
-    // Güven skoru premium üyelerde HER ZAMAN herkese açık (gizleme özelliği kaldırıldı).
-    const trustVisible = isPremium;
+    // The public trust score is a premium benefit (decision D6): shown for
+    // every premium seller, hidden for everyone else. `users.show_trust_score`
+    // is still accepted from old clients but has no effect (ADR 0014).
+    const trust = isPremium ? storedTrust : null;
 
     return {
       ...toPublicIdentity(user),
@@ -1420,8 +1397,9 @@ export class UserProfileService {
       followersCount,
       isPremium,
       membershipTier,
-      trustScore: trustVisible ? trust.score : null,
-      trustLevel: trustVisible ? trust.level : null,
+      trust,
+      // Deprecated, for live mobile 1.0.5: derived from `trust`, null with it.
+      ...legacyTrustFields(trust),
       stats: {
         totalListings,
         totalSales,

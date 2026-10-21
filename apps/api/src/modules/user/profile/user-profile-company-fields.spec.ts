@@ -42,6 +42,7 @@ describe("UserProfileService.updateProfile — şirket alanları", () => {
       {} as never, // search
       {} as never, // cache
       {} as never, // notifications
+      {} as never, // sellerTrust
     );
     // updateProfile sonda tam profili yeniden okur — bu test yazılan ALANLARA
     // baktığı için ağır okuma zinciri stub'lanır.
