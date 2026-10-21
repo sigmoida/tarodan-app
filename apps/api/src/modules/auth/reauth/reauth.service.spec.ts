@@ -234,6 +234,45 @@ describe("ReauthService", () => {
       expect(cache.setIfAbsent).not.toHaveBeenCalled();
     });
 
+    it("keeps a fixed window: later attempts, also while locked, do not extend it", async () => {
+      for (let i = 1; i <= REAUTH_MAX_FAILURES; i++) {
+        await failure({ password: "Wrong-Pass-1" });
+      }
+      expect((await failure({ password: PASSWORD })).getStatus()).toBe(429);
+      expect((await failure({ password: PASSWORD })).getStatus()).toBe(429);
+
+      // A sliding window (expire on every attempt) would keep a user who
+      // keeps retrying locked for good.
+      expect(cache.expire).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets the user prove itself again once the window has passed", async () => {
+      for (let i = 1; i <= REAUTH_MAX_FAILURES; i++) {
+        await failure({ password: "Wrong-Pass-1" });
+      }
+      expect((await failure({ password: PASSWORD })).getStatus()).toBe(429);
+
+      // Redis drops the counter when its TTL runs out.
+      cache.values.delete(`reauth:failures:${USER}`);
+      cache.ttls.delete(`reauth:failures:${USER}`);
+
+      const result = await service.reauthenticate(USER, {
+        password: PASSWORD,
+      } as ReauthDto);
+      expect(await service.isValidToken(USER, result.reauthToken)).toBe(true);
+    });
+
+    it("counts the failures per user: one user's lockout does not lock another", async () => {
+      for (let i = 1; i <= REAUTH_MAX_FAILURES; i++) {
+        await failure({ password: "Wrong-Pass-1" });
+      }
+
+      const result = await service.reauthenticate(OTHER_USER, {
+        password: PASSWORD,
+      } as ReauthDto);
+      expect(result.reauthToken).toBeTruthy();
+    });
+
     it("lets only 5 of many parallel attempts reach the comparison", async () => {
       const compare = jest.spyOn(bcrypt, "compare");
 

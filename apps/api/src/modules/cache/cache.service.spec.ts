@@ -46,3 +46,29 @@ describe("CacheService.setIfAbsent", () => {
     await expect(service.setIfAbsent("k", 30)).resolves.toBe(false);
   });
 });
+
+/**
+ * The step-up (`ReauthService`) fails closed on these answers: `incr` 0 means
+ * "no attempt reserved" (503, no proof checked) and `get` null means "no
+ * token" (403 REAUTH_REQUIRED). A rethrow or another value here would change
+ * what a step-up answers while Redis is down.
+ */
+describe("CacheService answers on a Redis error", () => {
+  const withFailingClient = () => {
+    const service = new CacheService({} as ConfigService);
+    const down = jest.fn().mockRejectedValue(new Error("down"));
+    (service as unknown as { client: Record<string, jest.Mock> }).client = {
+      incr: down,
+      get: down,
+    };
+    return service;
+  };
+
+  it("incr answers 0", async () => {
+    await expect(withFailingClient().incr("k")).resolves.toBe(0);
+  });
+
+  it("get answers null", async () => {
+    await expect(withFailingClient().get("k")).resolves.toBeNull();
+  });
+});

@@ -58,6 +58,12 @@ describe("AuthPasswordService.setPassword", () => {
     expect(db.tx.$queryRaw).toHaveBeenCalledTimes(1);
     const lockSql = (db.tx.$queryRaw.mock.calls[0][0] as string[]).join("?");
     expect(lockSql).toContain("FOR UPDATE");
+    // The lock is on this user's row and is taken before "no password yet?"
+    // is read: read-then-lock would let two calls both see no password.
+    expect(db.tx.$queryRaw.mock.calls[0].slice(1)).toEqual(["u1"]);
+    expect(db.tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      db.tx.user.findUnique.mock.invocationCallOrder[0],
+    );
     expect(
       await bcrypt.compare("New-Pass-1", db.state.user!.passwordHash!),
     ).toBe(true);
