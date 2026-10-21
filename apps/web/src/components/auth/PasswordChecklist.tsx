@@ -32,7 +32,7 @@ export function PasswordRequirement({
   );
 }
 
-/** Live 2-col requirements panel, shared by reset-password and register. */
+/** Live 2-col requirements panel: register, reset password, the corporate invite and Settings > Security. */
 export function PasswordChecklist({ password }: { password: string }) {
   const t = useTranslations();
   const c = passwordChecks(password);

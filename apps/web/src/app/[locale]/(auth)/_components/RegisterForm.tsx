@@ -20,7 +20,7 @@ import { GoogleSignInButton } from "./GoogleSignInButton";
 import { AppleSignInButton } from "./AppleSignInButton";
 import { useRegister } from "../_hooks/useRegister";
 import { AuthCard } from "./AuthCard";
-import { PasswordChecklist } from "./PasswordChecklist";
+import { PasswordChecklist } from "@/components/auth/PasswordChecklist";
 import { RegisterAccountTabs } from "./RegisterAccountTabs";
 
 export function RegisterForm() {
