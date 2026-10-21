@@ -101,7 +101,7 @@ export interface ApiError {
   statusCode: number;
   message: string;
   error?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 // Legal consent records: document keys + current versions (API, web, admin)
