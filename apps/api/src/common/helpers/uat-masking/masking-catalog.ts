@@ -1026,7 +1026,7 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
   },
   {
     reason:
-      "Kişisel veri taşımayan JSON: ayar, kural, tarife, tutar ve politika görüntüleri, etiketler, toplu sayılar.",
+      "JSON without personal data: settings, rules, tariffs, amount and policy snapshots, labels, aggregate counts.",
     columns: [
       "users.notification_settings",
       "admin_users.permissions",
@@ -1043,6 +1043,10 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "search_indexes.settings",
       "mail_area_settings.events",
       "elogo_invoices.line_items",
+      // `SellerTrustComponentsV1`: counts and sub-scores of the trust formula
+      // only, built field by field in `computeSellerTrust`; no ids, names,
+      // e-mails or hashes.
+      "seller_trust_scores.components",
     ],
   },
 ];
