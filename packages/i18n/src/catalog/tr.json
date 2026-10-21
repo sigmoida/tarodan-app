@@ -2635,6 +2635,7 @@
     "minAge18": "Kayıt olmak için 18 yaşından büyük olmalısınız.",
     "enterAmount": "Bir tutar girin",
     "enterValidAmount": "Geçerli bir tutar girin",
+    "amountFormatRefused": "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
     "max500Chars": "En fazla 500 karakter",
     "enterOrderNumber": "Sipariş numarası girin",
     "offerBelowPrice": "Teklif fiyattan düşük olmalı",

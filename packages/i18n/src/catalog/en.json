@@ -2635,6 +2635,7 @@
     "minAge18": "You must be at least 18 years old to register.",
     "enterAmount": "Enter an amount",
     "enterValidAmount": "Enter a valid amount",
+    "amountFormatRefused": "This amount was not accepted. Do not use thousands separators; use a comma for kuruş, for example 1250,50",
     "max500Chars": "Max 500 characters",
     "enterOrderNumber": "Enter order number",
     "offerBelowPrice": "Offer must be lower than the price",
