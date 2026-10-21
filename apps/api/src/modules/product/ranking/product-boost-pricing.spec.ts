@@ -1,5 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
-import type { MembershipTierType, Prisma } from "@prisma/client";
+import {
+  BoostAudienceService,
+  eligibleAudienceWhere,
+} from "../boost-seller/boost-audience.service";
 import { ProductBoostService } from "./product-boost.service";
 
 /** A tier as the price rules read it. */
@@ -18,10 +21,6 @@ interface PricingInternals {
     productPrice: number,
     userId: string,
   ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }>;
-  eligibleAudienceWhere(
-    userId: string,
-    tierType: MembershipTierType,
-  ): Prisma.AdPackageWhereInput;
   effectiveTierPrice(tier: TierPrice): number;
 }
 
@@ -106,6 +105,7 @@ describe("ProductBoostService — ad-package pricing", () => {
       prisma as never,
       {} as never,
       {} as never,
+      new BoostAudienceService(prisma as never),
     );
   });
 
@@ -189,7 +189,7 @@ describe("ProductBoostService — ad-package pricing", () => {
   });
 
   describe("audience targeting", () => {
-    const where = () => internals().eligibleAudienceWhere("user-1", "premium");
+    const where = () => eligibleAudienceWhere("user-1", "premium");
 
     it("keeps each audience mode scoped to its own target relation", () => {
       expect(where()).toEqual({
