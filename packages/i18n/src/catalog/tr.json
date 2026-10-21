@@ -9229,7 +9229,27 @@
         "saved": "Kimlik bilgileri güncellendi."
       },
       "filterIdentityAll": "Tümü",
-      "filterIdentityIncomplete": "Yalnız kimliği eksik"
+      "filterIdentityIncomplete": "Yalnız kimliği eksik",
+      "signInMethods": {
+        "title": "Giriş Yöntemleri",
+        "password": "Şifre",
+        "passwordSet": "Belirlenmiş",
+        "passwordNotSet": "Yok",
+        "providers": "Bağlı hesaplar",
+        "noProviders": "Bağlı hesap yok",
+        "providerEmail": "Sağlayıcı e-postası",
+        "linkedAt": "Bağlanma tarihi",
+        "loadError": "Giriş yöntemleri yüklenemedi",
+        "history": "Giriş Yöntemi Geçmişi",
+        "historyEmpty": "Bu kullanıcı için kayıtlı bir giriş yöntemi olayı yok",
+        "historyLoadError": "Geçmiş yüklenemedi",
+        "columnEvent": "Olay",
+        "columnProvider": "Sağlayıcı",
+        "columnSource": "Kaynak",
+        "columnDate": "Tarih",
+        "sourceManual": "Hesap ayarlarından",
+        "sourceLogin": "Girişte otomatik"
+      }
     },
     "deletedIdentities": {
       "title": "Silinen Hesap Kimlikleri",
