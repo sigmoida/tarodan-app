@@ -12,6 +12,7 @@ import {
 } from "./membership-common.service";
 import { MembershipTierUpdateService } from "./membership-tier-update.service";
 import { MembershipService } from "./membership.service";
+import { AdminMembershipService } from "../admin/finance/admin-membership.service";
 
 /**
  * The saved-search limit (critical path 13) comes only from the tier row
@@ -94,13 +95,21 @@ describe("maxSavedSearches: tier row to client", () => {
       user?: object | null;
       membership?: object | null;
     }) => {
+      const user =
+        opts.user === undefined ? { businessStatus: null } : opts.user;
       const prisma = {
         user: {
-          findUnique: jest
-            .fn()
-            .mockResolvedValue(
-              opts.user === undefined ? { businessStatus: null } : opts.user,
-            ),
+          // Honours `select` like Prisma: a field the gate does not select
+          // never reaches it.
+          findUnique: jest.fn(
+            ({ select }: { select: Record<string, boolean> }) =>
+              Promise.resolve(
+                user &&
+                  Object.fromEntries(
+                    Object.entries(user).filter(([key]) => select[key]),
+                  ),
+              ),
+          ),
         },
         userMembership: {
           findUnique: jest.fn().mockResolvedValue(opts.membership ?? null),
@@ -159,6 +168,46 @@ describe("maxSavedSearches: tier row to client", () => {
       await expect(result).resolves.toBe(5);
     });
 
+    it("a cancelled member keeps the paid limit until the paid period ends", async () => {
+      const { result } = limitFor({
+        membership: {
+          status: "cancelled",
+          currentPeriodEnd: FUTURE,
+          tier: premiumRow,
+        },
+      });
+      await expect(result).resolves.toBe(20);
+    });
+
+    it("a paid tier an admin switched off is on free", async () => {
+      const { result } = limitFor({
+        membership: {
+          status: "active",
+          currentPeriodEnd: FUTURE,
+          tier: { ...premiumRow, isActive: false },
+        },
+      });
+      await expect(result).resolves.toBe(5);
+    });
+
+    it("business with an approved corporate identity gets the business limit", async () => {
+      // The fake honours `select`, so a corporate-identity field the gate
+      // forgets to read leaves the member on free and fails here.
+      const { result } = limitFor({
+        user: {
+          businessStatus: "approved",
+          companyName: "Diecast Ltd",
+          taxId: "1234567890",
+        },
+        membership: {
+          status: "active",
+          currentPeriodEnd: FUTURE,
+          tier: businessRow,
+        },
+      });
+      await expect(result).resolves.toBe(50);
+    });
+
     it("no membership row means the free limit, without creating one", async () => {
       const { result, prisma } = limitFor({ membership: null });
       await expect(result).resolves.toBe(5);
@@ -193,6 +242,80 @@ describe("maxSavedSearches: tier row to client", () => {
         );
       expect(await errorsFor(30)).toHaveLength(0);
       expect(await errorsFor(-1)).not.toHaveLength(0);
+    });
+
+    const createWith = async (maxSavedSearches?: number) => {
+      const prisma = {
+        membershipTier: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn(({ data }: { data: Record<string, unknown> }) =>
+            Promise.resolve({
+              ...tierRow(5),
+              ...data,
+              maxSavedSearches: data.maxSavedSearches ?? 5,
+            }),
+          ),
+        },
+      };
+      const service = new MembershipService(
+        prisma as never,
+        common,
+        {} as never,
+        {} as never,
+      );
+      const dto = plainToInstance(CreateMembershipTierDto, {
+        type: MembershipTierType.premium,
+        name: "Premium",
+        monthlyPrice: 100,
+        yearlyPrice: 960,
+        maxFreeListings: 5,
+        maxTotalListings: 50,
+        maxImagesPerListing: 10,
+        canCreateCollections: true,
+        canTrade: true,
+        maxSavedSearches,
+      });
+      const created = await service.createTier(dto);
+      return {
+        created,
+        data: prisma.membershipTier.create.mock.calls[0][0].data,
+      };
+    };
+
+    it("writes the admin's value, 0 included", async () => {
+      for (const value of [30, 0]) {
+        const { created, data } = await createWith(value);
+        expect(data.maxSavedSearches).toBe(value);
+        expect(created.maxSavedSearches).toBe(value);
+      }
+    });
+
+    it("leaves the column default when the field is missing", async () => {
+      const { created, data } = await createWith(undefined);
+      expect(data.maxSavedSearches).toBeUndefined();
+      expect(created.maxSavedSearches).toBe(5);
+    });
+  });
+
+  describe("admin tier list", () => {
+    it("serves maxSavedSearches for the admin tier form", async () => {
+      const prisma = {
+        membershipTier: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              ...tierRow(0),
+              sortOrder: 1,
+              createdAt: new Date("2026-10-21T00:00:00.000Z"),
+              _count: { userMemberships: 3 },
+            },
+          ]),
+        },
+      };
+      const admin = new AdminMembershipService(prisma as never, {} as never);
+
+      const { data } = await admin.getMembershipTiers();
+
+      expect(data[0]).toMatchObject({ maxSavedSearches: 0, userCount: 3 });
     });
   });
 
