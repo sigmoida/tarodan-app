@@ -57,6 +57,7 @@ import {
 import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import { scenario } from "../../test-utils/scenario";
 import { ProductSchedulerService } from "../../../src/modules/product/jobs/product-scheduler.service";
+import { BoostTimelineService } from "../../../src/modules/product/boost-timeline/boost-timeline.service";
 import { PrismaService } from "../../../src/prisma";
 
 /** Both purchase consents; the boost initiate refuses a body without them. */
@@ -2569,6 +2570,297 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
         where: { productId: p.id },
       });
       expect(boost?.status).toBe("expired");
+    });
+
+    /** A boost row of a listing ending at `endsAt` (active unless given). */
+    async function mkBoost(opts: {
+      productId: string;
+      userId: string;
+      endsAt: Date;
+      autoRenew?: boolean;
+      status?: "active" | "paused" | "expired" | "cancelled" | "pending";
+    }) {
+      return getPrisma().productBoost.create({
+        data: {
+          productId: opts.productId,
+          userId: opts.userId,
+          durationDays: 7,
+          price: new Prisma.Decimal(59),
+          status: opts.status ?? "active",
+          autoRenew: opts.autoRenew ?? false,
+          startsAt: new Date(opts.endsAt.getTime() - 7 * 864e5),
+          endsAt: opts.endsAt,
+          purchasedAt: new Date(opts.endsAt.getTime() - 7 * 864e5),
+        },
+      });
+    }
+
+    /** The boost notice outbox keys of these boosts, sorted. */
+    const boostNoticeKeys = async (boostIds: string[]) =>
+      (
+        await getPrisma().outboxEvent.findMany({
+          where: { type: "boost.notice" },
+          select: { dedupeKey: true },
+        })
+      )
+        .map((row) => row.dedupeKey ?? "")
+        .filter((key) => boostIds.some((id) => key.includes(id)))
+        .sort();
+
+    scenario("PRD-222", async () => {
+      // Two stacked boosts: the first one ending sends nothing; the listing's
+      // promotion ending sends exactly one "ended" notice, never repeated.
+      const seller = await mkSeller();
+      const prisma = getPrisma();
+      const p = await mkProduct({ sellerId: seller.id, rankTier: 2 });
+      const first = await mkBoost({
+        productId: p.id,
+        userId: seller.id,
+        endsAt: new Date(Date.now() - 60 * 1000),
+      });
+      const second = await mkBoost({
+        productId: p.id,
+        userId: seller.id,
+        endsAt: new Date(Date.now() + 3 * 864e5),
+      });
+      const scheduler = ctx.module.get(ProductSchedulerService);
+
+      await scheduler.runExpireBoosts();
+
+      expect(
+        (await prisma.productBoost.findUnique({ where: { id: first.id } }))
+          ?.status,
+      ).toBe("expired");
+      const stillFeatured = await prisma.product.findUnique({
+        where: { id: p.id },
+      });
+      expect(stillFeatured?.boostedUntil?.getTime()).toBe(
+        second.endsAt?.getTime(),
+      );
+      expect(await boostNoticeKeys([first.id, second.id])).toEqual([]);
+
+      await prisma.productBoost.update({
+        where: { id: second.id },
+        data: { endsAt: new Date(Date.now() - 1000) },
+      });
+      await scheduler.runExpireBoosts();
+      await scheduler.runExpireBoosts();
+
+      expect(await boostNoticeKeys([first.id, second.id])).toEqual([
+        `boost.notice:expired:${second.id}`,
+      ]);
+      const unfeatured = await prisma.product.findUnique({
+        where: { id: p.id },
+      });
+      expect(unfeatured?.boostedUntil).toBeNull();
+      expect(unfeatured?.rankTier).toBeLessThan(2);
+    });
+
+    scenario("PRD-223", async () => {
+      // A premium seller with the reminder on hears once 24 h before the
+      // listing's end (the raw candidate query on Postgres); a stacked
+      // purchase re-arms it; a free seller never hears.
+      const premium = await mkSeller({ premium: true });
+      const free = await mkSeller();
+      const prisma = getPrisma();
+      const scheduler = ctx.module.get(ProductSchedulerService);
+      const timeline = ctx.module.get(BoostTimelineService);
+      const p = await mkProduct({ sellerId: premium.id });
+      const tail = await mkBoost({
+        productId: p.id,
+        userId: premium.id,
+        endsAt: new Date(Date.now() + 10 * 3600e3),
+        autoRenew: true,
+      });
+      const freeListing = await mkProduct({ sellerId: free.id });
+      const freeBoost = await mkBoost({
+        productId: freeListing.id,
+        userId: free.id,
+        endsAt: new Date(Date.now() + 10 * 3600e3),
+        autoRenew: true,
+      });
+      for (const id of [p.id, freeListing.id]) {
+        await prisma.$transaction((tx) =>
+          timeline.refreshProductPromotion(tx, id),
+        );
+      }
+
+      await scheduler.runExpireBoosts();
+      await scheduler.runExpireBoosts();
+
+      const reminded = await prisma.productBoost.findUnique({
+        where: { id: tail.id },
+      });
+      expect(reminded?.reminderSentAt).toBeInstanceOf(Date);
+      const keys = await boostNoticeKeys([tail.id, freeBoost.id]);
+      expect(keys).toHaveLength(1);
+      expect(keys[0].startsWith(`boost.notice:ending_soon:${tail.id}:`)).toBe(
+        true,
+      );
+
+      // The seller buys more time: the new tail ends 7 days later and is
+      // reminded only once it is within 24 h of its own end.
+      const next = await mkBoost({
+        productId: p.id,
+        userId: premium.id,
+        endsAt: new Date(Date.now() + 10 * 3600e3 + 7 * 864e5),
+        autoRenew: true,
+      });
+      await scheduler.runExpireBoosts();
+      expect(await boostNoticeKeys([next.id])).toEqual([]);
+      // Time passes (moved by hand): both ends come within the window.
+      await prisma.productBoost.update({
+        where: { id: tail.id },
+        data: { endsAt: new Date(Date.now() + 2 * 3600e3) },
+      });
+      await prisma.productBoost.update({
+        where: { id: next.id },
+        data: { endsAt: new Date(Date.now() + 5 * 3600e3) },
+      });
+      await scheduler.runExpireBoosts();
+      expect(await boostNoticeKeys([next.id])).toHaveLength(1);
+    });
+
+    scenario("PRD-224", async () => {
+      // My boosts: the caller's current and history sections in the list
+      // envelope; abandoned checkouts and other sellers' boosts never.
+      const seller = await mkSeller();
+      const other = await mkSeller();
+      const p = await mkProduct({ sellerId: seller.id });
+      const active = await mkBoost({
+        productId: p.id,
+        userId: seller.id,
+        endsAt: new Date(Date.now() + 3 * 864e5),
+      });
+      const ended = await mkBoost({
+        productId: p.id,
+        userId: seller.id,
+        endsAt: new Date(Date.now() - 864e5),
+        status: "expired",
+      });
+      await mkBoost({
+        productId: p.id,
+        userId: seller.id,
+        endsAt: new Date(Date.now() + 864e5),
+        status: "pending",
+      });
+      const othersListing = await mkProduct({ sellerId: other.id });
+      await mkBoost({
+        productId: othersListing.id,
+        userId: other.id,
+        endsAt: new Date(Date.now() + 864e5),
+      });
+
+      const current = await request(server())
+        .get("/api/products/boost/my?state=current")
+        .set(authHeader(seller))
+        .expect(200);
+      expect(current.body.data.map((r: { id: string }) => r.id)).toEqual([
+        active.id,
+      ]);
+      expect(current.body.meta).toMatchObject({ total: 1, page: 1 });
+      expect(current.body.data[0]).toMatchObject({
+        source: "purchase",
+        refundedAmount: 0,
+        product: { id: p.id },
+      });
+
+      const history = await request(server())
+        .get("/api/products/boost/my?state=history&limit=10")
+        .set(authHeader(seller))
+        .expect(200);
+      expect(history.body.data.map((r: { id: string }) => r.id)).toEqual([
+        ended.id,
+      ]);
+
+      await request(server())
+        .get("/api/products/boost/my?state=pending")
+        .set(authHeader(seller))
+        .expect(400);
+      await request(server()).get("/api/products/boost/my").expect(401);
+    });
+
+    scenario("PRD-225", async () => {
+      // Offers: due listings only, gone after dismissal; someone else's
+      // listing cannot be dismissed; the reminder switch is the owner's.
+      const prisma = getPrisma();
+      await ensureBoostPackage();
+      const since = new Date(Date.now() - 5 * 864e5).toISOString();
+      await prisma.platformSetting.upsert({
+        where: { settingKey: "boost_offer_since" },
+        update: { settingValue: since },
+        create: {
+          settingKey: "boost_offer_since",
+          settingValue: since,
+          settingType: "string",
+        },
+      });
+      const seller = await mkSeller();
+      const other = await mkSeller();
+      const older = await mkProduct({
+        sellerId: seller.id,
+        createdAt: new Date(Date.now() - 60 * 1000),
+      });
+      const newer = await mkProduct({ sellerId: seller.id });
+      await mkProduct({
+        sellerId: seller.id,
+        createdAt: new Date(Date.now() - 10 * 864e5), // before the start
+      });
+      const boosted = await mkProduct({ sellerId: seller.id });
+      await mkBoost({
+        productId: boosted.id,
+        userId: seller.id,
+        endsAt: new Date(Date.now() - 864e5),
+        status: "expired",
+      });
+      const othersListing = await mkProduct({ sellerId: other.id });
+
+      const offers = await request(server())
+        .get("/api/products/boost/offers")
+        .set(authHeader(seller))
+        .expect(200);
+      expect(offers.body.enabled).toBe(true);
+      expect(
+        offers.body.offers.map((o: { productId: string }) => o.productId),
+      ).toEqual([newer.id, older.id]);
+
+      await request(server())
+        .post("/api/products/boost/offers/dismiss")
+        .set(authHeader(seller))
+        .send({ productIds: [newer.id, older.id, othersListing.id] })
+        .expect(204);
+      // Idempotent.
+      await request(server())
+        .post("/api/products/boost/offers/dismiss")
+        .set(authHeader(seller))
+        .send({ productIds: [newer.id] })
+        .expect(204);
+
+      const after = await request(server())
+        .get("/api/products/boost/offers")
+        .set(authHeader(seller))
+        .expect(200);
+      expect(after.body.offers).toEqual([]);
+      expect(
+        await prisma.boostOfferDismissal.findUnique({
+          where: { productId: othersListing.id },
+        }),
+      ).toBeNull();
+
+      // The reminder: someone else's listing is a 404, a free seller 400.
+      await request(server())
+        .patch(`/api/products/${othersListing.id}/boost/reminder`)
+        .set(authHeader(seller))
+        .send({ enabled: false })
+        .expect(404);
+      const refused = await request(server())
+        .patch(`/api/products/${newer.id}/boost/reminder`)
+        .set(authHeader(seller))
+        .send({ enabled: true })
+        .expect(400);
+      expect(refused.body.i18nKey).toBe(
+        "server.product.boostReminderPremiumOnly",
+      );
     });
   });
 

@@ -5,9 +5,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
+import type { BoostPaymentSummary } from "@tarodan/types";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
+import {
+  PAYMENT_TYPE_PARAM,
+  paymentKind,
+  paymentReturnRoutes,
+} from "@/lib/paymentKind";
 
 const urlHasGuest = () =>
   typeof window !== "undefined" &&
@@ -17,7 +23,8 @@ type Phase = "client-loading" | "auth-loading" | "loading" | "ready";
 
 /**
  * Owns the payment-success lifecycle: verify retries, status fetch and the
- * guest/membership/trade redirects.
+ * guest/membership/trade redirects. The kind (checkout, membership, boost)
+ * picks the view and every route (`paymentReturnRoutes`).
  *
  * Deliberately does NOT chase an invoice. A physical order is invoiced on
  * DELIVERY, so polling right after payment can never succeed — the screen just
@@ -33,7 +40,7 @@ export function usePaymentSuccess() {
 
   const paymentId = searchParams.get("paymentId");
   const isGuestCheckout = searchParams.get("guest") === "true";
-  const isMembershipPayment = searchParams.get("type") === "membership";
+  const typeParam = searchParams.get(PAYMENT_TYPE_PARAM);
   const orderIdFromUrl =
     searchParams.get("orderId") || searchParams.get("orderid");
 
@@ -44,9 +51,17 @@ export function usePaymentSuccess() {
 
   useEffect(() => setClientReady(true), []);
 
+  const kind = paymentKind(typeParam, payment);
+  const boost: BoostPaymentSummary | null = payment?.boost ?? null;
+  const routes = paymentReturnRoutes(kind, {
+    paymentId,
+    guest: isGuestCheckout || urlHasGuest(),
+    boostProductId: boost?.productId,
+  });
+
   useEffect(() => {
-    if (isMembershipPayment) {
-      router.replace("/membership/success");
+    if (paymentKind(typeParam) === "membership") {
+      router.replace(paymentReturnRoutes("membership", { paymentId }).success);
       return;
     }
     if (authLoading) return;
@@ -58,13 +73,7 @@ export function usePaymentSuccess() {
     if (paymentId) fetchPayment();
     else setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    paymentId,
-    authLoading,
-    isAuthenticated,
-    isGuestCheckout,
-    isMembershipPayment,
-  ]);
+  }, [paymentId, authLoading, isAuthenticated, isGuestCheckout, typeParam]);
 
   const fetchPayment = async () => {
     try {
@@ -86,14 +95,18 @@ export function usePaymentSuccess() {
       const paymentData = response.data;
       setPayment(paymentData);
 
+      const loadedKind = paymentKind(typeParam, paymentData);
+      const loadedRoutes = paymentReturnRoutes(loadedKind, {
+        paymentId,
+        guest: isGuest,
+        boostProductId: paymentData?.boost?.productId,
+      });
       if (paymentData?.status === "failed") {
-        router.replace(
-          `/payment/fail?paymentId=${paymentId}${isGuest ? "&guest=true" : ""}`,
-        );
+        router.replace(loadedRoutes.fail);
         return;
       }
-      if (paymentData?.isMembershipOrder) {
-        router.replace("/membership/success");
+      if (loadedKind === "membership") {
+        router.replace(loadedRoutes.success);
         return;
       }
       if (paymentData?.tradeId) {
@@ -121,6 +134,9 @@ export function usePaymentSuccess() {
     phase,
     isCompleted: payment?.status === "completed",
     payment,
+    kind,
+    boost,
+    routes,
     isAuthenticated,
     orderIdFromUrl,
     t,

@@ -16,6 +16,13 @@ export interface CheckboxProps extends Omit<
   /** Size variant */
   size?: "sm" | "md" | "lg";
   /**
+   * How the box sits next to the label. `center` (default) centres it on
+   * the label; `start` puts it on the label's first line, for labels that
+   * wrap to several lines (consent statements). Mobile `Checkbox` always
+   * aligns to the first line.
+   */
+  align?: "center" | "start";
+  /**
    * Partial state (some-but-not-all of a group selected) — the native dash.
    * It is a DOM property, not an attribute, so it is applied via the ref.
    * Ignored while `checked` is true.
@@ -31,7 +38,16 @@ const sizeClasses = {
 
 export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
   (
-    { className, label, error, size = "md", id, indeterminate, ...props },
+    {
+      className,
+      label,
+      error,
+      size = "md",
+      align = "center",
+      id,
+      indeterminate,
+      ...props
+    },
     ref,
   ) => {
     const cbId =
@@ -79,9 +95,18 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       <div className="flex flex-col gap-1">
         <label
           htmlFor={cbId}
-          className="inline-flex cursor-pointer items-center gap-2 text-sm text-body"
+          className={cn(
+            "inline-flex cursor-pointer gap-2 text-sm text-body",
+            align === "start" ? "items-start" : "items-center",
+          )}
         >
-          {input}
+          {align === "start" ? (
+            // A slot one `text-sm` line high (h-5) centres the box on the
+            // first line of the label, whatever the box size.
+            <span className="flex h-5 shrink-0 items-center">{input}</span>
+          ) : (
+            input
+          )}
           <span>{label}</span>
         </label>
         {error && <p className="text-sm text-danger-600">{error}</p>}

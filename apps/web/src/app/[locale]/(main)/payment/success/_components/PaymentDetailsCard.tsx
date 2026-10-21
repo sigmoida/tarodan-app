@@ -10,6 +10,11 @@ import { formatTL } from "@/lib/format";
 interface PaymentDetailsCardProps {
   payment: any;
   isCompleted: boolean;
+  /**
+   * The "invoice by e-mail, also under Orders" line. Off for a boost: Orders
+   * hides virtual orders, so the line would point to a list without it.
+   */
+  showInvoiceNote?: boolean;
 }
 
 function Row({
@@ -35,6 +40,7 @@ function Row({
 export default function PaymentDetailsCard({
   payment,
   isCompleted,
+  showInvoiceNote = true,
 }: PaymentDetailsCardProps) {
   const t = useTranslations();
   return (
@@ -53,7 +59,9 @@ export default function PaymentDetailsCard({
         </div>
       </div>
 
-      <p className="mt-4 text-sm text-muted">{t("payment.invoiceByEmail")}</p>
+      {showInvoiceNote && (
+        <p className="mt-4 text-sm text-muted">{t("payment.invoiceByEmail")}</p>
+      )}
     </SectionCard>
   );
 }

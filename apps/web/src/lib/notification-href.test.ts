@@ -106,6 +106,7 @@ describe("bildirim hedefi", () => {
       "/profile/messages",
       "/profile/messages?thread=th1",
       "/profile/listings",
+      "/profile/boosts",
       "/profile/favorites",
       "/profile/payments",
       "/profile/notifications",

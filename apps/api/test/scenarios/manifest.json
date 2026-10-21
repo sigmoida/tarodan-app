@@ -1,12 +1,12 @@
 {
   "meta": {
-    "total": 2305,
+    "total": 2309,
     "source": "Tarodan-Test-Konsolu.html (window.__DATA__)",
     "generated": "30.06.2026",
     "gapCount": 33,
     "byPri": {
       "P0": 708,
-      "P1": 989,
+      "P1": 993,
       "P2": 608
     }
   },
@@ -5295,6 +5295,58 @@
       "pri": "P2",
       "steps": "expire-boosts job'unu tetikle (*/15 dk).",
       "exp": "ProductBoost expired; ürün rankTier sponsorlu seviyeden düşer (product-scheduler.service.ts:300-327).",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-222",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "Üst üste öne çıkarmada süre bitişi ilan başına bir kez bildirilir",
+      "tur": "Zamanlanmış",
+      "pri": "P1",
+      "steps": "İki üst üste aktif boost; ilki biter, expire-boosts çalışır; sonra ikincisi biter, iş iki kez çalışır.",
+      "exp": "İlk bitişte bildirim yok, ilan öne çıkmaya devam eder; ilanın öne çıkması bitince tek BOOST_EXPIRED outbox satırı (son biten boost), tekrar çalışmada yenisi yok.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-223",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "Premium hatırlatma bitişten 24 saat önce bir kez gider, yeni süreyle yeniden kurulur",
+      "tur": "Zamanlanmış",
+      "pri": "P1",
+      "steps": "Premium satıcı, hatırlatma açık, ilanın son boost'u 24 saat içinde bitiyor; expire-boosts iki kez; sonra üstüne yeni boost.",
+      "exp": "Tek BOOST_ENDING_SOON (reminderSentAt damgası); ücretsiz satıcıya yok; yeni son boost kendi bitişinden 24 saat önce bir kez hatırlatılır.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-224",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "Öne Çıkarmalarım: aktif ve geçmiş bölümleri, terk edilmiş ödeme yok",
+      "tur": "API",
+      "pri": "P1",
+      "steps": "GET /products/boost/my?state=current ve state=history; state=pending; oturumsuz istek.",
+      "exp": "{ data, meta } zarfı; yalnız çağıranın active/paused ve expired/cancelled satırları; pending/failed asla; geçersiz state 400; oturumsuz 401.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-225",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "Yeni ilan öne çıkarma önerisi ve kapatılması; hatırlatma anahtarı sahibe ait",
+      "tur": "API",
+      "pri": "P1",
+      "steps": "boost_offer_since ayarlı; GET /products/boost/offers; POST /products/boost/offers/dismiss (başkasının ilanı dahil); PATCH /products/:id/boost/reminder.",
+      "exp": "Uygun ilanlar yeniden eskiye; kapatma sonrası boş; başkasının ilanına kayıt yazılmaz; başkasının ilanında hatırlatma 404, ücretsiz satıcı açarken 400 boostReminderPremiumOnly.",
       "gap": false,
       "gapRefs": []
     },

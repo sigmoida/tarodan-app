@@ -78,13 +78,14 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
     };
     const search = { syncProduct: jest.fn().mockResolvedValue(undefined) };
     const service = new ProductSchedulerService(
-      prisma as any,
-      notifications as any,
-      {} as any,
-      cache as any,
-      search as any,
-      {} as any, // sellerTrust
+      prisma as never,
+      notifications as never,
+      {} as never,
+      cache as never,
+      search as never,
+      {} as never, // sellerTrust
       {} as never, // boost timeline
+      {} as never, // boost notices
     );
     return { service, prisma, notifications, cache, search };
   };

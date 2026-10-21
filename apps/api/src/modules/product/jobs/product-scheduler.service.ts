@@ -5,6 +5,7 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PrismaService } from "../../../prisma";
 import {
+  BoostStatus,
   ListingRemovalReason,
   Prisma,
   ProductInactiveReason,
@@ -35,6 +36,8 @@ import { isRenewableInPlace } from "../helpers/product-renewal";
 import { refreshProductVisibility } from "../helpers/product-visibility";
 import { recordListingRemovals } from "../helpers/listing-removal";
 import { BoostTimelineService } from "../boost-timeline/boost-timeline.service";
+import { BOOST_REMINDER_LEAD_MS } from "../boost-timeline/boost-expiry.service";
+import { BoostNoticeService } from "../ranking/boost-notice.service";
 import { writeProductRanking } from "../helpers/product-ranking-write";
 
 /**
@@ -42,6 +45,12 @@ import { writeProductRanking } from "../helpers/product-ranking-write";
  * in its own transaction); the rest follow on the next run, 15 minutes later.
  */
 const BOOST_SYSTEM_PAUSE_BATCH = 200;
+
+/** Listings one expire-boosts run expires (per source query) at most. */
+const BOOST_EXPIRY_BATCH = 500;
+
+/** Listings one expire-boosts run sends the ending-soon reminder at most. */
+const BOOST_REMINDER_BATCH = 500;
 
 /**
  * Product Scheduler Service
@@ -79,6 +88,8 @@ export class ProductSchedulerService implements OnModuleInit {
     private readonly searchService: SearchService,
     private readonly sellerTrust: SellerTrustService,
     private readonly boostTimeline: BoostTimelineService,
+    // Sends the expiry and reminder notices right after their commit.
+    private readonly boostNotices: BoostNoticeService,
   ) {}
 
   /**
@@ -301,97 +312,29 @@ export class ProductSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Süresi dolan boost'ları düşür. Her 15 dakikada çalışır.
-   * - boostedUntil geçmişte kalan ürünlerin rankTier'ını premium(1)/standart(0)'a indirir.
-   * - İlgili ProductBoost kayıtlarını 'expired' yapar.
-   * - Uzun süredir 'pending' kalan (ödenmemiş) boost'ları 'failed' yapar.
-   * Gerçek iş — Bull processor 'expire-boosts' buradan çağırır.
+   * The expire-boosts job, every 15 minutes (the Bull processor
+   * 'expire-boosts' calls it). Each listing is handled in its own transaction
+   * through the timeline owner, under the listing lock:
+   *
+   * 1. Expiry: the listing's ended boosts become `expired`, its promotion is
+   *    rebuilt, and the seller is told once when the promotion really ended
+   *    (no running boost of the listing ends later), not once per boost.
+   * 2. Reminder: a premium seller who asked for it hears 24 hours before the
+   *    listing's promotion ends (`BOOST_ENDING_SOON`), once per end.
+   * 3. Unpaid boosts older than a day become `failed`.
+   * 4. System pause and resume of the boosts of offline and live listings.
+   *
+   * The notices are outbox rows written with the change and sent right after
+   * the commit; the drainer sends what this run could not.
    */
   async runExpireBoosts(log: (msg: string) => void = () => {}) {
     try {
       const now = new Date();
 
-      // Süresi dolmuş boost izleri: filtre rankTier'a DEĞİL boost alanlarına
-      // bakar. Eskiden yalnız rankTier=2 taranıyordu; gece mutabakatı rankTier'ı
-      // indirmiş ama boostedAt'i temizlememişse ürün SÜRESİZ olarak LIFO
-      // sıralamasının tepesinde kalıyordu (stale boostedAt asla süpürülmüyordu).
-      const expiredProducts = await this.prisma.product.findMany({
-        where: {
-          boostedAt: { not: null },
-          boostedUntil: { lt: now },
-        },
-        select: { id: true },
-      });
+      const expiry = await this.expireEndedPromotions(now);
+      const reminded = await this.remindEndingPromotions(now);
 
-      // Şimdi sona eren aktif boost'lar (otomatik yenileme hatırlatması için)
-      const expiringBoosts = await this.prisma.productBoost.findMany({
-        where: { status: "active", endsAt: { lt: now } },
-        select: {
-          id: true,
-          userId: true,
-          productId: true,
-          autoRenew: true,
-          product: {
-            select: {
-              title: true,
-              sellerId: true,
-              viewCount: true,
-              likeCount: true,
-              clickCount: true,
-            },
-          },
-        },
-      });
-
-      // Downgrade each listing whose promotion ended, through the timeline
-      // owner under the listing lock: a boost activated between the read above
-      // and this write (the seller re-boosted) is seen and kept, instead of
-      // being overwritten with rank tier 0/1 and a cleared LIFO key.
-      for (const p of expiredProducts) {
-        await this.prisma.$transaction((tx) =>
-          this.boostTimeline.refreshProductPromotion(tx, p.id, now),
-        );
-      }
-      if (expiredProducts.length > 0) {
-        this.logger.log(
-          `Expired boost on ${expiredProducts.length} product(s)`,
-        );
-      }
-
-      // Otomatik yenileme açık + premium satıcı → yenileme hatırlatma bildirimi
-      // (Gerçek recurring çekim yok; üyelik auto-renew gibi hatırlatma gönderilir.)
-      for (const b of expiringBoosts) {
-        if (b.product) {
-          await this.prisma.productBoost.update({
-            where: { id: b.id },
-            data: {
-              finalViewCount: b.product.viewCount,
-              finalLikeCount: b.product.likeCount,
-              finalClickCount: b.product.clickCount,
-            },
-          });
-        }
-        // Süre dolumu HER satın alana bildirilir — eskiden yalnız autoRenew
-        // açık + premium satıcı haber alıyordu; normal alıcı boost'unun
-        // bittiğini hiçbir kanaldan öğrenmiyordu.
-        if (b.product) {
-          await this.notificationService
-            .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {
-              // Kimlik: mobil dokunuş ilanın kendisini açar.
-              productId: b.productId,
-              productTitle: b.product.title,
-            })
-            .catch(() => {});
-        }
-      }
-
-      // ProductBoost kayıtlarını expired yap
-      await this.prisma.productBoost.updateMany({
-        where: { status: "active", endsAt: { lt: now } },
-        data: { status: "expired" },
-      });
-
-      // 1 günden uzun süredir ödenmemiş (pending) boost'ları failed yap
+      // Unpaid (pending) boosts older than a day become failed.
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       await this.prisma.productBoost.updateMany({
         where: { status: "pending", createdAt: { lt: oneDayAgo } },
@@ -409,13 +352,15 @@ export class ProductSchedulerService implements OnModuleInit {
       const resumed = await this.resumeSystemPausedBoosts(now);
 
       log(
-        `${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi · ${paused} duraklatıldı · ${resumed} sürdürüldü`,
+        `${expiry.listings} listing(s) checked · ${expiry.expired} boost(s) ended · ${expiry.notices} ended notice(s) · ${reminded} reminder(s) · ${paused} paused · ${resumed} resumed`,
       );
       return {
-        summary: `${expiredProducts.length} boost düşürüldü · ${expiringBoosts.length} sona erdi`,
+        summary: `${expiry.expired} boost(s) ended · ${expiry.notices} listing(s) unfeatured · ${reminded} reminder(s)`,
         stats: {
-          downgraded: expiredProducts.length,
-          expired: expiringBoosts.length,
+          downgraded: expiry.listings,
+          expired: expiry.expired,
+          endedNotices: expiry.notices,
+          reminded,
           systemPaused: paused,
           systemResumed: resumed,
         },
@@ -431,6 +376,113 @@ export class ProductSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
+  }
+
+  /**
+   * Expiry, per listing (`BoostTimelineService.expireEnded`): the listings
+   * with an ended active boost, plus the listings whose promotion columns
+   * outlived their boosts (an ended `boostedUntil` with a LIFO key still set:
+   * the sweep looks at the boost columns, not at `rankTier`, so a listing the
+   * nightly reconcile downgraded never stays on top of the LIFO order).
+   * Bounded and ordered; the rest follow on the next run.
+   */
+  private async expireEndedPromotions(
+    now: Date,
+  ): Promise<{ listings: number; expired: number; notices: number }> {
+    const [ended, stale] = await Promise.all([
+      this.prisma.productBoost.findMany({
+        where: { status: "active", endsAt: { lte: now } },
+        select: { productId: true },
+        distinct: ["productId"],
+        orderBy: { productId: "asc" },
+        take: BOOST_EXPIRY_BATCH,
+      }),
+      this.prisma.product.findMany({
+        where: { boostedAt: { not: null }, boostedUntil: { lt: now } },
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: BOOST_EXPIRY_BATCH,
+      }),
+    ]);
+    const productIds = [
+      ...new Set([
+        ...ended.map((row) => row.productId),
+        ...stale.map((row) => row.id),
+      ]),
+    ];
+    const results = await this.perListing("expiry", productIds, (tx, id) =>
+      this.boostTimeline.expireEnded(tx, id, now),
+    );
+    let expired = 0;
+    let notices = 0;
+    for (const result of results) {
+      expired += result.expired;
+      if (result.notice) {
+        notices += 1;
+        await this.boostNotices.flush(result.notice);
+      }
+    }
+    if (expired > 0) {
+      this.logger.log(
+        `Boost expiry: ${expired} boost(s) on ${productIds.length} listing(s), ${notices} promotion(s) ended`,
+      );
+    }
+    return { listings: productIds.length, expired, notices };
+  }
+
+  /**
+   * Ending-soon reminders, per listing (`BoostTimelineService.remindEndingSoon`,
+   * which decides and claims under the listing lock). The candidates are the
+   * live listings whose last running boost ends within the lead time and has
+   * not announced this end yet, with the reminder on for the listing
+   * (`isBoostReminderDue` in SQL), so reminded listings never crowd out the
+   * batch. Premium is checked per listing in the timeline: a seller whose
+   * premium lapsed stays a candidate until the end passes (at most a day), a
+   * small set ordered after the sooner ends.
+   */
+  private async remindEndingPromotions(now: Date): Promise<number> {
+    const horizon = new Date(now.getTime() + BOOST_REMINDER_LEAD_MS);
+    const leadMinutes = BOOST_REMINDER_LEAD_MS / 60_000;
+    const rows = await this.prisma.$queryRaw<Array<{ productId: string }>>`
+      SELECT b."product_id" AS "productId"
+      FROM "product_boosts" b
+      JOIN "products" p ON p."id" = b."product_id"
+      WHERE b."status" = ${BoostStatus.active}::"BoostStatus"
+        AND b."ends_at" > ${now}
+        AND b."ends_at" <= ${horizon}
+        AND (
+          b."reminder_sent_at" IS NULL
+          OR b."reminder_sent_at" < b."ends_at" - make_interval(mins => ${leadMinutes}::int)
+        )
+        AND p."status" = ${ProductStatus.active}::"ProductStatus"
+        AND NOT EXISTS (
+          SELECT 1 FROM "product_boosts" later
+          WHERE later."product_id" = b."product_id"
+            AND later."status" = ${BoostStatus.active}::"BoostStatus"
+            AND later."ends_at" > b."ends_at"
+        )
+        AND EXISTS (
+          SELECT 1 FROM "product_boosts" asked
+          WHERE asked."product_id" = b."product_id"
+            AND asked."status" IN (${BoostStatus.active}::"BoostStatus", ${BoostStatus.paused}::"BoostStatus")
+            AND asked."auto_renew" = true
+        )
+      ORDER BY b."ends_at" ASC, b."product_id" ASC
+      LIMIT ${BOOST_REMINDER_BATCH}`;
+    const productIds = [...new Set(rows.map((row) => row.productId))];
+    const notices = await this.perListing("reminder", productIds, (tx, id) =>
+      this.boostTimeline.remindEndingSoon(tx, id, now),
+    );
+    let sent = 0;
+    for (const notice of notices) {
+      if (!notice) continue;
+      sent += 1;
+      await this.boostNotices.flush(notice);
+    }
+    if (sent > 0) {
+      this.logger.log(`Boost reminder: ${sent} listing(s)`);
+    }
+    return sent;
   }
 
   /**
@@ -450,7 +502,7 @@ export class ProductSchedulerService implements OnModuleInit {
       orderBy: { productId: "asc" },
       take: BOOST_SYSTEM_PAUSE_BATCH,
     });
-    return this.perListing("pause", rows, (tx, productId) =>
+    return this.countPerListing("pause", rows, (tx, productId) =>
       this.boostTimeline.pauseForDelisting(tx, productId, now),
     );
   }
@@ -473,37 +525,55 @@ export class ProductSchedulerService implements OnModuleInit {
       orderBy: { productId: "asc" },
       take: BOOST_SYSTEM_PAUSE_BATCH,
     });
-    return this.perListing("resume", rows, (tx, productId) =>
+    return this.countPerListing("resume", rows, (tx, productId) =>
       this.boostTimeline.resumeSystemPaused(tx, productId, now),
     );
   }
 
-  /**
-   * Runs one listing's system pause or resume per transaction. A listing that
-   * fails is logged and left for the next run; it never stops the others.
-   */
-  private async perListing(
+  /** A system pause or resume per listing; returns the boosts changed. */
+  private async countPerListing(
     action: "pause" | "resume",
     rows: Array<{ productId: string }>,
     work: (tx: Prisma.TransactionClient, productId: string) => Promise<number>,
   ): Promise<number> {
-    let changed = 0;
-    for (const { productId } of rows) {
-      try {
-        changed += await this.prisma.$transaction((tx) => work(tx, productId));
-      } catch (error: unknown) {
-        this.logger.error(
-          `System boost ${action} failed for listing ${productId}: ${errorMessage(error)}`,
-          errorStack(error),
-        );
-      }
-    }
+    const counts = await this.perListing(
+      action,
+      rows.map((row) => row.productId),
+      work,
+    );
+    const changed = counts.reduce((sum, count) => sum + count, 0);
     if (changed > 0) {
       this.logger.log(
         `System boost ${action}: ${changed} boost(s) on ${rows.length} listing(s)`,
       );
     }
     return changed;
+  }
+
+  /**
+   * Runs one listing's boost work per transaction and returns the results of
+   * the listings that succeeded. A listing that fails is logged (ids only)
+   * and left for the next run; it never stops the others.
+   */
+  private async perListing<T>(
+    action: string,
+    productIds: string[],
+    work: (tx: Prisma.TransactionClient, productId: string) => Promise<T>,
+  ): Promise<T[]> {
+    const results: T[] = [];
+    for (const productId of productIds) {
+      try {
+        results.push(
+          await this.prisma.$transaction((tx) => work(tx, productId)),
+        );
+      } catch (error: unknown) {
+        this.logger.error(
+          `Boost ${action} failed for listing ${productId}: ${errorMessage(error)}`,
+          errorStack(error),
+        );
+      }
+    }
+    return results;
   }
 
   /**

@@ -206,21 +206,29 @@ export interface MediaAvatarDeletePayload {
 }
 
 /**
- * Listing boost notice to its seller after a staff action: a free grant, a
- * stop without a refund (revoke) or a stop with a refund. Written in the
- * transaction that changes the boost (`BoostTimelineService`), so a committed
- * grant or stop is always announced. One row per boost and kind; the handler
- * (`BoostNoticeService`) reads the boost when it sends, so the payload holds
- * ids only.
+ * Listing boost notice to its seller: after a staff action (a free grant, a
+ * stop without a refund or a stop with a refund) and from the expire-boosts
+ * cron (the listing's promotion ends within 24 hours, or has ended). Written
+ * in the transaction that changes the boost (`BoostTimelineService`), so a
+ * committed change is always announced. One row per boost and kind; the
+ * handler (`BoostNoticeService`) reads the boost when it sends, so the
+ * payload holds ids only.
  */
 export const OUTBOX_BOOST_NOTICE = "boost.notice";
 
-export type BoostNoticeKind = "granted" | "cancelled" | "refunded";
+export type BoostNoticeKind =
+  "granted" | "cancelled" | "refunded" | "ending_soon" | "expired";
 
 export interface BoostNoticePayload {
   boostId: string;
   kind: BoostNoticeKind;
+  /**
+   * The reminder's claim stamp (ISO, `ProductBoost.reminderSentAt`), for
+   * `ending_soon` only: a boost whose end moved later can be reminded again,
+   * and each reminder needs its own outbox row.
+   */
+  at?: string;
 }
 
 export const boostNoticeDedupeKey = (p: BoostNoticePayload): string =>
-  `${OUTBOX_BOOST_NOTICE}:${p.kind}:${p.boostId}`;
+  `${OUTBOX_BOOST_NOTICE}:${p.kind}:${p.boostId}${p.at ? `:${p.at}` : ""}`;

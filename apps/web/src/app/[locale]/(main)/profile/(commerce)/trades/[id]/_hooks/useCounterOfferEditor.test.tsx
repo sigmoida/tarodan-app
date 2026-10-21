@@ -118,7 +118,7 @@ async function waitFor(assertion: () => void) {
 }
 
 let client: QueryClient;
-function setup() {
+function setup(current: Trade = trade) {
   client = makeQueryClient();
   client.setDefaultOptions({
     ...client.getDefaultOptions(),
@@ -128,7 +128,11 @@ function setup() {
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   return renderHook(
-    () => useCounterOfferEditor({ trade, invalidateTrade: async () => {} }),
+    () =>
+      useCounterOfferEditor({
+        trade: current,
+        invalidateTrade: async () => {},
+      }),
     wrapper,
   );
 }
@@ -505,5 +509,132 @@ describe("useCounterOfferEditor, paged pickers", () => {
       await invalidateListingQueries(client);
     });
     await waitFor(() => expect(result.current.counterProducts).toHaveLength(4));
+  });
+});
+
+describe("useCounterOfferEditor, cash amount", () => {
+  async function openAndPick() {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve(rows("t", 1, 2)));
+    counter.mockResolvedValue({});
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() => expect(result.current.counterProducts).toHaveLength(3));
+    // Differ from the current trade so the identical-offer guard stays quiet.
+    act(() => result.current.toggleCounterProduct("m1"));
+    return result;
+  }
+
+  it.each(["12,50", "12.50"])("sends %s as 12.5", async (value) => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount(value));
+    expect(result.current.counterCashRefused).toBe(false);
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(12.5);
+  });
+
+  it("makes the amount negative when they pay", async () => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount("12,50"));
+    act(() => result.current.setCounterCashPayer("them"));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(-12.5);
+  });
+
+  it("leaves cashAmount out when the field is empty", async () => {
+    const result = await openAndPick();
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBeUndefined();
+  });
+
+  it("flags a grouped value as refused and does not submit it", async () => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount("1.000"));
+    expect(result.current.counterCashRefused).toBe(true);
+    act(() => result.current.handleCounterSubmit());
+    expect(toastError).toHaveBeenCalledWith("trade.cashFormatRefused");
+    expect(counter).not.toHaveBeenCalled();
+  });
+});
+
+describe("useCounterOfferEditor, identical-offer check", () => {
+  // The initiator ("other") pays 1250.50; the receiver ("me") counters.
+  const cashTrade = {
+    ...trade,
+    cashAmount: 1250.5,
+    cashPayerId: "other",
+  } as unknown as Trade;
+
+  async function open(current: Trade) {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve(rows("t", 1, 2)));
+    counter.mockResolvedValue({});
+    const result = setup(current);
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() => expect(result.current.counterProducts).toHaveLength(3));
+    return result;
+  }
+
+  it("prefills the amount with a decimal comma and the current payer", async () => {
+    const result = await open(cashTrade);
+    expect(result.current.counterCashAmount).toBe("1250,50");
+    expect(result.current.counterCashPayer).toBe("them");
+  });
+
+  it("refuses the unchanged offer", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.handleCounterSubmit());
+    expect(toastError).toHaveBeenCalledWith("trade.counterOfferIdentical");
+    expect(counter).not.toHaveBeenCalled();
+  });
+
+  it("sends the offer when only the payer changes", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashPayer("me"));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(1250.5);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  // The no-cash trade has no payer (the API compares `null`), so neither radio
+  // value is a change, including the "me" default, which differs from the
+  // "them" derived from a missing `cashPayerId`.
+  it.each(["me", "them"] as const)(
+    "does not count the payer %s as a change when there is no amount",
+    async (payer) => {
+      const result = await open(trade);
+      act(() => result.current.setCounterCashPayer(payer));
+      act(() => result.current.handleCounterSubmit());
+      expect(toastError).toHaveBeenCalledWith("trade.counterOfferIdentical");
+      expect(counter).not.toHaveBeenCalled();
+    },
+  );
+
+  it("sends the offer when only the amount changes", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashAmount("1250,51"));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(-1250.51);
+  });
+
+  it("sends the offer when the amount is cleared", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashAmount(""));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBeUndefined();
+  });
+
+  it("treats the same amount typed with a dot as unchanged", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashAmount("1250.5"));
+    act(() => result.current.handleCounterSubmit());
+    expect(toastError).toHaveBeenCalledWith("trade.counterOfferIdentical");
+    expect(counter).not.toHaveBeenCalled();
   });
 });

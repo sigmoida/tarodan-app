@@ -1481,6 +1481,8 @@
     "noProductsAvailable": "Kullanılabilir ürün yok",
     "goToMyListings": "İlanlarıma Git",
     "cashBalanceHint": "Takas değerini dengelemek için nakit fark ekleyebilirsiniz.",
+    "cashHelper": "Kuruş için virgül kullanın, örn. 1250,50",
+    "cashFormatRefused": "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
     "whoPaysCash": "Nakit farkı kim ödeyecek?",
     "theyWillPay": "Karşı taraf ödeyecek",
     "totalWithCommission": "Komisyon dahil toplam:",
@@ -2063,7 +2065,7 @@
       "showcaseHint": "Ana sayfa vitrininde ve aramada üst sıralarda gösterilir",
       "searchHint": "Aramada üst sıralarda gösterilir",
       "activeBoostInfo": "Bu ilanda aktif öne çıkarma var: ~{days} gün kaldı. Seçtiğiniz süre kalan sürenin üstüne eklenir.",
-      "extendSummary": "Kalan {remaining} günün üstüne {selected} gün eklenecektir → toplam ~{total} gün",
+      "extendSummary": "Kalan {remaining} günün üstüne {selected} gün eklenecektir; toplam ~{total} gün",
       "daysValue": "{days} gün",
       "campaign": "Kampanya",
       "unavailable": "Öne çıkarma şu anda kullanılamıyor.",
@@ -2071,10 +2073,24 @@
       "pricingLoadError": "Fiyatlar yüklenemedi",
       "paymentStartFailed": "Ödeme başlatılamadı",
       "initiateFailed": "Öne çıkarma başlatılamadı",
-      "autoRenewLabel": "Süre bitince otomatik yenileme hatırlatması al (Premium)",
+      "autoRenewLabel": "Süre bitmeden 24 saat önce hatırlat (Premium). Otomatik ödeme alınmaz.",
       "redirecting": "Yönlendiriliyor",
       "extendAndPay": "Süreyi Uzat ve Öde",
-      "featureAndPay": "Öne Çıkar ve Öde"
+      "featureAndPay": "Öne Çıkar ve Öde",
+      "reminderUpgrade": "Premium'a geç",
+      "preInfo": {
+        "title": "Ön bilgilendirme",
+        "provider": "Hizmet sağlayıcı: {company}",
+        "service": "Hizmet: \"{listing}\" ilanının {package} paketiyle {days} gün öne çıkarılması",
+        "price": "Toplam bedel (KDV dahil): <amount>{price}</amount>",
+        "start": "Hizmet, ödemeniz onaylandığı anda başlar.",
+        "noCancel": "Öne çıkarma başladıktan sonra iptal edilemez."
+      },
+      "consent": {
+        "contract": "<preInfo>Ön Bilgilendirme Formu</preInfo>'nu ve <contract>Mesafeli Hizmet Sözleşmesi</contract>'ni okudum, onaylıyorum.",
+        "waiver": "Hizmetin onayımla hemen başlayacağını ve bu nedenle cayma hakkımın bulunmadığını kabul ediyorum.",
+        "required": "Devam etmek için iki onayı da vermelisiniz."
+      }
     },
     "bank": {
       "title": "Banka Hesabı / IBAN",
@@ -2395,6 +2411,11 @@
       "lastMethodHint": "Hesabınızda bir şifre ya da bağlı bir Google hesabı kalmalı. Önce bir şifre belirleyin.",
       "connectSuccess": "{provider} hesabı bağlandı.",
       "disconnectSuccess": "{provider} bağlantısı kaldırıldı."
+    },
+    "boosts": {
+      "reminder": {
+        "premiumOnly": "Hatırlatma Premium üyeler içindir."
+      }
     }
   },
   "review": {
@@ -2932,7 +2953,22 @@
     "invoiceByEmail": "Faturanız hazırlandığında e-posta ile gönderilir; Siparişlerim sayfasından da indirebilirsiniz.",
     "individualSellerNoInvoice": "Bu satıcı bireysel satıcıdır; ürün için fatura düzenlenmez. Tarodan'ın hizmet bedeli faturası e-posta ile iletilir.",
     "sellerInvoicePending": "Satıcı ürün faturasını henüz yüklemedi. Yüklendiğinde e-posta ile bilgilendirileceksiniz.",
-    "downloading": "İndiriliyor..."
+    "downloading": "İndiriliyor...",
+    "boost": {
+      "success": {
+        "title": "Öne çıkarma başladı",
+        "description": "\"{listing}\" ilanı {date} tarihine kadar öne çıkarılıyor.",
+        "pending": "Ödemeniz alındı. Öne çıkarma birkaç dakika içinde başlayacak."
+      },
+      "toBoosts": "Öne Çıkarmalarım",
+      "toListings": "İlanlarım",
+      "fail": {
+        "title": "Öne çıkarma ödemesi tamamlanamadı",
+        "description": "Ödeme tamamlanamadı. Tekrar deneyebilirsiniz.",
+        "retry": "Tekrar dene"
+      },
+      "cancelled": "Öne çıkarma ödemesi iptal edildi."
+    }
   },
   "bankAccount": {
     "savedBadge": "Kayıtlı",
@@ -10925,7 +10961,11 @@
       },
       "boostExpired": {
         "title": "🚀 Öne çıkarma süresi doldu",
-        "message": "\"{productTitle}\" ilanının öne çıkarması sona erdi. Dilerseniz ilanınızı yeniden öne çıkarabilirsiniz."
+        "message": "\"{productTitle}\" ilanının öne çıkarma süresi sona erdi."
+      },
+      "boostEndingSoon": {
+        "title": "Öne çıkarma süresi bitiyor",
+        "message": "\"{productTitle}\" ilanının öne çıkarma süresi 24 saat içinde bitiyor."
       },
       "boostActivated": {
         "title": "🚀 Öne Çıkarma Aktif",
@@ -11472,7 +11512,6 @@
       "imageLimitExceeded": "Üyeliğiniz ({tierName}) ile ilan başına maksimum {maxImages} görsel yükleyebilirsiniz. {sentCount} görsel gönderdiniz.",
       "imageNotAppropriate": "Yüklediğiniz resim uygun değildir. Lütfen uygun bir ürün görseli yükleyin.",
       "insufficientStock": "Bu ürün stokta bulunmamaktadır (müsait={available}, istenen={requested})",
-      "invalidBoostDuration": "Geçerli bir boost süresi seçiniz (3, 7 veya 30 gün)",
       "invalidBrandModelManufacturer": "Seçilen marka, model veya üretici geçersiz. Lütfen listeden tekrar seçin.",
       "invalidCategory": "Geçersiz kategori",
       "invalidIdFormat": "Geçersiz ürün ID formatı",
@@ -11499,6 +11538,7 @@
       "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
       "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil",
       "boostConsentRequired": "Ön bilgilendirme ve cayma hakkı onayları gereklidir",
+      "boostReminderPremiumOnly": "Hatırlatma yalnız Premium üyeler içindir",
       "duplicateImage": "Aynı görsel birden fazla kez gönderildi",
       "imageNotOwned": "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
       "imageKeyEmpty": "Görsel anahtarı boş olamaz",
