@@ -110,6 +110,75 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     await expect(asBody({ query })).rejects.toMatchObject({ status: 400 });
   });
 
+  it("takes attrGroups as an object or its JSON text, as the same search", async () => {
+    // Implicit conversion alone would make the object "[object Object]",
+    // which the canonical form drops as malformed JSON: a broader search.
+    const asObject = await asBody({
+      query: { search: "x", attrGroups: { "hw-rarity": ["th", "sth"] } },
+    });
+    const asText = await asBody({
+      query: { search: "x", attrGroups: '{"hw-rarity":["sth","th"]}' },
+    });
+    const canonical = canonicalizeSavedSearchQuery(asObject.query);
+    expect(canonical.attrGroups).toBe('{"hw-rarity":["sth","th"]}');
+    expect(savedSearchQueryHash(canonical)).toBe(
+      savedSearchQueryHash(canonicalizeSavedSearchQuery(asText.query)),
+    );
+  });
+
+  it("refuses attrGroups sent as an array, with a clear message", async () => {
+    const refusal = asBody({ query: { search: "x", attrGroups: ["th"] } });
+    await expect(refusal).rejects.toMatchObject({ status: 400 });
+    await expect(refusal).rejects.toMatchObject({
+      response: {
+        message: expect.arrayContaining([
+          "query.attrGroups must be a group -> slugs object or its JSON text",
+        ]),
+      },
+    });
+  });
+
+  it("caps attrGroups sent as an object by its JSON text", async () => {
+    await expect(
+      asBody({
+        query: { search: "x", attrGroups: { g: ["s".repeat(2000)] } },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it.each([
+    "search",
+    "brandId",
+    "brand",
+    "manufacturer",
+    "scale",
+    "material",
+    "color",
+    "sortBy",
+  ])("refuses an object as %s instead of storing its text", async (key) => {
+    await expect(
+      asBody({ query: { search: "x", [key]: { a: 1 } } }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("reads a number in a text filter as text, as a query string would", async () => {
+    const dto = await asBody({ query: { search: 1, scale: 18 } });
+    expect({ ...dto.query }).toEqual({ search: "1", scale: "18" });
+  });
+
+  it("counts the storage caps in code points, a variation selector not at all", async () => {
+    // 200 single-code-point emoji are 400 UTF-16 units: within the cap.
+    await expect(
+      asBody({ query: { search: "🏎".repeat(200) } }),
+    ).resolves.toBeDefined();
+    await expect(
+      asBody({ query: { search: "🏎️".repeat(200) } }),
+    ).resolves.toBeDefined();
+    await expect(
+      asBody({ query: { search: "🏎".repeat(201) } }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
   it("requires a query object", async () => {
     await expect(asBody({})).rejects.toMatchObject({ status: 400 });
     await expect(asBody({ query: "search=x" })).rejects.toMatchObject({
@@ -123,6 +192,16 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     await expect(
       asBody({ name: "x".repeat(61), query: { search: "x" } }),
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("refuses an object as the name instead of storing its text", async () => {
+    await expect(
+      asBody({ name: { a: 1 }, query: { search: "x" } }),
+    ).rejects.toMatchObject({ status: 400 });
+    // A number is read as text, as in the query filters.
+    await expect(
+      asBody({ name: 5, query: { search: "x" } }),
+    ).resolves.toMatchObject({ name: "5" });
   });
 
   it("counts the name in code points, as the labels and default name do", async () => {

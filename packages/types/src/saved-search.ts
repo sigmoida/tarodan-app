@@ -304,8 +304,9 @@ export function savedSearchDefaultName(
 /**
  * The URL params web `/listings` and mobile `/search` both read, to run a
  * saved search. `attrGroups` becomes `attr.<group>=a,b`. With `labels`, the
- * display names the filter chips read are added too (`brand`, `manufacturer`,
- * `carModel`); the list request still filters by the ids.
+ * display names the filter chips and the page title read are added too
+ * (`category`, `brand`, `manufacturer`, `carModel`), as both clients write
+ * them next to the id; the list request still filters by the ids.
  */
 export function savedSearchToRouteParams(
   query: SavedSearchQuery,
@@ -320,6 +321,9 @@ export function savedSearchToRouteParams(
   const groups = parseAttrGroups(query.attrGroups);
   for (const [group, slugs] of Object.entries(groups ?? {})) {
     params[`attr.${group}`] = slugs.join(",");
+  }
+  if (query.categoryId && labels.categoryId) {
+    params.category = labels.categoryId;
   }
   if (query.brandId && !query.brand && labels.brandId) {
     params.brand = labels.brandId;

@@ -271,12 +271,27 @@ describe("savedSearchToRouteParams", () => {
   });
 
   it("adds the display names the filter chips read", () => {
+    // Web /listings and mobile /search show a category chip (and web its
+    // title) from `category`; without it web shows no chip and mobile the
+    // generic "Category" for a subcategory id.
     expect(
       savedSearchToRouteParams(
-        { brandId: "b1", manufacturerId: UUID, carModelId: UUID },
-        { brandId: "Ferrari", manufacturerId: "Bburago", carModelId: "F40" },
+        {
+          categoryId: UUID,
+          brandId: "b1",
+          manufacturerId: UUID,
+          carModelId: UUID,
+        },
+        {
+          categoryId: "Diecast",
+          brandId: "Ferrari",
+          manufacturerId: "Bburago",
+          carModelId: "F40",
+        },
       ),
     ).toEqual({
+      categoryId: UUID,
+      category: "Diecast",
       brandId: "b1",
       brand: "Ferrari",
       manufacturerId: UUID,
@@ -286,14 +301,25 @@ describe("savedSearchToRouteParams", () => {
     });
   });
 
-  it("round-trips through the canonical form", () => {
+  it("adds no display name without a label", () => {
+    expect(
+      savedSearchToRouteParams({ categoryId: UUID, brandId: "b1" }),
+    ).toEqual({ categoryId: UUID, brandId: "b1" });
+  });
+
+  it("round-trips through the canonical form, display names included", () => {
     const query = canonicalizeSavedSearchQuery({
       search: "f40",
       color: "red,black",
       preOrder: true,
       maxPrice: 900,
+      categoryId: UUID,
+      carModelId: UUID,
     });
-    const params = savedSearchToRouteParams(query);
+    const params = savedSearchToRouteParams(query, {
+      categoryId: "Diecast",
+      carModelId: "F40",
+    });
     expect(canonicalizeSavedSearchQuery(params)).toEqual(query);
   });
 });

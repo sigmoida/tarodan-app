@@ -27,6 +27,10 @@ Refusals of `POST`, in this order:
 
 1. An invalid filter value: `400`, the same validation as `GET /products`
    (`PickType(ProductQueryDto, SAVED_SEARCH_QUERY_KEYS)`, plus length caps).
+   The text filters take strings, as in a query string: an object or array
+   there is a `400`, never turned into "[object Object]" by the implicit
+   conversion. `attrGroups` takes its JSON text or the group -> slugs object
+   (the same search either way); an array is a `400`.
 2. Nothing but a sort left after canonicalising: `400 server.savedSearch.emptyQuery`.
 3. The same canonical query already saved: `409 server.savedSearch.alreadySaved`,
    `errorCode: "SAVED_SEARCH_DUPLICATE"`. A duplicate needs no free slot, so it
@@ -45,7 +49,8 @@ and the `attrGroups` keys and slugs, and writes keys in sorted order. `page`
 and `limit` are never stored. The stored query can be sent to
 `GET /products` as it is; `savedSearchToRouteParams` turns it into the URL
 params web `/listings` and mobile `/search` read (`attr.<group>=a,b`, plus
-the display names from the labels).
+the display names `category`, `brand`, `manufacturer` and `carModel` from the
+labels, which the filter chips read next to the ids).
 
 `query_hash` is the SHA-256 hex of the JSON of the canonical query; the
 unique index `(user_id, query_hash)` is the duplicate rule. Rows are
@@ -72,7 +77,16 @@ The limit is read before the transaction (`MembershipService.getSavedSearchLimit
 the effective tier only, by the same `isPremiumEntitled` rule as every other
 gate, without the self-heal or the usage counts of `getUserLimits`, so a
 database error stays a 5xx). A past-due member is on the free limit until
-the membership heals. The transaction then locks the user row `FOR NO KEY UPDATE`
+the membership heals. `GET /membership/me/limits` and `GET /membership/me`
+run that heal and persist it, so the heal never makes the shown and the
+enforced limit differ for longer than until the client's next read: a save
+sent before any such read, after a paid renewal whose callback was lost, gets
+the free `limit` in its `403` until a read or the reconciliation job heals
+the membership. (A tier that really changes between a cached read and a save,
+such as a period that ends, is enforced at once; the `403` carries the
+enforced `limit`.)
+
+The transaction then locks the user row `FOR NO KEY UPDATE`
 (`lockActiveUserForQuota`), checks the duplicate, counts and inserts. Two
 parallel saves of one user therefore run one after the other, and the second
 sees the first one's row. The lock also refuses an account deleted meanwhile.
