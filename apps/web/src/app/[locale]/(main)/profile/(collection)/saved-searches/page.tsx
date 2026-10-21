@@ -5,7 +5,7 @@ import {
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import { Alert, Button } from "@tarodan/ui";
+import { Alert, Button, Skeleton } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
@@ -23,6 +23,7 @@ export default function SavedSearchesPage() {
     savedSearches,
     total,
     limit,
+    canUpgrade,
     isLoading,
     isError,
     refetch,
@@ -35,10 +36,10 @@ export default function SavedSearchesPage() {
   if (isLoading) {
     return (
       <PageShell className="pb-16">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-1/3 rounded bg-border-subtle" />
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-1/3" />
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-24 rounded-lg bg-border-subtle" />
+            <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
       </PageShell>
@@ -103,10 +104,15 @@ export default function SavedSearchesPage() {
           }
           title={t("savedSearch.limitTitle")}
         >
-          {t("search.savedLimitReached", { limit })}{" "}
-          <Link href="/membership" className="font-medium underline">
-            {t("search.premiumMoreSearches")}
-          </Link>
+          {t("search.savedLimitReached", { limit })}
+          {canUpgrade && (
+            <>
+              {" "}
+              <Link href="/membership" className="font-medium underline">
+                {t("search.premiumMoreSearches")}
+              </Link>
+            </>
+          )}
         </Alert>
       )}
     </PageShell>

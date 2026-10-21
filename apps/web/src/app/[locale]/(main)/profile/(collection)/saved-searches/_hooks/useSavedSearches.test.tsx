@@ -14,13 +14,14 @@ const h = vi.hoisted(() => ({
   list: vi.fn(),
   remove: vi.fn(),
   getLimits: vi.fn(),
+  getTiers: vi.fn(),
   confirm: vi.fn(),
   push: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
   savedSearchesApi: { list: h.list, remove: h.remove },
-  membershipApi: { getLimits: h.getLimits },
+  membershipApi: { getLimits: h.getLimits, getTiers: h.getTiers },
 }));
 vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ push: h.push }) }));
 vi.mock("@/components/ConfirmProvider", () => ({
@@ -44,6 +45,13 @@ const search = {
   createdAt: "2026-10-21T10:00:00.000Z",
 };
 
+const tiers = [
+  { type: "free", maxSavedSearches: 5 },
+  { type: "basic", maxSavedSearches: 10 },
+  { type: "premium", maxSavedSearches: 20 },
+  { type: "business", maxSavedSearches: 50 },
+];
+
 let container: HTMLDivElement;
 let root: Root;
 let client: QueryClient;
@@ -61,10 +69,12 @@ const mount = async (enabled = true) => {
       </QueryClientProvider>,
     ),
   );
-  // Let the list and limit queries settle.
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  // Let the list, the limit and then the tier queries settle.
+  for (let i = 0; i < 3; i += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
 };
 
 beforeEach(() => {
@@ -72,6 +82,7 @@ beforeEach(() => {
     data: { data: [search], meta: { total: 1, page: 1, limit: 100 } },
   });
   h.getLimits.mockResolvedValue({ data: { maxSavedSearches: 10 } });
+  h.getTiers.mockResolvedValue({ data: tiers });
   h.remove.mockResolvedValue({});
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -107,14 +118,51 @@ describe("useSavedSearches", () => {
     expect(h.getLimits).not.toHaveBeenCalled();
   });
 
-  it("discards the old local list once, without importing it", async () => {
+  it("never shows the old local list", async () => {
     localStorage.setItem(
       "diecast_saved_searches",
       JSON.stringify([{ id: "old", query: "porsche" }]),
     );
     await mount();
-    expect(localStorage.getItem("diecast_saved_searches")).toBeNull();
     expect(api.savedSearches.map((s) => s.id)).toEqual(["s1"]);
+  });
+
+  it("reads every page when a tier allows more than one page", async () => {
+    const page2 = { ...search, id: "s2" };
+    h.list.mockImplementation(async (page: number) => ({
+      data:
+        page === 1
+          ? { data: [search], meta: { total: 2, page: 1, totalPages: 2 } }
+          : { data: [page2], meta: { total: 2, page: 2, totalPages: 2 } },
+    }));
+    await mount();
+    expect(h.list.mock.calls.map(([page]) => page)).toEqual([1, 2]);
+    expect(api.savedSearches.map((s) => s.id)).toEqual(["s1", "s2"]);
+    expect(api.total).toBe(2);
+  });
+
+  it("offers the Premium upgrade only below the Premium limit", async () => {
+    await mount();
+    expect(api.canUpgrade).toBe(true);
+  });
+
+  it.each([20, 50])(
+    "offers no upgrade at a limit of %i (Premium, Business)",
+    async (limit) => {
+      h.getLimits.mockResolvedValue({ data: { maxSavedSearches: limit } });
+      await mount();
+      expect(api.limit).toBe(limit);
+      expect(api.canUpgrade).toBe(false);
+    },
+  );
+
+  it("offers no upgrade while every tier has the same limit", async () => {
+    h.getLimits.mockResolvedValue({ data: { maxSavedSearches: 5 } });
+    h.getTiers.mockResolvedValue({
+      data: tiers.map((tier) => ({ ...tier, maxSavedSearches: 5 })),
+    });
+    await mount();
+    expect(api.canUpgrade).toBe(false);
   });
 
   it("deletes after a confirm and refetches the list", async () => {

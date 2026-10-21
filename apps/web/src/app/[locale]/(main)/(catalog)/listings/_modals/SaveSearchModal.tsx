@@ -8,6 +8,7 @@ import { FormInput, FormModal, useZodForm } from "@tarodan/ui/form";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
+import { useSavedSearchUpgrade } from "@/hooks/useSavedSearchUpgrade";
 import {
   saveSearchSchema,
   type SaveSearchValues,
@@ -37,6 +38,8 @@ export default function SaveSearchModal({
   const modalLabels = useFormModalLabels();
   const values: SaveSearchValues = { name: defaultName };
   const form = useZodForm(saveSearchSchema(t), { defaultValues: values });
+  const limit = refusal?.kind === "limit" ? refusal.limit : null;
+  const canUpgrade = useSavedSearchUpgrade(limit);
 
   return (
     <FormModal
@@ -62,10 +65,15 @@ export default function SaveSearchModal({
           title={t("savedSearch.limitTitle")}
         >
           {refusal.limit !== null &&
-            `${t("search.savedLimitReached", { limit: refusal.limit })} `}
-          <Link href="/membership" className="font-medium underline">
-            {t("search.premiumMoreSearches")}
-          </Link>
+            t("search.savedLimitReached", { limit: refusal.limit })}
+          {canUpgrade && (
+            <>
+              {" "}
+              <Link href="/membership" className="font-medium underline">
+                {t("search.premiumMoreSearches")}
+              </Link>
+            </>
+          )}
         </Alert>
       )}
     </FormModal>

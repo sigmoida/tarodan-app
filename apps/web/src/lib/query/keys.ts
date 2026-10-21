@@ -110,14 +110,12 @@ export const queryKeys = {
     tiers: () => ["membership", "tiers"] as const,
     /** The current user's membership (tier + status + period). */
     me: () => ["membership", "me"] as const,
-    /** The current user's permissions/limits, incl. the tier's `isAdFree` flag. */
-    limits: () => ["membership", "limits"] as const,
     /**
-     * `maxSavedSearches` of the effective tier. Nested under `limits()` so the
-     * membership invalidation that refreshes the limits refreshes it too; a
-     * separate entry because `limits()` holds the narrower `{ isAdFree }` view.
+     * The whole `GET /membership/me/limits` body (the effective tier's values).
+     * One entry for every consumer (`hooks/useMembershipLimits`), each picking
+     * its field (`isAdFree`, `maxSavedSearches`) with `select`.
      */
-    savedSearchLimit: () => ["membership", "limits", "saved-search"] as const,
+    limits: () => ["membership", "limits"] as const,
   },
   // NOTE: every factory below returns the SAME array a call site used inline
   // before the registry existed — do NOT change the string values, or an

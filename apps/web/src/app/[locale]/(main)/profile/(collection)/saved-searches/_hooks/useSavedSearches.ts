@@ -2,66 +2,69 @@
 
 "use client";
 
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import type { SavedSearch } from "@tarodan/types";
-import { membershipApi, savedSearchesApi } from "@/lib/api";
+import { savedSearchesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { unwrapList } from "@/lib/unwrapList";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
+import {
+  useMembershipLimits,
+  type MembershipLimits,
+} from "@/hooks/useMembershipLimits";
+import { useSavedSearchUpgrade } from "@/hooks/useSavedSearchUpgrade";
 import { useRouter } from "@/i18n/navigation";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { savedSearchRunHref } from "../_lib/runHref";
-
-/** The device-local list the page kept before the server list. Discarded, not imported. */
-const LEGACY_STORAGE_KEY = "diecast_saved_searches";
 
 interface SavedSearchList {
   items: SavedSearch[];
   total: number;
 }
 
+/** Always the server's value for the effective tier: 0 is a valid limit. */
+const selectSavedSearchLimit = (limits: MembershipLimits): number | null =>
+  typeof limits.maxSavedSearches === "number" ? limits.maxSavedSearches : null;
+
+/**
+ * Every page of `GET /saved-searches`. Launch tiers fit in one page of 100,
+ * but an admin can set a tier up to `SAVED_SEARCH_TIER_LIMIT_MAX`, and a
+ * search past the first page must still be visible and deletable.
+ */
+async function fetchAllSavedSearches(): Promise<SavedSearchList> {
+  const first = (await savedSearchesApi.list(1)).data;
+  const items = unwrapList<SavedSearch>(first);
+  const totalPages = Number(first?.meta?.totalPages) || 1;
+  for (let page = 2; page <= totalPages; page += 1) {
+    items.push(
+      ...unwrapList<SavedSearch>((await savedSearchesApi.list(page)).data),
+    );
+  }
+  const total = Number(first?.meta?.total);
+  return { items, total: Number.isFinite(total) ? total : items.length };
+}
+
 /**
  * The server list of saved searches (`GET /saved-searches`) with the tier
- * limit, delete (with confirm) and run. The first call also discards the old
- * localStorage list, once and without importing it.
+ * limit, delete (with confirm) and run. The old localStorage list is
+ * discarded app-wide by the auth store (`clearLegacyStorageKeys`).
  */
 export function useSavedSearches(enabled: boolean) {
   const t = useTranslations();
   const router = useRouter();
   const confirm = useConfirm();
 
-  useEffect(() => {
-    if (!enabled) return;
-    try {
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-    } catch {
-      // Storage can be blocked (private window); nothing to discard then.
-    }
-  }, [enabled]);
-
   const list = useWebList<SavedSearchList>({
     resource: queryKeys.savedSearches.resource,
-    fetcher: async () => {
-      const body = (await savedSearchesApi.list()).data;
-      const items: SavedSearch[] = body?.data ?? [];
-      return { items, total: body?.meta?.total ?? items.length };
-    },
+    fetcher: fetchAllSavedSearches,
     enabled,
     query: { meta: { page: "profile-saved-searches" } },
   });
 
-  // Always the server's value for the effective tier: 0 is a valid limit.
-  const limit = useQuery({
-    queryKey: queryKeys.membership.savedSearchLimit(),
-    queryFn: async (): Promise<number | null> => {
-      const value = (await membershipApi.getLimits()).data?.maxSavedSearches;
-      return typeof value === "number" ? value : null;
-    },
-    enabled,
-    staleTime: 5 * 60 * 1000,
-  });
+  const limit =
+    useMembershipLimits(selectSavedSearchLimit, { enabled }).data ?? null;
+  const canUpgrade = useSavedSearchUpgrade(limit);
 
   const deleteMutation = useWebMutation(
     (id: string) => savedSearchesApi.remove(id),
@@ -90,7 +93,8 @@ export function useSavedSearches(enabled: boolean) {
   return {
     savedSearches: list.data?.items ?? [],
     total: list.data?.total ?? 0,
-    limit: limit.data ?? null,
+    limit,
+    canUpgrade,
     isLoading: list.isLoading,
     isError: list.isError,
     refetch: list.refetch,

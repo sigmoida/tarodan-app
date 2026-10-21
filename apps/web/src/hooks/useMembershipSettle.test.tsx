@@ -102,6 +102,20 @@ describe("useMembershipSettle", () => {
     expect(getCurrentMembership).toHaveBeenCalledTimes(3);
   });
 
+  it("caches the whole limits body, so the saved-search limit follows the new tier", async () => {
+    getCurrentMembership.mockResolvedValue(meOf("premium"));
+    getLimits.mockResolvedValue({
+      data: { isAdFree: true, maxSavedSearches: 20 },
+    });
+
+    await mount({ expectedTier: "premium" });
+
+    expect(client.getQueryData(queryKeys.membership.limits())).toEqual({
+      isAdFree: true,
+      maxSavedSearches: 20,
+    });
+  });
+
   it("hedef katman (URL) biliniyorsa ona ulaşınca durur", async () => {
     getCurrentMembership
       .mockResolvedValueOnce(meOf("basic"))
