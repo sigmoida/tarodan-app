@@ -13,7 +13,7 @@ const THROTTLER_TTL_DEFAULT = "THROTTLER:TTLdefault";
 
 describe("critical public route throttles", () => {
   const cases: Array<{
-    controller: any;
+    controller: { name: string; prototype: object };
     method: string;
     limit: number;
   }> = [
@@ -92,7 +92,7 @@ describe("critical public route throttles", () => {
   it.each(cases)(
     "limits $controller.name.$method to $limit requests per minute",
     ({ controller, method, limit }) => {
-      const handler = controller.prototype[method];
+      const handler = (controller.prototype as Record<string, object>)[method];
 
       expect(Reflect.getMetadata(THROTTLER_LIMIT_DEFAULT, handler)).toBe(limit);
       expect(Reflect.getMetadata(THROTTLER_TTL_DEFAULT, handler)).toBe(60000);

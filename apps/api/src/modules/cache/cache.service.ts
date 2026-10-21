@@ -61,7 +61,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Set value in cache
    */
-  async set(key: string, value: any, options?: CacheOptions): Promise<void> {
+  async set(
+    key: string,
+    value: unknown,
+    options?: CacheOptions,
+  ): Promise<void> {
     try {
       const ttl = options?.ttl ?? this.DEFAULT_TTL;
       const serialized = JSON.stringify(value);
@@ -228,7 +232,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   async setSession(
     sessionId: string,
-    data: any,
+    data: unknown,
     ttlSeconds = 3600,
   ): Promise<void> {
     const key = `session:${sessionId}`;
@@ -266,7 +270,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Push to queue
    */
-  async pushToQueue(queueName: string, data: any): Promise<void> {
+  async pushToQueue(queueName: string, data: unknown): Promise<void> {
     try {
       await this.client.rpush(queueName, JSON.stringify(data));
     } catch (error) {
@@ -307,7 +311,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Publish message
    */
-  async publish(channel: string, message: any): Promise<void> {
+  async publish(channel: string, message: unknown): Promise<void> {
     try {
       await this.client.publish(channel, JSON.stringify(message));
     } catch (error) {
@@ -320,7 +324,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   async subscribe(
     channel: string,
-    callback: (message: any) => void,
+    callback: (message: unknown) => void,
   ): Promise<void> {
     await this.subscriber.subscribe(channel);
     this.subscriber.on("message", (ch: string, message: string) => {
@@ -384,11 +388,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get Redis info
    */
-  async getInfo(): Promise<Record<string, any>> {
+  async getInfo(): Promise<Record<string, string>> {
     try {
       const info = await this.client.info();
       const lines = info.split("\n");
-      const result: Record<string, any> = {};
+      const result: Record<string, string> = {};
 
       for (const line of lines) {
         if (line.includes(":")) {
