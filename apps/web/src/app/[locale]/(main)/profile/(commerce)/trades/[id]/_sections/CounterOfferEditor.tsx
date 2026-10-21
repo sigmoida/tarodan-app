@@ -23,9 +23,15 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
     t,
     isLoadingCounterData,
     counterTargetProducts,
+    counterTargetHasMore,
+    counterTargetLoadingMore,
+    loadMoreCounterTarget,
     selectedCounterTargetProducts,
     toggleCounterTargetProduct,
     counterProducts,
+    counterProductsHasMore,
+    counterProductsLoadingMore,
+    loadMoreCounterProducts,
     selectedCounterProducts,
     toggleCounterProduct,
     counterCashAmount,
@@ -86,60 +92,71 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
-                    {counterTargetProducts.map((product) => {
-                      const isSelected = selectedCounterTargetProducts.includes(
-                        product.id,
-                      );
-                      return (
-                        <label
-                          key={product.id}
-                          className={`relative block w-full cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                            isSelected
-                              ? "border-primary-500 ring-2 ring-primary-200"
-                              : "border-border hover:border-primary-300"
-                          }`}
-                        >
-                          <div className="absolute top-2 right-2 z-10">
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() =>
-                                toggleCounterTargetProduct(product.id)
-                              }
-                            />
-                          </div>
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
-                              <OptimizedImage
-                                src={getProductImage(product)}
-                                alt={product.title}
-                                fill
-                                sizes={IMAGE_SIZES.pickerGrid}
-                                className="object-cover"
-                                logContext={{
-                                  productId: product.id,
-                                  page: "trades-detail-receiver",
-                                }}
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                      {counterTargetProducts.map((product) => {
+                        const isSelected =
+                          selectedCounterTargetProducts.includes(product.id);
+                        return (
+                          <label
+                            key={product.id}
+                            className={`relative block w-full cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                              isSelected
+                                ? "border-primary-500 ring-2 ring-primary-200"
+                                : "border-border hover:border-primary-300"
+                            }`}
+                          >
+                            <div className="absolute top-2 right-2 z-10">
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() =>
+                                  toggleCounterTargetProduct(product.id)
+                                }
                               />
                             </div>
-                            <div className="text-center w-full">
-                              <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
-                                {product.title}
-                              </h3>
-                              <p className="text-base font-bold text-primary-500">
-                                {getProductEffectivePrice(
-                                  product,
-                                ).toLocaleString("tr-TR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                TL
-                              </p>
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
+                                <OptimizedImage
+                                  src={getProductImage(product)}
+                                  alt={product.title}
+                                  fill
+                                  sizes={IMAGE_SIZES.pickerGrid}
+                                  className="object-cover"
+                                  logContext={{
+                                    productId: product.id,
+                                    page: "trades-detail-receiver",
+                                  }}
+                                />
+                              </div>
+                              <div className="text-center w-full">
+                                <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
+                                  {product.title}
+                                </h3>
+                                <p className="text-base font-bold text-primary-500">
+                                  {getProductEffectivePrice(
+                                    product,
+                                  ).toLocaleString("tr-TR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  TL
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </label>
-                      );
-                    })}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {counterTargetHasMore && (
+                      <Button
+                        variant="secondary"
+                        className="self-center"
+                        onClick={loadMoreCounterTarget}
+                        isLoading={counterTargetLoadingMore}
+                      >
+                        {t("common.loadMore")}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -169,58 +186,72 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                     </Link>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
-                    {counterProducts.map((product) => {
-                      const isSelected = selectedCounterProducts.includes(
-                        product.id,
-                      );
-                      return (
-                        <label
-                          key={product.id}
-                          className={`relative block w-full cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                            isSelected
-                              ? "border-primary-500 ring-2 ring-primary-200"
-                              : "border-border hover:border-primary-300"
-                          }`}
-                        >
-                          <div className="absolute top-2 right-2 z-10">
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => toggleCounterProduct(product.id)}
-                            />
-                          </div>
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
-                              <OptimizedImage
-                                src={getProductImage(product)}
-                                alt={product.title}
-                                fill
-                                sizes={IMAGE_SIZES.pickerGrid}
-                                className="object-cover"
-                                logContext={{
-                                  productId: product.id,
-                                  page: "trades-detail-counter",
-                                }}
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                      {counterProducts.map((product) => {
+                        const isSelected = selectedCounterProducts.includes(
+                          product.id,
+                        );
+                        return (
+                          <label
+                            key={product.id}
+                            className={`relative block w-full cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                              isSelected
+                                ? "border-primary-500 ring-2 ring-primary-200"
+                                : "border-border hover:border-primary-300"
+                            }`}
+                          >
+                            <div className="absolute top-2 right-2 z-10">
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() =>
+                                  toggleCounterProduct(product.id)
+                                }
                               />
                             </div>
-                            <div className="text-center w-full">
-                              <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
-                                {product.title}
-                              </h3>
-                              <p className="text-base font-bold text-primary-500">
-                                {getProductEffectivePrice(
-                                  product,
-                                ).toLocaleString("tr-TR", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                TL
-                              </p>
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-alt">
+                                <OptimizedImage
+                                  src={getProductImage(product)}
+                                  alt={product.title}
+                                  fill
+                                  sizes={IMAGE_SIZES.pickerGrid}
+                                  className="object-cover"
+                                  logContext={{
+                                    productId: product.id,
+                                    page: "trades-detail-counter",
+                                  }}
+                                />
+                              </div>
+                              <div className="text-center w-full">
+                                <h3 className="font-medium text-heading text-sm line-clamp-2 mb-1">
+                                  {product.title}
+                                </h3>
+                                <p className="text-base font-bold text-primary-500">
+                                  {getProductEffectivePrice(
+                                    product,
+                                  ).toLocaleString("tr-TR", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  TL
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </label>
-                      );
-                    })}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {counterProductsHasMore && (
+                      <Button
+                        variant="secondary"
+                        className="self-center"
+                        onClick={loadMoreCounterProducts}
+                        isLoading={counterProductsLoadingMore}
+                      >
+                        {t("common.loadMore")}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
