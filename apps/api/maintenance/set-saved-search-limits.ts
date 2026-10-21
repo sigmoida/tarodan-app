@@ -6,10 +6,12 @@
  * DEFAULT 5 on every tier (data backfills never go in a schema migration).
  * Run this once after that deploy, dry run first.
  *
- * Idempotent and admin-safe: it changes only tiers still at the column
- * default whose launch value differs (`planSavedSearchLimitUpdates`), so a
- * value an admin has changed is never overwritten and a re-run changes
- * nothing. It writes nothing unless `--apply` is given.
+ * Idempotent: it changes only tiers still at the column default (5) whose
+ * launch value differs (`planSavedSearchLimitUpdates`), so a re-run changes
+ * nothing and any value other than 5 an admin has set stays. A paid tier an
+ * admin deliberately set to 5 cannot be told apart from an untouched one:
+ * run it right after the deploy, before admins edit the field. It writes
+ * nothing unless `--apply` is given.
  *
  * Usage:
  *   node dist-seed/maintenance/set-saved-search-limits.js            # dry run
@@ -48,7 +50,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  await prisma.$transaction(
+  const results = await prisma.$transaction(
     updates.map((update) =>
       prisma.membershipTier.updateMany({
         // Compare-and-set: an admin edit between the read and this write wins.
@@ -60,7 +62,13 @@ async function main(): Promise<void> {
       }),
     ),
   );
-  console.log(`Updated ${updates.length} tier(s).`);
+  const updated = results.reduce((sum, result) => sum + result.count, 0);
+  console.log(`Updated ${updated} of ${updates.length} planned tier(s).`);
+  if (updated < updates.length) {
+    console.log(
+      "A tier changed since the read and was left alone; re-run the dry run.",
+    );
+  }
 }
 
 main()

@@ -26,8 +26,8 @@ export interface SavedSearchLimitUpdate {
 
 /**
  * The tiers the post-deploy script changes: only those still at the column
- * default whose launch value differs. A value an admin has already changed is
- * left alone, so the script is safe to re-run.
+ * default whose launch value differs, so a re-run changes nothing and a value
+ * other than the default an admin has set stays.
  */
 export function planSavedSearchLimitUpdates(
   tiers: ReadonlyArray<{ type: MembershipTierType; maxSavedSearches: number }>,

@@ -77,6 +77,7 @@ import {
 } from "../src/common/helpers/contact-patterns";
 import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
 import { grantPendingAccountConsents } from "../src/modules/consent/helpers/account-consents";
+import { SAVED_SEARCH_TIER_LIMITS } from "../src/modules/saved-search/helpers/saved-search-tier-limits";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -1056,7 +1057,7 @@ async function main() {
         maxFreeListings: 5,
         maxTotalListings: 10,
         maxImagesPerListing: 3,
-        maxSavedSearches: 5,
+        maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.free,
         canCreateCollections: false,
         canTrade: false,
         isAdFree: false,
@@ -1077,7 +1078,7 @@ async function main() {
         maxFreeListings: 15,
         maxTotalListings: 50,
         maxImagesPerListing: 6,
-        maxSavedSearches: 10,
+        maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.basic,
         canCreateCollections: true,
         canTrade: true,
         isAdFree: false,
@@ -1098,7 +1099,7 @@ async function main() {
         maxFreeListings: 50,
         maxTotalListings: 200,
         maxImagesPerListing: 10,
-        maxSavedSearches: 20,
+        maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.premium,
         canCreateCollections: true,
         canTrade: true,
         isAdFree: true,
@@ -1119,7 +1120,7 @@ async function main() {
         maxFreeListings: 200,
         maxTotalListings: 1000,
         maxImagesPerListing: 15,
-        maxSavedSearches: 50,
+        maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.business,
         canCreateCollections: true,
         canTrade: true,
         isAdFree: true,

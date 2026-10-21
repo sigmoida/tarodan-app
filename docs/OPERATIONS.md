@@ -435,9 +435,11 @@ docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/set-saved-se
 The first command only prints the tiers and the planned changes (basic 10,
 premium 20, business 50; free keeps 5). Locally: `pnpm --filter @tarodan/api
 set:prod:saved-search-limits` (after `build:seed`). The script changes only
-tiers still at 5 whose launch value differs, so a value an admin has set
-(**System -> Membership Tiers**) is never overwritten and a re-run changes
-nothing. In production this is a production write: only with the user's
+tiers still at 5 whose launch value differs, so a re-run changes nothing and
+a value other than 5 set in **System -> Membership Tiers** stays. It cannot
+tell a paid tier deliberately set to 5 from an untouched one: run it right
+after the deploy, before anyone edits the field. If it reports fewer updated
+tiers than planned, a tier changed meanwhile; run the dry run again. In production this is a production write: only with the user's
 approval.
 
 Rollback: set the values back in the admin panel. The column and table are
