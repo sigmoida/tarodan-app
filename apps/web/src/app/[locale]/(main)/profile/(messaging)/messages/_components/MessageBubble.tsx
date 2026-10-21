@@ -1,5 +1,6 @@
 "use client";
 
+import { ClockIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import MessageTicks from "./MessageTicks";
 import { parseMessageContent, type Message } from "../_lib/messages";
 import { formatTime } from "@/lib/format";
@@ -56,8 +57,18 @@ export default function MessageBubble({
           >
             {formatTime(message.createdAt)}
           </span>
-          {message.status === "pending" && <span className="text-xs">⏳</span>}
-          {message.status === "rejected" && <span className="text-xs">❌</span>}
+          {message.status === "pending" && (
+            <ClockIcon
+              className={`size-3.5 ${isFromMe ? "text-inverted/80" : "text-subtle"}`}
+              aria-hidden
+            />
+          )}
+          {message.status === "rejected" && (
+            <XCircleIcon
+              className={`size-3.5 ${isFromMe ? "text-inverted/80" : "text-subtle"}`}
+              aria-hidden
+            />
+          )}
           {isFromMe &&
             (message.status === "sent" ||
               message.status === "delivered" ||

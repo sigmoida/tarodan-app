@@ -7,9 +7,9 @@ import {
   TruckIcon,
   ArrowsRightLeftIcon,
   StarIcon,
-  CheckIcon,
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
+import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import UserActionsMenu from "@/components/UserActionsMenu";
 import { useTranslations } from "next-intl";
@@ -76,8 +76,11 @@ export default function SellerHeader({
                 </Badge>
               )}
               {seller.isVerified && (
-                <Badge variant="success" size="sm">
-                  <CheckIcon className="mr-1 inline size-3" aria-hidden />
+                <Badge
+                  variant="success"
+                  size="sm"
+                  icon={<CheckBadgeIcon className="size-3.5" aria-hidden />}
+                >
                   {t("seller.verified")}
                 </Badge>
               )}
