@@ -136,3 +136,17 @@ export interface InitiateBoostResponse {
   /** Dev and test only (`PAYMENT_BYPASS`). */
   useBypass: boolean;
 }
+
+/**
+ * The boost behind a boost payment: `boost` of `GET /payments/:id/status`,
+ * `/status-guest` and `GET /payments/:id` (with `isBoostOrder: true`).
+ */
+export interface BoostPaymentSummary {
+  /** `ProductBoost.id`. */
+  id: string;
+  /** The boosted listing. */
+  productId: string;
+  productTitle: string;
+  /** When the boost ends (ISO); null until the paid payment activates it. */
+  endsAt: string | null;
+}

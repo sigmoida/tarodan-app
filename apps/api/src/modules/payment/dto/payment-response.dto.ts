@@ -1,4 +1,24 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import type { BoostPaymentSummary } from "@tarodan/types";
+
+/** The boost behind a boost payment (`BoostPaymentSummary`). */
+export class BoostPaymentSummaryDto implements BoostPaymentSummary {
+  @ApiProperty({ example: "uuid", description: "ProductBoost id" })
+  id: string;
+
+  @ApiProperty({ example: "uuid", description: "The boosted listing" })
+  productId: string;
+
+  @ApiProperty({ example: "Model car" })
+  productTitle: string;
+
+  @ApiProperty({
+    example: "2026-10-28T10:30:00.000Z",
+    nullable: true,
+    description: "When the boost ends; null until the payment activates it",
+  })
+  endsAt: string | null;
+}
 
 export class PaymentResponseDto {
   @ApiProperty({ example: "uuid" })
@@ -27,6 +47,25 @@ export class PaymentResponseDto {
 
   @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   updatedAt: Date;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: "Present (true) only for a membership payment",
+  })
+  isMembershipOrder?: true;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: "Present (true) only for a boost payment",
+  })
+  isBoostOrder?: true;
+
+  @ApiPropertyOptional({
+    type: BoostPaymentSummaryDto,
+    nullable: true,
+    description: "The boost of a boost payment",
+  })
+  boost?: BoostPaymentSummaryDto | null;
 }
 
 export class PaymentInitResponseDto {

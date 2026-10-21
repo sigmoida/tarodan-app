@@ -8,6 +8,10 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { i18nMessage, I18nService } from "../i18n";
 import { type Locale, defaultLocale } from "@tarodan/i18n";
+import type {
+  VirtualOrderKind,
+  VirtualOrderPaymentFields,
+} from "@tarodan/types";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -15,6 +19,7 @@ import {
 } from "../../common/helpers/public-identity";
 import { dateRangeWhere } from "../../common/list";
 import { PaymentQueryDto } from "./dto";
+import { virtualOrderKind } from "./helpers/virtual-order-kind";
 
 // Aktif (devam eden) iade talebi durumları — order-common.pickActiveRefundRequest
 // ile aynı liste. "refunded" burada YOK; tamamlanmış iade ayrı ele alınır.
@@ -265,8 +270,10 @@ export class PaymentQueryService {
       sellerNetAmount,
     };
 
-    const isMembershipOrder =
-      payment.order.productId?.startsWith?.("membership-") ?? false;
+    const virtualOrder = await this.virtualOrderFields(
+      payment.orderId,
+      virtualOrderKind(payment.order),
+    );
 
     return {
       id: payment.id,
@@ -281,7 +288,41 @@ export class PaymentQueryService {
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       ...pendingPaytrResume,
-      ...(isMembershipOrder && { isMembershipOrder: true }),
+      ...virtualOrder,
+    };
+  }
+
+  /**
+   * The additive fields of a virtual order's payment: `isMembershipOrder`, or
+   * `isBoostOrder` with the boost behind it (the web result page names the
+   * listing and the boost's end). Nothing for an order of goods. One indexed
+   * read (`product_boosts.order_id` is unique), only for a boost payment.
+   */
+  private async virtualOrderFields(
+    orderId: string | null,
+    kind: VirtualOrderKind | null,
+  ): Promise<VirtualOrderPaymentFields> {
+    if (kind === "membership") return { isMembershipOrder: true };
+    if (kind !== "boost" || !orderId) return {};
+    const boost = await this.prisma.productBoost.findUnique({
+      where: { orderId },
+      select: {
+        id: true,
+        productId: true,
+        endsAt: true,
+        product: { select: { title: true } },
+      },
+    });
+    return {
+      isBoostOrder: true,
+      boost: boost
+        ? {
+            id: boost.id,
+            productId: boost.productId,
+            productTitle: boost.product.title,
+            endsAt: boost.endsAt?.toISOString() ?? null,
+          }
+        : null,
     };
   }
 
@@ -365,6 +406,10 @@ export class PaymentQueryService {
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
+      ...(await this.virtualOrderFields(
+        payment.orderId,
+        virtualOrderKind(payment.order),
+      )),
     };
   }
 

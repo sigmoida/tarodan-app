@@ -1,3 +1,5 @@
+import type { BoostPaymentSummary } from "./boost";
+
 /**
  * Virtual orders: a platform service sold as an ordinary Order on a virtual
  * product (`membership-<tierId>`, `boost-<boostId>`) and paid through the
@@ -14,4 +16,16 @@ export function isVirtualOrderKind(value: unknown): value is VirtualOrderKind {
     typeof value === "string" &&
     (VIRTUAL_ORDER_KINDS as readonly string[]).includes(value)
   );
+}
+
+/**
+ * The additive fields a virtual order adds to a payment's status
+ * (`GET /payments/:id/status`, `/status-guest`, `GET /payments/:id`); an
+ * order of goods has none of them. `boost` is null only if the boost row is
+ * missing.
+ */
+export interface VirtualOrderPaymentFields {
+  isMembershipOrder?: true;
+  isBoostOrder?: true;
+  boost?: BoostPaymentSummary | null;
 }
