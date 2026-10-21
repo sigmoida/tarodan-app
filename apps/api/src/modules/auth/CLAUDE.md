@@ -52,7 +52,11 @@ Sensitive routes add a strict `@Throttle` on top of the global limit (login 5/mi
 is the pattern; forgot-password 3/min; refresh 60/min).
 `guards/critical-route-throttles.spec.ts` pins them; keep it green and add new
 sensitive routes to it. Known gap (hub backlog): the throttler counts by
-`req.ip`, so web BFF traffic shares one bucket.
+`req.ip`, so web BFF traffic shares one bucket. A new strict limit on a route
+the web calls takes `@Throttle(clientIpThrottle(n))`
+(`common/helpers/client-ip.ts`, the real client IP the gateway forwards), as
+the step-up, sign-in method, account deletion and e-mail change routes do;
+the spec pins it with `perClientIp`.
 
 ## 2FA and social login
 
@@ -117,11 +121,12 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   while the platform setting `auth_require_reauth_for_sensitive_actions`
   (`REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING`, admin Settings >
   Security, off by default) is on. It covers `DELETE /users/me` and
-  `POST /auth/email/request-change`, which mobile 1.0.5 calls without a
-  token, nor does web until it sends one. **Switch the setting on only after
-  the web release that sends the token is live and
-  `min_supported_app_version_ios` and `_android` are above 1.0.5**
-  (tarodan-ops `compat.md`). The setting is
+  `POST /auth/email/request-change`, which mobile versions without the
+  step-up and web before its step-up release call without a token.
+  **Switch the setting on only after the web release that sends the token is
+  live and `min_supported_app_version_ios` and `_android` are at least the
+  first mobile version that sends it** (the rule lives on the setting
+  constant; the version in tarodan-ops `compat.md`). The setting is
   read uncached on each such request without a token, so switching it on
   applies at once; a failed read fails the request. The guard sets the
   route's `auth.flow` tag (`account_delete`, `email_change`) before it

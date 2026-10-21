@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  ValidateIf,
 } from "class-validator";
 import {
   SIGN_IN_PROVIDERS,
@@ -14,7 +13,10 @@ import {
   type SignInProvider,
   type UnlinkProviderRequest,
 } from "@tarodan/types";
-import { PROVIDER_PROOF_MAX_LENGTH } from "../../reauth/dto/reauth.dto";
+import {
+  IsGoogleProof,
+  PROVIDER_PROOF_MAX_LENGTH,
+} from "../../dto/google-proof.validator";
 import { REAUTH_TOKEN_MAX_LENGTH } from "../../reauth/reauth.service";
 
 /** The step-up token every link and unlink carries (`@RequireReauth`). */
@@ -32,21 +34,15 @@ export class GoogleLinkDto
   implements GoogleLinkRequest
 {
   @ApiPropertyOptional({
-    description: "Google auth code from the web popup (no idToken)",
+    description: "Google auth code from the web popup (never with idToken)",
   })
-  @ValidateIf((o: GoogleLinkDto) => !o.idToken)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(PROVIDER_PROOF_MAX_LENGTH)
+  @IsGoogleProof("code")
   code?: string;
 
   @ApiPropertyOptional({
-    description: "Google id_token from native sign-in (no code)",
+    description: "Google id_token from native sign-in (never with code)",
   })
-  @ValidateIf((o: GoogleLinkDto) => !o.code)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(PROVIDER_PROOF_MAX_LENGTH)
+  @IsGoogleProof("idToken")
   idToken?: string;
 }
 

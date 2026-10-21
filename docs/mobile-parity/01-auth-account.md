@@ -237,6 +237,8 @@ formu) · `no-token` (bilgi + yeniden gönderme formu).
 | `POST` | `/auth/apple`  | public | `{ identityToken, fullName?, authorizationCode? }` (10/dk)   |
 
 - Web auth-code akışı kullanıyor; **mobil `idToken` göndermeli** — backend bu şekli zaten destekliyor.
+- Google proof rule (also on `POST /auth/reauth` and `POST /auth/social/google/link`): send
+  exactly one of `code` and `idToken`, each at most 4096 characters. Both together answer 400.
 - **Apple Sign-In web'de de açık** (2026-08-13): giriş ve kayıt formlarında buton var, popup akışı
   `id_token` döndürüyor, BFF `/auth/apple`'a iletiyor. Web'in kimliği ayrı bir **Services ID**
   (`APPLE_SERVICES_ID` / `NEXT_PUBLIC_APPLE_SERVICES_ID`); native bundle id tek başına yetmez, çünkü

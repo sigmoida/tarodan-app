@@ -370,12 +370,14 @@ yeniden-onay penceresini görür. Belge metni değiştiğinde
 
 `DELETE /users/me` and `POST /auth/email/request-change` check a step-up token
 (`POST /auth/reauth`) whenever the client sends one, but by default they do
-not require one: mobile 1.0.5 and older send none. Switch the requirement on
-only when both are true:
+not require one: mobile versions without the step-up send none (which ones:
+tarodan-ops `compat.md`). Switch the requirement on only when both are true:
 
 1. A mobile version that sends the token is live, and
    `min_supported_app_version_ios` and `min_supported_app_version_android` are
-   above 1.0.5 (tarodan-ops `compat.md`).
+   at least that version, the first one that sends it. Raising them past the
+   version live today is not enough: a later version without the step-up
+   would lose account deletion and e-mail change.
 2. The web release that sends the token is live.
 
 Then, in the admin panel, **Settings -> Security**, turn on "Require step-up

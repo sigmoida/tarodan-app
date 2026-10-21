@@ -12,11 +12,16 @@ import {
   type ReauthResponse,
   type SignInProvider,
 } from "@tarodan/types";
+import {
+  IsGoogleProof,
+  PROVIDER_PROOF_MAX_LENGTH,
+} from "../../dto/google-proof.validator";
 
 /** Bounds only: a current password is checked as typed, never re-validated. */
 const PASSWORD_PROOF_MAX_LENGTH = 1024;
-/** Google auth codes and id tokens, Apple identity tokens. */
-export const PROVIDER_PROOF_MAX_LENGTH = 4096;
+
+const hasGoogleProvider = (body: Record<string, unknown>) =>
+  body.provider === "google";
 
 /**
  * Proof for `POST /auth/reauth` (`ReauthRequest` in `@tarodan/types`).
@@ -40,21 +45,17 @@ export class ReauthDto {
   password?: string;
 
   @ApiPropertyOptional({
-    description: "Google auth code from the web popup (google, no idToken)",
+    description:
+      "Google auth code from the web popup (google; never with idToken)",
   })
-  @ValidateIf((o: ReauthDto) => o.provider === "google" && !o.idToken)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(PROVIDER_PROOF_MAX_LENGTH)
+  @IsGoogleProof("code", hasGoogleProvider)
   code?: string;
 
   @ApiPropertyOptional({
-    description: "Google id_token from native sign-in (google, no code)",
+    description:
+      "Google id_token from native sign-in (google; never with code)",
   })
-  @ValidateIf((o: ReauthDto) => o.provider === "google" && !o.code)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(PROVIDER_PROOF_MAX_LENGTH)
+  @IsGoogleProof("idToken", hasGoogleProvider)
   idToken?: string;
 
   @ApiPropertyOptional({ description: "Apple identity token (apple)" })
