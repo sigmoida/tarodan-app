@@ -12,11 +12,11 @@ import {
 } from "@tarodan/ui/form";
 import { offersApi } from "@/lib/api";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
-import { maxOfferAmount } from "@tarodan/listing-form/price-limits";
 import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { useListingDetail } from "../_context/ListingDetailContext";
 import { offerSchema, type OfferValues } from "./offerSchema";
 import { formatTL } from "@/lib/format";
+import { tlAmountValue } from "@/lib/tlAmount";
 
 /**
  * Make-offer dialog — owns its RHF+zod form and the create-offer mutation, framed
@@ -48,7 +48,8 @@ export default function OfferModal() {
     mutationFn: (values: OfferValues) =>
       offersApi.create({
         productId: listing!.id,
-        amount: parseFloat(values.amount),
+        // The schema accepted the text, so the parser reads an amount.
+        amount: tlAmountValue(values.amount),
         message: values.message?.trim() || undefined,
       }),
     onSuccess: () => {
@@ -88,11 +89,10 @@ export default function OfferModal() {
 
       <FormInput
         name="amount"
-        type="number"
+        type="text"
+        inputMode="decimal"
         label={t("offer.yourOfferAmount")}
         placeholder={t("product.offerAmountPlaceholder")}
-        min={minOffer}
-        max={maxOfferAmount(effectivePrice)}
         helperText={
           floor != null
             ? t("listing.priceMinHint", { minPrice: formatTL(floor) })
