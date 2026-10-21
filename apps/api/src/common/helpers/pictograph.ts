@@ -32,3 +32,12 @@ export function stripPictographs(text: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 }
+
+/**
+ * Text-style symbols and arrows the catalog gate also rejects: stars, check
+ * and cross marks, the Unicode Arrows block and ASCII arrows. A navigation
+ * path is written "Profile > Addresses", a pairing in words. Test it against
+ * visible text, not markup (an HTML comment ends in "-->").
+ */
+export const DECORATIVE_GLYPH =
+  /[\u2605\u2606\u2713\u2714\u2715\u2717\u2190-\u21FF]|->|<-|=>/u;
