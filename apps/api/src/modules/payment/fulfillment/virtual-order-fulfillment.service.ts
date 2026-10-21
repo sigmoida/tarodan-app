@@ -23,11 +23,15 @@ import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
+import { traceBoost } from "../../product/helpers/boost-observability";
+import { SentryService } from "../../sentry/sentry.service";
 
 /** The fields of a paid payment that boost activation reads. */
 export interface BoostOrderPayment {
   id: string;
   orderId: string | null;
+  /** The order as the caller loaded it; only its number is read (Sentry trail). */
+  order?: { orderNumber?: string | null; [field: string]: unknown } | null;
 }
 
 /**
@@ -53,6 +57,7 @@ export class VirtualOrderFulfillmentService {
     @Optional()
     @InjectQueue(QUEUE_NAMES.SEARCH)
     private readonly searchQueue?: Queue,
+    @Optional() private readonly sentry?: SentryService,
   ) {}
 
   /**
@@ -323,6 +328,16 @@ export class VirtualOrderFulfillmentService {
     });
     this.logger.log(
       `Boost order ${orderId} completed after payment ${payment.id}`,
+    );
+    // The timeline's own breadcrumb (`boost.activate`) carries the boost id.
+    traceBoost(
+      this.sentry,
+      result.activation ? "activated" : "already_active",
+      {
+        orderId,
+        orderNumber: payment.order?.orderNumber,
+        productId: result.activation?.productId,
+      },
     );
     return result.activation?.productId ?? null;
   }

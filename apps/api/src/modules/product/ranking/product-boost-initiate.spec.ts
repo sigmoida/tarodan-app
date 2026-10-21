@@ -101,12 +101,14 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
         }),
       ),
     };
+    const sentry = { setTag: jest.fn(), addBreadcrumb: jest.fn() };
     const service = new ProductBoostService(
       prisma as never,
       payment as never,
       consents as never,
+      sentry as never,
     );
-    return { service, prisma, tx, consents, payment, calls };
+    return { service, prisma, tx, consents, payment, sentry, calls };
   }
 
   const input = (over: Record<string, unknown> = {}) => ({
@@ -255,6 +257,47 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
       expect(firstData(h.tx.order.create).totalAmount).toBe(99);
       expect(firstData(h.tx.productBoost.create).price).toBe(99);
       expect(result.price).toBe(99);
+    });
+  });
+
+  describe("traceability", () => {
+    it("tags flow=boost and leaves the boost and order ids in Sentry, no personal data", async () => {
+      const h = harness();
+
+      await h.service.initiateBoost(OWNER, "listing-1", input());
+
+      expect(h.sentry.setTag).toHaveBeenCalledWith("flow", "boost");
+      const crumbs = h.sentry.addBreadcrumb.mock.calls.map(
+        ([crumb]: [{ message: string; data: unknown }]) => crumb,
+      );
+      expect(crumbs).toEqual([
+        expect.objectContaining({
+          message: "boost.initiate",
+          data: { productId: "listing-1" },
+        }),
+        expect.objectContaining({
+          message: "boost.order_created",
+          data: {
+            boostId: "b1",
+            orderId: "order-1",
+            orderNumber: "BST-1",
+            productId: "listing-1",
+          },
+        }),
+      ]);
+    });
+
+    it("tags even a refused request", async () => {
+      const h = harness();
+
+      await expect(
+        h.service.initiateBoost(
+          OWNER,
+          "listing-1",
+          input({ withdrawalWaiverAccepted: false }),
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(h.sentry.setTag).toHaveBeenCalledWith("flow", "boost");
     });
   });
 

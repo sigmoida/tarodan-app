@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { Request } from "express";
 import { PrismaService } from "../../../prisma";
@@ -31,6 +32,8 @@ import {
   platformServiceConsentsAccepted,
   type PlatformServiceConsentInput,
 } from "../../consent/platform-service-consent.service";
+import { SentryService } from "../../sentry/sentry.service";
+import { traceBoost } from "../helpers/boost-observability";
 import {
   BOOST_ENABLED_SETTING,
   type BoostOptionsResponse,
@@ -63,6 +66,7 @@ export class ProductBoostService {
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
     private readonly platformServiceConsents: PlatformServiceConsentService,
+    @Optional() private readonly sentry?: SentryService,
   ) {}
 
   /** Whether boost sales are on (`isBoostEnabled`: a missing row means on). */
@@ -282,6 +286,7 @@ export class ProductBoostService {
     req?: Request,
   ) {
     const { packageId, durationDays, provider, autoRenew } = input;
+    traceBoost(this.sentry, "initiate", { productId });
     if (!platformServiceConsentsAccepted(input)) {
       throw new BadRequestException(
         i18nMessage("server.product.boostConsentRequired"),
@@ -435,6 +440,12 @@ export class ProductBoostService {
         userId,
       });
       return { boost, order };
+    });
+    traceBoost(this.sentry, "order_created", {
+      boostId: boost.id,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      productId: product.id,
     });
 
     try {
