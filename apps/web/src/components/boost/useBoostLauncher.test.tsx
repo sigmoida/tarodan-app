@@ -38,6 +38,7 @@ vi.mock("@/stores/authStore", () => ({
 }));
 
 import { useBoostLauncher, type BoostLauncher } from "./useBoostLauncher";
+import { useBoostDialogStore } from "@/stores/boostDialogStore";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -57,6 +58,7 @@ beforeEach(() => {
   h.tier = "free";
   h.mounts = 0;
   h.props = null;
+  useBoostDialogStore.setState({ openDialogs: 0 });
 });
 
 afterEach(() => {
@@ -94,6 +96,25 @@ describe("useBoostLauncher", () => {
     act(() => launcher.open({ ...LISTING, id: "listing-2" }));
     expect(h.props?.listing.id).toBe("listing-2");
     expect(h.mounts).toBe(2);
+  });
+
+  it("counts the open dialog so other layers wait for it", () => {
+    const open = () => useBoostDialogStore.getState().openDialogs;
+    render();
+    expect(open()).toBe(0);
+
+    act(() => launcher.open(LISTING));
+    expect(open()).toBe(1);
+    act(() => launcher.open({ ...LISTING, id: "listing-2" }));
+    expect(open()).toBe(1);
+
+    act(() => h.props!.onClose());
+    expect(open()).toBe(0);
+
+    act(() => launcher.open(LISTING));
+    act(() => root.unmount());
+    expect(open()).toBe(0);
+    root = createRoot(container);
   });
 
   it.each([

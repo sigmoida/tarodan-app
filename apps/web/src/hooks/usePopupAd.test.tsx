@@ -28,6 +28,7 @@ vi.mock("@/hooks/useCookieConsent", () => ({
 
 import { POPUP_AD_DELAY_MS, usePopupAd } from "./usePopupAd";
 import { popupAdDismissKey } from "@/lib/ads/popupFrequency";
+import { useBoostDialogStore } from "@/stores/boostDialogStore";
 import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 
 const ad = (over: Partial<Advertisement> = {}): Advertisement => ({
@@ -75,6 +76,7 @@ describe("usePopupAd", () => {
     state.cookieBannerOpen = false;
     state.enabledCalls = [];
     useRequiredStepsStore.setState({ outstanding: false });
+    useBoostDialogStore.setState({ offerOpen: false, openDialogs: 0 });
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
@@ -161,6 +163,24 @@ describe("usePopupAd", () => {
     expect(current.ad).toBeNull();
 
     act(() => useRequiredStepsStore.setState({ outstanding: false }));
+    elapse(POPUP_AD_DELAY_MS);
+    expect(current.ad?.id).toBe("ad-1");
+  });
+
+  it("waits while the boost offer or a boost dialog is open", () => {
+    state.ads = [ad()];
+    act(() => useBoostDialogStore.setState({ offerOpen: true }));
+    mount();
+    elapse(POPUP_AD_DELAY_MS * 2);
+    expect(current.ad).toBeNull();
+
+    act(() =>
+      useBoostDialogStore.setState({ offerOpen: false, openDialogs: 1 }),
+    );
+    elapse(POPUP_AD_DELAY_MS * 2);
+    expect(current.ad).toBeNull();
+
+    act(() => useBoostDialogStore.setState({ openDialogs: 0 }));
     elapse(POPUP_AD_DELAY_MS);
     expect(current.ad?.id).toBe("ad-1");
   });

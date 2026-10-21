@@ -12,6 +12,7 @@ import type { BoostOffer } from "@tarodan/types";
 
 const h = vi.hoisted(() => ({
   signedIn: true,
+  seller: true,
   path: "/",
   offers: vi.fn(),
   dismissOffers: vi.fn(),
@@ -31,7 +32,7 @@ vi.mock("@/stores/authStore", () => ({
   useAuthStore: (select: (s: unknown) => unknown) =>
     select({
       isAuthenticated: h.signedIn,
-      user: { membershipTier: "free" },
+      user: { membershipTier: "free", isSeller: h.seller },
     }),
 }));
 vi.mock("@/lib/api", () => ({
@@ -65,6 +66,9 @@ vi.mock("next/dynamic", async () => {
 
 import BoostOfferHost, { isOfferSuppressedPath } from "./BoostOfferHost";
 import BoostOfferMount from "./BoostOfferMount";
+import { useBoostDialogStore } from "@/stores/boostDialogStore";
+import { useOnboardingTourStore } from "@/stores/onboardingTourStore";
+import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 
 const offer = (id: string, title: string): BoostOffer => ({
   productId: id,
@@ -113,8 +117,12 @@ beforeEach(() => {
   root = createRoot(container);
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   h.signedIn = true;
+  h.seller = true;
   h.path = "/";
   h.boostDialog = null;
+  useBoostDialogStore.setState({ openDialogs: 0, offerOpen: false });
+  useRequiredStepsStore.setState({ outstanding: false });
+  useOnboardingTourStore.setState({ running: false });
   h.offers.mockReset();
   h.dismissOffers.mockReset();
   h.dismissOffers.mockResolvedValue({ data: undefined });
@@ -159,7 +167,13 @@ describe("BoostOfferHost", () => {
     expect(body()).not.toContain("boost.offer.title");
   });
 
-  it.each(["/payment/success", "/checkout", "/login"])(
+  it.each([
+    "/payment/success",
+    "/payment/abc",
+    "/cart/payment",
+    "/checkout",
+    "/membership/checkout",
+  ])(
     "waits on %s without dismissing, then opens on the next page",
     async (path) => {
       h.path = path;
@@ -176,10 +190,71 @@ describe("BoostOfferHost", () => {
   it("knows the suppressed paths", () => {
     expect(isOfferSuppressedPath("/payment")).toBe(true);
     expect(isOfferSuppressedPath("/payment/fail")).toBe(true);
+    expect(isOfferSuppressedPath("/cart/payment")).toBe(true);
     expect(isOfferSuppressedPath("/checkout/address")).toBe(true);
-    expect(isOfferSuppressedPath("/forgot-password")).toBe(true);
+    expect(isOfferSuppressedPath("/membership/checkout")).toBe(true);
     expect(isOfferSuppressedPath("/profile/listings")).toBe(false);
+    expect(isOfferSuppressedPath("/cart")).toBe(false);
+    expect(isOfferSuppressedPath("/payment-options")).toBe(false);
     expect(isOfferSuppressedPath("/checkouts-guide")).toBe(false);
+    expect(isOfferSuppressedPath("/membership")).toBe(false);
+  });
+
+  it.each([
+    [
+      "a required step is pending",
+      () => useRequiredStepsStore.setState({ outstanding: true }),
+    ],
+    [
+      "the onboarding tour runs",
+      () => useOnboardingTourStore.setState({ running: true }),
+    ],
+    [
+      "another page's boost dialog is open",
+      () => useBoostDialogStore.setState({ openDialogs: 1 }),
+    ],
+  ] as const)("waits while %s, then opens", async (_, block) => {
+    act(() => {
+      block();
+    });
+    await render();
+    expect(body()).not.toContain("boost.offer.title");
+    expect(useBoostDialogStore.getState().offerOpen).toBe(false);
+
+    act(() => {
+      useRequiredStepsStore.setState({ outstanding: false });
+      useOnboardingTourStore.setState({ running: false });
+      useBoostDialogStore.setState({ openDialogs: 0 });
+    });
+    await flush();
+    expect(body()).toContain("Ferrari F40");
+    expect(useBoostDialogStore.getState().offerOpen).toBe(true);
+  });
+
+  it("publishes its open state for the other layers", async () => {
+    await render();
+    expect(useBoostDialogStore.getState().offerOpen).toBe(true);
+
+    await click("boost.offer.notNow");
+    expect(useBoostDialogStore.getState().offerOpen).toBe(false);
+  });
+
+  it("dismisses an offer that arrived while the dialog was open", async () => {
+    h.offers.mockResolvedValueOnce({
+      data: { enabled: true, offers: [TWO[0]] },
+    });
+    await render();
+    expect(body()).not.toContain("Porsche 911");
+
+    act(() => {
+      window.dispatchEvent(new Event("visibilitychange"));
+    });
+    await flush();
+    expect(body()).toContain("Porsche 911");
+
+    await click("boost.offer.notNow");
+    expect(h.dismissOffers).toHaveBeenCalledTimes(1);
+    expect(h.dismissOffers).toHaveBeenCalledWith({ productIds: ["p1", "p2"] });
   });
 
   it("choosing one dismisses all and opens the boost dialog, never nested", async () => {
@@ -199,6 +274,10 @@ describe("BoostOfferHost", () => {
     expect(
       document.querySelector('[data-testid="boost-dialog"]'),
     ).not.toBeNull();
+    expect(useBoostDialogStore.getState()).toMatchObject({
+      openDialogs: 1,
+      offerOpen: false,
+    });
   });
 
   it('"not now" dismisses all listed offers and closes', async () => {
@@ -257,6 +336,13 @@ describe("BoostOfferHost", () => {
     await rerender();
     expect(h.offers).toHaveBeenCalledTimes(2);
   });
+
+  it("does not ask on a route change to a suppressed page", async () => {
+    await render();
+    h.path = "/cart/payment";
+    await rerender();
+    expect(h.offers).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("BoostOfferMount", () => {
@@ -267,8 +353,19 @@ describe("BoostOfferMount", () => {
     expect(body()).not.toContain("boost.offer.title");
   });
 
+  it("renders nothing and asks for nothing for a buyer", async () => {
+    h.seller = false;
+    await render(<BoostOfferMount />);
+    expect(h.offers).not.toHaveBeenCalled();
+    expect(body()).not.toContain("boost.offer.title");
+  });
+
   it("opens the dialog for a signed-in seller", async () => {
     await render(<BoostOfferMount />);
-    await vi.waitFor(() => expect(body()).toContain("Ferrari F40"));
+    // The lazy chunk resolves outside act: keep flushing inside it.
+    await vi.waitFor(async () => {
+      await flush();
+      expect(body()).toContain("Ferrari F40");
+    });
   });
 });
