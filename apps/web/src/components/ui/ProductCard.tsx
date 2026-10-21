@@ -335,7 +335,7 @@ export default function ProductCard({
           priority={priority}
         />
         {outOfStock && <OutOfStockOverlay />}
-        {/* Sol üst yuva `overlayStart`'ındır; doluysa rozet yığını çizilmez. */}
+        {/* The top-left slot is `overlayStart`'s; when set, no badge stack. */}
         {!overlayStart && (
           <ProductCardBadges product={product} labels={badgeLabels} />
         )}
@@ -385,7 +385,7 @@ export default function ProductCard({
           </ProductCardPriceRow>
         </div>
       </div>
-      {/* Sağ üst yuva `overlay`'indir; doluysa kalp çizilmez. */}
+      {/* The top-right slot is `overlay`'s; when set, no heart. */}
       {favorite && !overlay && (
         <ProductCardFavorite
           productId={product.id}

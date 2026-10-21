@@ -121,15 +121,37 @@ describe("useCartToggle", () => {
     expect(cart.isPending).toBe(false);
   });
 
-  it("toasts the failure and keeps the state", async () => {
-    h.addToCart.mockRejectedValue(new Error("nope"));
+  it("toasts the reason useCart rethrew for an add, and keeps the state", async () => {
+    h.addToCart.mockRejectedValue(new Error("Yetersiz stok"));
     render();
 
     act(() => cart.toggle());
     await flush();
 
-    expect(h.toast.error).toHaveBeenCalledWith("common.operationFailed");
+    expect(h.toast.error).toHaveBeenCalledTimes(1);
+    expect(h.toast.error).toHaveBeenCalledWith("Yetersiz stok");
     expect(h.toast.success).not.toHaveBeenCalled();
     expect(cart.inCart).toBe(false);
+  });
+
+  it("toasts the API message of a failed remove, never axios' own text", async () => {
+    h.lines = [{ productId: "p1" }];
+    h.removeFromCart.mockRejectedValueOnce(
+      Object.assign(new Error("Request failed with status code 409"), {
+        isAxiosError: true,
+        response: { data: { message: "Sepet kilitli" } },
+      }),
+    );
+    render();
+    act(() => cart.toggle());
+    await flush();
+    expect(h.toast.error).toHaveBeenLastCalledWith("Sepet kilitli");
+
+    h.removeFromCart.mockRejectedValueOnce(
+      Object.assign(new Error("Network Error"), { isAxiosError: true }),
+    );
+    act(() => cart.toggle());
+    await flush();
+    expect(h.toast.error).toHaveBeenLastCalledWith("common.operationFailed");
   });
 });

@@ -40,6 +40,7 @@ vi.mock("@/stores/authStore", () => ({
     selector({ user: { id: "me" } }),
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "tr",
   useTranslations: () => (key: string) => key,
 }));
 // The card's price-row action reads the boost switch (a query); collection

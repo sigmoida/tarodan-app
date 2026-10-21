@@ -39,6 +39,7 @@ vi.mock("@/components/boost/useBoostLauncher", () => ({
   useBoostLauncher: () => ({ open: vi.fn(), dialog: null }),
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "tr",
   useTranslations: () => (key: string) => key,
 }));
 vi.mock("@/components/OptimizedImage", () => ({

@@ -56,7 +56,7 @@ export default function FavoritesGrid({
           product={wishlistItemToProduct(item)}
           index={index}
           showMeta={false}
-          // Kartın kendi "kaldır" düğmesi var — ikinci bir kalp çizilmez.
+          // The card has its own remove control: no second heart.
           showFavorite={false}
           overlay={
             !isSharedView ? (

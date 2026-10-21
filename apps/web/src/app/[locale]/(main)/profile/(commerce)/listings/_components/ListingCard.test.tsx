@@ -26,6 +26,7 @@ vi.mock("@/components/boost/useBoostOffers", () => ({
   useBoostEnabled: () => h.boostEnabled,
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "tr",
   useTranslations: () => (key: string, values?: Record<string, string>) =>
     values ? `${key}(${Object.values(values).join("|")})` : key,
 }));

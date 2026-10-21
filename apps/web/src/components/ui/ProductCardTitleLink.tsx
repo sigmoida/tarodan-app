@@ -12,7 +12,8 @@ import { Link } from "@/i18n/navigation";
  *
  * The visible badges are `aria-hidden`; their text (`describeProductBadges`)
  * is read here, as part of the link's name. Keyboard focus shows a ring
- * around the whole card. Server- and client-safe (no hooks).
+ * inside the whole card's edge (inset: the cards clip their overflow, so an
+ * outer ring would not show). Server- and client-safe (no hooks).
  */
 export default function ProductCardTitleLink({
   href,
@@ -30,7 +31,7 @@ export default function ProductCardTitleLink({
     <Link
       href={href}
       onClick={onClick}
-      className="after:absolute after:inset-0 after:rounded focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary-600"
+      className="after:absolute after:inset-0 after:rounded focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-primary-600"
     >
       {title}
       {badgeSummary && <span className="sr-only"> {badgeSummary}</span>}

@@ -24,7 +24,7 @@ import { useBoostEnabled } from "@/components/boost/useBoostOffers";
 import { useAuthStore } from "@/stores/authStore";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -71,6 +71,7 @@ export default function ListingCard({
   onBoost,
 }: ListingCardProps) {
   const t = useTranslations();
+  const locale = useLocale();
   const status = getListingStatus(listingStatusKey(listing), t);
   const StatusIcon = status.icon;
   const viewable = VIEWABLE.includes(listing.status);
@@ -91,7 +92,7 @@ export default function ListingCard({
   );
   const boostEndsAt =
     listing.isBoosted && listing.boostedUntil
-      ? formatDayMonth(listing.boostedUntil)
+      ? formatDayMonth(listing.boostedUntil, locale)
       : "";
 
   return (

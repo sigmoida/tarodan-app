@@ -91,11 +91,12 @@ describe("useBoostEnabled", () => {
     expect(h.offers).not.toHaveBeenCalled();
   });
 
-  it("hides boost when the request fails", async () => {
+  it("keeps boost on when the request fails (the dialog still checks)", async () => {
     h.offers.mockRejectedValue(new Error("down"));
     render();
     await flush();
 
-    expect(last()).toBe(false);
+    expect(h.offers).toHaveBeenCalled();
+    expect(last()).toBe(true);
   });
 });

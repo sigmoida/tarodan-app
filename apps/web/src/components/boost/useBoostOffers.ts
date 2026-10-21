@@ -30,11 +30,13 @@ export function useBoostOffers({ enabled = true }: { enabled?: boolean } = {}) {
  * arrives this is true, the same default as the setting itself (missing =
  * on, `isBoostEnabled`), so an own listing shows its boost action without a
  * flicker; the dialog shows `profile.boost.unavailable` if sales turn out to
- * be off. A failed request hides the action.
+ * be off. A failed request also keeps it on: hiding the seller's boost
+ * entry on a transient error would be worse, and the dialog (and the API)
+ * still refuse a purchase while sales are off.
  */
 export function useBoostEnabled({
   enabled = true,
 }: { enabled?: boolean } = {}): boolean {
-  const { data, isError } = useBoostOffers({ enabled });
-  return data ? data.enabled : !isError;
+  const { data } = useBoostOffers({ enabled });
+  return data ? data.enabled : true;
 }

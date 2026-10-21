@@ -68,6 +68,7 @@ vi.mock("@/hooks/useAuthGate", () => ({
   useAuthGate: () => ({ requireAuth: () => true, authModal: null }),
 }));
 vi.mock("next-intl", () => ({
+  useLocale: () => "tr",
   useTranslations: () => (key: string, values?: Record<string, string>) =>
     values ? `${key}(${Object.values(values).join("|")})` : key,
 }));
@@ -342,6 +343,8 @@ describe("stretched title link", () => {
     expect(link.className).toContain("after:absolute");
     expect(link.className).toContain("after:inset-0");
     expect(link.className).toContain("focus-visible:after:ring-2");
+    // Inset: the card clips its overflow, an outer ring would not show.
+    expect(link.className).toContain("focus-visible:after:ring-inset");
     expect(link.textContent).toContain(TITLE);
     for (const button of container.querySelectorAll("button")) {
       expect(link.contains(button)).toBe(false);

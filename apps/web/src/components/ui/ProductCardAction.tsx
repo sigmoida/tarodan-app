@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { Button, IconButton } from "@tarodan/ui";
 import { productCardAction, type ProductCardAction } from "@tarodan/types";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useBoostEnabled } from "@/components/boost/useBoostOffers";
 import { useBoostLauncher } from "@/components/boost/useBoostLauncher";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -173,10 +173,11 @@ export default function ProductCardPriceRow({
   children: ReactNode;
 }) {
   const t = useTranslations();
+  const locale = useLocale();
   const { action, own } = useProductCardAction(listing);
   const endsAt =
     own && listing.isBoosted && listing.boostedUntil
-      ? formatDayMonth(listing.boostedUntil)
+      ? formatDayMonth(listing.boostedUntil, locale)
       : "";
   const endDate = endsAt ? (
     <p

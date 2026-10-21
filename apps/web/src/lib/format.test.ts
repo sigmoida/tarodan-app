@@ -9,14 +9,15 @@ import {
 } from "./format";
 
 describe("formatDayMonth", () => {
-  it("is the day and short month, without the year (a boost's end)", () => {
-    expect(formatDayMonth("2026-11-12T10:00:00.000Z")).toBe("12 Kas");
+  it("is the day and short month in the UI locale, without the year", () => {
+    expect(formatDayMonth("2026-11-12T10:00:00.000Z", "tr")).toBe("12 Kas");
+    expect(formatDayMonth("2026-11-12T10:00:00.000Z", "en")).toBe("Nov 12");
   });
 
   it("is empty for a missing or invalid date", () => {
-    expect(formatDayMonth(null)).toBe("");
-    expect(formatDayMonth("")).toBe("");
-    expect(formatDayMonth("not a date")).toBe("");
+    expect(formatDayMonth(null, "tr")).toBe("");
+    expect(formatDayMonth("", "tr")).toBe("");
+    expect(formatDayMonth("not a date", "tr")).toBe("");
   });
 });
 
