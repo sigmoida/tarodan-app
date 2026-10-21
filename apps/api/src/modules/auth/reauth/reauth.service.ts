@@ -75,6 +75,13 @@ function reauthFailedError(): ForbiddenException {
   });
 }
 
+function reauthUnavailableError(): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    ...i18nMessage("server.auth.reauthUnavailable"),
+    errorCode: SIGN_IN_METHODS_ERROR_CODES.reauthUnavailable,
+  });
+}
+
 /**
  * Step-up: a signed-in user proves it is them again before a sensitive write
  * and gets a short-lived opaque token for it (`ReauthGuard` checks it).
@@ -86,8 +93,9 @@ function reauthFailedError(): ForbiddenException {
  * - The token lives in Redis only, bound to the user, for
  *   `REAUTH_TOKEN_TTL_SECONDS`, and may be used several times in that time.
  *   With Redis down no token is issued and none is accepted (fails closed).
- * - Failed proofs are counted per user; at `REAUTH_MAX_FAILURES` within the
- *   window the step-up answers 429 until the window ends.
+ * - Attempts are counted per user before the proof is checked; after
+ *   `REAUTH_MAX_FAILURES` failures within the window the step-up answers 429
+ *   until the window ends. With Redis down no proof is checked (503).
  *
  * Not a JWT on purpose: `JwtStrategy` checks no token type, so a step-up JWT
  * signed with `JWT_SECRET` would also pass as an access token.
@@ -109,7 +117,6 @@ export class ReauthService {
     proof: ReauthDto,
   ): Promise<ReauthResponse> {
     this.sentry.setTag(AUTH_FLOW_TAG, "reauth");
-    await this.assertNotLocked(userId);
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -119,17 +126,19 @@ export class ReauthService {
 
     const method: ReauthMethod = proof.provider ?? "password";
     if (method !== "password" && user.passwordHash) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.reauthMethodNotAllowed"),
-      );
+      throw new BadRequestException({
+        ...i18nMessage("server.auth.reauthMethodNotAllowed"),
+        errorCode: SIGN_IN_METHODS_ERROR_CODES.reauthMethodNotAllowed,
+      });
     }
 
+    const attempt = await this.reserveAttempt(userId);
     const proven =
       method === "password"
         ? await this.isPasswordProof(user.passwordHash, proof.password)
         : await this.isProviderProof(userId, method, proof);
     if (!proven) {
-      await this.recordFailure(userId, method);
+      await this.recordFailure(userId, method, attempt);
       throw reauthFailedError();
     }
 
@@ -150,14 +159,36 @@ export class ReauthService {
     return stored?.userId === userId;
   }
 
-  private async assertNotLocked(userId: string): Promise<void> {
-    const failures = await this.cache.get<number>(failuresKey(userId));
-    if (typeof failures === "number" && failures >= REAUTH_MAX_FAILURES) {
+  /**
+   * Counts the attempt BEFORE the proof is checked: `incr` is atomic, so
+   * parallel requests get distinct numbers and only the first
+   * `REAUTH_MAX_FAILURES` of a window reach the (slow) comparison. A success
+   * clears the counter, so it holds the failures of the window.
+   *
+   * Fails closed: `incr` answers 0 when Redis is down, and then no proof is
+   * checked at all. Otherwise the lockout would be off and a right guess
+   * (503 at issuance) would read differently from a wrong one (403).
+   */
+  private async reserveAttempt(userId: string): Promise<number> {
+    const key = failuresKey(userId);
+    const attempt = await this.cache.incr(key);
+    if (attempt === 0) throw reauthUnavailableError();
+    // The window starts with the first attempt. A key left without a TTL (an
+    // expire lost after the incr) would lock the user for good, so it is
+    // repaired on the next attempt.
+    if (attempt === 1 || (await this.cache.ttl(key)) === -1) {
+      await this.cache.expire(key, REAUTH_FAILURE_WINDOW_SECONDS);
+    }
+    if (attempt > REAUTH_MAX_FAILURES) {
       throw new HttpException(
-        i18nMessage("server.auth.reauthLocked"),
+        {
+          ...i18nMessage("server.auth.reauthLocked"),
+          errorCode: SIGN_IN_METHODS_ERROR_CODES.reauthLocked,
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+    return attempt;
   }
 
   private async isPasswordProof(
@@ -215,25 +246,18 @@ export class ReauthService {
     return this.apple.verifyIdentityToken(proof.identityToken);
   }
 
+  /** `attempt` is the reserved number; the failure keeps it counted. */
   private async recordFailure(
     userId: string,
     method: ReauthMethod,
+    attempt: number,
   ): Promise<void> {
-    const key = failuresKey(userId);
-    const failures = await this.cache.incr(key);
-    // The window starts with the first failure. A key left without a TTL (an
-    // expire lost after the incr) would lock the user for good, so it is
-    // repaired on the next failure.
-    if (failures === 1 || (await this.cache.ttl(key)) === -1) {
-      await this.cache.expire(key, REAUTH_FAILURE_WINDOW_SECONDS);
-    }
-
     await this.writeSecurityLog(REAUTH_SECURITY_EVENTS.failed, "medium", {
       userId,
       method,
     });
-    // `incr` is atomic, so exactly one failure reaches the limit per window.
-    if (failures === REAUTH_MAX_FAILURES) {
+    // Attempt numbers are unique, so exactly one failure reaches the limit.
+    if (attempt === REAUTH_MAX_FAILURES) {
       await this.writeSecurityLog(REAUTH_SECURITY_EVENTS.locked, "high", {
         userId,
         method,
@@ -261,9 +285,7 @@ export class ReauthService {
     // A token that was not stored would be refused by every guarded route.
     if (!stored) {
       this.logger.error(`Reauth token could not be stored (user=${userId})`);
-      throw new ServiceUnavailableException(
-        i18nMessage("server.auth.reauthUnavailable"),
-      );
+      throw reauthUnavailableError();
     }
     return { reauthToken, expiresAt: expiresAt.toISOString() };
   }

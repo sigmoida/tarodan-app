@@ -90,9 +90,10 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   old (`iat`); it answers an **opaque** token stored in Redis by its SHA-256,
   bound to the user, for 5 minutes, reusable within that time. Not a JWT:
   `JwtStrategy` checks no token type. 5 failed proofs in 15 minutes lock the
-  step-up (`429 reauthLocked`, SecurityLog `reauth_failed`/`reauth_locked`,
-  Sentry warning). Redis down fails closed (no token issued: 503; none
-  accepted: 403).
+  step-up (`429 REAUTH_LOCKED`, SecurityLog `reauth_failed`/`reauth_locked`,
+  Sentry warning). Attempts are counted before the proof is checked, so
+  parallel requests cannot pass the limit. Redis down fails closed (no proof
+  checked and no token issued: 503; none accepted: 403).
 - A sensitive write takes `reauthToken` in its body and `@RequireReauth()`
   (`ReauthGuard`, after the global JWT guard). Declare `reauthToken` in its
   DTO too. **No step-up problem is a 401**: clients treat 401 as an expired
@@ -103,7 +104,8 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   security notice after commit and keep the sessions. `setPassword` lives in
   `auth-password.service.ts` (409 `passwordAlreadySet` when one exists);
   changing a password stays in `security/`.
-- Every route sets the Sentry tag `auth.flow`; add new step-up routes to
+- The step-up and every write set the Sentry tag `auth.flow` (`reauth`,
+  `password_set`, ...); add new step-up routes to
   `guards/critical-route-throttles.spec.ts`. Never log the token or its hash.
 
 ## Registration

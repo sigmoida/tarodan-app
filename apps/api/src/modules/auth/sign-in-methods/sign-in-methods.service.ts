@@ -34,7 +34,9 @@ export function toSignInMethods(row: SignInMethodsRow): SignInMethods {
       linkedAt: account.createdAt.toISOString(),
     });
   }
-  return { hasPassword: row.passwordHash !== null, providers };
+  // Truthy, as login, check-email, reauth and setPassword read it: a few
+  // system and anonymised rows store an empty hash, which is no password.
+  return { hasPassword: Boolean(row.passwordHash), providers };
 }
 
 /**

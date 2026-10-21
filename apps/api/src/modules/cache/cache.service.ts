@@ -149,18 +149,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Atomik "yoksa yaz" (`SET key 1 EX ttl NX`): anahtarı BU çağrı
-   * oluşturduysa true, zaten varsa false. Bir olayı pencere başına bir kez
-   * saymak (tekilleştirme) için — `exists` + `set` ikilisi eşzamanlı iki
-   * istekte ikisine de "ilk" derdi.
+   * Atomic "write if absent" (`SET key <value> EX ttl NX`): true when THIS
+   * call created the key, false when it already existed. Used to count an
+   * event once per window (deduplication); `exists` + `set` would call both of
+   * two concurrent requests "first".
    *
-   * Redis hatasında false döner (kapalı başarısızlık): bu bir kilit/sayım
-   * kapısıdır; Redis yokken her isteği "ilk" saymak tekilleştirmeyi tamamen
-   * kaldırırdı.
+   * Answers false on a Redis error (fails closed): this is a lock or counting
+   * gate, and treating every request as "first" while Redis is down would
+   * remove the deduplication entirely.
    *
-   * `value` (JSON, default `1`) lets a caller store a record that must not be
-   * reported as written when Redis is down, which `set` cannot tell (it
-   * swallows the error). The step-up token is stored this way; `get` reads it.
+   * `value` (stored as JSON, default `1`) lets a caller store a record that
+   * must not be reported as written when Redis is down, which `set` cannot
+   * tell (it swallows the error). The step-up token is stored this way; `get`
+   * reads it back.
    */
   async setIfAbsent(
     key: string,

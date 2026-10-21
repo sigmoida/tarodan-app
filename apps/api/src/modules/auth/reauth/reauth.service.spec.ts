@@ -207,6 +207,7 @@ describe("ReauthService", () => {
       expect(error.getStatus()).toBe(400);
       expect(error.getResponse()).toMatchObject({
         i18nKey: "server.auth.reauthMethodNotAllowed",
+        errorCode: "REAUTH_METHOD_NOT_ALLOWED",
       });
       expect(google.verifyIdToken).not.toHaveBeenCalled();
       expect(cache.incr).not.toHaveBeenCalled();
@@ -228,8 +229,50 @@ describe("ReauthService", () => {
       expect(locked.getStatus()).toBe(429);
       expect(locked.getResponse()).toMatchObject({
         i18nKey: "server.auth.reauthLocked",
+        errorCode: "REAUTH_LOCKED",
       });
       expect(cache.setIfAbsent).not.toHaveBeenCalled();
+    });
+
+    it("lets only 5 of many parallel attempts reach the comparison", async () => {
+      const compare = jest.spyOn(bcrypt, "compare");
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 12 }, () =>
+          service.reauthenticate(USER, {
+            password: "Wrong-Pass-1",
+          } as ReauthDto),
+        ),
+      );
+
+      const statuses = results.map((r) =>
+        ((r as PromiseRejectedResult).reason as HttpException).getStatus(),
+      );
+      expect(statuses.filter((s) => s === 403)).toHaveLength(
+        REAUTH_MAX_FAILURES,
+      );
+      expect(statuses.filter((s) => s === 429)).toHaveLength(
+        12 - REAUTH_MAX_FAILURES,
+      );
+      expect(compare).toHaveBeenCalledTimes(REAUTH_MAX_FAILURES);
+      compare.mockRestore();
+    });
+
+    it("checks no proof with Redis down (503), so a right guess reads like a wrong one", async () => {
+      const compare = jest.spyOn(bcrypt, "compare");
+      cache.setDown(true);
+
+      const wrong = await failure({ password: "Wrong-Pass-1" });
+      const right = await failure({ password: PASSWORD });
+
+      for (const error of [wrong, right]) {
+        expect(error.getStatus()).toBe(503);
+        expect(error.getResponse()).toMatchObject({
+          errorCode: "REAUTH_UNAVAILABLE",
+        });
+      }
+      expect(compare).not.toHaveBeenCalled();
+      compare.mockRestore();
     });
 
     it("logs reauth_locked and warns Sentry once, when the limit is reached", async () => {
@@ -396,14 +439,15 @@ describe("ReauthService", () => {
       expect(await service.isValidToken(USER, token)).toBe(false);
     });
 
-    it("issues no token with Redis down (503, not a token that never works)", async () => {
-      cache.setDown(true);
+    it("issues no token when it cannot be stored (503, not a token that never works)", async () => {
+      cache.setIfAbsent.mockResolvedValueOnce(false);
 
       const error = await failure({ password: PASSWORD });
 
       expect(error.getStatus()).toBe(503);
       expect(error.getResponse()).toMatchObject({
         i18nKey: "server.auth.reauthUnavailable",
+        errorCode: "REAUTH_UNAVAILABLE",
       });
     });
   });

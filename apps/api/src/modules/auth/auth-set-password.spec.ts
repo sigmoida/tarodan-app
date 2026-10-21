@@ -85,7 +85,10 @@ describe("AuthPasswordService.setPassword", () => {
     await expect(
       serviceFor(db).setPassword("u1", "New-Pass-1"),
     ).rejects.toMatchObject({
-      response: { i18nKey: "server.auth.passwordAlreadySet" },
+      response: {
+        i18nKey: "server.auth.passwordAlreadySet",
+        errorCode: "PASSWORD_ALREADY_SET",
+      },
     });
     expect(db.tx.user.update).not.toHaveBeenCalled();
     expect(db.state.securityLogs).toHaveLength(0);

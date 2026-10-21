@@ -43,6 +43,12 @@ describe("toSignInMethods", () => {
     });
   });
 
+  it("reads an empty hash as no password, as login and reauth do", () => {
+    expect(
+      toSignInMethods({ passwordHash: "", oauthAccounts: [] }).hasPassword,
+    ).toBe(false);
+  });
+
   it("leaves out rows of a provider that is not a sign-in method", () => {
     expect(
       toSignInMethods({

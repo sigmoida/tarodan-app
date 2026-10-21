@@ -67,8 +67,18 @@ export interface SetPasswordRequest {
 
 /** `errorCode` values of the sign-in methods and step-up routes. */
 export const SIGN_IN_METHODS_ERROR_CODES = {
+  /** 403: missing, expired or foreign `reauthToken`; confirm again. */
   reauthRequired: "REAUTH_REQUIRED",
+  /** 403: the proof was wrong. */
   reauthFailed: "REAUTH_FAILED",
+  /** 400: the account has a password, so only the password is accepted. */
+  reauthMethodNotAllowed: "REAUTH_METHOD_NOT_ALLOWED",
+  /** 429: too many failed proofs; differs from the generic per-IP throttle. */
+  reauthLocked: "REAUTH_LOCKED",
+  /** 503: the step-up store is unavailable; try again later. */
+  reauthUnavailable: "REAUTH_UNAVAILABLE",
+  /** 409: `POST /auth/password/set` on an account that has a password. */
+  passwordAlreadySet: "PASSWORD_ALREADY_SET",
 } as const;
 
 export type SignInMethodsErrorCode =

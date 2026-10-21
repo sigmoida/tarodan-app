@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
+import { SIGN_IN_METHODS_ERROR_CODES } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { getRequestClientInfo } from "../../common/context/request-context";
 import { NotificationService } from "../notification/notification.service";
@@ -196,9 +197,10 @@ export class AuthPasswordService {
         throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
       }
       if (user.passwordHash) {
-        throw new ConflictException(
-          i18nMessage("server.auth.passwordAlreadySet"),
-        );
+        throw new ConflictException({
+          ...i18nMessage("server.auth.passwordAlreadySet"),
+          errorCode: SIGN_IN_METHODS_ERROR_CODES.passwordAlreadySet,
+        });
       }
       await tx.user.update({ where: { id: userId }, data: { passwordHash } });
       await tx.securityLog.create({
