@@ -50,4 +50,14 @@ describe("CounterOfferEditor, cash amount field", () => {
     const c = render({ raw: "1.000", value: 0, refused: true });
     expect(c.textContent).toContain("trade.cashFormatRefused");
   });
+
+  it("asks who pays only for the parsed amount, not the raw text", () => {
+    expect(
+      render({ raw: "12,50", value: 12.5, refused: false }).textContent,
+    ).toContain("trade.whoPaysCash");
+    // "1.000" would read as 1 with parseFloat; refused, it is no amount.
+    expect(
+      render({ raw: "1.000", value: 0, refused: true }).textContent,
+    ).not.toContain("trade.whoPaysCash");
+  });
 });

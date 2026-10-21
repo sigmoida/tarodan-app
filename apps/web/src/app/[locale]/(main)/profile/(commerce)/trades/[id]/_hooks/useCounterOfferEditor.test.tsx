@@ -600,9 +600,39 @@ describe("useCounterOfferEditor, identical-offer check", () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("does not count the payer as a change when there is no amount", async () => {
-    const result = await open(trade);
-    act(() => result.current.setCounterCashPayer("them"));
+  // The no-cash trade has no payer (the API compares `null`), so neither radio
+  // value is a change, including the "me" default, which differs from the
+  // "them" derived from a missing `cashPayerId`.
+  it.each(["me", "them"] as const)(
+    "does not count the payer %s as a change when there is no amount",
+    async (payer) => {
+      const result = await open(trade);
+      act(() => result.current.setCounterCashPayer(payer));
+      act(() => result.current.handleCounterSubmit());
+      expect(toastError).toHaveBeenCalledWith("trade.counterOfferIdentical");
+      expect(counter).not.toHaveBeenCalled();
+    },
+  );
+
+  it("sends the offer when only the amount changes", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashAmount("1250,51"));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(-1250.51);
+  });
+
+  it("sends the offer when the amount is cleared", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashAmount(""));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBeUndefined();
+  });
+
+  it("treats the same amount typed with a dot as unchanged", async () => {
+    const result = await open(cashTrade);
+    act(() => result.current.setCounterCashAmount("1250.5"));
     act(() => result.current.handleCounterSubmit());
     expect(toastError).toHaveBeenCalledWith("trade.counterOfferIdentical");
     expect(counter).not.toHaveBeenCalled();

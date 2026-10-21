@@ -102,6 +102,7 @@ vi.mock("./_hooks/useNewTrade", () => ({
   useCreateTrade: () => ({ mutate: h.mutate, isPending: false }),
 }));
 
+import toast from "react-hot-toast";
 import NewTradePage from "./page";
 
 const item = (id: string): TradeProduct => ({
@@ -334,21 +335,56 @@ describe("new trade page, cash amount field", () => {
     expect(h.mutate.mock.calls[0][0].cashAmount).toBe(12.5);
   });
 
-  it("leaves cashAmount out when the field is empty", () => {
+  const PAYER_QUESTION = "page.new.page.nakitFarkiKimOdeyecek";
+  const payerRadio = (value: "me" | "them") => {
+    const input = container.querySelector<HTMLInputElement>(
+      `input[name="cashPayer"][value="${value}"]`,
+    );
+    if (!input) throw new Error(`no ${value} payer radio`);
+    return input;
+  };
+
+  it("makes the amount negative when they pay", () => {
     h.products = [item("a")];
     render();
+    typeCash("12,50");
+    act(() => payerRadio("them").click());
     act(() => checkbox("a").click());
     act(() => sendButton().click());
-    expect(h.mutate.mock.calls[0][0].cashAmount).toBeUndefined();
+    expect(h.mutate.mock.calls[0][0].cashAmount).toBe(-12.5);
   });
 
+  it("asks who pays only for an accepted amount", () => {
+    render();
+    expect(container.textContent).not.toContain(PAYER_QUESTION);
+    typeCash("12,50");
+    expect(container.textContent).toContain(PAYER_QUESTION);
+    // "1.000" would read as 1 with parseFloat; refused, it is no amount.
+    typeCash("1.000");
+    expect(container.textContent).not.toContain(PAYER_QUESTION);
+  });
+
+  it.each(["", "0", "0,00"])(
+    "leaves cashAmount out when the field is %j",
+    (value) => {
+      h.products = [item("a")];
+      render();
+      typeCash(value);
+      act(() => checkbox("a").click());
+      act(() => sendButton().click());
+      expect(h.mutate.mock.calls[0][0].cashAmount).toBeUndefined();
+    },
+  );
+
   it("shows the refusal and sends nothing for a grouped value", () => {
+    vi.mocked(toast.error).mockClear();
     h.products = [item("a")];
     render();
     typeCash("1.000");
     act(() => checkbox("a").click());
     expect(container.textContent).toContain("trade.cashFormatRefused");
     act(() => sendButton().click());
+    expect(toast.error).toHaveBeenCalledWith("trade.cashFormatRefused");
     expect(h.mutate).not.toHaveBeenCalled();
   });
 });

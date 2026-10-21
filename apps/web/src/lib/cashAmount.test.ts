@@ -26,13 +26,29 @@ describe("parseCashInput", () => {
     expect(parseCashInput(raw)).toEqual({ status: "empty" });
   });
 
-  it("keeps exact cents without a floating-point step", () => {
-    expect(parseCashInput("1,29")).toEqual({ status: "ok", amount: 1.29 });
-    expect(parseCashInput("0,01")).toEqual({ status: "ok", amount: 0.01 });
-    expect(parseCashInput("99999999,99")).toEqual({
+  it.each([
+    ["1,29", 1.29],
+    ["0,57", 0.57],
+    ["0.57", 0.57],
+    ["4.35", 4.35],
+    ["0,01", 0.01],
+    ["0.01", 0.01],
+    ["99999999,99", 99999999.99],
+    ["99999999.99", 99999999.99],
+  ])("keeps %j as exact cents without a floating-point step", (raw, amount) => {
+    // "0.57" read as one float and scaled is 56.99999999999999 cents; the
+    // dot must split into digit strings exactly like the comma.
+    expect(parseCashInput(raw)).toEqual({ status: "ok", amount });
+  });
+
+  it("refuses at the safe-integer cents boundary, not at whole lira", () => {
+    // 2^53 - 1 cents is the largest amount held exactly.
+    expect(parseCashInput("90071992547409,91")).toEqual({
       status: "ok",
-      amount: 99999999.99,
+      amount: 90071992547409.91,
     });
+    expect(parseCashInput("90071992547409,92")).toEqual({ status: "refused" });
+    expect(parseCashInput("90071992547410")).toEqual({ status: "refused" });
   });
 
   it.each([
@@ -84,6 +100,8 @@ describe("signedCashAmount", () => {
     expect(signedCashAmount("12,50", "me")).toBe(12.5);
     expect(signedCashAmount("12,50", "them")).toBe(-12.5);
     expect(signedCashAmount("", "me")).toBeUndefined();
+    expect(signedCashAmount("0,00", "them")).toBeUndefined();
     expect(signedCashAmount("1.000", "me")).toBeUndefined();
+    expect(signedCashAmount("1.000", "them")).toBeUndefined();
   });
 });
