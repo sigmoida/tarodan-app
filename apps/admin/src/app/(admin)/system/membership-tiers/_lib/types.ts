@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { useTranslations } from "next-intl";
+import { SAVED_SEARCH_TIER_LIMIT_MAX } from "@tarodan/types";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -13,6 +14,8 @@ export interface MembershipTier {
   maxFreeListings: number;
   maxTotalListings: number;
   maxImagesPerListing: number;
+  /** Saved-search cap for the tier; 0 = saving searches is off. */
+  maxSavedSearches: number;
   canCreateCollections: boolean;
   canTrade: boolean;
   isAdFree: boolean;
@@ -79,6 +82,10 @@ export const tierSchema = (t: T, isFree = false) =>
       (n) => Number.isInteger(n) && n >= 0,
       t("admin.tiers.validation.nonNegativeInt"),
     ),
+    maxSavedSearches: numField(
+      (n) => Number.isInteger(n) && n >= 0 && n <= SAVED_SEARCH_TIER_LIMIT_MAX,
+      t("admin.tiers.validation.savedSearchLimitRange"),
+    ),
     sortOrder: numField(
       (n) => Number.isInteger(n) && n >= 0,
       t("admin.tiers.validation.nonNegativeInt"),
@@ -99,6 +106,7 @@ export function tierToForm(t: MembershipTier): TierFormValues {
     maxFreeListings: String(t.maxFreeListings ?? 0),
     maxTotalListings: String(t.maxTotalListings ?? 0),
     maxImagesPerListing: String(t.maxImagesPerListing ?? 0),
+    maxSavedSearches: String(t.maxSavedSearches ?? 0),
     sortOrder: String(t.sortOrder ?? 0),
     canCreateCollections: t.canCreateCollections,
     canTrade: t.canTrade,
@@ -120,6 +128,7 @@ export function tierFormToPayload(v: TierFormValues, yearlyPrice: number) {
     maxFreeListings: int(v.maxFreeListings),
     maxTotalListings: int(v.maxTotalListings),
     maxImagesPerListing: int(v.maxImagesPerListing),
+    maxSavedSearches: int(v.maxSavedSearches),
     sortOrder: int(v.sortOrder),
     canCreateCollections: v.canCreateCollections,
     canTrade: v.canTrade,

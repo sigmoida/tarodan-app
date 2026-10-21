@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { SAVED_SEARCH_TIER_LIMIT_MAX } from "@tarodan/types";
 import {
   FormModal,
   FormInput,
@@ -143,6 +144,16 @@ export function TierFormModal({
           placeholder="10"
         />
       </div>
+
+      <FormInput
+        name="maxSavedSearches"
+        label={t("admin.tiers.field.maxSavedSearches")}
+        type="number"
+        min="0"
+        max={SAVED_SEARCH_TIER_LIMIT_MAX}
+        placeholder="0"
+        helperText={t("admin.tiers.field.maxSavedSearchesHelper")}
+      />
 
       {/* featuredListingSlots + commissionDiscount removed: the former is superseded
           by the paid ad-packages boost system, the latter was never applied by the

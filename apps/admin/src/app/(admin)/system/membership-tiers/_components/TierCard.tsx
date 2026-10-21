@@ -85,6 +85,11 @@ export function TierCard({
         <Field label={t("admin.tiers.card.imagesPerListing")}>
           {tier.maxImagesPerListing}
         </Field>
+        <Field label={t("admin.tiers.card.savedSearches")}>
+          {tier.maxSavedSearches > 0
+            ? tier.maxSavedSearches
+            : t("admin.tiers.card.savedSearchesOff")}
+        </Field>
       </DataList>
       <DataList columns={1} className="border-t border-border pt-2">
         <Field label={t("admin.tiers.card.userCount")}>{tier.userCount}</Field>
