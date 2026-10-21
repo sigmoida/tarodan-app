@@ -384,6 +384,42 @@ confirmation for account deletion and email change" (platform setting
 on the next request. While it is on, a request without a token gets
 `403 REAUTH_REQUIRED`. To roll back, turn it off.
 
+### Seller trust score (nightly batch)
+
+Reference: `docs/SELLER_TRUST.md`. The repeatable `seller-trust-refresh` runs
+at 02:30 Europe/Istanbul in the worker role and writes only its own table,
+`seller_trust_scores`.
+
+- **First deploy (no manual step).** Migration
+  `20261021165740_seller_trust_scores` creates the empty table. On boot, an
+  instance that finds the table empty queues one run with the fixed Bull job
+  id `seller-trust-bootstrap`, so several instances queue it once; the worker
+  runs it. If it fails, the next nightly run fills the table (the read path
+  shows "new seller" until then).
+- **Sentry.** The scheduled fire checks in to the cron monitor
+  `seller-trust-refresh`; a failed or missed run alerts by e-mail. Bootstrap
+  and manual runs are not tracked there (they show in Bull Board).
+- **Manual run.** Admin, Test Tools, "Satıcı güven skorları". On staging this
+  is the calibration step. In production it is a production write: only with
+  the user's approval.
+- **A failed run** keeps every existing row (no cleanup) and fails the Bull
+  job, which retries three times. The job log names the failed batch index
+  and the error class.
+- **Calibration** (read-only, on staging after a run):
+
+  ```sql
+  SELECT width_bucket(score_x100, 0, 500, 10) AS bucket, count(*)
+  FROM seller_trust_scores GROUP BY bucket ORDER BY bucket;
+  SELECT count(*) FILTER (WHERE score_x100 IS NULL) AS new_sellers, count(*)
+  FROM seller_trust_scores;
+  SELECT user_id, score_x100, components FROM seller_trust_scores
+  ORDER BY score_x100 DESC NULLS LAST LIMIT 20;
+  ```
+
+- **Rollback.** Revert the job code; on the next boot the repeatable is no
+  longer registered (remove the leftover one from Bull Board). The table is
+  harmless if left.
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`

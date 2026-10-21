@@ -102,6 +102,8 @@ const TABLES_TO_TRUNCATE = [
   // Onay kayıtları: ekleme-yalnız (UPDATE/DELETE tetikleyiciyle yasak) ama
   // TRUNCATE serbest; users'a RESTRICT FK ile bağlı olduğu için ondan önce.
   "consent_records",
+  // Derived per-user score; cascades with users, listed so it is explicit.
+  "seller_trust_scores",
   "users",
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
   "attributes",
