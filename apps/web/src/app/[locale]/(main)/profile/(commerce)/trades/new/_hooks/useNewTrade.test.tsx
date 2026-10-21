@@ -3,8 +3,12 @@
 
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 
 (
@@ -12,11 +16,12 @@ import { queryKeys } from "@/lib/query/keys";
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const getMyProducts = vi.fn();
+const getOne = vi.fn();
 let mockUserId: string | undefined = "u1";
 
 vi.mock("@/lib/api", () => ({
   api: {},
-  listingsApi: {},
+  listingsApi: { getOne: (...a: unknown[]) => getOne(...a) },
   userApi: { getMyProducts: (...a: unknown[]) => getMyProducts(...a) },
 }));
 vi.mock("@/stores/authStore", () => ({
@@ -29,7 +34,7 @@ vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
-import { useTradeableProducts } from "./useNewTrade";
+import { useTradeTarget, useTradeableProducts } from "./useNewTrade";
 
 const item = (id: string) => ({
   id,
@@ -37,6 +42,9 @@ const item = (id: string) => ({
   status: "active",
   isTradeEnabled: true,
 });
+
+/** Roots still mounted; unmounted after each test so no observer leaks. */
+const mounted = new Set<() => void>();
 
 /** Minimal renderHook (no testing-library in this package). */
 function renderHook<T>(
@@ -55,11 +63,12 @@ function renderHook<T>(
       root.render(<>{wrapper({ children: <Probe /> })}</>);
     });
   render();
-  return {
-    result,
-    rerender: render,
-    unmount: () => act(() => root.unmount()),
+  const unmount = () => {
+    if (!mounted.delete(unmount)) return;
+    act(() => root.unmount());
   };
+  mounted.add(unmount);
+  return { result, rerender: render, unmount };
 }
 
 async function waitFor(assertion: () => void) {
@@ -80,13 +89,22 @@ async function waitFor(assertion: () => void) {
 
 function setup() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
+    // The app's defaults (lib/query/client.ts): 60 s fresh, no focus refetch.
+    defaultOptions: {
+      queries: { retry: false, staleTime: 60_000, refetchOnWindowFocus: false },
+    },
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   return { client, wrapper };
 }
+
+afterEach(() => {
+  mounted.forEach((unmount) => unmount());
+  // Back to the default document-visibility focus check.
+  focusManager.setFocused(undefined);
+});
 
 describe("useTradeableProducts", () => {
   beforeEach(() => {
@@ -155,5 +173,67 @@ describe("useTradeableProducts", () => {
         .getQueryCache()
         .findAll({ queryKey: queryKeys.tradeEligible.all() }),
     ).toHaveLength(2);
+  });
+  it("settles to the empty state when the fetch fails (no endless spinner)", async () => {
+    const { wrapper } = setup();
+    getMyProducts.mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.products).toEqual([]);
+  });
+
+  it("refetches when the tab regains focus, without a spinner over a settled empty list", async () => {
+    const { wrapper } = setup();
+    getMyProducts.mockResolvedValue({ data: { data: [] } });
+    const { result } = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(getMyProducts).toHaveBeenCalledTimes(1);
+
+    let resolveRefetch: (v: unknown) => void = () => {};
+    getMyProducts.mockReturnValue(
+      new Promise((r) => {
+        resolveRefetch = r;
+      }),
+    );
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(2));
+    // Let react-query's batched notify render the in-flight refetch.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    // The settled empty state stays while the background refetch runs.
+    expect(result.current.isLoading).toBe(false);
+
+    await act(async () => {
+      resolveRefetch({ data: { data: [item("new")] } });
+    });
+    await waitFor(() => expect(result.current.products).toHaveLength(1));
+  });
+});
+
+describe("useTradeTarget", () => {
+  beforeEach(() => {
+    getOne.mockReset();
+  });
+
+  it("refetches the target on mount even when the cache is fresh", async () => {
+    const { wrapper } = setup();
+    getOne.mockResolvedValue({ data: { product: { id: "t1", price: 10 } } });
+    const first = renderHook(() => useTradeTarget("t1", true), { wrapper });
+    await waitFor(() => expect(first.result.current.target?.price).toBe(10));
+    first.unmount();
+
+    getOne.mockResolvedValue({ data: { product: { id: "t1", price: 12 } } });
+    const second = renderHook(() => useTradeTarget("t1", true), { wrapper });
+    await waitFor(() => expect(second.result.current.target?.price).toBe(12));
+    expect(getOne).toHaveBeenCalledTimes(2);
   });
 });
