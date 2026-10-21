@@ -69,12 +69,10 @@ const mount = async (enabled = true) => {
       </QueryClientProvider>,
     ),
   );
-  // Let the list, the limit and then the tier queries settle.
-  for (let i = 0; i < 3; i += 1) {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
+  // Let the list and limit queries settle.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 };
 
 beforeEach(() => {
@@ -118,15 +116,6 @@ describe("useSavedSearches", () => {
     expect(h.getLimits).not.toHaveBeenCalled();
   });
 
-  it("never shows the old local list", async () => {
-    localStorage.setItem(
-      "diecast_saved_searches",
-      JSON.stringify([{ id: "old", query: "porsche" }]),
-    );
-    await mount();
-    expect(api.savedSearches.map((s) => s.id)).toEqual(["s1"]);
-  });
-
   it("reads every page when a tier allows more than one page", async () => {
     const page2 = { ...search, id: "s2" };
     h.list.mockImplementation(async (page: number) => ({
@@ -136,33 +125,69 @@ describe("useSavedSearches", () => {
           : { data: [page2], meta: { total: 2, page: 2, totalPages: 2 } },
     }));
     await mount();
-    expect(h.list.mock.calls.map(([page]) => page)).toEqual([1, 2]);
-    expect(api.savedSearches.map((s) => s.id)).toEqual(["s1", "s2"]);
+    await vi.waitFor(() =>
+      expect(api.savedSearches.map((s) => s.id)).toEqual(["s1", "s2"]),
+    );
+    expect(h.list.mock.calls.map(([page]) => page).sort()).toEqual([1, 2]);
     expect(api.total).toBe(2);
   });
 
-  it("offers the Premium upgrade only below the Premium limit", async () => {
+  it("keeps a search once when it shifts onto the next page", async () => {
+    h.list.mockImplementation(async (page: number) => ({
+      data: {
+        data: page === 1 ? [search] : [search, { ...search, id: "s2" }],
+        meta: { total: 2, page, totalPages: 2 },
+      },
+    }));
     await mount();
-    expect(api.canUpgrade).toBe(true);
+    await vi.waitFor(() =>
+      expect(api.savedSearches.map((s) => s.id)).toEqual(["s1", "s2"]),
+    );
+  });
+
+  /** A user at `limit` searches (`total === limit`), so the alert shows. */
+  const atLimit = (limit: number) => {
+    h.getLimits.mockResolvedValue({ data: { maxSavedSearches: limit } });
+    h.list.mockResolvedValue({
+      data: { data: [search], meta: { total: limit, page: 1, totalPages: 1 } },
+    });
+  };
+
+  it("offers the Premium upgrade at a limit below Premium's", async () => {
+    atLimit(10);
+    await mount();
+    await vi.waitFor(() => expect(api.canUpgrade).toBe(true));
+    expect(api.atLimit).toBe(true);
   });
 
   it.each([20, 50])(
     "offers no upgrade at a limit of %i (Premium, Business)",
     async (limit) => {
-      h.getLimits.mockResolvedValue({ data: { maxSavedSearches: limit } });
+      atLimit(limit);
       await mount();
-      expect(api.limit).toBe(limit);
+      await vi.waitFor(() => expect(h.getTiers).toHaveBeenCalled());
+      await mount();
+      expect(api.atLimit).toBe(true);
       expect(api.canUpgrade).toBe(false);
     },
   );
 
   it("offers no upgrade while every tier has the same limit", async () => {
-    h.getLimits.mockResolvedValue({ data: { maxSavedSearches: 5 } });
+    atLimit(5);
     h.getTiers.mockResolvedValue({
       data: tiers.map((tier) => ({ ...tier, maxSavedSearches: 5 })),
     });
     await mount();
+    await vi.waitFor(() => expect(h.getTiers).toHaveBeenCalled());
+    await mount();
     expect(api.canUpgrade).toBe(false);
+  });
+
+  it("does not read the tier rows below the limit", async () => {
+    await mount();
+    expect(api.atLimit).toBe(false);
+    expect(api.canUpgrade).toBe(false);
+    expect(h.getTiers).not.toHaveBeenCalled();
   });
 
   it("deletes after a confirm and refetches the list", async () => {

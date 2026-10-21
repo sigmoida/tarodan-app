@@ -23,6 +23,7 @@ export default function SavedSearchesPage() {
     savedSearches,
     total,
     limit,
+    atLimit,
     canUpgrade,
     colorOptions,
     isLoading,
@@ -98,7 +99,7 @@ export default function SavedSearchesPage() {
         </div>
       )}
 
-      {limit !== null && total >= limit && (
+      {atLimit && (
         <Alert
           variant="warning"
           icon={

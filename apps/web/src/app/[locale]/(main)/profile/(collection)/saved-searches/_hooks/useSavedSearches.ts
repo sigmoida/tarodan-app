@@ -31,17 +31,25 @@ const selectSavedSearchLimit = (limits: MembershipLimits): number | null =>
 /**
  * Every page of `GET /saved-searches`. Launch tiers fit in one page of 100,
  * but an admin can set a tier up to `SAVED_SEARCH_TIER_LIMIT_MAX`, and a
- * search past the first page must still be visible and deletable.
+ * search past the first page must still be visible and deletable. The other
+ * pages load in parallel; an id that shifts onto two pages (a save in
+ * another tab meanwhile) is kept once.
  */
 async function fetchAllSavedSearches(): Promise<SavedSearchList> {
   const first = (await savedSearchesApi.list(1)).data;
-  const items = unwrapList<SavedSearch>(first);
   const totalPages = Number(first?.meta?.totalPages) || 1;
-  for (let page = 2; page <= totalPages; page += 1) {
-    items.push(
-      ...unwrapList<SavedSearch>((await savedSearchesApi.list(page)).data),
-    );
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(totalPages - 1, 0) }, (_, i) =>
+      savedSearchesApi.list(i + 2).then((res) => res.data),
+    ),
+  );
+  const byId = new Map<string, SavedSearch>();
+  for (const page of [first, ...rest]) {
+    for (const item of unwrapList<SavedSearch>(page)) {
+      if (!byId.has(item.id)) byId.set(item.id, item);
+    }
   }
+  const items = [...byId.values()];
   const total = Number(first?.meta?.total);
   return { items, total: Number.isFinite(total) ? total : items.length };
 }
@@ -65,7 +73,10 @@ export function useSavedSearches(enabled: boolean) {
 
   const limit =
     useMembershipLimits(selectSavedSearchLimit, { enabled }).data ?? null;
-  const canUpgrade = useSavedSearchUpgrade(limit);
+  const total = list.data?.total ?? 0;
+  const atLimit = limit !== null && total >= limit;
+  // The tier rows are read only when the limit alert (and its link) shows.
+  const canUpgrade = useSavedSearchUpgrade(atLimit ? limit : null);
   // The colour names of the chips: one read of the shared filter catalog,
   // only when a saved search filters by colour.
   const needsColors = !!list.data?.items.some((search) => search.query.color);
@@ -99,8 +110,9 @@ export function useSavedSearches(enabled: boolean) {
 
   return {
     savedSearches: list.data?.items ?? [],
-    total: list.data?.total ?? 0,
+    total,
     limit,
+    atLimit,
     canUpgrade,
     colorOptions,
     isLoading: list.isLoading,

@@ -30,15 +30,16 @@ export async function fetchMembershipLimits(): Promise<MembershipLimits> {
  */
 export function useMembershipLimits<T>(
   select: (limits: MembershipLimits) => T,
-  { enabled, retry }: { enabled: boolean; retry?: boolean },
+  { enabled }: { enabled: boolean },
 ) {
   return useQuery({
     queryKey: queryKeys.membership.limits(),
     queryFn: fetchMembershipLimits,
     select,
     enabled,
-    // Only when set: an explicit `undefined` would override the client default.
-    ...(retry === undefined ? {} : { retry }),
+    // One retry policy for every consumer: the banner rule must settle fast
+    // (a failure shows the ads), whichever observer starts the fetch.
+    retry: false,
     // Tiers change rarely; a membership change invalidates the entry.
     staleTime: 5 * 60 * 1000,
   });

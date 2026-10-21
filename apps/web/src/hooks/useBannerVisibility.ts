@@ -26,7 +26,6 @@ export function useBannerVisibility(): BannerVisibility {
 
   const limits = useMembershipLimits(selectIsAdFree, {
     enabled: isAuthenticated && !isAuthLoading,
-    retry: false,
   });
 
   return resolveBannerVisibility({
