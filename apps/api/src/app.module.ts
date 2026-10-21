@@ -36,6 +36,7 @@ import { TradeModule } from "./modules/trade";
 import { MessagingModule } from "./modules/messaging";
 import { MembershipModule } from "./modules/membership";
 import { RatingModule } from "./modules/rating";
+import { SellerTrustJobsModule } from "./modules/seller-trust/jobs/seller-trust-jobs.module";
 import { WishlistModule } from "./modules/wishlist";
 import { CollectionModule } from "./modules/collection";
 import { SupportModule } from "./modules/support";
@@ -202,6 +203,8 @@ import { isTest } from "./config/environment";
     MessagingModule, // GAP-002: Messaging with Content Filtering (BLOCKER)
     MembershipModule, // GAP-003: Membership Tiers & Subscriptions (BLOCKER)
     RatingModule, // GAP-010: Rating & Review System (HIGH)
+    // Nightly seller trust score batch (ADR 0014); nothing else imports it.
+    SellerTrustJobsModule,
     WishlistModule, // GAP-011: Wishlist/Favorites (MEDIUM)
     CollectionModule, // GAP-012: Collections System (MEDIUM)
     SupportModule, // GAP-013: Support Ticket System (MEDIUM)
