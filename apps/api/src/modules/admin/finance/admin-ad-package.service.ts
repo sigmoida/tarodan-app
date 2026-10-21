@@ -10,8 +10,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
-import { isPremiumEntitled } from "../../membership/helpers/membership.util";
-import { computeRelevanceScore } from "../../product/helpers/relevance-score";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 import {
   CreateAdPackageDto,
   UpdateAdPackageDto,
@@ -27,7 +26,10 @@ import { i18nMessage } from "../../i18n";
  */
 @Injectable()
 export class AdminAdPackageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly boostTimeline: BoostTimelineService,
+  ) {}
 
   private normalizeAudienceTargets(
     audienceMode: AdPackageAudienceMode,
@@ -477,181 +479,21 @@ export class AdminAdPackageService {
     return this.serializePurchase(boost, bestScore);
   }
 
+  /** Pause, resume and extend change the listing timeline: its owner does it. */
   async pausePurchase(id: string) {
-    const boost = await this.prisma.productBoost.findUnique({ where: { id } });
-    if (
-      !boost ||
-      boost.status !== BoostStatus.active ||
-      !boost.endsAt ||
-      boost.endsAt <= new Date()
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.pauseActiveOnly"),
-      );
-    }
-    const now = new Date();
-    await this.prisma.productBoost.update({
-      where: { id },
-      data: {
-        status: BoostStatus.paused,
-        pausedAt: now,
-        pausedRemainingSeconds: Math.max(
-          1,
-          Math.ceil((boost.endsAt.getTime() - now.getTime()) / 1000),
-        ),
-      },
-    });
-    await this.refreshProductPromotion(boost.productId);
+    await this.prisma.$transaction((tx) => this.boostTimeline.pause(tx, id));
     return this.getPurchase(id);
   }
 
   async resumePurchase(id: string) {
-    const boost = await this.prisma.productBoost.findUnique({ where: { id } });
-    if (!boost || boost.status !== BoostStatus.paused) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.resumePausedOnly"),
-      );
-    }
-    const now = new Date();
-    const lastActive = await this.prisma.productBoost.findFirst({
-      where: {
-        productId: boost.productId,
-        id: { not: id },
-        status: BoostStatus.active,
-        endsAt: { gt: now },
-      },
-      orderBy: { endsAt: "desc" },
-      select: { endsAt: true },
-    });
-    const base =
-      lastActive?.endsAt && lastActive.endsAt > now ? lastActive.endsAt : now;
-    const endsAt = new Date(
-      base.getTime() + (boost.pausedRemainingSeconds ?? 0) * 1000,
-    );
-    await this.prisma.productBoost.update({
-      where: { id },
-      data: {
-        status: BoostStatus.active,
-        endsAt,
-        pausedAt: null,
-        pausedRemainingSeconds: null,
-      },
-    });
-    await this.refreshProductPromotion(boost.productId);
+    await this.prisma.$transaction((tx) => this.boostTimeline.resume(tx, id));
     return this.getPurchase(id);
   }
 
   async extendPurchase(id: string, days: number) {
-    const boost = await this.prisma.productBoost.findUnique({ where: { id } });
-    if (
-      !boost ||
-      (boost.status !== BoostStatus.active &&
-        boost.status !== BoostStatus.paused)
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.extendActiveOrPausedOnly"),
-      );
-    }
-    if (days < 1 || days > 365) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.adPackage.extensionRange"),
-      );
-    }
-
-    if (boost.status === BoostStatus.paused) {
-      await this.prisma.productBoost.update({
-        where: { id },
-        data: {
-          pausedRemainingSeconds:
-            (boost.pausedRemainingSeconds ?? 0) + days * 24 * 60 * 60,
-          extendedDays: { increment: days },
-        },
-      });
-    } else {
-      const base =
-        boost.endsAt && boost.endsAt > new Date() ? boost.endsAt : new Date();
-      await this.prisma.productBoost.update({
-        where: { id },
-        data: {
-          endsAt: new Date(base.getTime() + days * 24 * 60 * 60 * 1000),
-          extendedDays: { increment: days },
-        },
-      });
-    }
-    await this.refreshProductPromotion(boost.productId);
+    await this.prisma.$transaction((tx) =>
+      this.boostTimeline.extend(tx, id, days),
+    );
     return this.getPurchase(id);
-  }
-
-  private async refreshProductPromotion(productId: string) {
-    const now = new Date();
-    const [product, activeBoosts] = await Promise.all([
-      this.prisma.product.findUnique({
-        where: { id: productId },
-        select: {
-          sellerId: true,
-          qualityScore: true,
-          popularityScore: true,
-          seller: {
-            select: {
-              businessStatus: true,
-              companyName: true,
-              taxId: true,
-              membership: {
-                select: {
-                  status: true,
-                  currentPeriodEnd: true,
-                  tier: { select: { type: true, isActive: true } },
-                },
-              },
-            },
-          },
-        },
-      }),
-      this.prisma.productBoost.findMany({
-        where: {
-          productId,
-          status: BoostStatus.active,
-          endsAt: { gt: now },
-        },
-        select: {
-          endsAt: true,
-          purchasedAt: true,
-          showcaseOnHome: true,
-        },
-        orderBy: { endsAt: "desc" },
-      }),
-    ]);
-    if (!product) return;
-
-    const promotedUntil = activeBoosts[0]?.endsAt ?? null;
-    const latestPurchase = activeBoosts.reduce<Date | null>(
-      (latest, item) =>
-        item.purchasedAt && (!latest || item.purchasedAt > latest)
-          ? item.purchasedAt
-          : latest,
-      null,
-    );
-    const homeShowcaseUntil =
-      activeBoosts.find((item) => item.showcaseOnHome)?.endsAt ?? null;
-    const premium = isPremiumEntitled(
-      product.seller.membership,
-      product.seller,
-    );
-    const rankTier = promotedUntil ? 2 : premium ? 1 : 0;
-
-    await this.prisma.product.update({
-      where: { id: productId },
-      data: {
-        boostedUntil: promotedUntil,
-        boostedAt: promotedUntil ? latestPurchase : null,
-        homeShowcaseUntil,
-        rankTier,
-        relevanceScore: computeRelevanceScore({
-          rankTier,
-          qualityScore: product.qualityScore ?? 0,
-          popularityScore: product.popularityScore,
-        }),
-      },
-    });
   }
 }

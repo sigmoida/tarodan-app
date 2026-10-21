@@ -23,6 +23,7 @@ import { FulfillmentFinalizer } from "../fulfillment/fulfillment-finalizer.servi
 import { EscrowHoldService } from "../fulfillment/escrow-hold.service";
 import { FulfillmentStockService } from "../fulfillment/fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "../fulfillment/virtual-order-fulfillment.service";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { PaymentLifecycleService } from "../checkout/payment-lifecycle.service";
 import { PrismaService } from "../../../prisma";
@@ -157,6 +158,7 @@ describe("PaymentService trade cash refund idempotency", () => {
         EscrowHoldService,
         FulfillmentStockService,
         VirtualOrderFulfillmentService,
+        BoostTimelineService,
         {
           provide: FulfillmentNotifier,
           useValue: {

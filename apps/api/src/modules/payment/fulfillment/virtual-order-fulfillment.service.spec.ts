@@ -1,4 +1,5 @@
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 import {
   CancellationActor,
   SubscriptionStatus,
@@ -83,7 +84,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       // D1: kullanılabilir kayıtlı kart var → autoRenew açılır.
       tx.savedCard.findFirst.mockResolvedValue({ id: "card-1" });
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
 
@@ -127,7 +132,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       // makeTx varsayılanı: savedCard.findFirst → null (kart yok)
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
 
@@ -151,7 +160,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.userMembership.findUnique.mockResolvedValue(membership("free"));
       tx.membershipPayment.findUnique.mockResolvedValue(intent("free"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       await svc.applyMembershipInTx(tx, {
         ...payment,
@@ -166,7 +179,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       tx.order.findMany.mockResolvedValue([{ id: "sib-1" }, { id: "sib-2" }]);
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       await svc.applyMembershipInTx(tx, payment);
 
@@ -192,7 +209,11 @@ describe("VirtualOrderFulfillmentService", () => {
       const tx = makeTx() as any;
       tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       await expect(
         svc.applyMembershipInTx(tx, {
@@ -224,7 +245,11 @@ describe("VirtualOrderFulfillmentService", () => {
         qualityScore: 10,
         popularityScore: 5,
       });
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       const productId = await svc.applyBoostInTx(tx, payment);
 
@@ -250,7 +275,11 @@ describe("VirtualOrderFulfillmentService", () => {
     it("eşleşen boost yoksa null döner, hiçbir mutasyon yapmaz", async () => {
       const tx = makeTx() as any;
       tx.productBoost.findUnique.mockResolvedValue(null);
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        new BoostTimelineService(),
+      );
 
       const productId = await svc.applyBoostInTx(tx, payment);
       expect(productId).toBeNull();

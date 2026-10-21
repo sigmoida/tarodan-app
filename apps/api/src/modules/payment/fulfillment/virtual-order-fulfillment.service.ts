@@ -13,10 +13,7 @@ import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { enqueueSellerListingReindex } from "../../membership/helpers/seller-listing-reindex";
 import { PrismaService } from "../../../prisma";
-import {
-  computeRelevanceScore,
-  RELEVANCE_PREMIUM_BONUS,
-} from "../../product/helpers/relevance-score";
+import { RELEVANCE_PREMIUM_BONUS } from "../../product/helpers/relevance-score";
 import { InvoicingService } from "../../invoicing";
 import {
   hasUsableRecurringCard,
@@ -25,6 +22,13 @@ import {
 import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
+
+/** The fields of a paid payment that boost activation reads. */
+export interface BoostOrderPayment {
+  id: string;
+  orderId: string | null;
+}
 
 /**
  * VirtualOrderFulfillmentService (Faz 8.2) — SANAL sipariş (üyelik / boost) fulfillment'ı.
@@ -42,6 +46,7 @@ export class VirtualOrderFulfillmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly invoicing: InvoicingService,
+    private readonly boostTimeline: BoostTimelineService,
     private readonly outbox?: OutboxService,
     // Aktivasyon takas yetkisini değiştirir; arama dokümanı (sellerCanTrade)
     // ancak reindex'le tazelenir. @Optional — spec harness'ları konumsal kurar.
@@ -293,94 +298,38 @@ export class VirtualOrderFulfillmentService {
   }
 
   /**
-   * Boost siparişi aktivasyonu (in-tx): ProductBoost'u aktive et (stacking — kalan süre
-   * üstüne ekle), ürünü sponsorlu kademeye (rankTier=2) al, siparişi terminal completed yap.
-   * @returns cache invalidate için productId (boost yoksa null).
+   * Activates the boost of a paid boost order (in the payment transaction):
+   * the listing timeline (stacking, showcase window, rank tier) belongs to
+   * `BoostTimelineService`; this marks the virtual order terminal `completed`.
+   * @returns the boosted listing for cache invalidation (null without a boost).
    */
   async applyBoostInTx(
     tx: Prisma.TransactionClient,
-    payment: any,
+    payment: BoostOrderPayment,
   ): Promise<string | null> {
-    const boost = await tx.productBoost.findUnique({
-      where: { orderId: payment.orderId },
-    });
-    if (!boost) {
+    const orderId = payment.orderId;
+    const boost = orderId
+      ? await tx.productBoost.findUnique({
+          where: { orderId },
+          select: { id: true },
+        })
+      : null;
+    if (!orderId || !boost) {
       this.logger.warn(
-        `Boost order ${payment.orderId} paid but no matching ProductBoost found`,
+        `Boost order ${orderId} paid but no matching ProductBoost found`,
       );
       return null;
     }
 
-    const nowTs = new Date();
-    // Stacking: aktif boost varsa yeni süre kalanın ÜSTÜNE eklenir.
-    const boostedProduct = await tx.product.findUnique({
-      where: { id: boost.productId },
-      select: {
-        boostedUntil: true,
-        homeShowcaseUntil: true,
-        qualityScore: true,
-        popularityScore: true,
-        viewCount: true,
-        likeCount: true,
-        clickCount: true,
-      },
-    });
-    const base =
-      boostedProduct?.boostedUntil && boostedProduct.boostedUntil > nowTs
-        ? boostedProduct.boostedUntil
-        : nowTs;
-    const endsAt = new Date(
-      base.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
-    );
-    // Vitrin penceresi AYRI izlenir: Vitrin paketi yalnız KENDİ süresi kadar
-    // vitrin verir (varsa kalan vitrin süresinin üstüne eklenir). Eskiden
-    // homeShowcaseUntil = endsAt yazılıyordu — 30 gün kalan ekonomik boost'un
-    // üstüne 3 günlük Vitrin alan ilan 33 gün vitrinde kalıyordu (hediye süre).
-    const showcaseBase =
-      boostedProduct?.homeShowcaseUntil &&
-      boostedProduct.homeShowcaseUntil > nowTs
-        ? boostedProduct.homeShowcaseUntil
-        : nowTs;
-    const showcaseEndsAt = new Date(
-      showcaseBase.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
-    );
-    await tx.productBoost.update({
-      where: { id: boost.id },
-      data: {
-        status: "active",
-        startsAt: nowTs,
-        endsAt,
-        purchasedAt: nowTs,
-        baselineViewCount: boostedProduct?.viewCount ?? 0,
-        baselineLikeCount: boostedProduct?.likeCount ?? 0,
-        baselineClickCount: boostedProduct?.clickCount ?? 0,
-      },
-    });
-    await tx.product.update({
-      where: { id: boost.productId },
-      data: {
-        boostedUntil: endsAt,
-        // LIFO ordering key (most-recently purchased first) for search + home.
-        boostedAt: nowTs,
-        // A Vitrin (showcaseOnHome) package also lights up the home showcase —
-        // yalnız kendi süresi kadar (karışık stack'te hediye süre yok).
-        ...(boost.showcaseOnHome ? { homeShowcaseUntil: showcaseEndsAt } : {}),
-        rankTier: 2,
-        relevanceScore: computeRelevanceScore({
-          rankTier: 2,
-          qualityScore: boostedProduct?.qualityScore ?? 0,
-          popularityScore: boostedProduct?.popularityScore,
-        }),
-      },
-    });
+    const activation = await this.boostTimeline.activate(tx, boost.id);
     await tx.order.update({
-      where: { id: payment.orderId },
+      where: { id: orderId },
       data: { status: OrderStatus.completed, preparingDeadline: null },
     });
     this.logger.log(
-      `Boost activated for product ${boost.productId} until ${endsAt.toISOString()} after payment ${payment.id}`,
+      `Boost order ${orderId} completed after payment ${payment.id}`,
     );
-    return boost.productId;
+    return activation?.productId ?? null;
   }
 
   async completeRecurringMembershipPayment(
