@@ -189,6 +189,23 @@ describe("ReauthModal: account with a password", () => {
     expect(dialog()).not.toBeNull();
   });
 
+  it("cannot be closed while the password is being checked", async () => {
+    h.reauth.mockReturnValue(new Promise(() => {}));
+    render();
+    await flush();
+    await typePassword("right");
+    await click(button("common.confirm"));
+
+    expect(button("common.cancel").disabled).toBe(true);
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(dialog()).not.toBeNull();
+  });
+
   it("refetches the methods on REAUTH_METHOD_NOT_ALLOWED (the variant on screen is stale)", async () => {
     h.reauth.mockRejectedValue(apiError(400, "REAUTH_METHOD_NOT_ALLOWED"));
     render();
