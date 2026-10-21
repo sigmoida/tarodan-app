@@ -2071,10 +2071,24 @@
       "pricingLoadError": "Failed to load prices",
       "paymentStartFailed": "Failed to start payment",
       "initiateFailed": "Failed to start boost",
-      "autoRenewLabel": "Get an auto-renew reminder when it expires (Premium)",
+      "autoRenewLabel": "Remind me 24 hours before it ends (Premium). You are not charged automatically.",
       "redirecting": "Redirecting",
       "extendAndPay": "Extend and Pay",
-      "featureAndPay": "Feature and Pay"
+      "featureAndPay": "Feature and Pay",
+      "reminderUpgrade": "Upgrade to Premium",
+      "preInfo": {
+        "title": "Pre-contract information",
+        "provider": "Service provider: {company}",
+        "service": "Service: featuring \"{listing}\" for {days} days with the {package} package",
+        "price": "Total price (VAT included): <amount>{price}</amount>",
+        "start": "The service starts as soon as your payment is confirmed.",
+        "noCancel": "A boost cannot be cancelled once it has started."
+      },
+      "consent": {
+        "contract": "I have read and accept the <preInfo>Pre-contract Information Form</preInfo> and the <contract>Distance Service Contract</contract>.",
+        "waiver": "I agree that the service starts immediately with my approval and that I therefore have no right of withdrawal.",
+        "required": "Please accept both statements to continue."
+      }
     },
     "bank": {
       "title": "Bank Account / IBAN",
@@ -2395,6 +2409,11 @@
       "lastMethodHint": "Your account must keep a password or a connected Google account. Set a password first.",
       "connectSuccess": "{provider} account connected.",
       "disconnectSuccess": "{provider} disconnected."
+    },
+    "boosts": {
+      "reminder": {
+        "premiumOnly": "Reminders are for Premium members."
+      }
     }
   },
   "review": {

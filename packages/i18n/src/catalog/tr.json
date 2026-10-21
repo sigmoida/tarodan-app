@@ -2071,10 +2071,24 @@
       "pricingLoadError": "Fiyatlar yüklenemedi",
       "paymentStartFailed": "Ödeme başlatılamadı",
       "initiateFailed": "Öne çıkarma başlatılamadı",
-      "autoRenewLabel": "Süre bitince otomatik yenileme hatırlatması al (Premium)",
+      "autoRenewLabel": "Süre bitmeden 24 saat önce hatırlat (Premium). Otomatik ödeme alınmaz.",
       "redirecting": "Yönlendiriliyor",
       "extendAndPay": "Süreyi Uzat ve Öde",
-      "featureAndPay": "Öne Çıkar ve Öde"
+      "featureAndPay": "Öne Çıkar ve Öde",
+      "reminderUpgrade": "Premium'a geç",
+      "preInfo": {
+        "title": "Ön bilgilendirme",
+        "provider": "Hizmet sağlayıcı: {company}",
+        "service": "Hizmet: \"{listing}\" ilanının {package} paketiyle {days} gün öne çıkarılması",
+        "price": "Toplam bedel (KDV dahil): <amount>{price}</amount>",
+        "start": "Hizmet, ödemeniz onaylandığı anda başlar.",
+        "noCancel": "Öne çıkarma başladıktan sonra iptal edilemez."
+      },
+      "consent": {
+        "contract": "<preInfo>Ön Bilgilendirme Formu</preInfo>'nu ve <contract>Mesafeli Hizmet Sözleşmesi</contract>'ni okudum, onaylıyorum.",
+        "waiver": "Hizmetin onayımla hemen başlayacağını ve bu nedenle cayma hakkımın bulunmadığını kabul ediyorum.",
+        "required": "Devam etmek için iki onayı da vermelisiniz."
+      }
     },
     "bank": {
       "title": "Banka Hesabı / IBAN",
@@ -2395,6 +2409,11 @@
       "lastMethodHint": "Hesabınızda bir şifre ya da bağlı bir Google hesabı kalmalı. Önce bir şifre belirleyin.",
       "connectSuccess": "{provider} hesabı bağlandı.",
       "disconnectSuccess": "{provider} bağlantısı kaldırıldı."
+    },
+    "boosts": {
+      "reminder": {
+        "premiumOnly": "Hatırlatma Premium üyeler içindir."
+      }
     }
   },
   "review": {

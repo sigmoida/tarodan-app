@@ -247,7 +247,7 @@ export const queryKeys = {
     theirResource: COUNTER_THEIR_PRODUCTS_RESOURCE,
   },
   boost: {
-    pricing: () => ["boost-pricing"] as const,
+    /** The owner's package and price matrix for one listing. */
     options: (productId: string) => ["boost-options", productId] as const,
   },
   // Hesap alanındaki tek öğe: `useWebItem` anahtarıyla BİREBİR aynı
