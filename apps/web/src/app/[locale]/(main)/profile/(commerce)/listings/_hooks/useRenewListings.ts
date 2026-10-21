@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { listingsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import { queryKeys } from "@/lib/query/keys";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import { LISTING_RESOURCE, RESOURCE } from "./useMyListings";
 import {
@@ -30,7 +31,11 @@ export function useRenewListing() {
       return (response.data?.data ?? response.data) as RenewResult;
     },
     {
-      invalidates: [RESOURCE, LISTING_RESOURCE],
+      invalidates: [
+        RESOURCE,
+        LISTING_RESOURCE,
+        queryKeys.tradeEligible.resource,
+      ],
       errorMessage: t("profile.expiredListings.renewFailed"),
       onSuccess: (result) => {
         toast.success(
@@ -60,7 +65,11 @@ export function useRenewListings() {
       };
     },
     {
-      invalidates: [RESOURCE, LISTING_RESOURCE],
+      invalidates: [
+        RESOURCE,
+        LISTING_RESOURCE,
+        queryKeys.tradeEligible.resource,
+      ],
       errorMessage: t("profile.expiredListings.renewFailed"),
       onSuccess: ({ batch, titles }) => {
         if (batch.renewed > 0) {

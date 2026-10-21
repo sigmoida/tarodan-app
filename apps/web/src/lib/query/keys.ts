@@ -1,6 +1,8 @@
 // Banka hesabı hesap alanında tek öğedir (`useWebItem` kaynağı + sabit id).
 const BANK_ACCOUNT_RESOURCE = "bank-account";
 const BANK_ACCOUNT_ID = "me";
+// The trade picker's own-listings list (a `useWebList` resource).
+const TRADE_ELIGIBLE_RESOURCE = "trade-eligible-products";
 
 /**
  * Central query-key registry. The whole point is that the **server prefetch**
@@ -214,6 +216,18 @@ export const queryKeys = {
   },
   profileListings: {
     all: () => ["profile-listings"] as const,
+  },
+  /**
+   * The trade picker's own-listings list (`useTradeableProducts`). `resource` is
+   * the `useWebList` resource; `all()` is its prefix and matches every picker
+   * (per user + target). The picker refetches on open and on tab focus anyway;
+   * listing writes still mark it stale (`invalidateListingQueries`, or the
+   * resource in `useWebMutation({ invalidates })`) so a cached list is never
+   * served as fresh.
+   */
+  tradeEligible: {
+    resource: TRADE_ELIGIBLE_RESOURCE,
+    all: () => webKeys.all(TRADE_ELIGIBLE_RESOURCE),
   },
   boost: {
     pricing: () => ["boost-pricing"] as const,

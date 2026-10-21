@@ -3,7 +3,7 @@
 "use client";
 
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Checkbox } from "@tarodan/ui";
+import { Checkbox, Spinner } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
@@ -14,16 +14,26 @@ import { useTranslations } from "next-intl";
 
 interface TradeProductPickerProps {
   products: TradeProduct[];
+  /** Fetching with nothing cached: show a spinner, never the empty state. */
+  isLoading?: boolean;
   selectedIds: string[];
   onToggle: (id: string) => void;
 }
 
 export default function TradeProductPicker({
   products,
+  isLoading = false,
   selectedIds,
   onToggle,
 }: TradeProductPickerProps) {
   const t = useTranslations();
+  if (isLoading && products.length === 0) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner size="lg" color="border-primary-500 border-t-transparent" />
+      </div>
+    );
+  }
   if (products.length === 0) {
     return (
       <div className="py-8 text-center">

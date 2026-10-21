@@ -14,11 +14,13 @@ import {
 import { useRouter } from "@/i18n/navigation";
 import type { UseFormReturn } from "react-hook-form";
 import { useZodForm } from "@tarodan/ui/form";
+import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { listingsApi } from "@/lib/api";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
 import { usePriceLimits } from "@/hooks/usePublicSettings";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -49,6 +51,7 @@ import {
 
 function useNewListingValue() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const {
     isAuthenticated,
     isLoading: authLoading,
@@ -292,6 +295,7 @@ function useNewListingValue() {
       };
 
       await listingsApi.create(payload as any);
+      void invalidateListingQueries(queryClient);
       toast.success(t("product.listingCreated"));
       await refreshUser();
       await refetchLimits();

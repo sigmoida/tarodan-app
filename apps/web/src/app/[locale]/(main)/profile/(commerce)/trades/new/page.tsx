@@ -62,10 +62,24 @@ function NewTradeContent() {
     listingId,
     enabled,
   );
-  const { products } = useTradeableProducts(listingId, enabled);
+  const { products, isLoading: productsLoading } = useTradeableProducts(
+    listingId,
+    enabled,
+  );
   const createTrade = useCreateTrade();
 
+  // The picker refetches on open and on tab focus: a pick that is no longer
+  // eligible (deactivated, sold, offered elsewhere) drops out of the offer
+  // instead of being sent and rejected by the API, and is pruned from the
+  // selection so it does not come back checked if the listing returns later.
   const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
+  const offeredIds = selectedProducts.map((p) => p.id);
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => products.some((p) => p.id === id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [products]);
   const cash = parseFloat(cashAmount) || 0;
 
   const {
@@ -73,7 +87,7 @@ function NewTradeContent() {
     previewLoading: costPreviewLoading,
     previewFailed: costPreviewFailed,
   } = useTradeCostPreview({
-    myProductIds: selectedIds,
+    myProductIds: offeredIds,
     theirProductIds: target ? [target.id] : [],
     cashAmount,
     cashPayer,
@@ -88,7 +102,7 @@ function NewTradeContent() {
   const submit = () => {
     // API en az 1 teklif edilen ürün ister (CreateTradeDto initiatorItems ArrayMinSize(1));
     // yalnız nakitle teklif sunucuda reddedilirdi.
-    if (selectedIds.length === 0)
+    if (offeredIds.length === 0)
       return toast.error(t("trade.selectAtLeastOneOffer"));
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
@@ -98,7 +112,7 @@ function NewTradeContent() {
 
     createTrade.mutate({
       receiverId: sellerId,
-      initiatorItems: selectedIds.map((id) => ({ productId: id, quantity: 1 })),
+      initiatorItems: offeredIds.map((id) => ({ productId: id, quantity: 1 })),
       receiverItems: [{ productId: target.id, quantity: 1 }],
       cashAmount: cash > 0 ? (cashPayer === "me" ? cash : -cash) : undefined,
       message: message || undefined,
@@ -180,6 +194,7 @@ function NewTradeContent() {
         >
           <TradeProductPicker
             products={products}
+            isLoading={productsLoading}
             selectedIds={selectedIds}
             onToggle={toggle}
           />
@@ -282,7 +297,7 @@ function NewTradeContent() {
         <Button
           className="flex-1 gap-2"
           onClick={submit}
-          disabled={selectedIds.length === 0}
+          disabled={offeredIds.length === 0}
           isLoading={createTrade.isPending}
         >
           <ArrowsRightLeftIcon className="h-5 w-5" />
