@@ -2,9 +2,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { Translate } from "@/types/i18n";
-import { buildPayload } from "./payload";
+import { buildPayload, fromDiscount } from "./payload";
 import { discountSchema } from "./schema";
-import { emptyDiscountForm, type DiscountFormData } from "./types";
+import {
+  emptyDiscountForm,
+  type Discount,
+  type DiscountFormData,
+} from "./types";
 
 /**
  * The discount value and the TL amount fields are text read by the shared TL
@@ -50,8 +54,9 @@ describe("discount amounts, payload", () => {
   });
 
   it("omits empty optional amounts and sends a zero value for bogo", () => {
+    // The default "10" stays in the hidden field after switching to bogo.
     const payload = buildPayload(
-      form({ type: "bogo", value: "", buyQuantity: "2", getQuantity: "1" }),
+      form({ type: "bogo", value: "10", buyQuantity: "2", getQuantity: "1" }),
     );
     expect(payload.value).toBe(0);
     expect(payload.minCartValue).toBeUndefined();
@@ -122,6 +127,10 @@ describe("discount amounts, refusal", () => {
       const percent = (value: string) =>
         issues(form({ type, value, minQuantity: "3" }));
       expect(percent("100")).toEqual({});
+      expect(percent("0,01")).toEqual({});
+      expect(percent("100,01")).toEqual({
+        value: "validation.discountPercentRange",
+      });
       expect(percent("150")).toEqual({
         value: "validation.discountPercentRange",
       });
@@ -146,5 +155,76 @@ describe("discount amounts, refusal", () => {
     expect(bulk("15,5")).toEqual({});
     expect(bulk("150")).toEqual({ value: "validation.discountPercentRange" });
     expect(bulk("")).toEqual({ value: "validation.discountPercentRange" });
+  });
+});
+
+describe("discount amounts, edit prefill", () => {
+  const saved = (patch: Partial<Discount>): Discount => ({
+    id: "d1",
+    code: "AUTUMN",
+    name: "Autumn",
+    description: null,
+    type: "fixed_amount",
+    value: 1250.5,
+    scope: "seller",
+    targetProductIds: [],
+    minCartValue: 1000,
+    maxDiscountAmount: null,
+    usageLimitTotal: null,
+    usageLimitPerUser: 1,
+    usedCount: 0,
+    isStackable: false,
+    priority: 0,
+    isActive: true,
+    startDate: "2026-10-01T00:00:00.000Z",
+    endDate: "2026-10-31T00:00:00.000Z",
+    createdAt: "2026-09-30T00:00:00.000Z",
+    isCurrentlyValid: true,
+    remainingUsage: null,
+    ...patch,
+  });
+
+  it("shows saved amounts with a decimal comma and no grouping", () => {
+    const values = fromDiscount(
+      saved({ value: 1250.5, minCartValue: 1000, maxDiscountAmount: 0.5 }),
+    );
+    expect(values).toMatchObject({
+      value: "1250,50",
+      minCartValue: "1000",
+      maxDiscountAmount: "0,50",
+    });
+  });
+
+  it("reads a decimal string the same way", () => {
+    // The API maps its Decimal columns to numbers; a string (an untyped or
+    // older response) must not reach the field as "12.50".
+    const values = fromDiscount(
+      saved({
+        value: "12.50" as unknown as number,
+        minCartValue: "1000.00" as unknown as number,
+      }),
+    );
+    expect(values.value).toBe("12,50");
+    expect(values.minCartValue).toBe("1000");
+  });
+
+  it("leaves absent amounts empty", () => {
+    const values = fromDiscount(
+      saved({ minCartValue: null, maxDiscountAmount: null }),
+    );
+    expect(values.minCartValue).toBe("");
+    expect(values.maxDiscountAmount).toBe("");
+  });
+
+  it("round-trips an unchanged edit to the saved amounts", () => {
+    const values = fromDiscount(
+      saved({ value: 1250.5, minCartValue: 1000, maxDiscountAmount: 99.99 }),
+    );
+    expect(issues(values)).toEqual({});
+    expect(buildPayload(values)).toMatchObject({
+      value: 1250.5,
+      minCartValue: 1000,
+      maxDiscountAmount: 99.99,
+    });
   });
 });
