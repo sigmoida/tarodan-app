@@ -185,11 +185,11 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       {} as never, // holdRelease
       new PaymentRefundAttemptService(prisma as never),
       {} as never, // tradeRefunds
+      boostTimeline as never,
       outbox as never,
       ledger as never,
       undefined, // discounts
       undefined, // staff mail
-      boostTimeline as never,
     );
     // Spied, not run: the staff mail itself is the mail module's business.
     const staffNotice = jest
