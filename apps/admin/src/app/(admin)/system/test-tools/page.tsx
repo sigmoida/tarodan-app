@@ -1,5 +1,6 @@
 "use client";
 
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Alert, Badge } from "@tarodan/ui";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
@@ -22,8 +23,15 @@ export default function TestToolsPage() {
         description={t("admin.system.testTools.description")}
       >
         {env && (
-          <Badge variant={env.isProd ? "danger" : "outline"}>
-            {env.isProd ? "⚠ PROD" : env.env}
+          <Badge
+            variant={env.isProd ? "danger" : "outline"}
+            icon={
+              env.isProd ? (
+                <ExclamationTriangleIcon className="size-3.5" aria-hidden />
+              ) : undefined
+            }
+          >
+            {env.isProd ? "PROD" : env.env}
           </Badge>
         )}
       </PageHeader>

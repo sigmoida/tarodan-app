@@ -6860,6 +6860,7 @@
         "tradeBadge": "Trade",
         "sellerCount": "{count} sellers",
         "tradeItemCount": "{initiatorCount} items for {receiverCount} items",
+        "tradeItemPair": "{initiator} for {receiver}",
         "orderSubtitle": "Order #{number}",
         "tradeSubtitle": "Trade #{number}",
         "paymentSubtitle": "Payment #{id}",

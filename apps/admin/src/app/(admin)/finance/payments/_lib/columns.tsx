@@ -77,7 +77,10 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
           const right = p.trade.receiverItems;
           const title =
             left.length === 1 && right.length === 1
-              ? `${left[0].title} ↔ ${right[0].title}`
+              ? t("admin.finance.payments.tradeItemPair", {
+                  initiator: left[0].title,
+                  receiver: right[0].title,
+                })
               : t("admin.finance.payments.tradeItemCount", {
                   initiatorCount: left.length,
                   receiverCount: right.length,

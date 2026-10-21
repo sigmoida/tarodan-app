@@ -1,5 +1,6 @@
 /** @format */
 
+import { CheckIcon } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import { col } from "@/components/table";
 import { CellLink } from "@/components/table/cells";
@@ -250,8 +251,9 @@ export const sellerColumns = (t: T) => [
     t("admin.finance.common.mail"),
     (s) =>
       s.emailSentAt ? (
-        <span className="text-xs text-success-600">
-          ✓ {t("admin.finance.common.sent")}
+        <span className="inline-flex items-center gap-1 text-xs text-success-600">
+          <CheckIcon className="size-3.5" aria-hidden />
+          {t("admin.finance.common.sent")}
         </span>
       ) : (
         <span className="text-xs text-muted">—</span>

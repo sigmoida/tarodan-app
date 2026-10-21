@@ -6860,6 +6860,7 @@
         "tradeBadge": "Takas",
         "sellerCount": "{count} satıcı",
         "tradeItemCount": "{initiatorCount} ürün karşılığında {receiverCount} ürün",
+        "tradeItemPair": "{initiator} karşılığında {receiver}",
         "orderSubtitle": "Sipariş #{number}",
         "tradeSubtitle": "Takas #{number}",
         "paymentSubtitle": "Ödeme #{id}",
