@@ -5,8 +5,6 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SellerTrustView } from "@tarodan/types";
-import en from "../../../../../../../../../packages/i18n/src/catalog/en.json";
-import tr from "../../../../../../../../../packages/i18n/src/catalog/tr.json";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -14,21 +12,21 @@ import tr from "../../../../../../../../../packages/i18n/src/catalog/tr.json";
 
 const h = vi.hoisted(() => ({ locale: "tr" }));
 
-vi.mock("next-intl", () => ({
-  useLocale: () => h.locale,
-  useTranslations: () => (key: string, values?: Record<string, unknown>) => {
-    const catalog = (h.locale === "tr" ? tr : en) as Record<string, unknown>;
-    let node: unknown = catalog;
-    for (const part of key.split(".")) {
-      node = (node as Record<string, unknown> | undefined)?.[part];
-    }
-    let text = typeof node === "string" ? node : key;
-    for (const [k, v] of Object.entries(values ?? {})) {
-      text = text.replace(`{${k}}`, String(v));
-    }
-    return text;
-  },
-}));
+// The real next-intl translator over the shared catalog, so the ICU copy is
+// parsed exactly as in the app.
+vi.mock("next-intl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next-intl")>();
+  const { getMessages } = await import("@tarodan/i18n");
+  return {
+    ...actual,
+    useLocale: () => h.locale,
+    useTranslations: () =>
+      actual.createTranslator({
+        locale: h.locale,
+        messages: getMessages(h.locale as "tr" | "en"),
+      }),
+  };
+});
 
 import SellerTrustBadge from "./SellerTrustBadge";
 
@@ -87,6 +85,11 @@ describe("SellerTrustBadge", () => {
     render(null);
     expect(container.innerHTML).toBe("");
     render(undefined);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders nothing for a level this client does not know", () => {
+    render(view({ level: "elite" as SellerTrustView["level"] }));
     expect(container.innerHTML).toBe("");
   });
 

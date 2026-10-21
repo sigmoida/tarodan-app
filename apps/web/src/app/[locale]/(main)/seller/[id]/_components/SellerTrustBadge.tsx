@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { Badge, Button } from "@tarodan/ui";
 import {
+  SELLER_TRUST_LEVELS,
   SELLER_TRUST_LEVEL_I18N_KEYS,
   formatTrustRating,
   type SellerTrustView,
@@ -19,14 +20,20 @@ interface SellerTrustBadgeProps {
 
 /**
  * Trust score badge of the seller header. Renders nothing without a `trust`
- * block; pressing it opens the "how is it calculated" modal.
+ * block or for a level this client does not know (contract: an unknown future
+ * level shows no badge); pressing it opens the "how is it calculated" modal.
  */
 export default function SellerTrustBadge({ trust }: SellerTrustBadgeProps) {
   const t = useTranslations();
   const locale = useLocale();
   const [infoOpen, setInfoOpen] = useState(false);
 
-  if (!trust) return null;
+  if (
+    !trust ||
+    !(SELLER_TRUST_LEVELS as readonly string[]).includes(trust.level)
+  ) {
+    return null;
+  }
 
   const label =
     trust.level === "new" || trust.rating === null
