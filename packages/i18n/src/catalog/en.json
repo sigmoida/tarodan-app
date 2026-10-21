@@ -759,8 +759,16 @@
       "ruleCoverText": "The cover should show the product straight on and uncluttered; keep other angles, measurements and packaging for the supporting images."
     },
     "boostedBadge": "Featured",
+    "boostedBadgeHint": "The seller paid to feature this listing",
+    "boostEndsAt": "Ends: {date}",
     "boostListing": "Feature",
     "extendBoost": "Extend",
+    "cardAction": {
+      "addToCartAria": "Add {title} to cart",
+      "removeFromCartAria": "Remove {title} from cart",
+      "boostAria": "Feature {title}",
+      "extendAria": "Extend the feature period of {title}"
+    },
     "estimatedNet": "Estimated net earnings: {amount}",
     "relist": "Relist",
     "deactivateListing": "Deactivate",

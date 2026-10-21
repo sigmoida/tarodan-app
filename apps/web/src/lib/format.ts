@@ -20,6 +20,17 @@ const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+// The month is a word here, so this formatter follows the UI locale (the
+// numeric ones above read the same in every language).
+const dayMonthFmts = new Map<string, Intl.DateTimeFormat>();
+const dayMonthFmt = (locale: string): Intl.DateTimeFormat => {
+  let fmt = dayMonthFmts.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+    dayMonthFmts.set(locale, fmt);
+  }
+  return fmt;
+};
 
 type DateLike = string | number | Date | null | undefined;
 
@@ -42,6 +53,17 @@ export function formatDateTime(value: DateLike): string {
   if (value === null || value === undefined || value === "") return "";
   const d = value instanceof Date ? value : new Date(value);
   return isNaN(d.getTime()) ? "" : dateTimeFmt.format(d);
+}
+
+/**
+ * Day and short month without the year, in the UI locale ("12 Kas",
+ * "12 Nov"): for dates that are close and must fit a narrow card (a boost's
+ * end, at most a few months ahead).
+ */
+export function formatDayMonth(value: DateLike, locale: string): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? "" : dayMonthFmt(locale).format(d);
 }
 
 /**

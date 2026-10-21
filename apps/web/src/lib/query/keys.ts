@@ -249,6 +249,8 @@ export const queryKeys = {
   boost: {
     /** The owner's package and price matrix for one listing. */
     options: (productId: string) => ["boost-options", productId] as const,
+    /** The signed-in seller's boost switch and due offers (one per session). */
+    offers: () => ["boost-offers"] as const,
   },
   // Hesap alanındaki tek öğe: `useWebItem` anahtarıyla BİREBİR aynı
   // (`webKeys.detail(resource, id)`), böylece `invalidates: ['bank-account']`

@@ -19,15 +19,8 @@ import { useFavorites } from "@/hooks/useFavorites";
 export default function SharedFavoritesClient() {
   const t = useTranslations();
   const router = useRouter();
-  const {
-    items,
-    pendingCount,
-    isLoading,
-    isSharedView,
-    handleCartToggle,
-    isInCart,
-    isPending,
-  } = useFavorites();
+  const { items, pendingCount, isLoading, isSharedView, isPending } =
+    useFavorites();
 
   useEffect(() => {
     if (!isSharedView) router.replace("/profile/favorites");
@@ -50,8 +43,6 @@ export default function SharedFavoritesClient() {
           isSharedView
           onRemove={() => undefined}
           isPending={isPending}
-          onCartToggle={handleCartToggle}
-          isInCart={isInCart}
         />
       )}
     </PageShell>

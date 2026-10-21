@@ -7,6 +7,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import SkeletonCard from "@/components/ui/SkeletonCard";
+import type { ProductBadgeLabels } from "@/lib/productCardBadges";
 import type { Product } from "@/types/product";
 import HomeProductCard from "./HomeProductCard";
 
@@ -20,15 +21,11 @@ const PAGE_SIZE = 20;
  */
 export default function FeaturedRailClient({
   initialItems,
-  sponsoredLabel,
-  tradeLabel,
-  discountLabel,
+  badgeLabels,
   outOfStockLabel,
 }: {
   initialItems: Product[];
-  sponsoredLabel: string;
-  tradeLabel: string;
-  discountLabel: string;
+  badgeLabels: ProductBadgeLabels;
   outOfStockLabel: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,9 +89,7 @@ export default function FeaturedRailClient({
             product={product}
             index={index}
             priority={index < 4}
-            sponsoredLabel={sponsoredLabel}
-            tradeLabel={tradeLabel}
-            discountLabel={discountLabel}
+            badgeLabels={badgeLabels}
             outOfStockLabel={outOfStockLabel}
           />
         </div>
