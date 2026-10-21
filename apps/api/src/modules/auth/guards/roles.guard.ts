@@ -7,7 +7,10 @@ import {
 import { Reflector } from "@nestjs/core";
 import { Request } from "express";
 import { ROLES_KEY } from "../decorators/roles.decorator";
-import { PERMISSION_KEY } from "../decorators/require-permission.decorator";
+import {
+  ALL_PERMISSIONS_KEY,
+  PERMISSION_KEY,
+} from "../decorators/require-permission.decorator";
 import { BYPASS_PERMISSION_MATRIX_KEY } from "../decorators/bypass-permission-matrix.decorator";
 import { RequestUser } from "../interfaces";
 import { PrismaService } from "../../../prisma";
@@ -22,7 +25,8 @@ import { isTest } from "../../../config/environment";
 //
 // İstek URL'inin ilk path segmenti kullanılır: /api/admin/<segment>/...
 // GET ve yazma isteklerinin ikisi de aynı izni gerektirir — sayfa erişim modeli.
-// @RequirePermission decorator varsa bu tabloyu override eder.
+// @RequirePermission / @RequireAllPermissions bu tabloyu override eder
+// (bkz. requiredPermissions).
 //
 export const PERMISSION_MAP: Record<string, string[]> = {
   dashboard: ["dashboard"],
@@ -152,10 +156,44 @@ function isCanonicalAdminUrl(url: string): boolean {
   return p[0] === "admin";
 }
 
-function resolveUrlPermissions(_method: string, url: string): string[] | null {
+function resolveUrlPermissions(url: string): string[] | null {
   const seg = extractSegment(url);
   if (!seg) return null;
   return PERMISSION_MAP[seg] ?? null;
+}
+
+/**
+ * What the permission matrix must grant: `any` of the keys (the URL map, or
+ * the one `@RequirePermission` key) or `all` of them (`@RequireAllPermissions`
+ * plus a `@RequirePermission` declared next to it, so no declared key is
+ * dropped). The decorators replace the URL map; null when nothing applies.
+ */
+export interface PermissionRequirement {
+  keys: string[];
+  match: "any" | "all";
+}
+
+export function requiredPermissions(
+  declared: { one?: string; all?: string[] },
+  url: string,
+): PermissionRequirement | null {
+  if (declared.all && declared.all.length > 0) {
+    const keys = declared.one ? [...declared.all, declared.one] : declared.all;
+    return { keys: [...new Set(keys)], match: "all" };
+  }
+  if (declared.one) return { keys: [declared.one], match: "any" };
+  const keys = resolveUrlPermissions(url);
+  return keys && keys.length > 0 ? { keys, match: "any" } : null;
+}
+
+/** The required keys the role lacks; empty when the requirement is met. */
+function missingPermissions(
+  requirement: PermissionRequirement,
+  rolePerms: string[],
+): string[] {
+  const missing = requirement.keys.filter((k) => !rolePerms.includes(k));
+  if (requirement.match === "all") return missing;
+  return missing.length === requirement.keys.length ? missing : [];
 }
 
 // ── In-memory cache ─────────────────────────────────────────────────────────
@@ -183,11 +221,16 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    // @RequirePermission decorator'dan gelen explicit override
+    // @RequirePermission / @RequireAllPermissions: explicit override
     const explicitPermission = this.reflector.getAllAndOverride<string>(
       PERMISSION_KEY,
       [context.getHandler(), context.getClass()],
     );
+    const allPermissions = this.reflector.getAllAndOverride<string[]>(
+      ALL_PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    const declaresAll = !!allPermissions && allPermissions.length > 0;
 
     // @BypassPermissionMatrix — izin matrisi sorgulanmaz; rol kontrolü yeterli.
     const bypassMatrix = this.reflector.getAllAndOverride<boolean>(
@@ -196,7 +239,11 @@ export class RolesGuard implements CanActivate {
     );
 
     // Ne rol ne izin tanımlanmışsa — geçir (public gibi davran).
-    if ((!requiredRoles || requiredRoles.length === 0) && !explicitPermission) {
+    if (
+      (!requiredRoles || requiredRoles.length === 0) &&
+      !explicitPermission &&
+      !declaresAll
+    ) {
       return true;
     }
 
@@ -225,15 +272,17 @@ export class RolesGuard implements CanActivate {
     if (user.role === "super_admin") return true;
 
     // ── 2b. @BypassPermissionMatrix — rol kontrolü yeterli, matris sorgulanmaz ──
-    if (bypassMatrix) return true;
+    // An explicit all-of requirement is never bypassed silently.
+    if (bypassMatrix && !declaresAll) return true;
 
     // ── 3. İzin matrisi kontrolü ──────────────────────────────────────────
     const url = req.originalUrl ?? req.url ?? "";
-    const permKeys: string[] | null = explicitPermission
-      ? [explicitPermission]
-      : resolveUrlPermissions(req.method, url);
+    const requirement = requiredPermissions(
+      { one: explicitPermission, all: allPermissions },
+      url,
+    );
 
-    if (!permKeys || permKeys.length === 0) {
+    if (!requirement) {
       // Fail-closed: kanonik bir /api/admin/<segment> route'u PERMISSION_MAP'te
       // eşlenmemişse (ve bilinen rol-only istisnalardan biri değilse) erişimi
       // reddet. Aksi halde yeni eklenen ve izin haritasına yazılması unutulan
@@ -256,10 +305,14 @@ export class RolesGuard implements CanActivate {
     const perms = await this.loadPermissions();
     const rolePerms = perms[user.role] ?? [];
 
-    if (!permKeys.some((k) => rolePerms.includes(k))) {
+    const missing = missingPermissions(requirement, rolePerms);
+    if (missing.length > 0) {
+      // For `all` only the first missing key is named: the message reads
+      // "one of [...]", which is exact for a single key.
+      const named = requirement.match === "all" ? missing.slice(0, 1) : missing;
       throw new ForbiddenException(
         i18nMessage("server.auth.permissionRequired", {
-          perms: permKeys.join(", "),
+          perms: named.join(", "),
           role: user.role,
         }),
       );

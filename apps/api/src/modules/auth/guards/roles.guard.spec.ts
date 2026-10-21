@@ -1,9 +1,16 @@
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { PERMISSION_MAP, RolesGuard } from "./roles.guard";
-import { ROLES_KEY } from "../decorators/roles.decorator";
-import { PERMISSION_KEY } from "../decorators/require-permission.decorator";
-import { BYPASS_PERMISSION_MATRIX_KEY } from "../decorators/bypass-permission-matrix.decorator";
+import { PERMISSION_MAP, RolesGuard, requiredPermissions } from "./roles.guard";
+import { Roles, ROLES_KEY } from "../decorators/roles.decorator";
+import {
+  PERMISSION_KEY,
+  RequireAllPermissions,
+  RequirePermission,
+} from "../decorators/require-permission.decorator";
+import {
+  BYPASS_PERMISSION_MATRIX_KEY,
+  BypassPermissionMatrix,
+} from "../decorators/bypass-permission-matrix.decorator";
 
 /**
  * retry-refund gibi gerçek-para iadesi tetikleyen endpoint @RequirePermission('refund_requests')
@@ -495,5 +502,131 @@ describe("RolesGuard — bildirim görseli yükleme izni", () => {
     await expect(
       makeGuard(["ads"]).canActivate(ctx("/api/admin/notifications/upload")),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+/**
+ * `@RequireAllPermissions`: every listed key is needed (the boost refund
+ * needs `ads` and `payments`), where the URL map and `@RequirePermission`
+ * accept any one. Real decorators and a real Reflector.
+ */
+describe("RolesGuard — @RequireAllPermissions (all-of)", () => {
+  @RequirePermission("trades")
+  class ClassScoped {
+    @Roles("super_admin", "admin", "moderator")
+    @RequireAllPermissions("ads", "payments")
+    both() {}
+
+    @Roles("super_admin", "admin", "moderator")
+    one() {}
+
+    @Roles("super_admin", "admin", "moderator")
+    @BypassPermissionMatrix()
+    @RequireAllPermissions("ads", "payments")
+    bypassed() {}
+  }
+
+  class Bare {
+    // No @Roles: the all-of rule alone still closes the route.
+    @RequireAllPermissions("ads", "payments")
+    noRoles() {}
+  }
+
+  const guard = (perms: Record<string, string[]>) =>
+    new RolesGuard(new Reflector(), {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ settingValue: JSON.stringify(perms) }),
+      },
+    } as never);
+
+  const ctx = (
+    cls: { prototype: object },
+    handler: string,
+    role: string,
+    user: Record<string, unknown> = { isAdmin: true, role },
+  ): ExecutionContext =>
+    ({
+      getHandler: () => (cls.prototype as Record<string, unknown>)[handler],
+      getClass: () => cls,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user,
+          method: "POST",
+          originalUrl: "/api/admin/ad-packages/purchases/b1/refund",
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
+  it("joins a class-level @RequirePermission into the all-of set", () => {
+    expect(
+      requiredPermissions({ one: "trades", all: ["ads", "payments"] }, ""),
+    ).toEqual({ keys: ["ads", "payments", "trades"], match: "all" });
+    expect(requiredPermissions({ one: "trades" }, "")).toEqual({
+      keys: ["trades"],
+      match: "any",
+    });
+    expect(requiredPermissions({}, "/api/admin/users/1")).toEqual({
+      keys: ["users", "seller_performance"],
+      match: "any",
+    });
+  });
+
+  it("passes only when the role has every key", async () => {
+    await expect(
+      guard({ admin: ["ads", "payments", "trades"] }).canActivate(
+        ctx(ClassScoped, "both", "admin"),
+      ),
+    ).resolves.toBe(true);
+    for (const perms of [
+      ["ads", "payments"],
+      ["ads", "trades"],
+      ["payments", "trades"],
+    ]) {
+      await expect(
+        guard({ admin: perms }).canActivate(ctx(ClassScoped, "both", "admin")),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    }
+  });
+
+  it("leaves the any-of handlers of the same class as they were", async () => {
+    await expect(
+      guard({ moderator: ["trades"] }).canActivate(
+        ctx(ClassScoped, "one", "moderator"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("is not skipped by @BypassPermissionMatrix", async () => {
+    await expect(
+      guard({ admin: ["ads", "trades"] }).canActivate(
+        ctx(ClassScoped, "bypassed", "admin"),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("closes a route without @Roles to non-admins and to admins lacking a key", async () => {
+    await expect(
+      guard({ admin: ["ads", "payments"] }).canActivate(
+        ctx(Bare, "noRoles", "admin", { isAdmin: false }),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      guard({ admin: ["ads"] }).canActivate(ctx(Bare, "noRoles", "admin")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      guard({ admin: ["ads", "payments"] }).canActivate(
+        ctx(Bare, "noRoles", "admin"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("lets super_admin through, as for every other permission", async () => {
+    await expect(
+      guard({ super_admin: [] }).canActivate(
+        ctx(ClassScoped, "both", "super_admin"),
+      ),
+    ).resolves.toBe(true);
   });
 });
