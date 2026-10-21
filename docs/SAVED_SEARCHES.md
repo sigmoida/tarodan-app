@@ -45,7 +45,8 @@ and the `attrGroups` keys and slugs, and writes keys in sorted order. `page`
 and `limit` are never stored. The stored query can be sent to
 `GET /products` as it is; `savedSearchToRouteParams` turns it into the URL
 params web `/listings` and mobile `/search` read (`attr.<group>=a,b`, plus
-the display names from the labels).
+the display names `category`, `brand`, `manufacturer` and `carModel` from the
+labels, which the filter chips read next to the ids).
 
 `query_hash` is the SHA-256 hex of the JSON of the canonical query; the
 unique index `(user_id, query_hash)` is the duplicate rule. Rows are
