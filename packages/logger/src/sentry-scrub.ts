@@ -61,11 +61,31 @@ function redactRecord<T>(value: T): T {
   return redactSensitive(value) as T;
 }
 
+/**
+ * Keys that are credentials in a request body only: a bare `code` there is a
+ * one-time credential (the Google auth code of sign-in, step-up and linking;
+ * an e-mail, phone or 2FA verification code). Elsewhere (`extra`, contexts,
+ * breadcrumbs) a `code` is usually an error code and stays readable, so the
+ * shared key list does not carry it. Top-level body fields only.
+ */
+const REQUEST_BODY_CREDENTIAL_KEYS = new Set(["code"]);
+
+function redactBodyFields(data: unknown): unknown {
+  const out = redactSensitive(data);
+  if (!out || typeof out !== "object" || Array.isArray(out)) return out;
+  return Object.fromEntries(
+    Object.entries(out).map(([key, value]) => [
+      key,
+      REQUEST_BODY_CREDENTIAL_KEYS.has(key.toLowerCase()) ? REDACTED : value,
+    ]),
+  );
+}
+
 /** A body may arrive as a JSON string: redact its fields, not just its text. */
 function redactBody(data: unknown): unknown {
-  if (typeof data !== "string") return redactSensitive(data);
+  if (typeof data !== "string") return redactBodyFields(data);
   try {
-    return JSON.stringify(redactSensitive(JSON.parse(data)));
+    return JSON.stringify(redactBodyFields(JSON.parse(data)));
   } catch {
     return redactString(data);
   }
