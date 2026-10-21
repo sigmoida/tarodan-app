@@ -181,6 +181,14 @@ export class CreateMembershipTierDto {
   @IsBoolean()
   canTrade: boolean;
 
+  // Same bounds as UpdateMembershipTierDto; missing means the column default.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(SAVED_SEARCH_TIER_LIMIT_MAX)
+  maxSavedSearches?: number;
+
   /**
    * Yükseltme/düşürme yönü katmanların sortOrder karşılaştırmasından çıkar —
    * alan yük taşır. Ayarlanamadığında yeni katman 0'a (free ile aynı sıraya)
