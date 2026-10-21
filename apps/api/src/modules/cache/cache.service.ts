@@ -153,10 +153,22 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    * Redis hatasında false döner (kapalı başarısızlık): bu bir kilit/sayım
    * kapısıdır; Redis yokken her isteği "ilk" saymak tekilleştirmeyi tamamen
    * kaldırırdı.
+   *
+   * `value` (JSON, default `1`) lets a caller store a record that must not be
+   * reported as written when Redis is down, which `set` cannot tell (it
+   * swallows the error). The step-up token is stored this way; `get` reads it.
    */
-  async setIfAbsent(key: string, ttlSeconds: number): Promise<boolean> {
+  async setIfAbsent(
+    key: string,
+    ttlSeconds: number,
+    value: unknown = 1,
+  ): Promise<boolean> {
     try {
-      return (await this.client.set(key, "1", "EX", ttlSeconds, "NX")) === "OK";
+      const serialized = JSON.stringify(value);
+      return (
+        (await this.client.set(key, serialized, "EX", ttlSeconds, "NX")) ===
+        "OK"
+      );
     } catch (error) {
       this.logger.warn("Cache setIfAbsent error");
       return false;

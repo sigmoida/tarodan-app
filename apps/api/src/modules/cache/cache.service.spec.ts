@@ -20,6 +20,22 @@ describe("CacheService.setIfAbsent", () => {
     expect(set).toHaveBeenCalledWith("k", "1", "EX", 30, "NX");
   });
 
+  it("stores a given value as JSON with the same atomic SET EX NX", async () => {
+    const set = jest.fn().mockResolvedValue("OK");
+    const service = withClient(set);
+
+    await expect(service.setIfAbsent("k", 300, { userId: "u1" })).resolves.toBe(
+      true,
+    );
+    expect(set).toHaveBeenCalledWith(
+      "k",
+      JSON.stringify({ userId: "u1" }),
+      "EX",
+      300,
+      "NX",
+    );
+  });
+
   it("anahtar zaten varsa false döner", async () => {
     const service = withClient(jest.fn().mockResolvedValue(null));
     await expect(service.setIfAbsent("k", 30)).resolves.toBe(false);

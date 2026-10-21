@@ -14,6 +14,11 @@ export interface AppleProfile {
    * ve iptal edilir.
    */
   audience: string;
+  /**
+   * When Apple issued the identity token (`iat`, seconds since the epoch). The
+   * step-up uses it to accept only a fresh sign-in.
+   */
+  issuedAt?: number;
 }
 
 @Injectable()
@@ -65,6 +70,13 @@ export class AppleAuthService {
       email: String(payload.email),
       isPrivateEmail: isPrivate,
       audience: String(audience ?? ""),
+      issuedAt: issuedAtSeconds(payload.iat),
     };
   }
+}
+
+/** The decoded JWT carries `iat` as a number; the library types it as a string. */
+function issuedAtSeconds(iat: unknown): number | undefined {
+  const value = Number(iat);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
 }

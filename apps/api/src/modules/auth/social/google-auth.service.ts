@@ -9,6 +9,11 @@ export interface GoogleProfile {
   email: string;
   name?: string;
   picture?: string;
+  /**
+   * When Google issued the id_token (`iat`, seconds since the epoch). The
+   * step-up uses it to accept only a fresh sign-in, not a cached token.
+   */
+  issuedAt?: number;
 }
 
 @Injectable()
@@ -96,6 +101,7 @@ export class GoogleAuthService {
       email: payload.email,
       name: payload.name,
       picture: payload.picture,
+      issuedAt: payload.iat,
     };
   }
 }

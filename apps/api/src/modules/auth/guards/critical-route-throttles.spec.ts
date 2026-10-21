@@ -4,6 +4,7 @@ import { NewsletterController } from "../../marketing/newsletter.controller";
 import { OrderController } from "../../order/order.controller";
 import { PaymentController } from "../../payment/payment.controller";
 import { ConsentController } from "../../consent/consent.controller";
+import { SignInMethodsController } from "../sign-in-methods/sign-in-methods.controller";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -67,6 +68,17 @@ describe("critical public route throttles", () => {
     {
       controller: NewsletterController,
       method: "subscribe",
+      limit: 5,
+    },
+    // Step-up and the writes it guards (sign-in methods plan, 2026-10-21).
+    {
+      controller: SignInMethodsController,
+      method: "reauthenticate",
+      limit: 5,
+    },
+    {
+      controller: SignInMethodsController,
+      method: "setPassword",
       limit: 5,
     },
     // Anonim çerez tercihi kaydı: tablo sınırsız büyümesin.
