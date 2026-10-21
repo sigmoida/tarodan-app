@@ -1,5 +1,9 @@
 import { ConsentAction, ConsentSource } from "@prisma/client";
-import { CONSENT_DOCUMENTS, GATEWAY_CLIENT_IP_HEADER } from "@tarodan/types";
+import {
+  CONSENT_DOCUMENTS,
+  GATEWAY_CLIENT_IP_HEADER,
+  isDraftConsentVersion,
+} from "@tarodan/types";
 import { requestIdMiddleware } from "../../common/context/request-context";
 import { ConsentService } from "./consent.service";
 import {
@@ -98,6 +102,44 @@ describe("PlatformServiceConsentService.recordForOrder", () => {
     );
     // Nothing goes through the root client: the rows commit with the order.
     expect(prisma.consentRecord).not.toHaveProperty("createMany");
+  });
+
+  describe("the version stamped on each row", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const recordedVersions = async (version: string) => {
+      for (const document of PLATFORM_SERVICE_CONSENT_DOCUMENTS) {
+        jest.replaceProperty(CONSENT_DOCUMENTS[document], "version", version);
+      }
+      const { service } = make();
+      const createMany = jest
+        .fn()
+        .mockImplementation(({ data }: { data: unknown[] }) =>
+          Promise.resolve({ count: data.length }),
+        );
+      await service.recordForOrder({ consentRecord: { createMany } } as never, {
+        orderId: "order-1",
+        userId: "seller-1",
+      });
+      const rows = createMany.mock.calls[0][0].data as Array<{
+        version: string;
+      }>;
+      return rows.map((row) => row.version);
+    };
+
+    it("keeps the -draft suffix, so the evidence never passes a draft off as the signed text", async () => {
+      const versions = await recordedVersions("2026-10-21-draft");
+
+      expect(versions).toEqual(["2026-10-21-draft", "2026-10-21-draft"]);
+      expect(versions.every(isDraftConsentVersion)).toBe(true);
+    });
+
+    it("stamps the signed version once the catalogue drops the suffix", async () => {
+      const versions = await recordedVersions("2026-11-01");
+
+      expect(versions).toEqual(["2026-11-01", "2026-11-01"]);
+      expect(versions.some(isDraftConsentVersion)).toBe(false);
+    });
   });
 
   it("records exactly the two platform service documents", () => {
