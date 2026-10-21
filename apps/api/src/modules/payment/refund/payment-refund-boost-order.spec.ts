@@ -185,11 +185,11 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       {} as never, // holdRelease
       new PaymentRefundAttemptService(prisma as never),
       {} as never, // tradeRefunds
+      boostTimeline as never,
       outbox as never,
       ledger as never,
       undefined, // discounts
       undefined, // staff mail
-      boostTimeline as never,
     );
     // Spied, not run: the staff mail itself is the mail module's business.
     const staffNotice = jest
@@ -359,6 +359,30 @@ describe("PaymentRefundService.processRefund on a boost order", () => {
       expect(boostTimeline.stopForRefund).not.toHaveBeenCalled();
     },
   );
+
+  // D16 refuses a boost order on the admin refund screens only. The system
+  // paths (the late-payment auto refund, the stuck-refund recovery) call
+  // processRefund directly and must still settle a boost order that has its
+  // boost row, stopping the boost with the money.
+  it("a system refund of a boost order that has its boost row still refunds and stops the boost", async () => {
+    const { service, prisma, paytr, boostTimeline } = make();
+    const productBoost = {
+      findUnique: jest.fn().mockResolvedValue({ id: "boost-1" }),
+    };
+    Object.assign(prisma, { productBoost });
+
+    await expect(
+      service.processRefund(ORDER_ID, undefined, {
+        cancelledBy: CancellationActor.system,
+      }),
+    ).resolves.toMatchObject({ success: true, refundAmount: PAID });
+    expect(paytr.createRefund).toHaveBeenCalledTimes(1);
+    expect(boostTimeline.stopForRefund).toHaveBeenCalledWith(
+      expect.anything(),
+      ORDER_ID,
+      expect.objectContaining({ refundedAmount: PAID }),
+    );
+  });
 
   describe("the seller hears it from the boost notice only", () => {
     // No skipRefundEvent: the recovery cron and the auto-refund sweep never

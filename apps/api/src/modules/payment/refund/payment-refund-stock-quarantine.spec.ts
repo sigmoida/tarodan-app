@@ -184,6 +184,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
       {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
       {} as any, // tradeRefunds — bu spec yalnız SİPARİŞ iadesini sürüyor
+      {} as any, // boostTimeline (not a boost order)
       undefined, // outbox
       undefined, // ledger (Faz 6.2, @Optional)
     );

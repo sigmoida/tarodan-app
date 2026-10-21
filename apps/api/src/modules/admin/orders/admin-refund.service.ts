@@ -21,6 +21,7 @@ import { ApproveRefundRequestDto } from "../dto";
 import { primaryCashPayment } from "../../trade/helpers/trade.constants";
 import { i18nMessage } from "../../i18n";
 import { refundComponentTotals } from "../../refund/helpers/refund-component-totals";
+import { assertNotBoostOrderRefund } from "../finance/boost/boost-refund-policy";
 
 /**
  * İade talepleri admin operasyonları (detay, karar, force-finalize) +
@@ -128,10 +129,14 @@ export class AdminRefundService {
         policyVersion: true,
         policyFinalizedAt: true,
         financialReviewRequired: true,
+        order: { select: { id: true, productId: true } },
       },
     });
     if (!before)
       throw new NotFoundException(i18nMessage("server.refund.notFound"));
+    // A request on a boost order (opened before buyers were refused one) is
+    // never paid out here: the boost screen refunds and stops it (D16).
+    await assertNotBoostOrderRefund(this.prisma, before.order);
     const decisionFields = [
       dto.resolvedReason,
       dto.faultParty,
@@ -244,9 +249,15 @@ export class AdminRefundService {
   async forceFinalizeRefund(adminId: string, refundRequestId: string) {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
-      select: { id: true, status: true, refundedAt: true },
+      select: {
+        id: true,
+        status: true,
+        refundedAt: true,
+        order: { select: { id: true, productId: true } },
+      },
     });
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
+    await assertNotBoostOrderRefund(this.prisma, rr.order);
     if (rr.refundedAt) {
       throw new BadRequestException(
         i18nMessage("server.admin.refund.alreadyCompleted"),

@@ -70,6 +70,7 @@ describe("Order refund idempotency (#85) [P0]", () => {
       {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
       {} as any, // tradeRefunds
+      {} as any, // boostTimeline (not a boost order)
     );
   });
 

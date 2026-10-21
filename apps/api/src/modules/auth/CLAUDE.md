@@ -20,10 +20,15 @@ work (Opus) and need tests.
   JwtAuth -> BannedUser. **Default closed**: every route needs a token unless
   it is `@Public()` (which still attempts optional auth).
 - Decorators (`decorators/`): `@Public`, `@AdminRoute`, `@CurrentUser`,
-  `@Roles`, `@RequirePermission`, `@BypassPermissionMatrix`.
+  `@Roles`, `@RequirePermission`, `@RequireAllPermissions`,
+  `@BypassPermissionMatrix`.
 - Admin routes pair `@AdminRoute` with an admin guard (`AdminJwtAuthGuard` +
   `RolesGuard`). `RolesGuard.PERMISSION_MAP` maps `/api/admin/<segment>` to a
   permission and **fails closed** for unmapped segments (`super_admin` passes).
+  The map and `@RequirePermission(key)` accept any one key;
+  `@RequireAllPermissions(a, b)` needs every key (an action of two screens:
+  the boost refund needs `ads` and `payments`). Both decorators replace the
+  map; `@BypassPermissionMatrix` never skips an all-of rule.
   Contract specs: `admin-guard-pairing`, `permission-map-coverage`,
   `roles-guard-url-normalization`. Add a new admin segment to the map.
 - Services own ownership checks ("is this your order?"); access is the

@@ -522,10 +522,30 @@ ama tutarı tutan dönüş **belirsiz** bırakılır (insan kararı).
 A boost (`BST-` order, `origin = platform_service`, the platform seller sells
 the virtual `boost-<id>` product) is refunded only from the admin Boost
 purchases screen: `POST /admin/ad-packages/purchases/:id/refund
-{ amount?, reason }` (`super_admin`, `admin`; `ads` permission). The generic
-`POST /admin/payments/:id/manual-refund` refuses a boost payment
-(`server.admin.payment.boostRefundUseBoostScreen`), and buyer refund requests
-never covered boosts.
+{ amount?, reason }` (`super_admin`, `admin`; the `ads` **and** `payments`
+permissions, `@RequireAllPermissions`). Every other refund path refuses an
+order that carries a boost, before any money moves (decision D16):
+
+- admin, `400 server.admin.payment.boostRefundUseBoostScreen`: the manual
+  refund (`POST /admin/payments/:id/manual-refund`), the order cancel and its
+  preview (`POST /admin/orders/:id/cancel`, `GET .../cancel-preview`; an
+  unpaid boost order still cancels, no money moves, and a closed one keeps
+  `cancelAlreadyClosed`), and approving or force-finalizing a refund request
+  (`POST /admin/refund-requests/:id/approve`, `.../force-finalize`). One
+  gate, `assertNotBoostOrderRefund`: a boost order (`virtualOrderKind`, so an
+  ordinary order costs no query) that still has its boost row
+  (`ProductBoost.orderId`). A boost order paid without its boost row has
+  nothing to stop and the boost screen cannot see it, so these paths still
+  settle it.
+- buyer: a refund request on any platform service order (`virtualOrderKind`)
+  answers `400 server.refund.orderStatusNotEligible` for a boost
+  (`membershipOrderNotEligible` for a membership). An order cancel is refused
+  as for any completed order (`server.order.cannotCancelShipped`), and one
+  still in a paid status (a boost order without its boost row) with
+  `400 server.refund.cancelPaidPreShipmentOnly`.
+- system paths still refund a boost order and stop its boost in the same
+  transaction: the auto-refund of a late payment on a cancelled order and the
+  stuck-refund recovery cron.
 
 - **Refundable**: a paid (`source = purchase`) boost that is `active` or
   `paused` with a `completed` payment; not an ended boost (decision D2). The
@@ -560,8 +580,14 @@ never covered boosts.
   no staff "order cancelled" mail and no shipment cancel for a boost order,
   whichever path finalizes it (the platform's own services never ship).
 - **Audit and notice**: one `boost_refund` audit row with the real outcome
-  (`refunded`, `failed`, `pending_reconciliation`), written only when that
-  call refunded; a failed audit write after the money went back is reported
+  (`refunded`, `failed`, `pending_reconciliation` when this call's own
+  attempt, its key, may be moving money, also when the stuck-refund recovery
+  took it over; `in_flight_elsewhere` when the attempt claim turned it away
+  before anything was sent because another attempt of the order, another
+  key, is unresolved: `RefundAttemptInFlightException`, still a 503
+  `RefundPendingReconciliationException` for the admin); `refunded` is
+  written only when that call refunded; a failed audit write after the
+  money went back is reported
   (`BOOST_REFUND_AUDIT_MISSING`, Sentry) and not turned into an error. The
   seller gets `BOOST_REFUNDED` through the outbox. Sentry: tag `flow=boost`,
   boost id and order number.
