@@ -23,6 +23,7 @@ import { Badge, Button } from "@tarodan/ui";
 import MembershipBadge from "@/components/membership/MembershipBadge";
 import UserAvatar from "@/components/UserAvatar";
 import { membershipNavLabel } from "@/lib/membership";
+import { MY_BOOSTS_PATH } from "@/lib/paymentKind";
 import { useLocale, useTranslations } from "next-intl";
 import type { HeaderData } from "./_hooks/useHeaderData";
 
@@ -242,7 +243,7 @@ export default function AccountMenu({
                 {t("nav.myListings")}
               </Link>
               <Link
-                href="/profile/boosts"
+                href={MY_BOOSTS_PATH}
                 onClick={close}
                 className={MENU_LINK_CLASS}
               >

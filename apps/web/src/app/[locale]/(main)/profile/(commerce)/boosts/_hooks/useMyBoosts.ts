@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import {
   MY_BOOSTS_DEFAULT_LIMIT,
@@ -46,12 +46,35 @@ export function useMyBoosts(
   };
 }
 
-type Snapshot = [readonly unknown[], MyBoostsResponse | undefined][];
+/** The listing's rows as they were before the switch flipped: row id -> `autoRenew`. */
+type ReminderSnapshot = Map<string, boolean>;
+
+/** Sets `autoRenew` on the listing's cached rows, in every "My boosts" page. */
+function patchRows(
+  queryClient: QueryClient,
+  root: readonly unknown[],
+  productId: string,
+  next: (row: MyBoostRow) => boolean,
+) {
+  queryClient.setQueriesData<MyBoostsResponse>({ queryKey: root }, (data) =>
+    data
+      ? {
+          ...data,
+          data: data.data.map((row): MyBoostRow =>
+            row.productId === productId
+              ? { ...row, autoRenew: next(row) }
+              : row,
+          ),
+        }
+      : data,
+  );
+}
 
 /**
  * The ending-soon reminder switch of one listing. The switch flips at once;
- * a rejection (for example `boostReminderPremiumOnly`) restores the cached
- * rows and the API's message shows as the toast.
+ * a rejection (for example `boostReminderPremiumOnly`) puts back only that
+ * listing's rows, so a switch flipped meanwhile on another listing keeps its
+ * state, then refetches; the API's message shows as the toast.
  */
 export function useBoostReminder() {
   const t = useTranslations();
@@ -65,30 +88,30 @@ export function useBoostReminder() {
       invalidates: root,
       successMessage: t("profile.boosts.reminder.saved"),
       mutation: {
-        onMutate: async ({ productId, enabled }): Promise<Snapshot> => {
+        onMutate: async ({ productId, enabled }): Promise<ReminderSnapshot> => {
           await queryClient.cancelQueries({ queryKey: root });
-          const snapshot = queryClient.getQueriesData<MyBoostsResponse>({
+          const snapshot: ReminderSnapshot = new Map();
+          for (const [, data] of queryClient.getQueriesData<MyBoostsResponse>({
             queryKey: root,
-          }) as Snapshot;
-          queryClient.setQueriesData<MyBoostsResponse>(
-            { queryKey: root },
-            (data) =>
-              data && {
-                ...data,
-                data: data.data.map((row: MyBoostRow): MyBoostRow =>
-                  row.productId === productId
-                    ? { ...row, autoRenew: enabled }
-                    : row,
-                ),
-              },
-          );
+          })) {
+            data?.data.forEach((row) => {
+              if (row.productId === productId)
+                snapshot.set(row.id, row.autoRenew);
+            });
+          }
+          patchRows(queryClient, root, productId, () => enabled);
           return snapshot;
         },
-        onSettled: (_data, error, _vars, snapshot) => {
+        onSettled: (_data, error, { productId }, snapshot) => {
           if (!error) return;
-          (snapshot as Snapshot | undefined)?.forEach(([key, data]) =>
-            queryClient.setQueryData(key, data),
+          const before = snapshot as ReminderSnapshot | undefined;
+          patchRows(
+            queryClient,
+            root,
+            productId,
+            (row) => before?.get(row.id) ?? row.autoRenew,
           );
+          void queryClient.invalidateQueries({ queryKey: root });
         },
       },
     },

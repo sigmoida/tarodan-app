@@ -134,6 +134,49 @@ describe("ReminderToggle", () => {
     expect(link?.textContent).toBe("profile.boost.reminderUpgrade");
   });
 
+  it("lets a non-premium member turn an on reminder off (off never needs premium)", async () => {
+    h.tier = "free";
+    h.reminder.mockResolvedValue({ data: { enabled: false } });
+    await render(true);
+    expect(switchEl().disabled).toBe(false);
+    await act(async () => switchEl().click());
+    expect(h.reminder).toHaveBeenCalledWith("p1", { enabled: false });
+  });
+
+  it("rolls back only its own listing, keeping a switch flipped meanwhile on another", async () => {
+    client.setQueryData(cacheKey, {
+      data: [
+        boostRow({ autoRenew: false }),
+        boostRow({ id: "b2", productId: "p2", autoRenew: false }),
+      ],
+      meta: { total: 2, page: 1, limit: 100, totalPages: 1 },
+    } satisfies MyBoostsResponse);
+    let refuse: (e: unknown) => void = () => {};
+    h.reminder.mockImplementation((productId: string) =>
+      productId === "p1"
+        ? new Promise((_, reject) => (refuse = reject))
+        : new Promise(() => {}),
+    );
+    await act(() =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <ReminderToggle productId="p1" checked={false} />
+          <ReminderToggle productId="p2" checked={false} />
+        </QueryClientProvider>,
+      ),
+    );
+    const [first, second] = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="switch"]'),
+    );
+    await act(async () => first.click());
+    await act(async () => second.click());
+    await act(async () => refuse({ response: { data: { message: "no" } } }));
+    await flush();
+    const rows = client.getQueryData<MyBoostsResponse>(cacheKey)?.data;
+    expect(rows?.find((r) => r.productId === "p1")?.autoRenew).toBe(false);
+    expect(rows?.find((r) => r.productId === "p2")?.autoRenew).toBe(true);
+  });
+
   it("restores the rows and toasts the API message when the server refuses", async () => {
     h.reminder.mockRejectedValue({
       response: {

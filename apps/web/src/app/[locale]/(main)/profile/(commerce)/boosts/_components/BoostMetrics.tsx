@@ -8,7 +8,10 @@ import { HeartIcon } from "@heroicons/react/24/solid";
 import type { BoostMetricCounts } from "@tarodan/types";
 import { formatCount } from "@/lib/format";
 
-/** The listing's views, favourites and clicks gained since the boost started. */
+/**
+ * The listing's views, favourites and clicks gained since the boost started.
+ * A counter that went down (an unfavourite) shows no gain, not a negative one.
+ */
 export default function BoostMetrics({
   gain,
 }: {
@@ -26,19 +29,19 @@ export default function BoostMetrics({
     {
       key: "views",
       icon: <EyeIcon className="h-4 w-4 text-primary-500" />,
-      value: gain.views,
+      value: Math.max(0, gain.views),
       label: t("profile.boosts.performance.views"),
     },
     {
       key: "likes",
       icon: <HeartIcon className="h-4 w-4 text-danger-500" />,
-      value: gain.likes,
+      value: Math.max(0, gain.likes),
       label: t("profile.boosts.performance.likes"),
     },
     {
       key: "clicks",
       icon: <CursorArrowRaysIcon className="h-4 w-4 text-subtle" />,
-      value: gain.clicks,
+      value: Math.max(0, gain.clicks),
       label: t("profile.boosts.performance.clicks"),
     },
   ];

@@ -12,7 +12,8 @@ import { useBoostReminder } from "../_hooks/useMyBoosts";
 
 /**
  * The listing's ending-soon reminder (a reminder only, no automatic charge).
- * Premium only: other members see it off and disabled, with the way to upgrade.
+ * Turning it on is premium only: other members see it disabled, with the way
+ * to upgrade, unless it is already on (then they can still turn it off).
  */
 export default function ReminderToggle({
   productId,
@@ -33,7 +34,9 @@ export default function ReminderToggle({
         <Toggle
           size="sm"
           checked={checked}
-          disabled={!premium || reminder.isPending}
+          // Turning it on needs premium; turning it off never does (a
+          // lapsed member must still be able to stop the reminder).
+          disabled={(!premium && !checked) || reminder.isPending}
           label={t("profile.boosts.reminder.label")}
           onChange={(enabled) => reminder.mutate({ productId, enabled })}
         />

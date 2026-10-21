@@ -5,13 +5,10 @@
 import { useTranslations } from "next-intl";
 import { Badge, Button, Card } from "@tarodan/ui";
 import type { MyBoostRow } from "@tarodan/types";
+import { boostDisplayStatus, boostStatusConfig } from "@tarodan/shared";
 import { Link } from "@/i18n/navigation";
 import { formatTL } from "@/lib/format";
-import {
-  BOOST_STATUS_BADGE,
-  boostDisplayStatus,
-  isListingViewable,
-} from "../_lib/boosts";
+import { isListingViewable } from "../_lib/boosts";
 import BoostPurchase from "./BoostPurchase";
 import BoostThumb from "./BoostThumb";
 
@@ -27,7 +24,7 @@ export default function BoostHistoryRow({
 }) {
   const t = useTranslations();
   const status = boostDisplayStatus(row);
-  const badge = BOOST_STATUS_BADGE[status];
+  const badge = boostStatusConfig[status];
   const { product } = row;
 
   return (
@@ -59,7 +56,9 @@ export default function BoostHistoryRow({
           </div>
           <BoostPurchase
             row={row}
-            refunded={status === "refunded"}
+            // Strike the price only when all of it came back; a partial
+            // refund keeps the price and says how much was refunded.
+            refunded={status === "refunded" && row.refundedAmount >= row.price}
             note={
               status === "refunded" ? (
                 <p className="text-xs text-danger-600">

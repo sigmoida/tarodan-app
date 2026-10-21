@@ -1,44 +1,9 @@
 /** @format */
 
-import type { BadgeVariant } from "@tarodan/ui";
-import type { MessageKey } from "@tarodan/i18n";
 import type { BoostMetricCounts, MyBoostRow } from "@tarodan/types";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
-
-/** What a boost row shows as its status. `refunded` is display-only. */
-export type BoostDisplayStatus =
-  "active" | "paused" | "expired" | "cancelled" | "refunded";
-
-/**
- * Status -> badge variant and catalog key (`@tarodan/shared` has no boost
- * status config yet). A cancelled boost with money refunded reads "refunded".
- */
-export const BOOST_STATUS_BADGE: Record<
-  BoostDisplayStatus,
-  { variant: BadgeVariant; labelKey: MessageKey }
-> = {
-  active: { variant: "success", labelKey: "profile.boosts.status.active" },
-  paused: { variant: "warning", labelKey: "profile.boosts.status.paused" },
-  expired: { variant: "outline", labelKey: "profile.boosts.status.expired" },
-  cancelled: { variant: "danger", labelKey: "profile.boosts.status.cancelled" },
-  refunded: { variant: "danger", labelKey: "profile.boosts.status.refunded" },
-};
-
-export function boostDisplayStatus(row: MyBoostRow): BoostDisplayStatus {
-  if (row.status === "cancelled" && row.refundedAmount > 0) return "refunded";
-  if (
-    row.status === "active" ||
-    row.status === "paused" ||
-    row.status === "expired" ||
-    row.status === "cancelled"
-  ) {
-    return row.status;
-  }
-  // `pending` and `failed` are never returned by the API; read as ended.
-  return "expired";
-}
 
 /** The listing page is viewable by the owner only in these states. */
 export function isListingViewable(status: string): boolean {

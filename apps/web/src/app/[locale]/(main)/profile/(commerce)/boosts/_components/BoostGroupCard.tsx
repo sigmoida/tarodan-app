@@ -5,9 +5,10 @@
 import { useTranslations } from "next-intl";
 import { RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, Card } from "@tarodan/ui";
+import { boostStatusConfig } from "@tarodan/shared";
 import { Link } from "@/i18n/navigation";
+import { useBoostEnabled } from "@/components/boost/useBoostOffers";
 import {
-  BOOST_STATUS_BADGE,
   isListingViewable,
   isStackedBehind,
   remainingParts,
@@ -34,8 +35,11 @@ export default function BoostGroupCard({
 }) {
   const t = useTranslations();
   const { product, paused } = group;
-  const badge = BOOST_STATUS_BADGE[paused ? "paused" : "active"];
+  const badge = boostStatusConfig[paused ? "paused" : "active"];
   const left = paused ? null : remainingParts(product.boostedUntil, now);
+  // Same rule as the card action: no "Süre Ekle" while boost sales are off
+  // (one shared query), nor while paused (the listing is not live).
+  const canExtend = useBoostEnabled() && !paused;
 
   return (
     <Card variant="bordered" className="space-y-3 p-4">
@@ -112,7 +116,7 @@ export default function BoostGroupCard({
           productId={group.productId}
           checked={group.reminderOn}
         />
-        {!paused && (
+        {canExtend && (
           <Button
             type="button"
             variant="warning"

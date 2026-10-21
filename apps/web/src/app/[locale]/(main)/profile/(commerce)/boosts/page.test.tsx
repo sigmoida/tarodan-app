@@ -26,6 +26,7 @@ type Section = {
 const meta = { total: 0, page: 1, limit: 20, totalPages: 1 };
 const h = vi.hoisted(() => ({
   open: vi.fn(),
+  boostEnabled: true,
   refetch: vi.fn(),
   download: vi.fn(),
   calls: [] as Array<[string, number]>,
@@ -73,10 +74,13 @@ vi.mock("@/components/AuthLoadingScreen", () => ({ default: () => null }));
 vi.mock("@/components/boost/useBoostLauncher", () => ({
   useBoostLauncher: () => ({ open: h.open, dialog: null }),
 }));
+vi.mock("@/components/boost/useBoostOffers", () => ({
+  useBoostEnabled: () => h.boostEnabled,
+}));
 vi.mock("../../_hooks/useRequireAuth", () => ({
   useRequireAuth: () => ({ ready: true }),
 }));
-vi.mock("../orders/_hooks/useOrders", () => ({
+vi.mock("../_hooks/useInvoiceDownload", () => ({
   useInvoiceDownload: () => ({ downloadingId: null, download: h.download }),
 }));
 vi.mock("./_components/ReminderToggle", () => ({
@@ -127,6 +131,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   h.open.mockReset();
+  h.boostEnabled = true;
   h.refetch.mockReset();
   h.download.mockReset();
   h.calls = [];
@@ -225,6 +230,14 @@ describe("My boosts page", () => {
     expect(text()).toContain("profile.boosts.status.paused");
   });
 
+  it("hides Süre Ekle while boost sales are off, as the card action does", async () => {
+    h.boostEnabled = false;
+    h.sections.current = section({ rows: [boostRow()] });
+    await render();
+    expect(button("product.extendBoost")).toBeUndefined();
+    expect(text()).toContain("profile.boosts.remaining");
+  });
+
   it("passes the listing's reminder state to the switch", async () => {
     h.sections.current = section({
       rows: [boostRow({ id: "b1" }), boostRow({ id: "b2", autoRenew: true })],
@@ -256,6 +269,23 @@ describe("My boosts page", () => {
     expect(text()).toContain("profile.boosts.best");
     expect(text()).toContain("profile.boosts.performance.title");
     expect(text()).toContain("profile.boosts.performance.pending");
+  });
+
+  it("shows a counter that went down as no gain, not a negative one", async () => {
+    h.sections.current = section({
+      rows: [
+        boostRow({
+          metrics: {
+            before: { views: 1, likes: 10, clicks: 1 },
+            current: { views: 4, likes: 8, clicks: 1 },
+            gain: { views: 3, likes: -2, clicks: 0 },
+            performanceScore: 3,
+          },
+        }),
+      ],
+    });
+    await render();
+    expect(text()).not.toContain("-2");
   });
 
   describe("Geçmiş", () => {
@@ -293,6 +323,25 @@ describe("My boosts page", () => {
       await click(invoices[1]);
       expect(h.download).toHaveBeenCalledWith("o2");
       expect(button("product.extendBoost")).toBeUndefined();
+    });
+
+    it("strikes the price only when all of it was refunded", async () => {
+      h.sections.history = section({
+        rows: [
+          refunded,
+          boostRow({
+            id: "h4",
+            productId: "p4",
+            status: "cancelled",
+            refundedAmount: 200,
+            price: 200,
+          }),
+        ],
+      });
+      await render();
+      await openTab("profile.boosts.sections.history");
+      const struck = Array.from(container.querySelectorAll(".line-through"));
+      expect(struck.map((el) => el.textContent)).toEqual(["200,00 TL"]);
     });
 
     it("pages with Pagination and asks the API for the chosen page", async () => {

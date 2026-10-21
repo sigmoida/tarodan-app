@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MyBoostRow } from "@tarodan/types";
-import {
-  boostDisplayStatus,
-  groupBoosts,
-  isStackedBehind,
-  remainingParts,
-} from "./boosts";
+import { boostDisplayStatus } from "@tarodan/shared";
+import { groupBoosts, isStackedBehind, remainingParts } from "./boosts";
 import { boostRow } from "./testRows";
 
 describe("boostDisplayStatus", () => {

@@ -6,10 +6,8 @@ import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import type { BoostListing } from "@/components/boost/BoostModal";
+import { BOOST_LISTING_PARAM } from "@/lib/paymentKind";
 import { useMyListings } from "./useMyListings";
-
-/** The query parameter that asks My listings to open the boost dialog. */
-export const BOOST_PARAM = "boost";
 
 /**
  * `/profile/listings?boost=<productId>` (the payment-fail "Tekrar dene" link)
@@ -25,7 +23,7 @@ export function useBoostDeepLink(
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-  const productId = searchParams.get(BOOST_PARAM);
+  const productId = searchParams.get(BOOST_LISTING_PARAM);
   const handled = useRef<string | null>(null);
 
   // Same key as the page's "all" tab, so this is one request at most.
@@ -46,7 +44,7 @@ export function useBoostDeepLink(
     }
 
     const rest = new URLSearchParams(searchParams.toString());
-    rest.delete(BOOST_PARAM);
+    rest.delete(BOOST_LISTING_PARAM);
     const query = rest.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,

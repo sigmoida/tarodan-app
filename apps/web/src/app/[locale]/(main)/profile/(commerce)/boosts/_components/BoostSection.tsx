@@ -6,8 +6,9 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button, Pagination, Skeleton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { MY_LISTINGS_PATH } from "@/lib/paymentKind";
 import { EmptyStateCard } from "@/components/ui/EmptyStateCard";
-import { useInvoiceDownload } from "../../orders/_hooks/useOrders";
+import { useInvoiceDownload } from "../../_hooks/useInvoiceDownload";
 import { useMyBoosts } from "../_hooks/useMyBoosts";
 import { groupBoosts, type BoostGroup } from "../_lib/boosts";
 import BoostGroupCard from "./BoostGroupCard";
@@ -53,7 +54,9 @@ export default function BoostSection({
     page,
     true,
   );
-  const { downloadingId, download } = useInvoiceDownload();
+  // A boost order has no order detail page: several documents (the sale
+  // invoice and a later return) open the sale invoice.
+  const { downloadingId, download } = useInvoiceDownload({ many: "primary" });
   const groups = useMemo(() => groupBoosts(rows), [rows]);
 
   if (isLoading) return <BoostSkeletons />;
@@ -77,7 +80,7 @@ export default function BoostSection({
         title={t("profile.boosts.empty.title")}
         description={t("profile.boosts.empty.description")}
         action={
-          <ButtonLink href="/profile/listings">
+          <ButtonLink href={MY_LISTINGS_PATH}>
             {t("profile.boosts.empty.action")}
           </ButtonLink>
         }
