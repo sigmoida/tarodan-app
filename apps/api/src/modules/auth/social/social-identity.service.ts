@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -456,8 +457,11 @@ export class SocialIdentityService {
    * when this account already has the identity or another identity of the
    * provider; 409 `providerLinkedToOtherAccount` when another account holds
    * it, also for a lost unique race. Staff, banned and deleted accounts get
-   * the sign-in refusals and nothing is written. Sessions stay; the notice
-   * mail goes out after commit and never fails the request.
+   * the sign-in refusals and nothing is written. An account whose e-mail is
+   * unverified gets 403 `EMAIL_NOT_VERIFIED`: a take-over at sign-in clears
+   * the registrant's credentials but not its links, so a link made by an
+   * unproven registrant would outlive it. Sessions stay; the notice mail
+   * goes out after commit and never fails the request.
    */
   async linkToUser(userId: string, identity: ProviderIdentity): Promise<void> {
     const { ipAddress, userAgent } = getRequestClientInfo();
@@ -472,6 +476,14 @@ export class SocialIdentityService {
           throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
         }
         assertCanOpenSession(user);
+        if (!user.isEmailVerified) {
+          // Same key and code as login (`auth-login.service.ts`), but 403:
+          // the session is not the problem, the unproven address is.
+          throw new ForbiddenException({
+            ...i18nMessage("server.auth.emailNotVerifiedLogin"),
+            errorCode: "EMAIL_NOT_VERIFIED",
+          });
+        }
 
         const holder = await tx.oAuthAccount.findUnique({
           where: {

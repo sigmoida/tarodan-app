@@ -1167,6 +1167,17 @@ describe("SocialIdentityService manual link and unlink", () => {
       },
     );
 
+    it("refuses an account whose e-mail is unverified with 403, and writes nothing", async () => {
+      addUser({ isEmailVerified: false });
+
+      await expect(identities.linkToUser(OWNER, GOOGLE)).rejects.toMatchObject({
+        status: 403,
+        response: { errorCode: "EMAIL_NOT_VERIFIED" },
+      });
+      expect(fake.state.links).toEqual([]);
+      expect(fake.state.securityLogs).toEqual([]);
+    });
+
     it("refuses a staff account and writes nothing", async () => {
       addUser({});
       fake.state.staff.push(OWNER);

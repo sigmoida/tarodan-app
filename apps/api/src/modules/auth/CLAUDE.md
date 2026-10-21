@@ -115,7 +115,8 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
 - Link and unlink (`POST /auth/social/{google,apple}/link`,
   `POST /auth/social/:provider/unlink`) are `SocialIdentityService`'s
   `linkToUser`/`unlinkFromUser`, the only OAuthAccount writers besides
-  sign-in. A link keys on the provider `sub`; the provider e-mail may differ.
+  sign-in. A link keys on the provider `sub`; the provider e-mail may differ; an
+  account with an unverified e-mail gets `403 EMAIL_NOT_VERIFIED`.
   A provider token the provider services refuse (their 401) answers
   `400 PROVIDER_TOKEN_INVALID`. 409 `PROVIDER_ALREADY_LINKED` (this account
   has the provider) or `PROVIDER_LINKED_TO_OTHER_ACCOUNT` (never says
@@ -123,7 +124,8 @@ sensitive routes to it. Known gap (hub backlog): the throttler counts by
   `canUnlinkProvider` (`@tarodan/types`): a password or a Google link must
   remain, Apple alone does not count; refused as `409 LAST_SIGN_IN_METHOD`,
   `404 PROVIDER_NOT_LINKED` for a provider that is not there. An Apple link
-  stores the mobile `authorizationCode` after commit, as login does.
+  stores the mobile `authorizationCode` after commit, as login does; a
+  token that lands after an unlink is stored revoke-requested.
   SecurityLog `social_linked` / `social_unlinked` with `details.source:
 "manual"`. A later sign-in may link an unlinked provider again through
   the verified e-mail rule (with the notice mail), by design.
