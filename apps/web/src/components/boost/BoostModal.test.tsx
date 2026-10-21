@@ -247,6 +247,83 @@ describe("BoostModal consent gating", () => {
   });
 });
 
+describe("BoostModal consent reset", () => {
+  /** Refetches the matrix with `next` as the server's answer. */
+  async function refetchWith(next: BoostOptionsResponse) {
+    h.options.mockResolvedValue({ data: next });
+    await act(async () => {
+      await client.refetchQueries({
+        queryKey: queryKeys.boost.options(LISTING.id),
+      });
+    });
+    await flush();
+  }
+
+  it("unticks both consents when another duration is chosen", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+    expect(payButton().disabled).toBe(false);
+
+    click(durationRow("Ekonomik", 3).querySelector("input")!);
+
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+    click(payButton());
+    expect(h.initiate).not.toHaveBeenCalled();
+  });
+
+  it("unticks both consents when another package is chosen", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    click(durationRow("Vitrin", 7).querySelector("input")!);
+
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("unticks both consents when a refetch reprices the chosen duration", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    await refetchWith({
+      ...OPTIONS,
+      packages: [
+        {
+          ...OPTIONS.packages[0],
+          options: [
+            OPTIONS.packages[0].options[0],
+            { ...OPTIONS.packages[0].options[1], price: 69 },
+          ],
+        },
+        OPTIONS.packages[1],
+      ],
+    });
+
+    expect(text()).toContain(
+      `profile.boost.preInfo.price|${JSON.stringify({ price: formatTL(69) })}`,
+    );
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("keeps both consents when a refetch returns the same price", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+
+    // A fresh copy of the same matrix: equal values, new objects.
+    await refetchWith(JSON.parse(JSON.stringify(OPTIONS)));
+
+    expect(h.options).toHaveBeenCalledTimes(2);
+    expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
+    expect(payButton().disabled).toBe(false);
+  });
+});
+
 describe("BoostModal request", () => {
   it("sends the package, the duration and both consents, then opens the pay page", async () => {
     render();
