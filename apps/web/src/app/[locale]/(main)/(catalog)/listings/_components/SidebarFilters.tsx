@@ -21,12 +21,13 @@ interface SidebarFiltersProps {
   onClearFilters: () => void;
 }
 
-// Boolean catalog flags shown after trade-only in the "options" group; the
-// same keys feed the URL, the API params and the toolbar chips.
+// Boolean catalog flags shown after trade-only in the "options" group, in the
+// mobile filter sheet's order; the keys are the Filters / URL / API param names.
 const FLAG_OPTIONS = [
   { key: "preOrder", labelKey: "product.preOrder" },
   { key: "limited", labelKey: "product.limitedEdition" },
   { key: "set", labelKey: "product.sets" },
+  { key: "discountOnly", labelKey: "product.onSale" },
 ] as const;
 
 export default function SidebarFilters({
@@ -375,7 +376,7 @@ export default function SidebarFilters({
           </AccordionContent>
         </AccordionItem>
 
-        {/* Diğer Seçenekler */}
+        {/* Other options */}
         <AccordionItem value="options">
           <AccordionTrigger>{t("product.options")}</AccordionTrigger>
           <AccordionContent>

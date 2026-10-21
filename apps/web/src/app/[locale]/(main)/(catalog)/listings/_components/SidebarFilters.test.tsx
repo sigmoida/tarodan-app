@@ -24,34 +24,40 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/api", () => ({ categoriesApi: { findBySlug: vi.fn() } }));
 vi.mock("../_lib/data", () => ({ fetchListingsClient: h.fetchListings }));
-vi.mock("../_hooks/useSidebarFilters", () => ({
-  useSidebarFilters: () => ({
-    t: (key: string) => key,
-    openSections: ["options"],
-    setOpenSections: vi.fn(),
-    categories: [],
-    brandList: [],
-    modelsForBrand: [],
-    scaleList: [],
-    materialList: [],
-    colorList: [],
-    displayManufacturers: [],
-    customAttrGroups: [],
-    CONDITIONS: [],
-    handleCategoryChange: vi.fn(),
-    handleBrandChange: vi.fn(),
-    handleCarModelChange: vi.fn(),
-    handleScaleChange: vi.fn(),
-    handleMaterialChange: vi.fn(),
-    toggleColor: vi.fn(),
-    handleManufacturerChange: vi.fn(),
-    toggleCustomAttribute: vi.fn(),
-    handleConditionChange: vi.fn(),
-  }),
-}));
+vi.mock("../_hooks/useSidebarFilters", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../_hooks/useSidebarFilters")>();
+  return {
+    ...actual,
+    useSidebarFilters: () => ({
+      t: (key: string) => key,
+      // The real default, so a collapsed "options" section would hide the boxes.
+      openSections: actual.BASE_SECTIONS,
+      setOpenSections: vi.fn(),
+      categories: [],
+      brandList: [],
+      modelsForBrand: [],
+      scaleList: [],
+      materialList: [],
+      colorList: [],
+      displayManufacturers: [],
+      customAttrGroups: [],
+      CONDITIONS: [],
+      handleCategoryChange: vi.fn(),
+      handleBrandChange: vi.fn(),
+      handleCarModelChange: vi.fn(),
+      handleScaleChange: vi.fn(),
+      handleMaterialChange: vi.fn(),
+      toggleColor: vi.fn(),
+      handleManufacturerChange: vi.fn(),
+      toggleCustomAttribute: vi.fn(),
+      handleConditionChange: vi.fn(),
+    }),
+  };
+});
 
 import { ListingsProvider, useListings } from "../_context/ListingsContext";
-import { buildListApiParams } from "../_lib/params";
+import { buildListApiParams, PAGE_LIMIT } from "../_lib/params";
 import { Button } from "@tarodan/ui";
 import SidebarFilters from "./SidebarFilters";
 
@@ -121,11 +127,20 @@ afterEach(() => {
   container.remove();
 });
 
+const ALL_FLAGS = "preOrder=true&limited=true&set=true&discountOnly=true";
+const FLAG_LABELS = [
+  "product.preOrder",
+  "product.limitedEdition",
+  "product.sets",
+  "product.onSale",
+];
+
 describe("listings sidebar flag toggles", () => {
   it.each([
     ["product.preOrder", "preOrder"],
     ["product.limitedEdition", "limited"],
     ["product.sets", "set"],
+    ["product.onSale", "discountOnly"],
   ])("%s toggles the %s URL and API param", async (label, param) => {
     await mount();
     expect(box(label).checked).toBe(false);
@@ -134,7 +149,9 @@ describe("listings sidebar flag toggles", () => {
     expect(lastUrl()).toBe(`/listings?${param}=true`);
     expect(box(label).checked).toBe(true);
     const sent = h.fetchListings.mock.calls.at(-1)![0];
-    expect(buildListApiParams(sent, undefined, 1, 48)[param]).toBe(true);
+    expect(buildListApiParams(sent, undefined, 1, PAGE_LIMIT)[param]).toBe(
+      true,
+    );
 
     click(box(label));
     expect(lastUrl()).toBe("/listings");
@@ -142,11 +159,12 @@ describe("listings sidebar flag toggles", () => {
   });
 
   it("is checked from the URL and counts each active flag once", async () => {
-    await mount("preOrder=true&limited=true&set=true");
-    expect(box("product.preOrder").checked).toBe(true);
-    expect(box("product.limitedEdition").checked).toBe(true);
-    expect(box("product.sets").checked).toBe(true);
-    expect(container.textContent).toContain("3");
+    await mount(ALL_FLAGS);
+    for (const label of FLAG_LABELS) expect(box(label).checked).toBe(true);
+    const badge = [...container.querySelectorAll("span")].find(
+      (s) => s.textContent === "product.filters",
+    )!.nextElementSibling;
+    expect(badge?.textContent).toBe("4");
   });
 
   it("resets to page 1 when a flag changes", async () => {
@@ -161,12 +179,10 @@ describe("listings sidebar flag toggles", () => {
     );
   });
 
-  it("clear removes all three flags", async () => {
-    await mount("preOrder=true&limited=true&set=true");
+  it("clear removes all four flags", async () => {
+    await mount(ALL_FLAGS);
     click(container.querySelector('[data-testid="clear"]')!);
-    expect(box("product.preOrder").checked).toBe(false);
-    expect(box("product.limitedEdition").checked).toBe(false);
-    expect(box("product.sets").checked).toBe(false);
+    for (const label of FLAG_LABELS) expect(box(label).checked).toBe(false);
     expect(lastUrl()).toBe("/listings");
   });
 });
