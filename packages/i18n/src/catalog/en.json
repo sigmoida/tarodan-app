@@ -134,6 +134,14 @@
       "remove": "Remove"
     }
   },
+  "boost": {
+    "offer": {
+      "title": "{count, plural, one {Your listing is live!} other {# of your listings are live!}}",
+      "intro": "Featured listings appear at the top of search and categories.",
+      "notNow": "Not now",
+      "onceHint": "This suggestion is shown once per listing. You can feature your listings later from My listings."
+    }
+  },
   "nav": {
     "home": "Home",
     "listings": "Listings",

@@ -134,6 +134,14 @@
       "remove": "Kaldır"
     }
   },
+  "boost": {
+    "offer": {
+      "title": "{count, plural, one {İlanınız yayında!} other {# ilanınız yayında!}}",
+      "intro": "Öne çıkan ilanlar aramada ve kategorilerde üst sıralarda gösterilir.",
+      "notNow": "Şimdi değil",
+      "onceHint": "Bu öneri her ilan için bir kez gösterilir. İlanlarınızı daha sonra İlanlarım'dan öne çıkarabilirsiniz."
+    }
+  },
   "nav": {
     "home": "Ana Sayfa",
     "listings": "İlanlar",

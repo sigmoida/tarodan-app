@@ -2,9 +2,10 @@
 
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useAuthStore } from "@/stores/authStore";
+import { useBoostDialogStore } from "@/stores/boostDialogStore";
 import { hasPaidMembership } from "@/lib/membership";
 import type { BoostListing } from "./BoostModal";
 
@@ -25,7 +26,8 @@ export interface BoostLauncher {
  * the payment-fail "Tekrar dene" deep link). The caller renders `dialog`; each
  * opening mounts a fresh dialog, so the consents never carry over. The
  * reminder is offered to paid members (`hasPaidMembership`, the same rule as
- * the API's `isPremiumEntitled`).
+ * the API's `isPremiumEntitled`). An open dialog is counted in
+ * `useBoostDialogStore`, so the offer dialog and the popup ad wait for it.
  */
 export function useBoostLauncher(): BoostLauncher {
   const [listing, setListing] = useState<BoostListing | null>(null);
@@ -33,6 +35,14 @@ export function useBoostLauncher(): BoostLauncher {
     hasPaidMembership(s.user?.membershipTier),
   );
   const close = useCallback(() => setListing(null), []);
+  const isOpen = listing !== null;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const { dialogOpened, dialogClosed } = useBoostDialogStore.getState();
+    dialogOpened();
+    return dialogClosed;
+  }, [isOpen]);
 
   return {
     open: setListing,
