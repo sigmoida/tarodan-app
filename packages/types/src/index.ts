@@ -184,3 +184,7 @@ export * from "./sign-in-methods";
 // Seller trust score: formula version, levels, read shapes and the formatter
 // (API, web, admin, mobile)
 export * from "./seller-trust";
+
+// Saved searches: the allow-list, canonical query, default name, route params
+// and error codes (API, web, mobile)
+export * from "./saved-search";
