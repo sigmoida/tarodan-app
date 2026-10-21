@@ -1,16 +1,24 @@
 import type { SavedSearch } from "@tarodan/types";
 import { formatCondition } from "@/lib/format";
 import type { Translate } from "@/types/i18n";
+import {
+  colorLabel,
+  materialLabel,
+  priceRangeLabel,
+  type ColorOption,
+} from "@/app/[locale]/(main)/(catalog)/listings/_lib/filterLabels";
 
 /**
  * The summary chips of a saved search, read from its canonical `query` and the
- * display-name `labels` snapshot (ids never reach the user). Flag labels reuse
- * the listings filter copy.
+ * display-name `labels` snapshot (ids never reach the user). Values read as
+ * the `/listings` filter chips do (`filterLabels`), flags reuse its copy.
+ * `colorOptions` is the listings filter catalog; a slug shows until it loads.
  */
 export function savedSearchChips(
   { query, labels }: Pick<SavedSearch, "query" | "labels">,
   t: Translate,
   locale: string,
+  colorOptions?: readonly ColorOption[],
 ): string[] {
   const chips: string[] = [];
   if (query.search) chips.push(`${t("common.search")}: "${query.search}"`);
@@ -21,14 +29,18 @@ export function savedSearchChips(
     (query.manufacturerId && labels.manufacturerId) || query.manufacturer,
     query.carModelId && labels.carModelId,
     query.scale,
-    query.material,
+    query.material && materialLabel(query.material, t),
   ];
   for (const name of named) if (name) chips.push(name);
 
   if (query.condition) chips.push(formatCondition(query.condition, locale));
-  if (query.color) chips.push(...query.color.split(","));
+  if (query.color) {
+    for (const slug of query.color.split(",")) {
+      chips.push(colorLabel(slug, colorOptions));
+    }
+  }
   if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-    chips.push(`₺${query.minPrice ?? 0} - ₺${query.maxPrice ?? "∞"}`);
+    chips.push(priceRangeLabel(query.minPrice, query.maxPrice));
   }
   if (query.tradeOnly) chips.push(t("product.tradeAvailable"));
   if (query.discountOnly) chips.push(t("product.onSale"));

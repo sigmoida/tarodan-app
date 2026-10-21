@@ -17,8 +17,12 @@ import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
 import { useListingFiltersQuery } from "../_hooks/useListingFiltersQuery";
 import { useSaveSearch } from "../_hooks/useSaveSearch";
+import {
+  colorLabel,
+  materialLabel,
+  priceRangeLabel,
+} from "../_lib/filterLabels";
 import SaveSearchModal from "../_modals/SaveSearchModal";
-import type { Translate } from "@/types/i18n";
 
 /**
  * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
@@ -105,13 +109,6 @@ export default function ListingsControls() {
   );
 }
 
-const MATERIAL_LABELS = (t: Translate): Record<string, string> => ({
-  diecast: t("page.listings.listingstoolbar.diecastMetal"),
-  resin: t("page.listings.listingstoolbar.resinRecine"),
-  composite: t("page.listings.listingstoolbar.composite"),
-  plastic: t("page.listings.listingstoolbar.plastic"),
-});
-
 // Per-filter active tint for the removable Chip.
 const CHIP_TINT = {
   success: "border-success-200 bg-success-500/10 text-success-600",
@@ -188,7 +185,7 @@ export function ActiveFilterChips() {
       k === "condition"
         ? formatCondition(v, locale)
         : k === "material"
-          ? MATERIAL_LABELS(t)[v] || v
+          ? materialLabel(v, t)
           : v;
     chips.push({
       key: k,
@@ -213,8 +210,7 @@ export function ActiveFilterChips() {
   for (const slug of filters.colors ?? []) {
     chips.push({
       key: `color:${slug}`,
-      label:
-        colorOptions?.find((option) => option.slug === slug)?.label ?? slug,
+      label: colorLabel(slug, colorOptions),
       onRemove: () =>
         handleFiltersChange({
           ...filters,
@@ -226,7 +222,7 @@ export function ActiveFilterChips() {
   if (filters.minPrice || filters.maxPrice) {
     chips.push({
       key: "price",
-      label: `₺${filters.minPrice || "0"} - ₺${filters.maxPrice || "∞"}`,
+      label: priceRangeLabel(filters.minPrice, filters.maxPrice),
       onRemove: () =>
         handleFiltersChange({ ...filters, minPrice: "", maxPrice: "" }),
     });

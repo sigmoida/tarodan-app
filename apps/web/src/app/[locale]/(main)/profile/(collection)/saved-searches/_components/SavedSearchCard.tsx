@@ -7,6 +7,7 @@ import { Badge, Button, IconButton } from "@tarodan/ui";
 import type { SavedSearch } from "@tarodan/types";
 import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
+import { useListingFiltersQuery } from "@/app/[locale]/(main)/(catalog)/listings/_hooks/useListingFiltersQuery";
 import { savedSearchChips } from "../_lib/chips";
 
 export default function SavedSearchCard({
@@ -20,7 +21,9 @@ export default function SavedSearchCard({
 }) {
   const t = useTranslations();
   const locale = useLocale();
-  const chips = savedSearchChips(search, t, locale);
+  // The listings filter catalog (one shared, long-lived query) names the colours.
+  const colorOptions = useListingFiltersQuery().data?.colors;
+  const chips = savedSearchChips(search, t, locale, colorOptions);
 
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-6">
