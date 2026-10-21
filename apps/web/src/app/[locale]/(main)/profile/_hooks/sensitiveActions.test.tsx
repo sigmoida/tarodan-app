@@ -65,8 +65,9 @@ beforeEach(() => {
   h.del.mockResolvedValue({ data: {} });
   h.withReauth
     .mockReset()
-    .mockImplementation((action: (token: string) => unknown) =>
-      action("step-up-token"),
+    .mockImplementation(
+      async (request: (token: string) => Promise<{ data: unknown }>) =>
+        (await request("step-up-token")).data,
     );
   h.toast.success.mockReset();
   h.toast.error.mockReset();

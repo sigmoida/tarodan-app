@@ -54,7 +54,7 @@ export function useConnectedAccounts() {
   const link = useWebMutation(
     async (credential: ProviderCredential) => {
       try {
-        const res = await withReauth((reauthToken) =>
+        return await withReauth((reauthToken) =>
           credential.provider === "google"
             ? signInMethodsApi.linkGoogle({
                 code: credential.code,
@@ -65,7 +65,6 @@ export function useConnectedAccounts() {
                 reauthToken,
               }),
         );
-        return res.data;
       } catch (error) {
         refreshIfStale(error);
         throw error;
@@ -86,10 +85,9 @@ export function useConnectedAccounts() {
   const unlink = useWebMutation(
     async (provider: SignInProvider) => {
       try {
-        const res = await withReauth((reauthToken) =>
+        return await withReauth((reauthToken) =>
           signInMethodsApi.unlink(provider, { reauthToken }),
         );
-        return res.data;
       } catch (error) {
         refreshIfStale(error);
         throw error;

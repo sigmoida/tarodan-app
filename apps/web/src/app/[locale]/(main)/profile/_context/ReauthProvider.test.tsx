@@ -254,6 +254,54 @@ describe("ReauthProvider: one step-up for the page", () => {
     expect(sent("DELETE /users/me")[0].data).toBeUndefined();
   });
 
+  it("keeps the token out of every mutation state, after a success and after a failure", async () => {
+    // Every string reachable from the cached mutations (data, error, variables).
+    const mutationStrings = () => {
+      const out: string[] = [];
+      const seen = new Set<unknown>();
+      const walk = (value: unknown, depth: number) => {
+        if (typeof value === "string") out.push(value);
+        if (
+          !value ||
+          typeof value !== "object" ||
+          seen.has(value) ||
+          depth > 12
+        )
+          return;
+        seen.add(value);
+        for (const key of Object.getOwnPropertyNames(value)) {
+          walk((value as Record<string, unknown>)[key], depth + 1);
+        }
+      };
+      for (const m of getQueryClient().getMutationCache().getAll()) {
+        walk(m.state, 0);
+      }
+      return out.join("|");
+    };
+
+    act(() => email.sendCode.mutate("new@example.com"));
+    await confirmWithPassword();
+    expect(sent("POST /auth/email/request-change")).toHaveLength(1);
+    expect(email.sendCode.isSuccess).toBe(true);
+    expect(mutationStrings()).not.toContain(TOKENS[0]);
+
+    // A refused guarded write: the error is kept in the mutation state.
+    routes["DELETE /users/me"] = refusal(409, "ACCOUNT_HAS_OPEN_ORDERS");
+    act(() => del.mutate());
+    await flush();
+    expect(sent("DELETE /users/me")[0].headers["x-reauth-token"]).toBe(
+      TOKENS[0],
+    );
+    expect(del.isError).toBe(true);
+    expect(
+      (del.error as { response?: { status?: number } }).response?.status,
+    ).toBe(409);
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "server:ACCOUNT_HAS_OPEN_ORDERS",
+    );
+    expect(mutationStrings()).not.toContain(TOKENS[0]);
+  });
+
   it("on 403 REAUTH_REQUIRED asks once more and retries once, then gives up without signing out", async () => {
     routes["POST /auth/email/request-change"] = refusal(403, "REAUTH_REQUIRED");
 
@@ -270,6 +318,12 @@ describe("ReauthProvider: one step-up for the page", () => {
     expect(dialog()).toBeNull();
     expect(h.toast.error).toHaveBeenCalledWith("server:REAUTH_REQUIRED");
     expectSessionKept();
+
+    // The twice-refused token is not reused: the next write asks first.
+    act(() => del.mutate());
+    await flush();
+    expect(dialog()).not.toBeNull();
+    expect(sent("DELETE /users/me")).toHaveLength(0);
   });
 
   it.each([

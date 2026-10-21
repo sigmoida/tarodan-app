@@ -66,13 +66,12 @@ export function useSetPassword() {
   return useWebMutation(
     async (values: SetPasswordValues) => {
       try {
-        const res = await withReauth((reauthToken) =>
+        return await withReauth((reauthToken) =>
           signInMethodsApi.setPassword({
             newPassword: values.newPassword,
             reauthToken,
           }),
         );
-        return res.data;
       } catch (error) {
         if (
           apiErrorCode(error) === SIGN_IN_METHODS_ERROR_CODES.passwordAlreadySet

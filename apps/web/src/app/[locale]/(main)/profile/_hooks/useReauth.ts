@@ -36,6 +36,72 @@ export function isReauthRequired(error: unknown): boolean {
   );
 }
 
+/** A write behind the step-up: the API call, given the token. */
+export type GuardedRequest<T> = (reauthToken: string) => Promise<{ data: T }>;
+
+/**
+ * A guarded write that failed, without its request. An axios error keeps the
+ * request (`config.data`, `config.headers`, `request`) and so the step-up
+ * token, and the mutation cache would hold it as `state.error`. This keeps
+ * what callers read: the answer (`response.status`, `response.data`), `name`
+ * and `code` (cancellation), and `config.url`/`config.method` for the Sentry
+ * report.
+ */
+export class GuardedRequestError extends Error {
+  readonly code?: string;
+  readonly response?: { status: number; data: unknown };
+  readonly config?: { url?: string; method?: string };
+
+  constructor(source: {
+    name?: unknown;
+    message?: unknown;
+    code?: unknown;
+    response?: { status?: unknown; data?: unknown };
+    config?: { url?: unknown; method?: unknown };
+  }) {
+    super(
+      typeof source.message === "string" ? source.message : "request_failed",
+    );
+    this.name = typeof source.name === "string" ? source.name : "Error";
+    if (typeof source.code === "string") this.code = source.code;
+    if (source.response && typeof source.response.status === "number") {
+      this.response = {
+        status: source.response.status,
+        data: source.response.data,
+      };
+    }
+    if (source.config) {
+      this.config = {
+        url:
+          typeof source.config.url === "string" ? source.config.url : undefined,
+        method:
+          typeof source.config.method === "string"
+            ? source.config.method
+            : undefined,
+      };
+    }
+  }
+}
+
+/**
+ * Runs a guarded write and returns only its body: the axios response keeps
+ * the request (and so the token) in `config`, and the mutation cache would
+ * hold it as `state.data`. A failure loses its request the same way.
+ */
+async function runGuarded<T>(
+  request: GuardedRequest<T>,
+  reauthToken: string,
+): Promise<T> {
+  try {
+    return (await request(reauthToken)).data;
+  } catch (error) {
+    if (error && typeof error === "object") {
+      throw new GuardedRequestError(error as never);
+    }
+    throw error;
+  }
+}
+
 /**
  * A cached token is reused only while it has this much life left by the
  * device clock. `expiresAt` is server time; a skewed clock is covered by the
@@ -56,14 +122,17 @@ interface PendingRequest {
 
 export interface ReauthController {
   /**
-   * Runs `action` with a live step-up token. Without a cached one it opens the
-   * confirm step and waits; closing it rejects with `ReauthCancelledError`.
-   * When `action` fails with `403 REAUTH_REQUIRED`, it drops the token, asks
-   * once more and retries once; any other error (and a second 403) is thrown
-   * as is. It never signs the user out: only a 401 means the session is gone,
-   * and the API client handles that.
+   * Runs the guarded write `request` with a live step-up token and resolves
+   * with the answer's body only. Without a cached token it opens the confirm
+   * step and waits; closing it rejects with `ReauthCancelledError`. When the
+   * write fails with `403 REAUTH_REQUIRED`, it drops the token, asks once
+   * more and retries once; any other error (and a second 403, whose token is
+   * dropped too) is thrown as a `GuardedRequestError`, which carries the
+   * answer but not the request. Neither the result nor the error holds the
+   * token, so the mutation cache never does. It never signs the user out:
+   * only a 401 means the session is gone, and the API client handles that.
    */
-  withReauth: <T>(action: (reauthToken: string) => Promise<T>) => Promise<T>;
+  withReauth: <T>(request: GuardedRequest<T>) => Promise<T>;
   /** Whether the confirm step is open (bound to `ReauthModal`). */
   isOpen: boolean;
   /** The confirm step succeeded. */
@@ -106,19 +175,30 @@ export function useReauthController(): ReauthController {
     return null;
   }, []);
 
+  const dropToken = useCallback((token: string) => {
+    if (tokenRef.current?.token === token) tokenRef.current = null;
+  }, []);
+
   const withReauth = useCallback(
-    async <T>(action: (reauthToken: string) => Promise<T>): Promise<T> => {
+    async <T>(request: GuardedRequest<T>): Promise<T> => {
       const token = liveToken() ?? (await requestToken());
       try {
-        return await action(token);
+        return await runGuarded(request, token);
       } catch (error) {
         if (!isReauthRequired(error)) throw error;
-        if (tokenRef.current?.token === token) tokenRef.current = null;
+        dropToken(token);
         // Another write may have confirmed meanwhile: use its token.
-        return action(liveToken() ?? (await requestToken()));
+        const retry = liveToken() ?? (await requestToken());
+        try {
+          return await runGuarded(request, retry);
+        } catch (retryError) {
+          // Refused twice: the next write asks again instead of a third 403.
+          if (isReauthRequired(retryError)) dropToken(retry);
+          throw retryError;
+        }
       }
     },
-    [liveToken, requestToken],
+    [dropToken, liveToken, requestToken],
   );
 
   const confirm = useCallback((response: ReauthResponse) => {

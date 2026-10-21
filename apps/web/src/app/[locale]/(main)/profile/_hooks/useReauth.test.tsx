@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isCancellation } from "@/lib/query/client";
 import {
+  GuardedRequestError,
   REAUTH_EXPIRY_MARGIN_MS,
   ReauthCancelledError,
   isReauthRequired,
@@ -67,7 +68,7 @@ afterEach(() => {
 
 describe("useReauthController", () => {
   it("opens the confirm step without a token and runs the action with the confirmed one", async () => {
-    const action = vi.fn(async (token: string) => `done:${token}`);
+    const action = vi.fn(async (token: string) => ({ data: `done:${token}` }));
     let result: Promise<string> | undefined;
     act(() => {
       result = ctl.withReauth(action);
@@ -84,11 +85,11 @@ describe("useReauthController", () => {
   });
 
   it("reuses the token for a second write within its life (no second prompt)", async () => {
-    act(() => void ctl.withReauth(async () => "first"));
+    act(() => void ctl.withReauth(async () => ({ data: "first" })));
     confirm("tok-1");
     await flush();
 
-    const second = vi.fn(async (token: string) => token);
+    const second = vi.fn(async (token: string) => ({ data: token }));
     let result: Promise<string> | undefined;
     act(() => {
       result = ctl.withReauth(second);
@@ -98,29 +99,35 @@ describe("useReauthController", () => {
   });
 
   it("asks again once the token is within the expiry margin", async () => {
-    act(() => void ctl.withReauth(async () => "first"));
+    act(() => void ctl.withReauth(async () => ({ data: "first" })));
     confirm("tok-1", iso(NOW + 60_000));
     await flush();
 
     vi.setSystemTime(NOW + 60_000 - REAUTH_EXPIRY_MARGIN_MS);
-    act(() => void ctl.withReauth(async () => "second").catch(() => {}));
+    act(
+      () =>
+        void ctl.withReauth(async () => ({ data: "second" })).catch(() => {}),
+    );
     expect(ctl.isOpen).toBe(true);
   });
 
   it("does not cache a token whose expiry it cannot read", async () => {
-    act(() => void ctl.withReauth(async () => "first"));
+    act(() => void ctl.withReauth(async () => ({ data: "first" })));
     confirm("tok-1", "not-a-date");
     await flush();
 
-    act(() => void ctl.withReauth(async () => "second").catch(() => {}));
+    act(
+      () =>
+        void ctl.withReauth(async () => ({ data: "second" })).catch(() => {}),
+    );
     expect(ctl.isOpen).toBe(true);
   });
 
   it("on 403 REAUTH_REQUIRED asks once more and retries once with the new token", async () => {
     const action = vi
-      .fn<(token: string) => Promise<string>>()
+      .fn<(token: string) => Promise<{ data: string }>>()
       .mockRejectedValueOnce(apiError(403, "REAUTH_REQUIRED"))
-      .mockImplementation(async (token) => `done:${token}`);
+      .mockImplementation(async (token) => ({ data: `done:${token}` }));
     let result: Promise<string> | undefined;
     act(() => {
       result = ctl.withReauth(action);
@@ -154,9 +161,15 @@ describe("useReauthController", () => {
     confirm("two");
     await flush();
 
-    expect(await result).toBe(required);
+    expect(await result).toMatchObject({ response: required.response });
     expect(action).toHaveBeenCalledTimes(2);
     expect(ctl.isOpen).toBe(false);
+
+    // The twice-refused token is dropped: the next write asks first.
+    const next = vi.fn(async () => ({ data: "next" }));
+    act(() => void ctl.withReauth(next).catch(() => {}));
+    expect(ctl.isOpen).toBe(true);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -177,7 +190,7 @@ describe("useReauthController", () => {
     confirm("tok");
     await flush();
 
-    expect(await result).toBe(error);
+    expect(await result).toMatchObject({ response: error.response });
     expect(ctl.isOpen).toBe(false);
   });
 
@@ -193,28 +206,28 @@ describe("useReauthController", () => {
     act(() =>
       ctl.confirm({ reauthToken: "late", expiresAt: iso(NOW + 300_000) }),
     );
-    const next = vi.fn(async (token: string) => token);
+    const next = vi.fn(async (token: string) => ({ data: token }));
     act(() => void ctl.withReauth(next).catch(() => {}));
     expect(ctl.isOpen).toBe(true);
     expect(next).not.toHaveBeenCalled();
   });
 
   it("on a 403 retries with a token another write confirmed meanwhile", async () => {
-    act(() => void ctl.withReauth(async () => "seed"));
+    act(() => void ctl.withReauth(async () => ({ data: "seed" })));
     confirm("t1");
     await flush();
 
     let rejectB!: (e: unknown) => void;
     const b = vi
-      .fn<(token: string) => Promise<string>>()
+      .fn<(token: string) => Promise<{ data: string }>>()
       .mockImplementationOnce(
         () => new Promise((_, reject) => (rejectB = reject)),
       )
-      .mockImplementation(async (token) => `b:${token}`);
+      .mockImplementation(async (token) => ({ data: `b:${token}` }));
     const a = vi
-      .fn<(token: string) => Promise<string>>()
+      .fn<(token: string) => Promise<{ data: string }>>()
       .mockRejectedValueOnce(apiError(403, "REAUTH_REQUIRED"))
-      .mockImplementation(async (token) => `a:${token}`);
+      .mockImplementation(async (token) => ({ data: `a:${token}` }));
 
     let resultA: Promise<string> | undefined;
     let resultB: Promise<string> | undefined;
@@ -238,8 +251,8 @@ describe("useReauthController", () => {
     let a: Promise<string> | undefined;
     let b: Promise<string> | undefined;
     act(() => {
-      a = ctl.withReauth(async (t) => `a:${t}`);
-      b = ctl.withReauth(async (t) => `b:${t}`);
+      a = ctl.withReauth(async (t) => ({ data: `a:${t}` }));
+      b = ctl.withReauth(async (t) => ({ data: `b:${t}` }));
     });
     confirm("tok");
     await flush();
@@ -274,7 +287,7 @@ describe("useReauthController", () => {
   });
 
   it("never persists the token: no storage, no cookie", async () => {
-    act(() => void ctl.withReauth(async () => "x"));
+    act(() => void ctl.withReauth(async () => ({ data: "x" })));
     confirm("secret-step-up-token");
     await flush();
 
@@ -284,6 +297,73 @@ describe("useReauthController", () => {
       document.cookie,
     ].join("|");
     expect(stored).not.toContain("secret-step-up-token");
+  });
+});
+
+describe("useReauthController: what a guarded write hands back", () => {
+  const TOKEN = "secret-step-up-token";
+  /** An axios-shaped answer whose request carries the token. */
+  const axiosLike = (token: string, status = 200) => {
+    const config = {
+      url: "/users/me",
+      method: "delete",
+      headers: { "x-reauth-token": token },
+      data: JSON.stringify({ reauthToken: token }),
+    };
+    return {
+      data: status < 400 ? { ok: true } : { errorCode: "LAST_SIGN_IN_METHOD" },
+      status,
+      config,
+      request: { _header: `x-reauth-token: ${token}` },
+    };
+  };
+
+  it("resolves with the body only, never the request", async () => {
+    let result: Promise<unknown> | undefined;
+    act(() => {
+      result = ctl.withReauth(async (t) => axiosLike(t));
+    });
+    confirm(TOKEN);
+    await flush();
+    const value = await result;
+    expect(value).toEqual({ ok: true });
+    expect(JSON.stringify(value)).not.toContain(TOKEN);
+  });
+
+  it("rejects with the answer but without the request", async () => {
+    let result: Promise<unknown> | undefined;
+    act(() => {
+      result = ctl
+        .withReauth(async (t) => {
+          const answer = axiosLike(t, 409);
+          throw Object.assign(
+            new Error("Request failed with status code 409"),
+            {
+              name: "AxiosError",
+              code: "ERR_BAD_REQUEST",
+              config: answer.config,
+              request: answer.request,
+              response: answer,
+            },
+          );
+        })
+        .catch((e) => e);
+    });
+    confirm(TOKEN);
+    await flush();
+    const error = (await result) as Record<string, unknown>;
+
+    expect(error).toBeInstanceOf(GuardedRequestError);
+    expect(error).toMatchObject({
+      name: "AxiosError",
+      code: "ERR_BAD_REQUEST",
+      response: { status: 409, data: { errorCode: "LAST_SIGN_IN_METHOD" } },
+      config: { url: "/users/me", method: "delete" },
+    });
+    expect(error.request).toBeUndefined();
+    expect(JSON.stringify({ ...error, message: error.message })).not.toContain(
+      TOKEN,
+    );
   });
 });
 
