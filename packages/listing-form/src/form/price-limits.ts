@@ -116,9 +116,10 @@ export const priceLimitMessages = (locale: string) => {
 export type PriceLimitMessages = ReturnType<typeof priceLimitMessages>;
 
 /**
- * Teklif giriş alanının tavanı: ilan fiyatının hemen altındaki tam tutar.
- * Teklif ekranı (`OfferModal`) alanın `max`'ını ve "teklif imkânsız" kararını
- * AYNI yerden alır.
+ * The offer ceiling used for the "no offer possible" decision: the whole
+ * amount just below the listing price. The web offer field (`OfferModal`) is
+ * a text field without a `max` attribute; its schema refuses an amount at or
+ * above the price.
  */
 export function maxOfferAmount(effectivePrice: number): number {
   return Math.max(0, Math.round(effectivePrice) - 1);

@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  cashAmountValue,
-  isCashRefused,
-  signedCashAmount,
-} from "@/lib/cashAmount";
+import { signedCashAmount } from "@/lib/cashAmount";
+import { isTlAmountRefused, tlAmountValue } from "@/lib/tlAmount";
 import { useState, useEffect, Suspense } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -88,8 +85,8 @@ function NewTradeContent() {
   });
   const selectedProducts = picks.picked;
   const offeredIds = picks.pickedIds;
-  const cash = cashAmountValue(cashAmount);
-  const cashRefused = isCashRefused(cashAmount);
+  const cash = tlAmountValue(cashAmount);
+  const cashRefused = isTlAmountRefused(cashAmount);
 
   const {
     preview: costPreview,

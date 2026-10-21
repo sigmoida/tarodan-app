@@ -11,6 +11,7 @@ import type { Offer } from "../_lib/types";
 import { formatTL } from "@/lib/format";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { useOfferFloor } from "@/hooks/usePublicSettings";
+import { parseTlAmount } from "@/lib/tlAmount";
 
 interface CounterOfferModalProps {
   open: boolean;
@@ -29,7 +30,7 @@ export default function CounterOfferModal({
   const t = useTranslations();
   const counter = useCounterOffer();
   const [amount, setAmount] = useState("");
-  // Hook koşulsuz çağrılır (offer null iken de): erken dönüşten ÖNCE.
+  // Called unconditionally (also while offer is null): before the early return.
   const floor = useOfferFloor(
     offer ? getProductEffectivePrice(offer.product) : 0,
   );
@@ -41,13 +42,21 @@ export default function CounterOfferModal({
   if (!offer) return null;
   const base = Number(offer.amount);
   const baseLabel = formatTL(base);
+  // "1.000" is one thousand to a Turkish user: grouping is refused, never read
+  // as a decimal (see `lib/tlAmount`).
+  const parsed = parseTlAmount(amount);
+  const refused = parsed.status === "refused";
 
   const submit = () => {
-    const value = parseFloat(amount.replace(",", "."));
-    if (Number.isNaN(value) || value <= 0) {
+    if (parsed.status === "refused") {
+      toast.error(t("trade.cashFormatRefused"));
+      return;
+    }
+    if (parsed.status === "empty") {
       toast.error(t("offer.counterModal.gecerliBirTutarGirin"));
       return;
     }
+    const value = parsed.amount;
     if (mode === "buyer" && value >= base) {
       toast.error(
         t(
@@ -95,7 +104,7 @@ export default function CounterOfferModal({
           cancelLabel={t("common.cancel")}
           confirmLabel={t("common.send")}
           isLoading={counter.isPending}
-          disabled={!amount.trim()}
+          disabled={!amount.trim() || refused}
         />
       }
     >
@@ -114,6 +123,7 @@ export default function CounterOfferModal({
         placeholder={t("offer.counterModal.tutar")}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
+        error={refused ? t("trade.cashFormatRefused") : undefined}
         helperText={
           floor != null
             ? t("listing.priceMinHint", { minPrice: formatTL(floor) })

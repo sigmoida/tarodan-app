@@ -2,7 +2,7 @@
 
 "use client";
 
-import { cashAmountValue } from "@/lib/cashAmount";
+import { tlAmountValue } from "@/lib/tlAmount";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesApi } from "@/lib/api";
@@ -28,7 +28,7 @@ interface UseTradeCostPreviewArgs {
   /** The products asked from the other side. */
   theirProductIds: string[];
   /**
-   * The raw field text, read with `cashAmountValue`: empty or refused text
+   * The raw field text, read with `tlAmountValue`: empty or refused text
    * counts as no cash difference.
    */
   cashAmount: string;
@@ -53,7 +53,7 @@ export function useTradeCostPreview({
   cashPayer,
   enabled,
 }: UseTradeCostPreviewArgs) {
-  const parsedCash = cashAmountValue(cashAmount);
+  const parsedCash = tlAmountValue(cashAmount);
   const signature = JSON.stringify([
     [...myProductIds].sort(),
     [...theirProductIds].sort(),
