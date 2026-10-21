@@ -628,3 +628,62 @@ describe("RolesGuard — @RequireAllPermissions (all-of)", () => {
     ).resolves.toBe(true);
   });
 });
+
+/**
+ * The URL map stays any-of next to the new all-of rule: a segment that lists
+ * two keys (`users`: `users` or `seller_performance`) opens to a role that
+ * has either one, and stays closed to a role with neither.
+ */
+describe("RolesGuard — URL map entries stay any-of", () => {
+  class Users {
+    @Roles("super_admin", "admin", "moderator")
+    list() {}
+  }
+
+  const guard = (perms: Record<string, string[]>) =>
+    new RolesGuard(new Reflector(), {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ settingValue: JSON.stringify(perms) }),
+      },
+    } as never);
+
+  const ctx = (role: string): ExecutionContext =>
+    ({
+      getHandler: () => Users.prototype.list,
+      getClass: () => Users,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { isAdmin: true, role },
+          method: "GET",
+          originalUrl: "/api/admin/users",
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
+  it("maps the users segment to two keys", () => {
+    expect(PERMISSION_MAP.users).toEqual(["users", "seller_performance"]);
+  });
+
+  it.each([["users"], ["seller_performance"]])(
+    "a role with only %s passes",
+    async (key) => {
+      await expect(
+        guard({ moderator: [key] }).canActivate(ctx("moderator")),
+      ).resolves.toBe(true);
+    },
+  );
+
+  it("a role with neither key gets 403 naming both", async () => {
+    await expect(
+      guard({ moderator: ["orders"] }).canActivate(ctx("moderator")),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: {
+        i18nKey: "server.auth.permissionRequired",
+        i18nParams: { perms: "users, seller_performance" },
+      },
+    });
+  });
+});
