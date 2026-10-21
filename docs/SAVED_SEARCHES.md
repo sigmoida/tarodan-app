@@ -52,6 +52,15 @@ unique index `(user_id, query_hash)` is the duplicate rule. Rows are
 re-canonicalised on read, so a key later removed from the allow-list does not
 reach clients.
 
+**Changing the canonical form needs a re-hash.** Stored hashes are frozen at
+save time. Removing a key from the allow-list, or any other change to
+`canonicalizeSavedSearchQuery`, makes old rows read differently from their
+hash: two rows of one user can then read as the same search, and a new save
+of that search is not seen as a duplicate. Ship such a change with a
+`maintenance/` script (dry run first, runbook entry in `docs/OPERATIONS.md`)
+that re-canonicalises each row, recomputes `query_hash` and resolves the
+rows of one user that now collide (keep the oldest).
+
 `labels` are display names keyed by query key, a snapshot at save time (a
 renamed category keeps the old label). `name` is the user's, else
 `savedSearchDefaultName`, else `null` (clients show `savedSearch.untitled`).
