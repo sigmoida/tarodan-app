@@ -70,9 +70,16 @@ function NewTradeContent() {
 
   // The picker refetches on open and on tab focus: a pick that is no longer
   // eligible (deactivated, sold, offered elsewhere) drops out of the offer
-  // instead of being sent and rejected by the API.
+  // instead of being sent and rejected by the API, and is pruned from the
+  // selection so it does not come back checked if the listing returns later.
   const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
   const offeredIds = selectedProducts.map((p) => p.id);
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => products.some((p) => p.id === id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [products]);
   const cash = parseFloat(cashAmount) || 0;
 
   const {

@@ -131,6 +131,40 @@ describe("useTradeableProducts", () => {
     expect(getMyProducts).toHaveBeenCalledTimes(2);
   });
 
+  it("reports loading, not empty, while a cached empty list refetches on reopen", async () => {
+    const { wrapper } = setup();
+    getMyProducts.mockResolvedValue({ data: { data: [] } });
+    const first = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+    first.unmount();
+
+    getMyProducts.mockReturnValue(new Promise(() => {}));
+    const second = renderHook(() => useTradeableProducts("t1", true), {
+      wrapper,
+    });
+    await waitFor(() => expect(getMyProducts).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    // The cached [] must not read as "no listings" while the reopen refetch runs.
+    expect(second.result.current.products).toEqual([]);
+    expect(second.result.current.isLoading).toBe(true);
+  });
+
+  it("stays idle until the user id is known", async () => {
+    const { wrapper } = setup();
+    mockUserId = undefined;
+    getMyProducts.mockResolvedValue({ data: { data: [item("a")] } });
+    renderHook(() => useTradeableProducts("t1", true), { wrapper });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(getMyProducts).not.toHaveBeenCalled();
+  });
+
   it("reports loading, not empty, while the first fetch is in flight", async () => {
     const { wrapper } = setup();
     getMyProducts.mockReturnValue(new Promise(() => {}));
