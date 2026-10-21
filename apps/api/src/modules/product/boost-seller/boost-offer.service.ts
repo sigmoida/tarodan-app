@@ -12,6 +12,7 @@ import {
 import { PrismaService } from "../../../prisma";
 import { SentryService } from "../../sentry/sentry.service";
 import { StorageService } from "../../storage/storage.service";
+import { cardImageUrl } from "../helpers/card-image-url";
 import { boostTierBasePrice } from "../helpers/product-sale-window";
 import {
   boostBreadcrumb,
@@ -124,9 +125,7 @@ export class BoostOfferService {
       .map((product) => ({
         productId: product.id,
         title: product.title,
-        image: product.images[0]?.cardKey
-          ? this.storage.getPublicAssetUrl(product.images[0].cardKey)
-          : null,
+        image: cardImageUrl(this.storage, product.images[0]?.cardKey),
         price: product.price.toNumber(),
         createdAt: product.createdAt.toISOString(),
       }));

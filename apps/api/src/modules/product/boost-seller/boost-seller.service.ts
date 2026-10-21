@@ -23,6 +23,7 @@ import {
   boostBreadcrumb,
   tagBoostRequest,
 } from "../helpers/boost-observability";
+import { cardImageUrl } from "../helpers/card-image-url";
 import { BoostAudienceService } from "./boost-audience.service";
 
 /** The boost columns "My boosts" returns, with its listing's summary. */
@@ -171,11 +172,6 @@ export class BoostSellerService {
     @Optional() private readonly sentry?: SentryService,
   ) {}
 
-  /** Public URL of a card-size image key, or null when there is none. */
-  private cardImageUrl(key: string | undefined): string | null {
-    return key ? this.storage.getPublicAssetUrl(key) : null;
-  }
-
   /**
    * One section of "My boosts", newest first: `current` (active, paused) or
    * `history` (expired, cancelled). Abandoned checkouts (`pending`,
@@ -210,7 +206,7 @@ export class BoostSellerService {
         b,
         b.orderId ? (orderNumbers.get(b.orderId) ?? null) : null,
         now,
-        this.cardImageUrl(b.product.images[0]?.cardKey),
+        cardImageUrl(this.storage, b.product.images[0]?.cardKey),
       ),
     );
     // One "best performing" row at most: the first with the highest score
