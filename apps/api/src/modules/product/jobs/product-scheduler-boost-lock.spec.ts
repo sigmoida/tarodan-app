@@ -122,6 +122,10 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
     await resume(service);
 
     expect(timeline.lockProduct).toHaveBeenCalledWith(tx, "p1");
+    // The listing's running end is read under the lock, never before it.
+    expect(timeline.lockProduct.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.product.findUnique.mock.invocationCallOrder[0],
+    );
     expect(tx.productBoost.updateMany).toHaveBeenCalledWith({
       where: { id: "b1", status: "paused", pausedBySystem: true },
       data: expect.objectContaining({
@@ -169,5 +173,49 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
     await resume(service);
 
     expect(tx.product.update).not.toHaveBeenCalled();
+  });
+
+  it("system resume only picks boosts the system paused, on live listings", async () => {
+    // A staff pause has pausedBySystem=false: the cron never resumes it.
+    const { service, prisma } = make();
+
+    await resume(service);
+
+    expect(prisma.productBoost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: "paused",
+          pausedBySystem: true,
+          product: { status: "active" },
+        },
+      }),
+    );
+  });
+
+  it("expires only ended active boosts and fails only stale pending ones", async () => {
+    // A late-paid boost is active (or still pending within a day): neither
+    // sweep may touch it, and nothing ever moves a failed boost.
+    const { service, prisma } = make();
+
+    await service.runExpireBoosts();
+
+    const updates = prisma.productBoost.updateMany.mock.calls.map(
+      ([arg]: [{ where: Record<string, unknown>; data: unknown }]) => arg,
+    );
+    expect(updates).toEqual([
+      {
+        where: { status: "active", endsAt: { lt: expect.any(Date) } },
+        data: { status: "expired" },
+      },
+      {
+        where: { status: "pending", createdAt: { lt: expect.any(Date) } },
+        data: { status: "failed" },
+      },
+    ]);
+    const [expireNow, failBefore] = [
+      updates[0].where.endsAt as { lt: Date },
+      updates[1].where.createdAt as { lt: Date },
+    ];
+    expect(expireNow.lt.getTime() - failBefore.lt.getTime()).toBe(24 * HOUR);
   });
 });
