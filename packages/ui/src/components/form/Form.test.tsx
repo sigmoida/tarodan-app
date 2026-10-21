@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { useZodForm } from "../../lib/use-zod-form";
 import { Form, FormInput } from "./Form";
+import { FormCheckbox } from "./FormCheckbox";
+import { FormTextarea } from "./FormTextarea";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -12,22 +14,35 @@ import { Form, FormInput } from "./Form";
 
 const schema = z.object({
   name: z.string().min(1, "name required"),
-  rows: z.array(z.object({ price: z.string().min(1, "price required") })),
+  rows: z.array(
+    z.object({
+      price: z.string().min(1, "price required"),
+      note: z.string().min(1, "note required"),
+      agreed: z.literal(true, {
+        errorMap: () => ({ message: "agree required" }),
+      }),
+    }),
+  ),
 });
 
 function Harness({ onSubmit }: { onSubmit: () => void }) {
   const form = useZodForm(schema, {
-    defaultValues: { name: "", rows: [{ price: "" }] },
+    defaultValues: {
+      name: "",
+      rows: [{ price: "", note: "", agreed: false as unknown as true }],
+    },
   });
   return (
     <Form form={form} onSubmit={onSubmit}>
       <FormInput name="name" />
       <FormInput name="rows.0.price" />
+      <FormTextarea name="rows.0.note" label="Note" />
+      <FormCheckbox name="rows.0.agreed" label="Agree" />
     </Form>
   );
 }
 
-describe("FormInput", () => {
+describe("form fields by name", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -56,5 +71,7 @@ describe("FormInput", () => {
     expect(container.textContent).toContain("name required");
     // "rows.0.price" is a path into the nested errors object, not a key.
     expect(container.textContent).toContain("price required");
+    expect(container.textContent).toContain("note required");
+    expect(container.textContent).toContain("agree required");
   });
 });
