@@ -123,6 +123,7 @@ cell type; the page only says which field it shows. Migrate any table you touch.
 `@tarodan/no-hardcoded-turkish` is an error here. Dates, money and numbers go
 through `lib/format.ts` (`fmtTry`, `fmtNumber`, `fmtPercent`, `fmtDate`,
 `fmtDateTime`, `fmtTime`; null-safe, Europe/Istanbul).
+No emoji or pictographs in copy; use design-system icons.
 
 ## Verification
 

@@ -918,7 +918,7 @@
     "selectBillingAddress": "Fatura adresi seçin",
     "enterBillingAddress": "Fatura adresini girin",
     "billingSameAsShippingLabel": "Fatura adresi teslimat adresiyle aynı",
-    "addAnotherAddressForBilling": "Farklı fatura adresi için profil → Adreslerimden ikinci bir adres ekleyin veya yukarıda \"teslimat adresiyle aynı\" seçin.",
+    "addAnotherAddressForBilling": "Farklı fatura adresi için profil – Adreslerimden ikinci bir adres ekleyin veya yukarıda \"teslimat adresiyle aynı\" seçin.",
     "paymentMethod": "Ödeme Yöntemi",
     "orderSummary": "Sipariş Özeti",
     "quantityLabel": "Adet: {count}",
@@ -1349,7 +1349,7 @@
       "subtitle": "Sistem her iki tarafa Sürat Kargo takip numarası tahsis etti. Aşağıdaki numara ile en yakın Sürat şubesine giderek ürününüzü teslim edin.",
       "yourShipment": "Sizin gönderiniz",
       "handIn": "Bu numarayla Sürat Kargo şubesine gidip ürününüzü teslim edin.",
-      "counterpartyDelivered": "✓ Karşı tarafın gönderisi de depoya ulaştı.",
+      "counterpartyDelivered": "Karşı tarafın gönderisi de depoya ulaştı.",
       "counterpartyInTransit": "Karşı tarafın gönderisi yolda.",
       "counterpartyCancelled": "Karşı tarafın gönderisi iptal edildi; yetkili ekibimiz devreye girecek.",
       "counterpartyFailed": "Karşı tarafın gönderisinde bir aksaklık oluştu; yetkili ekibimiz inceliyor.",
@@ -1441,7 +1441,7 @@
     "timeExpired": "Süre Doldu!",
     "dayShort": "g",
     "rejectTradeTitle": "Takası Reddet",
-    "profileAddressesLink": "Profil → Adresler",
+    "profileAddressesLink": "Profil – Adresler",
     "myTradesDesc": "Aktif ve geçmiş takas tekliflerini yönet.",
     "targetNotFoundDesc": "Takas etmek istediğiniz ürün bulunamadı veya artık mevcut değil.",
     "sendFailed": "Takas teklifi gönderilemedi",
@@ -1465,7 +1465,7 @@
     "cancelLockedTooltip": "Ürünlerden biri Tarodan deposuna ulaştı; iptal edilemez. Sorun varsa itiraz açın.",
     "itemReachedWarehouse": "Ürünlerden biri depoya ulaştı.",
     "shipInfoDesc": "Gönderim yapacağınız adresi ve kargo firmasını seçin.",
-    "noSavedAddresses": "Kayıtlı adres yok. <link>Profil → Adresler</link> bölümünden ekleyebilirsiniz.",
+    "noSavedAddresses": "Kayıtlı adres yok. <link>Profil – Adresler</link> bölümünden ekleyebilirsiniz.",
     "submitShipInfo": "Kargo Bilgisini Gönder",
     "warehouseBannerTitle": "Ürünleriniz Tarodan Deposunda",
     "warehouseBannerDesc": "Ekibimiz ürünleri inceliyor. İnceleme tamamlandığında bilgilendirileceksiniz.",
@@ -1635,7 +1635,7 @@
     "blockedContent": "Mesajınız uygunsuz içerik nedeniyle engellendi",
     "selectConversation": "Mesajlaşmak için bir konuşma seçin",
     "searchConversations": "Konuşmalarda ara",
-    "photoLabel": "📷 Fotoğraf",
+    "photoLabel": "Fotoğraf",
     "youPrefix": "Sen: ",
     "selectConversationTitle": "Bir sohbet seçin",
     "chooseThread": "Listeden bir sohbet seçin",
@@ -2148,7 +2148,7 @@
     },
     "changePhotoAction": "Fotoğrafı değiştir",
     "verifiedBadge": "Onaylı",
-    "ratingSummary": "★ {rating} · {count} değerlendirme",
+    "ratingSummary": "{rating} · {count} değerlendirme",
     "manageMembership": "Üyeliği Yönet",
     "metricListings": "İlan",
     "metricOrders": "Sipariş",
@@ -3290,7 +3290,7 @@
       "takasIslemleriniNasilYapiyoruz": "Takas işlemlerini nasıl yapıyoruz?",
       "heyecanVericiBirDigerDetayIse": "Heyecan verici bir diğer detay ise: koleksiyonlar arası takas da yapılabiliyor! Takas sürecinde her iki taraf da model araçlarını Tarodan deposuna gönderiyor. Uzman ekibimiz depoda gerekli kontrolleri sağlıyor; ürünler ilanla tamamen eşleşiyorsa takas işlemini güvenle başlatıyoruz. Eğer beklenmeyen kusurlu veya yanlış bir ürünle karşılaşırsak hemen taraflara bilgi veriyor, onayınızla süreci düzenliyor veya ürünleri güvenle sizlere iade ediyoruz. Böylece garaj değiştirmek tamamen güvence altında ilerliyor!",
       "siparisiminVeyaTakasiminDurumunuNasilTakip": "Siparişimin veya takasımın durumunu nasıl takip edebilirim?",
-      "tarodanUygulamasiniActiktanSonraSiparislerinizIcin": "Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takaslarınız için Hesabım → Takaslarım adımlarını izleyerek yeni göz bebeğinizin yolda olup olmadığını ya da takas sürecini anlık olarak takip edebilirsiniz.",
+      "tarodanUygulamasiniActiktanSonraSiparislerinizIcin": "Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım – Siparişlerim, takaslarınız için Hesabım – Takaslarım adımlarını izleyerek yeni göz bebeğinizin yolda olup olmadığını ya da takas sürecini anlık olarak takip edebilirsiniz.",
       "tekSepetteBirdenFazlaModelAlabilir": "Tek sepette birden fazla model alabilir miyim?",
       "evetSepetinizdekiTumGuzellikleriVeTakas": "Evet, sepetinizdeki tüm güzellikleri ve takas ürünlerini tek seferde ödeyerek kargoyla kapınıza gelmesini sağlayabilirsiniz.",
       "odenecekTutariModelFiyatindanNedenDaha": "Ödenecek tutarı model fiyatından neden daha yüksek görüyorum?",
@@ -3304,7 +3304,7 @@
       "siparisimNeZamanKargolanir": "Siparişim ne zaman kargolanır?",
       "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği {preparingDeadlineDays} iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
       "kargomuNasilTakipEdebilirim": "Kargomu nasıl takip edebilirim?",
-      "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım → Siparişlerim veya Hesabım → Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
+      "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım – Siparişlerim veya Hesabım – Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
       "siparisNeZamanTamamlanir": "Sipariş ne zaman tamamlanır?",
       "kargonuzKapiyaGeldiBittiSandinizDegil": "Kargonuz kapıya geldi, bitti sandınız değil mi? Aslında süreç, kargonuzu teslim alıp modeli inceledikten ve sistem üzerinden “Siparişi Onayla” butonuna bastıktan sonra resmi olarak tamamlanır. Göz bebeğinizin kutusundan sağ salim çıktığından emin olunca süreci tamamlayabilirsiniz.",
       "odememSaticiyaNeZamanGecer": "Ödemem satıcıya ne zaman geçer?",
@@ -3335,7 +3335,7 @@
       "uyelikPlanlariArasindakiFarklarNelerdir": "Üyelik planları arasındaki farklar nelerdir?",
       "tarodandaKoleksiyonunuzuSergilemekAlisverisYapmakVe": "Tarodan’da koleksiyonunuzu sergilemek, alışveriş yapmak ve takas sistemini kullanmak temel üyelik yapımızla tamamen sorunsuz bir şekilde ilerler. Farklı plan seçeneklerimiz; ilan öne çıkarma (roketleme) hakları, mağaza ayrıcalıkları ve gelişmiş sergileme özellikleri gibi detaylarda koleksiyonerlere esneklik sunar. İhtiyacınıza en uygun planı profilinizden inceleyerek seçebilirsiniz.",
       "siparisimiNasilTakipEderim": "Siparişimi nasıl takip ederim?",
-      "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takas işlemleriniz için ise Hesabım → Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
+      "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım – Siparişlerim, takas işlemleriniz için ise Hesabım – Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
       "iadeVeDegisimPolitikasiNedir": "İade ve değişim politikası nedir?",
       "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre {returnWindowDays} gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
     },
@@ -3520,7 +3520,7 @@
       "siparisinKesinlesmesiOdemeninTamVeEksiksiz": "Siparişin kesinleşmesi, ödemenin tam ve eksiksiz yapılmasına bağlıdır. Ürünün Alıcı'ya veya Alıcı'nın gösterdiği üçüncü kişiye teslimi anında hasar ve ziya sorumluluğu Alıcı'ya geçer. Satıcı'nın, Alıcı'nın açık talimatı veya Platform'un operasyonel süreçleri dışında gerçekleştirdiği erken sevkiyat veya hatalı lojistik organizasyonundan doğan ek masraflardan bizzat Satıcı sorumludur.",
       "caymaHakki14GunKapsamSure": "Cayma Hakkı (14 Gün) – Kapsam, Süre ve Usul",
       "aliciTeslimdenItibaren14OnDort": "Alıcı, teslimden itibaren 14 (on dört) gün içinde herhangi bir gerekçe göstermeksizin ve cezai şart ödemeksizin cayma hakkına sahiptir. Cayma bildiriminin bu süre içinde Satıcı'ya ve/veya Platform üzerinden sağlanan cayma kanallarına yöneltilmesi yeterlidir.",
-      "aliciCaymaBildiriminiHesabimSiparislerimIade": "Alıcı, cayma bildirimini Hesabım → Siparişlerim → İade/Cayma menüsünden veya Satıcı'nın e-posta/KEP adresi üzerinden iletebilir.",
+      "aliciCaymaBildiriminiHesabimSiparislerimIade": "Alıcı, cayma bildirimini Hesabım – Siparişlerim – İade/Cayma menüsünden veya Satıcı'nın e-posta/KEP adresi üzerinden iletebilir.",
       "aliciNinUrunuIadeIcinGondermesi": "Alıcı'nın ürünü iade için göndermesi gereken usul ve iade adresi, iade talebi oluşturulduğunda Platform arayüzünde gösterilir.",
       "caymaHalindeIadeKargoBedelininKim": "Cayma halinde iade kargo bedelinin kim tarafından karşılanacağı ve iade yöntemleri ürün sayfasında ve iade akışında ayrıca belirtilir.",
       "caymaHakkiIstisnalariHijyenSaglikNedeniyle": "Cayma hakkı istisnaları: hijyen/sağlık nedeniyle iadesi uygun olmayan ürünler, hızlı bozulan gıdalar, tüketicinin istekleri doğrultusunda kişiselleştirilmiş ürünler vb. mevzuatta yer alan istisnalar saklıdır. Siparişe konu ürün cayma kapsamı dışındaysa, ürün sayfasında ve sipariş öncesi ekranda ayrıca belirtilir.",
@@ -3536,7 +3536,7 @@
       "uyusmazliklardaTuketiciParasalSinirlarDahilindeTuketici": "Uyuşmazlıklarda tüketici; parasal sınırlar dahilinde Tüketici Hakem Heyeti'ne, diğer hallerde dava şartı arabuluculuk sonrası Tüketici Mahkemesi'ne başvurabilir.",
       "onBilgilendirmeOnayiVeKaliciVeri": "Ön Bilgilendirme Onayı ve Kalıcı Veri Saklayıcısı",
       "aliciSiparisiOnaylamadanOnceBuOn": "Alıcı, siparişi onaylamadan önce bu Ön Bilgilendirme'yi okuduğunu ve anladığını, sipariş onayının ödeme yükümlülüğü doğurduğunu kabul eder.",
-      "onBilgilendirmeVeMesafeliSatisSozlesmesi": "Ön Bilgilendirme ve Mesafeli Satış Sözleşmesi'ne Hesabım → Siparişlerim alanından erişilebilir; ayrıca kayıtlı e-posta adresinize bağlantı olarak gönderilebilir.",
+      "onBilgilendirmeVeMesafeliSatisSozlesmesi": "Ön Bilgilendirme ve Mesafeli Satış Sözleşmesi'ne Hesabım – Siparişlerim alanından erişilebilir; ayrıca kayıtlı e-posta adresinize bağlantı olarak gönderilebilir.",
       "onayKutucuguMetniOnBilgilendirmeFormu": "Onay kutucuğu metni: “Ön Bilgilendirme Formu'nu okudum, siparişi onayladığım takdirde ödeme yükümlülüğü altına gireceğimi anladım.”",
       "bMesafeliSatisSozlesmesi": "B) Mesafeli Satış Sözleşmesi",
       "taraflarTanimlarVeSozlesmeninKurulmasi": "Taraflar, Tanımlar ve Sözleşmenin Kurulması",
@@ -3592,12 +3592,12 @@
       "aliciNinKisiselVerileriUyelikSiparis": "Alıcı'nın kişisel verileri; üyelik/sipariş/teslimat/ödeme/iade süreçlerinin yürütülmesi ve mevzuattan doğan yükümlülüklerin yerine getirilmesi amacıyla işlenir. Detaylar Platform'daki KVKK Aydınlatma Metni'nde açıklanmıştır.",
       "saticiAliciVerileriniYalnizcaSiparisinIfasi": "Satıcı; Alıcı verilerini yalnızca siparişin ifası/teslimat ve yasal yükümlülükler kapsamında kullanabilir; reklam/pazarlama gibi amaçlarla ayrıca kullanamaz.",
       "yururlukVeErisim": "Yürürlük ve Erişim",
-      "buSozlesmeSiparisinAliciTarafindanElektronik": "Bu Sözleşme, siparişin Alıcı tarafından elektronik ortamda onaylanması ile yürürlüğe girer. Sözleşme metnine Alıcı, Hesabım → Siparişlerim alanından erişebilir; ayrıca e-posta ile kendisine gönderilebilir.",
+      "buSozlesmeSiparisinAliciTarafindanElektronik": "Bu Sözleşme, siparişin Alıcı tarafından elektronik ortamda onaylanması ile yürürlüğe girer. Sözleşme metnine Alıcı, Hesabım – Siparişlerim alanından erişebilir; ayrıca e-posta ile kendisine gönderilebilir.",
       "onayKutucuguMetniMesafeliSatisSozlesmesi": "Onay kutucuğu metni: “Mesafeli Satış Sözleşmesi'ni okudum ve kabul ediyorum.”",
       "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
       "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
       "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
-      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım → Siparişlerim alanından erişebilirsiniz."
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım – Siparişlerim alanından erişebilirsiniz."
     },
     "terms": {
       "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
@@ -3684,7 +3684,7 @@
       "neZamanIadeTalebiOlusturabilirim": "Ne zaman iade talebi oluşturabilirim?",
       "kargonuzuTeslimAldiginizAndanItibarenYasal": "Kargonuzu teslim aldığınız andan itibaren, yasal mevzuat ve platform kuralları çerçevesinde belirlenen 14 günlük süre içinde sistem üzerinden kolayca iade talebi oluşturabilirsiniz. Göz bebeğinizi kutusundan çıkarıp inceledikten sonra herhangi bir uyumsuzluk fark ederseniz vakit kaybetmeden talep açabilirsiniz.",
       "iadeTalebiNasilOlusturulur": "İade talebi nasıl oluşturulur?",
-      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini": "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyin. İlgili siparişin detayına girdikten sonra “İade Talebi Oluştur” butonuna tıklayın. Karşınıza çıkan listeden iade nedeninizi seçip, sorunu net bir şekilde gösteren güncel fotoğrafları sisteme yükleyerek talebinizi tek tıkla gönderebilirsiniz.",
+      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini": "Tarodan uygulamasını açarak Hesabım – Siparişlerim adımlarını izleyin. İlgili siparişin detayına girdikten sonra “İade Talebi Oluştur” butonuna tıklayın. Karşınıza çıkan listeden iade nedeninizi seçip, sorunu net bir şekilde gösteren güncel fotoğrafları sisteme yükleyerek talebinizi tek tıkla gönderebilirsiniz.",
       "iadeTalebiNasilDegerlendirilir": "İade talebi nasıl değerlendirilir?",
       "olusturdugunuzIadeTalebiVeBelirttiginizGerekce": "Oluşturduğunuz iade talebi ve belirttiğiniz gerekçe, Tarodan uzman destek ekibi ve depo kontrol mekanizmaları tarafından titizlikle incelenir. Gerekli görülmesi durumunda ürün merkez depomuza çağrılarak ilan bilgileriyle karşılaştırılır. Sürecin adil ve şeffaf yürütülmesi için hem alıcının hem de satıcının sunduğu kanıtlar değerlendirilerek nihai karar verilir.",
       "iadeTalebiNeKadarSuredeSonuclanir": "İade talebi ne kadar sürede sonuçlanır?",
@@ -3716,7 +3716,7 @@
       "neZamanIptalTalebiOlusturabilirim": "Ne zaman iptal talebi oluşturabilirim?",
       "siparisiniziVerdiktenSonraUrununuzHenuzKargoya": "Siparişinizi verdikten sonra, ürününüz henüz kargoya teslim edilmeden veya kargo sürecindeyken dilediğiniz an iptal talebi oluşturabilirsiniz. Ürününüz kargoya verilmeden yapılan iptallerde süreç çok daha hızlı ilerler.",
       "iptalTalebiNasilOlusturulur": "İptal talebi nasıl oluşturulur?",
-      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini2": "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyebilirsiniz. İptal etmek istediğiniz siparişin detayına girdikten sonra ilgili iptal nedenini seçerek talebinizi anında sisteme iletebilirsiniz.",
+      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini2": "Tarodan uygulamasını açarak Hesabım – Siparişlerim adımlarını izleyebilirsiniz. İptal etmek istediğiniz siparişin detayına girdikten sonra ilgili iptal nedenini seçerek talebinizi anında sisteme iletebilirsiniz.",
       "iptalTalebiNasilDegerlendirilir": "İptal talebi nasıl değerlendirilir?",
       "olusturdugunuzIptalTalebiUrununOAnki": "Oluşturduğunuz iptal talebi, ürünün o anki lojistik durumuna (kargoya verilip verilmediğine) ve seçtiğiniz iptal nedenine göre sistem tarafından otomatik olarak veya Tarodan operasyon ekibimiz tarafından titizlikle incelenerek değerlendirilir.",
       "iptalTalebiNeKadarSuredeSonuclanir": "İptal talebi ne kadar sürede sonuçlanır?",
@@ -4000,8 +4000,8 @@
       "gecerliIhlalBildirimleriSonrasindaTekrarlayanIhlal": "Geçerli ihlal bildirimleri sonrasında tekrarlayan ihlal yapan kullanıcı hesapları askıya alınabilir veya sonlandırılabilir.",
       "7Iletisim": "7. İletişim",
       "fikriMulkiyetVeIhlalBildirimleriLegal": "Fikri mülkiyet ve ihlal bildirimleri: legal@tarodan.com.tr",
-      "kullanimSartlari": "Kullanım Şartları →",
-      "saticiSozlesmesi": "Satıcı Sözleşmesi →"
+      "kullanimSartlari": "Kullanım Şartları",
+      "saticiSozlesmesi": "Satıcı Sözleşmesi"
     },
     "entity": {
       "legalName": "Unvan",
@@ -4297,7 +4297,7 @@
       "uygunKosullardaVeIncelemeSonucundaOdeme": "Uygun koşullarda ve inceleme sonucunda, ödeme satıcıya ulaşmadan önce iade edilebilir veya anlaşmazlık çözümüne göre alıcı lehine para iadesi yapılabilir. \"Para iade garantisi\" ifadesi, platformun belirlediği kurallar ve süreçler çerçevesinde sunulan korumayı ifade eder; her durumda otomatik iade anlamına gelmez.",
       "4AnlasmazlikCozumu": "4. Anlaşmazlık Çözümü",
       "bSaticiIleIletisimBOnce": "<b>Satıcı ile iletişim:</b>Önce sipariş/mesajlar üzerinden satıcıyla iletişime geçin.",
-      "bDestekTalebiBCozulemezseHesabim": "<b>Destek talebi:</b>Çözülemezse Hesabım → Siparişlerim → İlgili sipariş → \"Sorun bildir\" veya destek@tarodan.com.tr.",
+      "bDestekTalebiBCozulemezseHesabim": "<b>Destek talebi:</b>Çözülemezse Hesabım – Siparişlerim – İlgili sipariş – \"Sorun bildir\" veya destek@tarodan.com.tr.",
       "bIncelemeBDestekEkibimizTalebi": "<b>İnceleme:</b>Destek ekibimiz talebi ve (varsa) kanıtları inceler; gerekirse satıcıdan bilgi alır.",
       "bKararVeUygulamaBSonuc": "<b>Karar ve uygulama:</b>Sonuç (iade, kısmi iade, red) size ve gerekirse satıcıya bildirilir; ödeme süreçleri buna göre işletilir.",
       "sureBasvurularGenellikle510Is": "Süre: Başvurular genellikle 5–10 iş günü içinde incelenir; karmaşık durumlarda süre uzayabilir.",
@@ -5003,7 +5003,7 @@
         "adjustRecordAfter": "alanı değişecek:",
         "oldValue": "Eski",
         "newValue": "Yeni",
-        "prodDataWarning": "⚠ PROD — gerçek veri değişecek.",
+        "prodDataWarning": "PROD — gerçek veri değişecek.",
         "record": "Kayıt",
         "dates": "Tarihler",
         "action": "Aksiyon",
@@ -5038,7 +5038,7 @@
         },
         "cronConfirmTitle": "Cron'u tetikle",
         "cronConfirmDescription": "\"{label}\" işi kuyruğa alınacak ve worker'da hemen çalışacak. Devam edilsin mi?",
-        "cronProdWarning": "⚠ PROD — iş gerçek müşteri verisi üzerinde çalışacak.",
+        "cronProdWarning": "PROD — iş gerçek müşteri verisi üzerinde çalışacak.",
         "cronResultDone": "İş tamamlandı — {summary}",
         "cronResultDoneNoSummary": "İş tamamlandı",
         "cronResultFailed": "İş başarısız: {reason}",
@@ -5957,7 +5957,7 @@
         "unlimited": "Sınırsız",
         "startDate": "Başlangıç Tarihi",
         "endDate": "Bitiş Tarihi",
-        "flashSale": "⚡ Flash Sale (Flaş İndirim)",
+        "flashSale": "Flash Sale (Flaş İndirim)",
         "flashBadge": "Flash",
         "stackable": "Diğer indirimlerle kombine edilebilir",
         "free": "Bedava",
@@ -5995,7 +5995,7 @@
           "help": "Bu indirim şablonu için tek-kullanımlık benzersiz kodlar üretilir. Her kod yalnızca bir kez kullanılabilir.",
           "count": "Kod Adedi",
           "prefix": "Ön Ek (opsiyonel)",
-          "prefixHelper": "Örn. YILBASI → YILBASI-A7K2M9PQRS",
+          "prefixHelper": "Örn. YILBASI için YILBASI-A7K2M9PQRS",
           "generate": "Üret",
           "generated": "{count} kod üretildi (toplam {total})",
           "generateFailed": "Kod üretilemedi",
@@ -6608,7 +6608,7 @@
         "commissionVat": "Komisyon KDV",
         "withholding": "Stopaj",
         "corporateOnlyNote": "KDV ve stopaj yalnızca kurumsal satıcılara uygulanır (bireysel için 0).",
-        "previewTaxNote": "KDV/stopaj örnek değerlerdir; gerçek oranlar Finans → Vergi ekranından gelir.",
+        "previewTaxNote": "KDV/stopaj örnek değerlerdir; gerçek oranlar Finans – Vergi ekranından gelir.",
         "examplePackageTier": "Örnek paket boyutu",
         "shippingSharesTitle": "Kargo Bölüşümü",
         "shippingSharesHelper": "Alıcının ödeyeceği yüzdeyi girin; kalanı satıcı üstlenir. İki taraf da satırda canlı görünür.",
@@ -6628,7 +6628,7 @@
           "title": "Hesaplama Mantığı",
           "subtitle": "Bir siparişte para nasıl bölünür: ücretler, KDV ve stopaj.",
           "vatRuleTitle": "KDV kuralı",
-          "vatRule": "Alıcıya verilen her hizmetin KDV'si alıcıdan, satıcıya verilen her hizmetin KDV'si satıcıdan alınır. Oran ve açık/kapalı durumu Sistem → Ayarlar'dan yönetilir (service_vat_rate, service_vat_enabled). Ürün bedelinin kendisine KDV uygulanmaz (product_vat_enabled kapalı).",
+          "vatRule": "Alıcıya verilen her hizmetin KDV'si alıcıdan, satıcıya verilen her hizmetin KDV'si satıcıdan alınır. Oran ve açık/kapalı durumu Sistem – Ayarlar'dan yönetilir (service_vat_rate, service_vat_enabled). Ürün bedelinin kendisine KDV uygulanmaz (product_vat_enabled kapalı).",
           "buyerTitle": "Alıcının ödediği",
           "buyerResult": "Alıcı öder",
           "sellerTitle": "Satıcının eline geçen",
@@ -6689,7 +6689,7 @@
         "pspFee": "PayTR kesintisi",
         "netRevenue": "Tarodan hak edişi",
         "netTakeRate": "Net pay (ürün fiyatına oranla)",
-        "pspRateNote": "PayTR kesinti oranı Sistem → Ayarlar → Finans'tan alınır.",
+        "pspRateNote": "PayTR kesinti oranı Sistem – Ayarlar – Finans'tan alınır.",
         "serviceVatOut": "Hizmet KDV'si (devlete)",
         "tradeFeesTitle": "Takas hizmet bedelleri",
         "tradeFeesHelper": "Bu kurala düşen ürün takasa girdiğinde ürünü veren ve alan taraftan alınan sabit bedellerdir. KDV dahil tutarı girin; ücret alınmayacaksa 0 yazın. Kargo bu alanlardan bağımsız hesaplanır.",
@@ -6739,7 +6739,7 @@
         "orderAmount": "Sipariş Tutarı",
         "uploadedAt": "Yüklenme",
         "replaced": "Değiştirildi",
-        "returnReference": "İade → {reference}",
+        "returnReference": "İade: {reference}",
         "processLinks": {
           "order": "Sipariş",
           "offer": "Teklif",
@@ -6859,7 +6859,7 @@
         "itemSummary": "Ürün / İşlem",
         "tradeBadge": "Takas",
         "sellerCount": "{count} satıcı",
-        "tradeItemCount": "{initiatorCount} ürün ↔ {receiverCount} ürün",
+        "tradeItemCount": "{initiatorCount} ürün karşılığında {receiverCount} ürün",
         "orderSubtitle": "Sipariş #{number}",
         "tradeSubtitle": "Takas #{number}",
         "paymentSubtitle": "Ödeme #{id}",
@@ -7576,7 +7576,7 @@
           "pspFee": "PayTR kesintisi",
           "netRevenue": "Tarodan hak edişi",
           "netTakeRate": "Net pay (ürün fiyatına oranla)",
-          "pspRateNote": "PayTR kesinti oranı Sistem → Ayarlar → Finans'tan alınır.",
+          "pspRateNote": "PayTR kesinti oranı Sistem – Ayarlar – Finans'tan alınır.",
           "serviceVatOut": "Hizmet KDV'si (devlete)",
           "commissionRule": "Komisyon kuralı",
           "commissionRuleUnnamed": "Adsız kural",
@@ -7682,7 +7682,7 @@
         "cash": "Nakit",
         "paidBy": "Ödeyen",
         "disputed": "İtirazlı",
-        "disputedBadge": "⚠️ İtirazlı",
+        "disputedBadge": "İtirazlı",
         "resolveDispute": "İtirazı Çöz",
         "filterReviewQueue": "İnceleme kuyruğunu filtrele",
         "reviewQueueCount": "<value>{count}</value> takas inceleme bekliyor",
@@ -8290,8 +8290,8 @@
           "cleanupTaskFailed": "DİKKAT: Manuel temizleme görevi oluşturulamadı: {error}",
           "reference": "Referans",
           "step1": "1) Gönderi oluştur:",
-          "ok": "✓ başarılı",
-          "fail": "✗ hata",
+          "ok": "başarılı",
+          "fail": "hata",
           "step2": "2) Takip sorgula:",
           "singleEndpointHint": "Bir referans (OzelKargoTakipNo) ile tekil endpoint testi:",
           "refPlaceholder": "Referans (OzelKargoTakipNo)",
@@ -8647,7 +8647,7 @@
         "offersAccepted": "Kabul edilen teklif",
         "offerOrders": "Teklif siparişi",
         "offerResponseRate": "Teklif cevap oranı",
-        "offerConversionRate": "Teklif→sipariş oranı",
+        "offerConversionRate": "Teklif–sipariş oranı",
         "listingsCreated": "Açılan ilan",
         "listingsPublished": "Yayına giren ilan",
         "listingsSold": "Satılan ilan",
@@ -8665,9 +8665,9 @@
         "paymentAttempts": "Ödeme denemesi",
         "failedPayments": "Başarısız ödeme",
         "paymentFailureRate": "Ödeme başarısızlık oranı",
-        "medianPaidToShippedHours": "Ödeme→kargo (medyan)",
-        "medianShippedToDeliveredHours": "Kargo→teslim (medyan)",
-        "medianPaidToDeliveredHours": "Ödeme→teslim (medyan)",
+        "medianPaidToShippedHours": "Ödeme–kargo (medyan)",
+        "medianShippedToDeliveredHours": "Kargo–teslim (medyan)",
+        "medianPaidToDeliveredHours": "Ödeme–teslim (medyan)",
         "newMemberships": "Yeni üyelik",
         "renewals": "Yenileme",
         "churned": "İptal edilen üyelik",
@@ -9290,7 +9290,7 @@
         "viewAllTrades": "Tüm takasları görüntüle",
         "noTrades": "Henüz takas yok",
         "counterpartyLabel": "Karşı taraf:",
-        "tradeOfferSummary": "{a} ürün ↔ {b} ürün",
+        "tradeOfferSummary": "{a} ürün karşılığında {b} ürün",
         "receivedRatingsTitle": "Alınan Değerlendirmeler",
         "noReceivedRatings": "Henüz değerlendirme yok",
         "givenRatingsTitle": "Verilen Değerlendirmeler",
@@ -10175,7 +10175,7 @@
         "title": "Şifremi Unuttum",
         "instructions": "Hesabının e-posta adresini gir; sana şifre sıfırlama bağlantısı gönderelim.",
         "submit": "Sıfırlama bağlantısı gönder",
-        "backToLogin": "← Girişe dön",
+        "backToLogin": "Girişe dön",
         "sentMessage": "Eğer <strong>{email}</strong> sistemde kayıtlıysa, şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.",
         "pageDescription": "Hesap şifrenizi sıfırlayın"
       },
@@ -10768,7 +10768,7 @@
         "message": "{productTitle} ürününüz için {amount} TL teklif aldınız."
       },
       "offerAccepted": {
-        "title": "Teklifiniz Kabul Edildi! 🎉",
+        "title": "Teklifiniz Kabul Edildi!",
         "message": "{productTitle} için teklifiniz kabul edildi. Hemen ödeyin!"
       },
       "offerRejected": {
@@ -10816,7 +10816,7 @@
         "message": "{productTitle} ürününüze teklif veren alıcı hesabını sildiği için teklif kapatıldı."
       },
       "productApproved": {
-        "title": "İlanınız Yayında! 🎉",
+        "title": "İlanınız Yayında!",
         "message": "{productTitle} ilanınız onaylandı ve yayına alındı."
       },
       "productRejected": {
@@ -10824,7 +10824,7 @@
         "message": "{productTitle} ilanınız onaylanmadı. Neden: {reason}"
       },
       "productSold": {
-        "title": "Ürününüz Satıldı! 🎉",
+        "title": "Ürününüz Satıldı!",
         "message": "{productTitle} ürününüz {amount} TL'ye satıldı."
       },
       "paymentReceived": {
@@ -10840,7 +10840,7 @@
         "message": "Ürünleriniz için bir takas teklifi aldınız."
       },
       "tradeAccepted": {
-        "title": "Takas Kabul Edildi! 🎉",
+        "title": "Takas Kabul Edildi!",
         "message": "Takas teklifiniz kabul edildi. Lütfen kargoya verin."
       },
       "tradeRejected": {
@@ -10856,7 +10856,7 @@
         "message": "Takas paketiniz kargoya verildi. Takip no: {trackingNumber}"
       },
       "tradeCompleted": {
-        "title": "Takas Tamamlandı! 🎉",
+        "title": "Takas Tamamlandı!",
         "message": "Takas işlemi başarıyla tamamlandı!"
       },
       "newMessage": {
@@ -10864,7 +10864,7 @@
         "message": "{senderName}: {messagePreview}"
       },
       "priceDrop": {
-        "title": "Fiyat Düştü! 🔥",
+        "title": "Fiyat Düştü!",
         "message": "{productTitle} ürününün fiyatı {oldPrice} TL'den {newPrice} TL'ye düştü!"
       },
       "userBlockedAdmin": {
@@ -10876,7 +10876,7 @@
         "message": "{reporterName} {type, select, product {bir ilanı} collection {bir koleksiyonu} message {bir mesajı} review {bir değerlendirmeyi} other {bir kullanıcıyı}} şikayet etti: {reason, select, spam {Spam} inappropriate_content {Uygunsuz İçerik} fake_product {Sahte/Yanıltıcı Ürün} scam {Dolandırıcılık} harassment {Taciz} hate_speech {Nefret Söylemi} counterfeit {Taklit Ürün} wrong_category {Yanlış Kategori} misleading_info {Yanıltıcı Bilgi} other {Diğer}}."
       },
       "wishlistItemSold": {
-        "title": "Kaçırdınız! 😢",
+        "title": "Kaçırdınız!",
         "message": "Favorilerinize eklediğiniz {productTitle} satıldı."
       },
       "backInStock": {
@@ -10896,11 +10896,11 @@
         "message": "{userName} koleksiyonunuzu beğendi."
       },
       "productLiked": {
-        "title": "Ürününüz Beğenildi ❤️",
+        "title": "Ürününüz Beğenildi",
         "message": "{userName} {productTitle} ürününüzü favorilere ekledi."
       },
       "wishlistSold": {
-        "title": "Favori Ürününüz Satıldı 😢",
+        "title": "Favori Ürününüz Satıldı",
         "message": "Favorilerinize eklediğiniz {productTitle} satıldı."
       },
       "reviewReceived": {
@@ -10920,7 +10920,7 @@
         "message": "{tierName} üyeliğinizin otomatik yenilemesi kapatıldı: ödeme altyapımız değişti ve kayıtlı kartınız yenilemede kullanılamıyor. Üyeliğiniz dönem sonuna kadar sürer; yenilerken kartınızı kaydederseniz otomatik yenileme yeniden açılır."
       },
       "membershipUpgraded": {
-        "title": "Üyeliğiniz Yükseltildi! 🎉",
+        "title": "Üyeliğiniz Yükseltildi!",
         "message": "{tierName} üyeliğine hoş geldiniz! Yeni avantajlarınız aktif."
       },
       "listingExpiring": {
@@ -10932,19 +10932,19 @@
         "message": "{productTitle} ilanınız sona erdi. Yeniden yayınlayın."
       },
       "listingViewsMilestone": {
-        "title": "Tebrikler! 🎉",
+        "title": "Tebrikler!",
         "message": "{productTitle} ilanınız {viewCount} görüntülemeye ulaştı!"
       },
       "promotion": {
-        "title": "🎁 Özel Kampanya",
+        "title": "Özel Kampanya",
         "message": "{promotionTitle}"
       },
       "specialOffer": {
-        "title": "💎 Özel Teklif",
+        "title": "Özel Teklif",
         "message": "{offerDescription}"
       },
       "welcome": {
-        "title": "Tarodan'a Hoş Geldiniz! 🎉",
+        "title": "Tarodan'a Hoş Geldiniz!",
         "message": "Diecast model araba koleksiyoncuları platformuna hoş geldiniz."
       },
       "passwordReset": {
@@ -10956,11 +10956,11 @@
         "message": "E-postanızı doğrulamak için linke tıklayın."
       },
       "systemAnnouncement": {
-        "title": "📢 Duyuru",
+        "title": "Duyuru",
         "message": "{announcement}"
       },
       "boostExpired": {
-        "title": "🚀 Öne çıkarma süresi doldu",
+        "title": "Öne çıkarma süresi doldu",
         "message": "\"{productTitle}\" ilanının öne çıkarma süresi sona erdi."
       },
       "boostEndingSoon": {
@@ -10968,7 +10968,7 @@
         "message": "\"{productTitle}\" ilanının öne çıkarma süresi 24 saat içinde bitiyor."
       },
       "boostActivated": {
-        "title": "🚀 Öne Çıkarma Aktif",
+        "title": "Öne Çıkarma Aktif",
         "message": "\"{productTitle}\" ilanınızın öne çıkarması başladı. İlanınız listelerin üst sırasında gösteriliyor."
       },
       "tradeAutoCancelled": {
@@ -11088,7 +11088,7 @@
         "message": "{refundNumber} numaralı iade talebine 48 saat içinde yanıt verilmediği için otomatik onaylandı."
       },
       "sellerApplicationApproved": {
-        "title": "Kurumsal Başvurunuz Onaylandı! 🎉",
+        "title": "Kurumsal Başvurunuz Onaylandı!",
         "message": "Kurumsal hesap başvurunuz onaylandı. Artık satıcı olarak ürün listeleyebilirsiniz."
       },
       "sellerApplicationRejected": {
@@ -11313,7 +11313,7 @@
       "membershipRequiredForCounter": "Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.",
       "receiverCannotTrade": "Karşı tarafın üyeliği takasa uygun değil; bu ilan için şu anda takas teklifi gönderilemiyor.",
       "noShipmentToConfirm": "Onaylanacak gönderim bulunamadı",
-      "noShippingAddress": "Takas için bir teslimat adresi ekleyin. Profil → Adreslerim üzerinden adres ekleyebilirsiniz.",
+      "noShippingAddress": "Takas için bir teslimat adresi ekleyin. Profil – Adreslerim üzerinden adres ekleyebilirsiniz.",
       "notAuthorizedForAction": "Bu takas işlemi için yetkiniz yok",
       "notAuthorizedToCancel": "Bu takası iptal etme yetkiniz yok",
       "notAuthorizedToView": "Bu takası görüntüleme yetkiniz yok",
@@ -12018,7 +12018,7 @@
         "aboveMax": "Süre en fazla {max} olabilir.",
         "actionNotAllowed": "Bu süre için tanımlı olmayan bir eylem seçildi.",
         "actionUnavailable": "Bu eylem henüz kullanılamıyor.",
-        "useDedicatedEndpoint": "Bu ayar Sistem → Süreler ve Kurallar ekranından değiştirilir.",
+        "useDedicatedEndpoint": "Bu ayar Sistem – Süreler ve Kurallar ekranından değiştirilir.",
         "invariant": {
           "dropoffHardNotBelowDropoff": "İade kargosu için kesin kapanış süresi, kargoya verme süresinden kısa olamaz.",
           "listingWarningBeforeTtl": "İlan süresi uyarısı, ilanın yayın süresinden kısa olmalıdır.",
@@ -12052,7 +12052,7 @@
       "ctaIncomplete": "{slot}. butonun hem metni hem bağlantısı olmalı (ya da ikisi de boş kalmalı)",
       "maxLiveSlides": "Bir yerleşimde, bir platformda aynı anda en fazla {max} slayt yayında olabilir",
       "reorderMixedPlacement": "Sıralama yalnız aynı yerleşimdeki slaytlar için yapılabilir",
-      "useDedicatedEndpoint": "Bu ayar Pazarlama → Hero ekranından değiştirilir."
+      "useDedicatedEndpoint": "Bu ayar Pazarlama – Hero ekranından değiştirilir."
     },
     "brand": {
       "notFound": "Marka bulunamadı"
