@@ -1008,6 +1008,11 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
   },
   {
     reason:
+      "Dedupe key: the SHA-256 of a query that is itself scrubbed; it reveals nothing readable and staging only needs it to stay unique per user.",
+    columns: ["saved_searches.query_hash"],
+  },
+  {
+    reason:
       "Tek başına kimliği ele vermeyen konum / vergi dairesi / şirket türü (kargo tarifesi ve resmî bildirim il bazında).",
     columns: [
       "users.company_type",
@@ -1052,11 +1057,6 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "mail_area_settings.events",
       "elogo_invoices.line_items",
     ],
-  },
-  {
-    reason:
-      "Dedupe key: the SHA-256 of a query that is itself scrubbed; it reveals nothing readable and staging only needs it to stay unique per user.",
-    columns: ["saved_searches.query_hash"],
   },
 ];
 
