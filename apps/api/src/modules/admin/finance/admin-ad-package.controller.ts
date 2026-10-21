@@ -23,6 +23,7 @@ import { AdminAdPackageService } from "./admin-ad-package.service";
 import { AdminBoostOperationsService } from "./boost/admin-boost-operations.service";
 import { AdminJwtAuthGuard } from "../../auth/guards/admin-jwt-auth.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { RequireAllPermissions } from "../../auth/decorators/require-permission.decorator";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
@@ -135,6 +136,9 @@ export class AdminAdPackageController {
 
   @Post("purchases/:id/refund")
   @Roles(AdminRole.super_admin, AdminRole.admin)
+  // Money leaves the platform: the boost screen's `ads` and the payment
+  // screen's `payments`, both (grant and revoke need `ads` only).
+  @RequireAllPermissions("ads", "payments")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
@@ -145,6 +149,10 @@ export class AdminAdPackageController {
     status: HttpStatus.BAD_REQUEST,
     description:
       "server.admin.boost.refundNotAllowed, server.admin.boost.refundAmountInvalid, or a PayTR refusal",
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: "The role lacks the ads or the payments permission",
   })
   async refundBoost(
     @Param("id") id: string,

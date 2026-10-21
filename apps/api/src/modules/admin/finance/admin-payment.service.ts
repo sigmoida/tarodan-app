@@ -25,13 +25,13 @@ import {
   Prisma,
   PaymentStatus,
   RefundAttemptStatus,
-  RefundRequestStatus,
   TradeStatus,
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
 import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
 import { i18nMessage } from "../../i18n";
+import { assertNotBoostOrderRefund } from "./boost/boost-refund-policy";
 
 /**
  * Ödeme yönetimi (liste, detay, istatistik, manuel iade, zorla iptal) —
@@ -844,19 +844,8 @@ export class AdminPaymentService {
     }
 
     // A boost payment is refunded only by "refund and stop" on the boost
-    // screen, which stops the boost with the money. Refunded here, the money
-    // went back and the boost kept running.
-    if (
-      payment.orderId &&
-      (await this.prisma.productBoost.findUnique({
-        where: { orderId: payment.orderId },
-        select: { id: true },
-      }))
-    ) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.payment.boostRefundUseBoostScreen"),
-      );
-    }
+    // screen (decision D16).
+    await assertNotBoostOrderRefund(this.prisma, payment.order);
 
     if (payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(

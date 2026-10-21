@@ -7,7 +7,10 @@ import {
   Prisma,
 } from "@prisma/client";
 import { AdminBoostOperationsService } from "./admin-boost-operations.service";
-import { RefundPendingReconciliationException } from "../../../payment-providers/refund-errors";
+import {
+  RefundAttemptInFlightException,
+  RefundPendingReconciliationException,
+} from "../../../payment-providers/refund-errors";
 
 const D = (v: number | string) => new Prisma.Decimal(v);
 const ADMIN = "admin-user";
@@ -577,6 +580,28 @@ describe("AdminBoostOperationsService", () => {
         expect.anything(),
         expect.objectContaining({ outcome: "pending_reconciliation" }),
       );
+    });
+
+    it("a try turned away while another one is in flight is audited as such, not as a pending refund of its own", async () => {
+      const { service, payments, audit, notices } = make();
+      payments.processRefund.mockRejectedValue(
+        new RefundAttemptInFlightException("in flight"),
+      );
+
+      // Same answer to the admin as before (503, pending reconciliation).
+      await expect(
+        service.refund(ADMIN, "boost-1", { reason: REASON }),
+      ).rejects.toBeInstanceOf(RefundPendingReconciliationException);
+      expect(audit.createRequiredAuditLog).toHaveBeenCalledTimes(1);
+      expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
+        ADMIN,
+        "boost_refund",
+        "ProductBoost",
+        "boost-1",
+        expect.anything(),
+        expect.objectContaining({ outcome: "in_flight_elsewhere" }),
+      );
+      expect(notices.flush).not.toHaveBeenCalled();
     });
 
     it("an audit failure never hides the refund error", async () => {

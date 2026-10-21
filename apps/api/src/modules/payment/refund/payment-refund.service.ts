@@ -227,6 +227,10 @@ export class PaymentRefundService {
     private readonly holdRelease: PaymentHoldReleaseService,
     private readonly attempts: PaymentRefundAttemptService,
     private readonly tradeRefunds: PaymentTradeRefundService,
+    // A refunded boost order stops its boost in the finalize transaction.
+    // Required: without it a boost refund would send the money back and
+    // leave the boost running (PaymentModule imports BoostTimelineModule).
+    private readonly boostTimeline: BoostTimelineService,
     // Faz 5: iade tx'iyle AYNI anda "Sürat iptali" outbox satırı yaz → çökmeye dayanıklı
     // backstop (post-commit anlık iptal hızlı-yol kalır; handler idempotent). @Optional:
     // prod'da global OutboxModule daima enjekte eder; birim testleri (mock tx) sağlamak
@@ -243,10 +247,6 @@ export class PaymentRefundService {
     // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI, fırlatmaz.
     @Optional()
     private readonly mailNotifier?: MailInternalNotifier,
-    // A refunded boost order stops its boost in the finalize transaction.
-    // Always provided by PaymentModule; specs of non-boost refunds leave it out.
-    @Optional()
-    private readonly boostTimeline?: BoostTimelineService,
   ) {}
 
   /**
@@ -1371,7 +1371,7 @@ export class PaymentRefundService {
           // finalize through this transaction, so money never goes back while
           // the boost keeps running. A membership order has no boost (no-op).
           if (isPlatformService) {
-            const stop = await this.boostTimeline?.stopForRefund(tx, orderId, {
+            const stop = await this.boostTimeline.stopForRefund(tx, orderId, {
               actorId: opts.boostStop?.actorId ?? null,
               reason: opts.boostStop?.reason ?? null,
               refundedAmount: amountToRefund,

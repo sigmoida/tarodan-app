@@ -19,7 +19,10 @@ import {
   boostRefundIdempotencyKey,
   boostRefundKeyPrefix,
 } from "../../../payment/helpers/boost-refund-key";
-import { RefundPendingReconciliationException } from "../../../payment-providers/refund-errors";
+import {
+  RefundAttemptInFlightException,
+  RefundPendingReconciliationException,
+} from "../../../payment-providers/refund-errors";
 import { BoostTimelineService } from "../../../product/boost-timeline/boost-timeline.service";
 import { BoostNoticeService } from "../../../product/ranking/boost-notice.service";
 import { errorMessage } from "../../../../common/helpers/error-message";
@@ -37,6 +40,26 @@ import {
 
 /** Audit `entityType` of the staff boost actions. */
 const AUDIT_ENTITY = "ProductBoost";
+
+/**
+ * The `boost_refund` audit outcome of a refund call that threw:
+ * `in_flight_elsewhere` when the attempt claim turned it away before it sent
+ * anything because another attempt on the order (another key, typically an
+ * earlier try of this boost, which records its own outcome) is unresolved;
+ * `pending_reconciliation` when this call's own attempt (its key) may be
+ * moving money, including one the stuck-refund recovery took over;
+ * `failed` otherwise.
+ */
+export function boostRefundFailureOutcome(
+  error: unknown,
+): "in_flight_elsewhere" | "pending_reconciliation" | "failed" {
+  if (error instanceof RefundAttemptInFlightException) {
+    return "in_flight_elsewhere";
+  }
+  return error instanceof RefundPendingReconciliationException
+    ? "pending_reconciliation"
+    : "failed";
+}
 
 /**
  * Staff boost operations on the "Boost purchases" screen (tarodan-ops plan
@@ -306,12 +329,9 @@ export class AdminBoostOperationsService {
     } catch (error: unknown) {
       // The real outcome is audited (a refund that is not done is not written
       // as done); an audit failure must not hide the refund error.
-      await audited(
-        error instanceof RefundPendingReconciliationException
-          ? "pending_reconciliation"
-          : "failed",
-        { error: localizedPayloadOf(error) ?? errorMessage(error) },
-      ).catch((auditError: unknown) =>
+      await audited(boostRefundFailureOutcome(error), {
+        error: localizedPayloadOf(error) ?? errorMessage(error),
+      }).catch((auditError: unknown) =>
         this.logger.error(
           `boost refund audit failed boost=${boostId}: ${errorMessage(auditError)}`,
         ),

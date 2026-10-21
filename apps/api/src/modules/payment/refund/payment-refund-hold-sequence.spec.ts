@@ -444,6 +444,7 @@ function makeWorld(quantity: number) {
     {} as never, // holdRelease (not used by processRefund)
     new PaymentRefundAttemptService(db as never),
     {} as never, // tradeRefunds
+    {} as never, // boostTimeline (not a boost order)
   );
   const holdRelease = new PaymentHoldReleaseService(
     db as never,

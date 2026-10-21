@@ -12,7 +12,8 @@ describe("PaymentRefundService — order.cancelled personel bildirimi", () => {
       order: { findUnique: jest.fn().mockResolvedValue(order) },
     };
     const notifier = { emit: jest.fn().mockResolvedValue(undefined) };
-    const deps = Array.from({ length: 14 }, () => ({}));
+    // Every constructor dependency between prisma and the mail notifier.
+    const deps = Array.from({ length: 15 }, () => ({}));
     const service = new (
       PaymentRefundService as unknown as new (
         ...args: unknown[]

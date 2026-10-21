@@ -197,6 +197,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
       {} as any, // tradeRefunds
+      {} as any, // boostTimeline (not a boost order)
     );
 
     // 100 üzerinden 50 kısmi iade → portion 0.5
