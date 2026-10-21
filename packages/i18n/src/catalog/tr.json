@@ -11439,6 +11439,7 @@
       "userNotFound": "Kullanıcı bulunamadı",
       "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
       "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil",
+      "boostConsentRequired": "Ön bilgilendirme ve cayma hakkı onayları gereklidir",
       "duplicateImage": "Aynı görsel birden fazla kez gönderildi",
       "imageNotOwned": "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
       "imageKeyEmpty": "Görsel anahtarı boş olamaz",

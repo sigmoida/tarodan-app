@@ -25,14 +25,20 @@ import {
 } from "../../membership/helpers/membership.util";
 import { PaymentService } from "../../payment/payment.service";
 import { PaymentProvider } from "../../payment/dto";
+import { boostVirtualProductId } from "../../payment/helpers/virtual-order-kind";
+import {
+  PlatformServiceConsentService,
+  platformServiceConsentsAccepted,
+  type PlatformServiceConsentInput,
+} from "../../consent/platform-service-consent.service";
 import {
   BOOST_ENABLED_SETTING,
   type BoostOptionsResponse,
   isBoostEnabled as isBoostSettingOn,
 } from "@tarodan/types";
 
-/** What the seller chose in the boost dialog. */
-export interface InitiateBoostInput {
+/** What the seller chose and accepted in the boost dialog. */
+export interface InitiateBoostInput extends PlatformServiceConsentInput {
   packageId: string;
   durationDays: number;
   provider: PaymentProvider;
@@ -56,6 +62,7 @@ export class ProductBoostService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
+    private readonly platformServiceConsents: PlatformServiceConsentService,
   ) {}
 
   /** Whether boost sales are on (`isBoostEnabled`: a missing row means on). */
@@ -253,8 +260,17 @@ export class ProductBoostService {
   }
 
   /**
-   * Starts a boost purchase: validate, then ProductBoost (pending), the
-   * virtual product and the Order, then the payment intent.
+   * Starts a boost purchase: validate, then one transaction writes the
+   * ProductBoost (pending), the virtual product `boost-<boostId>`, the Order
+   * and the two purchase consents (pre-contract information and distance
+   * service contract, withdrawal waiver), and only after it commits the
+   * payment intent is created. An order of a boost therefore never exists
+   * without its consents, and a failed write leaves nothing behind.
+   *
+   * The consents are checked first: anything but `true` for both is a 400
+   * `server.product.boostConsentRequired` before any read or write. No
+   * setting relaxes it: mobile never buys a boost (ADR 0003, 0015) and the
+   * web dialog that sends them ships in the same release.
    *
    * The price is resolved on the server from the package tier for the
    * listing's price (never trusted from the client).
@@ -266,6 +282,11 @@ export class ProductBoostService {
     req?: Request,
   ) {
     const { packageId, durationDays, provider, autoRenew } = input;
+    if (!platformServiceConsentsAccepted(input)) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostConsentRequired"),
+      );
+    }
     if (!(await this.isBoostEnabled())) {
       throw new BadRequestException(
         i18nMessage("server.product.boostUnavailable"),
@@ -349,25 +370,32 @@ export class ProductBoostService {
       effectiveAutoRenew = isPremiumEntitled(membership, membership?.user);
     }
 
-    // The ProductBoost row (pending)
-    const boost = await this.prisma.productBoost.create({
-      data: {
-        productId: product.id,
-        userId,
-        packageId,
-        packageName,
-        showcaseOnHome,
-        durationDays,
-        price,
-        status: "pending",
-        autoRenew: effectiveAutoRenew,
-      },
-    });
+    // Reads stay outside the transaction; `order_number` is unique, so a
+    // code taken in between fails the write instead of being shared.
+    const orderNumber = await generateUniqueReference(
+      REFERENCE_PREFIX.boostOrder,
+      async (code) =>
+        (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+    );
 
-    try {
-      // Virtual product: boost-<boostId>
-      const virtualProductId = `boost-${boost.id}`;
-      await this.prisma.product.create({
+    // One business event, one transaction: inserts only, no lock on an
+    // existing row and nothing slow (the payment intent comes after).
+    const { boost, order } = await this.prisma.$transaction(async (tx) => {
+      const boost = await tx.productBoost.create({
+        data: {
+          productId: product.id,
+          userId,
+          packageId,
+          packageName,
+          showcaseOnHome,
+          durationDays,
+          price,
+          status: "pending",
+          autoRenew: effectiveAutoRenew,
+        },
+      });
+      const virtualProductId = boostVirtualProductId(boost.id);
+      await tx.product.create({
         data: {
           id: virtualProductId,
           sellerId: platformSeller.id,
@@ -381,14 +409,7 @@ export class ProductBoostService {
           status: ProductStatus.active,
         },
       });
-
-      const orderNumber = await generateUniqueReference(
-        REFERENCE_PREFIX.boostOrder,
-        async (code) =>
-          (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
-      );
-
-      const order = await this.prisma.order.create({
+      const order = await tx.order.create({
         data: {
           orderNumber,
           buyerId: userId,
@@ -404,13 +425,19 @@ export class ProductBoostService {
           shippingAddress: { type: "boost", boostId: boost.id },
         },
       });
-
       // Link the order to the boost (the payment callback finds it by orderId)
-      await this.prisma.productBoost.update({
+      await tx.productBoost.update({
         where: { id: boost.id },
         data: { orderId: order.id },
       });
+      await this.platformServiceConsents.recordForOrder(tx, {
+        orderId: order.id,
+        userId,
+      });
+      return { boost, order };
+    });
 
+    try {
       const paymentResult = await this.paymentService.initiatePayment(
         userId,
         { orderId: order.id, provider },
@@ -432,7 +459,8 @@ export class ProductBoostService {
     } catch (error) {
       // If the payment cannot start, mark the pending boost failed. A failure
       // here must not hide the original error, and the expiry sweep marks a
-      // stale pending boost failed anyway.
+      // stale pending boost failed anyway. The unpaid order expires with its
+      // payment window; its consents stay as the record of what was accepted.
       await this.prisma.productBoost
         .update({ where: { id: boost.id }, data: { status: "failed" } })
         .catch(() => undefined);

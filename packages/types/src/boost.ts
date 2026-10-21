@@ -105,3 +105,34 @@ export interface BoostOffersResponse {
   enabled: boolean;
   offers: BoostOffer[];
 }
+
+/**
+ * `POST /products/:id/boost/initiate` body. Both consents must be `true`
+ * (anything else: 400 `server.product.boostConsentRequired`, nothing is
+ * written); they are recorded with the boost order.
+ */
+export interface InitiateBoostRequest {
+  packageId: string;
+  durationDays: number;
+  /** Default `paytr`. */
+  provider?: "paytr";
+  /** The ending-soon reminder; kept only for premium members. */
+  autoRenew?: boolean;
+  /** The pre-contract information form and distance service contract (`platform_service_sales`). */
+  preInformationAccepted: true;
+  /** The statement that the service starts at once and the withdrawal right does not apply (`withdrawal_waiver`). */
+  withdrawalWaiverAccepted: true;
+}
+
+/** `POST /products/:id/boost/initiate` response: card entry goes through `/payments/direct-form`. */
+export interface InitiateBoostResponse {
+  boostId: string;
+  productId: string;
+  durationDays: number;
+  price: number;
+  paymentId: string;
+  provider: string;
+  expiresIn: number;
+  /** Dev and test only (`PAYMENT_BYPASS`). */
+  useBypass: boolean;
+}

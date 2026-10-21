@@ -66,7 +66,7 @@ describe("ProductBoostService — ad-package pricing", () => {
         ),
       },
     };
-    service = new ProductBoostService(prisma, {} as any);
+    service = new ProductBoostService(prisma, {} as any, {} as any);
   });
 
   const resolve = (dur: number, productPrice: number) =>
