@@ -180,3 +180,61 @@ export const SIGN_IN_METHODS_ERROR_CODES = {
 
 export type SignInMethodsErrorCode =
   (typeof SIGN_IN_METHODS_ERROR_CODES)[keyof typeof SIGN_IN_METHODS_ERROR_CODES];
+
+/** The proof of a step-up: the password, or a sign-in of a linked provider. */
+export const REAUTH_METHODS = ["password", ...SIGN_IN_PROVIDERS] as const;
+
+export type ReauthMethod = (typeof REAUTH_METHODS)[number];
+
+/**
+ * SecurityLog `eventType` values of the sign-in method events. The API writes
+ * them with the user id; admin labels them in the system logs and lists them
+ * per user (`GET /admin/users/:id/sign-in-methods/events`). The one source for
+ * the API writers and the admin labels; never re-type the strings.
+ */
+export const SIGN_IN_METHOD_EVENTS = {
+  /** A first password set while signed in (`POST /auth/password/set`). */
+  passwordSet: "password_set",
+  /** A wrong step-up proof (`details.method`). */
+  reauthFailed: "reauth_failed",
+  /** The step-up locked after too many wrong proofs (`details.method`). */
+  reauthLocked: "reauth_locked",
+  /** Linked by the owner in account settings (`details.source: "manual"`). */
+  socialLinked: "social_linked",
+  /** Linked at social sign-in by the verified e-mail (`details.source: "login"`). */
+  socialLinkedAuto: "social_linked_auto",
+  /** An unverified registration taken over (or healed) at social sign-in (`details.source: "login"`). */
+  socialLinkReset: "social_link_reset",
+  /** Unlinked by the owner in account settings (`details.source: "manual"`). */
+  socialUnlinked: "social_unlinked",
+} as const;
+
+export type SignInMethodEventType =
+  (typeof SIGN_IN_METHOD_EVENTS)[keyof typeof SIGN_IN_METHOD_EVENTS];
+
+export const SIGN_IN_METHOD_EVENT_TYPES = Object.values(
+  SIGN_IN_METHOD_EVENTS,
+) as readonly SignInMethodEventType[];
+
+/** `details.source` of the provider events: who made the change. */
+export const SIGN_IN_METHOD_EVENT_SOURCES = {
+  /** The owner, in account settings. */
+  manual: "manual",
+  /** A social sign-in (the T4 verified e-mail rule). */
+  login: "login",
+} as const;
+
+export type SignInMethodEventSource =
+  (typeof SIGN_IN_METHOD_EVENT_SOURCES)[keyof typeof SIGN_IN_METHOD_EVENT_SOURCES];
+
+/** `details.flow` of the sign-in method events: the request that wrote them. */
+export const SIGN_IN_METHOD_EVENT_FLOWS = {
+  passwordSet: "password_set",
+  reauth: "reauth",
+  providerLink: "provider_link",
+  providerUnlink: "provider_unlink",
+  socialLogin: "social_login",
+} as const;
+
+export type SignInMethodEventFlow =
+  (typeof SIGN_IN_METHOD_EVENT_FLOWS)[keyof typeof SIGN_IN_METHOD_EVENT_FLOWS];

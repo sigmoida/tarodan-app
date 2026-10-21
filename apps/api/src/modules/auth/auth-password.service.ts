@@ -7,7 +7,11 @@ import {
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
-import { SIGN_IN_METHODS_ERROR_CODES } from "@tarodan/types";
+import {
+  SIGN_IN_METHOD_EVENT_FLOWS,
+  SIGN_IN_METHOD_EVENTS,
+  SIGN_IN_METHODS_ERROR_CODES,
+} from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { getRequestClientInfo } from "../../common/context/request-context";
 import { NotificationService } from "../notification/notification.service";
@@ -17,11 +21,6 @@ import { DUMMY_BCRYPT_HASH } from "./utils/timing-pad";
 
 /** bcrypt cost of a new password (reset and set use the same). */
 const PASSWORD_HASH_ROUNDS = 12;
-
-/** Security log event types written here (admin system logs label them). */
-export const PASSWORD_SECURITY_EVENTS = {
-  set: "password_set",
-} as const;
 
 /**
  * Password writes of the auth module: the reset (one-time token: issue, send,
@@ -205,12 +204,12 @@ export class AuthPasswordService {
       await tx.user.update({ where: { id: userId }, data: { passwordHash } });
       await tx.securityLog.create({
         data: {
-          eventType: PASSWORD_SECURITY_EVENTS.set,
+          eventType: SIGN_IN_METHOD_EVENTS.passwordSet,
           severity: "low",
           userId,
           ipAddress,
           userAgent,
-          details: { flow: "password_set" },
+          details: { flow: SIGN_IN_METHOD_EVENT_FLOWS.passwordSet },
         },
       });
     });

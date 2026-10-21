@@ -10,6 +10,9 @@ import { ConsentSource, Prisma } from "@prisma/client";
 import {
   canUnlinkProvider,
   LEGAL_IDENTITY_FIELDS,
+  SIGN_IN_METHOD_EVENT_FLOWS,
+  SIGN_IN_METHOD_EVENT_SOURCES,
+  SIGN_IN_METHOD_EVENTS,
   SIGN_IN_METHODS_ERROR_CODES,
   type LegalIdentityField,
   type SignInProvider,
@@ -71,29 +74,10 @@ export interface SocialIdentityResolution {
   outcome: SocialIdentityOutcome;
 }
 
-/**
- * Security log event types written here (admin system logs and the admin
- * user history label them). Every row carries the user id and
- * `details.provider`; link rows also carry `details.source`.
- */
-export const SOCIAL_SECURITY_EVENTS = {
-  /** Linked by the owner in account settings (`source: manual`). */
-  linked: "social_linked",
-  /** Linked at social sign-in to the account with that verified e-mail. */
-  linkedAuto: "social_linked_auto",
-  /** An unverified registration taken over (or healed) at social sign-in. */
-  linkReset: "social_link_reset",
-  /** Unlinked by the owner in account settings (`source: manual`). */
-  unlinked: "social_unlinked",
-} as const;
-
-/** `details.source` of the link events: who made the link. */
-export const SOCIAL_LINK_SOURCES = {
-  manual: "manual",
-  login: "login",
-} as const;
-
-const FLOW_TAG = "social_login";
+// Security log rows written here (`SIGN_IN_METHOD_EVENTS`) carry the user id
+// and `details.provider`, `details.flow` and `details.source`; admin labels
+// them in the system logs and the user history.
+const FLOW_TAG = SIGN_IN_METHOD_EVENT_FLOWS.socialLogin;
 
 function providerAlreadyLinkedError(): ConflictException {
   return new ConflictException({
@@ -415,7 +399,7 @@ export class SocialIdentityService {
               provider: identity.provider,
               flow: FLOW_TAG,
               mode,
-              source: SOCIAL_LINK_SOURCES.login,
+              source: SIGN_IN_METHOD_EVENT_SOURCES.login,
               // Whether this sign-in added the link (a heal finds it, and a
               // second identity of the provider is never linked).
               linked: createLink,
@@ -425,7 +409,7 @@ export class SocialIdentityService {
 
       if (user.isEmailVerified) {
         if (createLink) {
-          await securityLog(SOCIAL_SECURITY_EVENTS.linkedAuto, "low");
+          await securityLog(SIGN_IN_METHOD_EVENTS.socialLinkedAuto, "low");
           return { result: { userId, outcome: "linked" } };
         }
         // Nothing linked, so no `social_linked_auto` row and no notice mail.
@@ -440,7 +424,7 @@ export class SocialIdentityService {
       await tx.emailChangeToken.deleteMany({ where: { userId } });
       if (mode === "heal") {
         await tx.user.update({ where: { id: userId }, data: HEAL_USER_DATA });
-        await securityLog(SOCIAL_SECURITY_EVENTS.linkReset, "high");
+        await securityLog(SIGN_IN_METHOD_EVENTS.socialLinkReset, "high");
         return { result: { userId, outcome: "tookOver" } };
       }
 
@@ -462,7 +446,7 @@ export class SocialIdentityService {
           tx,
         );
       }
-      await securityLog(SOCIAL_SECURITY_EVENTS.linkReset, "high");
+      await securityLog(SIGN_IN_METHOD_EVENTS.socialLinkReset, "high");
       return {
         result: { userId, outcome: "tookOver" },
         unsubscribe: user.acceptsMarketingEmails ? user.email : undefined,
@@ -538,15 +522,15 @@ export class SocialIdentityService {
         });
         await tx.securityLog.create({
           data: {
-            eventType: SOCIAL_SECURITY_EVENTS.linked,
+            eventType: SIGN_IN_METHOD_EVENTS.socialLinked,
             severity: "low",
             userId,
             ipAddress,
             userAgent,
             details: {
               provider: identity.provider,
-              flow: "provider_link",
-              source: SOCIAL_LINK_SOURCES.manual,
+              flow: SIGN_IN_METHOD_EVENT_FLOWS.providerLink,
+              source: SIGN_IN_METHOD_EVENT_SOURCES.manual,
             },
           },
         });
@@ -619,15 +603,15 @@ export class SocialIdentityService {
       }
       await tx.securityLog.create({
         data: {
-          eventType: SOCIAL_SECURITY_EVENTS.unlinked,
+          eventType: SIGN_IN_METHOD_EVENTS.socialUnlinked,
           severity: "medium",
           userId,
           ipAddress,
           userAgent,
           details: {
             provider,
-            flow: "provider_unlink",
-            source: SOCIAL_LINK_SOURCES.manual,
+            flow: SIGN_IN_METHOD_EVENT_FLOWS.providerUnlink,
+            source: SIGN_IN_METHOD_EVENT_SOURCES.manual,
           },
         },
       });
@@ -734,7 +718,7 @@ export class SocialIdentityService {
       `Social sign-in took over an unverified account (user=${userId}, provider=${identity.provider})`,
     );
     this.sentry.captureEvent({
-      message: SOCIAL_SECURITY_EVENTS.linkReset,
+      message: SIGN_IN_METHOD_EVENTS.socialLinkReset,
       level: "warning",
       tags: { provider: identity.provider, flow: FLOW_TAG },
       user: { id: userId },
