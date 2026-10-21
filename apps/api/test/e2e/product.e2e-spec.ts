@@ -318,6 +318,30 @@ describe("Product (E2E)", () => {
       expect(Array.isArray(items) ? items.length : 0).toBeGreaterThanOrEqual(2);
     });
 
+    it("tradeOnly=true returns only trade-enabled own listings", async () => {
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const open = await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        title: "Open to trade",
+        isTradeEnabled: true,
+      });
+      await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        title: "Not for trade",
+        isTradeEnabled: false,
+      });
+
+      const res = await request(ctx.app.getHttpServer())
+        .get("/api/products/my?tradeOnly=true")
+        .set(authHeader(seller))
+        .expect(200);
+
+      const items = res.body.items || res.body.data || res.body;
+      expect(items.map((p: { id: string }) => p.id)).toEqual([open.id]);
+    });
+
     it("rejects unauthenticated request (401)", async () => {
       await request(ctx.app.getHttpServer())
         .get("/api/products/my")

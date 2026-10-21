@@ -51,4 +51,87 @@ describe("ProductQueryService.findSellerProducts", () => {
       }),
     );
   });
+
+  describe("tradeOnly", () => {
+    const build = () => {
+      const prisma = {
+        product: {
+          count: jest.fn().mockResolvedValue(0),
+          findMany: jest.fn().mockResolvedValue([]),
+          fields: { reservedQuantity: "reservedQuantity" },
+        },
+      };
+      const common = {
+        formatProductResponseMany: jest.fn().mockResolvedValue([]),
+      };
+      const service = new ProductQueryService(
+        prisma as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        common as any,
+        {
+          isBlockedEither: async () => false,
+          getHiddenUserIds: async () => [],
+        } as any,
+        accountLaneServiceStub() as any,
+      );
+      return { prisma, service };
+    };
+
+    it("adds isTradeEnabled when tradeOnly is set", async () => {
+      const { prisma, service } = build();
+      await service.findSellerProducts("seller-1", {
+        tradeOnly: true,
+        status: "active",
+      } as any);
+      const arg = prisma.product.findMany.mock.calls[0][0];
+      expect(arg.where).toEqual(
+        expect.objectContaining({
+          sellerId: "seller-1",
+          status: "active",
+          isTradeEnabled: true,
+        }),
+      );
+      expect(prisma.product.count).toHaveBeenCalledWith({ where: arg.where });
+    });
+
+    it("leaves the where untouched without tradeOnly", async () => {
+      const { prisma, service } = build();
+      await service.findSellerProducts("seller-1", {} as any);
+      expect(prisma.product.findMany.mock.calls[0][0].where).not.toHaveProperty(
+        "isTradeEnabled",
+      );
+    });
+
+    it("combines tradeOnly with tradeEligible and pages the filtered set", async () => {
+      const { prisma, service } = build();
+      prisma.product.count.mockResolvedValue(45);
+      const result = await service.findSellerProducts("seller-1", {
+        tradeEligible: true,
+        tradeOnly: true,
+        page: 2,
+        limit: 20,
+      } as any);
+      const arg = prisma.product.findMany.mock.calls[0][0];
+      expect(arg.where).toEqual(
+        expect.objectContaining({
+          status: "active",
+          isTradeEnabled: true,
+          NOT: expect.anything(),
+          OR: expect.any(Array),
+        }),
+      );
+      expect(arg.skip).toBe(20);
+      expect(arg.take).toBe(20);
+      expect(result.meta).toEqual(
+        expect.objectContaining({
+          total: 45,
+          page: 2,
+          limit: 20,
+          totalPages: 3,
+        }),
+      );
+    });
+  });
 });

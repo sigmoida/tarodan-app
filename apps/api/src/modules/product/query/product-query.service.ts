@@ -788,6 +788,7 @@ export class ProductQueryService {
       status,
       inactiveReason,
       tradeEligible,
+      tradeOnly,
       page = 1,
       limit = 20,
     } = query;
@@ -795,18 +796,25 @@ export class ProductQueryService {
     const where: Prisma.ProductWhereInput = {
       ...catalogProductWhere(),
       sellerId,
-      // "Süresi dolan" sekmesi: neden yalnız pasif ilanda anlamlıdır (statü
-      // inactive dışına çıkınca temizlenir) — status ile birlikte gönderilir.
+      // Listings marked open to trade. Filtered on the server so paging and
+      // meta.total count only the filtered rows. Unlike GET /products there is
+      // no seller trade-capability join: every row belongs to the caller, and
+      // createTrade / counter-offer check the caller's permission per user.
+      ...(tradeOnly ? { isTradeEnabled: true } : {}),
+      // "Expired" tab: the reason only applies to inactive listings (it is
+      // cleared when the status leaves inactive), so it is sent with status.
       ...(inactiveReason ? { inactiveReason } : {}),
       ...(status && status.trim() !== ""
         ? { status: status as ProductStatus }
         : {
-            // "Tümü": deleted hariç hepsi (sold, inactive, reserved, active,
-            // pending, rejected görünür). Kaldırılan ürünler ayrı 'deleted' filtresinde.
+            // "All": everything except deleted (sold, inactive, reserved,
+            // active, pending, rejected). Removed listings have their own
+            // 'deleted' filter.
             status: { notIn: [ProductStatus.deleted] },
           }),
-      // Takas teklifine eklenebilir ürünler: aktif + aktif takasta değil + müsait stoğu var
-      // (createTrade'in initiator validasyonuyla birebir — trade.service.ts)
+      // Listings that can be offered in a trade: active, not in an active
+      // trade, with available stock. Mirrors createTrade's initiator
+      // validation (trade-lifecycle.service.ts). Overrides any status above.
       ...(tradeEligible
         ? {
             status: ProductStatus.active,
@@ -831,10 +839,10 @@ export class ProductQueryService {
       this.prisma.product,
       {
         where,
-        // Birincil sıralama: en yeni ilan en üstte (createdAt DESC). Satılabilir
-        // ilanların durumuna göre değil tarihe göre sıralanması istenir; satılan/
-        // pasif/reddedilen ilanlar aşağıdaki adımda en alta taşınır (yine en yeni
-        // önce). Öne çıkarma (boost) bu sorguya dahil değildir, dokunulmaz.
+        // Primary order: newest listing first (createdAt DESC), by date rather
+        // than by status. Sold, inactive and rejected listings are moved to
+        // the bottom in the step below (still newest first). Boosting does not
+        // apply to this query.
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         include: {
           images: { orderBy: { sortOrder: "asc" }, take: 1 },
@@ -851,9 +859,9 @@ export class ProductQueryService {
     );
     const products = result.data;
 
-    // Satılabilir ilanlar üstte, terminal durumdakiler (sold/inactive/rejected)
-    // en altta — her iki grup da kendi içinde en yeni önce (kararlı sıralama,
-    // createdAt DESC zaten uygulandı).
+    // Sellable listings on top, terminal ones (sold/inactive/rejected) at the
+    // bottom, each group newest first (stable sort; createdAt DESC already
+    // applied). Note: this runs per page, after pagination.
     const TERMINAL_STATUSES: ProductStatus[] = [
       ProductStatus.sold,
       ProductStatus.inactive,
