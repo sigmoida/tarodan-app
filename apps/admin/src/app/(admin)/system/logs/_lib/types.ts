@@ -1,8 +1,5 @@
 import type { BadgeVariant } from "@tarodan/ui";
-import {
-  SIGN_IN_METHOD_EVENTS,
-  type SignInMethodEventType,
-} from "@tarodan/types";
+import { signInMethodEventLabels } from "@/lib/sign-in-methods";
 import {
   ExclamationTriangleIcon,
   ShieldExclamationIcon,
@@ -137,36 +134,6 @@ export const eventTypeLabels = (t: T): Record<string, string> => ({
   "2fa_enabled": t("admin.system.logs.events.twoFactorEnabled"),
   account_locked: t("admin.system.logs.events.accountLocked"),
   ...signInMethodEventLabels(t),
-});
-
-/**
- * Labels of the sign-in method events, keyed by the shared event names
- * (`@tarodan/types`), so a new event without a label fails the typecheck.
- */
-export const signInMethodEventLabels = (
-  t: T,
-): Record<SignInMethodEventType, string> => ({
-  [SIGN_IN_METHOD_EVENTS.socialLinked]: t(
-    "admin.system.logs.events.socialLinked",
-  ),
-  [SIGN_IN_METHOD_EVENTS.socialLinkedAuto]: t(
-    "admin.system.logs.events.socialLinkedAuto",
-  ),
-  [SIGN_IN_METHOD_EVENTS.socialLinkReset]: t(
-    "admin.system.logs.events.socialLinkReset",
-  ),
-  [SIGN_IN_METHOD_EVENTS.socialUnlinked]: t(
-    "admin.system.logs.events.socialUnlinked",
-  ),
-  [SIGN_IN_METHOD_EVENTS.passwordSet]: t(
-    "admin.system.logs.events.passwordSet",
-  ),
-  [SIGN_IN_METHOD_EVENTS.reauthFailed]: t(
-    "admin.system.logs.events.reauthFailed",
-  ),
-  [SIGN_IN_METHOD_EVENTS.reauthLocked]: t(
-    "admin.system.logs.events.reauthLocked",
-  ),
 });
 
 export const actionLabels = (t: T): Record<string, string> => ({

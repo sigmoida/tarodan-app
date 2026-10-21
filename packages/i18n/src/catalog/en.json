@@ -9229,7 +9229,26 @@
         "saved": "Identity details updated."
       },
       "filterIdentityAll": "All",
-      "filterIdentityIncomplete": "Identity incomplete only"
+      "filterIdentityIncomplete": "Identity incomplete only",
+      "signInMethods": {
+        "title": "Sign-in Methods",
+        "password": "Password",
+        "passwordSet": "Set",
+        "passwordNotSet": "Not set",
+        "providers": "Connected accounts",
+        "noProviders": "No connected accounts",
+        "providerEmail": "Provider email",
+        "linkedAt": "Connected on",
+        "loadError": "Sign-in methods could not be loaded",
+        "history": "Sign-in Method History",
+        "historyEmpty": "No sign-in method events for this user",
+        "historyLoadError": "The history could not be loaded",
+        "columnEvent": "Event",
+        "columnProvider": "Provider",
+        "columnSource": "Source",
+        "sourceManual": "From account settings",
+        "sourceLogin": "Automatic at sign-in"
+      }
     },
     "deletedIdentities": {
       "title": "Deleted Account Identities",
