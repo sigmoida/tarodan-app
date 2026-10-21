@@ -24,9 +24,9 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from "@nestjs/swagger";
 import { Request } from "express";
+import { engagementClientIp } from "./helpers/engagement-client-ip";
 import { type Locale } from "@tarodan/i18n";
 import { ProductService } from "./product.service";
 import { ProductBoostService } from "./ranking/product-boost.service";
@@ -707,18 +707,12 @@ export class ProductController {
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
     @Headers("user-agent") userAgent?: string,
-    @Req() req?: any,
+    @Req() req?: Request,
   ) {
-    // Get real IP from headers if behind proxy
-    const clientIp =
-      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req?.headers?.["x-real-ip"] ||
-      ip ||
-      "unknown";
     return this.productService.incrementViewCount(
       id,
       userId,
-      clientIp,
+      engagementClientIp(req, ip),
       userAgent,
     );
   }
@@ -746,17 +740,12 @@ export class ProductController {
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
     @Headers("user-agent") userAgent?: string,
-    @Req() req?: any,
+    @Req() req?: Request,
   ) {
-    const clientIp =
-      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req?.headers?.["x-real-ip"] ||
-      ip ||
-      "unknown";
     return this.productService.incrementClickCount(
       id,
       userId,
-      clientIp,
+      engagementClientIp(req, ip),
       userAgent,
     );
   }
