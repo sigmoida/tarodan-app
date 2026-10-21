@@ -2951,7 +2951,22 @@
     "invoiceByEmail": "Faturanız hazırlandığında e-posta ile gönderilir; Siparişlerim sayfasından da indirebilirsiniz.",
     "individualSellerNoInvoice": "Bu satıcı bireysel satıcıdır; ürün için fatura düzenlenmez. Tarodan'ın hizmet bedeli faturası e-posta ile iletilir.",
     "sellerInvoicePending": "Satıcı ürün faturasını henüz yüklemedi. Yüklendiğinde e-posta ile bilgilendirileceksiniz.",
-    "downloading": "İndiriliyor..."
+    "downloading": "İndiriliyor...",
+    "boost": {
+      "success": {
+        "title": "Öne çıkarma başladı",
+        "description": "\"{listing}\" ilanı {date} tarihine kadar öne çıkarılıyor.",
+        "pending": "Ödemeniz alındı. Öne çıkarma birkaç dakika içinde başlayacak."
+      },
+      "toBoosts": "Öne Çıkarmalarım",
+      "toListings": "İlanlarım",
+      "fail": {
+        "title": "Öne çıkarma ödemesi tamamlanamadı",
+        "description": "Ödeme tamamlanamadı. Tekrar deneyebilirsiniz.",
+        "retry": "Tekrar dene"
+      },
+      "cancelled": "Öne çıkarma ödemesi iptal edildi."
+    }
   },
   "bankAccount": {
     "savedBadge": "Kayıtlı",

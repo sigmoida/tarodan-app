@@ -2,12 +2,18 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { useLocale, useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
+import {
+  PAYMENT_CANCELLED_PARAM,
+  PAYMENT_TYPE_PARAM,
+  paymentKind,
+  paymentReturnRoutes,
+} from "../../_lib/paymentKind";
 
 const urlHasGuest = () =>
   typeof window !== "undefined" &&
@@ -15,8 +21,13 @@ const urlHasGuest = () =>
 
 type Phase = "auth-loading" | "loading" | "ready";
 
-/** Loads the failed payment's status and, if still pending (callback not yet in),
- *  releases the reservation immediately. */
+/**
+ * Loads the failed payment's status and, if still pending (callback not yet
+ * in), releases the reservation at once (`confirm-failed`, a no-op while the
+ * 3DS charge may still be live). A payment that turns out completed goes to
+ * its success page instead of showing a failure. The kind (checkout,
+ * membership, boost) picks the view and every route (`paymentReturnRoutes`).
+ */
 export function usePaymentFail() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -25,9 +36,23 @@ export function usePaymentFail() {
 
   const paymentId = searchParams.get("paymentId");
   const isGuestCheckout = searchParams.get("guest") === "true";
+  const typeParam = searchParams.get(PAYMENT_TYPE_PARAM);
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const redirectingRef = useRef(false);
+
+  const kind = paymentKind(typeParam, payment);
+  const routesFor = (data: any, guest: boolean) =>
+    paymentReturnRoutes(paymentKind(typeParam, data), {
+      paymentId,
+      guest,
+      boostProductId: data?.boost?.productId,
+    });
+  const routes = routesFor(payment, isGuestCheckout || urlHasGuest());
+  // The buyer's own cancel on the pay page (boost has a view for it).
+  const cancelled =
+    kind === "boost" && searchParams.get(PAYMENT_CANCELLED_PARAM) === "true";
 
   useEffect(() => {
     if (authLoading) return;
@@ -46,8 +71,15 @@ export function usePaymentFail() {
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId!)
         : await paymentsApi.getStatusLight(paymentId!);
-      setPayment(response.data);
-      if (response.data?.status === "pending") {
+      const data = response.data;
+      setPayment(data);
+      if (data?.status === "completed") {
+        // Paid after all (e.g. a cancel that lost the race to the callback).
+        redirectingRef.current = true;
+        router.replace(routesFor(data, isGuest).success);
+        return;
+      }
+      if (data?.status === "pending") {
         try {
           await paymentsApi.confirmFailed(paymentId!);
         } catch {
@@ -64,13 +96,19 @@ export function usePaymentFail() {
 
   const guestOk = isGuestCheckout || urlHasGuest();
   const phase: Phase =
-    authLoading && !guestOk ? "auth-loading" : isLoading ? "loading" : "ready";
+    authLoading && !guestOk
+      ? "auth-loading"
+      : isLoading || redirectingRef.current
+        ? "loading"
+        : "ready";
 
   return {
     phase,
     payment,
     locale,
     isGuestCheckout,
-    handleRetry: () => router.push("/profile/orders"),
+    kind,
+    routes,
+    cancelled,
   };
 }

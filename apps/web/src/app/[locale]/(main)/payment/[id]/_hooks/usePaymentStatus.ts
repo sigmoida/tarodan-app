@@ -6,15 +6,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
+import type { BoostPaymentSummary } from "@tarodan/types";
 import {
   paymentCapabilities,
   paymentsApi,
   type PaymentConfig,
-  type PaymentPurpose,
 } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { hasAuthMarker } from "@/lib/authMarker";
 import { useTranslations } from "next-intl";
+import {
+  PAYMENT_TYPE_PARAM,
+  paymentKind,
+  paymentPurpose,
+  paymentReturnRoutes,
+  type PaymentKind,
+} from "../../_lib/paymentKind";
 
 type Phase = "auth-loading" | "loading" | "notfound" | "ready";
 
@@ -26,7 +33,9 @@ const urlHasGuest = () =>
 /**
  * Owns the payment-page lifecycle: loads public config + payment status, routes
  * completed/failed payments away, runs the dev bypass, and exposes the target +
- * cancel/retry actions. The page component stays presentational.
+ * cancel/retry actions. The page component stays presentational. Every route
+ * comes from `paymentReturnRoutes` for the payment's kind (checkout,
+ * membership, boost).
  */
 export function usePaymentStatus() {
   const t = useTranslations();
@@ -37,11 +46,9 @@ export function usePaymentStatus() {
 
   const paymentId = params.id as string;
   const isGuestCheckout = searchParams.get("guest") === "true";
-  const isMembershipPayment = searchParams.get("type") === "membership";
-  const purpose: PaymentPurpose = isMembershipPayment
-    ? "membership"
-    : "checkout";
-  const kind = searchParams.get("kind");
+  const typeParam = searchParams.get(PAYMENT_TYPE_PARAM);
+  // Membership only: the change kind its success page shows.
+  const membershipChange = searchParams.get("kind");
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,14 +56,26 @@ export function usePaymentStatus() {
   const [cancelling, setCancelling] = useState(false);
   const redirectingRef = useRef(false);
 
-  const membershipSuccessUrl = kind
-    ? `/membership/success?kind=${kind}`
-    : "/membership/success";
+  const routesFor = (
+    kind: PaymentKind,
+    data: { boost?: BoostPaymentSummary | null } | null,
+    guest: boolean,
+  ) =>
+    paymentReturnRoutes(kind, {
+      paymentId,
+      guest,
+      membershipChange,
+      boostProductId: data?.boost?.productId,
+    });
+
+  const kind = paymentKind(typeParam, payment);
+  const purpose = paymentPurpose(kind);
+  const routes = routesFor(kind, payment, isGuestCheckout || urlHasGuest());
 
   const fetchPayment = async () => {
+    const isGuest = isGuestCheckout || urlHasGuest();
     try {
       setIsLoading(true);
-      const isGuest = isGuestCheckout || urlHasGuest();
 
       let cfg: PaymentConfig = {
         bypassEnabled: false,
@@ -68,19 +87,23 @@ export function usePaymentStatus() {
       } catch {
         /* safe default: new-card only, no bypass */
       }
-      setCardStorageEnabled(
-        paymentCapabilities(cfg, purpose).cardStorageEnabled && !isGuest,
-      );
 
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
         : await paymentsApi.getStatusLight(paymentId);
       const paymentData = response.data;
       setPayment(paymentData);
+      // The store (and so card storage) follows the loaded kind: the URL may
+      // lack `type`, for example after the login redirect.
+      const loadedKind = paymentKind(typeParam, paymentData);
+      setCardStorageEnabled(
+        paymentCapabilities(cfg, paymentPurpose(loadedKind))
+          .cardStorageEnabled && !isGuest,
+      );
 
-      if (isMembershipPayment && paymentData.status === "completed") {
+      if (loadedKind === "membership" && paymentData.status === "completed") {
         redirectingRef.current = true;
-        router.replace(membershipSuccessUrl);
+        router.replace(routesFor(loadedKind, paymentData, isGuest).success);
         return;
       }
 
@@ -92,9 +115,7 @@ export function usePaymentStatus() {
             redirectingRef.current = true;
             const hasSession = isAuthenticated || hasLocalToken();
             router.push(
-              isMembershipPayment
-                ? membershipSuccessUrl
-                : `/payment/success?paymentId=${paymentId}${!hasSession ? "&guest=true" : ""}`,
+              routesFor(loadedKind, paymentData, !hasSession).success,
             );
             return;
           }
@@ -110,13 +131,7 @@ export function usePaymentStatus() {
         );
       toast.error(t("page.payment.usepaymentstatus.odemeBilgisiYuklenemedi"));
       redirectingRef.current = true;
-      router.push(
-        isGuestCheckout
-          ? "/"
-          : isMembershipPayment
-            ? "/membership"
-            : "/profile/orders",
-      );
+      router.push(routesFor(paymentKind(typeParam), null, isGuest).exit);
     } finally {
       setIsLoading(false);
     }
@@ -146,11 +161,10 @@ export function usePaymentStatus() {
     if (!payment) return;
     if (payment.status === "completed") {
       redirectingRef.current = true;
-      if (isMembershipPayment) router.push(membershipSuccessUrl);
-      else router.push(`/payment/success?paymentId=${paymentId}`);
+      router.push(routes.success);
     } else if (payment.status === "failed") {
       redirectingRef.current = true;
-      router.push(`/payment/fail?paymentId=${paymentId}`);
+      router.push(routes.fail);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment?.status]);
@@ -161,14 +175,18 @@ export function usePaymentStatus() {
     try {
       if (hasSession) {
         await paymentsApi.cancel(paymentId);
-        toast.success(
-          t("page.payment.usepaymentstatus.odemeIptalEdildiUrunTekrarSatisa"),
-        );
+        // The text says the goods are back on sale: checkout only. A boost
+        // lands on its own cancelled view instead.
+        if (kind === "checkout") {
+          toast.success(
+            t("page.payment.usepaymentstatus.odemeIptalEdildiUrunTekrarSatisa"),
+          );
+        }
       }
     } catch {
       /* silent: still navigate back */
     } finally {
-      router.push(isGuestCheckout ? "/" : "/cart");
+      router.push(routesFor(kind, payment, isGuestCheckout).cancel);
     }
   };
 
@@ -209,7 +227,8 @@ export function usePaymentStatus() {
     retry: fetchPayment,
     directTarget,
     hasTarget,
-    isMembershipPayment,
+    kind,
+    routes,
     purpose,
   };
 }
