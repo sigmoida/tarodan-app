@@ -10,7 +10,7 @@ import {
   parsePriceLimits,
   priceLimitMessages,
   priceLimitViolation,
-  salePriceLimitMessage,
+  saleDataError,
   type ListingPriceRules,
 } from "./price-limits";
 import { createEmptySaleData } from "./sale-data";
@@ -161,9 +161,25 @@ describe("buildEditListingSchema — fiyat sınırı", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("reads a comma price against the limit", () => {
+    expect(issues("249,99")).toHaveLength(1);
+    expect(issues("250,00")).toEqual([]);
+  });
+
+  it("reports refused price text once, as a refusal, not as a limit", () => {
+    // "1.000" is one thousand to the seller; read as 1 it would also be
+    // reported as below the 250 TL minimum.
+    expect(issues("1.000")).toEqual([
+      {
+        path: ["price"],
+        message: priceLimitMessages("tr").amountFormatRefused,
+      },
+    ]);
+  });
 });
 
-describe("salePriceLimitMessage", () => {
+describe("saleDataError", () => {
   const msg = priceLimitMessages("tr");
   const rules: ListingPriceRules = {
     limits: { minPrice: 250, maxPrice: null },
@@ -175,23 +191,23 @@ describe("salePriceLimitMessage", () => {
   });
 
   it("alt sınırın altındaki indirimli fiyat için hata verir", () => {
-    expect(salePriceLimitMessage(sale("200"), 1000, rules, msg)).toBe(
+    expect(saleDataError(sale("200"), 1000, rules, msg)).toBe(
       "İndirimli fiyat en az 250 TL olmalıdır.",
     );
   });
 
   it("sınır ve üstü geçer", () => {
-    expect(salePriceLimitMessage(sale("250"), 1000, rules, msg)).toBeNull();
+    expect(saleDataError(sale("250"), 1000, rules, msg)).toBeNull();
   });
 
   it("uygulanmayan indirim (boş ya da fiyattan büyük) denetlenmez", () => {
-    expect(salePriceLimitMessage(sale(""), 1000, rules, msg)).toBeNull();
-    expect(salePriceLimitMessage(sale("1200"), 1000, rules, msg)).toBeNull();
+    expect(saleDataError(sale(""), 1000, rules, msg)).toBeNull();
+    expect(saleDataError(sale("1200"), 1000, rules, msg)).toBeNull();
   });
 
   it("düzenlemede kayıtlı indirimli fiyat aynen kalırsa hata yok", () => {
     expect(
-      salePriceLimitMessage(
+      saleDataError(
         sale("200", "400"),
         400,
         { ...rules, storedPrices: [200, 400, null] },
@@ -202,8 +218,34 @@ describe("salePriceLimitMessage", () => {
 
   it("sınır yoksa hata yok", () => {
     expect(
-      salePriceLimitMessage(sale("1"), 1000, { limits: NO_PRICE_LIMITS }, msg),
+      saleDataError(sale("1"), 1000, { limits: NO_PRICE_LIMITS }, msg),
     ).toBeNull();
+  });
+
+  it.each([
+    ["1.000", ""],
+    ["", "1.250,50"],
+    ["abc", "1000"],
+  ])(
+    "refuses discount text that is not an amount (sale %j, original %j)",
+    (salePrice, originalPrice) => {
+      // Read as "no discount", it would silently clear the sale on save.
+      expect(
+        saleDataError(
+          sale(salePrice, originalPrice),
+          1000,
+          { limits: NO_PRICE_LIMITS },
+          msg,
+        ),
+      ).toBe(msg.amountFormatRefused);
+    },
+  );
+
+  it("reads comma amounts against the limit", () => {
+    expect(saleDataError(sale("249,99"), 1000, rules, msg)).toBe(
+      "İndirimli fiyat en az 250 TL olmalıdır.",
+    );
+    expect(saleDataError(sale("250,00"), 1000, rules, msg)).toBeNull();
   });
 });
 
