@@ -451,8 +451,8 @@ export class AuthController {
    * Sends a verification code to the NEW address. The current e-mail stays
    * active until the code is verified. Step-up: a `reauthToken` that is sent
    * is checked; without one the request passes while the setting
-   * `auth_require_reauth_for_sensitive_actions` is off (no mobile version
-   * sends one yet).
+   * `auth_require_reauth_for_sensitive_actions` is off (mobile versions
+   * without the step-up send none).
    */
   @Post("email/request-change")
   @UseGuards(JwtAuthGuard)
