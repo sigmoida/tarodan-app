@@ -1250,8 +1250,16 @@ describe("SocialIdentityService manual link and unlink", () => {
           "fulfilled",
           "rejected",
         ]);
+        const refused = results.find((r) => r.status === "rejected");
+        expect((refused as PromiseRejectedResult).reason).toMatchObject({
+          status: 409,
+          response: { errorCode: "PROVIDER_ALREADY_LINKED" },
+        });
         expect(linksOf(OWNER)).toHaveLength(1);
         expect(fake.state.securityLogs).toHaveLength(1);
+        expect(notifications.sendAccountSecurityNotice).toHaveBeenCalledTimes(
+          1,
+        );
       },
     );
 
@@ -1261,7 +1269,7 @@ describe("SocialIdentityService manual link and unlink", () => {
         addUser({ email: "owner@example.com" });
         serialiseTransactions();
 
-        await Promise.all([
+        const [, signIn] = await Promise.all([
           identities.linkToUser(OWNER, {
             provider,
             providerUserId: "manual-sub",
@@ -1274,8 +1282,61 @@ describe("SocialIdentityService manual link and unlink", () => {
           }),
         ]);
 
+        expect(signIn).toEqual({ userId: OWNER, outcome: "emailMatch" });
         expect(linksOf(OWNER)).toEqual([
           expect.objectContaining({ providerUserId: "manual-sub" }),
+        ]);
+        // Only the manual link is logged and mailed; the sign-in that added
+        // nothing writes no row and sends no notice.
+        expect(fake.state.securityLogs).toEqual([
+          expect.objectContaining({
+            eventType: "social_linked",
+            userId: OWNER,
+          }),
+        ]);
+        expect(notifications.sendAccountSecurityNotice).toHaveBeenCalledTimes(
+          1,
+        );
+      },
+    );
+
+    it.each<SocialProvider>(["google", "apple"])(
+      "a manual %s link racing a sign-in with another identity leaves one link (the sign-in locks first)",
+      async (provider) => {
+        addUser({ email: "owner@example.com" });
+        serialiseTransactions();
+
+        const signIn = identities.resolveUser({
+          provider,
+          providerUserId: "login-sub",
+          email: "owner@example.com",
+        });
+        // Let the sign-in reach its transaction (and so the lock) first.
+        while (fake.db.$transaction.mock.calls.length === 0) {
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+        const manual = identities.linkToUser(OWNER, {
+          provider,
+          providerUserId: "manual-sub",
+          email: "work@corp.example",
+        });
+
+        await expect(signIn).resolves.toEqual({
+          userId: OWNER,
+          outcome: "linked",
+        });
+        await expect(manual).rejects.toMatchObject({
+          status: 409,
+          response: { errorCode: "PROVIDER_ALREADY_LINKED" },
+        });
+        expect(linksOf(OWNER)).toEqual([
+          expect.objectContaining({ providerUserId: "login-sub" }),
+        ]);
+        expect(fake.state.securityLogs).toEqual([
+          expect.objectContaining({
+            eventType: "social_linked_auto",
+            userId: OWNER,
+          }),
         ]);
       },
     );
@@ -1322,6 +1383,50 @@ describe("SocialIdentityService manual link and unlink", () => {
   });
 
   describe("unlinkFromUser", () => {
+    it("decides on the locked row", async () => {
+      addUser({ passwordHash: "hash" });
+      link(OWNER, "google");
+
+      await identities.unlinkFromUser(OWNER, "google");
+
+      const [first] = fake.db.$queryRaw.mock.calls[0];
+      expect(first.join("?")).toContain("FOR UPDATE");
+    });
+
+    // D1: a password or a Google link must remain; Apple alone does not count.
+    it.each<[string, SocialProvider[], SocialProvider, SocialProvider[]]>([
+      ["password + Apple: Apple", ["apple"], "apple", []],
+      [
+        "password + Google + Apple: Google",
+        ["google", "apple"],
+        "google",
+        ["apple"],
+      ],
+      [
+        "password + Google + Apple: Apple",
+        ["google", "apple"],
+        "apple",
+        ["google"],
+      ],
+    ])(
+      "lets %s go while the password remains",
+      async (_label, providers, provider, remaining) => {
+        addUser({ passwordHash: "hash" });
+        providers.forEach((p) => link(OWNER, p));
+
+        await identities.unlinkFromUser(OWNER, provider);
+
+        expect(linksOf(OWNER).map((l) => l.provider)).toEqual(remaining);
+        expect(fake.state.securityLogs).toEqual([
+          expect.objectContaining({
+            eventType: "social_unlinked",
+            userId: OWNER,
+            details: expect.objectContaining({ provider }),
+          }),
+        ]);
+      },
+    );
+
     it("removes the provider, logs it and sends the notice; sessions stay", async () => {
       addUser({ passwordHash: "hash" });
       link(OWNER, "google");
@@ -1478,14 +1583,31 @@ describe("SocialIdentityService manual link and unlink", () => {
       expect(linksOf(OWNER).map((l) => l.provider)).toEqual(["google"]);
     });
 
-    it("refuses a banned account as sign-in does, and writes nothing", async () => {
-      addUser({ isBanned: true, passwordHash: "hash" });
-      link(OWNER, "google");
+    it.each<[string, Row, boolean, string]>([
+      ["banned", { isBanned: true }, false, "server.auth.accountSuspended"],
+      [
+        "deleted",
+        { deletedAt: new Date() },
+        false,
+        "server.auth.accountDeleted",
+      ],
+      ["staff", {}, true, "server.auth.staffAccountCustomerLogin"],
+    ])(
+      "refuses a %s account as sign-in does, and writes nothing",
+      async (_label, overrides, staff, key) => {
+        addUser({ passwordHash: "hash", ...overrides });
+        if (staff) fake.state.staff.push(OWNER);
+        link(OWNER, "google");
+        link(OWNER, "apple");
 
-      await expect(
-        identities.unlinkFromUser(OWNER, "google"),
-      ).rejects.toMatchObject({ status: 401 });
-      expect(linksOf(OWNER)).toHaveLength(1);
-    });
+        await expect(
+          identities.unlinkFromUser(OWNER, "apple"),
+        ).rejects.toMatchObject({ status: 401, response: { i18nKey: key } });
+        expect(linksOf(OWNER)).toHaveLength(2);
+        expect(fake.state.securityLogs).toEqual([]);
+        expect(appleTokens.requestRevocation).not.toHaveBeenCalled();
+        expect(notifications.sendAccountSecurityNotice).not.toHaveBeenCalled();
+      },
+    );
   });
 });
