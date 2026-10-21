@@ -3978,6 +3978,10 @@
     },
     "kvkkTitle": "KVKK Privacy Notice",
     "marketingConsentTitle": "Marketing Communications Consent",
+    "platformServiceSales": {
+      "title": "Pre-contract Information and Distance Service Contract"
+    },
+    "withdrawalWaiverTitle": "Withdrawal Waiver",
     "consentGate": {
       "title": "Your consent is required",
       "intro": "To continue, please read and accept the documents below.",

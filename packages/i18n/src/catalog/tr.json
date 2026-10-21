@@ -3978,6 +3978,10 @@
     },
     "kvkkTitle": "KVKK Aydınlatma Metni",
     "marketingConsentTitle": "Ticari Elektronik İleti İzni",
+    "platformServiceSales": {
+      "title": "Ön Bilgilendirme Formu ve Mesafeli Hizmet Sözleşmesi"
+    },
+    "withdrawalWaiverTitle": "Cayma Hakkı Onayı",
     "consentGate": {
       "title": "Onayınız gerekiyor",
       "intro": "Devam etmek için aşağıdaki belgeleri okuyup onaylamanız gerekiyor.",
