@@ -88,6 +88,48 @@ ile sipariş oluşturma anında e-posta doğrulamasıdır (Redis'te tek kullanı
 idempotency kontrolünden **sonra** tüketilir, replay kodu yakmaz). Misafir
 ödemesi `userId = null` ile sıradan `initiate`/`direct-form`'dur.
 
+### Return URLs and virtual orders
+
+Membership and boost are **virtual orders**: an ordinary Order on a virtual
+product (`membership-<tierId>`, `boost-<boostId>`, origin
+`platform_service`). `virtualOrderKind` (`payment/helpers/virtual-order-kind.ts`)
+is the one reader of those prefixes (`VIRTUAL_ORDER_KINDS` in
+`@tarodan/types`); the older prefix checks in fulfilment, refunds and
+invoicing are a backlog item.
+
+- **Return URLs.** `createDirectPaymentForm` builds
+  `merchant_ok_url = <FRONTEND_URL>/payment/success?<query>` and
+  `merchant_fail_url = <FRONTEND_URL>/payment/fail?<query>` with the same
+  query (`paymentReturnQuery`): `paymentId` always, `type=membership|boost`
+  for a virtual order, `guest=true` for a guest order or cart. A trade cash
+  payment carries `paymentId` only. Mobile matches only the path of these
+  URLs, so the query is safe for every app version.
+- **Fail page.** With the `paymentId` the web fail page calls
+  `POST /payments/:id/confirm-failed` while the payment is still `pending`.
+  It is a no-op while the 3DS charge may be live
+  (`metadata.lastChargeStartedAt` within `paymentFailTimeoutMinutes`); after
+  that it runs `processFailedPayment`, the same path as the PayTR failure
+  callback and the expiry cron (CAS to `failed`, order cancelled,
+  reservation released). A 3DS failure therefore needs a new checkout, as
+  before.
+- **Payment status.** `GET /payments/:id/status`, `/status-guest` and
+  `GET /payments/:id` add `isMembershipOrder: true` for a membership payment
+  and `isBoostOrder: true` with `boost: { id, productId, productTitle,
+endsAt }` for a boost payment (`endsAt` null until activation;
+  `VirtualOrderPaymentFields` in `@tarodan/types`). Orders of goods get
+  neither.
+- **Boost purchase consents.** `POST /products/:id/boost/initiate` needs the
+  pre-contract information and withdrawal waiver consents and writes the
+  boost, its virtual product, its order and both consents in one
+  transaction; `direct-form` refuses a boost order without them
+  (`400 server.product.boostConsentRequired`). Details and the legal release
+  blocker: `CONSENTS.md`, "Platform services (boost)".
+- **Tracing.** The boost purchase start tags its request `flow=boost`;
+  the purchase and the activation leave `boost.*` breadcrumbs with ids only
+  (boost, order, order number, listing). Activation sets no tag because it
+  also runs in worker jobs, which share the process scope. A paid boost
+  order without its boost row is a Sentry error event.
+
 ---
 
 ## 2. Sipariş para formülü

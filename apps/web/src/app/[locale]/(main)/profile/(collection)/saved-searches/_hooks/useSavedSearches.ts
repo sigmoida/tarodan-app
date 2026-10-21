@@ -55,6 +55,27 @@ async function fetchAllSavedSearches(): Promise<SavedSearchList> {
 }
 
 /**
+ * `DELETE /saved-searches/:id`. A 404 (`server.savedSearch.notFound`) means
+ * the row is already gone (deleted on another device): what the user asked
+ * for is done, so it counts as a success and the list refreshes instead of
+ * the stale row failing on every retry.
+ */
+const removeSavedSearch = (id: string): Promise<unknown> =>
+  savedSearchesApi.remove(id).catch((error: unknown) => {
+    const response = (
+      error as {
+        response?: { status?: number; data?: { i18nKey?: string } };
+      }
+    )?.response;
+    if (
+      response?.status === 404 &&
+      response.data?.i18nKey === "server.savedSearch.notFound"
+    )
+      return undefined;
+    throw error;
+  });
+
+/**
  * The server list of saved searches (`GET /saved-searches`) with the tier
  * limit, delete (with confirm) and run. The old localStorage list is
  * discarded app-wide by the auth store (`clearLegacyStorageKeys`).
@@ -84,14 +105,11 @@ export function useSavedSearches(enabled: boolean) {
     enabled: enabled && needsColors,
   }).data?.colors;
 
-  const deleteMutation = useWebMutation(
-    (id: string) => savedSearchesApi.remove(id),
-    {
-      invalidates: [queryKeys.savedSearches.resource],
-      successMessage: t("savedSearch.deleted"),
-      errorMessage: t("savedSearch.deleteFailed"),
-    },
-  );
+  const deleteMutation = useWebMutation(removeSavedSearch, {
+    invalidates: [queryKeys.savedSearches.resource],
+    successMessage: t("savedSearch.deleted"),
+    errorMessage: t("savedSearch.deleteFailed"),
+  });
 
   const remove = async (search: SavedSearch) => {
     const confirmed = await confirm({
@@ -117,6 +135,7 @@ export function useSavedSearches(enabled: boolean) {
     colorOptions,
     isLoading: list.isLoading,
     isError: list.isError,
+    isSuccess: list.isSuccess,
     refetch: list.refetch,
     remove,
     runSearch,

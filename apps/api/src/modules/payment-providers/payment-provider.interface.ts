@@ -71,7 +71,8 @@ export interface IPaymentProvider {
     basketItems: PayTRBasketItem[],
     options?: {
       installmentCount?: number;
-      successQueryParams?: string;
+      /** The query of both return URLs (`paymentReturnQuery`). */
+      returnQueryParams?: string;
       storeCard?: boolean;
       utoken?: string;
       savedCard?: {

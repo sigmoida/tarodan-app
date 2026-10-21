@@ -54,9 +54,16 @@ import {
   createAdminUser,
   authHeader,
 } from "../../factories/user.factory";
+import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import { scenario } from "../../test-utils/scenario";
 import { ProductSchedulerService } from "../../../src/modules/product/jobs/product-scheduler.service";
 import { PrismaService } from "../../../src/prisma";
+
+/** Both purchase consents; the boost initiate refuses a body without them. */
+const BOOST_CONSENTS = {
+  preInformationAccepted: true,
+  withdrawalWaiverAccepted: true,
+} as const;
 
 describe("04 — Ürün/İlan & Katalog (PRD)", () => {
   let ctx: E2ETestApp;
@@ -1468,7 +1475,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId, durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 })
         .expect(201);
       expect(res.body.productId).toBe(p.id);
       expect(res.body.durationDays).toBe(7);
@@ -1486,6 +1493,36 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
         where: { id: `boost-${res.body.boostId}` },
       });
       expect(virt).toBeTruthy();
+      // Both purchase consents are recorded with the boost order, at the
+      // current catalogue versions, before the payment intent.
+      const consents = await prisma.consentRecord.findMany({
+        where: { orderId: boost!.orderId! },
+        orderBy: { document: "asc" },
+      });
+      expect(
+        consents.map((c) => [
+          c.document,
+          c.version,
+          c.action,
+          c.source,
+          c.userId,
+        ]),
+      ).toEqual([
+        [
+          "platform_service_sales",
+          CONSENT_DOCUMENTS.platform_service_sales.version,
+          "granted",
+          "checkout",
+          seller.id,
+        ],
+        [
+          "withdrawal_waiver",
+          CONSENT_DOCUMENTS.withdrawal_waiver.version,
+          "granted",
+          "checkout",
+          seller.id,
+        ],
+      ]);
     });
 
     scenario("PRD-122", async () => {
@@ -1500,19 +1537,19 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, durationDays: 7 })
         .expect(400);
       // A duration the package has no tier for: 400.
       const bad = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId, durationDays: 5 })
+        .send({ ...BOOST_CONSENTS, packageId, durationDays: 5 })
         .expect(400);
       expect(bad.body.i18nKey).toBe("server.product.boostPriceUndefined");
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId, durationDays: 0 })
+        .send({ ...BOOST_CONSENTS, packageId, durationDays: 0 })
         .expect(400);
       expect(
         await getPrisma().productBoost.count({ where: { productId: p.id } }),
@@ -1529,7 +1566,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(attacker))
-        .send({ packageId: "pkg-any", durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
         .expect(403);
       expect(JSON.stringify(res.body.message)).toContain(
         "Sadece kendi ilanınızı öne çıkarabilirsiniz",
@@ -1545,7 +1582,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId: "pkg-any", durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
         .expect(400);
       expect(JSON.stringify(res.body.message)).toContain(
         "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
@@ -1572,7 +1609,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const res = await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId: "pkg-any", durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
         .expect(400);
       expect(JSON.stringify(res.body.message)).toContain(
         "Öne çıkarma şu anda kullanılamıyor",
@@ -1593,7 +1630,12 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const r1 = await request(server())
         .post(`/api/products/${p1.id}/boost/initiate`)
         .set(authHeader(plain))
-        .send({ packageId, durationDays: 7, autoRenew: true })
+        .send({
+          ...BOOST_CONSENTS,
+          packageId,
+          durationDays: 7,
+          autoRenew: true,
+        })
         .expect(201);
       const b1 = await prisma.productBoost.findUnique({
         where: { id: r1.body.boostId },
@@ -1612,7 +1654,12 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       const r2 = await request(server())
         .post(`/api/products/${p2.id}/boost/initiate`)
         .set(authHeader(prem))
-        .send({ packageId, durationDays: 7, autoRenew: true })
+        .send({
+          ...BOOST_CONSENTS,
+          packageId,
+          durationDays: 7,
+          autoRenew: true,
+        })
         .expect(201);
       const b2 = await prisma.productBoost.findUnique({
         where: { id: r2.body.boostId },
@@ -1632,7 +1679,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId, durationDays: 3 })
+        .send({ ...BOOST_CONSENTS, packageId, durationDays: 3 })
         .expect(201);
       const my = await request(server())
         .get("/api/products/boost/my")
@@ -1711,8 +1758,53 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       });
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
-        .send({ packageId: "pkg-any", durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
         .expect(401);
+    });
+
+    scenario("PRD-129", async () => {
+      await ensurePlatformSeller();
+      const packageId = await ensureBoostPackage();
+      const seller = await mkSeller();
+      const p = await mkProduct({
+        sellerId: seller.id,
+        status: ProductStatus.active,
+      });
+      const initiate = (body: Record<string, unknown>) =>
+        request(server())
+          .post(`/api/products/${p.id}/boost/initiate`)
+          .set(authHeader(seller))
+          .send({ packageId, durationDays: 7, ...body });
+      for (const body of [
+        {},
+        { preInformationAccepted: true },
+        { withdrawalWaiverAccepted: true },
+        { preInformationAccepted: true, withdrawalWaiverAccepted: false },
+      ]) {
+        const res = await initiate(body).expect(400);
+        expect(res.body.i18nKey).toBe("server.product.boostConsentRequired");
+      }
+      // Text is not a consent: no implicit "false" -> true conversion.
+      await initiate({
+        preInformationAccepted: "false",
+        withdrawalWaiverAccepted: "false",
+      }).expect(400);
+
+      const prisma = getPrisma();
+      expect(
+        await prisma.productBoost.count({ where: { productId: p.id } }),
+      ).toBe(0);
+      expect(await prisma.order.count({ where: { buyerId: seller.id } })).toBe(
+        0,
+      );
+      expect(
+        await prisma.consentRecord.count({
+          where: {
+            userId: seller.id,
+            document: { in: ["platform_service_sales", "withdrawal_waiver"] },
+          },
+        }),
+      ).toBe(0);
     });
   });
 
@@ -2417,11 +2509,11 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
         request(server())
           .post(`/api/products/${p.id}/boost/initiate`)
           .set(authHeader(seller))
-          .send({ packageId, durationDays: 7 }),
+          .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 }),
         request(server())
           .post(`/api/products/${p.id}/boost/initiate`)
           .set(authHeader(seller))
-          .send({ packageId, durationDays: 7 }),
+          .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 }),
       ]);
       // En az biri başarılı; tekillik olmadığından iki pending boost mümkün.
       const okCount = [a.status, b.status].filter((s) => s === 201).length;
@@ -2561,7 +2653,7 @@ describe("04 — Ürün/İlan & Katalog (PRD)", () => {
       await request(server())
         .post(`/api/products/${p.id}/boost/initiate`)
         .set(authHeader(attacker))
-        .send({ packageId: "pkg-any", durationDays: 7 })
+        .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
         .expect(403);
       // Boost prices of someone else's listing: 404, as for a missing one.
       await request(server())

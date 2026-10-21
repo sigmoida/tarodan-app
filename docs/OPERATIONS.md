@@ -371,7 +371,7 @@ yeniden-onay penceresini görür. Belge metni değiştiğinde
 `DELETE /users/me` and `POST /auth/email/request-change` check a step-up token
 (`POST /auth/reauth`) whenever the client sends one, but by default they do
 not require one: mobile versions without the step-up send none (which ones:
-tarodan-ops `compat.md`). Switch the requirement on only when both are true:
+tarodan-ops `compat.md`). Switch the requirement on only when all three are true:
 
 1. A mobile version that sends the token is live, and
    `min_supported_app_version_ios` and `min_supported_app_version_android` are
@@ -379,6 +379,11 @@ tarodan-ops `compat.md`). Switch the requirement on only when both are true:
    version live today is not enough: a later version without the step-up
    would lose account deletion and e-mail change.
 2. The web release that sends the token is live.
+3. Google sign-in on Android is live. Until then the setting stays off
+   (user decision, 2026-10-21): Apple-only accounts on Android, and
+   Google-only accounts while Google is off on Android, cannot pass the
+   step-up in the app, so in-app account deletion would need a password set by
+   e-mail first (App Store 5.1.1(v) and Play account-deletion risk).
 
 Then, in the admin panel, **Settings -> Security**, turn on "Require step-up
 confirmation for account deletion and email change" (platform setting
@@ -466,6 +471,15 @@ grant, cancel, refund and reminder columns to `product_boosts` and the empty
 - Boost prices come only from the ad package tiers; the legacy
   `boost_price_3d`, `boost_price_7d` and `boost_price_30d` settings are no
   longer read.
+- **Release blocker (boost purchase consents).** A boost purchase records
+  the `platform_service_sales` and `withdrawal_waiver` consents with its
+  order (`CONSENTS.md`, "Platform services (boost)"). Both texts are drafts
+  (versions ending in `-draft`) until legal signs them off; do not release
+  the boost purchase to production before the signed texts and their dated
+  versions are merged. No data step: a boost order created before the
+  release and still unpaid is refused at the card form
+  (`server.product.boostConsentRequired`); the seller starts the purchase
+  again from My listings.
 
 Migration `20261021211736_boost_own_showcase_window` adds each boost's own
 showcase end (`showcase_ends_at`) and its paused showcase remainder

@@ -27,68 +27,77 @@ describe("ProductBoostService access and settings", () => {
   const makePrisma = (opts: {
     product?: Record<string, unknown> | null;
     boostEnabled?: string | null;
-  }) => ({
-    platformSetting: {
-      findUnique: jest
-        .fn()
-        .mockResolvedValue(
-          opts.boostEnabled === undefined || opts.boostEnabled === null
-            ? null
-            : { settingValue: opts.boostEnabled },
-        ),
-    },
-    product: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValue(
-          opts.product === undefined ? listing() : opts.product,
-        ),
-      create: jest.fn().mockResolvedValue({}),
-    },
-    userMembership: { findUnique: jest.fn().mockResolvedValue(null) },
-    adPackage: {
-      findMany: jest.fn().mockResolvedValue([
-        {
+  }) => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            opts.boostEnabled === undefined || opts.boostEnabled === null
+              ? null
+              : { settingValue: opts.boostEnabled },
+          ),
+      },
+      product: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(
+            opts.product === undefined ? listing() : opts.product,
+          ),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      userMembership: { findUnique: jest.fn().mockResolvedValue(null) },
+      adPackage: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "pkg-1",
+            name: "Ekonomik",
+            slug: "ekonomik",
+            showcaseOnHome: false,
+            tiers: [
+              {
+                durationDays: 7,
+                price: 150,
+                campaignPrice: null,
+                campaignStartsAt: null,
+                campaignEndsAt: null,
+              },
+            ],
+          },
+        ]),
+        findFirst: jest.fn().mockResolvedValue({
           id: "pkg-1",
           name: "Ekonomik",
-          slug: "ekonomik",
           showcaseOnHome: false,
-          tiers: [
-            {
-              durationDays: 7,
-              price: 150,
-              campaignPrice: null,
-              campaignStartsAt: null,
-              campaignEndsAt: null,
-            },
-          ],
-        },
-      ]),
-      findFirst: jest.fn().mockResolvedValue({
-        id: "pkg-1",
-        name: "Ekonomik",
-        showcaseOnHome: false,
-      }),
-    },
-    adPackageTier: {
-      findFirst: jest.fn().mockResolvedValue({
-        price: 150,
-        campaignPrice: null,
-        campaignStartsAt: null,
-        campaignEndsAt: null,
-      }),
-    },
-    user: { findFirst: jest.fn().mockResolvedValue({ id: "platform" }) },
-    category: { findFirst: jest.fn().mockResolvedValue({ id: "cat-1" }) },
-    order: {
-      count: jest.fn().mockResolvedValue(0),
-      create: jest.fn().mockResolvedValue({ id: "ord-1" }),
-    },
-    productBoost: {
-      create: jest.fn().mockResolvedValue({ id: "boost-1" }),
-      update: jest.fn().mockResolvedValue({}),
-    },
-  });
+        }),
+      },
+      adPackageTier: {
+        findFirst: jest.fn().mockResolvedValue({
+          price: 150,
+          campaignPrice: null,
+          campaignStartsAt: null,
+          campaignEndsAt: null,
+        }),
+      },
+      user: { findFirst: jest.fn().mockResolvedValue({ id: "platform" }) },
+      category: { findFirst: jest.fn().mockResolvedValue({ id: "cat-1" }) },
+      order: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({ id: "ord-1" }),
+      },
+      productBoost: {
+        create: jest.fn().mockResolvedValue({ id: "boost-1" }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      $transaction: jest.fn(),
+    };
+    // The order and its consents are one transaction; the mock runs it on
+    // the same client.
+    prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn(prisma),
+    );
+    return prisma;
+  };
 
   const payment = {
     initiatePayment: jest.fn().mockResolvedValue({
@@ -100,8 +109,13 @@ describe("ProductBoostService access and settings", () => {
 
   const make = (opts: Parameters<typeof makePrisma>[0] = {}) => {
     const prisma = makePrisma(opts);
-    const service = new ProductBoostService(prisma as never, payment as never);
-    return { prisma, service };
+    const consents = { recordForOrder: jest.fn().mockResolvedValue(undefined) };
+    const service = new ProductBoostService(
+      prisma as never,
+      payment as never,
+      consents as never,
+    );
+    return { prisma, service, consents };
   };
 
   describe("isBoostEnabled", () => {
@@ -199,6 +213,8 @@ describe("ProductBoostService access and settings", () => {
       durationDays: 7,
       provider: PaymentProvider.paytr,
       autoRenew: false,
+      preInformationAccepted: true,
+      withdrawalWaiverAccepted: true,
     };
 
     it("prices the boost from the package tier and starts the payment", async () => {
@@ -303,5 +319,70 @@ describe("InitiateBoostDto", () => {
     await expect(
       asBody({ packageId: "pkg-1", durationDays: "7" }),
     ).resolves.toMatchObject({ packageId: "pkg-1", durationDays: 7 });
+  });
+
+  it("keeps both consents (declared, so the whitelist does not drop them)", async () => {
+    await expect(
+      asBody({
+        packageId: "pkg-1",
+        durationDays: 7,
+        preInformationAccepted: true,
+        withdrawalWaiverAccepted: true,
+      }),
+    ).resolves.toMatchObject({
+      preInformationAccepted: true,
+      withdrawalWaiverAccepted: true,
+    });
+  });
+
+  it("leaves a missing consent to the service (its catalog-key 400)", async () => {
+    const body = await asBody({ packageId: "pkg-1", durationDays: 7 });
+    expect(body.preInformationAccepted).toBeUndefined();
+    expect(body.withdrawalWaiverAccepted).toBeUndefined();
+  });
+
+  it.each(["false", "true", "yes", 1])(
+    "rejects the consent %p: only a JSON boolean counts (no implicit conversion)",
+    async (value) => {
+      await expect(
+        asBody({
+          packageId: "pkg-1",
+          durationDays: 7,
+          preInformationAccepted: value,
+          withdrawalWaiverAccepted: value,
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+    },
+  );
+
+  it.each(["preInformationAccepted", "withdrawalWaiverAccepted"])(
+    'rejects the text "false" in %s alone, next to a JSON true',
+    async (field) => {
+      // Each field carries its own JsonBoolean: losing it on one would read
+      // "false" as true for that statement only.
+      await expect(
+        asBody({
+          packageId: "pkg-1",
+          durationDays: 7,
+          preInformationAccepted: true,
+          withdrawalWaiverAccepted: true,
+          [field]: "false",
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+    },
+  );
+
+  it("keeps a JSON false for the service to refuse", async () => {
+    await expect(
+      asBody({
+        packageId: "pkg-1",
+        durationDays: 7,
+        preInformationAccepted: false,
+        withdrawalWaiverAccepted: true,
+      }),
+    ).resolves.toMatchObject({
+      preInformationAccepted: false,
+      withdrawalWaiverAccepted: true,
+    });
   });
 });

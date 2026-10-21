@@ -193,5 +193,9 @@ export * from "./saved-search";
 // offers shapes (API, web, admin, mobile)
 export * from "./boost";
 
+// Virtual orders (membership, boost): the kinds, also the `type` query of the
+// PayTR return URLs (API, web)
+export * from "./virtual-order";
+
 // The one action a listing card shows: boost own, add others to cart (web, mobile)
 export * from "./product-card-action";

@@ -4,10 +4,15 @@ import {
   BadRequestException,
   ForbiddenException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { i18nMessage, I18nService } from "../i18n";
 import { type Locale, defaultLocale } from "@tarodan/i18n";
+import type {
+  VirtualOrderKind,
+  VirtualOrderPaymentFields,
+} from "@tarodan/types";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -15,6 +20,7 @@ import {
 } from "../../common/helpers/public-identity";
 import { dateRangeWhere } from "../../common/list";
 import { PaymentQueryDto } from "./dto";
+import { virtualOrderKind } from "./helpers/virtual-order-kind";
 
 // Aktif (devam eden) iade talebi durumları — order-common.pickActiveRefundRequest
 // ile aynı liste. "refunded" burada YOK; tamamlanmış iade ayrı ele alınır.
@@ -182,8 +188,9 @@ export class PaymentQueryService {
       }
 
       const groupTotal = Number(group.totalAmount ?? 0);
-      const sum = (fn: (o: any) => number) =>
-        group.orders.reduce((acc: number, o: any) => acc + fn(o), 0);
+      type GroupOrder = (typeof group.orders)[number];
+      const sum = (fn: (o: GroupOrder) => number) =>
+        group.orders.reduce((acc, o) => acc + fn(o), 0);
       const shippingAmount = sum((o) => Number(o.shippingCost ?? 0));
       const buyerFeeAmount = sum((o) => Number(o.buyerFeeAmount ?? 0));
       const sellerFeeAmount = sum((o) => Number(o.sellerFeeAmount ?? 0));
@@ -210,7 +217,7 @@ export class PaymentQueryService {
           totalAmount: groupTotal,
           sellerNetAmount: Math.max(0, subtotal - sellerFeeAmount),
         },
-        orders: group.orders.map((o: any) => ({
+        orders: group.orders.map((o) => ({
           orderId: o.id,
           orderNumber: o.orderNumber,
           status: o.status,
@@ -265,8 +272,10 @@ export class PaymentQueryService {
       sellerNetAmount,
     };
 
-    const isMembershipOrder =
-      payment.order.productId?.startsWith?.("membership-") ?? false;
+    const virtualOrder = await this.virtualOrderFields(
+      payment.orderId,
+      virtualOrderKind(payment.order),
+    );
 
     return {
       id: payment.id,
@@ -281,7 +290,41 @@ export class PaymentQueryService {
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       ...pendingPaytrResume,
-      ...(isMembershipOrder && { isMembershipOrder: true }),
+      ...virtualOrder,
+    };
+  }
+
+  /**
+   * The additive fields of a virtual order's payment: `isMembershipOrder`, or
+   * `isBoostOrder` with the boost behind it (the web result page names the
+   * listing and the boost's end). Nothing for an order of goods. One indexed
+   * read (`product_boosts.order_id` is unique), only for a boost payment.
+   */
+  private async virtualOrderFields(
+    orderId: string | null,
+    kind: VirtualOrderKind | null,
+  ): Promise<VirtualOrderPaymentFields> {
+    if (kind === "membership") return { isMembershipOrder: true };
+    if (kind !== "boost" || !orderId) return {};
+    const boost = await this.prisma.productBoost.findUnique({
+      where: { orderId },
+      select: {
+        id: true,
+        productId: true,
+        endsAt: true,
+        product: { select: { title: true } },
+      },
+    });
+    return {
+      isBoostOrder: true,
+      boost: boost
+        ? {
+            id: boost.id,
+            productId: boost.productId,
+            productTitle: boost.product.title,
+            endsAt: boost.endsAt?.toISOString() ?? null,
+          }
+        : null,
     };
   }
 
@@ -365,6 +408,10 @@ export class PaymentQueryService {
       pricing,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
+      ...(await this.virtualOrderFields(
+        payment.orderId,
+        virtualOrderKind(payment.order),
+      )),
     };
   }
 
@@ -417,7 +464,7 @@ export class PaymentQueryService {
     // Payment üç ilişkiden biriyle bağlanır: tekil sipariş (orderId), sepet
     // (checkoutGroupId) veya takas nakit farkı (tradeCashPaymentId). Üçü de
     // kapsanmazsa sepet/takas ödemeleri geçmişte görünmez.
-    const where: any = {
+    const where: Prisma.PaymentWhereInput = {
       OR: [
         { order: { buyerId: userId } },
         { order: { sellerId: userId } },
@@ -499,10 +546,19 @@ export class PaymentQueryService {
     ]);
 
     // ProductImage `cardKey` (S3 anahtarı) tutar; frontend <img src> için URL ister.
-    const toImageUrls = (product: any) => {
+    const toImageUrls = (
+      product:
+        | {
+            id: string;
+            title: string;
+            images?: Array<{ cardKey: string | null }>;
+          }
+        | null
+        | undefined,
+    ) => {
       if (!product) return null;
       const urls = (product.images ?? [])
-        .map((img: any) => {
+        .map((img) => {
           const key = img?.cardKey;
           if (!key) return null;
           if (
@@ -519,8 +575,8 @@ export class PaymentQueryService {
 
     return {
       payments: payments.map((p) => {
-        const group = (p as any).checkoutGroup;
-        const tradeCash = (p as any).tradeCashPayment;
+        const group = p.checkoutGroup;
+        const tradeCash = p.tradeCashPayment;
         const firstGroupOrder = group?.orders?.[0];
 
         let type: "order" | "checkout_group" | "trade_cash" = "order";
@@ -577,7 +633,7 @@ export class PaymentQueryService {
           product: toImageUrls(p.order?.product ?? firstGroupOrder?.product),
           products: group
             ? (group.orders ?? [])
-                .map((o: any) => toImageUrls(o.product))
+                .map((o) => toImageUrls(o.product))
                 .filter(Boolean)
             : p.order?.product
               ? [toImageUrls(p.order.product)]
@@ -586,7 +642,7 @@ export class PaymentQueryService {
           // "Sepet ödemesi (N ürün)" satırı bunları dropdown ile açar (her ürün ayrı
           // sipariş: kendi no'su, tutarı, satıcısı, durumu, /orders/:id linki).
           orders: group
-            ? (group.orders ?? []).map((o: any) => ({
+            ? (group.orders ?? []).map((o) => ({
                 id: o.id,
                 orderNumber: o.orderNumber ?? null,
                 title:

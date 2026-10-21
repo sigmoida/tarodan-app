@@ -3978,6 +3978,10 @@
     },
     "kvkkTitle": "KVKK Privacy Notice",
     "marketingConsentTitle": "Marketing Communications Consent",
+    "platformServiceSales": {
+      "title": "Pre-contract Information and Distance Service Contract"
+    },
+    "withdrawalWaiverTitle": "Withdrawal Waiver",
     "consentGate": {
       "title": "Your consent is required",
       "intro": "To continue, please read and accept the documents below.",
@@ -10137,7 +10141,7 @@
       "sources": {
         "registration": "Registration form",
         "consentPrompt": "Re-consent prompt",
-        "checkout": "Cart checkout",
+        "checkout": "Checkout",
         "payment": "Payment page",
         "cookieBanner": "Cookie banner",
         "accountSettings": "Notification settings",
@@ -11446,6 +11450,7 @@
       "userNotFound": "User not found",
       "viewForbidden": "You do not have permission to view this product",
       "boostPackageNotFound": "The selected package was not found or is inactive",
+      "boostConsentRequired": "The pre-contract information and the withdrawal waiver must be accepted",
       "duplicateImage": "The same image was submitted more than once",
       "imageNotOwned": "One of the images does not come from an upload belonging to this account. Please upload the images again.",
       "imageKeyEmpty": "The image key cannot be empty",

@@ -73,6 +73,12 @@ import {
   extractCode,
 } from "../../test-utils/mail";
 
+/** Both purchase consents; the boost initiate refuses a body without them. */
+const BOOST_CONSENTS = {
+  preInformationAccepted: true,
+  withdrawalWaiverAccepted: true,
+} as const;
+
 describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
@@ -2189,7 +2195,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 })
       .expect(201);
     expect(res.body.boostId).toBeTruthy();
     expect(res.body.productId).toBe(product.id);
@@ -2226,7 +2232,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 15 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 15 })
       .expect(400);
   });
 
@@ -2240,7 +2246,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(other))
-      .send({ packageId, durationDays: 3 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 3 })
       .expect(403);
     expect(String(res.body.message)).toContain(
       "Sadece kendi ilanınızı öne çıkarabilirsiniz",
@@ -2259,7 +2265,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 })
       .expect(400);
     expect(String(res.body.message)).toContain(
       "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
@@ -2275,7 +2281,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     });
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
-      .send({ packageId: "pkg-any", durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
       .expect(401);
   });
 
@@ -2285,7 +2291,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post("/api/products/abc/boost/initiate")
       .set(authHeader(seller))
-      .send({ packageId: "pkg-any", durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId: "pkg-any", durationDays: 7 })
       .expect(400);
     expect(String(res.body.message)).toContain("Geçersiz ürün ID formatı");
   });
@@ -2302,7 +2308,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 })
       .expect(201);
 
     const prisma = getPrisma();
@@ -2345,7 +2351,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init1 = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 })
       .expect(201);
     const boost1 = await prisma.productBoost.findUnique({
       where: { id: init1.body.boostId },
@@ -2360,7 +2366,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init2 = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 30 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 30 })
       .expect(201);
     const boost2 = await prisma.productBoost.findUnique({
       where: { id: init2.body.boostId },
@@ -2390,7 +2396,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 7, autoRenew: true })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 7, autoRenew: true })
       .expect(201);
     const prisma = getPrisma();
     const boost = await prisma.productBoost.findUnique({
@@ -2414,7 +2420,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 30, autoRenew: true })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 30, autoRenew: true })
       .expect(201);
     const prisma = getPrisma();
     const boost = await prisma.productBoost.findUnique({
@@ -2435,7 +2441,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ packageId, durationDays: 7 })
+      .send({ ...BOOST_CONSENTS, packageId, durationDays: 7 })
       .expect(201);
     const res = await request(server())
       .get("/api/products/boost/my")
@@ -2472,7 +2478,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
       const res = await request(server())
         .post(`/api/products/${product.id}/boost/initiate`)
         .set(authHeader(seller))
-        .send({ packageId, durationDays })
+        .send({ ...BOOST_CONSENTS, packageId, durationDays })
         .expect(201);
       const boost = await prisma.productBoost.findUnique({
         where: { id: res.body.boostId },

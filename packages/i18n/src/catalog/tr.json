@@ -3978,6 +3978,10 @@
     },
     "kvkkTitle": "KVKK Aydınlatma Metni",
     "marketingConsentTitle": "Ticari Elektronik İleti İzni",
+    "platformServiceSales": {
+      "title": "Ön Bilgilendirme Formu ve Mesafeli Hizmet Sözleşmesi"
+    },
+    "withdrawalWaiverTitle": "Cayma Hakkı Onayı",
     "consentGate": {
       "title": "Onayınız gerekiyor",
       "intro": "Devam etmek için aşağıdaki belgeleri okuyup onaylamanız gerekiyor.",
@@ -10137,7 +10141,7 @@
       "sources": {
         "registration": "Kayıt formu",
         "consentPrompt": "Yeniden onay penceresi",
-        "checkout": "Sepet ödemesi",
+        "checkout": "Satın alma adımı",
         "payment": "Ödeme sayfası",
         "cookieBanner": "Çerez bandı",
         "accountSettings": "Bildirim ayarları",
@@ -11446,6 +11450,7 @@
       "userNotFound": "Kullanıcı bulunamadı",
       "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
       "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil",
+      "boostConsentRequired": "Ön bilgilendirme ve cayma hakkı onayları gereklidir",
       "duplicateImage": "Aynı görsel birden fazla kez gönderildi",
       "imageNotOwned": "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
       "imageKeyEmpty": "Görsel anahtarı boş olamaz",

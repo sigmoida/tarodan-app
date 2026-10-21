@@ -76,8 +76,9 @@ export class DistanceSalesConsentService {
   }
 
   /**
-   * Ödeme formu kapısı. `subject` null ise satın alma değildir (takas ücreti,
-   * üyelik / öne çıkarma) — kapı uygulanmaz.
+   * The payment form gate. A null `subject` is not a sale of goods (trade
+   * fee, membership, boost) and skips this gate; a boost is charged only
+   * with its own purchase consents (`PlatformServiceConsentService`).
    */
   async ensureForPayment(
     subject: DistanceSalesSubject | null,

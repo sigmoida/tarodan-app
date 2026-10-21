@@ -60,6 +60,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — merchant scope", (
       {} as never,
       events as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     const ctx = {
       payment: {
@@ -71,7 +72,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — merchant scope", (
       basketItems: [],
       merchantOid: "MEM1T1",
       amount: 199,
-      successQueryParams: "paymentId=pay-1&type=membership",
+      returnQueryParams: "paymentId=pay-1&type=membership",
       ownerId: "user-1",
     };
     const build = (dto: Record<string, unknown>, userId: string | null) =>
@@ -214,6 +215,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
       {} as never,
       events as never,
       { ensureForPayment: jest.fn().mockResolvedValue(null) } as never,
+      { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
     const ctx = {
       payment: {
@@ -236,7 +238,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — store_card", () =>
       ],
       merchantOid: "ORD1T1",
       amount: 150,
-      successQueryParams: "paymentId=pay-1",
+      returnQueryParams: "paymentId=pay-1",
       ownerId: opts.ownerId === undefined ? "user-1" : opts.ownerId,
     };
     const run = (

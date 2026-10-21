@@ -1,5 +1,35 @@
 import { BadRequestException } from "@nestjs/common";
+import type { MembershipTierType, Prisma } from "@prisma/client";
 import { ProductBoostService } from "./product-boost.service";
+
+/** A tier as the price rules read it. */
+interface TierPrice {
+  price: unknown;
+  campaignPrice: unknown;
+  campaignStartsAt: Date | null;
+  campaignEndsAt: Date | null;
+}
+
+/** The private pricing steps under test. */
+interface PricingInternals {
+  resolvePackagePrice(
+    packageId: string,
+    durationDays: number,
+    productPrice: number,
+    userId: string,
+  ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }>;
+  eligibleAudienceWhere(
+    userId: string,
+    tierType: MembershipTierType,
+  ): Prisma.AdPackageWhereInput;
+  effectiveTierPrice(tier: TierPrice): number;
+}
+
+/** The tier lookup's `where` (the parts the fake reads). */
+interface TierWhere {
+  durationDays: number;
+  minAmount: { lte: number };
+}
 
 /**
  * Ad-package pricing resolution — the money-path core of the boost purchase.
@@ -7,8 +37,14 @@ import { ProductBoostService } from "./product-boost.service";
  * only applies inside its (optional) window, and unknown package/tier throws.
  */
 describe("ProductBoostService — ad-package pricing", () => {
-  let prisma: any;
+  // The Prisma fake; jest.Mock members keep `mockResolvedValue` and friends.
+  let prisma: {
+    userMembership: { findUnique: jest.Mock };
+    adPackage: { findFirst: jest.Mock };
+    adPackageTier: { findFirst: jest.Mock };
+  };
   let service: ProductBoostService;
+  const internals = () => service as unknown as PricingInternals;
 
   const EKO = { id: "pkg-eko", name: "Ekonomik Paket", showcaseOnHome: false };
   // 7-gün tiers: 200-999 → 150, 1000-5000 → 250, 5000+ → 500
@@ -54,7 +90,7 @@ describe("ProductBoostService — ad-package pricing", () => {
       },
       adPackage: { findFirst: jest.fn().mockResolvedValue(EKO) },
       adPackageTier: {
-        findFirst: jest.fn(({ where }: any) =>
+        findFirst: jest.fn(({ where }: { where: TierWhere }) =>
           Promise.resolve(
             tiers.find(
               (t) =>
@@ -66,16 +102,15 @@ describe("ProductBoostService — ad-package pricing", () => {
         ),
       },
     };
-    service = new ProductBoostService(prisma, {} as any);
+    service = new ProductBoostService(
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
   });
 
   const resolve = (dur: number, productPrice: number) =>
-    (service as any).resolvePackagePrice(
-      "pkg-eko",
-      dur,
-      productPrice,
-      "user-1",
-    );
+    internals().resolvePackagePrice("pkg-eko", dur, productPrice, "user-1");
 
   it("picks the tier by the product's price range", async () => {
     expect((await resolve(7, 500)).price).toBe(150); // 200-999
@@ -154,8 +189,7 @@ describe("ProductBoostService — ad-package pricing", () => {
   });
 
   describe("audience targeting", () => {
-    const where = () =>
-      (service as any).eligibleAudienceWhere("user-1", "premium");
+    const where = () => internals().eligibleAudienceWhere("user-1", "premium");
 
     it("keeps each audience mode scoped to its own target relation", () => {
       expect(where()).toEqual({
@@ -182,14 +216,14 @@ describe("ProductBoostService — ad-package pricing", () => {
   });
 
   describe("campaign price window", () => {
-    const t = (over: any) => ({
+    const t = (over: Partial<TierPrice>): TierPrice => ({
       price: 1900,
       campaignPrice: 1750,
       campaignStartsAt: null,
       campaignEndsAt: null,
       ...over,
     });
-    const eff = (tier: any) => (service as any).effectiveTierPrice(tier);
+    const eff = (tier: TierPrice) => internals().effectiveTierPrice(tier);
 
     it("uses the campaign price when there is no window", () => {
       expect(eff(t({}))).toBe(1750);

@@ -28,6 +28,7 @@ import { BoostTimelineModule } from "../../product/boost-timeline/boost-timeline
 import { PaymentLifecycleService } from "../checkout/payment-lifecycle.service";
 import { PrismaService } from "../../../prisma";
 import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
+import { PlatformServiceConsentService } from "../../consent/platform-service-consent.service";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { EventService } from "../../events";
@@ -256,6 +257,10 @@ describe("PaymentService group payment (checkout group)", () => {
         {
           provide: DistanceSalesConsentService,
           useValue: { ensureForPayment: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: PlatformServiceConsentService,
+          useValue: { isRecordedForOrder: jest.fn().mockResolvedValue(true) },
         },
         {
           provide: CacheService,
