@@ -10141,7 +10141,7 @@
       "sources": {
         "registration": "Registration form",
         "consentPrompt": "Re-consent prompt",
-        "checkout": "Cart checkout",
+        "checkout": "Checkout",
         "payment": "Payment page",
         "cookieBanner": "Cookie banner",
         "accountSettings": "Notification settings",
