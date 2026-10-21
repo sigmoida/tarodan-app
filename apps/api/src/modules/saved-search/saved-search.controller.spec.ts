@@ -107,6 +107,17 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 
+  it("accepts null labels, padding and 80 characters of emoji", async () => {
+    const dto = await asBody({
+      query: { search: "x" },
+      labels: {
+        search: `  ${"🏎".repeat(80)}  `,
+        carModelId: null,
+      },
+    });
+    expect(dto.labels?.carModelId).toBeNull();
+  });
+
   it("caps the list page size at 100", async () => {
     const list = (query: unknown) =>
       pipe.transform(query, {

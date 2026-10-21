@@ -35,43 +35,59 @@ const ATTR_GROUPS_MAX = 2000;
  * own validation (`PickType`), so a value `GET /products` refuses is refused
  * here too. Keys outside the allow-list (`page`, `sellerId`, `status`, ...)
  * are dropped by the global whitelist before the service sees them.
+ *
+ * The fields below are redeclared only to add a storage cap. class-validator
+ * then drops the inherited validators of the same kind, so each one repeats
+ * the parent's `@IsString()`; `saved-search.dto.spec.ts` fails if a parent
+ * validator goes missing here.
  */
 export class SavedSearchQueryDto extends PickType(
   ProductQueryDto,
   SAVED_SEARCH_QUERY_KEYS,
 ) {
+  @IsString()
   @MaxLength(SEARCH_TEXT_MAX)
   search?: string;
 
+  @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   brandId?: string;
 
+  @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   brand?: string;
 
+  @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   manufacturer?: string;
 
+  @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   scale?: string;
 
+  @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   material?: string;
 
+  @IsString()
   @MaxLength(COLOR_LIST_MAX)
   color?: string;
 
+  @IsString()
   @MaxLength(ATTR_GROUPS_MAX)
   attrGroups?: string;
 
+  @IsString()
   @MaxLength(FILTER_TEXT_MAX)
   sortBy?: ProductQueryDto["sortBy"];
 }
 
 /**
- * `labels`: a plain object of at most `SAVED_SEARCH_LABELS_MAX` string values
- * of at most `SAVED_SEARCH_LABEL_MAX` characters. Keys that are not in the
- * canonical query are dropped by the service.
+ * `labels`: a plain object of at most `SAVED_SEARCH_LABELS_MAX` entries whose
+ * values are strings of at most `SAVED_SEARCH_LABEL_MAX` characters (trimmed,
+ * counted in code points, as `canonicalizeSavedSearchLabels` counts) or null.
+ * Null values and keys that are not in the canonical query are dropped by the
+ * service.
  */
 function IsSavedSearchLabels(options?: ValidationOptions): PropertyDecorator {
   return (target: object, propertyName: string | symbol) =>
@@ -92,8 +108,9 @@ function IsSavedSearchLabels(options?: ValidationOptions): PropertyDecorator {
             entries.length <= SAVED_SEARCH_LABELS_MAX &&
             entries.every(
               (label) =>
-                typeof label === "string" &&
-                label.length <= SAVED_SEARCH_LABEL_MAX,
+                label === null ||
+                (typeof label === "string" &&
+                  Array.from(label.trim()).length <= SAVED_SEARCH_LABEL_MAX),
             )
           );
         },
@@ -133,7 +150,7 @@ export class CreateSavedSearchDto {
   })
   @IsOptional()
   @IsSavedSearchLabels()
-  labels?: Record<string, string>;
+  labels?: Record<string, string | null>;
 }
 
 /** `GET /saved-searches` paging (clients send `limit=100`). */
