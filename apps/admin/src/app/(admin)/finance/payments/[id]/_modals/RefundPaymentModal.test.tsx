@@ -73,6 +73,57 @@ describe("RefundPaymentModal", () => {
     expect(h.manualRefund).not.toHaveBeenCalled();
   });
 
+  it("leaves the amount out when the field is empty (the server refunds all)", async () => {
+    await click(button(SUBMIT, dialogs()[0]));
+
+    expect(h.manualRefund).toHaveBeenCalledTimes(1);
+    const [, body] = h.manualRefund.mock.calls[0];
+    expect(body.amount).toBeUndefined();
+  });
+
+  it("caps the amount at the payment amount", async () => {
+    await type(amount(), "500,01");
+    await click(button(SUBMIT, dialogs()[0]));
+    expect(bodyText()).toContain("admin.finance.payments.refundAmountInvalid");
+    expect(h.manualRefund).not.toHaveBeenCalled();
+
+    await type(amount(), "500");
+    await click(button(SUBMIT, dialogs()[0]));
+    expect(h.manualRefund).toHaveBeenCalledWith(
+      "pay-1",
+      expect.objectContaining({ amount: 500 }),
+    );
+  });
+
+  it("resends a refused attempt with the same idempotency key", async () => {
+    h.manualRefund
+      .mockRejectedValueOnce(apiError(409, "server.payment.refundInProgress"))
+      .mockResolvedValueOnce({ data: {} });
+    await type(amount(), "20");
+    await click(button(SUBMIT, dialogs()[0]));
+    expect(h.toast.error).toHaveBeenCalled();
+    await click(button(SUBMIT, dialogs()[0]));
+
+    expect(h.manualRefund).toHaveBeenCalledTimes(2);
+    const [first, second] = h.manualRefund.mock.calls.map(
+      ([, body]) => body.idempotencyKey,
+    );
+    expect(typeof first).toBe("string");
+    expect(first).not.toBe("");
+    expect(second).toBe(first);
+  });
+
+  it("refetches the payment screens after an unknown outcome", async () => {
+    const invalidate = vi.spyOn(view.client, "invalidateQueries");
+    h.manualRefund.mockRejectedValue(new Error("Network Error"));
+    await type(amount(), "20");
+    await click(button(SUBMIT, dialogs()[0]));
+
+    expect(
+      invalidate.mock.calls.map(([filters]) => filters?.queryKey),
+    ).toContainEqual(["payments"]);
+  });
+
   it("replaces the form after an unknown outcome and offers no resubmit", async () => {
     h.manualRefund.mockRejectedValue(apiError(503));
     await type(amount(), "20");
