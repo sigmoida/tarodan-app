@@ -28,6 +28,7 @@ import WhyItMatters from "./_sections/WhyItMatters";
 export default function SecuritySettingsPage() {
   const t = useTranslations();
   const {
+    passwordRequired,
     status,
     isLoading,
     error,
@@ -45,7 +46,7 @@ export default function SecuritySettingsPage() {
   const { methods } = useSignInMethods();
   // 2FA needs a password (the API refuses it without one): an account that
   // signs in only with Google or Apple is sent to set one first.
-  const needsPassword = methods?.hasPassword === false;
+  const needsPassword = methods?.hasPassword === false || passwordRequired;
 
   if (isLoading && !setupData) {
     return (

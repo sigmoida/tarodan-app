@@ -26,6 +26,8 @@ export function use2FA() {
   const queryClient = useQueryClient();
   const refreshSignInMethods = useRefreshSignInMethods();
   const [error, setError] = useState("");
+  /** The API refused setup because the account has no password. */
+  const [passwordRequired, setPasswordRequired] = useState(false);
   const [setupData, setSetupData] = useState<SetupResponse | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
@@ -45,9 +47,10 @@ export function use2FA() {
     onMutate: () => setError(""),
     onSuccess: (data) => setSetupData(data),
     onError: (e: any) => {
-      // No password (a stale page): refetch the sign-in methods, and the page
-      // shows the "set a password first" hint instead of the raw error.
+      // No password (a stale page): the page shows the "set a password
+      // first" hint instead of the raw error, and the methods refresh.
       if (e?.response?.data?.i18nKey === PASSWORD_REQUIRED_KEY) {
+        setPasswordRequired(true);
         void refreshSignInMethods();
         return;
       }
@@ -106,6 +109,7 @@ export function use2FA() {
   };
 
   return {
+    passwordRequired,
     status: statusQuery.data ?? { isEnabled: false },
     isLoading: statusQuery.isLoading,
     error,
