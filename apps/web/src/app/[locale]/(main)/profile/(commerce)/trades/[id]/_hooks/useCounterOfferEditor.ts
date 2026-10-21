@@ -21,6 +21,7 @@ import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 import { usePagedPicks } from "@/hooks/usePagedPicks";
 import {
   cashAmountValue,
+  cashInputValue,
   isCashRefused,
   signedCashAmount,
 } from "@/lib/cashAmount";
@@ -224,7 +225,7 @@ export function useCounterOfferEditor({
     );
 
     if (trade.cashAmount && trade.cashAmount > 0) {
-      setCounterCashAmount(trade.cashAmount.toString());
+      setCounterCashAmount(cashInputValue(trade.cashAmount));
       // If the receiver was the cash payer they stay the payer by default.
       setCounterCashPayer(
         trade.cashPayerId === trade.receiverId ? "me" : "them",
@@ -277,13 +278,20 @@ export function useCounterOfferEditor({
     const newReceiverItemIds = [...selectedCounterTargetProducts].sort();
     const newCashAmount = counterCashValue;
     const currentCashAmount = Math.abs(trade.cashAmount || 0);
+    // Flipping only who pays is a real change (the API compares the payer
+    // too). Without an amount no payer is sent, so the radio alone is not one.
+    const currentCashPayer =
+      trade.cashPayerId === trade.receiverId ? "me" : "them";
+    const samePayer =
+      newCashAmount === 0 || counterCashPayer === currentCashPayer;
 
     const isIdentical =
       JSON.stringify(newInitiatorItemIds) ===
         JSON.stringify(currentReceiverItemIds) &&
       JSON.stringify(newReceiverItemIds) ===
         JSON.stringify(currentInitiatorItemIds) &&
-      newCashAmount === currentCashAmount;
+      newCashAmount === currentCashAmount &&
+      samePayer;
 
     if (isIdentical) {
       toast.error(t("trade.counterOfferIdentical"));
