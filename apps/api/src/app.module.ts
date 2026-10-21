@@ -38,6 +38,7 @@ import { MembershipModule } from "./modules/membership";
 import { RatingModule } from "./modules/rating";
 import { SellerTrustJobsModule } from "./modules/seller-trust/jobs/seller-trust-jobs.module";
 import { WishlistModule } from "./modules/wishlist";
+import { SavedSearchModule } from "./modules/saved-search";
 import { CollectionModule } from "./modules/collection";
 import { SupportModule } from "./modules/support";
 import { UserReportModule } from "./modules/user-report";
@@ -206,6 +207,7 @@ import { isTest } from "./config/environment";
     // Nightly seller trust score batch (ADR 0014); nothing else imports it.
     SellerTrustJobsModule,
     WishlistModule, // GAP-011: Wishlist/Favorites (MEDIUM)
+    SavedSearchModule, // Saved product searches with tier limits
     CollectionModule, // GAP-012: Collections System (MEDIUM)
     SupportModule, // GAP-013: Support Ticket System (MEDIUM)
     UserReportModule, // User-generated reports for products, users, collections

@@ -293,6 +293,7 @@ export class DevController {
       "cart_items",
       "wishlists",
       "wishlist_items",
+      "saved_searches",
       "support_tickets",
       "ticket_messages",
       "notification_logs",
