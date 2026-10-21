@@ -79,11 +79,13 @@ export const REAUTH_TOKEN_HEADER = "x-reauth-token";
 /**
  * On/off platform setting (`isPlatformSettingOn`): while on, account deletion
  * and the e-mail change request are refused without a step-up token
- * (`403 REAUTH_REQUIRED`). Off by default, because mobile 1.0.5 and older and
- * the current web send none. Switch it on only after the web release that
- * sends the token is live and `min_supported_app_version_ios` and
- * `min_supported_app_version_android` are above 1.0.5 (tarodan-ops
- * `compat.md`). A token that is sent is checked even while it is off.
+ * (`403 REAUTH_REQUIRED`). Off by default, because no mobile version sends a
+ * token yet (not 1.0.5, 1.1.0 or 1.1.1) and web sends none before its step-up
+ * release. Switch it on only after the web release that sends the token is
+ * live and `min_supported_app_version_ios` and
+ * `min_supported_app_version_android` are at least the first mobile version
+ * that sends it (tarodan-ops `compat.md`). A token that is sent is checked
+ * even while it is off.
  */
 export const REAUTH_REQUIRED_FOR_SENSITIVE_ACTIONS_SETTING =
   "auth_require_reauth_for_sensitive_actions";

@@ -138,8 +138,8 @@ export class UserController {
    * Deletes the signed-in account. Step-up: a token sent in the
    * `X-Reauth-Token` header (or a `reauthToken` body field) is checked;
    * without one the request passes while the setting
-   * `auth_require_reauth_for_sensitive_actions` is off (mobile 1.0.5 sends
-   * none).
+   * `auth_require_reauth_for_sensitive_actions` is off (no mobile version
+   * sends one yet).
    */
   @Delete("me")
   @UseGuards(JwtAuthGuard)
