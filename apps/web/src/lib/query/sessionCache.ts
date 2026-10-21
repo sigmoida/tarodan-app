@@ -38,3 +38,16 @@ export function clearQueryCacheOnSessionChange(getClient: () => QueryClient) {
     if (sessionOwnerChanged(prev, state)) getClient().clear();
   };
 }
+
+/**
+ * A fresh sign-in (not a session restore on reload): drop what was cached as
+ * a guest and refetch the mounted queries with the new session, because some
+ * responses depend on the viewer (own listings, blocks, test-lane accounts).
+ * `resetQueries`, not `clear`: mounted observers refetch instead of holding
+ * the guest data. Same rule as mobile (`resetServerStateForNewSession`).
+ */
+export function resetQueryCacheForNewSession(
+  client: QueryClient,
+): Promise<void> {
+  return client.resetQueries();
+}

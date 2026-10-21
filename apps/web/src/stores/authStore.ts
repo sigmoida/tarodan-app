@@ -6,10 +6,14 @@ import {
   googleLoginAction,
   appleLoginAction,
   logoutAction,
+  type WebLoginResult,
 } from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
 import { getQueryClient } from "@/lib/query/getQueryClient";
-import { clearQueryCacheOnSessionChange } from "@/lib/query/sessionCache";
+import {
+  clearQueryCacheOnSessionChange,
+  resetQueryCacheForNewSession,
+} from "@/lib/query/sessionCache";
 
 // Membership tier types
 export type MembershipTier = "free" | "basic" | "premium" | "business";
@@ -311,6 +315,24 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => {
       const initial = getInitialAuthFromStorage();
+
+      /**
+       * Shared tail of every sign-in action. The server action already wrote
+       * the httpOnly session cookies and the `tarodan_authed` marker; the
+       * client never writes them. Loads the user, then refetches the cache
+       * for the new session.
+       */
+      const completeSignIn = async (result: WebLoginResult) => {
+        if (result.status === "error") {
+          const error = new Error(result.message) as Error & { code: string };
+          error.code = result.reason;
+          throw error;
+        }
+        if (result.status === "2fa") throw twoFactorRequired();
+        await get().checkAuth();
+        void resetQueryCacheForNewSession(getQueryClient());
+      };
+
       return {
         user: null,
         token: initial.token,
@@ -332,42 +354,17 @@ export const useAuthStore = create<AuthState>()(
             password,
             twoFactorCode,
           });
-          if (result.status === "error") {
-            const error = new Error(result.message) as Error & {
-              code: string;
-            };
-            error.code = result.reason;
-            throw error;
-          }
-          if (result.status === "2fa") throw twoFactorRequired();
-          // loginAction (server) yazdı: web_at/web_rt + tarodan_authed. Client yazmaz.
-          await get().checkAuth();
+          await completeSignIn(result);
         },
 
         loginWithGoogle: async (code: string) => {
           const result = await googleLoginAction(code);
-          if (result.status === "error") {
-            const error = new Error(result.message) as Error & {
-              code: string;
-            };
-            error.code = result.reason;
-            throw error;
-          }
-          if (result.status === "2fa") throw twoFactorRequired();
-          await get().checkAuth();
+          await completeSignIn(result);
         },
 
         loginWithApple: async (idToken: string, fullName?: string) => {
           const result = await appleLoginAction(idToken, fullName);
-          if (result.status === "error") {
-            const error = new Error(result.message) as Error & {
-              code: string;
-            };
-            error.code = result.reason;
-            throw error;
-          }
-          if (result.status === "2fa") throw twoFactorRequired();
-          await get().checkAuth();
+          await completeSignIn(result);
         },
 
         register: async (
