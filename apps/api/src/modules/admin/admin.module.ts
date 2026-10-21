@@ -44,6 +44,7 @@ import { AdminSiteAccessController } from "./users/admin-site-access.controller"
 import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./users/admin-user.service";
 import { UserModule } from "../user/user.module";
+import { SellerTrustModule } from "../seller-trust";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
 import { AdminConsentService } from "./users/admin-consent.service";
@@ -192,6 +193,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     // extend_once kuralı (teklifin görünen durumu) — OfferExtensionPolicy.
     OfferModule,
     UserModule,
+    // User detail: the stored trust score and its breakdown. A leaf, no cycle.
+    SellerTrustModule,
     ModerationModule,
     InvoicingModule,
     ShippingTariffModule,

@@ -20,6 +20,7 @@ describe("AdminUserService.adminCancelUserMembership", () => {
     const service = new AdminUserService(
       prisma as any,
       audit as any,
+      {} as never, // sellerTrust
       undefined as any,
     );
     return { service, prisma, audit };
