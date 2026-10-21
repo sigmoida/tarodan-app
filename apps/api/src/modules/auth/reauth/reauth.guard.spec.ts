@@ -248,6 +248,36 @@ describe("ReauthGuard", () => {
 
       expect(sentry.setTag).toHaveBeenCalledWith("auth.flow", "account_delete");
     });
+
+    it("tags the flow before every other refusal too: a foreign token, no session, a failed setting read", async () => {
+      expectReauthRequired(
+        await refusal(
+          signedIn({ headers: { [REAUTH_TOKEN_HEADER]: "foreign" } }),
+          "bySetting",
+        ),
+      );
+      expectReauthRequired(await refusal({ headers: {} }, "bySetting"));
+      reauth.isRequiredForSensitiveActions.mockRejectedValue(
+        new Error("db down"),
+      );
+      await expect(
+        guard.canActivate(contextFor(signedIn(), "bySetting")),
+      ).rejects.toThrow("db down");
+
+      expect(sentry.setTag).toHaveBeenCalledTimes(3);
+      for (const call of sentry.setTag.mock.calls) {
+        expect(call).toEqual(["auth.flow", "account_delete"]);
+      }
+    });
+
+    it("sets no flow tag on a route whose policy names none", async () => {
+      reauth.isValidToken.mockResolvedValue(true);
+
+      await guard.canActivate(
+        contextFor(signedIn({ body: { reauthToken: "t" } }), "always"),
+      );
+      expect(sentry.setTag).not.toHaveBeenCalled();
+    });
   });
 
   it("refuses without a session user, without asking the store or the setting", async () => {
