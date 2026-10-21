@@ -123,7 +123,10 @@ model User {
   oauthAccounts           OAuthAccount[]
   appleSignInTokens       AppleSignInToken[]
   reports                 Report[]                 @relation("ReporterReports")
-  productBoosts           ProductBoost[]
+  productBoosts           ProductBoost[]           @relation("UserProductBoosts")
+  boostsGranted           ProductBoost[]           @relation("BoostGrantedBy")
+  boostsCancelled         ProductBoost[]           @relation("BoostCancelledBy")
+  boostOfferDismissals    BoostOfferDismissal[]
   deletedIdentity         DeletedUserIdentity?
   consentRecords          ConsentRecord[]
   sellerTrustScore        SellerTrustScore?
@@ -972,6 +975,7 @@ model Product {
   likes               ProductLike[]
   productRatings      ProductRating[]
   boosts              ProductBoost[]
+  boostOfferDismissal BoostOfferDismissal?
   removalEvents       ProductRemovalEvent[]
   brand               Brand?                  @relation(fields: [brandId], references: [id])
   carModel            CarModel?               @relation(fields: [carModelId], references: [id])
@@ -1117,10 +1121,31 @@ model ProductBoost {
   finalLikeCount         Int?        @map("final_like_count")
   finalClickCount        Int?        @map("final_click_count")
   orderId                String?     @unique @map("order_id")
+  /// How the boost came about. An `admin_grant` is free: no order, no payment,
+  /// no invoice and no revenue, so reports and refunds must tell it apart.
+  source                 BoostSource @default(purchase)
+  /// The staff user who granted a free boost (`source = admin_grant`).
+  grantedById            String?     @map("granted_by_id")
+  /// Why the boost was granted; the same text goes to the audit log.
+  grantReason            String?     @map("grant_reason")
+  /// When staff stopped the boost early (revoke, or refund and deactivate).
+  /// The status is then `cancelled`; `refundedAmount > 0` marks a refund.
+  cancelledAt            DateTime?   @map("cancelled_at")
+  /// The staff user who stopped the boost.
+  cancelledById          String?     @map("cancelled_by_id")
+  cancelReason           String?     @map("cancel_reason")
+  /// Sum refunded through the boost refund screen. The next refund is capped
+  /// at `price - refundedAmount`.
+  refundedAmount         Decimal?    @map("refunded_amount") @db.Decimal(10, 2)
+  /// Claim stamp of the "ends within 24 hours" reminder, so a cron rerun never
+  /// sends it twice. An extension creates a new tail row, which can be reminded.
+  reminderSentAt         DateTime?   @map("reminder_sent_at")
   createdAt              DateTime    @default(now()) @map("created_at")
   updatedAt              DateTime    @updatedAt @map("updated_at")
   product                Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User        @relation("UserProductBoosts", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy              User?       @relation("BoostGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  cancelledBy            User?       @relation("BoostCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   package                AdPackage?  @relation(fields: [packageId], references: [id], onDelete: SetNull)
 
   @@index([productId])
@@ -1130,6 +1155,23 @@ model ProductBoost {
   // Dashboard: dönem içinde satın alınan öne çıkarma geliri.
   @@index([purchasedAt])
   @@map("product_boosts")
+}
+
+/// The one-time boost offer for a new listing was dismissed. Rows are written
+/// only on dismissal; whether an offer is due is computed (listing age, never
+/// boosted, a matching package), so no listing activation path needs a hook.
+/// Server-side, so a dismissed offer stays dismissed on every device.
+model BoostOfferDismissal {
+  /// One row per listing: an offer is shown at most once per listing.
+  productId   String   @id @map("product_id")
+  /// The seller who dismissed it (the listing's owner at that time).
+  userId      String   @map("user_id")
+  dismissedAt DateTime @map("dismissed_at")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("boost_offer_dismissals")
 }
 
 /// Admin-managed advertisement/boost package (e.g. "Ekonomik", "Vitrin"). Fully
@@ -4144,6 +4186,12 @@ enum ProductCondition {
   very_good
   good
   fair
+}
+
+/// Where a `ProductBoost` came from (see `ProductBoost.source`).
+enum BoostSource {
+  purchase
+  admin_grant
 }
 
 enum BoostStatus {

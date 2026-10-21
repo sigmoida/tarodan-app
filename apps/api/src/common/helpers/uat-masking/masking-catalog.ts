@@ -533,6 +533,8 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
       ["addresses", ["title"]],
       ["messages", ["flagged_reason"]],
       ["moderation_events", ["reason"]],
+      // Staff-written boost grant and stop reasons (admin boost screen).
+      ["product_boosts", ["grant_reason", "cancel_reason"]],
       ["product_removal_events", ["detail"]],
       ["commission_ledger", ["waived_reason"]],
       ["discount_usages", ["revoke_reason"]],
