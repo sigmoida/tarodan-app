@@ -273,6 +273,16 @@ describe("ReauthModal: account without a password", () => {
     });
   });
 
+  it("opens the provider popup inside the click (popup rules)", async () => {
+    h.request.mockReturnValue(new Promise(() => {}));
+    render();
+    await flush();
+
+    // A synchronous click: no microtask runs before the assertion.
+    act(() => button('{"provider":"Google"}').click());
+    expect(h.request).toHaveBeenCalledWith("google");
+  });
+
   it("does nothing when the user closes the provider popup", async () => {
     h.request.mockResolvedValue(null);
     render();

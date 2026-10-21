@@ -292,6 +292,24 @@ describe("ConnectedAccountsSection: disconnect", () => {
     expect(h.logout).not.toHaveBeenCalled();
   });
 
+  it("refetches on 404 PROVIDER_NOT_LINKED (disconnected elsewhere), so the row offers Connect", async () => {
+    h.confirm.mockResolvedValue(true);
+    h.unlink.mockRejectedValue(apiError(404, "PROVIDER_NOT_LINKED"));
+    await render({ hasPassword: true, providers: [google] });
+    h.getMethods.mockResolvedValue({
+      data: { hasPassword: true, providers: [] },
+    });
+
+    await click(rowButton("google"));
+
+    expect(h.toast.error).toHaveBeenCalledWith("server:PROVIDER_NOT_LINKED");
+    expect(h.getMethods).toHaveBeenCalledTimes(2);
+    expect(rowButton("google").textContent).toContain(
+      "profile.connectedAccounts.connect",
+    );
+    expect(h.logout).not.toHaveBeenCalled();
+  });
+
   it("shows no error when the user closes the step-up", async () => {
     h.confirm.mockResolvedValue(true);
     const cancelled = Object.assign(new Error("reauth_cancelled"), {
@@ -325,6 +343,29 @@ describe("ConnectedAccountsSection: connect", () => {
     expect(rowButton("google").textContent).toContain(
       "profile.connectedAccounts.disconnect",
     );
+  });
+
+  it("opens the provider popup inside the click, before the step-up", async () => {
+    let answer!: (credential: unknown) => void;
+    h.request.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    h.linkGoogle.mockResolvedValue({
+      data: { hasPassword: true, providers: [google] },
+    });
+    await render({ hasPassword: true, providers: [] });
+
+    // A synchronous click: no microtask runs before the assertions, so the
+    // popup must have been asked for in the handler itself (popup rules).
+    act(() => rowButton("google").click());
+    expect(h.request).toHaveBeenCalledWith("google");
+    expect(h.withReauth).not.toHaveBeenCalled();
+
+    await act(async () => answer({ provider: "google", code: "auth-code" }));
+    await flush();
+    expect(h.withReauth).toHaveBeenCalledTimes(1);
+    expect(h.linkGoogle).toHaveBeenCalledWith({
+      code: "auth-code",
+      reauthToken: "step-up-token",
+    });
   });
 
   it("links Apple with its identity token and no authorization code (web)", async () => {
