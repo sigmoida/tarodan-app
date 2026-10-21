@@ -338,8 +338,77 @@ describe("Product (E2E)", () => {
         .set(authHeader(seller))
         .expect(200);
 
-      const items = res.body.items || res.body.data || res.body;
-      expect(items.map((p: { id: string }) => p.id)).toEqual([open.id]);
+      expect(res.body.data.map((p: { id: string }) => p.id)).toEqual([open.id]);
+      // The count runs over the filtered rows, so the pickers can page.
+      expect(res.body.meta).toEqual(
+        expect.objectContaining({ total: 1, totalPages: 1 }),
+      );
+
+      // "false" must not be read as true (query-string boolean parsing).
+      const off = await request(ctx.app.getHttpServer())
+        .get("/api/products/my?tradeOnly=false")
+        .set(authHeader(seller))
+        .expect(200);
+      expect(off.body.meta).toEqual(expect.objectContaining({ total: 2 }));
+    });
+
+    it("tradeOnly + tradeEligible pages only offerable trade-enabled listings", async () => {
+      const seller = await createUser(ctx.module, { isSeller: true });
+      const offerable: string[] = [];
+      for (const title of ["Offerable A", "Offerable B", "Offerable C"]) {
+        const p = await createProduct({
+          sellerId: seller.id,
+          categoryId: baseline.categoryId,
+          title,
+          isTradeEnabled: true,
+        });
+        offerable.push(p.id);
+      }
+      // Each of these fails exactly one rule and must not be counted.
+      await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        title: "Active, not for trade",
+        isTradeEnabled: false,
+      });
+      await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        title: "Trade-enabled but sold",
+        isTradeEnabled: true,
+        status: "sold",
+      });
+      await createProduct({
+        sellerId: seller.id,
+        categoryId: baseline.categoryId,
+        title: "Trade-enabled but out of stock",
+        isTradeEnabled: true,
+        quantity: 0,
+      });
+
+      const page = async (n: number) =>
+        request(ctx.app.getHttpServer())
+          .get(
+            `/api/products/my?tradeOnly=true&tradeEligible=true&page=${n}&limit=2`,
+          )
+          .set(authHeader(seller))
+          .expect(200);
+
+      const first = await page(1);
+      const second = await page(2);
+
+      expect(first.body.meta).toEqual(
+        expect.objectContaining({ total: 3, page: 1, limit: 2, totalPages: 2 }),
+      );
+      expect(second.body.meta).toEqual(
+        expect.objectContaining({ total: 3, page: 2, limit: 2, totalPages: 2 }),
+      );
+      expect(first.body.data).toHaveLength(2);
+      expect(second.body.data).toHaveLength(1);
+      const ids = [...first.body.data, ...second.body.data].map(
+        (p: { id: string }) => p.id,
+      );
+      expect([...ids].sort()).toEqual([...offerable].sort());
     });
 
     it("rejects unauthenticated request (401)", async () => {
