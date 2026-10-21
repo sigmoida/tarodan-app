@@ -71,6 +71,17 @@ describe("scrubSentryEvent", () => {
     expect(out.extra).toEqual({ code: "ERR_NETWORK", reauthToken: REDACTED });
   });
 
+  it("keeps a `code` readable in contexts, tags and breadcrumbs", () => {
+    const out = scrubSentryEvent({
+      contexts: { AxiosError: { code: "ERR_BAD_REQUEST" } },
+      tags: { code: "REAUTH_REQUIRED" },
+      breadcrumbs: [{ message: "api", data: { code: "LAST_SIGN_IN_METHOD" } }],
+    });
+    expect(out.contexts).toEqual({ AxiosError: { code: "ERR_BAD_REQUEST" } });
+    expect(out.tags).toEqual({ code: "REAUTH_REQUIRED" });
+    expect(out.breadcrumbs?.[0].data).toEqual({ code: "LAST_SIGN_IN_METHOD" });
+  });
+
   it("masks the client IP that the proxy headers carry (KVKK personal data)", () => {
     // `onRequestError` attaches the raw request headers; behind the reverse
     // proxy they hold the visitor's IP even with `sendDefaultPii: false`.
