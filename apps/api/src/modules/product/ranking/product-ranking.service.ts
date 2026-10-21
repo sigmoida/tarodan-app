@@ -3,19 +3,23 @@ import { PrismaService } from "../../../prisma";
 import { isPremiumEntitled } from "../../membership/helpers/membership.util";
 import { computeQualityScore } from "../helpers/quality-score";
 import { computeRelevanceScore } from "../helpers/relevance-score";
-import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
+import { SellerTrustService } from "../../seller-trust";
 
 /**
- * ProductRankingService — İlan Kalite Skoru + rankTier + relevanceScore yeniden
- * hesaplama (leaf; yalnız prisma). create/update sonrası ve boost yollarında çağrılır;
- * bu yüzden ProductCreateService/ProductUpdateService bunu enjekte eder (tek yön,
- * asiklik). Public imza korunur (facade + create/update delege eder).
+ * ProductRankingService: recomputes the listing quality score, rankTier and
+ * relevanceScore. A leaf (Prisma and the stored seller trust score). Called
+ * after create/update and on the boost paths, so ProductCreateService and
+ * ProductUpdateService inject it (one direction, acyclic). The public
+ * signature is kept (the facade and create/update delegate to it).
  */
 @Injectable()
 export class ProductRankingService {
   private readonly logger = new Logger(ProductRankingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sellerTrust: SellerTrustService,
+  ) {}
 
   /**
    * İlan Kalite Skoru + rankTier'ı yeniden hesaplar ve Product'a yazar.
@@ -31,28 +35,18 @@ export class ProductRankingService {
         boostedUntil: true,
         sellerId: true,
         popularityScore: true,
-        seller: { select: { isVerified: true } },
         _count: { select: { images: true } },
       },
     });
     if (!product) return;
 
-    // Satıcının onaylı ortalama güven puanı (0..5)
-    let sellerRating: number | null = null;
-    const ratingStats = await this.prisma.rating.aggregate({
-      where: publicUserRatingWhere({ receiverId: product.sellerId }),
-      _avg: { score: true },
-      _count: true,
-    });
-    if (ratingStats._count > 0 && ratingStats._avg?.score) {
-      sellerRating = Number(ratingStats._avg.score);
-    }
+    // The seller's stored trust rating (one primary-key lookup, ADR 0014).
+    const trust = await this.sellerTrust.getForUser(product.sellerId);
 
     const qualityScore = computeQualityScore({
       photoCount: product._count.images,
       description: product.description,
-      sellerRating,
-      isVerifiedSeller: product.seller?.isVerified ?? false,
+      sellerTrustRating: trust.rating,
     });
 
     // rankTier hesapla

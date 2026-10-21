@@ -7,7 +7,7 @@
  *
  * relevanceScore =
  *   boost/premium bonusu (rankTier'a göre)
- * + qualityScore * 100        (kademe içinde kalite eşitlik bozucu, max ~8500)
+ * + qualityScore * 100        (tie-breaker within a tier, at most 8000)
  * + popularityScore           (etkileşim: görüntülenme + favori + mesaj + satış + son aktivite)
  *
  * Bonus büyüklükleri tunable: BOOST_BONUS'u büyütmek boost'u "her zaman en üstte"ye yaklaştırır.

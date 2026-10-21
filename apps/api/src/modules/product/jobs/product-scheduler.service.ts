@@ -16,7 +16,7 @@ import { computeQualityScore } from "../helpers/quality-score";
 import { computeRelevanceScore } from "../helpers/relevance-score";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
-import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
+import { SellerTrustService } from "../../seller-trust";
 import {
   frontendUrl as resolveFrontendUrl,
   adminUrl,
@@ -67,6 +67,7 @@ export class ProductSchedulerService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    private readonly sellerTrust: SellerTrustService,
   ) {}
 
   /**
@@ -132,13 +133,15 @@ export class ProductSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Update popularity scores + İlan Kalite Skoru (qualityScore) + rankTier reconcile
-   * for all active products. Runs every night at 03:00.
+   * Update popularity scores + listing quality score (qualityScore) + rankTier
+   * reconcile for all active products. Runs every night at 03:00.
    *
-   * - popularityScore: mevcut ağırlıklı skor (popularityScore kolonuna yazılır)
-   * - qualityScore: foto sayısı + açıklama + satıcı güven puanı (sıralamada kullanılır)
-   * - rankTier reconcile: aktif boost → 2; ücretli (free olmayan) üyeli satıcı → 1; standart → 0
-   * Gerçek iş — Bull processor 'update-popularity' buradan çağırır.
+   * - popularityScore: the weighted engagement score
+   * - qualityScore: photos + description + the seller's stored trust rating
+   *   (`computeQualityScore`, used in ranking)
+   * - rankTier reconcile: active boost → 2; paid (non-free) member seller → 1;
+   *   standard → 0
+   * The real work: the Bull processor 'update-popularity' calls this.
    */
   async runUpdatePopularityScores(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting popularity + quality score update...");
@@ -159,7 +162,6 @@ export class ProductSchedulerService implements OnModuleInit {
           description: true,
           boostedUntil: true,
           sellerId: true,
-          seller: { select: { isVerified: true } },
           _count: {
             select: {
               images: true,
@@ -172,20 +174,10 @@ export class ProductSchedulerService implements OnModuleInit {
 
       this.logger.log(`Processing ${products.length} products...`);
 
-      // Satıcı güven puanlarını tek sorguda topla (N+1 önlemek için)
+      // The sellers' stored trust scores in one query (no N+1). The
+      // seller-trust-refresh run (02:30) has finished before this job (03:00).
       const sellerIds = [...new Set(products.map((p) => p.sellerId))];
-      const ratingGroups = sellerIds.length
-        ? await this.prisma.rating.groupBy({
-            by: ["receiverId"],
-            where: publicUserRatingWhere({ receiverId: { in: sellerIds } }),
-            _avg: { score: true },
-          })
-        : [];
-      const sellerRatingMap = new Map<string, number>();
-      for (const g of ratingGroups) {
-        if (g._avg?.score != null)
-          sellerRatingMap.set(g.receiverId, Number(g._avg.score));
-      }
+      const sellerTrust = await this.sellerTrust.getForUsers(sellerIds);
 
       // Ücretli (free olmayan) aktif üyeli satıcılar → rankTier 1
       const premiumMemberships = sellerIds.length
@@ -244,8 +236,7 @@ export class ProductSchedulerService implements OnModuleInit {
         const qualityScore = computeQualityScore({
           photoCount: product._count.images,
           description: product.description,
-          sellerRating: sellerRatingMap.get(product.sellerId) ?? null,
-          isVerifiedSeller: product.seller?.isVerified ?? false,
+          sellerTrustRating: sellerTrust.get(product.sellerId)?.rating ?? null,
         });
 
         // rankTier reconcile

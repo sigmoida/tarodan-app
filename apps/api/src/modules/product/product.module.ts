@@ -26,6 +26,7 @@ import { StorageModule } from "../storage/storage.module";
 import { PaymentModule } from "../payment";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { CommissionModule } from "../commission/commission.module";
+import { SellerTrustModule } from "../seller-trust";
 
 import { UserBlockModule } from "../user-block/user-block.module";
 
@@ -45,6 +46,8 @@ import { UserBlockModule } from "../user-block/user-block.module";
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     ModerationModule,
     CommissionModule,
+    // Ranking reads the stored seller trust score. A leaf, no cycle.
+    SellerTrustModule,
   ],
   controllers: [ProductController],
   providers: [
