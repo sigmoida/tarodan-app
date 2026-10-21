@@ -73,6 +73,7 @@ function setup(
   const service = new BoostOfferService(
     prisma as never,
     new BoostAudienceService(prisma as never),
+    { getPublicAssetUrl: (k: string) => `https://cdn.test/${k}` } as never,
     sentry as never,
   );
   const candidateQuery = () =>
@@ -95,10 +96,18 @@ describe("BoostOfferService.getOffers", () => {
     expect(result.offers[0]).toEqual({
       productId: "p2",
       title: "Listing p2",
-      image: "products/p2/card.webp",
+      image: "https://cdn.test/products/p2/card.webp",
       price: 500,
       createdAt: expect.any(String),
     });
+  });
+
+  it("returns a null image when the listing has no image", async () => {
+    const { service } = setup({ candidates: [listing("p3", { images: [] })] });
+
+    const result = await service.getOffers(SELLER);
+
+    expect(result.offers[0].image).toBeNull();
   });
 
   it.each([
