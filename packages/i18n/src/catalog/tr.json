@@ -2952,7 +2952,6 @@
     "noActiveListings": "Bu satıcının henüz aktif ilanı yok.",
     "viewProfile": "Profili Gör",
     "premiumBadge": "Premium",
-    "trust": "Güven",
     "noReviewsDesc": "Bu satıcının henüz değerlendirmesi yok.",
     "totalReviews": "değerlendirme",
     "noCollections": "Henüz koleksiyon yok",
@@ -3072,7 +3071,30 @@
       "newDiscount": "Yeni İndirim",
       "emptyFiltered": "Bu filtreye uygun indirim yok",
       "emptyDescription": "Müşterilerinize özel indirimler ve kampanyalar oluşturun"
-    }
+    },
+    "trustScore": {
+      "badge": "Güven skoru {rating}/5 · {level}",
+      "badgeNew": "Güven skoru: Yeni satıcı",
+      "levels": {
+        "excellent": "Çok güvenilir",
+        "trusted": "Güvenilir",
+        "fair": "Orta",
+        "developing": "Gelişmekte",
+        "new": "Yeni satıcı"
+      },
+      "info": {
+        "title": "Güven skoru nasıl hesaplanır?",
+        "intro": "Güven skoru, satıcının Tarodan'daki gerçek işlemlerinden 0 ile 5 arasında hesaplanır:",
+        "ratings": "Alıcı ve takas değerlendirmeleri (her kişinin oyu bir kez sayılır)",
+        "reliability": "Siparişleri iptal etmeden ve satıcı kaynaklı iade olmadan tamamlama",
+        "onTime": "Siparişleri süresi içinde kargoya verme",
+        "volume": "Tamamlanan satış ve takas sayısı",
+        "tenure": "Tarodan'daki hesap yaşı",
+        "newSeller": "En az {count} tamamlanmış işlemi olmayan satıcılar \"Yeni satıcı\" olarak görünür.",
+        "updated": "Skor her gün güncellenir."
+      }
+    },
+    "officialAccount": "Resmi hesap"
   },
   "sellerDashboard": {
     "title": "Satıcı Panosu",
