@@ -46,6 +46,7 @@ import {
 } from "../../consent/distance-sales-consent.service";
 import { PlatformServiceConsentService } from "../../consent/platform-service-consent.service";
 import { virtualOrderKind } from "../helpers/virtual-order-kind";
+import { paymentReturnQuery } from "../helpers/payment-return-query";
 
 /** Misafir siparişinin alıcı e-postası — `shippingAddress` JSON'ında saklanır. */
 function guestEmailOf(shippingAddress: Prisma.JsonValue | null): string | null {
@@ -413,7 +414,7 @@ export class PaymentInitiationService {
       basketItems,
       merchantOid,
       amount,
-      successQueryParams,
+      returnQueryParams,
       ownerId,
     } = await this.resolveDirectPaymentContext(
       userId,
@@ -431,7 +432,7 @@ export class PaymentInitiationService {
           basketItems,
           merchantOid,
           amount,
-          successQueryParams,
+          returnQueryParams,
           ownerId,
         },
         userId,
@@ -467,7 +468,7 @@ export class PaymentInitiationService {
       }>;
       merchantOid: string;
       amount: number;
-      successQueryParams: string;
+      returnQueryParams: string;
       /** Kartın senkronlanacağı hesap (callback'teki sahip); bkz. resolveStoreCard. */
       ownerId: string | null;
     },
@@ -479,7 +480,7 @@ export class PaymentInitiationService {
       basketItems,
       merchantOid,
       amount,
-      successQueryParams,
+      returnQueryParams,
       ownerId,
     } = ctx;
     // Ödemenin mağazası claim'de yazıldı (resolvePaytrMerchant). Form, kart
@@ -521,7 +522,7 @@ export class PaymentInitiationService {
         buyer,
         basketItems,
         {
-          successQueryParams,
+          returnQueryParams,
           testMode: payment.isTest === true,
           savedCard: {
             utoken: saved.utoken,
@@ -586,7 +587,7 @@ export class PaymentInitiationService {
       {
         storeCard,
         utoken: existingCard?.utoken,
-        successQueryParams,
+        returnQueryParams,
         // Test şeridi: DB trigger'ının damgaladığı Payment.isTest → test_mode=1.
         testMode: payment.isTest === true,
       },
@@ -618,10 +619,12 @@ export class PaymentInitiationService {
   }
 
   /**
-   * Direct API ödeme hedefini çöz: tekil sipariş / grup (sepet) / takas nakit farkı.
-   * Ortak Payment satırını bul/oluştur, providerConversationId=merchant_oid yaz, buyer + sepet +
-   * tutar + successQueryParams hazırla. iframe akışlarına DOKUNMADAN onların doğrulama mantığını
-   * (sahiplik, durum, süre) taklit eder. Sonuç tüm kart yolları (yeni/kayıtlı) için ortaktır.
+   * Resolves the Direct API payment target: a single order, a group (cart) or
+   * a trade's cash difference. Finds or creates the shared Payment row,
+   * writes providerConversationId = merchant_oid and prepares the buyer, the
+   * basket, the amount and the return URL query (`paymentReturnQuery`). It
+   * mirrors the iframe flows' checks (ownership, status, window) WITHOUT
+   * touching them. The result is shared by every card path (new or saved).
    */
   private async resolveDirectPaymentContext(
     userId: string | null,
@@ -640,7 +643,7 @@ export class PaymentInitiationService {
     }>;
     merchantOid: string;
     amount: number;
-    successQueryParams: string;
+    returnQueryParams: string;
     /**
      * Ödemenin sahibi: sipariş/grup alıcısı ya da takas satırının ödeyeni.
      * Callback kartı bu hesaba yazar (payment-callback savedCardOwnerId).
@@ -733,7 +736,7 @@ export class PaymentInitiationService {
     }>;
     let baseOid: string;
     let amount: number;
-    let successQueryParams: string;
+    let returnQueryParams: string;
     let ownerId: string | null = null;
     // Mesafeli satış onayının ait olduğu satın alma. Satın alma olmayan
     // hedeflerde (takas ücreti, üyelik / öne çıkarma) null kalır.
@@ -863,13 +866,15 @@ export class PaymentInitiationService {
           guestEmail: isGuestOrder ? guestEmailOf(order.shippingAddress) : null,
         };
       }
-      const isMembershipOrder = paytrMerchant === PaytrMerchant.membership;
-      // Misafir siparişinde başarı URL'ine guest=true taşı: aksi halde PayTR
-      // dönüşünde /payment/success guest'i tanıyamayıp /login'e atıyor (fatura
-      // da görünmüyor). Üyelik ödemesi misafir olamaz.
-      successQueryParams = isMembershipOrder
-        ? `paymentId=${payment.id}&type=membership`
-        : `paymentId=${payment.id}${isGuestOrder ? "&guest=true" : ""}`;
+      // Both return URLs carry the payment, the kind (membership, boost) and
+      // guest=true for a guest order: without it the result page cannot tell
+      // the guest and sends them to /login. A virtual order is never a guest
+      // order.
+      returnQueryParams = paymentReturnQuery({
+        paymentId: payment.id,
+        kind,
+        guest: isGuestOrder,
+      });
     } else if (dto.checkoutGroupId) {
       const group = await this.prisma.checkoutGroup.findUnique({
         where: { id: dto.checkoutGroupId },
@@ -964,9 +969,11 @@ export class PaymentInitiationService {
           ? guestEmailOf(group.orders[0].shippingAddress)
           : null,
       };
-      // Misafir grup ödemesinde başarı URL'ine guest=true taşı (yukarıdaki order
-      // yolundaki ile aynı sebep: dönüşte /login'e atılmasın, fatura görünsün).
-      successQueryParams = `paymentId=${payment.id}${group.isGuest ? "&guest=true" : ""}`;
+      // guest=true for a guest cart, for the same reason as the order branch.
+      returnQueryParams = paymentReturnQuery({
+        paymentId: payment.id,
+        guest: group.isGuest,
+      });
     } else if (dto.tradeId) {
       const trade = await this.prisma.trade.findUnique({
         where: { id: dto.tradeId },
@@ -1050,7 +1057,7 @@ export class PaymentInitiationService {
         },
       ];
       baseOid = `TRADE${String(trade.tradeNumber).replace(/-/g, "")}`;
-      successQueryParams = `paymentId=${payment.id}`;
+      returnQueryParams = paymentReturnQuery({ paymentId: payment.id });
     } else {
       throw new BadRequestException(
         i18nMessage("server.payment.paymentTargetRequired"),
@@ -1181,7 +1188,7 @@ export class PaymentInitiationService {
       basketItems,
       merchantOid,
       amount,
-      successQueryParams,
+      returnQueryParams,
       ownerId,
     };
   }
