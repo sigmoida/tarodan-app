@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  cashAmountValue,
+  isCashRefused,
+  signedCashAmount,
+} from "@/lib/cashAmount";
 import { useState, useEffect, Suspense } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -83,7 +88,8 @@ function NewTradeContent() {
   });
   const selectedProducts = picks.picked;
   const offeredIds = picks.pickedIds;
-  const cash = parseFloat(cashAmount) || 0;
+  const cash = cashAmountValue(cashAmount);
+  const cashRefused = isCashRefused(cashAmount);
 
   const {
     preview: costPreview,
@@ -105,6 +111,7 @@ function NewTradeContent() {
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
       return toast.error(t("page.new.page.lutfenBirTeslimatAdresiSecinVeya"));
+    if (cashRefused) return toast.error(t("trade.cashFormatRefused"));
     const sellerId = getSellerId(target);
     if (!sellerId) return toast.error(t("trade.sellerNotFound"));
 
@@ -112,7 +119,7 @@ function NewTradeContent() {
       receiverId: sellerId,
       initiatorItems: offeredIds.map((id) => ({ productId: id, quantity: 1 })),
       receiverItems: [{ productId: target.id, quantity: 1 }],
-      cashAmount: cash > 0 ? (cashPayer === "me" ? cash : -cash) : undefined,
+      cashAmount: signedCashAmount(cashAmount, cashPayer),
       message: message || undefined,
       shippingAddressId: addressId || undefined,
     });
@@ -214,12 +221,13 @@ function NewTradeContent() {
               ₺
             </span>
             <Input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={cashAmount}
               onChange={(e) => setCashAmount(e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
+              placeholder="0,00"
+              helperText={t("trade.cashHelper")}
+              error={cashRefused ? t("trade.cashFormatRefused") : undefined}
               className="pl-10"
             />
           </div>

@@ -298,3 +298,57 @@ describe("new trade page, paged picker", () => {
     expect(sendButton().disabled).toBe(true);
   });
 });
+
+describe("new trade page, cash amount field", () => {
+  const cashInput = () => {
+    const input = container.querySelector<HTMLInputElement>(
+      'input[inputmode="decimal"]',
+    );
+    if (!input) throw new Error("no cash input");
+    return input;
+  };
+  const typeCash = (value: string) =>
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(cashInput(), value);
+      cashInput().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+  it("always shows the helper and no warning for a valid value", () => {
+    render();
+    expect(container.textContent).toContain("trade.cashHelper");
+    typeCash("12,50");
+    expect(container.textContent).toContain("trade.cashHelper");
+    expect(container.textContent).not.toContain("trade.cashFormatRefused");
+  });
+
+  it.each(["12,50", "12.50"])("sends %s as 12.5", (value) => {
+    h.products = [item("a")];
+    render();
+    typeCash(value);
+    act(() => checkbox("a").click());
+    act(() => sendButton().click());
+    expect(h.mutate.mock.calls[0][0].cashAmount).toBe(12.5);
+  });
+
+  it("leaves cashAmount out when the field is empty", () => {
+    h.products = [item("a")];
+    render();
+    act(() => checkbox("a").click());
+    act(() => sendButton().click());
+    expect(h.mutate.mock.calls[0][0].cashAmount).toBeUndefined();
+  });
+
+  it("shows the refusal and sends nothing for a grouped value", () => {
+    h.products = [item("a")];
+    render();
+    typeCash("1.000");
+    act(() => checkbox("a").click());
+    expect(container.textContent).toContain("trade.cashFormatRefused");
+    act(() => sendButton().click());
+    expect(h.mutate).not.toHaveBeenCalled();
+  });
+});

@@ -507,3 +507,51 @@ describe("useCounterOfferEditor, paged pickers", () => {
     await waitFor(() => expect(result.current.counterProducts).toHaveLength(4));
   });
 });
+
+describe("useCounterOfferEditor, cash amount", () => {
+  async function openAndPick() {
+    getMyProducts.mockImplementation(serve(rows("m", 1, 2)));
+    getAll.mockImplementation(serve(rows("t", 1, 2)));
+    counter.mockResolvedValue({});
+    const result = setup();
+    act(() => result.current.handleOpenCounterModal());
+    await waitFor(() => expect(result.current.counterProducts).toHaveLength(3));
+    // Differ from the current trade so the identical-offer guard stays quiet.
+    act(() => result.current.toggleCounterProduct("m1"));
+    return result;
+  }
+
+  it.each(["12,50", "12.50"])("sends %s as 12.5", async (value) => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount(value));
+    expect(result.current.counterCashRefused).toBe(false);
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(12.5);
+  });
+
+  it("makes the amount negative when they pay", async () => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount("12,50"));
+    act(() => result.current.setCounterCashPayer("them"));
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(-12.5);
+  });
+
+  it("leaves cashAmount out when the field is empty", async () => {
+    const result = await openAndPick();
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBeUndefined();
+  });
+
+  it("flags a grouped value as refused and does not submit it", async () => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount("1.000"));
+    expect(result.current.counterCashRefused).toBe(true);
+    act(() => result.current.handleCounterSubmit());
+    expect(toastError).toHaveBeenCalledWith("trade.cashFormatRefused");
+    expect(counter).not.toHaveBeenCalled();
+  });
+});

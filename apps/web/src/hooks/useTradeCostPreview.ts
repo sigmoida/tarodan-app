@@ -2,6 +2,7 @@
 
 "use client";
 
+import { cashAmountValue } from "@/lib/cashAmount";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesApi } from "@/lib/api";
@@ -49,7 +50,7 @@ export function useTradeCostPreview({
   cashPayer,
   enabled,
 }: UseTradeCostPreviewArgs) {
-  const parsedCash = Math.abs(parseFloat(cashAmount) || 0);
+  const parsedCash = cashAmountValue(cashAmount);
   const signature = JSON.stringify([
     [...myProductIds].sort(),
     [...theirProductIds].sort(),

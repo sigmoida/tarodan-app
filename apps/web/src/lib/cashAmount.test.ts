@@ -1,0 +1,45 @@
+/** @format */
+
+import { describe, expect, it } from "vitest";
+import {
+  cashAmountValue,
+  isCashRefused,
+  parseCashInput,
+  signedCashAmount,
+} from "./cashAmount";
+
+describe("parseCashInput", () => {
+  it.each([
+    ["12,50", 12.5],
+    ["12.50", 12.5],
+    ["1250", 1250],
+    ["12,5", 12.5],
+    ["12,", 12],
+    [",5", 0.5],
+    [" 7 ", 7],
+  ])("accepts %j", (raw, amount) => {
+    expect(parseCashInput(raw)).toEqual({ status: "ok", amount });
+  });
+
+  it.each(["", "  ", "0", "0,00", ","])("reads %j as empty", (raw) => {
+    expect(parseCashInput(raw)).toEqual({ status: "empty" });
+  });
+
+  it.each(["1.000", "1.250,50", "1,250.50", "12,345", "1,2,3", "abc", "-5"])(
+    "refuses %j",
+    (raw) => {
+      expect(parseCashInput(raw)).toEqual({ status: "refused" });
+      expect(isCashRefused(raw)).toBe(true);
+      expect(cashAmountValue(raw)).toBe(0);
+    },
+  );
+});
+
+describe("signedCashAmount", () => {
+  it("signs by payer and omits empty cash", () => {
+    expect(signedCashAmount("12,50", "me")).toBe(12.5);
+    expect(signedCashAmount("12,50", "them")).toBe(-12.5);
+    expect(signedCashAmount("", "me")).toBeUndefined();
+    expect(signedCashAmount("1.000", "me")).toBeUndefined();
+  });
+});

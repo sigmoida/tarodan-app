@@ -19,6 +19,11 @@ import type { Trade, TradeItem } from "../_lib/types";
 import { mergeTradeItems, type CounterProduct } from "../_lib/counterProducts";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 import { usePagedPicks } from "@/hooks/usePagedPicks";
+import {
+  cashAmountValue,
+  isCashRefused,
+  signedCashAmount,
+} from "@/lib/cashAmount";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -45,6 +50,9 @@ export function useCounterOfferEditor({
   const [counterCashAmount, setCounterCashAmount] = useState<string>("");
   const [counterCashPayer, setCounterCashPayer] = useState<"me" | "them">("me");
   const [counterMessage, setCounterMessage] = useState("");
+
+  const counterCashValue = cashAmountValue(counterCashAmount);
+  const counterCashRefused = isCashRefused(counterCashAmount);
 
   const counterMutation = useMutation({
     mutationFn: (data: {
@@ -243,6 +251,11 @@ export function useCounterOfferEditor({
   const handleCounterSubmit = () => {
     if (!trade) return;
 
+    if (counterCashRefused) {
+      toast.error(t("trade.cashFormatRefused"));
+      return;
+    }
+
     if (selectedCounterProducts.length === 0) {
       toast.error(t("trade.selectAtLeastOneOffer"));
       return;
@@ -262,7 +275,7 @@ export function useCounterOfferEditor({
       .sort();
     const newInitiatorItemIds = [...selectedCounterProducts].sort();
     const newReceiverItemIds = [...selectedCounterTargetProducts].sort();
-    const newCashAmount = Math.abs(parseFloat(counterCashAmount) || 0);
+    const newCashAmount = counterCashValue;
     const currentCashAmount = Math.abs(trade.cashAmount || 0);
 
     const isIdentical =
@@ -277,15 +290,6 @@ export function useCounterOfferEditor({
       return;
     }
 
-    // Calculate cash amount: positive = initiator (receiver in counter) pays, negative = receiver (original initiator) pays
-    let finalCashAmount: number | undefined = undefined;
-    if (counterCashAmount && parseFloat(counterCashAmount) > 0) {
-      finalCashAmount =
-        counterCashPayer === "me"
-          ? parseFloat(counterCashAmount)
-          : -parseFloat(counterCashAmount);
-    }
-
     counterMutation.mutate({
       initiatorItems: selectedCounterProducts.map((id) => ({
         productId: id,
@@ -295,7 +299,7 @@ export function useCounterOfferEditor({
         productId: id,
         quantity: 1,
       })),
-      cashAmount: finalCashAmount,
+      cashAmount: signedCashAmount(counterCashAmount, counterCashPayer),
       message: counterMessage || undefined,
     });
   };
@@ -327,6 +331,8 @@ export function useCounterOfferEditor({
     selectedCounterProducts,
     selectedCounterTargetProducts,
     counterCashAmount,
+    counterCashValue,
+    counterCashRefused,
     setCounterCashAmount,
     counterCashPayer,
     setCounterCashPayer,
