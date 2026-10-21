@@ -3093,8 +3093,7 @@
         "newSeller": "En az {count} tamamlanmış işlemi olmayan satıcılar \"Yeni satıcı\" olarak görünür.",
         "updated": "Skor her gün güncellenir."
       }
-    },
-    "officialAccount": "Resmi hesap"
+    }
   },
   "sellerDashboard": {
     "title": "Satıcı Panosu",

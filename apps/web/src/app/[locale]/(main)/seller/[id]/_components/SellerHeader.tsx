@@ -52,7 +52,6 @@ export default function SellerHeader({
   const averageRating = stats?.averageRating ?? 0;
   const hasRatings = totalRatings > 0;
   const followersCount = seller.followersCount ?? 0;
-  const isPlatform = seller.sellerType === "platform";
 
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-5 md:p-6">
@@ -75,20 +74,12 @@ export default function SellerHeader({
                   {t("seller.premiumBadge")}
                 </Badge>
               )}
-              {isPlatform ? (
+              {seller.isVerified && (
                 <Badge variant="success" size="sm">
-                  {t("seller.officialAccount")}
+                  ✓ {t("seller.verified")}
                 </Badge>
-              ) : (
-                <>
-                  {seller.isVerified && (
-                    <Badge variant="success" size="sm">
-                      ✓ {t("seller.verified")}
-                    </Badge>
-                  )}
-                  <SellerTrustBadge trust={seller.trust} />
-                </>
               )}
+              <SellerTrustBadge trust={seller.trust} />
             </div>
             <p className="mt-1 text-xs text-subtle">
               {membershipDuration}

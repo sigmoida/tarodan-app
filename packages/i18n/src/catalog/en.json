@@ -3093,8 +3093,7 @@
         "newSeller": "Sellers with fewer than {count} completed transactions are shown as \"New seller\".",
         "updated": "The score is updated every day."
       }
-    },
-    "officialAccount": "Official account"
+    }
   },
   "sellerDashboard": {
     "title": "Seller Dashboard",
