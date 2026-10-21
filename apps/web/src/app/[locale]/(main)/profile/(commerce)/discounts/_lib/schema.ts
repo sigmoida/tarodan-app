@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Translate } from "@/types/i18n";
-import { parseTlAmount, tlAmountValue } from "@/lib/tlAmount";
+import { parseTlAmount } from "@/lib/tlAmount";
 
 /**
  * Validation for the discount create/edit form. `z.infer` is structurally the
@@ -40,15 +40,28 @@ export const discountSchema = (t: Translate) =>
         path: "value" | "minCartValue" | "maxDiscountAmount",
         message: string,
       ) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
-      // The value is TL only for a fixed amount; a percentage gets the
-      // generic copy (the format copy speaks of kurus).
-      if (d.type !== "bogo" && parseTlAmount(d.value).status === "refused") {
-        refuse(
-          "value",
-          d.type === "fixed_amount"
-            ? t("trade.cashFormatRefused")
-            : t("validation.enterValidValue"),
-        );
+      // bogo has no value. The value is TL only for a fixed amount; a
+      // percentage gets the generic copy (the format copy speaks of kurus).
+      // The API checks the percent range only for bulk campaigns, so the form
+      // keeps every percentage within 0-100 and every value above zero.
+      if (d.type !== "bogo") {
+        const parsed = parseTlAmount(d.value);
+        const isPercent = d.type !== "fixed_amount";
+        if (parsed.status === "refused") {
+          refuse(
+            "value",
+            isPercent
+              ? t("validation.enterValidValue")
+              : t("trade.cashFormatRefused"),
+          );
+        } else if (isPercent) {
+          const percent = parsed.status === "ok" ? parsed.amount : 0;
+          if (percent <= 0 || percent > 100) {
+            refuse("value", t("validation.discountPercentRange"));
+          }
+        } else if (parsed.status === "empty") {
+          refuse("value", t("validation.enterValidValue"));
+        }
       }
       for (const path of ["minCartValue", "maxDiscountAmount"] as const) {
         if (parseTlAmount(d[path]).status === "refused") {
@@ -71,17 +84,6 @@ export const discountSchema = (t: Translate) =>
     .refine((d) => d.type !== "bulk_quantity" || parseInt(d.minQuantity) >= 2, {
       message: t("validation.minQuantityMin2"),
       path: ["minQuantity"],
-    })
-    .refine(
-      (d) => {
-        if (d.type !== "bulk_quantity") return true;
-        const percent = tlAmountValue(d.value);
-        return percent > 0 && percent <= 100;
-      },
-      {
-        message: t("validation.discountPercentRange"),
-        path: ["value"],
-      },
-    );
+    });
 
 export type DiscountFormValues = z.infer<ReturnType<typeof discountSchema>>;

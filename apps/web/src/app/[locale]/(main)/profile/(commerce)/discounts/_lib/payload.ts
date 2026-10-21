@@ -3,9 +3,15 @@
 import { tlAmountValue } from "@/lib/tlAmount";
 import type { DiscountFormData } from "./types";
 
-/** An optional TL amount field: omitted when empty (the schema refused bad text). */
-const optionalAmount = (raw: string): number | undefined =>
-  raw.trim() ? tlAmountValue(raw) : undefined;
+/**
+ * An optional TL amount field: omitted when the parser reads no amount (empty,
+ * "0", "0,00"), so a zero never goes out as a 0 TL cap or threshold. The
+ * schema already refused malformed text.
+ */
+const optionalAmount = (raw: string): number | undefined => {
+  const amount = tlAmountValue(raw);
+  return amount > 0 ? amount : undefined;
+};
 
 /** The create/update request body from the validated form values. */
 export function buildPayload(form: DiscountFormData) {

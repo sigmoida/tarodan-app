@@ -58,6 +58,18 @@ describe("discount amounts, payload", () => {
     expect(payload.maxDiscountAmount).toBeUndefined();
   });
 
+  it.each(["0", "0,00", ","])(
+    "omits a zero optional amount %j instead of sending a 0 TL cap",
+    (raw) => {
+      // A 0 cap would clip every discount to nothing in the cart.
+      const payload = buildPayload(
+        form({ minCartValue: raw, maxDiscountAmount: raw }),
+      );
+      expect(payload.minCartValue).toBeUndefined();
+      expect(payload.maxDiscountAmount).toBeUndefined();
+    },
+  );
+
   it("sends a comma percentage", () => {
     expect(buildPayload(form({ value: "12,5" })).value).toBe(12.5);
   });
@@ -101,6 +113,31 @@ describe("discount amounts, refusal", () => {
         }),
       ),
     ).toEqual({});
+  });
+
+  it.each(["percentage", "bulk_quantity"] as const)(
+    "keeps a %s value within 0-100",
+    (type) => {
+      // The API range-checks only bulk campaigns; 150% would exceed the subtotal.
+      const percent = (value: string) =>
+        issues(form({ type, value, minQuantity: "3" }));
+      expect(percent("100")).toEqual({});
+      expect(percent("150")).toEqual({
+        value: "validation.discountPercentRange",
+      });
+      expect(percent("0")).toEqual({
+        value: "validation.discountPercentRange",
+      });
+    },
+  );
+
+  it("asks for a fixed amount above zero", () => {
+    expect(issues(form({ type: "fixed_amount", value: "" }))).toEqual({
+      value: "validation.enterValidValue",
+    });
+    expect(issues(form({ type: "fixed_amount", value: "0,00" }))).toEqual({
+      value: "validation.enterValidValue",
+    });
   });
 
   it("keeps the bulk percentage range on the parsed value", () => {
