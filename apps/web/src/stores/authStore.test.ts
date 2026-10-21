@@ -318,4 +318,41 @@ describe("authStore query cache per session", () => {
       expect(useAuthStore.getState().user?.id).toBe("u1");
     });
   });
+
+  it("retries a missing profile without showing the loading state", () => {
+    useAuthStore.setState({
+      user: null,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    h.hasAuthMarker.mockReturnValue(true);
+    let answer!: (v: unknown) => void;
+    h.getProfile.mockReturnValueOnce(new Promise((r) => (answer = r)));
+
+    useAuthStore.getState().reconcileSession();
+
+    expect(h.getProfile).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().isLoading).toBe(false);
+    answer({ data: { id: "u1" } });
+  });
+
+  it("re-runs a pending load check when another tab writes a snapshot", async () => {
+    useAuthStore.setState({ isLoading: true });
+    h.hasAuthMarker.mockReturnValue(true);
+    let answerOld!: (v: unknown) => void;
+    h.getProfile
+      .mockReturnValueOnce(new Promise((r) => (answerOld = r)))
+      .mockResolvedValueOnce({ data: { id: "u2" } });
+    const check = useAuthStore.getState().checkAuth();
+
+    localStorage.setItem("tarodan_user_snapshot", JSON.stringify({ id: "u2" }));
+    window.dispatchEvent(
+      new StorageEvent("storage", { key: "tarodan_user_snapshot" }),
+    );
+    answerOld({ data: { id: "u1" } });
+    await check;
+
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+    expect(localStorage.getItem("tarodan_user_snapshot")).toContain('"u2"');
+  });
 });

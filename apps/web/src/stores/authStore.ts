@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { authApi, userApi, USER_PROFILE_PATH } from "@/lib/api";
+import { authApi, userApi } from "@/lib/api";
 import {
   loginAction,
   googleLoginAction,
@@ -211,6 +211,8 @@ let sessionGeneration = 0;
 let activeCheck: Promise<void> | null = null;
 /** Set while a check is pending to ask for one more run after it. */
 let rerunCheck = false;
+/** Tags the pending check's own `/users/me` request (see the 401 report). */
+let checkSignal: AbortSignal | null = null;
 /** A hung `/users/me` must not hold the single flight forever. */
 const PROFILE_TIMEOUT_MS = 15_000;
 function readUserSnapshot(): User | null {
@@ -372,15 +374,20 @@ export const useAuthStore = create<AuthState>()(
             limits: getMembershipLimitsForUser(snapshot),
             isLoading: false,
           });
-        } else if (!current) {
+        } else if (!current && !get().isAuthenticated) {
+          // Only an unresolved visitor shows the loading state: a signed-in
+          // store retrying its profile must not unmount the page's forms.
           set({ isLoading: true });
         }
 
         try {
           // /users/me: on a 401 the gateway proxy first tries a silent
           // refresh from the session cookie.
+          const request = new AbortController();
+          checkSignal = request.signal;
           const response = await userApi.getProfile({
             timeout: PROFILE_TIMEOUT_MS,
+            signal: request.signal,
           });
           if (superseded()) return;
           const apiUser = response.data.user || response.data;
@@ -559,8 +566,12 @@ export const useAuthStore = create<AuthState>()(
             // does.
             const markerGone =
               !marker && !isSessionPreservedPath(window.location.pathname);
-            // Signed in without a profile (a failed or timed-out check): retry.
-            const noProfile = !state.user && !pending;
+            // Signed in without a profile (a failed or timed-out check):
+            // retry, except on checkout and payment pages.
+            const noProfile =
+              !state.user &&
+              !pending &&
+              !isSessionPreservedPath(window.location.pathname);
             stale = otherUser || markerGone || noProfile;
           }
           if (!stale) return;
@@ -641,19 +652,22 @@ if (typeof window !== "undefined") {
   // The API client saw a 401 with the marker gone: re-check with the server
   // and drop to a guest if the session really ended, also on the public
   // pages the client does not redirect away from.
-  // A pending check meets its own /users/me 401 itself; queueing a re-run
-  // for it would loop. A 401 of any other request is reconciled, so a check
-  // answered just before the session ended does not keep its user.
-  setSessionGoneHandler((url) => {
-    if (activeCheck && url === USER_PROFILE_PATH) return;
+  // A pending check meets its own /users/me 401 itself (recognised by its
+  // request's abort signal); queueing a re-run for it would loop. A 401 of
+  // any other request is reconciled, so a check answered just before the
+  // session ended does not keep its user.
+  setSessionGoneHandler((requestSignal) => {
+    if (activeCheck && requestSignal && requestSignal === checkSignal) return;
     useAuthStore.getState().reconcileSession();
   });
   // Another tab signed in, signed out or switched account: it wrote or
   // removed the user snapshot. Covers every route, with or without Header.
+  // A pending check may be answering for the previous account whatever the
+  // store shows, so it always runs once more.
   window.addEventListener("storage", (event) => {
-    if (event.key === USER_SNAPSHOT_KEY || event.key === null) {
-      useAuthStore.getState().reconcileSession();
-    }
+    if (event.key !== USER_SNAPSHOT_KEY && event.key !== null) return;
+    if (activeCheck) rerunCheck = true;
+    else useAuthStore.getState().reconcileSession();
   });
 }
 

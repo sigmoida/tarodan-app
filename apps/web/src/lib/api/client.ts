@@ -91,7 +91,7 @@ async function handleApiError(error: AxiosError) {
       // The store and its query cache must not stay with the ended session,
       // including on the public pages that are not redirected below. The
       // store confirms with the server first (see reportSessionGone).
-      reportSessionGone(error.config?.url);
+      reportSessionGone(error.config?.signal);
       const currentPath = window.location?.pathname || "";
       const publicPathsNoRedirect = [
         "/track-order",

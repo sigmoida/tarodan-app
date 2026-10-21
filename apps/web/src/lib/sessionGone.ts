@@ -2,10 +2,12 @@
  * Session signals shared by the API client and the auth store, kept out of
  * both so the client never imports the store (which imports the API layer).
  */
-let handler: ((url?: string) => void) | undefined;
+type SessionGoneHandler = (requestSignal?: unknown) => void;
+
+let handler: SessionGoneHandler | undefined;
 
 /** Registered once by the auth store. */
-export function setSessionGoneHandler(next: (url?: string) => void): void {
+export function setSessionGoneHandler(next: SessionGoneHandler): void {
   handler = next;
 }
 
@@ -13,10 +15,11 @@ export function setSessionGoneHandler(next: (url?: string) => void): void {
  * Called by the API client on a 401 after the gateway expired the
  * `tarodan_authed` marker. The store verifies with the server before it
  * signs out, because the marker can be missing for a moment while two
- * refreshes race. `url` is the request that got the 401.
+ * refreshes race. `requestSignal` is the abort signal of the request that
+ * got the 401, which lets the store recognise its own session check.
  */
-export function reportSessionGone(url?: string): void {
-  handler?.(url);
+export function reportSessionGone(requestSignal?: unknown): void {
+  handler?.(requestSignal);
 }
 
 /** Route segments of the checkout, cart and payment flows (any locale). */
