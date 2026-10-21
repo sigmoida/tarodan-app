@@ -29,9 +29,9 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Yarım kalmış bir ödemeye dönüş ekranı. Yaşam döngüsü (yükleme, bulunamadı,
- * tamamlanmışı yönlendirme) burada; ödemeye hazır görünüm `PaymentReady`'de —
- * checkout ile aynı iskelet, sayfa başlığı yok.
+ * The screen for returning to an unfinished payment. The lifecycle (loading,
+ * not found, routing a finished payment away) lives here; the ready-to-pay
+ * view is `PaymentReady`, the same layout as checkout, without a page title.
  */
 export default function PaymentPageClient() {
   const t = useTranslations();
@@ -47,7 +47,6 @@ export default function PaymentPageClient() {
     hasTarget,
     kind,
     routes,
-    purpose,
   } = usePaymentStatus();
 
   if (phase === "auth-loading") return <AuthLoadingScreen />;
@@ -82,12 +81,12 @@ export default function PaymentPageClient() {
       <PaymentReady
         target={directTarget}
         paymentId={payment.id}
+        kind={kind}
         amount={payment.amount}
-        // Kalemler yalnız takas ödemesinde döner (grup/sipariş ödemesinin
-        // kendi özeti sepet ekranındadır).
+        // Only a trade payment returns line items (a cart or order payment
+        // has its own summary on the cart screen).
         pricing={payment.tradeId ? payment.pricing : null}
         cardStorageEnabled={cardStorageEnabled}
-        purpose={purpose}
         hasTarget={hasTarget}
         onCancel={handleCancel}
         cancelling={cancelling}

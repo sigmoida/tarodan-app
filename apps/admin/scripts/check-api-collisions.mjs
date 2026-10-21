@@ -20,13 +20,15 @@ const SKIP = new Set(['client.ts']);
 // methods. Their interface fields sit at one indent too, so without this they'd
 // be read as method names and collide with each other (`resource`, `id`, …).
 const isTypeModule = (file) => file.endsWith('.types.ts');
+// Colocated specs (`users.test.ts`) indent `it(` one level inside `describe`.
+const isTest = (file) => file.endsWith('.test.ts');
 // One indent unit (2 spaces or 1 tab) + identifier + `:` or `(` → a top-level key.
 const KEY = /^(?:  |\t)([A-Za-z_$][\w$]*)\s*[:(]/;
 
 const owners = new Map(); // name -> [files]
 
 for (const file of readdirSync(apiDir)) {
-  if (!file.endsWith('.ts') || SKIP.has(file) || isTypeModule(file)) continue;
+  if (!file.endsWith('.ts') || SKIP.has(file) || isTypeModule(file) || isTest(file)) continue;
   const lines = readFileSync(join(apiDir, file), 'utf8').split('\n');
   for (const line of lines) {
     const m = KEY.exec(line);

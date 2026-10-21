@@ -7,6 +7,7 @@ import {
   paymentPagePath,
   paymentPurpose,
   paymentReturnRoutes,
+  takesDistanceSalesConsent,
   type PaymentKind,
 } from "./paymentKind";
 
@@ -70,6 +71,14 @@ describe("paymentPurpose", () => {
     expect(paymentPurpose("membership")).toBe("membership");
     expect(paymentPurpose("boost")).toBe("checkout");
     expect(paymentPurpose("checkout")).toBe("checkout");
+  });
+});
+
+describe("takesDistanceSalesConsent", () => {
+  it("asks for the distance sales contract on a sale of goods only", () => {
+    expect(takesDistanceSalesConsent("checkout")).toBe(true);
+    expect(takesDistanceSalesConsent("boost")).toBe(false);
+    expect(takesDistanceSalesConsent("membership")).toBe(false);
   });
 });
 

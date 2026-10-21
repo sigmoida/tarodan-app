@@ -51,8 +51,22 @@ export function extractImportErrors(
   return errors ? errors.map(String) : [extractErrorMessage(error, fallback)];
 }
 
+const statusOf = (error: unknown): number | undefined =>
+  (error as { response?: { status?: number } })?.response?.status;
+
 export function isNotFoundError(error: unknown): boolean {
-  return (
-    (error as { response?: { status?: number } })?.response?.status === 404
-  );
+  return statusOf(error) === 404;
+}
+
+/**
+ * A refund call whose outcome the screen cannot know. The API answers 503
+ * (`RefundPendingReconciliationException`) when PayTR may have moved the
+ * money or another attempt of the order is unresolved; a 5xx from the
+ * gateway or proxy (a timeout during the PayTR call) or no response at all
+ * leaves the same doubt. Only a 4xx is a clean refusal. The screen must say
+ * so and send staff to the refund reconciliation, never offer a blind retry.
+ */
+export function isRefundOutcomeUnknown(error: unknown): boolean {
+  const status = statusOf(error);
+  return status === undefined || status >= 500;
 }

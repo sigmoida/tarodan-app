@@ -19,6 +19,12 @@ import type { Trade, TradeItem } from "../_lib/types";
 import { mergeTradeItems, type CounterProduct } from "../_lib/counterProducts";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 import { usePagedPicks } from "@/hooks/usePagedPicks";
+import { signedCashAmount } from "@/lib/cashAmount";
+import {
+  isTlAmountRefused,
+  tlAmountInputValue,
+  tlAmountValue,
+} from "@/lib/tlAmount";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -45,6 +51,9 @@ export function useCounterOfferEditor({
   const [counterCashAmount, setCounterCashAmount] = useState<string>("");
   const [counterCashPayer, setCounterCashPayer] = useState<"me" | "them">("me");
   const [counterMessage, setCounterMessage] = useState("");
+
+  const counterCashValue = tlAmountValue(counterCashAmount);
+  const counterCashRefused = isTlAmountRefused(counterCashAmount);
 
   const counterMutation = useMutation({
     mutationFn: (data: {
@@ -216,7 +225,7 @@ export function useCounterOfferEditor({
     );
 
     if (trade.cashAmount && trade.cashAmount > 0) {
-      setCounterCashAmount(trade.cashAmount.toString());
+      setCounterCashAmount(tlAmountInputValue(trade.cashAmount));
       // If the receiver was the cash payer they stay the payer by default.
       setCounterCashPayer(
         trade.cashPayerId === trade.receiverId ? "me" : "them",
@@ -243,6 +252,11 @@ export function useCounterOfferEditor({
   const handleCounterSubmit = () => {
     if (!trade) return;
 
+    if (counterCashRefused) {
+      toast.error(t("trade.cashFormatRefused"));
+      return;
+    }
+
     if (selectedCounterProducts.length === 0) {
       toast.error(t("trade.selectAtLeastOneOffer"));
       return;
@@ -262,28 +276,26 @@ export function useCounterOfferEditor({
       .sort();
     const newInitiatorItemIds = [...selectedCounterProducts].sort();
     const newReceiverItemIds = [...selectedCounterTargetProducts].sort();
-    const newCashAmount = Math.abs(parseFloat(counterCashAmount) || 0);
+    const newCashAmount = counterCashValue;
     const currentCashAmount = Math.abs(trade.cashAmount || 0);
+    // Flipping only who pays is a real change (the API compares the payer
+    // too). Without an amount no payer is sent, so the radio alone is not one.
+    const currentCashPayer =
+      trade.cashPayerId === trade.receiverId ? "me" : "them";
+    const samePayer =
+      newCashAmount === 0 || counterCashPayer === currentCashPayer;
 
     const isIdentical =
       JSON.stringify(newInitiatorItemIds) ===
         JSON.stringify(currentReceiverItemIds) &&
       JSON.stringify(newReceiverItemIds) ===
         JSON.stringify(currentInitiatorItemIds) &&
-      newCashAmount === currentCashAmount;
+      newCashAmount === currentCashAmount &&
+      samePayer;
 
     if (isIdentical) {
       toast.error(t("trade.counterOfferIdentical"));
       return;
-    }
-
-    // Calculate cash amount: positive = initiator (receiver in counter) pays, negative = receiver (original initiator) pays
-    let finalCashAmount: number | undefined = undefined;
-    if (counterCashAmount && parseFloat(counterCashAmount) > 0) {
-      finalCashAmount =
-        counterCashPayer === "me"
-          ? parseFloat(counterCashAmount)
-          : -parseFloat(counterCashAmount);
     }
 
     counterMutation.mutate({
@@ -295,7 +307,7 @@ export function useCounterOfferEditor({
         productId: id,
         quantity: 1,
       })),
-      cashAmount: finalCashAmount,
+      cashAmount: signedCashAmount(counterCashAmount, counterCashPayer),
       message: counterMessage || undefined,
     });
   };
@@ -327,6 +339,8 @@ export function useCounterOfferEditor({
     selectedCounterProducts,
     selectedCounterTargetProducts,
     counterCashAmount,
+    counterCashValue,
+    counterCashRefused,
     setCounterCashAmount,
     counterCashPayer,
     setCounterCashPayer,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
+import { isOptionalTlAmountWithin } from "@/lib/amount-input";
 import { fmtTry } from "@/lib/format";
 import { optionalReasonField, reasonField } from "@/lib/schemas/common";
 
@@ -25,11 +26,7 @@ export const refundPaymentSchema = (t: T, maxAmount: number) =>
       .trim()
       .optional()
       .refine(
-        (v) => {
-          if (!v) return true;
-          const n = Number(v);
-          return !Number.isNaN(n) && n > 0 && n <= maxAmount;
-        },
+        (v) => isOptionalTlAmountWithin(v ?? "", maxAmount),
         t("admin.finance.payments.refundAmountInvalid", {
           max: fmtTry(maxAmount),
         }),

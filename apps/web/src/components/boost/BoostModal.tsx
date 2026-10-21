@@ -94,6 +94,45 @@ function resolveSelection(
   return pkg && option ? { pkg, option } : null;
 }
 
+/**
+ * What the pre-information shows for a choice (`BoostPreInformation`'s
+ * props), and so what the seller consents to.
+ */
+interface ConsentedTerms {
+  listingTitle: string;
+  packageId: string;
+  packageName: string;
+  durationDays: number;
+  price: number;
+}
+
+function termsOf(
+  listingTitle: string,
+  choice: { pkg: BoostPackage; option: BoostDurationOption } | null,
+): ConsentedTerms | null {
+  return choice
+    ? {
+        listingTitle,
+        packageId: choice.pkg.id,
+        packageName: choice.pkg.name,
+        durationDays: choice.option.durationDays,
+        price: choice.option.price,
+      }
+    : null;
+}
+
+/** Any change, however small (also to the price), is a different offer. */
+function sameTerms(a: ConsentedTerms | null, b: ConsentedTerms | null) {
+  if (!a || !b) return a === b;
+  return (
+    a.listingTitle === b.listingTitle &&
+    a.packageId === b.packageId &&
+    a.packageName === b.packageName &&
+    a.durationDays === b.durationDays &&
+    a.price === b.price
+  );
+}
+
 function OptionsSkeleton() {
   return (
     <div className="space-y-4" aria-hidden>
@@ -120,7 +159,8 @@ function OptionsSkeleton() {
  * pre-contract information and the two purchase consents (plan section 3.6:
  * `platform_service_sales`, `withdrawal_waiver`). Pay stays disabled until a
  * duration is chosen and BOTH consents are ticked; the API refuses the order
- * without them. On success it hands over to the pay page
+ * without them. A change to the pre-information (listing, package, duration,
+ * price) unticks both. On success it hands over to the pay page
  * (`/payment/<id>?type=boost`).
  *
  * Mount it per opening (`useBoostLauncher` does): the consents start unticked
@@ -139,6 +179,10 @@ export default function BoostModal({
   const [reminder, setReminder] = useState(false);
   const [contractAccepted, setContractAccepted] = useState(false);
   const [waiverAccepted, setWaiverAccepted] = useState(false);
+  const resetConsents = () => {
+    setContractAccepted(false);
+    setWaiverAccepted(false);
+  };
 
   // Fresh on every opening (staleTime 0) and payable only once that fetch
   // succeeded: the price is the one the seller consents to, so a cached
@@ -154,6 +198,17 @@ export default function BoostModal({
   const choice =
     resolveSelection(packages, selected) ??
     resolveSelection(packages, defaultSelection(packages));
+  const terms = termsOf(listing.title, choice);
+  // The consents belong to the pre-information they were given on. When it
+  // changes (another package or duration, or a refetch that reprices or
+  // renames the choice), both are asked again, in the same render, so pay is
+  // never enabled on terms the seller has not seen. A refetch with the same
+  // terms keeps them.
+  const [termsShown, setTermsShown] = useState(terms);
+  if (!sameTerms(termsShown, terms)) {
+    setTermsShown(terms);
+    resetConsents();
+  }
   const canBuy = !!options?.enabled && packages.length > 0;
   const optionsFresh = optionsQuery.isSuccess && !optionsQuery.isFetching;
 
@@ -177,8 +232,7 @@ export default function BoostModal({
         // seller consented to (the price changed in between), do not pay on
         // it: reload the prices and ask for both consents again.
         if (Math.abs(data.price - consentedPrice) > PRICE_EPSILON) {
-          setContractAccepted(false);
-          setWaiverAccepted(false);
+          resetConsents();
           queryClient.invalidateQueries({
             queryKey: queryKeys.boost.options(listing.id),
           });
