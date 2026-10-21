@@ -4,7 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { formatDateTime } from "@/lib/format";
-import { paymentReturnRoutes, type PaymentKind } from "../_lib/paymentKind";
+import { paymentReturnRoutes, type PaymentKind } from "@/lib/paymentKind";
 
 const h = vi.hoisted(() => ({
   success: {} as Record<string, unknown>,
@@ -120,9 +120,15 @@ describe("payment success view", () => {
     expect(hrefs(html)).toEqual(["/profile/listings", "/profile/boosts"]);
   });
 
-  it("boost paid but its end not known yet: still pending", () => {
-    const html = success({ boost: { ...BOOST, endsAt: null } });
-    expect(html).toContain("payment.boost.success.pending");
+  it("boost paid but never activated: confirms the payment, never that the boost starts", () => {
+    for (const boost of [{ ...BOOST, endsAt: null }, null]) {
+      const html = success({ boost });
+
+      expect(html).toContain("payment.completedTitle");
+      expect(html).not.toContain("payment.boost.success.pending");
+      expect(html).not.toContain("payment.boost.success.title");
+      expect(hrefs(html)).toEqual(["/profile/listings", "/profile/boosts"]);
+    }
   });
 
   it("checkout: the order success view is unchanged", () => {
@@ -162,9 +168,21 @@ describe("payment fail view", () => {
   });
 
   it("boost cancelled by the buyer: the cancelled title, no description, no decline reasons", () => {
-    const html = fail({ cancelled: true });
+    const html = fail({
+      cancelled: true,
+      payment: {
+        id: "p1",
+        amount: 59,
+        status: "failed",
+        failureReason: "cancelled-by-user",
+      },
+    });
 
     expect(html).toContain("payment.boost.cancelled");
+    // The status says cancelled, and the buyer's own cancel is no "error".
+    expect(html).toContain("common.cancelled");
+    expect(html).not.toContain("trade.shipmentStatus.failed");
+    expect(html).not.toContain("cancelled-by-user");
     expect(html).not.toContain("payment.boost.fail.title");
     expect(html).not.toContain("payment.boost.fail.description");
     expect(html).not.toContain("payment.failureReasonsTitle");

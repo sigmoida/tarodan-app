@@ -3,7 +3,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { ClockIcon } from "@heroicons/react/24/outline";
@@ -26,12 +26,12 @@ import {
   type BoostPackage,
   type InitiateBoostRequest,
   type InitiateBoostResponse,
-  type VirtualOrderKind,
 } from "@tarodan/types";
 import { Link, useRouter } from "@/i18n/navigation";
 import { boostApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { formatTL } from "@/lib/format";
+import { MEMBERSHIP_PATH, paymentPagePath } from "@/lib/paymentKind";
 import { apiErrorI18nKey, useWebMutation } from "@/hooks/useWebMutation";
 import BoostPreInformation from "./BoostPreInformation";
 
@@ -62,10 +62,9 @@ interface Selection {
 const DEFAULT_DURATION_DAYS = 7;
 /** The API's rejection when a consent is missing. */
 const CONSENT_REQUIRED_KEY = "server.product.boostConsentRequired";
-/** The pay page's `type` for a boost (`/payment/<id>?type=boost`). */
-const BOOST_PAYMENT_TYPE: VirtualOrderKind = "boost";
-const MEMBERSHIP_PATH = "/membership";
 const DAY_MS = 86_400_000;
+/** Prices are TL with kuruş; anything below one kuruş is the same price. */
+const PRICE_EPSILON = 0.005;
 
 function defaultSelection(packages: BoostPackage[]): Selection | null {
   const pkg = packages[0];
@@ -80,6 +79,8 @@ function defaultSelection(packages: BoostPackage[]): Selection | null {
 /**
  * The package and duration behind a selection in the CURRENT options, so the
  * price shown, consented to and sent always comes from the latest response.
+ * A choice the latest response no longer offers resolves to nothing (the
+ * caller then falls back to the default selection).
  */
 function resolveSelection(
   packages: BoostPackage[],
@@ -132,14 +133,16 @@ export default function BoostModal({
 }: BoostModalProps) {
   const t = useTranslations();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const consentId = useId();
   const [selected, setSelected] = useState<Selection | null>(null);
   const [reminder, setReminder] = useState(false);
   const [contractAccepted, setContractAccepted] = useState(false);
   const [waiverAccepted, setWaiverAccepted] = useState(false);
 
-  // Fresh on every opening (staleTime 0): the price is the one the seller
-  // consents to, so a cached matrix from minutes ago must not be paid on.
+  // Fresh on every opening (staleTime 0) and payable only once that fetch
+  // succeeded: the price is the one the seller consents to, so a cached
+  // matrix (or one whose refetch failed) is never paid on.
   const optionsQuery = useQuery({
     queryKey: queryKeys.boost.options(listing.id),
     queryFn: async () => (await boostApi.options(listing.id)).data,
@@ -148,24 +151,42 @@ export default function BoostModal({
   });
   const options = optionsQuery.data;
   const packages = options?.packages ?? [];
-  const choice = resolveSelection(
-    packages,
-    selected ?? defaultSelection(packages),
-  );
+  const choice =
+    resolveSelection(packages, selected) ??
+    resolveSelection(packages, defaultSelection(packages));
   const canBuy = !!options?.enabled && packages.length > 0;
+  const optionsFresh = optionsQuery.isSuccess && !optionsQuery.isFetching;
 
   const initiate = useWebMutation(
-    async (body: InitiateBoostRequest): Promise<InitiateBoostResponse> =>
+    async ({
+      body,
+    }: {
+      body: InitiateBoostRequest;
+      /** The total the pre-information showed when the seller consented. */
+      consentedPrice: number;
+    }): Promise<InitiateBoostResponse> =>
       (await boostApi.initiate(listing.id, body)).data,
     {
       errorMessage: t("profile.boost.initiateFailed"),
-      onSuccess: (data) => {
+      onSuccess: (data, { consentedPrice }) => {
         if (!data?.paymentId) {
           toast.error(t("profile.boost.paymentStartFailed"));
           return;
         }
+        // The server prices the order itself. If that is not the total the
+        // seller consented to (the price changed in between), do not pay on
+        // it: reload the prices and ask for both consents again.
+        if (Math.abs(data.price - consentedPrice) > PRICE_EPSILON) {
+          setContractAccepted(false);
+          setWaiverAccepted(false);
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.boost.options(listing.id),
+          });
+          toast.error(t("profile.boost.paymentStartFailed"));
+          return;
+        }
         onClose();
-        router.push(`/payment/${data.paymentId}?type=${BOOST_PAYMENT_TYPE}`);
+        router.push(paymentPagePath(data.paymentId, "boost"));
       },
     },
   );
@@ -173,8 +194,7 @@ export default function BoostModal({
     apiErrorI18nKey(initiate.error) === CONSENT_REQUIRED_KEY;
 
   const consentsAccepted = contractAccepted && waiverAccepted;
-  const canPay =
-    canBuy && !!choice && consentsAccepted && !optionsQuery.isFetching;
+  const canPay = optionsFresh && canBuy && !!choice && consentsAccepted;
 
   const remainingDays = listing.boostedUntil
     ? Math.max(
@@ -189,12 +209,15 @@ export default function BoostModal({
   const handleConfirm = () => {
     if (!canPay || !choice) return;
     initiate.mutate({
-      packageId: choice.pkg.id,
-      durationDays: choice.option.durationDays,
-      preInformationAccepted: true,
-      withdrawalWaiverAccepted: true,
-      // The reminder is a premium feature: other sellers never send it.
-      ...(canRemind ? { autoRenew: reminder } : {}),
+      body: {
+        packageId: choice.pkg.id,
+        durationDays: choice.option.durationDays,
+        preInformationAccepted: true,
+        withdrawalWaiverAccepted: true,
+        // The reminder is a premium feature: other sellers never send it.
+        ...(canRemind ? { autoRenew: reminder } : {}),
+      },
+      consentedPrice: choice.option.price,
     });
   };
 
@@ -217,7 +240,7 @@ export default function BoostModal({
   let body: ReactNode;
   if (optionsQuery.isPending) {
     body = <OptionsSkeleton />;
-  } else if (optionsQuery.isError && !options) {
+  } else if (optionsQuery.isError) {
     body = (
       <Alert
         variant="danger"

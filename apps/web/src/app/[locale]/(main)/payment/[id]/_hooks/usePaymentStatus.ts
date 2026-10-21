@@ -21,7 +21,7 @@ import {
   paymentPurpose,
   paymentReturnRoutes,
   type PaymentKind,
-} from "../../_lib/paymentKind";
+} from "@/lib/paymentKind";
 
 type Phase = "auth-loading" | "loading" | "notfound" | "ready";
 

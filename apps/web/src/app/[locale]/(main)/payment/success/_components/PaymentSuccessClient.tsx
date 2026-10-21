@@ -11,7 +11,7 @@ import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { formatDateTime } from "@/lib/format";
 import { usePaymentSuccess } from "../_hooks/usePaymentSuccess";
 import { getEstimatedDelivery } from "../_lib/delivery";
-import { MY_LISTINGS_PATH, MY_ORDERS_PATH } from "../../_lib/paymentKind";
+import { MY_LISTINGS_PATH, MY_ORDERS_PATH } from "@/lib/paymentKind";
 import PaymentResultIcon from "../../_components/PaymentResultIcon";
 import PaymentDetailsCard from "./PaymentDetailsCard";
 
@@ -41,27 +41,40 @@ export default function PaymentSuccessClient() {
   if (phase === "client-loading" || phase === "loading") return <Loading />;
 
   if (kind === "boost") {
-    // Activation runs in the payment's own transaction, so a completed payment
-    // has an end date; until then (callback not in yet) it is "starting".
-    const started = isCompleted && !!boost?.endsAt;
+    // Activation runs in the payment's own transaction: a completed payment
+    // has the boost's end. Before the callback it is "starting". A completed
+    // payment WITHOUT an end means activation was skipped (a Sentry error on
+    // the API); it will not start by itself, so the page claims only the
+    // payment, never that the boost starts.
+    const endsAt = boost?.endsAt ?? null;
+    const view = !isCompleted ? "pending" : endsAt ? "started" : "paid";
     return (
       <PageShell className="flex items-center justify-center p-4">
         <div className="w-full max-w-2xl">
           <SectionCard className="p-8 text-center">
-            <PaymentResultIcon tone={started ? "success" : "pending"} />
+            <PaymentResultIcon
+              tone={view === "pending" ? "pending" : "success"}
+            />
             <h1 className="mb-2 text-3xl font-bold text-heading">
-              {started
+              {view === "started"
                 ? t("payment.boost.success.title")
-                : t("payment.confirmingTitle")}
+                : view === "paid"
+                  ? t("payment.completedTitle")
+                  : t("payment.confirmingTitle")}
             </h1>
-            <p className="mb-6 text-muted">
-              {started && boost?.endsAt
-                ? t("payment.boost.success.description", {
-                    listing: boost.productTitle,
-                    date: formatDateTime(boost.endsAt),
-                  })
-                : t("payment.boost.success.pending")}
-            </p>
+            {view === "started" && boost && endsAt && (
+              <p className="mb-6 text-muted">
+                {t("payment.boost.success.description", {
+                  listing: boost.productTitle,
+                  date: formatDateTime(endsAt),
+                })}
+              </p>
+            )}
+            {view === "pending" && (
+              <p className="mb-6 text-muted">
+                {t("payment.boost.success.pending")}
+              </p>
+            )}
 
             {payment && (
               <div className="mb-6">

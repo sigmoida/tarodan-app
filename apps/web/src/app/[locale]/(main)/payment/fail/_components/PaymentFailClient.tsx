@@ -15,7 +15,7 @@ import { SectionCard, ButtonLink } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentFail } from "../_hooks/usePaymentFail";
 import { formatTL } from "@/lib/format";
-import type { PaymentKind } from "../../_lib/paymentKind";
+import type { PaymentKind } from "@/lib/paymentKind";
 import PaymentResultIcon from "../../_components/PaymentResultIcon";
 
 const REASON_KEYS = [
@@ -101,11 +101,16 @@ export default function PaymentFailClient() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">{t("common.status")}:</span>
-                  <Badge variant="danger">
-                    {t("trade.shipmentStatus.failed")}
-                  </Badge>
+                  {cancelled ? (
+                    <Badge variant="warning">{t("common.cancelled")}</Badge>
+                  ) : (
+                    <Badge variant="danger">
+                      {t("trade.shipmentStatus.failed")}
+                    </Badge>
+                  )}
                 </div>
-                {payment.failureReason && (
+                {/* The buyer cancelled themselves: no error to explain. */}
+                {payment.failureReason && !cancelled && (
                   <div className="mt-3 border-t border-border pt-3 text-xs text-muted">
                     <strong>{t("common.error")}:</strong>{" "}
                     {payment.failureReason}

@@ -11,7 +11,8 @@ import type { PaymentPurpose } from "@/lib/api";
  * What a payment pays for: an order of goods (cart, single or offer order,
  * trade cash) or a virtual order (`membership`, `boost`). One reader for the
  * payment pages (`/payment/[id]`, `/payment/success`, `/payment/fail`), so
- * every page routes and words the same purchase the same way.
+ * every page routes and words the same purchase the same way, and one writer
+ * of the pay-page link the purchase dialogs open (`paymentPagePath`).
  */
 export type PaymentKind = "checkout" | VirtualOrderKind;
 
@@ -43,6 +44,12 @@ export function paymentKind(
     return "checkout";
   }
   return isVirtualOrderKind(type) ? type : "checkout";
+}
+
+/** The pay page of a payment, naming its kind for a virtual order. */
+export function paymentPagePath(paymentId: string, kind: PaymentKind): string {
+  const path = `/payment/${encodeURIComponent(paymentId)}`;
+  return kind === "checkout" ? path : `${path}?${PAYMENT_TYPE_PARAM}=${kind}`;
 }
 
 /**

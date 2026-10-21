@@ -13,7 +13,7 @@ import {
   PAYMENT_TYPE_PARAM,
   paymentKind,
   paymentReturnRoutes,
-} from "../../_lib/paymentKind";
+} from "@/lib/paymentKind";
 
 const urlHasGuest = () =>
   typeof window !== "undefined" &&

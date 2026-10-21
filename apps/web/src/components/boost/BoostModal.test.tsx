@@ -10,6 +10,7 @@ import {
   type InitiateBoostResponse,
 } from "@tarodan/types";
 import { formatTL } from "@/lib/format";
+import { queryKeys } from "@/lib/query/keys";
 import { PLATFORM_ENTITY } from "@/lib/legal/platform-entity";
 
 (
@@ -395,6 +396,74 @@ describe("BoostModal pre-contract information", () => {
       `profile.boost.extendSummary|${JSON.stringify({ remaining: 3, selected: 7, total: 10 })}`,
     );
     expect(button("profile.boost.extendAndPay")).toBeTruthy();
+  });
+});
+
+describe("BoostModal price integrity", () => {
+  it("does not open the pay page when the server priced the order differently from the consented total", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.push).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "profile.boost.paymentStartFailed",
+    );
+    // Both consents again, on the reloaded prices.
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+    expect(h.options).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let a matrix whose refetch failed be paid on", async () => {
+    render();
+    await flush();
+    await acceptBoth();
+    expect(payButton().disabled).toBe(false);
+
+    h.options.mockRejectedValueOnce(new Error("down"));
+    await act(async () => {
+      await client
+        .refetchQueries({ queryKey: queryKeys.boost.options(LISTING.id) })
+        .catch(() => undefined);
+    });
+    await flush();
+
+    expect(text()).toContain("profile.boost.pricingLoadError");
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("falls back to the default duration when the chosen one is no longer offered", async () => {
+    render();
+    await flush();
+    click(durationRow("Ekonomik", 3).querySelector("input")!);
+
+    h.options.mockResolvedValue({
+      data: {
+        ...OPTIONS,
+        packages: [
+          { ...OPTIONS.packages[0], options: [OPTIONS.packages[0].options[1]] },
+          OPTIONS.packages[1],
+        ],
+      },
+    });
+    await act(async () => {
+      await client.refetchQueries({
+        queryKey: queryKeys.boost.options(LISTING.id),
+      });
+    });
+    await flush();
+
+    expect(
+      (durationRow("Ekonomik", 7).querySelector("input") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(text()).toContain(
+      `profile.boost.preInfo.service|${JSON.stringify({ listing: LISTING.title, package: "Ekonomik", days: 7 })}`,
+    );
   });
 });
 

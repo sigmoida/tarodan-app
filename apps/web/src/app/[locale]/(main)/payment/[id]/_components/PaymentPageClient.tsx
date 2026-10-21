@@ -11,7 +11,7 @@ import { usePaymentStatus } from "../_hooks/usePaymentStatus";
 import PaymentReady from "./PaymentReady";
 import { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
-import type { PaymentKind } from "../../_lib/paymentKind";
+import type { PaymentKind } from "@/lib/paymentKind";
 
 /** The not-found button: back to the purchase's own list. */
 const BACK_LABEL: Record<PaymentKind, MessageKey> = {

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { VirtualOrderPaymentFields } from "@tarodan/types";
 import {
   paymentKind,
+  paymentPagePath,
   paymentPurpose,
   paymentReturnRoutes,
   type PaymentKind,
@@ -51,6 +52,16 @@ describe("paymentKind", () => {
     ["membership", GOODS_PAYMENT, "checkout"],
   ])("type=%s with payment %j is %s", (type, payment, kind) => {
     expect(paymentKind(type, payment)).toBe(kind);
+  });
+});
+
+describe("paymentPagePath", () => {
+  it("names the kind of a virtual order and nothing for goods", () => {
+    expect(paymentPagePath("p1", "boost")).toBe("/payment/p1?type=boost");
+    expect(paymentPagePath("p1", "membership")).toBe(
+      "/payment/p1?type=membership",
+    );
+    expect(paymentPagePath("p1", "checkout")).toBe("/payment/p1");
   });
 });
 
