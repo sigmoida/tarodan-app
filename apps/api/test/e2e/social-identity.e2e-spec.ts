@@ -237,4 +237,91 @@ describe("Social identity resolution (E2E, real DB)", () => {
       }),
     ).toBe(1);
   });
+
+  // At most one link per provider on the manual write path too (T9). Only
+  // the real row lock can prove these: there is no unique (user, provider)
+  // index, so without the lock both writers would insert.
+  it("keeps one Google link when two manual links of different identities run at once", async () => {
+    const owner = await prisma.user.create({
+      data: {
+        email: "owner@example.com",
+        displayName: "Owner",
+        isEmailVerified: true,
+      },
+    });
+
+    const results = await Promise.allSettled([
+      identities.linkToUser(owner.id, identity("work@corp.example", "sub-a")),
+      identities.linkToUser(owner.id, identity("home@mail.example", "sub-b")),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    const refused = results.find((r) => r.status === "rejected");
+    expect((refused as PromiseRejectedResult).reason).toMatchObject({
+      status: 409,
+      response: { errorCode: "PROVIDER_ALREADY_LINKED" },
+    });
+    expect(
+      await prisma.oAuthAccount.count({
+        where: { userId: owner.id, provider: "google" },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.securityLog.count({
+        where: { userId: owner.id, eventType: "social_linked" },
+      }),
+    ).toBe(1);
+  });
+
+  it("keeps one Google link when a sign-in races a manual link of another identity", async () => {
+    const owner = await prisma.user.create({
+      data: {
+        email: "owner@example.com",
+        displayName: "Owner",
+        isEmailVerified: true,
+      },
+    });
+
+    const [manual, signIn] = await Promise.allSettled([
+      identities.linkToUser(
+        owner.id,
+        identity("work@corp.example", "sub-manual"),
+      ),
+      identities.resolveUser(identity("owner@example.com", "sub-login")),
+    ]);
+
+    // The sign-in always opens the account; whichever writer locked the row
+    // first holds the one link, and the other adds none.
+    expect(signIn).toMatchObject({
+      status: "fulfilled",
+      value: { userId: owner.id },
+    });
+    const links = await prisma.oAuthAccount.findMany({
+      where: { userId: owner.id, provider: "google" },
+      select: { providerUserId: true },
+    });
+    expect(links).toHaveLength(1);
+    if (links[0].providerUserId === "sub-manual") {
+      expect(manual.status).toBe("fulfilled");
+      expect(signIn).toMatchObject({ value: { outcome: "emailMatch" } });
+    } else {
+      expect(manual).toMatchObject({
+        status: "rejected",
+        reason: { response: { errorCode: "PROVIDER_ALREADY_LINKED" } },
+      });
+      expect(signIn).toMatchObject({ value: { outcome: "linked" } });
+    }
+    // One row for the one link, whoever wrote it.
+    expect(
+      await prisma.securityLog.count({
+        where: {
+          userId: owner.id,
+          eventType: { in: ["social_linked", "social_linked_auto"] },
+        },
+      }),
+    ).toBe(1);
+  });
 });

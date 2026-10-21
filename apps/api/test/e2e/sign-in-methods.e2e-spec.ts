@@ -1,4 +1,5 @@
 import * as request from "supertest";
+import { UnauthorizedException } from "@nestjs/common";
 import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
@@ -381,6 +382,13 @@ describe("Sign-in methods and step-up (E2E)", () => {
     it("answers 400 PROVIDER_TOKEN_INVALID, not 401, for a refused Google token", async () => {
       const user = await createUser(ctx.module);
       const token = await reauthWithPassword(user);
+      // The refusal GoogleAuthService gives a bad token, without a call to
+      // Google (no network in the test).
+      jest.spyOn(google, "verifyIdToken").mockRejectedValue(
+        new UnauthorizedException({
+          i18nKey: "server.auth.googleSessionVerifyFailed",
+        }),
+      );
 
       const res = await http()
         .post("/api/auth/social/google/link")
@@ -388,6 +396,20 @@ describe("Sign-in methods and step-up (E2E)", () => {
         .send({ idToken: "not-a-google-token", reauthToken: token })
         .expect(400);
       expect(res.body.errorCode).toBe("PROVIDER_TOKEN_INVALID");
+      expect(await linksOf(user.id)).toEqual([]);
+    });
+
+    it("answers 400 for a Google link with neither a code nor an idToken", async () => {
+      const user = await createUser(ctx.module);
+      const token = await reauthWithPassword(user);
+      stubGoogle(undefined, "new-google-sub");
+
+      await http()
+        .post("/api/auth/social/google/link")
+        .set(authHeader(user))
+        .send({ reauthToken: token })
+        .expect(400);
+      expect(await linksOf(user.id)).toEqual([]);
     });
 
     it("answers 409 for an identity linked to another account and for a second Google", async () => {
@@ -402,7 +424,11 @@ describe("Sign-in methods and step-up (E2E)", () => {
         .send({ idToken: "native-id-token", reauthToken: token })
         .expect(409);
       expect(taken.body.errorCode).toBe("PROVIDER_LINKED_TO_OTHER_ACCOUNT");
-      expect(JSON.stringify(taken.body)).not.toContain(owner.email);
+      // Never says which account holds the identity.
+      const body = JSON.stringify(taken.body);
+      expect(body).not.toContain(owner.email);
+      expect(body).not.toContain(owner.id);
+      expect(await linksOf(user.id)).toEqual([]);
 
       stubGoogle(undefined, "first-google-sub");
       await http()
