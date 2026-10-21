@@ -228,6 +228,9 @@ export function useEditListingForm({
       queryClient.invalidateQueries({
         queryKey: queryKeys.profileListings.all(),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.tradeEligible.all(),
+      });
       router.push(`/listings/${id}`);
     },
     onError: (error: any) =>
