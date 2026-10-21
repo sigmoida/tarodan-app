@@ -27,8 +27,8 @@ export function useHeaderData() {
   // stale guest store while the marker says signed in, a signed-in store
   // after another tab signed out (marker gone) or switched account (snapshot
   // of another user). It runs on tab focus/visibility, bfcache restore
-  // (pageshow), SPA route changes and `storage` events, which fire here at
-  // once when another tab writes or removes the user snapshot. Without this,
+  // (pageshow) and SPA route changes; the auth store itself listens for
+  // another tab writing or removing the user snapshot. Without this,
   // a transient guest resolution would stick showing "sign in", and another
   // tab's sign-out would leave this tab showing the old account and its
   // cached data.
@@ -42,12 +42,10 @@ export function useHeaderData() {
 
     window.addEventListener("focus", reconcile);
     window.addEventListener("pageshow", reconcile);
-    window.addEventListener("storage", reconcile);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("focus", reconcile);
       window.removeEventListener("pageshow", reconcile);
-      window.removeEventListener("storage", reconcile);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);

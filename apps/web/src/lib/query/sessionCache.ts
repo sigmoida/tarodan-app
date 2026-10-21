@@ -18,7 +18,8 @@ export interface SessionOwner {
  */
 export type SessionChange = "ended" | "switched" | "signedIn";
 
-const isSignedIn = (s: SessionOwner) => !!s.isAuthenticated || !!s.user;
+/** The one "is this store signed in" rule (a session may lack its profile). */
+export const isSignedIn = (s: SessionOwner) => !!s.isAuthenticated || !!s.user;
 
 /**
  * Classifies one auth store update. `wasGuest` says the visitor had been

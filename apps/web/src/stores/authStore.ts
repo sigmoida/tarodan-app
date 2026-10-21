@@ -10,8 +10,14 @@ import {
 } from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
 import { getQueryClient } from "@/lib/query/getQueryClient";
-import { syncQueryCacheWithSession } from "@/lib/query/sessionCache";
-import { setSessionGoneHandler } from "@/lib/sessionGone";
+import {
+  isSignedIn,
+  syncQueryCacheWithSession,
+} from "@/lib/query/sessionCache";
+import {
+  isSessionPreservedPath,
+  setSessionGoneHandler,
+} from "@/lib/sessionGone";
 
 // Membership tier types
 export type MembershipTier = "free" | "basic" | "premium" | "business";
@@ -198,6 +204,11 @@ const mapApiUser = (apiUser: any): User => ({
  * (phone / taxId). checkAuth refreshes the full user right after.
  */
 const USER_SNAPSHOT_KEY = "tarodan_user_snapshot";
+
+/** Orders `checkAuth` calls; see `checkAuth`. */
+let authCheckGeneration = 0;
+/** True while the latest `checkAuth` waits for the profile. */
+let checkInFlight = false;
 function readUserSnapshot(): User | null {
   if (typeof window === "undefined") return null;
   try {
@@ -426,10 +437,17 @@ export const useAuthStore = create<AuthState>()(
         },
 
         checkAuth: async () => {
+          // Only the latest check may write: an older profile response must
+          // not overwrite a newer one (e.g. another tab switched account).
+          const generation = ++authCheckGeneration;
+          const isLatest = () => generation === authCheckGeneration;
           clearLegacyTokenKeys();
           // Could we be signed in? The server writes a JS-readable marker
-          // cookie with the session. Without it we are a guest, no profile call.
-          if (!hasAuthMarker()) {
+          // cookie with the session. Without it a guest stays a guest with no
+          // profile call; a signed-in store asks the server first, because
+          // the marker can be missing for a moment while two refreshes race.
+          if (!hasAuthMarker() && !isSignedIn(get())) {
+            checkInFlight = false;
             get().clearSession();
             return;
           }
@@ -449,10 +467,12 @@ export const useAuthStore = create<AuthState>()(
             set({ isLoading: true });
           }
 
+          checkInFlight = true;
           try {
             // /users/me: on a 401 the gateway proxy first tries a silent
             // refresh from the session cookie.
             const response = await userApi.getProfile();
+            if (!isLatest()) return;
             const apiUser = response.data.user || response.data;
             const user = mapApiUser(apiUser);
             const limits = getMembershipLimitsForUser(user);
@@ -466,6 +486,7 @@ export const useAuthStore = create<AuthState>()(
               limits,
             });
           } catch (error: unknown) {
+            if (!isLatest()) return;
             const status = (error as { response?: { status?: number } })
               ?.response?.status;
             const isUnauthorized = status === 401 || status === 403;
@@ -484,18 +505,28 @@ export const useAuthStore = create<AuthState>()(
               set({ isAuthenticated: true });
             }
           } finally {
-            set({ isLoading: false });
+            if (isLatest()) {
+              checkInFlight = false;
+              set({ isLoading: false });
+            }
           }
         },
 
         reconcileSession: () => {
-          const { isAuthenticated, user } = get();
+          // A pending check already answers with the latest session.
+          if (checkInFlight) return;
+          const state = get();
           const marker = hasAuthMarker();
+          if (!isSignedIn(state)) {
+            if (marker) void get().checkAuth();
+            return;
+          }
+          // Checkout and payment pages keep their session (as on a 401).
+          if (isSessionPreservedPath(window.location.pathname)) return;
           const snapshotId = readUserSnapshot()?.id;
-          const stale = isAuthenticated
-            ? !marker || (!!user && !!snapshotId && snapshotId !== user.id)
-            : marker;
-          if (stale) void get().checkAuth();
+          const otherUser =
+            !!state.user && !!snapshotId && snapshotId !== state.user.id;
+          if (!marker || otherUser) void get().checkAuth();
         },
 
         setUser: (user) => {
@@ -566,11 +597,16 @@ if (typeof window !== "undefined") {
   useAuthStore.subscribe(
     syncQueryCacheWithSession(getQueryClient, useAuthStore.getState()),
   );
-  // The API client saw the server end the session (a 401 with the marker
-  // gone): drop to a guest here too, also on public pages it does not leave.
-  setSessionGoneHandler(() => {
-    const { isAuthenticated, user, clearSession } = useAuthStore.getState();
-    if (isAuthenticated || user) clearSession();
+  // The API client saw a 401 with the marker gone: re-check with the server
+  // and drop to a guest if the session really ended, also on the public
+  // pages the client does not redirect away from.
+  setSessionGoneHandler(() => useAuthStore.getState().reconcileSession());
+  // Another tab signed in, signed out or switched account: it wrote or
+  // removed the user snapshot. Covers every route, with or without Header.
+  window.addEventListener("storage", (event) => {
+    if (event.key === USER_SNAPSHOT_KEY || event.key === null) {
+      useAuthStore.getState().reconcileSession();
+    }
   });
 }
 

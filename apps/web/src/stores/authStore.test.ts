@@ -180,4 +180,20 @@ describe("authStore query cache per session", () => {
 
     expect(cached()).toBe(3);
   });
+
+  it("lets the latest checkAuth win when profile answers cross", async () => {
+    signedIn();
+    h.hasAuthMarker.mockReturnValue(true);
+    let answerFirst!: (v: unknown) => void;
+    h.getProfile
+      .mockReturnValueOnce(new Promise((r) => (answerFirst = r)))
+      .mockResolvedValueOnce({ data: { id: "u2" } });
+
+    const first = useAuthStore.getState().checkAuth();
+    await useAuthStore.getState().checkAuth();
+    answerFirst({ data: { id: "u1" } });
+    await first;
+
+    expect(useAuthStore.getState().user?.id).toBe("u2");
+  });
 });

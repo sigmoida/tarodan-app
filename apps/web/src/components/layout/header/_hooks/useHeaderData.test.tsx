@@ -62,6 +62,8 @@ function Header() {
 
 const flush = () => act(async () => new Promise((r) => setTimeout(r, 0)));
 const profileOf = (id: string) => ({ data: { id } });
+/** What the gateway answers once the session is really gone. */
+const sessionGone = { response: { status: 401 } };
 
 let container: HTMLDivElement;
 let root: Root;
@@ -108,6 +110,7 @@ describe("useHeaderData session reconcile", () => {
     await mountSignedInAsU1();
 
     h.hasAuthMarker.mockReturnValue(false);
+    h.getProfile.mockRejectedValue(sessionGone);
     act(() => void window.dispatchEvent(new Event("focus")));
     await flush();
 
@@ -119,6 +122,7 @@ describe("useHeaderData session reconcile", () => {
     await mountSignedInAsU1();
 
     h.hasAuthMarker.mockReturnValue(false);
+    h.getProfile.mockRejectedValue(sessionGone);
     localStorage.removeItem(SNAPSHOT_KEY);
     act(
       () =>
@@ -161,5 +165,49 @@ describe("useHeaderData session reconcile", () => {
 
     expect(h.getProfile).not.toHaveBeenCalled();
     expect(getQueryClient().getQueryData(ORDERS)).toEqual(["u1-order"]);
+  });
+
+  it("keeps the session when the marker is missing but the server still knows u1", async () => {
+    await mountSignedInAsU1();
+
+    // Two refreshes raced: the marker is gone for a moment, the session is not.
+    h.hasAuthMarker.mockReturnValue(false);
+    h.getProfile.mockResolvedValue(profileOf("u1"));
+    act(() => void window.dispatchEvent(new Event("focus")));
+    await flush();
+
+    expect(useAuthStore.getState().user?.id).toBe("u1");
+    expect(getQueryClient().getQueryData(ORDERS)).toEqual(["u1-order"]);
+  });
+
+  it("sends one profile request for a burst of reconcile triggers", async () => {
+    await mountSignedInAsU1();
+
+    h.hasAuthMarker.mockReturnValue(false);
+    let answer!: (v: unknown) => void;
+    h.getProfile.mockReturnValue(new Promise((r) => (answer = r)));
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+      window.dispatchEvent(new Event("pageshow"));
+      window.dispatchEvent(new StorageEvent("storage", { key: SNAPSHOT_KEY }));
+    });
+    await flush();
+
+    expect(h.getProfile).toHaveBeenCalledTimes(1);
+    answer(profileOf("u1"));
+    await flush();
+  });
+
+  it("leaves the session alone on a payment page, as the API client does", async () => {
+    await mountSignedInAsU1();
+    window.history.replaceState(null, "", "/payment/abc");
+
+    h.hasAuthMarker.mockReturnValue(false);
+    act(() => void window.dispatchEvent(new Event("focus")));
+    await flush();
+    window.history.replaceState(null, "", "/");
+
+    expect(h.getProfile).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().user?.id).toBe("u1");
   });
 });
