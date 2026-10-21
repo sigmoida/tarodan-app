@@ -1,4 +1,5 @@
 import type {
+  BoostOffersResponse,
   BoostOptionsResponse,
   InitiateBoostRequest,
   InitiateBoostResponse,
@@ -24,4 +25,9 @@ export const boostApi = {
       `/products/${productId}/boost/initiate`,
       body,
     ),
+  /**
+   * Whether boost sales are on (`enabled`, the API's `isBoostEnabled`) and
+   * the caller's listings due the one-time boost offer. Signed-in only.
+   */
+  offers: () => api.get<BoostOffersResponse>("/products/boost/offers"),
 };

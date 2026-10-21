@@ -46,6 +46,8 @@ export interface Product {
   discountPercent?: number | null;
   isOnSale?: boolean;
   isBoosted?: boolean;
+  /** End of the running boost (ISO), or null; set while `isBoosted`. */
+  boostedUntil?: string | null;
   /** 'active' = in stock; any other status counts as out of stock. */
   status?: string | null;
   /** quantity - reserved. null = unlimited stock; <= 0 = out of stock. */

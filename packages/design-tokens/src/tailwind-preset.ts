@@ -1,7 +1,9 @@
 import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
+import containerQueries from "@tailwindcss/container-queries";
 import {
   colors,
+  containers,
   radius,
   spacing,
   shadows,
@@ -83,7 +85,13 @@ const safeAreaPlugin = plugin(({ addUtilities }) => {
 });
 
 const tarodanPreset: Partial<Config> = {
-  plugins: [safeAreaPlugin],
+  // Container queries: a fluid component (the listing card) changes its
+  // presentation by its OWN width, which depends on each route's column
+  // count, not on the viewport. Mark the component root `@container` and
+  // write `@card-wide:...`. The root's width must come from outside (a grid
+  // cell or a sized wrapper): an inline-size container never grows to fit
+  // its content.
+  plugins: [safeAreaPlugin, containerQueries],
   theme: {
     /**
      * Kırılım noktaları — Tailwind'in varsayılan listesi, başına `xs` eklenmiş.
@@ -158,6 +166,10 @@ const tarodanPreset: Partial<Config> = {
       // arbitrary `text-[10px]` sizes.
       fontSize: {
         "2xs": `${typography.fontSize["2xs"] / 16}rem`,
+      },
+      // Named container sizes from `containers.ts` (rem, like spacing).
+      containers: {
+        "card-wide": `${containers.cardWide / 16}rem`,
       },
       borderRadius: toPx(radius),
       spacing: toRem(spacing),
