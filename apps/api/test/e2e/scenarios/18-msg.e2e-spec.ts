@@ -1153,7 +1153,8 @@ describe("18 — Mesajlaşma & Bildirim (MSG)", () => {
     });
 
     scenario("MSG-062", async () => {
-      // Link/ikon interpolasyonu — NEW_MESSAGE şablonu ile doğrula.
+      // Link resolution for the NEW_MESSAGE template; the list carries no
+      // emoji icon (user-facing copy has no pictographs).
       const deniz = await createUser(ctx.module, { displayName: "Deniz" });
       const ahmet = await createUser(ctx.module, { displayName: "Ahmet" });
       const t = await createThread(ahmet, {
@@ -1169,7 +1170,7 @@ describe("18 — Mesajlaşma & Bildirim (MSG)", () => {
         (x: any) => x.type === "new_message",
       );
       expect(n).toBeTruthy();
-      expect(n.icon).toBe("💬");
+      expect(n).not.toHaveProperty("icon");
       expect(n.link).toBe(`/messages?thread=${t.body.id}`);
     });
 

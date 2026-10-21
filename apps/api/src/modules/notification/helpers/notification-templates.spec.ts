@@ -1,13 +1,12 @@
 import { getMessages, locales } from "@tarodan/i18n";
 import { NotificationType } from "../dto";
+import { PICTOGRAPH } from "../../../common/helpers/pictograph";
 import { NOTIFICATION_TEMPLATES } from "./notification-templates";
 
 /**
  * User-facing notification copy carries no emoji or pictograph icons. The
  * catalog-wide rule is enforced by `packages/i18n/scripts/check-catalog.mjs`.
  */
-
-const PICTOGRAPH = /\p{Extended_Pictographic}/u;
 
 const lookup = (catalog: unknown, key: string): unknown =>
   key

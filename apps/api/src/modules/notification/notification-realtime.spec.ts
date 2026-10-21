@@ -110,4 +110,32 @@ describe("NotificationService realtime emit", () => {
     expect(item).not.toHaveProperty("icon");
     expect(item?.data).toEqual({ threadId: "t1" });
   });
+
+  it("drops the emoji a legacy row's title was saved with, keeping the words", async () => {
+    mockPrisma.notificationLog.findMany.mockResolvedValueOnce([
+      {
+        id: "n1",
+        type: NotificationType.TRADE_ACCEPTED,
+        title: "Takas Kabul Edildi! \u{1F389}",
+        body: "b",
+        status: "sent",
+        createdAt: new Date(),
+        data: {},
+      },
+      {
+        id: "n2",
+        type: NotificationType.PRODUCT_LIKED,
+        title: "\u{1F680} Öne Çıkarma Aktif ❤️",
+        body: "b",
+        status: "read",
+        createdAt: new Date(),
+        data: {},
+      },
+    ]);
+    const result = await service.getInAppNotifications("u1");
+    expect(result.notifications.map((n) => n.title)).toEqual([
+      "Takas Kabul Edildi!",
+      "Öne Çıkarma Aktif",
+    ]);
+  });
 });
