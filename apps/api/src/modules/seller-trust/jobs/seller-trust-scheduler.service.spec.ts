@@ -31,6 +31,7 @@ function build(candidates: string[]) {
   const prisma = fakePrisma();
   const cache = {
     setIfAbsent: jest.fn().mockResolvedValue(true),
+    exists: jest.fn().mockResolvedValue(true),
     del: jest.fn().mockResolvedValue(undefined),
   };
   const sellerTrust = {
@@ -135,6 +136,19 @@ describe("SellerTrustSchedulerService.runRefresh", () => {
     expect(t.sellerTrust.upsertBatch).not.toHaveBeenCalled();
     expect(t.sellerTrust.deleteStale).not.toHaveBeenCalled();
     // It never held the lock, so it must not release someone else's.
+    expect(t.cache.del).not.toHaveBeenCalled();
+  });
+
+  it("fails (for a retry and the cron alert) when Redis cannot be reached", async () => {
+    const t = build(ids(3));
+    // setIfAbsent answers false on a Redis error; no lock is actually held.
+    t.cache.setIfAbsent.mockResolvedValue(false);
+    t.cache.exists.mockResolvedValue(false);
+
+    await expect(t.service.runRefresh(undefined, asOf)).rejects.toThrow(
+      "run lock unavailable",
+    );
+    expect(t.prisma.$transaction).not.toHaveBeenCalled();
     expect(t.cache.del).not.toHaveBeenCalled();
   });
 
@@ -294,12 +308,31 @@ describe("SellerTrustSchedulerService.runRefresh", () => {
     expect(lines).toContain("failedBatches=1");
   });
 
-  it("deletes stale rows when there are no candidates at all", async () => {
+  it("keeps every row when a run writes nothing (no candidates)", async () => {
     const t = build([]);
     const result = await t.service.runRefresh(undefined, asOf);
     expect(t.sellerTrust.upsertBatch).not.toHaveBeenCalled();
-    expect(t.sellerTrust.deleteStale).toHaveBeenCalledWith(asOf);
-    expect(result.stats).toMatchObject({ candidates: 0, batches: 0 });
+    expect(t.sellerTrust.deleteStale).not.toHaveBeenCalled();
+    expect(result.summary).toMatch(/^cleanup skipped: /);
+    expect(result.stats).toMatchObject({
+      candidates: 0,
+      batches: 0,
+      written: 0,
+      deleted: 0,
+    });
+  });
+
+  it("keeps every row when no candidate is eligible", async () => {
+    const t = build(ids(3));
+    t.userStats.trustEligibleUsers.mockResolvedValue([]);
+    await t.service.runRefresh(undefined, asOf);
+    expect(t.sellerTrust.deleteStale).not.toHaveBeenCalled();
+  });
+
+  it("reports the deleted count in the summary", async () => {
+    const t = build(ids(1));
+    const result = await t.service.runRefresh(undefined, asOf);
+    expect(result.summary).toContain("deleted=2");
   });
 
   it("runs every read inside a read-only snapshot with a statement timeout", async () => {

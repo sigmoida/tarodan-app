@@ -24,7 +24,10 @@ export interface SellerFulfilmentRow {
 
 export interface CounterpartyCountRow {
   userId: string;
-  /** The buyer's user id, or `order:<id>` for a guest checkout. */
+  /**
+   * The buyer's user id; for a guest checkout `guest:<md5 of the e-mail>`
+   * (or `order:<id>` when the order has no guest e-mail). Never stored.
+   */
   counterpartyKey: string;
   count: number;
 }
@@ -153,8 +156,11 @@ export class OrderSellerTrustStatsService {
   /**
    * Completed sales per (seller, counterparty) in the window, so the caller
    * can cap each counterparty across sales and trades. Guest checkouts share
-   * one system buyer, so each guest order is its own counterparty.
-   * Index probes on `orders(seller_id)`.
+   * one system buyer, so a guest is told apart by the e-mail the checkout
+   * stored (`shipping_address.guestEmail`), normalised and hashed in SQL: the
+   * cap holds for one person ordering as a guest many times, and no address
+   * reaches the application. A guest order without an e-mail is its own
+   * counterparty. Index probes on `orders(seller_id)`.
    */
   async salesCounterparties(
     tx: Prisma.TransactionClient,
@@ -166,8 +172,12 @@ export class OrderSellerTrustStatsService {
     return tx.$queryRaw<CounterpartyCountRow[]>`
       SELECT
         o."seller_id" AS "userId",
-        CASE WHEN o."buyer_id" = ${guestBuyerId}::text
-          THEN 'order:' || o."id" ELSE o."buyer_id" END AS "counterpartyKey",
+        CASE
+          WHEN o."buyer_id" IS DISTINCT FROM ${guestBuyerId}::text THEN o."buyer_id"
+          WHEN NULLIF(btrim(o."shipping_address"->>'guestEmail'), '') IS NOT NULL
+            THEN 'guest:' || md5(lower(btrim(o."shipping_address"->>'guestEmail')))
+          ELSE 'order:' || o."id"
+        END AS "counterpartyKey",
         COUNT(*)::int AS "count"
       FROM "orders" o
       WHERE o."seller_id" = ANY(${sellerIds}::text[])

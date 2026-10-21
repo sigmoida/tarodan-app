@@ -33,13 +33,13 @@ Any change to a definition or a constant below is a product decision and bumps
 
 ## Components (v1)
 
-| #   | Component   | Weight | Definition                                                                                                                                                                                                                                                                                                                                                                   | Window                         |
-| --- | ----------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| 1   | Rating      | 0.40   | Published (`approved`) ratings received **as seller** (the rated order's `seller_id` is the receiver) or on a completed trade. Banned givers are left out. Each giver's scores are averaged first (one vote per person), then smoothed: `R = (5 × 4.0 + Σ giver_mean) / (5 + n_givers)`. `s1 = (R − 1) / 4`                                                                  | `ratings.created_at`, 730 days |
-| 2   | Reliability | 0.25   | `E` = paid orders (`preparing_deadline` set) whose **first** deadline `coalesce(original_preparing_deadline, preparing_deadline)` is in the window and has passed, minus cancellations that are not failures (see below). `F` = failures among them. `f = (F + 10 × 0.02) / (E + 10)`, `s2 = clamp(1 − f / 0.25, 0, 1)`                                                      | first deadline, 365 days       |
-| 3   | On-time     | 0.15   | `S` = orders in `E` with `shipments.shipped_at` (the first physical carrier handoff, stamped by the Surat tracking sync or by an admin's manual tracking entry). `L` = those with `shipped_at > first deadline + 2 h`; the grace absorbs the 30-minute sync lag. An extension does not help (decision D4). `l = (L + 10 × 0.05) / (S + 10)`, `s3 = clamp(1 − l / 0.5, 0, 1)` | as 2                           |
-| 4   | Volume      | 0.15   | `N` = completed sales (`status = completed`, `completed_at` in the window) plus completed trades (`completed_at` in the window), at most 3 per counterparty across sales and trades together. Guest checkouts share one system buyer (`guest@tarodan.system`), so each guest order is its own counterparty. `s4 = min(1, ln(1 + N) / ln(101))`                               | 730 days                       |
-| 5   | Tenure      | 0.05   | `D` = whole days since `users.created_at`. `s5 = min(1, D / 730)`                                                                                                                                                                                                                                                                                                            | none                           |
+| #   | Component   | Weight | Definition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Window                         |
+| --- | ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| 1   | Rating      | 0.40   | Published (`approved`) ratings received **as seller** (the rated order's `seller_id` is the receiver) or on a completed trade. Banned givers are left out. Each giver's scores are averaged first (one vote per person), then smoothed: `R = (5 × 4.0 + Σ giver_mean) / (5 + n_givers)`. `s1 = (R − 1) / 4`                                                                                                                                                                                            | `ratings.created_at`, 730 days |
+| 2   | Reliability | 0.25   | `E` = paid orders (`preparing_deadline` set) whose **first** deadline `coalesce(original_preparing_deadline, preparing_deadline)` is in the window and has passed, minus cancellations that are not failures (see below). `F` = failures among them. `f = (F + 10 × 0.02) / (E + 10)`, `s2 = clamp(1 − f / 0.25, 0, 1)`                                                                                                                                                                                | first deadline, 365 days       |
+| 3   | On-time     | 0.15   | `S` = orders in `E` with `shipments.shipped_at` (the first physical carrier handoff, stamped by the Surat tracking sync or by an admin's manual tracking entry). `L` = those with `shipped_at > first deadline + 2 h`; the grace absorbs the 30-minute sync lag. An extension does not help (decision D4). `l = (L + 10 × 0.05) / (S + 10)`, `s3 = clamp(1 − l / 0.5, 0, 1)`                                                                                                                           | as 2                           |
+| 4   | Volume      | 0.15   | `N` = completed sales (`status = completed`, `completed_at` in the window) plus completed trades (`completed_at` in the window), at most 3 per counterparty across sales and trades together. Guest checkouts share one system buyer (`guest@tarodan.system`), so a guest is told apart by the e-mail stored on the order (`shipping_address.guestEmail`, trimmed, lower-cased and hashed in SQL; never stored); a guest order without one is its own counterparty. `s4 = min(1, ln(1 + N) / ln(101))` | 730 days                       |
+| 5   | Tenure      | 0.05   | `D` = whole days since `users.created_at`. `s5 = min(1, D / 730)`                                                                                                                                                                                                                                                                                                                                                                                                                                      | none                           |
 
 ```
 score      = 5 × (0.40·s1 + 0.25·s2 + 0.15·s3 + 0.15·s4 + 0.05·s5)
@@ -94,8 +94,10 @@ Cron `seller-trust-refresh` at 02:30 Europe/Istanbul, before
 `update-popularity` (03:00).
 
 1. **Lock.** Redis `seller-trust:refresh-lock` (2 h TTL), on top of Bull's
-   one-consumer delivery. A run that does not get it returns
-   `skipped: locked` and touches nothing.
+   one-consumer delivery. A run that finds the lock held returns
+   `skipped: locked` and touches nothing. If Redis cannot be reached the run
+   fails instead (retry and cron alert), so a Redis outage never looks like a
+   green no-op.
 2. **Candidates** (one read-only snapshot): sellers with a paid order in the
    last 760 days (the volume window plus a 30-day margin, because an order
    completes days to weeks after payment) and participants of trades
@@ -112,13 +114,16 @@ Cron `seller-trust-refresh` at 02:30 Europe/Istanbul, before
    `DELETE ... WHERE computed_at < asOf` removes sellers that dropped out, or
    were banned, deleted or moved to the test lane. Otherwise every old row is
    kept and the job fails (Bull retries 3 times; the Sentry cron monitor
-   alerts by e-mail).
+   alerts by e-mail). A run that wrote no row at all also skips the cleanup
+   (`cleanup skipped: ...`): an empty result is far more likely a broken
+   query or an empty snapshot than every seller leaving at once.
 6. **Result** (admin jobs page, Bull job data): `candidates`, `batches`,
    `eligible`, `scored`, `notEnoughData`, `written`, `deleted`,
    `failedBatches`.
 
-A run is a pure function of the data at `asOf`: re-running it writes the same
-rows.
+Re-running over unchanged data writes the same rows. Each batch reads its own
+snapshot, so a change during a run (an order shipped between two batches) is
+seen by the later batches only; the next night evens it out.
 
 ### Indexes used
 

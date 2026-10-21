@@ -77,8 +77,10 @@ function errorKind(error: unknown): string {
 /**
  * Nightly seller trust refresh (ADR 0014, `docs/SELLER_TRUST.md`).
  *
- * One run = one `asOf` instant; every window ends there, so a run is a pure
- * function of the data at `asOf` and re-running it is idempotent. Safeguards:
+ * One run = one `asOf` instant; every window ends there, so re-running over
+ * unchanged data writes the same rows. (State that changes during a run, such
+ * as an order shipped between two batches, is read as of each batch's
+ * snapshot; the next night picks it up.) Safeguards:
  * a Redis run lock (on top of Bull's one-consumer delivery), set-based reads
  * per owning domain in batches of 500 inside a read-only snapshot with a
  * statement timeout, one bounded upsert per batch, a pause between batches,
@@ -148,6 +150,12 @@ export class SellerTrustSchedulerService implements OnModuleInit {
     if (
       !(await this.cache.setIfAbsent(SELLER_TRUST_LOCK_KEY, LOCK_TTL_SECONDS))
     ) {
+      // setIfAbsent also answers false when Redis fails. Only a lock that is
+      // really there is a skip; anything else fails the job so Bull retries
+      // and the cron monitor sees it, instead of a silent green no-op.
+      if (!(await this.cache.exists(SELLER_TRUST_LOCK_KEY))) {
+        throw new Error("seller-trust-refresh: run lock unavailable");
+      }
       log("another run holds the lock");
       return { summary: "skipped: locked", stats: { skipped: 1 } };
     }
@@ -236,20 +244,29 @@ export class SellerTrustSchedulerService implements OnModuleInit {
       if (i < batches.length - 1) await this.pause(PAUSE_BETWEEN_BATCHES_MS);
     }
 
-    const counters = Object.entries(stats)
-      .map(([k, v]) => `${k}=${v}`)
-      .join(" ");
+    const counters = () =>
+      Object.entries(stats)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(" ");
     if (stats.failedBatches > 0) {
       // Keep every existing row: a failed batch's sellers keep yesterday's
       // score. Throwing marks the Bull job failed (retries, Sentry cron alert).
-      log(`not cleaned up: ${counters}`);
+      log(`not cleaned up: ${counters()}`);
       throw new Error(
         `seller-trust-refresh: ${stats.failedBatches} of ${stats.batches} batches failed; stale rows kept`,
       );
     }
+    if (stats.written === 0) {
+      // A run that wrote nothing would delete every score. That is far more
+      // likely a broken candidate query or an empty snapshot than every
+      // seller dropping out at once, so keep the rows and say so.
+      log(`cleanup skipped: nothing written`);
+      this.logger.warn("Seller trust run wrote no row; cleanup skipped");
+      return { summary: `cleanup skipped: ${counters()}`, stats };
+    }
 
     stats.deleted = await this.sellerTrust.deleteStale(asOf);
-    return { summary: counters, stats };
+    return { summary: counters(), stats };
   }
 
   private async runBatch(

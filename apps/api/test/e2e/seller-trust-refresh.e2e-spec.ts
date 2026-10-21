@@ -118,6 +118,7 @@ interface OrderFixture {
   cancelledBy?: CancellationActor | null;
   cancelReason?: string | null;
   adminCancelReasonCode?: string | null;
+  shippingAddress?: Prisma.InputJsonValue;
 }
 
 /** Defaults: a completed, on-time order paid 10 days before asOf. */
@@ -146,6 +147,7 @@ async function order(f: OrderFixture): Promise<string> {
       cancelledBy: f.cancelledBy ?? null,
       cancelReason: f.cancelReason ?? null,
       adminCancelReasonCode: f.adminCancelReasonCode ?? null,
+      shippingAddress: f.shippingAddress,
     },
   });
   const shippedAt =
@@ -295,8 +297,10 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
       cancelledBy: CancellationActor.system,
       cancelReason: ORDER_CANCEL_REASON.paymentWindowExpired,
     });
-    // Ratings are two-way: the seller's rating of its buyer belongs to the
-    // buyer, who sells nothing, so it counts for nobody.
+    // Ratings are two-way. The buyer is a seller too (case D), so the
+    // seller's rating of this buyer WOULD reach the buyer's score if the
+    // "received as seller" filter were missing.
+    await caseD(buyer);
     const ownOrder = await order({
       sellerId: seller,
       buyerId: buyer,
@@ -313,7 +317,11 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
       reliability: { eligibleOrders: 6, failures: 0 },
       volume: { transactions: 5, counterparties: 5 },
     });
-    expect(await scoreOf(buyer)).toBeNull();
+    // The buyer's own score has its 5 givers only, not the seller's 1 star.
+    expect(components(await scoreOf(buyer)).rating).toMatchObject({
+      raters: 5,
+      smoothed: 4.5,
+    });
     expect(await scoreOf(testBuyer)).toBeNull();
   });
 
@@ -335,21 +343,46 @@ describe("seller-trust-refresh (E2E, data layer)", () => {
     expect(c.rating.smoothed).toBeCloseTo(46 / 11, 4);
   });
 
-  it("counts each guest checkout as its own counterparty", async () => {
+  it("tells guests apart by their e-mail and caps a repeat guest", async () => {
     const seller = await user();
     const guest = await user({ email: SYSTEM_GUEST_EMAIL });
-    for (let i = 0; i < 4; i++)
-      await order({ sellerId: seller, buyerId: guest });
-    await order({ sellerId: seller, buyerId: await user() });
+    const asGuest = (guestEmail?: string) =>
+      order({
+        sellerId: seller,
+        buyerId: guest,
+        shippingAddress: {
+          isGuestOrder: true,
+          ...(guestEmail ? { guestEmail } : {}),
+        },
+      });
+    // Three different guests.
+    await asGuest("a@guest.test");
+    await asGuest("b@guest.test");
+    await asGuest("c@guest.test");
+    // One guest five times (case and spaces differ): one counterparty, capped at 3.
+    for (const email of [
+      "d@guest.test",
+      "D@Guest.test",
+      " d@guest.test ",
+      "d@guest.test",
+      "d@guest.test",
+    ]) {
+      await asGuest(email);
+    }
+    // A guest order without an e-mail is its own counterparty.
+    await asGuest();
+    await asGuest();
 
     await buildRunner().service.runRefresh(undefined, asOf);
 
     const row = await scoreOf(seller);
     expect(components(row).volume).toMatchObject({
-      transactions: 5,
-      counterparties: 5,
+      transactions: 3 + 3 + 2,
+      counterparties: 3 + 1 + 2,
     });
     expect(row?.scoreX100).not.toBeNull();
+    // The system guest account itself is never scored as a seller.
+    expect(await scoreOf(guest)).toBeNull();
   });
 
   it("counts seller-caused failures only, on fields that are populated", async () => {
