@@ -25,6 +25,7 @@ describe("gateway forwarded headers", () => {
       "pragma",
       "idempotency-key",
       "x-payment-capability",
+      "x-reauth-token",
     ]) {
       expect(FORWARDED_REQUEST_HEADERS).toContain(header);
     }
@@ -131,6 +132,13 @@ describe("gateway proxy request forwarding", () => {
     });
     expect(path).toBe("/payments/direct-form");
     expect(headers.get("x-payment-capability")).toBe("cap-token");
+  });
+
+  it("forwards the step-up token header (X-Reauth-Token) to the API", async () => {
+    // Account deletion is a DELETE without a body: the token travels in this
+    // header, and a dropped header would read as "no step-up" on the API.
+    const { headers } = await forward({ "X-Reauth-Token": "step-up-token" });
+    expect(headers.get("x-reauth-token")).toBe("step-up-token");
   });
 
   it("safelist dışındaki başlıkları ve tarayıcı kimlik bilgisini taşımaz", async () => {
