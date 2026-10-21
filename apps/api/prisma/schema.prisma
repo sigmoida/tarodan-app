@@ -1155,7 +1155,9 @@ model ProductBoost {
   /// at `price - refundedAmount`.
   refundedAmount         Decimal?    @map("refunded_amount") @db.Decimal(10, 2)
   /// Claim stamp of the "ends within 24 hours" reminder, so a cron rerun never
-  /// sends it twice. An extension creates a new tail row, which can be reminded.
+  /// sends it twice. A purchase stacked behind creates a new tail row, which can
+  /// be reminded; when this boost's end moves past the window the reminder
+  /// announced (an extension, a resume), it is due again (`isBoostReminderDue`).
   reminderSentAt         DateTime?   @map("reminder_sent_at")
   createdAt              DateTime    @default(now()) @map("created_at")
   updatedAt              DateTime    @updatedAt @map("updated_at")

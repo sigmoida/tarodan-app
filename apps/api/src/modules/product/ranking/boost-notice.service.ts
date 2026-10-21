@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { BoostStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { OutboxService } from "../../outbox/outbox.service";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
@@ -16,15 +17,18 @@ const KIND_TO_TYPE: Record<BoostNoticeKind, NotificationType> = {
   granted: NotificationType.BOOST_GRANTED,
   cancelled: NotificationType.BOOST_CANCELLED,
   refunded: NotificationType.BOOST_REFUNDED,
+  ending_soon: NotificationType.BOOST_ENDING_SOON,
+  expired: NotificationType.BOOST_EXPIRED,
 };
 
 /**
- * Seller notices of staff boost actions (grant, revoke, refund and stop),
- * through the outbox (apps/api/CLAUDE.md, "Side effects go through the
- * outbox"). `BoostTimelineService` writes the row in the transaction that
- * changes the boost; the staff action then sends it at once (`flush`), and the
- * drainer sends it if the process stops in between, or when the change
- * committed elsewhere (a boost refund finalized by the recovery cron).
+ * Seller notices of a boost, through the outbox (apps/api/CLAUDE.md, "Side
+ * effects go through the outbox"): staff actions (grant, revoke, refund and
+ * stop) and the expire-boosts cron (ends within 24 hours, ended).
+ * `BoostTimelineService` writes the row in the transaction that changes the
+ * boost; the caller then sends it at once (`flush`), and the drainer sends it
+ * if the process stops in between, or when the change committed elsewhere (a
+ * boost refund finalized by the recovery cron).
  */
 @Injectable()
 export class BoostNoticeService implements OnModuleInit {
@@ -61,9 +65,14 @@ export class BoostNoticeService implements OnModuleInit {
   /**
    * The outbox handler: one notice to the boost's seller, read when it is
    * sent (the refunded amount is final by then). A boost that no longer
-   * exists (deleted with its listing) has nobody to tell.
+   * exists (deleted with its listing) has nobody to tell, and an ending-soon
+   * reminder delivered late (the drainer) is dropped once the boost no longer
+   * runs: "ends within 24 hours" would then be wrong.
    */
-  async send(notice: BoostNoticePayload): Promise<void> {
+  async send(
+    notice: BoostNoticePayload,
+    now: Date = new Date(),
+  ): Promise<void> {
     const boost = await this.prisma.productBoost.findUnique({
       where: { id: notice.boostId },
       select: {
@@ -71,10 +80,20 @@ export class BoostNoticeService implements OnModuleInit {
         productId: true,
         durationDays: true,
         refundedAmount: true,
+        status: true,
+        endsAt: true,
         product: { select: { title: true } },
       },
     });
     if (!boost) return;
+    if (
+      notice.kind === "ending_soon" &&
+      (boost.status !== BoostStatus.active ||
+        !boost.endsAt ||
+        boost.endsAt <= now)
+    ) {
+      return;
+    }
     // The record must exist before the push: a retry then pushes once.
     await this.notificationService.createInAppNotification(
       boost.userId,

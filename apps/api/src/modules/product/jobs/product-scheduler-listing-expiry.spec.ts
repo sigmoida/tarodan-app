@@ -85,6 +85,7 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
       search as any,
       {} as any, // sellerTrust
       {} as never, // boost timeline
+      {} as never, // boost notices
     );
     return { service, prisma, notifications, cache, search };
   };

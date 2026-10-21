@@ -3,6 +3,7 @@ import type { SentryService } from "../../sentry/sentry.service";
 import { BoostActivationService } from "./boost-activation.service";
 import { BoostStaffTimelineService } from "./boost-staff-timeline.service";
 import { BoostSystemPauseService } from "./boost-system-pause.service";
+import { BoostExpiryService } from "./boost-expiry.service";
 import { BoostTimelineStore } from "./boost-timeline-store.service";
 import { BoostTimelineService } from "./boost-timeline.service";
 
@@ -26,6 +27,7 @@ export function newBoostTimeline(
     new BoostActivationService(store),
     new BoostStaffTimelineService(store),
     new BoostSystemPauseService(store),
+    new BoostExpiryService(store),
   );
   return { timeline, store };
 }
