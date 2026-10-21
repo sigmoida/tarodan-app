@@ -36,6 +36,7 @@ import { isRenewableInPlace } from "../helpers/product-renewal";
 import { refreshProductVisibility } from "../helpers/product-visibility";
 import { recordListingRemovals } from "../helpers/listing-removal";
 import { BoostTimelineService } from "../boost-timeline/boost-timeline.service";
+import { writeProductRanking } from "../helpers/product-ranking-write";
 
 /**
  * Product Scheduler Service
@@ -165,7 +166,6 @@ export class ProductSchedulerService implements OnModuleInit {
           viewCount: true,
           likeCount: true,
           description: true,
-          boostedUntil: true,
           sellerId: true,
           _count: {
             select: {
@@ -245,30 +245,16 @@ export class ProductSchedulerService implements OnModuleInit {
           sellerTrustRating: sellerTrust.get(product.sellerId)?.rating ?? null,
         });
 
-        // rankTier reconcile
-        const hasActiveBoost =
-          product.boostedUntil != null && new Date(product.boostedUntil) > now;
-        const rankTier = hasActiveBoost
-          ? 2
-          : premiumSet.has(product.sellerId)
-            ? 1
-            : 0;
-
-        const relevanceScore = computeRelevanceScore({
-          rankTier,
+        // rankTier reconcile: boosted (2) is decided by the row at write
+        // time, so a boost activated since the read above keeps its tier and
+        // bonus; otherwise a paid member seller gets 1, everyone else 0.
+        await writeProductRanking(this.prisma, {
+          productId: product.id,
           qualityScore,
           popularityScore,
-        });
-
-        await this.prisma.product.update({
-          where: { id: product.id },
-          data: {
-            popularityScore,
-            popularityUpdatedAt: now,
-            qualityScore,
-            rankTier,
-            relevanceScore,
-          },
+          unboostedTier: premiumSet.has(product.sellerId) ? 1 : 0,
+          writePopularity: true,
+          now,
         });
 
         updatedCount++;
