@@ -84,6 +84,15 @@ export class MembershipService {
     return this.common.getUserMembership(userId);
   }
 
+  /**
+   * The saved-search limit of the user's effective tier, for the save gate.
+   * Reads only the tier (`getEffectiveTier`): no self-heal, and database
+   * errors stay 5xx instead of becoming `limitsFetchFailed`.
+   */
+  async getSavedSearchLimit(userId: string): Promise<number> {
+    return (await this.common.getEffectiveTier(userId)).maxSavedSearches;
+  }
+
   // ==========================================================================
   // GET USER'S MEMBERSHIP LIMITS (for checking permissions)
   // ==========================================================================
@@ -219,6 +228,7 @@ export class MembershipService {
         canCreateCollections: dto.canCreateCollections,
         canTrade: dto.canTrade,
         isAdFree: dto.isAdFree,
+        maxSavedSearches: dto.maxSavedSearches,
         featuredListingSlots: dto.featuredListingSlots,
         // sortOrder yük taşır: yükseltme/düşürme yönü katmanların sortOrder
         // karşılaştırmasından çıkar. Yazılmadığında yeni katman 0'a (free ile

@@ -14,7 +14,11 @@ import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { i18nMessage } from "../i18n";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
-import { isPremiumEntitled } from "./helpers/membership.util";
+import {
+  isPremiumEntitled,
+  type BusinessEntitlementOwner,
+  type PremiumCheckMembership,
+} from "./helpers/membership.util";
 
 /**
  * The tier columns the tier response reads; a full `MembershipTier` row fits.
@@ -193,21 +197,10 @@ export class MembershipCommonService {
       }
     }
 
-    let effectiveTier = { ...membership.tier };
-    if (
-      membership.tier.type !== MembershipTierType.free &&
-      !isPremiumEntitled(membership, entitlementOwner)
-    ) {
-      const freeTier = await this.prisma.membershipTier.findUnique({
-        where: { type: MembershipTierType.free },
-      });
-      if (!freeTier) {
-        throw new NotFoundException(
-          i18nMessage("server.membership.freeTierNotFound"),
-        );
-      }
-      effectiveTier = { ...freeTier };
-    }
+    const effectiveTier = await this.effectiveTierOf(
+      membership,
+      entitlementOwner,
+    );
 
     const pendingIntent = await this.prisma.membershipPayment.findFirst({
       where: {
@@ -297,6 +290,61 @@ export class MembershipCommonService {
       // featured-slot alanları kaldırıldı: özellik hiç uygulanmadı (sayaç hep
       // 0'dı) ve öne çıkarmayı ücretli paketler devraldı.
     };
+  }
+
+  /**
+   * The tier whose features apply: the subscribed tier while it is entitled
+   * (`isPremiumEntitled`), else the free tier. The one rule for every gate.
+   */
+  private async effectiveTierOf(
+    membership: PremiumCheckMembership & { tier: MembershipTier },
+    owner: BusinessEntitlementOwner | null,
+  ): Promise<MembershipTier> {
+    if (
+      membership.tier.type === MembershipTierType.free ||
+      isPremiumEntitled(membership, owner)
+    ) {
+      return { ...membership.tier };
+    }
+    return this.freeTier();
+  }
+
+  private async freeTier(): Promise<MembershipTier> {
+    const freeTier = await this.prisma.membershipTier.findUnique({
+      where: { type: MembershipTierType.free },
+    });
+    if (!freeTier) {
+      throw new NotFoundException(
+        i18nMessage("server.membership.freeTierNotFound"),
+      );
+    }
+    return freeTier;
+  }
+
+  /**
+   * The effective tier without the read side effects of `getUserMembership`
+   * (no free-membership create, no past-due self-heal with its provider
+   * call, no usage counts), for a gate that needs one tier value on a write
+   * path. No membership row means the free tier, as `getUserMembership`
+   * would create; a past-due membership stays on free until it heals there.
+   */
+  async getEffectiveTier(userId: string): Promise<MembershipTier> {
+    const [owner, membership] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { businessStatus: true, companyName: true, taxId: true },
+      }),
+      this.prisma.userMembership.findUnique({
+        where: { userId },
+        include: { tier: true },
+      }),
+    ]);
+    if (!owner) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    return membership
+      ? this.effectiveTierOf(membership, owner)
+      : this.freeTier();
   }
 
   mapTierToDto(tier: MembershipTierRow): MembershipTierResponseDto {

@@ -102,11 +102,10 @@ export class SavedSearchService {
     const name = dto.name || savedSearchDefaultName(query, labels) || null;
     const queryHash = savedSearchQueryHash(query);
 
-    // Read before the transaction: it may self-heal a past-due membership
-    // (a provider call), which must not run under the user row lock. A tier
-    // change racing this save is harmless: the next save sees it.
-    const { maxSavedSearches: limit } =
-      await this.membership.getUserLimits(userId);
+    // The effective tier's limit, read before the transaction (nothing
+    // more than the tier rows). A tier change racing this save is harmless:
+    // the next save sees it.
+    const limit = await this.membership.getSavedSearchLimit(userId);
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {

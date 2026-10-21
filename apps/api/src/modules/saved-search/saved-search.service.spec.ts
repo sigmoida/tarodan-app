@@ -54,9 +54,7 @@ describe("SavedSearchService", () => {
       },
     };
     const membership = {
-      getUserLimits: jest
-        .fn()
-        .mockResolvedValue({ maxSavedSearches: opts.limit ?? 5 }),
+      getSavedSearchLimit: jest.fn().mockResolvedValue(opts.limit ?? 5),
     };
     const sentry = { setTag: jest.fn() };
     const service = new SavedSearchService(
@@ -146,10 +144,10 @@ describe("SavedSearchService", () => {
       expect(tx.savedSearch.count).toHaveBeenCalledWith({
         where: { userId: "u1" },
       });
-      // The limit is read before the transaction (no provider call under the lock).
-      expect(membership.getUserLimits.mock.invocationCallOrder[0]).toBeLessThan(
-        prisma.$transaction.mock.invocationCallOrder[0],
-      );
+      // The limit is read before the transaction, outside the lock.
+      expect(
+        membership.getSavedSearchLimit.mock.invocationCallOrder[0],
+      ).toBeLessThan(prisma.$transaction.mock.invocationCallOrder[0]);
     });
 
     it("refuses a deleted account found under the lock", async () => {
@@ -255,7 +253,7 @@ describe("SavedSearchService", () => {
       expect(responseOf(error)).toMatchObject({
         i18nKey: "server.savedSearch.emptyQuery",
       });
-      expect(membership.getUserLimits).not.toHaveBeenCalled();
+      expect(membership.getSavedSearchLimit).not.toHaveBeenCalled();
     });
 
     it("stores the canonical query without unknown keys, with its hash", async () => {

@@ -59,9 +59,11 @@ There is no rename in v1.
 
 ## The limit under concurrency
 
-The limit is read before the transaction (`getUserLimits`, the effective
-tier; it may self-heal a past-due membership, which must not run under a
-lock). The transaction then locks the user row `FOR NO KEY UPDATE`
+The limit is read before the transaction (`MembershipService.getSavedSearchLimit`:
+the effective tier only, by the same `isPremiumEntitled` rule as every other
+gate, without the self-heal or the usage counts of `getUserLimits`, so a
+database error stays a 5xx). A past-due member is on the free limit until
+the membership heals. The transaction then locks the user row `FOR NO KEY UPDATE`
 (`lockActiveUserForQuota`), checks the duplicate, counts and inserts. Two
 parallel saves of one user therefore run one after the other, and the second
 sees the first one's row. The lock also refuses an account deleted meanwhile.

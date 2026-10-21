@@ -46,14 +46,6 @@ describe("Saved searches (E2E)", () => {
     }
   };
 
-  /**
-   * The free membership is created lazily on the first membership read and
-   * that create is not race-safe; parallel tests warm it first so they test
-   * the save race only.
-   */
-  const warmMembership = (user: CreatedTestUser) =>
-    http().get("/api/membership/me/limits").set(authHeader(user)).expect(200);
-
   const countOf = (userId: string) =>
     getPrisma().savedSearch.count({ where: { userId } });
 
@@ -151,7 +143,6 @@ describe("Saved searches (E2E)", () => {
 
     it("two parallel identical saves store one row and answer one 409", async () => {
       const user = await createUser(ctx.module);
-      await warmMembership(user);
 
       const results = await Promise.all([
         save(user, { query: { search: "same" } }),
