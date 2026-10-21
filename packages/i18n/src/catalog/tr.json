@@ -11767,7 +11767,8 @@
         "pauseActiveOnly": "Yalnızca süresi devam eden aktif paket duraklatılabilir",
         "resumePausedOnly": "Yalnızca duraklatılmış paket devam ettirilebilir",
         "extendActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış paketin süresi uzatılabilir",
-        "extensionRange": "Uzatma süresi 1-365 gün olmalıdır"
+        "extensionRange": "Uzatma süresi 1-365 gün olmalıdır",
+        "slugTaken": "Bu slug ile bir paket zaten var"
       },
       "fileMissing": "Dosya gönderilmedi",
       "commission": {

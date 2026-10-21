@@ -11767,7 +11767,8 @@
         "pauseActiveOnly": "Only an active package that is still running can be paused",
         "resumePausedOnly": "Only a paused package can be resumed",
         "extendActiveOrPausedOnly": "Only an active or paused package can be extended",
-        "extensionRange": "The extension must be between 1 and 365 days"
+        "extensionRange": "The extension must be between 1 and 365 days",
+        "slugTaken": "A package with this slug already exists"
       },
       "fileMissing": "No file was sent",
       "commission": {

@@ -4,7 +4,9 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import {
+  AdPackage,
   AdPackageAudienceMode,
+  AdPackageTier,
   BoostStatus,
   MembershipTierType,
   Prisma,
@@ -18,6 +20,87 @@ import {
 } from "../dto/ad-package.dto";
 import { paginate } from "../../../common/list";
 import { i18nMessage } from "../../i18n";
+
+const isBoostStatus = (value: string): value is BoostStatus =>
+  (Object.values(BoostStatus) as string[]).includes(value);
+
+/** A package as the admin reads it: the row plus whichever relations it loaded. */
+type PackageRow = AdPackage & {
+  tiers?: AdPackageTier[];
+  targetTiers?: Array<{ tierType: MembershipTierType }>;
+  targetUsers?: Array<{
+    user: {
+      id: string;
+      adminCode: string | null;
+      username: string | null;
+      displayName: string;
+      email: string;
+    };
+  }>;
+};
+
+/**
+ * What a package response loads: tiers in display order and the audience. The
+ * target users are read for their public admin identity only (the create and
+ * update paths used to load whole user rows).
+ */
+const PACKAGE_INCLUDE = {
+  tiers: { orderBy: [{ durationDays: "asc" }, { minAmount: "asc" }] },
+  targetTiers: true,
+  targetUsers: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          adminCode: true,
+          username: true,
+          displayName: true,
+          email: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AdPackageInclude;
+
+/** The engagement counters a purchase's before/after metrics read. */
+type MetricsRow = {
+  baselineViewCount: number | null;
+  baselineLikeCount: number | null;
+  baselineClickCount: number | null;
+  finalViewCount: number | null;
+  finalLikeCount: number | null;
+  finalClickCount: number | null;
+  product: { viewCount: number; likeCount: number; clickCount: number } | null;
+};
+
+/** What the purchase list and detail load for each boost. */
+const PURCHASE_INCLUDE = {
+  user: {
+    select: {
+      id: true,
+      adminCode: true,
+      username: true,
+      displayName: true,
+      email: true,
+      avatarUrl: true,
+    },
+  },
+  package: { select: { id: true, name: true } },
+  product: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      viewCount: true,
+      likeCount: true,
+      clickCount: true,
+    },
+  },
+} satisfies Prisma.ProductBoostInclude;
+
+type PurchaseRow = Prisma.ProductBoostGetPayload<{
+  include: typeof PURCHASE_INCLUDE;
+}>;
 
 /**
  * Admin management of the dynamic ad/boost packages (Ekonomik / Vitrin / …) and
@@ -95,7 +178,7 @@ export class AdminAdPackageService {
     };
   }
 
-  private serialize(pkg: any) {
+  private serialize(pkg: PackageRow) {
     return {
       id: pkg.id,
       name: pkg.name,
@@ -104,8 +187,8 @@ export class AdminAdPackageService {
       isActive: pkg.isActive,
       sortOrder: pkg.sortOrder,
       audienceMode: pkg.audienceMode,
-      targetTierTypes: (pkg.targetTiers ?? []).map((t: any) => t.tierType),
-      targetUsers: (pkg.targetUsers ?? []).map((target: any) => ({
+      targetTierTypes: (pkg.targetTiers ?? []).map((t) => t.tierType),
+      targetUsers: (pkg.targetUsers ?? []).map((target) => ({
         id: target.user.id,
         adminCode: target.user.adminCode,
         username: target.user.username,
@@ -113,7 +196,7 @@ export class AdminAdPackageService {
         email: target.user.email,
       })),
       createdAt: pkg.createdAt,
-      tiers: (pkg.tiers ?? []).map((t: any) => ({
+      tiers: (pkg.tiers ?? []).map((t) => ({
         id: t.id,
         durationDays: t.durationDays,
         minAmount: Number(t.minAmount),
@@ -127,7 +210,7 @@ export class AdminAdPackageService {
     };
   }
 
-  private purchaseMetrics(boost: any) {
+  private purchaseMetrics(boost: MetricsRow) {
     const current = {
       views: boost.finalViewCount ?? boost.product?.viewCount ?? 0,
       likes: boost.finalLikeCount ?? boost.product?.likeCount ?? 0,
@@ -156,7 +239,7 @@ export class AdminAdPackageService {
     return { before, current, gain, performanceScore };
   }
 
-  private serializePurchase(boost: any, bestScore?: number) {
+  private serializePurchase(boost: PurchaseRow, bestScore?: number) {
     const now = Date.now();
     const metrics = this.purchaseMetrics(boost);
     const remainingSeconds =
@@ -211,23 +294,7 @@ export class AdminAdPackageService {
   async listPackages() {
     const packages = await this.prisma.adPackage.findMany({
       orderBy: { sortOrder: "asc" },
-      include: {
-        tiers: { orderBy: [{ durationDays: "asc" }, { minAmount: "asc" }] },
-        targetTiers: true,
-        targetUsers: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                adminCode: true,
-                username: true,
-                displayName: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
+      include: PACKAGE_INCLUDE,
     });
     return { data: packages.map((p) => this.serialize(p)) };
   }
@@ -237,7 +304,9 @@ export class AdminAdPackageService {
       where: { slug: dto.slug },
     });
     if (existing) {
-      throw new BadRequestException("Bu slug ile bir paket zaten var");
+      throw new BadRequestException(
+        i18nMessage("server.admin.adPackage.slugTaken"),
+      );
     }
     const audienceMode = dto.audienceMode ?? AdPackageAudienceMode.everyone;
     const targets = this.normalizeAudienceTargets(
@@ -267,11 +336,7 @@ export class AdminAdPackageService {
           ? { create: dto.tiers.map((t) => this.tierData(t)) }
           : undefined,
       },
-      include: {
-        tiers: true,
-        targetTiers: true,
-        targetUsers: { include: { user: true } },
-      },
+      include: PACKAGE_INCLUDE,
     });
     return this.serialize(pkg);
   }
@@ -291,7 +356,9 @@ export class AdminAdPackageService {
         where: { slug: dto.slug },
       });
       if (clash)
-        throw new BadRequestException("Bu slug ile bir paket zaten var");
+        throw new BadRequestException(
+          i18nMessage("server.admin.adPackage.slugTaken"),
+        );
     }
     const audienceMode = dto.audienceMode ?? pkg.audienceMode;
     const targets = this.normalizeAudienceTargets(
@@ -312,7 +379,7 @@ export class AdminAdPackageService {
           audienceMode,
         },
       });
-      // "satır ekle/çıkar": verilirse kademe satırları toptan değiştirilir.
+      // "Add or remove rows": when given, the tier rows are replaced wholesale.
       if (dto.tiers) {
         await tx.adPackageTier.deleteMany({ where: { packageId: id } });
         if (dto.tiers.length) {
@@ -344,13 +411,9 @@ export class AdminAdPackageService {
           })),
         });
       }
-      return tx.adPackage.findUnique({
+      return tx.adPackage.findUniqueOrThrow({
         where: { id },
-        include: {
-          tiers: { orderBy: [{ durationDays: "asc" }, { minAmount: "asc" }] },
-          targetTiers: true,
-          targetUsers: { include: { user: true } },
-        },
+        include: PACKAGE_INCLUDE,
       });
     });
     return this.serialize(updated);
@@ -362,12 +425,12 @@ export class AdminAdPackageService {
       throw new NotFoundException(
         i18nMessage("server.admin.adPackage.notFound"),
       );
-    // Cascade deletes tiers; ProductBoost.packageId → SetNull (geçmiş korunur).
+    // Cascade deletes tiers; ProductBoost.packageId → SetNull (history kept).
     await this.prisma.adPackage.delete({ where: { id } });
     return { success: true };
   }
 
-  /** Boost satın alma takibi: kim, hangi ürün, hangi paket, ne zaman, ne kadar. */
+  /** Boost purchase tracking: who bought which package for which listing, when, for how much. */
   async listPurchases(query: {
     page?: number;
     limit?: number;
@@ -378,7 +441,8 @@ export class AdminAdPackageService {
     const { page = 1, limit = 20, packageId, status, search } = query;
     const where: Prisma.ProductBoostWhereInput = {};
     if (packageId) where.packageId = packageId;
-    if (status) where.status = status as any;
+    // An unknown status filters nothing (it used to reach Prisma and 500).
+    if (status && isBoostStatus(status)) where.status = status;
     const term = search?.trim();
     if (term) {
       where.OR = [
@@ -394,29 +458,7 @@ export class AdminAdPackageService {
       {
         where,
         orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              adminCode: true,
-              username: true,
-              displayName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-          package: { select: { id: true, name: true } },
-          product: {
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              viewCount: true,
-              likeCount: true,
-              clickCount: true,
-            },
-          },
-        },
+        include: PURCHASE_INCLUDE,
       },
       { page, limit },
     );
@@ -430,29 +472,7 @@ export class AdminAdPackageService {
   async getPurchase(id: string) {
     const boost = await this.prisma.productBoost.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            adminCode: true,
-            username: true,
-            displayName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
-        package: { select: { id: true, name: true } },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            viewCount: true,
-            likeCount: true,
-            clickCount: true,
-          },
-        },
-      },
+      include: PURCHASE_INCLUDE,
     });
     if (!boost)
       throw new NotFoundException(
