@@ -1,12 +1,12 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 /**
  * The trade cash payment a distance sales consent belongs to. A trade has no
  * order or cart: each party pays its own `TradeCashPayment` row (trade fee,
  * shipping and, when it applies, the cash difference), so the consent is
- * bound to that row. `ConsentRecord` has no trade column; the reference is
- * kept in `details` (see `apps/api/prisma/schema.prisma`), written and read
- * only through this file.
+ * bound to that row through `consent_records.trade_cash_payment_id`. The
+ * reference is also kept in `details` (rows written before the column carry
+ * it only there). Written and read only through this file.
  */
 export interface DistanceSalesTradeTarget {
   tradeId: string;
@@ -14,7 +14,19 @@ export interface DistanceSalesTradeTarget {
   tradeCashPaymentId: string;
 }
 
-/** The `details` of a trade consent row: the reference, nothing else. */
+/**
+ * The partial unique index that keeps ONE granted distance sales row per
+ * trade cash payment (migration
+ * `20261022160000_consent_records_trade_cash_payment`).
+ */
+export const TRADE_CONSENT_UNIQUE_INDEX =
+  "consent_records_trade_cash_payment_granted_key";
+
+/**
+ * The `details` of a trade consent row: the reference, nothing else. Still
+ * written next to the column for the readers of `details` (the previous image
+ * during a deploy, ad-hoc SQL).
+ */
 export function distanceSalesTradeDetails(
   target: DistanceSalesTradeTarget,
 ): Prisma.InputJsonObject {
@@ -25,13 +37,59 @@ export function distanceSalesTradeDetails(
   };
 }
 
-/** "Is there a consent for this trade cash payment" (the payment gate). */
+/**
+ * "Is there a consent for this trade cash payment" (the payment gate): the
+ * column, or a row written before the column existed.
+ */
 export function distanceSalesTradeWhere(
   tradeCashPaymentId: string,
 ): Prisma.ConsentRecordWhereInput {
   return {
+    OR: [
+      { tradeCashPaymentId },
+      legacyTradeConsentDetailsWhere(tradeCashPaymentId),
+    ],
+  };
+}
+
+/**
+ * LEGACY FALLBACK: a trade consent written before
+ * `consent_records.trade_cash_payment_id` existed (or by the previous image
+ * during the deploy) has the column NULL and the reference only in `details`.
+ * This is an unindexed JSON match. Remove it, and its use in
+ * `distanceSalesTradeWhere`, once `backfill:prod:consent-trade-cash-payments`
+ * has run in production after the release that writes the column
+ * (`docs/OPERATIONS.md`).
+ */
+export function legacyTradeConsentDetailsWhere(
+  tradeCashPaymentId: string,
+): Prisma.ConsentRecordWhereInput {
+  return {
+    tradeCashPaymentId: null,
     details: { path: ["tradeCashPaymentId"], equals: tradeCashPaymentId },
   };
+}
+
+/**
+ * Whether a write failed on `TRADE_CONSENT_UNIQUE_INDEX`: a concurrent submit
+ * for the same trade cash payment recorded the consent first. Prisma reports
+ * the target of an index the schema does not describe either by its name or
+ * by its columns, so both are matched.
+ */
+export function isTradeConsentUniqueViolation(error: unknown): boolean {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2002"
+  ) {
+    return false;
+  }
+  const target = error.meta?.target;
+  const text = Array.isArray(target) ? target.join(",") : String(target ?? "");
+  return (
+    text.includes(TRADE_CONSENT_UNIQUE_INDEX) ||
+    text.includes("trade_cash_payment_id") ||
+    text.includes("tradeCashPaymentId")
+  );
 }
 
 /**
@@ -47,4 +105,20 @@ export function tradeOfConsentDetails(
     return null;
   }
   return { id: tradeId, tradeNumber };
+}
+
+/**
+ * The trade of a consent row for the admin screen: the linked cash payment's
+ * trade, else (a row before the backfill, or a cash payment the test-lane
+ * purge deleted) what `details` says, for a distance sales row only.
+ */
+export function tradeOfConsentRow(row: {
+  document: string;
+  details: Record<string, unknown> | null;
+  tradeCashPayment: { trade: { id: string; tradeNumber: string } } | null;
+}): { id: string; tradeNumber: string } | null {
+  if (row.tradeCashPayment) return row.tradeCashPayment.trade;
+  return row.document === "distance_sales"
+    ? tradeOfConsentDetails(row.details)
+    : null;
 }

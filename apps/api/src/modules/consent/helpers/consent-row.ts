@@ -21,6 +21,8 @@ export interface ConsentEntry {
   details?: Prisma.InputJsonValue;
   checkoutGroupId?: string | null;
   orderId?: string | null;
+  /** The trade cash payment a distance sales consent belongs to. */
+  tradeCashPaymentId?: string | null;
 }
 
 /**
@@ -52,6 +54,7 @@ export function toConsentRow(
     details: entry.details ?? undefined,
     checkoutGroupId: entry.checkoutGroupId ?? null,
     orderId: entry.orderId ?? null,
+    tradeCashPaymentId: entry.tradeCashPaymentId ?? null,
     ipAddress,
     userAgent,
   };

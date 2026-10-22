@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { ConsentAction, ConsentSource, Prisma } from "@prisma/client";
 import {
   DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
@@ -6,6 +11,7 @@ import {
 } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
+import { SentryService } from "../sentry/sentry.service";
 import { ConsentService, type ConsentWriter } from "./consent.service";
 import {
   distanceSalesGateDecision,
@@ -14,6 +20,7 @@ import {
 import {
   distanceSalesTradeDetails,
   distanceSalesTradeWhere,
+  isTradeConsentUniqueViolation,
   type DistanceSalesTradeTarget,
 } from "./helpers/distance-sales-trade";
 
@@ -55,6 +62,7 @@ export class DistanceSalesConsentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly consents: ConsentService,
+    @Optional() private readonly sentry?: SentryService,
   ) {}
 
   /** Checkout transaction'ı içinde: grup oluştuğu anda onayı ona bağlar. */
@@ -124,11 +132,57 @@ export class DistanceSalesConsentService {
     });
 
     if (decision === "reject") {
+      this.traceGate(subject, decision);
       throw new BadRequestException(
         i18nMessage("server.consent.distanceSalesRequired"),
       );
     }
-    if (decision === "record") {
+    // A concurrent submit for the same trade cash payment may record it
+    // between the lookup and the write: the consent then exists, so go on.
+    const recordedConcurrently =
+      decision === "record" && !(await this.recordAtPayment(subject));
+    const outcome = recordedConcurrently ? "proceed" : decision;
+    if (outcome === "unrecorded") {
+      this.logger.warn(
+        `Payment starting without a distance sales consent (requirement off): ` +
+          `group=${subject.checkoutGroupId ?? "-"} order=${subject.orderId ?? "-"} ` +
+          `trade=${subject.trade?.tradeNumber ?? "-"}`,
+      );
+    }
+    this.traceGate(subject, outcome, recordedConcurrently);
+    return outcome;
+  }
+
+  /** A Sentry breadcrumb of the gate's outcome: ids and codes only, no PII. */
+  private traceGate(
+    subject: DistanceSalesSubject,
+    decision: DistanceSalesGateDecision,
+    recordedConcurrently = false,
+  ): void {
+    this.sentry?.addBreadcrumb({
+      category: "consent",
+      message: `consent.distance_sales.${decision}`,
+      level: "info",
+      data: {
+        checkoutGroupId: subject.checkoutGroupId ?? null,
+        orderId: subject.orderId ?? null,
+        tradeNumber: subject.trade?.tradeNumber ?? null,
+        tradeCashPaymentId: subject.trade?.tradeCashPaymentId ?? null,
+        recordedConcurrently,
+      },
+    });
+  }
+
+  /**
+   * Writes the consent taken on the payment form. Returns false when the
+   * partial unique index refused it because a concurrent submit already
+   * recorded the consent of this trade cash payment (the gate's lookup and
+   * this write are not atomic); any other failure propagates.
+   */
+  private async recordAtPayment(
+    subject: DistanceSalesSubject,
+  ): Promise<boolean> {
+    try {
       await this.consents.record([
         {
           document: "distance_sales",
@@ -136,19 +190,21 @@ export class DistanceSalesConsentService {
           subject: { userId: subject.userId, guestEmail: subject.guestEmail },
           checkoutGroupId: subject.checkoutGroupId,
           orderId: subject.orderId,
+          tradeCashPaymentId: subject.trade?.tradeCashPaymentId,
           details: subject.trade
             ? distanceSalesTradeDetails(subject.trade)
             : undefined,
         },
       ]);
-    }
-    if (decision === "unrecorded") {
-      this.logger.warn(
-        `Payment starting without a distance sales consent (requirement off): ` +
-          `group=${subject.checkoutGroupId ?? "-"} order=${subject.orderId ?? "-"} ` +
-          `trade=${subject.trade?.tradeNumber ?? "-"}`,
+      return true;
+    } catch (error) {
+      if (!subject.trade || !isTradeConsentUniqueViolation(error)) throw error;
+      this.logger.log(
+        `Distance sales consent already recorded by a concurrent submit: ` +
+          `trade=${subject.trade.tradeNumber} ` +
+          `tradeCashPayment=${subject.trade.tradeCashPaymentId}`,
       );
+      return false;
     }
-    return decision;
   }
 }

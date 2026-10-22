@@ -2,8 +2,8 @@
 
 The proof of every legal consent a user gives: **who accepted (or withdrew)
 which document, in which version, when and from where** (IP and user agent).
-One table: `consent_records` (append-only; a database trigger rejects UPDATE
-and DELETE). Module: `apps/api/src/modules/consent`. Admin: **Users -> Consent
+One table: `consent_records` (append-only; a database trigger rejects DELETE
+and every UPDATE except the link changes described under "Trade binding"). Module: `apps/api/src/modules/consent`. Admin: **Users -> Consent
 records** and the **Consents** section of the user file.
 
 ## Documents and versions: one source
@@ -147,12 +147,38 @@ marketing consent, a dated `marketing / granted` record is written as well.
   cash payments (trade fee, shipping and any cash difference; decision
   2026-10-22). Membership and boost payments do not go through this gate;
   boost has its own consents (next section).
-- **Trade binding**: a trade has no order or cart, and `consent_records` has
-  no trade column. A trade consent is bound to the payer's own
-  `TradeCashPayment` row through `details`
-  (`{ tradeId, tradeNumber, tradeCashPaymentId }`, written and read only by
-  `consent/helpers/distance-sales-trade.ts`); the subject is the payer
-  (`userId`). The admin Consent Records screen links the row to the trade.
+- **Trade binding**: a trade has no order or cart, so a trade consent is
+  bound to the payer's own `TradeCashPayment` row (trade fee, shipping and
+  any cash difference); the subject is the payer (`userId`). Everything below
+  is written and read only by `consent/helpers/distance-sales-trade.ts`.
+  - **Column**: `consent_records.trade_cash_payment_id`, a nullable FK to
+    `trade_cash_payments` with `ON DELETE SET NULL` (like the cart and order
+    links: the evidence stays when the test-lane purge deletes the trade),
+    indexed.
+  - **`details`** keeps `{ tradeId, tradeNumber, tradeCashPaymentId }` on
+    every trade row as well, for its existing readers and for rows written
+    before the column.
+  - **One consent per payment**: the partial unique index
+    `consent_records_trade_cash_payment_granted_key` allows one `granted`
+    `distance_sales` row per cash payment. When two pay-page submits race
+    (both see no record, both write), the second write hits the index and the
+    gate treats it as already recorded: the payment goes on (`proceed`), no
+    second row, no error. A Sentry breadcrumb
+    `consent.distance_sales.<decision>` carries the trade number and the
+    cash payment id (`recordedConcurrently: true` for this case).
+  - **Lookup**: the gate finds a consent by the column or, for a legacy row
+    (column NULL), by `details.tradeCashPaymentId`
+    (`legacyTradeConsentDetailsWhere`, an unindexed JSON match). The fallback
+    goes once `backfill:prod:consent-trade-cash-payments` has run in
+    production (`OPERATIONS.md`).
+  - **Append-only guard**: besides the cart and order links becoming NULL,
+    the trigger allows `trade_cash_payment_id` to become NULL (the FK) and to
+    go from NULL to the row's own `details->>'tradeCashPaymentId'` (the
+    backfill); any other change is refused.
+  - **Admin**: the Consent Records screen and the export show the trade of
+    the linked cash payment (`trade { id, tradeNumber }`, falling back to
+    `details` for a legacy or purged row), and the search finds a row by its
+    trade number through that link.
 
 ### Platform services (boost): pre-contract information and withdrawal waiver
 
@@ -207,7 +233,7 @@ The newsletter unsubscribe link and account deletion write `withdrawn` too.
 ## Admin
 
 - `GET /admin/consents`: the list (search: member name, e-mail or code, guest
-  e-mail, visitor id, IP, cart or order number; filters: `document`, `action`,
+  e-mail, visitor id, IP, cart, order or trade number; filters: `document`, `action`,
   `source`, `subjectType` = `user|guest|visitor`, `userId`, date range;
   DMMF-based sorting; `{ data, meta }` envelope). The boost documents appear
   with source `checkout` and the `BST-` order.
