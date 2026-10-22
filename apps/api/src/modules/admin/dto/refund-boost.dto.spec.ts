@@ -26,9 +26,10 @@ describe("RefundBoostDto amount", () => {
     await expect(asBody({ amount })).resolves.toMatchObject({ amount });
   });
 
-  it('converts the text "150.55"', async () => {
-    await expect(asBody({ amount: "150.55" })).resolves.toMatchObject({
-      amount: 150.55,
+  // The admin client sends a JSON number; text is refused like the tier amounts in this DTO.
+  it('refuses the text "150.55" with 400', async () => {
+    await expect(asBody({ amount: "150.55" })).rejects.toMatchObject({
+      status: 400,
     });
   });
 
