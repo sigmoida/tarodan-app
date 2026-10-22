@@ -3,7 +3,9 @@ import { WishlistService } from "./wishlist.service";
 /**
  * `GET /wishlist` row mapping. The web Favorites cards apply the shared card
  * rule (`productCardAction`), which needs the stock as `availableQuantity`
- * (quantity - reservedQuantity; missing = unlimited).
+ * (quantity - reservedQuantity; missing = unlimited). A cart line added from
+ * Favorites also needs the listing's `maxQuantityPerOrder` (missing = no
+ * per-order limit).
  */
 describe("WishlistService.getWishlist", () => {
   const wishlist = {
@@ -26,6 +28,7 @@ describe("WishlistService.getWishlist", () => {
       seller: { id: "s1", username: "seller" },
       quantity: null,
       reservedQuantity: 0,
+      maxQuantityPerOrder: null,
       ...product,
     },
   });
@@ -70,5 +73,29 @@ describe("WishlistService.getWishlist", () => {
     const result = await service.getWishlist("u1");
     expect(result.items[0].availableQuantity).toBeUndefined();
     expect(result.items[0].sellerId).toBe("s1");
+  });
+
+  it("returns the listing's per-order cap", async () => {
+    const service = build([
+      row({ id: "p1", quantity: 10, maxQuantityPerOrder: 2 }),
+    ]);
+    const result = await service.getWishlist("u1");
+    expect(result.items[0].maxQuantityPerOrder).toBe(2);
+    expect(result.items[0].availableQuantity).toBe(10);
+  });
+
+  it("omits the per-order cap when the listing has none", async () => {
+    const service = build([
+      row({ id: "p1", maxQuantityPerOrder: null }),
+      row({ id: "p2", maxQuantityPerOrder: undefined }),
+    ]);
+    const result = await service.getWishlist("u1");
+    expect(result.items).toHaveLength(2);
+    for (const item of result.items) {
+      expect(item.maxQuantityPerOrder).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(item))).not.toHaveProperty(
+        "maxQuantityPerOrder",
+      );
+    }
   });
 });

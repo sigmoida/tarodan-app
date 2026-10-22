@@ -11,7 +11,7 @@ import { excludeIds } from "../user-block/user-block.helpers";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
-import { ProductStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { DiscountService } from "../discount/discount.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
@@ -27,6 +27,20 @@ import {
 } from "../../common/helpers/public-identity";
 import { errorMessage } from "../../common/helpers/error-message";
 import { i18nMessage } from "../i18n";
+
+/** The product fields every wishlist row is mapped from (`mapItemToDto`). */
+const WISHLIST_ITEM_INCLUDE = {
+  product: {
+    include: {
+      images: { take: 1 },
+      seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+    },
+  },
+} satisfies Prisma.WishlistItemInclude;
+
+type WishlistItemRow = Prisma.WishlistItemGetPayload<{
+  include: typeof WISHLIST_ITEM_INCLUDE;
+}>;
 
 @Injectable()
 export class WishlistService {
@@ -74,14 +88,7 @@ export class WishlistService {
           sellerId: excludeIds(hidden),
         },
       },
-      include: {
-        product: {
-          include: {
-            images: { take: 1 },
-            seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
-          },
-        },
-      },
+      include: WISHLIST_ITEM_INCLUDE,
       orderBy: { addedAt: "desc" },
     });
 
@@ -143,14 +150,7 @@ export class WishlistService {
           productId: dto.productId,
         },
       },
-      include: {
-        product: {
-          include: {
-            images: { take: 1 },
-            seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
-          },
-        },
-      },
+      include: WISHLIST_ITEM_INCLUDE,
     });
 
     if (existingItem) {
@@ -165,14 +165,7 @@ export class WishlistService {
           wishlistId: wishlist.id,
           productId: dto.productId,
         },
-        include: {
-          product: {
-            include: {
-              images: { take: 1 },
-              seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
-            },
-          },
-        },
+        include: WISHLIST_ITEM_INCLUDE,
       }),
       // Also increment the product's likeCount for accurate display
       this.prisma.product.update({
@@ -307,7 +300,9 @@ export class WishlistService {
   // ==========================================================================
   // HELPER - row mapping: productPrice is always the current selling price
   // ==========================================================================
-  private async mapItemToDto(item: any): Promise<WishlistItemResponseDto> {
+  private async mapItemToDto(
+    item: WishlistItemRow,
+  ): Promise<WishlistItemResponseDto> {
     const product = item.product;
     const basePrice = Number(product.price);
 
@@ -339,6 +334,10 @@ export class WishlistService {
       productStatus: product.status,
       // Same rule as the product payloads; missing = unlimited stock.
       availableQuantity: getAvailableQuantity(product) ?? undefined,
+      // The listing's per-order cap, so a client cart line added from
+      // Favorites is capped like the server cart (`CartService`); missing =
+      // no per-order limit.
+      maxQuantityPerOrder: product.maxQuantityPerOrder ?? undefined,
       sellerId: product.seller.id,
       sellerName: publicName(product.seller),
       addedAt: item.addedAt,
