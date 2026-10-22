@@ -122,6 +122,17 @@ const STARTED: InitiateBoostResponse = {
   useBypass: false,
 };
 
+/** The API's answer when the price is no longer the one the dialog showed. */
+const PRICE_CHANGED = {
+  response: {
+    status: 409,
+    data: {
+      message: "server:priceChanged",
+      i18nKey: "server.product.boostPriceChanged",
+    },
+  },
+};
+
 const LISTING: BoostListing = { id: "listing-1", title: "1:18 Ferrari F40" };
 
 let container: HTMLDivElement;
@@ -487,7 +498,7 @@ describe("BoostModal consent reset", () => {
 });
 
 describe("BoostModal request", () => {
-  it("sends the package, the duration and both consents, then opens the pay page", async () => {
+  it("sends the package, the duration, the shown price and both consents, then opens the pay page", async () => {
     render();
     await flush();
     await acceptBoth();
@@ -500,6 +511,8 @@ describe("BoostModal request", () => {
     expect(body).toEqual({
       packageId: "pkg-eco",
       durationDays: 7,
+      // The price the pre-information showed (the campaign price, not 79).
+      expectedPrice: 59,
       preInformationAccepted: true,
       withdrawalWaiverAccepted: true,
     });
@@ -509,7 +522,7 @@ describe("BoostModal request", () => {
     expect(h.push).toHaveBeenCalledWith("/payment/pay-1?type=boost");
   });
 
-  it("sends the chosen package and duration", async () => {
+  it("sends the chosen package, duration and its price", async () => {
     render();
     await flush();
     click(durationRow("Vitrin", 7).querySelector("input")!);
@@ -520,6 +533,7 @@ describe("BoostModal request", () => {
     expect(h.initiate.mock.calls[0][1]).toMatchObject({
       packageId: "pkg-vitrin",
       durationDays: 7,
+      expectedPrice: 149,
     });
   });
 
@@ -579,6 +593,8 @@ describe("BoostModal request", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(h.push).not.toHaveBeenCalled();
     expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
+    // Only a changed price reloads the prices.
+    expect(h.options).toHaveBeenCalledTimes(1);
     const helper = Array.from(dialog().querySelectorAll("p")).find(
       (p) => p.textContent === "profile.boost.consent.required",
     );
@@ -639,8 +655,8 @@ describe("BoostModal pre-contract information", () => {
 });
 
 describe("BoostModal price integrity", () => {
-  it("does not open the pay page when the server priced the order differently from the consented total", async () => {
-    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+  it("does not open the pay page when the API says the price changed, and asks again on the reloaded prices", async () => {
+    h.initiate.mockRejectedValue(PRICE_CHANGED);
     render();
     await flush();
     await acceptBoth();
@@ -649,12 +665,56 @@ describe("BoostModal price integrity", () => {
 
     expect(h.push).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    expect(h.toast.error).toHaveBeenCalledWith(
-      "profile.boost.paymentStartFailed",
-    );
+    expect(dialog()).toBeTruthy();
+    // The server's own message, not the generic failure.
+    expect(h.toast.error).toHaveBeenCalledTimes(1);
+    expect(h.toast.error).toHaveBeenCalledWith("server:priceChanged");
     // Both consents again, on the reloaded prices.
     expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
     expect(h.options).toHaveBeenCalledTimes(2);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it.each([
+    ["another price", 79],
+    // One kuruş is a different price (the shared kuruş rule).
+    ["a one-kuruş difference", 59.01],
+  ])(
+    "does not open the pay page when an order was started at %s (an API that does not check the price yet)",
+    async (_label, price) => {
+      h.initiate.mockResolvedValue({ data: { ...STARTED, price } });
+      render();
+      await flush();
+      await acceptBoth();
+      click(payButton());
+      await flush();
+
+      expect(h.push).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(h.toast.error).toHaveBeenCalledWith(
+        "profile.boost.paymentStartFailed",
+      );
+      // Both consents again, on the reloaded prices.
+      expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+      expect(h.options).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("keeps pay disabled when the prices cannot be reloaded after a price change", async () => {
+    h.initiate.mockRejectedValue(PRICE_CHANGED);
+    h.options
+      .mockResolvedValueOnce({ data: OPTIONS })
+      .mockRejectedValue(new Error("down"));
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(text()).toContain("profile.boost.pricingLoadError");
+    expect(payButton().disabled).toBe(true);
+    expect(h.initiate).toHaveBeenCalledTimes(1);
+    expect(h.push).not.toHaveBeenCalled();
   });
 
   it("does not let a matrix whose refetch failed be paid on", async () => {
@@ -767,18 +827,6 @@ describe("BoostModal purchase safety", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("treats a one-kuruş difference as a different price", async () => {
-    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 59.01 } });
-    render();
-    await flush();
-    await acceptBoth();
-    click(payButton());
-    await flush();
-
-    expect(h.push).not.toHaveBeenCalled();
-    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
-  });
-
   it("after a price change, pays on the reloaded price once both consents are given again", async () => {
     const repriced: BoostOptionsResponse = {
       ...OPTIONS,
@@ -796,11 +844,9 @@ describe("BoostModal purchase safety", () => {
     h.options
       .mockResolvedValueOnce({ data: OPTIONS })
       .mockResolvedValue({ data: repriced });
-    h.initiate
-      .mockResolvedValueOnce({ data: { ...STARTED, price: 79 } })
-      .mockResolvedValue({
-        data: { ...STARTED, price: 79, paymentId: "pay-2" },
-      });
+    h.initiate.mockRejectedValueOnce(PRICE_CHANGED).mockResolvedValue({
+      data: { ...STARTED, price: 79, paymentId: "pay-2" },
+    });
     render();
     await flush();
     await acceptBoth();
@@ -818,6 +864,8 @@ describe("BoostModal purchase safety", () => {
     await flush();
 
     expect(h.initiate).toHaveBeenCalledTimes(2);
+    expect(h.initiate.mock.calls[0][1]).toMatchObject({ expectedPrice: 59 });
+    expect(h.initiate.mock.calls[1][1]).toMatchObject({ expectedPrice: 79 });
     expect(h.push).toHaveBeenCalledTimes(1);
     expect(h.push).toHaveBeenCalledWith("/payment/pay-2?type=boost");
   });

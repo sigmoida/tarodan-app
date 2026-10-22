@@ -259,13 +259,37 @@ export interface BoostReminderResponse {
 }
 
 /**
+ * Whether the price the seller was shown (`InitiateBoostRequest.expectedPrice`)
+ * is the price the server charges, compared in whole kuruş: 59.9, 59.90 and
+ * 59.899999 are 59,90 TL, 59.89 is not. A value that is not a finite number
+ * never matches, so a caller without a price fails closed. The one comparison
+ * rule of the boost purchase: the API refuses a mismatch with 409
+ * `server.product.boostPriceChanged` before it writes anything.
+ */
+export function boostPriceMatches(expected: number, actual: number): boolean {
+  return (
+    Number.isFinite(expected) &&
+    Number.isFinite(actual) &&
+    Math.round(expected * 100) === Math.round(actual * 100)
+  );
+}
+
+/**
  * `POST /products/:id/boost/initiate` body. Both consents must be `true`
  * (anything else: 400 `server.product.boostConsentRequired`, nothing is
- * written); they are recorded with the boost order.
+ * written); they are recorded with the boost order. `expectedPrice` must be
+ * what the server charges now (`boostPriceMatches`), else 409
+ * `server.product.boostPriceChanged` and nothing is written.
  */
 export interface InitiateBoostRequest {
   packageId: string;
   durationDays: number;
+  /**
+   * The price the pre-information showed for this package and duration (TL,
+   * VAT included): `price` of the chosen `BoostDurationOption`. A JSON number
+   * with at most two decimals (text is a 400).
+   */
+  expectedPrice: number;
   /** Default `paytr`. */
   provider?: "paytr";
   /** The ending-soon reminder; kept only for premium members. */

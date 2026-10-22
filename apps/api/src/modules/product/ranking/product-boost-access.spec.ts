@@ -213,6 +213,7 @@ describe("ProductBoostService access and settings", () => {
     const input = {
       packageId: "pkg-1",
       durationDays: 7,
+      expectedPrice: 150,
       provider: PaymentProvider.paytr,
       autoRenew: false,
       preInformationAccepted: true,
@@ -308,26 +309,76 @@ describe("InitiateBoostDto", () => {
       data: "",
     } satisfies ArgumentMetadata);
 
+  /** The chosen package, duration and the price the dialog showed. */
+  const TERMS = { packageId: "pkg-1", durationDays: 7, expectedPrice: 59.9 };
+
   it("requires a package (the flat-price request without one is retired)", async () => {
-    await expect(asBody({ durationDays: 7 })).rejects.toMatchObject({
+    await expect(
+      asBody({ durationDays: 7, expectedPrice: 59.9 }),
+    ).rejects.toMatchObject({
       status: 400,
     });
-    await expect(
-      asBody({ packageId: "", durationDays: 7 }),
-    ).rejects.toMatchObject({ status: 400 });
+    await expect(asBody({ ...TERMS, packageId: "" })).rejects.toMatchObject({
+      status: 400,
+    });
   });
 
-  it("accepts a package and a duration", async () => {
+  it("accepts a package, a duration and the expected price", async () => {
     await expect(
-      asBody({ packageId: "pkg-1", durationDays: "7" }),
-    ).resolves.toMatchObject({ packageId: "pkg-1", durationDays: 7 });
+      asBody({ ...TERMS, durationDays: "7" }),
+    ).resolves.toMatchObject({
+      packageId: "pkg-1",
+      durationDays: 7,
+      expectedPrice: 59.9,
+    });
+  });
+
+  describe("expectedPrice", () => {
+    it("is required: a body without it is a 400 (old clients included)", async () => {
+      const { expectedPrice: _omitted, ...withoutPrice } = TERMS;
+      await expect(
+        asBody({
+          ...withoutPrice,
+          preInformationAccepted: true,
+          withdrawalWaiverAccepted: true,
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it.each([0, 1, 59, 59.9, 59.99, 150, 12345678.91])(
+      "keeps the JSON number %p as it came",
+      async (value) => {
+        await expect(
+          asBody({ ...TERMS, expectedPrice: value }),
+        ).resolves.toMatchObject({ expectedPrice: value });
+      },
+    );
+
+    it.each([
+      // Text is not a price: no implicit "59.9" -> 59.9 conversion.
+      ["the text", "59.9"],
+      ["an empty text", ""],
+      ["a boolean", true],
+      ["null", null],
+      ["an array", [59.9]],
+      ["an object", { amount: 59.9 }],
+      // More than whole kuruş.
+      ["three decimals", 59.999],
+      ["float noise", 0.1 + 0.2],
+      // Never a 500 for a number JS writes in exponent form.
+      ["an exponent form", 1e-7],
+      ["a negative amount", -59.9],
+    ])("refuses %s (%p) with 400", async (_label, value) => {
+      await expect(
+        asBody({ ...TERMS, expectedPrice: value }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
   });
 
   it("keeps both consents (declared, so the whitelist does not drop them)", async () => {
     await expect(
       asBody({
-        packageId: "pkg-1",
-        durationDays: 7,
+        ...TERMS,
         preInformationAccepted: true,
         withdrawalWaiverAccepted: true,
       }),
@@ -338,7 +389,7 @@ describe("InitiateBoostDto", () => {
   });
 
   it("leaves a missing consent to the service (its catalog-key 400)", async () => {
-    const body = await asBody({ packageId: "pkg-1", durationDays: 7 });
+    const body = await asBody(TERMS);
     expect(body.preInformationAccepted).toBeUndefined();
     expect(body.withdrawalWaiverAccepted).toBeUndefined();
   });
@@ -348,8 +399,7 @@ describe("InitiateBoostDto", () => {
     async (value) => {
       await expect(
         asBody({
-          packageId: "pkg-1",
-          durationDays: 7,
+          ...TERMS,
           preInformationAccepted: value,
           withdrawalWaiverAccepted: value,
         }),
@@ -364,8 +414,7 @@ describe("InitiateBoostDto", () => {
       // "false" as true for that statement only.
       await expect(
         asBody({
-          packageId: "pkg-1",
-          durationDays: 7,
+          ...TERMS,
           preInformationAccepted: true,
           withdrawalWaiverAccepted: true,
           [field]: "false",
@@ -377,8 +426,7 @@ describe("InitiateBoostDto", () => {
   it("keeps a JSON false for the service to refuse", async () => {
     await expect(
       asBody({
-        packageId: "pkg-1",
-        durationDays: 7,
+        ...TERMS,
         preInformationAccepted: false,
         withdrawalWaiverAccepted: true,
       }),

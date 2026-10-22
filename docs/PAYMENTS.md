@@ -124,9 +124,29 @@ endsAt }` for a boost payment (`endsAt` null until activation;
   transaction; `direct-form` refuses a boost order without them
   (`400 server.product.boostConsentRequired`). Details and the legal release
   blocker: `CONSENTS.md`, "Platform services (boost)".
+- **Boost price at consent.** The initiate body carries `expectedPrice`, the
+  price the dialog showed for the chosen package and duration (TL, VAT
+  included; required, a JSON number with at most two decimals, text is a
+  400). The server resolves the price itself (package tier for the listing's
+  price band and the seller's audience, campaign price inside its window: the
+  same rule `GET /products/:id/boost/options` shows) and compares the two in
+  whole kuruş (`boostPriceMatches` in `@tarodan/types`, the only comparison
+  rule). A mismatch (the package and duration are still offered, at another
+  price) is `409 server.product.boostPriceChanged` before any order lookup,
+  reference or write, so no boost, order, consent or payment row exists for
+  terms the seller did not see. The refusals that come before it win:
+  consents, boost off, listing, owner, status, package, tier, a zero price; so
+  a package or duration that is no longer offered at all is the 400
+  `boostPackageNotFound` or `boostPriceUndefined`, not the 409. On a match the
+  resolved price is what the boost, the order and the payment carry; the
+  client's number is never written. On the 409 the dialog reloads the prices
+  and asks for both consents again; it also refuses to open the pay page for
+  a started order whose price is not the one shown (same rule), which covers
+  an API that does not check the price yet while a release rolls out.
 - **Tracing.** The boost purchase start tags its request `flow=boost`;
   the purchase and the activation leave `boost.*` breadcrumbs with ids only
-  (boost, order, order number, listing). Activation sets no tag because it
+  (boost, order, order number, listing; `boost.price_mismatch` carries the
+  listing, package and duration, no amount). Activation sets no tag because it
   also runs in worker jobs, which share the process scope. A paid boost
   order without its boost row is a Sentry error event.
 

@@ -23,7 +23,8 @@ import {
   type MyBoostState,
 } from "@tarodan/types";
 import { PaymentProvider } from "../../payment/dto";
-import { JsonBoolean } from "../../../common/transforms";
+import { JsonBoolean, JsonNumber } from "../../../common/transforms";
+import { IsTlAmount } from "../../../common/validators/tl-amount";
 
 export class InitiateBoostDto {
   @ApiProperty({
@@ -42,6 +43,20 @@ export class InitiateBoostDto {
   @IsInt({ message: "Süre tam sayı olmalıdır" })
   @Min(1, { message: "Geçerli bir süre seçiniz" })
   durationDays: number;
+
+  // The price the seller consented to. Required: every client that could
+  // lack it also lacks the consents, which are required already. Only a JSON
+  // number passes (`JsonNumber`): implicit conversion would accept the text
+  // "59.9". The service compares it in whole kuruş with what it would charge
+  // (`boostPriceMatches`) before anything is written.
+  @ApiProperty({
+    example: 59.9,
+    description:
+      "The price the pre-information showed for this package and duration (TL, VAT included: `price` of the chosen `BoostDurationOption`). A JSON number of at least 0 with at most two decimals. When it is not what the server charges now (whole kuruş), the answer is 409 `server.product.boostPriceChanged` and nothing is written.",
+  })
+  @JsonNumber()
+  @IsTlAmount()
+  expectedPrice: number;
 
   @ApiPropertyOptional({
     enum: PaymentProvider,

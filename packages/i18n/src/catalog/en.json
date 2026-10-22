@@ -11599,6 +11599,7 @@
       "viewForbidden": "You do not have permission to view this product",
       "boostPackageNotFound": "The selected package was not found or is inactive",
       "boostConsentRequired": "The pre-contract information and the withdrawal waiver must be accepted",
+      "boostPriceChanged": "The boost price has changed. Check the new price and accept again.",
       "boostReminderPremiumOnly": "Reminders are for Premium members only",
       "duplicateImage": "The same image was submitted more than once",
       "imageNotOwned": "One of the images does not come from an upload belonging to this account. Please upload the images again.",

@@ -10,14 +10,16 @@ import { ProductBoostService } from "./product-boost.service";
 
 /**
  * Behaviour pin of the boost purchase start (money): the consent gate, the
- * one transaction that writes the boost, its virtual product, its order and
- * the two consents, the amounts, and what happens when a step fails.
+ * consented price, the one transaction that writes the boost, its virtual
+ * product, its order and the two consents, the amounts, and what happens
+ * when a step fails.
  */
 describe("ProductBoostService.initiateBoost — consent and transaction", () => {
   const OWNER = "seller-1";
   const DAY_MS = 24 * 60 * 60 * 1000;
 
   const tier = (over: Record<string, unknown> = {}) => ({
+    durationDays: 7,
     price: 150,
     campaignPrice: null,
     campaignStartsAt: null,
@@ -74,6 +76,16 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
           name: "Ekonomik",
           showcaseOnHome: false,
         }),
+        // What the options call shows for the same tier (the dialog's price).
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "pkg-1",
+            name: "Ekonomik",
+            slug: "ekonomik",
+            showcaseOnHome: false,
+            tiers: [tier(opts.tier)],
+          },
+        ]),
       },
       adPackageTier: {
         findFirst: jest.fn().mockResolvedValue(tier(opts.tier)),
@@ -116,6 +128,8 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
   const input = (over: Record<string, unknown> = {}) => ({
     packageId: "pkg-1",
     durationDays: 7,
+    // The tier price the dialog showed (150 unless a test says otherwise).
+    expectedPrice: 150,
     provider: PaymentProvider.paytr,
     autoRenew: false,
     preInformationAccepted: true,
@@ -304,12 +318,328 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
         },
       });
 
-      const result = await h.service.initiateBoost(OWNER, "listing-1", input());
+      const result = await h.service.initiateBoost(
+        OWNER,
+        "listing-1",
+        input({ expectedPrice: 99 }),
+      );
 
       expect(firstData(h.tx.order.create).totalAmount).toBe(99);
       expect(firstData(h.tx.productBoost.create).price).toBe(99);
       expect(result.price).toBe(99);
     });
+  });
+
+  describe("consented price", () => {
+    const CAMPAIGN_NOW = () => ({
+      price: 150,
+      campaignPrice: 99,
+      campaignStartsAt: new Date(Date.now() - DAY_MS),
+      campaignEndsAt: new Date(Date.now() + DAY_MS),
+    });
+
+    /** Nothing was read for the order, referenced, written or charged. */
+    const expectNothingStarted = (h: ReturnType<typeof harness>) => {
+      // No platform seller, category or reminder lookup, no order number.
+      expect(h.prisma.user.findFirst).not.toHaveBeenCalled();
+      expect(h.prisma.category.findFirst).not.toHaveBeenCalled();
+      expect(h.prisma.order.count).not.toHaveBeenCalled();
+      // No transaction, so no boost, virtual product, order or consent row.
+      expect(h.prisma.$transaction).not.toHaveBeenCalled();
+      expect(h.calls).toEqual([]);
+      expect(h.consents.recordForOrder).not.toHaveBeenCalled();
+      // No payment intent and no cleanup write.
+      expect(h.payment.initiatePayment).not.toHaveBeenCalled();
+      expect(h.prisma.productBoost.update).not.toHaveBeenCalled();
+    };
+
+    it.each([59.9, 59.899999, 59.900001])(
+      "goes ahead when %p is the resolved 59,90 in whole kuruş, and charges the resolved price",
+      async (expectedPrice) => {
+        const h = harness({ tier: { price: 59.9 } });
+
+        const result = await h.service.initiateBoost(
+          OWNER,
+          "listing-1",
+          input({ expectedPrice }),
+        );
+
+        // The server's price is written, never the client's number.
+        expect(firstData(h.tx.productBoost.create).price).toBe(59.9);
+        expect(firstData(h.tx.product.create).price).toBe(59.9);
+        expect(firstData(h.tx.order.create).totalAmount).toBe(59.9);
+        expect(result.price).toBe(59.9);
+        expect(h.payment.initiatePayment).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each([59.89, 59.91, 0])(
+      "refuses %p against the resolved 59,90 with 409 boostPriceChanged before anything is written",
+      async (expectedPrice) => {
+        const h = harness({ tier: { price: 59.9 } });
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input({ expectedPrice })),
+        ).rejects.toMatchObject({
+          status: 409,
+          response: { i18nKey: "server.product.boostPriceChanged" },
+        });
+        expectNothingStarted(h);
+      },
+    );
+
+    it("refuses the list price while a campaign runs", async () => {
+      const h = harness({ tier: CAMPAIGN_NOW() });
+
+      await expect(
+        h.service.initiateBoost(
+          OWNER,
+          "listing-1",
+          input({ expectedPrice: 150 }),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { i18nKey: "server.product.boostPriceChanged" },
+      });
+      expectNothingStarted(h);
+    });
+
+    it("refuses the campaign price once the campaign has ended", async () => {
+      const h = harness({
+        tier: {
+          ...CAMPAIGN_NOW(),
+          campaignEndsAt: new Date(Date.now() - 1000),
+        },
+      });
+
+      await expect(
+        h.service.initiateBoost(
+          OWNER,
+          "listing-1",
+          input({ expectedPrice: 99 }),
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { i18nKey: "server.product.boostPriceChanged" },
+      });
+      expectNothingStarted(h);
+    });
+
+    it.each([
+      ["the list price", {}],
+      ["a running campaign", CAMPAIGN_NOW()],
+      [
+        "a campaign that has not started",
+        { campaignPrice: 99, campaignStartsAt: new Date(Date.now() + DAY_MS) },
+      ],
+      [
+        "an ended campaign",
+        { campaignPrice: 99, campaignEndsAt: new Date(Date.now() - 1000) },
+      ],
+    ])(
+      "accepts the price the options call shows for %s (one pricing path)",
+      async (_label, over) => {
+        const h = harness({ tier: over });
+        const options = await h.service.getBoostOptions("listing-1", OWNER);
+        const [pkg] = options.packages;
+        const [shown] = pkg.options;
+
+        const result = await h.service.initiateBoost(
+          OWNER,
+          "listing-1",
+          input({
+            packageId: pkg.id,
+            durationDays: shown.durationDays,
+            expectedPrice: shown.price,
+          }),
+        );
+
+        expect(result.price).toBe(shown.price);
+        expect(firstData(h.tx.order.create).totalAmount).toBe(shown.price);
+      },
+    );
+
+    it("leaves a price_mismatch breadcrumb with ids only (no amounts, no personal data)", async () => {
+      const h = harness();
+
+      await expect(
+        h.service.initiateBoost(
+          OWNER,
+          "listing-1",
+          input({ expectedPrice: 149.99 }),
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+
+      const crumbs = h.sentry.addBreadcrumb.mock.calls.map(
+        ([crumb]: [{ message: string; data: unknown }]) => crumb,
+      );
+      expect(crumbs).toEqual([
+        expect.objectContaining({ message: "boost.initiate" }),
+        expect.objectContaining({
+          message: "boost.price_mismatch",
+          data: { productId: "listing-1", packageId: "pkg-1", durationDays: 7 },
+        }),
+      ]);
+      expect(h.sentry.setTag).toHaveBeenCalledWith("flow", "boost");
+    });
+
+    describe("order of checks: every earlier refusal wins over a price mismatch", () => {
+      const WRONG = { expectedPrice: 1 };
+
+      it("the consent 400 (nothing is read)", async () => {
+        const h = harness();
+
+        await expect(
+          h.service.initiateBoost(
+            OWNER,
+            "listing-1",
+            input({ ...WRONG, withdrawalWaiverAccepted: false }),
+          ),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostConsentRequired" },
+        });
+        expect(h.prisma.platformSetting.findUnique).not.toHaveBeenCalled();
+        expect(h.prisma.adPackageTier.findFirst).not.toHaveBeenCalled();
+      });
+
+      it("boost sales off (400 boostUnavailable)", async () => {
+        const h = harness();
+        h.prisma.platformSetting.findUnique.mockResolvedValue({
+          settingValue: "false",
+        });
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input(WRONG)),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostUnavailable" },
+        });
+      });
+
+      it("a missing listing (404)", async () => {
+        const h = harness();
+        h.prisma.product.findFirst.mockResolvedValue(null);
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input(WRONG)),
+        ).rejects.toMatchObject({
+          status: 404,
+          response: { i18nKey: "server.product.notFound" },
+        });
+      });
+
+      it("someone else's listing (403), before any price is resolved", async () => {
+        const h = harness();
+
+        await expect(
+          h.service.initiateBoost("stranger", "listing-1", input(WRONG)),
+        ).rejects.toMatchObject({
+          status: 403,
+          response: { i18nKey: "server.product.boostOwnOnly" },
+        });
+        // A stranger learns nothing about the tier prices.
+        expect(h.prisma.adPackageTier.findFirst).not.toHaveBeenCalled();
+      });
+
+      it("a listing that is not active (400)", async () => {
+        const h = harness();
+        h.prisma.product.findFirst.mockResolvedValue({
+          id: "listing-1",
+          sellerId: OWNER,
+          status: ProductStatus.inactive,
+          price: 1500,
+          oldPrice: null,
+        });
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input(WRONG)),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostActiveOnly" },
+        });
+      });
+
+      it("a package the seller cannot buy (400)", async () => {
+        const h = harness();
+        h.prisma.adPackage.findFirst.mockResolvedValue(null);
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input(WRONG)),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostPackageNotFound" },
+        });
+      });
+
+      it("a duration without a tier for the listing's price (400)", async () => {
+        const h = harness();
+        h.prisma.adPackageTier.findFirst.mockResolvedValue(null);
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input(WRONG)),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostPriceUndefined" },
+        });
+      });
+
+      it("a tier priced at zero (400), even when the client also says zero", async () => {
+        const h = harness({ tier: { price: 0 } });
+
+        await expect(
+          h.service.initiateBoost(
+            OWNER,
+            "listing-1",
+            input({ expectedPrice: 0 }),
+          ),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.product.boostPriceUndefined" },
+        });
+        expectNothingStarted(h);
+      });
+
+      it.each([
+        [0, 1],
+        [0, 59.9],
+        [-10, 1],
+      ])(
+        "a tier priced at %p (400) wins over the mismatched %p",
+        async (tierPrice, expectedPrice) => {
+          // With matching zeros the order of the two checks cannot show;
+          // a mismatch pins that the zero price is refused first.
+          const h = harness({ tier: { price: tierPrice } });
+
+          await expect(
+            h.service.initiateBoost(
+              OWNER,
+              "listing-1",
+              input({ expectedPrice }),
+            ),
+          ).rejects.toMatchObject({
+            status: 400,
+            response: { i18nKey: "server.product.boostPriceUndefined" },
+          });
+          expectNothingStarted(h);
+        },
+      );
+    });
+
+    it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY])(
+      "fails closed on the missing or non-finite %p from a caller that skipped the DTO (409, nothing written)",
+      async (expectedPrice) => {
+        const h = harness();
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input({ expectedPrice })),
+        ).rejects.toMatchObject({
+          status: 409,
+          response: { i18nKey: "server.product.boostPriceChanged" },
+        });
+        expectNothingStarted(h);
+      },
+    );
   });
 
   describe("traceability", () => {

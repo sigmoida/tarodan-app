@@ -4812,7 +4812,7 @@
       "title": "Boost initiate happy path with a package",
       "tur": "Happy path / Money",
       "pri": "P1",
-      "steps": "POST /api/products/:id/boost/initiate body { \"packageId\": <package>, \"durationDays\": 7, \"preInformationAccepted\": true, \"withdrawalWaiverAccepted\": true }.",
+      "steps": "POST /api/products/:id/boost/initiate body { \"packageId\": <package>, \"durationDays\": 7, \"expectedPrice\": 59, \"preInformationAccepted\": true, \"withdrawalWaiverAccepted\": true }.",
       "exp": "201 {boostId, productId, durationDays:7, price:59 (the package tier), paymentId, provider, ...}; ProductBoost(pending), the boost- virtual product, an Order(pending_payment) and two consent rows (platform_service_sales, withdrawal_waiver; current versions, source checkout, the order's id) are created in one transaction.",
       "gap": false,
       "gapRefs": []
@@ -4918,6 +4918,19 @@
       "pri": "P0",
       "steps": "POST /api/products/:id/boost/initiate with a package and a duration but without preInformationAccepted and withdrawalWaiverAccepted both true (missing, one, false); then both as the text \"false\".",
       "exp": "400 server.product.boostConsentRequired each time; the text values get a validation 400 (no implicit conversion to true); no ProductBoost, Order or consent row is created.",
+      "gap": false,
+      "gapRefs": []
+    },
+    {
+      "id": "PRD-130",
+      "code": "04",
+      "prefix": "PRD",
+      "domTitle": "04 — Ürün/İlan & Katalog",
+      "title": "Boost initiate at a price that changed after the options (409)",
+      "tur": "Negatif / Para",
+      "pri": "P0",
+      "steps": "Read GET /api/products/:id/boost/options (7 days at 59), reprice the tier to 79, then POST /api/products/:id/boost/initiate with expectedPrice 59 and 78.99; then without expectedPrice, as the text \"79\", with three decimals and null; then 59 with a refused consent; then 79.",
+      "exp": "409 server.product.boostPriceChanged for 59 and 78.99; a validation 400 for the missing, text, three-decimal and null prices; the consent 400 wins over the price; no ProductBoost, Order, consent or Payment row is created by any of them; 79 gives 201 with price 79 and an order of 79.",
       "gap": false,
       "gapRefs": []
     },

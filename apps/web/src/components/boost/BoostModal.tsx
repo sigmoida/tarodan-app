@@ -22,6 +22,7 @@ import {
 import { cn } from "@tarodan/ui/utils";
 import {
   CONSENT_DOCUMENTS,
+  boostPriceMatches,
   type BoostDurationOption,
   type BoostPackage,
   type InitiateBoostRequest,
@@ -62,9 +63,12 @@ interface Selection {
 const DEFAULT_DURATION_DAYS = 7;
 /** The API's rejection when a consent is missing. */
 const CONSENT_REQUIRED_KEY = "server.product.boostConsentRequired";
+/**
+ * The API's 409 when `expectedPrice` is no longer the price it charges
+ * (`boostPriceMatches`, whole kuruş); nothing was written.
+ */
+const PRICE_CHANGED_KEY = "server.product.boostPriceChanged";
 const DAY_MS = 86_400_000;
-/** Prices are TL with kuruş; anything below one kuruş is the same price. */
-const PRICE_EPSILON = 0.005;
 
 function defaultSelection(packages: BoostPackage[]): Selection | null {
   const pkg = packages[0];
@@ -160,8 +164,10 @@ function OptionsSkeleton() {
  * `platform_service_sales`, `withdrawal_waiver`). Pay stays disabled until a
  * duration is chosen and BOTH consents are ticked; the API refuses the order
  * without them. A change to the pre-information (listing, package, duration,
- * price) unticks both. On success it hands over to the pay page
- * (`/payment/<id>?type=boost`).
+ * price) unticks both. The request carries the price shown; when the API
+ * answers that it changed (409), or a started order is not at that price,
+ * the prices are fetched again and both consents are asked again on them.
+ * Otherwise it hands over to the pay page (`/payment/<id>?type=boost`).
  *
  * Mount it per opening (`useBoostLauncher` does): the consents start unticked
  * every time and are never remembered.
@@ -212,30 +218,30 @@ export default function BoostModal({
   const canBuy = !!options?.enabled && packages.length > 0;
   const optionsFresh = optionsQuery.isSuccess && !optionsQuery.isFetching;
 
+  /** The consented price is gone: reload the prices, ask for both again. */
+  const askAgainOnNewPrices = () => {
+    resetConsents();
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.boost.options(listing.id),
+    });
+  };
+
+  // The server decides the price: it refuses an `expectedPrice` that is not
+  // what it charges (409, nothing written). A started order at another price
+  // (an API that does not check it yet, for example while a release rolls
+  // out) is never paid on either: same rule, same reaction.
   const initiate = useWebMutation(
-    async ({
-      body,
-    }: {
-      body: InitiateBoostRequest;
-      /** The total the pre-information showed when the seller consented. */
-      consentedPrice: number;
-    }): Promise<InitiateBoostResponse> =>
+    async (body: InitiateBoostRequest): Promise<InitiateBoostResponse> =>
       (await boostApi.initiate(listing.id, body)).data,
     {
       errorMessage: t("profile.boost.initiateFailed"),
-      onSuccess: (data, { consentedPrice }) => {
+      onSuccess: (data, body) => {
         if (!data?.paymentId) {
           toast.error(t("profile.boost.paymentStartFailed"));
           return;
         }
-        // The server prices the order itself. If that is not the total the
-        // seller consented to (the price changed in between), do not pay on
-        // it: reload the prices and ask for both consents again.
-        if (Math.abs(data.price - consentedPrice) > PRICE_EPSILON) {
-          resetConsents();
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.boost.options(listing.id),
-          });
+        if (!boostPriceMatches(body.expectedPrice, data.price)) {
+          askAgainOnNewPrices();
           toast.error(t("profile.boost.paymentStartFailed"));
           return;
         }
@@ -262,17 +268,28 @@ export default function BoostModal({
 
   const handleConfirm = () => {
     if (!canPay || !choice) return;
-    initiate.mutate({
-      body: {
+    initiate.mutate(
+      {
         packageId: choice.pkg.id,
         durationDays: choice.option.durationDays,
+        // The price the pre-information shows: the API refuses any other.
+        expectedPrice: choice.option.price,
         preInformationAccepted: true,
         withdrawalWaiverAccepted: true,
         // The reminder is a premium feature: other sellers never send it.
         ...(canRemind ? { autoRenew: reminder } : {}),
       },
-      consentedPrice: choice.option.price,
-    });
+      {
+        // The hook toasts the server's message. A changed price also asks
+        // again on reloaded prices; pay stays disabled until that fetch has
+        // succeeded (`optionsFresh`).
+        onError: (error) => {
+          if (apiErrorI18nKey(error) === PRICE_CHANGED_KEY) {
+            askAgainOnNewPrices();
+          }
+        },
+      },
+    );
   };
 
   const termsPath = CONSENT_DOCUMENTS.platform_service_sales.path;
