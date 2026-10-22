@@ -397,7 +397,8 @@ describe("DistanceSalesConsentService: trade consent bound by the column", () =>
       service.ensureForPayment(tradePayment(), true),
     ]);
 
-    expect(prisma.consentRecord.findFirst).toHaveBeenCalledTimes(2);
+    // Two lookups, then the loser's read-back of the winner's row.
+    expect(prisma.consentRecord.findFirst).toHaveBeenCalledTimes(3);
     expect(prisma.consentRecord.createMany).toHaveBeenCalledTimes(2);
     expect(outcomes.sort()).toEqual(["proceed", "record"]);
     expect(rows).toHaveLength(1);
@@ -412,6 +413,23 @@ describe("DistanceSalesConsentService: trade consent bound by the column", () =>
         }),
       }),
     );
+  });
+
+  it("rethrows a trade unique violation when no granted row can be read back", async () => {
+    const { service, prisma, rows } = makeStoreService();
+    prisma.consentRecord.createMany.mockRejectedValueOnce(uniqueViolation());
+
+    await expect(
+      service.ensureForPayment(tradePayment(), true),
+    ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
+    expect(rows).toHaveLength(0);
+    // Lookup, then the read-back after the violation.
+    expect(prisma.consentRecord.findFirst).toHaveBeenCalledTimes(2);
+    expect(prisma.consentRecord.findFirst.mock.calls[1][0].where).toEqual({
+      document: "distance_sales",
+      action: "granted",
+      tradeCashPaymentId: "tcp-1",
+    });
   });
 
   it("rethrows a unique violation outside a trade (no silent swallow)", async () => {

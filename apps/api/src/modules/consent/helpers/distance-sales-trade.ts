@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { ConsentAction, Prisma } from "@prisma/client";
 
 /**
  * The trade cash payment a distance sales consent belongs to. A trade has no
@@ -70,11 +70,19 @@ export function legacyTradeConsentDetailsWhere(
   };
 }
 
+/** The target of a unique violation on that index, as a column list. */
+const TRADE_CONSENT_UNIQUE_COLUMNS = new Set([
+  "trade_cash_payment_id",
+  "tradeCashPaymentId",
+]);
+
 /**
  * Whether a write failed on `TRADE_CONSENT_UNIQUE_INDEX`: a concurrent submit
  * for the same trade cash payment recorded the consent first. Prisma reports
  * the target of an index the schema does not describe either by its name or
- * by its columns, so both are matched.
+ * by its column list, so both are matched; a list must be exactly that one
+ * column, so a later composite unique index that includes it is not taken for
+ * this one.
  */
 export function isTradeConsentUniqueViolation(error: unknown): boolean {
   if (
@@ -84,12 +92,23 @@ export function isTradeConsentUniqueViolation(error: unknown): boolean {
     return false;
   }
   const target = error.meta?.target;
-  const text = Array.isArray(target) ? target.join(",") : String(target ?? "");
-  return (
-    text.includes(TRADE_CONSENT_UNIQUE_INDEX) ||
-    text.includes("trade_cash_payment_id") ||
-    text.includes("tradeCashPaymentId")
-  );
+  if (Array.isArray(target)) {
+    return (
+      target.length === 1 && TRADE_CONSENT_UNIQUE_COLUMNS.has(String(target[0]))
+    );
+  }
+  return String(target ?? "") === TRADE_CONSENT_UNIQUE_INDEX;
+}
+
+/** The granted distance sales row the unique index holds for a payment. */
+export function recordedTradeConsentWhere(
+  tradeCashPaymentId: string,
+): Prisma.ConsentRecordWhereInput {
+  return {
+    document: "distance_sales",
+    action: ConsentAction.granted,
+    tradeCashPaymentId,
+  };
 }
 
 /**

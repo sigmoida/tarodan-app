@@ -21,6 +21,7 @@ import {
   distanceSalesTradeDetails,
   distanceSalesTradeWhere,
   isTradeConsentUniqueViolation,
+  recordedTradeConsentWhere,
   type DistanceSalesTradeTarget,
 } from "./helpers/distance-sales-trade";
 
@@ -122,8 +123,8 @@ export class DistanceSalesConsentService {
     });
     const hasRecord = existing !== null;
     const isAccepted = accepted === true;
-    // Ayar yalnız gerektiğinde okunur: kayıt ya da onay varken karar ondan
-    // bağımsızdır.
+    // The setting is read only when it matters: with a record or a consent
+    // the decision does not depend on it.
     const required = hasRecord || isAccepted ? false : await this.isRequired();
     const decision = distanceSalesGateDecision({
       hasRecord,
@@ -177,7 +178,9 @@ export class DistanceSalesConsentService {
    * Writes the consent taken on the payment form. Returns false when the
    * partial unique index refused it because a concurrent submit already
    * recorded the consent of this trade cash payment (the gate's lookup and
-   * this write are not atomic); any other failure propagates.
+   * this write are not atomic), confirmed by reading that row back, so the
+   * payment never goes on without a granted row; any other failure
+   * propagates.
    */
   private async recordAtPayment(
     subject: DistanceSalesSubject,
@@ -199,6 +202,11 @@ export class DistanceSalesConsentService {
       return true;
     } catch (error) {
       if (!subject.trade || !isTradeConsentUniqueViolation(error)) throw error;
+      const recorded = await this.prisma.consentRecord.findFirst({
+        where: recordedTradeConsentWhere(subject.trade.tradeCashPaymentId),
+        select: { id: true },
+      });
+      if (!recorded) throw error;
       this.logger.log(
         `Distance sales consent already recorded by a concurrent submit: ` +
           `trade=${subject.trade.tradeNumber} ` +

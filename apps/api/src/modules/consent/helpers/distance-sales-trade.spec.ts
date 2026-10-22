@@ -126,6 +126,11 @@ describe("isTradeConsentUniqueViolation", () => {
   it.each([
     ["another unique target", p2002(["id"])],
     [
+      "a composite target that includes the column",
+      p2002(["trade_cash_payment_id", "version"]),
+    ],
+    ["another index name", p2002("consent_records_trade_cash_payment_id_idx")],
+    [
       "another Prisma error",
       new Prisma.PrismaClientKnownRequestError("FK", {
         code: "P2003",

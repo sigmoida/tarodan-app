@@ -33,7 +33,7 @@ import { ConsentService } from "../../consent/consent.service";
 import { tradeOfConsentRow } from "../../consent/helpers/distance-sales-trade";
 import type { ConsentRecordQueryDto } from "../dto/consent-record.dto";
 
-/** Aramanın yayıldığı kolonlar — listede görünen her kimlik alanı. */
+/** The columns the search covers: every identifying field the list shows. */
 const SEARCH_FIELDS = [
   "guestEmail",
   "visitorId",
@@ -219,8 +219,8 @@ export function buildConsentWhere(
 }
 
 function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
-  // Belge anahtarı yazımda doğrulanır; okunan değer katalog dışıysa (elle
-  // SQL) yine gösterilir ama "güncel sürüm" sayılmaz.
+  // The document key is validated on write; a value outside the catalogue
+  // (manual SQL) is still shown but never counts as the current version.
   const currentVersion = isConsentDocumentKey(row.document)
     ? CONSENT_DOCUMENTS[row.document].version
     : null;
