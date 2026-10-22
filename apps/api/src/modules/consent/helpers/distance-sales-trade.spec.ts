@@ -138,6 +138,14 @@ describe("isTradeConsentUniqueViolation", () => {
         meta: { field_name: "trade_cash_payment_id" },
       }),
     ],
+    [
+      "a non-unique Prisma error whose target names the column",
+      new Prisma.PrismaClientKnownRequestError("Null constraint", {
+        code: "P2011",
+        clientVersion: "test",
+        meta: { target: ["trade_cash_payment_id"] },
+      }),
+    ],
     ["a plain error", new Error("trade_cash_payment_id")],
     ["a P2002-shaped object", { code: "P2002", meta: { target: "x" } }],
   ])("does not match %s", (_label, error) => {

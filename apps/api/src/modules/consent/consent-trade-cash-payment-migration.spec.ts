@@ -87,6 +87,49 @@ describe(`migration ${MIGRATION}`, () => {
       );
     });
 
+    // The pieces above can each still match a guard that was loosened next to
+    // them (an extra `OR TRUE`, a DELETE that returns early, a cart or order
+    // link that may change freely). The whole body is pinned, whitespace
+    // collapsed, so any change to the guard's control flow fails here and is
+    // reviewed on purpose.
+    it("pins the whole guard body (every exemption, nothing more)", () => {
+      const body =
+        /CREATE OR REPLACE FUNCTION consent_records_append_only\(\) RETURNS trigger AS \$\$([\s\S]*?)\$\$ LANGUAGE plpgsql;/.exec(
+          sql,
+        )?.[1] ?? "";
+      expect(body.replace(/\s+/g, " ").trim()).toBe(
+        [
+          "BEGIN",
+          "IF current_setting('tarodan.allow_consent_purge', true) = 'on' THEN",
+          "IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;",
+          "RETURN NEW;",
+          "END IF;",
+          "IF TG_OP = 'DELETE' THEN",
+          "RAISE EXCEPTION 'consent_records: DELETE refused (consent records are append-only)'",
+          "USING ERRCODE = 'restrict_violation';",
+          "END IF;",
+          "IF (NEW.checkout_group_id IS NULL OR NEW.checkout_group_id IS NOT DISTINCT FROM OLD.checkout_group_id)",
+          "AND (NEW.order_id IS NULL OR NEW.order_id IS NOT DISTINCT FROM OLD.order_id)",
+          "AND (",
+          "NEW.trade_cash_payment_id IS NULL",
+          "OR NEW.trade_cash_payment_id IS NOT DISTINCT FROM OLD.trade_cash_payment_id",
+          "OR (",
+          "OLD.trade_cash_payment_id IS NULL",
+          "AND NEW.trade_cash_payment_id = OLD.details ->> 'tradeCashPaymentId'",
+          ")",
+          ")",
+          "AND (to_jsonb(NEW) - 'checkout_group_id' - 'order_id' - 'trade_cash_payment_id')",
+          "= (to_jsonb(OLD) - 'checkout_group_id' - 'order_id' - 'trade_cash_payment_id')",
+          "THEN",
+          "RETURN NEW;",
+          "END IF;",
+          "RAISE EXCEPTION 'consent_records: UPDATE refused (only a deleted cart, order or trade cash payment link may become NULL, or the trade cash payment link may be filled from details)'",
+          "USING ERRCODE = 'restrict_violation';",
+          "END;",
+        ].join(" "),
+      );
+    });
+
     it("keeps every other column immutable", () => {
       expect(fn).toMatch(
         /\(to_jsonb\(NEW\) - 'checkout_group_id' - 'order_id' - 'trade_cash_payment_id'\)\s+= \(to_jsonb\(OLD\) - 'checkout_group_id' - 'order_id' - 'trade_cash_payment_id'\)/,

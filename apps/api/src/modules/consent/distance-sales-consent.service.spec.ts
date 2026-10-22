@@ -452,6 +452,36 @@ describe("DistanceSalesConsentService: trade consent bound by the column", () =>
     ).rejects.toThrow("connection lost");
   });
 
+  // Only the unique violation is "already recorded": another failure (here
+  // the FK of a cash payment deleted in between) is rethrown even when a
+  // granted row of the same payment exists by then, and no read-back runs.
+  it("rethrows a non-unique failure even when a granted row exists by then", async () => {
+    const { service, prisma, rows } = makeStoreService();
+    const fkViolation = new Prisma.PrismaClientKnownRequestError(
+      "Foreign key constraint failed",
+      {
+        code: "P2003",
+        clientVersion: "test",
+        meta: { field_name: "consent_records_trade_cash_payment_id_fkey" },
+      },
+    );
+    prisma.consentRecord.createMany.mockImplementationOnce(async () => {
+      rows.push({
+        id: "consent-winner",
+        document: "distance_sales",
+        action: "granted",
+        tradeCashPaymentId: "tcp-1",
+        details: null,
+      });
+      throw fkViolation;
+    });
+
+    await expect(service.ensureForPayment(tradePayment(), true)).rejects.toBe(
+      fkViolation,
+    );
+    expect(prisma.consentRecord.findFirst).toHaveBeenCalledTimes(1);
+  });
+
   it("traces the gate outcome with ids and codes only", async () => {
     const { service, sentry } = makeStoreService();
 
