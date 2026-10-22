@@ -10257,7 +10257,7 @@
       "title": "Consent Records",
       "description": "Legal consents given by users: who, which document and version, when and from where.",
       "totalCount": "{count} records",
-      "search": "Search member, email, IP, visitor ID or order no…",
+      "search": "Search member, email, IP, visitor ID, order or trade no…",
       "empty": "No consent records",
       "outdatedVersion": "outdated",
       "columns": {

@@ -24,6 +24,7 @@
     "backfill:prod:distance-sales-consents": "node dist-seed/maintenance/backfill-distance-sales-consents.js",
     "backfill:prod:ad-platform": "node dist-seed/maintenance/backfill-ad-platform.js",
     "backfill:prod:test-account-consents": "node dist-seed/maintenance/backfill-test-account-consents.js",
+    "backfill:prod:consent-trade-cash-payments": "node dist-seed/maintenance/backfill-consent-trade-cash-payments.js",
     "elogo:reissue-demo:prod": "node dist-seed/maintenance/reissue-demo-elogo-invoices.js",
     "notify:prod:membership-card-readd": "node dist-seed/maintenance/notify-membership-card-readd.js",
     "settle:prod:seller-fault-residuals": "node dist-seed/maintenance/settle-seller-fault-residuals.js",

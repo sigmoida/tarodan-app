@@ -237,40 +237,51 @@ enum IdentitySnapshotSource {
 /// misafir siparişinin alıcısı paylaşılan sistem hesabıdır, kişiyi göstermez)
 /// ya da giriş yapmamış ziyaretçi (`visitorId`, yalnız çerez tercihi).
 model ConsentRecord {
-  id              String         @id @default(uuid())
+  id                 String            @id @default(uuid())
   /// Belge anahtarı: `@tarodan/types` CONSENT_DOCUMENT_KEYS. Enum DEĞİL —
   /// anahtar listesinin tek kaynağı o paket; müşteri yeni bir metin (ör. açık
   /// rıza) verdiğinde şema göçü gerekmesin. Yazım yalnız ConsentService'ten,
   /// anahtar doğrulanarak yapılır.
-  document        String
+  document           String
   /// Onaylanan metnin sürümü — kayıt anında `CONSENT_DOCUMENTS[document]
   /// .version`. Metin sonradan değişse de hangi metnin kabul edildiği kalır.
-  version         String
-  action          ConsentAction
-  source          ConsentSource
-  userId          String?        @map("user_id")
+  version            String
+  action             ConsentAction
+  source             ConsentSource
+  userId             String?           @map("user_id")
   /// Giriş yapmamış ziyaretçinin tarayıcıda ürettiği kalıcı kimlik (UUID).
   /// Yalnız çerez tercihinde dolar; üye girişliyse `userId` de yazılır.
-  visitorId       String?        @map("visitor_id")
+  visitorId          String?           @map("visitor_id")
   /// Misafir checkout'ta alıcının e-postası (küçük harf).
-  guestEmail      String?        @map("guest_email")
+  guestEmail         String?           @map("guest_email")
   /// Belgeye özgü ayrıntı: çerez kategorileri ({ functional, analytics,
   /// marketing }) gibi. Hukuki metin buraya yazılmaz — sürüm yeter.
-  details         Json?
+  details            Json?
   /// İstemci IP'si: web gateway'inden gelen istekte gateway'in taşıdığı
   /// tarayıcı IP'si, doğrudan çağrıda (mobil) bağlantının IP'si.
-  ipAddress       String?        @map("ip_address")
-  userAgent       String?        @map("user_agent")
+  ipAddress          String?           @map("ip_address")
+  userAgent          String?           @map("user_agent")
   /// Mesafeli satış onayının ait olduğu sepet / tekil (teklif) sipariş.
   /// SET NULL: kanıt, bağlı satır silinse bile (test şeridi temizliği) kalır.
-  checkoutGroupId String?        @map("checkout_group_id")
-  orderId         String?        @map("order_id")
-  createdAt       DateTime       @default(now()) @map("created_at")
+  checkoutGroupId    String?           @map("checkout_group_id")
+  orderId            String?           @map("order_id")
+  /// The trade cash payment a distance sales consent belongs to: a trade has
+  /// no order or cart, and each party pays its own `TradeCashPayment` row. A
+  /// partial unique index in the migration
+  /// (`consent_records_trade_cash_payment_granted_key`) keeps ONE granted
+  /// distance sales row per payment, so two concurrent pay-page submits cannot
+  /// record it twice. SET NULL like the cart and order links: the evidence
+  /// stays when the test-lane purge deletes the trade. Rows written before
+  /// this column carry the reference only in `details`
+  /// (`backfill:prod:consent-trade-cash-payments` copies it here).
+  tradeCashPaymentId String?           @map("trade_cash_payment_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
   /// Restrict: üyeler fiziksel silinmez (anonimleşir); kanıt satırı, kullanıcı
   /// kaydının yanlışlıkla silinmesini de engeller (apps/api/prisma/CLAUDE.md).
-  user            User?          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
-  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  user               User?             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  checkoutGroup      CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
+  order              Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tradeCashPayment   TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id], onDelete: SetNull)
 
   // Yeniden-onay hesabı: üyenin belge başına en son satırı.
   @@index([userId, document, createdAt])
@@ -281,6 +292,8 @@ model ConsentRecord {
   // Ödeme kapısı: "bu sepet/sipariş için onay var mı".
   @@index([checkoutGroupId])
   @@index([orderId])
+  // The FK's SET NULL and the admin trade-number search join on it.
+  @@index([tradeCashPaymentId])
   @@map("consent_records")
 }
 
@@ -1500,6 +1513,7 @@ model TradeCashPayment {
   trade               Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   payment             Payment?
   payoutTransfers     PayoutTransfer[] @relation("TradeCashPayoutTransfers")
+  consentRecords      ConsentRecord[]
 
   /// Taraf başına TEK ödeme satırı (v2'de aynı takasta iki taraf, iki satır).
   @@unique([tradeId, payerId])

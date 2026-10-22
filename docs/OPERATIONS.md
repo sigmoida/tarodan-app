@@ -366,6 +366,40 @@ yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte
 yeniden-onay penceresini görür. Belge metni değiştiğinde
 `packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
 
+### One-off: trade consents onto the cash payment column
+
+Migration `20261022180000_consent_records_trade_cash_payment` adds
+`consent_records.trade_cash_payment_id` (nullable FK, `ON DELETE SET NULL`), a
+partial unique index (one granted distance sales consent per trade cash
+payment) and widens the append-only guard for that column (`CONSENTS.md`,
+"Trade binding"). It runs on deploy and moves no data. Trade consents written
+before it (or by the previous image during the deploy) have the reference only
+in `details`; the API still finds them there. After the release is live, copy
+the reference into the column, dry run first (the default, writes nothing):
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-consent-trade-cash-payments.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-consent-trade-cash-payments.js --apply --db=<database name>'
+```
+
+`--db` must match the target database the dry run prints. Locally:
+`pnpm --filter @tarodan/api backfill:prod:consent-trade-cash-payments` (run
+`build:seed` first).
+
+The dry run lists each candidate (consent id, cash payment id, outcome) and
+the totals; ids only, no personal data:
+
+- `set`: `--apply` fills the column.
+- `payment_missing`: the cash payment no longer exists (test-lane purge); the
+  row stays NULL and keeps its `details`.
+- `duplicate`: another granted consent of the same payment holds it (an
+  earlier double submit); only the earliest row is filled. Nothing to do.
+
+Each write is a compare-and-set on the column being NULL, so a re-run is safe
+and a second run reports no `set` rows. Once it is clean in production, the
+legacy `details` fallback (`legacyTradeConsentDetailsWhere`) can be removed in
+a later release.
+
 ### One-off: require the step-up for account deletion and e-mail change
 
 `DELETE /users/me` and `POST /auth/email/request-change` check a step-up token

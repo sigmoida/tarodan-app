@@ -30,10 +30,10 @@ import {
   type Translate,
 } from "../../../common/export";
 import { ConsentService } from "../../consent/consent.service";
-import { tradeOfConsentDetails } from "../../consent/helpers/distance-sales-trade";
+import { tradeOfConsentRow } from "../../consent/helpers/distance-sales-trade";
 import type { ConsentRecordQueryDto } from "../dto/consent-record.dto";
 
-/** Aramanın yayıldığı kolonlar — listede görünen her kimlik alanı. */
+/** The columns the search covers: every identifying field the list shows. */
 const SEARCH_FIELDS = [
   "guestEmail",
   "visitorId",
@@ -44,6 +44,9 @@ const SEARCH_FIELDS = [
   "user.adminCode",
   "checkoutGroup.groupNumber",
   "order.orderNumber",
+  // A trade consent's trade, through its cash payment. A row written before
+  // the column was backfilled is not found by its trade number yet.
+  "tradeCashPayment.trade.tradeNumber",
 ] as const;
 
 const ROW_SELECT = {
@@ -64,6 +67,9 @@ const ROW_SELECT = {
   },
   checkoutGroup: { select: { id: true, groupNumber: true } },
   order: { select: { id: true, orderNumber: true } },
+  tradeCashPayment: {
+    select: { trade: { select: { id: true, tradeNumber: true } } },
+  },
 } satisfies Prisma.ConsentRecordSelect;
 
 type ConsentRecordWithRelations = Prisma.ConsentRecordGetPayload<{
@@ -213,8 +219,8 @@ export function buildConsentWhere(
 }
 
 function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
-  // Belge anahtarı yazımda doğrulanır; okunan değer katalog dışıysa (elle
-  // SQL) yine gösterilir ama "güncel sürüm" sayılmaz.
+  // The document key is validated on write; a value outside the catalogue
+  // (manual SQL) is still shown but never counts as the current version.
   const currentVersion = isConsentDocumentKey(row.document)
     ? CONSENT_DOCUMENTS[row.document].version
     : null;
@@ -240,8 +246,11 @@ function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
     userAgent: row.userAgent,
     checkoutGroup: row.checkoutGroup,
     order: row.order,
-    trade:
-      row.document === "distance_sales" ? tradeOfConsentDetails(details) : null,
+    trade: tradeOfConsentRow({
+      document: row.document,
+      details,
+      tradeCashPayment: row.tradeCashPayment,
+    }),
     createdAt: row.createdAt.toISOString(),
   };
 }

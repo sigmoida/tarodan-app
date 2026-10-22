@@ -10257,7 +10257,7 @@
       "title": "Onay Kayıtları",
       "description": "Kullanıcıların verdiği hukuki onaylar: kim, hangi belge ve sürüm, ne zaman, nereden.",
       "totalCount": "{count} kayıt",
-      "search": "Üye, e-posta, IP, ziyaretçi kimliği veya sipariş no ara…",
+      "search": "Üye, e-posta, IP, ziyaretçi kimliği, sipariş veya takas no ara…",
       "empty": "Onay kaydı yok",
       "outdatedVersion": "eski sürüm",
       "columns": {
