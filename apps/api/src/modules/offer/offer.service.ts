@@ -44,7 +44,7 @@ import {
   assertProposalWithinPriceCeiling,
   isOfferAcceptableAtPrice,
   offerPriceChangedError,
-} from "./helpers/offer-price-ceiling";
+} from "./helpers/offer-price-ceiling-policy";
 import { loadProductPriceLimits } from "../product/helpers/product-price-limits";
 import { resolveMinOfferPercentage } from "../../config/offer";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";

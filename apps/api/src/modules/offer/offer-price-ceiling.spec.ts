@@ -1,17 +1,6 @@
-import {
-  BadRequestException,
-  ConflictException,
-  HttpException,
-} from "@nestjs/common";
+import { BadRequestException, HttpException } from "@nestjs/common";
 import { OfferStatus, ProductStatus } from "@prisma/client";
 import { OfferService } from "./offer.service";
-import {
-  assertProposalWithinPriceCeiling,
-  isOfferAcceptableAtPrice,
-  isWithinPriceCeiling,
-  offerPriceChangedError,
-  offerProposer,
-} from "./helpers/offer-price-ceiling";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
 
 /**
@@ -20,6 +9,7 @@ import { userBlockServiceStub } from "../user-block/user-block.testing";
  * accepted. The buyer (offer and buyer counter) stays strictly below it, the
  * seller counter may reach it. A pending offer the price dropped under is
  * refused at accept with a 409 instead of being charged above the price.
+ * The pure rule is pinned in `helpers/offer-price-ceiling-policy.spec.ts`.
  */
 
 const HOUR = 3_600_000;
@@ -65,78 +55,6 @@ const openSale = {
 
 const i18nKeyOf = (error: unknown) =>
   (error as { response?: { i18nKey?: string } } | undefined)?.response?.i18nKey;
-
-describe("offer price ceiling helpers", () => {
-  it("names the proposer from buyerMustAccept", () => {
-    expect(offerProposer({ buyerMustAccept: true })).toBe("seller");
-    expect(offerProposer({ buyerMustAccept: false })).toBe("buyer");
-    expect(offerProposer({ buyerMustAccept: null })).toBe("buyer");
-  });
-
-  it.each([
-    ["buyer", 999.99, true],
-    ["buyer", 1000, false],
-    ["buyer", 1000.01, false],
-    ["seller", 999.99, true],
-    ["seller", 1000, true],
-    ["seller", 1000.01, false],
-  ] as const)(
-    "%s amount %p on a 1000 TL price is within the ceiling: %p",
-    (proposer, amount, within) => {
-      expect(isWithinPriceCeiling(amount, 1000, proposer)).toBe(within);
-    },
-  );
-
-  it("refuses a buyer amount at the price with offerMustBeBelowPrice", () => {
-    const error = (() => {
-      try {
-        assertProposalWithinPriceCeiling(1000, 1000, "buyer");
-      } catch (e) {
-        return e;
-      }
-    })();
-    expect(error).toBeInstanceOf(BadRequestException);
-    expect(i18nKeyOf(error)).toBe("server.offer.offerMustBeBelowPrice");
-  });
-
-  it("refuses a seller amount above the price with counterCannotExceedPrice", () => {
-    const error = (() => {
-      try {
-        assertProposalWithinPriceCeiling(1000.01, 1000, "seller");
-      } catch (e) {
-        return e;
-      }
-    })();
-    expect(error).toBeInstanceOf(BadRequestException);
-    expect(i18nKeyOf(error)).toBe("server.offer.counterCannotExceedPrice");
-  });
-
-  it("reads a Decimal-like amount for the accept check", () => {
-    const decimal = { toString: () => "1000", valueOf: () => 1000 };
-    expect(
-      isOfferAcceptableAtPrice(
-        { amount: decimal, buyerMustAccept: false },
-        1000,
-      ),
-    ).toBe(false);
-    expect(
-      isOfferAcceptableAtPrice(
-        { amount: decimal, buyerMustAccept: true },
-        1000,
-      ),
-    ).toBe(true);
-  });
-
-  it("the accept refusal is a 409 carrying the current price", () => {
-    const error = offerPriceChangedError(899.5);
-    expect(error).toBeInstanceOf(ConflictException);
-    expect(error.getStatus()).toBe(409);
-    expect(error.getResponse()).toEqual({
-      i18nKey: "server.offer.priceChangedSinceOffer",
-      i18nParams: { price: "899.50" },
-    });
-  });
-});
 
 /** counter / buyerCounter stop at the first write after the price gates. */
 describe("OfferService counters against the current price", () => {
