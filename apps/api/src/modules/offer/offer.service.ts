@@ -3,7 +3,6 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-  ConflictException,
   Optional,
   Logger,
 } from "@nestjs/common";
@@ -41,6 +40,11 @@ import {
 import { paginate } from "../../common/list";
 import { offerExpiresAt } from "./helpers/offer-expiry";
 import { assertOfferAmountAboveFloor } from "./helpers/offer-price-floor";
+import {
+  assertProposalWithinPriceCeiling,
+  isOfferAcceptableAtPrice,
+  offerPriceChangedError,
+} from "./helpers/offer-price-ceiling-policy";
 import { loadProductPriceLimits } from "../product/helpers/product-price-limits";
 import { resolveMinOfferPercentage } from "../../config/offer";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";
@@ -257,13 +261,8 @@ export class OfferService {
       }
       // An offer is strictly below the current sale price: the rule web and
       // mobile apply against the same number (`resolveSalePrice`, served as
-      // `price`). At the price it is a purchase, not an offer; the seller
-      // counter may reach the price (`counterCannotExceedPrice`).
-      if (dto.amount >= productPrice) {
-        throw new BadRequestException(
-          i18nMessage("server.offer.offerMustBeBelowPrice"),
-        );
-      }
+      // `price`). At the price it is a purchase, not an offer.
+      assertProposalWithinPriceCeiling(dto.amount, productPrice, "buyer");
 
       // Check for existing pending offer from this buyer
       const existingOffer = await tx.offer.findFirst({
@@ -475,6 +474,17 @@ export class OfferService {
         );
       }
 
+      // The agreement is struck here: the amount must still fit the ceiling
+      // of whoever proposed it, against the price read under the product lock
+      // (a price drop since the offer is refused, never charged).
+      const listingPrice = resolveSalePrice(productData).price;
+      if (!isOfferAcceptableAtPrice(offerData, listingPrice)) {
+        this.logger.warn(
+          `Offer ${offerId} accept refused: amount above the current price ceiling of product ${productData.id}`,
+        );
+        throw offerPriceChangedError(listingPrice);
+      }
+
       // Accept this offer with version check
       const acceptedOffer = await tx.offer.update({
         where: {
@@ -598,7 +608,9 @@ export class OfferService {
           financialSnapshot: this.checkoutCommon.buildOfferFinancialSnapshot({
             productId: offerData.productId,
             amount: Number(offerData.amount),
-            listingUnitPrice: Number(productData.price),
+            // The sale price at accept (`resolveSalePrice`), not the raw
+            // column: outside a sale window the listing sells at `oldPrice`.
+            listingUnitPrice: listingPrice,
             shippingDesi: productData.shippingDesi,
             shippingTariff,
             pricing: offerPricing,
@@ -878,13 +890,11 @@ export class OfferService {
         );
       }
 
-      // Tavan da ilan fiyatının TEK kaynağından (`resolveSalePrice`) gelir.
+      // The ceiling is the CURRENT sale price (`resolveSalePrice` on the row
+      // read in this transaction), never the price the offer was made at. The
+      // seller counter may reach it.
       const listingPrice = resolveSalePrice(offer.product).price;
-      if (dto.amount > listingPrice) {
-        throw new BadRequestException(
-          i18nMessage("server.offer.counterCannotExceedPrice"),
-        );
-      }
+      assertProposalWithinPriceCeiling(dto.amount, listingPrice, "seller");
       // Karşı teklif de platform alt sınırının altına inemez.
       assertOfferAmountAboveFloor(dto.amount, priceLimits, listingPrice);
 
@@ -1014,6 +1024,10 @@ export class OfferService {
           i18nMessage("server.offer.buyerCounterMustBeLower"),
         );
       }
+      // Below the seller's counter is not enough: after a price drop the
+      // counter can sit at or above the current price. The buyer counter is a
+      // buyer offer, strictly below the current sale price like `create`.
+      assertProposalWithinPriceCeiling(dto.amount, productPrice, "buyer");
 
       assertOfferAmountAboveFloor(dto.amount, priceLimits, productPrice);
 
@@ -1452,7 +1466,10 @@ export class OfferService {
       product: {
         id: offer.product.id,
         title: offer.product.title,
-        price: Number(offer.product.price),
+        // The current sale price (`resolveSalePrice`): the bound the server
+        // checks counters and accepts against, so the counter modals of web
+        // and mobile check the same number.
+        price: resolveSalePrice(offer.product).price,
         imageUrl: imageUrl || undefined,
         images,
         status: offer.product.status,

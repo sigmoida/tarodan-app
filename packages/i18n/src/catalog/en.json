@@ -11345,7 +11345,8 @@
       "productNotActive": "This product is not currently for sale",
       "productNotFound": "Product not found",
       "productOutOfStock": "The product is out of stock or does not have enough available quantity",
-      "offerMustBeBelowPrice": "The offer must be lower than the product price"
+      "offerMustBeBelowPrice": "The offer must be lower than the product price",
+      "priceChangedSinceOffer": "The offer cannot be accepted because the listing price dropped to {price} TL after it was made. A new offer can be made based on the current price."
     },
     "trade": {
       "addressNotFound": "Address not found",

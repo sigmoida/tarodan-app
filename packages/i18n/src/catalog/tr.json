@@ -11345,7 +11345,8 @@
       "productNotActive": "Bu ürün şu anda satışta değil",
       "productNotFound": "Ürün bulunamadı",
       "productOutOfStock": "Ürün stokta yok veya yeterli müsait adet yok",
-      "offerMustBeBelowPrice": "Teklif tutarı, ürün fiyatından düşük olmalıdır"
+      "offerMustBeBelowPrice": "Teklif tutarı, ürün fiyatından düşük olmalıdır",
+      "priceChangedSinceOffer": "İlanın fiyatı bu tekliften sonra {price} TL'ye düştüğü için teklif kabul edilemez. Güncel fiyata göre yeni bir teklif verilebilir."
     },
     "trade": {
       "addressNotFound": "Adres bulunamadı",
