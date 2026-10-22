@@ -11,6 +11,8 @@ export interface WishlistItem {
   productOriginalPrice?: number;
   productCondition?: string;
   productStatus?: string;
+  /** Null or missing = unlimited / unknown stock. */
+  availableQuantity?: number | null;
   sellerId: string;
   sellerName: string;
   addedAt: string | Date;
@@ -25,4 +27,6 @@ export const wishlistItemToProduct = (item: WishlistItem): Product => ({
   condition: item.productCondition,
   originalPrice: item.productOriginalPrice,
   status: item.productStatus,
+  sellerId: item.sellerId,
+  availableQuantity: item.availableQuantity,
 });
