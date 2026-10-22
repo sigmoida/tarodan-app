@@ -940,10 +940,6 @@ export class TradeLifecycleService {
     // Store version for optimistic locking
     const tradeVersion = trade.version;
 
-    if (!trade) {
-      throw new NotFoundException(i18nMessage("server.trade.notFound"));
-    }
-
     // Only receiver can send counter-offer
     if (trade.receiverId !== userId) {
       throw new ForbiddenException(
