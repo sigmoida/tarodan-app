@@ -56,22 +56,39 @@ export function packageDurations(pkg: AdPackage): number[] {
 // ── Form schema (validation-only; strings→numbers/ISO shaped in toPayload) ──
 // The TL fields are text read by the shared TL amount parser
 // (`@/lib/schemas/amount`): "1.000" is refused, never 1 TL. 0 is a real value.
+// A tier's price band is half-open (`@/lib/amount-band`): the form takes the
+// exclusive upper bound as stored, as the commission form does.
 
 const tierRowSchema = (t: T) =>
-  z.object({
-    durationDays: z
-      .string()
-      .min(1, t("admin.marketing.adPackages.validation.durationMin")),
-    minAmount: amountField(t).default("0"),
-    maxAmount: amountField(t).default(""),
-    price: amountField(t, {
-      required: t("admin.marketing.adPackages.validation.priceMin"),
-    }),
-    campaignPrice: amountField(t).default(""),
-    campaignStartsAt: z.string().default(""),
-    campaignEndsAt: z.string().default(""),
-    isActive: z.boolean().default(true),
-  });
+  z
+    .object({
+      durationDays: z
+        .string()
+        .min(1, t("admin.marketing.adPackages.validation.durationMin")),
+      minAmount: amountField(t).default("0"),
+      maxAmount: amountField(t).default(""),
+      price: amountField(t, {
+        required: t("admin.marketing.adPackages.validation.priceMin"),
+      }),
+      campaignPrice: amountField(t).default(""),
+      campaignStartsAt: z.string().default(""),
+      campaignEndsAt: z.string().default(""),
+      isActive: z.boolean().default(true),
+    })
+    .superRefine((row, context) => {
+      // The API refuses an empty band on any row (active or not). Refused
+      // text has its own field error, and null skips the comparison; a blank
+      // lower bound is sent as 0 (`packageFormToPayload`).
+      const max = amountOrNull(row.maxAmount);
+      const min = row.minAmount.trim() === "" ? 0 : amountOrNull(row.minAmount);
+      if (max != null && min != null && max <= min) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["maxAmount"],
+          message: t("admin.finance.commission.validation.strictRange"),
+        });
+      }
+    });
 
 export const packageSchema = (t: T) =>
   z
@@ -152,6 +169,24 @@ export const emptyTierRow: TierRowValues = {
   campaignEndsAt: "",
   isActive: true,
 };
+
+/**
+ * The row "Add row" appends. After a band with an upper bound it is the next
+ * band of the same duration, starting at that bound: the upper bound is
+ * exclusive, so the two bands touch with no gap (1000-5000, then 5000-...).
+ * After an open-ended band (or none) that duration is covered, so the new
+ * row starts from scratch.
+ */
+export function nextTierRow(rows: readonly TierRowValues[]): TierRowValues {
+  const last = rows.at(-1);
+  const end = last ? amountOrNull(last.maxAmount) : null;
+  if (!last || end == null) return { ...emptyTierRow };
+  return {
+    ...emptyTierRow,
+    durationDays: last.durationDays,
+    minAmount: amountInputValue(end),
+  };
+}
 
 const dateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
 
