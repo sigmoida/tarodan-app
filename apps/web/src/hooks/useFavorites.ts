@@ -73,6 +73,7 @@ export function useFavorites() {
             productOriginalPrice: p.originalPrice,
             productCondition: p.condition,
             productStatus: p.status,
+            availableQuantity: p.availableQuantity,
             sellerId: p.sellerId ?? p.userId,
             sellerName: publicNameOf(p.seller, p.sellerName ?? ""),
             addedAt: p.createdAt,

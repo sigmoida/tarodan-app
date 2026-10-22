@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   inCart: new Set<string>(),
   pending: new Set<string>(),
   toggles: [] as string[],
+  userId: "me" as string | null,
 }));
 
 vi.mock("@/hooks/useCartToggle", () => ({
@@ -30,8 +31,8 @@ vi.mock("@/hooks/useCartToggle", () => ({
   }),
 }));
 vi.mock("@/stores/authStore", () => ({
-  useAuthStore: (select: (s: { user: { id: string } }) => unknown) =>
-    select({ user: { id: "me" } }),
+  useAuthStore: (select: (s: { user: { id: string } | null }) => unknown) =>
+    select({ user: h.userId ? { id: h.userId } : null }),
 }));
 vi.mock("@/components/boost/useBoostOffers", () => ({
   useBoostEnabled: () => true,
@@ -95,6 +96,7 @@ beforeEach(() => {
   h.inCart = new Set(["b"]);
   h.pending = new Set();
   h.toggles = [];
+  h.userId = "me";
   onRemove.mockReset();
 });
 
@@ -154,5 +156,42 @@ describe("FavoritesGrid", () => {
       ),
     ).toBeNull();
     expect(cartButtons()).toHaveLength(2);
+  });
+
+  describe("footer follows the card rule", () => {
+    const renderOne = (over: Partial<WishlistItem>) =>
+      act(() =>
+        root.render(
+          <FavoritesGrid
+            items={[{ ...item("x"), ...over }]}
+            pendingCount={0}
+            isSharedView={false}
+            onRemove={onRemove}
+            isPending={() => false}
+          />,
+        ),
+      );
+
+    it("shows the cart for another seller's active in-stock listing", () => {
+      renderOne({ availableQuantity: 3 });
+      expect(cartButtons()).toHaveLength(1);
+    });
+
+    it("shows the cart to a guest", () => {
+      h.userId = null;
+      renderOne({});
+      expect(cartButtons()).toHaveLength(1);
+    });
+
+    it.each([
+      ["sold", { productStatus: "sold" }],
+      ["reserved", { productStatus: "reserved" }],
+      ["inactive", { productStatus: "inactive" }],
+      ["out of stock", { availableQuantity: 0 }],
+      ["own", { sellerId: "me" }],
+    ])("hides the cart for a %s listing", (_name, over) => {
+      renderOne(over);
+      expect(cartButtons()).toHaveLength(0);
+    });
   });
 });
