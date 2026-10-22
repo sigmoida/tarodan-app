@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
   Logger,
@@ -39,6 +40,7 @@ import {
 import {
   BOOST_ENABLED_SETTING,
   type BoostOptionsResponse,
+  boostPriceMatches,
   isBoostEnabled as isBoostSettingOn,
 } from "@tarodan/types";
 
@@ -46,6 +48,8 @@ import {
 export interface InitiateBoostInput extends PlatformServiceConsentInput {
   packageId: string;
   durationDays: number;
+  /** The price the dialog showed (TL); must match what is charged now. */
+  expectedPrice: number;
   provider: PaymentProvider;
   /** Asks for the ending-soon reminder; kept only for premium members. */
   autoRenew: boolean;
@@ -221,7 +225,15 @@ export class ProductBoostService {
    * web dialog that sends them ships in the same release.
    *
    * The price is resolved on the server from the package tier for the
-   * listing's price (never trusted from the client).
+   * listing's price (never trusted from the client), with the same rule the
+   * options call shows. When it is not the price the seller consented to
+   * (`expectedPrice`, `boostPriceMatches`: whole kuruş), the answer is 409
+   * `server.product.boostPriceChanged` before any order lookup, reference or
+   * write: a campaign, a tier, the listing's price band or the seller's
+   * audience changed since the options were read. Every earlier refusal
+   * (consents, boost off, listing, owner, status, package, tier) wins over
+   * it. The checked price is the one written, so the boost, the order, the
+   * payment and the consents carry the consented price.
    */
   async initiateBoost(
     userId: string,
@@ -229,7 +241,8 @@ export class ProductBoostService {
     input: InitiateBoostInput,
     req?: Request,
   ) {
-    const { packageId, durationDays, provider, autoRenew } = input;
+    const { packageId, durationDays, expectedPrice, provider, autoRenew } =
+      input;
     tagBoostRequest(this.sentry);
     boostBreadcrumb(this.sentry, "initiate", { productId });
     if (!platformServiceConsentsAccepted(input)) {
@@ -278,6 +291,16 @@ export class ProductBoostService {
     if (price <= 0) {
       throw new BadRequestException(
         i18nMessage("server.product.boostPriceUndefined"),
+      );
+    }
+    if (!boostPriceMatches(expectedPrice, price)) {
+      boostBreadcrumb(this.sentry, "price_mismatch", {
+        productId,
+        packageId,
+        durationDays,
+      });
+      throw new ConflictException(
+        i18nMessage("server.product.boostPriceChanged"),
       );
     }
 

@@ -487,7 +487,7 @@ describe("BoostModal consent reset", () => {
 });
 
 describe("BoostModal request", () => {
-  it("sends the package, the duration and both consents, then opens the pay page", async () => {
+  it("sends the package, the duration, the shown price and both consents, then opens the pay page", async () => {
     render();
     await flush();
     await acceptBoth();
@@ -500,6 +500,8 @@ describe("BoostModal request", () => {
     expect(body).toEqual({
       packageId: "pkg-eco",
       durationDays: 7,
+      // The price the pre-information showed (the campaign price, not 79).
+      expectedPrice: 59,
       preInformationAccepted: true,
       withdrawalWaiverAccepted: true,
     });
@@ -509,7 +511,7 @@ describe("BoostModal request", () => {
     expect(h.push).toHaveBeenCalledWith("/payment/pay-1?type=boost");
   });
 
-  it("sends the chosen package and duration", async () => {
+  it("sends the chosen package, duration and its price", async () => {
     render();
     await flush();
     click(durationRow("Vitrin", 7).querySelector("input")!);
@@ -520,6 +522,7 @@ describe("BoostModal request", () => {
     expect(h.initiate.mock.calls[0][1]).toMatchObject({
       packageId: "pkg-vitrin",
       durationDays: 7,
+      expectedPrice: 149,
     });
   });
 

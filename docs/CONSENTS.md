@@ -167,6 +167,11 @@ Flow:
   write; a text such as `"true"` or `"false"` is a validation 400 (the field
   is read raw, `JsonBoolean`, so implicit conversion cannot turn `"false"`
   into `true`).
+- The consents belong to the price they were given on: the body's
+  `expectedPrice` must be the price charged now (whole kuruş), else
+  `409 server.product.boostPriceChanged` and nothing is written, so no consent
+  row names a price the seller did not see. The consent check comes first.
+  Details: `PAYMENTS.md`, "Boost price at consent".
 - With both, **one transaction** writes the boost (`pending`), its virtual
   product, its order and one `granted` row per document
   (`PlatformServiceConsentService.recordForOrder`: catalogue version, source

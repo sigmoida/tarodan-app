@@ -3,12 +3,18 @@ import type { SentryService } from "../../sentry/sentry.service";
 /** The Sentry tag of a boost request (purchase start, admin actions). */
 export const BOOST_SENTRY_TAG = { key: "flow", value: "boost" } as const;
 
-/** Ids only: never a name, an e-mail or a listing's text. */
+/**
+ * Ids only: never a name, an e-mail, a listing's text or an amount. The
+ * package and the duration name what was chosen (the price follows from
+ * them and the tier).
+ */
 export interface BoostTraceIds {
   boostId?: string | null;
   orderId?: string | null;
   orderNumber?: string | null;
   productId?: string | null;
+  packageId?: string | null;
+  durationDays?: number | null;
 }
 
 type BoostSentry = Pick<SentryService, "setTag" | "addBreadcrumb">;

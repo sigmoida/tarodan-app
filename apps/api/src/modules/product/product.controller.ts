@@ -599,8 +599,9 @@ export class ProductController {
 
   /**
    * POST /products/:id/boost/initiate
-   * Boost a listing: package, duration and both purchase consents, then the
-   * payment intent. Ownership and the active status are checked.
+   * Boost a listing: package, duration, the price the dialog showed and both
+   * purchase consents, then the payment intent. Ownership and the active
+   * status are checked; a changed price is a 409 with nothing written.
    */
   @Post(":id/boost/initiate")
   @UseGuards(JwtAuthGuard)
@@ -615,11 +616,16 @@ export class ProductController {
   @ApiResponse({
     status: 400,
     description:
-      "A consent is not true (server.product.boostConsentRequired), no package, a package or duration without a tier for the listing's price, or the listing is not active",
+      "A consent is not true (server.product.boostConsentRequired), no package, no valid expectedPrice (a JSON number with at most two decimals), a package or duration without a tier for the listing's price, or the listing is not active",
   })
   @ApiResponse({
     status: 403,
     description: "Only your own listing can be boosted",
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      "expectedPrice is not the price charged now (server.product.boostPriceChanged); nothing is written",
   })
   async initiateBoost(
     @Param(
@@ -643,6 +649,7 @@ export class ProductController {
       {
         packageId: dto.packageId,
         durationDays: dto.durationDays,
+        expectedPrice: dto.expectedPrice,
         provider: dto.provider ?? PaymentProvider.paytr,
         autoRenew: dto.autoRenew ?? false,
         preInformationAccepted: dto.preInformationAccepted,

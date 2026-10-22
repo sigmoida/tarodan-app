@@ -266,6 +266,8 @@ export default function BoostModal({
       body: {
         packageId: choice.pkg.id,
         durationDays: choice.option.durationDays,
+        // The price the pre-information shows: the API refuses any other.
+        expectedPrice: choice.option.price,
         preInformationAccepted: true,
         withdrawalWaiverAccepted: true,
         // The reminder is a premium feature: other sellers never send it.

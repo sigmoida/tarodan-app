@@ -1,10 +1,11 @@
-// The boost setting rules and the card action live once in `@tarodan/types`
-// (the API, web, admin and mobile call the same functions); this spec pins them
-// for every surface.
+// The boost setting rules, the consented-price rule and the card action live
+// once in `@tarodan/types` (the API, web, admin and mobile call the same
+// functions); this spec pins them for every surface.
 import {
   BOOST_ENABLED_SETTING,
   BOOST_OFFER_SINCE_SETTING,
   boostOfferSince,
+  boostPriceMatches,
   isBoostEnabled,
   isPlatformSettingOn,
   productCardAction,
@@ -71,6 +72,52 @@ describe("boostOfferSince", () => {
       expect(boostOfferSince(value)).toBeNull();
     },
   );
+});
+
+describe("boostPriceMatches", () => {
+  // The one rule that decides whether the boost purchase goes ahead at the
+  // price the seller consented to: equal in whole kuruş, never a float
+  // epsilon.
+  it.each([
+    [59.9, 59.9],
+    // Float noise and a value that rounds to the same kuruş.
+    [59.899999, 59.9],
+    [59.900001, 59.9],
+    [0.1 + 0.2, 0.3],
+    [150, 150],
+    [0, 0],
+    [12345678.91, 12345678.91],
+  ])("%p matches %p", (expected, actual) => {
+    expect(boostPriceMatches(expected, actual)).toBe(true);
+  });
+
+  it.each([
+    // One kuruş either way is a different price.
+    [59.89, 59.9],
+    [59.91, 59.9],
+    [149.99, 150],
+    // A campaign price is not the list price, and the other way round.
+    [150, 99],
+    [99, 150],
+    [0, 59.9],
+  ])("%p does not match %p", (expected, actual) => {
+    expect(boostPriceMatches(expected, actual)).toBe(false);
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "never matches the non-finite %p (fails closed)",
+    (value) => {
+      expect(boostPriceMatches(value, 59.9)).toBe(false);
+      expect(boostPriceMatches(59.9, value)).toBe(false);
+      expect(boostPriceMatches(value, value)).toBe(false);
+    },
+  );
+
+  it("never matches a value that is not a number (a caller that skipped the DTO)", () => {
+    expect(boostPriceMatches(undefined as never, 59.9)).toBe(false);
+    expect(boostPriceMatches("59.9" as never, 59.9)).toBe(false);
+    expect(boostPriceMatches(null as never, 0)).toBe(false);
+  });
 });
 
 describe("productCardAction", () => {
