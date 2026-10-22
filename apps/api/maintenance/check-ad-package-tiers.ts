@@ -15,7 +15,14 @@
  * - `UPPER BOUND NOW OUTSIDE`: an active band's upper bound that no other
  *   active band of the duration covers. A listing priced exactly at it was
  *   matched before the half-open rule and is not any more (the launch rows
- *   200-999 then 1000-5000 leave 999 uncovered).
+ *   200-999 then 1000-5000 left 999 uncovered).
+ *
+ * The migration `20261022165035_ad_package_tier_band_gaps` closes every gap
+ * of at most 1 between two bands that it can close without an overlap (the
+ * launch rows become 200-1000), so after it this check should report no
+ * `GAP` or `UPPER BOUND NOW OUTSIDE` line for them. One that remains is a
+ * wider gap, or a band the migration left alone because widening it would
+ * overlap another tier.
  *
  * It never writes: there is no `--apply`. Fix the rows in the admin panel
  * (Marketing -> Ad packages), which also refuses a save that still overlaps.
@@ -112,8 +119,13 @@ async function main(): Promise<void> {
   });
 
   let packagesWithFindings = 0;
+  let gapFindings = 0;
   for (const pkg of packages) {
     const lines = checkPackage(pkg.tiers);
+    gapFindings += lines.filter(
+      (line) =>
+        line.startsWith("GAP ") || line.startsWith("UPPER BOUND NOW OUTSIDE "),
+    ).length;
     const status = pkg.isActive ? "active" : "inactive";
     console.log(
       `\n${pkg.slug} (${pkg.id}, ${status}, ${pkg.tiers.length} tiers): ${lines.length === 0 ? "OK" : `${lines.length} finding(s)`}`,
@@ -125,6 +137,11 @@ async function main(): Promise<void> {
   console.log(
     `\n[READ ONLY] ${packages.length} package(s) checked, ${packagesWithFindings} with findings. Nothing written.`,
   );
+  if (gapFindings > 0) {
+    console.log(
+      "Gaps of at most 1 between bands are closed by migration 20261022165035_ad_package_tier_band_gaps; a GAP or UPPER BOUND NOW OUTSIDE line after it is a wider gap or a band it could not widen without an overlap.",
+    );
+  }
 }
 
 main()
