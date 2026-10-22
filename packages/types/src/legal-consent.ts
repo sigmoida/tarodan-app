@@ -221,6 +221,8 @@ export interface AdminConsentRecordRow {
   userAgent: string | null;
   checkoutGroup: { id: string; groupNumber: string } | null;
   order: { id: string; orderNumber: string } | null;
+  /** The trade of a distance sales consent given for a trade cash payment. */
+  trade: { id: string; tradeNumber: string } | null;
   createdAt: string;
 }
 

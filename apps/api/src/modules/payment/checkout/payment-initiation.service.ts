@@ -738,8 +738,9 @@ export class PaymentInitiationService {
     let amount: number;
     let returnQueryParams: string;
     let ownerId: string | null = null;
-    // Mesafeli satış onayının ait olduğu satın alma. Satın alma olmayan
-    // hedeflerde (takas ücreti, üyelik / öne çıkarma) null kalır.
+    // The purchase the distance sales consent belongs to (cart, single order,
+    // trade cash payment). Stays null for a platform service (membership,
+    // boost), which is not a sale of goods.
     let distanceSalesSubject: DistanceSalesSubject | null = null;
     // A boost order: charged only with its purchase consents on record.
     let platformServiceConsentOrderId: string | null = null;
@@ -1057,6 +1058,17 @@ export class PaymentInitiationService {
         },
       ];
       baseOid = `TRADE${String(trade.tradeNumber).replace(/-/g, "")}`;
+      // The payer accepts the distance sales contract on the pay page, as for
+      // an order; the consent is bound to the payer's own cash payment row.
+      distanceSalesSubject = {
+        trade: {
+          tradeId: trade.id,
+          tradeNumber: trade.tradeNumber,
+          tradeCashPaymentId: cashPayment.id,
+        },
+        userId: cashPayment.payerId,
+        guestEmail: null,
+      };
       returnQueryParams = paymentReturnQuery({ paymentId: payment.id });
     } else {
       throw new BadRequestException(
@@ -1073,10 +1085,11 @@ export class PaymentInitiationService {
       );
     }
 
-    // MESAFELİ SATIŞ KAPISI — çekimden ÖNCE (claim'den de önce: ret, ödeme
-    // satırını `processing`e almadan döner). Bu form, her satın almanın PayTR
-    // çekiminden önceki ORTAK son adımıdır: checkout'ta alınmamış onay (teklif
-    // siparişi, eski istemci) burada alınır; ayar açıksa onaysız ödeme başlamaz.
+    // DISTANCE SALES GATE, before the charge and before the claim (a refusal
+    // returns without moving the payment row to `processing`). This form is
+    // the common last step before every PayTR charge: a consent not taken at
+    // checkout (offer order, trade cash payment, old client) is taken here;
+    // while the setting is on, no payment starts without it.
     await this.distanceSalesConsent.ensureForPayment(
       distanceSalesSubject,
       dto.distanceSalesAccepted,

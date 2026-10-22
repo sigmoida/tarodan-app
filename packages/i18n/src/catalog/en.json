@@ -10324,7 +10324,8 @@
         "userAgent": "Browser (user agent)",
         "cookieCategories": "Cookie categories",
         "checkoutGroup": "Cart no",
-        "order": "Order no"
+        "order": "Order no",
+        "trade": "Trade no"
       }
     },
     "gibReport": {

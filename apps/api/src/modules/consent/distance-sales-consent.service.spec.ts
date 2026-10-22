@@ -54,6 +54,7 @@ describe("DistanceSalesConsentService.ensureForPayment", () => {
       orderId: "order-1",
       userId: "buyer-1",
     });
+    expect(row.details).toBeUndefined();
   });
 
   it("checkout'ta kaydedilmiş sepet için ikinci satır yazmaz", async () => {
@@ -138,7 +139,7 @@ describe("DistanceSalesConsentService.ensureForPayment", () => {
     ).resolves.toBe("proceed");
   });
 
-  it("satın alma olmayan hedefte (takas, üyelik) kapı uygulanmaz", async () => {
+  it("skips the gate for a platform service (membership, boost)", async () => {
     const { service, prisma } = makeService({ setting: "true" });
 
     await expect(service.ensureForPayment(null, undefined)).resolves.toBeNull();
@@ -159,6 +160,79 @@ describe("DistanceSalesConsentService.ensureForPayment", () => {
       guestEmail: "g@x.com",
       checkoutGroupId: "group-9",
     });
+  });
+});
+
+describe("DistanceSalesConsentService.ensureForPayment: trade cash payment", () => {
+  const tradePayment = {
+    trade: {
+      tradeId: "trade-1",
+      tradeNumber: "TKS-10001",
+      tradeCashPaymentId: "tcp-1",
+    },
+    userId: "payer-1",
+    guestEmail: null,
+  };
+
+  it("records the consent bound to the payer's cash payment row", async () => {
+    const { service, prisma } = makeService({});
+
+    await expect(service.ensureForPayment(tradePayment, true)).resolves.toBe(
+      "record",
+    );
+
+    expect(prisma.consentRecord.findFirst.mock.calls[0][0].where).toEqual({
+      document: "distance_sales",
+      action: "granted",
+      OR: [{ details: { path: ["tradeCashPaymentId"], equals: "tcp-1" } }],
+    });
+    const { data } = prisma.consentRecord.createMany.mock.calls[0][0];
+    expect(data).toHaveLength(1);
+    expect(data[0]).toMatchObject({
+      document: "distance_sales",
+      version: CONSENT_DOCUMENTS.distance_sales.version,
+      action: "granted",
+      source: ConsentSource.payment,
+      userId: "payer-1",
+      guestEmail: null,
+      orderId: null,
+      checkoutGroupId: null,
+      details: {
+        tradeId: "trade-1",
+        tradeNumber: "TKS-10001",
+        tradeCashPaymentId: "tcp-1",
+      },
+    });
+  });
+
+  it("does not write a second row on a retry of the same cash payment", async () => {
+    const { service, prisma } = makeService({
+      existing: true,
+      setting: "true",
+    });
+
+    await expect(service.ensureForPayment(tradePayment, true)).resolves.toBe(
+      "proceed",
+    );
+    expect(prisma.consentRecord.createMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses a trade payment without consent while the setting is on", async () => {
+    const { service, prisma } = makeService({ setting: "true" });
+
+    await expect(
+      service.ensureForPayment(tradePayment, undefined),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.consentRecord.createMany).not.toHaveBeenCalled();
+  });
+
+  it("lets a trade payment without consent go on while the setting is off", async () => {
+    const { service, prisma } = makeService({ setting: null });
+
+    await expect(
+      service.ensureForPayment(tradePayment, undefined),
+    ).resolves.toBe("unrecorded");
+    expect(prisma.consentRecord.createMany).not.toHaveBeenCalled();
   });
 });
 
