@@ -99,8 +99,9 @@ const tier = (
 });
 
 /**
- * Tiers saved before the overlap check: the launch bands plus legacy rows
- * that overlap them. The save refuses such rows now; the lookups still have
+ * Tiers saved before the overlap check: the launch bands as first inserted
+ * (200-999; migration `20261022165035_ad_package_tier_band_gaps` widens that
+ * band to 200-1000) plus legacy rows that overlap them. The save refuses such rows now; the lookups still have
  * to pick one tier per duration deterministically, and the same one.
  */
 const TIERS: Row[] = [
