@@ -229,9 +229,12 @@ export class ProductBoostService {
    * options call shows. When it is not the price the seller consented to
    * (`expectedPrice`, `boostPriceMatches`: whole kuruş), the answer is 409
    * `server.product.boostPriceChanged` before any order lookup, reference or
-   * write: a campaign, a tier, the listing's price band or the seller's
-   * audience changed since the options were read. Every earlier refusal
-   * (consents, boost off, listing, owner, status, package, tier) wins over
+   * write: a campaign started or ended, or the tier, the listing's price band
+   * or the seller's audience changed since the options were read, and the
+   * package and duration are still offered at another price. When they are
+   * no longer offered at all, the earlier 400 (`boostPackageNotFound`,
+   * `boostPriceUndefined`) answers instead. Every earlier refusal (consents,
+   * boost off, listing, owner, status, package, tier, a zero price) wins over
    * it. The checked price is the one written, so the boost, the order, the
    * payment and the consents carry the consented price.
    */

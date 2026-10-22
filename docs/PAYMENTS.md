@@ -131,13 +131,18 @@ endsAt }` for a boost payment (`endsAt` null until activation;
   price band and the seller's audience, campaign price inside its window: the
   same rule `GET /products/:id/boost/options` shows) and compares the two in
   whole kuruş (`boostPriceMatches` in `@tarodan/types`, the only comparison
-  rule). A mismatch is `409 server.product.boostPriceChanged` before any order
-  lookup, reference or write, so no boost, order, consent or payment row
-  exists for terms the seller did not see. The refusals that come before it
-  win: consents, boost off, listing, owner, status, package, tier, a zero
-  price. On a match the resolved price is what the boost, the order and the
-  payment carry; the client's number is never written. The dialog then asks
-  for the consents again on the new price.
+  rule). A mismatch (the package and duration are still offered, at another
+  price) is `409 server.product.boostPriceChanged` before any order lookup,
+  reference or write, so no boost, order, consent or payment row exists for
+  terms the seller did not see. The refusals that come before it win:
+  consents, boost off, listing, owner, status, package, tier, a zero price; so
+  a package or duration that is no longer offered at all is the 400
+  `boostPackageNotFound` or `boostPriceUndefined`, not the 409. On a match the
+  resolved price is what the boost, the order and the payment carry; the
+  client's number is never written. On the 409 the dialog reloads the prices
+  and asks for both consents again; it also refuses to open the pay page for
+  a started order whose price is not the one shown (same rule), which covers
+  an API that does not check the price yet while a release rolls out.
 - **Tracing.** The boost purchase start tags its request `flow=boost`;
   the purchase and the activation leave `boost.*` breadcrumbs with ids only
   (boost, order, order number, listing; `boost.price_mismatch` carries the
