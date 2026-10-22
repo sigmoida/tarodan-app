@@ -143,7 +143,7 @@ export const commissionSchema = (t: T) =>
       name: z
         .string()
         .min(1, t("admin.finance.commission.validation.nameRequired")),
-      categoryId: z.string().min(1, "Kategori zorunludur"),
+      categoryId: z.string().min(1, t("validation.selectCategory")),
       sellerType: z.enum(["FREE", "BASIC", "PREMIUM", "BUSINESS"]),
       minAmount: tlField(t),
       maxAmount: optionalTlField(t),
