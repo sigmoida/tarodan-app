@@ -599,7 +599,47 @@ describe("ProductBoostService.initiateBoost — consent and transaction", () => 
         });
         expectNothingStarted(h);
       });
+
+      it.each([
+        [0, 1],
+        [0, 59.9],
+        [-10, 1],
+      ])(
+        "a tier priced at %p (400) wins over the mismatched %p",
+        async (tierPrice, expectedPrice) => {
+          // With matching zeros the order of the two checks cannot show;
+          // a mismatch pins that the zero price is refused first.
+          const h = harness({ tier: { price: tierPrice } });
+
+          await expect(
+            h.service.initiateBoost(
+              OWNER,
+              "listing-1",
+              input({ expectedPrice }),
+            ),
+          ).rejects.toMatchObject({
+            status: 400,
+            response: { i18nKey: "server.product.boostPriceUndefined" },
+          });
+          expectNothingStarted(h);
+        },
+      );
     });
+
+    it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY])(
+      "fails closed on the missing or non-finite %p from a caller that skipped the DTO (409, nothing written)",
+      async (expectedPrice) => {
+        const h = harness();
+
+        await expect(
+          h.service.initiateBoost(OWNER, "listing-1", input({ expectedPrice })),
+        ).rejects.toMatchObject({
+          status: 409,
+          response: { i18nKey: "server.product.boostPriceChanged" },
+        });
+        expectNothingStarted(h);
+      },
+    );
   });
 
   describe("traceability", () => {
