@@ -52,6 +52,14 @@ params web `/listings` and mobile `/search` read (`attr.<group>=a,b`, plus
 the display names `category`, `brand`, `manufacturer` and `carModel` from the
 labels, which the filter chips read next to the ids).
 
+Price bounds travel as plain numbers with a dot (`minPrice=1250.5`), in the
+stored query and in the route params. Both clients read a `minPrice` or
+`maxPrice` param, and the typed field text, with the shared TL parser
+(`parseTlAmount`), so a grouped "1.000" is refused and never read as 1 TL.
+Empty, zero and refused text set no bound, and a run ignores that bound;
+the two stored shapes this hits are a value with three decimals and a
+`maxPrice` of 0. The stored row and its hash do not change.
+
 `query_hash` is the SHA-256 hex of the JSON of the canonical query; the
 unique index `(user_id, query_hash)` is the duplicate rule. Rows are
 re-canonicalised on read, so a key later removed from the allow-list does not

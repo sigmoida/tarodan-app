@@ -186,3 +186,126 @@ describe("listings sidebar flag toggles", () => {
     expect(lastUrl()).toBe("/listings");
   });
 });
+
+const priceBox = (label: "product.minPrice" | "product.maxPrice") =>
+  container.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement;
+const typeInto = (el: HTMLInputElement, value: string) =>
+  act(() => {
+    // React tracks the value through the native setter; set it, then fire input.
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+const refusal = () =>
+  [...container.querySelectorAll('[role="alert"]')].find(
+    (el) => el.textContent === "validation.amountFormatRefused",
+  );
+const badgeCount = () =>
+  [...container.querySelectorAll("span")].find(
+    (s) => s.textContent === "product.filters",
+  )!.nextElementSibling?.textContent ?? "0";
+const sentParams = () =>
+  buildListApiParams(
+    h.fetchListings.mock.calls.at(-1)![0],
+    undefined,
+    1,
+    PAGE_LIMIT,
+  );
+const rangeButton = (label: string) =>
+  [...container.querySelectorAll("button")].find(
+    (b) => b.textContent === label,
+  )!;
+
+describe("listings sidebar price range", () => {
+  it("is a text field with the decimal keyboard, never type=number", async () => {
+    await mount();
+    for (const label of ["product.minPrice", "product.maxPrice"] as const) {
+      expect(priceBox(label).type).toBe("text");
+      expect(priceBox(label).inputMode).toBe("decimal");
+    }
+  });
+
+  it("writes the canonical bound to the URL and the API", async () => {
+    await mount();
+    typeInto(priceBox("product.minPrice"), "1250,50");
+    expect(lastUrl()).toBe("/listings?minPrice=1250.5");
+    expect(priceBox("product.minPrice").value).toBe("1250,50");
+    expect(sentParams().minPrice).toBe(1250.5);
+
+    typeInto(priceBox("product.maxPrice"), "2000");
+    expect(lastUrl()).toBe("/listings?minPrice=1250.5&maxPrice=2000");
+    expect(sentParams().maxPrice).toBe(2000);
+    expect(badgeCount()).toBe("1");
+    expect(refusal()).toBeUndefined();
+  });
+
+  it('refuses "1.000": shows the refusal and searches no min (not 1 TL)', async () => {
+    await mount("minPrice=500");
+    typeInto(priceBox("product.minPrice"), "1.000");
+    expect(refusal()).toBeDefined();
+    expect(priceBox("product.minPrice").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+    expect(priceBox("product.minPrice").getAttribute("aria-describedby")).toBe(
+      refusal()!.id,
+    );
+    expect(priceBox("product.maxPrice").hasAttribute("aria-invalid")).toBe(
+      false,
+    );
+    // The refused text is not applied: the bound goes, the text stays.
+    expect(lastUrl()).toBe("/listings");
+    expect(sentParams()).not.toHaveProperty("minPrice");
+    expect(priceBox("product.minPrice").value).toBe("1.000");
+    expect(badgeCount()).toBe("0");
+  });
+
+  it("shows a legacy grouped URL value as refused and ignores its bound", async () => {
+    await mount("minPrice=1.000&maxPrice=5000");
+    expect(priceBox("product.minPrice").value).toBe("1.000");
+    expect(refusal()).toBeDefined();
+    const sent = sentParams();
+    expect(sent).not.toHaveProperty("minPrice");
+    expect(sent.maxPrice).toBe(5000);
+  });
+
+  it("zero is no bound and no error", async () => {
+    await mount();
+    typeInto(priceBox("product.maxPrice"), "0");
+    expect(refusal()).toBeUndefined();
+    expect(sentParams()).not.toHaveProperty("maxPrice");
+    expect(badgeCount()).toBe("0");
+  });
+
+  it("keeps a min above the max as typed (no swap, no error)", async () => {
+    await mount();
+    typeInto(priceBox("product.minPrice"), "500");
+    typeInto(priceBox("product.maxPrice"), "100");
+    expect(lastUrl()).toBe("/listings?minPrice=500&maxPrice=100");
+    expect(sentParams()).toMatchObject({ minPrice: 500, maxPrice: 100 });
+    expect(refusal()).toBeUndefined();
+  });
+
+  it("a quick range sets both bounds and lights up, also for typed text", async () => {
+    await mount();
+    click(rangeButton("₺1000+"));
+    expect(lastUrl()).toBe("/listings?minPrice=1000");
+    expect(rangeButton("₺1000+").className).toContain("bg-primary-500");
+
+    click(rangeButton("₺1000+"));
+    expect(lastUrl()).toBe("/listings");
+
+    typeInto(priceBox("product.minPrice"), "100,00");
+    typeInto(priceBox("product.maxPrice"), "500");
+    expect(rangeButton("₺100-500").className).toContain("bg-primary-500");
+  });
+
+  it("clear empties a refused field and its message", async () => {
+    await mount();
+    typeInto(priceBox("product.minPrice"), "1.000");
+    click(container.querySelector('[data-testid="clear"]')!);
+    expect(priceBox("product.minPrice").value).toBe("");
+    expect(refusal()).toBeUndefined();
+  });
+});

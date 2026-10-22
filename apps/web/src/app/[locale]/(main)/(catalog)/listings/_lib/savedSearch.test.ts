@@ -1,9 +1,11 @@
 /** @format */
 
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   canonicalizeSavedSearchQuery,
   savedSearchToRouteParams,
+  type SavedSearchQuery,
 } from "@tarodan/types";
 import { parseListingsFilters } from "./params";
 import { buildSavedSearchDraft, toCreateSavedSearchInput } from "./savedSearch";
@@ -90,6 +92,64 @@ describe("buildSavedSearchDraft", () => {
       new URLSearchParams(savedSearchToRouteParams(query, labels)),
     );
     expect(run).toEqual({ ...saved, colors: ["black", "red"] });
+  });
+});
+
+// The API's dedupe key (`saved-search-hash.ts`): SHA-256 of the canonical
+// query's JSON. Mirrored here to pin that price parsing changes no stored hash.
+const queryHash = (query: SavedSearchQuery) =>
+  createHash("sha256").update(JSON.stringify(query)).digest("hex");
+
+describe("saved-search price criteria", () => {
+  // Stored criteria hold plain numbers, as the old clients saved them.
+  it.each<[string, SavedSearchQuery]>([
+    ["whole bounds", { maxPrice: 1000, minPrice: 100 }],
+    ["a decimal bound", { maxPrice: 1250.5, minPrice: 99.99 }],
+    ["a min alone", { minPrice: 1000, search: "mustang" }],
+    ["a max alone", { maxPrice: 500, tradeOnly: true }],
+    ["a min above the max", { maxPrice: 100, minPrice: 500 }],
+  ])("re-saving a run search keeps the stored hash (%s)", (_, stored) => {
+    const run = parseListingsFilters(
+      new URLSearchParams(savedSearchToRouteParams(stored)),
+    );
+    const { query } = buildSavedSearchDraft(run, undefined);
+    expect(query).toEqual(stored);
+    expect(queryHash(query)).toBe(queryHash(stored));
+  });
+
+  // Two stored shapes a run no longer applies (pinned): no TL amount has three
+  // decimals ("99.999" reads like a grouped 99 thousand), and a 0 max is no
+  // bound. The stored rows and their hashes stay as they are; only the run
+  // ignores the bound.
+  it.each<[string, SavedSearchQuery, SavedSearchQuery]>([
+    ["three decimals", { minPrice: 99.999, search: "a" }, { search: "a" }],
+    ["a zero max", { maxPrice: 0, search: "a" }, { search: "a" }],
+  ])("a run ignores a stored bound with %s", (_, stored, run) => {
+    const runFilters = parseListingsFilters(
+      new URLSearchParams(savedSearchToRouteParams(stored)),
+    );
+    expect(buildSavedSearchDraft(runFilters, undefined).query).toEqual(run);
+  });
+
+  it("saves typed text as the same canonical numbers as plain input", () => {
+    const typed = buildSavedSearchDraft(
+      { ...filters(), minPrice: "1250,50", maxPrice: "2000,00" },
+      undefined,
+    );
+    const plain = buildSavedSearchDraft(
+      filters("minPrice=1250.5&maxPrice=2000"),
+      undefined,
+    );
+    expect(typed.query).toEqual({ maxPrice: 2000, minPrice: 1250.5 });
+    expect(queryHash(typed.query)).toBe(queryHash(plain.query));
+  });
+
+  it('saves no bound for refused text (never 1 TL for "1.000")', () => {
+    const draft = buildSavedSearchDraft(
+      { ...filters("search=mustang"), minPrice: "1.000" },
+      undefined,
+    );
+    expect(draft.query).toEqual({ search: "mustang" });
   });
 });
 
