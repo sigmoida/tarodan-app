@@ -1,7 +1,10 @@
 import * as ExcelJS from "exceljs";
 import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import { ExportListService } from "../../../common/export";
-import { AdminConsentService, buildConsentWhere } from "./admin-consent.service";
+import {
+  AdminConsentService,
+  buildConsentWhere,
+} from "./admin-consent.service";
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: "c1",
@@ -155,6 +158,35 @@ describe("AdminConsentService.list", () => {
       details: { analytics: true },
     });
     expect(result.meta.total).toBe(2);
+  });
+
+  it("maps a trade cash payment consent to its trade (from details)", async () => {
+    const tradeDetails = {
+      tradeId: "trade-1",
+      tradeNumber: "TKS-10001",
+      tradeCashPaymentId: "tcp-1",
+    };
+    const { service } = makeService([
+      row({
+        document: "distance_sales",
+        version: CONSENT_DOCUMENTS.distance_sales.version,
+        source: "payment",
+        details: tradeDetails,
+      }),
+      row({ id: "c2" }),
+      // Only a distance sales row is read as a trade reference.
+      row({ id: "c3", document: "cookies", details: tradeDetails }),
+    ]);
+
+    const result = await service.list({});
+
+    expect(result.data[0]).toMatchObject({
+      trade: { id: "trade-1", tradeNumber: "TKS-10001" },
+      order: null,
+      checkoutGroup: null,
+    });
+    expect(result.data[1].trade).toBeNull();
+    expect(result.data[2].trade).toBeNull();
   });
 });
 

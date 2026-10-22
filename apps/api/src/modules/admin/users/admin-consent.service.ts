@@ -30,6 +30,7 @@ import {
   type Translate,
 } from "../../../common/export";
 import { ConsentService } from "../../consent/consent.service";
+import { tradeOfConsentDetails } from "../../consent/helpers/distance-sales-trade";
 import type { ConsentRecordQueryDto } from "../dto/consent-record.dto";
 
 /** Aramanın yayıldığı kolonlar — listede görünen her kimlik alanı. */
@@ -238,6 +239,10 @@ function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
     userAgent: row.userAgent,
     checkoutGroup: row.checkoutGroup,
     order: row.order,
+    trade:
+      row.document === "distance_sales"
+        ? tradeOfConsentDetails(row.details)
+        : null,
     createdAt: row.createdAt.toISOString(),
   };
 }
