@@ -37,7 +37,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
     toggleCounterProduct,
     counterCashAmount,
     counterCashValue,
-    counterCashRefused,
+    counterCashError,
     setCounterCashAmount,
     counterCashPayer,
     setCounterCashPayer,
@@ -266,11 +266,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                     onChange={(e) => setCounterCashAmount(e.target.value)}
                     placeholder="0,00"
                     helperText={t("trade.cashHelper")}
-                    error={
-                      counterCashRefused
-                        ? t("validation.amountFormatRefused")
-                        : undefined
-                    }
+                    error={counterCashError}
                     className="pr-4 h-12 rounded-xl"
                   />
                 </div>

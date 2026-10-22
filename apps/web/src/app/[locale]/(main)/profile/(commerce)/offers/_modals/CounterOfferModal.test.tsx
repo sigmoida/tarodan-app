@@ -132,6 +132,28 @@ describe("CounterOfferModal amount", () => {
       expect(h.post).not.toHaveBeenCalled();
     },
   );
+
+  it("sends the API's ceiling of an agreed amount", async () => {
+    type("9999999");
+    expect(document.body.textContent).not.toContain(
+      "validation.amountAboveMax",
+    );
+    await send();
+    expect(h.post).toHaveBeenCalledWith("/offers/o1/counter", {
+      amount: 9_999_999,
+    });
+  });
+
+  it.each(["10000000", "9999999,01"])(
+    "refuses %j above the API's ceiling with no API call",
+    async (text) => {
+      type(text);
+      expect(document.body.textContent).toContain("validation.amountAboveMax");
+      expect(sendButton().disabled).toBe(true);
+      await send();
+      expect(h.post).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("CounterOfferModal bounds", () => {

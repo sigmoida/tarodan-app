@@ -77,6 +77,51 @@ describe("offerSchema, amount text", () => {
   });
 });
 
+describe("offerSchema, the API's ceiling of an agreed amount", () => {
+  // A listing above the ceiling: offers from 6,000,000 TL up to 20,000,000 TL.
+  const schema = offerSchema(6_000_000, 20_000_000, "tr", null);
+
+  it("accepts the ceiling itself", () => {
+    expect(amountIssue(schema, "9999999")).toBeNull();
+    expect(amountIssue(schema, "9999999,00")).toBeNull();
+  });
+
+  it.each(["10000000", "9999999,01", "19999999"])(
+    "refuses %j with the ceiling in the message",
+    (raw) => {
+      expect(amountIssue(schema, raw)).toBe("Tutar 9.999.999 TL'yi aşamaz.");
+    },
+  );
+
+  it("says it in English with the English number format", () => {
+    const en = offerSchema(6_000_000, 20_000_000, "en", null);
+    expect(amountIssue(en, "10000000")).toBe(
+      "The amount cannot exceed 9,999,999 TL.",
+    );
+  });
+
+  it("refuses the format before the ceiling", () => {
+    expect(amountIssue(schema, "10.000.000")).toBe(
+      "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
+    );
+  });
+
+  // The ceiling comes before every price bound: an amount the API refuses
+  // says so, whatever the listing's bounds would say about it.
+  it.each([
+    ["at or above the listing price", offerSchema(1000, 2000, "tr", null)],
+    ["below the 50% minimum", offerSchema(15_000_000, 30_000_000, "tr", null)],
+    [
+      "below the platform floor",
+      offerSchema(1000, 30_000_000, "tr", 12_000_000),
+    ],
+  ])("refuses the ceiling before a bound (%s)", (_case, bounded) => {
+    expect(amountIssue(bounded, "10000000")).toBe(
+      "Tutar 9.999.999 TL'yi aşamaz.",
+    );
+  });
+});
+
 describe("offerSchema, rule order", () => {
   // One issue per field, in order: refused, empty, 50%, floor, below price.
   const schema = offerSchema(500, 1000, "tr", 600);

@@ -2694,6 +2694,7 @@
     "enterAmount": "Bir tutar girin",
     "enterValidAmount": "Geçerli bir tutar girin",
     "amountFormatRefused": "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
+    "amountAboveMax": "Tutar {max, number} TL'yi aşamaz.",
     "max500Chars": "En fazla 500 karakter",
     "enterOrderNumber": "Sipariş numarası girin",
     "offerBelowPrice": "Teklif fiyattan düşük olmalı",

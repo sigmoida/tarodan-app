@@ -2,11 +2,11 @@
 
 "use client";
 
-import { tlAmountValue } from "@tarodan/shared";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { cashAmountValue } from "@/lib/cashAmount";
 
 /** One party's preview breakdown (no user ids: the offer does not exist yet). */
 export interface TradeQuotePreviewParty {
@@ -28,8 +28,8 @@ interface UseTradeCostPreviewArgs {
   /** The products asked from the other side. */
   theirProductIds: string[];
   /**
-   * The raw field text, read with `tlAmountValue`: empty or refused text
-   * counts as no cash difference.
+   * The raw field text, read with `cashAmountValue`: empty or refused text
+   * and an amount above the API's ceiling count as no cash difference.
    */
   cashAmount: string;
   cashPayer: "me" | "them";
@@ -53,7 +53,7 @@ export function useTradeCostPreview({
   cashPayer,
   enabled,
 }: UseTradeCostPreviewArgs) {
-  const parsedCash = tlAmountValue(cashAmount);
+  const parsedCash = cashAmountValue(cashAmount);
   const signature = JSON.stringify([
     [...myProductIds].sort(),
     [...theirProductIds].sort(),

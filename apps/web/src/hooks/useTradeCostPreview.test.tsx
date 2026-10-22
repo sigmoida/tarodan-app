@@ -82,8 +82,8 @@ describe("useTradeCostPreview, cash amount", () => {
     expect(body.cashPayer).toBe("receiver");
   });
 
-  it.each(["", "0,00", "1.000", "12,345"])(
-    "prices %j without cash",
+  it.each(["", "0,00", "1.000", "12,345", "10000000", "9999999,01"])(
+    "prices %j without cash (no amount, or above the API's ceiling)",
     async (raw) => {
       expect((await render(raw)).cashAmount).toBeUndefined();
     },

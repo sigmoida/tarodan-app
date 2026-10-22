@@ -1,13 +1,15 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
-import { formatTL } from "@tarodan/shared";
-import { parseTlAmount } from "@tarodan/shared";
+import { formatTL, parseTlAmount } from "@tarodan/shared";
+import { exceedsTlNegotiatedAmountMax } from "@tarodan/types";
+import { amountAboveMaxMessage } from "@/lib/negotiatedAmount";
 
 /**
  * Make-offer form. `amount` stays the raw text of a `type="text"` field, read
  * by the shared TL amount parser (grouping such as "1.000" is refused, never
- * read as 1 TL), and is validated against the listing's price bounds: at least
+ * read as 1 TL), and is validated against the API's ceiling of an agreed
+ * amount (`TL_NEGOTIATED_AMOUNT_MAX`) and the listing's price bounds: at least
  * 50% of the current price and strictly below it. Bounds are runtime values,
  * so this is a factory (like the auth / track-order schemas).
  */
@@ -39,6 +41,9 @@ export const offerSchema = (
           return fail(t("validation.enterValidAmount"));
         }
         const amount = parsed.amount;
+        if (exceedsTlNegotiatedAmountMax(amount)) {
+          return fail(amountAboveMaxMessage(t));
+        }
         if (amount < min) {
           return fail(
             t("offer.minimumOfferFloorError", { amount: formatTL(min) }),

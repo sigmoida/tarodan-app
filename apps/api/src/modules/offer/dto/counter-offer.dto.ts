@@ -1,10 +1,8 @@
 import { Min, Max, IsOptional, IsString, MaxLength } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import {
-  IsTlAmount,
-  TL_NEGOTIATED_AMOUNT_MAX,
-} from "../../../common/validators/tl-amount";
+import { TL_NEGOTIATED_AMOUNT_MAX } from "@tarodan/types";
+import { IsTlAmount } from "../../../common/validators/tl-amount";
 
 export class CounterOfferDto {
   @ApiProperty({

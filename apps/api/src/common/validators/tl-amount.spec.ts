@@ -1,9 +1,12 @@
 import { isNumber } from "class-validator";
 import {
+  exceedsTlNegotiatedAmountMax,
+  TL_NEGOTIATED_AMOUNT_MAX,
+} from "@tarodan/types";
+import {
   isSignedTlAmount,
   isTlAmount,
   TL_AMOUNT_COLUMN_MAX,
-  TL_NEGOTIATED_AMOUNT_MAX,
 } from "./tl-amount";
 
 /**
@@ -74,5 +77,22 @@ describe("TL_AMOUNT_COLUMN_MAX", () => {
 
   it("leaves a negotiated amount room for the fees added on top", () => {
     expect(TL_NEGOTIATED_AMOUNT_MAX * 2).toBeLessThan(TL_AMOUNT_COLUMN_MAX);
+  });
+});
+
+describe("exceedsTlNegotiatedAmountMax", () => {
+  it.each([0, 59.99, TL_NEGOTIATED_AMOUNT_MAX, -TL_NEGOTIATED_AMOUNT_MAX])(
+    "allows %p (the ceiling itself included, either sign)",
+    (value) => {
+      expect(exceedsTlNegotiatedAmountMax(value)).toBe(false);
+    },
+  );
+
+  it.each([
+    TL_NEGOTIATED_AMOUNT_MAX + 0.01,
+    -(TL_NEGOTIATED_AMOUNT_MAX + 0.01),
+    TL_AMOUNT_COLUMN_MAX,
+  ])("refuses %p", (value) => {
+    expect(exceedsTlNegotiatedAmountMax(value)).toBe(true);
   });
 });

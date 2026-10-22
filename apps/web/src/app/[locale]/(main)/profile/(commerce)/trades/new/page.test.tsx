@@ -389,4 +389,34 @@ describe("new trade page, cash amount field", () => {
     expect(toast.error).toHaveBeenCalledWith("validation.amountFormatRefused");
     expect(h.mutate).not.toHaveBeenCalled();
   });
+
+  it.each(["9999999", "9999999,00"])(
+    "sends %s, the API's ceiling, as it is",
+    (value) => {
+      h.products = [item("a")];
+      render();
+      typeCash(value);
+      act(() => checkbox("a").click());
+      expect(container.textContent).not.toContain("validation.amountAboveMax");
+      act(() => sendButton().click());
+      expect(h.mutate.mock.calls[0][0].cashAmount).toBe(9_999_999);
+    },
+  );
+
+  it.each(["10000000", "9999999,01"])(
+    "refuses %s above the API's ceiling and sends nothing",
+    (value) => {
+      vi.mocked(toast.error).mockClear();
+      h.products = [item("a")];
+      render();
+      typeCash(value);
+      act(() => checkbox("a").click());
+      expect(container.textContent).toContain("validation.amountAboveMax");
+      // No amount to pay: the payer question waits for an accepted amount.
+      expect(container.textContent).not.toContain(PAYER_QUESTION);
+      act(() => sendButton().click());
+      expect(toast.error).toHaveBeenCalledWith("validation.amountAboveMax");
+      expect(h.mutate).not.toHaveBeenCalled();
+    },
+  );
 });

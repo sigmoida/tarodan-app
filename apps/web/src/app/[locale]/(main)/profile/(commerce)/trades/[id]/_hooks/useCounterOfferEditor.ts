@@ -19,12 +19,9 @@ import type { Trade, TradeItem } from "../_lib/types";
 import { mergeTradeItems, type CounterProduct } from "../_lib/counterProducts";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 import { usePagedPicks } from "@/hooks/usePagedPicks";
-import { signedCashAmount } from "@/lib/cashAmount";
-import {
-  isTlAmountRefused,
-  tlAmountInputValue,
-  tlAmountValue,
-} from "@tarodan/shared";
+import { cashAmountValue, signedCashAmount } from "@/lib/cashAmount";
+import { negotiatedAmountError } from "@/lib/negotiatedAmount";
+import { tlAmountInputValue } from "@tarodan/shared";
 
 interface UseCounterOfferEditorArgs {
   trade: Trade | null;
@@ -52,8 +49,9 @@ export function useCounterOfferEditor({
   const [counterCashPayer, setCounterCashPayer] = useState<"me" | "them">("me");
   const [counterMessage, setCounterMessage] = useState("");
 
-  const counterCashValue = tlAmountValue(counterCashAmount);
-  const counterCashRefused = isTlAmountRefused(counterCashAmount);
+  const counterCashValue = cashAmountValue(counterCashAmount);
+  // Text that is not an amount, or an amount above the API's ceiling.
+  const counterCashError = negotiatedAmountError(counterCashAmount, t);
 
   const counterMutation = useMutation({
     mutationFn: (data: {
@@ -252,8 +250,8 @@ export function useCounterOfferEditor({
   const handleCounterSubmit = () => {
     if (!trade) return;
 
-    if (counterCashRefused) {
-      toast.error(t("validation.amountFormatRefused"));
+    if (counterCashError) {
+      toast.error(counterCashError);
       return;
     }
 
@@ -340,7 +338,7 @@ export function useCounterOfferEditor({
     selectedCounterTargetProducts,
     counterCashAmount,
     counterCashValue,
-    counterCashRefused,
+    counterCashError,
     setCounterCashAmount,
     counterCashPayer,
     setCounterCashPayer,

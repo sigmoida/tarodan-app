@@ -6,18 +6,11 @@ const TL_AMOUNT_TEXT = /^\d+(\.\d{1,2})?$/;
 /**
  * The largest amount a `Decimal(10, 2)` money column holds. A larger input
  * fails in the database as a generic 500, so a DTO or service bounds amounts
- * written to such a column by it.
+ * written to such a column by it. An amount two users agree on has a lower
+ * ceiling, shared with the clients: `TL_NEGOTIATED_AMOUNT_MAX` in
+ * `@tarodan/types`.
  */
 export const TL_AMOUNT_COLUMN_MAX = 99_999_999.99;
-
-/**
- * The largest amount two users agree on: an offer, a counter-offer, the cash
- * part of a trade. Far below `TL_AMOUNT_COLUMN_MAX` on purpose: the payment
- * rows add fees, shipping and commission on top (`TradeCashPayment.
- * totalAmount`, `Payment.amount`, both `Decimal(10, 2)`), so an agreed amount
- * at the column maximum would overflow later, at accept or checkout.
- */
-export const TL_NEGOTIATED_AMOUNT_MAX = 9_999_999;
 
 /**
  * A TL amount in a JSON body: a finite number of at least 0 with at most two
