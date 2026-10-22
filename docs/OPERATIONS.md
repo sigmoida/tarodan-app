@@ -368,7 +368,7 @@ yeniden-onay penceresini görür. Belge metni değiştiğinde
 
 ### One-off: trade consents onto the cash payment column
 
-Migration `20261022160000_consent_records_trade_cash_payment` adds
+Migration `20261022180000_consent_records_trade_cash_payment` adds
 `consent_records.trade_cash_payment_id` (nullable FK, `ON DELETE SET NULL`), a
 partial unique index (one granted distance sales consent per trade cash
 payment) and widens the append-only guard for that column (`CONSENTS.md`,

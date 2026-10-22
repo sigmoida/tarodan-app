@@ -1,7 +1,7 @@
 /**
  * Copies the trade cash payment reference of trade distance sales consents
  * written before `consent_records.trade_cash_payment_id` existed (migration
- * `20261022160000_consent_records_trade_cash_payment`) from
+ * `20261022180000_consent_records_trade_cash_payment`) from
  * `details.tradeCashPaymentId` into the column, so the payment gate reads them
  * by the indexed column and the admin search finds them by trade number.
  *

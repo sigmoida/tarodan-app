@@ -10,7 +10,7 @@ import { apiAppRoot } from "../../common/helpers/app-root";
  * else.
  */
 const MIGRATIONS_DIR = join(apiAppRoot(), "prisma/migrations");
-const MIGRATION = "20261022160000_consent_records_trade_cash_payment";
+const MIGRATION = "20261022180000_consent_records_trade_cash_payment";
 const UNIQUE_INDEX = "consent_records_trade_cash_payment_granted_key";
 
 const withoutComments = (sql: string) => sql.replace(/--.*$/gm, "");

@@ -148,7 +148,7 @@ describe("isTradeConsentUniqueViolation", () => {
     const sql = readFileSync(
       join(
         apiAppRoot(),
-        "prisma/migrations/20261022160000_consent_records_trade_cash_payment/migration.sql",
+        "prisma/migrations/20261022180000_consent_records_trade_cash_payment/migration.sql",
       ),
       "utf8",
     );

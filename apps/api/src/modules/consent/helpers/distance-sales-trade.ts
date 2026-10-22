@@ -17,7 +17,7 @@ export interface DistanceSalesTradeTarget {
 /**
  * The partial unique index that keeps ONE granted distance sales row per
  * trade cash payment (migration
- * `20261022160000_consent_records_trade_cash_payment`).
+ * `20261022180000_consent_records_trade_cash_payment`).
  */
 export const TRADE_CONSENT_UNIQUE_INDEX =
   "consent_records_trade_cash_payment_granted_key";
