@@ -1,8 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
 import {
-  isSignedTlAmount,
+  exceedsTlNegotiatedAmountMax,
   TL_NEGOTIATED_AMOUNT_MAX,
-} from "../../../common/validators/tl-amount";
+} from "@tarodan/types";
+import { isSignedTlAmount } from "../../../common/validators/tl-amount";
 import { i18nMessage } from "../../i18n";
 
 /**
@@ -23,7 +24,7 @@ export function assertTradeCashAmount(cashAmount: number | null | undefined) {
   if (cashAmount == null) return;
   if (
     !isSignedTlAmount(cashAmount) ||
-    Math.abs(cashAmount) > TL_NEGOTIATED_AMOUNT_MAX
+    exceedsTlNegotiatedAmountMax(cashAmount)
   ) {
     throw new BadRequestException(
       i18nMessage("server.trade.invalidCashAmount", {

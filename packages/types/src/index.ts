@@ -30,6 +30,10 @@ export * from "./admin-refund-list";
 // Trade types
 export * from "./trade";
 
+// The ceiling of an agreed amount: offer, counter-offer, trade cash (API, web,
+// mobile)
+export * from "./negotiated-amount";
+
 // Message types
 export * from "./message";
 
