@@ -12,6 +12,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
+import { TL_AMOUNT_COLUMN_MAX } from "../../../common/validators/tl-amount";
 import {
   DiscountType,
   DiscountScope,
@@ -45,12 +46,17 @@ export class CreateDiscountDto {
   @IsEnum(DiscountType)
   type: DiscountType;
 
+  // Bounded by the `Decimal(10, 2)` column, which otherwise fails as a 500.
+  // A fixed amount above the cart is not refused here: checkout caps a
+  // coupon to the eligible subtotal (`computeCouponDiscount`).
   @ApiProperty({
     description: "İndirim değeri (yüzde veya tutar)",
     example: 10,
+    maximum: TL_AMOUNT_COLUMN_MAX,
   })
   @IsNumber()
   @Min(0)
+  @Max(TL_AMOUNT_COLUMN_MAX)
   @Type(() => Number)
   value: number;
 
@@ -78,10 +84,12 @@ export class CreateDiscountDto {
   @ApiPropertyOptional({
     description: "Minimum sepet tutarı (TL)",
     example: 100,
+    maximum: TL_AMOUNT_COLUMN_MAX,
   })
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(TL_AMOUNT_COLUMN_MAX)
   @Type(() => Number)
   minCartValue?: number;
 
@@ -115,10 +123,15 @@ export class CreateDiscountDto {
   @Type(() => Number)
   getQuantity?: number;
 
-  @ApiPropertyOptional({ description: "Max indirim tutarı (TL)", example: 500 })
+  @ApiPropertyOptional({
+    description: "Max indirim tutarı (TL)",
+    example: 500,
+    maximum: TL_AMOUNT_COLUMN_MAX,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(TL_AMOUNT_COLUMN_MAX)
   @Type(() => Number)
   maxDiscountAmount?: number;
 

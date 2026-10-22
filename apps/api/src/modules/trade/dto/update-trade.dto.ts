@@ -61,7 +61,8 @@ export class CounterTradeDto {
   receiverItems: TradeItemDto[];
 
   /**
-   * Optional cash adjustment
+   * Optional cash adjustment, signed as on create from the counter-offerer's
+   * side (positive = they pay). Bounds as `CreateTradeDto.cashAmount`.
    */
   @IsOptional()
   @IsNumber()

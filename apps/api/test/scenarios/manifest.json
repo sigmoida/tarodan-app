@@ -9220,7 +9220,7 @@
       "tur": "Negatif/Doğrulama",
       "pri": "P2",
       "steps": "1. POST /api/offers body { productId, amount:\"abc\" }.",
-      "exp": "HTTP 400; mesaj \"Teklif tutarı sayı olmalıdır\" (Number'a çevrilemeyen değer).",
+      "exp": "HTTP 400; message \"Teklif tutarı en fazla iki ondalık basamaklı bir sayı olmalıdır\" (a value that is not a TL amount).",
       "gap": false,
       "gapRefs": []
     },
@@ -9242,11 +9242,11 @@
       "code": "08",
       "prefix": "OFR",
       "domTitle": "08 — Teklif (Pazarlık)",
-      "title": "Teklif = fiyat / fiyattan yüksek: API kabul ediyor, client engelliyor (PARİTE/FINDING)",
+      "title": "Offer at or above the price is refused, as web and mobile refuse it",
       "tur": "Sınır değer",
       "pri": "P1",
-      "steps": "1. POST /api/offers body { productId, amount:200 } (fiyatla eşit). 2. POST /api/offers body { productId, amount:5000 } (fiyattan yüksek, ≤9.999.999).",
-      "exp": "Her ikisi HTTP 201 (sunucu min %50 ve Max(9999999) dışında kontrol yapmaz — offer.service.ts:112-120).",
+      "steps": "1. POST /api/offers body { productId, amount:200 } (equal to the price). 2. POST /api/offers body { productId, amount:5000 } (above the price, <= 9,999,999). 3. POST /api/offers body { productId, amount:199.99 }.",
+      "exp": "Both HTTP 400 with i18nKey server.offer.offerMustBeBelowPrice; 199.99 is HTTP 201 (offer.service.ts create: amount >= resolveSalePrice price).",
       "gap": false,
       "gapRefs": []
     },

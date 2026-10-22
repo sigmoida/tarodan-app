@@ -18,6 +18,7 @@ import {
 import { Transform, Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdPackageAudienceMode, MembershipTierType } from "@prisma/client";
+import { IsTlAmount } from "../../../common/validators/tl-amount";
 import {
   BOOST_ADMIN_REASON_MAX_LENGTH,
   BOOST_ADMIN_REASON_MIN_LENGTH,
@@ -241,9 +242,11 @@ export class RefundBoostDto extends BoostAdminReasonDto {
     description:
       "TL, at most the purchase's refundableAmount; empty refunds all of it",
   })
+  // `IsTlAmount`, not `@IsNumber({ maxDecimalPlaces })`: that threw on an
+  // exponent form (1e-7) and the pipe answered 500 (as `ManualRefundDto`).
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsTlAmount()
   @Min(0.01)
   amount?: number;
 }

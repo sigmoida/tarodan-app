@@ -4,6 +4,22 @@ import { registerDecorator, type ValidationOptions } from "class-validator";
 const TL_AMOUNT_TEXT = /^\d+(\.\d{1,2})?$/;
 
 /**
+ * The largest amount a `Decimal(10, 2)` money column holds. A larger input
+ * fails in the database as a generic 500, so a DTO or service bounds amounts
+ * written to such a column by it.
+ */
+export const TL_AMOUNT_COLUMN_MAX = 99_999_999.99;
+
+/**
+ * The largest amount two users agree on: an offer, a counter-offer, the cash
+ * part of a trade. Far below `TL_AMOUNT_COLUMN_MAX` on purpose: the payment
+ * rows add fees, shipping and commission on top (`TradeCashPayment.
+ * totalAmount`, `Payment.amount`, both `Decimal(10, 2)`), so an agreed amount
+ * at the column maximum would overflow later, at accept or checkout.
+ */
+export const TL_NEGOTIATED_AMOUNT_MAX = 9_999_999;
+
+/**
  * A TL amount in a JSON body: a finite number of at least 0 with at most two
  * decimals (whole kuruş). Decided on the shortest decimal form JS writes for
  * the number (`String(value)`), which is what the client sent: 59.9 and 59.99
@@ -20,8 +36,19 @@ export function isTlAmount(value: unknown): value is number {
 }
 
 /**
+ * `isTlAmount` for an amount whose sign carries meaning (trade cash: positive
+ * when the initiator pays, negative when the receiver pays): its magnitude is
+ * a TL amount. -59.99 passes, -59.999 and -1e-7 do not.
+ */
+export function isSignedTlAmount(value: unknown): value is number {
+  return typeof value === "number" && isTlAmount(Math.abs(value));
+}
+
+/**
  * `isTlAmount` as a property decorator. Pair it with `@JsonNumber()` so text
- * such as "59.9" is refused instead of converted.
+ * such as "59.9" is refused instead of converted. Where a released client may
+ * still send text, leave `JsonNumber` out: the global pipe's implicit
+ * conversion then turns "59.9" into 59.9 before this check runs.
  */
 export function IsTlAmount(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {

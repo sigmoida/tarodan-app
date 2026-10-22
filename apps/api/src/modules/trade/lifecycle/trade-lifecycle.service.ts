@@ -10,6 +10,10 @@ import {
 import { PrismaService } from "../../../prisma";
 import { tradeRejectedData } from "../helpers/trade-rejection";
 import {
+  assertTradeCashAmount,
+  tradeCashTerms,
+} from "../helpers/trade-cash-amount";
+import {
   tradeCancelledData,
   tradePartyActor,
 } from "../helpers/trade-cancellation";
@@ -267,6 +271,8 @@ export class TradeLifecycleService {
     initiatorId: string,
     dto: CreateTradeDto,
   ): Promise<TradeResponseDto> {
+    assertTradeCashAmount(dto.cashAmount);
+
     // Validate receiver exists and is not self
     if (initiatorId === dto.receiverId) {
       throw new BadRequestException(
@@ -382,12 +388,11 @@ export class TradeLifecycleService {
     const responseDeadline = new Date();
     responseDeadline.setHours(responseDeadline.getHours() + responseHours);
 
-    // Calculate cash payer if there's a cash component
-    let cashPayerId: string | null = null;
-    if (dto.cashAmount && dto.cashAmount !== 0) {
-      // Positive = initiator pays, negative = receiver pays
-      cashPayerId = dto.cashAmount > 0 ? initiatorId : dto.receiverId;
-    }
+    // Positive = initiator pays, negative = receiver pays.
+    const cash = tradeCashTerms(dto.cashAmount, {
+      positivePayerId: initiatorId,
+      negativePayerId: dto.receiverId,
+    });
 
     // Teklifi başlatanın teslimat adresi (tx dışı okuma). Takas fiziksel gönderim
     // gerektirir; teklifi yapanın bir teslimat adresi OLMASI ZORUNLU (yoksa depo→
@@ -428,8 +433,8 @@ export class TradeLifecycleService {
           initiatorId,
           receiverId: dto.receiverId,
           status: TradeStatus.pending,
-          cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
-          cashPayerId,
+          cashAmount: cash.cashAmount,
+          cashPayerId: cash.cashPayerId,
           initiatorMessage,
           initiatorAddressId,
           responseDeadline,
@@ -919,6 +924,8 @@ export class TradeLifecycleService {
     userId: string,
     dto: CounterTradeDto,
   ): Promise<TradeResponseDto> {
+    assertTradeCashAmount(dto.cashAmount);
+
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
@@ -932,10 +939,6 @@ export class TradeLifecycleService {
 
     // Store version for optimistic locking
     const tradeVersion = trade.version;
-
-    if (!trade) {
-      throw new NotFoundException(i18nMessage("server.trade.notFound"));
-    }
 
     // Only receiver can send counter-offer
     if (trade.receiverId !== userId) {
@@ -1000,17 +1003,18 @@ export class TradeLifecycleService {
       .map((i) => i.productId)
       .sort();
     const newReceiverItemIds = dto.receiverItems.map((i) => i.productId).sort();
-    const newCashAmount = Math.abs(dto.cashAmount || 0);
+    // After the swap the counter-offerer (originalReceiverId) is the
+    // initiator: positive = they pay, negative = originalInitiatorId pays.
+    const cash = tradeCashTerms(dto.cashAmount, {
+      positivePayerId: originalReceiverId,
+      negativePayerId: originalInitiatorId,
+    });
+    const newCashAmount = cash.cashAmount ?? 0;
     const currentCashAmount = Math.abs(trade.cashAmount?.toNumber() || 0);
 
     // Nakit YÖNÜNÜ de karşılaştır: sadece "kim öder"i çevirmek (ben→o) gerçek bir değişikliktir.
-    // Math.abs yön bilgisini sildiği için, ödeyen tarafı ayrıca kıyaslıyoruz.
-    const newCashPayerId =
-      dto.cashAmount && dto.cashAmount !== 0
-        ? dto.cashAmount > 0
-          ? originalReceiverId
-          : originalInitiatorId
-        : null;
+    // Tutar yön bilgisini taşımadığı için, ödeyen tarafı ayrıca kıyaslıyoruz.
+    const newCashPayerId = cash.cashPayerId;
     const currentCashPayerId = trade.cashPayerId ?? null;
 
     const isIdentical =
@@ -1102,15 +1106,6 @@ export class TradeLifecycleService {
     const responseDeadline = new Date();
     responseDeadline.setHours(responseDeadline.getHours() + responseHours);
 
-    // Calculate cash payer if there's a cash component
-    // After swap: originalReceiverId becomes initiator, originalInitiatorId becomes receiver
-    let cashPayerId: string | null = null;
-    if (dto.cashAmount && dto.cashAmount !== 0) {
-      // Positive = new initiator (originalReceiverId) pays, negative = new receiver (originalInitiatorId) pays
-      cashPayerId =
-        dto.cashAmount > 0 ? originalReceiverId : originalInitiatorId;
-    }
-
     const oldItems = await this.prisma.tradeItem.findMany({
       where: { tradeId },
     });
@@ -1153,8 +1148,8 @@ export class TradeLifecycleService {
           initiatorId: originalReceiverId, // Swapped
           receiverId: originalInitiatorId, // Swapped
           initiatorAddressId: newInitiatorAddressId, // Yeni initiator'ın adresi (swap ile güncellenmeli)
-          cashAmount: dto.cashAmount ? Math.abs(dto.cashAmount) : null,
-          cashPayerId,
+          cashAmount: cash.cashAmount,
+          cashPayerId: cash.cashPayerId,
           initiatorMessage, // New initiator's message
           receiverMessage: null, // Clear old receiver message
           responseDeadline,
