@@ -7,7 +7,11 @@ export class OfferProductDto {
   @ApiProperty({ example: "Vintage Star Wars Figure" })
   title: string;
 
-  @ApiProperty({ example: 299.99 })
+  @ApiProperty({
+    example: 299.99,
+    description:
+      "Current sale price (sale window applied): the ceiling of offers, counters and accepts",
+  })
   price: number;
 
   @ApiPropertyOptional({ example: "https://storage.example.com/image.jpg" })
