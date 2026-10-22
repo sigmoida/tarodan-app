@@ -105,6 +105,21 @@ describe("offerSchema, the API's ceiling of an agreed amount", () => {
       "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
     );
   });
+
+  // The ceiling comes before every price bound: an amount the API refuses
+  // says so, whatever the listing's bounds would say about it.
+  it.each([
+    ["at or above the listing price", offerSchema(1000, 2000, "tr", null)],
+    ["below the 50% minimum", offerSchema(15_000_000, 30_000_000, "tr", null)],
+    [
+      "below the platform floor",
+      offerSchema(1000, 30_000_000, "tr", 12_000_000),
+    ],
+  ])("refuses the ceiling before a bound (%s)", (_case, bounded) => {
+    expect(amountIssue(bounded, "10000000")).toBe(
+      "Tutar 9.999.999 TL'yi aşamaz.",
+    );
+  });
 });
 
 describe("offerSchema, rule order", () => {
