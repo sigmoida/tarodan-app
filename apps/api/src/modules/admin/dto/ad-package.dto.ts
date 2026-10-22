@@ -3,7 +3,6 @@ import {
   IsBoolean,
   IsOptional,
   IsInt,
-  IsNumber,
   IsArray,
   ValidateNested,
   Min,
@@ -25,6 +24,7 @@ import {
   BOOST_GRANT_MAX_DAYS,
   BOOST_GRANT_MIN_DAYS,
 } from "@tarodan/types";
+import { JsonNumber } from "../../../common/transforms";
 
 /** Trims a string body field before it is validated (a reason of spaces is empty). */
 const trimmed = () =>
@@ -32,6 +32,17 @@ const trimmed = () =>
     typeof value === "string" ? value.trim() : value,
   );
 
+/** The largest band bound `ad_package_tiers.min_amount`/`max_amount` hold (Decimal(12,2)). */
+const TIER_BAND_MAX = 9_999_999_999.99;
+/** The largest price `price`/`campaign_price` hold (Decimal(10,2)). */
+const TIER_PRICE_MAX = 99_999_999.99;
+
+/**
+ * One tier row. The TL fields are JSON numbers of at least 0 with at most two
+ * decimals (`IsTlAmount`); the band is half-open (`boost-tier-band.ts`), and
+ * the service refuses an empty band and overlapping active bands of one
+ * duration.
+ */
 export class AdPackageTierDto {
   @ApiProperty({ example: 7 })
   @Type(() => Number)
@@ -39,30 +50,38 @@ export class AdPackageTierDto {
   @Min(1)
   durationDays: number;
 
-  @ApiProperty({ example: 200 })
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @ApiProperty({
+    example: 1000,
+    description: "Lowest listing price of the band (TL), inside the band",
+  })
+  @JsonNumber()
+  @IsTlAmount()
+  @Max(TIER_BAND_MAX)
   minAmount: number;
 
-  @ApiPropertyOptional({ example: 999, description: "null = no upper bound" })
+  @ApiPropertyOptional({
+    example: 5000,
+    nullable: true,
+    description:
+      "Listing price where the band ends (TL), outside the band; null = no upper bound",
+  })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @JsonNumber()
+  @IsTlAmount()
+  @Max(TIER_BAND_MAX)
   maxAmount?: number | null;
 
-  @ApiProperty({ example: 150 })
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @ApiProperty({ example: 150, description: "TL, VAT included" })
+  @JsonNumber()
+  @IsTlAmount()
+  @Max(TIER_PRICE_MAX)
   price: number;
 
-  @ApiPropertyOptional({ example: 1750 })
+  @ApiPropertyOptional({ example: 1750, nullable: true })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @JsonNumber()
+  @IsTlAmount()
+  @Max(TIER_PRICE_MAX)
   campaignPrice?: number | null;
 
   @ApiPropertyOptional()
@@ -245,7 +264,7 @@ export class RefundBoostDto extends BoostAdminReasonDto {
   // `IsTlAmount`, not `@IsNumber({ maxDecimalPlaces })`: that threw on an
   // exponent form (1e-7) and the pipe answered 500 (as `ManualRefundDto`).
   @IsOptional()
-  @Type(() => Number)
+  @JsonNumber()
   @IsTlAmount()
   @Min(0.01)
   amount?: number;

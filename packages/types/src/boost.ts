@@ -89,6 +89,11 @@ export interface BoostPackage {
   slug: string;
   /** A "Vitrin" package also places the listing in the home showcase. */
   showcaseOnHome: boolean;
+  /**
+   * At most one option per duration, ascending: the tier the purchase start
+   * resolves for the same listing price, so `price` is the `expectedPrice`
+   * the initiate call accepts.
+   */
   options: BoostDurationOption[];
 }
 
@@ -96,7 +101,11 @@ export interface BoostPackage {
 export interface BoostOptionsResponse {
   /** `isBoostEnabled` of the platform setting. */
   enabled: boolean;
-  /** The price the tiers are matched against (`boostTierBasePrice`). */
+  /**
+   * The price the tiers are matched against (`boostTierBasePrice`). A tier's
+   * band is half-open: `minAmount <= productPrice < maxAmount`, no
+   * `maxAmount` means no upper bound.
+   */
   productPrice: number;
   /** Packages with at least one tier for this price and this seller. */
   packages: BoostPackage[];

@@ -47,34 +47,6 @@ export function eligibleAudienceWhere(
 }
 
 /**
- * The tiers whose price band covers a listing price (`boostTierBasePrice`):
- * `minAmount <= price` and no `maxAmount` or `maxAmount >= price`.
- */
-export function tierCoversPriceWhere(
-  price: number,
-): Prisma.AdPackageTierWhereInput {
-  return {
-    minAmount: { lte: price },
-    OR: [{ maxAmount: null }, { maxAmount: { gte: price } }],
-  };
-}
-
-/** The same band rule in memory (`tierCoversPriceWhere`), for many prices at once. */
-export function tierCoversPrice(
-  tier: {
-    minAmount: Prisma.Decimal.Value;
-    maxAmount: Prisma.Decimal.Value | null;
-  },
-  price: number,
-): boolean {
-  const amount = new Prisma.Decimal(price);
-  return (
-    new Prisma.Decimal(tier.minAmount).lte(amount) &&
-    (tier.maxAmount == null || new Prisma.Decimal(tier.maxAmount).gte(amount))
-  );
-}
-
-/**
  * Who a boost seller is to the boost rules: the effective membership tier the
  * package targeting matches, and whether the seller is premium (the
  * ending-soon reminder). One read of the membership with its KYC owner; the

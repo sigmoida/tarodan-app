@@ -20,9 +20,13 @@ import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../../common/helpers/generate-reference";
 import { boostTierBasePrice } from "../helpers/product-sale-window";
 import {
+  BOOST_TIER_PRECEDENCE,
+  boostTierCoversPriceWhere,
+  firstTierPerDuration,
+} from "../helpers/boost-tier-band";
+import {
   BoostAudienceService,
   eligibleAudienceWhere,
-  tierCoversPriceWhere,
 } from "../boost-seller/boost-audience.service";
 import { PaymentService } from "../../payment/payment.service";
 import { PaymentProvider } from "../../payment/dto";
@@ -100,7 +104,11 @@ export class ProductBoostService {
     return Number(tier.campaignPrice);
   }
 
-  /** The active tier of (package, duration) for the listing price, and its price now. */
+  /**
+   * The active tier of (package, duration) for the listing price, and its
+   * price now. The same band rule and precedence as the options call
+   * (`boost-tier-band.ts`), so both pick the same tier for the same price.
+   */
   private async resolvePackagePrice(
     packageId: string,
     durationDays: number,
@@ -126,8 +134,9 @@ export class ProductBoostService {
         packageId,
         durationDays,
         isActive: true,
-        ...tierCoversPriceWhere(productPrice),
+        ...boostTierCoversPriceWhere(productPrice),
       },
+      orderBy: BOOST_TIER_PRECEDENCE,
     });
     if (!tier) {
       throw new BadRequestException(
@@ -183,8 +192,11 @@ export class ProductBoostService {
       orderBy: { sortOrder: "asc" },
       include: {
         tiers: {
-          where: { isActive: true, ...tierCoversPriceWhere(productPrice) },
-          orderBy: { durationDays: "asc" },
+          where: {
+            isActive: true,
+            ...boostTierCoversPriceWhere(productPrice),
+          },
+          orderBy: [{ durationDays: "asc" }, ...BOOST_TIER_PRECEDENCE],
         },
       },
     });
@@ -198,7 +210,8 @@ export class ProductBoostService {
           name: p.name,
           slug: p.slug,
           showcaseOnHome: p.showcaseOnHome,
-          options: p.tiers.map((t) => ({
+          // One option per duration: the tier the purchase start resolves.
+          options: firstTierPerDuration(p.tiers).map((t) => ({
             durationDays: t.durationDays,
             price: this.effectiveTierPrice(t),
             listPrice: Number(t.price),

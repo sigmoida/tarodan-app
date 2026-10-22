@@ -211,7 +211,9 @@ describe("BoostOfferService.getOffers", () => {
     const { service, prisma } = setup({
       candidates: [
         listing("cheap", { price: new Prisma.Decimal(50) }),
-        listing("mid", { price: new Prisma.Decimal(999) }),
+        listing("mid", { price: new Prisma.Decimal(998.99) }),
+        // The upper bound is outside the band (half-open, like the options).
+        listing("top", { price: new Prisma.Decimal(999) }),
         listing("edge", { price: new Prisma.Decimal(200) }),
         listing("pricey", { price: new Prisma.Decimal(5000) }),
       ],

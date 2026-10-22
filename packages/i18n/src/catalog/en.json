@@ -6401,7 +6401,7 @@
         "audienceUserCount": "{count} users",
         "audienceMixedCount": "{tiers} tiers + {users} users",
         "tiers": "Price Tiers",
-        "tiersHelper": "Each row sets the package price for a duration and product price range",
+        "tiersHelper": "Each row sets the package price for a duration and product price range. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap (for example 1,000-5,000 and 5,000-unlimited).",
         "addTier": "Add Row",
         "removeTier": "Remove Row",
         "noTiers": "No tiers yet. Add one with 'Add Row'.",
@@ -11936,7 +11936,8 @@
         "resumePausedOnly": "Only a paused package can be resumed",
         "extendActiveOrPausedOnly": "Only an active or paused package can be extended",
         "extensionRange": "The extension must be between 1 and 365 days",
-        "slugTaken": "A package with this slug already exists"
+        "slugTaken": "A package with this slug already exists",
+        "tierOverlap": "The price ranges for the {durationDays}-day duration overlap: {firstMin, number} TL - {firstMax, select, none {no upper limit} other {{firstMax, number} TL}} and {secondMin, number} TL - {secondMax, select, none {no upper limit} other {{secondMax, number} TL}}. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap."
       },
       "fileMissing": "No file was sent",
       "commission": {

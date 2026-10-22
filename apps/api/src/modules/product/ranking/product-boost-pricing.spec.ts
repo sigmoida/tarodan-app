@@ -46,7 +46,7 @@ describe("ProductBoostService — ad-package pricing", () => {
   const internals = () => service as unknown as PricingInternals;
 
   const EKO = { id: "pkg-eko", name: "Ekonomik Paket", showcaseOnHome: false };
-  // 7-gün tiers: 200-999 → 150, 1000-5000 → 250, 5000+ → 500
+  // 7-day tiers (half-open bands): [200, 999) 150, [1000, 5000) 250, 5000+ 500
   const tiers = [
     {
       durationDays: 7,
@@ -95,7 +95,7 @@ describe("ProductBoostService — ad-package pricing", () => {
               (t) =>
                 t.durationDays === where.durationDays &&
                 t.minAmount <= where.minAmount.lte &&
-                (t.maxAmount == null || t.maxAmount >= where.minAmount.lte),
+                (t.maxAmount == null || t.maxAmount > where.minAmount.lte),
             ) ?? null,
           ),
         ),

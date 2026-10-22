@@ -6401,7 +6401,7 @@
         "audienceUserCount": "{count} kullanıcı",
         "audienceMixedCount": "{tiers} katman + {users} kullanıcı",
         "tiers": "Fiyat Kademeleri",
-        "tiersHelper": "Her satır bir gün süresi ve ürün fiyat aralığı için paket fiyatını belirler",
+        "tiersHelper": "Her satır bir gün süresi ve ürün fiyat aralığı için paket fiyatını belirler. Alt sınır aralığa dahildir, üst sınır dahil değildir; aynı süredeki etkin aralıklar birbirine değebilir ancak çakışamaz (örneğin 1.000-5.000 ve 5.000-sınırsız).",
         "addTier": "Satır Ekle",
         "removeTier": "Satırı Sil",
         "noTiers": "Henüz kademe yok. 'Satır Ekle' ile ekleyin.",
@@ -11936,7 +11936,8 @@
         "resumePausedOnly": "Yalnızca duraklatılmış paket devam ettirilebilir",
         "extendActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış paketin süresi uzatılabilir",
         "extensionRange": "Uzatma süresi 1-365 gün olmalıdır",
-        "slugTaken": "Bu slug ile bir paket zaten var"
+        "slugTaken": "Bu slug ile bir paket zaten var",
+        "tierOverlap": "{durationDays} günlük süre için fiyat aralıkları çakışmaktadır: {firstMin, number} TL - {firstMax, select, none {üst sınır yok} other {{firstMax, number} TL}} ile {secondMin, number} TL - {secondMax, select, none {üst sınır yok} other {{secondMax, number} TL}}. Alt sınır aralığa dahildir, üst sınır dahil değildir; aynı süredeki etkin aralıklar birbirine değebilir ancak çakışamaz."
       },
       "fileMissing": "Dosya gönderilmedi",
       "commission": {
