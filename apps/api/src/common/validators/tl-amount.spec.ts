@@ -1,5 +1,9 @@
 import { isNumber } from "class-validator";
-import { isTlAmount } from "./tl-amount";
+import {
+  isSignedTlAmount,
+  isTlAmount,
+  TL_AMOUNT_COLUMN_MAX,
+} from "./tl-amount";
 
 /**
  * A TL amount in a JSON body: a finite number of at least 0 with at most two
@@ -39,4 +43,31 @@ describe("isTlAmount", () => {
       expect(isTlAmount(value)).toBe(false);
     },
   );
+});
+
+describe("isSignedTlAmount", () => {
+  it.each([0, 59.99, -59.99, -1, TL_AMOUNT_COLUMN_MAX, -TL_AMOUNT_COLUMN_MAX])(
+    "accepts %p",
+    (value) => {
+      expect(isSignedTlAmount(value)).toBe(true);
+    },
+  );
+
+  it.each([59.999, -59.999, 1e-7, -1e-7, -1e21, Number.NEGATIVE_INFINITY])(
+    "refuses %p",
+    (value) => {
+      expect(isSignedTlAmount(value)).toBe(false);
+    },
+  );
+
+  it.each(["-59.9", null, undefined])("refuses the non-number %p", (value) => {
+    expect(isSignedTlAmount(value)).toBe(false);
+  });
+});
+
+describe("TL_AMOUNT_COLUMN_MAX", () => {
+  it("is the largest Decimal(10, 2) value, itself a TL amount", () => {
+    expect(TL_AMOUNT_COLUMN_MAX).toBe(Number("9".repeat(8) + ".99"));
+    expect(isTlAmount(TL_AMOUNT_COLUMN_MAX)).toBe(true);
+  });
 });
