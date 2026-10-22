@@ -20,6 +20,9 @@ import { PLATFORM_ENTITY } from "@/lib/legal/platform-entity";
 const h = vi.hoisted(() => ({
   options: vi.fn(),
   initiate: vi.fn(),
+  cancelPayment: vi.fn(),
+  /** Every `logger.child(...).info` call: the Sentry breadcrumbs. */
+  info: vi.fn(),
   push: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn() },
   /** The pay button's `disabled` on every render of the footer, in order. */
@@ -58,7 +61,18 @@ vi.mock("@tarodan/ui", async (importOriginal) => {
 });
 vi.mock("@/lib/api", () => ({
   boostApi: { options: h.options, initiate: h.initiate },
+  paymentsApi: { cancel: h.cancelPayment },
 }));
+vi.mock("@/lib/logger", () => {
+  const log = {
+    debug: vi.fn(),
+    info: h.info,
+    warn: vi.fn(),
+    error: vi.fn(),
+    captureException: vi.fn(),
+  };
+  return { logger: { ...log, child: () => log } };
+});
 vi.mock("@/i18n/navigation", () => ({
   useRouter: () => ({ push: h.push }),
   Link: ({ href, children, ...rest }: { href: string; children: ReactNode }) =>
@@ -208,6 +222,7 @@ beforeEach(() => {
   });
   h.options.mockResolvedValue({ data: OPTIONS });
   h.initiate.mockResolvedValue({ data: STARTED });
+  h.cancelPayment.mockResolvedValue({ data: { success: true } });
 });
 
 afterEach(() => {
@@ -520,6 +535,9 @@ describe("BoostModal request", () => {
     expect(body).not.toHaveProperty("autoRenew");
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(h.push).toHaveBeenCalledWith("/payment/pay-1?type=boost");
+    // A handed-over order is paid on the pay page: nothing is cancelled.
+    expect(h.cancelPayment).not.toHaveBeenCalled();
+    expect(h.info).not.toHaveBeenCalled();
   });
 
   it("sends the chosen package, duration and its price", async () => {
@@ -593,8 +611,11 @@ describe("BoostModal request", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(h.push).not.toHaveBeenCalled();
     expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
-    // Only a changed price reloads the prices.
+    // Only a changed price or a stale offer reloads the prices.
     expect(h.options).toHaveBeenCalledTimes(1);
+    // Not a stale offer: no breadcrumb, and nothing was written to cancel.
+    expect(h.info).not.toHaveBeenCalled();
+    expect(h.cancelPayment).not.toHaveBeenCalled();
     const helper = Array.from(dialog().querySelectorAll("p")).find(
       (p) => p.textContent === "profile.boost.consent.required",
     );
@@ -611,6 +632,12 @@ describe("BoostModal request", () => {
 
     expect(h.toast.error).toHaveBeenCalledWith("profile.boost.initiateFailed");
     expect(onClose).not.toHaveBeenCalled();
+    // An error without an i18n key is neither a changed price nor a stale
+    // offer: the consents stay, nothing is reloaded, logged or cancelled.
+    expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
+    expect(h.options).toHaveBeenCalledTimes(1);
+    expect(h.info).not.toHaveBeenCalled();
+    expect(h.cancelPayment).not.toHaveBeenCalled();
   });
 });
 
@@ -675,6 +702,80 @@ describe("BoostModal price integrity", () => {
     expect(payButton().disabled).toBe(true);
   });
 
+  it("leaves an id-only breadcrumb when the API says the price changed, and cancels nothing", async () => {
+    h.initiate.mockRejectedValue(PRICE_CHANGED);
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.info).toHaveBeenCalledTimes(1);
+    expect(h.info).toHaveBeenCalledWith("boost.price_changed", {
+      productId: "listing-1",
+      packageId: "pkg-eco",
+    });
+    // Nothing was written, so there is no payment to cancel.
+    expect(h.cancelPayment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "server.product.boostPriceUndefined",
+    "server.product.boostPackageNotFound",
+    "server.product.boostUnavailable",
+  ])(
+    "on 400 %s keeps the dialog open, shows the server message, reloads the options and unticks both consents",
+    async (i18nKey) => {
+      h.initiate.mockRejectedValue({
+        response: { status: 400, data: { message: "server:stale", i18nKey } },
+      });
+      render();
+      await flush();
+      await acceptBoth();
+      click(payButton());
+      await flush();
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(h.push).not.toHaveBeenCalled();
+      expect(dialog()).toBeTruthy();
+      expect(h.toast.error).toHaveBeenCalledTimes(1);
+      expect(h.toast.error).toHaveBeenCalledWith("server:stale");
+      expect(h.options).toHaveBeenCalledTimes(2);
+      expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+      expect(payButton().disabled).toBe(true);
+      expect(h.info).toHaveBeenCalledTimes(1);
+      expect(h.info).toHaveBeenCalledWith("boost.offer_stale", {
+        productId: "listing-1",
+        packageId: "pkg-eco",
+      });
+      expect(h.cancelPayment).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows the unavailable state when boost sales were switched off behind the dialog", async () => {
+    h.options
+      .mockResolvedValueOnce({ data: OPTIONS })
+      .mockResolvedValue({ data: { ...OPTIONS, enabled: false } });
+    h.initiate.mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          message: "server:off",
+          i18nKey: "server.product.boostUnavailable",
+        },
+      },
+    });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(text()).toContain("profile.boost.unavailable");
+    expect(checkboxes()).toHaveLength(0);
+    expect(payButton().disabled).toBe(true);
+  });
+
   it.each([
     ["another price", 79],
     // One kuruş is a different price (the shared kuruş rule).
@@ -699,6 +800,135 @@ describe("BoostModal price integrity", () => {
       expect(h.options).toHaveBeenCalledTimes(2);
     },
   );
+
+  it("cancels the payment of an order started at another price, once", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.cancelPayment).toHaveBeenCalledWith("pay-1");
+    // Ids only: no amount, title or personal data.
+    expect(h.info).toHaveBeenCalledTimes(1);
+    expect(h.info).toHaveBeenCalledWith("boost.price_mismatch_after_initiate", {
+      productId: "listing-1",
+      boostId: "boost-1",
+      paymentId: "pay-1",
+      packageId: "pkg-eco",
+    });
+  });
+
+  it("keeps a failed cancel of the abandoned payment silent", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+    h.cancelPayment.mockRejectedValue({
+      response: { status: 500, data: { message: "server:down" } },
+    });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.info).toHaveBeenCalledTimes(2);
+    // Only the dialog's own message: the cancel adds no toast.
+    expect(h.toast.error).toHaveBeenCalledTimes(1);
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "profile.boost.paymentStartFailed",
+    );
+    expect(h.info).toHaveBeenLastCalledWith(
+      "boost.abandoned_payment_cancel_failed",
+      {
+        productId: "listing-1",
+        boostId: "boost-1",
+        paymentId: "pay-1",
+        status: "500",
+      },
+    );
+    // The dialog is not held: it is open on the reloaded prices.
+    expect(dialog()).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(h.options).toHaveBeenCalledTimes(2);
+    expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+  });
+
+  it("records a cancel that failed without a response as status none, silently", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+    h.cancelPayment.mockRejectedValue(new Error("Network Error"));
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.toast.error).toHaveBeenCalledTimes(1);
+    expect(h.info).toHaveBeenCalledTimes(2);
+    expect(h.info).toHaveBeenLastCalledWith(
+      "boost.abandoned_payment_cancel_failed",
+      {
+        productId: "listing-1",
+        boostId: "boost-1",
+        paymentId: "pay-1",
+        status: "none",
+      },
+    );
+  });
+
+  it("cancels nothing when the mismatched order opened no payment", async () => {
+    h.initiate.mockResolvedValue({
+      data: { ...STARTED, price: 79, paymentId: "" },
+    });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.cancelPayment).not.toHaveBeenCalled();
+    expect(h.push).not.toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "profile.boost.paymentStartFailed",
+    );
+  });
+
+  it("cancels only the mismatched payment when the next order matches", async () => {
+    h.initiate
+      .mockResolvedValueOnce({ data: { ...STARTED, price: 79 } })
+      .mockResolvedValue({ data: { ...STARTED, paymentId: "pay-2" } });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.initiate).toHaveBeenCalledTimes(2);
+    expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.cancelPayment).toHaveBeenCalledWith("pay-1");
+    expect(h.push).toHaveBeenCalledTimes(1);
+    expect(h.push).toHaveBeenCalledWith("/payment/pay-2?type=boost");
+  });
+
+  it("does not hold the dialog while the cancel of the abandoned payment is pending", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+    h.cancelPayment.mockReturnValue(new Promise(() => undefined));
+    render();
+    await flush();
+
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.options).toHaveBeenCalledTimes(2);
+    await acceptBoth();
+    expect(payButton().disabled).toBe(false);
+  });
 
   it("keeps pay disabled when the prices cannot be reloaded after a price change", async () => {
     h.initiate.mockRejectedValue(PRICE_CHANGED);
