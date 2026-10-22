@@ -34,7 +34,12 @@ const PRICE_RANGES = [
   ["100", "500"],
   ["500", "1000"],
   ["1000", ""],
-] as const;
+].map(([min, max]) => ({
+  min,
+  max,
+  // The bounds the range sets, compared with the fields' bounds.
+  bounds: `${priceFilterParam(min)}-${priceFilterParam(max)}`,
+}));
 
 // Boolean catalog flags shown after trade-only in the "options" group, in the
 // mobile filter sheet's order; the keys are the Filters / URL / API param names.
@@ -404,12 +409,21 @@ function PriceRange({
     { key: "minPrice", placeholder: "Min ₺", label: t("product.minPrice") },
     { key: "maxPrice", placeholder: "Max ₺", label: t("product.maxPrice") },
   ] as const;
-  const refused = fields.some(({ key }) => isPriceFilterRefused(filters[key]));
+  const refusedField = {
+    minPrice: isPriceFilterRefused(filters.minPrice),
+    maxPrice: isPriceFilterRefused(filters.maxPrice),
+  };
+  const refused = refusedField.minPrice || refusedField.maxPrice;
+  // No range is active while a field is refused: its "" would match an open
+  // range bound ("1.000" next to max 100 is not "0-100").
+  const bounds = refused
+    ? null
+    : `${priceFilterParam(filters.minPrice)}-${priceFilterParam(filters.maxPrice)}`;
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         {fields.map(({ key, placeholder, label }, i) => {
-          const fieldRefused = isPriceFilterRefused(filters[key]);
+          const fieldRefused = refusedField[key];
           return (
             <Fragment key={key}>
               {i > 0 && <span className="flex-shrink-0 text-subtle">-</span>}
@@ -440,11 +454,9 @@ function PriceRange({
         </p>
       )}
       <div className="flex flex-wrap gap-1">
-        {PRICE_RANGES.map(([min, max]) => {
+        {PRICE_RANGES.map(({ min, max, bounds: rangeBounds }) => {
           // Compared as bounds, so "100,00" typed by hand lights "100".
-          const isActive =
-            priceFilterParam(filters.minPrice) === priceFilterParam(min) &&
-            priceFilterParam(filters.maxPrice) === priceFilterParam(max);
+          const isActive = bounds === rangeBounds;
           return (
             <Button
               variant="secondary"

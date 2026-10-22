@@ -301,6 +301,18 @@ describe("listings sidebar price range", () => {
     expect(rangeButton("₺100-500").className).toContain("bg-primary-500");
   });
 
+  it("no quick range is active while a field is refused", async () => {
+    await mount("maxPrice=100");
+    expect(rangeButton("₺0-100").className).toContain("bg-primary-500");
+    typeInto(priceBox("product.minPrice"), "1.000");
+    expect(rangeButton("₺0-100").className).not.toContain("bg-primary-500");
+  });
+
+  it("prefills a URL bound with a decimal comma", async () => {
+    await mount("minPrice=1250.5");
+    expect(priceBox("product.minPrice").value).toBe("1250,50");
+  });
+
   it("clear empties a refused field and its message", async () => {
     await mount();
     typeInto(priceBox("product.minPrice"), "1.000");

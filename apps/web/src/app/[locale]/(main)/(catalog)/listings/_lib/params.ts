@@ -9,7 +9,11 @@
  * pure functions. Do NOT branch behavior by environment; keep this free of
  * `'use client'` and React so it runs identically on both.
  */
-import { parseTlAmount } from "@tarodan/shared";
+import {
+  isTlAmountRefused,
+  parseTlAmount,
+  tlAmountInputValue,
+} from "@tarodan/shared";
 
 /** Search terms that are really brands; when the search box matches one, we
  *  treat it as a brand filter instead of a free-text search. */
@@ -77,8 +81,19 @@ export function priceFilterBound(text: string): number | undefined {
 }
 
 /** True when the price text is not an amount (`validation.amountFormatRefused`). */
-export function isPriceFilterRefused(text: string): boolean {
-  return parseTlAmount(text).status === "refused";
+export const isPriceFilterRefused = (text: string): boolean =>
+  isTlAmountRefused(text);
+
+/**
+ * The field text for a URL price value (a shared link, a saved-search run):
+ * the bound prefilled with a decimal comma (`tlAmountInputValue`, "1250,50"),
+ * or the value as it is when it is refused, so the field shows the refusal
+ * instead of hiding why the bound is ignored. Empty or zero is "".
+ */
+export function priceFilterText(value: string): string {
+  const bound = priceFilterBound(value);
+  if (bound !== undefined) return tlAmountInputValue(bound);
+  return isPriceFilterRefused(value) ? value.trim() : "";
 }
 
 /**
@@ -153,8 +168,8 @@ export function parseListingsFilters(sp: URLSearchParams): Filters {
       .map((slug) => slug.trim())
       .filter(Boolean),
     condition: sp.get("condition") || "",
-    minPrice: sp.get("minPrice") || "",
-    maxPrice: sp.get("maxPrice") || "",
+    minPrice: priceFilterText(sp.get("minPrice") || ""),
+    maxPrice: priceFilterText(sp.get("maxPrice") || ""),
     tradeOnly: sp.get("tradeOnly") === "true",
     discountOnly: sp.get("discountOnly") === "true",
     preOrder: sp.get("preOrder") === "true",

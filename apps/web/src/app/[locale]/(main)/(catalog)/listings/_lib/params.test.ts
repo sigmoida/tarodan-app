@@ -11,6 +11,7 @@ import {
   parseListingsFilters,
   priceFilterBound,
   priceFilterParam,
+  priceFilterText,
 } from "./params";
 
 const sp = (query: string) => new URLSearchParams(query);
@@ -203,5 +204,26 @@ describe("listings URL round trip", () => {
     const filters = parseListingsFilters(sp("minPrice=1.000&maxPrice=500"));
     expect(filters.minPrice).toBe("1.000");
     expect(buildListingsUrlParams(filters, 1).toString()).toBe("maxPrice=500");
+  });
+});
+
+describe("price field prefill from the URL", () => {
+  it("prefills a bound with a decimal comma (tlAmountInputValue)", () => {
+    expect(priceFilterText("1250.5")).toBe("1250,50");
+    expect(priceFilterText("1250.50")).toBe("1250,50");
+    expect(priceFilterText("1000")).toBe("1000");
+    expect(
+      parseListingsFilters(sp("minPrice=99.99&maxPrice=500")),
+    ).toMatchObject({ minPrice: "99,99", maxPrice: "500" });
+  });
+
+  it("keeps refused text so the field shows the refusal", () => {
+    expect(priceFilterText("1.000")).toBe("1.000");
+    expect(priceFilterText(" -5 ")).toBe("-5");
+  });
+
+  it("empty and zero prefill nothing", () => {
+    expect(priceFilterText("")).toBe("");
+    expect(priceFilterText("0")).toBe("");
   });
 });
