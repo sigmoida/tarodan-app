@@ -22,6 +22,7 @@ import {
 import { cn } from "@tarodan/ui/utils";
 import {
   CONSENT_DOCUMENTS,
+  boostPriceMatches,
   type BoostDurationOption,
   type BoostPackage,
   type InitiateBoostRequest,
@@ -63,8 +64,8 @@ const DEFAULT_DURATION_DAYS = 7;
 /** The API's rejection when a consent is missing. */
 const CONSENT_REQUIRED_KEY = "server.product.boostConsentRequired";
 /**
- * The API's 409 when `expectedPrice` is no longer the price it charges (the
- * comparison rule is the API's `boostPriceMatches`); nothing was written.
+ * The API's 409 when `expectedPrice` is no longer the price it charges
+ * (`boostPriceMatches`, whole kuruş); nothing was written.
  */
 const PRICE_CHANGED_KEY = "server.product.boostPriceChanged";
 const DAY_MS = 86_400_000;
@@ -164,9 +165,9 @@ function OptionsSkeleton() {
  * duration is chosen and BOTH consents are ticked; the API refuses the order
  * without them. A change to the pre-information (listing, package, duration,
  * price) unticks both. The request carries the price shown; when the API
- * answers that it changed (409), the prices are fetched again and both
- * consents are asked again on them. On success it hands over to the pay page
- * (`/payment/<id>?type=boost`).
+ * answers that it changed (409), or a started order is not at that price,
+ * the prices are fetched again and both consents are asked again on them.
+ * Otherwise it hands over to the pay page (`/payment/<id>?type=boost`).
  *
  * Mount it per opening (`useBoostLauncher` does): the consents start unticked
  * every time and are never remembered.
@@ -217,16 +218,30 @@ export default function BoostModal({
   const canBuy = !!options?.enabled && packages.length > 0;
   const optionsFresh = optionsQuery.isSuccess && !optionsQuery.isFetching;
 
+  /** The consented price is gone: reload the prices, ask for both again. */
+  const askAgainOnNewPrices = () => {
+    resetConsents();
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.boost.options(listing.id),
+    });
+  };
+
   // The server decides the price: it refuses an `expectedPrice` that is not
-  // what it charges (409, nothing written), so a success is always at the
-  // price the seller consented to.
+  // what it charges (409, nothing written). A started order at another price
+  // (an API that does not check it yet, for example while a release rolls
+  // out) is never paid on either: same rule, same reaction.
   const initiate = useWebMutation(
     async (body: InitiateBoostRequest): Promise<InitiateBoostResponse> =>
       (await boostApi.initiate(listing.id, body)).data,
     {
       errorMessage: t("profile.boost.initiateFailed"),
-      onSuccess: (data) => {
+      onSuccess: (data, body) => {
         if (!data?.paymentId) {
+          toast.error(t("profile.boost.paymentStartFailed"));
+          return;
+        }
+        if (!boostPriceMatches(body.expectedPrice, data.price)) {
+          askAgainOnNewPrices();
           toast.error(t("profile.boost.paymentStartFailed"));
           return;
         }
@@ -265,15 +280,13 @@ export default function BoostModal({
         ...(canRemind ? { autoRenew: reminder } : {}),
       },
       {
-        // The hook toasts the server's message. A changed price also
-        // reloads the prices and asks for both consents again on them; pay
-        // stays disabled until that fetch has succeeded (`optionsFresh`).
+        // The hook toasts the server's message. A changed price also asks
+        // again on reloaded prices; pay stays disabled until that fetch has
+        // succeeded (`optionsFresh`).
         onError: (error) => {
-          if (apiErrorI18nKey(error) !== PRICE_CHANGED_KEY) return;
-          resetConsents();
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.boost.options(listing.id),
-          });
+          if (apiErrorI18nKey(error) === PRICE_CHANGED_KEY) {
+            askAgainOnNewPrices();
+          }
         },
       },
     );

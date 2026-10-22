@@ -675,6 +675,31 @@ describe("BoostModal price integrity", () => {
     expect(payButton().disabled).toBe(true);
   });
 
+  it.each([
+    ["another price", 79],
+    // One kuruş is a different price (the shared kuruş rule).
+    ["a one-kuruş difference", 59.01],
+  ])(
+    "does not open the pay page when an order was started at %s (an API that does not check the price yet)",
+    async (_label, price) => {
+      h.initiate.mockResolvedValue({ data: { ...STARTED, price } });
+      render();
+      await flush();
+      await acceptBoth();
+      click(payButton());
+      await flush();
+
+      expect(h.push).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(h.toast.error).toHaveBeenCalledWith(
+        "profile.boost.paymentStartFailed",
+      );
+      // Both consents again, on the reloaded prices.
+      expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+      expect(h.options).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("keeps pay disabled when the prices cannot be reloaded after a price change", async () => {
     h.initiate.mockRejectedValue(PRICE_CHANGED);
     h.options
