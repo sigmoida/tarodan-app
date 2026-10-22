@@ -90,6 +90,18 @@ describe("useSaveSearch", () => {
     expect(api.authModal).toBeNull();
   });
 
+  it("shows the refusal and does not open the save for a refused price", () => {
+    // "1.000" is not applied to the search; saving would drop the bound.
+    setFilters("search=mustang&minPrice=1.000");
+    mount();
+    act(() => api.start());
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "validation.amountFormatRefused",
+    );
+    expect(api.open).toBe(false);
+    expect(h.create).not.toHaveBeenCalled();
+  });
+
   it("gives a guest the shared sign-in prompt instead of the modal", () => {
     h.auth.isAuthenticated = false;
     mount();

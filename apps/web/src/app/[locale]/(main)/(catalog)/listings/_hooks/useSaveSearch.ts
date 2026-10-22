@@ -15,6 +15,7 @@ import {
   useWebMutation,
 } from "@/hooks/useWebMutation";
 import { useListings } from "../_context/ListingsContext";
+import { isPriceFilterRefused } from "../_lib/params";
 import {
   buildSavedSearchDraft,
   toCreateSavedSearchInput,
@@ -72,6 +73,15 @@ export function useSaveSearch() {
   /** The toolbar button: guests get the sign-in prompt, signed-in users the modal. */
   const start = () => {
     if (draft.isEmpty) return;
+    // A refused price is not applied to the search, so saving now would store
+    // a search without the bound the user typed: show the refusal instead.
+    if (
+      isPriceFilterRefused(filtersForSidebar.minPrice) ||
+      isPriceFilterRefused(filtersForSidebar.maxPrice)
+    ) {
+      toast.error(t("validation.amountFormatRefused"));
+      return;
+    }
     if (
       !requireAuth({
         title: t("savedSearch.saveTitle"),

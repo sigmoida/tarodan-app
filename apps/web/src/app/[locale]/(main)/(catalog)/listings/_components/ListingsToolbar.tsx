@@ -23,6 +23,7 @@ import {
   priceRangeLabel,
 } from "@/lib/listingFilterLabels";
 import SaveSearchModal from "../_modals/SaveSearchModal";
+import { hasPriceFilter, priceFilterBound } from "../_lib/params";
 
 /**
  * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
@@ -219,10 +220,15 @@ export function ActiveFilterChips() {
     });
   }
 
-  if (filters.minPrice || filters.maxPrice) {
+  // The bounds the search applies, not the typed text ("1.000" is refused,
+  // never shown as 1 TL).
+  if (hasPriceFilter(filters)) {
     chips.push({
       key: "price",
-      label: priceRangeLabel(filters.minPrice, filters.maxPrice),
+      label: priceRangeLabel(
+        priceFilterBound(filters.minPrice),
+        priceFilterBound(filters.maxPrice),
+      ),
       onRemove: () =>
         handleFiltersChange({ ...filters, minPrice: "", maxPrice: "" }),
     });
