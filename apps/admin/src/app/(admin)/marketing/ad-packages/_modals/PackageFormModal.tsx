@@ -16,7 +16,7 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { adminKeys } from "@/lib/query/keys";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   packageSchema,
@@ -107,6 +107,8 @@ export function PackageFormModal({
     setSelectedUsers((current) => current.filter((user) => user.id !== userId));
   };
 
+  // The rows of the request in flight: the API's tierIndexes point into them.
+  const sentRowCount = useRef(0);
   const save = useAdminMutation(
     (v: PackageFormValues) =>
       isEdit
@@ -123,15 +125,16 @@ export function PackageFormModal({
       errorMessage: t("admin.marketing.adPackages.saveFailed"),
       // A refusal that names tier rows is shown on those rows instead.
       showErrorToast: (error) =>
-        refusedTierRows(error, form.getValues("tiers").length) === null,
+        refusedTierRows(error, sentRowCount.current) === null,
       onSuccess: onClose,
     },
   );
 
-  const submit = (values: PackageFormValues) =>
+  const submit = (values: PackageFormValues) => {
+    sentRowCount.current = values.tiers.length;
     save.mutate(values, {
       onError: (error) => {
-        const refused = refusedTierRows(error, values.tiers.length);
+        const refused = refusedTierRows(error, sentRowCount.current);
         if (!refused) return;
         const message = extractErrorMessage(
           error,
@@ -146,6 +149,7 @@ export function PackageFormModal({
         );
       },
     });
+  };
 
   return (
     <FormModal
