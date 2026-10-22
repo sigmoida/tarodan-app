@@ -305,7 +305,7 @@ export class WishlistService {
   }
 
   // ==========================================================================
-  // HELPER – A + oldPrice: price (A) = her zaman güncel satış fiyatı
+  // HELPER - row mapping: productPrice is always the current selling price
   // ==========================================================================
   private async mapItemToDto(item: any): Promise<WishlistItemResponseDto> {
     const product = item.product;

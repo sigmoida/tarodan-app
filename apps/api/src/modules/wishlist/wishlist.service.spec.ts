@@ -1,9 +1,9 @@
 import { WishlistService } from "./wishlist.service";
 
 /**
- * `GET /wishlist` row mapping. The web and mobile Favorites cards apply the
- * shared card rule (`productCardAction`), which needs the stock as
- * `availableQuantity` (quantity - reservedQuantity; missing = unlimited).
+ * `GET /wishlist` row mapping. The web Favorites cards apply the shared card
+ * rule (`productCardAction`), which needs the stock as `availableQuantity`
+ * (quantity - reservedQuantity; missing = unlimited).
  */
 describe("WishlistService.getWishlist", () => {
   const wishlist = {

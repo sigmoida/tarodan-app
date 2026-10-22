@@ -193,5 +193,13 @@ describe("FavoritesGrid", () => {
       renderOne(over);
       expect(cartButtons()).toHaveLength(0);
     });
+
+    // Same as every grid card: a line that can no longer be bought is
+    // handled on the cart page, not by a card toggle.
+    it("hides the cart for a sold-out listing already in the cart", () => {
+      h.inCart = new Set(["x"]);
+      renderOne({ availableQuantity: 0 });
+      expect(cartButtons()).toHaveLength(0);
+    });
   });
 });
