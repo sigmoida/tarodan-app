@@ -25,7 +25,7 @@ export class WishlistItemResponseDto {
   productStatus: ProductStatus;
   /** quantity - reservedQuantity; missing = unlimited stock. */
   availableQuantity?: number;
-  /** Most units one order may hold; missing = no per-order limit. */
+  /** Most units one order may hold (positive); missing = no per-order limit. */
   maxQuantityPerOrder?: number;
   sellerId: string;
   sellerName: string;

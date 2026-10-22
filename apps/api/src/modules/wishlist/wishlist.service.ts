@@ -28,18 +28,38 @@ import {
 import { errorMessage } from "../../common/helpers/error-message";
 import { i18nMessage } from "../i18n";
 
-/** The product fields every wishlist row is mapped from (`mapItemToDto`). */
-const WISHLIST_ITEM_INCLUDE = {
+/**
+ * Exactly the fields a wishlist row is mapped from (`mapItemToDto`): the
+ * price inputs, the card rule inputs (status, stock, seller), the per-order
+ * cap and the cover image (lowest `sortOrder`, like the order payloads).
+ */
+const WISHLIST_ITEM_SELECT = {
+  id: true,
+  addedAt: true,
   product: {
-    include: {
-      images: { take: 1 },
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      sellerId: true,
+      categoryId: true,
+      condition: true,
+      status: true,
+      quantity: true,
+      reservedQuantity: true,
+      maxQuantityPerOrder: true,
+      images: {
+        take: 1,
+        orderBy: { sortOrder: "asc" },
+        select: { cardKey: true },
+      },
       seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
     },
   },
-} satisfies Prisma.WishlistItemInclude;
+} satisfies Prisma.WishlistItemSelect;
 
 type WishlistItemRow = Prisma.WishlistItemGetPayload<{
-  include: typeof WISHLIST_ITEM_INCLUDE;
+  select: typeof WISHLIST_ITEM_SELECT;
 }>;
 
 @Injectable()
@@ -88,7 +108,7 @@ export class WishlistService {
           sellerId: excludeIds(hidden),
         },
       },
-      include: WISHLIST_ITEM_INCLUDE,
+      select: WISHLIST_ITEM_SELECT,
       orderBy: { addedAt: "desc" },
     });
 
@@ -125,10 +145,7 @@ export class WishlistService {
     // Verify product exists and is active
     const product = await this.prisma.product.findFirst({
       where: { id: dto.productId, ...catalogProductWhere() },
-      include: {
-        images: { take: 1 },
-        seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
-      },
+      select: { id: true, sellerId: true, title: true },
     });
 
     if (!product) {
@@ -150,7 +167,7 @@ export class WishlistService {
           productId: dto.productId,
         },
       },
-      include: WISHLIST_ITEM_INCLUDE,
+      select: WISHLIST_ITEM_SELECT,
     });
 
     if (existingItem) {
@@ -165,7 +182,7 @@ export class WishlistService {
           wishlistId: wishlist.id,
           productId: dto.productId,
         },
-        include: WISHLIST_ITEM_INCLUDE,
+        select: WISHLIST_ITEM_SELECT,
       }),
       // Also increment the product's likeCount for accurate display
       this.prisma.product.update({
@@ -335,9 +352,13 @@ export class WishlistService {
       // Same rule as the product payloads; missing = unlimited stock.
       availableQuantity: getAvailableQuantity(product) ?? undefined,
       // The listing's per-order cap, so a client cart line added from
-      // Favorites is capped like the server cart (`CartService`); missing =
-      // no per-order limit.
-      maxQuantityPerOrder: product.maxQuantityPerOrder ?? undefined,
+      // Favorites is capped like the server cart (`CartService`). Sent only
+      // as a positive number: missing = no per-order limit (a stray 0 or
+      // negative column value is not a usable cap, so it is not sent).
+      maxQuantityPerOrder:
+        product.maxQuantityPerOrder != null && product.maxQuantityPerOrder > 0
+          ? product.maxQuantityPerOrder
+          : undefined,
       sellerId: product.seller.id,
       sellerName: publicName(product.seller),
       addedAt: item.addedAt,

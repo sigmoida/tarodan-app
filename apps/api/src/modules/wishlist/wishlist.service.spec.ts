@@ -33,10 +33,12 @@ describe("WishlistService.getWishlist", () => {
     },
   });
 
+  let findMany: jest.Mock;
   const build = (items: unknown[]) => {
+    findMany = jest.fn().mockResolvedValue(items);
     const prisma = {
       wishlist: { findUnique: jest.fn().mockResolvedValue(wishlist) },
-      wishlistItem: { findMany: jest.fn().mockResolvedValue(items) },
+      wishlistItem: { findMany },
     };
     const discount = {
       getEffectiveDisplayPrice: jest.fn().mockResolvedValue(null),
@@ -84,13 +86,28 @@ describe("WishlistService.getWishlist", () => {
     expect(result.items[0].availableQuantity).toBe(10);
   });
 
-  it("omits the per-order cap when the listing has none", async () => {
+  it("reads the per-order cap and the stock inputs from the product", async () => {
+    const service = build([]);
+    await service.getWishlist("u1");
+    const { select } = findMany.mock.calls[0][0];
+    expect(select.product.select).toMatchObject({
+      maxQuantityPerOrder: true,
+      quantity: true,
+      reservedQuantity: true,
+      sellerId: true,
+      status: true,
+    });
+  });
+
+  it("omits the per-order cap when the listing has none or a non-positive one", async () => {
     const service = build([
       row({ id: "p1", maxQuantityPerOrder: null }),
       row({ id: "p2", maxQuantityPerOrder: undefined }),
+      row({ id: "p3", maxQuantityPerOrder: 0 }),
+      row({ id: "p4", maxQuantityPerOrder: -1 }),
     ]);
     const result = await service.getWishlist("u1");
-    expect(result.items).toHaveLength(2);
+    expect(result.items).toHaveLength(4);
     for (const item of result.items) {
       expect(item.maxQuantityPerOrder).toBeUndefined();
       expect(JSON.parse(JSON.stringify(item))).not.toHaveProperty(
