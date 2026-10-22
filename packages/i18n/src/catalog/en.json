@@ -6401,7 +6401,7 @@
         "audienceUserCount": "{count} users",
         "audienceMixedCount": "{tiers} tiers + {users} users",
         "tiers": "Price Tiers",
-        "tiersHelper": "Each row sets the package price for a duration and product price range. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap (for example 1,000-5,000 and 5,000-unlimited). A new row's lower limit is filled with the previous row's upper limit.",
+        "tiersHelper": "Each row sets the package price for a duration and product price range. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap (for example 1,000-5,000 and 5,000-unlimited). When the previous row has an upper limit, a new row continues the same duration from that amount.",
         "addTier": "Add Row",
         "removeTier": "Remove Row",
         "noTiers": "No tiers yet. Add one with 'Add Row'.",

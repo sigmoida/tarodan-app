@@ -171,16 +171,19 @@ export const emptyTierRow: TierRowValues = {
 };
 
 /**
- * The row "Add row" appends. After a band with an upper bound it is the next
- * band of the same duration, starting at that bound: the upper bound is
- * exclusive, so the two bands touch with no gap (1000-5000, then 5000-...).
- * After an open-ended band (or none) that duration is covered, so the new
- * row starts from scratch.
+ * The row "Add row" appends below the last row. After a band with an upper
+ * bound it is the next band of the same duration, starting at that bound:
+ * the upper bound is exclusive, so the two bands touch with no gap
+ * (1000-5000, then 5000-...). After an open-ended band that duration is
+ * covered up to any price, so the row starts a new duration at 0 and leaves
+ * the duration for the admin to pick (copying it would overlap). The first
+ * row is the default row.
  */
 export function nextTierRow(rows: readonly TierRowValues[]): TierRowValues {
   const last = rows.at(-1);
-  const end = last ? amountOrNull(last.maxAmount) : null;
-  if (!last || end == null) return { ...emptyTierRow };
+  if (!last) return { ...emptyTierRow };
+  const end = amountOrNull(last.maxAmount);
+  if (end == null) return { ...emptyTierRow, durationDays: "" };
   return {
     ...emptyTierRow,
     durationDays: last.durationDays,

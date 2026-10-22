@@ -234,11 +234,12 @@ describe("PackageFormModal new bands", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("starts a fresh row after an open-ended band", async () => {
+  it("starts a new duration at 0 after an open-ended band", async () => {
     await type(input("tiers.0.minAmount"), "5000");
 
     await addRow();
 
+    expect(input("tiers.1.durationDays").value).toBe("");
     expect(input("tiers.1.minAmount").value).toBe("0");
     expect(input("tiers.1.maxAmount").value).toBe("");
   });

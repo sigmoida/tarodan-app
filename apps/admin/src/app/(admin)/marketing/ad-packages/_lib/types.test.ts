@@ -175,14 +175,18 @@ describe("nextTierRow", () => {
     },
   );
 
-  it("starts from scratch after an open-ended band", () => {
+  it("starts a new duration at 0 after an open-ended band", () => {
+    // Copying the duration would give a second band covering every price.
     expect(
       nextTierRow([row({ durationDays: "30", minAmount: "5000" })]),
-    ).toEqual(emptyTierRow);
+    ).toEqual({ ...emptyTierRow, durationDays: "" });
   });
 
-  it("starts from scratch when the previous upper bound is not an amount", () => {
-    expect(nextTierRow([row({ maxAmount: "1.000" })])).toEqual(emptyTierRow);
+  it("starts a new duration when the previous upper bound is not an amount", () => {
+    expect(nextTierRow([row({ maxAmount: "1.000" })])).toEqual({
+      ...emptyTierRow,
+      durationDays: "",
+    });
   });
 
   it("gives contiguous bands with no gap when the form is filled in order", () => {
