@@ -14,7 +14,7 @@ import {
   priceFilterIssueMessage,
   priceFilterParam,
   priceFilterText,
-  priceRangeIssue,
+  priceRangeIssues,
 } from "./params";
 
 const sp = (query: string) => new URLSearchParams(query);
@@ -175,17 +175,18 @@ describe("price bounds above the search max", () => {
     );
   });
 
-  it("ranks a refusal before a bound above the max (one message for both fields)", () => {
-    expect(priceRangeIssue({ minPrice: "", maxPrice: "" })).toBeUndefined();
-    expect(
-      priceRangeIssue({ minPrice: "100", maxPrice: "500" }),
-    ).toBeUndefined();
-    expect(priceRangeIssue({ minPrice: "", maxPrice: "10000000" })).toBe(
+  it("lists each field's issue once, a refusal first", () => {
+    expect(priceRangeIssues({ minPrice: "", maxPrice: "" })).toEqual([]);
+    expect(priceRangeIssues({ minPrice: "100", maxPrice: "500" })).toEqual([]);
+    expect(priceRangeIssues({ minPrice: "", maxPrice: "10000000" })).toEqual([
       "aboveMax",
-    );
-    expect(priceRangeIssue({ minPrice: "10000000", maxPrice: "1.000" })).toBe(
-      "refused",
-    );
+    ]);
+    expect(
+      priceRangeIssues({ minPrice: "10000000", maxPrice: "20000000" }),
+    ).toEqual(["aboveMax"]);
+    expect(
+      priceRangeIssues({ minPrice: "10000000", maxPrice: "1.000" }),
+    ).toEqual(["refused", "aboveMax"]);
   });
 
   it("names the max as money in the message", () => {

@@ -15,7 +15,7 @@ import {
   useWebMutation,
 } from "@/hooks/useWebMutation";
 import { useListings } from "../_context/ListingsContext";
-import { priceFilterIssueMessage, priceRangeIssue } from "../_lib/params";
+import { priceFilterIssueMessage, priceRangeIssues } from "../_lib/params";
 import {
   buildSavedSearchDraft,
   toCreateSavedSearchInput,
@@ -75,7 +75,7 @@ export function useSaveSearch() {
     if (draft.isEmpty) return;
     // A refused or too large price is not applied to the search, so saving
     // now would store a search without the bound the user typed: show why.
-    const priceIssue = priceRangeIssue(filtersForSidebar);
+    const [priceIssue] = priceRangeIssues(filtersForSidebar);
     if (priceIssue) {
       toast.error(priceFilterIssueMessage(priceIssue, t));
       return;

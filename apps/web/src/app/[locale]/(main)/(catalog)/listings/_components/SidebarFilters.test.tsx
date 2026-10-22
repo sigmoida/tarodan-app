@@ -348,15 +348,18 @@ describe("listings sidebar price range", () => {
     expect(badgeCount()).toBe("0");
   });
 
-  it("shows the refusal first when one field is refused and the other above the max", async () => {
+  it("gives each field its own message when one is refused and the other above the max", async () => {
     await mount();
     typeInto(priceBox("product.minPrice"), "1.000");
     typeInto(priceBox("product.maxPrice"), "10000000");
     expect(refusal()).toBeDefined();
-    expect(maxMessage()).toBeUndefined();
-    for (const label of ["product.minPrice", "product.maxPrice"] as const) {
-      expect(priceBox(label).getAttribute("aria-invalid")).toBe("true");
-    }
+    expect(maxMessage()).toBeDefined();
+    expect(priceBox("product.minPrice").getAttribute("aria-describedby")).toBe(
+      refusal()!.id,
+    );
+    expect(priceBox("product.maxPrice").getAttribute("aria-describedby")).toBe(
+      maxMessage()!.id,
+    );
   });
 
   it("clear empties a refused field and its message", async () => {

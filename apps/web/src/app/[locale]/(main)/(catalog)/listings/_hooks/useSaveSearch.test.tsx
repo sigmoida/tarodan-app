@@ -112,6 +112,17 @@ describe("useSaveSearch", () => {
     expect(h.create).not.toHaveBeenCalled();
   });
 
+  it("shows the refusal first when one price is refused and the other too large", () => {
+    setFilters("search=mustang&minPrice=1.000&maxPrice=10000000");
+    mount();
+    act(() => api.start());
+    expect(h.toast.error).toHaveBeenCalledTimes(1);
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "validation.amountFormatRefused",
+    );
+    expect(h.create).not.toHaveBeenCalled();
+  });
+
   it("gives a guest the shared sign-in prompt instead of the modal", () => {
     h.auth.isAuthenticated = false;
     mount();

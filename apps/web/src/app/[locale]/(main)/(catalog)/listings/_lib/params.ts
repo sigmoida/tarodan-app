@@ -9,9 +9,12 @@
  * pure functions. Do NOT branch behavior by environment; keep this free of
  * `'use client'` and React so it runs identically on both.
  */
-import { parseTlAmount, tlAmountInputValue } from "@tarodan/shared";
+import {
+  formatPrice,
+  parseTlAmount,
+  tlAmountInputValue,
+} from "@tarodan/shared";
 import { SEARCH_PRICE_MAX } from "@tarodan/types";
-import { formatPrice } from "@/lib/format";
 import type { Translate } from "@/types/i18n";
 
 /** Search terms that are really brands; when the search box matches one, we
@@ -84,38 +87,45 @@ export type PriceFilterIssue = "refused" | "aboveMax";
  * before.
  */
 export function priceFilterBound(text: string): number | undefined {
-  const parsed = parseTlAmount(text);
-  return parsed.status === "ok" && parsed.amount <= SEARCH_PRICE_MAX
-    ? parsed.amount
-    : undefined;
+  return readPriceFilter(text).bound;
 }
 
 /** Why the price text sets no bound, or `undefined` when it sets one or is empty or zero. */
 export function priceFilterIssue(text: string): PriceFilterIssue | undefined {
-  const parsed = parseTlAmount(text);
-  if (parsed.status === "refused") return "refused";
-  if (parsed.status === "ok" && parsed.amount > SEARCH_PRICE_MAX) {
-    return "aboveMax";
-  }
-  return undefined;
+  return readPriceFilter(text).issue;
 }
 
+/** The one reading of a price text: its bound, or why it sets none (empty and zero: neither). */
+function readPriceFilter(text: string): {
+  bound?: number;
+  issue?: PriceFilterIssue;
+} {
+  const parsed = parseTlAmount(text);
+  if (parsed.status === "refused") return { issue: "refused" };
+  if (parsed.status !== "ok") return {};
+  return parsed.amount > SEARCH_PRICE_MAX
+    ? { issue: "aboveMax" }
+    : { bound: parsed.amount };
+}
+
+/** A refusal first: the more basic error, and the first one a save shows. */
+const PRICE_FILTER_ISSUE_ORDER: readonly PriceFilterIssue[] = [
+  "refused",
+  "aboveMax",
+];
+
 /**
- * The issue shown under the price fields (one message for both): a refusal
- * first, as the more basic error, then a bound above the max.
+ * The distinct issues of the two price fields, a refusal first: the fields
+ * show one message per issue, each field pointing at its own.
  */
-export function priceRangeIssue(
+export function priceRangeIssues(
   filters: Pick<Filters, "minPrice" | "maxPrice">,
-): PriceFilterIssue | undefined {
-  const issues = [
+): PriceFilterIssue[] {
+  const found = [
     priceFilterIssue(filters.minPrice),
     priceFilterIssue(filters.maxPrice),
   ];
-  return issues.includes("refused")
-    ? "refused"
-    : issues.includes("aboveMax")
-      ? "aboveMax"
-      : undefined;
+  return PRICE_FILTER_ISSUE_ORDER.filter((issue) => found.includes(issue));
 }
 
 /** The message of a price issue; the max reads as money ("9.999.999,00 TL"). */
