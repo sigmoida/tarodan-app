@@ -1,7 +1,7 @@
 import { ValidationPipe, type ArgumentMetadata } from "@nestjs/common";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../common/validators/global-validation-pipe-options";
 import { IS_PUBLIC_KEY } from "../auth/decorators/public.decorator";
-import { canonicalizeSavedSearchQuery } from "@tarodan/types";
+import { canonicalizeSavedSearchQuery, SEARCH_PRICE_MAX } from "@tarodan/types";
 import { CreateSavedSearchDto, SavedSearchListQueryDto } from "./dto";
 import { savedSearchQueryHash } from "./helpers/saved-search-hash";
 import { SavedSearchController } from "./saved-search.controller";
@@ -103,6 +103,7 @@ describe("CreateSavedSearchDto through the global pipe", () => {
     ["a bad category UUID", { categoryId: "not-a-uuid" }],
     ["a bad car model UUID", { carModelId: "x" }],
     ["maxPrice over the GET /products cap", { maxPrice: 10000000 }],
+    ["minPrice over the GET /products cap", { minPrice: SEARCH_PRICE_MAX + 1 }],
     ["a negative minPrice", { minPrice: -1 }],
     ["an unknown condition", { condition: "broken" }],
     ["an over-long search text", { search: "x".repeat(201) }],
