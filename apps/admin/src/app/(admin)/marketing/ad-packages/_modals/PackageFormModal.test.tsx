@@ -22,7 +22,9 @@ import {
   bodyText,
   button,
   click,
+  field,
   mount,
+  type,
   type Mounted,
 } from "@/test-utils/dom";
 import type { AdPackage, AdPackageTier } from "../_lib/types";
@@ -176,5 +178,69 @@ describe("PackageFormModal", () => {
       "admin.marketing.adPackages.updated",
     );
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("refuses an upper bound not above the lower bound before sending", async () => {
+    await type(field('input[name="tiers.0.maxAmount"]'), "200");
+
+    await click(button("common.update"));
+
+    expect(fieldError("tiers.0.maxAmount")).toContain(
+      "admin.finance.commission.validation.strictRange",
+    );
+    expect(h.patch).not.toHaveBeenCalled();
+  });
+});
+
+describe("PackageFormModal new bands", () => {
+  const input = (name: string) => field(`input[name="${name}"]`);
+  const addRow = () => click(button("admin.marketing.adPackages.addTier"));
+
+  beforeEach(() => {
+    view.unmount();
+    h.post.mockResolvedValue({ data: { id: "pkg-2" } });
+    view = mount(<PackageFormModal open onClose={onClose} />);
+  });
+
+  it("starts each added row at the previous upper bound, so the bands touch", async () => {
+    await type(input("name"), "Vitrin");
+    await type(input("slug"), "vitrin");
+    await type(input("tiers.0.maxAmount"), "1000");
+    await type(input("tiers.0.price"), "10");
+
+    await addRow();
+    expect(input("tiers.1.durationDays").value).toBe("7");
+    expect(input("tiers.1.minAmount").value).toBe("1000");
+    expect(input("tiers.1.maxAmount").value).toBe("");
+    await type(input("tiers.1.maxAmount"), "5000");
+    await type(input("tiers.1.price"), "20");
+
+    await addRow();
+    expect(input("tiers.2.minAmount").value).toBe("5000");
+    await type(input("tiers.2.price"), "30");
+
+    await click(button("common.create"));
+
+    expect(h.post).toHaveBeenCalledWith(
+      "/admin/ad-packages",
+      expect.objectContaining({
+        tiers: [
+          expect.objectContaining({ minAmount: 0, maxAmount: 1000 }),
+          expect.objectContaining({ minAmount: 1000, maxAmount: 5000 }),
+          expect.objectContaining({ minAmount: 5000, maxAmount: null }),
+        ],
+      }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("starts a new duration at 0 after an open-ended band", async () => {
+    await type(input("tiers.0.minAmount"), "5000");
+
+    await addRow();
+
+    expect(input("tiers.1.durationDays").value).toBe("");
+    expect(input("tiers.1.minAmount").value).toBe("0");
+    expect(input("tiers.1.maxAmount").value).toBe("");
   });
 });

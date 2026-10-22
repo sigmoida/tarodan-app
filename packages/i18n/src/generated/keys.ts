@@ -9998,6 +9998,7 @@ export type MessageKey =
   | "server.offer.offerNotFound"
   | "server.offer.onlyBuyerCanAcceptCounter"
   | "server.offer.onlyBuyerCanRejectCounter"
+  | "server.offer.priceChangedSinceOffer"
   | "server.offer.productNoLongerActive"
   | "server.offer.productNotActive"
   | "server.offer.productNotFound"

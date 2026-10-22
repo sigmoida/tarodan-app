@@ -6402,7 +6402,7 @@
         "audienceUserCount": "{count} users",
         "audienceMixedCount": "{tiers} tiers + {users} users",
         "tiers": "Price Tiers",
-        "tiersHelper": "Each row sets the package price for a duration and product price range. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap (for example 1,000-5,000 and 5,000-unlimited).",
+        "tiersHelper": "Each row sets the package price for a duration and product price range. The lower limit is inside the range and the upper limit is not; active ranges of one duration may touch but must not overlap (for example 1,000-5,000 and 5,000-unlimited). When the previous row has an upper limit, a new row continues the same duration from that amount.",
         "addTier": "Add Row",
         "removeTier": "Remove Row",
         "noTiers": "No tiers yet. Add one with 'Add Row'.",
@@ -6410,8 +6410,8 @@
         "duration": "Duration",
         "durationDays": "Duration (days)",
         "days": "days",
-        "minAmount": "Min. Price",
-        "maxAmount": "Max. Price",
+        "minAmount": "Lower Limit (inclusive)",
+        "maxAmount": "Upper Limit (exclusive)",
         "unlimited": "Unlimited",
         "priceRange": "Price Range",
         "price": "Price",
@@ -11346,7 +11346,8 @@
       "productNotActive": "This product is not currently for sale",
       "productNotFound": "Product not found",
       "productOutOfStock": "The product is out of stock or does not have enough available quantity",
-      "offerMustBeBelowPrice": "The offer must be lower than the product price"
+      "offerMustBeBelowPrice": "The offer must be lower than the product price",
+      "priceChangedSinceOffer": "The offer cannot be accepted because the listing price dropped to {price} TL after it was made. A new offer can be made based on the current price."
     },
     "trade": {
       "addressNotFound": "Address not found",

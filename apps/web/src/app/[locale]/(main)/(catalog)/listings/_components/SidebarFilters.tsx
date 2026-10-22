@@ -15,9 +15,12 @@ import type { Translate } from "@/types/i18n";
 import { useSidebarFilters } from "../_hooks/useSidebarFilters";
 import FilterOptionList, { type FilterOption } from "./FilterOptionList";
 import {
-  isPriceFilterRefused,
+  priceFilterIssue,
+  priceFilterIssueMessage,
   priceFilterParam,
+  priceRangeIssues,
   type Filters,
+  type PriceFilterIssue,
 } from "../_lib/params";
 
 interface SidebarFiltersProps {
@@ -390,8 +393,10 @@ export default function SidebarFilters({
 /**
  * Min/max price fields and the quick ranges. The fields keep the typed text in
  * `filters` (see `priceFilterBound`): the search, the URL and the chip read
- * only the parsed bound, so refused text ("1.000") filters nothing and shows
- * `validation.amountFormatRefused` instead of searching for 1 TL.
+ * only the parsed bound, so refused text ("1.000") or a bound above the search
+ * maximum filters nothing and shows its message (`priceFilterIssueMessage`,
+ * one per issue, each field described by its own) instead of searching for
+ * 1 TL or failing the search.
  */
 function PriceRange({
   filters,
@@ -404,26 +409,22 @@ function PriceRange({
   errorId: string;
   t: Translate;
 }) {
-  const refusedText = t("validation.amountFormatRefused");
   const fields = [
     { key: "minPrice", placeholder: "Min ₺", label: t("product.minPrice") },
     { key: "maxPrice", placeholder: "Max ₺", label: t("product.maxPrice") },
   ] as const;
-  const refusedField = {
-    minPrice: isPriceFilterRefused(filters.minPrice),
-    maxPrice: isPriceFilterRefused(filters.maxPrice),
-  };
-  const refused = refusedField.minPrice || refusedField.maxPrice;
-  // No range is active while a field is refused: its "" would match an open
+  const issues = priceRangeIssues(filters);
+  const messageId = (issue: PriceFilterIssue) => `${errorId}-${issue}`;
+  // No range is active while a field has an issue: its "" would match an open
   // range bound ("1.000" next to max 100 is not "0-100").
-  const bounds = refused
+  const bounds = issues.length
     ? null
     : `${priceFilterParam(filters.minPrice)}-${priceFilterParam(filters.maxPrice)}`;
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         {fields.map(({ key, placeholder, label }, i) => {
-          const fieldRefused = refusedField[key];
+          const fieldIssue = priceFilterIssue(filters[key]);
           return (
             <Fragment key={key}>
               {i > 0 && <span className="flex-shrink-0 text-subtle">-</span>}
@@ -438,9 +439,15 @@ function PriceRange({
                 onChange={(e) =>
                   onFilterChange({ ...filters, [key]: e.target.value })
                 }
-                error={fieldRefused ? refusedText : undefined}
-                aria-invalid={fieldRefused || undefined}
-                aria-describedby={fieldRefused ? errorId : undefined}
+                error={
+                  fieldIssue
+                    ? priceFilterIssueMessage(fieldIssue, t)
+                    : undefined
+                }
+                aria-invalid={fieldIssue ? true : undefined}
+                aria-describedby={
+                  fieldIssue ? messageId(fieldIssue) : undefined
+                }
                 inputSize="sm"
                 className="min-w-0 flex-1 rounded px-2"
               />
@@ -448,11 +455,16 @@ function PriceRange({
           );
         })}
       </div>
-      {refused && (
-        <p id={errorId} role="alert" className="text-xs text-danger-600">
-          {refusedText}
+      {issues.map((issue) => (
+        <p
+          key={issue}
+          id={messageId(issue)}
+          role="alert"
+          className="text-xs text-danger-600"
+        >
+          {priceFilterIssueMessage(issue, t)}
         </p>
-      )}
+      ))}
       <div className="flex flex-wrap gap-1">
         {PRICE_RANGES.map(({ min, max, bounds: rangeBounds }) => {
           // Compared as bounds, so "100,00" typed by hand lights "100".

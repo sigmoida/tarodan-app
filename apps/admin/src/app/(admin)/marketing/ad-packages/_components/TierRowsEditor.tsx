@@ -7,16 +7,18 @@ import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Panel } from "@/components/detail/Panel";
 import { SectionTitle } from "@/components/detail/SectionTitle";
-import { emptyTierRow, type PackageFormValues } from "../_lib/types";
+import { nextTierRow, type PackageFormValues } from "../_lib/types";
 
 /**
- * "Satır ekle / çıkar" tier matrix editor. Each row prices one duration ×
- * product-price-range combination; rows can be freely added/removed so admins
- * define fully dynamic packages (any duration, any number of ranges).
+ * The add/remove-row tier matrix editor. Each row prices one duration x
+ * product-price-band combination; rows can be freely added/removed so admins
+ * define fully dynamic packages (any duration, any number of bands). A new
+ * row continues the last band (`nextTierRow`), so filling the form in order
+ * gives contiguous bands.
  */
 export function TierRowsEditor() {
   const t = useTranslations();
-  const { control } = useFormContext<PackageFormValues>();
+  const { control, getValues } = useFormContext<PackageFormValues>();
   const { fields, append, remove } = useFieldArray({ control, name: "tiers" });
 
   return (
@@ -35,7 +37,7 @@ export function TierRowsEditor() {
           variant="secondary"
           size="sm"
           leftIcon={<PlusIcon className="h-4 w-4" />}
-          onClick={() => append({ ...emptyTierRow })}
+          onClick={() => append(nextTierRow(getValues("tiers")))}
         >
           {t("admin.marketing.adPackages.addTier")}
         </Button>

@@ -6402,7 +6402,7 @@
         "audienceUserCount": "{count} kullanıcı",
         "audienceMixedCount": "{tiers} katman + {users} kullanıcı",
         "tiers": "Fiyat Kademeleri",
-        "tiersHelper": "Her satır bir gün süresi ve ürün fiyat aralığı için paket fiyatını belirler. Alt sınır aralığa dahildir, üst sınır dahil değildir; aynı süredeki etkin aralıklar birbirine değebilir ancak çakışamaz (örneğin 1.000-5.000 ve 5.000-sınırsız).",
+        "tiersHelper": "Her satır bir gün süresi ve ürün fiyat aralığı için paket fiyatını belirler. Alt sınır aralığa dahildir, üst sınır dahil değildir; aynı süredeki etkin aralıklar birbirine değebilir ancak çakışamaz (örneğin 1.000-5.000 ve 5.000-sınırsız). Önceki satırın üst sınırı varsa, eklenen satır aynı sürede bu tutardan başlar.",
         "addTier": "Satır Ekle",
         "removeTier": "Satırı Sil",
         "noTiers": "Henüz kademe yok. 'Satır Ekle' ile ekleyin.",
@@ -6410,8 +6410,8 @@
         "duration": "Süre",
         "durationDays": "Süre (gün)",
         "days": "gün",
-        "minAmount": "Min. Fiyat",
-        "maxAmount": "Maks. Fiyat",
+        "minAmount": "Alt Sınır (dahil)",
+        "maxAmount": "Üst Sınır (hariç)",
         "unlimited": "Sınırsız",
         "priceRange": "Fiyat Aralığı",
         "price": "Fiyat",
@@ -11346,7 +11346,8 @@
       "productNotActive": "Bu ürün şu anda satışta değil",
       "productNotFound": "Ürün bulunamadı",
       "productOutOfStock": "Ürün stokta yok veya yeterli müsait adet yok",
-      "offerMustBeBelowPrice": "Teklif tutarı, ürün fiyatından düşük olmalıdır"
+      "offerMustBeBelowPrice": "Teklif tutarı, ürün fiyatından düşük olmalıdır",
+      "priceChangedSinceOffer": "İlanın fiyatı bu tekliften sonra {price} TL'ye düştüğü için teklif kabul edilemez. Güncel fiyata göre yeni bir teklif verilebilir."
     },
     "trade": {
       "addressNotFound": "Adres bulunamadı",

@@ -202,6 +202,10 @@ const refusal = () =>
   [...container.querySelectorAll('[role="alert"]')].find(
     (el) => el.textContent === "validation.amountFormatRefused",
   );
+const maxMessage = () =>
+  [...container.querySelectorAll('[role="alert"]')].find(
+    (el) => el.textContent === "validation.maxValue",
+  );
 const badgeCount = () =>
   [...container.querySelectorAll("span")].find(
     (s) => s.textContent === "product.filters",
@@ -311,6 +315,51 @@ describe("listings sidebar price range", () => {
   it("prefills a URL bound with a decimal comma", async () => {
     await mount("minPrice=1250.5");
     expect(priceBox("product.minPrice").value).toBe("1250,50");
+  });
+
+  it("shows the max for a bound above it and searches without it", async () => {
+    await mount("minPrice=500");
+    typeInto(priceBox("product.maxPrice"), "1000");
+    expect(lastUrl()).toBe("/listings?minPrice=500&maxPrice=1000");
+    typeInto(priceBox("product.maxPrice"), "10000000");
+    expect(maxMessage()).toBeDefined();
+    expect(refusal()).toBeUndefined();
+    expect(priceBox("product.maxPrice").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+    expect(priceBox("product.maxPrice").getAttribute("aria-describedby")).toBe(
+      maxMessage()!.id,
+    );
+    expect(priceBox("product.minPrice").hasAttribute("aria-invalid")).toBe(
+      false,
+    );
+    // The search goes on with the other bound; the typed text stays.
+    expect(lastUrl()).toBe("/listings?minPrice=500");
+    expect(sentParams()).not.toHaveProperty("maxPrice");
+    expect(sentParams().minPrice).toBe(500);
+    expect(priceBox("product.maxPrice").value).toBe("10000000");
+  });
+
+  it("reads a legacy URL bound above the max as no bound and shows why", async () => {
+    await mount("maxPrice=10000000");
+    expect(priceBox("product.maxPrice").value).toBe("10000000");
+    expect(maxMessage()).toBeDefined();
+    expect(sentParams()).not.toHaveProperty("maxPrice");
+    expect(badgeCount()).toBe("0");
+  });
+
+  it("gives each field its own message when one is refused and the other above the max", async () => {
+    await mount();
+    typeInto(priceBox("product.minPrice"), "1.000");
+    typeInto(priceBox("product.maxPrice"), "10000000");
+    expect(refusal()).toBeDefined();
+    expect(maxMessage()).toBeDefined();
+    expect(priceBox("product.minPrice").getAttribute("aria-describedby")).toBe(
+      refusal()!.id,
+    );
+    expect(priceBox("product.maxPrice").getAttribute("aria-describedby")).toBe(
+      maxMessage()!.id,
+    );
   });
 
   it("clear empties a refused field and its message", async () => {

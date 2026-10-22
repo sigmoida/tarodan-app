@@ -189,6 +189,9 @@ export * from "./sign-in-methods";
 // (API, web, admin, mobile)
 export * from "./seller-trust";
 
+// Product search: the GET /products price filter bound (API, web, mobile)
+export * from "./product-search";
+
 // Saved searches: the allow-list, canonical query, default name, route params
 // and error codes (API, web, mobile)
 export * from "./saved-search";

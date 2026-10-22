@@ -29,7 +29,8 @@ import {
   type InitiateBoostResponse,
 } from "@tarodan/types";
 import { Link, useRouter } from "@/i18n/navigation";
-import { boostApi } from "@/lib/api";
+import { boostApi, paymentsApi } from "@/lib/api";
+import { logger } from "@/lib/logger";
 import { queryKeys } from "@/lib/query/keys";
 import { formatTL } from "@/lib/format";
 import { MEMBERSHIP_PATH, paymentPagePath } from "@/lib/paymentKind";
@@ -68,7 +69,62 @@ const CONSENT_REQUIRED_KEY = "server.product.boostConsentRequired";
  * (`boostPriceMatches`, whole kuruş); nothing was written.
  */
 const PRICE_CHANGED_KEY = "server.product.boostPriceChanged";
+/**
+ * The API's 400s for an offer the dialog still shows but the server no longer
+ * sells: boost sales were switched off, the package was removed or
+ * deactivated, or the chosen duration has no price for the listing any more.
+ * Nothing was written; the options are fetched again and both consents asked
+ * again on them, as for a changed price.
+ */
+const STALE_OFFER_KEYS: ReadonlySet<string> = new Set([
+  "server.product.boostUnavailable",
+  "server.product.boostPackageNotFound",
+  "server.product.boostPriceUndefined",
+]);
 const DAY_MS = 86_400_000;
+
+const boostLog = logger.child("boost");
+
+/**
+ * A Sentry breadcrumb (through the shared logger) for a purchase the dialog
+ * could not complete, so a seller who keeps failing is traceable. Same
+ * message shape as the API's (`boost.<step>`, info). Ids only, plus an HTTP
+ * status where one explains the step: never an amount, a title or anything
+ * about the person.
+ */
+function boostBreadcrumb(
+  step:
+    | "price_changed"
+    | "price_mismatch_after_initiate"
+    | "offer_stale"
+    | "abandoned_payment_cancel_failed",
+  ids: Record<string, string>,
+) {
+  boostLog.info(`boost.${step}`, ids);
+}
+
+/**
+ * Cancels the pending payment of an order the dialog will not hand over to
+ * the pay page, so the order and its payment do not wait for the 24 h
+ * expiry sweep. Fire and forget: a failure only leaves a breadcrumb, never a
+ * toast, and never holds the dialog (the sweep still expires it).
+ */
+function cancelAbandonedPayment(ids: {
+  productId: string;
+  boostId: string;
+  paymentId: string;
+}) {
+  paymentsApi.cancel(ids.paymentId).catch((error: unknown) => {
+    // The status tells a harmless race (400: already expired or paid) from
+    // an access or network problem (403, 401, none).
+    const status = (error as { response?: { status?: unknown } })?.response
+      ?.status;
+    boostBreadcrumb("abandoned_payment_cancel_failed", {
+      ...ids,
+      status: typeof status === "number" ? String(status) : "none",
+    });
+  });
+}
 
 function defaultSelection(packages: BoostPackage[]): Selection | null {
   const pkg = packages[0];
@@ -165,8 +221,11 @@ function OptionsSkeleton() {
  * duration is chosen and BOTH consents are ticked; the API refuses the order
  * without them. A change to the pre-information (listing, package, duration,
  * price) unticks both. The request carries the price shown; when the API
- * answers that it changed (409), or a started order is not at that price,
- * the prices are fetched again and both consents are asked again on them.
+ * answers that it changed (409), or that the chosen offer is no longer sold
+ * (400 `boostUnavailable`, `boostPackageNotFound`, `boostPriceUndefined`),
+ * or a started order is not at that price, the prices are fetched again and
+ * both consents are asked again on them; a started order the dialog will not
+ * pay on has its pending payment cancelled.
  * Otherwise it hands over to the pay page (`/payment/<id>?type=boost`).
  *
  * Mount it per opening (`useBoostLauncher` does): the consents start unticked
@@ -241,6 +300,16 @@ export default function BoostModal({
           return;
         }
         if (!boostPriceMatches(body.expectedPrice, data.price)) {
+          const ids = {
+            productId: listing.id,
+            boostId: data.boostId,
+            paymentId: data.paymentId,
+          };
+          boostBreadcrumb("price_mismatch_after_initiate", {
+            ...ids,
+            packageId: body.packageId,
+          });
+          cancelAbandonedPayment(ids);
           askAgainOnNewPrices();
           toast.error(t("profile.boost.paymentStartFailed"));
           return;
@@ -280,11 +349,18 @@ export default function BoostModal({
         ...(canRemind ? { autoRenew: reminder } : {}),
       },
       {
-        // The hook toasts the server's message. A changed price also asks
-        // again on reloaded prices; pay stays disabled until that fetch has
-        // succeeded (`optionsFresh`).
-        onError: (error) => {
-          if (apiErrorI18nKey(error) === PRICE_CHANGED_KEY) {
+        // The hook toasts the server's message. A changed price, or an
+        // offer the server no longer sells, also asks again on reloaded
+        // prices; pay stays disabled until that fetch has succeeded
+        // (`optionsFresh`).
+        onError: (error, sent) => {
+          const key = apiErrorI18nKey(error);
+          const ids = { productId: listing.id, packageId: sent.packageId };
+          if (key === PRICE_CHANGED_KEY) {
+            boostBreadcrumb("price_changed", ids);
+            askAgainOnNewPrices();
+          } else if (key && STALE_OFFER_KEYS.has(key)) {
+            boostBreadcrumb("offer_stale", ids);
             askAgainOnNewPrices();
           }
         },

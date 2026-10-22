@@ -4,12 +4,9 @@ import { Badge, Modal } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { DataList, Field } from "@/components/detail/DataList";
 import { Panel } from "@/components/detail/Panel";
+import { inclusiveBandMaximum } from "@/lib/amount-band";
 import { fmtPercent, fmtTry } from "@/lib/format";
-import {
-  inclusiveCommissionMaximum,
-  sellerTypeLabel,
-  type CommissionRule,
-} from "../_lib/types";
+import { sellerTypeLabel, type CommissionRule } from "../_lib/types";
 
 const percent = (value: number) => fmtPercent(value, 2);
 const optionalMoney = (value: number | null) =>
@@ -65,7 +62,7 @@ export function CommissionRuleDetailModal({
             {fmtTry(rule.minAmount)}
           </Field>
           <Field label={t("admin.finance.commission.maxAmountLabel")}>
-            {optionalMoney(inclusiveCommissionMaximum(rule.maxAmount))}
+            {optionalMoney(inclusiveBandMaximum(rule.maxAmount))}
           </Field>
           <Field label={t("admin.finance.commission.sellerCommission")}>
             {percent(rule.sellerCommissionRate)}
