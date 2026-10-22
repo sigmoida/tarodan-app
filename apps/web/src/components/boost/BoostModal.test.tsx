@@ -611,8 +611,11 @@ describe("BoostModal request", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(h.push).not.toHaveBeenCalled();
     expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
-    // Only a changed price reloads the prices.
+    // Only a changed price or a stale offer reloads the prices.
     expect(h.options).toHaveBeenCalledTimes(1);
+    // Not a stale offer: no breadcrumb, and nothing was written to cancel.
+    expect(h.info).not.toHaveBeenCalled();
+    expect(h.cancelPayment).not.toHaveBeenCalled();
     const helper = Array.from(dialog().querySelectorAll("p")).find(
       (p) => p.textContent === "profile.boost.consent.required",
     );
@@ -629,6 +632,12 @@ describe("BoostModal request", () => {
 
     expect(h.toast.error).toHaveBeenCalledWith("profile.boost.initiateFailed");
     expect(onClose).not.toHaveBeenCalled();
+    // An error without an i18n key is neither a changed price nor a stale
+    // offer: the consents stay, nothing is reloaded, logged or cancelled.
+    expect(checkboxes().map((c) => c.checked)).toEqual([true, true]);
+    expect(h.options).toHaveBeenCalledTimes(1);
+    expect(h.info).not.toHaveBeenCalled();
+    expect(h.cancelPayment).not.toHaveBeenCalled();
   });
 });
 
@@ -734,6 +743,7 @@ describe("BoostModal price integrity", () => {
       expect(h.options).toHaveBeenCalledTimes(2);
       expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
       expect(payButton().disabled).toBe(true);
+      expect(h.info).toHaveBeenCalledTimes(1);
       expect(h.info).toHaveBeenCalledWith("boost.offer_stale", {
         productId: "listing-1",
         packageId: "pkg-eco",
@@ -823,6 +833,7 @@ describe("BoostModal price integrity", () => {
     await flush();
 
     expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.info).toHaveBeenCalledTimes(2);
     // Only the dialog's own message: the cancel adds no toast.
     expect(h.toast.error).toHaveBeenCalledTimes(1);
     expect(h.toast.error).toHaveBeenCalledWith(
@@ -842,6 +853,66 @@ describe("BoostModal price integrity", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(h.options).toHaveBeenCalledTimes(2);
     expect(checkboxes().map((c) => c.checked)).toEqual([false, false]);
+  });
+
+  it("records a cancel that failed without a response as status none, silently", async () => {
+    h.initiate.mockResolvedValue({ data: { ...STARTED, price: 79 } });
+    h.cancelPayment.mockRejectedValue(new Error("Network Error"));
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.toast.error).toHaveBeenCalledTimes(1);
+    expect(h.info).toHaveBeenCalledTimes(2);
+    expect(h.info).toHaveBeenLastCalledWith(
+      "boost.abandoned_payment_cancel_failed",
+      {
+        productId: "listing-1",
+        boostId: "boost-1",
+        paymentId: "pay-1",
+        status: "none",
+      },
+    );
+  });
+
+  it("cancels nothing when the mismatched order opened no payment", async () => {
+    h.initiate.mockResolvedValue({
+      data: { ...STARTED, price: 79, paymentId: "" },
+    });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.cancelPayment).not.toHaveBeenCalled();
+    expect(h.push).not.toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalledWith(
+      "profile.boost.paymentStartFailed",
+    );
+  });
+
+  it("cancels only the mismatched payment when the next order matches", async () => {
+    h.initiate
+      .mockResolvedValueOnce({ data: { ...STARTED, price: 79 } })
+      .mockResolvedValue({ data: { ...STARTED, paymentId: "pay-2" } });
+    render();
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+    await acceptBoth();
+    click(payButton());
+    await flush();
+
+    expect(h.initiate).toHaveBeenCalledTimes(2);
+    expect(h.cancelPayment).toHaveBeenCalledTimes(1);
+    expect(h.cancelPayment).toHaveBeenCalledWith("pay-1");
+    expect(h.push).toHaveBeenCalledTimes(1);
+    expect(h.push).toHaveBeenCalledWith("/payment/pay-2?type=boost");
   });
 
   it("does not hold the dialog while the cancel of the abandoned payment is pending", async () => {
