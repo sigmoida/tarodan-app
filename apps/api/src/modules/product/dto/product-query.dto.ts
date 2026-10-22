@@ -10,6 +10,7 @@ import {
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
+import { SEARCH_PRICE_MAX } from "@tarodan/types";
 import { QueryBoolean } from "../../../common/transforms";
 import {
   ProductStatus,
@@ -213,9 +214,12 @@ export class ProductQueryDto {
   @IsBoolean()
   set?: boolean;
 
+  // No upper cap on purpose: released mobile builds may send a larger
+  // minimum, which matches nothing; a 400 would put their search in its error
+  // state. Web and mobile keep it within SEARCH_PRICE_MAX themselves.
   @ApiPropertyOptional({
     example: 100,
-    description: "Minimum price filter",
+    description: "Minimum price filter (TL)",
   })
   @IsOptional()
   @IsNumber()
@@ -225,12 +229,13 @@ export class ProductQueryDto {
 
   @ApiPropertyOptional({
     example: 1000,
-    description: "Maximum price filter",
+    maximum: SEARCH_PRICE_MAX,
+    description: "Maximum price filter (TL)",
   })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
-  @Max(9999999)
+  @Max(SEARCH_PRICE_MAX)
   maxPrice?: number;
 
   @ApiPropertyOptional({
