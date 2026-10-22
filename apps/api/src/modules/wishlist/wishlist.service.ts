@@ -20,6 +20,7 @@ import {
   WishlistItemResponseDto,
 } from "./dto";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -304,7 +305,7 @@ export class WishlistService {
   }
 
   // ==========================================================================
-  // HELPER – A + oldPrice: price (A) = her zaman güncel satış fiyatı
+  // HELPER - row mapping: productPrice is always the current selling price
   // ==========================================================================
   private async mapItemToDto(item: any): Promise<WishlistItemResponseDto> {
     const product = item.product;
@@ -336,6 +337,8 @@ export class WishlistService {
         effectivePrice < originalPrice ? originalPrice : undefined,
       productCondition: product.condition,
       productStatus: product.status,
+      // Same rule as the product payloads; missing = unlimited stock.
+      availableQuantity: getAvailableQuantity(product) ?? undefined,
       sellerId: product.seller.id,
       sellerName: publicName(product.seller),
       addedAt: item.addedAt,

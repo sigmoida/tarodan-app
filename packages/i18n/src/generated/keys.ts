@@ -796,6 +796,7 @@ export type MessageKey =
   | "admin.consents.export.sheetName"
   | "admin.consents.export.source"
   | "admin.consents.export.subjectType"
+  | "admin.consents.export.trade"
   | "admin.consents.export.userAgent"
   | "admin.consents.export.userCode"
   | "admin.consents.export.userEmail"

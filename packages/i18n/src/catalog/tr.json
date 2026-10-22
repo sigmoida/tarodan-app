@@ -10324,7 +10324,8 @@
         "userAgent": "Tarayıcı (user agent)",
         "cookieCategories": "Çerez kategorileri",
         "checkoutGroup": "Sepet no",
-        "order": "Sipariş no"
+        "order": "Sipariş no",
+        "trade": "Takas no"
       }
     },
     "gibReport": {
