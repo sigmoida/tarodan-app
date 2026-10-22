@@ -107,14 +107,17 @@ describe("boost tier band", () => {
       ]);
     });
 
-    it("never pairs an empty band, which covers no price", () => {
-      expect(
-        findBoostTierOverlaps([
-          { durationDays: 7, ...band(0, null) },
-          { durationDays: 7, ...band(1000, 1000) },
-        ]),
-      ).toEqual([]);
-    });
+    it.each([
+      ["after", [band(0, null), band(1000, 1000)]],
+      ["before", [band(1000, 1000), band(0, null)]],
+    ])(
+      "never pairs an empty band %s an open band, which covers no price",
+      (_label, bands) => {
+        expect(
+          findBoostTierOverlaps(bands.map((b) => ({ durationDays: 7, ...b }))),
+        ).toEqual([]);
+      },
+    );
 
     it("finds nothing in a tiling of touching bands", () => {
       expect(

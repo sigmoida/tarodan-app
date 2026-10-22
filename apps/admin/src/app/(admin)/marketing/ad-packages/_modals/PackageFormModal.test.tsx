@@ -136,11 +136,29 @@ describe("PackageFormModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("marks only the rows the form has when some indexes are out of range", async () => {
+    h.patch.mockRejectedValue(
+      refusal("server.admin.adPackage.tierOverlap", OVERLAP_MESSAGE, [1, 3]),
+    );
+
+    await click(button("common.update"));
+
+    expect(fieldError("tiers.1.minAmount")).toContain(OVERLAP_MESSAGE);
+    expect(bodyText().split(OVERLAP_MESSAGE)).toHaveLength(2);
+    expect(h.toast.error).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["without row indexes", apiError(400, "server.admin.adPackage.slugTaken")],
     [
       "with indexes the form does not have",
       refusal("server.admin.adPackage.tierOverlap", OVERLAP_MESSAGE, [7, -1]),
+    ],
+    [
+      // The form has 3 rows: index 3 is one past the last.
+      "with the index one past the last row",
+      refusal("server.admin.adPackage.tierOverlap", OVERLAP_MESSAGE, [3]),
     ],
   ])("toasts any other refusal %s", async (_label, error) => {
     h.patch.mockRejectedValue(error);

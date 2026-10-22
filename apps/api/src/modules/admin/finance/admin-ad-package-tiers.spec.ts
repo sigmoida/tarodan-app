@@ -181,6 +181,32 @@ describe("AdminAdPackageService tier bands", () => {
     );
   });
 
+  it("locks the package row before it replaces the tiers, so concurrent saves queue", async () => {
+    // Two valid saves of one package must not merge into an overlap: the
+    // package UPDATE (a row lock held to commit) has to run before the tier
+    // deleteMany, or a second save's delete misses the first save's new rows.
+    const h = make();
+
+    await h.update(LAUNCH);
+
+    const [[lock]] = h.tx.adPackage.update.mock.calls as [
+      [{ where: { id: string }; data: Record<string, unknown> }],
+    ];
+    expect(lock.where).toEqual({ id: "pkg-1" });
+    // A non-empty SET: Prisma skips the UPDATE (and the lock) for empty data.
+    expect(lock.data.audienceMode).toBe("everyone");
+    const [lockOrder] = h.tx.adPackage.update.mock.invocationCallOrder;
+    const [deleteOrder] =
+      h.tx.adPackageTier.deleteMany.mock.invocationCallOrder;
+    const [createOrder] =
+      h.tx.adPackageTier.createMany.mock.invocationCallOrder;
+    expect(lockOrder).toBeLessThan(deleteOrder);
+    expect(deleteOrder).toBeLessThan(createOrder);
+    expect(h.tx.adPackageTier.deleteMany).toHaveBeenCalledWith({
+      where: { packageId: "pkg-1" },
+    });
+  });
+
   it("does not check the tiers of an update that leaves them alone", async () => {
     const h = make();
 
