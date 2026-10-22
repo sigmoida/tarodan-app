@@ -500,10 +500,56 @@ refuse overlapping tiers. Two consequences for rows already in the database:
   band, or in none. The launch rows (migration `20260726234552_ad_packages`)
   are 200-999, 1000-5000 and 5000-(none) per duration: 5000 now resolves to
   the 5000-(none) tier only (before, the options showed both prices and the
-  purchase start could pick either), and a listing priced exactly 999 has
-  no tier any more until the first band's upper bound is set to 1000.
+  purchase start could pick either), and a listing priced exactly 999 had
+  no tier until the first band's upper bound was set to 1000. The migration
+  `20261022165035_ad_package_tier_band_gaps` (runs with the deploy) does
+  that: it sets an active band's upper bound to the next active band's lower
+  bound when they are at most 1 apart and the widened band overlaps no other
+  active tier of the duration. It writes only `max_amount`, a second run
+  changes nothing, and its header carries the rollback SQL.
 - Overlapping active tiers of one duration still resolve, deterministically
   (`BOOST_TIER_PRECEDENCE`), but the price may not be the one meant.
+
+**Before the deploy (dry run and rollback record).** The migration runs at
+boot, so its dry run is this read-only query, the migration's UPDATE as a
+SELECT. Run it with a read-only SQL session against the database of the
+environment about to be deployed (staging before the push, production before
+the release; production only with the user's approval) and keep the output:
+each row is a tier the migration will widen, with its old upper bound, which
+is also the rollback record for rows other than the launch ones.
+
+```sql
+SELECT t."id", t."package_id", t."duration_days", t."min_amount",
+       t."max_amount" AS "old_max_amount", gap."next_min" AS "new_max_amount"
+FROM "ad_package_tiers" AS t
+JOIN (
+  SELECT cur."id", (
+    SELECT MIN(nxt."min_amount") FROM "ad_package_tiers" AS nxt
+    WHERE nxt."package_id" = cur."package_id"
+      AND nxt."duration_days" = cur."duration_days"
+      AND nxt."is_active"
+      AND (nxt."max_amount" IS NULL OR nxt."max_amount" > nxt."min_amount")
+      AND nxt."min_amount" > cur."max_amount"
+  ) AS "next_min"
+  FROM "ad_package_tiers" AS cur
+  WHERE cur."is_active" AND cur."max_amount" IS NOT NULL
+    AND cur."max_amount" > cur."min_amount"
+) AS gap ON gap."id" = t."id"
+WHERE gap."next_min" - t."max_amount" <= 1
+  AND NOT EXISTS (
+    SELECT 1 FROM "ad_package_tiers" AS other
+    WHERE other."package_id" = t."package_id"
+      AND other."duration_days" = t."duration_days"
+      AND other."id" <> t."id"
+      AND other."is_active"
+      AND (other."max_amount" IS NULL OR other."max_amount" > other."min_amount")
+      AND other."min_amount" < gap."next_min"
+      AND (other."max_amount" IS NULL OR other."max_amount" > t."min_amount")
+  )
+ORDER BY t."package_id", t."duration_days", t."min_amount";
+```
+
+On the launch data it lists the four 200-999 rows with `new_max_amount` 1000.
 
 After the deploy, run the read-only check on staging, then on production:
 
@@ -517,13 +563,21 @@ Locally: `pnpm --filter @tarodan/api check:prod:ad-package-tiers` (after
 the same prices), `EMPTY` (an upper bound not above the lower bound),
 `GAP` (prices between two bands that no tier covers) and
 `UPPER BOUND NOW OUTSIDE` (a band's upper bound that no other active band of
-the duration covers, the 999 case). Fix each finding in **Marketing -> Ad packages**; the save
+the duration covers, the 999 case). After the migration the launch packages
+should report no `GAP` or `UPPER BOUND NOW OUTSIDE` line; one that remains is a
+wider gap, or a band the migration left alone because widening it would
+overlap another tier. Fix each finding in **Marketing -> Ad packages**; the save
 refuses a package whose tiers still overlap, so a saved package is clean. A
 production fix is a production write: only with the user's approval. Run the
 check again until every package is `OK` or its remaining `GAP` lines are
 intended.
 
-Rollback: revert the API. No data changes.
+Rollback: revert the API. An API from before the half-open rule reads the
+upper bound as inclusive, so a listing priced exactly 1000 then matches two
+bands (as 5000 always did); with such a revert, run the rollback SQL in the
+header of `20261022165035_ad_package_tier_band_gaps` and set any other row the
+dry run listed back to its `old_max_amount` (production only with the user's
+approval).
 
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
