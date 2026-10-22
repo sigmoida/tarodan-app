@@ -47,6 +47,7 @@ describe("ProductBoostService — ad-package pricing", () => {
 
   const EKO = { id: "pkg-eko", name: "Ekonomik Paket", showcaseOnHome: false };
   // 7-day tiers (half-open bands): [200, 999) 150, [1000, 5000) 250, 5000+ 500
+  // (the launch rows as first inserted, before the 999 gap migration)
   const tiers = [
     {
       durationDays: 7,
