@@ -133,18 +133,26 @@ marketing consent, a dated `marketing / granted` record is written as well.
   optional `distanceSalesAccepted: boolean`. With `true` the consent is
   recorded in the same transaction as the group, bound to the cart.
 - `POST /payments/direct-form`: optional `distanceSalesAccepted: boolean`. The
-  common last step before the PayTR charge; if the cart or order has no
-  consent record yet (an offer order, a client that sent none at checkout),
-  it is recorded here. An existing record is not written twice.
+  common last step before the PayTR charge; if the cart, order or trade cash
+  payment has no consent record yet (an offer order, a trade, a client that
+  sent none at checkout), it is recorded here. An existing record is not
+  written twice.
 - **Requirement switch**: the platform setting
   `distance_sales_consent_required`, **off by default** (Settings -> Legal; no
   deploy needed). While off, a payment without consent goes on (no row, a
   warning is logged). While on, a purchase without a consent record that does
   not send `distanceSalesAccepted: true` gets
   `400 server.consent.distanceSalesRequired`.
-- Scope: purchases of goods (cart, single or offer order, guest). The trade
-  fee, membership and boost payments do not go through this gate; boost has
-  its own consents (next section).
+- Scope: purchases of goods (cart, single or offer order, guest) and trade
+  cash payments (trade fee, shipping and any cash difference; decision
+  2026-10-22). Membership and boost payments do not go through this gate;
+  boost has its own consents (next section).
+- **Trade binding**: a trade has no order or cart, and `consent_records` has
+  no trade column. A trade consent is bound to the payer's own
+  `TradeCashPayment` row through `details`
+  (`{ tradeId, tradeNumber, tradeCashPaymentId }`, written and read only by
+  `consent/helpers/distance-sales-trade.ts`); the subject is the payer
+  (`userId`). The admin Consent Records screen links the row to the trade.
 
 ### Platform services (boost): pre-contract information and withdrawal waiver
 

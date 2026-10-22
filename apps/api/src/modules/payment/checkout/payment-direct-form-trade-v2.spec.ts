@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { PaymentStatus, TradeStatus } from "@prisma/client";
 import { PaymentInitiationService } from "./payment-initiation.service";
 
@@ -29,7 +30,10 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
     ...over,
   });
 
-  const makeService = (trade: Record<string, unknown>) => {
+  const makeService = (
+    trade: Record<string, unknown>,
+    gate: jest.Mock = jest.fn().mockResolvedValue("record"),
+  ) => {
     const payments = new Map<string, any>();
     const prisma: any = {
       trade: { findUnique: jest.fn().mockResolvedValue(trade) },
@@ -67,10 +71,10 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
       {} as any,
       {} as any,
       {} as any,
-      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
+      { ensureForPayment: gate } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
-    return { service, prisma };
+    return { service, prisma, gate };
   };
 
   const v2Trade = (over: Record<string, unknown> = {}) => ({
@@ -101,10 +105,65 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
     ...over,
   });
 
-  const resolve = (service: PaymentInitiationService, userId: string) =>
+  const resolve = (
+    service: PaymentInitiationService,
+    userId: string,
+    extra: Record<string, unknown> = {},
+  ) =>
     (service as any).resolveDirectPaymentContext(userId, {
       tradeId: "trade-1",
+      ...extra,
     });
+
+  // Decision 2026-10-22: a trade cash payment takes the distance sales
+  // consent on the pay page, like an order; it is bound to the payer's row.
+  it("passes the payer's cash payment row and the consent to the distance sales gate", async () => {
+    const { service, gate } = makeService(v2Trade());
+
+    await resolve(service, "user-receiver", { distanceSalesAccepted: true });
+
+    expect(gate).toHaveBeenCalledWith(
+      {
+        trade: {
+          tradeId: "trade-1",
+          tradeNumber: "TKS-10001",
+          tradeCashPaymentId: "tcp-receiver",
+        },
+        userId: "user-receiver",
+        guestEmail: null,
+      },
+      true,
+    );
+  });
+
+  it("leaves the decision to the setting when no consent is sent (old client)", async () => {
+    const { service, gate } = makeService(v2Trade());
+
+    await resolve(service, "user-initiator");
+
+    expect(gate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trade: expect.objectContaining({ tradeCashPaymentId: "tcp-initiator" }),
+        userId: "user-initiator",
+      }),
+      undefined,
+    );
+  });
+
+  it("does not claim the payment when the gate refuses", async () => {
+    const reject = jest
+      .fn()
+      .mockRejectedValue(
+        new BadRequestException("server.consent.distanceSalesRequired"),
+      );
+    const { service, prisma } = makeService(v2Trade(), reject);
+
+    await expect(resolve(service, "user-initiator")).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
 
   it("kafa kafaya v2 takasta (nakit fark yok) taraf kendi satırını ödeyebilir", async () => {
     const { service } = makeService(v2Trade());

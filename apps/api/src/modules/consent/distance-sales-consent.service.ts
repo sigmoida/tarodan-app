@@ -11,16 +11,25 @@ import {
   distanceSalesGateDecision,
   type DistanceSalesGateDecision,
 } from "./helpers/distance-sales-gate";
+import {
+  distanceSalesTradeDetails,
+  distanceSalesTradeWhere,
+  type DistanceSalesTradeTarget,
+} from "./helpers/distance-sales-trade";
+
+export type { DistanceSalesTradeTarget } from "./helpers/distance-sales-trade";
 
 /**
- * Mesafeli satış onayının ait olduğu satın alma ve onu veren kişi. Sepette
- * `checkoutGroupId`, sepete bağlı olmayan tekil (teklif) siparişte `orderId`.
- * Misafirde `userId` null'dır — misafir siparişinin alıcısı paylaşılan sistem
- * hesabıdır; kişi `guestEmail`dir.
+ * The purchase a distance sales consent belongs to and the person who gave
+ * it: `checkoutGroupId` for a cart, `orderId` for a single (offer) order
+ * outside a cart, `trade` for a trade cash payment (the payer's own row).
+ * For a guest `userId` is null (a guest order's buyer is the shared system
+ * account); the person is `guestEmail`.
  */
 export interface DistanceSalesSubject {
   checkoutGroupId?: string | null;
   orderId?: string | null;
+  trade?: DistanceSalesTradeTarget | null;
   userId: string | null;
   guestEmail: string | null;
 }
@@ -76,9 +85,9 @@ export class DistanceSalesConsentService {
   }
 
   /**
-   * The payment form gate. A null `subject` is not a sale of goods (trade
-   * fee, membership, boost) and skips this gate; a boost is charged only
-   * with its own purchase consents (`PlatformServiceConsentService`).
+   * The payment form gate. A null `subject` is a platform service
+   * (membership, boost) and skips this gate; a boost is charged only with
+   * its own purchase consents (`PlatformServiceConsentService`).
    */
   async ensureForPayment(
     subject: DistanceSalesSubject | null,
@@ -90,6 +99,9 @@ export class DistanceSalesConsentService {
       targets.push({ checkoutGroupId: subject.checkoutGroupId });
     }
     if (subject.orderId) targets.push({ orderId: subject.orderId });
+    if (subject.trade) {
+      targets.push(distanceSalesTradeWhere(subject.trade.tradeCashPaymentId));
+    }
     if (targets.length === 0) return null;
 
     const existing = await this.prisma.consentRecord.findFirst({
@@ -124,13 +136,17 @@ export class DistanceSalesConsentService {
           subject: { userId: subject.userId, guestEmail: subject.guestEmail },
           checkoutGroupId: subject.checkoutGroupId,
           orderId: subject.orderId,
+          details: subject.trade
+            ? distanceSalesTradeDetails(subject.trade)
+            : undefined,
         },
       ]);
     }
     if (decision === "unrecorded") {
       this.logger.warn(
         `Mesafeli satış onayı olmadan ödeme başlatılıyor (zorunluluk kapalı): ` +
-          `group=${subject.checkoutGroupId ?? "-"} order=${subject.orderId ?? "-"}`,
+          `group=${subject.checkoutGroupId ?? "-"} order=${subject.orderId ?? "-"} ` +
+          `trade=${subject.trade?.tradeNumber ?? "-"}`,
       );
     }
     return decision;
