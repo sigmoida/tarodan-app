@@ -1,22 +1,15 @@
 import { col } from "@/components/table";
+import { amountBandLabel } from "@/lib/amount-band";
 import { fmtPercent, fmtTry } from "@/lib/format";
 import { commissionRowMenu } from "./rowActions";
-import {
-  inclusiveCommissionMaximum,
-  type CommissionRule,
-  sellerTypeLabel,
-} from "./types";
+import { type CommissionRule, sellerTypeLabel } from "./types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
 const rate = (value: number) => fmtPercent(value, 2);
-const range = (rule: CommissionRule) => {
-  const inclusiveMax = inclusiveCommissionMaximum(rule.maxAmount);
-  return inclusiveMax == null
-    ? `${fmtTry(rule.minAmount)} – ∞`
-    : `${fmtTry(rule.minAmount)} – ${fmtTry(inclusiveMax)}`;
-};
+const range = (rule: CommissionRule) =>
+  amountBandLabel(rule.minAmount, rule.maxAmount);
 
 export function commissionColumns(
   {
