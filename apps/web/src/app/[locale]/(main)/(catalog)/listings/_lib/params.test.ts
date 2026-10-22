@@ -1,17 +1,20 @@
 /** @format */
 
 import { describe, expect, it } from "vitest";
+import { SEARCH_PRICE_MAX } from "@tarodan/types";
 import {
   buildListApiParams,
   buildListingsUrlParams,
   hasPriceFilter,
-  isPriceFilterRefused,
   mergeUrlFilters,
   PAGE_LIMIT,
   parseListingsFilters,
   priceFilterBound,
+  priceFilterIssue,
+  priceFilterIssueMessage,
   priceFilterParam,
   priceFilterText,
+  priceRangeIssue,
 } from "./params";
 
 const sp = (query: string) => new URLSearchParams(query);
@@ -88,14 +91,14 @@ describe("price filter bounds", () => {
     ["12,", 12],
   ])("%j is the bound %d", (text, bound) => {
     expect(priceFilterBound(text)).toBe(bound);
-    expect(isPriceFilterRefused(text)).toBe(false);
+    expect(priceFilterIssue(text)).toBeUndefined();
   });
 
   it.each(["", "  ", "0", "0,00", ","])(
     "%j sets no bound and is not refused",
     (text) => {
       expect(priceFilterBound(text)).toBeUndefined();
-      expect(isPriceFilterRefused(text)).toBe(false);
+      expect(priceFilterIssue(text)).toBeUndefined();
       expect(priceFilterParam(text)).toBe("");
     },
   );
@@ -111,7 +114,7 @@ describe("price filter bounds", () => {
     "abc",
     "1 000",
   ])("%j is refused and sets no bound", (text) => {
-    expect(isPriceFilterRefused(text)).toBe(true);
+    expect(priceFilterIssue(text)).toBe("refused");
     expect(priceFilterBound(text)).toBeUndefined();
     expect(priceFilterParam(text)).toBe("");
   });
@@ -128,6 +131,74 @@ describe("price filter bounds", () => {
     expect(hasPriceFilter({ minPrice: "", maxPrice: "1,5" })).toBe(true);
     expect(hasPriceFilter({ minPrice: "1.000", maxPrice: "" })).toBe(false);
     expect(hasPriceFilter({ minPrice: "0", maxPrice: "" })).toBe(false);
+  });
+});
+
+describe("price bounds above the search max", () => {
+  const above = [
+    String(SEARCH_PRICE_MAX + 1),
+    "10000000",
+    "9999999,01",
+    "9999999.01",
+  ];
+
+  it("takes the max itself as a bound", () => {
+    expect(priceFilterBound(String(SEARCH_PRICE_MAX))).toBe(SEARCH_PRICE_MAX);
+    expect(priceFilterIssue(String(SEARCH_PRICE_MAX))).toBeUndefined();
+  });
+
+  it.each(above)("%j sets no bound and is above the max", (text) => {
+    expect(priceFilterBound(text)).toBeUndefined();
+    expect(priceFilterParam(text)).toBe("");
+    expect(priceFilterIssue(text)).toBe("aboveMax");
+    expect(hasPriceFilter({ minPrice: text, maxPrice: "" })).toBe(false);
+  });
+
+  it("is never sent to GET /products (min or max)", () => {
+    const params = buildListApiParams(
+      parseListingsFilters(sp("minPrice=10000000&maxPrice=20000000")),
+      undefined,
+      1,
+      PAGE_LIMIT,
+    );
+    expect(params).not.toHaveProperty("minPrice");
+    expect(params).not.toHaveProperty("maxPrice");
+  });
+
+  it("reads a legacy URL or saved-search value as no bound and drops it from the next URL", () => {
+    // Prefilled so the field shows why the bound is ignored.
+    const filters = parseListingsFilters(sp("maxPrice=10000000&minPrice=500"));
+    expect(filters.maxPrice).toBe("10000000");
+    expect(buildListingsUrlParams(filters, 1).toString()).toBe("minPrice=500");
+    expect(buildListApiParams(filters, undefined, 1, PAGE_LIMIT)).toMatchObject(
+      { minPrice: 500 },
+    );
+  });
+
+  it("ranks a refusal before a bound above the max (one message for both fields)", () => {
+    expect(priceRangeIssue({ minPrice: "", maxPrice: "" })).toBeUndefined();
+    expect(
+      priceRangeIssue({ minPrice: "100", maxPrice: "500" }),
+    ).toBeUndefined();
+    expect(priceRangeIssue({ minPrice: "", maxPrice: "10000000" })).toBe(
+      "aboveMax",
+    );
+    expect(priceRangeIssue({ minPrice: "10000000", maxPrice: "1.000" })).toBe(
+      "refused",
+    );
+  });
+
+  it("names the max as money in the message", () => {
+    const t = ((key: string, values?: { max?: string }) =>
+      values?.max ? `${key}|${values.max}` : key) as unknown as Parameters<
+      typeof priceFilterIssueMessage
+    >[1];
+    expect(priceFilterIssueMessage("aboveMax", t)).toBe(
+      "validation.maxValue|9.999.999,00 TL",
+    );
+    expect(priceFilterIssueMessage("refused", t)).toBe(
+      "validation.amountFormatRefused",
+    );
   });
 });
 

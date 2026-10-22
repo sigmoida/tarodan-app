@@ -9,11 +9,10 @@
  * pure functions. Do NOT branch behavior by environment; keep this free of
  * `'use client'` and React so it runs identically on both.
  */
-import {
-  isTlAmountRefused,
-  parseTlAmount,
-  tlAmountInputValue,
-} from "@tarodan/shared";
+import { parseTlAmount, tlAmountInputValue } from "@tarodan/shared";
+import { SEARCH_PRICE_MAX } from "@tarodan/types";
+import { formatPrice } from "@/lib/format";
+import type { Translate } from "@/types/i18n";
 
 /** Search terms that are really brands; when the search box matches one, we
  *  treat it as a brand filter instead of a free-text search. */
@@ -66,34 +65,80 @@ export interface Filters {
 }
 
 /**
+ * Why a non-empty price text sets no bound: it is not an amount ("refused",
+ * `validation.amountFormatRefused`), or it is above `SEARCH_PRICE_MAX`, the
+ * highest bound `GET /products` accepts ("aboveMax", `validation.maxValue`).
+ */
+export type PriceFilterIssue = "refused" | "aboveMax";
+
+/**
  * The bound a price filter text sets, read with the shared TL parser
  * (`parseTlAmount`, the one reader of typed TL amounts): `undefined` when the
- * text is empty, zero or refused, so such text never filters. "1.000" is
- * refused (a Turkish user means one thousand), never read as 1 TL; that also
- * holds for a legacy URL or saved-search value, whose bound is then ignored.
- * Plain numbers ("1000", "1250.5", the canonical URL form) and a decimal comma
- * ("1250,5") read as written. A min above the max is kept as it is (the API
- * then finds nothing), the same as before.
+ * text is empty, zero, refused or above `SEARCH_PRICE_MAX`, so such text never
+ * filters and never reaches `GET /products` (which answers a larger bound with
+ * a 400). "1.000" is refused (a Turkish user means one thousand), never read
+ * as 1 TL; that also holds for a legacy URL or saved-search value, whose bound
+ * is then ignored, as is one above the max. Plain numbers ("1000", "1250.5",
+ * the canonical URL form) and a decimal comma ("1250,5") read as written. A
+ * min above the max is kept as it is (the API then finds nothing), the same as
+ * before.
  */
 export function priceFilterBound(text: string): number | undefined {
   const parsed = parseTlAmount(text);
-  return parsed.status === "ok" ? parsed.amount : undefined;
+  return parsed.status === "ok" && parsed.amount <= SEARCH_PRICE_MAX
+    ? parsed.amount
+    : undefined;
 }
 
-/** True when the price text is not an amount (`validation.amountFormatRefused`). */
-export const isPriceFilterRefused = (text: string): boolean =>
-  isTlAmountRefused(text);
+/** Why the price text sets no bound, or `undefined` when it sets one or is empty or zero. */
+export function priceFilterIssue(text: string): PriceFilterIssue | undefined {
+  const parsed = parseTlAmount(text);
+  if (parsed.status === "refused") return "refused";
+  if (parsed.status === "ok" && parsed.amount > SEARCH_PRICE_MAX) {
+    return "aboveMax";
+  }
+  return undefined;
+}
+
+/**
+ * The issue shown under the price fields (one message for both): a refusal
+ * first, as the more basic error, then a bound above the max.
+ */
+export function priceRangeIssue(
+  filters: Pick<Filters, "minPrice" | "maxPrice">,
+): PriceFilterIssue | undefined {
+  const issues = [
+    priceFilterIssue(filters.minPrice),
+    priceFilterIssue(filters.maxPrice),
+  ];
+  return issues.includes("refused")
+    ? "refused"
+    : issues.includes("aboveMax")
+      ? "aboveMax"
+      : undefined;
+}
+
+/** The message of a price issue; the max reads as money ("9.999.999,00 TL"). */
+export function priceFilterIssueMessage(
+  issue: PriceFilterIssue,
+  t: Translate,
+): string {
+  return issue === "refused"
+    ? t("validation.amountFormatRefused")
+    : t("validation.maxValue", { max: formatPrice(SEARCH_PRICE_MAX) });
+}
 
 /**
  * The field text for a URL price value (a shared link, a saved-search run):
- * the bound prefilled with a decimal comma (`tlAmountInputValue`, "1250,50"),
- * or the value as it is when it is refused, so the field shows the refusal
- * instead of hiding why the bound is ignored. Empty or zero is "".
+ * the amount prefilled with a decimal comma (`tlAmountInputValue`, "1250,50"),
+ * or the value as it is when it is refused, so the field shows the issue
+ * instead of hiding why the bound is ignored. An amount above
+ * `SEARCH_PRICE_MAX` is prefilled too, and shows its issue. Empty or zero is "".
  */
 export function priceFilterText(value: string): string {
-  const bound = priceFilterBound(value);
-  if (bound !== undefined) return tlAmountInputValue(bound);
-  return isPriceFilterRefused(value) ? value.trim() : "";
+  const parsed = parseTlAmount(value);
+  if (parsed.status === "ok") return tlAmountInputValue(parsed.amount);
+  return parsed.status === "refused" ? value.trim() : "";
 }
 
 /**

@@ -102,6 +102,16 @@ describe("useSaveSearch", () => {
     expect(h.create).not.toHaveBeenCalled();
   });
 
+  it("shows the bound and does not open the save for a price above the search max", () => {
+    // 10,000,000 is not applied to the search (GET /products refuses it).
+    setFilters("search=mustang&maxPrice=10000000");
+    mount();
+    act(() => api.start());
+    expect(h.toast.error).toHaveBeenCalledWith("validation.maxValue");
+    expect(api.open).toBe(false);
+    expect(h.create).not.toHaveBeenCalled();
+  });
+
   it("gives a guest the shared sign-in prompt instead of the modal", () => {
     h.auth.isAuthenticated = false;
     mount();
