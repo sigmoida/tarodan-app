@@ -139,6 +139,19 @@ describe("OfferService counters against the current price", () => {
       expect(i18nKeyOf(error)).toBe("server.offer.buyerCounterMustBeLower");
     });
 
+    it("refuses an amount at the seller counter as not lower before the price check", async () => {
+      // Price dropped to 800 under a 1000 counter: 1000 breaks both rules,
+      // the counter rule answers first.
+      const { service, tx } = build({ price: 800 }, sellerCounter);
+
+      const error = await service
+        .buyerCounter("o1", "b1", { amount: 1000 })
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.buyerCounterMustBeLower");
+      expect(tx.offer.update).not.toHaveBeenCalled();
+    });
+
     it("is unchanged when the price did not move", async () => {
       const { service } = build(
         { price: 1000 },
@@ -293,22 +306,30 @@ describe("OfferService.accept against the current price", () => {
         .mockResolvedValue({ id: "pkg-1", packageNumber: "PKG-TEST000001" }),
       buildOfferFinancialSnapshot: jest.fn().mockReturnValue({ version: 2 }),
     };
+    // The price is read only from the row the product lock returns.
+    const productLock = {
+      lockProductForUpdate: jest.fn().mockResolvedValue(listing),
+    };
+    const feeDiscounts = {
+      spendBudgets: jest.fn().mockResolvedValue(undefined),
+    };
+    const events = { emitOfferAccepted: jest.fn() };
     const service = new OfferService(
       prisma as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
       { get: () => undefined } as any,
-      { emitOfferAccepted: jest.fn() } as any,
+      events as any,
       {
         notifyOfferAccepted: jest.fn(),
         notifyOfferCounterAccepted: jest.fn(),
       } as any,
       {} as any,
-      { lockProductForUpdate: jest.fn().mockResolvedValue(listing) } as any,
-      undefined as any,
+      productLock as any,
+      feeDiscounts as any,
       checkoutCommon as any,
       userBlockServiceStub() as any,
     );
-    return { service, tx, checkoutCommon };
+    return { service, tx, checkoutCommon, productLock, feeDiscounts, events };
   };
 
   const refusal = (error: unknown) => ({
@@ -340,6 +361,49 @@ describe("OfferService.accept against the current price", () => {
         expect(tx.order.create).not.toHaveBeenCalled();
       },
     );
+
+    it("writes nothing when refused: no offer, order, package or budget", async () => {
+      const { service, tx, checkoutCommon, productLock, feeDiscounts, events } =
+        build({ price: 1000 }, { amount: 1000 });
+
+      const error = await service
+        .accept("offer-1", "s1")
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.priceChangedSinceOffer");
+      // The refused price is the one read under the product row lock.
+      expect(productLock.lockProductForUpdate).toHaveBeenCalledWith(tx, "p1");
+      expect(tx.offer.update).not.toHaveBeenCalled();
+      expect(checkoutCommon.resolveOfferOrderPricing).not.toHaveBeenCalled();
+      expect(checkoutCommon.generateOrderNumber).not.toHaveBeenCalled();
+      expect(checkoutCommon.createSingleSellerPackage).not.toHaveBeenCalled();
+      expect(tx.order.create).not.toHaveBeenCalled();
+      expect(feeDiscounts.spendBudgets).not.toHaveBeenCalled();
+      expect(events.emitOfferAccepted).not.toHaveBeenCalled();
+    });
+
+    it("reads the price from the locked row, not the offer read before it", async () => {
+      // The offer read carries a stale 1200 listing; the locked row is 1000.
+      const { service, tx } = build({ price: 1000 }, { amount: 1000 });
+      tx.offer.findUnique.mockResolvedValue({
+        ...(await tx.offer.findUnique()),
+        product: product({ price: 1200 }),
+      });
+
+      const error = await service
+        .accept("offer-1", "s1")
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.priceChangedSinceOffer");
+    });
+
+    it("accepts 0.01 below the price", async () => {
+      const { service, tx } = build({ price: 1000.01 }, { amount: 1000 });
+
+      await service.accept("offer-1", "s1");
+
+      expect(tx.order.create).toHaveBeenCalledTimes(1);
+    });
 
     it("is accepted when the price stayed above it, freezing that price", async () => {
       const { service, tx, checkoutCommon } = build(
@@ -443,5 +507,33 @@ describe("OfferService offer payload price", () => {
     const payload = await (service as any).formatOfferResponse(offer);
 
     expect(payload.product.price).toBe(1000);
+  });
+
+  it("serves the discounted price while the sale window is open", async () => {
+    const service = new OfferService(
+      {} as any,
+      {} as any,
+      { get: () => undefined } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      undefined as any,
+      {} as any,
+      userBlockServiceStub() as any,
+    );
+
+    const payload = await (service as any).formatOfferResponse({
+      id: "o1",
+      amount: 700,
+      status: OfferStatus.pending,
+      buyerMustAccept: false,
+      expiresAt: new Date(Date.now() + HOUR),
+      product: product(openSale),
+      buyer: { id: "b1", displayName: "B" },
+      seller: { id: "s1", displayName: "S" },
+    });
+
+    expect(payload.product.price).toBe(800);
   });
 });
