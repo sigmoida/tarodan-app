@@ -8,10 +8,31 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
 import ProductCardCartButton from "@/components/ui/ProductCardCartButton";
+import { useProductCardAction } from "@/components/ui/ProductCardAction";
+import { toProductCardListing } from "@/lib/productCardListing";
 import { useTranslations } from "next-intl";
 import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
 import { wishlistItemToProduct, type WishlistItem } from "./types";
 import FavoriteTileSkeleton from "./FavoriteTileSkeleton";
+
+/**
+ * The footer follows the same card rule as every grid (`productCardAction`):
+ * the cart toggle only for an active, in-stock listing that is not the
+ * viewer's own; otherwise nothing (no boost action in Favorites).
+ */
+function FavoriteFooter({ item }: { item: WishlistItem }) {
+  const { action } = useProductCardAction(
+    toProductCardListing(wishlistItemToProduct(item)),
+  );
+  if (action.kind !== "add_to_cart") return null;
+  return (
+    <ProductCardCartButton
+      productId={item.productId}
+      title={item.productTitle}
+      presentation="full"
+    />
+  );
+}
 
 export default function FavoritesGrid({
   items,
@@ -21,11 +42,11 @@ export default function FavoritesGrid({
   isPending,
 }: {
   items: WishlistItem[];
-  /** Gerçek satırı henüz gelmemiş iyimser eklemeler — yükleniyor kartı. */
+  /** Optimistic adds whose real row has not arrived yet: loading tiles. */
   pendingCount: number;
   isSharedView: boolean;
   onRemove: (productId: string) => void;
-  /** Bu ürün için favori isteği sürüyor mu? (kaldır düğmesi meşgul) */
+  /** A favorite request for this product is in flight (remove button busy). */
   isPending: (productId: string) => boolean;
 }) {
   const t = useTranslations();
@@ -46,7 +67,7 @@ export default function FavoritesGrid({
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-      {/* İyimser satırlar listenin başına eklenir; kartları da başta durur. */}
+      {/* Optimistic rows are prepended, so their tiles come first too. */}
       {Array.from({ length: pendingCount }, (_, i) => (
         <FavoriteTileSkeleton key={`pending-${i}`} />
       ))}
@@ -74,13 +95,7 @@ export default function FavoritesGrid({
           }
           // The shared cart toggle, full width with its text (the footer
           // replaces the card's own price-row action).
-          footer={
-            <ProductCardCartButton
-              productId={item.productId}
-              title={item.productTitle}
-              presentation="full"
-            />
-          }
+          footer={<FavoriteFooter item={item} />}
         />
       ))}
     </div>

@@ -23,6 +23,8 @@ export class WishlistItemResponseDto {
   productOriginalPrice?: number;
   productCondition: ProductCondition;
   productStatus: ProductStatus;
+  /** quantity - reservedQuantity; missing = unlimited stock. */
+  availableQuantity?: number;
   sellerId: string;
   sellerName: string;
   addedAt: Date;

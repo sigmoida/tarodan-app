@@ -17,8 +17,9 @@ import { publicNameOf } from "@/lib/public-name";
 
 /**
  * Favorites data: the user's wishlist OR a shared read-only list (`?ids=`), plus
- * the remove action (each card's cart toggle is the shared
- * `ProductCardCartButton`). The list is the shared
+ * the remove action. Each row carries the card rule's inputs (`productStatus`,
+ * `availableQuantity`, `sellerId`), so the card footer shows the shared cart
+ * toggle only when `productCardAction` says so. The list is the shared
  * `wishlistItemsQuery` (same cache as the header badge and the card hearts) and
  * removal goes through the shared `useToggleWishlist` (optimistic + rollback).
  *
@@ -34,7 +35,7 @@ export function useFavorites() {
   const sharedIds = useMemo(() => {
     const ids = searchParams.get("ids");
     if (!ids) return null;
-    // Paylaşılan linkte en fazla MAX_SHARED_FAVORITES ürün (N istek sınırı).
+    // A shared link loads at most MAX_SHARED_FAVORITES products (one request each).
     return ids.split(",").filter(Boolean).slice(0, MAX_SHARED_FAVORITES);
   }, [searchParams]);
   const isSharedView = sharedIds !== null && sharedIds.length > 0;
@@ -73,6 +74,7 @@ export function useFavorites() {
             productOriginalPrice: p.originalPrice,
             productCondition: p.condition,
             productStatus: p.status,
+            availableQuantity: p.availableQuantity,
             sellerId: p.sellerId ?? p.userId,
             sellerName: publicNameOf(p.seller, p.sellerName ?? ""),
             addedAt: p.createdAt,
@@ -104,7 +106,7 @@ export function useFavorites() {
     isAuthenticated,
     authLoading,
     isPending: (productId: string) => pendingIds.has(productId),
-    /** `false` = aynı ürün için istek sürüyor, tıklama yok sayıldı. */
+    /** `false` = a request for that product is in flight; the click was ignored. */
     handleRemove: (productId: string) => toggleWishlist(productId, true),
   };
 }
