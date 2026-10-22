@@ -239,14 +239,14 @@ describe("08 — Teklif & Pazarlık (OFR)", () => {
     });
 
     scenario("OFR-014", async () => {
-      // amount Number'a çevrilemeyen string → @IsNumber mesajı.
+      // A string that is not a number → the IsTlAmount message.
       const { buyer, product } = await makeBuyerSellerProduct({ price: 200 });
       const res = await postOffer(buyer, {
         productId: product.id,
         amount: "abc",
       }).expect(400);
       expect(JSON.stringify(res.body)).toContain(
-        "Teklif tutarı sayı olmalıdır",
+        "Teklif tutarı en fazla iki ondalık basamaklı bir sayı olmalıdır",
       );
     });
 
@@ -269,18 +269,20 @@ describe("08 — Teklif & Pazarlık (OFR)", () => {
     });
 
     scenario("OFR-016", async () => {
-      // Sunucu min %50 ve Max(9999999) dışında üst sınır kontrolü YAPMAZ:
-      // fiyatla eşit ve fiyattan yüksek teklifler 201.
-      const { buyer, seller, product } = await makeBuyerSellerProduct({
-        price: 200,
-      });
-      await postOffer(buyer, { productId: product.id, amount: 200 }).expect(
-        201,
-      );
-      // İkinci pending engeli için farklı alıcı kullan.
-      const buyer2 = await createUser(ctx.module);
-      void seller;
-      await postOffer(buyer2, { productId: product.id, amount: 5000 }).expect(
+      // An offer is strictly below the price, as web and mobile check it:
+      // equal to and above the price are 400, just below is 201.
+      const { buyer, product } = await makeBuyerSellerProduct({ price: 200 });
+      const equal = await postOffer(buyer, {
+        productId: product.id,
+        amount: 200,
+      }).expect(400);
+      expect(equal.body.i18nKey).toBe("server.offer.offerMustBeBelowPrice");
+      const above = await postOffer(buyer, {
+        productId: product.id,
+        amount: 5000,
+      }).expect(400);
+      expect(above.body.i18nKey).toBe("server.offer.offerMustBeBelowPrice");
+      await postOffer(buyer, { productId: product.id, amount: 199.99 }).expect(
         201,
       );
     });

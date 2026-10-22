@@ -178,6 +178,7 @@ export class OfferService {
    * - Cannot offer on own product
    * - Only one pending offer per user per product
    * - Minimum offer = 50% of product price
+   * - Below the current sale price (as web and mobile check it)
    * - Product must be active
    * - Uses FOR UPDATE SKIP LOCKED to prevent race conditions
    */
@@ -252,6 +253,15 @@ export class OfferService {
             minOfferPercentage: this.minOfferPercentage,
             offerAmount: dto.amount.toFixed(2),
           }),
+        );
+      }
+      // An offer is strictly below the current sale price: the rule web and
+      // mobile apply against the same number (`resolveSalePrice`, served as
+      // `price`). At the price it is a purchase, not an offer; the seller
+      // counter may reach the price (`counterCannotExceedPrice`).
+      if (dto.amount >= productPrice) {
+        throw new BadRequestException(
+          i18nMessage("server.offer.offerMustBeBelowPrice"),
         );
       }
 

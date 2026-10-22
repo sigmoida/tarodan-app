@@ -17,7 +17,8 @@ describe("OfferService — teklif notu içerik filtresi", () => {
     id: "p1",
     sellerId: "s1",
     status: "active",
-    price: 100,
+    // Above the 100 TL offers below: an offer at the price is refused.
+    price: 120,
     oldPrice: null,
     quantity: 5,
     reservedQuantity: 0,
