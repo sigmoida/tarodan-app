@@ -144,7 +144,7 @@ export class DistanceSalesConsentService {
     }
     if (decision === "unrecorded") {
       this.logger.warn(
-        `Mesafeli satış onayı olmadan ödeme başlatılıyor (zorunluluk kapalı): ` +
+        `Payment starting without a distance sales consent (requirement off): ` +
           `group=${subject.checkoutGroupId ?? "-"} order=${subject.orderId ?? "-"} ` +
           `trade=${subject.trade?.tradeNumber ?? "-"}`,
       );
