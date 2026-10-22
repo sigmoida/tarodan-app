@@ -49,6 +49,10 @@ export class CreateTradeDto {
    * Optional cash component to balance the trade (in TRY)
    * If positive, initiator pays to receiver
    * If negative, receiver pays to initiator
+   * At most two decimals and a magnitude of at most TL_AMOUNT_COLUMN_MAX: the
+   * service refuses anything else with `server.trade.invalidCashAmount`
+   * (`assertTradeCashAmount`). Text such as "150" is still converted: released
+   * mobile clients send numbers, but the conversion is the existing contract.
    */
   @IsOptional()
   @IsNumber()
