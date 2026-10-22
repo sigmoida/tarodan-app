@@ -143,6 +143,26 @@ endsAt }` for a boost payment (`endsAt` null until activation;
   and asks for both consents again; it also refuses to open the pay page for
   a started order whose price is not the one shown (same rule), which covers
   an API that does not check the price yet while a release rolls out.
+- **Boost tier band.** A package tier prices one duration for a band of
+  listing prices (`boostTierBasePrice`). The band is half-open:
+  `minAmount <= price < maxAmount`, a null `maxAmount` has no upper bound,
+  the same rule as the commission bands. So 1000-5000 and 5000-(none) touch
+  without overlapping, and a listing priced exactly 5000 is in the second
+  band only. The rule lives in one file,
+  `product/helpers/boost-tier-band.ts`, read by the options, the purchase
+  start and the one-time offer. The admin save (create, and an update that
+  sends `tiers`) refuses, before any write, a band whose upper bound is not
+  above its lower bound (`400 server.admin.commission.maxAboveMin`) and two
+  active tiers of one duration whose bands share a price
+  (`400 server.admin.adPackage.tierOverlap`, with both ranges in the
+  message); both name the rows in `tierIndexes` (positions in `tiers`).
+  Inactive rows and other durations may overlap. For rows saved before the
+  check, the options and the purchase start read the covering tiers with the
+  same filter and the same order (`BOOST_TIER_PRECEDENCE`: highest lower
+  bound, then the narrower band, then the older row, then the id) and take
+  the first one per duration, so the options show one price per duration and
+  initiate resolves that same tier. `maintenance/check-ad-package-tiers.ts`
+  lists such rows (`OPERATIONS.md`, "Check: ad package tier bands").
 - **Tracing.** The boost purchase start tags its request `flow=boost`;
   the purchase and the activation leave `boost.*` breadcrumbs with ids only
   (boost, order, order number, listing; `boost.price_mismatch` carries the

@@ -22,6 +22,10 @@ import {
 import { paginate } from "../../../common/list";
 import { i18nMessage } from "../../i18n";
 import { boostRefundableAmount } from "./boost/boost-refund-policy";
+import {
+  boostTierBandIsEmpty,
+  findBoostTierOverlaps,
+} from "../../product/helpers/boost-tier-band";
 
 const isBoostStatus = (value: string): value is BoostStatus =>
   (Object.values(BoostStatus) as string[]).includes(value);
@@ -185,6 +189,39 @@ export class AdminAdPackageService {
           ? users
           : [],
     };
+  }
+
+  /**
+   * Refuses tier rows the lookups could not price unambiguously, before any
+   * write: a band whose upper bound is not above its lower bound, and two
+   * active rows of one duration whose bands overlap (half-open,
+   * `boost-tier-band.ts`). Bands may touch (1000-5000 and 5000-none). The
+   * 400 names the rows (`tierIndexes`, their positions in `tiers`) so the
+   * admin form can mark them.
+   */
+  private assertTiersPriceable(tiers: AdPackageTierDto[]): void {
+    const empty = tiers.findIndex((tier) => boostTierBandIsEmpty(tier));
+    if (empty !== -1) {
+      throw new BadRequestException({
+        ...i18nMessage("server.admin.commission.maxAboveMin"),
+        tierIndexes: [empty],
+      });
+    }
+    const [overlap] = findBoostTierOverlaps(tiers);
+    if (overlap) {
+      const first = tiers[overlap.first];
+      const second = tiers[overlap.second];
+      throw new BadRequestException({
+        ...i18nMessage("server.admin.adPackage.tierOverlap", {
+          durationDays: first.durationDays,
+          firstMin: first.minAmount,
+          firstMax: first.maxAmount ?? "none",
+          secondMin: second.minAmount,
+          secondMax: second.maxAmount ?? "none",
+        }),
+        tierIndexes: [overlap.first, overlap.second],
+      });
+    }
   }
 
   private tierData(t: AdPackageTierDto) {
@@ -365,6 +402,7 @@ export class AdminAdPackageService {
   }
 
   async createPackage(dto: CreateAdPackageDto) {
+    this.assertTiersPriceable(dto.tiers ?? []);
     const existing = await this.prisma.adPackage.findUnique({
       where: { slug: dto.slug },
     });
@@ -407,6 +445,7 @@ export class AdminAdPackageService {
   }
 
   async updatePackage(id: string, dto: UpdateAdPackageDto) {
+    if (dto.tiers) this.assertTiersPriceable(dto.tiers);
     const pkg = await this.prisma.adPackage.findUnique({
       where: { id },
       include: { targetTiers: true, targetUsers: true },
