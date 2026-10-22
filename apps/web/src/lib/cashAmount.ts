@@ -24,12 +24,19 @@ export function cashAmountValue(raw: string): number {
 
 /**
  * The signed `cashAmount` payload field: positive when I pay, negative when
- * they pay, `undefined` when there is no cash (see `cashAmountValue`).
+ * they pay, `undefined` when there is no cash (empty, zero or refused text).
+ * An amount above the ceiling throws instead of going out as "no cash": the
+ * screens block it first (`negotiatedAmountError`), so this only stops a
+ * caller that skipped that check.
  */
 export function signedCashAmount(
   raw: string,
   payer: "me" | "them",
 ): number | undefined {
+  const parsed = parseTlAmount(raw);
+  if (parsed.status === "ok" && exceedsTlNegotiatedAmountMax(parsed.amount)) {
+    throw new Error("cash amount is above the negotiated amount ceiling");
+  }
   const amount = cashAmountValue(raw);
   if (amount <= 0) return undefined;
   return payer === "me" ? amount : -amount;

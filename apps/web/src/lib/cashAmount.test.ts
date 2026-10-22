@@ -22,11 +22,17 @@ describe("cashAmountValue, the API's ceiling", () => {
   });
 
   it.each(["10000000", "9999999,01"])(
-    "reads %s above the ceiling as no cash",
+    "reads %s above the ceiling as no cash for the summary and the preview",
     (raw) => {
       expect(cashAmountValue(raw)).toBe(0);
-      expect(signedCashAmount(raw, "me")).toBeUndefined();
-      expect(signedCashAmount(raw, "them")).toBeUndefined();
+    },
+  );
+
+  it.each(["10000000", "9999999,01"])(
+    "never sends %s as no cash: the payload builder throws",
+    (raw) => {
+      expect(() => signedCashAmount(raw, "me")).toThrow();
+      expect(() => signedCashAmount(raw, "them")).toThrow();
     },
   );
 });
