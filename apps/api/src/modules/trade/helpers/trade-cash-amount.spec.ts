@@ -3,8 +3,10 @@ import { assertTradeCashAmount, tradeCashTerms } from "./trade-cash-amount";
 
 /**
  * Trade cash is a signed TL amount stored as its magnitude in a
- * `Decimal(10, 2)` column. A third decimal used to be rounded silently and an
- * overflow failed in the database as a 500; both are a 400 with a catalog key.
+ * `Decimal(10, 2)` column and charged with fees on top. A third decimal used
+ * to be rounded silently and an overflow failed in the database as a 500;
+ * both are a 400 with a catalog key. The ceiling is the offer ceiling
+ * (9,999,999), which leaves the payment row room for fees and shipping.
  */
 describe("assertTradeCashAmount", () => {
   it.each([
@@ -15,8 +17,8 @@ describe("assertTradeCashAmount", () => {
     -150,
     59.99,
     -59.99,
-    99_999_999.99,
-    -99_999_999.99,
+    9_999_999,
+    -9_999_999,
   ])("accepts %p", (value) => {
     expect(() => assertTradeCashAmount(value)).not.toThrow();
   });
@@ -30,10 +32,12 @@ describe("assertTradeCashAmount", () => {
     1e-7,
     -1e-7,
     1e21,
-    // Above the column on either side.
+    // Above the ceiling on either side, up to the column and past it.
+    9_999_999.01,
+    -9_999_999.01,
+    99_999_999.99,
     100_000_000,
     -100_000_000,
-    99_999_999.991,
   ])("refuses %p with server.trade.invalidCashAmount", (value) => {
     try {
       assertTradeCashAmount(value);
@@ -42,6 +46,7 @@ describe("assertTradeCashAmount", () => {
       expect(error).toBeInstanceOf(BadRequestException);
       expect((error as BadRequestException).getResponse()).toMatchObject({
         i18nKey: "server.trade.invalidCashAmount",
+        i18nParams: { max: 9_999_999 },
       });
     }
   });

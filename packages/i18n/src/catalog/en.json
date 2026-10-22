@@ -11393,7 +11393,7 @@
       "someItemsNotOwnedOrInactive": "Some products do not belong to you or are not active",
       "tradeNotInDisputeStatus": "The trade is not in dispute status",
       "platformCancelledReason": "Cancelled by Tarodan: {reason}",
-      "invalidCashAmount": "The cash difference can have at most two decimal places and cannot exceed 99,999,999.99 TL."
+      "invalidCashAmount": "The cash difference can have at most two decimal places and cannot exceed {max, number} TL."
     },
     "order": {
       "accountBanned": "Your account is banned. You cannot create new orders.",

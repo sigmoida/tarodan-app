@@ -9,7 +9,10 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsTlAmount } from "../../../common/validators/tl-amount";
+import {
+  IsTlAmount,
+  TL_NEGOTIATED_AMOUNT_MAX,
+} from "../../../common/validators/tl-amount";
 
 export class CreateOfferDto {
   @ApiProperty({
@@ -35,7 +38,9 @@ export class CreateOfferDto {
     message: "Teklif tutarı en fazla iki ondalık basamaklı bir sayı olmalıdır",
   })
   @Min(1, { message: "Teklif en az 1 TL olmalıdır" })
-  @Max(9999999, { message: "Teklif en fazla 9,999,999 TL olabilir" })
+  @Max(TL_NEGOTIATED_AMOUNT_MAX, {
+    message: "Teklif en fazla 9,999,999 TL olabilir",
+  })
   amount: number;
 
   @ApiPropertyOptional({

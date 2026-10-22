@@ -3,6 +3,7 @@ import {
   isSignedTlAmount,
   isTlAmount,
   TL_AMOUNT_COLUMN_MAX,
+  TL_NEGOTIATED_AMOUNT_MAX,
 } from "./tl-amount";
 
 /**
@@ -69,5 +70,9 @@ describe("TL_AMOUNT_COLUMN_MAX", () => {
   it("is the largest Decimal(10, 2) value, itself a TL amount", () => {
     expect(TL_AMOUNT_COLUMN_MAX).toBe(Number("9".repeat(8) + ".99"));
     expect(isTlAmount(TL_AMOUNT_COLUMN_MAX)).toBe(true);
+  });
+
+  it("leaves a negotiated amount room for the fees added on top", () => {
+    expect(TL_NEGOTIATED_AMOUNT_MAX * 2).toBeLessThan(TL_AMOUNT_COLUMN_MAX);
   });
 });

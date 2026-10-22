@@ -11393,7 +11393,7 @@
       "someItemsNotOwnedOrInactive": "Bazı ürünler size ait değil veya aktif değil",
       "tradeNotInDisputeStatus": "Takas itiraz durumunda değil",
       "platformCancelledReason": "Tarodan tarafından iptal edildi: {reason}",
-      "invalidCashAmount": "Nakit fark tutarı en fazla iki ondalık basamak içerebilir ve 99.999.999,99 TL'yi aşamaz."
+      "invalidCashAmount": "Nakit fark tutarı en fazla iki ondalık basamak içerebilir ve {max, number} TL'yi aşamaz."
     },
     "order": {
       "accountBanned": "Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.",

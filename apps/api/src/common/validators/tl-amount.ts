@@ -11,6 +11,15 @@ const TL_AMOUNT_TEXT = /^\d+(\.\d{1,2})?$/;
 export const TL_AMOUNT_COLUMN_MAX = 99_999_999.99;
 
 /**
+ * The largest amount two users agree on: an offer, a counter-offer, the cash
+ * part of a trade. Far below `TL_AMOUNT_COLUMN_MAX` on purpose: the payment
+ * rows add fees, shipping and commission on top (`TradeCashPayment.
+ * totalAmount`, `Payment.amount`, both `Decimal(10, 2)`), so an agreed amount
+ * at the column maximum would overflow later, at accept or checkout.
+ */
+export const TL_NEGOTIATED_AMOUNT_MAX = 9_999_999;
+
+/**
  * A TL amount in a JSON body: a finite number of at least 0 with at most two
  * decimals (whole kuruş). Decided on the shortest decimal form JS writes for
  * the number (`String(value)`), which is what the client sent: 59.9 and 59.99

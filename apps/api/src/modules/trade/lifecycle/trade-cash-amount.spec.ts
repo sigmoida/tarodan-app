@@ -4,7 +4,7 @@ import { TradeLifecycleService } from "./trade-lifecycle.service";
 
 /**
  * Trade cash on create and counter: a bad amount (third decimal, exponent
- * form, above the `Decimal(10, 2)` column) is a 400 with
+ * form, above the 9,999,999 ceiling) is a 400 with
  * `server.trade.invalidCashAmount` before anything is read or written, and a
  * valid one keeps its sign semantics: positive = the proposer pays, negative
  * = the other side pays, stored as the magnitude.
@@ -83,7 +83,7 @@ describe("TradeLifecycleService — trade cash amount", () => {
     });
   };
 
-  describe.each([59.999, -59.999, 1e-7, 100_000_000, -100_000_000])(
+  describe.each([59.999, -59.999, 1e-7, 10_000_000, -99_999_999.99])(
     "cash %p",
     (cashAmount) => {
       it("createTrade refuses it before any read", async () => {
@@ -115,7 +115,7 @@ describe("TradeLifecycleService — trade cash amount", () => {
     [250.5, { cashAmount: 250.5, cashPayerId: "u2" }],
     // Negative = the original initiator (u1) pays, stored as the magnitude.
     [-250.5, { cashAmount: 250.5, cashPayerId: "u1" }],
-    [99_999_999.99, { cashAmount: 99_999_999.99, cashPayerId: "u2" }],
+    [9_999_999, { cashAmount: 9_999_999, cashPayerId: "u2" }],
     [0, { cashAmount: null, cashPayerId: null }],
     [undefined, { cashAmount: null, cashPayerId: null }],
   ])("counterTrade stores cash %p as %p", async (cashAmount, stored) => {

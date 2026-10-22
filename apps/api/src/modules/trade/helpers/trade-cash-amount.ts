@@ -1,17 +1,19 @@
 import { BadRequestException } from "@nestjs/common";
 import {
   isSignedTlAmount,
-  TL_AMOUNT_COLUMN_MAX,
+  TL_NEGOTIATED_AMOUNT_MAX,
 } from "../../../common/validators/tl-amount";
 import { i18nMessage } from "../../i18n";
 
 /**
- * The cash part of a trade proposal (create and counter) as the client sends
- * it: a signed TL amount, positive when the proposer pays and negative when
- * the other side pays. Its magnitude is stored in `Trade.cashAmount`
- * (`Decimal(10, 2)`), so it has at most two decimals and at most
- * `TL_AMOUNT_COLUMN_MAX`. Without this check a third decimal was rounded
- * silently and an overflow failed in the database as a generic 500.
+ * The cash part of a trade proposal (create, counter and the unsaved preview)
+ * as the client sends it: a signed TL amount, positive when the proposer pays
+ * and negative when the other side pays. Its magnitude is stored in
+ * `Trade.cashAmount` and charged in `TradeCashPayment.totalAmount` with fees
+ * and shipping on top (both `Decimal(10, 2)`), so it has at most two decimals
+ * and at most `TL_NEGOTIATED_AMOUNT_MAX`, the ceiling an offer has too.
+ * Without this check a third decimal was rounded silently and an overflow
+ * failed in the database as a generic 500.
  *
  * Checked in the service, not the DTO, so the 400 carries a catalog key in the
  * request locale; the DTO's `@IsNumber()` keeps text, NaN and Infinity out.
@@ -21,10 +23,12 @@ export function assertTradeCashAmount(cashAmount: number | null | undefined) {
   if (cashAmount == null) return;
   if (
     !isSignedTlAmount(cashAmount) ||
-    Math.abs(cashAmount) > TL_AMOUNT_COLUMN_MAX
+    Math.abs(cashAmount) > TL_NEGOTIATED_AMOUNT_MAX
   ) {
     throw new BadRequestException(
-      i18nMessage("server.trade.invalidCashAmount"),
+      i18nMessage("server.trade.invalidCashAmount", {
+        max: TL_NEGOTIATED_AMOUNT_MAX,
+      }),
     );
   }
 }

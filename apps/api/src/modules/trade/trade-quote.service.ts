@@ -19,6 +19,7 @@ import {
   type TradeSide,
 } from "./helpers/trade-pricing.helper";
 import { TRADE_PRICING_V2 } from "./helpers/trade.constants";
+import { assertTradeCashAmount } from "./helpers/trade-cash-amount";
 import {
   CommissionRuleMatchError,
   CommissionSellerConfigurationError,
@@ -229,6 +230,8 @@ export class TradeQuoteService {
    * ilan fiyatı olmasıdır (teklif henüz snapshot almadı).
    */
   async previewQuote(input: TradeQuotePreviewInput): Promise<TradePricing> {
+    // The preview prices only what create and counter would accept.
+    assertTradeCashAmount(input.cashAmount);
     const rows = [
       ...input.initiatorItems.map((i) => ({
         ...i,
