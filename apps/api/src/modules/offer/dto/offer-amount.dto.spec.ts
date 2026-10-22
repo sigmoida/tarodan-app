@@ -44,8 +44,10 @@ describe.each([
     // Exponent forms: a 400, never a 500.
     1e-7,
     1e21,
-    // Out of range and below zero.
+    // Out of range and below zero, also just past either bound.
     0.5,
+    0.99,
+    9_999_999.01,
     10_000_000,
     -250,
     // Not a number.

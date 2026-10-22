@@ -334,6 +334,24 @@ describe("OfferService — teklif alt sınırı", () => {
       expect(i18nKeyOf(error)).toBe("server.offer.alreadyPendingOffer");
     });
 
+    it("create bounds by the discounted price inside an open sale window", async () => {
+      // price 800 with oldPrice 1000 and a window still open: the listing
+      // sells (and shows) at 800, so 900 is at or above the price.
+      const { service, tx } = build({ min: undefined, listingPrice: 800 });
+      tx.product.findUnique.mockResolvedValue({
+        ...product(800),
+        oldPrice: 1000,
+        saleEndDate: new Date(Date.now() + 3_600_000),
+      });
+
+      const error = await service
+        .create("b1", { productId: "p1", amount: 900 })
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.offerMustBeBelowPrice");
+      expect(tx.offer.findFirst).not.toHaveBeenCalled();
+    });
+
     it("the seller counter may equal the listing price", async () => {
       const { service, tx } = build({
         min: undefined,

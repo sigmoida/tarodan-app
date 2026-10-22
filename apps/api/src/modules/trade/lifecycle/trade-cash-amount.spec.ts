@@ -117,10 +117,47 @@ describe("TradeLifecycleService — trade cash amount", () => {
     [-250.5, { cashAmount: 250.5, cashPayerId: "u1" }],
     [9_999_999, { cashAmount: 9_999_999, cashPayerId: "u2" }],
     [0, { cashAmount: null, cashPayerId: null }],
+    [-0, { cashAmount: null, cashPayerId: null }],
     [undefined, { cashAmount: null, cashPayerId: null }],
   ])("counterTrade stores cash %p as %p", async (cashAmount, stored) => {
     const { service, txTradeUpdate } = build();
     await service.counterTrade("t1", "u2", { ...items, cashAmount } as never);
     expect(txTradeUpdate.mock.calls[0][0].data).toMatchObject(stored);
+  });
+
+  it.each([
+    // The initiator (u1) proposes: positive = u1 pays.
+    [250.5, { cashAmount: 250.5, cashPayerId: "u1" }],
+    // Negative = the receiver (u2) pays, stored as the magnitude.
+    [-250.5, { cashAmount: 250.5, cashPayerId: "u2" }],
+    [-9_999_999, { cashAmount: 9_999_999, cashPayerId: "u2" }],
+    [0, { cashAmount: null, cashPayerId: null }],
+    [-0, { cashAmount: null, cashPayerId: null }],
+    [undefined, { cashAmount: null, cashPayerId: null }],
+  ])("createTrade stores cash %p as %p", async (cashAmount, stored) => {
+    const { service, prisma } = build();
+    // No active trade holds the offered item on create.
+    prisma.tradeItem.findMany.mockResolvedValue([]);
+    const STOP = new Error("stop");
+    const tradeCreate = jest.fn().mockRejectedValue(STOP);
+    prisma.$transaction.mockImplementation((fn) =>
+      fn({
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        trade: { create: tradeCreate },
+      }),
+    );
+    Object.assign(service, {
+      generateTradeNumber: jest.fn().mockResolvedValue("TR-1"),
+      screenNewTradeMessage: jest
+        .fn()
+        .mockResolvedValue({ text: null, recordFlag: jest.fn() }),
+    });
+
+    const error = await service
+      .createTrade("u1", { receiverId: "u2", ...items, cashAmount } as never)
+      .catch((e: unknown) => e);
+
+    expect(error).toBe(STOP);
+    expect(tradeCreate.mock.calls[0][0].data).toMatchObject(stored);
   });
 });
