@@ -123,10 +123,6 @@ export const sellerTypes = (t: T): { value: SellerType; label: string }[] => [
 export const sellerTypeLabel = (value: SellerType, t: T) =>
   sellerTypes(t).find((item) => item.value === value)?.label ?? value;
 
-/** Rules store an exclusive upper bound; read-only UI shows the last cent included. */
-export const inclusiveCommissionMaximum = (maxAmount: number | null) =>
-  maxAmount == null ? null : Math.max(0, maxAmount - 0.01);
-
 /** Rates (4 decimals) stay number inputs; see the TL fields below. */
 const numberString = z
   .string()
