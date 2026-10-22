@@ -34,14 +34,15 @@ export function distanceSalesTradeWhere(
   };
 }
 
-/** The trade a consent row refers to, read back from its `details`. */
+/**
+ * The trade a consent row refers to, read back from its `details` (already
+ * narrowed to a plain object by the caller).
+ */
 export function tradeOfConsentDetails(
-  details: unknown,
+  details: Record<string, unknown> | null,
 ): { id: string; tradeNumber: string } | null {
-  if (!details || typeof details !== "object" || Array.isArray(details)) {
-    return null;
-  }
-  const { tradeId, tradeNumber } = details as Record<string, unknown>;
+  if (!details) return null;
+  const { tradeId, tradeNumber } = details;
   if (typeof tradeId !== "string" || typeof tradeNumber !== "string") {
     return null;
   }

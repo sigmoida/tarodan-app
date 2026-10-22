@@ -218,6 +218,12 @@ function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
   const currentVersion = isConsentDocumentKey(row.document)
     ? CONSENT_DOCUMENTS[row.document].version
     : null;
+  const details =
+    row.details &&
+    typeof row.details === "object" &&
+    !Array.isArray(row.details)
+      ? (row.details as Record<string, unknown>)
+      : null;
   return {
     id: row.id,
     document: row.document as AdminConsentRecordRow["document"],
@@ -229,20 +235,13 @@ function toAdminRow(row: ConsentRecordWithRelations): AdminConsentRecordRow {
     user: row.user,
     guestEmail: row.guestEmail,
     visitorId: row.visitorId,
-    details:
-      row.details &&
-      typeof row.details === "object" &&
-      !Array.isArray(row.details)
-        ? (row.details as Record<string, unknown>)
-        : null,
+    details,
     ipAddress: row.ipAddress,
     userAgent: row.userAgent,
     checkoutGroup: row.checkoutGroup,
     order: row.order,
     trade:
-      row.document === "distance_sales"
-        ? tradeOfConsentDetails(row.details)
-        : null,
+      row.document === "distance_sales" ? tradeOfConsentDetails(details) : null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -281,5 +280,6 @@ export function consentExportRecord(
     cookieCategories: cookieCategoriesText(r.details),
     checkoutGroup: r.checkoutGroup?.groupNumber,
     order: r.order?.orderNumber,
+    trade: r.trade?.tradeNumber,
   };
 }

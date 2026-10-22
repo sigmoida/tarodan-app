@@ -253,6 +253,32 @@ describe("AdminConsentService.export", () => {
       new Date("2026-10-01T12:00:00.000Z"),
     );
   });
+
+  it("exports the trade number of a trade cash payment consent", async () => {
+    const { service } = makeService([
+      row({
+        document: "distance_sales",
+        version: CONSENT_DOCUMENTS.distance_sales.version,
+        source: "payment",
+        details: {
+          tradeId: "trade-1",
+          tradeNumber: "TKS-10001",
+          tradeCashPaymentId: "tcp-1",
+        },
+      }),
+    ]);
+
+    const file = await service.export({}, "admin-1", "tr");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.body as never);
+    const sheet = workbook.worksheets[1];
+    const header = (sheet.getRow(1).values as unknown[]).map(String);
+    const values = sheet.getRow(2).values as unknown[];
+
+    expect(values[header.indexOf("Takas no")]).toBe("TKS-10001");
+    // The trade reference is not read as cookie categories.
+    expect(values[header.indexOf("Çerez kategorileri")] ?? "").toBe("");
+  });
 });
 
 describe("AdminConsentService.status", () => {
