@@ -177,6 +177,17 @@ describe("ad package tier band gaps migration", () => {
       expect(statement).toContain(PINS.overlapGuard);
     });
 
+    it("is exactly the pinned statement, with no other condition", () => {
+      // `toContain` above would let an added condition through (a narrower
+      // or wider UPDATE than the one reviewed); the whole statement is fixed.
+      expect(statement).toBe(
+        'UPDATE "ad_package_tiers" AS t SET "max_amount" = gap."next_min" ' +
+          `FROM ( SELECT cur."id", ( ${PINS.nextStart} ) AS "next_min" ` +
+          `FROM "ad_package_tiers" AS cur ${PINS.liveTier} ) AS gap ` +
+          `WHERE t."id" = gap."id" AND ${PINS.gapLimit} ${PINS.overlapGuard};`,
+      );
+    });
+
     it("has a dry run in the runbook that selects with the same conditions", () => {
       const runbook = readFileSync(
         join(repoRoot(), "docs/OPERATIONS.md"),
@@ -193,6 +204,24 @@ describe("ad package tier band gaps migration", () => {
       expect(query).toMatch(/^SELECT /);
       expect(query).not.toMatch(/\b(UPDATE|INSERT|DELETE|ALTER|DROP)\b/i);
       for (const pin of Object.values(PINS)) expect(query).toContain(pin);
+
+      // The same rows as the UPDATE, no more and no fewer: an inner join on
+      // the UPDATE's own snapshot subquery and its WHERE, nothing added.
+      const between = (text: string, from: string, to: string) =>
+        text.slice(text.indexOf(from) + from.length, text.indexOf(to));
+      const gapQuery = between(statement, " FROM ( ", " ) AS gap ");
+      const conditions = between(
+        statement,
+        'WHERE t."id" = gap."id" AND ',
+        ";",
+      );
+      expect(query).toBe(
+        'SELECT t."id", t."package_id", t."duration_days", t."min_amount", ' +
+          't."max_amount" AS "old_max_amount", gap."next_min" AS "new_max_amount" ' +
+          `FROM "ad_package_tiers" AS t JOIN ( ${gapQuery} ) AS gap ` +
+          `ON gap."id" = t."id" WHERE ${conditions} ` +
+          'ORDER BY t."package_id", t."duration_days", t."min_amount";',
+      );
     });
 
     it("carries the rollback in its header", () => {
@@ -325,6 +354,40 @@ describe("ad package tier band gaps migration", () => {
         row("next", 1000, null),
       ]);
       expect(maxOf(inactiveCover, "t")).toBe("1000.00");
+    });
+
+    it("an empty band neither ends the gap nor blocks the widening", () => {
+      // An empty or inverted band covers no price (`boostTierBandIsEmpty`),
+      // so it is not the next band and does not overlap the widened one.
+      const after = closeGaps([
+        row("t", 200, 999),
+        row("empty-inside", 500, 500),
+        row("empty-in-gap", 999.5, 999.5),
+        row("inverted-in-gap", 999.5, 999.2),
+        row("next", 1000, null),
+      ]);
+      expect(maxOf(after, "t")).toBe("1000.00");
+      expect(maxOf(after, "empty-inside")).toBe("500.00");
+      expect(maxOf(after, "empty-in-gap")).toBe("999.50");
+      expect(maxOf(after, "inverted-in-gap")).toBe("999.20");
+    });
+
+    it("widens consecutive bands of one duration in the same run, from the rows as they were", () => {
+      // UPDATE ... FROM reads one snapshot: each band is judged against the
+      // others' old bounds, and the widened bands still touch, never overlap.
+      const after = closeGaps([
+        row("low", 200, 999),
+        row("mid", 1000, 1999),
+        row("high", 2000, null),
+      ]);
+      expect(after.map((tier) => bound(tier.maxAmount))).toEqual([
+        "1000.00",
+        "2000.00",
+        null,
+      ]);
+      expect(findBoostTierOverlaps(after)).toEqual([]);
+      expect(findBoostTierGaps(after)).toEqual([]);
+      expect(closeGaps(after)).toEqual(after);
     });
 
     it("never creates an overlap and changes nothing on a second run (random tiers)", () => {
