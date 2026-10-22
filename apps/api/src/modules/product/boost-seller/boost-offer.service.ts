@@ -14,6 +14,7 @@ import { SentryService } from "../../sentry/sentry.service";
 import { StorageService } from "../../storage/storage.service";
 import { cardImageUrl } from "../helpers/card-image-url";
 import { boostTierBasePrice } from "../helpers/product-sale-window";
+import { boostTierCoversPrice } from "../helpers/boost-tier-band";
 import {
   boostBreadcrumb,
   tagBoostRequest,
@@ -21,7 +22,6 @@ import {
 import {
   BoostAudienceService,
   eligibleAudienceWhere,
-  tierCoversPrice,
 } from "./boost-audience.service";
 import { DAY_MS } from "../boost-timeline/boost-lanes";
 
@@ -119,7 +119,7 @@ export class BoostOfferService {
     const offers = candidates
       .filter((product) => {
         const price = boostTierBasePrice(product);
-        return tiers.some((tier) => tierCoversPrice(tier, price));
+        return tiers.some((tier) => boostTierCoversPrice(tier, price));
       })
       .slice(0, BOOST_OFFER_MAX)
       .map((product) => ({
