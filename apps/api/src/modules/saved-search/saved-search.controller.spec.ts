@@ -102,8 +102,7 @@ describe("CreateSavedSearchDto through the global pipe", () => {
   it.each([
     ["a bad category UUID", { categoryId: "not-a-uuid" }],
     ["a bad car model UUID", { carModelId: "x" }],
-    ["maxPrice over the GET /products cap", { maxPrice: 10000000 }],
-    ["minPrice over the GET /products cap", { minPrice: SEARCH_PRICE_MAX + 1 }],
+    ["maxPrice over the GET /products cap", { maxPrice: SEARCH_PRICE_MAX + 1 }],
     ["a negative minPrice", { minPrice: -1 }],
     ["an unknown condition", { condition: "broken" }],
     ["an over-long search text", { search: "x".repeat(201) }],

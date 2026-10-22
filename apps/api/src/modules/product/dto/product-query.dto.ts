@@ -214,16 +214,17 @@ export class ProductQueryDto {
   @IsBoolean()
   set?: boolean;
 
+  // No upper cap on purpose: released mobile builds may send a larger
+  // minimum, which matches nothing; a 400 would put their search in its error
+  // state. Web and mobile keep it within SEARCH_PRICE_MAX themselves.
   @ApiPropertyOptional({
     example: 100,
-    maximum: SEARCH_PRICE_MAX,
     description: "Minimum price filter (TL)",
   })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   @Min(0)
-  @Max(SEARCH_PRICE_MAX)
   minPrice?: number;
 
   @ApiPropertyOptional({

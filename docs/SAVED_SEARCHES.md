@@ -59,9 +59,9 @@ stored query and in the route params. Both clients read a `minPrice` or
 Empty, zero and refused text set no bound, and a run ignores that bound;
 the two stored shapes this hits are a value with three decimals and a
 `maxPrice` of 0. A bound above `SEARCH_PRICE_MAX` (`@tarodan/types`, the
-highest `minPrice`/`maxPrice` `GET /products` accepts) is no bound either:
-the field shows `validation.maxValue` and the bound is never sent, so a run
-of an older row holding one does not fail. The stored row and its hash do
+search price bound; `GET /products` refuses a larger `maxPrice` with a 400)
+is no bound either: the field shows `validation.maxValue` and the bound is
+never sent, so a run of an older row holding one does not fail. The stored row and its hash do
 not change.
 
 `query_hash` is the SHA-256 hex of the JSON of the canonical query; the
