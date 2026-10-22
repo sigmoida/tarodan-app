@@ -61,7 +61,8 @@ import { PRODUCT_PLACEHOLDER } from "@/lib/productPlaceholder";
  * (`href={null}`), where the caller opts out with `showFavorite={false}`, and
  * on grid cards that fill the top-right slot with their own `overlay`. The
  * action is skipped for non-navigating cards and for cards with a `footer`
- * (Favorites has its own cart button there). The grid image's top-left holds
+ * (Favorites puts a full-width cart toggle there, from the same rule and
+ * without the boost action). The grid image's top-left holds
  * the badge stack (max 2: %discount → boosted → trade → campaign, see
  * `selectProductCardBadges`); it is not drawn when the caller fills the
  * top-left slot with `overlayStart`. The list layout shows the trade icon
