@@ -489,6 +489,42 @@ timeline change writes the column, and a remainder paused before it is capped
 at the boost's bought and extended days on resume. Rollback: revert the API;
 the columns are harmless if left.
 
+### Check: ad package tier bands
+
+Reference: `docs/PAYMENTS.md`, "Boost tier band". An ad package tier's band
+of listing prices is half-open (`minAmount <= price < maxAmount`). Before
+this rule the upper bound was inside the band too, and the admin save did not
+refuse overlapping tiers. Two consequences for rows already in the database:
+
+- A listing priced exactly at a band's upper bound now falls in the next
+  band, or in none. The launch rows (migration `20260726234552_ad_packages`)
+  are 200-999, 1000-5000 and 5000-(none) per duration: 5000 now resolves to
+  the 5000-(none) tier only (before, the options showed both prices and the
+  purchase start could pick either), and a listing priced exactly 999 has
+  no tier any more until the first band's upper bound is set to 1000.
+- Overlapping active tiers of one duration still resolve, deterministically
+  (`BOOST_TIER_PRECEDENCE`), but the price may not be the one meant.
+
+After the deploy, run the read-only check on staging, then on production:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/check-ad-package-tiers.js'
+```
+
+Locally: `pnpm --filter @tarodan/api check:prod:ad-package-tiers` (after
+`build:seed`). It never writes and has no `--apply`. Per package it prints
+`OK` or the findings: `OVERLAP` (two active tiers of one duration that cover
+the same prices), `EMPTY` (an upper bound not above the lower bound),
+`GAP` (prices between two bands that no tier covers) and
+`UPPER BOUND NOW OUTSIDE` (a band's upper bound that no other band starts
+at, the 999 case). Fix each finding in **Marketing -> Ad packages**; the save
+refuses a package whose tiers still overlap, so a saved package is clean. A
+production fix is a production write: only with the user's approval. Run the
+check again until every package is `OK` or its remaining `GAP` lines are
+intended.
+
+Rollback: revert the API. No data changes.
+
 ### Bir kerelik: reklam platformu (web / uygulama) geçişi
 
 `20261016110000_ad_platform_popup` migration'ı reklamlara `platform`
