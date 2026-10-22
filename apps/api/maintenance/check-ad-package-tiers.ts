@@ -13,7 +13,7 @@
  *   matches a listing);
  * - `GAP`: prices between two bands of a duration that no active tier covers;
  * - `UPPER BOUND NOW OUTSIDE`: an active band's upper bound that no other
- *   band of the duration starts at. A listing priced exactly at it was
+ *   active band of the duration covers. A listing priced exactly at it was
  *   matched before the half-open rule and is not any more (the launch rows
  *   200-999 then 1000-5000 leave 999 uncovered).
  *

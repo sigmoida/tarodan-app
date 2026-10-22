@@ -104,7 +104,8 @@ export interface BoostTierRow extends BoostTierBand {
 /**
  * Every pair of active tiers of the same duration whose bands overlap, as
  * indexes into `tiers` (`first < second`), in input order. Inactive rows are
- * never matched, so they may keep any band.
+ * never matched, so they may keep any band; an empty band covers no price
+ * (`boostTierBandIsEmpty`) and overlaps nothing.
  */
 export function findBoostTierOverlaps(
   tiers: readonly BoostTierRow[],
@@ -112,10 +113,16 @@ export function findBoostTierOverlaps(
   const pairs: Array<{ first: number; second: number }> = [];
   for (let first = 0; first < tiers.length; first++) {
     const a = tiers[first];
-    if (a.isActive === false) continue;
+    if (a.isActive === false || boostTierBandIsEmpty(a)) continue;
     for (let second = first + 1; second < tiers.length; second++) {
       const b = tiers[second];
-      if (b.isActive === false || b.durationDays !== a.durationDays) continue;
+      if (
+        b.isActive === false ||
+        b.durationDays !== a.durationDays ||
+        boostTierBandIsEmpty(b)
+      ) {
+        continue;
+      }
       if (boostTierBandsOverlap(a, b)) pairs.push({ first, second });
     }
   }

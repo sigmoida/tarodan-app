@@ -32,6 +32,11 @@ const trimmed = () =>
     typeof value === "string" ? value.trim() : value,
   );
 
+/** The largest band bound `ad_package_tiers.min_amount`/`max_amount` hold (Decimal(12,2)). */
+const TIER_BAND_MAX = 9_999_999_999.99;
+/** The largest price `price`/`campaign_price` hold (Decimal(10,2)). */
+const TIER_PRICE_MAX = 99_999_999.99;
+
 /**
  * One tier row. The TL fields are JSON numbers of at least 0 with at most two
  * decimals (`IsTlAmount`); the band is half-open (`boost-tier-band.ts`), and
@@ -51,6 +56,7 @@ export class AdPackageTierDto {
   })
   @JsonNumber()
   @IsTlAmount()
+  @Max(TIER_BAND_MAX)
   minAmount: number;
 
   @ApiPropertyOptional({
@@ -62,17 +68,20 @@ export class AdPackageTierDto {
   @IsOptional()
   @JsonNumber()
   @IsTlAmount()
+  @Max(TIER_BAND_MAX)
   maxAmount?: number | null;
 
   @ApiProperty({ example: 150, description: "TL, VAT included" })
   @JsonNumber()
   @IsTlAmount()
+  @Max(TIER_PRICE_MAX)
   price: number;
 
   @ApiPropertyOptional({ example: 1750, nullable: true })
   @IsOptional()
   @JsonNumber()
   @IsTlAmount()
+  @Max(TIER_PRICE_MAX)
   campaignPrice?: number | null;
 
   @ApiPropertyOptional()

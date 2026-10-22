@@ -5,6 +5,7 @@ import {
   RefundBoostDto,
   type AdPackageTierDto,
 } from "../dto/ad-package.dto";
+import { translateMessage } from "../../i18n/translate";
 import { AdminAdPackageService } from "./admin-ad-package.service";
 
 const row = (over: Partial<AdPackageTierDto> = {}): AdPackageTierDto => ({
@@ -188,6 +189,42 @@ describe("AdminAdPackageService tier bands", () => {
     expect(h.tx.adPackageTier.deleteMany).not.toHaveBeenCalled();
     expect(h.tx.adPackage.update).toHaveBeenCalledTimes(1);
   });
+
+  it("answers 404 for an unknown package before it checks the tiers", async () => {
+    const h = make();
+    h.prisma.adPackage.findUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      h.update([row({ minAmount: 0 }), row({ minAmount: 100 })]),
+    ).rejects.toMatchObject({
+      status: 404,
+      response: { i18nKey: "server.admin.adPackage.notFound" },
+    });
+  });
+
+  it.each([
+    [
+      "tr",
+      "7 günlük süre için fiyat aralıkları çakışmaktadır: 1.000 TL - 5.000 TL ile 4.999,99 TL - üst sınır yok.",
+    ],
+    [
+      "en",
+      "The price ranges for the 7-day duration overlap: 1,000 TL - 5,000 TL and 4,999.99 TL - no upper limit.",
+    ],
+  ] as const)("renders the overlap with both ranges in %s", (locale, text) => {
+    const message = translateMessage(
+      "server.admin.adPackage.tierOverlap",
+      locale,
+      {
+        durationDays: 7,
+        firstMin: 1000,
+        firstMax: 5000,
+        secondMin: 4999.99,
+        secondMax: "none",
+      },
+    );
+    expect(message.startsWith(text)).toBe(true);
+  });
 });
 
 describe("ad package DTO amounts", () => {
@@ -233,7 +270,16 @@ describe("ad package DTO amounts", () => {
   it.each(["minAmount", "maxAmount", "price", "campaignPrice"])(
     "refuses a bad %s with 400, never a 500",
     async (field) => {
-      for (const value of [1e-7, 1e21, 0.001, -1, 0.1 + 0.2, "150", true]) {
+      for (const value of [
+        1e-7,
+        1e20, // no exponent form, but above every money column
+        1e21,
+        0.001,
+        -1,
+        0.1 + 0.2,
+        "150",
+        true,
+      ]) {
         await expect(
           asBody(CreateAdPackageDto, withTier({ [field]: value })),
         ).rejects.toMatchObject({ status: 400 });

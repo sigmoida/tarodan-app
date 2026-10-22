@@ -516,8 +516,8 @@ Locally: `pnpm --filter @tarodan/api check:prod:ad-package-tiers` (after
 `OK` or the findings: `OVERLAP` (two active tiers of one duration that cover
 the same prices), `EMPTY` (an upper bound not above the lower bound),
 `GAP` (prices between two bands that no tier covers) and
-`UPPER BOUND NOW OUTSIDE` (a band's upper bound that no other band starts
-at, the 999 case). Fix each finding in **Marketing -> Ad packages**; the save
+`UPPER BOUND NOW OUTSIDE` (a band's upper bound that no other active band of
+the duration covers, the 999 case). Fix each finding in **Marketing -> Ad packages**; the save
 refuses a package whose tiers still overlap, so a saved package is clean. A
 production fix is a production write: only with the user's approval. Run the
 check again until every package is `OK` or its remaining `GAP` lines are

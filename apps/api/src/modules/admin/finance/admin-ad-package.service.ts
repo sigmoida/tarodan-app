@@ -445,7 +445,6 @@ export class AdminAdPackageService {
   }
 
   async updatePackage(id: string, dto: UpdateAdPackageDto) {
-    if (dto.tiers) this.assertTiersPriceable(dto.tiers);
     const pkg = await this.prisma.adPackage.findUnique({
       where: { id },
       include: { targetTiers: true, targetUsers: true },
@@ -454,6 +453,7 @@ export class AdminAdPackageService {
       throw new NotFoundException(
         i18nMessage("server.admin.adPackage.notFound"),
       );
+    if (dto.tiers) this.assertTiersPriceable(dto.tiers);
 
     if (dto.slug && dto.slug !== pkg.slug) {
       const clash = await this.prisma.adPackage.findUnique({
