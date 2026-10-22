@@ -33,12 +33,13 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
   const makeService = (
     trade: Record<string, unknown>,
     gate: jest.Mock = jest.fn().mockResolvedValue("record"),
+    existingPayment: Record<string, unknown> | null = null,
   ) => {
     const payments = new Map<string, any>();
     const prisma: any = {
       trade: { findUnique: jest.fn().mockResolvedValue(trade) },
       payment: {
-        findUnique: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue(existingPayment),
         create: jest.fn().mockImplementation(({ data }: any) => {
           const created = {
             id: `pay-${data.tradeCashPaymentId}`,
@@ -62,6 +63,11 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
     prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
+    const lifecycle = {
+      verifyPaymentFromClient: jest
+        .fn()
+        .mockResolvedValue({ completed: false }),
+    };
     const service = new PaymentInitiationService(
       prisma,
       {} as any,
@@ -69,12 +75,12 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      lifecycle as any, // paymentLifecycle
       {} as any,
       { ensureForPayment: gate } as never, // distanceSalesConsent
       { isRecordedForOrder: jest.fn().mockResolvedValue(true) } as never, // platformServiceConsent
     );
-    return { service, prisma, gate };
+    return { service, prisma, gate, lifecycle };
   };
 
   const v2Trade = (over: Record<string, unknown> = {}) => ({
@@ -163,6 +169,77 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
     );
     expect(prisma.payment.updateMany).not.toHaveBeenCalled();
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("claims the payment once the gate lets it through", async () => {
+    const { service, prisma } = makeService(v2Trade());
+
+    await resolve(service, "user-initiator", { distanceSalesAccepted: true });
+
+    expect(prisma.payment.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a retry before the PayTR status query and the claim", async () => {
+    const reject = jest
+      .fn()
+      .mockRejectedValue(
+        new BadRequestException("server.consent.distanceSalesRequired"),
+      );
+    const { service, prisma, lifecycle } = makeService(v2Trade(), reject, {
+      id: "pay-tcp-initiator",
+      tradeCashPaymentId: "tcp-initiator",
+      providerConversationId: "TRADETKS10001OLD",
+      status: PaymentStatus.failed,
+      metadata: null,
+    });
+
+    await expect(resolve(service, "user-initiator")).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(lifecycle.verifyPaymentFromClient).not.toHaveBeenCalled();
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("gives each v2 payer a subject of their own cash payment row", async () => {
+    const { service, gate } = makeService(v2Trade());
+
+    await resolve(service, "user-initiator", { distanceSalesAccepted: true });
+    await resolve(service, "user-receiver", { distanceSalesAccepted: true });
+
+    const subjects = gate.mock.calls.map(([subject]) => ({
+      userId: subject.userId,
+      row: subject.trade.tradeCashPaymentId,
+    }));
+    expect(subjects).toEqual([
+      { userId: "user-initiator", row: "tcp-initiator" },
+      { userId: "user-receiver", row: "tcp-receiver" },
+    ]);
+  });
+
+  it("binds a v1 trade consent to the cash difference row", async () => {
+    const { service, gate } = makeService(
+      v2Trade({
+        pricingVersion: "v1",
+        cashAmount: 100,
+        cashPayerId: "user-initiator",
+        cashPayments: [row({ id: "tcp-v1", amount: 100, totalAmount: 105 })],
+      }),
+    );
+
+    await resolve(service, "user-initiator", { distanceSalesAccepted: true });
+
+    expect(gate).toHaveBeenCalledWith(
+      {
+        trade: {
+          tradeId: "trade-1",
+          tradeNumber: "TKS-10001",
+          tradeCashPaymentId: "tcp-v1",
+        },
+        userId: "user-initiator",
+        guestEmail: null,
+      },
+      true,
+    );
   });
 
   it("kafa kafaya v2 takasta (nakit fark yok) taraf kendi satırını ödeyebilir", async () => {
