@@ -11,6 +11,7 @@ import { Button, Checkbox, Input } from "@tarodan/ui";
 import { Panel } from "@/components/detail/Panel";
 import { SectionTitle } from "@/components/detail/SectionTitle";
 import { adminApi } from "@/lib/api";
+import { extractErrorMessage } from "@/lib/error";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { adminKeys } from "@/lib/query/keys";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ import {
   type MembershipTierType,
 } from "../_lib/types";
 import { TierRowsEditor } from "../_components/TierRowsEditor";
+import { refusedTierRows } from "../_lib/tierErrors";
 
 /** Create/edit an ad package. Mount with `key={pkg?.id ?? 'new'}` for fresh defaults. */
 export function PackageFormModal({
@@ -119,9 +121,31 @@ export function PackageFormModal({
         ? t("admin.marketing.adPackages.updated")
         : t("admin.marketing.adPackages.created"),
       errorMessage: t("admin.marketing.adPackages.saveFailed"),
+      // A refusal that names tier rows is shown on those rows instead.
+      showErrorToast: (error) =>
+        refusedTierRows(error, form.getValues("tiers").length) === null,
       onSuccess: onClose,
     },
   );
+
+  const submit = (values: PackageFormValues) =>
+    save.mutate(values, {
+      onError: (error) => {
+        const refused = refusedTierRows(error, values.tiers.length);
+        if (!refused) return;
+        const message = extractErrorMessage(
+          error,
+          t("admin.marketing.adPackages.saveFailed"),
+        );
+        refused.indexes.forEach((index, position) =>
+          form.setError(
+            `tiers.${index}.${refused.field}`,
+            { type: "server", message },
+            { shouldFocus: position === 0 },
+          ),
+        );
+      },
+    });
 
   return (
     <FormModal
@@ -133,7 +157,7 @@ export function PackageFormModal({
           : t("admin.marketing.adPackages.new")
       }
       form={form}
-      onSubmit={(v) => save.mutate(v)}
+      onSubmit={submit}
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.create")}
       size="2xl"
