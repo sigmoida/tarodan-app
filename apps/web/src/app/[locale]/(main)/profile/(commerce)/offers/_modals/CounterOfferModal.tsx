@@ -12,6 +12,7 @@ import { formatTL } from "@/lib/format";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { useOfferFloor } from "@/hooks/usePublicSettings";
 import { parseTlAmount } from "@tarodan/shared";
+import { negotiatedAmountError } from "@/lib/negotiatedAmount";
 
 interface CounterOfferModalProps {
   open: boolean;
@@ -43,16 +44,18 @@ export default function CounterOfferModal({
   const base = Number(offer.amount);
   const baseLabel = formatTL(base);
   // "1.000" is one thousand to a Turkish user: grouping is refused, never read
-  // as a decimal (see `@tarodan/shared` `parseTlAmount`).
+  // as a decimal (see `@tarodan/shared` `parseTlAmount`). An amount above the
+  // API's ceiling is refused too (`negotiatedAmountError`).
   const parsed = parseTlAmount(amount);
-  const refused = parsed.status === "refused";
+  const amountError = negotiatedAmountError(amount, t);
 
   const submit = () => {
-    if (parsed.status === "refused") {
-      toast.error(t("validation.amountFormatRefused"));
+    if (amountError) {
+      toast.error(amountError);
       return;
     }
-    if (parsed.status === "empty") {
+    // Refused text is reported above (`amountError`); what is left is blank.
+    if (parsed.status !== "ok") {
       toast.error(t("offer.counterModal.gecerliBirTutarGirin"));
       return;
     }
@@ -104,7 +107,7 @@ export default function CounterOfferModal({
           cancelLabel={t("common.cancel")}
           confirmLabel={t("common.send")}
           isLoading={counter.isPending}
-          disabled={!amount.trim() || refused}
+          disabled={!amount.trim() || !!amountError}
         />
       }
     >
@@ -123,7 +126,7 @@ export default function CounterOfferModal({
         placeholder={t("offer.counterModal.tutar")}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        error={refused ? t("validation.amountFormatRefused") : undefined}
+        error={amountError}
         helperText={
           floor != null
             ? t("listing.priceMinHint", { minPrice: formatTL(floor) })

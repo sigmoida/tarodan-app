@@ -1,7 +1,7 @@
 "use client";
 
-import { signedCashAmount } from "@/lib/cashAmount";
-import { isTlAmountRefused, tlAmountValue } from "@tarodan/shared";
+import { cashAmountValue, signedCashAmount } from "@/lib/cashAmount";
+import { negotiatedAmountError } from "@/lib/negotiatedAmount";
 import { useState, useEffect, Suspense } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -85,8 +85,9 @@ function NewTradeContent() {
   });
   const selectedProducts = picks.picked;
   const offeredIds = picks.pickedIds;
-  const cash = tlAmountValue(cashAmount);
-  const cashRefused = isTlAmountRefused(cashAmount);
+  const cash = cashAmountValue(cashAmount);
+  // Text that is not an amount, or an amount above the API's ceiling.
+  const cashError = negotiatedAmountError(cashAmount, t);
 
   const {
     preview: costPreview,
@@ -108,7 +109,7 @@ function NewTradeContent() {
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
       return toast.error(t("page.new.page.lutfenBirTeslimatAdresiSecinVeya"));
-    if (cashRefused) return toast.error(t("validation.amountFormatRefused"));
+    if (cashError) return toast.error(cashError);
     const sellerId = getSellerId(target);
     if (!sellerId) return toast.error(t("trade.sellerNotFound"));
 
@@ -222,9 +223,7 @@ function NewTradeContent() {
               onChange={(e) => setCashAmount(e.target.value)}
               placeholder="0,00"
               helperText={t("trade.cashHelper")}
-              error={
-                cashRefused ? t("validation.amountFormatRefused") : undefined
-              }
+              error={cashError}
             />
           </div>
           {cash > 0 && (

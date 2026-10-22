@@ -528,7 +528,7 @@ describe("useCounterOfferEditor, cash amount", () => {
   it.each(["12,50", "12.50"])("sends %s as 12.5", async (value) => {
     const result = await openAndPick();
     act(() => result.current.setCounterCashAmount(value));
-    expect(result.current.counterCashRefused).toBe(false);
+    expect(result.current.counterCashError).toBeUndefined();
     act(() => result.current.handleCounterSubmit());
     await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
     expect(counter.mock.calls[0][1].cashAmount).toBe(12.5);
@@ -553,11 +553,35 @@ describe("useCounterOfferEditor, cash amount", () => {
   it("flags a grouped value as refused and does not submit it", async () => {
     const result = await openAndPick();
     act(() => result.current.setCounterCashAmount("1.000"));
-    expect(result.current.counterCashRefused).toBe(true);
+    expect(result.current.counterCashError).toBe(
+      "validation.amountFormatRefused",
+    );
     act(() => result.current.handleCounterSubmit());
     expect(toastError).toHaveBeenCalledWith("validation.amountFormatRefused");
     expect(counter).not.toHaveBeenCalled();
   });
+
+  it("sends the API's ceiling as it is", async () => {
+    const result = await openAndPick();
+    act(() => result.current.setCounterCashAmount("9999999"));
+    expect(result.current.counterCashError).toBeUndefined();
+    act(() => result.current.handleCounterSubmit());
+    await waitFor(() => expect(counter).toHaveBeenCalledTimes(1));
+    expect(counter.mock.calls[0][1].cashAmount).toBe(9_999_999);
+  });
+
+  it.each(["10000000", "9999999,01"])(
+    "refuses %s above the API's ceiling and does not submit it",
+    async (value) => {
+      const result = await openAndPick();
+      act(() => result.current.setCounterCashAmount(value));
+      expect(result.current.counterCashError).toBe("validation.amountAboveMax");
+      expect(result.current.counterCashValue).toBe(0);
+      act(() => result.current.handleCounterSubmit());
+      expect(toastError).toHaveBeenCalledWith("validation.amountAboveMax");
+      expect(counter).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("useCounterOfferEditor, identical-offer check", () => {

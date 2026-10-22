@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * read by the shared TL amount parser: the request carries the parsed amount
  * and refused text never reaches the API.
  */
-const h = vi.hoisted(() => ({ create: vi.fn() }));
+const h = vi.hoisted(() => ({ create: vi.fn(), price: 2000 }));
 
 vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -34,8 +34,9 @@ vi.mock("../_context/ListingDetailContext", () => ({
     t: (k: string) => k,
     locale: "tr",
     listing: { id: "p1" },
-    // 2000 TL listing: offers from 1000 TL up to (not including) 2000 TL.
-    effectivePrice: 2000,
+    // 2000 TL listing by default: offers from 1000 TL up to (not including)
+    // 2000 TL.
+    effectivePrice: h.price,
     showOfferModal: true,
     setShowOfferModal: vi.fn(),
   }),
@@ -49,11 +50,7 @@ const REFUSED =
 let root: Root;
 let container: HTMLDivElement;
 
-beforeEach(() => {
-  h.create.mockReset().mockResolvedValue({ data: {} });
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
+const mount = () => {
   const client = new QueryClient({
     defaultOptions: { mutations: { retry: false } },
   });
@@ -66,6 +63,15 @@ beforeEach(() => {
       </QueryClientProvider>,
     ),
   );
+};
+
+beforeEach(() => {
+  h.create.mockReset().mockResolvedValue({ data: {} });
+  h.price = 2000;
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  mount();
 });
 
 afterEach(() => {
@@ -150,4 +156,33 @@ describe("OfferModal amount", () => {
       expect.objectContaining({ productId: "p1", amount }),
     );
   });
+});
+
+describe("OfferModal, the API's ceiling of an agreed amount", () => {
+  // A 12,000,000 TL listing: its bounds (6,000,000 up to 12,000,000) straddle
+  // the ceiling.
+  beforeEach(() => {
+    h.price = 12_000_000;
+    mount();
+  });
+
+  it("sends the ceiling itself", async () => {
+    type("9999999");
+    await send();
+    expect(h.create).toHaveBeenCalledWith(
+      expect.objectContaining({ productId: "p1", amount: 9_999_999 }),
+    );
+  });
+
+  it.each(["10000000", "9999999,01"])(
+    "refuses %j above the ceiling with no API call",
+    async (text) => {
+      type(text);
+      await send();
+      expect(document.body.textContent).toContain(
+        "Tutar 9.999.999 TL'yi aşamaz.",
+      );
+      expect(h.create).not.toHaveBeenCalled();
+    },
+  );
 });
