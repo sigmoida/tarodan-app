@@ -5,22 +5,23 @@
 import { SectionCard } from "@/components/ui";
 import { formatPriceNumber, formatTL } from "@/lib/format";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import {
   buyerOrderSummaryOf,
-  isMembershipOrder,
   sellerOrderSummaryOf,
   type OrderDetail,
 } from "../_lib/types";
 
 /**
- * Siparişin para özeti — alıcıya ödediğinin, satıcıya hak ettiğinin kırılımı.
+ * The order's money summary: what the buyer paid, what the seller earns.
  *
- * Tutarların hiçbiri burada türetilmez: satırlar `buyerOrderSummaryOf` /
- * `sellerOrderSummaryOf` ile hesaplanır (KDV dağıtım kuralı ve neden öyle
- * olduğu orada yazılı) ve bu bileşen yalnız basar.
+ * No amount is derived here: the rows come from `buyerOrderSummaryOf` /
+ * `sellerOrderSummaryOf` (the VAT split rule and its reason are documented
+ * there) and this component only prints them. A digital order always gets
+ * the buyer summary, without the shipping row.
  */
 export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
-  if (order.isSeller && !isMembershipOrder(order)) {
+  if (order.isSeller && !isDigitalOrder(order)) {
     return <SellerSummary order={order} />;
   }
   return <BuyerSummary order={order} />;
@@ -80,16 +81,17 @@ function BuyerSummary({ order }: { order: OrderDetail }) {
           <span>{t("order.productAmount")}</span>
           <span>₺{formatPriceNumber(s.productAmount)}</span>
         </div>
-        {/* Üyelik/dijital siparişlerde kargo satırı yoktur */}
-        {!isMembershipOrder(order) && (
+        {/* A digital order (membership, boost) has no shipping row. */}
+        {!isDigitalOrder(order) && (
           <div className="flex justify-between text-muted">
             <span>{t("checkout.shipping")}</span>
             <span>
               {s.shippingAmount > 0
                 ? `₺${formatPriceNumber(s.shippingAmount)}`
                 : order.packageId
-                  ? /* Satıcı paketi kardeşi: kargo pakette bir kez ödendi, bu order 0 →
-                       "Ücretsiz" YANLIŞ olur; kargo pakete dahildir. */
+                  ? /* Sibling in a seller package: shipping was paid once for the
+                       package and this order carries 0, so "Free" would be
+                       wrong; shipping is included in the package. */
                     t("order.shippingIncludedInPackage")
                   : t("membership.free")}
             </span>

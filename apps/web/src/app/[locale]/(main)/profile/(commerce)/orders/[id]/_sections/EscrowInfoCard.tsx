@@ -5,17 +5,16 @@
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { Alert } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import { useTimingPolicy, useTimingValues } from "@/hooks/useTimingPolicy";
-import {
-  computePayoutDate,
-  isMembershipOrder,
-  type OrderDetail,
-} from "../_lib/types";
+import { computePayoutDate, type OrderDetail } from "../_lib/types";
 
 /**
- * Escrow bilgisi (teslim sonrası) — alıcı onayı artık payout tetiklemez.
- * Satıcıya ödeme: sunucunun hold'a yazdığı tarihte (teslim + iade penceresi +
- * payout grace) otomatik; tarih ve gün sayısı Süreler ve Kurallar'dan gelir.
+ * Escrow note after delivery; the buyer's confirmation no longer triggers the
+ * payout. The seller is paid automatically on the date the server wrote to
+ * the hold (delivery + return window + payout grace); the date and day counts
+ * come from the timing rules. A digital order (membership, boost) has no
+ * escrow.
  */
 export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
@@ -25,7 +24,7 @@ export default function EscrowInfoCard({ order }: { order: OrderDetail }) {
   if (
     !order.isBuyer ||
     !["delivered", "awaiting_buyer_confirmation"].includes(order.status) ||
-    isMembershipOrder(order)
+    isDigitalOrder(order)
   ) {
     return null;
   }

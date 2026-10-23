@@ -7,13 +7,15 @@ import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Button, Modal } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import { useConfirmDelivery } from "../_hooks/useOrderDetail";
-import { isMembershipOrder, type OrderDetail } from "../_lib/types";
+import type { OrderDetail } from "../_lib/types";
 
 /**
- * Alıcının "Teslim Aldım" onayı. delivered → sipariş tamamlanır;
- * awaiting_buyer_confirmation (48s penceresi) → erken onay. Onay, satıcı
- * ödemesinin planlanmasını hızlandırır — bu yüzden onay modalı ile korunur.
+ * The buyer's "I received it" confirmation. delivered -> the order completes;
+ * awaiting_buyer_confirmation (the 48 h window) -> early confirmation. It
+ * speeds up the seller payout, so a confirm dialog guards it. A digital order
+ * (membership, boost) is never delivered, so it has none.
  */
 export default function ConfirmDeliverySection({
   order,
@@ -27,7 +29,7 @@ export default function ConfirmDeliverySection({
   const early = order.status === "awaiting_buyer_confirmation";
   const visible =
     !!order.isBuyer &&
-    !isMembershipOrder(order) &&
+    !isDigitalOrder(order) &&
     (order.status === "delivered" || early) &&
     !order.activeRefundRequest;
   if (!visible) return null;

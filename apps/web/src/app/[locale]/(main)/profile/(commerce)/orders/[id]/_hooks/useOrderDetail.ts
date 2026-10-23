@@ -17,6 +17,7 @@ import { combinePhone } from "@/lib/phone";
 import { useTranslations } from "next-intl";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
+import { logger } from "@/lib/logger";
 import type {
   ElogoInvoice,
   OrderDetail,
@@ -24,9 +25,10 @@ import type {
 } from "../_lib/types";
 
 /**
- * Grup çatısı görünümü: order id sunucuda grubuna çözülür (grupsuz sipariş =
- * sentetik tek siparişlik grup). Aynı 'order' resource anahtarı kullanılır ki
- * mevcut invalidation'lar (iptal/iade/onay) bu sorguyu da tazelesin.
+ * The group umbrella view: the server resolves the order id to its group (an
+ * ungrouped order is a synthetic one-order group). It uses the same 'order'
+ * resource key so the existing invalidations (cancel, refund, confirm) refresh
+ * this query too.
  */
 export function useOrderGroupQuery(orderId: string, enabled: boolean) {
   const t = useTranslations();
@@ -40,6 +42,12 @@ export function useOrderGroupQuery(orderId: string, enabled: boolean) {
         throw new Error(
           t("page.orders.useorderdetail.invalidOrderGroupResponse"),
         );
+      }
+      // `kind` decides the digital-order gating; without it `isDigitalOrder`
+      // falls back to `origin` and `isMembership`. The breadcrumb (order id
+      // only) shows a stale API in the trail of any error on this page.
+      if (data.orders.some((o: { kind?: unknown }) => !o?.kind)) {
+        logger.info("order.digital.fallback", { orderId: id });
       }
       return data;
     },
