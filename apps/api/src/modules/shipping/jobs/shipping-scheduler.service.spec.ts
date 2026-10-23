@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
 import { ShippingSchedulerService } from "./shipping-scheduler.service";
 
@@ -142,5 +143,105 @@ describe("ShippingSchedulerService", () => {
     );
     expect(tracking.syncAllActiveTradeShipments).toHaveBeenCalledTimes(1);
     expect(tracking.syncAllActiveRefundReturns).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * One failure, one alarm: per-record failures are warn lines whose ids land
+   * in the run summary (the alarm); a step that threw logged its own error, so
+   * a summary made only of those is marked reported and the cron tracker
+   * keeps it out of Sentry.
+   */
+  describe("which line is the alarm", () => {
+    let error: jest.SpyInstance;
+    beforeEach(() => {
+      error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+      jest.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const failure = async (run: Promise<unknown>) => {
+      try {
+        await run;
+      } catch (e) {
+        return e as CronStepFailuresError;
+      }
+      throw new Error("expected the run to fail");
+    };
+
+    it("makes the summary the alarm for record failures and names them", async () => {
+      const { service, tracking } = makeService();
+      tracking.syncAllActiveShipments.mockResolvedValue({
+        synced: 0,
+        pending: 0,
+        failed: 1,
+        failures: ["PKG-WQMTZDB5TT (network: fetch failed)"],
+      });
+      tracking.syncAllActiveTradeShipments.mockResolvedValue({
+        synced: 0,
+        pending: 0,
+        failed: 1,
+        failures: ["trade-leg-1 (Sürat takip provider hatası: hatalı)"],
+      });
+
+      const e = await failure(service.runSyncSuratTracking());
+
+      expect(e.alreadyReported).toBe(false);
+      expect(e.message).toContain("PKG-WQMTZDB5TT");
+      expect(e.message).toContain("trade-leg-1");
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it("marks a summary of thrown steps as already reported", async () => {
+      const { service, tracking } = makeService();
+      tracking.syncAllActiveShipments.mockRejectedValue(new Error("db down"));
+
+      const e = await failure(service.runSyncSuratTracking());
+
+      expect(e.alreadyReported).toBe(true);
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(
+        "Sürat tracking sync error: db down",
+        expect.stringContaining("db down"),
+      );
+    });
+
+    it("keeps the summary an alarm when thrown and record failures mix", async () => {
+      const { service, tracking } = makeService();
+      tracking.syncAllActiveShipments.mockRejectedValue(new Error("db down"));
+      tracking.syncAllActiveRefundReturns.mockResolvedValue({
+        synced: 0,
+        pending: 0,
+        failed: 1,
+        failures: ["refund-1 (timeout)"],
+      });
+
+      const e = await failure(service.runSyncSuratTracking());
+
+      expect(e.alreadyReported).toBe(false);
+    });
+
+    it("does not log the barcode retry again when it reported its own steps", async () => {
+      const { service, tracking } = makeService();
+      tracking.retryPendingBarcodes.mockRejectedValue(
+        new CronStepFailuresError(["order-barcode-retry"], ["x"], true),
+      );
+
+      const e = await failure(service.runSyncSuratTracking());
+
+      expect(e.alreadyReported).toBe(true);
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it("leaves a post-delivery sweep failure to the cron tracker alone", async () => {
+      const { service, tracking } = makeService();
+      const boom = new Error("db down");
+      tracking.syncPostDeliveryShipments.mockRejectedValue(boom);
+
+      await expect(service.runSyncSuratPostDelivery()).rejects.toBe(boom);
+      expect(error).not.toHaveBeenCalled();
+    });
   });
 });

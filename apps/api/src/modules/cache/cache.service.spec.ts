@@ -48,6 +48,34 @@ describe("CacheService.setIfAbsent", () => {
 });
 
 /**
+ * `claimKey` is the same atomic SET but keeps "Redis down" apart from "held":
+ * the Sentry repeat throttle reports on an outage instead of going silent.
+ */
+describe("CacheService.claimKey", () => {
+  const withClient = (set: jest.Mock) => {
+    const service = new CacheService({} as ConfigService);
+    (service as unknown as { client: { set: jest.Mock } }).client = { set };
+    return service;
+  };
+
+  it("claims a free key with one atomic SET EX NX", async () => {
+    const set = jest.fn().mockResolvedValue("OK");
+    await expect(withClient(set).claimKey("k", 60)).resolves.toBe("claimed");
+    expect(set).toHaveBeenCalledWith("k", "1", "EX", 60, "NX");
+  });
+
+  it("reports a key someone else holds as held", async () => {
+    const service = withClient(jest.fn().mockResolvedValue(null));
+    await expect(service.claimKey("k", 60)).resolves.toBe("held");
+  });
+
+  it("reports a Redis failure as unavailable, never as held", async () => {
+    const service = withClient(jest.fn().mockRejectedValue(new Error("down")));
+    await expect(service.claimKey("k", 60)).resolves.toBe("unavailable");
+  });
+});
+
+/**
  * The step-up (`ReauthService`) fails closed on these answers: `incr` 0 means
  * "no attempt reserved" (503, no proof checked) and `get` null means "no
  * token" (403 REAUTH_REQUIRED). A rethrow or another value here would change

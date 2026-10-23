@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../../prisma";
 import {
@@ -347,6 +348,7 @@ export class TradeTrackingSyncService {
     synced: number;
     pending: number;
     failed: number;
+    failures: string[];
   }> {
     // #2: order sync ile AYNI filtre — terminal-OLMAYAN her bacağı pollala.
     // Eski `in: [label_created, pending, in_transit]` beyaz-listesi, ara durumlara
@@ -371,6 +373,10 @@ export class TradeTrackingSyncService {
     let synced = 0;
     let pending = 0;
     let failed = 0;
+    // Id + reason of each thrown failure: the cron run summary lists them and
+    // is their one alarm. warn here, because the same leg fails every run and
+    // an error per leg made each one a Sentry event every 30 minutes.
+    const failures: string[] = [];
 
     for (const ts of activeTradeShipments) {
       try {
@@ -378,10 +384,10 @@ export class TradeTrackingSyncService {
         if (result === "synced") synced++;
         else if (result === "pending") pending++;
         else failed++;
-      } catch (error: any) {
-        this.logger.error(
-          `Failed to sync trade-shipment ${ts.id}: ${error.message}`,
-        );
+      } catch (error: unknown) {
+        const reason = errorMessage(error);
+        this.logger.warn(`Failed to sync trade-shipment ${ts.id}: ${reason}`);
+        failures.push(`${ts.id} (${reason})`);
         failed++;
       }
     }
@@ -389,7 +395,7 @@ export class TradeTrackingSyncService {
     this.logger.log(
       `Surat trade-shipment sync: ${synced} synced, ${pending} pending, ${failed} failed out of ${activeTradeShipments.length}`,
     );
-    return { synced, pending, failed };
+    return { synced, pending, failed, failures };
   }
 
   /**

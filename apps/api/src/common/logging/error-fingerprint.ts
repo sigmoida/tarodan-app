@@ -13,18 +13,24 @@
  * job'ları) farklı fingerprint'i alır.
  */
 
+import { maskIdentifiers } from "./error-identifiers";
+
 const MAX_NORMALIZED_LENGTH = 160;
 
 const DURATION_PATTERN = /\(\s*\d+(?:\.\d+)?\s*(?:ms|s|sn|dk|m|h)\s*\)/gi;
 const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
-// PKG-/ORD-/GRP-/RFD-/TKS-/TRD- işlem/varlık kodları: tire opsiyonel çünkü
-// "no=TRD10023" gibi bitişik kullanımlar da var.
+// Legacy digit-only codes ("no=TRD10023", "ORD123"). Real references are
+// alphanumeric (`PKG-WQMTZDB5TT`) and are masked by `maskIdentifiers`; without
+// that every parcel opened its own Sentry issue.
 const ENTITY_CODE_PATTERN = /\b(PKG|ORD|GRP|RFD|TKS|TRD)-?\d+\b/gi;
-const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+// Shared with the repeat-report key (`error-report-key.ts`): one rule for
+// what is volatile text, so both read a message the same way.
+export const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 // Mask only the query string; the path stays for its diagnostic value. Both
 // absolute URLs and relative request paths ("GET /api/products?search=...").
-const URL_QUERY_PATTERN = /((?:\bhttps?:\/\/|(?<![\w/])\/)[^\s?]*)\?[^\s]*/gi;
+export const URL_QUERY_PATTERN =
+  /((?:\bhttps?:\/\/|(?<![\w/])\/)[^\s?]*)\?[^\s]*/gi;
 // Tırnak içindeki değer bir rakam barındırıyorsa değişkendir (id, sayı, kod);
 // yalnızca harflerden oluşan tırnaklı değerler (cron job adları gibi) sabit
 // kalır ki "Cron 'refund-crons' FAILED" ile "Cron 'sync-surat-tracking'
@@ -38,9 +44,13 @@ const LONG_DIGIT_RUN_PATTERN = /\b\d{4,}\b/g;
  * Saf fonksiyon: aynı girdi her zaman aynı çıktıyı üretir.
  */
 export function normalizeErrorMessage(message: string): string {
-  let normalized = message
-    .replace(DURATION_PATTERN, "(<dur>)")
-    .replace(UUID_PATTERN, "<uuid>")
+  const withoutIds = maskIdentifiers(
+    message
+      .replace(DURATION_PATTERN, "(<dur>)")
+      .replace(UUID_PATTERN, "<uuid>"),
+    "<code>",
+  );
+  let normalized = withoutIds
     .replace(ENTITY_CODE_PATTERN, "<code>")
     .replace(EMAIL_PATTERN, "<email>")
     .replace(URL_QUERY_PATTERN, "$1?<query>")

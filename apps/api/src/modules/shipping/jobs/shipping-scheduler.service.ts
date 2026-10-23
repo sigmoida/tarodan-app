@@ -4,9 +4,16 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { SuratTrackingService } from "../../surat-cargo/sync/surat-tracking.service";
-import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
+import {
+  CronStepFailuresError,
+  isAlreadyReportedCronFailure,
+} from "../../../monitoring/cron-step-runner";
 import { PrismaService } from "../../../prisma";
 import { resolveTimingValue } from "../../../common/timing-rules";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 
 /**
  * Teslim sonrası SICAK pencere. İade orijinal etiketle dönüyorsa teslimden hemen
@@ -97,32 +104,28 @@ export class ShippingSchedulerService implements OnModuleInit {
     toHoursAgo: number,
     log: (msg: string) => void,
   ) {
-    try {
-      const result = await this.suratTracking.syncPostDeliveryShipments(
-        fromHoursAgo,
-        toHoursAgo,
+    // No try/catch logging here: a failure is rethrown to the cron tracker,
+    // which reports it once with its stack (a log here made it two events).
+    const result = await this.suratTracking.syncPostDeliveryShipments(
+      fromHoursAgo,
+      toHoursAgo,
+    );
+    const summary =
+      `Teslim sonrası kargo senkron (${fromHoursAgo}s-${toHoursAgo}s): ` +
+      `${result.synced} güncellendi, ${result.pending} beklemede, ${result.failed} başarısız`;
+    log(summary);
+    if (result.failed > 0) {
+      throw new CronStepFailuresError(
+        [step],
+        [
+          `${step}: ${result.failed} kayıt senkronlanamadı${describeFailures(result.failures)}`,
+        ],
       );
-      const summary =
-        `Teslim sonrası kargo senkron (${fromHoursAgo}s-${toHoursAgo}s): ` +
-        `${result.synced} güncellendi, ${result.pending} beklemede, ${result.failed} başarısız`;
-      log(summary);
-      if (result.failed > 0) {
-        throw new CronStepFailuresError(
-          [step],
-          [
-            `${step}: ${result.failed} kayıt senkronlanamadı${describeFailures(result.failures)}`,
-          ],
-        );
-      }
-      // `stats` sayısal telemetri (Record<string, number>); failures metinsel
-      // teşhis bilgisi ve yeri alarm mesajı — ikisi karışmasın.
-      const { failures: _failures, ...counts } = result;
-      return { summary, stats: counts };
-    } catch (error: any) {
-      if (error instanceof CronStepFailuresError) throw error;
-      this.logger.error(`${step} error: ${error?.message}`);
-      throw error;
     }
+    // `stats` sayısal telemetri (Record<string, number>); failures metinsel
+    // teşhis bilgisi ve yeri alarm mesajı — ikisi karışmasın.
+    const { failures: _failures, ...counts } = result;
+    return { summary, stats: counts };
   }
 
   /**
@@ -132,10 +135,19 @@ export class ShippingSchedulerService implements OnModuleInit {
   async runSyncSuratTracking(log: (msg: string) => void = () => {}) {
     const failedSteps: string[] = [];
     const failureDetails: string[] = [];
-    const recordStepFailure = (step: string, error: unknown) => {
-      const message = (error as Error)?.message ?? String(error);
+    // A step that threw logged its own error below; a "-records" step only
+    // counted per-record warnings, so the run summary is its one alarm. The
+    // summary stays an error unless every failure was already reported.
+    let everyFailureReported = true;
+    const recordStepFailure = (
+      step: string,
+      error: unknown,
+      reported: boolean,
+    ) => {
+      const message = errorMessage(error);
       failedSteps.push(step);
       failureDetails.push(`${step}: ${message}`);
+      if (!reported) everyFailureReported = false;
       return message;
     };
     const stats = {
@@ -163,6 +175,7 @@ export class ShippingSchedulerService implements OnModuleInit {
         recordStepFailure(
           "barcode-retry-records",
           new Error(`${stats.barcodeRetryFailed} kayıt tamamlanamadı`),
+          false,
         );
       }
       if (stats.barcodeRetried > 0 || stats.barcodeRetryFailed > 0) {
@@ -174,9 +187,17 @@ export class ShippingSchedulerService implements OnModuleInit {
             `(order ${retry.order.retried}/${retry.order.failed}, trade ${retry.trade.retried}/${retry.trade.failed})`,
         );
       }
-    } catch (error: any) {
-      const message = recordStepFailure("barcode-retry", error);
-      this.logger.error(`Surat barcode retry error: ${message}`);
+    } catch (error: unknown) {
+      const message = recordStepFailure("barcode-retry", error, true);
+      // BarcodeRetryService already logged each failed step at error.
+      if (isAlreadyReportedCronFailure(error)) {
+        this.logger.warn(`Surat barcode retry error: ${message}`);
+      } else {
+        this.logger.error(
+          `Surat barcode retry error: ${message}`,
+          errorStack(error),
+        );
+      }
       log(`Kargo kodu retry HATASI: ${message}`);
     }
 
@@ -193,6 +214,7 @@ export class ShippingSchedulerService implements OnModuleInit {
           new Error(
             `${result.failed} kayıt senkronlanamadı${describeFailures(result.failures)}`,
           ),
+          false,
         );
       }
       log(
@@ -204,9 +226,12 @@ export class ShippingSchedulerService implements OnModuleInit {
           `Sürat tracking sync: ${result.synced} synced, ${result.failed} failed`,
         );
       }
-    } catch (error: any) {
-      const message = recordStepFailure("order-tracking", error);
-      this.logger.error(`Sürat tracking sync error: ${message}`);
+    } catch (error: unknown) {
+      const message = recordStepFailure("order-tracking", error, true);
+      this.logger.error(
+        `Sürat tracking sync error: ${message}`,
+        errorStack(error),
+      );
       log(`Sipariş kargo senkron HATASI: ${message}`);
     }
 
@@ -219,7 +244,10 @@ export class ShippingSchedulerService implements OnModuleInit {
       if (tradeResult.failed > 0) {
         recordStepFailure(
           "trade-tracking-records",
-          new Error(`${tradeResult.failed} kayıt senkronlanamadı`),
+          new Error(
+            `${tradeResult.failed} kayıt senkronlanamadı${describeFailures(tradeResult.failures)}`,
+          ),
+          false,
         );
       }
       log(
@@ -230,9 +258,12 @@ export class ShippingSchedulerService implements OnModuleInit {
           `Sürat trade-shipment sync: ${tradeResult.synced} synced, ${tradeResult.failed} failed`,
         );
       }
-    } catch (error: any) {
-      const message = recordStepFailure("trade-tracking", error);
-      this.logger.error(`Sürat trade-shipment sync error: ${message}`);
+    } catch (error: unknown) {
+      const message = recordStepFailure("trade-tracking", error, true);
+      this.logger.error(
+        `Sürat trade-shipment sync error: ${message}`,
+        errorStack(error),
+      );
       log(`Takas kargo senkron HATASI: ${message}`);
     }
 
@@ -245,7 +276,10 @@ export class ShippingSchedulerService implements OnModuleInit {
       if (refundResult.failed > 0) {
         recordStepFailure(
           "refund-tracking-records",
-          new Error(`${refundResult.failed} kayıt senkronlanamadı`),
+          new Error(
+            `${refundResult.failed} kayıt senkronlanamadı${describeFailures(refundResult.failures)}`,
+          ),
+          false,
         );
       }
       log(
@@ -256,9 +290,12 @@ export class ShippingSchedulerService implements OnModuleInit {
           `Sürat refund-return sync: ${refundResult.synced} synced, ${refundResult.failed} failed`,
         );
       }
-    } catch (error: any) {
-      const message = recordStepFailure("refund-tracking", error);
-      this.logger.error(`Sürat refund-return sync error: ${message}`);
+    } catch (error: unknown) {
+      const message = recordStepFailure("refund-tracking", error, true);
+      this.logger.error(
+        `Sürat refund-return sync error: ${message}`,
+        errorStack(error),
+      );
       log(`İade kargo senkron HATASI: ${message}`);
     }
 
@@ -266,9 +303,12 @@ export class ShippingSchedulerService implements OnModuleInit {
     // alarmları — kayıt başına haftada bir, log-tabanlı uyarı kanalına.
     try {
       await this.suratTracking.alertStaleCargo();
-    } catch (error: any) {
-      const message = recordStepFailure("stale-cargo-alert", error);
-      this.logger.error(`Stale cargo alert error: ${message}`);
+    } catch (error: unknown) {
+      const message = recordStepFailure("stale-cargo-alert", error, true);
+      this.logger.error(
+        `Stale cargo alert error: ${message}`,
+        errorStack(error),
+      );
     }
 
     const totalSynced =
@@ -280,7 +320,11 @@ export class ShippingSchedulerService implements OnModuleInit {
         ? ` · ${stats.barcodeRetried} kod tamamlandı`
         : "";
     if (failedSteps.length > 0) {
-      throw new CronStepFailuresError(failedSteps, failureDetails);
+      throw new CronStepFailuresError(
+        failedSteps,
+        failureDetails,
+        everyFailureReported,
+      );
     }
     return {
       summary: `${totalSynced} kargo güncellendi · ${totalPending} kabul bekliyor · ${stats.failed} başarısız${retrySummary}`,

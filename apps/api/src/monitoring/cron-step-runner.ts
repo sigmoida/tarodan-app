@@ -8,13 +8,26 @@ import { errorMessage } from "../common/helpers/error-message";
  * çalışır ve Sentry Cron check-in'i "error" olur.
  */
 export class CronStepFailuresError extends Error {
+  /**
+   * @param alreadyReported true when EVERY failure listed here was already
+   *   logged at `error` (with its own id and stack) where it happened. The
+   *   run summary then logs at `warn` only (`CronTrackerService`), so one
+   *   failure is not two Sentry events. Leave it false when any failure was
+   *   logged at `warn` or not at all: the summary is then its only alarm.
+   */
   constructor(
     readonly failedSteps: string[],
     readonly details: string[],
+    readonly alreadyReported = false,
   ) {
     super(`${failedSteps.length} cron adımı başarısız: ${details.join(" | ")}`);
     this.name = "CronStepFailuresError";
   }
+}
+
+/** True for a step-failure summary whose failures were each logged at error. */
+export function isAlreadyReportedCronFailure(error: unknown): boolean {
+  return error instanceof CronStepFailuresError && error.alreadyReported;
 }
 
 export interface CronStepRunner {
@@ -52,9 +65,12 @@ export function createCronStepRunner(params: {
         const result = await fn();
         log?.(`OK ${name}`);
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         const message = errorMessage(error);
-        logger.error(`Step "${name}" failed: ${message}`, error?.stack);
+        logger.error(
+          `Step "${name}" failed: ${message}`,
+          error instanceof Error ? error.stack : undefined,
+        );
         log?.(`HATA ${name}: ${message}`);
         failedSteps.push(name);
         details.push(`${name}: ${message}`);
@@ -63,7 +79,8 @@ export function createCronStepRunner(params: {
     },
     assertAllStepsSucceeded(): void {
       if (failedSteps.length > 0) {
-        throw new CronStepFailuresError([...failedSteps], [...details]);
+        // Every step above logged its own failure at error.
+        throw new CronStepFailuresError([...failedSteps], [...details], true);
       }
     },
   };

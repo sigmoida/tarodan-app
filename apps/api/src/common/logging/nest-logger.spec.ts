@@ -1,5 +1,8 @@
+import { BadRequestException } from "@nestjs/common";
+import { i18nMessage } from "../../modules/i18n/localized-message";
 import { AppNestLogger } from "./nest-logger";
 import { readFingerprint } from "./error-fingerprint";
+import { takeReportKey } from "./error-report-key";
 import { getAppLogger } from "./logger";
 
 jest.mock("./logger", () => ({ getAppLogger: jest.fn() }));
@@ -91,5 +94,85 @@ describe("AppNestLogger", () => {
       "CustomError",
       "boom",
     ]);
+  });
+  it("gives an unchanged repeat of the same entity's failure the same report key", () => {
+    const logger = new AppNestLogger();
+    logger.error(
+      "Cron 'refund-crons' FAILED (120ms): Failed to finalize refund 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "CronTracker",
+    );
+    logger.error(
+      "Cron 'refund-crons' FAILED (98ms): Failed to finalize refund 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "CronTracker",
+    );
+    logger.error(
+      "Cron 'refund-crons' FAILED (98ms): Failed to finalize refund 9c858901-8a57-4791-81fe-4c455b099bc9",
+      "CronTracker",
+    );
+
+    const [first, repeat, otherRefund] = child.error.mock.calls.map(([, ctx]) =>
+      takeReportKey(ctx.error),
+    );
+    expect(first).toEqual(expect.any(String));
+    expect(repeat).toBe(first);
+    expect(otherRefund).not.toBe(first);
+  });
+
+  it("keys a supplied error by its own reason, not only by the log text", () => {
+    const logger = new AppNestLogger();
+    const insufficient = () =>
+      new Error(
+        "insufficient balance payment 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      );
+    logger.error("PayTR refund error:", insufficient(), "PaytrService");
+    logger.error("PayTR refund error:", insufficient(), "PaytrService");
+    logger.error(
+      "PayTR refund error:",
+      new Error(
+        "merchant blocked payment 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      ),
+      "PaytrService",
+    );
+    logger.error(
+      "PayTR refund error:",
+      new Error(
+        "insufficient balance payment 9c858901-8a57-4791-81fe-4c455b099bc9",
+      ),
+      "PaytrService",
+    );
+
+    const [first, repeat, otherReason, otherPayment] =
+      child.error.mock.calls.map(([, ctx]) => takeReportKey(ctx.error));
+    expect(repeat).toBe(first);
+    expect(otherReason).not.toBe(first);
+    expect(otherPayment).not.toBe(first);
+  });
+
+  it("keys two localized exceptions by their catalog keys, not by 'Bad Request Exception'", () => {
+    const logger = new AppNestLogger();
+    const refunded = () =>
+      new BadRequestException(
+        i18nMessage("server.payment.orderAlreadyRefunded"),
+      );
+    const other = () =>
+      new BadRequestException(i18nMessage("server.payment.paymentNotFound"));
+    expect(refunded().message).toBe(other().message);
+
+    logger.error("PayTR refund error:", refunded(), "PaytrService");
+    logger.error("PayTR refund error:", other(), "PaytrService");
+    logger.error(refunded(), "PaytrService");
+    logger.error(other(), "PaytrService");
+
+    const [withText, otherWithText, alone, otherAlone] =
+      child.error.mock.calls.map(([, ctx]) => takeReportKey(ctx.error));
+    expect(otherWithText).not.toBe(withText);
+    expect(otherAlone).not.toBe(alone);
+  });
+
+  it("does not key warn lines (they never reach Sentry)", () => {
+    new AppNestLogger().warn("degraded", "OrdersService");
+
+    expect(child.warn).toHaveBeenCalledWith("degraded", undefined);
+    expect(child.error).not.toHaveBeenCalled();
   });
 });

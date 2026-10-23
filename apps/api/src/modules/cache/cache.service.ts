@@ -168,15 +168,35 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     ttlSeconds: number,
     value: unknown = 1,
   ): Promise<boolean> {
+    return (await this.claimKey(key, ttlSeconds, value)) === "claimed";
+  }
+
+  /**
+   * `setIfAbsent` that tells "already held" apart from "Redis unavailable".
+   * For callers whose safe default differs from a lock: the Sentry repeat
+   * throttle must REPORT when Redis is down (an outage hiding every alarm is
+   * worse than a few duplicates), so it cannot read a failure as "held".
+   * Never throws; the failure is logged at warn only, because an error log
+   * here would loop back through the Sentry sink that called it.
+   */
+  async claimKey(
+    key: string,
+    ttlSeconds: number,
+    value: unknown = 1,
+  ): Promise<"claimed" | "held" | "unavailable"> {
     try {
       const serialized = JSON.stringify(value);
-      return (
-        (await this.client.set(key, serialized, "EX", ttlSeconds, "NX")) ===
-        "OK"
+      const result = await this.client.set(
+        key,
+        serialized,
+        "EX",
+        ttlSeconds,
+        "NX",
       );
-    } catch (error) {
-      this.logger.warn("Cache setIfAbsent error");
-      return false;
+      return result === "OK" ? "claimed" : "held";
+    } catch {
+      this.logger.warn("Cache claimKey error");
+      return "unavailable";
     }
   }
 
