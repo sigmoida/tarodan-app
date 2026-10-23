@@ -51,13 +51,25 @@ module.exports = {
       },
       BinaryExpression(node) {
         if (
-          node.operator === "+" &&
-          node.left.type === "Literal" &&
-          typeof node.left.value === "string" &&
-          PAGE_PREFIX.test(node.left.value)
+          node.operator !== "+" ||
+          node.left.type !== "Literal" ||
+          typeof node.left.value !== "string" ||
+          !PAGE_PREFIX.test(node.left.value)
         ) {
-          context.report({ node, messageId: "handBuilt" });
+          return;
         }
+        // `"/listings/" + id + "/edit"` parses as `("/listings/" + id) + "/edit"`:
+        // an action sub-route, allowed like its template-literal form.
+        const { parent } = node;
+        const subRoute =
+          parent &&
+          parent.type === "BinaryExpression" &&
+          parent.operator === "+" &&
+          parent.left === node &&
+          parent.right.type === "Literal" &&
+          typeof parent.right.value === "string" &&
+          parent.right.value.startsWith("/");
+        if (!subRoute) context.report({ node, messageId: "handBuilt" });
       },
     };
   },

@@ -34,6 +34,7 @@ describe("no-hand-built-listing-path", () => {
   it.each([
     "const href = listingPath({ id, title });",
     "const edit = `/listings/${id}/edit`;",
+    "const edit = '/listings/' + id + '/edit';",
     "const back = `/login?redirect=/listings/${id}/edit`;",
     "const api = `/admin/listings/${id}`;",
     "const list = '/listings';",
