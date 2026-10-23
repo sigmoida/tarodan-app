@@ -59,6 +59,9 @@ describe("critical admin audit durability", () => {
     // membership.service) bu tek dosyaya delege eder; zorunlu denetim yazımı
     // artık burada yaşar.
     "membership-tier-update.service.ts",
+    // Review moderation (hide / show again) is UGC moderation evidence
+    // (App Store 1.2): no visibility change without its audit row.
+    "admin-review.service.ts",
   ])("uses required audit writes in %s", (filename) => {
     const source = readFileSync(findByName(filename), "utf8");
     expect(source).toContain("createRequiredAuditLog");

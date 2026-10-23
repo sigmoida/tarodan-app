@@ -10,14 +10,15 @@
  *     GET users/:id, users/:id/stats, products/:id, products/:id/stats (@Public → misafire 200).
  *     POST /api/ratings/products/:ratingId/helpful (JWT korumalı, @Post default 201).
  *     Tüm :id path param'ları ParseUUIDPipe → geçersiz UUID = 400.
- *   - Admin moderasyon: PATCH /api/admin/reviews/:id/status ve
- *     /api/admin/user-ratings/:id/status (UpdateRatingStatusDto @IsEnum; geçersiz status=400;
- *     bulunamadı=404). GET /api/admin/reviews & /api/admin/user-ratings → { data, meta }.
+ *   - Admin moderation: PATCH /api/admin/reviews/:id/status and
+ *     /api/admin/user-ratings/:id/status take { status: "hidden" | "approved", reason? }
+ *     (reason 5-500 characters required to hide; any other status = 400; not found = 404).
+ *     GET /api/admin/reviews & /api/admin/user-ratings → { data, meta }.
  *     AdminController @UseGuards(AdminJwtAuthGuard, RolesGuard) + @Roles(super_admin,admin,moderator).
  *   - Puan yalnız DELIVERED/COMPLETED siparişte verilebilir; MEM- siparişleri reddedilir.
  *   - Rating.@@unique([giverId,orderId]) & ([giverId,tradeId]); ProductRating.orderId @unique.
- *   - Post-moderasyon: yeni puan status='approved' → anında public listede/stat'ta görünür;
- *     admin panelden sonradan rejected yapabilir. (Seed'lenen pending kayıtlar filtre dışı kalır.)
+ *   - Post-moderation: a new rating is status='approved' → public at once; an admin
+ *     can hide it later (`hidden`, with a reason). Seeded pending rows stay non-public.
  *   - AI moderasyon (küfür filtresi) test ortamında KAPALI (.env.test AI_MODERATION_ENABLED yok →
  *     ModerationAiClient.isEnabled=false → assertCleanComment no-op). RAT-060/061/062 için
  *     paylaşılan ModerationAiClient örneğinin `enabled` alanını test içinde geçici true'ya
@@ -882,16 +883,26 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
   // Admin moderasyon (PATCH reviews / user-ratings status)
   // ════════════════════════════════════════════════════════════════════════
   describe("Admin moderasyon", () => {
-    const patchReview = (auth: Auth, id: string, status: string) =>
+    const patchReview = (
+      auth: Auth,
+      id: string,
+      status: string,
+      reason?: string,
+    ) =>
       request(server())
         .patch(`/api/admin/reviews/${id}/status`)
         .set(authHeader(auth))
-        .send({ status });
-    const patchUserRating = (auth: Auth, id: string, status: string) =>
+        .send({ status, reason });
+    const patchUserRating = (
+      auth: Auth,
+      id: string,
+      status: string,
+      reason?: string,
+    ) =>
       request(server())
         .patch(`/api/admin/user-ratings/${id}/status`)
         .set(authHeader(auth))
-        .send({ status });
+        .send({ status, reason });
 
     scenario("RAT-070", async () => {
       // Admin ürün yorumunu onaylar → public listede görünür + Product denorm güncellenir.
@@ -929,7 +940,8 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
     });
 
     scenario("RAT-071", async () => {
-      // Admin yorumu reddeder → public listeden kalkar + ortalama düşer/null olur.
+      // An admin hides a review with a reason → it leaves the public list and the
+      // average; the row and the audit keep the reason; the author still sees it, flagged.
       const admin = (await createAdminUser(ctx.module)) as unknown as Auth;
       const { buyer, productId, orderId } = await setupDeliveredOrder();
       const rating = await seedApprovedProductRating({
@@ -946,7 +958,19 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
         data: { averageRating: 5, ratingCount: 1 },
       });
 
-      await patchReview(admin, rating.id, "rejected").expect(200);
+      // No reason → 400, nothing changes.
+      await patchReview(admin, rating.id, "hidden").expect(400);
+      expect(
+        (await prisma.productRating.findUnique({ where: { id: rating.id } }))
+          ?.status,
+      ).toBe(RatingStatus.approved);
+
+      await patchReview(
+        admin,
+        rating.id,
+        "hidden",
+        "  Off-topic advert  ",
+      ).expect(200);
       const list = await request(server())
         .get(`/api/ratings/products/${productId}`)
         .expect(200);
@@ -956,6 +980,28 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
       });
       expect(product?.averageRating).toBeNull();
       expect(product?.ratingCount).toBe(0);
+      const row = await prisma.productRating.findUnique({
+        where: { id: rating.id },
+      });
+      expect(row).toMatchObject({
+        status: RatingStatus.hidden,
+        moderationReason: "Off-topic advert",
+      });
+      expect(row?.moderatedAt).toBeInstanceOf(Date);
+      expect(row?.moderatedByAdminId).toBeTruthy();
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: "review_status_update", entityId: rating.id },
+      });
+      expect(audit).toMatchObject({
+        entityType: "ProductRating",
+        newValue: { status: "hidden", reason: "Off-topic advert" },
+      });
+
+      const own = await request(server())
+        .get(`/api/orders/${orderId}/my-review`)
+        .set(authHeader(buyer))
+        .expect(200);
+      expect(own.body.product).toMatchObject({ score: 5, hidden: true });
     });
 
     scenario("RAT-072", async () => {
@@ -982,7 +1028,23 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
       const audit = await prisma.auditLog.findFirst({
         where: { action: "user_rating_status_update", entityId: rating.id },
       });
-      expect(audit).toBeTruthy();
+      expect(audit).toMatchObject({ entityType: "Rating" });
+
+      // Hidden: it leaves the seller's public list and stats.
+      await patchUserRating(
+        admin,
+        rating.id,
+        "hidden",
+        "Abusive language",
+      ).expect(200);
+      const afterHide = await request(server())
+        .get(`/api/ratings/users/${seller.id}`)
+        .expect(200);
+      expect(afterHide.body.total).toBe(0);
+      const stats = await request(server())
+        .get(`/api/ratings/users/${seller.id}/stats`)
+        .expect(200);
+      expect(stats.body.totalRatings).toBe(0);
     });
 
     scenario("RAT-073", async () => {
@@ -1029,7 +1091,8 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
     });
 
     scenario("RAT-077", async () => {
-      // Yeniden onaya alma: rejected → pending → approved (her geçiş 200).
+      // Show again: there is no way back to pending (400); a legacy rejected or
+      // a hidden review is shown again with approved (200) and is public again.
       const admin = (await createAdminUser(ctx.module)) as unknown as Auth;
       const { buyer, productId, orderId } = await setupDeliveredOrder();
       const rating = await seedApprovedProductRating({
@@ -1038,12 +1101,25 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
         orderId,
         status: RatingStatus.rejected,
       });
-      await patchReview(admin, rating.id, "pending").expect(200);
+      await patchReview(admin, rating.id, "pending").expect(400);
+      await patchReview(admin, rating.id, "rejected", "Legacy action").expect(
+        400,
+      );
+      await patchReview(admin, rating.id, "approved").expect(200);
+      await patchReview(admin, rating.id, "hidden", "Spam link").expect(200);
       await patchReview(admin, rating.id, "approved").expect(200);
       const list = await request(server())
         .get(`/api/ratings/products/${productId}`)
         .expect(200);
       expect(list.body.total).toBe(1);
+      const row = await getPrisma().productRating.findUnique({
+        where: { id: rating.id },
+      });
+      // showing again keeps the last hide reason; the audit log has the history
+      expect(row).toMatchObject({
+        status: RatingStatus.approved,
+        moderationReason: "Spam link",
+      });
     });
 
     scenario("RAT-078", async () => {

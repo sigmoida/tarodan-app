@@ -11,7 +11,7 @@ import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { StorageService } from "../../storage/storage.service";
-import { RatingStatus, SellerApplicationQueryDto } from "../dto";
+import { SellerApplicationQueryDto } from "../dto";
 import {
   OrderStatus,
   Prisma,
@@ -29,10 +29,10 @@ import {
 import { i18nMessage } from "../../i18n";
 
 /**
- * Satıcı başvurusu admin operasyonları — AdminService'in SELLER APPLICATIONS
- * bölümünden birebir taşındı. updateUserRatingStatus da
- * bu banner aralığında olduğu için bölümle birlikte taşındı.
- * AdminService aynı imzalarla buraya delege eder.
+ * Admin operations on seller applications, moved from AdminService's SELLER
+ * APPLICATIONS section; AdminService delegates with the same signatures.
+ * (The user-rating status update that used to sit here is review moderation:
+ * it lives in AdminReviewService.)
  */
 @Injectable()
 export class AdminSellerApplicationService {
@@ -523,34 +523,5 @@ export class AdminSellerApplicationService {
       );
     }
     return { success: true, status: "approved" };
-  }
-
-  /**
-   * Update seller (user) rating status (approve/reject)
-   */
-  async updateUserRatingStatus(
-    adminId: string,
-    ratingId: string,
-    status: RatingStatus,
-  ) {
-    const rating = await this.prisma.rating.findUnique({
-      where: { id: ratingId },
-    });
-    if (!rating)
-      throw new NotFoundException(i18nMessage("server.admin.review.notFound"));
-    const previous = { ...rating };
-    await this.prisma.rating.update({
-      where: { id: ratingId },
-      data: { status },
-    });
-    await this.audit.createAuditLog(
-      adminId,
-      "user_rating_status_update",
-      "Rating",
-      ratingId,
-      previous,
-      { status },
-    );
-    return { success: true };
   }
 }

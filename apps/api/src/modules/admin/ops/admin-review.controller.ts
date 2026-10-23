@@ -48,15 +48,26 @@ export class AdminReviewController {
 
   @Patch("reviews/:id/status")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Update review status" })
+  @ApiOperation({
+    summary: "Hide a product review (reason required) or show it again",
+  })
   @ApiParam({ name: "id", description: "Review ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Review status updated" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Invalid status, or a missing or too long reason",
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: "No such review" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: "Another admin changed the status at the same time",
+  })
   async updateReviewStatus(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
     @Body() dto: UpdateRatingStatusDto,
   ) {
-    return this.adminService.updateReviewStatus(adminId, id, dto.status);
+    return this.adminService.updateReviewStatus(adminId, id, dto);
   }
 
   // ==================== SELLER (USER) RATINGS ====================
@@ -71,14 +82,25 @@ export class AdminReviewController {
 
   @Patch("user-ratings/:id/status")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Update seller rating status (approve/reject)" })
+  @ApiOperation({
+    summary: "Hide a user rating (reason required) or show it again",
+  })
   @ApiParam({ name: "id", description: "User Rating ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Status updated" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Invalid status, or a missing or too long reason",
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: "No such rating" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: "Another admin changed the status at the same time",
+  })
   async updateUserRatingStatus(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
     @Body() dto: UpdateRatingStatusDto,
   ) {
-    return this.adminService.updateUserRatingStatus(adminId, id, dto.status);
+    return this.adminService.updateUserRatingStatus(adminId, id, dto);
   }
 }
