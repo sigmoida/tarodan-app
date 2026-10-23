@@ -40,7 +40,6 @@ export function ProductReviewsSection({
 }) {
   const t = useTranslations();
   const { request, busyId, modalProps } = useReviewModeration(
-    "product-reviews",
     (id, body) => adminApi.updateReviewStatus(id, body),
     t("admin.accounts.reviews.productReview"),
   );

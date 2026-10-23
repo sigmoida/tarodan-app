@@ -17,7 +17,6 @@ import { useTranslations } from "next-intl";
 export function SellerReviewsTab() {
   const t = useTranslations();
   const { request, busyId, modalProps } = useReviewModeration(
-    "user-ratings",
     (id, body) => adminApi.updateUserRatingStatus(id, body),
     t("admin.accounts.reviews.sellerReview"),
   );
