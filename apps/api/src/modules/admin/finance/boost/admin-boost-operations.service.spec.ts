@@ -838,6 +838,63 @@ describe("AdminBoostOperationsService", () => {
       expect(notify).toHaveBeenCalledWith(listingTags);
     });
 
+    it("an uncertain refund reaches the admin unchanged and refreshes nothing", async () => {
+      const { service, payments, cache } = make();
+      const uncertain = new RefundPendingReconciliationException("timeout");
+      payments.processRefund.mockRejectedValue(uncertain);
+
+      await expect(
+        service.refund(ADMIN, "boost-1", { reason: REASON }),
+      ).rejects.toBe(uncertain);
+      expect(cache.del).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a stopped boost asked for another amount is refused without a refresh", async () => {
+      const { service, payments, cache } = make({
+        boost: paidBoost({
+          status: BoostStatus.cancelled,
+          refundedAmount: D(20),
+        }),
+      });
+
+      await expect(
+        service.refund(ADMIN, "boost-1", { reason: REASON, amount: 39 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(payments.processRefund).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a refresh failure never fails a grant or a revoke, and the notice still goes out", async () => {
+      const granted = make();
+      granted.cache.delPattern.mockRejectedValue(new Error("redis down"));
+      await expect(
+        granted.service.grant(ADMIN, {
+          productId: "u010001",
+          durationDays: 7,
+          reason: REASON,
+        }),
+      ).resolves.toEqual({ id: "grant-1" });
+      expect(granted.notices.flush).toHaveBeenCalledWith({
+        boostId: "grant-1",
+        kind: "granted",
+      });
+
+      const revoked = make({
+        boost: paidBoost({ source: BoostSource.admin_grant, orderId: null }),
+      });
+      revoked.cache.del.mockRejectedValue(new Error("redis down"));
+      await expect(
+        revoked.service.revoke(ADMIN, "boost-1", { reason: REASON }),
+      ).resolves.toEqual({ id: "boost-1" });
+      expect(revoked.notices.flush).toHaveBeenCalledWith({
+        boostId: "boost-1",
+        kind: "cancelled",
+      });
+    });
+
     it("a refresh failure never turns a refund that went through into an error", async () => {
       const { service, cache, notices } = make();
       cache.delPattern.mockRejectedValue(new Error("redis down"));
