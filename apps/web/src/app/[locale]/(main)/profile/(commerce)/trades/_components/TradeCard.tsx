@@ -20,6 +20,7 @@ import { TradeSwapBadge } from "./TradeSwapBadge";
 import { publicNameOf } from "@/lib/public-name";
 import { statusConfig } from "@/lib/statusLabels";
 import { imagePlaceholder } from "@/lib/placeholder";
+import { listingPath } from "@tarodan/types";
 
 const fmt = (n: number) =>
   n.toLocaleString("tr-TR", {
@@ -39,7 +40,10 @@ function ItemColumn({ label, items }: { label: string; items: TradeItem[] }) {
         {items.map((item, idx) => (
           <Link
             key={item.id || idx}
-            href={`/listings/${item.productId}`}
+            href={listingPath({
+              id: item.productId,
+              title: item.productTitle,
+            })}
             className="group/item flex items-center gap-3 rounded-lg p-2 transition-colors"
           >
             <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-border-subtle flex-shrink-0">

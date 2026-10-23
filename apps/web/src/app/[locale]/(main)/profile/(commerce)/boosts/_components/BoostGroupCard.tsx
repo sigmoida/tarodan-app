@@ -18,6 +18,7 @@ import BoostMetrics from "./BoostMetrics";
 import BoostPurchase from "./BoostPurchase";
 import BoostThumb from "./BoostThumb";
 import ReminderToggle from "./ReminderToggle";
+import { listingPath } from "@tarodan/types";
 
 /**
  * "Aktif": the running and paused boosts of one listing as one card, so the
@@ -53,7 +54,7 @@ export default function BoostGroupCard({
         <div className="min-w-0 flex-1 space-y-1">
           {isListingViewable(product.status) ? (
             <Link
-              href={`/listings/${product.id}`}
+              href={listingPath(product)}
               className="line-clamp-2 font-semibold text-heading hover:text-primary-600"
             >
               {product.title}

@@ -3,6 +3,7 @@
 import { ProductCard, SectionCard } from "@/components/ui";
 import type { Product } from "@/types/product";
 import { useListingDetail } from "../_context/ListingDetailContext";
+import { listingPath } from "@tarodan/types";
 
 /**
  * "Benzer Ürünler" — aynı kategorideki ürünlerin kart ızgarası.
@@ -27,7 +28,7 @@ export default function ProductRelated() {
               key={product.id}
               product={product}
               index={index}
-              href={`/listings/${product.id}`}
+              href={listingPath(product)}
             />
           ))}
         </div>

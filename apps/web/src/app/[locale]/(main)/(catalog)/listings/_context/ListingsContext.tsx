@@ -27,7 +27,7 @@ import { createUrlWriteTracker, normalizeParams } from "../_lib/urlSync";
 import { type ProductLayout } from "../_components/ProductLayoutSelector";
 
 export interface Listing {
-  id: string | number;
+  id: string;
   title: string;
   price: number;
   originalPrice?: number | null;

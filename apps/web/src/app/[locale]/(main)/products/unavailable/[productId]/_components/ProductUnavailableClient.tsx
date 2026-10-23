@@ -9,6 +9,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { SectionCard, ProductCard, ButtonLink } from "@/components/ui";
 import { useUnavailableProduct } from "../_hooks/useUnavailableProduct";
 import { useTranslations } from "next-intl";
+import { listingPath } from "@tarodan/types";
 
 export default function ProductUnavailableClient() {
   const t = useTranslations();
@@ -56,7 +57,10 @@ export default function ProductUnavailableClient() {
                 : t("product.unavailable.beklediginizUrunTekrarSatista")}{" "}
               Hemen incelemek ister misin?
             </p>
-            <ButtonLink variant="primary" href={`/listings/${productId}`}>
+            <ButtonLink
+              variant="primary"
+              href={listingPath({ id: productId, title: product?.title })}
+            >
               {t("product.unavailable.urunuGor")}
             </ButtonLink>
           </>
@@ -100,7 +104,7 @@ export default function ProductUnavailableClient() {
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {similar.map((p) => (
-              <ProductCard key={p.id} product={p} href={`/listings/${p.id}`} />
+              <ProductCard key={p.id} product={p} href={listingPath(p)} />
             ))}
           </div>
         )}

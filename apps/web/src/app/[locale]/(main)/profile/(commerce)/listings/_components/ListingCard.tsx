@@ -18,7 +18,7 @@ import {
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import { ProductBadge } from "@tarodan/ui/product-badge";
-import { productCardAction } from "@tarodan/types";
+import { productCardAction, listingPath } from "@tarodan/types";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useBoostEnabled } from "@/components/boost/useBoostOffers";
 import { useAuthStore } from "@/stores/authStore";
@@ -136,7 +136,7 @@ export default function ListingCard({
       <div className="flex flex-1 flex-col p-4">
         {viewable ? (
           <Link
-            href={`/listings/${listing.id}`}
+            href={listingPath(listing)}
             className="mb-2 line-clamp-2 font-semibold text-heading transition-colors after:absolute after:inset-0 group-hover:text-primary-600"
           >
             {listing.title}

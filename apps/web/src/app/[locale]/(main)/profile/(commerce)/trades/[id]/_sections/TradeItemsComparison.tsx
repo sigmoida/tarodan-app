@@ -13,6 +13,7 @@ import {
 import { TradeSwapBadge } from "../../_components/TradeSwapBadge";
 import { useTranslations } from "next-intl";
 import { imagePlaceholder } from "@/lib/placeholder";
+import { listingPath } from "@tarodan/types";
 
 function ItemColumn({
   heading,
@@ -38,7 +39,10 @@ function ItemColumn({
         {items.map((item) => (
           <Link
             key={item.id}
-            href={`/listings/${item.productId}`}
+            href={listingPath({
+              id: item.productId,
+              title: item.productTitle,
+            })}
             className="group/item flex items-center gap-3 rounded-lg p-2 transition-colors"
           >
             <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-border-subtle flex-shrink-0">

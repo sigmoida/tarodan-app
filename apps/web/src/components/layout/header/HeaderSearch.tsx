@@ -17,6 +17,7 @@ import {
   headerSearchQueryFor,
   headerSearchQueryForHref,
 } from "./_lib/searchSync";
+import { listingPath } from "@tarodan/types";
 
 const HeaderSearchDropdown = dynamic(() => import("./HeaderSearchDropdown"), {
   ssr: false,
@@ -260,7 +261,7 @@ function useNavSearch() {
         type: "product",
         id: p.id,
         label: p.title,
-        href: `/listings/${p.id}`,
+        href: listingPath(p),
       }),
     );
     autoResults.brands?.forEach((b) =>

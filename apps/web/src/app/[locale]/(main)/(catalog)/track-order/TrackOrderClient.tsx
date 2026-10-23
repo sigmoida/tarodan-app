@@ -22,6 +22,7 @@ import GuestCancelModal from "./_components/GuestCancelModal";
 // (hareket eden kargo durumu VEYA shippedAt mührü) — kopya liste yok.
 import { isOrderCancellable } from "../../profile/(commerce)/orders/_lib/types";
 import { statusConfig } from "@/lib/statusLabels";
+import { listingPath } from "@tarodan/types";
 
 /** Etiket + değer satırı — kargo ve adres bloklarında tekrar eden desen. */
 function Row({
@@ -206,7 +207,9 @@ export default function TrackOrderClient() {
               </div>
               <div className="min-w-0 flex-1">
                 <Link
-                  href={`/listings/${order.product?.id}`}
+                  href={
+                    order.product ? listingPath(order.product) : "/listings"
+                  }
                   className="line-clamp-2 font-medium text-heading hover:text-primary-600"
                 >
                   {order.product?.title}

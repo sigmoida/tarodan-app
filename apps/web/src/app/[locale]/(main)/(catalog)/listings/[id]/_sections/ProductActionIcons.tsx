@@ -7,7 +7,7 @@ import { IconButton } from "@tarodan/ui";
 import ShareMenu from "@/components/share/ShareMenu";
 import { FAVORITE_BUSY_CLASS, favoriteBusyProps } from "@/lib/favorite-busy";
 import { formatTL } from "@/lib/format";
-import { listingSharePath } from "@/lib/share";
+import { listingPath } from "@tarodan/types";
 import { useListingDetail } from "../_context/ListingDetailContext";
 
 /**
@@ -65,7 +65,7 @@ export default function ProductActionIcons() {
       </IconButton>
 
       <ShareMenu
-        path={listingSharePath(id)}
+        path={listingPath({ id, title: listing?.title })}
         title={listing?.title ?? ""}
         text={
           listing ? `${listing.title} - ${formatTL(effectivePrice)}` : undefined

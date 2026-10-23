@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
 import { tlAmountValue } from "@tarodan/shared";
+import { listingPath } from "@tarodan/types";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { invalidateListingQueries } from "@/lib/query/invalidateListing";
@@ -225,7 +226,12 @@ export function useEditListingForm({
     onSuccess: () => {
       toast.success(t("product.listingUpdated"));
       void invalidateListingQueries(queryClient, id);
-      router.push(`/listings/${id}`);
+      // The bare UUID, not the new title's slug: the server page decides the
+      // canonical URL from its cached product, and the on-demand revalidation
+      // of that cache is fire-and-forget. Pushing the new slug before it lands
+      // would be redirected straight back to the old one; the bare UUID goes
+      // to whatever the server holds and moves on once the cache refreshes.
+      router.push(listingPath({ id }));
     },
     onError: (error: any) =>
       toast.error(error.response?.data?.message || t("product.updateFailed")),

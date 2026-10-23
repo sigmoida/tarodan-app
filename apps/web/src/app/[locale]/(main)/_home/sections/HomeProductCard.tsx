@@ -18,6 +18,7 @@ import {
 import type { Product } from "@/types/product";
 import { getImageUrl } from "../lib/helpers";
 import { formatTL } from "@/lib/format";
+import { listingPath } from "@tarodan/types";
 
 // Para biçimi TEK yerden gelir (`lib/format`): ekranlar kendi
 // `toLocaleString` çağrılarını yazdığında aynı ürün bir kartta "468 ₺",
@@ -84,7 +85,7 @@ export default function HomeProductCard({
       <div className="flex flex-1 flex-col p-2.5">
         <h3 className="mb-1 line-clamp-2 text-sm font-medium leading-tight text-heading transition-colors group-hover:text-primary-600 sm:text-md">
           <ProductCardTitleLink
-            href={`/listings/${product.id}`}
+            href={listingPath(product)}
             title={product.title}
             badgeSummary={describeProductBadges(
               selectProductCardBadges(product),

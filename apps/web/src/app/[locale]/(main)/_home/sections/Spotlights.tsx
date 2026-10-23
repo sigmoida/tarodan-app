@@ -10,6 +10,7 @@ import type { FeaturedBusiness, FeaturedCollector } from "../lib/types";
 import { getImageUrl } from "../lib/helpers";
 import HomeAvatar from "./HomeAvatar";
 import { publicNameOf } from "@/lib/public-name";
+import { listingPath } from "@tarodan/types";
 
 export default async function Spotlights({
   featuredCollector,
@@ -86,7 +87,12 @@ export default async function Spotlights({
                         <Link
                           key={item.id}
                           href={
-                            item.productId ? `/listings/${item.productId}` : "#"
+                            item.productId
+                              ? listingPath({
+                                  id: item.productId,
+                                  title: item.productTitle,
+                                })
+                              : "#"
                           }
                           className="block"
                         >
@@ -194,7 +200,7 @@ export default async function Spotlights({
                       {featuredBusiness.products.slice(0, 5).map((product) => (
                         <Link
                           key={product.id}
-                          href={`/listings/${product.id}`}
+                          href={listingPath(product)}
                           className="block"
                         >
                           <div className="relative aspect-square bg-surface-alt rounded overflow-hidden">

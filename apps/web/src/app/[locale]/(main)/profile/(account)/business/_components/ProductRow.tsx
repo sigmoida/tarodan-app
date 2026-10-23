@@ -10,6 +10,7 @@ import {
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { formatTL } from "@/lib/format";
 import type { ProductStats } from "../_lib/types";
+import { listingPath } from "@tarodan/types";
 
 export default function ProductRow({
   product,
@@ -22,7 +23,7 @@ export default function ProductRow({
 }) {
   return (
     <Link
-      href={`/listings/${product.id}`}
+      href={listingPath(product)}
       className="group flex items-center gap-4 rounded-lg p-3 transition-colors hover:bg-surface"
     >
       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-alt text-sm font-bold text-muted">

@@ -6,12 +6,17 @@
   "extends": ["@tarodan/eslint-config/next.json"],
   "plugins": ["@tarodan"],
   "rules": {
-    "@tarodan/no-hardcoded-turkish": "error"
+    "@tarodan/no-hardcoded-turkish": "error",
+    "@tarodan/no-hand-built-listing-path": "error"
   },
   "overrides": [
     {
       "files": ["**/*.spec.*", "**/*.test.*"],
-      "rules": { "@tarodan/no-hardcoded-turkish": "off" }
+      "rules": {
+        "@tarodan/no-hardcoded-turkish": "off",
+        // Tests spell expected URLs out by hand on purpose: an independent oracle.
+        "@tarodan/no-hand-built-listing-path": "off"
+      }
     },
     {
       "files": ["**/turkeyLocations.ts", "**/brands-data.ts"],

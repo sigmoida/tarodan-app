@@ -17,5 +17,11 @@ import { routing } from "./routing";
  * (External `<a>` links and the API `next/navigation` bits that don't move —
  * `useSearchParams`, `notFound` — stay on the originals.)
  */
-export const { Link, redirect, usePathname, useRouter, getPathname } =
-  createNavigation(routing);
+export const {
+  Link,
+  redirect,
+  permanentRedirect,
+  usePathname,
+  useRouter,
+  getPathname,
+} = createNavigation(routing);
