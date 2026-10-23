@@ -6,7 +6,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
-import { generateSlug } from "../../common/helpers/slug";
+import { generateSlug } from "@tarodan/types";
 import { publicListingWhere } from "../product/helpers/catalog-product-where";
 import {
   assertCategoryHasPublishedCommissionCoverage,
