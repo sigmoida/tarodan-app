@@ -496,7 +496,9 @@ export class AdminPaymentController {
   }
 
   @Post("payouts/:transferId/retry")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  // A money decision (it can resend a transfer PayTR may have paid): the
+  // same roles as "Mark as paid", not moderators.
+  @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:

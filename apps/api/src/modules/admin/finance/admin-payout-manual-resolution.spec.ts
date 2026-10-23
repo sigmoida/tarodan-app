@@ -94,26 +94,35 @@ describe("mark-paid endpoint — access", () => {
   });
 });
 
-describe("retry endpoint — access is unchanged", () => {
+describe("retry endpoint — access", () => {
   const handler = AdminPaymentController.prototype.retryPayoutTransfer;
   const url = "/api/admin/payouts/t-1/retry";
 
-  it("keeps super_admin, admin and moderator by role", () => {
+  // A retry can resend a transfer PayTR may already have paid: the same
+  // roles as "Mark as paid".
+  it("is limited to super_admin and admin", () => {
     expect(Reflect.getMetadata(ROLES_KEY, handler)).toEqual([
       AdminRole.super_admin,
       AdminRole.admin,
-      AdminRole.moderator,
     ]);
   });
 
-  it("still needs the payouts permission (moderator has none by default)", async () => {
-    await expect(
-      guard().canActivate(context(handler, url, AdminRole.moderator)),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+  it("moderator is rejected by role, even with the payouts permission", async () => {
     await expect(
       guard({ moderator: ["payouts"] }).canActivate(
         context(handler, url, AdminRole.moderator),
       ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("admin needs the payouts permission", async () => {
+    await expect(
+      guard({ admin: ["payments"] }).canActivate(
+        context(handler, url, AdminRole.admin),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      guard().canActivate(context(handler, url, AdminRole.admin)),
     ).resolves.toBe(true);
   });
 });
