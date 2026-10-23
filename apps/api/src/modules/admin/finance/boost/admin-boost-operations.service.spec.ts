@@ -823,6 +823,21 @@ describe("AdminBoostOperationsService", () => {
       expect(notify).not.toHaveBeenCalled();
     });
 
+    it("a replay of a finished refund refreshes the listing again, refunding nothing", async () => {
+      // The first call may have died between the refund and its refresh.
+      const { service, payments } = make({
+        boost: paidBoost({
+          status: BoostStatus.cancelled,
+          refundedAmount: D(59),
+        }),
+      });
+
+      await service.refund(ADMIN, "boost-1", { reason: REASON });
+
+      expect(payments.processRefund).not.toHaveBeenCalled();
+      expect(notify).toHaveBeenCalledWith(listingTags);
+    });
+
     it("a refresh failure never turns a refund that went through into an error", async () => {
       const { service, cache, notices } = make();
       cache.delPattern.mockRejectedValue(new Error("redis down"));

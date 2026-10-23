@@ -279,11 +279,14 @@ export class AdminBoostOperationsService {
       );
     }
     // A replay of a refund that went through (the first response was lost).
+    // The first call may have died before its refresh; refreshing again is
+    // harmless.
     if (
       boost.status === BoostStatus.cancelled &&
       boost.refundedAmount?.gt(0) &&
       (dto.amount === undefined || boost.refundedAmount.eq(dto.amount))
     ) {
+      await this.refreshListing(boost.productId);
       return this.purchases.getPurchase(boostId);
     }
 
