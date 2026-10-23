@@ -42,6 +42,20 @@ describe("buildErrorReportKey", () => {
     expect(key(one)).not.toBe(key(two));
   });
 
+  it("does not key by a one-time value in a query string", () => {
+    expect(
+      key("OAuth callback failed at /api/auth/callback?code=4f9a1c&state=x"),
+    ).toBe(
+      key("OAuth callback failed at /api/auth/callback?code=77be02&state=y"),
+    );
+  });
+
+  it("treats an amount after a word ending in 'id' as a number, not an entity", () => {
+    expect(key("Order paid: 1250 but ledger missing")).toBe(
+      key("Order paid: 980 but ledger missing"),
+    );
+  });
+
   it("ignores the order in which a summary lists the same entities", () => {
     expect(key("failed: PKG-WQMTZDB5TT, PKG-K7X9M2QF3N")).toBe(
       key("failed: PKG-K7X9M2QF3N, PKG-WQMTZDB5TT"),
@@ -150,6 +164,14 @@ describe("extractIdentifiers", () => {
         "abc-1",
       ].sort(),
     );
+  });
+
+  it("takes camelCase and snake_case keys, not words that end in id/no/ref/code", () => {
+    expect(
+      extractIdentifiers(
+        "invoiceNo=INV7 order_id: o-9 refundRef=r1 errorCode=E42 paid: 1250 Android: 14 Invalid: x",
+      ),
+    ).toEqual(["E42", "INV7", "o-9", "r1"]);
   });
 
   it("does not take plain words that start like a prefix for identifiers", () => {

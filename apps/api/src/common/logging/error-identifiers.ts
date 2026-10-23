@@ -30,9 +30,15 @@ const IDENTIFIER_SOURCES = [
   "\\b[BKU]\\d{6,}\\b",
 ];
 
-/** A `key=value` pair naming an entity; the value is capture group 1. */
+/**
+ * A `key=value` pair naming an entity; the value is capture group 1. The key
+ * is `id`/`no`/`ref`/`code` on its own, camelCase (`orderId`, `invoiceNo`) or
+ * snake_case (`order_id`), never a word that merely ends in those letters
+ * ("paid: 1250", "Android:", "Invalid:"), or a changing amount would make
+ * every occurrence a new key and the throttle would never hold it back.
+ */
 const KEYED_IDENTIFIER =
-  /\b[A-Za-z]*(?:[iI][dD]|[nN]o|[rR]ef|[cC]ode)\s*[=:]\s*([A-Za-z0-9][\w-]*)/g;
+  /\b(?:[a-z][A-Za-z]*(?:Id|No|Ref|Code)|[A-Za-z]+_(?:id|no|ref|code)|[iI][dD]|[nN]o|[rR]ef|[cC]ode)\s*[=:]\s*([A-Za-z0-9][\w-]*)/g;
 
 function identifierPattern(): RegExp {
   return new RegExp(IDENTIFIER_SOURCES.join("|"), "g");

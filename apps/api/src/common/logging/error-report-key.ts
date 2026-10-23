@@ -29,7 +29,8 @@ export const SENTRY_REPEAT_WINDOW_SECONDS = 20 * 60 * 60;
  * - Same entity, same reason, new run -> same key (suppressed in the window).
  * - Another entity, another reason, another context or error class -> another
  *   key (reported at once). A cron summary that starts listing one more
- *   parcel is a new key, so a new failure is never hidden behind an old one.
+ *   parcel is a new key. A count-only or truncated summary ("+2 more") is
+ *   not: a new entity the line does not name waits for the window.
  *
  * The key is a hash: it is stored in Redis and must not carry message text.
  */
@@ -60,7 +61,9 @@ export function buildErrorReportKey(input: ErrorReportKeyInput): string {
     input.context,
     input.errorName ?? "",
     errorMessageShape(input.message),
-    ...extractIdentifiers(input.message),
+    // Not from a query string: a one-time `?code=` or a search term is not
+    // an entity, and would make every occurrence a new key.
+    ...extractIdentifiers(input.message.replace(URL_QUERY_PATTERN, "$1")),
   ];
   return createHash("sha256")
     .update(JSON.stringify(parts))
