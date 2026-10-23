@@ -6,6 +6,7 @@ import {
   manualSettlementOf,
   payoutResolutionFlags,
   platformFundingAmount,
+  providerMessageOf,
   transferOutcomeMayBeUnknown,
   transferTotalOf,
   withoutManualSettlement,
@@ -254,6 +255,26 @@ describe("payout resolution policy", () => {
       oidRemaining: 0,
       missingInput: "source",
     });
+  });
+
+  it("reads PayTR's rejection message, and nothing else, for the admin list", () => {
+    expect(
+      providerMessageOf({
+        status: "error",
+        err_no: "005",
+        err_msg: "  IBAN hatali  ",
+        transferTotal: { net: 40 },
+      }),
+    ).toBe("IBAN hatali");
+    expect(providerMessageOf(null)).toBeNull();
+    expect(providerMessageOf({ status: "success" })).toBeNull();
+    expect(providerMessageOf({ status: "error", err_msg: " " })).toBeNull();
+    // A network failure is our message, not PayTR's.
+    expect(
+      providerMessageOf({
+        error: { phase: "unknown", causeCode: "ECONNRESET", message: "x" },
+      }),
+    ).toBeNull();
   });
 
   it("drops an earlier manual settlement from a row sent again, keeping the rest", () => {

@@ -93,6 +93,16 @@ export function transferTotalOf(
 }
 
 /**
+ * PayTR's own message on a transfer it rejected (`err_msg`, stored with the
+ * answer in `providerResponse`), for the admin list; null when PayTR sent
+ * none (accepted, unreachable, unknown outcome, parked before any call).
+ */
+export function providerMessageOf(providerResponse: unknown): string | null {
+  const message = asRecord(providerResponse)?.err_msg;
+  return typeof message === "string" && message.trim() ? message.trim() : null;
+}
+
+/**
  * The one way this row may be marked as paid, or null:
  * - `paytr_confirmed` when PayTR may have taken it (the panel shows it did);
  * - `external_bank` when PayTR provably took nothing and the payment cannot

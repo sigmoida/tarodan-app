@@ -40,6 +40,7 @@ import { PayoutResolutionService } from "../../payout/resolution/payout-resoluti
 import {
   manualSettlementOf,
   payoutResolutionFlags,
+  providerMessageOf,
   transferTotalOf,
 } from "../../payout/helpers/payout-resolution-policy";
 import type { PayoutManualSettlementMethod } from "@tarodan/types";
@@ -410,6 +411,9 @@ export class AdminPayoutService {
         ? (orderNumberById.get(t.paymentHold.orderId) ?? null)
         : null,
       tradeCashPaymentId: t.tradeCashPaymentId,
+      // PayTR's transfer reference: the key to look the transfer up in the
+      // PayTR panel before a retry or a "mark as paid".
+      transId: t.transId,
       seller: t.seller,
       amount: Number(t.amount),
       netAmount: Number(t.netAmount),
@@ -426,6 +430,7 @@ export class AdminPayoutService {
       submittedTotalAmount:
         t.submittedTotalAmount === null ? null : Number(t.submittedTotalAmount),
       transferTotal: transferTotalOf(t.providerResponse),
+      providerMessage: providerMessageOf(t.providerResponse),
       resolution: payoutResolutionFlags(t),
       manualSettlement: manualSettlementView(t),
     }));
