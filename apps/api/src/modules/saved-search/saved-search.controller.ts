@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Post,
   Query,
+  UseInterceptors,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
@@ -23,7 +24,14 @@ import {
   SavedSearchListResponseDto,
   SavedSearchResponseDto,
 } from "./dto";
+import { scopedSentryTag } from "../sentry/scoped-sentry-tag.interceptor";
 import { SavedSearchService } from "./saved-search.service";
+
+/** Sentry tag on every saved-search request, so its 5xx errors group by feature. */
+export const SAVED_SEARCH_SENTRY_TAG = {
+  key: "feature",
+  value: "saved_search",
+};
 
 /**
  * The caller's saved searches. Every route needs a session: the global
@@ -32,6 +40,7 @@ import { SavedSearchService } from "./saved-search.service";
  */
 @ApiTags("saved-searches")
 @ApiBearerAuth()
+@UseInterceptors(scopedSentryTag(SAVED_SEARCH_SENTRY_TAG))
 @Controller("saved-searches")
 export class SavedSearchController {
   constructor(private readonly savedSearches: SavedSearchService) {}

@@ -35,6 +35,27 @@ import { errorStack } from "../helpers/error-message";
  *    message, never an internal `error.message`, stack, SQL, or file path. Full
  *    detail is logged server-side (and persisted by ErrorLogInterceptor).
  */
+const CLIENT_ABORT_CODES = new Set(["ECONNABORTED", "ECONNRESET"]);
+
+/**
+ * True when the error only says the client dropped the request: multer/busboy
+ * "Request aborted", body-parser `request.aborted`, or a reset/aborted socket.
+ * These are neither server faults nor worth a Sentry event.
+ */
+export function isClientAbort(exception: unknown): boolean {
+  if (typeof exception !== "object" || exception === null) return false;
+  const { message, type, code } = exception as {
+    message?: unknown;
+    type?: unknown;
+    code?: unknown;
+  };
+  return (
+    message === "Request aborted" ||
+    type === "request.aborted" ||
+    (typeof code === "string" && CLIENT_ABORT_CODES.has(code))
+  );
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -90,7 +111,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
-    // 2+3) Prisma / unknown — resolve to a sanitized status + catalog message.
+    // 2) The client went away mid-request (aborted upload, dropped connection).
+    // Nothing is wrong on our side and nobody is left to read an answer.
+    if (isClientAbort(exception)) {
+      this.logger.debug(
+        `${request?.method} ${String(request?.url ?? "").split("?")[0]} -> client aborted the request`,
+      );
+      if (
+        !response.headersSent &&
+        !response.writableEnded &&
+        !response.socket?.destroyed
+      ) {
+        response.status(HttpStatus.BAD_REQUEST).end();
+      }
+      return;
+    }
+
+    // 3) Prisma / unknown — resolve to a sanitized status + catalog message.
     const { status, key, params } = this.resolve(exception);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -182,7 +219,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
-    // 3) Anything else — sanitized 500, no internal detail in the response.
+    // 4) Anything else — sanitized 500, no internal detail in the response.
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       key: "server.common.internalError",

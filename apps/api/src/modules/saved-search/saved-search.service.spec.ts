@@ -56,13 +56,11 @@ describe("SavedSearchService", () => {
     const membership = {
       getSavedSearchLimit: jest.fn().mockResolvedValue(opts.limit ?? 5),
     };
-    const sentry = { setTag: jest.fn() };
     const service = new SavedSearchService(
       prisma as never,
       membership as never,
-      sentry as never,
     );
-    return { service, prisma, tx, membership, sentry };
+    return { service, prisma, tx, membership };
   };
 
   const dto = (
@@ -365,14 +363,6 @@ describe("SavedSearchService", () => {
         labels: {},
         createdAt: "2026-10-21T10:00:00.000Z",
       });
-    });
-
-    it("tags the request for Sentry", async () => {
-      const { service, sentry } = makeService();
-
-      await service.create("u1", dto());
-
-      expect(sentry.setTag).toHaveBeenCalledWith("feature", "saved_search");
     });
   });
 
