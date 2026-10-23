@@ -170,16 +170,18 @@ shares a process with HTTP.
   occurrence. The key keeps the entity and drops counters and durations, so
   **name the entity in the message** (UUID, reference code, `id=...`): another
   entity, or another reason, is reported at once. The message of an `Error`
-  passed to `logger.error(text, err)` counts too. A count-only summary
-  ("3 unresolved attempts") is one key whatever the count, so a new entity in
-  it waits for the window: log the new entity on its own line. HTTP 5xx
-  captured by `SentryInterceptor` are never throttled, even when the service
-  logged the same error object first.
-- **A failed cron run is an alarm on a state change only** (`CronTrackerService`):
+  passed to `logger.error(text, err)` counts too (a localized exception by its
+  catalog key). A count-only or truncated summary ("3 unresolved attempts",
+  "+2 more") is one key whatever the count, so a new entity in it waits for
+  the window: log the new entity on its own line. Values in a URL query
+  string are not identifiers. HTTP 5xx captured by `SentryInterceptor` are
+  never throttled, even when the service logged the same error object first.
+- **A failed cron run is an alarm on a state change** (`CronTrackerService`):
   the first failure, or one that differs from the previous run's (compared by
   the repeat-report key), logs at `error`; the same failure on the next runs
-  logs at `warn`, and the first success after it logs the recovery. Every run
-  still fails (Bull retry) and sends its "error" check-in.
+  logs at `warn` until the ~20h window has passed, then it is raised again.
+  The first success after a failure logs the recovery. Every run still fails
+  (Bull retry) and sends its "error" check-in.
 - **One failure, one alarm in crons.** A per-record failure logs at `warn`
   and its id goes into the run summary, which is the alarm. A step that
   throws logs its own `error`; a summary made only of those is
