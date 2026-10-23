@@ -12,7 +12,10 @@ const DISALLOW = [
   "/payment",
   "/membership/checkout",
   "/track-order",
-  "/listings/new",
+  // `$` ends the match: a bare prefix would also block every listing whose
+  // slug starts with "new" (`/listings/newray-1-32-...-<uuid>`).
+  "/listings/new$",
+  "/en/listings/new$",
   // Owner-only editor; the page is noindex as well.
   "/listings/*/edit",
   "/login",
