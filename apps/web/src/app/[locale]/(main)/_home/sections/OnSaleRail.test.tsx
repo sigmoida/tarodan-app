@@ -1,43 +1,31 @@
 /** @format */
 
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { Product } from "@/types/product";
 
-// Yalnız başlık bandı sabitlenir: rail ve çerçeve kendi testlerinde.
+// Only the header band is pinned here; the section logic has its own test.
 vi.mock("next-intl/server", () => ({
   getTranslations: async () => (key: string) => key,
 }));
-vi.mock("./HomeSection", () => ({
-  default: ({
-    title,
-    badge,
-    children,
-  }: {
-    title: string;
-    badge?: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <section data-title={title}>
-      {badge}
-      {children}
-    </section>
-  ),
-}));
-vi.mock("./ProductRail", () => ({ default: () => <i data-rail /> }));
+vi.mock("./HomeRailSection", () => ({ default: () => null }));
 
 import OnSaleRail from "./OnSaleRail";
 
 const items = [{ id: "p1", title: "A", price: 1 }] as Product[];
 
 describe("OnSaleRail", () => {
-  it("başlıkta sabit 'Fırsat' etiketi yoktur", async () => {
-    const html = renderToStaticMarkup(await OnSaleRail({ items }));
-    expect(html).toContain('data-title="product.onSale"');
-    expect(html).not.toContain("home.deals");
+  it("has no fixed 'deals' badge in the header", async () => {
+    const el = await OnSaleRail({ items });
+    expect(el.props).toMatchObject({
+      rail: "discounted",
+      title: "product.onSale",
+      items,
+    });
+    expect(el.props).not.toHaveProperty("badge");
   });
 
-  it("ürün yoksa hiçbir şey çizmez", async () => {
-    expect(await OnSaleRail({ items: [] })).toBeNull();
+  it("has no empty state, so an empty answer hides the rail", async () => {
+    const el = await OnSaleRail({ items: [] });
+    expect(el.props.emptyState).toBeUndefined();
   });
 });
