@@ -51,6 +51,17 @@ describe("reviewModerationError", () => {
         "fallback",
       ),
     ).toBe("Status just changed");
+    // no limits to name: the server's localized text is the message
+    expect(
+      reviewModerationError(
+        apiError(
+          "server.admin.review.deletedNotModeratable",
+          "A review its author deleted cannot be shown again or hidden.",
+        ),
+        t,
+        "fallback",
+      ),
+    ).toBe("A review its author deleted cannot be shown again or hidden.");
     expect(reviewModerationError(apiError(undefined, ""), t, "fallback")).toBe(
       "fallback",
     );
