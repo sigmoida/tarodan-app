@@ -10,6 +10,7 @@ import {
   REVIEW_STATUS_TONE,
   reviewStatusLabel,
 } from "@/components/reviews/reviewStatus";
+import { currentHideReason } from "./detail";
 import { Stars } from "../_components/Stars";
 import { reviewRowMenu } from "./rowActions";
 import type { useTranslations } from "next-intl";
@@ -32,11 +33,18 @@ const statusColumn = <R extends { status?: ReviewStatus }>(t: T) =>
     { sortKey: "status", sortType: "text" },
   );
 
-/** Reason, time and moderator of the last hide / show: same on both tabs. */
-const moderationColumns = <R extends ReviewModeration>(t: T) => [
+/**
+ * Hide reason (only while hidden), time and moderator of the last hide / show:
+ * same on both tabs.
+ */
+const moderationColumns = <
+  R extends ReviewModeration & { status?: ReviewStatus },
+>(
+  t: T,
+) => [
   col.muted<R>(
     t("admin.accounts.reviews.reasonColumn"),
-    (r) => r.moderationReason,
+    (r) => currentHideReason(r),
     {
       grow: 3,
       minWidth: 220,

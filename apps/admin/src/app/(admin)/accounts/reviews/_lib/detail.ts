@@ -28,7 +28,10 @@ export interface ReviewDetail {
   isVerifiedPurchase?: boolean;
   author: { name: string; email?: string; href?: string };
   links: ReviewDetailLink[];
-  /** Last hide / show: reason (or note), time and moderator; null if never moderated. */
+  /**
+   * Last hide / show: time and moderator; null if never moderated. `reason`
+   * is set only while the review is hidden (see `currentHideReason`).
+   */
   moderation: {
     reason?: string;
     at: string;
@@ -37,13 +40,28 @@ export interface ReviewDetail {
   } | null;
 }
 
+/**
+ * The reason a review is hidden right now. Showing a review again keeps the
+ * last hide reason on the row but moves the time and moderator to the
+ * show-again action, so the old reason is only read while the review is
+ * hidden; otherwise it would read as the reason of the admin who showed it.
+ * The full history is in the audit log.
+ */
+export function currentHideReason(
+  row: ReviewModeration & { status?: ReviewStatus },
+): string | undefined {
+  return row.status === "hidden"
+    ? row.moderationReason || undefined
+    : undefined;
+}
+
 /** The moderation record of a row; null until an admin has acted on it. */
 export function toModerationDetail(
-  row: ReviewModeration,
+  row: ReviewModeration & { status?: ReviewStatus },
 ): ReviewDetail["moderation"] {
   if (!row.moderatedAt) return null;
   return {
-    reason: row.moderationReason || undefined,
+    reason: currentHideReason(row),
     at: row.moderatedAt,
     by: row.moderatedBy?.displayName,
   };
