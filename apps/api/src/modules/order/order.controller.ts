@@ -89,6 +89,14 @@ export class OrderController {
     if (Number.isNaN(amount) || amount < 0) {
       throw new BadRequestException(i18nMessage("server.order.invalidAmount"));
     }
+    // A missing category is a client mistake, not a server fault: answer 400
+    // here instead of letting the fail-closed pricing path log an error and
+    // return 503.
+    if (!categoryId) {
+      throw new BadRequestException(
+        i18nMessage("server.commission.categoryRequired"),
+      );
+    }
     // Satıcı desi göndermez; paket boyutu gönderir ve desi ondan TÜRETİLİR —
     // böylece önizleme, checkout'un uyguladığı kademeyle birebir aynı olur.
     const tierCode =
@@ -104,14 +112,15 @@ export class OrderController {
     return this.orderService.getCommissionPreview(
       amount,
       userId,
-      categoryId || null,
+      categoryId,
       shippingDesi,
     );
   }
 
   /**
    * POST /orders/commission-preview-batch - Batch commission preview for multiple amounts (e.g. ilanlarım list).
-   * Uses current user as seller. Returns array of { sellerFeeAmount, sellerNetAmount } in same order.
+   * Uses current user as seller. Returns array of { sellerFeeAmount, sellerNetAmount } in same order;
+   * an item without a category yields null at its index.
    */
   @Post("commission-preview-batch")
   @UseGuards(JwtAuthGuard)

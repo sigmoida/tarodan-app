@@ -1106,7 +1106,8 @@ export class OrderPricingService {
    * Batch commission preview for multiple (amount, categoryId, packageTier)
    * tuples. Same order as input. Paket boyutu verilmeyen kalem küçük paket
    * sayılır — desi tek preview ucundakiyle AYNI haritadan türetilir ki liste
-   * görünümü ile ilan formu aynı sonucu göstersin.
+   * görünümü ile ilan formu aynı sonucu göstersin. Kategorisiz kalem için
+   * o sıradaki sonuç `null` olur (hata değil).
    */
   async getCommissionPreviewBatch(
     sellerId: string,
@@ -1116,11 +1117,16 @@ export class OrderPricingService {
       packageTier?: ShippingPackageTierCode | null;
     }>,
   ): Promise<{
-    results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
+    results: Array<{
+      sellerFeeAmount: number;
+      sellerNetAmount: number;
+    } | null>;
   }> {
     const pinnedRuleSetId = await this.getActiveCommissionRuleSetId();
     const results = await Promise.all(
       items.map(async (item) => {
+        // No category, no rule: one such item must not fail the whole batch.
+        if (!item.categoryId) return null;
         const amount = Number(item.amount);
         if (Number.isNaN(amount) || amount < 0) {
           return { sellerFeeAmount: 0, sellerNetAmount: amount };
