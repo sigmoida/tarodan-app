@@ -1,100 +1,31 @@
 import {
   Controller,
   Get,
-  Post,
-  Put,
   Patch,
-  Delete,
   Body,
   Param,
   Query,
   UseGuards,
-  HttpCode,
   HttpStatus,
-  UseInterceptors,
-  UploadedFile,
-  BadRequestException,
-  Res,
 } from "@nestjs/common";
-
-import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from "@nestjs/swagger";
+import { AdminRole } from "@prisma/client";
 import { AdminService } from "../admin.service";
-import { AdvertisementService } from "../../advertisement/advertisement.service";
-import { MediaService } from "../../media/media.service";
-import {
-  CreateAdvertisementDto,
-  UpdateAdvertisementDto,
-  ReorderAdsDto,
-} from "../../advertisement/dto";
-import { DiscountService } from "../../discount/discount.service";
-import {
-  CreateDiscountDto,
-  UpdateDiscountDto,
-  DiscountQueryDto,
-} from "../../discount/dto";
 import { AdminJwtAuthGuard } from "../../auth/guards/admin-jwt-auth.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
-import { RequirePermission } from "../../auth/decorators/require-permission.decorator";
-import { BypassPermissionMatrix } from "../../auth/decorators/bypass-permission-matrix.decorator";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
-import { Public } from "../../auth/decorators/public.decorator";
-import { AdminRole } from "@prisma/client";
 import {
-  CreateCommissionRuleDto,
-  UpdateCommissionRuleDto,
-  CommissionRuleResponseDto,
-  UpdatePlatformSettingDto,
-  PlatformSettingResponseDto,
-  AdminUserQueryDto,
-  AdminProductQueryDto,
-  AdminOrderQueryDto,
-  AuditLogQueryDto,
-  ApproveProductDto,
-  RejectProductDto,
-  BanUserDto,
-  AssignAdminStaffDto,
-  UpdateAdminStaffDto,
-  UpdateStaffSettingsDto,
-  SetRolePermissionsDto,
-  AnalyticsQueryDto,
-  UpdateOrderStatusDto,
-  ReportQueryDto,
-  AdminPaymentQueryDto,
-  PaymentStatisticsQueryDto,
-  PayoutTransactionsQueryDto,
-  CreateTaxRegionDto,
-  UpdateTaxRegionDto,
-  CreateTaxRateDto,
-  UpdateTaxRateDto,
-  CreateTaxRuleDto,
-  UpdateTaxRuleDto,
-  TaxReportQueryDto,
-  CreateStaticPageDto,
-  UpdateStaticPageDto,
-  UpdateEmailTemplateDto,
-  UpdateProductDto,
-  SendTestEmailDto,
   RatingQueryDto,
   AdminUserRatingQueryDto,
   UpdateRatingStatusDto,
-  ApproveWarehouseTradeDto,
-  RejectWarehouseTradeDto,
-  MarkShipmentDto,
-  MarkReturnLostDto,
-  ForceCancelStuckDto,
-  TradeShipmentQueryDto,
-  RefundRequestQueryDto,
-  AdminChangeMembershipDto,
 } from "../dto";
 
 @ApiTags("admin")
