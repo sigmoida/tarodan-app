@@ -374,7 +374,9 @@ on the payment − totals the other transfers on the oid took)`.
    admin retried an unknown outcome before this late result came; the
    money moved, so it is settled instead of sent again, error log), each
    once by CAS. Other rows are never revived; a callback for one logs an
-   error (check the PayTR panel before paying it any other way). A row without a send snapshot (unknown outcome, or
+   error (check the PayTR panel before paying it any other way), and so does
+   a callback for a row an admin paid from the bank (`external_bank`):
+   possible double payment. A row without a send snapshot (unknown outcome, or
    bookkeeping failed after acceptance) gets the send time and net
    stamped, so a later bank return still matches. A callback later than 3 days raises an alarm. Daily
    returned-transfer scan plus a 30-minute stuck-`processing` check.
@@ -409,11 +411,16 @@ on the payment − totals the other transfers on the oid took)`.
      A row PayTR may have taken needs `confirmProviderChecked: true` and a
      reason (the PayTR panel shows no transfer with that `trans_id`), else
      409: `transfer_outcome_unknown`, and rows from before the reason codes
-     whose free text came from a thrown error during a send attempt
-     (`retryCount > 0`, no stored PayTR answer; e.g. "Bad Request
-     Exception"). A stored `status: "error"` answer is a rejection, and a
-     free-text row without an attempt failed before sending; neither needs
-     the check.
+     with a free-text reason after more than one attempt (the old handler
+     resent the same `trans_id` and kept only the last attempt's reason and
+     answer, so an earlier attempt may have reached PayTR) or after one
+     attempt without a stored PayTR answer (a thrown error, e.g. "Bad
+     Request Exception"). One attempt answered by PayTR (`status: "error"`)
+     is a rejection, and a free-text row without an attempt failed before
+     sending; neither needs the check. A checked retry of a legacy row
+     records the net it may have sent (`submittedAmount`), so the row keeps
+     saying an earlier send is unconfirmed (a net without `submittedAt`)
+     until PayTR accepts a later attempt.
    - **Mark as paid** (`POST /admin/payouts/transfers/:id/mark-paid`,
      super_admin/admin with the `payouts` permission; body `method`,
      `reference`, `reason`, `expectedNetAmount`). One method fits a row:
@@ -436,6 +443,10 @@ on the payment − totals the other transfers on the oid took)`.
        time).
      - `expectedNetAmount` must equal the net to the kuruş (409 otherwise),
        so a stale screen never books a different amount.
+     - `external_bank` on a row whose earlier send PayTR never confirmed
+       (`resolution.markPaidRequiresProviderCheck`) also needs
+       `confirmProviderChecked: true`: the panel shows no transfer with its
+       `trans_id` (409 `markPaidProviderCheckRequired` otherwise).
      - Ledger, in the same transaction: `external_bank` first funds what the
        escrow no longer holds, `F = max(0, net − max(0, seller_escrow))` per
        order (per trade and recipient for trade cash): `adjustment`
