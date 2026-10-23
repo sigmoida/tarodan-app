@@ -209,3 +209,7 @@ export * from "./virtual-order";
 
 // The one action a listing card shows: boost own, add others to cart (web, mobile)
 export * from "./product-card-action";
+
+// URL slugs: the catalog slug rule (Turkish transliteration) and the listing
+// URL `/listings/<slug>-<uuid>`, its build and its parse (API, web, admin, mobile)
+export * from "./slug";

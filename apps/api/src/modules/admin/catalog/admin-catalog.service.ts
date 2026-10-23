@@ -10,7 +10,8 @@ import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { CacheService } from "../../cache/cache.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { carModelSlug, generateSlug } from "../../../common/helpers/slug";
+import { generateSlug } from "@tarodan/types";
+import { carModelSlug } from "../../../common/helpers/slug";
 import { BRANDS_CACHE_PATTERN } from "../../brand/brand-cache";
 import {
   fulltextAttributeGroupSearch,

@@ -1,12 +1,15 @@
 import { IsUUID, IsNotEmpty } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { ProductStatus, ProductCondition } from "@prisma/client";
+import { ListingIdField } from "../../../common/transforms";
 
 export class AddToWishlistDto {
   @ApiProperty({
     example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    description: "Product ID (UUID format) to add to wishlist",
+    description:
+      "Product ID (UUID) to add to wishlist; a listing URL segment `<slug>-<uuid>` is also accepted",
   })
+  @ListingIdField()
   @IsNotEmpty({ message: "Ürün ID gereklidir" })
   @IsUUID("4", {
     message: "Geçerli bir ürün ID giriniz (UUID formatında olmalıdır)",
