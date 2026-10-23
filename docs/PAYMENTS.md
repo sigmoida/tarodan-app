@@ -370,8 +370,11 @@ on the payment − totals the other transfers on the oid took)`.
 7. **Callback**: `POST /payouts/callback/paytr-transfer` (public, hash
    verified, must answer a plain `"OK"`). It completes `processing` rows and
    also `failed / transfer_outcome_unknown` rows (PayTR confirms a transfer
-   we did not hear back about), each once by CAS; other failed rows are
-   never revived. A row without a send snapshot (unknown outcome, or
+   we did not hear back about), and `pending` / `retry_pending` rows (an
+   admin retried an unknown outcome before this late result came; the
+   money moved, so it is settled instead of sent again, error log), each
+   once by CAS. Other rows are never revived; a callback for one logs an
+   error (check the PayTR panel before paying it any other way). A row without a send snapshot (unknown outcome, or
    bookkeeping failed after acceptance) gets the send time and net
    stamped, so a later bank return still matches. A callback later than 3 days raises an alarm. Daily
    returned-transfer scan plus a 30-minute stuck-`processing` check.
@@ -397,15 +400,20 @@ on the payment − totals the other transfers on the oid took)`.
    guards and the list row's `resolution` flags. Every write is a CAS on the
    row as read (status, reason, `updatedAt`), with the required audit record
    in the same transaction (`payout_retry`, `payout_mark_paid`).
-   - **Retry** (`POST /admin/payouts/:transferId/retry`): `failed` or
-     `returned` → `pending`, retry counter, reference and
-     `submittedTotalAmount` cleared; net and total are never set here. A row
-     PayTR may have taken needs `confirmProviderChecked: true` and a reason
-     (the PayTR panel shows no transfer with that `trans_id`), else 409:
-     `transfer_outcome_unknown`, and rows from before the reason codes whose
-     free text came from a thrown error rather than a PayTR answer (e.g.
-     "Bad Request Exception"; a stored `status: "error"` answer is a
-     rejection and needs no check).
+   - **Retry** (`POST /admin/payouts/:transferId/retry`, super_admin/admin
+     with the `payouts` permission): `failed` or `returned` → `pending`,
+     retry counter and reference cleared (an earlier manual settlement too);
+     net and total are never set here. `submittedTotalAmount` and
+     `submittedAmount` stay: a pending row is not counted against the oid,
+     the next claim overwrites them, and a late callback settles with them.
+     A row PayTR may have taken needs `confirmProviderChecked: true` and a
+     reason (the PayTR panel shows no transfer with that `trans_id`), else
+     409: `transfer_outcome_unknown`, and rows from before the reason codes
+     whose free text came from a thrown error during a send attempt
+     (`retryCount > 0`, no stored PayTR answer; e.g. "Bad Request
+     Exception"). A stored `status: "error"` answer is a rejection, and a
+     free-text row without an attempt failed before sending; neither needs
+     the check.
    - **Mark as paid** (`POST /admin/payouts/transfers/:id/mark-paid`,
      super_admin/admin with the `payouts` permission; body `method`,
      `reference`, `reason`, `expectedNetAmount`). One method fits a row:
@@ -416,8 +424,12 @@ on the payment − totals the other transfers on the oid took)`.
        payment or source: that is a data problem, fix and retry) and
        `transfer_total_exceeds_remaining`, after finance paid the net from the
        company account (decision of 2026-10-23). The processor's guards run
-       again (order payable, no refund in flight, the hold still entitles the
-       seller to the net), else 409 and a retry recomputes. `submittedTotalAmount
+       again inside the transaction, under the payment and then the order
+       row lock (refund attempts and refund requests take them) on the row
+       read after the locks: order payable, no refund in flight, the hold
+       still entitles the seller to the net; for trade cash, the cash payment
+       completed, released, not refunded and not below the net. Else 409 and
+       a retry recomputes. `submittedTotalAmount
 = 0` (siblings on the oid do not count it), `submittedAt` and
        `submittedAmount` null (no PayTR transfer for the PSP comparison or
        the returned-transfer scan, which never matches a row without a send
