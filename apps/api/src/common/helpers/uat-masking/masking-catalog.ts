@@ -525,8 +525,12 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
       ["trade_disputes", ["reason", "resolution"]],
       ["trade_shipments", ["lost_reason"]],
       ["user_blocks", ["reason"]],
-      ["ratings", ["comment"]],
-      ["product_ratings", ["title", "review", "admin_reply"]],
+      // The moderation reason is staff-written but may quote the review.
+      ["ratings", ["comment", "moderation_reason"]],
+      [
+        "product_ratings",
+        ["title", "review", "admin_reply", "moderation_reason"],
+      ],
       ["collections", ["name", "description"]],
       ["saved_searches", ["name"]],
       ["collection_items", ["custom_title", "custom_description"]],

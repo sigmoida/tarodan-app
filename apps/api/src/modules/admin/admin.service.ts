@@ -72,7 +72,7 @@ import {
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
   RatingQueryDto,
-  RatingStatus,
+  UpdateRatingStatusDto,
   AdminUserRatingQueryDto,
   AdminCategoryQueryDto,
   AdminBrandQueryDto,
@@ -1724,7 +1724,7 @@ export class AdminService {
   }
 
   // ==================== REVIEWS & RATINGS ====================
-  // Taşındı: admin-review.service.ts — imzalar aynen korunuyor (facade delege).
+  // Moved to admin-review.service.ts; the facade delegates.
 
   async getReviews(query: RatingQueryDto) {
     return this.reviewService.getReviews(query);
@@ -1733,19 +1733,25 @@ export class AdminService {
   async updateReviewStatus(
     adminId: string,
     reviewId: string,
-    status: RatingStatus,
+    dto: UpdateRatingStatusDto,
   ) {
-    return this.reviewService.updateReviewStatus(adminId, reviewId, status);
+    return this.reviewService.updateReviewStatus(adminId, reviewId, dto);
   }
 
   async getUserRatings(query: AdminUserRatingQueryDto) {
     return this.reviewService.getUserRatings(query);
   }
 
+  async updateUserRatingStatus(
+    adminId: string,
+    ratingId: string,
+    dto: UpdateRatingStatusDto,
+  ) {
+    return this.reviewService.updateUserRatingStatus(adminId, ratingId, dto);
+  }
+
   // ==================== SELLER APPLICATIONS ====================
-  // Taşındı: admin-seller-application.service.ts — imzalar aynen korunuyor (facade delege).
-  // Not: updateUserRatingStatus da bu banner aralığında
-  // olduğu için bölümle birlikte taşındı.
+  // Moved to admin-seller-application.service.ts; the facade delegates.
 
   async getSellerApplications(query: SellerApplicationQueryDto) {
     return this.sellerApplicationService.getSellerApplications(query);
@@ -1794,18 +1800,6 @@ export class AdminService {
     return this.sellerApplicationService.finalApproveSellerApplication(
       adminId,
       applicationId,
-    );
-  }
-
-  async updateUserRatingStatus(
-    adminId: string,
-    ratingId: string,
-    status: RatingStatus,
-  ) {
-    return this.sellerApplicationService.updateUserRatingStatus(
-      adminId,
-      ratingId,
-      status,
     );
   }
 }

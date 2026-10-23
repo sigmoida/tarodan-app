@@ -1,100 +1,31 @@
 import {
   Controller,
   Get,
-  Post,
-  Put,
   Patch,
-  Delete,
   Body,
   Param,
   Query,
   UseGuards,
-  HttpCode,
   HttpStatus,
-  UseInterceptors,
-  UploadedFile,
-  BadRequestException,
-  Res,
 } from "@nestjs/common";
-
-import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from "@nestjs/swagger";
+import { AdminRole } from "@prisma/client";
 import { AdminService } from "../admin.service";
-import { AdvertisementService } from "../../advertisement/advertisement.service";
-import { MediaService } from "../../media/media.service";
-import {
-  CreateAdvertisementDto,
-  UpdateAdvertisementDto,
-  ReorderAdsDto,
-} from "../../advertisement/dto";
-import { DiscountService } from "../../discount/discount.service";
-import {
-  CreateDiscountDto,
-  UpdateDiscountDto,
-  DiscountQueryDto,
-} from "../../discount/dto";
 import { AdminJwtAuthGuard } from "../../auth/guards/admin-jwt-auth.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
-import { RequirePermission } from "../../auth/decorators/require-permission.decorator";
-import { BypassPermissionMatrix } from "../../auth/decorators/bypass-permission-matrix.decorator";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
-import { Public } from "../../auth/decorators/public.decorator";
-import { AdminRole } from "@prisma/client";
 import {
-  CreateCommissionRuleDto,
-  UpdateCommissionRuleDto,
-  CommissionRuleResponseDto,
-  UpdatePlatformSettingDto,
-  PlatformSettingResponseDto,
-  AdminUserQueryDto,
-  AdminProductQueryDto,
-  AdminOrderQueryDto,
-  AuditLogQueryDto,
-  ApproveProductDto,
-  RejectProductDto,
-  BanUserDto,
-  AssignAdminStaffDto,
-  UpdateAdminStaffDto,
-  UpdateStaffSettingsDto,
-  SetRolePermissionsDto,
-  AnalyticsQueryDto,
-  UpdateOrderStatusDto,
-  ReportQueryDto,
-  AdminPaymentQueryDto,
-  PaymentStatisticsQueryDto,
-  PayoutTransactionsQueryDto,
-  CreateTaxRegionDto,
-  UpdateTaxRegionDto,
-  CreateTaxRateDto,
-  UpdateTaxRateDto,
-  CreateTaxRuleDto,
-  UpdateTaxRuleDto,
-  TaxReportQueryDto,
-  CreateStaticPageDto,
-  UpdateStaticPageDto,
-  UpdateEmailTemplateDto,
-  UpdateProductDto,
-  SendTestEmailDto,
   RatingQueryDto,
   AdminUserRatingQueryDto,
   UpdateRatingStatusDto,
-  ApproveWarehouseTradeDto,
-  RejectWarehouseTradeDto,
-  MarkShipmentDto,
-  MarkReturnLostDto,
-  ForceCancelStuckDto,
-  TradeShipmentQueryDto,
-  RefundRequestQueryDto,
-  AdminChangeMembershipDto,
 } from "../dto";
 
 @ApiTags("admin")
@@ -117,15 +48,26 @@ export class AdminReviewController {
 
   @Patch("reviews/:id/status")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Update review status" })
+  @ApiOperation({
+    summary: "Hide a product review (reason required) or show it again",
+  })
   @ApiParam({ name: "id", description: "Review ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Review status updated" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Invalid status, or a missing or too long reason",
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: "No such review" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: "Another admin changed the status at the same time",
+  })
   async updateReviewStatus(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
     @Body() dto: UpdateRatingStatusDto,
   ) {
-    return this.adminService.updateReviewStatus(adminId, id, dto.status);
+    return this.adminService.updateReviewStatus(adminId, id, dto);
   }
 
   // ==================== SELLER (USER) RATINGS ====================
@@ -140,14 +82,25 @@ export class AdminReviewController {
 
   @Patch("user-ratings/:id/status")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Update seller rating status (approve/reject)" })
+  @ApiOperation({
+    summary: "Hide a user rating (reason required) or show it again",
+  })
   @ApiParam({ name: "id", description: "User Rating ID" })
   @ApiResponse({ status: HttpStatus.OK, description: "Status updated" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Invalid status, or a missing or too long reason",
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: "No such rating" })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: "Another admin changed the status at the same time",
+  })
   async updateUserRatingStatus(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
     @Body() dto: UpdateRatingStatusDto,
   ) {
-    return this.adminService.updateUserRatingStatus(adminId, id, dto.status);
+    return this.adminService.updateUserRatingStatus(adminId, id, dto);
   }
 }

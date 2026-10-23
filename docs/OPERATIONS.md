@@ -461,6 +461,37 @@ at 02:30 Europe/Istanbul in the worker role and writes only its own table,
   longer registered (remove the leftover one from Bull Board). The table is
   harmless if left.
 
+### Review moderation (hide / show again)
+
+Admins hide a product review or a user rating (Accounts, Reviews) with a
+required reason (5-500 characters) and show it again. Only `approved` reviews
+are public (`common/helpers/public-rating.ts`): a hidden one leaves the lists,
+counts, averages, product cards and search at once, and the seller trust score
+at the next nightly run. The author still sees it on the order, flagged
+`hidden` (`GET /orders/:id/my-review`).
+
+- **Deploy (no manual step).** Migration
+  `20261023140000_review_moderation_fields` adds the `hidden` status and
+  `moderation_reason`, `moderated_at`, `moderated_by_admin_id` on `ratings` and
+  `product_ratings`: additive, no backfill. It sorts after
+  `20261023120000_payout_submitted_total_amount` and ships after that hotfix.
+  Existing `pending` / `rejected` rows stay as they are (non-public); an admin
+  can publish or hide them.
+- **Trace.** Each change writes an audit row in the same transaction
+  (`review_status_update` / entity `ProductRating`,
+  `user_rating_status_update` / entity `Rating`, with the reason) and a Sentry
+  breadcrumb `review.moderation` (ids only). A failed post-commit refresh
+  (API cache, web revalidation) is reported to Sentry; the caches then
+  expire on their own (web ISR 60 s). The product's search document is
+  re-indexed through the outbox (`search.product_reindex`): a failed inline
+  run is retried by the outbox drainer.
+- **Rollback.** Before reverting the code, set hidden rows to `rejected`
+  (still non-public), or the old image cannot read them:
+  `UPDATE ratings SET status = 'rejected' WHERE status = 'hidden';` and the
+  same for `product_ratings` (a production write: user approval). The columns
+  and the enum value are harmless if left; dropping the columns needs a new
+  migration.
+
 ### One-off: saved-search tier limits
 
 Reference: `docs/SAVED_SEARCHES.md`. Migration `20261021174800_saved_searches`

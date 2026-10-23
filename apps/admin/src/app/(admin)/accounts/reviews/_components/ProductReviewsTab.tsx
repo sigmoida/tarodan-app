@@ -2,29 +2,27 @@
 
 "use client";
 
-import { useState } from "react";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { type Review } from "../_lib/types";
 import { productReviewColumns } from "../_lib/columns";
-import { reviewFilterFields } from "../_lib/filters";
-import { useReviewAction } from "./useReviewAction";
+import { REVIEW_DEEP_LINK_FILTERS, reviewFilterFields } from "../_lib/filters";
+import { useReviewModeration } from "@/components/reviews/useReviewModeration";
+import { ReviewModerationModal } from "@/components/reviews/ReviewModerationModal";
+import { useReviewDeepLink } from "./useReviewDeepLink";
 import { ReviewDetailDrawer } from "./ReviewDetailDrawer";
 import { toProductReviewDetail } from "../_lib/detail";
 import { useTranslations } from "next-intl";
 
 export function ProductReviewsTab() {
   const t = useTranslations();
-  const { act, isPending, variables } = useReviewAction(
-    "reviews",
-    (id, status) => adminApi.updateReviewStatus(id, status),
+  const { request, busyId, modalProps } = useReviewModeration(
+    (id, body) => adminApi.updateReviewStatus(id, body),
     t("admin.accounts.reviews.productReview"),
   );
+  const [selectedId, setSelectedId] = useReviewDeepLink();
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const busyId = isPending ? variables?.id : undefined;
-
-  const columns = productReviewColumns(act, t, busyId, setSelectedId);
+  const columns = productReviewColumns(request, t, busyId, setSelectedId);
 
   return (
     <ResourceList<Review>
@@ -33,6 +31,7 @@ export function ProductReviewsTab() {
       getRowId={(r) => r.id}
       syncUrl
       filters={reviewFilterFields(t)}
+      initialFilters={REVIEW_DEEP_LINK_FILTERS}
     >
       <ResourceList.Toolbar />
       <ResourceList.Table
@@ -44,10 +43,11 @@ export function ProductReviewsTab() {
       <ReviewDetailDrawer<Review>
         selectedId={selectedId}
         toDetail={toProductReviewDetail}
-        onAct={act}
+        onAct={request}
         busyId={busyId}
         onClose={() => setSelectedId(null)}
       />
+      <ReviewModerationModal {...modalProps} />
     </ResourceList>
   );
 }

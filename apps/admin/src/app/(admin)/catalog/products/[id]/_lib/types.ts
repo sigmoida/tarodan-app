@@ -11,6 +11,7 @@ export const PACKAGE_TIER_OPTIONS = [
   labelKey: string;
 }>;
 
+import type { RatingStatusCode } from "@tarodan/types";
 import type { ListingEditPayload } from "@tarodan/listing-form";
 import type {
   AdminListingRemovalEvent,
@@ -76,7 +77,7 @@ export interface Review {
   score: number;
   title?: string;
   review?: string;
-  status: "pending" | "approved" | "rejected" | "deleted";
+  status: RatingStatusCode;
   adminReply?: string;
   adminReplyAt?: string;
   createdAt: string;
