@@ -2,9 +2,9 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
 import { ChevronRightIcon, CubeIcon } from "@heroicons/react/24/outline";
 import { Button, EmptyState, Spinner } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { PRODUCT_PLACEHOLDER } from "../_lib/add-item";
 import type { UseAddItem } from "../_hooks/useAddItem";
@@ -31,14 +31,15 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
       icon={<CubeIcon className="h-6 w-6" />}
       title={t("collection.noProductsToAdd")}
       action={
-        <Link
+        <ButtonLink
+          variant="secondary"
           href="/listings/new"
-          className="inline-flex items-center text-sm font-medium text-primary-500 hover:text-primary-600"
+          className="gap-2"
           onClick={close}
         >
           {t("collection.createNewListing")}
-          <ChevronRightIcon className="ml-1 h-4 w-4" />
-        </Link>
+          <ChevronRightIcon className="h-5 w-5" />
+        </ButtonLink>
       }
     />
   ) : (

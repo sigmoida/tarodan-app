@@ -1,9 +1,9 @@
 /** @format */
 
-import { Link } from "@/i18n/navigation";
 import {
   ArrowsRightLeftIcon,
   ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import {
   Button,
@@ -14,6 +14,7 @@ import {
   Spinner,
   Textarea,
 } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import OptimizedImage from "@/components/OptimizedImage";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { formatTL } from "@/lib/format";
@@ -184,12 +185,14 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                     icon={<ArrowsRightLeftIcon className="h-6 w-6" />}
                     title={t("trade.noProductsAvailable")}
                     action={
-                      <Link
+                      <ButtonLink
+                        variant="secondary"
                         href="/profile/listings"
-                        className="text-primary-500 hover:text-primary-600 font-medium"
+                        className="gap-2"
                       >
                         {t("trade.goToMyListings")}
-                      </Link>
+                        <ChevronRightIcon className="h-5 w-5" />
+                      </ButtonLink>
                     }
                   />
                 ) : (

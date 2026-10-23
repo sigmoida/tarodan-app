@@ -43,10 +43,7 @@ export default function ManufacturerProductsGrid({
       ) : products.length === 0 ? (
         <EmptyState
           icon={<MagnifyingGlassIcon className="h-7 w-7" />}
-          title={
-            t("brands.noProducts") ||
-            t("brands.manufacturerGrid.ilanBulunamadi")
-          }
+          title={t("brands.noProducts")}
           description={t("brands.manufacturerGrid.buUreticiyeAitHenuzBirIlan")}
           action={
             <ButtonLink href="/listings/new">
