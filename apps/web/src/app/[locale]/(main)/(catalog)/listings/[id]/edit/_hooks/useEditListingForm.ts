@@ -223,13 +223,15 @@ export function useEditListingForm({
     mutationFn: (payload: Record<string, unknown>) =>
       listingsApi.update(id, payload as any),
     onMutate: () => setIsLoading(true),
-    onSuccess: (_response, payload) => {
+    onSuccess: () => {
       toast.success(t("product.listingUpdated"));
       void invalidateListingQueries(queryClient, id);
-      // The saved title: an edited title moves the canonical URL, and landing
-      // on it directly skips the redirect from the old slug.
-      const title = typeof payload.title === "string" ? payload.title : null;
-      router.push(listingPath({ id, title }));
+      // The bare UUID, not the new title's slug: the server page decides the
+      // canonical URL from its cached product, and the on-demand revalidation
+      // of that cache is fire-and-forget. Pushing the new slug before it lands
+      // would be redirected straight back to the old one; the bare UUID goes
+      // to whatever the server holds and moves on once the cache refreshes.
+      router.push(listingPath({ id }));
     },
     onError: (error: any) =>
       toast.error(error.response?.data?.message || t("product.updateFailed")),
