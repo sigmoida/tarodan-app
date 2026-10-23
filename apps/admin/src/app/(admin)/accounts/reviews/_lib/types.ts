@@ -21,7 +21,7 @@ export interface Review extends ReviewModeration {
   status: ReviewStatus;
   adminReply?: string;
   adminReplyAt?: string;
-  /** Yorum görselleri — API düz URL ya da `{ url }` dönebilir. */
+  /** Review images: the API returns plain URLs or `{ url }`. */
   images?: Array<string | { url: string }>;
   orderId?: string;
   sellerId?: string;

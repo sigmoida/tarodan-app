@@ -63,8 +63,8 @@ export function targetHref(report: ReportDetail): string | null {
     case "user":
       return `/accounts/users/${report.targetId}`;
     case "review":
-      // Tekil yorum sayfası yok: ilgili sekmede yorumun çekmecesini açar
-      // (gizleme / yeniden gösterme orada).
+      // No single review page: opens the review's drawer on its tab
+      // (hide / show again happen there).
       return `/accounts/reviews?tab=${
         report.target.reviewKind === "seller" ? "seller" : "product"
       }&id=${report.targetId}`;

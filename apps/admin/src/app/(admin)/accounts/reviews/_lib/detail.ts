@@ -9,12 +9,12 @@ export type ReviewLinkKind = "product" | "order" | "trade" | "seller";
 
 export interface ReviewDetailLink {
   kind: ReviewLinkKind;
-  /** Bağlantı metni (ürün adı, satıcı adı ya da kısa kod). */
+  /** Link text (product title, seller name or a short code). */
   label: string;
   href: string;
 }
 
-/** Ürün ve satıcı yorumunun çekmecede AYNI çizilen ortak görünümü. */
+/** The shared view of a product or seller review, drawn the SAME in the drawer. */
 export interface ReviewDetail {
   id: string;
   score: number;
@@ -67,7 +67,7 @@ export function toModerationDetail(
   };
 }
 
-/** API görseli düz URL ya da `{ url }` olabilir; boşlar atılır. */
+/** An API image is a plain URL or `{ url }`; empty ones are dropped. */
 export function normalizeReviewImages(
   images: Array<string | { url: string }> | null | undefined,
 ): string[] {
@@ -78,7 +78,7 @@ export function normalizeReviewImages(
 
 const userHref = (id?: string) => (id ? `/accounts/users/${id}` : undefined);
 
-/** Kısa kod: uzun kimlik tek satıra sığsın diye ilk 8 karakter. */
+/** Short code: the first 8 characters, so a long id fits on one line. */
 const shortId = (id: string) => id.slice(0, 8);
 
 export function toProductReviewDetail(row: Review): ReviewDetail {

@@ -9,10 +9,10 @@ import { TextLink } from "@/components/TextLink";
 import type { ReportTarget } from "../../_lib/detail";
 
 /**
- * Şikayet edilen yorum (Apple 1.2): yazan, değerlendirilen (ürün ya da
- * satıcı), puan, yayın durumu (gizli mi) ve metnin kendisi. Gizleme / yeniden
- * gösterme yorum ekranında yapılır — sayfa başlığındaki "İçeriği aç" bağlantısı
- * yorumun çekmecesini açar.
+ * The reported review (Apple 1.2): author, rated product or seller, score,
+ * public status (hidden or not) and the text itself. Hide / show again happens
+ * on the reviews page: the "Open content" link in the page header opens the
+ * review's drawer there.
  */
 export function ReviewTargetFields({ target }: { target: ReportTarget }) {
   const t = useTranslations();

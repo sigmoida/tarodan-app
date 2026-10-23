@@ -23,10 +23,10 @@ const DETAIL_BUTTON_VARIANT = {
 } as const satisfies Record<ReviewModerationStatus, string>;
 
 /**
- * Yorum detay çekmecesi — ürün ve satıcı yorumları AYNI görünümü (`ReviewDetail`)
- * çizer. Liste bağlamı içinde durur: seçili satır `rows`'tan her render'da
- * okunur, böylece bir moderasyon geçişinden sonra liste tazelenince çekmece de
- * yeni durumu gösterir (satır süzgeçten düştüyse kapanır).
+ * Review detail drawer: product and seller reviews draw the SAME view
+ * (`ReviewDetail`). It lives inside the list context: the selected row is read
+ * from `rows` on every render, so after a moderation the refreshed list also
+ * updates the drawer (it closes if the row drops out of the filter).
  */
 export function ReviewDetailDrawer<Row extends { id: string }>({
   selectedId,
@@ -37,7 +37,7 @@ export function ReviewDetailDrawer<Row extends { id: string }>({
 }: {
   selectedId: string | null;
   toDetail: (row: Row) => ReviewDetail;
-  /** Satır menüsüyle AYNI eylem (neden penceresini açar) — çoğaltılmaz. */
+  /** The SAME action as the row menu (opens the reason modal); not duplicated. */
   onAct: (id: string, status: ReviewModerationStatus) => void;
   busyId?: string;
   onClose: () => void;
