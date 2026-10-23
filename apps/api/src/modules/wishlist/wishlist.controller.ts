@@ -4,7 +4,6 @@ import {
   Post,
   Delete,
   Body,
-  Request,
   HttpCode,
   HttpStatus,
   Logger,
@@ -17,6 +16,7 @@ import {
 } from "./dto";
 import { errorMessage } from "../../common/helpers/error-message";
 import { ListingIdParam } from "../../common/pipes/listing-id.pipe";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 
 @Controller("wishlist")
 export class WishlistController {
@@ -29,14 +29,16 @@ export class WishlistController {
    * GET /wishlist
    */
   @Get()
-  async getWishlist(@Request() req: any): Promise<WishlistResponseDto> {
+  async getWishlist(
+    @CurrentUser("id") userId: string,
+  ): Promise<WishlistResponseDto> {
     try {
-      return await this.wishlistService.getWishlist(req.user.id);
+      return await this.wishlistService.getWishlist(userId);
     } catch (err) {
       this.logger.warn(`getWishlist failed: ${errorMessage(err)}`);
       return {
         id: "",
-        userId: req.user.id,
+        userId: userId,
         items: [],
         totalItems: 0,
         createdAt: new Date(),
@@ -50,10 +52,10 @@ export class WishlistController {
    */
   @Post()
   async addToWishlist(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @Body() dto: AddToWishlistDto,
   ): Promise<WishlistItemResponseDto> {
-    return this.wishlistService.addToWishlist(req.user.id, dto);
+    return this.wishlistService.addToWishlist(userId, dto);
   }
 
   /**
@@ -63,10 +65,10 @@ export class WishlistController {
   @Delete(":productId")
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeFromWishlist(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @ListingIdParam("productId") productId: string,
   ): Promise<void> {
-    return this.wishlistService.removeFromWishlist(req.user.id, productId);
+    return this.wishlistService.removeFromWishlist(userId, productId);
   }
 
   /**
@@ -75,11 +77,11 @@ export class WishlistController {
    */
   @Get("check/:productId")
   async isInWishlist(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @ListingIdParam("productId") productId: string,
   ): Promise<{ inWishlist: boolean }> {
     const inWishlist = await this.wishlistService.isInWishlist(
-      req.user.id,
+      userId,
       productId,
     );
     return { inWishlist };
@@ -91,7 +93,7 @@ export class WishlistController {
    */
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async clearWishlist(@Request() req: any): Promise<void> {
-    return this.wishlistService.clearWishlist(req.user.id);
+  async clearWishlist(@CurrentUser("id") userId: string): Promise<void> {
+    return this.wishlistService.clearWishlist(userId);
   }
 }
