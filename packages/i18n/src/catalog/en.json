@@ -11696,7 +11696,7 @@
       },
       "payout": {
         "transferNotFound": "Payout transfer not found",
-        "retryStateInvalid": "A transfer in the '{status}' state cannot be retried"
+        "retryStateInvalid": "A transfer in the {status} state cannot be retried."
       },
       "product": {
         "approvePendingOnly": "Only pending products can be approved",

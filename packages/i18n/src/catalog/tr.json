@@ -11696,7 +11696,7 @@
       },
       "payout": {
         "transferNotFound": "Payout transfer bulunamadı",
-        "retryStateInvalid": "Transfer durumu '{status}' tekrar denenebilir değil"
+        "retryStateInvalid": "Durumu {status} olan transfer tekrar denenemez."
       },
       "product": {
         "approvePendingOnly": "Sadece bekleyen ürünler onaylanabilir",
