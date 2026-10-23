@@ -133,6 +133,7 @@ describe.each<[string, Signals]>([
   ["boost", { kind: "boost" }],
   ["membership", { kind: "membership" }],
   ["no kind, origin platform_service", { origin: "platform_service" }],
+  ["no kind, deprecated isMembership", { isMembership: true }],
 ])("orders list card for a digital order (%s)", (_, signals) => {
   it("shows the title as text and offers none of the goods actions", () => {
     const html = card(order(signals, "delivered"));

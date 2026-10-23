@@ -44,7 +44,8 @@ export function useOrderGroupQuery(orderId: string, enabled: boolean) {
         );
       }
       // `kind` decides the digital-order gating; without it `isDigitalOrder`
-      // falls back to `origin`. The breadcrumb makes a stale API visible.
+      // falls back to `origin` and `isMembership`. The breadcrumb (order id
+      // only) shows a stale API in the trail of any error on this page.
       if (data.orders.some((o: { kind?: unknown }) => !o?.kind)) {
         logger.info("order.digital.fallback", { orderId: id });
       }

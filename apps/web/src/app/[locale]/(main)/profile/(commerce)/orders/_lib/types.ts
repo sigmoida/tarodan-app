@@ -236,15 +236,16 @@ export const visibleCargoCode = (
 export const isDigitalPackage = (pkg: ServerPackageView): boolean =>
   pkg.orders.length > 0 && pkg.orders.every(isDigitalOrder);
 
-/** İptal edilebilir sipariş durumları (kargo öncesi). */
+/** Order statuses that can be cancelled (before shipping). */
 const CANCELLABLE_STATUSES = ["pending_payment", "paid", "preparing"];
 
 /**
  * Group cancel (R4): cancelling the whole cart is open only while no member
  * has been handed to the carrier. A partly shipped cart cannot be cancelled
  * as a group; its unshipped lines use the single-line cancel
- * (`isOrderCancellable`). A digital order is never cancelled by the buyer, so
- * a group holding one offers no group cancel.
+ * (`isOrderCancellable`). The client offers no cancel for a digital order (an
+ * unpaid one expires on the server), so a group holding one offers no group
+ * cancel.
  */
 export const isGroupCancellable = (group: ServerOrderGroup): boolean =>
   group.viewerRole === "buyer" &&
@@ -270,7 +271,8 @@ export interface CancellableOrderLike extends DigitalOrderSignals {
  * (pending_payment, paid or preparing, the shipment at most at the label
  * stage) and with no active refund, the buyer can cancel one line. In a mixed
  * cart (one line shipped, another not) the group cancel closes but this path
- * stays open. A digital order (membership, boost) is never cancellable here.
+ * stays open. The client offers no cancel for a digital order (membership,
+ * boost); an unpaid one expires on the server's payment-expiry sweep.
  */
 export const isOrderCancellable = (o: CancellableOrderLike): boolean => {
   if (isDigitalOrder(o)) return false;

@@ -188,7 +188,7 @@ export default function OrderGroupDetailPage() {
             const shippedOrder = pkgOrders.find((o) => o.shipment);
             const cargoCode = visibleCargoCode(pkg.cargo);
             // A digital package (membership, boost) ships nothing: no parcel
-            // header, cargo code or shipping card.
+            // header or cargo code (ShippingInfoCard gates itself).
             const shipsParcel = !isDigitalPackage(pkg);
             return (
               <section
@@ -238,9 +238,7 @@ export default function OrderGroupDetailPage() {
                 ))}
                 {/* ONE shipping card per package: all its orders share the
                     shipment, so it is not repeated per order. */}
-                {shipsParcel && shippedOrder && (
-                  <ShippingInfoCard order={shippedOrder} />
-                )}
+                {shippedOrder && <ShippingInfoCard order={shippedOrder} />}
               </section>
             );
           })}

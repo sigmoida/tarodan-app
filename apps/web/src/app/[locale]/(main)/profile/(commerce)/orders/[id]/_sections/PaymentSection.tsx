@@ -38,8 +38,8 @@ import { orderAmountOf, type OrderDetail } from "../_lib/types";
  *
  * Not for a digital order (membership, boost): it has no delivery address
  * (its address field holds the purchase snapshot, which an address would
- * overwrite) and its payment is resumed from its own checkout, so the order
- * detail stays read-only, as on mobile.
+ * overwrite) and its payment belongs to its own checkout (membership or
+ * boost), so the order detail stays read-only, as on mobile.
  */
 export default function PaymentSection({
   order,

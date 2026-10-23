@@ -13,11 +13,12 @@ import {
 } from "../_lib/types";
 
 /**
- * Siparişin para özeti — alıcıya ödediğinin, satıcıya hak ettiğinin kırılımı.
+ * The order's money summary: what the buyer paid, what the seller earns.
  *
- * Tutarların hiçbiri burada türetilmez: satırlar `buyerOrderSummaryOf` /
- * `sellerOrderSummaryOf` ile hesaplanır (KDV dağıtım kuralı ve neden öyle
- * olduğu orada yazılı) ve bu bileşen yalnız basar.
+ * No amount is derived here: the rows come from `buyerOrderSummaryOf` /
+ * `sellerOrderSummaryOf` (the VAT split rule and its reason are documented
+ * there) and this component only prints them. A digital order always gets
+ * the buyer summary, without the shipping row.
  */
 export default function OrderSummaryCard({ order }: { order: OrderDetail }) {
   if (order.isSeller && !isDigitalOrder(order)) {
