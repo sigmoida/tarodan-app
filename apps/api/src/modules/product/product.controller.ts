@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
   BadRequestException,
   NotFoundException,
   ForbiddenException,
@@ -57,7 +56,14 @@ import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import { errorStack } from "../../common/helpers/error-message";
-import { UuidParam } from "../../common/pipes/uuid-param.decorator";
+import {
+  UuidParam,
+  uuidParamPipe,
+} from "../../common/pipes/uuid-param.decorator";
+import {
+  LISTING_ID_PARAM_DESCRIPTION,
+  ListingIdParam,
+} from "../../common/pipes/listing-id.pipe";
 
 @ApiTags("products")
 @Controller("products")
@@ -397,12 +403,12 @@ export class ProductController {
   @Header("Cache-Control", "no-store, no-cache, must-revalidate")
   @Header("Pragma", "no-cache")
   @ApiOperation({ summary: "Kendi ürünüm (düzenleme için)" })
-  @ApiParam({ name: "id", description: "Product UUID" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({ status: 200, description: "Ürün detayı" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   @ApiResponse({ status: 403, description: "Bu ürün size ait değil" })
   async findMyProductById(
-    @Param("id", ParseUUIDPipe) id: string,
+    @ListingIdParam("id") id: string,
     @CurrentUser("id") userId: string,
   ) {
     return this.productService.findMyProductById(id, userId);
@@ -415,7 +421,7 @@ export class ProductController {
   @Get(":id")
   @Public()
   @ApiOperation({ summary: "Ürün detayı" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Ürün detayı",
@@ -424,7 +430,10 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async findOne(
-    @UuidParam("id", "server.product.invalidIdFormatDetailed")
+    @ListingIdParam(
+      "id",
+      uuidParamPipe("server.product.invalidIdFormatDetailed"),
+    )
     id: string,
     @CurrentUser("id") viewerId?: string,
   ) {
@@ -439,9 +448,9 @@ export class ProductController {
   @Get(":id/similar")
   @Public()
   @ApiOperation({ summary: "Benzer ürünler (aynı kategori, aktif)" })
-  @ApiParam({ name: "id", description: "Product ID (UUID)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async getSimilar(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", uuidParamPipe("server.product.invalidIdFormat"))
     id: string,
     @Query("limit") limit?: string,
     @CurrentUser("id") viewerId?: string,
@@ -704,7 +713,7 @@ export class ProductController {
   @Post(":id/view")
   @Public()
   @ApiOperation({ summary: "Görüntülenme sayısını artır" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description: "Görüntülenme sayısı artırıldı",
@@ -717,7 +726,7 @@ export class ProductController {
   })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async incrementViewCount(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", uuidParamPipe("server.product.invalidIdFormat"))
     id: string,
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,

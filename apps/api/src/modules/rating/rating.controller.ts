@@ -19,6 +19,7 @@ import {
 } from "./dto";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ListingIdParam } from "../../common/pipes/listing-id.pipe";
 
 @Controller("ratings")
 export class RatingController {
@@ -78,12 +79,12 @@ export class RatingController {
 
   /**
    * Get product ratings (public)
-   * GET /ratings/products/:productId
+   * GET /ratings/products/:productId (bare UUID or listing URL segment)
    */
   @Public()
   @Get("products/:productId")
   async getProductRatings(
-    @Param("productId", ParseUUIDPipe) productId: string,
+    @ListingIdParam("productId") productId: string,
     @Query("page") page?: number,
     @Query("pageSize") pageSize?: number,
     @Query("sortBy") sortBy?: string,
@@ -102,12 +103,12 @@ export class RatingController {
 
   /**
    * Get product rating stats (public)
-   * GET /ratings/products/:productId/stats
+   * GET /ratings/products/:productId/stats (bare UUID or listing URL segment)
    */
   @Public()
   @Get("products/:productId/stats")
   async getProductRatingStats(
-    @Param("productId", ParseUUIDPipe) productId: string,
+    @ListingIdParam("productId") productId: string,
   ): Promise<ProductRatingStatsDto> {
     return this.ratingService.getProductRatingStats(productId);
   }
