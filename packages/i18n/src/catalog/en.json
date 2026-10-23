@@ -3049,7 +3049,6 @@
     "report": "Report",
     "noActiveListings": "This seller has no active listings yet.",
     "viewProfile": "View Profile",
-    "premiumBadge": "Premium",
     "noReviewsDesc": "This seller has no reviews yet.",
     "totalReviews": "reviews",
     "noCollections": "No collections yet",
@@ -3171,8 +3170,10 @@
       "emptyDescription": "Create discounts and campaigns for your customers"
     },
     "trustScore": {
-      "badge": "Trust score {rating}/5 · {level}",
-      "badgeNew": "Trust score: New seller",
+      "badge": "{rating}",
+      "badgeNew": "New seller",
+      "a11yLabel": "Trust score {rating} out of 5, {level}",
+      "a11yLabelNew": "Trust score: New seller",
       "levels": {
         "excellent": "Excellent",
         "trusted": "Trusted",

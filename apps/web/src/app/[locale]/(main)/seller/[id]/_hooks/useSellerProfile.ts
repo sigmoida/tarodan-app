@@ -76,7 +76,6 @@ export function useSellerProfile() {
           avatarUrl: firstProduct.seller.avatarUrl,
           createdAt: firstProduct.seller.createdAt || new Date().toISOString(),
           isVerified: firstProduct.seller.isVerified || false,
-          isPremium: firstProduct.seller.isPremium || false,
           stats: {
             totalListings: 0,
             totalSales: 0,

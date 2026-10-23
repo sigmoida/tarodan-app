@@ -9,14 +9,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const h = vi.hoisted(() => ({ isPremium: true }));
+const h = vi.hoisted(() => ({
+  isPremium: true,
+  locale: "tr",
+  rating: 0,
+}));
 
 vi.mock("../_context/ListingDetailContext", () => ({
   useListingDetail: () => ({
     t: (key: string) => key,
+    locale: h.locale,
     listing: {
       id: "l1",
-      seller: { id: "s1", username: "kaan", isPremium: h.isPremium },
+      seller: {
+        id: "s1",
+        username: "kaan",
+        isPremium: h.isPremium,
+        rating: h.rating,
+      },
     },
     isAuthenticated: true,
     isOwner: false,
@@ -58,24 +68,41 @@ afterEach(() => {
   container.remove();
 });
 
-describe("SellerCard Premium badge", () => {
-  it("sabit metin yerine seller.premiumBadge anahtarını kullanır", () => {
+describe("SellerCard package badge", () => {
+  it("never shows a Premium badge, even for a premium seller", () => {
     h.isPremium = true;
     act(() => root.render(<SellerCard />));
-    expect(container.textContent).toContain("seller.premiumBadge");
+    expect(container.textContent).not.toContain("seller.premiumBadge");
     expect(container.textContent).not.toContain("Premium");
   });
 
-  it("premium olmayan satıcıda rozet yok", () => {
+  it("shows no badge for a non-premium seller either", () => {
     h.isPremium = false;
     act(() => root.render(<SellerCard />));
     expect(container.textContent).not.toContain("seller.premiumBadge");
   });
 });
 
+describe("SellerCard rating", () => {
+  afterEach(() => {
+    h.locale = "tr";
+    h.rating = 0;
+  });
+
+  it("formats the review average with the locale's separator", () => {
+    h.rating = 4.25;
+    act(() => root.render(<SellerCard />));
+    expect(container.textContent).toContain("4,3");
+
+    h.locale = "en";
+    act(() => root.render(<SellerCard />));
+    expect(container.textContent).toContain("4.3");
+  });
+});
+
 describe("seller.premiumBadge catalog", () => {
-  it("tr ve en katalogunda tanımlıdır", () => {
-    expect(messages.tr.seller.premiumBadge).toBe("Premium");
-    expect(messages.en.seller.premiumBadge).toBe("Premium");
+  it("is removed from both catalogs", () => {
+    expect(messages.tr.seller).not.toHaveProperty("premiumBadge");
+    expect(messages.en.seller).not.toHaveProperty("premiumBadge");
   });
 });

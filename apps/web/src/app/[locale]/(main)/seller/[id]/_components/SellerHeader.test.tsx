@@ -37,7 +37,6 @@ const seller = (over: Partial<Seller>): Seller => ({
   displayName: "Seller",
   createdAt: "2025-01-01T00:00:00.000Z",
   isVerified: true,
-  isPremium: true,
   trust: { rating: 3.74, level: "fair", formulaVersion: 1 },
   sellerType: "individual",
   ...over,
@@ -77,21 +76,47 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+// The visible badge is only a number, so gating is pinned on the badge button
+// (its accessible name carries "Güven skoru"), not on the visible text.
+const trustBadge = () =>
+  container.querySelector('button[aria-label^="Güven skoru"]');
+
 describe("SellerHeader badges", () => {
-  it("shows Premium, Verified and the trust score for a premium seller", () => {
-    render(seller({}));
+  it("shows Verified and only the trust number, no Premium or label", () => {
+    // The API still sends `isPremium`; the header must ignore it.
+    render({ ...seller({}), isPremium: true } as Seller);
     const text = container.textContent ?? "";
-    expect(text).toContain("Premium");
+    expect(text).not.toContain("Premium");
     expect(text).toContain("Doğrulanmış");
-    expect(text).toContain("Güven skoru 3,74/5 · Orta");
+    expect(text).toContain("3,74");
+    expect(text).not.toContain("Güven skoru");
+    expect(text).not.toContain("Orta");
+    expect(trustBadge()?.textContent).toBe("3,74");
   });
 
   it("shows no trust badge when the API gates the score (trust null)", () => {
-    render(seller({ isPremium: false, trust: null }));
+    render(seller({ trust: null }));
     const text = container.textContent ?? "";
-    expect(text).not.toContain("Güven skoru");
+    expect(trustBadge()).toBeNull();
+    expect(text).not.toContain("Yeni satıcı");
     expect(text).not.toContain("Premium");
     expect(text).toContain("Doğrulanmış");
+  });
+
+  it("shows the review average in the locale format", () => {
+    render(
+      seller({
+        trust: null,
+        stats: {
+          totalListings: 0,
+          totalSales: 0,
+          totalTrades: 0,
+          totalRatings: 12,
+          averageRating: 3.74,
+        },
+      }),
+    );
+    expect(container.textContent).toContain("3,7 (12)");
   });
 
   it("treats the platform seller like every seller (D5)", () => {
@@ -103,12 +128,12 @@ describe("SellerHeader badges", () => {
     );
     const text = container.textContent ?? "";
     expect(text).toContain("Doğrulanmış");
-    expect(text).toContain("Güven skoru 4,10/5 · Güvenilir");
+    expect(trustBadge()?.textContent).toBe("4,10");
     expect(text).not.toContain("Resmi hesap");
   });
 
   it("shows no trust badge for a platform seller whose score is gated", () => {
-    render(seller({ sellerType: "platform", isPremium: false, trust: null }));
-    expect(container.textContent).not.toContain("Güven skoru");
+    render(seller({ sellerType: "platform", trust: null }));
+    expect(trustBadge()).toBeNull();
   });
 });

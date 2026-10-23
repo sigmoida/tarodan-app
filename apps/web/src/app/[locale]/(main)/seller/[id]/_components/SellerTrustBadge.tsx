@@ -35,11 +35,19 @@ export default function SellerTrustBadge({ trust }: SellerTrustBadgeProps) {
     return null;
   }
 
-  const label =
+  const rating =
     trust.level === "new" || trust.rating === null
+      ? null
+      : formatTrustRating(trust.rating, locale);
+  const label =
+    rating === null
       ? t("seller.trustScore.badgeNew")
-      : t("seller.trustScore.badge", {
-          rating: formatTrustRating(trust.rating, locale),
+      : t("seller.trustScore.badge", { rating });
+  const a11yLabel =
+    rating === null
+      ? t("seller.trustScore.a11yLabelNew")
+      : t("seller.trustScore.a11yLabel", {
+          rating,
           level: t(SELLER_TRUST_LEVEL_I18N_KEYS[trust.level]),
         });
 
@@ -50,7 +58,7 @@ export default function SellerTrustBadge({ trust }: SellerTrustBadgeProps) {
         className="h-auto rounded-full p-0"
         onClick={() => setInfoOpen(true)}
         aria-haspopup="dialog"
-        aria-label={`${label}. ${t("seller.trustScore.info.title")}`}
+        aria-label={`${a11yLabel}. ${t("seller.trustScore.info.title")}`}
       >
         <Badge variant="warning" size="sm">
           {label}

@@ -12,10 +12,11 @@ import {
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import UserActionsMenu from "@/components/UserActionsMenu";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
+import { formatRating } from "@/lib/format";
 import { publicNameOf } from "@/lib/public-name";
 import SellerTrustBadge from "./SellerTrustBadge";
 
@@ -48,6 +49,7 @@ export default function SellerHeader({
   onRequireAuth,
 }: SellerHeaderProps) {
   const t = useTranslations();
+  const locale = useLocale();
   const stats = seller.stats;
   const totalRatings = stats?.totalRatings ?? 0;
   const averageRating = stats?.averageRating ?? 0;
@@ -70,11 +72,6 @@ export default function SellerHeader({
               <h1 className="truncate text-xl font-bold text-heading">
                 {publicNameOf(seller)}
               </h1>
-              {seller.isPremium && (
-                <Badge variant="default" size="sm">
-                  {t("seller.premiumBadge")}
-                </Badge>
-              )}
               {seller.isVerified && (
                 <Badge
                   variant="success"
@@ -95,7 +92,7 @@ export default function SellerHeader({
                     className="mb-0.5 inline size-3.5 text-warning-500"
                     aria-hidden
                   />{" "}
-                  {`${averageRating.toFixed(1)} (${totalRatings})`}
+                  {`${formatRating(averageRating, locale)} (${totalRatings})`}
                 </>
               )}
               {` · ${followersCount} ${t("profile.followers")}`}
@@ -153,7 +150,7 @@ export default function SellerHeader({
         <MetricCard
           icon={StarIcon}
           label={t("profile.rating")}
-          value={hasRatings ? averageRating.toFixed(1) : "—"}
+          value={hasRatings ? formatRating(averageRating, locale) : "—"}
           accent="text-warning-600"
         />
       </div>

@@ -45,7 +45,6 @@ export interface Seller {
   bio?: string;
   createdAt: string;
   isVerified: boolean;
-  isPremium?: boolean;
   /** Null for non-premium sellers; absent on older API responses. */
   trust?: SellerTrustView | null;
   sellerType?: string;
