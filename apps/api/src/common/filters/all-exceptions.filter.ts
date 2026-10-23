@@ -18,6 +18,7 @@ import { getRequestId } from "../context/request-context";
 import { I18nService } from "../../modules/i18n/i18n.service";
 import { isLocalizedMessage } from "../../modules/i18n/localized-message";
 import { resolveRequestLocale } from "../../modules/i18n/locale.util";
+import { isClientAbort } from "../helpers/client-abort";
 import { errorStack } from "../helpers/error-message";
 
 /**
@@ -34,28 +35,9 @@ import { errorStack } from "../helpers/error-message";
  *  - Anything else becomes a sanitized 500: the client sees a generic localized
  *    message, never an internal `error.message`, stack, SQL, or file path. Full
  *    detail is logged server-side (and persisted by ErrorLogInterceptor).
+ *  - A client abort (`isClientAbort`) is only a debug line: no 5xx, no Sentry
+ *    event, and no body for a client that is gone.
  */
-const CLIENT_ABORT_CODES = new Set(["ECONNABORTED", "ECONNRESET"]);
-
-/**
- * True when the error only says the client dropped the request: multer/busboy
- * "Request aborted", body-parser `request.aborted`, or a reset/aborted socket.
- * These are neither server faults nor worth a Sentry event.
- */
-export function isClientAbort(exception: unknown): boolean {
-  if (typeof exception !== "object" || exception === null) return false;
-  const { message, type, code } = exception as {
-    message?: unknown;
-    type?: unknown;
-    code?: unknown;
-  };
-  return (
-    message === "Request aborted" ||
-    type === "request.aborted" ||
-    (typeof code === "string" && CLIENT_ABORT_CODES.has(code))
-  );
-}
-
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -113,7 +95,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // 2) The client went away mid-request (aborted upload, dropped connection).
     // Nothing is wrong on our side and nobody is left to read an answer.
-    if (isClientAbort(exception)) {
+    if (isClientAbort(exception, request)) {
       this.logger.debug(
         `${request?.method} ${String(request?.url ?? "").split("?")[0]} -> client aborted the request`,
       );

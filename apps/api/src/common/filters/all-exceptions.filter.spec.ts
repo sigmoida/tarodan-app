@@ -225,6 +225,7 @@ describe("AllExceptionsFilter", () => {
             method: "POST",
             url: "/api/media/upload/product?token=secret",
             headers: {},
+            readableAborted: true,
           }),
         }),
       } as unknown as ArgumentsHost;
@@ -269,13 +270,26 @@ describe("AllExceptionsFilter", () => {
       expect(out.status).not.toHaveBeenCalled();
     });
 
-    it("ends an still-open response with an empty 400", () => {
+    it("ends a still-open response with an empty 400", () => {
       const out = runAbort(abort({}, "Request aborted"), {
         socket: { destroyed: false },
       });
       expect(out.status).toHaveBeenCalledWith(400);
       expect(out.end).toHaveBeenCalled();
       expect(out.json).not.toHaveBeenCalled();
+    });
+
+    it("an upstream ECONNRESET with the client still connected is a logged 500", () => {
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      try {
+        const upstream = abort({ code: "ECONNRESET" }, "socket hang up");
+        expect(run(upstream).status).toBe(500);
+        expect(error).toHaveBeenCalledTimes(1);
+      } finally {
+        error.mockRestore();
+      }
     });
 
     it("still turns an unrelated error into a logged 500", () => {
