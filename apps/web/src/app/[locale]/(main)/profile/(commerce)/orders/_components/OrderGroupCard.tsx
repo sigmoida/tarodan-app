@@ -9,9 +9,11 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
 import { Button } from "@tarodan/ui";
+import { isDigitalOrder } from "@tarodan/types";
 import {
   formatTL,
   getOrderPrimary,
+  isDigitalPackage,
   isGroupCancellable,
   productAmountOf,
   sellerNetOf,
@@ -65,7 +67,12 @@ function OrderLine({
           />
         </div>
         <div className="min-w-0 flex-1">
-          {product ? (
+          {/* A digital order's virtual product has no listing page (D4). */}
+          {product && isDigitalOrder(order) ? (
+            <p className="font-medium text-heading">
+              {product.title || t("order.product")}
+            </p>
+          ) : product ? (
             <Link
               href={`/listings/${product.id}`}
               className="font-medium text-heading transition-colors hover:text-primary-600"
@@ -201,7 +208,7 @@ export default function OrderGroupCard({
               </div>
               {/* Kargo bedeli burada GÖSTERİLMEZ: kart tutarı zaten sepetin
                   ödenen toplamıdır, kalem kalem döküm detay sayfasındadır. */}
-              {(pkg.packageNumber || cargoCode) && (
+              {!isDigitalPackage(pkg) && (pkg.packageNumber || cargoCode) && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-surface-alt p-3 text-sm">
                   {/* Teslimat no: bu kutudaki ürünler TEK kolide gider. Sürat'a
                       giden ve kargo etiketinde yazan kod budur. */}

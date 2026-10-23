@@ -23,7 +23,11 @@ import {
   isOrderReturnable,
 } from "./_lib/types";
 import type { OrderDetail } from "./_lib/types";
-import { isGroupCancellable, visibleCargoCode } from "../_lib/types";
+import {
+  isDigitalPackage,
+  isGroupCancellable,
+  visibleCargoCode,
+} from "../_lib/types";
 import OrderItemBlock, {
   type OrderItemBlockHandlers,
 } from "./_sections/OrderItemBlock";
@@ -183,6 +187,9 @@ export default function OrderGroupDetailPage() {
             const pkgOrders = pkg.orders as unknown as OrderDetail[];
             const shippedOrder = pkgOrders.find((o) => o.shipment);
             const cargoCode = visibleCargoCode(pkg.cargo);
+            // A digital package (membership, boost) ships nothing: no parcel
+            // header, cargo code or shipping card.
+            const shipsParcel = !isDigitalPackage(pkg);
             return (
               <section
                 key={pkg.id}
@@ -192,10 +199,10 @@ export default function OrderGroupDetailPage() {
                     : "space-y-6"
                 }
               >
-                {/* Koli başlığı: tek satıcılı sepette de gösterilir — koli
-                    numarası (PKG-…) sepet ve sipariş numaralarından bağımsız
-                    üçüncü seviyedir ve kargo etiketinde bu yazar. */}
-                {(multiPackage || pkg.packageNumber) && (
+                {/* Parcel header, also in a single-seller cart: the parcel
+                    number (PKG-…) is a third level, independent of the cart
+                    and order numbers, and it is what the cargo label says. */}
+                {shipsParcel && (multiPackage || pkg.packageNumber) && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-heading">
                       {multiPackage && pkg.seller
@@ -229,9 +236,11 @@ export default function OrderGroupDetailPage() {
                     handlers={handlers}
                   />
                 ))}
-                {/* Paket başına TEK kargo kartı: paketin tüm siparişleri aynı
-                    gönderiyi paylaşır — sipariş başına tekrarlanmaz. */}
-                {shippedOrder && <ShippingInfoCard order={shippedOrder} />}
+                {/* ONE shipping card per package: all its orders share the
+                    shipment, so it is not repeated per order. */}
+                {shipsParcel && shippedOrder && (
+                  <ShippingInfoCard order={shippedOrder} />
+                )}
               </section>
             );
           })}

@@ -1,28 +1,30 @@
 /** @format */
 
 import {
+  isDigitalOrder,
   isPreShipmentCancellableStatus,
   isShipmentHandedToCarrier,
 } from "@tarodan/types";
-import { isMembershipOrder, type OrderDetail } from "./types";
+import type { OrderDetail } from "./types";
 
 /**
- * Sipariş dosyasındaki "kargoya verme son tarihi" notu.
+ * The "ship by" note on the order file.
  *
- * Tarih sunucudan gelir (`preparingDeadline`): tek seferlik uzatmada sunucu
- * yeni son tarihi aynı alana yazar, ekran hesap yapmaz. `extended`, uzatmanın
- * kullanıldığını söyler — satıcıya "son süre", alıcıya "gecikme + iptal hakkı"
- * metni gösterilir.
+ * The date comes from the server (`preparingDeadline`): on the one-time
+ * extension the server writes the new deadline to the same field, the screen
+ * computes nothing. `extended` says the extension was used: the seller sees
+ * "final deadline", the buyer "delayed, you may cancel before shipping".
  *
- * Not, sunucunun gerçekten yapacağından fazlasını vaat etmez; bu yüzden
- * yalnız şu durumda görünür:
- *  - parası alınmış ama henüz yola çıkmamış sipariş, VE
- *  - koli taşıyıcıya devredilmemiş — sunucunun süre dolumu taramasıyla AYNI
- *    kural (`isShipmentHandedToCarrier`: hareket eden durum ya da `shippedAt`
- *    mührü). Devredilmiş koli için tarama iptal etmez; "otomatik iptal edilir"
- *    demek yanlış olurdu. VE
- *  - son tarih henüz geçmemiş. Geçmişse karar (uzatma ya da iptal) bir sonraki
- *    tarama turundadır; geçmiş bir tarihte iptal vaat edilmez.
+ * The note never promises more than the server will do, so it shows only
+ * when:
+ *  - the order is paid but has not left yet, AND
+ *  - the parcel has not been handed to the carrier, by the SAME rule as the
+ *    server's expiry sweep (`isShipmentHandedToCarrier`: a moving status or
+ *    the `shippedAt` stamp). The sweep does not cancel a handed-over parcel,
+ *    so "cancelled automatically" would be wrong. AND
+ *  - the deadline has not passed. Once it has, the decision (extension or
+ *    cancel) is the next sweep's; no cancel is promised for a past date. AND
+ *  - the order is not digital (membership, boost): nothing ships.
  */
 export interface PreparingDeadlineNotice {
   deadline: string;
@@ -36,7 +38,7 @@ export function preparingDeadlineNoticeOf(
 ): PreparingDeadlineNotice | null {
   if (!order.preparingDeadline) return null;
   if (!order.isBuyer && !order.isSeller) return null;
-  if (isMembershipOrder(order)) return null;
+  if (isDigitalOrder(order)) return null;
   if (!isPreShipmentCancellableStatus(order.status)) return null;
   if (isShipmentHandedToCarrier(order.shipment ?? null)) return null;
   const deadlineMs = new Date(order.preparingDeadline).getTime();

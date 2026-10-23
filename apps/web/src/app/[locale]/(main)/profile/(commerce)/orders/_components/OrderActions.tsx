@@ -7,6 +7,7 @@ import { StarIcon } from "@heroicons/react/24/solid";
 import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import {
   REVIEWABLE_STATUSES,
   getOrderProductId,
@@ -50,7 +51,10 @@ export default function OrderActions({
   const cancelled = isCancelledOrder(order);
   const isBuyer = order.isBuyer !== false;
   const isSeller = !!order.isSeller;
-  const hasProduct = !!getOrderProductId(order);
+  // A digital order (membership, boost) has no listing to reorder, nothing to
+  // rate and no refund request; only its invoice stays.
+  const digital = isDigitalOrder(order);
+  const hasProduct = !digital && !!getOrderProductId(order);
   const isTerminal = [
     "delivered",
     "completed",
@@ -78,11 +82,14 @@ export default function OrderActions({
     refundLink: !!refundId,
     requestRefund:
       !refundId &&
+      !digital &&
       isBuyer &&
       shipped &&
       !["cancelled", "refunded"].includes(order.status),
     sellerInvoice:
-      isSeller && ["paid", "preparing", "shipped"].includes(order.status),
+      isSeller &&
+      !digital &&
+      ["paid", "preparing", "shipped"].includes(order.status),
     review: canReview,
   };
 
@@ -137,7 +144,7 @@ export default function OrderActions({
         )
       )}
 
-      {isSeller && order.status === "preparing" && (
+      {isSeller && !digital && order.status === "preparing" && (
         <ButtonLink
           href={`/profile/orders/${order.id}`}
           variant="primary"
