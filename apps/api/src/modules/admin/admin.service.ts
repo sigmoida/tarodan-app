@@ -66,6 +66,7 @@ import {
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
+  MarkPayoutTransferPaidDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -754,8 +755,24 @@ export class AdminService {
     );
   }
 
-  async retryPayoutTransfer(adminId: string, transferId: string) {
-    return this.payoutService.retryPayoutTransfer(adminId, transferId);
+  async retryPayoutTransfer(
+    adminId: string,
+    transferId: string,
+    input: { confirmProviderChecked?: boolean; reason?: string } = {},
+  ) {
+    return this.payoutService.retryPayoutTransfer(adminId, transferId, input);
+  }
+
+  async markPayoutTransferPaid(
+    adminId: string,
+    transferId: string,
+    input: MarkPayoutTransferPaidDto,
+  ) {
+    return this.payoutService.markPayoutTransferPaid(
+      adminId,
+      transferId,
+      input,
+    );
   }
 
   async getFailedPayouts(page = 1, limit = 20) {

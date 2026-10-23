@@ -90,6 +90,8 @@ import {
   PayoutTransfersQueryDto,
   ReleasePayoutDto,
   SettleHoldResidualDto,
+  RetryPayoutTransferDto,
+  MarkPayoutTransferPaidDto,
   CreateTaxRegionDto,
   UpdateTaxRegionDto,
   CreateTaxRateDto,
@@ -496,14 +498,61 @@ export class AdminPaymentController {
   @Post("payouts/:transferId/retry")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Retry a failed payout transfer" })
+  @ApiOperation({
+    summary:
+      "Retry a failed or returned payout transfer (the processor recomputes net and total)",
+  })
   @ApiParam({ name: "transferId", description: "PayoutTransfer ID" })
-  @ApiResponse({ status: HttpStatus.OK, description: "Payout retried" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Payout requeued" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Not failed or returned",
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Outcome unknown without confirmProviderChecked and a reason, or the transfer changed meanwhile",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "No such transfer",
+  })
   async retryPayoutTransfer(
     @Param("transferId") transferId: string,
     @CurrentUser("id") adminId: string,
+    @Body() dto: RetryPayoutTransferDto,
   ) {
-    return this.adminService.retryPayoutTransfer(adminId, transferId);
+    return this.adminService.retryPayoutTransfer(adminId, transferId, dto);
+  }
+
+  @Post("payouts/transfers/:id/mark-paid")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Mark a failed payout transfer as paid: confirmed in the PayTR panel, or paid by the platform from its bank account (ledger + audit, idempotent)",
+  })
+  @ApiParam({ name: "id", description: "PayoutTransfer ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Payout settled" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Missing reason or reference",
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      "Method does not fit the transfer, net changed, payout blocked (refund, order) or the transfer changed meanwhile",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "No such transfer",
+  })
+  async markPayoutTransferPaid(
+    @Param("id") transferId: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: MarkPayoutTransferPaidDto,
+  ) {
+    return this.adminService.markPayoutTransferPaid(adminId, transferId, dto);
   }
 
   @Get("payouts/failed")

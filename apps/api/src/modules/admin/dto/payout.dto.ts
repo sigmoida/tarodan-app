@@ -5,9 +5,15 @@ import {
   IsIn,
   IsDateString,
   IsNotEmpty,
+  IsNumber,
   MaxLength,
+  Min,
 } from "class-validator";
 import { PayoutStatus } from "@prisma/client";
+import {
+  PAYOUT_MANUAL_SETTLEMENT_METHODS,
+  type PayoutManualSettlementMethod,
+} from "@tarodan/types";
 import { QueryBoolean } from "../../../common/transforms";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
@@ -136,4 +142,69 @@ export class SettleHoldResidualDto {
   @IsNotEmpty()
   @MaxLength(500)
   reason: string;
+}
+
+/**
+ * Retry a failed or returned payout transfer. A transfer PayTR may have taken
+ * (`resolution.retryRequiresProviderCheck` on the list row) needs
+ * `confirmProviderChecked: true` and a reason; otherwise the body may be empty.
+ */
+export class RetryPayoutTransferDto {
+  @ApiPropertyOptional({
+    description:
+      "The admin checked the PayTR panel: no transfer with this trans_id exists. Required (true) for a transfer whose outcome is unknown.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirmProviderChecked?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Why the transfer is retried. Required with confirmProviderChecked.",
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+/**
+ * "Mark as paid": record a failed payout transfer as paid without PayTR.
+ * The list row says which method fits (`resolution.markPaidMethod`) and the
+ * net to confirm (`resolution.markPaidNetAmount`).
+ */
+export class MarkPayoutTransferPaidDto {
+  @ApiProperty({
+    enum: PAYOUT_MANUAL_SETTLEMENT_METHODS,
+    description:
+      "paytr_confirmed: the PayTR panel shows the transfer arrived. external_bank: the platform paid the net from its own bank account.",
+  })
+  @IsIn(PAYOUT_MANUAL_SETTLEMENT_METHODS)
+  method: PayoutManualSettlementMethod;
+
+  @ApiProperty({
+    description:
+      "Bank transfer reference (external_bank) or PayTR panel reference (paytr_confirmed)",
+    maxLength: 120,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  reference: string;
+
+  @ApiProperty({ description: "Why it is marked as paid", maxLength: 500 })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
+
+  @ApiProperty({
+    description:
+      "The net (TL) the admin confirms was paid; must equal the row's current net, else 409",
+    example: 40,
+  })
+  @IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false })
+  @Min(0.01)
+  expectedNetAmount: number;
 }

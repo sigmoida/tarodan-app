@@ -173,7 +173,9 @@ describe("Admin Payout Management (E2E)", () => {
           transferIban: "TR330006100519786457841326",
           transferName: "Test",
           status: PayoutStatus.failed,
-          failureReason: "IBAN error",
+          // PayTR refused it: no panel check needed before a retry.
+          failureReason: "provider_rejected",
+          providerResponse: { status: "error", err_no: "001" },
           retryCount: 3,
         },
       });
@@ -192,6 +194,158 @@ describe("Admin Payout Management (E2E)", () => {
       expect(payoutAfter?.status).toBe(PayoutStatus.pending);
       expect(payoutAfter?.retryCount).toBe(0);
       expect(payoutAfter?.failureReason).toBeNull();
+      expect(payoutAfter?.transId).toBe(payout.transId);
+    });
+
+    it("needs the PayTR panel check before retrying an unknown outcome", async () => {
+      const prisma = getPrisma();
+      const admin = await createAdminUser(ctx.module);
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const payout = await prisma.payoutTransfer.create({
+        data: {
+          sellerId: seller.id,
+          amount: 100,
+          commission: 5,
+          netAmount: 95,
+          merchantOid: "UNKNOWN1",
+          transId: `UNKNOWN${Date.now()}`,
+          transferIban: "TR330006100519786457841326",
+          transferName: "Test",
+          status: PayoutStatus.failed,
+          failureReason: "transfer_outcome_unknown",
+          submittedAmount: 95,
+          submittedTotalAmount: 100,
+        },
+      });
+
+      const refused = await request(ctx.app.getHttpServer())
+        .post(`/api/admin/payouts/${payout.id}/retry`)
+        .set(authHeader(admin))
+        .expect(409);
+      expect(refused.body.i18nKey).toBe(
+        "server.admin.payout.providerCheckRequired",
+      );
+      expect(
+        (await prisma.payoutTransfer.findUnique({ where: { id: payout.id } }))
+          ?.status,
+      ).toBe(PayoutStatus.failed);
+
+      await request(ctx.app.getHttpServer())
+        .post(`/api/admin/payouts/${payout.id}/retry`)
+        .set(authHeader(admin))
+        .send({
+          confirmProviderChecked: true,
+          reason: "PayTR panel: no transfer with this trans_id",
+        })
+        .expect(200);
+
+      const after = await prisma.payoutTransfer.findUnique({
+        where: { id: payout.id },
+      });
+      expect(after).toMatchObject({
+        status: PayoutStatus.pending,
+        transId: payout.transId,
+        submittedTotalAmount: null,
+      });
+      const audit = await prisma.auditLog.findFirst({
+        where: { action: "payout_retry", entityId: payout.id },
+      });
+      expect(audit?.oldValue).toMatchObject({
+        providerCheckConfirmed: true,
+        reason: "PayTR panel: no transfer with this trans_id",
+      });
+    });
+  });
+
+  describe("POST /api/admin/payouts/transfers/:id/mark-paid", () => {
+    it("records a transfer the PayTR panel confirms, once, with its ledger and audit", async () => {
+      const prisma = getPrisma();
+      const admin = await createAdminUser(ctx.module);
+      const seller = await createUser(ctx.module, {
+        isSeller: true,
+        premium: true,
+      });
+      const payout = await prisma.payoutTransfer.create({
+        data: {
+          sellerId: seller.id,
+          amount: 100,
+          commission: 5,
+          netAmount: 95,
+          merchantOid: "CONFIRMED1",
+          transId: `CONFIRMED${Date.now()}`,
+          transferIban: "TR330006100519786457841326",
+          transferName: "Test",
+          status: PayoutStatus.failed,
+          failureReason: "transfer_outcome_unknown",
+          submittedAmount: 95,
+          submittedTotalAmount: 100,
+        },
+      });
+      const body = {
+        method: "paytr_confirmed",
+        reference: "PAYTR-PANEL-1",
+        reason: "Transfer listed in the PayTR panel",
+        expectedNetAmount: 95,
+      };
+
+      // The other method does not fit an unknown outcome.
+      const wrong = await request(ctx.app.getHttpServer())
+        .post(`/api/admin/payouts/transfers/${payout.id}/mark-paid`)
+        .set(authHeader(admin))
+        .send({ ...body, method: "external_bank" })
+        .expect(409);
+      expect(wrong.body.i18nKey).toBe("server.admin.payout.markPaidNotAllowed");
+
+      const res = await request(ctx.app.getHttpServer())
+        .post(`/api/admin/payouts/transfers/${payout.id}/mark-paid`)
+        .set(authHeader(admin))
+        .send(body)
+        .expect(200);
+      expect(res.body).toMatchObject({
+        success: true,
+        method: "paytr_confirmed",
+        netAmount: 95,
+        platformFundedAmount: 0,
+        alreadySettled: false,
+      });
+
+      // A second click returns the first result and writes nothing.
+      const again = await request(ctx.app.getHttpServer())
+        .post(`/api/admin/payouts/transfers/${payout.id}/mark-paid`)
+        .set(authHeader(admin))
+        .send(body)
+        .expect(200);
+      expect(again.body.alreadySettled).toBe(true);
+
+      const after = await prisma.payoutTransfer.findUnique({
+        where: { id: payout.id },
+      });
+      expect(after?.status).toBe(PayoutStatus.completed);
+      expect(Number(after?.submittedTotalAmount)).toBe(100);
+      expect(after?.submittedAt).not.toBeNull();
+      const ledger = await prisma.ledgerEntry.findMany({
+        where: { payoutId: payout.id },
+        orderBy: { lineNo: "asc" },
+      });
+      expect(
+        ledger.map((e) => [
+          e.idempotencyKey,
+          e.account,
+          e.direction,
+          Number(e.amount),
+        ]),
+      ).toEqual([
+        [`payout-completed:${payout.id}`, "seller_escrow", "credit", 95],
+        [`payout-completed:${payout.id}`, "payout", "debit", 95],
+      ]);
+      expect(
+        await prisma.auditLog.count({
+          where: { action: "payout_mark_paid", entityId: payout.id },
+        }),
+      ).toBe(1);
     });
   });
 
