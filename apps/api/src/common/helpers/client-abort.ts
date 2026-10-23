@@ -6,18 +6,17 @@
  *
  * Two things must hold, not one:
  *
- * 1. The error has the shape a body reader gives when the client goes away:
- *    multer/busboy "Request aborted", raw-body `request.aborted`, or the
- *    request stream's own `ECONNRESET`/`ECONNABORTED`.
+ * 1. The error comes from a body reader that saw the client go away: multer's
+ *    "Request aborted" or raw-body's `type: "request.aborted"`. A bare socket
+ *    code (`ECONNRESET`, `ECONNABORTED`) does not count: an S3, Redis or
+ *    carrier call raises the same codes, and a client that gives up on a slow
+ *    request is exactly when an upstream outage would then go unreported.
  * 2. The request stream itself was aborted (`readableAborted`, or the legacy
  *    `aborted` flag) — Node sets both before the body readers raise.
  *
- * The second check is what keeps a real outage visible: an upstream call (S3,
- * Redis, SMTP, a carrier API) that fails with `ECONNRESET` while the client is
- * still connected is a server error and must stay a logged 500.
+ * The second check keeps a look-alike message from elsewhere (a client
+ * library's own "Request aborted") a logged 500 while the client is connected.
  */
-const CLIENT_ABORT_CODES = new Set(["ECONNABORTED", "ECONNRESET"]);
-
 interface AbortableRequest {
   readableAborted?: boolean;
   aborted?: boolean;
@@ -25,16 +24,10 @@ interface AbortableRequest {
 
 export function isClientAbort(exception: unknown, request: unknown): boolean {
   if (typeof exception !== "object" || exception === null) return false;
-  const { message, type, code } = exception as {
-    message?: unknown;
-    type?: unknown;
-    code?: unknown;
-  };
-  const abortShaped =
-    message === "Request aborted" ||
-    type === "request.aborted" ||
-    (typeof code === "string" && CLIENT_ABORT_CODES.has(code));
-  if (!abortShaped) return false;
+  const { message, type } = exception as { message?: unknown; type?: unknown };
+  const fromBodyReader =
+    message === "Request aborted" || type === "request.aborted";
+  if (!fromBodyReader) return false;
 
   const req = request as AbortableRequest | null | undefined;
   return req?.readableAborted === true || req?.aborted === true;

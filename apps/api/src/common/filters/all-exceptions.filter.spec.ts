@@ -250,9 +250,7 @@ describe("AllExceptionsFilter", () => {
 
     it.each([
       ["multer", abort({}, "Request aborted")],
-      ["body-parser", abort({ type: "request.aborted" })],
-      ["ECONNABORTED", abort({ code: "ECONNABORTED" })],
-      ["ECONNRESET", abort({ code: "ECONNRESET" })],
+      ["body-parser", abort({ type: "request.aborted", code: "ECONNABORTED" })],
     ])("%s: no error log, debug only, no query string", (_name, err) => {
       const out = runAbort(err);
       expect(out.error).toHaveLength(0);

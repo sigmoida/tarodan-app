@@ -11,7 +11,6 @@ describe("isClientAbort", () => {
   it.each([
     ["multer", err({}, "Request aborted")],
     ["raw-body", err({ type: "request.aborted", code: "ECONNABORTED" })],
-    ["request stream reset", err({ code: "ECONNRESET" })],
   ])("%s on an aborted request is a client abort", (_name, e) => {
     expect(isClientAbort(e, aborted)).toBe(true);
     expect(isClientAbort(e, legacyAborted)).toBe(true);
@@ -31,6 +30,9 @@ describe("isClientAbort", () => {
 
   it("an unrelated error on an aborted request is not swallowed", () => {
     expect(isClientAbort(new Error("db down"), aborted)).toBe(false);
+    // An upstream call failing after the client gave up is still ours.
+    expect(isClientAbort(err({ code: "ECONNRESET" }), aborted)).toBe(false);
+    expect(isClientAbort(err({ code: "ECONNABORTED" }), aborted)).toBe(false);
     expect(isClientAbort("Request aborted", aborted)).toBe(false);
     expect(isClientAbort(null, aborted)).toBe(false);
   });
