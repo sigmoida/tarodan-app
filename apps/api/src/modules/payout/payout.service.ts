@@ -207,14 +207,18 @@ export class PayoutService {
    * order passes; the residual of an order closed by a refund or cancellation
    * passes only when the seller is not at fault (read from the finalized
    * refund requests; queried only for a closed order). The processor and the
-   * admin's manual settlement (`resolution/`) both check it.
+   * admin's manual settlement (`resolution/`, inside its transaction: `db`)
+   * both check it.
    */
-  async orderPayoutBlock(order: {
-    id: string;
-    status: OrderStatus;
-  }): Promise<HoldReleaseBlockedReason | null> {
+  async orderPayoutBlock(
+    order: {
+      id: string;
+      status: OrderStatus;
+    },
+    db: Pick<Prisma.TransactionClient, "refundRequest"> = this.prisma,
+  ): Promise<HoldReleaseBlockedReason | null> {
     const finalizedRefunds = RESIDUAL_ORDER_STATUSES.includes(order.status)
-      ? await this.prisma.refundRequest.findMany({
+      ? await db.refundRequest.findMany({
           where: { orderId: order.id, status: RefundRequestStatus.refunded },
           select: { faultParty: true, policyCode: true },
         })
@@ -223,19 +227,24 @@ export class PayoutService {
   }
 
   /**
-   * Bu ödeme/sipariş için parayı bağlayan bir iade var mı? Payout OLUŞTURMA,
-   * transfer ETME ve iade-void'lu payout'u yeniden kuyruğa alma yollarının
-   * tamamı aynı guard'ı kullanır (tek kaynak).
+   * Whether a refund still ties up the money of this payment and order (or
+   * trade): an open refund request or an unresolved refund attempt. Creating
+   * a payout, sending it, requeueing a refund-voided one and the admin's
+   * manual settlement (inside its transaction: `db`) all use this one guard.
    *
-   * @returns engel nedeni (`refund_pending`) veya engel yoksa `null`
+   * @returns the block reason (`refund_pending`) or `null`
    */
-  async findBlockingRefund(target: {
-    orderId: string | null;
-    paymentId: string;
-    tradeId?: string | null;
-  }): Promise<typeof PAYOUT_FAILURE.refundPending | null> {
+  async findBlockingRefund(
+    target: {
+      orderId: string | null;
+      paymentId: string;
+      tradeId?: string | null;
+    },
+    db: Pick<Prisma.TransactionClient, "refundRequest" | "refundAttempt"> = this
+      .prisma,
+  ): Promise<typeof PAYOUT_FAILURE.refundPending | null> {
     if (target.orderId) {
-      const openRefund = await this.prisma.refundRequest.findFirst({
+      const openRefund = await db.refundRequest.findFirst({
         where: {
           orderId: target.orderId,
           status: { in: [...OPEN_REFUND_STATUSES] },
@@ -244,7 +253,7 @@ export class PayoutService {
       });
       if (openRefund) return PAYOUT_FAILURE.refundPending;
     }
-    const activeAttempt = await this.prisma.refundAttempt.findFirst({
+    const activeAttempt = await db.refundAttempt.findFirst({
       where: {
         paymentId: target.paymentId,
         orderId: target.orderId,
@@ -1228,17 +1237,18 @@ export class PayoutService {
     this.logger.log(
       `Payout ${params.transId} completed: ${params.netAmount} TL → ${maskIban(params.transferIban)}`,
     );
-    // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
-    // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
-    // → sipariş bazında escrow net 0'a iner.
+    // Ledger: the escrow is paid to the seller. seller_escrow (the debt held
+    // since capture) is credited and payout (money out) debited, which
+    // balances the capture's escrow debit for the order (or trade).
     //
-    // POST-COMMIT: payout zaten `completed` yazıldı; burada fırlatmak hiçbir şeyi
-    // geri almaz → best-effort KALIR (tx-içi yollardan farklı olarak). Reconciliation
-    // escrow kalıntısı olarak yakalar.
+    // POST-COMMIT: the payout is already `completed`; throwing here would
+    // undo nothing, so this stays best-effort (unlike the in-transaction
+    // paths). The reconciliation reports a missing entry as escrow residue.
     //
-    // `orderId`/`holdId` referansları escrow kalıntı invaryantının ön koşuludur:
-    // sipariş bazlı escrow bakiyesi ancak settle kaydı siparişe bağlıysa kapanır.
-    // Hold ↔ payout 1:1 (PayoutTransfer.paymentHoldId UNIQUE) → payout satırından türer.
+    // The order/hold (or trade) refs are what lets the per-order escrow
+    // balance close; hold and payout are 1:1, so they come from the row.
+    // One group per payout (`payout-completed:<id>`): PayTR repeats the
+    // callback until it sees "OK".
     try {
       const net = params.netAmount;
       if (net > 0) {
@@ -1247,10 +1257,9 @@ export class PayoutService {
           select: {
             paymentHoldId: true,
             paymentHold: { select: { orderId: true } },
+            tradeCashPayment: { select: { tradeId: true } },
           },
         });
-        // Payout başına TEK settle kaydı (`payout-completed:<id>`): PayTR "OK"
-        // görene dek bildirimi yineler.
         await this.ledger?.record(
           this.prisma,
           payoutCompletedLedgerInput(
@@ -1259,6 +1268,7 @@ export class PayoutService {
               sellerId: params.sellerId,
               orderId: payoutRow?.paymentHold?.orderId ?? null,
               holdId: payoutRow?.paymentHoldId ?? null,
+              tradeId: payoutRow?.tradeCashPayment?.tradeId ?? null,
             },
             net,
           ),
@@ -1379,10 +1389,42 @@ export class PayoutService {
           );
         }
       }
+      // PayTR confirms a transfer that waits to be sent again: an admin
+      // retried an unknown outcome (same trans_id) before this late result
+      // arrived. The money moved, so settle it instead of sending it twice.
+      // Nothing else puts an executed trans_id back in the queue.
+      if (
+        claim.count === 0 &&
+        (payout.status === PayoutStatus.pending ||
+          payout.status === PayoutStatus.retry_pending)
+      ) {
+        claim = await this.prisma.payoutTransfer.updateMany({
+          where: {
+            id: payout.id,
+            status: payout.status,
+            transId: payout.transId,
+          },
+          data: {
+            status: PayoutStatus.completed,
+            processedAt: new Date(),
+            failureReason: null,
+            nextRetryAt: null,
+            submittedAt: payout.submittedAt ?? payout.updatedAt,
+            submittedAmount: payout.submittedAmount ?? payout.netAmount,
+          },
+        });
+        if (claim.count > 0) {
+          this.logger.error(
+            `Payout ${payout.id} (${payout.transId}) was waiting to be sent again (${payout.status}) when the PayTR callback confirmed it: completed, not resent; check the retry that requeued it`,
+          );
+        }
+      }
       if (claim.count === 0) {
         if (payout.status !== PayoutStatus.completed) {
-          this.logger.warn(
-            `PayTR transfer callback: payout ${payout.id} beklenmeyen statüde (${payout.status}) — dokunulmadı`,
+          // PayTR says this transfer was paid while we hold it as not paid
+          // (rejected, returned): never pay it again before checking.
+          this.logger.error(
+            `PayTR transfer callback confirms payout ${payout.id} (${payout.transId}) in state ${payout.status}/${payout.failureReason ?? "-"}: not changed; check the PayTR panel before any further payment of it`,
           );
         }
         continue;

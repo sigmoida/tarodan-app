@@ -73,7 +73,14 @@ interface Row {
     amount: number;
     refundedAmount: number;
   } | null;
-  tradeCashPayment: { tradeId: string; payment: { id: string } | null } | null;
+  tradeCashPayment: {
+    tradeId: string;
+    amount: number;
+    status: string;
+    releasedAt: Date | null;
+    refundedAt: Date | null;
+    payment: { id: string } | null;
+  } | null;
 }
 
 interface LedgerRow {
@@ -117,6 +124,10 @@ class World {
    */
   beforeCas: ((row: Row) => void) | null = null;
   private committedElsewhere: Row[] = [];
+  /** Row locks taken (`SELECT ... FOR UPDATE`), in order. */
+  locks: string[] = [];
+  /** Runs when a lock is taken (another writer committing just before). */
+  onLock: (() => void) | null = null;
 
   addRow(over: Partial<Row> & { id: string }): Row {
     const row: Row = {
@@ -344,6 +355,16 @@ class World {
             this.orders.get(where.id) ?? null,
         ),
       },
+      $queryRaw: jest.fn(
+        async (sql: TemplateStringsArray, ...values: unknown[]) => {
+          const table = /FROM (\w+)/.exec(sql.join("?"))?.[1] ?? "?";
+          this.locks.push(`${table}:${String(values[0])}`);
+          const hook = this.onLock;
+          this.onLock = null;
+          hook?.();
+          return [];
+        },
+      ),
     };
     return client;
   }
@@ -513,6 +534,56 @@ describe("PayoutResolutionService.markPaid", () => {
       );
     });
 
+    it("checks the guards under the payment, then order, row locks (refund attempts and requests take them)", async () => {
+      const world = residualWorld();
+      const { service, payouts } = build(world);
+
+      await markPaid(service, "p1");
+
+      expect(world.locks).toEqual(["payments:pay-1", "orders:order-1"]);
+      // The guards read inside the settlement's transaction.
+      expect(payouts.orderPayoutBlock).toHaveBeenCalledWith(
+        { id: "order-1", status: OrderStatus.refunded },
+        expect.anything(),
+      );
+      expect(payouts.findBlockingRefund).toHaveBeenCalledWith(
+        { orderId: "order-1", paymentId: "pay-1" },
+        expect.anything(),
+      );
+    });
+
+    it("a refund that committed just before the locks is seen (409, nothing written)", async () => {
+      const world = residualWorld();
+      const { service } = build(world);
+      // The refund finalization held the payment lock and lowered the hold.
+      world.onLock = () => {
+        world.row("p1").paymentHold!.refundedAmount = 340;
+      };
+
+      await expect(markPaid(service, "p1")).rejects.toMatchObject({
+        response: expect.objectContaining({
+          i18nKey: "server.admin.payout.markPaidPayoutBlocked",
+          i18nParams: { reason: "net_above_entitlement" },
+        }),
+      });
+      expect(world.ledger.some((e) => e.payoutId === "p1")).toBe(false);
+      expect(world.row("p1").status).toBe(PayoutStatus.failed);
+    });
+
+    it("a row that moved while waiting for the locks -> 409", async () => {
+      const world = residualWorld();
+      const { service } = build(world);
+      world.onLock = () => {
+        world.row("p1").updatedAt = new Date(T0.getTime() + 9000);
+      };
+
+      await expect(markPaid(service, "p1")).rejects.toMatchObject({
+        response: expect.objectContaining({
+          i18nKey: "server.admin.payout.transferStateChanged",
+        }),
+      });
+    });
+
     it("escrow still holds part of the net: funds only the gap", async () => {
       const world = residualWorld();
       world.book(
@@ -579,7 +650,14 @@ describe("PayoutResolutionService.markPaid", () => {
         netAmount: 150,
         paymentHoldId: null,
         paymentHold: null,
-        tradeCashPayment: { tradeId: "trade-1", payment: { id: "pay-3" } },
+        tradeCashPayment: {
+          tradeId: "trade-1",
+          amount: 150,
+          status: "completed",
+          releasedAt: T0,
+          refundedAt: null,
+          payment: { id: "pay-3" },
+        },
       });
       world.book(
         "capture:trade-cash:tcp-1",
@@ -609,17 +687,56 @@ describe("PayoutResolutionService.markPaid", () => {
         tradeId: "trade-1",
         platformFundedAmount: 100,
       });
-      expect(payouts.findBlockingRefund).toHaveBeenCalledWith({
-        orderId: null,
-        paymentId: "pay-3",
-        tradeId: "trade-1",
-      });
+      expect(payouts.findBlockingRefund).toHaveBeenCalledWith(
+        { orderId: null, paymentId: "pay-3", tradeId: "trade-1" },
+        expect.anything(),
+      );
       for (const e of world.ledger.filter((e) => e.payoutId === "p3")) {
         expect(e.tradeId).toBe("trade-1");
       }
       expectBalanced(world);
       expect(world.escrow({ tradeId: "trade-1" })).toBe(0);
     });
+
+    it.each([
+      ["refunded", { refundedAt: T0 }, "fully_refunded"],
+      ["not released", { releasedAt: null }, "order_not_payout_eligible"],
+      ["not completed", { status: "refunded" }, "order_not_payout_eligible"],
+      ["smaller than the row net", { amount: 120 }, "net_above_entitlement"],
+    ] as const)(
+      "trade cash %s -> 409, nothing written",
+      async (_case, over, reason) => {
+        const world = new World();
+        world.addRow({
+          id: "p3",
+          netAmount: 150,
+          paymentHoldId: null,
+          paymentHold: null,
+          tradeCashPayment: {
+            tradeId: "trade-1",
+            amount: 150,
+            status: "completed",
+            releasedAt: T0,
+            refundedAt: null,
+            payment: { id: "pay-3" },
+            ...over,
+          },
+        });
+        const { service } = build(world);
+
+        await expect(
+          markPaid(service, "p3", { expectedNetAmount: 150 }),
+        ).rejects.toMatchObject({
+          response: expect.objectContaining({
+            i18nKey: "server.admin.payout.markPaidPayoutBlocked",
+            i18nParams: { reason },
+          }),
+        });
+        expect(world.ledger).toHaveLength(0);
+        expect(world.row("p3").status).toBe(PayoutStatus.failed);
+        expect(world.locks).toEqual(["payments:pay-3"]);
+      },
+    );
 
     it("leaves sibling transfers on the oid free to use what the payment still has", async () => {
       const world = residualWorld();
@@ -898,6 +1015,26 @@ describe("PayoutResolutionService.markPaid", () => {
       expectUntouched(world, "p1", before);
     });
 
+    it("paytr_confirmed for a legacy free-text failure that never reached a send attempt -> 409", async () => {
+      const world = new World();
+      world.addRow({
+        id: "p5",
+        failureReason: "Satıcının banka hesabı yok",
+        providerResponse: null,
+        retryCount: 0,
+      });
+      const { service } = build(world);
+
+      await expect(
+        markPaid(service, "p5", { method: "paytr_confirmed" }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          i18nKey: "server.admin.payout.markPaidNotAllowed",
+        }),
+      });
+      expect(world.ledger).toHaveLength(0);
+    });
+
     it("a parked row without a payment or source (data problem) -> 409 missing input", async () => {
       const world = residualWorld();
       world.row("p1").providerResponse = {
@@ -1025,11 +1162,12 @@ describe("PayoutResolutionService.retry", () => {
       retryCount: 0,
       nextRetryAt: null,
       providerReference: null,
-      submittedTotalAmount: null,
       // Net and total are recomputed by the processor, never set here.
       netAmount: 40,
       amount: 322,
     });
+    // A retry is a money decision, not a guard read: it takes no row locks.
+    expect(world.locks).toEqual([]);
     expect(afterWrite).toHaveBeenCalledWith(
       expect.anything(),
       result,
@@ -1037,6 +1175,34 @@ describe("PayoutResolutionService.retry", () => {
         status: PayoutStatus.failed,
         providerReference: "OLDREF",
         providerResponse: PARKED_SNAPSHOT,
+      }),
+    );
+  });
+
+  it("a returned row drops its earlier manual settlement (the audit keeps it)", async () => {
+    const world = residualWorld();
+    Object.assign(world.row("p1"), {
+      status: PayoutStatus.returned,
+      failureReason: "Geri döndü (PayTR ref R1, tespit 2026-10-22)",
+      providerResponse: {
+        returned: { ref_no: "R1" },
+        manualSettlement: { method: "paytr_confirmed", reference: "P1" },
+      },
+    });
+    const { service, afterWrite } = build(world);
+
+    await retry(service, "p1", { afterWrite });
+
+    expect(world.row("p1").providerResponse).toEqual({
+      returned: { ref_no: "R1" },
+    });
+    expect(afterWrite).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        providerResponse: expect.objectContaining({
+          manualSettlement: expect.anything(),
+        }),
       }),
     );
   });
@@ -1099,7 +1265,7 @@ describe("PayoutResolutionService.retry", () => {
       },
     );
 
-    it("with confirmation and a reason -> pending, same trans_id, the oid total released", async () => {
+    it("with confirmation and a reason -> pending, same trans_id, the earlier send kept for a late callback", async () => {
       const world = unknownWorld("transfer_outcome_unknown", null);
       const { service } = build(world);
 
@@ -1116,7 +1282,20 @@ describe("PayoutResolutionService.retry", () => {
       expect(world.row("p4")).toMatchObject({
         status: PayoutStatus.pending,
         transId: "PYTP4",
-        submittedTotalAmount: null,
+        // Not counted while pending; the next claim overwrites them, and a
+        // late PayTR callback for the earlier send settles with them.
+        submittedTotalAmount: 303,
+        submittedAmount: 300,
+      });
+    });
+
+    it("a legacy free-text failure that never reached a send attempt needs no check", async () => {
+      const world = unknownWorld("Satıcının banka hesabı yok", null);
+      world.row("p4").retryCount = 0;
+      const { service } = build(world);
+
+      await expect(retry(service, "p4")).resolves.toMatchObject({
+        providerCheckConfirmed: false,
       });
     });
 
@@ -1258,6 +1437,100 @@ describe("retry hands the row back to the processor, which recomputes net and to
       status: PayoutStatus.completed,
       submittedTotalAmount: 303,
     });
+  });
+
+  it("a late PayTR callback for the earlier send settles a retried unknown outcome instead of sending it again", async () => {
+    const world = new PayoutProcessorWorld();
+    world.addPayment("pay-1", 349);
+    world.addOrderPayout({
+      payoutId: "p1",
+      paymentId: "pay-1",
+      orderId: "o1",
+      orderTotal: 349,
+      holdAmount: 300,
+      merchantOid: "OIDLATE",
+      transId: "PYTLATE1",
+      status: PayoutStatus.failed,
+      over: {
+        failureReason: "transfer_outcome_unknown",
+        retryCount: 1,
+        submittedAmount: 300,
+        submittedTotalAmount: 349,
+        providerResponse: {
+          error: { phase: "unknown", causeCode: "ECONNRESET" },
+        },
+      },
+    });
+    const {
+      service: processor,
+      prisma,
+      createPlatformTransfer,
+      ledger,
+      notification,
+    } = buildPayoutProcessor(world);
+    const resolution = new PayoutResolutionService(
+      {
+        ...prisma,
+        $transaction: (fn: (tx: unknown) => Promise<unknown>) =>
+          fn({ ...prisma }),
+      } as never,
+      {} as never,
+      processor,
+    );
+    const errors = jest.spyOn(Logger.prototype, "error");
+
+    await resolution.retry("p1", {
+      actor: "admin-1",
+      confirmProviderChecked: true,
+      reason: "PayTR panel showed nothing yet",
+    });
+    await processor.handleTransferResultCallback('["PYTLATE1"]', "hash");
+    await processor.processPendingPayouts();
+
+    expect(createPlatformTransfer).not.toHaveBeenCalled();
+    expect(world.payout("p1")).toMatchObject({
+      status: PayoutStatus.completed,
+      failureReason: null,
+      submittedTotalAmount: 349,
+      submittedAmount: 300,
+    });
+    expect(ledger.record).toHaveBeenCalledTimes(1);
+    expect(ledger.record.mock.calls[0][1]).toMatchObject({
+      idempotencyKey: "payout-completed:p1",
+    });
+    const released = notification.sendTemplateEmailToUser.mock.calls.filter(
+      ([, template]) => template === "payout-released-seller",
+    );
+    expect(released).toHaveLength(1);
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringMatching(/p1.*PYTLATE1.*waiting to be sent again/),
+    );
+  });
+
+  it("a PayTR callback for a transfer we hold as rejected changes nothing and raises an error", async () => {
+    const world = new PayoutProcessorWorld();
+    world.addPayment("pay-1", 349);
+    world.addOrderPayout({
+      payoutId: "p1",
+      paymentId: "pay-1",
+      orderId: "o1",
+      orderTotal: 349,
+      holdAmount: 300,
+      merchantOid: "OIDREJ",
+      transId: "PYTREJ1",
+      status: PayoutStatus.failed,
+      over: { failureReason: "provider_rejected", retryCount: 1 },
+    });
+    const { service: processor, ledger } = buildPayoutProcessor(world);
+    const errors = jest.spyOn(Logger.prototype, "error");
+
+    await processor.handleTransferResultCallback('["PYTREJ1"]', "hash");
+
+    expect(world.payout("p1").status).toBe(PayoutStatus.failed);
+    expect(ledger.record).not.toHaveBeenCalled();
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringMatching(/p1.*PYTREJ1.*failed\/provider_rejected/),
+    );
   });
 
   it("a residual that still does not fit goes back to the manual decision without a PayTR call", async () => {

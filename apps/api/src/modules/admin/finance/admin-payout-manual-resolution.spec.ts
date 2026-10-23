@@ -462,6 +462,20 @@ describe("AdminPayoutService.toTransferRows — resolution flags", () => {
     });
   });
 
+  it("a resent row does not show an earlier settlement", async () => {
+    const [row] = await service.toTransferRows([
+      transfer({
+        status: PayoutStatus.pending,
+        failureReason: null,
+        providerResponse: {
+          manualSettlement: { method: "paytr_confirmed", reference: "P1" },
+        },
+      }),
+    ]);
+
+    expect(row.manualSettlement).toBeNull();
+  });
+
   it("a row marked as paid shows the settlement without the admin id", async () => {
     const [row] = await service.toTransferRows([
       transfer({

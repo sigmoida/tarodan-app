@@ -5,8 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { LedgerAccount, PayoutStatus, Prisma } from "@prisma/client";
+import {
+  LedgerAccount,
+  PaymentStatus,
+  PayoutStatus,
+  Prisma,
+} from "@prisma/client";
 import type {
+  HoldReleaseBlockedReason,
   PayoutFailureReason,
   PayoutManualSettlementMethod,
 } from "@tarodan/types";
@@ -22,13 +28,16 @@ import {
 } from "../helpers/payout-entitlement";
 import { PAYOUT_FAILURE } from "../helpers/payout-failure-reasons";
 import {
+  asRecord,
   manualSettlementMethodFor,
   manualSettlementNet,
   manualSettlementOf,
   platformFundingAmount,
-  retryRequiresProviderCheck,
   sameKurus,
-  transferTotalMissingInput,
+  toKurus,
+  transferOutcomeMayBeUnknown,
+  transferTotalOf,
+  withoutManualSettlement,
   type ManualSettlementRecord,
 } from "../helpers/payout-resolution-policy";
 import {
@@ -50,6 +59,7 @@ const RESOLUTION_ROW_SELECT = {
   netAmount: true,
   submittedAmount: true,
   submittedTotalAmount: true,
+  retryCount: true,
   transferIban: true,
   updatedAt: true,
   paymentHoldId: true,
@@ -62,7 +72,14 @@ const RESOLUTION_ROW_SELECT = {
     },
   },
   tradeCashPayment: {
-    select: { tradeId: true, payment: { select: { id: true } } },
+    select: {
+      tradeId: true,
+      amount: true,
+      status: true,
+      releasedAt: true,
+      refundedAt: true,
+      payment: { select: { id: true } },
+    },
   },
 } satisfies Prisma.PayoutTransferSelect;
 
@@ -116,15 +133,14 @@ export type PayoutResolutionAfterWrite<T> = (
   previous: PayoutResolutionPrevious,
 ) => Promise<unknown>;
 
-/** Why an external_bank settlement must wait: a processor guard, or a row
- *  net above what the hold still entitles the seller to. */
-type ExternalSettlementBlock = PayoutFailureReason | "net_above_entitlement";
+/** Why an external_bank settlement must wait: a processor guard, the
+ *  order's release block, or a row net above what the seller is still
+ *  entitled to. */
+type ExternalSettlementBlock =
+  PayoutFailureReason | HoldReleaseBlockedReason | "net_above_entitlement";
 
 const num = (value: unknown): number | null =>
   value === null || value === undefined ? null : Number(value);
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 function previousOf(row: ResolutionRow): PayoutResolutionPrevious {
   return {
@@ -190,7 +206,7 @@ export class PayoutResolutionService {
           }),
         );
       }
-      const providerCheck = retryRequiresProviderCheck(row);
+      const providerCheck = transferOutcomeMayBeUnknown(row);
       if (providerCheck && (opts.confirmProviderChecked !== true || !reason)) {
         throw new ConflictException(
           i18nMessage("server.admin.payout.providerCheckRequired"),
@@ -223,11 +239,20 @@ export class PayoutResolutionService {
           nextRetryAt: null,
           // A resend gets a new PayTR reference; keeping the old one would let
           // the returned-transfer scan mark this row returned again.
-          // providerResponse stays until the next send (the audit keeps it).
+          // providerResponse stays until the next send (the audit keeps it),
+          // except an earlier manual settlement, which no longer applies.
           providerReference: null,
-          // Nothing is in flight while pending; the claim stamps the total
-          // of the next attempt.
-          submittedTotalAmount: null,
+          ...(manualSettlementOf(row.providerResponse)
+            ? {
+                providerResponse: withoutManualSettlement(
+                  row.providerResponse,
+                ) as Prisma.InputJsonValue,
+              }
+            : {}),
+          // submittedTotalAmount and submittedAmount stay: a pending row is
+          // not counted against the oid and the next claim overwrites them,
+          // but a late PayTR callback for the earlier send settles the row
+          // with them (handleTransferResultCallback).
           ...(newTransId ? { transId: newTransId } : {}),
         },
       });
@@ -279,7 +304,7 @@ export class PayoutResolutionService {
       if (method !== opts.method) {
         if (
           opts.method === "external_bank" &&
-          transferTotalMissingInput(row.providerResponse) !== null
+          transferTotalOf(row.providerResponse)?.missingInput
         ) {
           throw new ConflictException(
             i18nMessage("server.admin.payout.markPaidMissingInput"),
@@ -307,12 +332,24 @@ export class PayoutResolutionService {
           }),
         );
       }
-      // The platform is about to pay from its own account what the processor
-      // would have sent: the same guards hold (no open refund, order still
-      // payable, the hold still entitles the seller to this net). PayTR-
-      // confirmed money already moved; the row only records it.
+      // The platform pays from its own account what the processor would have
+      // sent: the same guards hold (no refund in flight, order still payable,
+      // the seller still entitled to this net). They run under the payment
+      // and order row locks that refund attempts and refund requests take,
+      // on the row read again after the locks, so a refund cannot start
+      // between the check and the commit. PayTR-confirmed money already
+      // moved; that row only records it.
       if (method === "external_bank") {
-        const blocked = await this.externalSettlementBlock(row);
+        const locked = await this.lockSource(tx, row);
+        if (
+          locked.updatedAt.getTime() !== row.updatedAt.getTime() ||
+          !sameKurus(locked.netAmount, row.netAmount)
+        ) {
+          throw new ConflictException(
+            i18nMessage("server.admin.payout.transferStateChanged"),
+          );
+        }
+        const blocked = await this.externalSettlementBlock(tx, locked);
         if (blocked) {
           throw new ConflictException(
             i18nMessage("server.admin.payout.markPaidPayoutBlocked", {
@@ -345,9 +382,7 @@ export class PayoutResolutionService {
       };
 
       // Claim first: a request that loses the race writes nothing.
-      const previousResponse = isRecord(row.providerResponse)
-        ? row.providerResponse
-        : {};
+      const previousResponse = asRecord(row.providerResponse) ?? {};
       const claimed = await tx.payoutTransfer.updateMany({
         where: {
           id: row.id,
@@ -522,50 +557,84 @@ export class PayoutResolutionService {
   }
 
   /**
+   * Locks the payout's payment row, then its order row (the lock order of
+   * the money paths, payment-order-lock.ts), and reads the payout again.
+   * Refund attempts lock the payment and refund requests the order, so
+   * neither can start until this settlement commits.
+   */
+  private async lockSource(
+    tx: Prisma.TransactionClient,
+    row: ResolutionRow,
+  ): Promise<ResolutionRow> {
+    const paymentId =
+      row.paymentHold?.paymentId ?? row.tradeCashPayment?.payment?.id ?? null;
+    if (paymentId) {
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
+    }
+    if (row.paymentHold) {
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${row.paymentHold.orderId} FOR UPDATE`;
+    }
+    return this.loadRow(tx, row.id);
+  }
+
+  /**
    * The processor's pre-send guards, for a payout the platform pays itself:
-   * order still payable, no refund in flight, and the hold still entitles
-   * the seller to the row's net (a refund since the row was parked lowers
-   * it: retry, so the processor recomputes, instead of paying the old net).
+   * order still payable, no refund in flight, and the seller still entitled
+   * to the row's net (a refund since the row was parked lowers it: retry, so
+   * the processor recomputes, instead of paying the old net). Trade cash:
+   * the cash payment is completed, released and not refunded.
    */
   private async externalSettlementBlock(
+    tx: Prisma.TransactionClient,
     row: ResolutionRow,
   ): Promise<ExternalSettlementBlock | null> {
     const hold = row.paymentHold;
     if (hold) {
-      const order = await this.prisma.order.findUnique({
+      const order = await tx.order.findUnique({
         where: { id: hold.orderId },
         select: { status: true },
       });
-      if (
-        !order ||
-        (await this.payouts.orderPayoutBlock({
-          id: hold.orderId,
-          status: order.status,
-        }))
-      ) {
-        return PAYOUT_FAILURE.orderNotPayoutEligible;
-      }
-      const refund = await this.payouts.findBlockingRefund({
-        orderId: hold.orderId,
-        paymentId: hold.paymentId,
-      });
+      if (!order) return PAYOUT_FAILURE.orderNotPayoutEligible;
+      const orderBlock = await this.payouts.orderPayoutBlock(
+        { id: hold.orderId, status: order.status },
+        tx,
+      );
+      if (orderBlock) return orderBlock;
+      const refund = await this.payouts.findBlockingRefund(
+        { orderId: hold.orderId, paymentId: hold.paymentId },
+        tx,
+      );
       if (refund) return refund;
       const entitled = entitledNetFromHold(hold);
       if (entitled <= PAYOUT_MIN_NET) return PAYOUT_FAILURE_FULLY_REFUNDED;
-      if (Math.round(entitled * 100) < Math.round(Number(row.netAmount) * 100))
-        return "net_above_entitlement";
-      return null;
+      return toKurus(entitled) < toKurus(row.netAmount)
+        ? "net_above_entitlement"
+        : null;
     }
     const tradeCash = row.tradeCashPayment;
     if (tradeCash?.payment) {
-      return this.payouts.findBlockingRefund({
-        orderId: null,
-        paymentId: tradeCash.payment.id,
-        tradeId: tradeCash.tradeId,
-      });
+      if (tradeCash.refundedAt) return PAYOUT_FAILURE_FULLY_REFUNDED;
+      if (
+        tradeCash.status !== PaymentStatus.completed ||
+        !tradeCash.releasedAt
+      ) {
+        return PAYOUT_FAILURE.orderNotPayoutEligible;
+      }
+      const refund = await this.payouts.findBlockingRefund(
+        {
+          orderId: null,
+          paymentId: tradeCash.payment.id,
+          tradeId: tradeCash.tradeId,
+        },
+        tx,
+      );
+      if (refund) return refund;
+      return toKurus(tradeCash.amount) < toKurus(row.netAmount)
+        ? "net_above_entitlement"
+        : null;
     }
-    // No hold and no trade payment: the total check parked it with a missing
-    // input, which never reaches this point.
+    // No hold and no paid trade cash: the total check parked it with a
+    // missing input, which never reaches this point.
     return PAYOUT_FAILURE.orderNotPayoutEligible;
   }
 }

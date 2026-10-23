@@ -40,6 +40,7 @@ import { PayoutResolutionService } from "../../payout/resolution/payout-resoluti
 import {
   manualSettlementOf,
   payoutResolutionFlags,
+  transferTotalOf,
 } from "../../payout/helpers/payout-resolution-policy";
 import type { PayoutManualSettlementMethod } from "@tarodan/types";
 
@@ -96,29 +97,16 @@ function istanbulDateRange(filter: {
   };
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** The transfer-total snapshot the processor stored (`providerResponse
- *  .transferTotal`), as the admin shows it next to a parked transfer. */
-function transferTotalView(providerResponse: unknown) {
-  const snapshot = isRecord(providerResponse)
-    ? providerResponse.transferTotal
-    : null;
-  if (!isRecord(snapshot)) return null;
-  return {
-    net: Number(snapshot.net ?? 0),
-    allowedTotal: Number(snapshot.allowedTotal ?? 0),
-    ownAllowed: Number(snapshot.ownAllowed ?? 0),
-    oidRemaining: Number(snapshot.oidRemaining ?? 0),
-    missingInput:
-      typeof snapshot.missingInput === "string" ? snapshot.missingInput : null,
-  };
-}
-
-/** A manual settlement as the admin list shows it (no admin id). */
-function manualSettlementView(providerResponse: unknown) {
-  const record = manualSettlementOf(providerResponse);
+/** A manual settlement as the admin list shows it (no admin id); only on a
+ *  completed row (a returned and resent one is no longer settled by it). */
+function manualSettlementView(t: {
+  status: PayoutStatus;
+  providerResponse: unknown;
+}) {
+  const record =
+    t.status === PayoutStatus.completed
+      ? manualSettlementOf(t.providerResponse)
+      : null;
   return record
     ? {
         method: record.method,
@@ -437,9 +425,9 @@ export class AdminPayoutService {
       // nothing in flight or a row sent before 2026-10-23).
       submittedTotalAmount:
         t.submittedTotalAmount === null ? null : Number(t.submittedTotalAmount),
-      transferTotal: transferTotalView(t.providerResponse),
+      transferTotal: transferTotalOf(t.providerResponse),
       resolution: payoutResolutionFlags(t),
-      manualSettlement: manualSettlementView(t.providerResponse),
+      manualSettlement: manualSettlementView(t),
     }));
   }
 

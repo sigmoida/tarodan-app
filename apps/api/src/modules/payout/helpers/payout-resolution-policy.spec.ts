@@ -6,8 +6,9 @@ import {
   manualSettlementOf,
   payoutResolutionFlags,
   platformFundingAmount,
-  retryRequiresProviderCheck,
   transferOutcomeMayBeUnknown,
+  transferTotalOf,
+  withoutManualSettlement,
   type PayoutResolutionRow,
 } from "./payout-resolution-policy";
 
@@ -17,6 +18,8 @@ const row = (over: Partial<PayoutResolutionRow> = {}): PayoutResolutionRow => ({
   providerResponse: null,
   netAmount: 40,
   submittedAmount: null,
+  // The processor's failure handler counted the attempts.
+  retryCount: 3,
   ...over,
 });
 
@@ -47,6 +50,27 @@ describe("payout resolution policy", () => {
           }),
         ),
       ).toBe(true);
+    });
+
+    it("a legacy free-text reason without a send attempt did not (failed before sending)", () => {
+      expect(
+        transferOutcomeMayBeUnknown(
+          row({
+            failureReason: "Satıcının banka hesabı yok",
+            providerResponse: null,
+            retryCount: 0,
+          }),
+        ),
+      ).toBe(false);
+      expect(
+        manualSettlementMethodFor(
+          row({
+            failureReason: "Satıcının banka hesabı yok",
+            providerResponse: null,
+            retryCount: 0,
+          }),
+        ),
+      ).toBeNull();
     });
 
     it("a legacy free-text reason with PayTR's error answer did not (a rejection)", () => {
@@ -80,13 +104,13 @@ describe("payout resolution policy", () => {
 
     it("the retry needs the panel check exactly for those rows", () => {
       expect(
-        retryRequiresProviderCheck(
+        transferOutcomeMayBeUnknown(
           row({ failureReason: "transfer_outcome_unknown" }),
         ),
       ).toBe(true);
-      expect(retryRequiresProviderCheck(row())).toBe(false);
+      expect(transferOutcomeMayBeUnknown(row())).toBe(false);
       expect(
-        retryRequiresProviderCheck(
+        transferOutcomeMayBeUnknown(
           row({ status: PayoutStatus.returned, failureReason: "Geri döndü" }),
         ),
       ).toBe(false);
@@ -207,6 +231,44 @@ describe("payout resolution policy", () => {
     ])("net %p, escrow %p -> %p", (net, escrow, funded) => {
       expect(platformFundingAmount(net, escrow)).toBe(funded);
     });
+  });
+
+  it("reads the transfer total snapshot a parked row carries", () => {
+    expect(transferTotalOf(null)).toBeNull();
+    expect(transferTotalOf({ status: "error" })).toBeNull();
+    expect(
+      transferTotalOf({
+        transferTotal: {
+          net: 40,
+          allowedTotal: 0,
+          ownAllowed: 0,
+          oidRemaining: 0,
+          sourceTotal: 322,
+          missingInput: "source",
+        },
+      }),
+    ).toEqual({
+      net: 40,
+      allowedTotal: 0,
+      ownAllowed: 0,
+      oidRemaining: 0,
+      missingInput: "source",
+    });
+  });
+
+  it("drops an earlier manual settlement from a row sent again, keeping the rest", () => {
+    const response = {
+      status: "success",
+      returned: { ref_no: "R1" },
+      manualSettlement: { method: "paytr_confirmed", reference: "P1" },
+    };
+    expect(withoutManualSettlement(response)).toEqual({
+      status: "success",
+      returned: { ref_no: "R1" },
+    });
+    expect(withoutManualSettlement(null)).toBeNull();
+    const plain = { status: "success" };
+    expect(withoutManualSettlement(plain)).toBe(plain);
   });
 
   it("reads back the manual settlement stored on a row", () => {

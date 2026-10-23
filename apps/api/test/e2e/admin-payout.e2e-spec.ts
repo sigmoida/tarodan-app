@@ -248,8 +248,10 @@ describe("Admin Payout Management (E2E)", () => {
       expect(after).toMatchObject({
         status: PayoutStatus.pending,
         transId: payout.transId,
-        submittedTotalAmount: null,
       });
+      // Kept for a late PayTR callback of the earlier send; not counted while
+      // pending and overwritten by the next claim.
+      expect(Number(after?.submittedTotalAmount)).toBe(100);
       const audit = await prisma.auditLog.findFirst({
         where: { action: "payout_retry", entityId: payout.id },
       });
@@ -409,7 +411,7 @@ describe("Admin Payout Management (E2E)", () => {
       // Should only list failed + returned, not completed
       expect(res.body.total).toBe(2);
       expect(res.body.items.length).toBe(2);
-      const statuses = res.body.items.map((i: any) => i.status);
+      const statuses = res.body.items.map((i: { status: string }) => i.status);
       expect(statuses).toContain("failed");
       expect(statuses).toContain("returned");
       expect(statuses).not.toContain("completed");
