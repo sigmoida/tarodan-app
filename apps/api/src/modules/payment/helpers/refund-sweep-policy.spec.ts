@@ -3,9 +3,10 @@ import {
   REFUND_SWEEP_FIRST_DELAY_MS,
   REFUND_SWEEP_MAX_DELAY_MS,
   claimRefundAlarm,
+  copiedPaymentWhere,
   refundRetryAt,
   sweepablePaymentWhere,
-  waitingOrderIds,
+  waitingSubjectIds,
 } from "./refund-sweep-policy";
 
 const MINUTE = 60_000;
@@ -14,8 +15,8 @@ const NOW = new Date("2026-10-23T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
 
 /** A failed attempt after `failures` definite failures, the last `lastMs` ago. */
-const failed = (orderId: string, failures: number, lastMs: number) => ({
-  orderId,
+const failed = (subjectId: string, failures: number, lastMs: number) => ({
+  subjectId,
   failureCount: failures,
   updatedAt: at(-lastMs),
 });
@@ -38,23 +39,32 @@ describe("refundRetryAt (wait read from the RefundAttempt ledger)", () => {
 
   /**
    * Review finding: measured from the attempt's age, an attempt the status
-   * inquiry just requeued (two days in manual review) waited 6 hours before
-   * the refund was resent. Time in review is not failing.
+   * inquiry had just requeued (two days in manual review) waited 6 hours.
+   * Time in review is not failing: only definite failures count.
    */
-  it("an attempt requeued without a new failure waits only the first step", () => {
+  it("an attempt that never failed definitively (count 0) waits the first step", () => {
     expect(refundRetryAt(failed("o", 0, 0))).toEqual(at(10 * MINUTE));
+  });
+
+  /**
+   * A requeue (status inquiry: PayTR has no record of the refund) keeps the
+   * count: the attempt was refused before and a requeue is no evidence that
+   * a resend will now succeed, so it keeps its longer wait.
+   */
+  it("a requeued attempt keeps the wait of its earlier failures", () => {
+    expect(refundRetryAt(failed("o", 4, 0))).toEqual(at(80 * MINUTE));
   });
 });
 
-describe("waitingOrderIds", () => {
+describe("waitingSubjectIds", () => {
   it("lists orders whose latest failure is still in its wait, once each", () => {
     expect(
-      waitingOrderIds(
+      waitingSubjectIds(
         [
           failed("waiting", 1, 5 * MINUTE),
           failed("waiting", 3, 30 * MINUTE),
           failed("due", 1, 11 * MINUTE),
-          { orderId: null, failureCount: 1, updatedAt: NOW },
+          { subjectId: null, failureCount: 1, updatedAt: NOW },
         ],
         NOW,
       ),
@@ -85,6 +95,16 @@ describe("claimRefundAlarm", () => {
     await expect(
       claimRefundAlarm(cacheAnswering("unavailable"), "k"),
     ).resolves.toBe(true);
+  });
+});
+
+describe("copiedPaymentWhere (the complement of sweepablePaymentWhere)", () => {
+  it("non-test payments created up to the copy", () => {
+    const cutoff = new Date("2026-10-20T03:00:00.000Z");
+    expect(copiedPaymentWhere(cutoff)).toEqual({
+      isTest: false,
+      createdAt: { lte: cutoff },
+    });
   });
 });
 

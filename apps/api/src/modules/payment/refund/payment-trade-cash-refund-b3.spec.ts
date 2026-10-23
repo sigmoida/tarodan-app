@@ -38,6 +38,7 @@ import {
 } from "../../payment-providers/refund-errors";
 import { UatProductionCopyService } from "../../admin-test-tools/uat-refresh/uat-production-copy.service";
 import { RefundOrderSweepService } from "./refund-order-sweep.service";
+import { RefundTradeSweepService } from "./refund-trade-sweep.service";
 import {
   REFUND_FAILURE_PROVIDER_NOTHING_LEFT,
   REFUND_FAILURE_PROVIDER_NOT_SENT,
@@ -159,6 +160,7 @@ describe("PaymentService trade cash refund idempotency", () => {
         PspReconciliationService,
         RefundReconciliationService,
         RefundOrderSweepService,
+        RefundTradeSweepService,
         // Staging guard of the refund sweeps; not the subject here.
         {
           provide: UatProductionCopyService,

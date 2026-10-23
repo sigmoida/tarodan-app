@@ -34,17 +34,24 @@ export const REFUND_SWEEP_COOLDOWN_SECONDS = 60 * 60;
 
 /** What the backoff reads from a failed `RefundAttempt`. */
 export interface FailedRefundAttempt {
-  orderId: string | null;
-  /** Consecutive definite provider failures; 0 for a requeued attempt. */
+  /** The order or trade the attempt refunds (what the sweep queries by). */
+  subjectId: string | null;
+  /**
+   * Consecutive definite provider failures. A requeue (status inquiry)
+   * keeps it; an attempt that only ever went to review has 0.
+   */
   failureCount: number;
   updatedAt: Date;
 }
 
 /**
- * When the sweep may try an order again after its attempt failed: the last
- * failure plus 10 minutes doubled per further failure, at most 6 hours
- * (10, 20, 40, 80, 160, 320, then 360 minutes). An attempt requeued without
- * a new failure (status inquiry, admin "retry") waits the first step only.
+ * When the sweep may try an order or trade again after its attempt failed:
+ * the last failure plus 10 minutes doubled per further failure, at most 6
+ * hours (10, 20, 40, 80, 160, 320, then 360 minutes). The count survives a
+ * requeue by the status inquiry on purpose: PayTR refused this attempt
+ * before, and "no record of the refund" is no evidence a resend now goes
+ * through, so it keeps its longer wait (fewer resends of a refund that keeps
+ * failing). An attempt that never failed definitively waits 10 minutes.
  */
 export function refundRetryAt(attempt: FailedRefundAttempt): Date {
   const doublings = Math.min(Math.max(attempt.failureCount - 1, 0), 30);
@@ -56,18 +63,18 @@ export function refundRetryAt(attempt: FailedRefundAttempt): Date {
 }
 
 /**
- * Orders the sweep leaves out of its candidate queries right now: a failed
- * attempt of theirs (any key: PayTR just refused this order) is still in its
+ * Orders or trades the sweep leaves out of its candidate query right now: a
+ * failed attempt of theirs (any key: PayTR just refused it) is still in its
  * wait.
  */
-export function waitingOrderIds(
+export function waitingSubjectIds(
   failed: readonly FailedRefundAttempt[],
   now: Date,
 ): string[] {
   const waiting = new Set<string>();
   for (const attempt of failed) {
-    if (attempt.orderId && refundRetryAt(attempt).getTime() > now.getTime()) {
-      waiting.add(attempt.orderId);
+    if (attempt.subjectId && refundRetryAt(attempt).getTime() > now.getTime()) {
+      waiting.add(attempt.subjectId);
     }
   }
   return [...waiting];
@@ -98,4 +105,15 @@ export function sweepablePaymentWhere(
   return copiedBefore
     ? { OR: [{ isTest: true }, { createdAt: { gt: copiedBefore } }] }
     : {};
+}
+
+/**
+ * The complement of `sweepablePaymentWhere`: a payment copied from
+ * production (for a "has none of these" relation filter, e.g. a trade's
+ * cash payments).
+ */
+export function copiedPaymentWhere(
+  copiedBefore: Date,
+): Prisma.PaymentWhereInput {
+  return { isTest: false, createdAt: { lte: copiedBefore } };
 }

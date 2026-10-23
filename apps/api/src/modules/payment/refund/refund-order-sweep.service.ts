@@ -18,7 +18,7 @@ import {
   REFUND_SWEEP_MAX_DELAY_MS,
   claimRefundAlarm,
   sweepablePaymentWhere,
-  waitingOrderIds,
+  waitingSubjectIds,
 } from "../helpers/refund-sweep-policy";
 
 /**
@@ -166,7 +166,14 @@ export class RefundOrderSweepService {
       }),
       this.productionCopy.copiedBefore(now),
     ]);
-    const waiting = waitingOrderIds(recentFailures, now);
+    const waiting = waitingSubjectIds(
+      recentFailures.map((attempt) => ({
+        subjectId: attempt.orderId,
+        failureCount: attempt.failureCount,
+        updatedAt: attempt.updatedAt,
+      })),
+      now,
+    );
     const sweepable = sweepablePaymentWhere(copiedBefore);
 
     // Common to the three branches: not while the order waits after a

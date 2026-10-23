@@ -18,6 +18,7 @@ import { PaymentExpiryReconciliationService } from "./reconciliation/payment-exp
 import { PspReconciliationService } from "./reconciliation/psp-reconciliation.service";
 import { RefundReconciliationService } from "./refund/refund-reconciliation.service";
 import { RefundOrderSweepService } from "./refund/refund-order-sweep.service";
+import { RefundTradeSweepService } from "./refund/refund-trade-sweep.service";
 import { MiscReconciliationService } from "./reconciliation/misc-reconciliation.service";
 import { PaymentInitiationService } from "./checkout/payment-initiation.service";
 import { PaymentOptionalAuthService } from "./checkout/payment-optional-auth.service";
@@ -108,6 +109,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PspReconciliationService,
     RefundReconciliationService,
     RefundOrderSweepService,
+    RefundTradeSweepService,
     MiscReconciliationService,
     PaymentInitiationService,
     PaymentCallbackService,
