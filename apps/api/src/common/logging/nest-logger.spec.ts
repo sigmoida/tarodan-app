@@ -1,3 +1,5 @@
+import { BadRequestException } from "@nestjs/common";
+import { i18nMessage } from "../../modules/i18n/localized-message";
 import { AppNestLogger } from "./nest-logger";
 import { readFingerprint } from "./error-fingerprint";
 import { takeReportKey } from "./error-report-key";
@@ -144,6 +146,27 @@ describe("AppNestLogger", () => {
     expect(repeat).toBe(first);
     expect(otherReason).not.toBe(first);
     expect(otherPayment).not.toBe(first);
+  });
+
+  it("keys two localized exceptions by their catalog keys, not by 'Bad Request Exception'", () => {
+    const logger = new AppNestLogger();
+    const refunded = () =>
+      new BadRequestException(
+        i18nMessage("server.payment.orderAlreadyRefunded"),
+      );
+    const other = () =>
+      new BadRequestException(i18nMessage("server.payment.paymentNotFound"));
+    expect(refunded().message).toBe(other().message);
+
+    logger.error("PayTR refund error:", refunded(), "PaytrService");
+    logger.error("PayTR refund error:", other(), "PaytrService");
+    logger.error(refunded(), "PaytrService");
+    logger.error(other(), "PaytrService");
+
+    const [withText, otherWithText, alone, otherAlone] =
+      child.error.mock.calls.map(([, ctx]) => takeReportKey(ctx.error));
+    expect(otherWithText).not.toBe(withText);
+    expect(otherAlone).not.toBe(alone);
   });
 
   it("does not key warn lines (they never reach Sentry)", () => {
