@@ -1042,7 +1042,7 @@ export class AdminService {
   // ==================== EMAIL TEMPLATES ====================
   // Taşındı: admin-content.service.ts — imzalar aynen korunuyor (facade delege).
 
-  substituteVariables(text: string, data: Record<string, any>): string {
+  substituteVariables(text: string, data: Record<string, unknown>): string {
     return this.contentService.substituteVariables(text, data);
   }
 
@@ -1068,7 +1068,7 @@ export class AdminService {
 
   async previewEmailTemplate(
     key: string,
-    templateData?: Record<string, any>,
+    templateData?: Record<string, unknown>,
     overrideHtml?: string,
     overrideSubject?: string,
   ) {
@@ -1082,7 +1082,7 @@ export class AdminService {
 
   async sendTestEmail(
     key: string,
-    dto: { to: string; templateData?: Record<string, any> },
+    dto: { to: string; templateData?: Record<string, unknown> },
   ) {
     return this.contentService.sendTestEmail(key, dto);
   }
