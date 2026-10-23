@@ -17,6 +17,7 @@ import { ReservationReconciliationService } from "./reconciliation/reservation-r
 import { PaymentExpiryReconciliationService } from "./reconciliation/payment-expiry-reconciliation.service";
 import { PspReconciliationService } from "./reconciliation/psp-reconciliation.service";
 import { RefundReconciliationService } from "./refund/refund-reconciliation.service";
+import { RefundOrderSweepService } from "./refund/refund-order-sweep.service";
 import { MiscReconciliationService } from "./reconciliation/misc-reconciliation.service";
 import { PaymentInitiationService } from "./checkout/payment-initiation.service";
 import { PaymentOptionalAuthService } from "./checkout/payment-optional-auth.service";
@@ -53,6 +54,7 @@ import { StorageModule } from "../storage/storage.module";
 import { InvoicingModule } from "../invoicing";
 import { DiscountModule } from "../discount";
 import { ConsentModule } from "../consent/consent.module";
+import { UatProductionCopyModule } from "../admin-test-tools/uat-refresh/uat-production-copy.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -75,6 +77,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     DiscountModule,
     // Ödeme formu kapısı: mesafeli satış onayı (consent_records).
     ConsentModule,
+    // Staging: refund sweeps leave rows copied from production alone.
+    UatProductionCopyModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     // Üyelik aktivasyonunda satıcının takas ilanları yeniden indekslenir.
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
@@ -103,6 +107,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentExpiryReconciliationService,
     PspReconciliationService,
     RefundReconciliationService,
+    RefundOrderSweepService,
     MiscReconciliationService,
     PaymentInitiationService,
     PaymentCallbackService,

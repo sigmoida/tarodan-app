@@ -1,5 +1,5 @@
 import { CancellationActor } from "@prisma/client";
-import { RefundReconciliationService } from "../refund/refund-reconciliation.service";
+import { RefundOrderSweepService } from "../refund/refund-order-sweep.service";
 
 /**
  * MONEY-H5: processRefundedOrders artık GRUP (sepet) siparişlerini de süpürür.
@@ -10,7 +10,7 @@ import { RefundReconciliationService } from "../refund/refund-reconciliation.ser
  * SEAM-B3: outbound paket göndericiye iade dönmüş (shipment=returned) ama
  * refund_requested'da takılı siparişler de returned-arm ile retry edilir.
  */
-describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
+describe("RefundOrderSweepService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
   const makeService = () => {
     const prisma = {
       order: { findMany: jest.fn() },
@@ -18,11 +18,13 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),
     };
-    const service = new RefundReconciliationService(
+    const service = new RefundOrderSweepService(
       prisma as any, // prisma
       paymentRefund as any, // paymentRefund
-      { resolve: () => ({}) } as any, // paymentProviders (bu testte kullanılmaz)
-      { get: jest.fn().mockReturnValue(undefined) } as any, // configService
+      // Backoff state (D1): empty cache, every candidate is due.
+      { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
+      // Staging guard (D1): no production copy here.
+      { copiedBefore: jest.fn().mockResolvedValue(null) } as any,
     );
     const warn = jest
       .spyOn((service as any).logger, "warn")

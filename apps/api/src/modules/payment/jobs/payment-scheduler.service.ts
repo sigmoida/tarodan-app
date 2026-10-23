@@ -279,17 +279,15 @@ export class PaymentSchedulerService implements OnModuleInit {
     });
 
     // Recover only durable safe states. Ambiguous provider submissions are
-    // quarantined for manual reconciliation and are never resubmitted.
+    // quarantined for manual reconciliation and are never resubmitted. The
+    // service raises the manual review alarm itself, one line per attempt
+    // and at most once a day each; a counts line here would repeat it on
+    // every run.
     await this.runStep("reconcileStuckRefundMarkers", async () => {
       const stuck = await this.paymentService.reconcileStuckRefundMarkers();
       if (stuck.recovered > 0) {
         this.logger.warn(
           `Stuck refund markers finalized: ${stuck.recovered} of ${stuck.checked}`,
-        );
-      }
-      if (stuck.manualReview > 0) {
-        this.logger.error(
-          `${stuck.manualReview} refund attempt(s) require manual provider reconciliation`,
         );
       }
     });

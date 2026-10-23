@@ -2,90 +2,61 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import { LIVE_PAYMENT } from "../../account-lane/live-lane.where";
-import {
-  CancellationActor,
-  PaymentStatus,
-  OrderStatus,
-  ShipmentStatus,
-  RefundAttemptStatus,
-  RefundRequestStatus,
-} from "@prisma/client";
+import { RefundAttemptStatus, RefundRequestStatus } from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
+import { CacheService } from "../../cache/cache.service";
+import { UatProductionCopyService } from "../../admin-test-tools/uat-refresh/uat-production-copy.service";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { refundRequestIdOf } from "../../invoicing/helpers/refund-request-key";
 import {
   refundAttemptCancelActor,
   refundRequestAdminReasonCode,
 } from "../helpers/refund-attempt-actor";
-
-/**
- * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
- * ödemesi (sepet) — hangisi varsa iade kaydı orada tutulur.
- */
-const REFUND_SWEEP_CANDIDATE_SELECT = {
-  id: true,
-  payment: { select: { metadata: true } },
-  checkoutGroup: { select: { payment: { select: { metadata: true } } } },
-} as const;
-
-interface RefundSweepCandidate {
-  id: string;
-  payment?: { metadata: unknown } | null;
-  checkoutGroup?: { payment?: { metadata: unknown } | null } | null;
-}
-
-/**
- * Bu sipariş için ödemede KAYITLI bir iade var mı (tam ya da kısmi)?
- *
- * Kayıt varsa iade zaten İCRA EDİLMİŞ bir karardır: kısmi tutar, satıcı kusuru
- * / kargo payı gibi bir settlement'ın sonucudur ve sipariş o kararla kapanmıştır.
- * Sweep ise her zaman TAM tutarı ister — tekrar denerse MONEY-H4 kümülatif tavanı
- * `refundAmountExceedsLimit` fırlatır ve sipariş her cron turunda sonsuza dek
- * "başarısız" loglanır (TARODAN-API-8). Başarısız kalmış bir iade metadata'ya
- * HİÇ yazılmadığından retry hedefi kaybolmaz; yalnız bitmiş işler elenir.
- */
-function hasRecordedRefund(metadata: unknown, orderId: string): boolean {
-  const meta = (metadata as Record<string, unknown> | null) ?? {};
-  const refundedOrders =
-    (meta.refundedOrders as Record<string, number> | undefined) ?? {};
-  return Number(refundedOrders[orderId] ?? 0) > 0;
-}
-
-/**
- * Adayları "iadesi henüz yapılmamış" / "iadesi zaten kayıtlı" diye ayırır
- * (tekil ve grup ödemeler için ortak).
- *
- * `skipped` çağırana geri verilir çünkü atlamanın anlamı DALA GÖRE değişir:
- * terminal durumdaki (cancelled/refunded) bir siparişte iade kararı icra
- * edilmiş demektir ve sessizce elenmesi doğrudur; terminal OLMAYAN bir
- * siparişte ise sipariş takılı kalmış demektir ve görünür olmalıdır.
- */
-function partitionRefundCandidates(candidates: RefundSweepCandidate[]): {
-  pending: string[];
-  skipped: string[];
-} {
-  const pending: string[] = [];
-  const skipped: string[] = [];
-  for (const candidate of candidates) {
-    const metadata =
-      candidate.payment?.metadata ?? candidate.checkoutGroup?.payment?.metadata;
-    (hasRecordedRefund(metadata, candidate.id) ? skipped : pending).push(
-      candidate.id,
-    );
-  }
-  return { pending, skipped };
-}
+import { REFUND_FAILURE_PROVIDER_NOTHING_LEFT } from "../helpers/refund-provider-failure";
+import {
+  dailyAlarms,
+  sweepablePaymentWhere,
+} from "../helpers/refund-sweep-policy";
 
 /** İade sonucu belirsiz kalan attempt'in durum-sorguyla çözülmeden önce bekleyeceği süre. */
 const REFUND_RESOLVE_MIN_AGE_MINUTES = 15;
 /** Tutar eşlemesinde tolerans (kuruş yuvarlamaları). */
 const REFUND_RESOLVE_AMOUNT_TOLERANCE_TL = 0.05;
 
+/** A `submitting` attempt older than this ended without a durable answer. */
+const STALE_SUBMISSION_MINUTES = 10;
+/** Attempts per run: recovery candidates, quarantine, review alarm. */
+const RECOVERY_BATCH = 50;
+const REVIEW_ALARM_BATCH = 200;
+/** Cache key of the once-a-day manual review alarm (attempt id -> last alarm). */
+const REVIEW_ALARM_KEY = "refund-alarm:manual-review";
+const REVIEW_ALARM_TTL_SECONDS = 2 * 24 * 60 * 60;
+const STALE_SUBMISSION_REASON =
+  "Refund submission ended without a durable provider response";
+
+/** Which order or trade an attempt refunds, for one alarm line. */
+function attemptSubject(attempt: {
+  id: string;
+  orderId: string | null;
+  tradeId: string | null;
+}): string {
+  const owner = attempt.orderId
+    ? `order ${attempt.orderId}`
+    : attempt.tradeId
+      ? `trade ${attempt.tradeId}`
+      : "no order";
+  return `refund attempt ${attempt.id} (${owner})`;
+}
+
 /**
- * İade odaklı mutabakat süpürmeleri (cron). PaymentReconciliationService facade'i
- * aynı imzalarla buraya delege eder (asiklik: REC→REF).
+ * İade denemesi (RefundAttempt) mutabakat süpürmeleri (cron). PaymentReconciliationService
+ * facade'i aynı imzalarla buraya delege eder (asiklik: REC→REF). The order
+ * refund retry sweep is `RefundOrderSweepService`.
+ *
+ * On staging, attempts of payments copied from production are left alone
+ * (`UatProductionCopyService`): the PayTR test store knows nothing of them.
  */
 @Injectable()
 export class RefundReconciliationService {
@@ -96,6 +67,8 @@ export class RefundReconciliationService {
     private readonly paymentRefund: PaymentRefundService,
     private readonly paymentProviders: PaymentProviderRegistry,
     private readonly configService: ConfigService,
+    private readonly cache: CacheService,
+    private readonly productionCopy: UatProductionCopyService,
     @Optional()
     private readonly providerEvents?: PaymentProviderEventService,
   ) {}
@@ -131,13 +104,28 @@ export class RefundReconciliationService {
     const cutoff = new Date(
       Date.now() - REFUND_RESOLVE_MIN_AGE_MINUTES * 60 * 1000,
     );
+    const copiedBefore = await this.productionCopy.copiedBefore();
     const attempts = await this.prisma.refundAttempt.findMany({
       where: {
         status: RefundAttemptStatus.manual_review,
         provider: "paytr",
         // Test şeridi iadesi PayTR'ye hiç gitmez; durum-sorguda karşılığı yoktur.
-        payment: LIVE_PAYMENT,
+        // Staging: production copies are unknown to the PayTR test store.
+        payment: { ...LIVE_PAYMENT, ...sweepablePaymentWhere(copiedBefore) },
         updatedAt: { lt: cutoff },
+        // PayTR said nothing is left to refund: the inquiry would find no
+        // refund with our reference and requeue it, and the resend would be
+        // refused again. A person decides (admin reconciliation list).
+        OR: [
+          { failureReason: null },
+          {
+            NOT: {
+              failureReason: {
+                startsWith: REFUND_FAILURE_PROVIDER_NOTHING_LEFT,
+              },
+            },
+          },
+        ],
       },
       // İade hangi mağazaya gönderildiyse durum-sorgu da oraya: ödemenin mağazası.
       include: { payment: { select: { paytrMerchant: true } } },
@@ -241,7 +229,7 @@ export class RefundReconciliationService {
           );
           await this.recordResolveEvent(attempt, inquiry, "not_found");
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.error(
           `Refund resolve: attempt ${attempt.id} çözümlenemedi: ${errorMessage(error)}`,
         );
@@ -285,140 +273,38 @@ export class RefundReconciliationService {
   }
 
   /**
-   * İptal/iade edilmiş ama ödemesi hâlâ `completed` olan siparişleri bulup PayTR iadesini
-   * GÜVENİLİR şekilde tamamlar. Tek bir DB-tabanlı, idempotent, crash'e dayanıklı sweep
-   * şu boşlukları birden yedekler:
-   *  - K3: alıcı iptali → OrderService.cancel order'ı `refunded` yapar ama iade tetiklemezdi.
-   *  - Y9: handleExpiredPreparingOrders order'ı `cancelled` yapıp tx-dışı processRefund çağırır;
-   *        başarısızsa eskiden yalnız "MANUAL INTERVENTION" log'u kalırdı — artık burada retry edilir.
-   *  - Y7: processSuccessfulPayment cron-yarışı dalındaki tx-dışı iade başarısızlığı.
-   * processRefund order'ı `cancelled` + payment'ı `refunded` yaptığından (ve payout
-   * tamamlandıysa K1 guard'ı bloke ettiğinden) sweep idempotenttir: işlenen sipariş bir
-   * daha eşleşmez, kalıcı bloke olan nadir vaka her turda loglanır (manuel alarm sinyali).
-   * Tek istisna KISMİ iadedir — payment `completed` kalır — bu yüzden her üç dal da
-   * `hasRecordedRefund` ile elenir: iadesi bir kez icra edilmiş sipariş sweep'in işi
-   * değildir (kalan bakiye admin kararıdır).
-   * Yani bu sweep aynı zamanda tx-dışı iadeler için bir retry/outbox görevi görür.
+   * Recovers attempts left in a durable safe state (`prepared`: claimed but
+   * not sent; `succeeded`: PayTR refunded, the database not finalized) with
+   * their own key, quarantines submissions that ended without an answer, and
+   * raises the manual review alarm.
+   *
+   * D1: the alarm was one counts-only error line on every 5-minute run. The
+   * Sentry repeat throttle keys a report by message shape and entity ids, so
+   * that line hid a newly stuck attempt for up to 20 h. Now a newly
+   * quarantined attempt gets its own error line at once, and every attempt
+   * still in review one line a day.
    */
-  async processRefundedOrders(): Promise<{ refunded: number; failed: number }> {
-    // 1) Tekil (order-bazlı) ödemeler — Order.payment doğrudan siparişe bağlı.
-    // Kısmi iade sonrası payment `completed` KALIR (MONEY-H4: sonraki kısmi iadeler
-    // mümkün olsun diye), o yüzden bu sorgu iadesi çoktan bitmiş siparişi de görür →
-    // `hasRecordedRefund` ile elenir (grup dalıyla aynı kural).
-    const orders = await this.prisma.order.findMany({
-      where: {
-        status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
-        payment: { is: { status: PaymentStatus.completed } },
-      },
-      select: REFUND_SWEEP_CANDIDATE_SELECT,
-      take: 50,
-    });
-
-    // 2) MONEY-H5: GRUP (sepet) siparişleri. Grup ödemesinde Order.payment NULL'dur —
-    // ödeme CheckoutGroup'a bağlıdır — bu yüzden yukarıdaki `payment.is.status`
-    // filtresi sepet siparişlerini HİÇ görmez ve iptal edilen sepet siparişi asla
-    // iade edilmezdi. Grup ödemesi ancak grubun TÜM siparişleri iade edilince
-    // `refunded` olduğundan, hâlâ `completed` olan gruptaki iptal/iade siparişleri
-    // henüz iade edilmemiş adaylardır. Zaten iade edilmişleri (grup payment
-    // metadata.refundedOrders) app tarafında eleriz — aksi halde processRefund
-    // `orderAlreadyRefunded` fırlatıp her turda gürültülü REFUND_MANUAL_REVIEW üretir.
-    const groupOrders = await this.prisma.order.findMany({
-      where: {
-        status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
-        payment: { is: null },
-        checkoutGroupId: { not: null },
-        checkoutGroup: {
-          is: { payment: { is: { status: PaymentStatus.completed } } },
-        },
-      },
-      select: REFUND_SWEEP_CANDIDATE_SELECT,
-      take: 50,
-    });
-
-    // 3) SEAM-B3 recovery: outbound paket göndericiye İADE DÖNMÜŞ (shipment.status=returned)
-    // ama processRefund başarısız olduğu için `refund_requested`'da TAKILI siparişler.
-    // surat-tracking `applyTrackingUpdate` bunları refund_requested yapıp processRefund'ı
-    // dener; başarısız olursa poller terminal (returned) shipment'ı ARTIK POLLAMADIĞINDAN
-    // kendi retry EDEMEZ → burada güvenilir retry. `shipment.status=returned` bunları
-    // normal-akış refund_requested siparişlerinden (outbound `delivered`, iade RefundRequest'te
-    // ayrı izlenir) ayıran güvenli ayraçtır. processRefund başarınca order=cancelled → bir
-    // daha eşleşmez (idempotent).
-    const returnedStuckOrders = await this.prisma.order.findMany({
-      where: {
-        status: OrderStatus.refund_requested,
-        shipment: { is: { status: ShipmentStatus.returned } },
-      },
-      select: REFUND_SWEEP_CANDIDATE_SELECT,
-      take: 50,
-    });
-
-    // Dal 1 ve 2'de atlananlar TERMİNAL durumdadır (cancelled/refunded): iade
-    // kararı icra edilmiş, sipariş kapanmıştır → sessizce elenirler. Dal 3'te ise
-    // sipariş `refund_requested`, yani terminal DEĞİL: iadesi kısmen kaydedilmiş
-    // ama sipariş kapanmamış bir paket bu sweep dışında hiçbir yerden ilerlemez
-    // (poller terminal shipment'ı artık pollamaz) → sessiz kalmasın, alarm ver.
-    const returnedCandidates = partitionRefundCandidates(returnedStuckOrders);
-    if (returnedCandidates.skipped.length > 0) {
-      this.logger.warn(
-        `REFUND_MANUAL_REVIEW: ${returnedCandidates.skipped.length} sipariş iadesi kayıtlı ama ` +
-          `hâlâ refund_requested — sweep ilerletemiyor, manuel inceleme gerekli: ` +
-          `${returnedCandidates.skipped.join(", ")}`,
-      );
-    }
-
-    const allOrderIds = [
-      ...partitionRefundCandidates(orders).pending,
-      ...partitionRefundCandidates(groupOrders).pending,
-      ...returnedCandidates.pending,
-    ];
-
-    let refunded = 0;
-    let failed = 0;
-    const failures: string[] = [];
-    for (const orderId of allOrderIds) {
-      try {
-        // Dal 1-2: sipariş zaten iptal (aktörü korunur). Dal 3: paket
-        // göndericiye iade döndü — kimse "iptal et" demedi, sistem kapatır.
-        await this.paymentRefund.processRefund(orderId, undefined, {
-          cancelledBy: CancellationActor.system,
-        });
-        refunded++;
-      } catch (error) {
-        failed++;
-        const reason = errorMessage(error);
-        failures.push(`${orderId} (${reason})`);
-        this.logger.error(
-          `Auto-refund (iptal edilen sipariş ${orderId}) başarısız: ${reason}`,
-        );
-      }
-    }
-    // Görünürlük: kalıcı başarısız para iadeleri sessizce sonsuza dek retry edilmesin —
-    // tek satırlık greplenebilir alarm sinyali (ör. log-tabanlı uyarı kuralı buna bağlanır).
-    // NOT: stok geri-yükleme artık OrderService.cancel'da (iptalle senkron) yapıldığından
-    // takılı iade YALNIZ para tarafını etkiler; envanter piyasadan silinmez.
-    if (failed > 0) {
-      this.logger.warn(
-        `REFUND_MANUAL_REVIEW: ${failed} sipariş için otomatik para iadesi hâlâ başarısız — ` +
-          `manuel inceleme gerekli: ${failures.join(", ")}`,
-      );
-    }
-    return { refunded, failed };
-  }
-
-  async reconcileStuckRefundMarkers(): Promise<{
+  async reconcileStuckRefundMarkers(now = new Date()): Promise<{
     checked: number;
     recovered: number;
     manualReview: number;
   }> {
+    const copiedBefore = await this.productionCopy.copiedBefore(now);
+    // Staging: production copies are left alone (no filter elsewhere).
+    const paymentFilter = copiedBefore
+      ? { payment: sweepablePaymentWhere(copiedBefore) }
+      : {};
+
     const candidates = await this.prisma.refundAttempt.findMany({
       where: {
         orderId: { not: null },
         status: {
           in: [RefundAttemptStatus.prepared, RefundAttemptStatus.succeeded],
         },
+        ...paymentFilter,
       },
       orderBy: { createdAt: "asc" },
-      take: 50,
+      take: RECOVERY_BATCH,
     });
 
     let checked = 0;
@@ -471,7 +357,7 @@ export class RefundReconciliationService {
           `REFUND_ATTEMPT_RECOVERED: attempt=${attempt.id} order=${attempt.orderId} ` +
             `payment=${attempt.paymentId} previousStatus=${attempt.status}`,
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.error(
           `Refund attempt recovery failed attempt=${attempt.id} order=${attempt.orderId}: ${errorMessage(e)}`,
         );
@@ -484,9 +370,10 @@ export class RefundReconciliationService {
         status: {
           in: [RefundAttemptStatus.prepared, RefundAttemptStatus.succeeded],
         },
+        ...paymentFilter,
       },
       orderBy: { createdAt: "asc" },
-      take: 50,
+      take: RECOVERY_BATCH,
     });
     for (const attempt of tradeCandidates) {
       if (!attempt.tradeId) continue;
@@ -497,40 +384,121 @@ export class RefundReconciliationService {
             attempt.tradeId,
           );
         if (result.refunded) recovered++;
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.error(
           `Trade refund attempt recovery failed attempt=${attempt.id} trade=${attempt.tradeId}: ${errorMessage(e)}`,
         );
       }
     }
 
-    const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
-    const markedUnknown = await this.prisma.refundAttempt.updateMany({
-      where: {
-        status: RefundAttemptStatus.submitting,
-        requestStartedAt: { lt: staleBefore },
-      },
-      data: {
-        status: RefundAttemptStatus.manual_review,
-        failureReason:
-          "Refund submission ended without a durable provider response",
-      },
-    });
+    const quarantined = await this.quarantineStaleSubmissions(
+      now,
+      paymentFilter,
+    );
     const manualReview = await this.prisma.refundAttempt.count({
-      where: { status: RefundAttemptStatus.manual_review },
+      where: { status: RefundAttemptStatus.manual_review, ...paymentFilter },
     });
+    await this.alarmManualReview(now, paymentFilter, quarantined);
 
-    if (markedUnknown.count > 0 || manualReview > 0) {
-      this.logger.error(
-        `REFUND_MANUAL_REVIEW: ${manualReview} unresolved refund attempt(s); ` +
-          `${markedUnknown.count} stale submission(s) newly quarantined`,
-      );
-    }
     if (recovered > 0) {
       this.logger.warn(
         `Refund attempt reconciliation: ${recovered}/${checked} recovered`,
       );
     }
     return { checked, recovered, manualReview };
+  }
+
+  /**
+   * A submission older than the window ended without a durable provider
+   * answer: PayTR may have refunded, so it goes to manual review, one CAS per
+   * attempt (one that finished meanwhile is left alone) and one error line
+   * per attempt. Returns the ids it moved.
+   */
+  private async quarantineStaleSubmissions(
+    now: Date,
+    paymentFilter: { payment?: ReturnType<typeof sweepablePaymentWhere> },
+  ): Promise<Set<string>> {
+    const staleBefore = new Date(
+      now.getTime() - STALE_SUBMISSION_MINUTES * 60 * 1000,
+    );
+    const stale = await this.prisma.refundAttempt.findMany({
+      where: {
+        status: RefundAttemptStatus.submitting,
+        requestStartedAt: { lt: staleBefore },
+        ...paymentFilter,
+      },
+      select: { id: true, orderId: true, tradeId: true },
+      orderBy: { requestStartedAt: "asc" },
+      take: RECOVERY_BATCH,
+    });
+    const quarantined = new Set<string>();
+    for (const attempt of stale) {
+      const moved = await this.prisma.refundAttempt.updateMany({
+        where: {
+          id: attempt.id,
+          status: RefundAttemptStatus.submitting,
+          requestStartedAt: { lt: staleBefore },
+        },
+        data: {
+          status: RefundAttemptStatus.manual_review,
+          failureReason: STALE_SUBMISSION_REASON,
+        },
+      });
+      if (moved.count !== 1) continue;
+      quarantined.add(attempt.id);
+      this.logger.error(
+        `REFUND_MANUAL_REVIEW: ${attemptSubject(attempt)} quarantined: the submission ended without a durable provider response; check PayTR before resolving it`,
+      );
+    }
+    return quarantined;
+  }
+
+  /**
+   * One error line per attempt still in manual review, at most once a day
+   * each (cache stamps, helpers/refund-sweep-policy). An attempt quarantined
+   * in this run already had its line. Without the cache every run alarms
+   * again, the old behaviour.
+   */
+  private async alarmManualReview(
+    now: Date,
+    paymentFilter: { payment?: ReturnType<typeof sweepablePaymentWhere> },
+    quarantined: Set<string>,
+  ): Promise<void> {
+    const inReview = await this.prisma.refundAttempt.findMany({
+      where: { status: RefundAttemptStatus.manual_review, ...paymentFilter },
+      select: { id: true, orderId: true, tradeId: true, failureReason: true },
+      orderBy: { updatedAt: "asc" },
+      take: REVIEW_ALARM_BATCH,
+    });
+    let stored: unknown = null;
+    try {
+      stored = await this.cache.get<unknown>(REVIEW_ALARM_KEY);
+    } catch (error) {
+      this.logger.warn(
+        `Refund review alarm state unreadable: ${errorMessage(error)}`,
+      );
+    }
+    const { due, stamps } = dailyAlarms(
+      stored,
+      inReview.map((attempt) => attempt.id),
+      now,
+    );
+    const dueIds = new Set(due);
+    for (const attempt of inReview) {
+      if (!dueIds.has(attempt.id) || quarantined.has(attempt.id)) continue;
+      this.logger.error(
+        `REFUND_MANUAL_REVIEW: ${attemptSubject(attempt)} needs a manual provider check: ${attempt.failureReason ?? "no reason recorded"}`,
+      );
+    }
+    if (inReview.length === 0 && stored === null) return;
+    try {
+      await this.cache.set(REVIEW_ALARM_KEY, stamps, {
+        ttl: REVIEW_ALARM_TTL_SECONDS,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Refund review alarm state not saved: ${errorMessage(error)}`,
+      );
+    }
   }
 }

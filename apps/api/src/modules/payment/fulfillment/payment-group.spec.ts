@@ -14,6 +14,8 @@ import { ReservationReconciliationService } from "../reconciliation/reservation-
 import { PaymentExpiryReconciliationService } from "../reconciliation/payment-expiry-reconciliation.service";
 import { PspReconciliationService } from "../reconciliation/psp-reconciliation.service";
 import { RefundReconciliationService } from "../refund/refund-reconciliation.service";
+import { RefundOrderSweepService } from "../refund/refund-order-sweep.service";
+import { UatProductionCopyService } from "../../admin-test-tools/uat-refresh/uat-production-copy.service";
 import { MiscReconciliationService } from "../reconciliation/misc-reconciliation.service";
 import { PaymentInitiationService } from "../checkout/payment-initiation.service";
 import { PaymentCallbackService } from "../checkout/payment-callback.service";
@@ -217,6 +219,12 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentExpiryReconciliationService,
         PspReconciliationService,
         RefundReconciliationService,
+        RefundOrderSweepService,
+        // Staging guard of the refund sweeps; not the subject here.
+        {
+          provide: UatProductionCopyService,
+          useValue: { copiedBefore: jest.fn().mockResolvedValue(null) },
+        },
         MiscReconciliationService,
         PaymentInitiationService,
         PaymentCallbackService,
