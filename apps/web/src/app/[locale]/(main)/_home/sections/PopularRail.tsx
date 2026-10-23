@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { TagIcon } from "@heroicons/react/24/outline";
-import { EmptyState } from "@tarodan/ui";
+import { EmptyState } from "@tarodan/ui/empty-state";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import type { Product } from "@/types/product";
 import HomeSection from "./HomeSection";

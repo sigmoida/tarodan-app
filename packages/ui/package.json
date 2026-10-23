@@ -15,7 +15,8 @@
     "./button": "./src/components/Button.tsx",
     "./badge": "./src/components/Badge.tsx",
     "./product-badge": "./src/components/ProductBadge.tsx",
-    "./section-card": "./src/components/SectionCard.tsx"
+    "./section-card": "./src/components/SectionCard.tsx",
+    "./empty-state": "./src/components/EmptyState.tsx"
   },
   "scripts": {
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
