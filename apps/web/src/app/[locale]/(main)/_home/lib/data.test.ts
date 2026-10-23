@@ -104,6 +104,15 @@ describe("fetchProductRail", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not retry an unreadable body", async () => {
+    fetchMock.mockResolvedValue(new Response("<html>proxy</html>"));
+
+    await expect(
+      settle(fetchProductRail("/products", { page: 1 })),
+    ).rejects.toThrow(SyntaxError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("throws after two failed attempts", async () => {
     fetchMock
       .mockResolvedValueOnce(json({}, 503))

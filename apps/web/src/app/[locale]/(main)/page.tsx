@@ -41,8 +41,8 @@ export default async function HomePage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  // Throws when a product rail fails at runtime, so ISR keeps the last good
-  // page instead of caching one with the rail hidden (see `_home/lib/data.ts`).
+  // Never throws: a product rail whose fetch failed gets a `null` seed and
+  // loads in the browser (see `_home/lib/data.ts`).
   const data = await loadHomePageData();
   return <HomeContent data={data} locale={locale} />;
 }

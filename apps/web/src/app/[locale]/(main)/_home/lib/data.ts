@@ -60,9 +60,13 @@ export class RailHttpError extends Error {
   }
 }
 
-/** Network failure, timeout or 5xx: worth one more try. A 4xx is final. */
+/**
+ * Network failure (`TypeError` from fetch), timeout or abort (`DOMException`)
+ * or 5xx: worth one more try. A 4xx or an unreadable body is final.
+ */
 function isRetryable(error: unknown): boolean {
-  return !(error instanceof RailHttpError) || error.status >= 500;
+  if (error instanceof RailHttpError) return error.status >= 500;
+  return error instanceof TypeError || error instanceof DOMException;
 }
 
 async function fetchRailOnce(path: string, url: string): Promise<Product[]> {

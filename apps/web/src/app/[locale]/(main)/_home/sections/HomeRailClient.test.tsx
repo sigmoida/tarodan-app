@@ -52,7 +52,12 @@ async function render(node: React.ReactNode) {
       <QueryClientProvider client={client}>{node}</QueryClientProvider>,
     );
   });
-  // Let the query settle and the gate re-render.
+  await flush();
+  return client;
+}
+
+/** Let the query settle and the gate re-render. */
+async function flush() {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
@@ -93,6 +98,20 @@ describe("HomeRailGate + HomeRailCards", () => {
     h.getAll.mockRejectedValue(new Error("boom"));
     await render(section("trade"));
     expect(container.innerHTML).toBe("");
+  });
+
+  it("keeps a loaded rail when a later refetch fails", async () => {
+    h.getAll.mockResolvedValueOnce({ data: [product("a")] });
+    const client = await render(section("trade"));
+    h.getAll.mockRejectedValueOnce(new Error("boom"));
+    await act(async () => {
+      await client.refetchQueries();
+    });
+    await flush();
+    expect(h.getAll).toHaveBeenCalledTimes(2);
+    expect(
+      container.querySelector("[data-cards]")?.getAttribute("data-cards"),
+    ).toBe("a");
   });
 
   it("stays hidden on an empty answer unless the rail has an empty state", async () => {

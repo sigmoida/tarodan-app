@@ -26,8 +26,8 @@ export async function fetchHomeRailClient(rail: HomeRail): Promise<Product[]> {
 /**
  * A home rail's first page. A server seed is used as is; a `null` seed (the
  * server fetch failed) loads the rail in the browser. Returns `null` while it
- * loads or when that fetch fails too, so the caller keeps the rail hidden
- * rather than calling it empty.
+ * loads or when it never loaded, so the caller keeps the rail hidden rather
+ * than calling it empty.
  */
 export function useHomeRail(rail: HomeRail, seed: HomeRailSeed): HomeRailSeed {
   const query = useQuery({
@@ -38,5 +38,6 @@ export function useHomeRail(rail: HomeRail, seed: HomeRailSeed): HomeRailSeed {
     staleTime: 60_000,
   });
   if (seed !== null) return seed;
-  return query.isSuccess ? query.data : null;
+  // A failed refetch keeps the last loaded data (React Query keeps `data`).
+  return query.data ?? null;
 }
