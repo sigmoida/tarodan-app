@@ -62,3 +62,23 @@ export function isPayoutFailureReason(
     (PAYOUT_FAILURE_REASONS as readonly string[]).includes(value)
   );
 }
+
+/**
+ * How an admin records a failed payout transfer as paid ("Mark as paid"):
+ * - paytr_confirmed: the PayTR panel shows our transfer (same trans_id)
+ *   arrived although we never heard back. Only for a row whose outcome is
+ *   unknown.
+ * - external_bank: the platform paid the net from its own bank account
+ *   because the payment (merchant_oid) cannot carry it (decision of
+ *   2026-10-23). Only for `transfer_needs_manual_decision` and
+ *   `transfer_total_exceeds_remaining`.
+ * The API offers at most one method per row (`resolution.markPaidMethod` on
+ * the admin transfer list).
+ */
+export const PAYOUT_MANUAL_SETTLEMENT_METHODS = [
+  "paytr_confirmed",
+  "external_bank",
+] as const;
+
+export type PayoutManualSettlementMethod =
+  (typeof PAYOUT_MANUAL_SETTLEMENT_METHODS)[number];
