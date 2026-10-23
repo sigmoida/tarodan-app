@@ -1706,13 +1706,13 @@ export class PayoutService {
           { submittedAmount: amount },
           { submittedAmount: null, netAmount: amount },
         ],
-        ...(Number.isNaN(transferDate.getTime())
-          ? {}
-          : {
-              submittedAt: {
-                lte: new Date(transferDate.getTime() + DAY_MS),
-              },
-            }),
+        // Only a row PayTR carried can come back: a payout settled outside
+        // PayTR (admin "Mark as paid" / external_bank) has no send time and
+        // must never be taken for this bank return, even when PayTR's date
+        // cannot be read.
+        submittedAt: Number.isNaN(transferDate.getTime())
+          ? { not: null }
+          : { lte: new Date(transferDate.getTime() + DAY_MS) },
       },
     });
     if (candidates.length === 1) {

@@ -137,6 +137,44 @@ const payout = (o: Partial<FakePayout> = {}): FakePayout => ({
 });
 
 describe("PayoutService.checkReturnedTransfers — ref_no ile eşleme", () => {
+  it.each([
+    ["a readable transfer date", "2026-08-01"],
+    ["an unreadable transfer date", "not-a-date"],
+  ])(
+    "never matches a payout settled outside PayTR (external_bank), with %s",
+    async (_case, transferDate) => {
+      // Same IBAN and net, no PayTR reference, completed: only the missing
+      // send time says PayTR never carried it.
+      const external = payout({
+        providerReference: null,
+        providerResponse: {
+          manualSettlement: { method: "external_bank", reference: "EFT-1" },
+        },
+        submittedAt: null,
+        submittedAmount: null,
+        submittedTotalAmount: 0,
+      });
+      const { service, updates, notification, prisma } = build(
+        [external],
+        [row({ refNo: "OLDREF", transferDate })],
+      );
+
+      const result = await service.checkReturnedTransfers();
+
+      expect(result).toEqual({ returned: 0, unmatched: 1 });
+      expect(updates).toHaveLength(0);
+      expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
+      expect(prisma.payoutTransfer.findMany.mock.calls[0][0].where).toEqual(
+        expect.objectContaining({
+          submittedAt: expect.objectContaining(
+            transferDate === "not-a-date" ? { not: null } : {},
+          ),
+        }),
+      );
+      expect(external.status).toBe(PayoutStatus.completed);
+    },
+  );
+
   it("matches by providerReference, keeps the instruction response and emails without a reason", async () => {
     const { service, updates, notification } = build([payout()], [row()]);
 
