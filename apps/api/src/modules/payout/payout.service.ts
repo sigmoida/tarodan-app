@@ -47,6 +47,7 @@ import {
   resolveTransferTotal,
   type TransferTotalSnapshot,
 } from "./helpers/transfer-total";
+import { payoutCompletedLedgerInput } from "./helpers/payout-ledger";
 import type {
   PaytrPlatformTransferResult,
   PaytrReturnedTransfer,
@@ -1246,29 +1247,20 @@ export class PayoutService {
             paymentHold: { select: { orderId: true } },
           },
         });
-        await this.ledger?.record(this.prisma, {
-          eventType: LedgerEventType.payout_completed,
-          // Payout başına TEK settle kaydı: PayTR "OK" görene dek bildirimi yineler.
-          idempotencyKey: `payout-completed:${params.payoutId}`,
-          entries: [
+        // Payout başına TEK settle kaydı (`payout-completed:<id>`): PayTR "OK"
+        // görene dek bildirimi yineler.
+        await this.ledger?.record(
+          this.prisma,
+          payoutCompletedLedgerInput(
             {
-              account: LedgerAccount.seller_escrow,
-              direction: LedgerDirection.credit,
-              amount: net,
+              payoutId: params.payoutId,
+              sellerId: params.sellerId,
+              orderId: payoutRow?.paymentHold?.orderId ?? null,
+              holdId: payoutRow?.paymentHoldId ?? null,
             },
-            {
-              account: LedgerAccount.payout,
-              direction: LedgerDirection.debit,
-              amount: net,
-            },
-          ],
-          refs: {
-            payoutId: params.payoutId,
-            sellerId: params.sellerId,
-            orderId: payoutRow?.paymentHold?.orderId ?? null,
-            holdId: payoutRow?.paymentHoldId ?? null,
-          },
-        });
+            net,
+          ),
+        );
       }
     } catch (e) {
       this.logger.warn(
