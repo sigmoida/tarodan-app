@@ -114,11 +114,19 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
       {} as never, // trade refunds
       {} as never, // boost timeline
     );
-    jest
-      .spyOn(
-        (service as unknown as { logger: { error: () => void } }).logger,
-        "error",
-      )
+    const logger = (
+      service as unknown as {
+        logger: {
+          error: (message: string) => void;
+          warn: (message: string) => void;
+        };
+      }
+    ).logger;
+    const errorLog = jest
+      .spyOn(logger, "error")
+      .mockImplementation(() => undefined);
+    const warnLog = jest
+      .spyOn(logger, "warn")
       .mockImplementation(() => undefined);
 
     const attemptWrites = () =>
@@ -131,7 +139,18 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
           args.where.failureReason === "order_refunded" &&
           args.data.status === "pending",
       );
-    return { service, prisma, paytr, attemptWrites, payoutRestored };
+    const failureLines = () => ({
+      error: errorLog.mock.calls.map(([line]) => String(line)),
+      warn: warnLog.mock.calls.map(([line]) => String(line)),
+    });
+    return {
+      service,
+      prisma,
+      paytr,
+      attemptWrites,
+      payoutRestored,
+      failureLines,
+    };
   };
 
   const run = (service: PaymentRefundService) =>
@@ -229,5 +248,61 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
       },
     ]);
     expect(payoutRestored()).toBe(false);
+  });
+
+  /**
+   * D1 review: with the retry sweep as caller, "Refund error for payment" was
+   * an error on every backed-off retry next to the sweep's own once-a-day
+   * alarm. A caller that alarms itself (`callerAlarms`) gets it at warn when
+   * no money moved; where money may have moved it stays an error for all.
+   */
+  describe("failure log level", () => {
+    const refundErrorLine = (lines: string[]) =>
+      lines.filter((line) => line.startsWith("Refund error for payment"));
+
+    it("a caller that alarms itself: a definite failure is a warn", async () => {
+      const { service, failureLines } = make(
+        new ProviderRefundRejectedException("iade limiti asildi"),
+      );
+
+      await expect(
+        service.processRefund(ORDER_ID, undefined, {
+          cancelledBy: CancellationActor.system,
+          callerAlarms: true,
+        }),
+      ).rejects.toBeInstanceOf(ProviderRefundRejectedException);
+
+      expect(refundErrorLine(failureLines().error)).toEqual([]);
+      expect(refundErrorLine(failureLines().warn)).toHaveLength(1);
+    });
+
+    it("a caller that alarms itself: money that may have moved is still an error", async () => {
+      const { service, failureLines } = make(
+        new ProviderRefundOutcomeUnknownException(
+          i18nMessage("server.payment.refundError"),
+        ),
+      );
+
+      await expect(
+        service.processRefund(ORDER_ID, undefined, {
+          cancelledBy: CancellationActor.system,
+          callerAlarms: true,
+        }),
+      ).rejects.toBeInstanceOf(RefundPendingReconciliationException);
+
+      expect(refundErrorLine(failureLines().error)).toHaveLength(1);
+    });
+
+    it("any other caller keeps the error line (pin)", async () => {
+      const { service, failureLines } = make(
+        new ProviderRefundRejectedException("iade limiti asildi"),
+      );
+
+      await expect(run(service)).rejects.toBeInstanceOf(
+        ProviderRefundRejectedException,
+      );
+
+      expect(refundErrorLine(failureLines().error)).toHaveLength(1);
+    });
   });
 });

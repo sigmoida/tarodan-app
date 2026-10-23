@@ -196,6 +196,13 @@ export interface ProcessRefundOptions {
    * a concurrent refund has just stopped.
    */
   claimGuard?: (tx: Prisma.TransactionClient) => Promise<void>;
+  /**
+   * The caller raises its own, rate-limited alarm for a failed refund (the
+   * retry sweep: once a day per order). A failure that moved no money is then
+   * logged here at warn; one where money may have moved (PayTR refunded, or
+   * the outcome is uncertain) stays an error for every caller.
+   */
+  callerAlarms?: boolean;
 }
 
 /**
@@ -1503,9 +1510,12 @@ export class PaymentRefundService {
       }
       return refundCommitResult;
     } catch (error: unknown) {
-      this.logger.error(
-        `Refund error for payment ${payment.id}: ${errorMessage(error)}`,
-      );
+      const failureLine = `Refund error for payment ${payment.id}: ${errorMessage(error)}`;
+      if (opts.callerAlarms && !paytrRefunded && !providerOutcomeUncertain) {
+        this.logger.warn(failureLine);
+      } else {
+        this.logger.error(failureLine);
+      }
       // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
       // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
       // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
