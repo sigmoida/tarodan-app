@@ -2305,6 +2305,11 @@ model RefundAttempt {
   providerResponse    Json?               @map("provider_response")
   status              RefundAttemptStatus @default(prepared)
   failureReason       String?             @map("failure_reason")
+  /// Consecutive definite provider failures (rejected or never sent) of this
+  /// attempt. The order refund sweep waits 10 min * 2^(n-1), at most 6 h,
+  /// after `updatedAt` before resending it; a resolution that requeues the
+  /// attempt (status inquiry, admin) leaves it, so the next wait is short.
+  failureCount        Int                 @default(0) @map("failure_count")
   requestStartedAt    DateTime?           @map("request_started_at")
   providerSucceededAt DateTime?           @map("provider_succeeded_at")
   finalizedAt         DateTime?           @map("finalized_at")
