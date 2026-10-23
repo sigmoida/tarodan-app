@@ -1,10 +1,12 @@
 import { UserBankService } from "./user-bank.service";
 
 /**
- * K9 sözleşmesi: IBAN yokken failed(no_bank_account) düşen payout transferleri,
- * satıcı banka hesabını kaydettiği anda pending'e döner (15 dk cron devralır).
- * Admin retry beklemeden para akışı kendiliğinden canlanır; IBAN-değişikliği
- * cooldown'u cron tarafında aynen devrededir (burada atlatılmaz).
+ * K9 contract: payout transfers that failed for a reason the seller fixes
+ * (no bank account, invalid IBAN, PayTR rejected the IBAN or holder name)
+ * return to pending when the seller saves the bank account; the 15-minute
+ * cron takes over with the current details. The "payout failed" e-mail
+ * promises exactly this. None of these reached PayTR's oid, so resending is
+ * safe. The IBAN-change cooldown still applies in the cron (not skipped).
  */
 describe("UserBankService.upsertBankAccount — payout requeue", () => {
   const makeService = (existingIban: string | null) => {
@@ -19,10 +21,15 @@ describe("UserBankService.upsertBankAccount — payout requeue", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
     };
-    return { service: new UserBankService(prisma as any), prisma };
+    return {
+      service: new UserBankService(
+        prisma as unknown as ConstructorParameters<typeof UserBankService>[0],
+      ),
+      prisma,
+    };
   };
 
-  it("ilk IBAN kaydında no_bank_account transferleri pending'e çekilir", async () => {
+  it("requeues every seller-fixable failed transfer when the account is saved", async () => {
     const { service, prisma } = makeService(null);
 
     await service.upsertBankAccount("seller-1", {
@@ -34,7 +41,13 @@ describe("UserBankService.upsertBankAccount — payout requeue", () => {
       where: {
         sellerId: "seller-1",
         status: "failed",
-        failureReason: "no_bank_account",
+        failureReason: {
+          in: [
+            "no_bank_account",
+            "invalid_iban_format",
+            "bank_details_rejected",
+          ],
+        },
       },
       data: {
         status: "pending",
