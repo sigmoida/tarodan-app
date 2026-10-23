@@ -690,6 +690,58 @@ ayrıdır; belirsizler `manual_review`'a park eder ve
 listesini `referenceNo` ile eşleyip CAS ile `succeeded`'a çevirir; referanssız
 ama tutarı tutan dönüş **belirsiz** bırakılır (insan kararı).
 
+### Refund failures and the retry sweeps
+
+Since 2026-10-23 (D1, the refund sweep loop: Sentry TARODAN-API-3M/3N/3P, 156
+events in three days for one order) a failed PayTR refund call is typed by
+what it means for the money, in `createRefund` and one table
+(`payment/helpers/refund-provider-failure.ts`) for the order refund and the
+trade cash refund. The `RefundAttempt` intent is written before the call.
+
+| PayTR outcome                                                                                                        | Attempt                                          | Resent by                            | Voided payout |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ | ------------- |
+| Not sent: connect phase (`classifyPaytrFetchError`: DNS, refused, connect timeout) or the request could not be built | `failed`, `provider_not_sent: <cause>`           | the retry sweeps                     | restored      |
+| Rejected                                                                                                             | `failed`, PayTR's text                           | the retry sweeps                     | restored      |
+| Rejected, nothing left ("kalan tutardan (0 TL) fazla olamaz")                                                        | `manual_review`, `provider_nothing_left: <text>` | a person (admin reconciliation list) | stays voided  |
+| Unknown: sent, then reset, our timeout, unreadable or empty answer                                                   | `manual_review`                                  | the status inquiry or a person       | stays voided  |
+
+"Nothing left" means PayTR holds no money of that payment any more: it was
+refunded in the PayTR panel, or by an earlier attempt we did not hear back
+from. The status inquiry leaves these attempts alone (it would find no refund
+with our reference and requeue a refund PayTR refuses again). A non-zero
+remaining ("kalan tutardan (15 TL)") is an ordinary rejection.
+
+The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
+`payment-expired`, every 5 minutes) and the attempt recovery
+(`RefundReconciliationService`) follow `payment/helpers/refund-sweep-policy.ts`:
+
+- An order whose refund fails waits 10 minutes, then twice as long after each
+  further failure, at most 6 hours; it is not queried while it waits. A
+  success clears it.
+- An order whose refund has an unresolved attempt (`prepared`, `submitting`,
+  `succeeded`, `manual_review`) is not swept: the attempt recovery, the
+  quarantine, the status inquiry or a person owns it.
+- Alarms are one line per order or attempt (`REFUND_MANUAL_REVIEW`, with its
+  ids, so the Sentry repeat throttle keys each one), at error at most once a
+  day each, warn in between. A submission quarantined to `manual_review`
+  gets its own error line at once.
+- The backoff and alarm state lives in the cache. Lost (flush, outage), the
+  sweeps behave as before: retry and alarm every run. Whether money may move
+  is decided by the `RefundAttempt` ledger only.
+- `createRefund` logs one warn line per failure; the caller logs the decision.
+
+**Staging.** The staging database is a masked production copy
+([UAT_REFRESH.md](./UAT_REFRESH.md)), and the PayTR test store refuses the
+refunds of production's payments forever. On a deployment that is not live
+production (`isLiveProduction()`, fail closed), the refund sweeps (order sweep,
+attempt recovery and quarantine, status inquiry, review alarm) leave out
+payments created up to the last production copy
+(`UatProductionCopyService.copiedBefore`: the refresh's `sourceSnapshotAt`; an
+unfinished refresh counts up to now, capped at its timeout). Test-lane payments
+stay in (they never reach PayTR). On live production nothing is filtered.
+Payouts need no such filter: staging cannot boot without
+`PAYOUTS_DISABLED=true`, and with it the payout run sends nothing.
+
 ### Boost refund and stop (admin)
 
 A boost (`BST-` order, `origin = platform_service`, the platform seller sells

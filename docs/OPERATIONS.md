@@ -1003,6 +1003,28 @@ picks `failed` rows, so they wait safely.
    Support writes once to these sellers, because they earlier received a
    "payout failed" e-mail with PayTR's raw text (decision U4).
 
+### When needed: refund attempts in manual review
+
+A refund attempt that a sweep cannot settle alone waits in `manual_review`
+(admin → Finance → Payments → Reconciliation; `PAYMENTS.md` §7, "Refund
+failures and the retry sweeps"). The alarm is one `REFUND_MANUAL_REVIEW` error
+per attempt, at most once a day. Resolve in the list, after checking the
+order's merchant_oid in the PayTR panel (refunds listed with their
+`reference_no` = the attempt id without hyphens):
+
+| Reason                                                        | What to do                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `provider_nothing_left: …`                                    | PayTR has nothing left to refund on that payment. If the panel lists a refund of this amount (by our reference, or one made by hand in the panel): "provider succeeded", which finalizes the order and the hold on the next run. If it does not: hand it to a developer; do **not** retry (PayTR refuses it again). |
+| "Refund submission ended without a durable provider response" | Our request may have reached PayTR. Listed in the panel: "provider succeeded". Not listed after 15 minutes: the status inquiry usually requeues it by itself; otherwise "retry".                                                                                                                                    |
+| `payout_completed` / `payout_processing`                      | The seller was already paid: the refund needs a clawback first (`CLAWBACK_REQUIRED` log line).                                                                                                                                                                                                                      |
+| anything else                                                 | Check the panel; "provider succeeded" if the refund is there, otherwise "retry".                                                                                                                                                                                                                                    |
+
+A refund that keeps failing without reaching review (`failed`, e.g.
+`provider_not_sent` while the host cannot reach PayTR) is retried by the sweep
+with a growing wait (10 minutes up to 6 hours) and alarmed once a day per
+order. On staging, refunds of payments copied from production are left out of
+the sweeps on purpose.
+
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 
 Hesap silme, Sign in with Apple refresh token'ının Apple'da iptalini outbox'a
