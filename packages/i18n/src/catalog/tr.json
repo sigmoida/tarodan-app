@@ -3052,7 +3052,6 @@
     "report": "Raporla",
     "noActiveListings": "Bu satıcının henüz aktif ilanı yok.",
     "viewProfile": "Profili Gör",
-    "premiumBadge": "Premium",
     "noReviewsDesc": "Bu satıcının henüz değerlendirmesi yok.",
     "totalReviews": "değerlendirme",
     "noCollections": "Henüz koleksiyon yok",
@@ -3174,8 +3173,10 @@
       "emptyDescription": "Müşterilerinize özel indirimler ve kampanyalar oluşturun"
     },
     "trustScore": {
-      "badge": "Güven skoru {rating}/5 · {level}",
-      "badgeNew": "Güven skoru: Yeni satıcı",
+      "badge": "{rating}",
+      "badgeNew": "Yeni satıcı",
+      "a11yLabel": "Güven skoru {rating}/5, {level}",
+      "a11yLabelNew": "Güven skoru: Yeni satıcı",
       "levels": {
         "excellent": "Çok güvenilir",
         "trusted": "Güvenilir",

@@ -58,15 +58,15 @@ afterEach(() => {
   container.remove();
 });
 
-describe("SellerCard Premium badge", () => {
-  it("sabit metin yerine seller.premiumBadge anahtarını kullanır", () => {
+describe("SellerCard package badge", () => {
+  it("never shows a Premium badge, even for a premium seller", () => {
     h.isPremium = true;
     act(() => root.render(<SellerCard />));
-    expect(container.textContent).toContain("seller.premiumBadge");
+    expect(container.textContent).not.toContain("seller.premiumBadge");
     expect(container.textContent).not.toContain("Premium");
   });
 
-  it("premium olmayan satıcıda rozet yok", () => {
+  it("shows no badge for a non-premium seller either", () => {
     h.isPremium = false;
     act(() => root.render(<SellerCard />));
     expect(container.textContent).not.toContain("seller.premiumBadge");
@@ -74,8 +74,8 @@ describe("SellerCard Premium badge", () => {
 });
 
 describe("seller.premiumBadge catalog", () => {
-  it("tr ve en katalogunda tanımlıdır", () => {
-    expect(messages.tr.seller.premiumBadge).toBe("Premium");
-    expect(messages.en.seller.premiumBadge).toBe("Premium");
+  it("is removed from both catalogs", () => {
+    expect(messages.tr.seller).not.toHaveProperty("premiumBadge");
+    expect(messages.en.seller).not.toHaveProperty("premiumBadge");
   });
 });

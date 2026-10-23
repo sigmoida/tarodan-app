@@ -37,7 +37,6 @@ const seller = (over: Partial<Seller>): Seller => ({
   displayName: "Seller",
   createdAt: "2025-01-01T00:00:00.000Z",
   isVerified: true,
-  isPremium: true,
   trust: { rating: 3.74, level: "fair", formulaVersion: 1 },
   sellerType: "individual",
   ...over,
@@ -78,16 +77,18 @@ afterEach(() => {
 });
 
 describe("SellerHeader badges", () => {
-  it("shows Premium, Verified and the trust score for a premium seller", () => {
+  it("shows Verified and only the trust number, no Premium or label", () => {
     render(seller({}));
     const text = container.textContent ?? "";
-    expect(text).toContain("Premium");
+    expect(text).not.toContain("Premium");
     expect(text).toContain("Doğrulanmış");
-    expect(text).toContain("Güven skoru 3,74/5 · Orta");
+    expect(text).toContain("3,74");
+    expect(text).not.toContain("Güven skoru");
+    expect(text).not.toContain("Orta");
   });
 
   it("shows no trust badge when the API gates the score (trust null)", () => {
-    render(seller({ isPremium: false, trust: null }));
+    render(seller({ trust: null }));
     const text = container.textContent ?? "";
     expect(text).not.toContain("Güven skoru");
     expect(text).not.toContain("Premium");
@@ -103,12 +104,12 @@ describe("SellerHeader badges", () => {
     );
     const text = container.textContent ?? "";
     expect(text).toContain("Doğrulanmış");
-    expect(text).toContain("Güven skoru 4,10/5 · Güvenilir");
+    expect(text).toContain("4,10");
     expect(text).not.toContain("Resmi hesap");
   });
 
   it("shows no trust badge for a platform seller whose score is gated", () => {
-    render(seller({ sellerType: "platform", isPremium: false, trust: null }));
+    render(seller({ sellerType: "platform", trust: null }));
     expect(container.textContent).not.toContain("Güven skoru");
   });
 });

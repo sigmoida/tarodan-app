@@ -12,12 +12,18 @@ import {
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import UserActionsMenu from "@/components/UserActionsMenu";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
 import SellerTrustBadge from "./SellerTrustBadge";
+
+const formatRating = (value: number, locale: string) =>
+  new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value);
 
 interface SellerHeaderProps {
   seller: Seller;
@@ -48,6 +54,7 @@ export default function SellerHeader({
   onRequireAuth,
 }: SellerHeaderProps) {
   const t = useTranslations();
+  const locale = useLocale();
   const stats = seller.stats;
   const totalRatings = stats?.totalRatings ?? 0;
   const averageRating = stats?.averageRating ?? 0;
@@ -70,11 +77,6 @@ export default function SellerHeader({
               <h1 className="truncate text-xl font-bold text-heading">
                 {publicNameOf(seller)}
               </h1>
-              {seller.isPremium && (
-                <Badge variant="default" size="sm">
-                  {t("seller.premiumBadge")}
-                </Badge>
-              )}
               {seller.isVerified && (
                 <Badge
                   variant="success"
@@ -95,7 +97,7 @@ export default function SellerHeader({
                     className="mb-0.5 inline size-3.5 text-warning-500"
                     aria-hidden
                   />{" "}
-                  {`${averageRating.toFixed(1)} (${totalRatings})`}
+                  {`${formatRating(averageRating, locale)} (${totalRatings})`}
                 </>
               )}
               {` · ${followersCount} ${t("profile.followers")}`}

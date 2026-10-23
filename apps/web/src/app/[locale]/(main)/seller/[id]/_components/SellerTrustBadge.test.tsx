@@ -60,25 +60,42 @@ afterEach(() => {
 });
 
 describe("SellerTrustBadge", () => {
-  it("shows the rating with a comma and the level in tr", () => {
+  const label = () =>
+    container.querySelector("button")!.getAttribute("aria-label");
+
+  it("shows only the number with a comma in tr", () => {
     render(view({}));
-    expect(container.textContent).toBe("Güven skoru 3,74/5 · Orta");
+    expect(container.textContent).toBe("3,74");
+    expect(label()).toBe(
+      "Güven skoru 3,74/5, Orta. Güven skoru nasıl hesaplanır?",
+    );
   });
 
-  it("shows the rating with a dot and the level in en", () => {
+  it("shows only the number with a dot in en", () => {
     h.locale = "en";
     render(view({}));
-    expect(container.textContent).toBe("Trust score 3.74/5 · Fair");
+    expect(container.textContent).toBe("3.74");
+    expect(label()).toBe(
+      "Trust score 3.74 out of 5, Fair. How is the trust score calculated?",
+    );
   });
 
   it("always shows two decimals", () => {
     render(view({ rating: 4, level: "trusted" }));
-    expect(container.textContent).toBe("Güven skoru 4,00/5 · Güvenilir");
+    expect(container.textContent).toBe("4,00");
   });
 
-  it("shows the new-seller state", () => {
+  it("shows only the new-seller label for a new seller", () => {
     render(view({ rating: null, level: "new" }));
-    expect(container.textContent).toBe("Güven skoru: Yeni satıcı");
+    expect(container.textContent).toBe("Yeni satıcı");
+    expect(label()).toBe(
+      "Güven skoru: Yeni satıcı. Güven skoru nasıl hesaplanır?",
+    );
+  });
+
+  it("shows the new-seller label when the rating is null at any level", () => {
+    render(view({ rating: null }));
+    expect(container.textContent).toBe("Yeni satıcı");
   });
 
   it("renders nothing when trust is null or absent", () => {

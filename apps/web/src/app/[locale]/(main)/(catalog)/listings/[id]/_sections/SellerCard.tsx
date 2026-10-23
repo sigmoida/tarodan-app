@@ -9,7 +9,7 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import { Badge, Button } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
@@ -23,7 +23,6 @@ export default function SellerCard() {
   const seller = listing?.seller;
   if (!seller) return null;
 
-  const isPremium = (seller as { isPremium?: boolean }).isPremium;
   const totalRatings = (seller as { totalRatings?: number }).totalRatings;
   const rating = seller.rating ?? 0;
   const listingsCount = seller.listings_count || seller.productsCount || 0;
@@ -60,12 +59,6 @@ export default function SellerCard() {
             <span className="font-semibold text-heading truncate transition-colors group-hover:text-primary-500">
               {name}
             </span>
-            {isPremium && (
-              <Badge variant="warning" size="sm" className="gap-1">
-                <StarIconSolid className="w-3 h-3" />
-                {t("seller.premiumBadge")}
-              </Badge>
-            )}
           </div>
           <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-sm text-muted mt-1">
             {rating > 0 ? (
