@@ -43,6 +43,11 @@ describe("classifyTransferRejection", () => {
     [{ err_no: "003", err_msg: "Sistem hatası" }],
     [{ err_msg: "" }],
     [{}],
+    // Names an IBAN but says nothing is wrong with the seller's details:
+    // e-mailing the seller would send them to change a correct IBAN.
+    [{ err_msg: "IBAN'a transfer şu an yapılamıyor" }],
+    [{ err_msg: "Platform IBAN tanımlı değil" }],
+    [{ err_msg: "Bu kısım için transfer yapılamaz" }],
   ])("maps any other rejection to provider_rejected: %j", (result) => {
     expect(classifyTransferRejection(result)).toBe(
       PAYOUT_FAILURE.providerRejected,

@@ -19,6 +19,9 @@ export const PAYOUT_FAILURE = {
   transferNeedsManualDecision: "transfer_needs_manual_decision",
   providerUnreachable: "provider_unreachable",
   transferOutcomeUnknown: "transfer_outcome_unknown",
+  orderNotPayoutEligible: "order_not_payout_eligible",
+  refundPending: "refund_pending",
+  orderRefunded: "order_refunded",
 } as const satisfies Record<string, PayoutFailureReason>;
 
 /** PayTR's only documented transfer error: "toplam transfer tutarı kalan
@@ -37,9 +40,17 @@ function fold(text: string): string {
     .replace(/ç/g, "c");
 }
 
-/** Rejections naming the payee's IBAN or name/title: the seller can fix them. */
-const BANK_DETAILS_PATTERN =
+/**
+ * A rejection is the seller's to fix only when it names the payee's details
+ * (IBAN, holder name or title) AND says they are wrong. A message that only
+ * mentions an IBAN (e.g. "IBAN'a transfer şu an yapılamıyor") stays with the
+ * team: e-mailing the seller would make them change a correct IBAN and start
+ * the IBAN-change cooldown.
+ */
+const BANK_DETAILS_SUBJECT =
   /iban|transfer_name|hesap sahibi|alici adi|unvan|\bisim\b|ad soyad/;
+const BANK_DETAILS_DEFECT =
+  /gecersiz|hatali|yanlis|uyus|eslesm|bulunamad|kapali|invalid|wrong|mismatch/;
 
 /**
  * Which failure a PayTR rejection (`status: "error"`) is. Only err_no 010 is
@@ -61,7 +72,7 @@ export function classifyTransferRejection(result: {
   ) {
     return PAYOUT_FAILURE.transferTotalExceedsRemaining;
   }
-  if (BANK_DETAILS_PATTERN.test(message)) {
+  if (BANK_DETAILS_SUBJECT.test(message) && BANK_DETAILS_DEFECT.test(message)) {
     return PAYOUT_FAILURE.bankDetailsRejected;
   }
   return PAYOUT_FAILURE.providerRejected;
