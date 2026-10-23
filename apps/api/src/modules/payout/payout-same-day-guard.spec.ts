@@ -34,13 +34,18 @@ describe("PayoutService.processPendingPayouts same-day guard", () => {
         count: jest.fn().mockResolvedValue(0),
       },
       order: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: "o1", status: OrderStatus.completed }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "o1",
+          status: OrderStatus.completed,
+          totalAmount: 100,
+        }),
         update: jest.fn().mockResolvedValue({}),
       },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(null) },
-      refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
+      refundAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       sellerBankAccount: {
         findUnique: jest.fn().mockResolvedValue({
           userId: payout.sellerId,
@@ -88,7 +93,7 @@ describe("PayoutService.processPendingPayouts same-day guard", () => {
       orderId: "o1",
       amount: 88,
       refundedAmount: 0,
-      payment: { paidAt, createdAt: paidAt },
+      payment: { paidAt, createdAt: paidAt, amount: 100, metadata: null },
     },
     tradeCashPayment: null,
   });

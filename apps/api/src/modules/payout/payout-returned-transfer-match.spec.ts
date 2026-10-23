@@ -25,24 +25,54 @@ const row = (
   ...o,
 });
 
-function build(payouts: any[], rows: PaytrReturnedTransfer[]) {
-  const updates: any[] = [];
+/** The payout row fields the returned-transfer match reads and writes. */
+interface FakePayout {
+  id: string;
+  sellerId: string;
+  transId: string;
+  netAmount: number;
+  submittedAmount: number | null;
+  submittedAt: Date | null;
+  transferIban: string;
+  status: PayoutStatus;
+  providerReference: string | null;
+  providerResponse: unknown;
+  [key: string]: unknown;
+}
+
+/** The Prisma arguments the matcher sends, as loose as it sends them. */
+interface FakeArgs {
+  where: {
+    id?: string;
+    providerReference?: string | null;
+    transferIban?: string;
+    status?: { in: PayoutStatus[] };
+    OR?: Array<{ submittedAmount?: string | null }>;
+    submittedAt?: { lte?: Date; not?: null };
+  };
+  data?: Record<string, unknown>;
+}
+
+type PayoutDeps = ConstructorParameters<typeof PayoutService>;
+
+function build(payouts: FakePayout[], rows: PaytrReturnedTransfer[]) {
+  const updates: Array<{ id: string; data: Record<string, unknown> }> = [];
   const prisma = {
     payoutTransfer: {
       // Referans durumdan bağımsız aranır (işlenmiş satırı tanımak için).
       findFirst: jest
         .fn()
-        .mockImplementation(({ where }: any) =>
+        .mockImplementation(({ where }: FakeArgs) =>
           Promise.resolve(
             payouts.find(
               (p) => p.providerReference === where.providerReference,
             ) ?? null,
           ),
         ),
-      findMany: jest.fn().mockImplementation(({ where }: any) =>
+      findMany: jest.fn().mockImplementation(({ where }: FakeArgs) =>
         Promise.resolve(
           payouts.filter((p) => {
-            const amount = where.OR[0].submittedAmount;
+            const amount = where.OR?.[0]?.submittedAmount;
             const amountOk =
               p.submittedAmount != null
                 ? Number(p.submittedAmount).toFixed(2) === amount
@@ -50,19 +80,23 @@ function build(payouts: any[], rows: PaytrReturnedTransfer[]) {
             return (
               p.providerReference == null &&
               p.transferIban === where.transferIban &&
-              where.status.in.includes(p.status) &&
+              (where.status?.in ?? []).includes(p.status) &&
               amountOk &&
-              (!where.submittedAt || p.submittedAt <= where.submittedAt.lte)
+              // SQL: a NULL submitted_at never satisfies <= or IS NOT NULL.
+              (!where.submittedAt ||
+                (p.submittedAt != null &&
+                  (where.submittedAt.lte === undefined ||
+                    p.submittedAt <= where.submittedAt.lte)))
             );
           }),
         ),
       ),
-      updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
+      updateMany: jest.fn().mockImplementation(({ where, data }: FakeArgs) => {
         const p = payouts.find((x) => x.id === where.id);
-        if (!p || !where.status.in.includes(p.status)) {
+        if (!p || !(where.status?.in ?? []).includes(p.status)) {
           return Promise.resolve({ count: 0 });
         }
-        updates.push({ id: p.id, data });
+        updates.push({ id: p.id, data: data ?? {} });
         Object.assign(p, data);
         return Promise.resolve({ count: 1 });
       }),
@@ -80,15 +114,15 @@ function build(payouts: any[], rows: PaytrReturnedTransfer[]) {
   const notification = { sendTemplateEmailToUser: jest.fn() };
   const getReturnedTransfers = jest.fn().mockResolvedValue(rows);
   const service = new PayoutService(
-    prisma as any,
-    { resolve: () => ({ getReturnedTransfers }) } as any,
-    { get: jest.fn().mockReturnValue(undefined) } as any,
-    notification as any,
+    prisma as unknown as PayoutDeps[0],
+    { resolve: () => ({ getReturnedTransfers }) } as unknown as PayoutDeps[1],
+    { get: jest.fn().mockReturnValue(undefined) } as unknown as PayoutDeps[2],
+    notification as unknown as PayoutDeps[3],
   );
   return { service, prisma, updates, notification, getReturnedTransfers };
 }
 
-const payout = (o: Record<string, unknown> = {}) => ({
+const payout = (o: Partial<FakePayout> = {}): FakePayout => ({
   id: "p1",
   sellerId: "seller-1",
   transId: "PYTK7X9M2QF3N",
@@ -103,6 +137,44 @@ const payout = (o: Record<string, unknown> = {}) => ({
 });
 
 describe("PayoutService.checkReturnedTransfers — ref_no ile eşleme", () => {
+  it.each([
+    ["a readable transfer date", "2026-08-01"],
+    ["an unreadable transfer date", "not-a-date"],
+  ])(
+    "never matches a payout settled outside PayTR (external_bank), with %s",
+    async (_case, transferDate) => {
+      // Same IBAN and net, no PayTR reference, completed: only the missing
+      // send time says PayTR never carried it.
+      const external = payout({
+        providerReference: null,
+        providerResponse: {
+          manualSettlement: { method: "external_bank", reference: "EFT-1" },
+        },
+        submittedAt: null,
+        submittedAmount: null,
+        submittedTotalAmount: 0,
+      });
+      const { service, updates, notification, prisma } = build(
+        [external],
+        [row({ refNo: "OLDREF", transferDate })],
+      );
+
+      const result = await service.checkReturnedTransfers();
+
+      expect(result).toEqual({ returned: 0, unmatched: 1 });
+      expect(updates).toHaveLength(0);
+      expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
+      expect(prisma.payoutTransfer.findMany.mock.calls[0][0].where).toEqual(
+        expect.objectContaining({
+          submittedAt: expect.objectContaining(
+            transferDate === "not-a-date" ? { not: null } : {},
+          ),
+        }),
+      );
+      expect(external.status).toBe(PayoutStatus.completed);
+    },
+  );
+
   it("matches by providerReference, keeps the instruction response and emails without a reason", async () => {
     const { service, updates, notification } = build([payout()], [row()]);
 

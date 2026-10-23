@@ -1742,6 +1742,7 @@ export function renderEmailTemplate(
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Tutar", formatEmailPrice(data?.payoutAmount || 0) + " TL", true)}
           ${data?.bankAccountLast4 ? detailRow("Hesap", "•••• " + data.bankAccountLast4) : ""}
+          ${data?.failureReason ? detailRow("Neden", String(data.failureReason)) : ""}
         </table>
       `)}
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Lütfen profilinizden IBAN ve hesap sahibi bilgilerinizin doğru olduğundan emin olun. Sorun devam ederse destek ekibimizle iletişime geçin.</p>`)}

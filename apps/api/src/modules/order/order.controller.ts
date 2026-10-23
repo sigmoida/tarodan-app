@@ -79,6 +79,12 @@ export class OrderController {
   @ApiOperation({
     summary: "Get commission preview for a price (seller listing form)",
   })
+  @ApiResponse({ status: HttpStatus.OK, description: "Commission preview" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "Invalid amount or package size, or no categoryId (server.commission.categoryRequired)",
+  })
   async getCommissionPreview(
     @Query("amount") amountStr: string,
     @Query("categoryId") categoryId: string | undefined,
@@ -88,6 +94,14 @@ export class OrderController {
     const amount = parseFloat(amountStr);
     if (Number.isNaN(amount) || amount < 0) {
       throw new BadRequestException(i18nMessage("server.order.invalidAmount"));
+    }
+    // A missing category is a client mistake, not a server fault: answer 400
+    // here instead of letting the fail-closed pricing path log an error and
+    // return 503.
+    if (!categoryId) {
+      throw new BadRequestException(
+        i18nMessage("server.commission.categoryRequired"),
+      );
     }
     // Satıcı desi göndermez; paket boyutu gönderir ve desi ondan TÜRETİLİR —
     // böylece önizleme, checkout'un uyguladığı kademeyle birebir aynı olur.
@@ -104,19 +118,29 @@ export class OrderController {
     return this.orderService.getCommissionPreview(
       amount,
       userId,
-      categoryId || null,
+      categoryId,
       shippingDesi,
     );
   }
 
   /**
    * POST /orders/commission-preview-batch - Batch commission preview for multiple amounts (e.g. ilanlarım list).
-   * Uses current user as seller. Returns array of { sellerFeeAmount, sellerNetAmount } in same order.
+   * Uses current user as seller. Returns array of { sellerFeeAmount, sellerNetAmount } in same order;
+   * an item without a category yields null at its index.
    */
   @Post("commission-preview-batch")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Batch commission preview for multiple items" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description:
+      "results in input order; null for an item without a categoryId",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "items missing or more than 50",
+  })
   async getCommissionPreviewBatch(
     @Body()
     body: {

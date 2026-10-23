@@ -4,6 +4,7 @@ import type { Locale } from "@tarodan/i18n";
 import {
   EXPORT_CATALOGS,
   earlyReleaseDays,
+  isPayoutFailureReason,
   type ExportCatalogKey,
 } from "@tarodan/types";
 
@@ -177,7 +178,11 @@ export function transferExportRecord(
     adjustmentDeduction: row.adjustmentDeduction,
     ibanLast4: row.ibanLast4 ? `••${row.ibanLast4}` : null,
     status: t(`status.payout.${row.status}`),
-    failureReason: row.failureReason,
+    // A reason code reads as its label; legacy and returned rows keep their
+    // free text (the admin list does the same).
+    failureReason: isPayoutFailureReason(row.failureReason)
+      ? t(`status.payoutFailureReason.${row.failureReason}`)
+      : row.failureReason,
     createdAt: row.createdAt,
   };
 }

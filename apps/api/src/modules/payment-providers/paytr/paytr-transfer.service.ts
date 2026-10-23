@@ -6,9 +6,16 @@ import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { parsePaytrMoneyString } from "./paytr-money.util";
 import { normalizeTrIban } from "../../../common/validators/tr-iban";
 import {
+  classifyPaytrFetchError,
+  fetchErrorCode,
   networkErrorReason,
   withPaytrFetchRetry,
 } from "./paytr-fetch-retry.util";
+import { PlatformTransferRequestError } from "../transfer-errors";
+import { errorMessage } from "../../../common/helpers/error-message";
+
+/** 4xx statuses that do not prove the request went unprocessed. */
+const UNCERTAIN_CLIENT_ERROR_STATUSES = new Set([408, 409]);
 
 /** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
  *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
@@ -75,7 +82,7 @@ export class PayTRTransferService {
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
   }
-  private parsePaytrJson<T = any>(raw: string) {
+  private parsePaytrJson<T = unknown>(raw: string) {
     return this.paytr.parsePaytrJson<T>(raw);
   }
 
@@ -86,6 +93,14 @@ export class PayTRTransferService {
   /**
    * Transfer funds to seller's IBAN via PayTR Platform Transfer API.
    * Requires a previously completed payment (merchant_oid must match).
+   *
+   * Returns PayTR's parsed answer, accepted (`status: "success"`) or rejected
+   * (`status: "error"` with `err_no`/`err_msg`). Throws
+   * `PlatformTransferRequestError` when no usable answer came back, with
+   * `phase: "not_sent"` only when PayTR provably did not process it (failure
+   * before the request left the host, connect-phase error, or a 4xx refusal
+   * without a PayTR answer). Never retried here: this call moves money, the
+   * caller decides.
    */
   async createPlatformTransfer(params: {
     merchantOid: string;
@@ -95,16 +110,113 @@ export class PayTRTransferService {
     transferName: string;
     transferIban: string;
   }): Promise<PaytrPlatformTransferResult> {
-    // PayTR: trans_id yalnız harf/rakam. Tire SİLİNMEZ — sonuç callback'i ve dönen
-    // transfer listesi numarayı aldığı biçimde döndürür, DB ile eşleşmezdi.
-    // Biçimi çağıran (payout.service) garanti eder; burası son savunma.
+    // PayTR: trans_id is letters and digits only. The hyphen is NOT stripped
+    // here: the result callback and the returned-transfer list echo the id as
+    // sent, so it would no longer match the database. The caller
+    // (payout.service) guarantees the format; this is the last line.
     if (!isValidPayoutTransId(params.transId)) {
-      throw new BadRequestException(
-        i18nMessage("server.payment.paytrPlatformTransferFailed", {
-          reason: `trans_id alfanümerik olmalı (aldı: ${params.transId})`,
-        }),
+      throw this.noAnswer(
+        params.transId,
+        "not_sent",
+        "INVALID_TRANS_ID",
+        `trans_id must be alphanumeric (got ${params.transId})`,
       );
     }
+    // Anything failing before fetch (endpoint, credentials, signing, timeout
+    // setting) never reached PayTR. PRE_SEND is a configuration problem.
+    let request: { url: string; body: string; signal: AbortSignal };
+    try {
+      request = {
+        url: new URL(`${this.baseUrl}/platform/transfer`).href,
+        body: this.platformTransferBody(params),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      };
+    } catch (error) {
+      throw this.noAnswer(
+        params.transId,
+        "not_sent",
+        "PRE_SEND",
+        errorMessage(error),
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(request.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: request.body,
+        signal: request.signal,
+      });
+    } catch (error) {
+      throw this.noAnswer(
+        params.transId,
+        classifyPaytrFetchError(error),
+        fetchErrorCode(error),
+        networkErrorReason(error),
+      );
+    }
+
+    // From here on PayTR received the request: anything but a parsed answer
+    // leaves the outcome unknown.
+    if (response.status >= 500) {
+      throw this.noAnswer(
+        params.transId,
+        "unknown",
+        `HTTP_${response.status}`,
+        `PayTR answered HTTP ${response.status}`,
+      );
+    }
+    let rawText: string;
+    try {
+      rawText = await response.text();
+    } catch (error) {
+      throw this.noAnswer(
+        params.transId,
+        "unknown",
+        fetchErrorCode(error),
+        networkErrorReason(error),
+      );
+    }
+    const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(rawText);
+    if (!parsed || typeof parsed.status !== "string") {
+      // A 4xx without a PayTR answer is a refusal before processing (WAF,
+      // rate limit, wrong path): nothing was transferred. 408 and 409 are
+      // the exceptions: a timeout or a conflict can follow processing.
+      const clientError = response.status >= 400 && response.status < 500;
+      if (
+        clientError &&
+        !UNCERTAIN_CLIENT_ERROR_STATUSES.has(response.status)
+      ) {
+        throw this.noAnswer(
+          params.transId,
+          "not_sent",
+          `HTTP_${response.status}`,
+          `PayTR refused the request with HTTP ${response.status} and no answer`,
+        );
+      }
+      throw this.noAnswer(
+        params.transId,
+        "unknown",
+        clientError ? `HTTP_${response.status}` : "INVALID_BODY",
+        "PayTR answer is empty or not a transfer result",
+      );
+    }
+    this.logger.log(
+      `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_no ? ` err_no=${parsed.err_no}` : ""}${parsed.err_msg ? ` err=${parsed.err_msg}` : ""}`,
+    );
+    return parsed;
+  }
+
+  /** The signed form body of a platform transfer instruction (amounts in kurus). */
+  private platformTransferBody(params: {
+    merchantOid: string;
+    transId: string;
+    submerchantAmount: number;
+    totalAmount: number;
+    transferName: string;
+    transferIban: string;
+  }): string {
     const submerchantAmountKurus = Math.round(
       params.submerchantAmount * 100,
     ).toString();
@@ -120,9 +232,7 @@ export class PayTRTransferService {
       params.transferName +
       params.transferIban;
 
-    const paytrToken = this.creds.signWithSalt(hashStr);
-
-    const postData = new URLSearchParams({
+    return new URLSearchParams({
       merchant_id: this.merchantId,
       merchant_oid: oid,
       trans_id: params.transId,
@@ -130,37 +240,25 @@ export class PayTRTransferService {
       total_amount: totalAmountKurus,
       transfer_name: params.transferName,
       transfer_iban: params.transferIban,
-      paytr_token: paytrToken,
+      paytr_token: this.creds.signWithSalt(hashStr),
     }).toString();
+  }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/platform/transfer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: postData,
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
-      const rawText = await response.text();
-      const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(
-        rawText,
-      ) ?? {
-        status: "failed",
-        err_msg: "PayTR geçersiz/boş yanıt",
-      };
-      this.logger.log(
-        `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_msg ? ` err=${parsed.err_msg}` : ""}`,
-      );
-      return parsed;
-    } catch (error: any) {
-      this.logger.error(
-        `Platform transfer failed for ${params.transId}: ${error.message}`,
-      );
-      throw new BadRequestException(
-        i18nMessage("server.payment.paytrPlatformTransferFailed", {
-          reason: error.message,
-        }),
-      );
-    }
+  /**
+   * One `warn` line with the cause code, then the typed error. The payout
+   * flow logs the decision (retry or final) at the right level, so logging
+   * `error` here too would raise the same incident twice.
+   */
+  private noAnswer(
+    transId: string,
+    phase: PlatformTransferRequestError["phase"],
+    causeCode: string | undefined,
+    message: string,
+  ): PlatformTransferRequestError {
+    this.logger.warn(
+      `Platform transfer ${transId}: no answer from PayTR (phase=${phase}, cause=${causeCode ?? "none"}): ${message}`,
+    );
+    return new PlatformTransferRequestError(phase, causeCode, message);
   }
 
   /**
@@ -247,7 +345,7 @@ export class PayTRTransferService {
           raw: r,
         };
       });
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof BadRequestException) throw error;
       // İzin verilen deneme sayısı tükendikten sonra buraya düşer; rethrow eden
       // exception filter zaten alarm üretecek — burada `warn` yeterli, tekrar
@@ -258,7 +356,7 @@ export class PayTRTransferService {
       );
       throw new BadRequestException(
         i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
-          reason: error.message,
+          reason: errorMessage(error),
         }),
       );
     }
@@ -270,7 +368,7 @@ export class PayTRTransferService {
   async resendReturnedTransfers(params: {
     transId: string;
     transfers: Array<{ amount: number; receiver: string; iban: string }>;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const paytrToken = this.creds.signWithSalt(
       this.merchantId + params.transId,
     );
@@ -300,11 +398,13 @@ export class PayTRTransferService {
       );
       const rawText = await response.text();
       return this.parsePaytrJson(rawText) ?? { status: "failed" };
-    } catch (error: any) {
-      this.logger.error(`Resend returned transfers failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `Resend returned transfers failed: ${networkErrorReason(error)}`,
+      );
       throw new BadRequestException(
         i18nMessage("server.payment.paytrSendFromAccountFailed", {
-          reason: error.message,
+          reason: errorMessage(error),
         }),
       );
     }

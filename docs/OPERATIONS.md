@@ -879,6 +879,130 @@ The first case leaves no residual. In the second, if that order later closes
 Find it by the log line and leave it to the payout. Anything else the re-run
 finds is settled the same way as above.
 
+### When needed: payout transfers needing a decision
+
+Since 2026-10-23 a payout transfer that does not go through ends in `failed`
+with a reason code (`PAYOUT_FAILURE_REASONS`, `PAYMENTS.md` §6) instead of
+being retried blindly, and the cron never resends it. The team resolves
+these rows in **admin → Finance → Payouts → Transfers**. The row says what
+fits: `resolution.retryRequiresProviderCheck`, `resolution.markPaidMethod`
+and `resolution.markPaidNetAmount`; the row menu offers only those actions.
+Click a row to see its PayTR `trans_id`, the reason, PayTR's message on a
+rejection and, on a parked row, the transfer total snapshot (net, allowed
+total, order and payment remaining). "Mark as paid" asks for the reference,
+a reason and the net typed again.
+
+| Reason                                                                                                                                                                                | What to do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transfer_outcome_unknown`, or a free-text reason from before 2026-10-23 after more than one send attempt, or after one attempt without a PayTR answer (e.g. "Bad Request Exception") | Find the `trans_id` in the PayTR panel (platform transfers). **Listed:** "Mark as paid", method `paytr_confirmed`, the panel reference, a reason. **Not listed:** "Retry" with "PayTR panel checked" ticked and a reason. Never retry without the check: PayTR may already have paid it. The old handler resent the same `trans_id` up to 3 times and kept only the last attempt's reason, so a legacy row showing PayTR's rejection text may still have had an earlier attempt ("fetch failed") that reached PayTR: the panel lookup is for the `trans_id`, whatever the reason says. If PayTR's result still arrives after the retry, the callback settles the row instead of sending it again (error log). |
+| `transfer_needs_manual_decision`                                                                                                                                                      | The net does not fit what the payment (merchant_oid) still has, typically a residual after a full refund. If the snapshot shows a missing payment or source, it is a data problem: do **not** pay it, hand it to a developer, retry once fixed. Otherwise finance pays the net (see below), then "Mark as paid", method `external_bank`.                                                                                                                                                                                                                                                                                                                                                                      |
+| `transfer_total_exceeds_remaining`                                                                                                                                                    | PayTR refused the total three times (err_no 010). Retry once: the processor recomputes against the current refunds and sibling transfers. If it then lands in `transfer_needs_manual_decision`, go on as above. Before paying it from the bank, confirm in the PayTR panel that its merchant_oid has a live payment (not test mode): err_no 010 with nothing at PayTR can also mean a test-mode payment, which owes nothing (the user decides those).                                                                                                                                                                                                                                                         |
+| `provider_unreachable`                                                                                                                                                                | The request never reached PayTR. Retry; if it keeps happening, the host's outbound network to PayTR needs a look (devops).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `provider_rejected`                                                                                                                                                                   | Any other PayTR refusal; PayTR's message is in the row's details. Fix the cause with PayTR, then retry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `no_bank_account`, `invalid_iban_format`, `bank_details_rejected`                                                                                                                     | The seller was e-mailed; saving their bank details requeues the payout. Nothing to do unless they ask.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+Retry and "Mark as paid" are for super_admin and admin with the `payouts`
+permission; both write an audit record (`payout_retry`, `payout_mark_paid`).
+
+**Paying from the company account (`external_bank`).** Decision of
+2026-10-23: a non-faulty seller's residual that PayTR cannot carry is paid
+by the platform. First, in the PayTR panel: the merchant_oid has a live
+payment (not test mode), and no transfer is listed for the row's
+`trans_id`. If PayTR lists a transfer for it, stop and hand the row to a
+developer (PayTR paid it although the row says otherwise; the callback logs
+an error for that). A row whose earlier send PayTR never confirmed (an
+unknown outcome that was retried, `resolution.markPaidRequiresProviderCheck`)
+cannot be marked `external_bank` without ticking "PayTR panel checked"
+(409 otherwise). If PayTR confirms a transfer for a row already paid from
+the bank, the callback logs "possible double payment": check the PayTR panel
+and the bank transfer and recover the duplicate from the seller.
+Otherwise finance transfers exactly `markPaidNetAmount` to the seller's IBAN (admin → Users → seller → bank account; its last 4 digits must
+match the transfer row), then the admin marks the row as paid with the bank
+reference and a reason. The API checks again, under the payment and order
+row locks, that the order (or trade cash payment) is payable, no refund is
+in flight and the net has not changed (409 otherwise: retry, so the
+processor recomputes, and do not pay a different amount). It writes in
+one transaction: the platform funding of what the order's escrow no longer
+holds (`payout-platform-funding:<payoutId>`), the payout
+(`payout-completed:<payoutId>`), the row (`completed`, nothing taken from
+the oid) and the audit record `payout_mark_paid`. The seller gets the normal
+"payout released" e-mail. A double click is harmless (the second request
+returns the first result).
+
+#### Recovery of the payouts that failed before the 2026-10-23 hotfix
+
+The payouts that failed before the fix carry PayTR's raw text or "Bad
+Request Exception" as reason. The list of affected transfers is kept in the
+hub plan, not here. **Every production step below needs the user's approval,
+each time.** Nothing is retried before the hotfix is live: the cron never
+picks `failed` rows, so they wait safely.
+
+1. **Read-only checks first** (approval: production DB read, `SELECT`
+   only). Per transfer:
+
+   ```sql
+   -- the transfer and its siblings on the same payment (merchant_oid)
+   SELECT id, trans_id, status, amount, net_amount, merchant_oid, failure_reason,
+          retry_count, submitted_at, submitted_total_amount, provider_response
+     FROM payout_transfers
+    WHERE merchant_oid = (SELECT merchant_oid FROM payout_transfers WHERE trans_id = :trans_id);
+   -- hold, order and payment behind it
+   SELECT h.amount, h.refunded_amount, h.status, o.order_number, o.status, o.total_amount,
+          p.id AS payment_id, p.amount AS payment_amount, p.is_test, p.paid_at, p.checkout_group_id
+     FROM payout_transfers t
+     JOIN payment_holds h ON h.id = t.payment_hold_id
+     JOIN orders o ON o.id = h.order_id
+     JOIN payments p ON p.id = h.payment_id
+    WHERE t.trans_id = :trans_id;
+   -- refunds on that payment, per order and status
+   SELECT order_id, trade_id, status, SUM(amount) FROM refund_attempts
+    WHERE payment_id = :payment_id GROUP BY order_id, trade_id, status;
+   -- the order's escrow in the ledger (debit +, credit -)
+   SELECT SUM(CASE direction WHEN 'debit' THEN amount ELSE -amount END)
+     FROM ledger_entries WHERE account = 'seller_escrow' AND order_id = :order_id;
+   ```
+
+   For a cart (`GRP…`) payment also compare the sum of its orders'
+   `total_amount` with the payment amount, and look up the finalized refund
+   requests (`fault_party`) of closed orders.
+
+2. **PayTR panel check** (user or finance, read-only), per merchant_oid: a
+   live payment (not test mode), its refunds, the platform transfers with
+   their `trans_id`, the remaining balance. For **every** affected row, not
+   only the "Bad Request Exception" one: is there a transfer with its
+   `trans_id`? The old handler kept only the last of up to 3 attempts, so a
+   row showing PayTR's 010 text may have had an earlier "fetch failed"
+   attempt (the Sentry history shows it) that reached PayTR. The admin retry
+   asks for this check on every legacy row with more than one attempt.
+3. **Classify** each transfer:
+   - partial refund, the net fits what the payment has left: retry after
+     the deploy (automatic from then on);
+   - residual larger than what the payment has left: `external_bank` after
+     the retry has parked it as `transfer_needs_manual_decision`, with the
+     panel check ticked again (the earlier sends stay unconfirmed);
+   - payment taken in PayTR test mode (no money at PayTR): the user decides
+     (nothing may be owed); leave the row `failed` until then;
+   - cart over-allocation: retry; if it still does not fit, `external_bank`;
+   - unknown outcome: `paytr_confirmed` if the panel lists the transfer,
+     otherwise retry with the panel check;
+   - a residual of a seller-fault order: not payable; settle it with
+     `settle-residual` (above) instead.
+4. **Deploy the hotfix** (approvals: push, PR merge to `master`, tag, deploy).
+   The migration runs on boot. Check the API health and, on the next
+   15-minute tick, a `Payouts processed` log line without errors.
+5. **Retry** the transfers that fit, one at a time (approval per batch).
+   Expect `completed` (or `processing` with `submitted_at` and a callback the
+   next day when `PAYTR_TRANSFER_CALLBACK_ENABLED=true`); the log shows the
+   computed total. One that lands in `transfer_needs_manual_decision` moves
+   to the next step.
+6. **Pay the residuals** from the company account and mark them
+   `external_bank` (approval per transfer), as described above.
+7. **Verify**: each affected order's `seller_escrow` sum in the ledger is 0;
+   the Finance overview shows no new mismatch; the related Sentry issues are
+   resolved with the release; the sellers got the "payout released" e-mail.
+   Support writes once to these sellers, because they earlier received a
+   "payout failed" e-mail with PayTR's raw text (decision U4).
+
 ### Gerektiğinde: Apple token iptali DLQ'su (hesap silme)
 
 Hesap silme, Sign in with Apple refresh token'ının Apple'da iptalini outbox'a

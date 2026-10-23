@@ -29,7 +29,12 @@ describe("PayoutService.processPendingPayouts legacy trans_id heal", () => {
         orderId: "o1",
         amount: 88,
         refundedAmount: 0,
-        payment: { paidAt: threeDaysAgo, createdAt: threeDaysAgo },
+        payment: {
+          paidAt: threeDaysAgo,
+          createdAt: threeDaysAgo,
+          amount: 100,
+          metadata: null,
+        },
       },
       tradeCashPayment: null,
     };
@@ -54,13 +59,18 @@ describe("PayoutService.processPendingPayouts legacy trans_id heal", () => {
         findUnique: jest.fn().mockResolvedValue(payout),
       },
       order: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: "o1", status: OrderStatus.completed }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "o1",
+          status: OrderStatus.completed,
+          totalAmount: 100,
+        }),
         update: jest.fn().mockResolvedValue({}),
       },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(null) },
-      refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
+      refundAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       sellerBankAccount: {
         findUnique: jest.fn().mockResolvedValue({
           userId: "s1",

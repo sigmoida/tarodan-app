@@ -73,7 +73,14 @@ describe("PayoutService.processPendingPayouts IBAN cooldown", () => {
       transferName: "Seller",
       status: PayoutStatus.pending,
       paymentHold: null,
-      tradeCashPayment: null,
+      // A paid source: the transfer total is capped against its payment
+      // before the claim, so a payout without one never reaches the claim.
+      tradeCashPayment: {
+        tradeId: "trade-2",
+        paidAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        totalAmount: 100,
+        payment: { id: "pay-2", amount: 100, metadata: null },
+      },
     };
     let persistedStatus: PayoutStatus = PayoutStatus.pending;
     const updateMany = jest.fn().mockImplementation(({ where, data }) => {
@@ -88,6 +95,10 @@ describe("PayoutService.processPendingPayouts IBAN cooldown", () => {
         findMany: jest.fn().mockResolvedValue([payout]),
         updateMany,
         update: jest.fn().mockResolvedValue({}),
+      },
+      refundAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       sellerBankAccount: {
         findUnique: jest

@@ -128,6 +128,9 @@ export * from "./early-release";
 // Escrow hold releasability: why a hold cannot be released (API + admin badge)
 export * from "./hold-release";
 
+// Payout transfer failure reason codes (API stores, admin labels)
+export * from "./payout-failure";
+
 // Refund decision per-side totals (API computes, admin refund detail renders)
 export * from "./refund-totals";
 
