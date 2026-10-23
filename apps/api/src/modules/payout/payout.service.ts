@@ -1,17 +1,14 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  Optional,
-} from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import {
   PayoutStatus,
   PayoutTransfer,
+  PaymentHold,
   PaymentHoldStatus,
   PaymentStatus,
+  Order,
   OrderStatus,
   Prisma,
   RefundRequestStatus,
@@ -151,9 +148,9 @@ export class PayoutService {
           bankAccountLast4: last4 || undefined,
         },
       );
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `payout-released email failed for seller ${sellerId}: ${err?.message}`,
+        `payout-released email failed for seller ${sellerId}: ${errorMessage(err)}`,
       );
     }
   }
@@ -195,9 +192,9 @@ export class PayoutService {
           failureReason: params.reason,
         },
       );
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `${params.template} email failed for seller ${params.sellerId}: ${err?.message}`,
+        `${params.template} email failed for seller ${params.sellerId}: ${errorMessage(err)}`,
       );
     }
   }
@@ -514,8 +511,11 @@ export class PayoutService {
   }
 
   private async createAdjustedOrderPayout(input: {
-    hold: any;
-    order: any;
+    hold: Pick<PaymentHold, "id" | "sellerId">;
+    order: Pick<
+      Order,
+      "id" | "totalAmount" | "commissionAmount" | "withholdingTaxAmount"
+    >;
     merchantOid: string;
     transId: string;
     bankAccount: { iban: string; accountHolder: string } | null;
@@ -1074,7 +1074,7 @@ export class PayoutService {
           await this.prisma.payoutTransfer.update({
             where: { id: payout.id },
             data: {
-              providerResponse: result as any,
+              providerResponse: result as unknown as Prisma.InputJsonValue,
               // Geri dönen transfer listesi yalnız bu referansla eşlenir.
               providerReference: result.reference ?? null,
               submittedAt,
@@ -1093,7 +1093,7 @@ export class PayoutService {
             where: { id: payout.id },
             data: {
               status: PayoutStatus.completed,
-              providerResponse: result as any,
+              providerResponse: result as unknown as Prisma.InputJsonValue,
               providerReference: result.reference ?? null,
               processedAt: submittedAt,
               submittedAt,
@@ -1215,9 +1215,9 @@ export class PayoutService {
           },
         });
       }
-    } catch (e: any) {
+    } catch (e) {
       this.logger.warn(
-        `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${e?.message}`,
+        `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${errorMessage(e)}`,
       );
     }
   }
