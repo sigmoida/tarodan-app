@@ -95,8 +95,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       // 5xx: keep the full cause server-side, send nothing internal to the client.
+      // The line becomes the Sentry message and fingerprint: the path only,
+      // never the query string (user search text, possibly PII, and one
+      // Sentry issue per distinct query).
+      const path = String(request?.url ?? "").split("?")[0];
       this.logger.error(
-        `${request?.method} ${request?.url} -> ${status}`,
+        `${request?.method} ${path} -> ${status}`,
         errorStack(exception),
       );
     }

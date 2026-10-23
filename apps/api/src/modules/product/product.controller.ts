@@ -74,36 +74,30 @@ export class ProductController {
 
   /**
    * GET /products
-   * List products with filters (public)
+   * List products with filters (public).
    */
   @Get()
   @Public()
   @Header("Cache-Control", "no-store, no-cache, must-revalidate")
   @Header("Pragma", "no-cache")
-  @ApiOperation({ summary: "Ürün listesi" })
+  @ApiOperation({ summary: "Product list" })
   @ApiResponse({
     status: 200,
-    description: "Ürün listesi",
+    description: "Product list (an empty result is an empty page)",
     type: PaginatedProductsDto,
   })
-  async findAll(
+  @ApiResponse({
+    status: 500,
+    description:
+      "The list could not be read; never answered as an empty 200 page",
+  })
+  findAll(
     @Query() query: ProductQueryDto,
     @CurrentUser("id") viewerId?: string,
   ) {
-    try {
-      return await this.productService.findAll(query, viewerId);
-    } catch (err) {
-      this.logger.error("findAll failed", errorStack(err));
-      return {
-        data: [],
-        meta: {
-          total: 0,
-          page: query.page ?? 1,
-          limit: query.limit ?? 20,
-          totalPages: 0,
-        },
-      };
-    }
+    // A failure reaches AllExceptionsFilter (sanitised 5xx + Sentry). An
+    // empty 200 here was cached by the web home as "no listings".
+    return this.productService.findAll(query, viewerId);
   }
 
   /**

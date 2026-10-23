@@ -385,6 +385,10 @@ export class ProductSchedulerService implements OnModuleInit {
    * the sweep looks at the boost columns, not at `rankTier`, so a listing the
    * nightly reconcile downgraded never stays on top of the LIFO order).
    * Bounded and ordered; the rest follow on the next run.
+   *
+   * Every listing whose transaction committed had its promotion rebuilt, so
+   * its caches, search entry and the web lists are refreshed once after the
+   * loop (`refreshProductVisibility`); a listing that failed is left out.
    */
   private async expireEndedPromotions(
     now: Date,
@@ -410,8 +414,15 @@ export class ProductSchedulerService implements OnModuleInit {
         ...stale.map((row) => row.id),
       ]),
     ];
-    const results = await this.perListing("expiry", productIds, (tx, id) =>
-      this.boostTimeline.expireEnded(tx, id, now),
+    // Each result carries its listing: `perListing` drops failed listings, so
+    // the results are not aligned with `productIds`.
+    const results = await this.perListing(
+      "expiry",
+      productIds,
+      async (tx, id) => ({
+        productId: id,
+        ...(await this.boostTimeline.expireEnded(tx, id, now)),
+      }),
     );
     let expired = 0;
     let notices = 0;
@@ -422,6 +433,14 @@ export class ProductSchedulerService implements OnModuleInit {
         await this.boostNotices.flush(result.notice);
       }
     }
+    await refreshProductVisibility(
+      {
+        cache: this.cache,
+        searchService: this.searchService,
+        logger: this.logger,
+      },
+      results.map((result) => result.productId),
+    );
     if (expired > 0) {
       this.logger.log(
         `Boost expiry: ${expired} boost(s) on ${productIds.length} listing(s), ${notices} promotion(s) ended`,

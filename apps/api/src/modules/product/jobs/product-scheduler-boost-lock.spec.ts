@@ -1,4 +1,10 @@
 import { ProductSchedulerService } from "./product-scheduler.service";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
+
+jest.mock("../../../common/helpers/revalidate", () => ({
+  ...jest.requireActual("../../../common/helpers/revalidate"),
+  notifyWebRevalidate: jest.fn().mockResolvedValue(undefined),
+}));
 
 /**
  * The expire-boosts cron changes a listing's boost timeline only through
@@ -12,6 +18,8 @@ import { ProductSchedulerService } from "./product-scheduler.service";
 describe("ProductSchedulerService expire-boosts under the listing lock", () => {
   const NOW = new Date("2026-10-21T12:00:00.000Z");
   const HOUR = 60 * 60 * 1000;
+  const notify = notifyWebRevalidate as jest.Mock;
+  beforeEach(() => notify.mockClear());
 
   const make = () => {
     // Passed through to the timeline untouched; the cron never writes on it.
@@ -34,17 +42,22 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
       resumeSystemPaused: jest.fn().mockResolvedValue(0),
     };
     const notices = { flush: jest.fn().mockResolvedValue(undefined) };
+    const cache = {
+      del: jest.fn().mockResolvedValue(undefined),
+      delPattern: jest.fn().mockResolvedValue(0),
+    };
+    const search = { syncProduct: jest.fn().mockResolvedValue(undefined) };
     const service = new ProductSchedulerService(
       prisma as never,
       {} as never, // notifications
       {} as never, // scheduled queue
-      {} as never, // cache
-      {} as never, // search
+      cache as never,
+      search as never,
       {} as never, // seller trust
       timeline as never,
       notices as never,
     );
-    return { service, prisma, tx, timeline, notices };
+    return { service, prisma, tx, timeline, notices, cache, search };
   };
 
   describe("expiry", () => {
@@ -148,6 +161,108 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
         boostId: "b2",
         kind: "expired",
       });
+    });
+  });
+
+  /**
+   * An ended promotion changes the product lists: the expired listings are
+   * refreshed once after the loop (API caches first, then the web lists and
+   * pages), so the home rails stop showing them without waiting out the API
+   * list cache and the web ISR window.
+   */
+  describe("expiry refresh", () => {
+    it("refreshes the listings whose expiry committed once, the API list cache before the web", async () => {
+      const { service, prisma, cache, search } = make();
+      prisma.productBoost.findMany.mockResolvedValueOnce([
+        { productId: "p1" },
+        { productId: "p2" },
+      ]);
+
+      await service.runExpireBoosts();
+
+      expect(cache.del.mock.calls).toEqual([
+        ["products:detail:p1"],
+        ["products:detail:p2"],
+      ]);
+      expect(cache.delPattern).toHaveBeenCalledTimes(1);
+      expect(cache.delPattern).toHaveBeenCalledWith("products:list:*");
+      expect(search.syncProduct.mock.calls).toEqual([["p1"], ["p2"]]);
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith([
+        "products:list",
+        "product:p1",
+        "product:p2",
+      ]);
+      expect(notify.mock.invocationCallOrder[0]).toBeGreaterThan(
+        cache.delPattern.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("leaves out a listing whose transaction failed", async () => {
+      const { service, prisma, timeline, cache } = make();
+      prisma.productBoost.findMany.mockResolvedValueOnce([
+        { productId: "p1" },
+        { productId: "p2" },
+        { productId: "p3" },
+      ]);
+      timeline.expireEnded
+        .mockResolvedValueOnce({ expired: 1, notice: null })
+        .mockRejectedValueOnce(new Error("lock timeout"))
+        .mockResolvedValueOnce({ expired: 1, notice: null });
+
+      await service.runExpireBoosts();
+
+      expect(cache.del.mock.calls).toEqual([
+        ["products:detail:p1"],
+        ["products:detail:p3"],
+      ]);
+      expect(notify).toHaveBeenCalledWith([
+        "products:list",
+        "product:p1",
+        "product:p3",
+      ]);
+    });
+
+    it("refreshes only after every listing transaction has closed", async () => {
+      const { service, prisma, tx, cache, notices } = make();
+      prisma.productBoost.findMany.mockResolvedValueOnce([
+        { productId: "p1" },
+        { productId: "p2" },
+      ]);
+      let open = 0;
+      prisma.$transaction.mockImplementation(
+        async (fn: (t: typeof tx) => Promise<unknown>) => {
+          open += 1;
+          try {
+            return await fn(tx);
+          } finally {
+            open -= 1;
+          }
+        },
+      );
+      const openAtRefresh: number[] = [];
+      cache.del.mockImplementation(async () => {
+        openAtRefresh.push(open);
+      });
+      cache.delPattern.mockImplementation(async () => {
+        openAtRefresh.push(open);
+        return 0;
+      });
+
+      await service.runExpireBoosts();
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(openAtRefresh).toEqual([0, 0, 0]);
+      expect(notices.flush).not.toHaveBeenCalled();
+    });
+
+    it("refreshes nothing when no promotion ended", async () => {
+      const { service, cache } = make();
+
+      await service.runExpireBoosts();
+
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
     });
   });
 

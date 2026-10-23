@@ -11,6 +11,12 @@ import {
   RefundAttemptInFlightException,
   RefundPendingReconciliationException,
 } from "../../../payment-providers/refund-errors";
+import { notifyWebRevalidate } from "../../../../common/helpers/revalidate";
+
+jest.mock("../../../../common/helpers/revalidate", () => ({
+  ...jest.requireActual("../../../../common/helpers/revalidate"),
+  notifyWebRevalidate: jest.fn().mockResolvedValue(undefined),
+}));
 
 const D = (v: number | string) => new Prisma.Decimal(v);
 const ADMIN = "admin-user";
@@ -23,6 +29,9 @@ const REASON = "Seller reported a listing outage";
  * notices are fakes; their own specs pin what they do.
  */
 describe("AdminBoostOperationsService", () => {
+  const notify = notifyWebRevalidate as jest.Mock;
+  beforeEach(() => notify.mockClear());
+
   const paidBoost = (over: Record<string, unknown> = {}) => ({
     id: "boost-1",
     source: BoostSource.purchase,
@@ -30,6 +39,7 @@ describe("AdminBoostOperationsService", () => {
     price: D(59),
     refundedAmount: null as Prisma.Decimal | null,
     orderId: "order-1",
+    productId: "prod-1",
     ...over,
   });
 
@@ -42,8 +52,14 @@ describe("AdminBoostOperationsService", () => {
   ) => {
     const tx = { marker: "tx" };
     const boostRow = over.boost === undefined ? paidBoost() : over.boost;
+    // What happened, in order: the commit, the API list cache, the web call.
+    const events: string[] = [];
     const prisma = {
-      $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+      $transaction: jest.fn(async (fn: (t: typeof tx) => unknown) => {
+        const result = await fn(tx);
+        events.push("commit");
+        return result;
+      }),
       product: { findFirst: jest.fn().mockResolvedValue({ id: "prod-1" }) },
       adPackage: {
         findUnique: jest.fn().mockResolvedValue({
@@ -96,6 +112,17 @@ describe("AdminBoostOperationsService", () => {
       getPurchase: jest.fn(async (id: string) => ({ id })),
     };
     const notices = { flush: jest.fn().mockResolvedValue(undefined) };
+    const cache = {
+      del: jest.fn().mockResolvedValue(undefined),
+      delPattern: jest.fn(async () => {
+        events.push("api-list-cache");
+        return 1;
+      }),
+    };
+    const search = { syncProduct: jest.fn().mockResolvedValue(undefined) };
+    (notifyWebRevalidate as jest.Mock).mockImplementation(async () => {
+      events.push("web");
+    });
     const sentry = {
       setTag: jest.fn(),
       addBreadcrumb: jest.fn(),
@@ -108,10 +135,15 @@ describe("AdminBoostOperationsService", () => {
       audit as never,
       purchases as never,
       notices as never,
+      cache as never,
+      search as never,
       sentry as never,
     );
     return {
       service,
+      events,
+      cache,
+      search,
       tx,
       prisma,
       timeline,
@@ -688,6 +720,192 @@ describe("AdminBoostOperationsService", () => {
       await expect(
         service.refund(ADMIN, "missing", { reason: REASON }),
       ).rejects.toMatchObject({ status: 404 });
+    });
+  });
+
+  /**
+   * After a committed change the listing's caches, search entry and the web
+   * lists are refreshed, so the home rails show it without waiting out the
+   * API list cache (120 s) and the web ISR window. API cache first, then the
+   * web, never inside the transaction, never on a change that did not happen.
+   */
+  describe("listing refresh after the change", () => {
+    const listingTags = ["products:list", "product:prod-1"];
+
+    it("a grant refreshes the listing after its commit, the API list cache before the web", async () => {
+      const { service, events, cache, search } = make();
+
+      await service.grant(ADMIN, {
+        productId: "u010001",
+        durationDays: 7,
+        reason: REASON,
+      });
+
+      expect(events).toEqual(["commit", "api-list-cache", "web"]);
+      expect(cache.del).toHaveBeenCalledWith("products:detail:prod-1");
+      expect(cache.delPattern).toHaveBeenCalledWith("products:list:*");
+      expect(search.syncProduct).toHaveBeenCalledWith("prod-1");
+      expect(notify).toHaveBeenCalledWith(listingTags);
+    });
+
+    it("a grant whose transaction fails refreshes nothing", async () => {
+      const { service, timeline, cache } = make();
+      timeline.grant.mockRejectedValue(new Error("lock timeout"));
+
+      await expect(
+        service.grant(ADMIN, {
+          productId: "u010001",
+          durationDays: 7,
+          reason: REASON,
+        }),
+      ).rejects.toThrow("lock timeout");
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a revoke refreshes the stopped listing after its commit", async () => {
+      const { service, events } = make({
+        boost: paidBoost({ source: BoostSource.admin_grant, orderId: null }),
+      });
+
+      await service.revoke(ADMIN, "boost-1", { reason: REASON });
+
+      expect(events).toEqual(["commit", "api-list-cache", "web"]);
+      expect(notify).toHaveBeenCalledWith(listingTags);
+    });
+
+    it("a revoke that stopped nothing under the lock refreshes nothing", async () => {
+      const { service, timeline, cache } = make({
+        boost: paidBoost({ source: BoostSource.admin_grant, orderId: null }),
+      });
+      timeline.cancel.mockResolvedValue({
+        stopped: false,
+        status: BoostStatus.expired,
+      });
+
+      await expect(
+        service.revoke(ADMIN, "boost-1", { reason: REASON }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a refund that stopped the boost refreshes its listing after the refund", async () => {
+      const { service, payments, cache } = make();
+
+      await service.refund(ADMIN, "boost-1", { reason: REASON });
+
+      expect(notify).toHaveBeenCalledWith(listingTags);
+      expect(cache.delPattern.mock.invocationCallOrder[0]).toBeGreaterThan(
+        payments.processRefund.mock.invocationCallOrder[0],
+      );
+      expect(notify.mock.invocationCallOrder[0]).toBeGreaterThan(
+        cache.delPattern.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("a refund that did not stop the boost, or failed, refreshes nothing", async () => {
+      const notStopped = make({ boostAfterRefund: BoostStatus.active });
+      await notStopped.service.refund(ADMIN, "boost-1", { reason: REASON });
+      expect(notStopped.cache.delPattern).not.toHaveBeenCalled();
+
+      const failed = make();
+      failed.payments.processRefund.mockRejectedValue(
+        new BadRequestException({
+          i18nKey: "server.payment.paytrRefundFailed",
+        }),
+      );
+      await expect(
+        failed.service.refund(ADMIN, "boost-1", { reason: REASON }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(failed.cache.delPattern).not.toHaveBeenCalled();
+
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a replay of a finished refund refreshes the listing again, refunding nothing", async () => {
+      // The first call may have died between the refund and its refresh.
+      const { service, payments } = make({
+        boost: paidBoost({
+          status: BoostStatus.cancelled,
+          refundedAmount: D(59),
+        }),
+      });
+
+      await service.refund(ADMIN, "boost-1", { reason: REASON });
+
+      expect(payments.processRefund).not.toHaveBeenCalled();
+      expect(notify).toHaveBeenCalledWith(listingTags);
+    });
+
+    it("an uncertain refund reaches the admin unchanged and refreshes nothing", async () => {
+      const { service, payments, cache } = make();
+      const uncertain = new RefundPendingReconciliationException("timeout");
+      payments.processRefund.mockRejectedValue(uncertain);
+
+      await expect(
+        service.refund(ADMIN, "boost-1", { reason: REASON }),
+      ).rejects.toBe(uncertain);
+      expect(cache.del).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a stopped boost asked for another amount is refused without a refresh", async () => {
+      const { service, payments, cache } = make({
+        boost: paidBoost({
+          status: BoostStatus.cancelled,
+          refundedAmount: D(20),
+        }),
+      });
+
+      await expect(
+        service.refund(ADMIN, "boost-1", { reason: REASON, amount: 39 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(payments.processRefund).not.toHaveBeenCalled();
+      expect(cache.delPattern).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it("a refresh failure never fails a grant or a revoke, and the notice still goes out", async () => {
+      const granted = make();
+      granted.cache.delPattern.mockRejectedValue(new Error("redis down"));
+      await expect(
+        granted.service.grant(ADMIN, {
+          productId: "u010001",
+          durationDays: 7,
+          reason: REASON,
+        }),
+      ).resolves.toEqual({ id: "grant-1" });
+      expect(granted.notices.flush).toHaveBeenCalledWith({
+        boostId: "grant-1",
+        kind: "granted",
+      });
+
+      const revoked = make({
+        boost: paidBoost({ source: BoostSource.admin_grant, orderId: null }),
+      });
+      revoked.cache.del.mockRejectedValue(new Error("redis down"));
+      await expect(
+        revoked.service.revoke(ADMIN, "boost-1", { reason: REASON }),
+      ).resolves.toEqual({ id: "boost-1" });
+      expect(revoked.notices.flush).toHaveBeenCalledWith({
+        boostId: "boost-1",
+        kind: "cancelled",
+      });
+    });
+
+    it("a refresh failure never turns a refund that went through into an error", async () => {
+      const { service, cache, notices } = make();
+      cache.delPattern.mockRejectedValue(new Error("redis down"));
+
+      await expect(
+        service.refund(ADMIN, "boost-1", { reason: REASON }),
+      ).resolves.toEqual({ id: "boost-1" });
+      expect(notices.flush).toHaveBeenCalledWith({
+        boostId: "boost-1",
+        kind: "refunded",
+      });
     });
   });
 });

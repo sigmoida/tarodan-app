@@ -27,6 +27,17 @@ export function resolveWebRevalidateUrl(raw: string): string | null {
   return url.toString();
 }
 
+/** The web's cache tag of every product list (home rails, listings). */
+const PRODUCTS_LIST_TAG = "products:list";
+
+/**
+ * The web cache tags to revalidate when listings change how they show in the
+ * product lists (status, ranking, boost): the lists and each listing's page.
+ */
+export function productListTags(productIds: readonly string[]): string[] {
+  return [PRODUCTS_LIST_TAG, ...productIds.map((id) => `product:${id}`)];
+}
+
 /**
  * Best-effort on-demand ISR revalidation of the web app. When a product's price or
  * discount changes (or admin hero / trust badge content), the API POSTs the
