@@ -2,10 +2,7 @@
 
 "use client";
 
-import {
-  ArrowsRightLeftIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronRightIcon, TagIcon } from "@heroicons/react/24/outline";
 import { Button, Checkbox, EmptyState, Spinner } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -48,7 +45,7 @@ export default function TradeProductPicker({
     return (
       <EmptyState
         size="compact"
-        icon={<ArrowsRightLeftIcon className="h-6 w-6" />}
+        icon={<TagIcon className="h-6 w-6" />}
         title={t("page.new.tradeproductpicker.takasEdilebilirAktifIlaninizYok")}
         action={
           <ButtonLink

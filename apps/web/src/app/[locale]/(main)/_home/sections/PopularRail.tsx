@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { CubeIcon } from "@heroicons/react/24/outline";
+import { TagIcon } from "@heroicons/react/24/outline";
 import { EmptyState } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import type { Product } from "@/types/product";
@@ -21,7 +21,7 @@ export default async function PopularRail({ items }: { items: Product[] }) {
         emptyState={
           <EmptyState
             size="compact"
-            icon={<CubeIcon className="h-6 w-6" />}
+            icon={<TagIcon className="h-6 w-6" />}
             title={t("product.noListings")}
             description={t("home.beTheFirst")}
             action={

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { CubeIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { EmptyState } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
@@ -42,7 +42,7 @@ export default function ManufacturerProductsGrid({
         </div>
       ) : products.length === 0 ? (
         <EmptyState
-          icon={<CubeIcon className="h-7 w-7" />}
+          icon={<MagnifyingGlassIcon className="h-7 w-7" />}
           title={
             t("brands.noProducts") ||
             t("brands.manufacturerGrid.ilanBulunamadi")

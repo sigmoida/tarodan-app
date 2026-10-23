@@ -2,7 +2,7 @@
 
 "use client";
 
-import { RectangleStackIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { CubeIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, EmptyState, IconButton } from "@tarodan/ui";
 import { ProductCard } from "@/components/ui";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
@@ -54,7 +54,7 @@ export default function CollectionItemsGrid() {
   if (sortedItems.length === 0) {
     return (
       <EmptyState
-        icon={<RectangleStackIcon className="h-7 w-7" />}
+        icon={<CubeIcon className="h-7 w-7" />}
         title={t("collection.noProductsYet")}
         action={
           isOwner ? (
