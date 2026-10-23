@@ -299,7 +299,22 @@ describe("cart toggle", () => {
     ).toContain("@container");
   });
 
-  it("in the cart: remove label, pressed, danger colour", () => {
+  it("not in the cart: outline primary, icon and text alike", () => {
+    render(<ProductCard product={listing} />);
+
+    for (const button of [iconButton()!, textButton()!]) {
+      const classes = button.className.split(" ");
+      expect(classes).toContain("border-primary-600");
+      expect(classes).toContain("text-primary-700");
+      expect(classes).not.toContain("bg-primary-600");
+      expect(classes).not.toContain("text-inverted");
+    }
+    expect(textButton()!.querySelector("svg")!.getAttribute("fill")).toBe(
+      "none",
+    );
+  });
+
+  it("in the cart: remove label, pressed, filled primary", () => {
     h.inCart = true;
     render(<ProductCard product={listing} />);
     const icon = iconButton()!;
@@ -308,7 +323,13 @@ describe("cart toggle", () => {
       `product.cardAction.removeFromCartAria(${TITLE})`,
     );
     expect(icon.getAttribute("aria-pressed")).toBe("true");
-    expect(icon.className).toContain("text-danger-600");
+    for (const button of [icon, textButton()!]) {
+      const classes = button.className.split(" ");
+      expect(classes).toContain("bg-primary-600");
+      expect(classes).toContain("text-inverted");
+      expect(classes).not.toContain("border-primary-600");
+      expect(classes).not.toContain("text-danger-600");
+    }
     // In the cart: the solid icon, so colour is not the only cue.
     expect(icon.querySelector("svg")!.getAttribute("fill")).toBe(
       "currentColor",

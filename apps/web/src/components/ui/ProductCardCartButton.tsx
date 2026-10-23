@@ -21,11 +21,13 @@ import {
  * list card and the Favorites footer all render this one button.
  *
  * - `fit` / `list`: icon-only on a narrow card, text on a wide one (see
- *   `productCardActionPresentation`). The icon-only toggle names the listing
- *   (`product.cardAction.*Aria`, also its `title`) and says its state with
- *   `aria-pressed`, a solid icon and the danger colour, so colour is not the
- *   only cue.
- * - `full`: a full-width text button (the Favorites footer).
+ *   `productCardActionPresentation`). Not in the cart: `outline-primary`
+ *   with the outline icon; in the cart: filled `primary` with the solid
+ *   icon. The icon-only toggle names the listing (`product.cardAction.*Aria`,
+ *   also its `title`) and says its state with `aria-pressed` and the
+ *   outline/solid fill, so colour is not the only cue.
+ * - `full`: a full-width text button (the Favorites footer), `primary` to
+ *   add and `danger` to remove.
  *
  * The in-cart state needs the browser (the guest cart is in local storage),
  * so the first render shows "Sepete Ekle" like the server HTML did. While the
@@ -47,13 +49,12 @@ export default function ProductCardCartButton({
   const inCart = hydrated && cart.inCart;
   const busy = favoriteBusyProps(cart.isPending);
   const label = inCart ? t("product.removeFromCart") : t("product.addToCart");
-  const variant = inCart ? "danger" : "primary";
 
   if (presentation === "full") {
     return (
       <Button
         type="button"
-        variant={variant}
+        variant={inCart ? "danger" : "primary"}
         onClick={cart.toggle}
         {...busy}
         className={`flex w-full gap-1.5 py-1.5 text-xs sm:gap-2 sm:py-2 sm:text-sm ${FAVORITE_BUSY_CLASS}`}
@@ -68,6 +69,7 @@ export default function ProductCardCartButton({
     ? t("product.cardAction.removeFromCartAria", { title })
     : t("product.cardAction.addToCartAria", { title });
   const Icon = inCart ? ShoppingCartSolidIcon : ShoppingCartIcon;
+  const variant = inCart ? "primary" : "outline-primary";
 
   return (
     <>
