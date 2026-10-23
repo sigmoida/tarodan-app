@@ -752,9 +752,12 @@ the trade attempt's failure count, no retry while the refund has an
 unresolved attempt (a "nothing left" refusal parks it in review), the
 one-hour cooldown, one alarm line per trade once a day. The cash payer is
 told "refund failed" once per failure episode: `refundTradeCashTracked` sets
-the marker with a CAS on "no marker yet" and only that call notifies; a retry
-refreshes the marker without a notification, and success clears it. The
-admin "retry trade refund" action still notifies on its own failure.
+the marker with a CAS on "no marker yet" and only that call notifies; an
+unscoped retry (the sweep) refreshes the marker without a notification, and
+success clears it. A scoped call (`payerId`: one outbox event per payer on a
+cancel, a dispute compensation) always tells its own payer, since on a
+two-payer trade the marker may carry the other party's failure. The admin
+"retry trade refund" action still notifies on its own failure.
 
 **Staging.** The staging database is a masked production copy
 ([UAT_REFRESH.md](./UAT_REFRESH.md)), and the PayTR test store refuses the
