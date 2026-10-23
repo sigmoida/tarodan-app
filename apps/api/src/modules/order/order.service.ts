@@ -118,9 +118,7 @@ export class OrderService {
       categoryId?: string | null;
       packageTier?: ShippingPackageTierCode | null;
     }>,
-  ): Promise<{
-    results: Array<{ sellerFeeAmount: number; sellerNetAmount: number }>;
-  }> {
+  ): ReturnType<OrderPricingService["getCommissionPreviewBatch"]> {
     return this.orderPricing.getCommissionPreviewBatch(sellerId, items);
   }
 

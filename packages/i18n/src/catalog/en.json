@@ -11466,6 +11466,7 @@
     "commission": {
       "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",
       "sellerSalesSuspended": "This product cannot be purchased because the seller's corporate membership is not active.",
+      "categoryRequired": "Select a category to see the commission preview.",
       "pricingChanged": "Commission terms have changed. Please refresh your cart and confirm the new amount."
     },
     "admin": {
