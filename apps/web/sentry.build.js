@@ -79,7 +79,7 @@ function withSentry(nextConfig, env) {
   if (!env.NEXT_PUBLIC_SENTRY_ENVIRONMENT) {
     // eslint-disable-next-line no-console
     console.warn(
-      '[sentry] NEXT_PUBLIC_SENTRY_ENVIRONMENT is not set; events will be tagged "unknown".',
+      "[sentry] NEXT_PUBLIC_SENTRY_ENVIRONMENT is not set; the environment is derived from NEXT_PUBLIC_APP_URL.",
     );
   }
   const release = resolveSentryRelease(env);
