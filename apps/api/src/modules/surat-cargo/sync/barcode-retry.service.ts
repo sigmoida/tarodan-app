@@ -8,11 +8,11 @@ import { OrderShipmentProvisioner } from "./order-shipment-provisioner.service";
 import { notifyUser } from "./surat-tracking-support";
 import { errorMessage } from "../../../common/helpers/error-message";
 
-/** Kargo kodu (barkod) retry job istatistiği — yüzey başına. */
+/** Carrier code (barcode) retry stats, per surface. */
 export interface BarcodeRetryStat {
-  /** Bu tick'te kodu başarıyla tamamlanan kayıt sayısı. */
+  /** Records whose code was completed in this tick. */
   retried: number;
-  /** Denenip yine kod alamayan kayıt sayısı (geçici/kalıcı hata). */
+  /** Records tried that still got no code (temporary or lasting failure). */
   failed: number;
   /**
    * Which records failed and why: `<surface> <id> (<reason>)`. Ids and reason
@@ -78,16 +78,23 @@ export class BarcodeRetryService {
     return (await this.cache.get(this.backoffKey(surface, id))) != null;
   }
 
-  /** Başarısız denemede sayacı artırıp üstel TTL'li backoff penceresi açar.
-   * Sayaç pencereden UZUN yaşar (3 gün) ki pencere kapanınca üstel büyüme
-   * sıfırlanmasın. */
+  /**
+   * Records a failed attempt: names the record in the run summary (the cron
+   * alarm) and on a `warn` line of its own (the summary lists only the first
+   * few), bumps the attempt counter and opens an exponential backoff window.
+   * The counter outlives the window (3 days) so the growth does not reset when
+   * the window closes.
+   */
   private async recordRetryFailure(
     surface: string,
     id: string,
     reason: string,
     failures: string[],
   ): Promise<void> {
-    failures.push(`${surface} ${id} (${reason})`);
+    const entry = `${surface} ${id} (${reason})`;
+    failures.push(entry);
+    // warn, not error: one failure, one alarm, and the summary is the alarm.
+    this.logger.warn(`Barcode retry failed: ${entry}`);
     const attempts =
       ((await this.cache.get<number>(this.attemptsKey(surface, id))) ?? 0) + 1;
     await this.cache.set(this.attemptsKey(surface, id), attempts, {
@@ -126,9 +133,13 @@ export class BarcodeRetryService {
     const createdBefore = new Date(now - BarcodeRetryService.RETRY_MIN_AGE_MS);
     const createdAfter = new Date(now - BarcodeRetryService.RETRY_MAX_AGE_MS);
 
-    const empty: BarcodeRetryStat = { retried: 0, failed: 0, failures: [] };
-    let order = empty;
-    let trade = empty;
+    const empty = (): BarcodeRetryStat => ({
+      retried: 0,
+      failed: 0,
+      failures: [],
+    });
+    let order = empty();
+    let trade = empty();
     const failedSteps: string[] = [];
     const failureDetails: string[] = [];
 
@@ -375,9 +386,6 @@ export class BarcodeRetryService {
           errorMessage(e),
           failures,
         );
-        this.logger.error(
-          `Retry ensure-shipment threw order=${o.orderNumber}: ${errorMessage(e)}`,
-        );
       }
     }
     for (const s of candidates) {
@@ -426,9 +434,6 @@ export class BarcodeRetryService {
       } catch (e: unknown) {
         failed++;
         await this.recordRetryFailure("order", s.id, errorMessage(e), failures);
-        this.logger.error(
-          `Retry order barcode threw shipment=${s.id}: ${errorMessage(e)}`,
-        );
       }
     }
     return { retried, failed, failures };
@@ -534,9 +539,6 @@ export class BarcodeRetryService {
               errorMessage(e),
               failures,
             );
-            this.logger.error(
-              `Retry trade barcode threw trade-shipment=${ts.id}: ${errorMessage(e)}`,
-            );
           }
         }
       }
@@ -580,9 +582,6 @@ export class BarcodeRetryService {
               ts.id,
               errorMessage(e),
               failures,
-            );
-            this.logger.error(
-              `Retry trade return barcode threw trade-shipment=${ts.id}: ${errorMessage(e)}`,
             );
           }
         }

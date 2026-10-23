@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { ShipmentStatus } from "@prisma/client";
 import { BarcodeRetryService } from "./barcode-retry.service";
 
@@ -115,5 +116,48 @@ describe("BarcodeRetryService carrier registration semantics", () => {
       "order shipment-1 (carrier returned no barcode)",
       "order shipment-2 (carrier timeout)",
     ]);
+  });
+
+  // One failure, one alarm: the run summary is the alarm, each record only
+  // gets a warn line of its own (the summary lists the first few).
+  it("logs each failed record at warn and none at error", async () => {
+    const { service, prisma, orderShipments } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      {
+        id: "shipment-1",
+        orderId: "order-1",
+        trackingNumber: "PKG-1",
+        order: { orderNumber: "ORD-1", sellerId: "seller-1" },
+      },
+      {
+        id: "shipment-2",
+        orderId: "order-2",
+        trackingNumber: "PKG-2",
+        order: { orderNumber: "ORD-2", sellerId: "seller-2" },
+      },
+    ]);
+    orderShipments.createBarcode
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("carrier timeout"));
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    try {
+      await (service as any).retryPendingOrderBarcodes(new Date(0), new Date());
+
+      expect(error).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        "Barcode retry failed: order shipment-1 (carrier returned no barcode)",
+      );
+      expect(warn).toHaveBeenCalledWith(
+        "Barcode retry failed: order shipment-2 (carrier timeout)",
+      );
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
   });
 });

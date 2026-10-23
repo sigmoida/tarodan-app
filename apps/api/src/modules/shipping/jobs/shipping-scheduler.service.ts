@@ -162,11 +162,11 @@ export class ShippingSchedulerService implements OnModuleInit {
       failed: 0,
     };
 
-    // Önce kodsuz kalmış kayıtlar için barkodu yeniden dene (yaş-filtreli), sonra
-    // durum senkronu — böylece yeni üretilen kodların durumu aynı tick'te çekilir.
-    // (Refund iade barkodunun retry'ı burada DEĞİL: openReturnShipment blocking
-    // olduğundan kodsuz "surat" kaydı oluşamaz; refund-scheduler 10 dk'da bir tam
-    // açılışı yeniden dener.)
+    // First retry the barcode for records still without a code (age-filtered),
+    // then the status sync, so a freshly issued code is polled in the same tick.
+    // (The refund return barcode is not retried here: openReturnShipment is
+    // blocking, so no code-less "surat" row can exist; the refund scheduler
+    // retries the whole opening every 10 minutes.)
     try {
       const retry = await this.suratTracking.retryPendingBarcodes();
       stats.barcodeRetried = retry.order.retried + retry.trade.retried;
@@ -186,7 +186,7 @@ export class ShippingSchedulerService implements OnModuleInit {
       }
       if (stats.barcodeRetried > 0 || stats.barcodeRetryFailed > 0) {
         log(
-          `Kargo kodu retry: ${stats.barcodeRetried} tamamlandı, ${stats.barcodeRetryFailed} başarısız`,
+          `Barcode retry: ${stats.barcodeRetried} completed, ${stats.barcodeRetryFailed} failed`,
         );
         this.logger.log(
           `Surat barcode retry: ${stats.barcodeRetried} filled, ${stats.barcodeRetryFailed} failed ` +
@@ -204,7 +204,7 @@ export class ShippingSchedulerService implements OnModuleInit {
           errorStack(error),
         );
       }
-      log(`Kargo kodu retry HATASI: ${message}`);
+      log(`Barcode retry ERROR: ${message}`);
     }
 
     try {
