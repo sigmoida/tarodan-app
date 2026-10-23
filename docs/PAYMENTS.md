@@ -359,8 +359,7 @@ on the payment − totals the other transfers on the oid took)`.
    `invalid_iban_format` and `bank_details_rejected` when the IBAN or
    holder name changed. Admin retry puts a `failed` row back to
    `pending` (same `trans_id`; `returned` gets a new one) and the processor
-   recomputes net and total; before retrying `transfer_outcome_unknown`,
-   check in the PayTR panel that no transfer with that `trans_id` exists.
+   recomputes net and total (see 9).
 
 6. **Submitted / processed**: PayTR `success` only means the _instruction
    was accepted_. With `PAYTR_TRANSFER_CALLBACK_ENABLED=true` the payout stays
@@ -392,6 +391,54 @@ on the payment − totals the other transfers on the oid took)`.
    (masked IBAN last 4); never PayTR's text or an oid. Platform-side reasons
    send nothing; the team resolves them. `payout-returned-seller` goes out
    when the bank returns a transfer.
+9. **Manual resolution (admin → Finance → Payouts → Transfers)**, in the
+   payout domain (`payout/resolution/payout-resolution.service.ts`); one
+   policy (`payout/helpers/payout-resolution-policy.ts`) drives the API
+   guards and the list row's `resolution` flags. Every write is a CAS on the
+   row as read (status, reason, `updatedAt`), with the required audit record
+   in the same transaction (`payout_retry`, `payout_mark_paid`).
+   - **Retry** (`POST /admin/payouts/:transferId/retry`): `failed` or
+     `returned` → `pending`, retry counter, reference and
+     `submittedTotalAmount` cleared; net and total are never set here. A row
+     PayTR may have taken needs `confirmProviderChecked: true` and a reason
+     (the PayTR panel shows no transfer with that `trans_id`), else 409:
+     `transfer_outcome_unknown`, and rows from before the reason codes whose
+     free text came from a thrown error rather than a PayTR answer (e.g.
+     "Bad Request Exception"; a stored `status: "error"` answer is a
+     rejection and needs no check).
+   - **Mark as paid** (`POST /admin/payouts/transfers/:id/mark-paid`,
+     super_admin/admin with the `payouts` permission; body `method`,
+     `reference`, `reason`, `expectedNetAmount`). One method fits a row:
+     - `paytr_confirmed` for a row PayTR may have taken (as above) when the
+       panel shows it arrived. Net = `submittedAmount ?? netAmount`. Stamps
+       like the callback: `submittedAt` = the failure time, total kept.
+     - `external_bank` for `transfer_needs_manual_decision` (not a missing
+       payment or source: that is a data problem, fix and retry) and
+       `transfer_total_exceeds_remaining`, after finance paid the net from the
+       company account (decision of 2026-10-23). The processor's guards run
+       again (order payable, no refund in flight, the hold still entitles the
+       seller to the net), else 409 and a retry recomputes. `submittedTotalAmount
+= 0` (siblings on the oid do not count it), `submittedAt` and
+       `submittedAmount` null (no PayTR transfer for the PSP comparison or
+       the returned-transfer scan, which never matches a row without a send
+       time).
+     - `expectedNetAmount` must equal the net to the kuruş (409 otherwise),
+       so a stale screen never books a different amount.
+     - Ledger, in the same transaction: `external_bank` first funds what the
+       escrow no longer holds, `F = max(0, net − max(0, seller_escrow))` per
+       order (per trade and recipient for trade cash): `adjustment`
+       `seller_escrow` debit / `platform_commission` credit, key
+       `payout-platform-funding:<payoutId>`. Then both methods book
+       `payout_completed` (`seller_escrow` credit / `payout` debit, net, key
+       `payout-completed:<payoutId>`, metadata method and reference). If
+       that key already exists (a transfer the bank returned, then retried)
+       nothing is booked again. The order's escrow ends at 0.
+     - The row keeps `providerResponse.manualSettlement` (method, reference,
+       admin, time, net, funded amount). The seller gets the normal "payout
+       released" e-mail after commit. A repeated request returns the first
+       result (`alreadySettled: true`) and writes nothing; a row a callback
+       or retry moved first gives 409.
+   - Runbook: OPERATIONS.md, "Payout transfers needing a decision".
 
 ---
 
