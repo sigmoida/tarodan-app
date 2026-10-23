@@ -81,9 +81,11 @@ describe("payout transfer resolution", () => {
       retryRequiresProviderCheck: false,
       markPaidMethod: "external_bank" as const,
       markPaidNetAmount: 1234.5,
+      markPaidRequiresProviderCheck: false,
     };
     const schema = markPaidSchema(t, 1234.5);
     const valid = {
+      confirmProviderChecked: false,
       reference: " DEKONT-42 ",
       reason: " Kalan tutar PayTR'de yok ",
       typedAmount: "1.234,50",
@@ -91,6 +93,7 @@ describe("payout transfer resolution", () => {
 
     it("requires reference, reason and the typed net", () => {
       const result = schema.safeParse({
+        confirmProviderChecked: false,
         reference: " ",
         reason: "",
         typedAmount: "",
@@ -129,6 +132,43 @@ describe("payout transfer resolution", () => {
       // The typed confirmation is never sent; the net is the row's.
       expect(markPaidBody(resolution, values)).not.toHaveProperty(
         "typedAmount",
+      );
+    });
+
+    describe("a row whose earlier send PayTR never confirmed", () => {
+      const checked = { ...resolution, markPaidRequiresProviderCheck: true };
+      const gated = markPaidSchema(t, 1234.5, true);
+
+      it("requires the PayTR panel check", () => {
+        const result = gated.safeParse({
+          ...valid,
+          confirmProviderChecked: false,
+        });
+        expect(result.success).toBe(false);
+        expect(result.error?.issues[0]).toMatchObject({
+          path: ["confirmProviderChecked"],
+          message: t(
+            "admin.finance.payouts.resolution.confirmProviderCheckedRequired",
+          ),
+        });
+      });
+
+      it("sends confirmProviderChecked: true with the rest", () => {
+        const values = gated.parse({ ...valid, confirmProviderChecked: true });
+        expect(markPaidBody(checked, values)).toEqual({
+          method: "external_bank",
+          reference: "DEKONT-42",
+          reason: "Kalan tutar PayTR'de yok",
+          expectedNetAmount: 1234.5,
+          confirmProviderChecked: true,
+        });
+      });
+    });
+
+    it("an ungated row needs no panel check and does not send one", () => {
+      const values = schema.parse({ ...valid, confirmProviderChecked: false });
+      expect(markPaidBody(resolution, values)).not.toHaveProperty(
+        "confirmProviderChecked",
       );
     });
 
@@ -193,6 +233,7 @@ describe("payout transfer resolution", () => {
         "server.admin.payout.markPaidNotAllowed",
         "server.admin.payout.markPaidPayoutBlocked",
         "server.admin.payout.markPaidMissingInput",
+        "server.admin.payout.markPaidProviderCheckRequired",
         "server.admin.payout.providerCheckRequired",
         "server.admin.payout.retryStateInvalid",
         "server.admin.payout.transferNotFound",

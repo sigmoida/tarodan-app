@@ -55,6 +55,7 @@ const row: PayoutTransferRow = {
     retryRequiresProviderCheck: true,
     markPaidMethod: "paytr_confirmed",
     markPaidNetAmount: 40,
+    markPaidRequiresProviderCheck: false,
   },
   manualSettlement: null,
 };

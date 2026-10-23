@@ -34,10 +34,23 @@ export type RetryTransferValues = z.infer<
 
 /**
  * "Mark as paid": the payment reference, a reason, and the net typed again
- * as the confirmation (it must equal the net the row shows).
+ * as the confirmation (it must equal the net the row shows). A row whose
+ * earlier send PayTR never confirmed also needs the PayTR panel check
+ * (`resolution.markPaidRequiresProviderCheck`).
  */
-export const markPaidSchema = (t: T, netAmount: number) =>
+export const markPaidSchema = (
+  t: T,
+  netAmount: number,
+  requiresProviderCheck = false,
+) =>
   z.object({
+    confirmProviderChecked: z
+      .boolean()
+      .refine((checked) => checked || !requiresProviderCheck, {
+        message: t(
+          "admin.finance.payouts.resolution.confirmProviderCheckedRequired",
+        ),
+      }),
     reference: z
       .string()
       .trim()

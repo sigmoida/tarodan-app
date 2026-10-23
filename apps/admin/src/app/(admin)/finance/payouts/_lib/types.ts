@@ -50,6 +50,9 @@ export interface PayoutTransferResolution {
   markPaidMethod: PayoutManualSettlementMethod | null;
   /** The net (TL) the mark-paid request confirms (`expectedNetAmount`). */
   markPaidNetAmount: number | null;
+  /** Mark as paid must confirm the PayTR panel check: an earlier send of
+   *  this row may have reached PayTR unconfirmed (`confirmProviderChecked`). */
+  markPaidRequiresProviderCheck: boolean;
 }
 
 /** A completed row an admin marked as paid. */

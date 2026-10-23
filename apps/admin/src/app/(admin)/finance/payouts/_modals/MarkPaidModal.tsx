@@ -2,6 +2,7 @@
 
 import { Alert } from "@tarodan/ui";
 import {
+  FormCheckbox,
   FormError,
   FormInput,
   FormModal,
@@ -41,8 +42,14 @@ export function MarkPaidModal({
   const modalLabels = useFormModalLabels();
   const method = row.resolution.markPaidMethod;
   const net = row.resolution.markPaidNetAmount ?? 0;
-  const form = useZodForm(markPaidSchema(t, net), {
-    defaultValues: { reference: "", reason: "", typedAmount: "" },
+  const requiresProviderCheck = row.resolution.markPaidRequiresProviderCheck;
+  const form = useZodForm(markPaidSchema(t, net, requiresProviderCheck), {
+    defaultValues: {
+      confirmProviderChecked: false,
+      reference: "",
+      reason: "",
+      typedAmount: "",
+    },
   });
   const markPaid = usePayoutTransferAction(
     (body: MarkPayoutTransferPaidBody) =>
@@ -104,6 +111,17 @@ export function MarkPaidModal({
       </DataList>
       {method === "external_bank" && row.transferTotal && (
         <TransferTotalBreakdown total={row.transferTotal} />
+      )}
+      {requiresProviderCheck && (
+        <>
+          <Alert variant="warning">
+            {t("server.admin.payout.markPaidProviderCheckRequired")}
+          </Alert>
+          <FormCheckbox
+            name="confirmProviderChecked"
+            label={t("admin.finance.payouts.resolution.confirmProviderChecked")}
+          />
+        </>
       )}
       <FormInput
         name="reference"

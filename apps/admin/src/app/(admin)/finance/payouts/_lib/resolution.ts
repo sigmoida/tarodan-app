@@ -68,7 +68,11 @@ export function retryTransferBody(
  */
 export function markPaidBody(
   resolution: PayoutTransferResolution | null | undefined,
-  values: { reference?: string; reason?: string },
+  values: {
+    reference?: string;
+    reason?: string;
+    confirmProviderChecked?: boolean;
+  },
 ): MarkPayoutTransferPaidBody | null {
   if (!resolution?.markPaidMethod || resolution.markPaidNetAmount == null) {
     return null;
@@ -78,6 +82,10 @@ export function markPaidBody(
     reference: (values.reference ?? "").trim(),
     reason: (values.reason ?? "").trim(),
     expectedNetAmount: resolution.markPaidNetAmount,
+    // Sent only when the row asks for it (the schema made it checked).
+    ...(resolution.markPaidRequiresProviderCheck
+      ? { confirmProviderChecked: values.confirmProviderChecked === true }
+      : {}),
   };
 }
 
@@ -114,6 +122,9 @@ export const PAYOUT_ACTION_ERRORS: Record<
   "server.admin.payout.markPaidMissingInput": { refresh: true },
   "server.admin.payout.markPaidAmountChanged": { refresh: true },
   "server.admin.payout.markPaidPayoutBlocked": { refresh: true },
+  // The row gained the panel-check requirement after the list loaded: the
+  // reloaded row shows the checkbox.
+  "server.admin.payout.markPaidProviderCheckRequired": { refresh: true },
 };
 
 export interface PayoutActionError extends PayoutActionErrorHandling {

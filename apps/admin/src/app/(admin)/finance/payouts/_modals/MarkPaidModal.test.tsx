@@ -62,6 +62,7 @@ const row = (over: Partial<PayoutTransferRow> = {}): PayoutTransferRow => ({
     retryRequiresProviderCheck: false,
     markPaidMethod: "external_bank",
     markPaidNetAmount: 40,
+    markPaidRequiresProviderCheck: false,
   },
   manualSettlement: null,
   ...over,
@@ -192,6 +193,7 @@ describe("MarkPaidModal", () => {
           retryRequiresProviderCheck: true,
           markPaidMethod: "paytr_confirmed",
           markPaidNetAmount: 38.5,
+          markPaidRequiresProviderCheck: false,
         },
       }),
     );
@@ -210,6 +212,74 @@ describe("MarkPaidModal", () => {
     expect(toastSuccess).toHaveBeenCalledWith(
       "admin.finance.payouts.resolution.alreadyMarkedPaid",
     );
+  });
+
+  describe("a row whose earlier send PayTR never confirmed", () => {
+    const gated = () =>
+      row({
+        resolution: {
+          retryRequiresProviderCheck: false,
+          markPaidMethod: "external_bank",
+          markPaidNetAmount: 40,
+          markPaidRequiresProviderCheck: true,
+        },
+      });
+
+    it("does not send before the PayTR panel check is ticked", async () => {
+      await render(gated());
+      expect(document.body.textContent).toContain(
+        "server.admin.payout.markPaidProviderCheckRequired",
+      );
+      await fillValid();
+      await submit();
+      expect(markPayoutTransferPaid).not.toHaveBeenCalled();
+      expect(document.body.textContent).toContain(
+        "admin.finance.payouts.resolution.confirmProviderCheckedRequired",
+      );
+    });
+
+    it("sends confirmProviderChecked: true once ticked", async () => {
+      markPayoutTransferPaid.mockResolvedValue({
+        data: { success: true, alreadySettled: false },
+      });
+      await render(gated());
+      await fillValid();
+      await act(() => {
+        field("confirmProviderChecked").click();
+      });
+      await submit();
+      expect(markPayoutTransferPaid).toHaveBeenCalledWith("pt1", {
+        method: "external_bank",
+        reference: "DEKONT-42",
+        reason: "PayTR'de kalan yok",
+        expectedNetAmount: 40,
+        confirmProviderChecked: true,
+      });
+    });
+  });
+
+  it("an ungated row shows no panel check", async () => {
+    await render();
+    expect(
+      document.querySelector('[name="confirmProviderChecked"]'),
+    ).toBeNull();
+  });
+
+  it("a row that gained the panel check meanwhile reloads the list", async () => {
+    markPayoutTransferPaid.mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          message: "PayTR panelini kontrol edin.",
+          i18nKey: "server.admin.payout.markPaidProviderCheckRequired",
+        },
+      },
+    });
+    await render();
+    await fillValid();
+    await submit();
+    expect(toastError).toHaveBeenCalledWith("PayTR panelini kontrol edin.");
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("sends one request when submitted twice while the first runs", async () => {

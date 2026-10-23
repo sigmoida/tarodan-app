@@ -17,6 +17,8 @@ export interface MarkPayoutTransferPaidBody {
   reason: string;
   /** TL; must equal the row's `resolution.markPaidNetAmount`, else 409. */
   expectedNetAmount: number;
+  /** Required (true) when the row says `resolution.markPaidRequiresProviderCheck`. */
+  confirmProviderChecked?: boolean;
 }
 
 /**
