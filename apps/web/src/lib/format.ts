@@ -66,6 +66,32 @@ export function formatDayMonth(value: DateLike, locale: string): string {
   return isNaN(d.getTime()) ? "" : dayMonthFmt(locale).format(d);
 }
 
+const dateTimeMonthFmts = new Map<string, Intl.DateTimeFormat>();
+const dateTimeMonthFmt = (locale: string): Intl.DateTimeFormat => {
+  let fmt = dateTimeMonthFmts.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    dateTimeMonthFmts.set(locale, fmt);
+  }
+  return fmt;
+};
+
+/**
+ * Date and time with a short month word in the UI locale ("12 Kas 2026
+ * 14:30", "Nov 12, 2026, 2:30 PM"): for cards that show a full timestamp.
+ */
+export function formatDateTimeLong(value: DateLike, locale: string): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? "" : dateTimeMonthFmt(locale).format(d);
+}
+
 /**
  * Format price as "12.30 TL" instead of "₺12.30" or "TRY 12.30"
  */

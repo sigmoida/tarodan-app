@@ -2,11 +2,25 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  formatDateTimeLong,
   formatDayMonth,
   formatPrice,
   formatPriceNumber,
   formatTL,
 } from "./format";
+
+describe("formatDateTimeLong", () => {
+  it("follows the UI locale for the month word", () => {
+    const iso = "2026-11-12T10:00:00.000Z";
+    expect(formatDateTimeLong(iso, "tr")).toContain("Kas");
+    expect(formatDateTimeLong(iso, "en")).toContain("Nov");
+  });
+
+  it("is empty for a missing or invalid value", () => {
+    expect(formatDateTimeLong(null, "tr")).toBe("");
+    expect(formatDateTimeLong("nope", "en")).toBe("");
+  });
+});
 
 describe("formatDayMonth", () => {
   it("is the day and short month in the UI locale, without the year", () => {
