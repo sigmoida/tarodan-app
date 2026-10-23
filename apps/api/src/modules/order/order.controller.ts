@@ -79,6 +79,12 @@ export class OrderController {
   @ApiOperation({
     summary: "Get commission preview for a price (seller listing form)",
   })
+  @ApiResponse({ status: HttpStatus.OK, description: "Commission preview" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      "Invalid amount or package size, or no categoryId (server.commission.categoryRequired)",
+  })
   async getCommissionPreview(
     @Query("amount") amountStr: string,
     @Query("categoryId") categoryId: string | undefined,
@@ -126,6 +132,15 @@ export class OrderController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Batch commission preview for multiple items" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description:
+      "results in input order; null for an item without a categoryId",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "items missing or more than 50",
+  })
   async getCommissionPreviewBatch(
     @Body()
     body: {
