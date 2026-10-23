@@ -11,31 +11,37 @@ import { PrismaService } from "../../../prisma";
 import { CacheService } from "../../cache/cache.service";
 import { UatProductionCopyService } from "../../admin-test-tools/uat-refresh/uat-production-copy.service";
 import { errorMessage } from "../../../common/helpers/error-message";
-import { PaymentRefundService } from "./payment-refund.service";
 import { RefundPendingReconciliationException } from "../../payment-providers/refund-errors";
+import { PaymentRefundService } from "./payment-refund.service";
 import {
-  dailyAlarms,
-  normalizeRefundSweepBackoff,
-  pruneRefundSweepBackoff,
-  recordRefundSweepFailure,
+  REFUND_SWEEP_MAX_DELAY_MS,
+  claimRefundAlarm,
   sweepablePaymentWhere,
   waitingOrderIds,
 } from "../helpers/refund-sweep-policy";
 
 /**
- * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
- * ödemesi (sepet) — hangisi varsa iade kaydı orada tutulur.
+ * A sweep candidate with the payment that holds its refund record: its own
+ * payment (single order) or its basket group's payment.
  */
 const REFUND_SWEEP_CANDIDATE_SELECT = {
   id: true,
   payment: { select: { metadata: true } },
   checkoutGroup: { select: { payment: { select: { metadata: true } } } },
+  // A carried-out refund (also a zero-cash settlement, which records 0 on
+  // the payment). Branches 1-2 filter these out in SQL already.
+  refundAttempts: {
+    where: { status: RefundAttemptStatus.finalized },
+    select: { id: true },
+    take: 1,
+  },
 } as const;
 
 interface RefundSweepCandidate {
   id: string;
   payment?: { metadata: unknown } | null;
   checkoutGroup?: { payment?: { metadata: unknown } | null } | null;
+  refundAttempts?: { id: string }[];
 }
 
 /** Candidates per branch and run (bounded, ordered: oldest change first). */
@@ -54,37 +60,37 @@ const UNRESOLVED_REFUND_ATTEMPT_STATUSES = [
   RefundAttemptStatus.manual_review,
 ];
 
-/** Cache keys of the advisory sweep state (helpers/refund-sweep-policy). */
-const BACKOFF_KEY = "refund-sweep:backoff";
-const RETURNED_ALARM_KEY = "refund-sweep:returned-alarms";
-const BACKOFF_TTL_SECONDS = 7 * 24 * 60 * 60;
-const ALARM_TTL_SECONDS = 2 * 24 * 60 * 60;
-
 /**
- * Bu sipariş için ödemede KAYITLI bir iade var mı (tam ya da kısmi)?
+ * Was a refund of this order already carried out (full, partial or a
+ * zero-cash settlement)?
  *
- * Kayıt varsa iade zaten İCRA EDİLMİŞ bir karardır: kısmi tutar, satıcı kusuru
- * / kargo payı gibi bir settlement'ın sonucudur ve sipariş o kararla kapanmıştır.
- * Sweep ise her zaman TAM tutarı ister — tekrar denerse MONEY-H4 kümülatif tavanı
- * `refundAmountExceedsLimit` fırlatır ve sipariş her cron turunda sonsuza dek
- * "başarısız" loglanır (TARODAN-API-8). Başarısız kalmış bir iade metadata'ya
- * HİÇ yazılmadığından retry hedefi kaybolmaz; yalnız bitmiş işler elenir.
+ * A carried-out refund is a decision: a partial amount is the outcome of a
+ * settlement (seller fault, shipping share) and the order closed with it. The
+ * sweep always asks for the FULL amount, so a retry would hit the cumulative
+ * cap (`refundAmountExceedsLimit`, MONEY-H4) and log the order as failed on
+ * every run (TARODAN-API-8), or, after a zero-cash settlement that records 0
+ * on the payment, refund the whole amount. A failed refund leaves neither a
+ * finalized attempt nor a payment record, so no retry target is lost. The
+ * payment record also covers refunds from before the attempt ledger.
  */
-function hasRecordedRefund(metadata: unknown, orderId: string): boolean {
+function hasCarriedOutRefund(candidate: RefundSweepCandidate): boolean {
+  if ((candidate.refundAttempts?.length ?? 0) > 0) return true;
+  const metadata =
+    candidate.payment?.metadata ?? candidate.checkoutGroup?.payment?.metadata;
   const meta = (metadata as Record<string, unknown> | null) ?? {};
   const refundedOrders =
     (meta.refundedOrders as Record<string, number> | undefined) ?? {};
-  return Number(refundedOrders[orderId] ?? 0) > 0;
+  return Number(refundedOrders[candidate.id] ?? 0) > 0;
 }
 
 /**
- * Adayları "iadesi henüz yapılmamış" / "iadesi zaten kayıtlı" diye ayırır
- * (tekil ve grup ödemeler için ortak).
+ * Splits candidates into "refund not done yet" and "refund already recorded"
+ * (single and basket payments alike).
  *
- * `skipped` çağırana geri verilir çünkü atlamanın anlamı DALA GÖRE değişir:
- * terminal durumdaki (cancelled/refunded) bir siparişte iade kararı icra
- * edilmiş demektir ve sessizce elenmesi doğrudur; terminal OLMAYAN bir
- * siparişte ise sipariş takılı kalmış demektir ve görünür olmalıdır.
+ * `skipped` goes back to the caller because skipping means different things
+ * per branch: on a terminal order (cancelled/refunded) the refund decision
+ * was carried out and dropping it silently is right; on a non-terminal order
+ * the order is stuck and must stay visible.
  */
 function partitionRefundCandidates(candidates: RefundSweepCandidate[]): {
   pending: string[];
@@ -93,11 +99,7 @@ function partitionRefundCandidates(candidates: RefundSweepCandidate[]): {
   const pending: string[] = [];
   const skipped: string[] = [];
   for (const candidate of candidates) {
-    const metadata =
-      candidate.payment?.metadata ?? candidate.checkoutGroup?.payment?.metadata;
-    (hasRecordedRefund(metadata, candidate.id) ? skipped : pending).push(
-      candidate.id,
-    );
+    (hasCarriedOutRefund(candidate) ? skipped : pending).push(candidate.id);
   }
   return { pending, skipped };
 }
@@ -105,28 +107,25 @@ function partitionRefundCandidates(candidates: RefundSweepCandidate[]): {
 /**
  * Retry sweep of order refunds that did not go through (cron
  * `payment-expired`, every 5 minutes; `PaymentReconciliationService`
- * delegates here).
- *
- * İptal/iade edilmiş ama ödemesi hâlâ `completed` olan siparişleri bulup PayTR
- * iadesini GÜVENİLİR şekilde tamamlar. Tek bir DB-tabanlı, idempotent,
- * crash'e dayanıklı sweep şu boşlukları birden yedekler:
- *  - K3: alıcı iptali → OrderService.cancel order'ı `refunded` yapar ama iade tetiklemezdi.
- *  - Y9: handleExpiredPreparingOrders order'ı `cancelled` yapıp tx-dışı processRefund çağırır;
- *        başarısızsa eskiden yalnız "MANUAL INTERVENTION" log'u kalırdı — artık burada retry edilir.
- *  - Y7: processSuccessfulPayment cron-yarışı dalındaki tx-dışı iade başarısızlığı.
- * processRefund order'ı `cancelled` + payment'ı `refunded` yaptığından (ve payout
- * tamamlandıysa K1 guard'ı bloke ettiğinden) sweep idempotenttir: işlenen sipariş bir
- * daha eşleşmez. Tek istisna KISMİ iadedir — payment `completed` kalır — bu yüzden
- * her üç dal da `hasRecordedRefund` ile elenir: iadesi bir kez icra edilmiş sipariş
- * sweep'in işi değildir (kalan bakiye admin kararıdır).
+ * delegates here). One DB-driven, idempotent, crash-safe sweep that backs up:
+ *  - K3: a buyer cancel sets the order `refunded` without starting the refund;
+ *  - Y9: the missed-preparation cancel refunds outside its transaction and
+ *    used to leave only a "MANUAL INTERVENTION" log when that failed;
+ *  - Y7: the out-of-transaction refund of the payment/cron race.
+ * A full refund cancels the order and refunds the payment, so the order no
+ * longer matches. A partial refund leaves the payment `completed`, so every
+ * branch leaves out orders whose refund was already carried out (a finalized
+ * attempt, or a refund recorded on the payment): the rest of the balance is
+ * an admin decision, never the sweep's full refund.
  *
  * D1 (Sentry TARODAN-API-3M/3N/3P): a refund the provider keeps refusing is
- * not resent on every run. A failing order waits longer after every failure
- * and is left out of the queries meanwhile; its alarm (error,
- * `REFUND_MANUAL_REVIEW`, one line per order) goes out once a day. An order
- * whose refund has an unresolved attempt belongs to the attempt recovery or
- * to a person. On staging, orders paid before the last production copy are
- * left out (`UatProductionCopyService`).
+ * not resent on every run. An order whose attempt failed waits longer the
+ * longer it has been failing (read from the attempt, helpers/
+ * refund-sweep-policy) and is left out of the queries meanwhile; its alarm
+ * (error, `REFUND_MANUAL_REVIEW`, one line per order) goes out once a day,
+ * warn in between. An order whose refund has an unresolved attempt belongs to
+ * the attempt recovery or to a person. On staging, orders paid before the
+ * last production copy are left out (`UatProductionCopyService`).
  */
 @Injectable()
 export class RefundOrderSweepService {
@@ -142,101 +141,117 @@ export class RefundOrderSweepService {
   async processRefundedOrders(
     now = new Date(),
   ): Promise<{ refunded: number; failed: number }> {
-    const [storedBackoff, storedReturnedAlarms, copiedBefore] =
-      await Promise.all([
-        this.readState(BACKOFF_KEY),
-        this.readState(RETURNED_ALARM_KEY),
-        this.productionCopy.copiedBefore(now),
-      ]);
-    const backoff = pruneRefundSweepBackoff(
-      normalizeRefundSweepBackoff(storedBackoff),
-      now,
-    );
-    const waiting = waitingOrderIds(backoff, now);
+    const [recentFailures, copiedBefore] = await Promise.all([
+      // Only failures recent enough to still be waiting (the longest wait).
+      this.prisma.refundAttempt.findMany({
+        where: {
+          status: RefundAttemptStatus.failed,
+          orderId: { not: null },
+          updatedAt: {
+            gt: new Date(now.getTime() - REFUND_SWEEP_MAX_DELAY_MS),
+          },
+        },
+        select: { orderId: true, createdAt: true, updatedAt: true },
+      }),
+      this.productionCopy.copiedBefore(now),
+    ]);
+    const waiting = waitingOrderIds(recentFailures, now);
     const sweepable = sweepablePaymentWhere(copiedBefore);
 
     // Common to the three branches: not while the order waits after a
-    // failure, not while another process owns its refund.
-    const findCandidates = (where: Prisma.OrderWhereInput) =>
+    // failure, not while (or once) another refund owns it.
+    const findCandidates = (
+      where: Prisma.OrderWhereInput,
+      ownedStatuses: RefundAttemptStatus[],
+    ) =>
       this.prisma.order.findMany({
         where: {
           ...where,
           ...(waiting.length > 0 ? { id: { notIn: waiting } } : {}),
-          refundAttempts: {
-            none: { status: { in: UNRESOLVED_REFUND_ATTEMPT_STATUSES } },
-          },
+          refundAttempts: { none: { status: { in: ownedStatuses } } },
         },
         select: REFUND_SWEEP_CANDIDATE_SELECT,
         orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
         take: REFUND_SWEEP_BATCH,
       });
+    // Branches 1-2 also leave out orders with a finalized refund in SQL, not
+    // only in app code: a closed order with a carried-out refund (partial,
+    // or a zero-cash settlement that records nothing on the payment) would
+    // otherwise match forever, fill the 50-row batch and hide new cancels,
+    // and a zero-cash one would be refunded in full.
+    const settledOrOwned = [
+      ...UNRESOLVED_REFUND_ATTEMPT_STATUSES,
+      RefundAttemptStatus.finalized,
+    ];
 
-    // 1) Tekil (order-bazlı) ödemeler — Order.payment doğrudan siparişe bağlı.
-    // Kısmi iade sonrası payment `completed` KALIR (MONEY-H4: sonraki kısmi iadeler
-    // mümkün olsun diye), o yüzden bu sorgu iadesi çoktan bitmiş siparişi de görür →
-    // `hasRecordedRefund` ile elenir (grup dalıyla aynı kural).
-    const orders = await findCandidates({
-      status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
-      payment: { is: { status: PaymentStatus.completed, ...sweepable } },
-    });
+    // 1) Single-order payments: Order.payment belongs to the order. After a
+    // partial refund the payment stays `completed` (MONEY-H4), hence the
+    // finalized-attempt filter and the `hasCarriedOutRefund` backstop.
+    const orders = await findCandidates(
+      {
+        status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
+        payment: { is: { status: PaymentStatus.completed, ...sweepable } },
+      },
+      settledOrOwned,
+    );
 
-    // 2) MONEY-H5: GRUP (sepet) siparişleri. Grup ödemesinde Order.payment NULL'dur —
-    // ödeme CheckoutGroup'a bağlıdır — bu yüzden yukarıdaki `payment.is.status`
-    // filtresi sepet siparişlerini HİÇ görmez ve iptal edilen sepet siparişi asla
-    // iade edilmezdi. Grup ödemesi ancak grubun TÜM siparişleri iade edilince
-    // `refunded` olduğundan, hâlâ `completed` olan gruptaki iptal/iade siparişleri
-    // henüz iade edilmemiş adaylardır. Zaten iade edilmişleri (grup payment
-    // metadata.refundedOrders) app tarafında eleriz — aksi halde processRefund
-    // `orderAlreadyRefunded` fırlatıp her turda gürültülü REFUND_MANUAL_REVIEW üretir.
-    const groupOrders = await findCandidates({
-      status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
-      payment: { is: null },
-      checkoutGroupId: { not: null },
-      checkoutGroup: {
-        is: {
-          payment: { is: { status: PaymentStatus.completed, ...sweepable } },
+    // 2) MONEY-H5: basket (group) orders. Their Order.payment is null (the
+    // payment belongs to the CheckoutGroup), so branch 1 never sees them. The
+    // group payment turns `refunded` only when every order of the group is
+    // refunded, so cancelled orders of a group whose payment is still
+    // `completed` are candidates until their own refund is done.
+    const groupOrders = await findCandidates(
+      {
+        status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
+        payment: { is: null },
+        checkoutGroupId: { not: null },
+        checkoutGroup: {
+          is: {
+            payment: { is: { status: PaymentStatus.completed, ...sweepable } },
+          },
         },
       },
-    });
-
-    // 3) SEAM-B3 recovery: outbound paket göndericiye İADE DÖNMÜŞ (shipment.status=returned)
-    // ama processRefund başarısız olduğu için `refund_requested`'da TAKILI siparişler.
-    // surat-tracking `applyTrackingUpdate` bunları refund_requested yapıp processRefund'ı
-    // dener; başarısız olursa poller terminal (returned) shipment'ı ARTIK POLLAMADIĞINDAN
-    // kendi retry EDEMEZ → burada güvenilir retry. `shipment.status=returned` bunları
-    // normal-akış refund_requested siparişlerinden (outbound `delivered`, iade RefundRequest'te
-    // ayrı izlenir) ayıran güvenli ayraçtır. processRefund başarınca order=cancelled → bir
-    // daha eşleşmez (idempotent).
-    const returnedStuckOrders = await findCandidates({
-      status: OrderStatus.refund_requested,
-      shipment: { is: { status: ShipmentStatus.returned } },
-      ...(copiedBefore
-        ? {
-            OR: [
-              { payment: { is: sweepable } },
-              { checkoutGroup: { is: { payment: { is: sweepable } } } },
-            ],
-          }
-        : {}),
-    });
-
-    // Dal 1 ve 2'de atlananlar TERMİNAL durumdadır (cancelled/refunded): iade
-    // kararı icra edilmiş, sipariş kapanmıştır → sessizce elenirler. Dal 3'te ise
-    // sipariş `refund_requested`, yani terminal DEĞİL: iadesi kısmen kaydedilmiş
-    // ama sipariş kapanmamış bir paket bu sweep dışında hiçbir yerden ilerlemez
-    // (poller terminal shipment'ı artık pollamaz) → sessiz kalmasın, günde bir
-    // kez (sipariş başına) uyar.
-    const returnedCandidates = partitionRefundCandidates(returnedStuckOrders);
-    const returnedAlarms = dailyAlarms(
-      storedReturnedAlarms,
-      returnedCandidates.skipped,
-      now,
+      settledOrOwned,
     );
-    for (const orderId of returnedAlarms.due) {
-      this.logger.warn(
-        `REFUND_MANUAL_REVIEW: order ${orderId} has a recorded refund but is still refund_requested; ` +
-          `the refund sweep cannot close it, manual review needed`,
-      );
+
+    // 3) SEAM-B3 recovery: the outbound parcel came back to the sender
+    // (shipment `returned`) but the refund failed, so the order is stuck in
+    // `refund_requested`. The tracking poller stops at a terminal shipment
+    // and cannot retry; this sweep does. `shipment.status = returned` tells
+    // them apart from ordinary `refund_requested` orders (return tracked on
+    // the RefundRequest). Orders with a carried-out refund stay in this
+    // query: closed money on a still open order is the stuck case alarmed
+    // below, never a second (full) refund.
+    const returnedStuckOrders = await findCandidates(
+      {
+        status: OrderStatus.refund_requested,
+        shipment: { is: { status: ShipmentStatus.returned } },
+        ...(copiedBefore
+          ? {
+              OR: [
+                { payment: { is: sweepable } },
+                { checkoutGroup: { is: { payment: { is: sweepable } } } },
+              ],
+            }
+          : {}),
+      },
+      UNRESOLVED_REFUND_ATTEMPT_STATUSES,
+    );
+
+    // Skips in branches 1-2 are terminal (cancelled/refunded: the refund was
+    // carried out) and silent. In branch 3 the order is not terminal: a
+    // refund is recorded but the order is still open, and nothing but this
+    // sweep would move it, so it is reported once a day per order.
+    const returnedCandidates = partitionRefundCandidates(returnedStuckOrders);
+    for (const orderId of returnedCandidates.skipped) {
+      if (
+        await claimRefundAlarm(this.cache, `refund-sweep:returned:${orderId}`)
+      ) {
+        this.logger.warn(
+          `REFUND_MANUAL_REVIEW: order ${orderId} has a recorded refund but is still refund_requested; ` +
+            `the refund sweep cannot close it, manual review needed`,
+        );
+      }
     }
 
     const allOrderIds = [
@@ -249,13 +264,14 @@ export class RefundOrderSweepService {
     let failed = 0;
     for (const orderId of allOrderIds) {
       try {
-        // Dal 1-2: sipariş zaten iptal (aktörü korunur). Dal 3: paket
-        // göndericiye iade döndü — kimse "iptal et" demedi, sistem kapatır.
+        // Branches 1-2: the order is already cancelled (its actor is kept).
+        // Branch 3: the parcel came back; nobody asked to cancel, the system
+        // closes it. The sweep raises its own alarm (below).
         await this.paymentRefund.processRefund(orderId, undefined, {
           cancelledBy: CancellationActor.system,
+          callerAlarms: true,
         });
         refunded++;
-        delete backoff[orderId];
       } catch (error) {
         failed++;
         if (error instanceof RefundPendingReconciliationException) {
@@ -265,71 +281,23 @@ export class RefundOrderSweepService {
           this.logger.warn(
             `Auto-refund of order ${orderId} handed to refund attempt reconciliation: ${errorMessage(error)}`,
           );
-          delete backoff[orderId];
           continue;
         }
-        const { entry, alarm } = recordRefundSweepFailure(
-          backoff[orderId],
-          now,
-        );
-        backoff[orderId] = entry;
         // One line per order (the Sentry repeat throttle keys it by the
-        // order id). Stock is restored at cancel time, so a stuck refund
-        // only holds the buyer's money.
+        // order id). Stock is restored at cancel time, so a stuck refund only
+        // holds the buyer's money.
         const line =
-          `REFUND_MANUAL_REVIEW: auto-refund of order ${orderId} failed: ${errorMessage(error)} ` +
-          `(failure ${entry.failures} since ${entry.firstFailedAt}, next try after ${entry.nextAttemptAt})`;
-        if (alarm) {
+          `REFUND_MANUAL_REVIEW: auto-refund of order ${orderId} failed: ${errorMessage(error)}; ` +
+          `the sweep retries it with a growing wait`;
+        if (
+          await claimRefundAlarm(this.cache, `refund-sweep:order:${orderId}`)
+        ) {
           this.logger.error(line);
         } else {
           this.logger.warn(line);
         }
       }
     }
-
-    await this.writeState(
-      BACKOFF_KEY,
-      storedBackoff,
-      backoff,
-      BACKOFF_TTL_SECONDS,
-    );
-    await this.writeState(
-      RETURNED_ALARM_KEY,
-      storedReturnedAlarms,
-      returnedAlarms.stamps,
-      ALARM_TTL_SECONDS,
-    );
     return { refunded, failed };
-  }
-
-  /** The cache is advisory: unreadable means "no state", the old behaviour. */
-  private async readState(key: string): Promise<unknown> {
-    try {
-      return await this.cache.get<unknown>(key);
-    } catch (error) {
-      this.logger.warn(
-        `Refund sweep state ${key} unreadable, sweeping without it: ${errorMessage(error)}`,
-      );
-      return null;
-    }
-  }
-
-  private async writeState(
-    key: string,
-    previous: unknown,
-    next: object,
-    ttlSeconds: number,
-  ): Promise<void> {
-    const unchanged =
-      JSON.stringify(previous ?? {}) === JSON.stringify(next) &&
-      Object.keys(next).length === 0;
-    if (unchanged) return;
-    try {
-      await this.cache.set(key, next, { ttl: ttlSeconds });
-    } catch (error) {
-      this.logger.warn(
-        `Refund sweep state ${key} not saved: ${errorMessage(error)}`,
-      );
-    }
   }
 }

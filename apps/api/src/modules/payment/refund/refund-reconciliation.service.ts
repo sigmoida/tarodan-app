@@ -16,7 +16,7 @@ import {
 } from "../helpers/refund-attempt-actor";
 import { REFUND_FAILURE_PROVIDER_NOTHING_LEFT } from "../helpers/refund-provider-failure";
 import {
-  dailyAlarms,
+  claimRefundAlarm,
   sweepablePaymentWhere,
 } from "../helpers/refund-sweep-policy";
 
@@ -27,12 +27,17 @@ const REFUND_RESOLVE_AMOUNT_TOLERANCE_TL = 0.05;
 
 /** A `submitting` attempt older than this ended without a durable answer. */
 const STALE_SUBMISSION_MINUTES = 10;
-/** Attempts per run: recovery candidates, quarantine, review alarm. */
+/** Attempts per run: recovery candidates and quarantine. */
 const RECOVERY_BATCH = 50;
-const REVIEW_ALARM_BATCH = 200;
-/** Cache key of the once-a-day manual review alarm (attempt id -> last alarm). */
-const REVIEW_ALARM_KEY = "refund-alarm:manual-review";
-const REVIEW_ALARM_TTL_SECONDS = 2 * 24 * 60 * 60;
+/**
+ * Attempts the review alarm looks at per run, newest first: a newly parked
+ * attempt always alarms; past this many, the oldest ones (alarmed before)
+ * skip their daily repeat.
+ */
+const REVIEW_ALARM_BATCH = 500;
+/** Cache key of an attempt's once-a-day manual review alarm. */
+const reviewAlarmKey = (attemptId: string) =>
+  `refund-alarm:review:${attemptId}`;
 const STALE_SUBMISSION_REASON =
   "Refund submission ended without a durable provider response";
 
@@ -51,9 +56,10 @@ function attemptSubject(attempt: {
 }
 
 /**
- * İade denemesi (RefundAttempt) mutabakat süpürmeleri (cron). PaymentReconciliationService
- * facade'i aynı imzalarla buraya delege eder (asiklik: REC→REF). The order
- * refund retry sweep is `RefundOrderSweepService`.
+ * Refund attempt (RefundAttempt) reconciliation sweeps (cron).
+ * `PaymentReconciliationService` delegates here with the same signatures
+ * (acyclic: REC -> REF). The order refund retry sweep is
+ * `RefundOrderSweepService`.
  *
  * On staging, attempts of payments copied from production are left alone
  * (`UatProductionCopyService`): the PayTR test store knows nothing of them.
@@ -109,8 +115,8 @@ export class RefundReconciliationService {
       where: {
         status: RefundAttemptStatus.manual_review,
         provider: "paytr",
-        // Test şeridi iadesi PayTR'ye hiç gitmez; durum-sorguda karşılığı yoktur.
-        // Staging: production copies are unknown to the PayTR test store.
+        // A test-lane refund never reaches PayTR: the inquiry has nothing on
+        // it. Staging: production copies are unknown to the PayTR test store.
         payment: { ...LIVE_PAYMENT, ...sweepablePaymentWhere(copiedBefore) },
         updatedAt: { lt: cutoff },
         // PayTR said nothing is left to refund: the inquiry would find no
@@ -314,8 +320,8 @@ export class RefundReconciliationService {
       checked++;
       try {
         const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
-        // Talepten doğan denemede aktör talebin kendisindedir (alıcı ya da
-        // platform iptali) — anahtar tek başına ayırt edemez.
+        // An attempt born from a refund request carries its actor in the
+        // request (buyer or platform cancel); the key alone cannot tell.
         const request = refundRequestId
           ? await this.prisma.refundRequest.findUnique({
               where: { id: refundRequestId },
@@ -331,9 +337,10 @@ export class RefundReconciliationService {
               attempt.idempotencyKey,
               request?.metadata,
             ),
-            // İncelemeye/mutabakata düşmüş platform iptali bu kurtarmayla
-            // kesinleşirse: kod siparişe yazılır ve genel iptal metni yerine
-            // nedenli platform duyurusu gider (processRefund).
+            // A platform cancel that fell to review and completes with this
+            // recovery: the code is written on the order and the platform
+            // notice with the reason goes out instead of the generic one
+            // (processRefund).
             adminCancelReasonCode: refundRequestAdminReasonCode(
               request?.metadata,
             ),
@@ -398,7 +405,7 @@ export class RefundReconciliationService {
     const manualReview = await this.prisma.refundAttempt.count({
       where: { status: RefundAttemptStatus.manual_review, ...paymentFilter },
     });
-    await this.alarmManualReview(now, paymentFilter, quarantined);
+    await this.alarmManualReview(paymentFilter, quarantined);
 
     if (recovered > 0) {
       this.logger.warn(
@@ -446,6 +453,8 @@ export class RefundReconciliationService {
       });
       if (moved.count !== 1) continue;
       quarantined.add(attempt.id);
+      // Its daily review alarm starts now: this line is today's.
+      await claimRefundAlarm(this.cache, reviewAlarmKey(attempt.id));
       this.logger.error(
         `REFUND_MANUAL_REVIEW: ${attemptSubject(attempt)} quarantined: the submission ended without a durable provider response; check PayTR before resolving it`,
       );
@@ -455,49 +464,28 @@ export class RefundReconciliationService {
 
   /**
    * One error line per attempt still in manual review, at most once a day
-   * each (cache stamps, helpers/refund-sweep-policy). An attempt quarantined
-   * in this run already had its line. Without the cache every run alarms
-   * again, the old behaviour.
+   * each (an atomic claim per attempt, helpers/refund-sweep-policy; without
+   * the cache every run alarms, fail loud). Newest first, so a newly parked
+   * attempt always alarms. An attempt quarantined in this run already had
+   * its line.
    */
   private async alarmManualReview(
-    now: Date,
     paymentFilter: { payment?: ReturnType<typeof sweepablePaymentWhere> },
     quarantined: Set<string>,
   ): Promise<void> {
     const inReview = await this.prisma.refundAttempt.findMany({
       where: { status: RefundAttemptStatus.manual_review, ...paymentFilter },
       select: { id: true, orderId: true, tradeId: true, failureReason: true },
-      orderBy: { updatedAt: "asc" },
+      orderBy: { updatedAt: "desc" },
       take: REVIEW_ALARM_BATCH,
     });
-    let stored: unknown = null;
-    try {
-      stored = await this.cache.get<unknown>(REVIEW_ALARM_KEY);
-    } catch (error) {
-      this.logger.warn(
-        `Refund review alarm state unreadable: ${errorMessage(error)}`,
-      );
-    }
-    const { due, stamps } = dailyAlarms(
-      stored,
-      inReview.map((attempt) => attempt.id),
-      now,
-    );
-    const dueIds = new Set(due);
     for (const attempt of inReview) {
-      if (!dueIds.has(attempt.id) || quarantined.has(attempt.id)) continue;
+      if (quarantined.has(attempt.id)) continue;
+      if (!(await claimRefundAlarm(this.cache, reviewAlarmKey(attempt.id)))) {
+        continue;
+      }
       this.logger.error(
         `REFUND_MANUAL_REVIEW: ${attemptSubject(attempt)} needs a manual provider check: ${attempt.failureReason ?? "no reason recorded"}`,
-      );
-    }
-    if (inReview.length === 0 && stored === null) return;
-    try {
-      await this.cache.set(REVIEW_ALARM_KEY, stamps, {
-        ttl: REVIEW_ALARM_TTL_SECONDS,
-      });
-    } catch (error) {
-      this.logger.warn(
-        `Refund review alarm state not saved: ${errorMessage(error)}`,
       );
     }
   }

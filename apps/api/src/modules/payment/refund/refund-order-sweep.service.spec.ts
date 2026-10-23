@@ -7,39 +7,57 @@ import { RefundPendingReconciliationException } from "../../payment-providers/re
  * the `payment-expired` cron (every 5 minutes) resent a refund PayTR kept
  * refusing and logged it at error on every run. Now:
  *
- * - each failing order waits longer after every failure (10 min, doubling,
- *   capped at 6 h) and is not even queried while it waits;
+ * - an order whose refund attempt failed waits longer the longer it has been
+ *   failing (read from the attempt itself) and is not even queried meanwhile;
  * - the alarm (error, `REFUND_MANUAL_REVIEW`, one line per order id) goes out
- *   once a day per order; the runs in between log a warn;
- * - an order whose refund already has an unresolved attempt (in flight,
- *   succeeded but not finalized, or in manual review) belongs to the attempt
- *   recovery or to a person, not to this sweep: it is not queried;
+ *   once a day per order (atomic claim per order); the runs in between log a
+ *   warn; without the cache it alarms every time (fail loud);
+ * - an order whose refund has an unresolved attempt belongs to the attempt
+ *   recovery or a person; an order whose refund was carried out (finalized,
+ *   also a zero-cash settlement) is never refunded again and never fills the
+ *   batch;
  * - on staging, orders paid before the last production copy are left out.
- *
- * The backoff state is advisory (Redis): if the cache is down the sweep
- * behaves as before (retries every run, alarms every run).
  */
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const NOW = new Date("2026-10-23T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
 
-type Candidate = { id: string; payment?: { metadata: unknown } | null };
+type Candidate = {
+  id: string;
+  payment?: { metadata: unknown } | null;
+  refundAttempts?: { id: string }[];
+};
+type FailedAttempt = { orderId: string; createdAt: Date; updatedAt: Date };
+type OrderWhere = Prisma.OrderWhereInput & {
+  id?: unknown;
+  OR?: unknown;
+  refundAttempts?: unknown;
+};
 
-function makeHarness(opts: { copiedBefore?: Date | null } = {}) {
-  const store = new Map<string, unknown>();
+function makeHarness(
+  opts: { copiedBefore?: Date | null; cacheDown?: boolean } = {},
+) {
+  // The alarm claims behave like Redis `SET NX EX` against a test clock.
+  let clock = NOW;
+  const claims = new Map<string, number>();
   const cache = {
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    set: jest.fn(async (key: string, value: unknown) => {
-      store.set(key, JSON.parse(JSON.stringify(value)));
+    claimKey: jest.fn(async (key: string, ttlSeconds: number) => {
+      if (opts.cacheDown) return "unavailable" as const;
+      const expiresAt = claims.get(key);
+      if (expiresAt !== undefined && expiresAt > clock.getTime()) {
+        return "held" as const;
+      }
+      claims.set(key, clock.getTime() + ttlSeconds * 1000);
+      return "claimed" as const;
     }),
   };
   /** Candidates per branch for the next run: [single, group, returned]. */
   let branches: Candidate[][] = [[], [], []];
+  let failedAttempts: FailedAttempt[] = [];
   const prisma = {
-    order: {
-      findMany: jest.fn(async () => branches.shift() ?? []),
-    },
+    order: { findMany: jest.fn(async () => branches.shift() ?? []) },
+    refundAttempt: { findMany: jest.fn(async () => failedAttempts) },
   };
   const paymentRefund = {
     processRefund: jest.fn().mockResolvedValue({ success: true }),
@@ -53,60 +71,132 @@ function makeHarness(opts: { copiedBefore?: Date | null } = {}) {
     cache as never,
     productionCopy as never,
   );
-  const logger = (service as unknown as { logger: Record<string, unknown> })
-    .logger;
-  const error = jest
-    .spyOn(logger as never, "error" as never)
-    .mockImplementation((() => undefined) as never);
-  const warn = jest
-    .spyOn(logger as never, "warn" as never)
-    .mockImplementation((() => undefined) as never);
-  const nextRun = (candidates: Candidate[][]) => {
+  const logger = (
+    service as unknown as {
+      logger: {
+        error: (message: string) => void;
+        warn: (message: string) => void;
+      };
+    }
+  ).logger;
+  const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+  const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+  /** Prepares one run at `now` with these candidates and failed attempts. */
+  const nextRun = (
+    now: Date,
+    candidates: Candidate[][],
+    failed: FailedAttempt[] = [],
+  ) => {
+    clock = now;
     branches = candidates;
+    failedAttempts = failed;
     prisma.order.findMany.mockClear();
+    prisma.refundAttempt.findMany.mockClear();
     paymentRefund.processRefund.mockClear();
     error.mockClear();
     warn.mockClear();
   };
   const wheres = () =>
     (
-      prisma.order.findMany.mock.calls as unknown as [
-        { where: Prisma.OrderWhereInput & { id?: unknown; OR?: unknown } },
-      ][]
+      prisma.order.findMany.mock.calls as unknown as [{ where: OrderWhere }][]
     ).map(([args]) => args.where);
-  return {
-    service,
-    prisma,
-    paymentRefund,
-    productionCopy,
-    cache,
-    store,
-    error,
-    warn,
-    nextRun,
-    wheres,
-  };
+  return { service, prisma, paymentRefund, error, warn, nextRun, wheres };
 }
 
-const single = (id: string): Candidate => ({
-  id,
-  payment: { metadata: {} },
+const single = (id: string): Candidate => ({ id, payment: { metadata: {} } });
+const failedAttempt = (
+  orderId: string,
+  firstFailedAt: Date,
+  lastFailedAt: Date,
+): FailedAttempt => ({
+  orderId,
+  createdAt: firstFailedAt,
+  updatedAt: lastFailedAt,
 });
 
-describe("RefundOrderSweepService.processRefundedOrders backoff and alarm", () => {
-  it("a refused refund is not resent on the next 5-minute run, and alarms once", async () => {
+describe("RefundOrderSweepService.processRefundedOrders backoff (from the attempt ledger)", () => {
+  it("reads only the failed attempts that can still be waiting", async () => {
     const h = makeHarness();
-    h.nextRun([[single("order-1")], [], []]);
-    h.paymentRefund.processRefund.mockRejectedValueOnce(
+    h.nextRun(NOW, [[], [], []]);
+
+    await h.service.processRefundedOrders(NOW);
+
+    expect(h.prisma.refundAttempt.findMany).toHaveBeenCalledWith({
+      where: {
+        status: RefundAttemptStatus.failed,
+        orderId: { not: null },
+        updatedAt: { gt: at(-6 * HOUR) },
+      },
+      select: { orderId: true, createdAt: true, updatedAt: true },
+    });
+  });
+
+  it("an order whose attempt just failed is kept out of every candidate query", async () => {
+    const h = makeHarness();
+    h.nextRun(
+      at(5 * MINUTE),
+      [[], [], []],
+      [failedAttempt("order-1", NOW, NOW)],
+    );
+
+    await h.service.processRefundedOrders(at(5 * MINUTE));
+
+    const wheres = h.wheres();
+    expect(wheres).toHaveLength(3);
+    for (const where of wheres) {
+      expect(where.id).toEqual({ notIn: ["order-1"] });
+    }
+    expect(h.paymentRefund.processRefund).not.toHaveBeenCalled();
+  });
+
+  it("is due again once its wait is over (10 minutes after a first failure)", async () => {
+    const h = makeHarness();
+    h.nextRun(
+      at(10 * MINUTE),
+      [[single("order-1")], [], []],
+      [failedAttempt("order-1", NOW, NOW)],
+    );
+
+    await h.service.processRefundedOrders(at(10 * MINUTE));
+
+    expect(h.wheres()[0].id).toBeUndefined();
+    expect(h.paymentRefund.processRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits longer the longer the attempt has been failing", async () => {
+    const h = makeHarness();
+    // Failing since 40 minutes before its last failure: waits 40 more.
+    const failing = failedAttempt(
+      "order-1",
+      at(-70 * MINUTE),
+      at(-30 * MINUTE),
+    );
+
+    h.nextRun(NOW, [[], [], []], [failing]);
+    await h.service.processRefundedOrders(NOW);
+    expect(h.wheres()[0].id).toEqual({ notIn: ["order-1"] });
+
+    h.nextRun(at(10 * MINUTE), [[], [], []], [failing]);
+    await h.service.processRefundedOrders(at(10 * MINUTE));
+    expect(h.wheres()[0].id).toBeUndefined();
+  });
+});
+
+describe("RefundOrderSweepService.processRefundedOrders alarm", () => {
+  it("first failure: one error line naming the order", async () => {
+    const h = makeHarness();
+    h.paymentRefund.processRefund.mockRejectedValue(
       new Error(
-        "Talep edilen iade tutari (1556 TL), kalan tutardan (15 TL) fazla olamaz.",
+        "Talep edilen iade tutari (349 TL), kalan tutardan (15 TL) fazla olamaz.",
       ),
     );
+    h.nextRun(NOW, [[single("order-1")], [], []]);
 
     await expect(h.service.processRefundedOrders(NOW)).resolves.toEqual({
       refunded: 0,
       failed: 1,
     });
+
     expect(h.error).toHaveBeenCalledTimes(1);
     expect(h.error.mock.calls[0][0]).toEqual(
       expect.stringContaining("REFUND_MANUAL_REVIEW"),
@@ -114,62 +204,46 @@ describe("RefundOrderSweepService.processRefundedOrders backoff and alarm", () =
     expect(h.error.mock.calls[0][0]).toEqual(
       expect.stringContaining("order-1"),
     );
-
-    // 5 minutes later: the order is kept out of every candidate query.
-    h.nextRun([[], [], []]);
-    await h.service.processRefundedOrders(at(5 * MINUTE));
-    for (const where of h.wheres()) {
-      expect(where.id).toEqual({ notIn: ["order-1"] });
-    }
-    expect(h.paymentRefund.processRefund).not.toHaveBeenCalled();
-    expect(h.error).not.toHaveBeenCalled();
   });
 
-  it("retries after the wait, with a warn instead of a second alarm the same day", async () => {
+  it("a repeat the same day is a warn; a day later it alarms again", async () => {
     const h = makeHarness();
-    h.nextRun([[single("order-1")], [], []]);
     h.paymentRefund.processRefund.mockRejectedValue(new Error("refused"));
+    h.nextRun(NOW, [[single("order-1")], [], []]);
     await h.service.processRefundedOrders(NOW);
 
-    h.nextRun([[single("order-1")], [], []]);
+    h.nextRun(at(10 * MINUTE), [[single("order-1")], [], []]);
     await h.service.processRefundedOrders(at(10 * MINUTE));
-
-    expect(h.wheres()[0].id).toBeUndefined();
-    expect(h.paymentRefund.processRefund).toHaveBeenCalledTimes(1);
     expect(h.error).not.toHaveBeenCalled();
     expect(h.warn).toHaveBeenCalledWith(expect.stringContaining("order-1"));
 
-    // The second failure doubles the wait: still waiting 15 minutes later.
-    h.nextRun([[], [], []]);
-    await h.service.processRefundedOrders(at(25 * MINUTE));
-    expect(h.wheres()[0].id).toEqual({ notIn: ["order-1"] });
-  });
-
-  it("alarms again a day after the last alarm", async () => {
-    const h = makeHarness();
-    h.paymentRefund.processRefund.mockRejectedValue(new Error("refused"));
-    h.nextRun([[single("order-1")], [], []]);
-    await h.service.processRefundedOrders(NOW);
-
-    h.nextRun([[single("order-1")], [], []]);
+    h.nextRun(at(24 * HOUR), [[single("order-1")], [], []]);
     await h.service.processRefundedOrders(at(24 * HOUR));
-
     expect(h.error).toHaveBeenCalledTimes(1);
-    expect(h.error.mock.calls[0][0]).toEqual(
-      expect.stringContaining("order-1"),
-    );
   });
 
   it("one alarm line per order, so each order is its own report", async () => {
     const h = makeHarness();
     h.paymentRefund.processRefund.mockRejectedValue(new Error("refused"));
-    h.nextRun([[single("order-1"), single("order-2")], [], []]);
+    h.nextRun(NOW, [[single("order-1"), single("order-2")], [], []]);
 
     await h.service.processRefundedOrders(NOW);
 
     expect(h.error).toHaveBeenCalledTimes(2);
     expect(h.error.mock.calls[0][0]).toContain("order-1");
     expect(h.error.mock.calls[1][0]).toContain("order-2");
+  });
+
+  it("without the cache every failure alarms (fail loud)", async () => {
+    const h = makeHarness({ cacheDown: true });
+    h.paymentRefund.processRefund.mockRejectedValue(new Error("refused"));
+
+    h.nextRun(NOW, [[single("order-1")], [], []]);
+    await h.service.processRefundedOrders(NOW);
+    h.nextRun(at(10 * MINUTE), [[single("order-1")], [], []]);
+    await h.service.processRefundedOrders(at(10 * MINUTE));
+
+    expect(h.error).toHaveBeenCalledTimes(1);
   });
 
   it("a refund handed to attempt reconciliation is a warn: the attempt's own alarm owns it", async () => {
@@ -179,7 +253,7 @@ describe("RefundOrderSweepService.processRefundedOrders backoff and alarm", () =
         "Talep edilen iade tutari (1556 TL), kalan tutardan (0 TL) fazla olamaz.",
       ),
     );
-    h.nextRun([[single("order-1")], [], []]);
+    h.nextRun(NOW, [[single("order-1")], [], []]);
 
     await expect(h.service.processRefundedOrders(NOW)).resolves.toEqual({
       refunded: 0,
@@ -188,51 +262,94 @@ describe("RefundOrderSweepService.processRefundedOrders backoff and alarm", () =
 
     expect(h.error).not.toHaveBeenCalled();
     expect(h.warn).toHaveBeenCalledWith(expect.stringContaining("order-1"));
-    // No backoff of its own: the unresolved attempt keeps it out of the
-    // queries until a person or the status inquiry resolves it.
-    h.nextRun([[], [], []]);
-    await h.service.processRefundedOrders(at(MINUTE));
-    expect(h.wheres()[0].id).toBeUndefined();
   });
 
-  it("a success clears the order's backoff", async () => {
+  it("tells processRefund that it raises the alarm itself", async () => {
     const h = makeHarness();
-    h.paymentRefund.processRefund.mockRejectedValueOnce(new Error("refused"));
-    h.nextRun([[single("order-1")], [], []]);
-    await h.service.processRefundedOrders(NOW);
-
-    h.nextRun([[single("order-1")], [], []]);
-    await expect(
-      h.service.processRefundedOrders(at(10 * MINUTE)),
-    ).resolves.toEqual({ refunded: 1, failed: 0 });
-
-    expect(h.store.get("refund-sweep:backoff")).toEqual({});
-    h.nextRun([[], [], []]);
-    await h.service.processRefundedOrders(at(11 * MINUTE));
-    expect(h.wheres()[0].id).toBeUndefined();
-  });
-
-  it("orders whose refund has an unresolved attempt are not swept (manual review stays parked)", async () => {
-    const h = makeHarness();
+    h.nextRun(NOW, [[single("order-1")], [], []]);
 
     await h.service.processRefundedOrders(NOW);
 
-    const wheres = h.wheres();
-    expect(wheres).toHaveLength(3);
-    for (const where of wheres) {
+    expect(h.paymentRefund.processRefund).toHaveBeenCalledWith(
+      "order-1",
+      undefined,
+      { cancelledBy: CancellationActor.system, callerAlarms: true },
+    );
+  });
+
+  it("a stuck returned-shipment order is reported once a day, not every run", async () => {
+    const h = makeHarness();
+    const stuck: Candidate = {
+      id: "returned-refunded",
+      payment: { metadata: { refundedOrders: { "returned-refunded": 500 } } },
+    };
+
+    h.nextRun(NOW, [[], [], [stuck]]);
+    await h.service.processRefundedOrders(NOW);
+    expect(h.warn).toHaveBeenCalledTimes(1);
+    expect(h.warn.mock.calls[0][0]).toContain("REFUND_MANUAL_REVIEW");
+    expect(h.warn.mock.calls[0][0]).toContain("returned-refunded");
+
+    h.nextRun(at(5 * MINUTE), [[], [], [stuck]]);
+    await h.service.processRefundedOrders(at(5 * MINUTE));
+    expect(h.warn).not.toHaveBeenCalled();
+
+    h.nextRun(at(24 * HOUR), [[], [], [stuck]]);
+    await h.service.processRefundedOrders(at(24 * HOUR));
+    expect(h.warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("RefundOrderSweepService.processRefundedOrders candidates", () => {
+  const unresolved = [
+    RefundAttemptStatus.prepared,
+    RefundAttemptStatus.submitting,
+    RefundAttemptStatus.succeeded,
+    RefundAttemptStatus.manual_review,
+  ];
+
+  /**
+   * Review finding: closed orders with a carried-out refund (partial, or a
+   * zero-cash settlement that records 0 on the payment) matched branches 1-2
+   * forever. Filtered only in app code, 50 of them filled the batch and no
+   * new cancellation was ever refunded; a zero-cash one would have been
+   * refunded in full.
+   */
+  it("branches 1-2 leave out orders with an unresolved or finalized attempt, in SQL", async () => {
+    const h = makeHarness();
+
+    await h.service.processRefundedOrders(NOW);
+
+    const [singleWhere, groupWhere, returnedWhere] = h.wheres();
+    for (const where of [singleWhere, groupWhere]) {
       expect(where.refundAttempts).toEqual({
         none: {
-          status: {
-            in: [
-              RefundAttemptStatus.prepared,
-              RefundAttemptStatus.submitting,
-              RefundAttemptStatus.succeeded,
-              RefundAttemptStatus.manual_review,
-            ],
-          },
+          status: { in: [...unresolved, RefundAttemptStatus.finalized] },
         },
       });
     }
+    // Branch 3 keeps finalized ones: a closed refund on an open order is the
+    // stuck case it reports.
+    expect(returnedWhere.refundAttempts).toEqual({
+      none: { status: { in: unresolved } },
+    });
+  });
+
+  it("a returned-shipment order with a zero-cash settlement is reported, never refunded", async () => {
+    const h = makeHarness();
+    const zeroCash: Candidate = {
+      id: "returned-zero-cash",
+      payment: { metadata: { refundedOrders: { "returned-zero-cash": 0 } } },
+      refundAttempts: [{ id: "attempt-finalized" }],
+    };
+    h.nextRun(NOW, [[], [], [zeroCash]]);
+
+    await h.service.processRefundedOrders(NOW);
+
+    expect(h.paymentRefund.processRefund).not.toHaveBeenCalled();
+    expect(h.warn).toHaveBeenCalledWith(
+      expect.stringContaining("returned-zero-cash"),
+    );
   });
 
   it("candidate queries are bounded and ordered", async () => {
@@ -246,48 +363,6 @@ describe("RefundOrderSweepService.processRefundedOrders backoff and alarm", () =
       expect(args.take).toBe(50);
       expect(args.orderBy).toEqual([{ updatedAt: "asc" }, { id: "asc" }]);
     }
-  });
-
-  it("without the cache it behaves as before: retries and alarms every run (fail loud)", async () => {
-    const h = makeHarness();
-    h.cache.get.mockRejectedValue(new Error("redis down"));
-    h.cache.set.mockRejectedValue(new Error("redis down"));
-    h.paymentRefund.processRefund.mockRejectedValue(new Error("refused"));
-
-    h.nextRun([[single("order-1")], [], []]);
-    await h.service.processRefundedOrders(NOW);
-    h.nextRun([[single("order-1")], [], []]);
-    await h.service.processRefundedOrders(at(5 * MINUTE));
-
-    expect(h.paymentRefund.processRefund).toHaveBeenCalledTimes(1);
-    expect(h.error).toHaveBeenCalledTimes(1);
-    expect(h.paymentRefund.processRefund).toHaveBeenCalledWith(
-      "order-1",
-      undefined,
-      { cancelledBy: CancellationActor.system },
-    );
-  });
-
-  it("a stuck returned-shipment order is reported once a day, not every run", async () => {
-    const h = makeHarness();
-    const stuck: Candidate = {
-      id: "returned-refunded",
-      payment: { metadata: { refundedOrders: { "returned-refunded": 500 } } },
-    };
-
-    h.nextRun([[], [], [stuck]]);
-    await h.service.processRefundedOrders(NOW);
-    expect(h.warn).toHaveBeenCalledTimes(1);
-    expect(h.warn.mock.calls[0][0]).toContain("REFUND_MANUAL_REVIEW");
-    expect(h.warn.mock.calls[0][0]).toContain("returned-refunded");
-
-    h.nextRun([[], [], [stuck]]);
-    await h.service.processRefundedOrders(at(5 * MINUTE));
-    expect(h.warn).not.toHaveBeenCalled();
-
-    h.nextRun([[], [], [stuck]]);
-    await h.service.processRefundedOrders(at(24 * HOUR));
-    expect(h.warn).toHaveBeenCalledTimes(1);
   });
 });
 

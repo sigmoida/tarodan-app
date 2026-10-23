@@ -76,12 +76,23 @@ describe("RefundReconciliationService durable attempt recovery", () => {
         .fn()
         .mockResolvedValue({ refunded: true, paymentId: "pay-trade-1" }),
     };
-    const store = new Map<string, unknown>();
+    // Alarm claims behave like Redis `SET NX EX` against the test clock.
+    const claims = new Map<string, number>();
+    const clock = { now: Date.now() };
     const cache = {
-      get: jest.fn(async (key: string) => store.get(key) ?? null),
-      set: jest.fn(async (key: string, value: unknown) => {
-        store.set(key, JSON.parse(JSON.stringify(value)));
-      }),
+      claimKey: jest.fn(
+        async (
+          key: string,
+          ttlSeconds: number,
+        ): Promise<"claimed" | "held" | "unavailable"> => {
+          const expiresAt = claims.get(key);
+          if (expiresAt !== undefined && expiresAt > clock.now) {
+            return "held" as const;
+          }
+          claims.set(key, clock.now + ttlSeconds * 1000);
+          return "claimed" as const;
+        },
+      ),
     };
     const productionCopy = {
       copiedBefore: jest.fn().mockResolvedValue(opts?.copiedBefore ?? null),
@@ -97,7 +108,12 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     const error = jest
       .spyOn((service as any).logger, "error")
       .mockImplementation(() => undefined);
-    return { service, prisma, paymentRefund, error };
+    /** Runs the recovery at `now` (the alarm claims expire against it). */
+    const runAt = (now: Date) => {
+      clock.now = now.getTime();
+      return service.reconcileStuckRefundMarkers(now);
+    };
+    return { service, prisma, paymentRefund, error, runAt, cache };
   };
 
   it("recovers a prepared order attempt with its original idempotency key", async () => {
@@ -273,14 +289,14 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     });
 
     it("each newly quarantined attempt gets its own error line with its ids", async () => {
-      const { service, error } = makeService({
+      const { runAt, error } = makeService({
         staleAttempts: [
           { id: "stale-1", orderId: "order-1", tradeId: null },
           { id: "stale-2", orderId: null, tradeId: "trade-1" },
         ],
       });
 
-      await service.reconcileStuckRefundMarkers(NOW);
+      await runAt(NOW);
 
       const lines = error.mock.calls.map((call) => String(call[0]));
       expect(lines).toHaveLength(2);
@@ -297,12 +313,12 @@ describe("RefundReconciliationService durable attempt recovery", () => {
         review("attempt-a", "provider_nothing_left: kalan tutardan (0 TL)"),
         review("attempt-b", "payout_completed"),
       ];
-      const { service, error } = makeService({
+      const { runAt, error } = makeService({
         reviewAttempts,
         manualReviewCount: 2,
       });
 
-      await service.reconcileStuckRefundMarkers(NOW);
+      await runAt(NOW);
       const first = error.mock.calls.map((call) => String(call[0]));
       expect(first).toHaveLength(2);
       expect(first[0]).toContain("attempt-a");
@@ -311,26 +327,56 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       expect(first[1]).toContain("attempt-b");
 
       error.mockClear();
-      await service.reconcileStuckRefundMarkers(later(HOUR));
+      await runAt(later(HOUR));
       expect(error).not.toHaveBeenCalled();
 
-      await service.reconcileStuckRefundMarkers(later(24 * HOUR));
+      await runAt(later(24 * HOUR));
       expect(error).toHaveBeenCalledTimes(2);
     });
 
     it("a newly quarantined attempt is not alarmed twice in the same run", async () => {
-      const { service, error } = makeService({
+      const { runAt, error } = makeService({
         staleAttempts: [{ id: "stale-1", orderId: "order-1", tradeId: null }],
         reviewAttempts: [review("stale-1", "Refund submission ended")],
         manualReviewCount: 1,
       });
 
-      await service.reconcileStuckRefundMarkers(NOW);
+      await runAt(NOW);
       expect(error).toHaveBeenCalledTimes(1);
 
       error.mockClear();
-      await service.reconcileStuckRefundMarkers(later(HOUR));
+      await runAt(later(HOUR));
       expect(error).not.toHaveBeenCalled();
+    });
+
+    it("reads the attempts in review newest first, so a newly parked one always alarms", async () => {
+      const { runAt, prisma } = makeService();
+
+      await runAt(NOW);
+
+      const reviewQuery = (
+        prisma.refundAttempt.findMany.mock.calls as unknown as [
+          { where: { status?: unknown }; orderBy: unknown; take: number },
+        ][]
+      )
+        .map(([args]) => args)
+        .find(
+          (args) => args.where.status === RefundAttemptStatus.manual_review,
+        );
+      expect(reviewQuery?.orderBy).toEqual({ updatedAt: "desc" });
+      expect(reviewQuery?.take).toBe(500);
+    });
+
+    it("without the cache every run alarms (fail loud)", async () => {
+      const { runAt, error, cache } = makeService({
+        reviewAttempts: [review("attempt-a", "payout_completed")],
+      });
+      cache.claimKey.mockResolvedValue("unavailable");
+
+      await runAt(NOW);
+      await runAt(later(HOUR));
+
+      expect(error).toHaveBeenCalledTimes(2);
     });
 
     it("staging: production copies are left out of recovery, quarantine and the alarm", async () => {
@@ -338,9 +384,9 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       const sweepable = {
         OR: [{ isTest: true }, { createdAt: { gt: cutoff } }],
       };
-      const { service, prisma } = makeService({ copiedBefore: cutoff });
+      const { runAt, prisma } = makeService({ copiedBefore: cutoff });
 
-      await service.reconcileStuckRefundMarkers(NOW);
+      await runAt(NOW);
 
       const wheres = prisma.refundAttempt.findMany.mock.calls.map(
         ([args]: [{ where: any }]) => args.where,
@@ -356,9 +402,9 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     });
 
     it("live production: no payment filter at all", async () => {
-      const { service, prisma } = makeService({ copiedBefore: null });
+      const { runAt, prisma } = makeService({ copiedBefore: null });
 
-      await service.reconcileStuckRefundMarkers(NOW);
+      await runAt(NOW);
 
       for (const [args] of prisma.refundAttempt.findMany.mock.calls as [
         { where: any },
