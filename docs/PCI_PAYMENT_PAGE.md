@@ -147,10 +147,20 @@ açıktır**: ödeme sayfası storefront chrome'unun (Header/Footer +
 
 ## 4. İhlal raporlaması (11.6.1)
 
-`report-uri`, Sentry DSN'inden türetilen güvenlik uç noktasına gider
+`report-uri` points to the security endpoint derived from the Sentry DSN
 (`sentryReportUri`): `https://<host>/api/<projectId>/security/?sentry_key=<key>`.
-Ayrı bir rapor altyapısı kurmadan CSP ihlalleri Sentry'ye düşer. DSN yoksa
-raporlama sessizce kapalıdır (politika yine uygulanır).
+CSP violations land in Sentry without separate reporting infrastructure.
+
+Reporting is on **only in production** (`reportUriForEnvironment`): the
+directive is emitted when the Sentry environment tag is `production`. The tag
+is `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, or, when unset, derived from the
+`NEXT_PUBLIC_APP_URL` host (`resolveSentryEnvironment`: a `staging` label ->
+`staging`, `tarodan.com.tr` and its subdomains -> `production`), and the
+endpoint carries `&sentry_environment=production` so the reports match the
+production alert rules. Staging and local violations are test noise, not a
+detection signal. Without a DSN, or outside production, reporting is off; the
+policy itself (enforced on the payment pages) is identical in every
+environment.
 
 Bu, 11.6.1'in **tespit** ayağının ilk adımıdır; periyodik envanter karşılaştırması
 ve alarm yönlendirmesi ayrı issue'da izlenmektedir.

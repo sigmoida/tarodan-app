@@ -1094,13 +1094,13 @@ and e-mail values removed.
 Per app (web -> project `tarodan-web`, admin -> project `tarodan-admin`, org
 `tarodan`) and per environment:
 
-| Variable                         | Build / runtime        | Value                                                  |
-| -------------------------------- | ---------------------- | ------------------------------------------------------ |
-| `NEXT_PUBLIC_SENTRY_DSN`         | build (and runtime)    | the project's DSN (public; it ships in the JS bundle)  |
-| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | build                  | `staging` or `production`, never derived from NODE_ENV |
-| `NEXT_PUBLIC_SENTRY_RELEASE`     | build, optional        | leave unset: the short `SOURCE_COMMIT` is used         |
-| `SENTRY_AUTH_TOKEN`              | build only, **secret** | org auth token with release + source map upload scope  |
-| `SENTRY_ORG`, `SENTRY_PROJECT`   | build, optional        | defaults `tarodan` / `tarodan-web` or `tarodan-admin`  |
+| Variable                         | Build / runtime        | Value                                                 |
+| -------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `NEXT_PUBLIC_SENTRY_DSN`         | build (and runtime)    | the project's DSN (public; it ships in the JS bundle) |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | build                  | `staging` or `production`; unset = from the app URL   |
+| `NEXT_PUBLIC_SENTRY_RELEASE`     | build, optional        | leave unset: the short `SOURCE_COMMIT` is used        |
+| `SENTRY_AUTH_TOKEN`              | build only, **secret** | org auth token with release + source map upload scope |
+| `SENTRY_ORG`, `SENTRY_PROJECT`   | build, optional        | defaults `tarodan` / `tarodan-web` or `tarodan-admin` |
 
 Coolify settings, per app (Advanced > Build):
 
