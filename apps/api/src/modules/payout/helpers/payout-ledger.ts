@@ -7,13 +7,18 @@ import {
 import type { LedgerRecordInput } from "../../ledger/ledger.service";
 
 /**
- * The payout's ledger groups: one builder per business event, so every path
- * that completes a payout writes the same entries under the same key.
+ * The payout's ledger groups. One builder per business event, shared by the
+ * automatic completion (PayTR accepted or confirmed) and the admin's manual
+ * settlement, so both write the same entries under the same keys.
  */
 
 /** One `payout_completed` group per payout row, whatever completed it. */
 export const payoutCompletedLedgerKey = (payoutId: string) =>
   `payout-completed:${payoutId}`;
+
+/** One platform-funding group per payout row (external_bank settlement). */
+export const payoutPlatformFundingLedgerKey = (payoutId: string) =>
+  `payout-platform-funding:${payoutId}`;
 
 /** What the payout's ledger rows point at (escrow is checked per order). */
 export interface PayoutLedgerRefs {
@@ -59,5 +64,40 @@ export function payoutCompletedLedgerInput(
     ],
     refs: refsOf(refs),
     ...(metadata === undefined ? {} : { metadata }),
+  };
+}
+
+/**
+ * The platform puts its own money into the seller's escrow before paying a
+ * net the order's escrow no longer holds (residual after a proportional
+ * refund): `seller_escrow` debit (like a capture) and `platform_commission`
+ * credit (platform revenue goes down), both `amount`. The reverse of the
+ * seller-fault residual settlement (`hold-residual-settle:<holdId>`).
+ */
+export function platformFundingLedgerInput(
+  refs: PayoutLedgerRefs,
+  amount: number,
+  metadata: Prisma.InputJsonValue,
+): LedgerRecordInput {
+  const memo = `Platform-funded payout ${refs.payoutId} (order ${refs.orderId ?? "-"}, trade ${refs.tradeId ?? "-"})`;
+  return {
+    eventType: LedgerEventType.adjustment,
+    idempotencyKey: payoutPlatformFundingLedgerKey(refs.payoutId),
+    entries: [
+      {
+        account: LedgerAccount.seller_escrow,
+        direction: LedgerDirection.debit,
+        amount,
+        memo,
+      },
+      {
+        account: LedgerAccount.platform_commission,
+        direction: LedgerDirection.credit,
+        amount,
+        memo,
+      },
+    ],
+    refs: refsOf(refs),
+    metadata,
   };
 }

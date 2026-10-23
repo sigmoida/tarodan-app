@@ -11696,7 +11696,15 @@
       },
       "payout": {
         "transferNotFound": "Payout transfer bulunamadı",
-        "retryStateInvalid": "Durumu {status} olan transfer tekrar denenemez."
+        "retryStateInvalid": "Durumu {status} olan transfer tekrar denenemez.",
+        "providerCheckRequired": "Bu transferin PayTR sonucu bilinmiyor. Tekrar denemeden önce PayTR panelinde bu işlem numarasıyla bir transfer olmadığını doğrulayın ve bir sebep yazın.",
+        "transferStateChanged": "Transfer bu arada değişti. Listeyi yenileyip tekrar kontrol edin.",
+        "referenceRequired": "Ödeme referansı zorunludur.",
+        "reasonRequired": "Bu işlem için sebep zorunludur.",
+        "markPaidNotAllowed": "Bu transfer bu yöntemle ödendi olarak işaretlenemez (durum: {status}, neden: {reason}).",
+        "markPaidMissingInput": "Bu transferin ödeme ya da sipariş bağlantısı eksik. Bu bir veri sorunu: bağlantıyı düzeltip transferi tekrar deneyin, PayTR dışında ödemeyin.",
+        "markPaidAmountChanged": "Ödenecek net tutar değişti, güncel tutar {current} TL. Listeyi yenileyip tutarı kontrol edin.",
+        "markPaidPayoutBlocked": "Bu ödeme şu an yapılamaz ({reason}). Transferi tekrar deneyin; tutar ve koşullar yeniden hesaplanır."
       },
       "product": {
         "approvePendingOnly": "Sadece bekleyen ürünler onaylanabilir",

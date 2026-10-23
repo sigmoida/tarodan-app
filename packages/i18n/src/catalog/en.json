@@ -11696,7 +11696,15 @@
       },
       "payout": {
         "transferNotFound": "Payout transfer not found",
-        "retryStateInvalid": "A transfer in the {status} state cannot be retried."
+        "retryStateInvalid": "A transfer in the {status} state cannot be retried.",
+        "providerCheckRequired": "The PayTR outcome of this transfer is unknown. Before retrying, confirm in the PayTR panel that no transfer with this transaction ID exists, and give a reason.",
+        "transferStateChanged": "The transfer changed in the meantime. Reload the list and check it again.",
+        "referenceRequired": "A payment reference is required.",
+        "reasonRequired": "A reason is required for this action.",
+        "markPaidNotAllowed": "This transfer cannot be marked as paid with this method (status: {status}, reason: {reason}).",
+        "markPaidMissingInput": "This transfer is missing its payment or order link. This is a data problem: fix the link and retry the transfer; do not pay it outside PayTR.",
+        "markPaidAmountChanged": "The net to pay has changed; the current amount is {current} TL. Reload the list and check the amount.",
+        "markPaidPayoutBlocked": "This payout cannot be made right now ({reason}). Retry the transfer so the amount and conditions are recomputed."
       },
       "product": {
         "approvePendingOnly": "Only pending products can be approved",

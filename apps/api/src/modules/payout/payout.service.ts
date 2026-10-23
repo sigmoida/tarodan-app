@@ -126,10 +126,11 @@ export class PayoutService {
   ) {}
 
   /**
-   * "Ödemeniz aktarıldı" e-postası — payout transferi PayTR'de başarıyla
-   * tamamlandığında satıcıya markalı bilgilendirme. Asla throw etmez.
+   * The seller's "payout released" e-mail, sent when a transfer completes at
+   * PayTR or an admin marks it as paid (`resolution/payout-resolution.service.ts`).
+   * Never throws.
    */
-  private async sendPayoutReleasedEmail(
+  async sendPayoutReleasedEmail(
     sellerId: string,
     netAmount: number,
     iban: string,
@@ -201,13 +202,14 @@ export class PayoutService {
   }
 
   /**
-   * Siparişin durumu hold parasının satıcıya gitmesine izin veriyor mu — hold
-   * bırakma yollarıyla AYNI yüklem (`holdPayoutOrderBlock`). Teslim edilmiş
-   * sipariş doğrudan geçer; iade/iptalle kapanmış siparişin KALINTISI yalnız
-   * kusur satıcıda değilse geçer (kusur, sonuçlanmış iade taleplerinden okunur
-   * — bu sorgu yalnız kapanmış siparişte koşar).
+   * Whether the order's state lets the hold money go to the seller: the same
+   * predicate as the hold release paths (`holdPayoutOrderBlock`). A delivered
+   * order passes; the residual of an order closed by a refund or cancellation
+   * passes only when the seller is not at fault (read from the finalized
+   * refund requests; queried only for a closed order). The processor and the
+   * admin's manual settlement (`resolution/`) both check it.
    */
-  private async orderPayoutBlock(order: {
+  async orderPayoutBlock(order: {
     id: string;
     status: OrderStatus;
   }): Promise<HoldReleaseBlockedReason | null> {
@@ -227,7 +229,7 @@ export class PayoutService {
    *
    * @returns engel nedeni (`refund_pending`) veya engel yoksa `null`
    */
-  private async findBlockingRefund(target: {
+  async findBlockingRefund(target: {
     orderId: string | null;
     paymentId: string;
     tradeId?: string | null;
