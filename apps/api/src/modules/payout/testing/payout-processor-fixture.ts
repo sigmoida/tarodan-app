@@ -59,6 +59,7 @@ export interface FixturePayout {
   submittedAmount: number | null;
   submittedTotalAmount: number | null;
   processedAt: Date | null;
+  updatedAt: Date;
   transferIban: string;
   transferName: string;
   paymentHoldId: string | null;
@@ -212,6 +213,7 @@ export class PayoutProcessorWorld {
       submittedAmount: null,
       submittedTotalAmount: null,
       processedAt: null,
+      updatedAt: new Date(),
       transferIban: FIXTURE_IBAN,
       transferName: "Seller Name",
       paymentHoldId: null,
@@ -259,6 +261,7 @@ export class PayoutProcessorWorld {
   }
 
   private apply(row: FixturePayout, data: Record<string, unknown>) {
+    row.updatedAt = new Date();
     for (const [key, value] of Object.entries(data)) {
       (row as unknown as Record<string, unknown>)[key] =
         value !== null &&
@@ -361,7 +364,12 @@ export type TransferMock = jest.Mock;
 /** PayoutService wired to the world, a PayTR transfer double and spies. */
 export function buildPayoutProcessor(
   world: PayoutProcessorWorld,
-  opts: { createPlatformTransfer?: TransferMock; callbackFlag?: boolean } = {},
+  opts: {
+    createPlatformTransfer?: TransferMock;
+    callbackFlag?: boolean;
+    /** Overrides provider resolution (e.g. to make it throw). */
+    resolve?: () => unknown;
+  } = {},
 ) {
   const prisma = world.prisma();
   const createPlatformTransfer: TransferMock =
@@ -373,7 +381,9 @@ export function buildPayoutProcessor(
   const service = new PayoutService(
     prisma as unknown as Deps[0],
     {
-      resolve: () => ({ createPlatformTransfer, verifyTransferCallback }),
+      resolve:
+        opts.resolve ??
+        (() => ({ createPlatformTransfer, verifyTransferCallback })),
     } as unknown as Deps[1],
     {
       get: (key: string) =>

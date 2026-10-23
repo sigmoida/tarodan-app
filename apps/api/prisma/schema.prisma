@@ -2510,7 +2510,8 @@ model PayoutTransfer {
   /// change it). A set submittedAt means PayTR has the instruction, so the
   /// zombie check skips the row. On an unknown outcome (`failed` /
   /// `transfer_outcome_unknown`) submittedAmount holds the net of the request
-  /// that may have gone through while submittedAt stays null.
+  /// that may have gone through; submittedAt stays null until a PayTR
+  /// callback confirms the transfer and stamps the send time.
   submittedAt            DateTime?                     @map("submitted_at")
   submittedAmount        Decimal?                      @map("submitted_amount") @db.Decimal(10, 2)
   /// PayTR `total_amount` of the transfer instruction this row sent or is

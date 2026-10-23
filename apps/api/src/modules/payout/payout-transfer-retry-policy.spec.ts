@@ -288,6 +288,7 @@ describe("payout transfer retry policy", () => {
         createPlatformTransfer,
       });
       await service.processPendingPayouts();
+      const sentAt = world.payout("p1").updatedAt;
 
       await service.handleTransferResultCallback('["PYTRETRY1"]', "hash");
       await service.handleTransferResultCallback('["PYTRETRY1"]', "hash");
@@ -295,6 +296,9 @@ describe("payout transfer retry policy", () => {
       expect(world.payout("p1")).toMatchObject({
         status: PayoutStatus.completed,
         failureReason: null,
+        // The returned-transfer match by IBAN + amount + date needs the send
+        // time; no PayTR reference came back for this one.
+        submittedAt: sentAt,
       });
       expect(world.payout("p1").processedAt).toBeInstanceOf(Date);
       const released = notification.sendTemplateEmailToUser.mock.calls.filter(
@@ -352,6 +356,68 @@ describe("payout transfer retry policy", () => {
       });
       // 449 - 349 (unknown, may be gone) = 100: still fits; one kurus more would not.
       expect(world.payout("p2").submittedTotalAmount).toBe(100);
+    });
+  });
+
+  describe("failures that are not transfer outcomes", () => {
+    it("a provider that cannot be resolved stops the run before the claim; the payout stays pending", async () => {
+      const world = world349();
+      const { service, createPlatformTransfer } = buildPayoutProcessor(world, {
+        resolve: () => {
+          throw new Error("no provider registered");
+        },
+      });
+
+      await expect(service.processPendingPayouts()).rejects.toThrow(
+        "no provider registered",
+      );
+
+      expect(createPlatformTransfer).not.toHaveBeenCalled();
+      expect(world.payout("p1")).toMatchObject({
+        status: PayoutStatus.pending,
+        failureReason: null,
+        submittedTotalAmount: null,
+      });
+    });
+
+    it("a bookkeeping error after PayTR accepted leaves the row processing and the batch goes on", async () => {
+      const world = world349();
+      world.payments.get("pay-1")!.amount = 449;
+      world.addOrderPayout({
+        payoutId: "p2",
+        paymentId: "pay-1",
+        orderId: "o2",
+        orderTotal: 100,
+        holdAmount: 90,
+        merchantOid: "GRPTEST000001T000001",
+        transId: "PYTSIBLING2",
+      });
+      const { service, prisma, createPlatformTransfer, notification } =
+        buildPayoutProcessor(world);
+      // The first write after PayTR's acceptance fails (p1).
+      prisma.payoutTransfer.update.mockRejectedValueOnce(
+        new Error("connection terminated"),
+      );
+
+      const result = await service.processPendingPayouts();
+
+      expect(createPlatformTransfer).toHaveBeenCalledTimes(2);
+      expect(world.payout("p1")).toMatchObject({
+        status: PayoutStatus.processing,
+        submittedTotalAmount: 349,
+        submittedAt: null,
+        failureReason: null,
+        retryCount: 0,
+      });
+      expect(world.payout("p2").status).toBe(PayoutStatus.completed);
+      expect(result).toMatchObject({ processed: 1, failed: 0 });
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /p1.*PYTRETRY1.*accepted by PayTR.*do not resend/,
+        ),
+      );
+      // Only p2 completed: one release e-mail.
+      expect(notification.sendTemplateEmailToUser).toHaveBeenCalledTimes(1);
     });
   });
 
