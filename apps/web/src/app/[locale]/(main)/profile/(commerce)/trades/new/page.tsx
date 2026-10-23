@@ -13,7 +13,7 @@ import TradeAddressPicker from "../_components/TradeAddressPicker";
 import SectionCard from "@/components/ui/SectionCard";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/productPrice";
@@ -135,7 +135,8 @@ function NewTradeContent() {
     return (
       <PageShell className="pb-16">
         <div className="mx-auto w-full max-w-2xl px-4 pt-4">
-          <EmptyStateCard
+          <EmptyState
+            icon={<ArrowsRightLeftIcon className="h-7 w-7" />}
             title={t("trade.targetNotFound")}
             description={t("trade.targetNotFoundDesc")}
             action={

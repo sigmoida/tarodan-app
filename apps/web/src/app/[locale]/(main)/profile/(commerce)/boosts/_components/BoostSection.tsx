@@ -2,12 +2,13 @@
 
 "use client";
 
+import { RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Button, Pagination, Skeleton } from "@tarodan/ui";
+import { EmptyState, Pagination, Skeleton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { MY_LISTINGS_PATH } from "@/lib/paymentKind";
-import { EmptyStateCard } from "@/components/ui/EmptyStateCard";
+import ErrorState from "@/components/feedback/ErrorState";
 import { useInvoiceDownload } from "../../_hooks/useInvoiceDownload";
 import { useMyBoosts } from "../_hooks/useMyBoosts";
 import { groupBoosts, type BoostGroup } from "../_lib/boosts";
@@ -63,20 +64,18 @@ export default function BoostSection({
 
   if (isError) {
     return (
-      <EmptyStateCard
+      <ErrorState
         title={t("profile.boosts.loadFailed")}
-        action={
-          <Button type="button" variant="outline" onClick={() => refetch()}>
-            {t("common.tryAgain")}
-          </Button>
-        }
+        reset={() => void refetch()}
+        inline
       />
     );
   }
 
   if (rows.length === 0) {
     return (
-      <EmptyStateCard
+      <EmptyState
+        icon={<RocketLaunchIcon className="h-7 w-7" />}
         title={t("profile.boosts.empty.title")}
         description={t("profile.boosts.empty.description")}
         action={

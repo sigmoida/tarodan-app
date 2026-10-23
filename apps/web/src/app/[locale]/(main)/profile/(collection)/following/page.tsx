@@ -1,10 +1,11 @@
 "use client";
 
+import { UserGroupIcon } from "@heroicons/react/24/outline";
 import { Link } from "@/i18n/navigation";
 import { Button, Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useFollowing, useUnfollow } from "./_hooks/useFollowing";
@@ -34,7 +35,8 @@ export default function FollowingPage() {
           <Spinner size="xl" />
         </div>
       ) : following.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={<UserGroupIcon className="h-7 w-7" />}
           title={t("profile.followingPage.henuzKimseyiTakipEtmiyorsunuz")}
           description={t(
             "profile.followingPage.saticilariTakipEderekYeniIlanlarindanHaberdar",

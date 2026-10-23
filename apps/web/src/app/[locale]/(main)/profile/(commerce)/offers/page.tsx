@@ -10,12 +10,13 @@ import {
   CheckCircleIcon,
   TagIcon,
   Squares2X2Icon,
-  ExclamationCircleIcon,
+  EnvelopeOpenIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
+import ErrorState from "@/components/feedback/ErrorState";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useOffers, useOfferAction } from "./_hooks/useOffers";
 import { useCommissionPreviews } from "../_hooks/useCommissionPreviews";
@@ -146,14 +147,20 @@ function OffersPageContent() {
           <Spinner size="xl" color="border-primary-500 border-t-transparent" />
         </div>
       ) : active.isError ? (
-        <div className="rounded-lg border border-border bg-surface-elevated py-16 text-center">
-          <ExclamationCircleIcon className="mx-auto mb-4 h-16 w-16 text-danger-400" />
-          <p className="mb-4 text-danger-500">
-            {t("offer.listPage.tekliflerYuklenirkenBirHataOlustu")}
-          </p>
-        </div>
+        <ErrorState
+          title={t("offer.listPage.tekliflerYuklenirkenBirHataOlustu")}
+          reset={() => void active.refetch()}
+          inline
+        />
       ) : offers.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={
+            activeTab === "received" ? (
+              <EnvelopeOpenIcon className="h-7 w-7" />
+            ) : (
+              <PaperAirplaneIcon className="h-7 w-7" />
+            )
+          }
           title={
             activeTab === "received"
               ? t("offer.listPage.henuzGelenTeklifYok")

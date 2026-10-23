@@ -1,10 +1,14 @@
 "use client";
 
+import {
+  ReceiptPercentIcon,
+  ShoppingCartIcon,
+} from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Pagination, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
@@ -134,7 +138,14 @@ export default function OrdersPage() {
           <Spinner size="xl" />
         </div>
       ) : groups.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={
+            role === "seller" ? (
+              <ShoppingCartIcon className="h-7 w-7" />
+            ) : (
+              <ReceiptPercentIcon className="h-7 w-7" />
+            )
+          }
           title={emptyTitle}
           action={
             role === "buyer" && statusFilter === "active" ? (

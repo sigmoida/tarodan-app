@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PlusIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, ClockIcon, TagIcon } from "@heroicons/react/24/outline";
 import {
   Alert,
   Badge,
@@ -15,7 +15,7 @@ import {
   TabsTrigger,
 } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
@@ -181,7 +181,14 @@ export default function ProfileListingsPage() {
           ))}
         </div>
       ) : listings.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={
+            isExpiredTab ? (
+              <ClockIcon className="h-7 w-7" />
+            ) : (
+              <TagIcon className="h-7 w-7" />
+            )
+          }
           title={
             isExpiredTab
               ? t("profile.expiredListings.empty")

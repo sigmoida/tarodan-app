@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
 import { Button, Spinner } from "@tarodan/ui";
-import { CountBadge } from "@/components/ui";
+import { CountBadge, EmptyState } from "@/components/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
@@ -182,12 +182,11 @@ export default function NotificationBell() {
                 />
               </div>
             ) : notifications.length === 0 ? (
-              <div className="text-center py-8 px-4">
-                <BellIcon className="w-10 h-10 text-border-strong mx-auto mb-2" />
-                <p className="text-sm text-muted">
-                  {t("notification.noNotifications")}
-                </p>
-              </div>
+              <EmptyState
+                size="compact"
+                icon={<BellIcon className="h-6 w-6" />}
+                title={t("notification.noNotifications")}
+              />
             ) : (
               <div
                 className="divide-y divide-border-subtle"

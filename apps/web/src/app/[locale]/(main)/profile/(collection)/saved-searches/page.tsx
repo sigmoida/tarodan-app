@@ -9,7 +9,7 @@ import { Alert, Button, Skeleton } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useSavedSearches } from "./_hooks/useSavedSearches";
 import SavedSearchCard from "./_components/SavedSearchCard";
@@ -75,7 +75,8 @@ export default function SavedSearchesPage() {
           }
         />
       ) : savedSearches.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={<MagnifyingGlassIcon className="h-7 w-7" />}
           title={t("search.savedEmptyTitle")}
           description={t("search.savedEmptyDescription")}
           action={

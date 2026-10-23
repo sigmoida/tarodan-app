@@ -3,14 +3,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, BellIcon } from "@heroicons/react/24/outline";
 import { Button, Select, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { useNotifications } from "./_hooks/useNotifications";
 import NotificationCard from "./_components/NotificationCard";
 import {
@@ -95,7 +95,8 @@ export default function NotificationsPage() {
           <p className="text-muted">{t("common.loading")}</p>
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={<BellIcon className="h-7 w-7" />}
           title={
             filter === "unread"
               ? t("notification.noUnread")
