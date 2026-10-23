@@ -525,8 +525,8 @@ export class PayTRService implements IPaymentProvider {
     const oid = merchantOid.includes("-")
       ? merchantOid.replace(/-/g, "")
       : merchantOid;
-    // Opsiyonel takip referansı (durum-sorgu yanıtında geri döner). PayTR
-    // alfanümerik/max 64 ister; UUID tireleri vb. temizlenir.
+    // Optional tracking reference (echoed in the status inquiry). PayTR wants
+    // letters and digits, at most 64: UUID hyphens and the like are removed.
     const cleanRef = (referenceNo ?? "")
       .replace(/[^a-zA-Z0-9]/g, "")
       .slice(0, 64);
@@ -536,13 +536,14 @@ export class PayTRService implements IPaymentProvider {
     let body: string;
     let signal: AbortSignal;
     try {
-      // ÖNEMLİ: PayTR İade API return_amount = ONDALIK TL ("10.25"), KURUŞ DEĞİL.
-      // Resmi İade doc: "Ayraç olarak yalnızca bir nokta (.) gönderilmelidir. Örnek: 10.25".
-      // Kuruş (×100) göndermek 100 KAT fazla iadeye = maddi kayba yol açar (createDirectPaymentForm
-      // ile aynı /odeme birim kuralı). Hash de aynı string ile üretilir.
-      const returnAmount = amount.toFixed(2); // ONDALIK TL
+      // IMPORTANT: the PayTR refund API's return_amount is DECIMAL TL
+      // ("10.25"), NOT kurus. Refund doc: "Ayraç olarak yalnızca bir nokta (.)
+      // gönderilmelidir. Örnek: 10.25". Sending kurus (x100) refunds 100 times
+      // the amount (same /odeme unit rule as createDirectPaymentForm). The
+      // hash is built from the same string.
+      const returnAmount = amount.toFixed(2); // decimal TL
 
-      // Build hash for refund — reference_no doküman gereği token'a KATILMAZ.
+      // Refund hash; per the doc reference_no is NOT part of the token.
       const paytrToken = this.creds.signWithSalt(
         `${this.merchantId}${oid}${returnAmount}`,
       );
