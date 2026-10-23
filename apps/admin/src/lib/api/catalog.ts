@@ -1,3 +1,4 @@
+import type { ReviewModerationRequest } from "@tarodan/types";
 import { api } from "./client";
 import type {
   CatalogImportResource,
@@ -107,11 +108,11 @@ export const catalogApi = {
 
   // Reviews
   getReviews: (params?: any) => api.get("/admin/reviews", { params }),
-  updateReviewStatus: (id: string, status: string) =>
-    api.patch(`/admin/reviews/${id}/status`, { status }),
+  updateReviewStatus: (id: string, body: ReviewModerationRequest) =>
+    api.patch(`/admin/reviews/${id}/status`, body),
   getUserRatings: (params?: any) => api.get("/admin/user-ratings", { params }),
-  updateUserRatingStatus: (id: string, status: string) =>
-    api.patch(`/admin/user-ratings/${id}/status`, { status }),
+  updateUserRatingStatus: (id: string, body: ReviewModerationRequest) =>
+    api.patch(`/admin/user-ratings/${id}/status`, body),
 
   // Categories
   getCategories: (

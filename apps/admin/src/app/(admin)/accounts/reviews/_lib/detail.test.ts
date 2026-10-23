@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   normalizeReviewImages,
+  toModerationDetail,
   toProductReviewDetail,
   toSellerReviewDetail,
 } from "./detail";
@@ -26,9 +27,9 @@ const review: Review = {
 
 describe("normalizeReviewImages", () => {
   it("accepts plain urls and { url } objects and drops empties", () => {
-    expect(
-      normalizeReviewImages(["a", { url: "b" }, "", { url: "" }]),
-    ).toEqual(["a", "b"]);
+    expect(normalizeReviewImages(["a", { url: "b" }, "", { url: "" }])).toEqual(
+      ["a", "b"],
+    );
   });
 
   it("is empty for missing images", () => {
@@ -89,5 +90,48 @@ describe("toSellerReviewDetail", () => {
     expect(detail.text).toBe("Fast shipping");
     expect(detail.links.map((l) => l.kind)).toEqual(["seller", "trade"]);
     expect(detail.links[1]!.href).toBe("/operations/trades/trade-99999999");
+  });
+});
+
+describe("toModerationDetail", () => {
+  it("is null for a review nobody has moderated", () => {
+    expect(toModerationDetail({})).toBeNull();
+    expect(toModerationDetail({ moderatedAt: null })).toBeNull();
+  });
+
+  it("carries the reason, time and moderator name", () => {
+    expect(
+      toModerationDetail({
+        moderationReason: "Abusive language",
+        moderatedAt: "2026-10-23T09:00:00Z",
+        moderatedBy: { id: "a1", displayName: "Moderator Mia" },
+      }),
+    ).toEqual({
+      reason: "Abusive language",
+      at: "2026-10-23T09:00:00Z",
+      by: "Moderator Mia",
+    });
+  });
+
+  it("keeps the time when the moderator or reason is gone", () => {
+    expect(
+      toModerationDetail({
+        moderationReason: null,
+        moderatedAt: "2026-10-23T09:00:00Z",
+        moderatedBy: null,
+      }),
+    ).toEqual({ reason: undefined, at: "2026-10-23T09:00:00Z", by: undefined });
+  });
+
+  it("reaches the product and seller details", () => {
+    const moderation = {
+      moderationReason: "Spam link",
+      moderatedAt: "2026-10-23T09:00:00Z",
+    };
+    expect(
+      toProductReviewDetail({ ...review, ...moderation }).moderation,
+    ).toMatchObject({
+      reason: "Spam link",
+    });
   });
 });

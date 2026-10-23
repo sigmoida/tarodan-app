@@ -9,9 +9,14 @@ import { ProductReviewsTab } from "./_components/ProductReviewsTab";
 import { SellerReviewsTab } from "./_components/SellerReviewsTab";
 import { useTranslations } from "next-intl";
 
+/** A report deep link's `id` belongs to one tab: switching tabs drops it. */
+const TAB_SCOPED_PARAMS = ["id"];
+
 export default function ReviewsPage() {
   const t = useTranslations();
-  const [tab, setTab] = useTabParam("product");
+  const [tab, setTab] = useTabParam("product", {
+    clearOnChange: TAB_SCOPED_PARAMS,
+  });
 
   return (
     <AdminPage>

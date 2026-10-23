@@ -1,4 +1,9 @@
-import type { Review, ReviewStatus, UserRating } from "./types";
+import type {
+  Review,
+  ReviewModeration,
+  ReviewStatus,
+  UserRating,
+} from "./types";
 
 export type ReviewLinkKind = "product" | "order" | "trade" | "seller";
 
@@ -23,6 +28,25 @@ export interface ReviewDetail {
   isVerifiedPurchase?: boolean;
   author: { name: string; email?: string; href?: string };
   links: ReviewDetailLink[];
+  /** Last hide / show: reason (or note), time and moderator; null if never moderated. */
+  moderation: {
+    reason?: string;
+    at: string;
+    /** Moderator display name (admins have no detail page to link). */
+    by?: string;
+  } | null;
+}
+
+/** The moderation record of a row; null until an admin has acted on it. */
+export function toModerationDetail(
+  row: ReviewModeration,
+): ReviewDetail["moderation"] {
+  if (!row.moderatedAt) return null;
+  return {
+    reason: row.moderationReason || undefined,
+    at: row.moderatedAt,
+    by: row.moderatedBy?.displayName,
+  };
 }
 
 /** API görseli düz URL ya da `{ url }` olabilir; boşlar atılır. */
@@ -79,6 +103,7 @@ export function toProductReviewDetail(row: Review): ReviewDetail {
       href: userHref(row.user.id),
     },
     links,
+    moderation: toModerationDetail(row),
   };
 }
 
@@ -120,5 +145,6 @@ export function toSellerReviewDetail(row: UserRating): ReviewDetail {
       href: userHref(row.giver?.id),
     },
     links,
+    moderation: toModerationDetail(row),
   };
 }

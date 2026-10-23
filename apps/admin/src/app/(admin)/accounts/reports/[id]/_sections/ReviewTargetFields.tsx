@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Badge } from "@tarodan/ui";
+import { reviewStatusConfig } from "@/components/reviews/reviewStatus";
 import { DataList, Field } from "@/components/detail/DataList";
 import { Panel } from "@/components/detail/Panel";
 import { TextLink } from "@/components/TextLink";
@@ -8,8 +10,9 @@ import type { ReportTarget } from "../../_lib/detail";
 
 /**
  * Şikayet edilen yorum (Apple 1.2): yazan, değerlendirilen (ürün ya da
- * satıcı), puan ve metnin kendisi. Reddetme/geri alma yorum ekranında yapılır
- * — sayfa başlığındaki "İçeriği aç" bağlantısı ilgili sekmeye gider.
+ * satıcı), puan, yayın durumu (gizli mi) ve metnin kendisi. Gizleme / yeniden
+ * gösterme yorum ekranında yapılır — sayfa başlığındaki "İçeriği aç" bağlantısı
+ * yorumun çekmecesini açar.
  */
 export function ReviewTargetFields({ target }: { target: ReportTarget }) {
   const t = useTranslations();
@@ -44,6 +47,11 @@ export function ReviewTargetFields({ target }: { target: ReportTarget }) {
         </Field>
         <Field label={t("admin.accounts.reviews.score")}>
           {target.score ?? "—"}
+        </Field>
+        <Field label={t("common.status")}>
+          {target.status && (
+            <Badge status={target.status} config={reviewStatusConfig(t)} />
+          )}
         </Field>
       </DataList>
       <DataList columns={1} className="mt-4">

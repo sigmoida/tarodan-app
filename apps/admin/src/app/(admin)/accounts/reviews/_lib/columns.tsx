@@ -1,18 +1,57 @@
-import { Badge } from "@tarodan/ui";
+import type { ReviewModerationStatus } from "@tarodan/types";
 import { col } from "@/components/table";
 import {
   type Review,
   type UserRating,
+  type ReviewModeration,
   type ReviewStatus,
-  reviewStatusConfig,
 } from "./types";
+import {
+  REVIEW_STATUS_TONE,
+  reviewStatusLabel,
+} from "@/components/reviews/reviewStatus";
 import { Stars } from "../_components/Stars";
 import { reviewRowMenu } from "./rowActions";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-type Act = (id: string, s: ReviewStatus) => void;
+type Act = (id: string, s: ReviewModerationStatus) => void;
+
+/** Status badge shared by both tabs; a row without a status is approved. */
+const statusColumn = <R extends { status?: ReviewStatus }>(t: T) =>
+  col.status<R>(
+    t("common.status"),
+    (r) => {
+      const status = r.status ?? "approved";
+      return {
+        variant: REVIEW_STATUS_TONE[status],
+        children: reviewStatusLabel(t, status),
+      };
+    },
+    { sortKey: "status", sortType: "text" },
+  );
+
+/** Reason, time and moderator of the last hide / show: same on both tabs. */
+const moderationColumns = <R extends ReviewModeration>(t: T) => [
+  col.muted<R>(
+    t("admin.accounts.reviews.reasonColumn"),
+    (r) => r.moderationReason,
+    {
+      grow: 3,
+      minWidth: 220,
+      sortable: false,
+    },
+  ),
+  col.date<R>(t("admin.accounts.reviews.moderatedAtColumn"), "moderatedAt", {
+    withTime: true,
+  }),
+  col.text<R>(
+    t("admin.accounts.reviews.moderatedByColumn"),
+    (r) => r.moderatedBy?.displayName,
+    { sortable: false },
+  ),
+];
 
 export function productReviewColumns(
   act: Act,
@@ -60,11 +99,8 @@ export function productReviewColumns(
       ),
       { grow: 3, minWidth: 240, sortKey: "score", sortType: "number" },
     ),
-    col.badge<Review>(
-      t("common.status"),
-      (r) => <Badge status={r.status} config={reviewStatusConfig(t)} />,
-      { sortKey: "status", sortType: "text" },
-    ),
+    statusColumn<Review>(t),
+    ...moderationColumns<Review>(t),
     col.date<Review>(t("common.date"), "createdAt"),
     col.rowMenu<Review>((r) =>
       reviewRowMenu(
@@ -124,13 +160,8 @@ export function sellerReviewColumns(
         sortKey: "comment",
       },
     ),
-    col.badge<UserRating>(
-      t("common.status"),
-      (r) => (
-        <Badge status={r.status || "approved"} config={reviewStatusConfig(t)} />
-      ),
-      { sortKey: "status", sortType: "text" },
-    ),
+    statusColumn<UserRating>(t),
+    ...moderationColumns<UserRating>(t),
     col.muted<UserRating>(
       t("admin.accounts.reviews.source"),
       (r) =>
