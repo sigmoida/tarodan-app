@@ -41,16 +41,25 @@ function fold(text: string): string {
 }
 
 /**
- * A rejection is the seller's to fix only when it names the payee's details
- * (IBAN, holder name or title) AND says they are wrong. A message that only
- * mentions an IBAN (e.g. "IBAN'a transfer şu an yapılamıyor") stays with the
- * team: e-mailing the seller would make them change a correct IBAN and start
- * the IBAN-change cooldown.
+ * A rejection is the seller's to fix only when it says the payee's details
+ * (IBAN, holder name or title) are wrong: a detail word and a defect word
+ * next to each other (at most one word between them, either order), e.g.
+ * "Geçersiz IBAN", "IBAN numarası hatalı", "Alıcı adı ile IBAN uyumsuz".
+ * A message that only mentions an IBAN ("IBAN'a transfer şu an
+ * yapılamıyor") or whose defect is about something else ("IBAN'a
+ * gönderilecek tutar hatalı") stays with the team: e-mailing the seller
+ * would make them change a correct IBAN and start the IBAN-change cooldown.
+ * Matching runs on the folded (ASCII, lower-case) message.
  */
-const BANK_DETAILS_SUBJECT =
-  /iban|transfer_name|hesap sahibi|alici adi|unvan|\bisim\b|ad soyad/;
-const BANK_DETAILS_DEFECT =
-  /gecersiz|hatali|yanlis|uyus|eslesm|bulunamad|kapali|invalid|wrong|mismatch/;
+const DETAIL =
+  "(?:transfer_iban|transfer_name|iban|hesap sahibi\\w*|alici adi\\w*|unvan\\w*|isim|ismi|ad soyad\\w*)";
+const DEFECT =
+  "(?:gecersiz\\w*|gecerli degil|hatali\\w*|yanlis\\w*|uyus\\w*|uyumsuz\\w*|eslesm\\w*|bulunamad\\w*|dogrulanamad\\w*|kapali\\w*|invalid|incorrect|wrong|mismatch\\w*)";
+/** Separators, optionally one word in between. */
+const GAP = "[^a-z0-9_]+(?:[a-z0-9_]+[^a-z0-9_]+)?";
+const BANK_DETAILS_REJECTION = new RegExp(
+  `\\b${DETAIL}${GAP}${DEFECT}|\\b${DEFECT}${GAP}${DETAIL}\\b`,
+);
 
 /**
  * Which failure a PayTR rejection (`status: "error"`) is. Only err_no 010 is
@@ -72,7 +81,7 @@ export function classifyTransferRejection(result: {
   ) {
     return PAYOUT_FAILURE.transferTotalExceedsRemaining;
   }
-  if (BANK_DETAILS_SUBJECT.test(message) && BANK_DETAILS_DEFECT.test(message)) {
+  if (BANK_DETAILS_REJECTION.test(message)) {
     return PAYOUT_FAILURE.bankDetailsRejected;
   }
   return PAYOUT_FAILURE.providerRejected;

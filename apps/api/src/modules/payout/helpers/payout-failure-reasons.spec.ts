@@ -33,6 +33,11 @@ describe("classifyTransferRejection", () => {
     "transfer_name ile hesap sahibi uyusmuyor",
     "Alıcı adı / ünvan hatalı",
     "Hesap sahibi bilgisi eşleşmedi",
+    "Alıcı adı ile IBAN uyumsuz",
+    "IBAN geçerli değil",
+    "Hesap sahibi doğrulanamadı",
+    "IBAN incorrect",
+    "IBAN'ı hatalı",
   ])("maps a bank-details rejection to bank_details_rejected: %s", (msg) => {
     expect(classifyTransferRejection({ err_no: "005", err_msg: msg })).toBe(
       PAYOUT_FAILURE.bankDetailsRejected,
@@ -48,6 +53,9 @@ describe("classifyTransferRejection", () => {
     [{ err_msg: "IBAN'a transfer şu an yapılamıyor" }],
     [{ err_msg: "Platform IBAN tanımlı değil" }],
     [{ err_msg: "Bu kısım için transfer yapılamaz" }],
+    // The defect is about something else in the message (amount, request).
+    [{ err_msg: "IBAN'a gönderilecek tutar hatalı" }],
+    [{ err_msg: "invalid request for IBAN transfer" }],
   ])("maps any other rejection to provider_rejected: %j", (result) => {
     expect(classifyTransferRejection(result)).toBe(
       PAYOUT_FAILURE.providerRejected,
