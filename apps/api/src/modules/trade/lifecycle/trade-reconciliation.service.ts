@@ -738,52 +738,19 @@ export class TradeReconciliationService {
   }
 
   /**
-   * MONEY-H2: PayTR nakit iadesi başarısız olup `refundFailureReason` marker'ı
-   * yazılmış takasları periyodik olarak yeniden dener. cancelTrade / resolveDispute /
-   * rejectWarehouseTrade / retryTradeRefund akışlarında iade PayTR'da patlarsa para
-   * alıcıda kalır; admin elle müdahale etmese bile bu süpürme onu toparlar.
-   * `refundTradeCashTracked` başarıda marker'ı temizler, tekrar patlarsa mesajı
-   * tazeler (kalıcı hatada döngü zararsızdır: aynı takas her turda yeniden denenir
-   * ama çift-iade guard'ları PayTR'yi bir kez çağırır).
+   * MONEY-H2: retries the trade cash refunds whose PayTR call failed and left
+   * `trade.refundFailureReason` (cancel, dispute, warehouse reject, admin
+   * retry). The sweep lives with the refund it retries
+   * (`RefundTradeSweepService`, payment module): backoff on the attempt's
+   * failure count, no retry of a refund owned by an unresolved attempt, a
+   * daily alarm, the payer notified once per failure, staging copies left
+   * out (D1).
    */
   async retryFailedTradeRefunds(): Promise<{
     retried: number;
     recovered: number;
   }> {
-    const stuck = await this.prisma.trade.findMany({
-      where: {
-        refundFailureReason: { not: null },
-        status: {
-          in: [
-            TradeStatus.cancelled,
-            TradeStatus.returning,
-            TradeStatus.disputed,
-            // compensate_* itiraz çözümü takası COMPLETED bırakır; başarısız
-            // tazminat iadesi de marker yazar ve burada toparlanmalıdır.
-            // Kapsamsız çağrı completed'da güvenlidir: satır bazlı niyet
-            // filtresi (holdReleaseAt=null) yalnız iade borcu satırları görür.
-            TradeStatus.completed,
-          ],
-        },
-      },
-      select: { id: true },
-      take: 50,
-    });
-
-    let recovered = 0;
-    for (const t of stuck) {
-      const res = await this.paymentService.refundTradeCashTracked(t.id);
-      // "recovered" = marker artık temizlenmiş demektir (iade yapıldı VEYA iade
-      // edilecek tamamlanmış ödeme kalmadı). Yalnız `failed` olanlar marker'da kalır.
-      if (!res.failed) recovered++;
-    }
-
-    if (stuck.length > 0) {
-      this.logger.log(
-        `retryFailedTradeRefunds: ${stuck.length} takas denendi, ${recovered} toparlandı`,
-      );
-    }
-    return { retried: stuck.length, recovered };
+    return this.paymentService.retryFailedTradeRefunds();
   }
 
   /**

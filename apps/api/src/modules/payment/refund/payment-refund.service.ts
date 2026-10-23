@@ -73,6 +73,11 @@ import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { testLaneRefundResult } from "../helpers/test-lane-refund";
+import {
+  isPaymentNotYetSyncedRejection,
+  providerRefundFailure,
+  refundAttemptFailureData,
+} from "../helpers/refund-provider-failure";
 import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
 import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-notices";
 import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
@@ -192,6 +197,13 @@ export interface ProcessRefundOptions {
    * a concurrent refund has just stopped.
    */
   claimGuard?: (tx: Prisma.TransactionClient) => Promise<void>;
+  /**
+   * The caller raises its own, rate-limited alarm for a failed refund (the
+   * retry sweep: once a day per order). A failure that moved no money is then
+   * logged here at warn; one where money may have moved (PayTR refunded, or
+   * the outcome is uncertain) stays an error for every caller.
+   */
+  callerAlarms?: boolean;
 }
 
 /**
@@ -851,22 +863,22 @@ export class PaymentRefundService {
                   )),
               };
             } catch (err) {
-              const reason = (err as Error).message || "refund request failed";
-              if (err instanceof ProviderRefundRejectedException) {
+              // One outcome table for every refund path
+              // (helpers/refund-provider-failure): retryable `failed` only
+              // when no money moved; otherwise the attempt waits for a person
+              // or the status inquiry and the voided payout stays voided.
+              const failure = providerRefundFailure(err);
+              if (!failure.needsReconciliation) {
                 await this.prisma.refundAttempt.updateMany({
                   where: {
                     id: refundAttempt.attempt.id,
                     status: RefundAttemptStatus.submitting,
                   },
-                  data: {
-                    status: RefundAttemptStatus.failed,
-                    failureReason: reason,
-                  },
+                  data: refundAttemptFailureData(failure),
                 });
                 if (
-                  /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-                    reason,
-                  )
+                  err instanceof ProviderRefundRejectedException &&
+                  isPaymentNotYetSyncedRejection(failure.failureReason)
                 ) {
                   throw new BadRequestException(
                     i18nMessage("server.payment.paymentNotYetSynced"),
@@ -882,15 +894,14 @@ export class PaymentRefundService {
                     id: refundAttempt.attempt.id,
                     status: RefundAttemptStatus.submitting,
                   },
-                  data: {
-                    status: RefundAttemptStatus.manual_review,
-                    failureReason: reason,
-                  },
+                  data: refundAttemptFailureData(failure),
                 })
                 .catch(() => undefined);
               throw err instanceof ProviderRefundOutcomeUnknownException
                 ? err
-                : new RefundPendingReconciliationException(reason);
+                : new RefundPendingReconciliationException(
+                    localizedPayloadOf(err) ?? errorMessage(err),
+                  );
             }
           }
         }
@@ -1494,14 +1505,19 @@ export class PaymentRefundService {
       }
       return refundCommitResult;
     } catch (error: unknown) {
-      this.logger.error(
-        `Refund error for payment ${payment.id}: ${errorMessage(error)}`,
-      );
-      // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
-      // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
-      // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
-      // Finding 3: yalnız BU çağrının void'lediği ID'leri restore et — önceki bir başarılı
-      // iadenin void'lediği bayat payout'u diriltip satıcıyı çift ödemeyelim.
+      const failureLine = `Refund error for payment ${payment.id}: ${errorMessage(error)}`;
+      if (opts.callerAlarms && !paytrRefunded && !providerOutcomeUncertain) {
+        this.logger.warn(failureLine);
+      } else {
+        this.logger.error(failureLine);
+      }
+      // MONEY-M3: if it failed before PayTR refunded anything, RESTORE the
+      // payouts voided before the PayTR call (order_refunded -> pending) so the
+      // seller can be paid. If PayTR refunded (paytrRefunded) or may have
+      // (providerOutcomeUncertain), they stay voided: the buyer's money went
+      // or may have gone back, the seller must not be paid.
+      // Finding 3: restore only the ids THIS call voided, never a stale
+      // payout an earlier successful refund voided (double payment).
       if (
         !paytrRefunded &&
         !providerOutcomeUncertain &&
@@ -1531,9 +1547,9 @@ export class PaymentRefundService {
           .catch(() => undefined);
       }
       if (paytrRefunded || providerOutcomeUncertain) {
-        // Sarmalarken katalog payload'unu KORU: `error.message` yerelleştirilmiş
-        // istisnalarda "Bad Request Exception"a düşer, yani istemci de log da
-        // gerçek sebebi kaybederdi.
+        // KEEP the catalog payload when wrapping: on a localized exception
+        // `error.message` degrades to "Bad Request Exception", so the client
+        // and the log would lose the real reason.
         throw error instanceof RefundPendingReconciliationException
           ? error
           : new RefundPendingReconciliationException(

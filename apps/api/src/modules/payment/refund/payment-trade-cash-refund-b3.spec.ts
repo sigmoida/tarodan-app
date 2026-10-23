@@ -32,9 +32,17 @@ import { PlatformServiceConsentService } from "../../consent/platform-service-co
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import {
+  ProviderRefundNotSentException,
   ProviderRefundRejectedException,
   RefundPendingReconciliationException,
 } from "../../payment-providers/refund-errors";
+import { UatProductionCopyService } from "../../admin-test-tools/uat-refresh/uat-production-copy.service";
+import { RefundOrderSweepService } from "./refund-order-sweep.service";
+import { RefundTradeSweepService } from "./refund-trade-sweep.service";
+import {
+  REFUND_FAILURE_PROVIDER_NOTHING_LEFT,
+  REFUND_FAILURE_PROVIDER_NOT_SENT,
+} from "../helpers/refund-provider-failure";
 import { EventService } from "../../events";
 import { InvoiceService } from "../../invoice/invoice.service";
 import { InvoicingService } from "../../invoicing";
@@ -151,6 +159,13 @@ describe("PaymentService trade cash refund idempotency", () => {
         PaymentExpiryReconciliationService,
         PspReconciliationService,
         RefundReconciliationService,
+        RefundOrderSweepService,
+        RefundTradeSweepService,
+        // Staging guard of the refund sweeps; not the subject here.
+        {
+          provide: UatProductionCopyService,
+          useValue: { copiedBefore: jest.fn().mockResolvedValue(null) },
+        },
         MiscReconciliationService,
         PaymentInitiationService,
         PaymentCallbackService,
@@ -420,6 +435,7 @@ describe("PaymentService trade cash refund idempotency", () => {
       data: {
         status: RefundAttemptStatus.failed,
         failureReason: "odeme henuz siteye bildirilmemis",
+        failureCount: { increment: 1 },
       },
     });
   });
@@ -466,7 +482,57 @@ describe("PaymentService trade cash refund idempotency", () => {
       data: {
         status: RefundAttemptStatus.failed,
         failureReason: "insufficient balance",
+        failureCount: { increment: 1 },
       },
     });
+  });
+
+  // D1: same outcome table as the order refund (helpers/refund-provider-failure).
+  it("a refund request that never reached PayTR stays retryable, not manual review", async () => {
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
+    mockPaytr.createRefund.mockRejectedValue(
+      new ProviderRefundNotSentException(
+        { i18nKey: "server.payment.refundInitiationFailed" },
+        "fetch failed (ECONNREFUSED)",
+      ),
+    );
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toBeInstanceOf(ProviderRefundNotSentException);
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.failed,
+        failureReason: `${REFUND_FAILURE_PROVIDER_NOT_SENT}: fetch failed (ECONNREFUSED)`,
+        failureCount: { increment: 1 },
+      },
+    });
+  });
+
+  it("PayTR's 'nothing left to refund' parks the attempt for a person", async () => {
+    const nothingLeft =
+      "Talep edilen iade tutari (75 TL), kalan tutardan (0 TL) fazla olamaz.";
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
+    mockPaytr.createRefund.mockRejectedValue(
+      new ProviderRefundRejectedException(nothingLeft, true),
+    );
+
+    await expect(
+      service.refundTradeCashPaymentIfCompleted(TRADE_ID),
+    ).rejects.toBeInstanceOf(RefundPendingReconciliationException);
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.manual_review,
+        failureReason: `${REFUND_FAILURE_PROVIDER_NOTHING_LEFT}: ${nothingLeft}`,
+      },
+    });
+    // The trade payout stays held back until a person decides.
+    expect(mockPrisma.payoutTransfer.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "pending", failureReason: null },
+      }),
+    );
   });
 });

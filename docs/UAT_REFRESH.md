@@ -412,7 +412,10 @@ while that run is unfinished; after the run ends it is useless.
 5. Check staging integrations are in test mode (PayTR test merchant, Sürat test,
    eLogo demo, `PAYOUTS_DISABLED`): staging now holds production orders, and
    its crons will act on them against whatever endpoints staging is configured
-   for.
+   for. The refund sweeps leave payments created up to the refresh's
+   `sourceSnapshotAt` alone (an unfinished refresh: up to now, capped at its
+   timeout), because the PayTR test store refuses their refunds forever
+   (`PAYMENTS.md` §7, "Staging").
 
 **Dry run first (always)**
 

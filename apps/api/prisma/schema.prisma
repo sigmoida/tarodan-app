@@ -2305,6 +2305,12 @@ model RefundAttempt {
   providerResponse    Json?               @map("provider_response")
   status              RefundAttemptStatus @default(prepared)
   failureReason       String?             @map("failure_reason")
+  /// Consecutive definite provider failures (rejected or never sent) of this
+  /// attempt. The refund retry sweeps wait 10 min * 2^(n-1), at most 6 h,
+  /// after `updatedAt` before resending it. A requeue by the status inquiry
+  /// keeps the count (no evidence a resend now succeeds); an attempt that
+  /// only ever went to review has 0 and waits 10 min.
+  failureCount        Int                 @default(0) @map("failure_count")
   requestStartedAt    DateTime?           @map("request_started_at")
   providerSucceededAt DateTime?           @map("provider_succeeded_at")
   finalizedAt         DateTime?           @map("finalized_at")

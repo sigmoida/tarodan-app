@@ -57,6 +57,11 @@ export interface IPaymentProvider {
     testMode?: boolean;
   };
 
+  /**
+   * Sends one refund; never retries (it moves money). A failure is one of the
+   * typed outcomes in `refund-errors.ts`: not sent (safe to resend), rejected
+   * (`nothingLeftToRefund` when the payment has nothing left) or unknown.
+   */
   createRefund(
     merchantOid: string,
     amount: number,

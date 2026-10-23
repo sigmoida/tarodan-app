@@ -1,5 +1,11 @@
+import { Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
+import {
+  ProviderRefundNotSentException,
+  ProviderRefundOutcomeUnknownException,
+  ProviderRefundRejectedException,
+} from "../refund-errors";
 import { PayTRService } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
@@ -191,6 +197,181 @@ describe("PayTRService", () => {
       expect(tokenOf(fetchSpy.mock.calls[0])).toBe(
         tokenOf(fetchSpy.mock.calls[1]),
       );
+    });
+  });
+
+  /**
+   * D1 (refund sweep loop, Sentry TARODAN-API-3N): what a failed refund call
+   * means for the money. A connect-phase failure never reached PayTR, so the
+   * refund may be resent; anything after the request left the host is an
+   * unknown outcome. "Nothing left to refund" is flagged so the caller parks
+   * the attempt for a person instead of resending it forever. The service
+   * logs one warn line: the caller decides how loud a failed refund is.
+   */
+  describe("createRefund failure outcomes", () => {
+    const networkError = (code: string) =>
+      Object.assign(new TypeError("fetch failed"), { cause: { code } });
+    const errorBody = (err_msg: string) => ({
+      text: async () => JSON.stringify({ status: "error", err_msg }),
+    });
+    let warnSpy: jest.SpyInstance;
+    let errorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      warnSpy = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      errorSpy = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    const rejection = async () => {
+      try {
+        await service.createRefund("ORDER123", 10, "attempt-1");
+      } catch (error) {
+        return error as Error;
+      }
+      throw new Error("createRefund did not throw");
+    };
+
+    it.each([
+      "UND_ERR_CONNECT_TIMEOUT",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+    ])(
+      "a connect-phase failure (%s) is 'not sent', with its cause code",
+      async (code) => {
+        fetchSpy.mockRejectedValue(networkError(code));
+
+        const error = await rejection();
+
+        expect(error).toBeInstanceOf(ProviderRefundNotSentException);
+        expect((error as ProviderRefundNotSentException).detail).toContain(
+          code,
+        );
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it("Happy Eyeballs: every address failing to connect is still 'not sent'", async () => {
+      fetchSpy.mockRejectedValue(
+        Object.assign(new TypeError("fetch failed"), {
+          cause: {
+            code: "ETIMEDOUT",
+            errors: [
+              { code: "ETIMEDOUT", syscall: "connect" },
+              { code: "ENETUNREACH", syscall: "connect" },
+            ],
+          },
+        }),
+      );
+
+      expect(await rejection()).toBeInstanceOf(ProviderRefundNotSentException);
+    });
+
+    it.each(["ECONNRESET", "UND_ERR_SOCKET", "UND_ERR_HEADERS_TIMEOUT"])(
+      "a failure after the request left the host (%s) is an unknown outcome",
+      async (code) => {
+        fetchSpy.mockRejectedValue(networkError(code));
+
+        const error = await rejection();
+
+        expect(error).toBeInstanceOf(ProviderRefundOutcomeUnknownException);
+        expect(error).not.toBeInstanceOf(ProviderRefundNotSentException);
+      },
+    );
+
+    it("our own timeout and a bare 'fetch failed' are unknown outcomes", async () => {
+      const timeout = Object.assign(
+        new Error("The operation was aborted due to timeout"),
+        { name: "TimeoutError" },
+      );
+      fetchSpy.mockRejectedValueOnce(timeout);
+      expect(await rejection()).toBeInstanceOf(
+        ProviderRefundOutcomeUnknownException,
+      );
+
+      fetchSpy.mockRejectedValueOnce(new TypeError("fetch failed"));
+      expect(await rejection()).toBeInstanceOf(
+        ProviderRefundOutcomeUnknownException,
+      );
+    });
+
+    it("a body that cannot be read is an unknown outcome", async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () => {
+          throw networkError("ECONNRESET");
+        },
+      });
+
+      expect(await rejection()).toBeInstanceOf(
+        ProviderRefundOutcomeUnknownException,
+      );
+    });
+
+    it.each([
+      "Talep edilen iade tutari (1556 TL), kalan tutardan (0 TL) fazla olamaz.",
+      "Talep edilen iade tutari (10.5 TL), kalan tutardan (0.00 TL) fazla olamaz.",
+      "iade tutari kalan tutardan (0) fazla olamaz",
+    ])(
+      "PayTR's 'nothing left to refund' is a flagged rejection: %s",
+      async (errMsg) => {
+        fetchSpy.mockResolvedValue(errorBody(errMsg));
+
+        const error = await rejection();
+
+        expect(error).toBeInstanceOf(ProviderRefundRejectedException);
+        expect(error.message).toBe(errMsg);
+        expect(
+          (error as ProviderRefundRejectedException).nothingLeftToRefund,
+        ).toBe(true);
+      },
+    );
+
+    it.each([
+      "Talep edilen iade tutari (349 TL), kalan tutardan (15 TL) fazla olamaz.",
+      "Talep edilen iade tutari (349 TL), kalan tutardan (0.50 TL) fazla olamaz.",
+      "odeme henuz siteye bildirilmemis",
+    ])("any other rejection is not flagged: %s", async (errMsg) => {
+      fetchSpy.mockResolvedValue(errorBody(errMsg));
+
+      const error = await rejection();
+
+      expect(error).toBeInstanceOf(ProviderRefundRejectedException);
+      expect(
+        (error as ProviderRefundRejectedException).nothingLeftToRefund,
+      ).toBe(false);
+    });
+
+    it("logs one warn line per failure and never an error (the caller alarms)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        errorBody(
+          "Talep edilen iade tutari (1556 TL), kalan tutardan (0 TL) fazla olamaz.",
+        ),
+      );
+      await rejection();
+      fetchSpy.mockRejectedValueOnce(networkError("UND_ERR_CONNECT_TIMEOUT"));
+      await rejection();
+      fetchSpy.mockRejectedValueOnce(networkError("ECONNRESET"));
+      await rejection();
+      fetchSpy.mockResolvedValueOnce({ text: async () => "" });
+      await rejection();
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledTimes(4);
+      expect(warnSpy.mock.calls.map((call) => call[0])).toEqual([
+        expect.stringContaining("rejected"),
+        expect.stringContaining("UND_ERR_CONNECT_TIMEOUT"),
+        expect.stringContaining("ECONNRESET"),
+        expect.stringContaining("ORDER123"),
+      ]);
     });
   });
 });

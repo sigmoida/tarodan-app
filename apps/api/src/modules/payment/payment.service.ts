@@ -216,6 +216,14 @@ export class PaymentService {
     return this.paymentReconciliation.processRefundedOrders();
   }
 
+  /** Retry sweep of failed trade cash refunds (the trade cron calls it). */
+  async retryFailedTradeRefunds(): Promise<{
+    retried: number;
+    recovered: number;
+  }> {
+    return this.paymentReconciliation.retryFailedTradeRefunds();
+  }
+
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
   async syncSavedCardsFromUtoken(
     userId: string,

@@ -1,5 +1,5 @@
 import { CancellationActor } from "@prisma/client";
-import { RefundReconciliationService } from "../refund/refund-reconciliation.service";
+import { RefundOrderSweepService } from "../refund/refund-order-sweep.service";
 
 /**
  * MONEY-H5: processRefundedOrders artık GRUP (sepet) siparişlerini de süpürür.
@@ -10,19 +10,30 @@ import { RefundReconciliationService } from "../refund/refund-reconciliation.ser
  * SEAM-B3: outbound paket göndericiye iade dönmüş (shipment=returned) ama
  * refund_requested'da takılı siparişler de returned-arm ile retry edilir.
  */
-describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
+describe("RefundOrderSweepService.processRefundedOrders — MONEY-H5 group + SEAM-B3 returned", () => {
   const makeService = () => {
     const prisma = {
       order: { findMany: jest.fn() },
+      // D1: no recent failed attempt, nothing waits; a failure leaves one.
+      refundAttempt: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue({ id: "attempt-failed" }),
+      },
     };
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),
     };
-    const service = new RefundReconciliationService(
+    const service = new RefundOrderSweepService(
       prisma as any, // prisma
       paymentRefund as any, // paymentRefund
-      { resolve: () => ({}) } as any, // paymentProviders (bu testte kullanılmaz)
-      { get: jest.fn().mockReturnValue(undefined) } as any, // configService
+      // Alarm claims (D1): every alarm is the first of the day.
+      {
+        claimKey: jest.fn().mockResolvedValue("claimed"),
+        exists: jest.fn().mockResolvedValue(false),
+        setIfAbsent: jest.fn().mockResolvedValue(true),
+      } as any,
+      // Staging guard (D1): no production copy here.
+      { copiedBefore: jest.fn().mockResolvedValue(null) } as any,
     );
     const warn = jest
       .spyOn((service as any).logger, "warn")
@@ -58,12 +69,12 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
     expect(paymentRefund.processRefund).toHaveBeenCalledWith(
       "single-1",
       undefined,
-      { cancelledBy: CancellationActor.system },
+      { cancelledBy: CancellationActor.system, callerAlarms: true },
     );
     expect(paymentRefund.processRefund).toHaveBeenCalledWith(
       "group-1",
       undefined,
-      { cancelledBy: CancellationActor.system },
+      { cancelledBy: CancellationActor.system, callerAlarms: true },
     );
     // group-2 zaten iade edilmiş (refundedOrders map'inde) → atlanır
     expect(
@@ -136,7 +147,7 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
     expect(paymentRefund.processRefund).toHaveBeenCalledWith(
       "single-untouched",
       undefined,
-      { cancelledBy: CancellationActor.system },
+      { cancelledBy: CancellationActor.system, callerAlarms: true },
     );
     expect(
       paymentRefund.processRefund.mock.calls.map((call: unknown[]) => call[0]),
@@ -216,7 +227,7 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
     expect(paymentRefund.processRefund).toHaveBeenCalledWith(
       "returned-1",
       undefined,
-      { cancelledBy: CancellationActor.system },
+      { cancelledBy: CancellationActor.system, callerAlarms: true },
     );
     expect(res).toEqual({ refunded: 1, failed: 0 });
 

@@ -11,6 +11,7 @@ import { i18nMessage } from "../../i18n";
 import type { IPaymentProvider } from "../payment-provider.interface";
 import { PAYMENT_PROVIDER_PAYTR } from "../payment-provider.interface";
 import {
+  ProviderRefundNotSentException,
   ProviderRefundOutcomeUnknownException,
   ProviderRefundRejectedException,
 } from "../refund-errors";
@@ -177,6 +178,11 @@ import {
 import { PayTRReportService } from "./paytr-report.service";
 import { PayTRTransferService } from "./paytr-transfer.service";
 import { parsePaytrMoneyString } from "./paytr-money.util";
+import {
+  classifyPaytrFetchError,
+  networkErrorReason,
+} from "./paytr-fetch-retry.util";
+import { isNothingLeftToRefund } from "./paytr-refund-rejection";
 
 // =============================================================================
 // PAYTR SERVICE
@@ -494,7 +500,22 @@ export class PayTRService implements IPaymentProvider {
   // ==========================================================================
 
   /**
-   * Create refund request
+   * Refund request (`/odeme/iade`). Never retried here: it moves money, the
+   * caller (the RefundAttempt ledger) decides. A failure is typed by what it
+   * means for the money:
+   *
+   * - `ProviderRefundNotSentException`: the request provably never left the
+   *   host (building it failed, or a connect-phase network error,
+   *   `classifyPaytrFetchError`). Safe to send again.
+   * - `ProviderRefundRejectedException`: PayTR answered "no";
+   *   `nothingLeftToRefund` when the payment has nothing left to refund.
+   * - `ProviderRefundOutcomeUnknownException`: anything after the request
+   *   left (reset, our timeout, unreadable or empty answer). PayTR may have
+   *   refunded; never resend without checking.
+   *
+   * One warn line per failure: the caller logs the decision at the right
+   * level, so an error here would raise the same incident twice (Sentry
+   * TARODAN-API-3N was this line, once per sweep run).
    */
   async createRefund(
     merchantOid: string,
@@ -504,67 +525,120 @@ export class PayTRService implements IPaymentProvider {
     const oid = merchantOid.includes("-")
       ? merchantOid.replace(/-/g, "")
       : merchantOid;
-    // ÖNEMLİ: PayTR İade API return_amount = ONDALIK TL ("10.25"), KURUŞ DEĞİL.
-    // Resmi İade doc: "Ayraç olarak yalnızca bir nokta (.) gönderilmelidir. Örnek: 10.25".
-    // Kuruş (×100) göndermek 100 KAT fazla iadeye = maddi kayba yol açar (createDirectPaymentForm
-    // ile aynı /odeme birim kuralı). Hash de aynı string ile üretilir.
-    const returnAmount = amount.toFixed(2); // ONDALIK TL
-
-    // Build hash for refund — reference_no doküman gereği token'a KATILMAZ.
-    const paytrToken = this.creds.signWithSalt(
-      `${this.merchantId}${oid}${returnAmount}`,
-    );
-
-    const formData = new URLSearchParams({
-      merchant_id: this.merchantId,
-      merchant_oid: oid,
-      return_amount: returnAmount,
-      paytr_token: paytrToken,
-    });
-    // Opsiyonel takip referansı (durum-sorgu yanıtında geri döner). PayTR
-    // alfanümerik/max 64 ister; UUID tireleri vb. temizlenir.
+    // Optional tracking reference (echoed in the status inquiry). PayTR wants
+    // letters and digits, at most 64: UUID hyphens and the like are removed.
     const cleanRef = (referenceNo ?? "")
       .replace(/[^a-zA-Z0-9]/g, "")
       .slice(0, 64);
-    if (cleanRef) formData.set("reference_no", cleanRef);
+    const subject = `PayTR refund oid=${oid} ref=${cleanRef || "-"}`;
 
+    // Anything failing before fetch (credentials, signing) never reached PayTR.
+    let body: string;
+    let signal: AbortSignal;
     try {
-      const response = await fetch("https://www.paytr.com/odeme/iade", {
+      // IMPORTANT: the PayTR refund API's return_amount is DECIMAL TL
+      // ("10.25"), NOT kurus. Refund doc: "Ayraç olarak yalnızca bir nokta (.)
+      // gönderilmelidir. Örnek: 10.25". Sending kurus (x100) refunds 100 times
+      // the amount (same /odeme unit rule as createDirectPaymentForm). The
+      // hash is built from the same string.
+      const returnAmount = amount.toFixed(2); // decimal TL
+
+      // Refund hash; per the doc reference_no is NOT part of the token.
+      const paytrToken = this.creds.signWithSalt(
+        `${this.merchantId}${oid}${returnAmount}`,
+      );
+
+      const formData = new URLSearchParams({
+        merchant_id: this.merchantId,
+        merchant_oid: oid,
+        return_amount: returnAmount,
+        paytr_token: paytrToken,
+      });
+      if (cleanRef) formData.set("reference_no", cleanRef);
+      body = formData.toString();
+      signal = AbortSignal.timeout(this.httpTimeoutMs);
+    } catch (error) {
+      throw this.refundNotSent(
+        subject,
+        `request not built: ${networkErrorReason(error)}`,
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await fetch("https://www.paytr.com/odeme/iade", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: formData.toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
+        body,
+        signal,
       });
-
-      const rawText = await response.text();
-      const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
-      if (!data) {
-        throw new ProviderRefundOutcomeUnknownException(
-          i18nMessage("server.payment.refundResponseInvalid"),
-        );
+    } catch (error) {
+      const reason = networkErrorReason(error);
+      if (classifyPaytrFetchError(error) === "not_sent") {
+        throw this.refundNotSent(subject, reason);
       }
-
-      if (data.status !== "success") {
-        throw new ProviderRefundRejectedException(
-          data.err_msg || i18nMessage("server.payment.refundFailed"),
-        );
-      }
-
-      return data;
-    } catch (error: any) {
-      this.logger.error("PayTR refund error:", error);
-      if (
-        error instanceof ProviderRefundRejectedException ||
-        error instanceof ProviderRefundOutcomeUnknownException
-      ) {
-        throw error;
-      }
-      throw new ProviderRefundOutcomeUnknownException(
+      throw this.refundOutcomeUnknown(
+        subject,
+        reason,
         i18nMessage("server.payment.refundError"),
       );
     }
+
+    // From here on PayTR received the request: anything but a parsed answer
+    // leaves the outcome unknown.
+    let rawText: string;
+    try {
+      rawText = await response.text();
+    } catch (error) {
+      throw this.refundOutcomeUnknown(
+        subject,
+        `answer not readable: ${networkErrorReason(error)}`,
+        i18nMessage("server.payment.refundError"),
+      );
+    }
+    const data = this.parsePaytrJson<PayTRRefundResponse>(rawText);
+    if (!data) {
+      throw this.refundOutcomeUnknown(
+        subject,
+        "answer is empty or not JSON",
+        i18nMessage("server.payment.refundResponseInvalid"),
+      );
+    }
+
+    if (data.status !== "success") {
+      const nothingLeft = isNothingLeftToRefund(data.err_msg);
+      this.logger.warn(
+        `${subject}: rejected${nothingLeft ? " (nothing left to refund)" : ""}${data.err_no ? ` err_no=${data.err_no}` : ""}: ${data.err_msg ?? "no message"}`,
+      );
+      throw new ProviderRefundRejectedException(
+        data.err_msg || i18nMessage("server.payment.refundFailed"),
+        nothingLeft,
+      );
+    }
+
+    return data;
+  }
+
+  private refundNotSent(
+    subject: string,
+    detail: string,
+  ): ProviderRefundNotSentException {
+    this.logger.warn(`${subject}: not sent, safe to retry: ${detail}`);
+    return new ProviderRefundNotSentException(
+      i18nMessage("server.payment.refundInitiationFailed"),
+      detail,
+    );
+  }
+
+  private refundOutcomeUnknown(
+    subject: string,
+    detail: string,
+    response: ReturnType<typeof i18nMessage>,
+  ): ProviderRefundOutcomeUnknownException {
+    this.logger.warn(`${subject}: outcome unknown: ${detail}`);
+    return new ProviderRefundOutcomeUnknownException(response);
   }
 
   /**
