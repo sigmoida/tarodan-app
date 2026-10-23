@@ -5,7 +5,6 @@ import { webAuthConfig } from "@/lib/auth.config";
 import { isEmbedPath } from "@/lib/embed";
 import { localeMiddleware } from "@/lib/localeMiddleware";
 import { RETURN_TO_HEADER, readsReturnToHeader } from "@/lib/returnTo";
-import { resolveSentryEnvironment } from "@/lib/sentryEnvironment";
 import { SITE_UNLOCK_COOKIE } from "@/lib/siteLock";
 import { internalComingSoonPath, isSiteLocked } from "@/lib/siteLockPolicy.mjs";
 import { verifyUnlockCookie } from "@/lib/siteUnlockCookie.mjs";
@@ -17,6 +16,8 @@ import {
   sentryIngestOrigin,
   reportUriForEnvironment,
 } from "@/lib/cspPolicy.mjs";
+// The same tag the Sentry SDKs use, so CSP reporting and event routing agree.
+import { sentryEnvironment } from "../sentry.release";
 
 /**
  * Web middleware = i18n routing (#214) composed with the edge auth gate.
@@ -136,13 +137,7 @@ function applyCsp(request: NextRequest, isPayment: boolean): string {
     apiOrigin: safeOrigin(process.env.NEXT_PUBLIC_API_URL),
     wsOrigin: safeOrigin(process.env.NEXT_PUBLIC_WS_URL),
     sentryOrigin: sentryIngestOrigin(dsn),
-    reportUri: reportUriForEnvironment(
-      resolveSentryEnvironment(
-        process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
-        process.env.NEXT_PUBLIC_APP_URL,
-      ),
-      dsn,
-    ),
+    reportUri: reportUriForEnvironment(sentryEnvironment, dsn),
   });
   request.headers.set("x-nonce", nonce);
   request.headers.set(cspHeaderName(isPayment), policy);
