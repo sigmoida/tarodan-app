@@ -29,11 +29,49 @@ import {
   PUBLIC_NAME_SELECT,
   publicIdentityFields,
   publicName,
+  type PublicIdentityInput,
 } from "../../common/helpers/public-identity";
 import { i18nMessage } from "../i18n";
 import { UserBlockService } from "../user-block/user-block.service";
 import { excludeIds } from "../user-block/user-block.helpers";
 import { virtualOrderKind } from "../payment/helpers/virtual-order-kind";
+
+/** A rating's author as the mappers read it (public identity + avatar). */
+type RatingAuthor = PublicIdentityInput & {
+  id: string;
+  avatarUrl?: string | null;
+};
+
+/** The `Rating` columns and relations `mapUserRatingToDto` reads. */
+interface UserRatingRow {
+  id: string;
+  giverId: string;
+  receiverId: string;
+  orderId: string | null;
+  tradeId: string | null;
+  score: number;
+  comment: string | null;
+  createdAt: Date;
+  giver?: RatingAuthor | null;
+  receiver?: PublicIdentityInput | null;
+}
+
+/** The `ProductRating` columns and relations `mapProductRatingToDto` reads. */
+interface ProductRatingRow {
+  id: string;
+  productId: string;
+  userId: string;
+  orderId: string;
+  score: number;
+  title: string | null;
+  review: string | null;
+  images: string[];
+  isVerifiedPurchase: boolean;
+  helpfulCount: number;
+  createdAt: Date;
+  product?: { title: string } | null;
+  user?: RatingAuthor | null;
+}
 
 @Injectable()
 export class RatingService {
@@ -512,7 +550,9 @@ export class RatingService {
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
 
     // Build orderBy based on sortBy parameter
-    let orderBy: any = { createdAt: "desc" };
+    let orderBy: Prisma.ProductRatingOrderByWithRelationInput = {
+      createdAt: "desc",
+    };
     switch (sortBy) {
       case "oldest":
         orderBy = { createdAt: "asc" };
@@ -660,7 +700,7 @@ export class RatingService {
   // HELPER METHODS
   // ==========================================================================
   private mapUserRatingToDto(
-    rating: any,
+    rating: UserRatingRow,
     resolvedGiverAvatar?: string | null,
   ): UserRatingResponseDto {
     return {
@@ -686,7 +726,7 @@ export class RatingService {
   }
 
   private mapProductRatingToDto(
-    rating: any,
+    rating: ProductRatingRow,
     resolvedAvatarUrl?: string | null,
   ): ProductRatingResponseDto {
     return {

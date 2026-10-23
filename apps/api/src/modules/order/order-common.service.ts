@@ -2,7 +2,12 @@ import { Injectable, Optional, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
-import { OrderStatus, OfferStatus, PaymentStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  OfferStatus,
+  PaymentStatus,
+  type RefundRequest,
+} from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { sellerNetAmountOf } from "./helpers/order-net.helper";
 import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
@@ -37,6 +42,42 @@ export function isReactivatablePayment(order: {
     status !== PaymentStatus.completed && status !== PaymentStatus.refunded
   );
 }
+
+/**
+ * The address snapshot stored on an order (`Order.shippingAddress` JSON). A
+ * guest order also carries the guest's name; a platform-service order stores
+ * a marker (`{ type, ... }`) instead of an address.
+ */
+interface OrderAddressSnapshot {
+  id?: string;
+  title?: string;
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  district?: string;
+  city?: string;
+  zipCode?: string;
+  postalCode?: string;
+  isGuestOrder?: boolean;
+  guestName?: string;
+}
+
+/** The refund request columns the order response reads. */
+type OrderRefundRequestRow = Pick<
+  RefundRequest,
+  | "id"
+  | "refundNumber"
+  | "status"
+  | "reason"
+  | "returnTrackingNumber"
+  | "returnProviderTrackingId"
+  | "returnProvider"
+  | "returnStatus"
+  | "createdAt"
+  | "refundedAt"
+>;
 
 @Injectable()
 export class OrderCommonService {
@@ -179,20 +220,15 @@ export class OrderCommonService {
         ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(cargoCode)}`
         : null;
 
-    // Misafir siparişi: alıcı satırı ortak sentetik hesaptır, gerçek ad
-    // teslimat verisinde tutulur (bkz. order-checkout-group `isGuestOrder`).
-    const shippingAddressJson = order.shippingAddress as {
-      isGuestOrder?: boolean;
-      guestName?: string;
-      fullName?: string;
-    } | null;
+    const address =
+      order.shippingAddress && typeof order.shippingAddress === "object"
+        ? (order.shippingAddress as OrderAddressSnapshot)
+        : null;
+    // Guest order: the buyer row is the shared synthetic account; the real
+    // name is kept in the delivery data (see order-checkout-group `isGuestOrder`).
     const guestBuyerName =
-      shippingAddressJson && typeof shippingAddressJson === "object"
-        ? shippingAddressJson.isGuestOrder === true
-          ? shippingAddressJson.guestName ||
-            shippingAddressJson.fullName ||
-            "Misafir Alıcı"
-          : null
+      address?.isGuestOrder === true
+        ? address.guestName || address.fullName || "Misafir Alıcı"
         : null;
 
     const totalAmount = Number(order.totalAmount ?? 0);
@@ -316,37 +352,21 @@ export class OrderCommonService {
         ...publicIdentityFields(order.seller),
         avatarUrl: await this.resolveAvatarUrl(order.seller?.avatarUrl),
       },
-      shippingAddress:
-        order.shippingAddress && typeof order.shippingAddress === "object"
-          ? {
-              id:
-                (order.shippingAddress as any).id ||
-                order.shippingAddressId ||
-                "",
-              title: (order.shippingAddress as any).title || "",
-              fullName: (order.shippingAddress as any).fullName || "",
-              phone: (order.shippingAddress as any).phone || "",
-              address:
-                (order.shippingAddress as any).address ||
-                (order.shippingAddress as any).addressLine1 ||
-                "",
-              addressLine1:
-                (order.shippingAddress as any).address ||
-                (order.shippingAddress as any).addressLine1 ||
-                "",
-              addressLine2: (order.shippingAddress as any).addressLine2 || "",
-              district: (order.shippingAddress as any).district || "",
-              city: (order.shippingAddress as any).city || "",
-              zipCode:
-                (order.shippingAddress as any).zipCode ||
-                (order.shippingAddress as any).postalCode ||
-                "",
-              postalCode:
-                (order.shippingAddress as any).zipCode ||
-                (order.shippingAddress as any).postalCode ||
-                "",
-            }
-          : null,
+      shippingAddress: address
+        ? {
+            id: address.id || order.shippingAddressId || "",
+            title: address.title || "",
+            fullName: address.fullName || "",
+            phone: address.phone || "",
+            address: address.address || address.addressLine1 || "",
+            addressLine1: address.address || address.addressLine1 || "",
+            addressLine2: address.addressLine2 || "",
+            district: address.district || "",
+            city: address.city || "",
+            zipCode: address.zipCode || address.postalCode || "",
+            postalCode: address.zipCode || address.postalCode || "",
+          }
+        : null,
       billingAddress: null, // Billing address not stored separately
       shipment: order.shipment
         ? {
@@ -419,8 +439,8 @@ export class OrderCommonService {
     };
   }
 
-  private pickActiveRefundRequest(refundRequests: any[]): any | null {
-    const activeStatuses = [
+  private pickActiveRefundRequest(refundRequests: OrderRefundRequestRow[]) {
+    const activeStatuses: string[] = [
       "pending_review",
       "approved",
       "wait_for_delivery",
