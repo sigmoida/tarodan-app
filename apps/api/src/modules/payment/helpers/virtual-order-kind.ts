@@ -1,4 +1,8 @@
-import { VIRTUAL_ORDER_KINDS, type VirtualOrderKind } from "@tarodan/types";
+import {
+  VIRTUAL_ORDER_KINDS,
+  type OrderKind,
+  type VirtualOrderKind,
+} from "@tarodan/types";
 
 /** The id prefix of each kind's virtual product. */
 export const VIRTUAL_PRODUCT_ID_PREFIX = {
@@ -27,8 +31,8 @@ export function boostVirtualProductId(boostId: string): string {
  * Which platform service an order sells, read from its virtual product id
  * (`membership-<tierId>`, `boost-<boostId>`); null for a listing order. The
  * one place that knows the prefixes: payment status, return URLs and the
- * PayTR merchant choice call it (the remaining prefix checks in fulfilment,
- * refunds and invoicing are a backlog item).
+ * PayTR merchant choice, the order response and rating call it (the
+ * remaining prefix checks in fulfilment and invoicing are a backlog item).
  */
 export function virtualOrderKind(
   order: { productId?: string | null } | null | undefined,
@@ -40,4 +44,11 @@ export function virtualOrderKind(
       productId.startsWith(VIRTUAL_PRODUCT_ID_PREFIX[kind]),
     ) ?? null
   );
+}
+
+/** The `kind` of an order response: its platform service, or `listing`. */
+export function orderKindOf(
+  order: { productId?: string | null } | null | undefined,
+): OrderKind {
+  return virtualOrderKind(order) ?? "listing";
 }

@@ -9,6 +9,7 @@ import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
 import { deriveOrderCancelCategory } from "./helpers/order-cancel-reasons";
 import { escrowReleaseAtOf } from "./helpers/order-escrow-release";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
+import { orderKindOf } from "../payment/helpers/virtual-order-kind";
 
 /**
  * Sipariş modülü ortak yardımcıları (sipariş yanıtı formatlama + ürün cache
@@ -150,6 +151,7 @@ export class OrderCommonService {
    * Format order response
    */
   async formatOrderResponse(order: any, userId: string) {
+    const kind = orderKindOf(order);
     const resolvedImageUrl = this.resolveProductImageUrl(
       order.product?.images?.[0]?.cardKey,
     );
@@ -249,13 +251,17 @@ export class OrderCommonService {
     return {
       id: order.id,
       orderNumber: order.orderNumber,
-      // Üyelik/dijital siparişler sanal ürün + platform satıcısı olarak modellenir
-      // (orderNumber "MEM-" öneki, shippingAddress { type: 'membership' }). Bu siparişlerde
-      // yorum/iade/teslimat adresi gibi fiziksel-ürün aksiyonları geçerli değildir.
-      isMembership:
-        (order.orderNumber?.startsWith("MEM-") ?? false) ||
-        (typeof order.shippingAddress === "object" &&
-          (order.shippingAddress as any)?.type === "membership"),
+      // What the order sells: a listing, or a platform service (membership,
+      // boost) modelled as a virtual product sold by the platform account.
+      // A platform-service order has no shipping, escrow, refund request,
+      // delivery confirmation or rating; clients gate on `isDigitalOrder`.
+      kind,
+      /**
+       * @deprecated True for every platform-service order (membership and
+       * boost); read `kind`. Live mobile apps read it only to hide
+       * physical-goods UI, so widening it gates boost orders there too.
+       */
+      isMembership: kind !== "listing",
       checkoutGroupId: order.checkoutGroupId ?? null,
       // Cati/sepet numarasi (CheckoutGroup.groupNumber) — UI cati basliginda gosterir.
       groupNumber: order.checkoutGroup?.groupNumber ?? null,
