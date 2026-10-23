@@ -4,7 +4,6 @@ import { Link } from "@/i18n/navigation";
 import {
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
-  BookmarkIcon,
 } from "@heroicons/react/24/outline";
 import { Alert, Button, Skeleton } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
@@ -77,7 +76,7 @@ export default function SavedSearchesPage() {
         />
       ) : savedSearches.length === 0 ? (
         <EmptyState
-          icon={<BookmarkIcon className="h-7 w-7" />}
+          icon={<MagnifyingGlassIcon className="h-7 w-7" />}
           title={t("search.savedEmptyTitle")}
           description={t("search.savedEmptyDescription")}
           action={

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { ShoppingBagIcon } from "@heroicons/react/24/outline";
+import { TagIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { EmptyState, ProductCard } from "@/components/ui";
 import type { Product } from "@/types/product";
@@ -18,7 +18,7 @@ export default function ListingsTab({
   if (products.length === 0) {
     return (
       <EmptyState
-        icon={<ShoppingBagIcon className="h-7 w-7" />}
+        icon={<TagIcon className="h-7 w-7" />}
         title={t("product.noListings")}
         description={noActiveMessage}
       />

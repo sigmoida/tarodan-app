@@ -2,7 +2,7 @@
 
 "use client";
 
-import { FolderPlusIcon } from "@heroicons/react/24/outline";
+import { RectangleStackIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { EmptyState } from "@/components/ui";
@@ -42,7 +42,7 @@ export default function CollectionsGrid() {
   if (displayedCollections.length === 0) {
     return (
       <EmptyState
-        icon={<FolderPlusIcon className="h-7 w-7" />}
+        icon={<RectangleStackIcon className="h-7 w-7" />}
         title={
           searchQuery
             ? `"${searchQuery}" ${t("common.noResults")}`

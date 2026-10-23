@@ -2,7 +2,7 @@
 
 "use client";
 
-import { BoltIcon } from "@heroicons/react/24/outline";
+import { RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { EmptyState, Pagination, Skeleton } from "@tarodan/ui";
@@ -66,7 +66,8 @@ export default function BoostSection({
     return (
       <ErrorState
         title={t("profile.boosts.loadFailed")}
-        reset={() => refetch()}
+        reset={() => void refetch()}
+        inline
       />
     );
   }
@@ -74,7 +75,7 @@ export default function BoostSection({
   if (rows.length === 0) {
     return (
       <EmptyState
-        icon={<BoltIcon className="h-7 w-7" />}
+        icon={<RocketLaunchIcon className="h-7 w-7" />}
         title={t("profile.boosts.empty.title")}
         description={t("profile.boosts.empty.description")}
         action={

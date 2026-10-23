@@ -4,11 +4,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  PlusIcon,
-  ClockIcon,
-  ShoppingBagIcon,
-} from "@heroicons/react/24/outline";
+import { PlusIcon, ClockIcon, TagIcon } from "@heroicons/react/24/outline";
 import {
   Alert,
   Badge,
@@ -186,7 +182,13 @@ export default function ProfileListingsPage() {
         </div>
       ) : listings.length === 0 ? (
         <EmptyState
-          icon={<ShoppingBagIcon className="h-7 w-7" />}
+          icon={
+            isExpiredTab ? (
+              <ClockIcon className="h-7 w-7" />
+            ) : (
+              <TagIcon className="h-7 w-7" />
+            )
+          }
           title={
             isExpiredTab
               ? t("profile.expiredListings.empty")

@@ -1,6 +1,9 @@
 "use client";
 
-import { ShoppingBagIcon } from "@heroicons/react/24/outline";
+import {
+  ReceiptPercentIcon,
+  ShoppingCartIcon,
+} from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Pagination, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
@@ -136,7 +139,13 @@ export default function OrdersPage() {
         </div>
       ) : groups.length === 0 ? (
         <EmptyState
-          icon={<ShoppingBagIcon className="h-7 w-7" />}
+          icon={
+            role === "seller" ? (
+              <ShoppingCartIcon className="h-7 w-7" />
+            ) : (
+              <ReceiptPercentIcon className="h-7 w-7" />
+            )
+          }
           title={emptyTitle}
           action={
             role === "buyer" && statusFilter === "active" ? (

@@ -48,6 +48,8 @@ export default function PaymentMethodsPage() {
           title={t("payment.savedCardsLoadFailed")}
           description={t("payment.savedCardsLoadFailedDesc")}
           reset={() => void refetch()}
+          retrying={isFetching}
+          inline
         />
       ) : cards.length === 0 ? (
         <EmptyState

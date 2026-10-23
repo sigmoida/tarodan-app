@@ -8,7 +8,7 @@ import {
   CubeIcon,
   StarIcon,
   RectangleStackIcon,
-  UserCircleIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
@@ -70,7 +70,7 @@ export default function SellerProfileClient() {
       <PageShell>
         <div className="mx-auto w-full max-w-6xl">
           <EmptyState
-            icon={<UserCircleIcon className="h-7 w-7" />}
+            icon={<UserIcon className="h-7 w-7" />}
             title={t("seller.notFound")}
             description={t("seller.notFoundDesc")}
             action={

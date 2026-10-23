@@ -2,7 +2,7 @@
 
 "use client";
 
-import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
@@ -62,7 +62,7 @@ export default function ReviewsTab({
   if (reviews.length === 0) {
     return (
       <EmptyState
-        icon={<ChatBubbleLeftRightIcon className="h-7 w-7" />}
+        icon={<StarOutlineIcon className="h-7 w-7" />}
         title={t("review.noReviews")}
         description={t("seller.noReviewsDesc")}
       />

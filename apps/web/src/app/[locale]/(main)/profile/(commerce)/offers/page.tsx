@@ -10,6 +10,7 @@ import {
   CheckCircleIcon,
   TagIcon,
   Squares2X2Icon,
+  EnvelopeOpenIcon,
 } from "@heroicons/react/24/outline";
 import { Button, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
@@ -149,10 +150,17 @@ function OffersPageContent() {
         <ErrorState
           title={t("offer.listPage.tekliflerYuklenirkenBirHataOlustu")}
           reset={() => void active.refetch()}
+          inline
         />
       ) : offers.length === 0 ? (
         <EmptyState
-          icon={<TagIcon className="h-7 w-7" />}
+          icon={
+            activeTab === "received" ? (
+              <EnvelopeOpenIcon className="h-7 w-7" />
+            ) : (
+              <PaperAirplaneIcon className="h-7 w-7" />
+            )
+          }
           title={
             activeTab === "received"
               ? t("offer.listPage.henuzGelenTeklifYok")

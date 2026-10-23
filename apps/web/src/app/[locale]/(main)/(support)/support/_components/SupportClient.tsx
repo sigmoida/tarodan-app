@@ -6,7 +6,7 @@ import {
   EnvelopeIcon,
   LifebuoyIcon,
   PlusIcon,
-  ClockIcon,
+  ChatBubbleLeftRightIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
@@ -226,7 +226,7 @@ export default function SupportClient() {
             ) : tickets.length === 0 ? (
               <EmptyState
                 size="compact"
-                icon={<ClockIcon className="h-6 w-6" />}
+                icon={<ChatBubbleLeftRightIcon className="h-6 w-6" />}
                 title={t("support.noTickets")}
               />
             ) : (

@@ -2,11 +2,7 @@
 
 "use client";
 
-import {
-  StarIcon,
-  ChatBubbleLeftRightIcon,
-  CheckBadgeIcon,
-} from "@heroicons/react/24/outline";
+import { StarIcon, CheckBadgeIcon } from "@heroicons/react/24/outline";
 import { Badge, Button, Select, Spinner } from "@tarodan/ui";
 import { EmptyState, SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
@@ -133,7 +129,7 @@ export default function ProductReviews() {
       ) : reviews.length === 0 ? (
         <EmptyState
           size="compact"
-          icon={<ChatBubbleLeftRightIcon className="h-6 w-6" />}
+          icon={<StarIcon className="h-6 w-6" />}
           title={
             reviewFilterScore
               ? t("product.noReviewsWithRating")

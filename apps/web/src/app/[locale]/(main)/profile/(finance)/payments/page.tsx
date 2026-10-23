@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCardIcon } from "@heroicons/react/24/outline";
+import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner, ConfirmDialog } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -66,7 +66,7 @@ export default function PaymentHistoryPage() {
         </div>
       ) : payments.length === 0 ? (
         <EmptyState
-          icon={<CreditCardIcon className="h-7 w-7" />}
+          icon={<ReceiptPercentIcon className="h-7 w-7" />}
           title={t("payment.noHistory")}
         />
       ) : (
