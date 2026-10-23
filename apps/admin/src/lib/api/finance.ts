@@ -1,5 +1,23 @@
-import type { AdminGibReportRow } from "@tarodan/types";
+import type {
+  AdminGibReportRow,
+  PayoutManualSettlementMethod,
+} from "@tarodan/types";
 import { api } from "./client";
+
+/** `POST /admin/payouts/:transferId/retry` body. */
+export interface RetryPayoutTransferBody {
+  confirmProviderChecked?: boolean;
+  reason?: string;
+}
+
+/** `POST /admin/payouts/transfers/:id/mark-paid` body. */
+export interface MarkPayoutTransferPaidBody {
+  method: PayoutManualSettlementMethod;
+  reference: string;
+  reason: string;
+  /** TL; must equal the row's `resolution.markPaidNetAmount`, else 409. */
+  expectedNetAmount: number;
+}
 
 /**
  * Finance domain: commission config, payments & invoices, seller
@@ -156,8 +174,18 @@ export const financeApi = {
     page?: number;
     limit?: number;
   }) => api.get("/admin/payouts/transfers", { params }),
-  retryPayoutTransfer: (transferId: string) =>
-    api.post(`/admin/payouts/${transferId}/retry`),
+  // A transfer whose PayTR outcome is unknown (`resolution.
+  // retryRequiresProviderCheck`) needs `confirmProviderChecked` and a reason.
+  retryPayoutTransfer: (
+    transferId: string,
+    body: RetryPayoutTransferBody = {},
+  ) => api.post(`/admin/payouts/${transferId}/retry`, body),
+  // "Mark as paid": method and expectedNetAmount come from the row's
+  // `resolution` (markPaidMethod, markPaidNetAmount).
+  markPayoutTransferPaid: (
+    transferId: string,
+    body: MarkPayoutTransferPaidBody,
+  ) => api.post(`/admin/payouts/transfers/${transferId}/mark-paid`, body),
   // Seller debt deductions (return shipping, outbound charge, shipping deficit)
   getPayoutAdjustments: (params?: {
     status?: string;
