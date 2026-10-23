@@ -102,10 +102,22 @@ function setup(
       return 0;
     }),
   };
-  const search = {
-    syncProduct: jest.fn().mockImplementation(async (id: string) => {
-      events.push(`search.sync ${id}`);
+  const searchIndexing = {
+    queueIndexProduct: jest.fn().mockImplementation(async (id: string) => {
+      events.push(`search.reindex ${id}`);
     }),
+  };
+  const outbox = {
+    enqueue: jest.fn().mockImplementation(async () => {
+      events.push("outbox.enqueue");
+    }),
+    // runs the work like a claim that succeeded
+    runInline: jest.fn(
+      async (_db: unknown, _key: string, work: () => Promise<unknown>) => ({
+        ran: true,
+        result: await work(),
+      }),
+    ),
   };
   const sentry = { addBreadcrumb: jest.fn(), captureException: jest.fn() };
   const audit: jest.MockedFunction<RatingModerationAuditWriter> = jest
@@ -121,7 +133,8 @@ function setup(
     prisma as never,
     ratingService as never,
     cache as never,
-    search as never,
+    searchIndexing as never,
+    outbox as never,
     sentry as never,
   );
   return {
@@ -130,7 +143,8 @@ function setup(
     tx,
     ratingService,
     cache,
-    search,
+    searchIndexing,
+    outbox,
     sentry,
     audit,
     events,
@@ -189,14 +203,87 @@ describe("RatingModerationService.moderateProductRating", () => {
       "product.lock",
       "review.update",
       "stats",
+      // the search re-index is durable: written with the change
+      "outbox.enqueue",
       "audit",
       "commit",
       // API caches first, then the search document and the web pages
       "cache.del products:detail:p-1",
       "cache.delPattern products:list:*",
-      "search.sync p-1",
+      "search.reindex p-1",
       "web products:list,product:p-1",
     ]);
+  });
+
+  it("queues the search re-index in the outbox with one key per change, and runs that same row after commit", async () => {
+    const ctx = setup();
+
+    await ctx.service.moderateProductRating(HIDE, ctx.audit);
+
+    const [txArg, event] = ctx.outbox.enqueue.mock.calls[0];
+    expect(txArg).toBe(ctx.tx);
+    expect(event).toEqual({
+      type: "search.product_reindex",
+      payload: { productId: "p-1" },
+      dedupeKey: expect.stringMatching(
+        /^search\.product_reindex:p-1:review:pr-1:\d{4}-\d{2}-\d{2}T/,
+      ),
+    });
+    expect(ctx.outbox.runInline).toHaveBeenCalledWith(
+      ctx.prisma,
+      event.dedupeKey,
+      expect.any(Function),
+    );
+  });
+
+  it("a failed inline re-index leaves the outbox row to the drainer and still answers", async () => {
+    const ctx = setup();
+    ctx.outbox.runInline.mockRejectedValue(new Error("redis down"));
+
+    await expect(
+      ctx.service.moderateProductRating(HIDE, ctx.audit),
+    ).resolves.toMatchObject({ status: "hidden", changed: true });
+    expect(ctx.outbox.enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("hiding a hidden review with a new reason corrects the reason only (audited, no visibility work)", async () => {
+    const ctx = setup({
+      productRow: {
+        id: "pr-1",
+        status: "hidden",
+        moderationReason: "Spam link",
+        moderatedAt: new Date("2026-10-01T00:00:00.000Z"),
+        productId: "p-1",
+      },
+    });
+
+    const result = await ctx.service.moderateProductRating(
+      { ...HIDE, reason: "Spam link to an outside shop" },
+      ctx.audit,
+    );
+
+    expect(ctx.tx.productRating.updateMany).toHaveBeenCalledWith({
+      where: { id: "pr-1", status: "hidden" },
+      data: {
+        status: "hidden",
+        moderationReason: "Spam link to an outside shop",
+        moderatedAt: expect.any(Date),
+        moderatedByAdminId: "adm-1",
+      },
+    });
+    expect(ctx.audit).toHaveBeenCalledWith(ctx.tx, {
+      before: { status: "hidden", moderationReason: "Spam link" },
+      after: { status: "hidden", reason: "Spam link to an outside shop" },
+    });
+    expect(result).toMatchObject({
+      changed: true,
+      moderationReason: "Spam link to an outside shop",
+    });
+    expect(ctx.tx.$queryRaw).not.toHaveBeenCalled();
+    expect(ctx.ratingService.updateProductRatingStats).not.toHaveBeenCalled();
+    expect(ctx.outbox.enqueue).not.toHaveBeenCalled();
+    expect(ctx.cache.del).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("refuses a hide without a reason before opening a transaction", async () => {

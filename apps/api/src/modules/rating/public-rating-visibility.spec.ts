@@ -29,7 +29,13 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
             .mockResolvedValue({ _avg: { score: 4.5 }, _count: 2 }),
         },
         product: { update: jest.fn().mockResolvedValue({}) },
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        // the recompute runs in its own transaction when none is given
+        $transaction: jest.fn(),
       };
+      prisma.$transaction.mockImplementation(
+        (fn: (tx: typeof prisma) => unknown) => fn(prisma),
+      );
       const service = new RatingService(
         prisma as any,
         {} as any,
@@ -56,6 +62,21 @@ describe("yayınlanmış puan görünürlüğü — yalnız approved", () => {
           where: { id: "p1" },
           data: { averageRating: 4.5, ratingCount: 2 },
         }),
+      );
+    });
+
+    it("locks the product row before counting, in one transaction (a new review cannot overwrite a moderation's count)", async () => {
+      const { service, prisma } = makeService();
+
+      await service.updateProductRatingStats("p1");
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const lockOrder = prisma.$queryRaw.mock.invocationCallOrder[0];
+      expect(lockOrder).toBeLessThan(
+        prisma.productRating.aggregate.mock.invocationCallOrder[0],
+      );
+      expect(prisma.$queryRaw.mock.calls[0][0].join("?")).toContain(
+        'FROM "products" WHERE id = ? FOR UPDATE',
       );
     });
 

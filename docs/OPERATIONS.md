@@ -481,8 +481,10 @@ at the next nightly run. The author still sees it on the order, flagged
   (`review_status_update` / entity `ProductRating`,
   `user_rating_status_update` / entity `Rating`, with the reason) and a Sentry
   breadcrumb `review.moderation` (ids only). A failed post-commit refresh
-  (cache, search, web revalidation) is reported to Sentry; the caches then
-  expire on their own (web ISR 60 s).
+  (API cache, web revalidation) is reported to Sentry; the caches then
+  expire on their own (web ISR 60 s). The product's search document is
+  re-indexed through the outbox (`search.product_reindex`): a failed inline
+  run is retried by the outbox drainer.
 - **Rollback.** Before reverting the code, set hidden rows to `rejected`
   (still non-public), or the old image cannot read them:
   `UPDATE ratings SET status = 'rejected' WHERE status = 'hidden';` and the

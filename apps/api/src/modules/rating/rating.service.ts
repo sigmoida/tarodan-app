@@ -450,13 +450,24 @@ export class RatingService {
    * reviews only; otherwise a review an admin hides would stay counted on the
    * card while the detail page no longer lists it.
    *
-   * `db` lets a moderation change recompute in its own transaction, so the
-   * status and the counters commit together.
+   * The product row is locked (`FOR UPDATE`) before the aggregate, so two
+   * recomputes of one product (a new review and an admin moderation) run one
+   * after the other and the later one counts the earlier commit; without the
+   * lock a stale count could overwrite a fresh one. With `db` (a moderation's
+   * transaction) the recompute commits with the status change; without it,
+   * it runs in its own short transaction.
    */
   async updateProductRatingStats(
     productId: string,
-    db: Prisma.TransactionClient = this.prisma,
+    db?: Prisma.TransactionClient,
   ): Promise<void> {
+    if (!db) {
+      await this.prisma.$transaction((tx) =>
+        this.updateProductRatingStats(productId, tx),
+      );
+      return;
+    }
+    await lockProductRow(db, productId);
     const stats = await db.productRating.aggregate({
       where: publicProductRatingWhere({ productId }),
       _avg: { score: true },
@@ -773,4 +784,15 @@ export class RatingService {
         : undefined,
     };
   }
+}
+
+/**
+ * Locks a product row for the rest of the transaction: the one lock every
+ * writer of the rating counters takes first (lock order product -> review).
+ */
+export async function lockProductRow(
+  db: Prisma.TransactionClient,
+  productId: string,
+): Promise<void> {
+  await db.$queryRaw`SELECT id FROM "products" WHERE id = ${productId} FOR UPDATE`;
 }

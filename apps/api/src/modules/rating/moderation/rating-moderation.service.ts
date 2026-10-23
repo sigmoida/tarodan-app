@@ -5,18 +5,24 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma, ProductStatus, RatingStatus } from "@prisma/client";
+import type { MessageKey } from "@tarodan/i18n";
 import type { ReviewModerationStatus } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { CacheService } from "../../cache/cache.service";
-import { SearchService } from "../../search/search.service";
+import { SearchIndexingService } from "../../search/indexing/search-indexing.service";
 import { SentryService } from "../../sentry/sentry.service";
-import { RatingService } from "../rating.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import {
+  OUTBOX_SEARCH_PRODUCT_REINDEX,
+  searchProductReindexDedupeKey,
+} from "../../outbox/outbox.types";
+import { lockProductRow, RatingService } from "../rating.service";
 import { i18nMessage } from "../../i18n";
 import {
   normalizeModerationReason,
   ratingModerationData,
+  type RatingModerationData,
 } from "../helpers/rating-moderation.helper";
-import { refreshProductVisibility } from "../../product/helpers/product-visibility";
 import {
   notifyWebRevalidate,
   productListTags,
@@ -59,17 +65,9 @@ export interface RatingModerationResult {
   status: RatingStatus;
   moderationReason: string | null;
   moderatedAt: Date | null;
-  /** False when the review already had the status (double submit): nothing was written. */
+  /** False when nothing was written (the same status again: a double submit). */
   changed: boolean;
 }
-
-/** The columns a moderation reads back, plus the key its refresh needs. */
-const MODERATION_SELECT = {
-  id: true,
-  status: true,
-  moderationReason: true,
-  moderatedAt: true,
-} as const;
 
 /**
  * Most listing pages of the rated user asked to revalidate after a user
@@ -78,22 +76,59 @@ const MODERATION_SELECT = {
  */
 export const SELLER_LISTING_REVALIDATE_LIMIT = 200;
 
-type ModerationRow = Prisma.ProductRatingGetPayload<{
-  select: typeof MODERATION_SELECT;
-}>;
+/** The columns a moderation reads, plus the key its refresh needs. */
+type ModerationRow = {
+  id: string;
+  status: RatingStatus;
+  moderationReason: string | null;
+  moderatedAt: Date | null;
+};
+
+const MODERATION_SELECT = {
+  id: true,
+  status: true,
+  moderationReason: true,
+  moderatedAt: true,
+} as const;
+
+/** What differs between the two review tables. */
+interface ModerationTarget<R extends ModerationRow> {
+  kind: RatingModerationKind;
+  notFoundKey: MessageKey;
+  find(tx: Prisma.TransactionClient, id: string): Promise<R | null>;
+  /** Compare-and-set on the status the row had; returns the rows changed. */
+  update(
+    tx: Prisma.TransactionClient,
+    row: R,
+    data: RatingModerationData,
+  ): Promise<number>;
+  /** Locks taken before the row update, when the visibility changes. */
+  lock?(tx: Prisma.TransactionClient, row: R): Promise<void>;
+  /** Writes after the row update, in the transaction, when the visibility changes. */
+  afterUpdate?(
+    tx: Prisma.TransactionClient,
+    row: R,
+    data: RatingModerationData,
+  ): Promise<void>;
+  /** After commit, when the visibility changed. */
+  refresh(row: R, data: RatingModerationData): Promise<void>;
+}
 
 /**
  * Admin moderation of reviews: hide (`hidden`, with a reason) and show again
  * (`approved`), for product reviews and user ratings.
  *
  * - One transaction: compare-and-set on the status the row had, the
- *   moderation columns, the product counters (product reviews) and the
- *   caller's audit entry. Two admins acting at once: the second gets 409.
- * - The same status again (double submit) writes nothing and returns
- *   `changed: false`.
- * - After commit: the API caches, the search document and the web ISR pages
- *   that show the review or its aggregates. The trust score follows at the
- *   next nightly run (ADR 0014).
+ *   moderation columns, the product counters (product reviews, under the
+ *   product row lock) and the caller's audit entry. Two admins acting at
+ *   once: the second gets 409.
+ * - The same status again writes nothing (`changed: false`), except a hidden
+ *   review hidden again with a different reason: that corrects the reason
+ *   (audited), without touching visibility.
+ * - After commit: the API caches and the web ISR pages that show the review
+ *   or its aggregates (best effort: both expire on their own), and the
+ *   product's search document through the outbox (lossless: it has no TTL).
+ *   The trust score follows at the next nightly run (ADR 0014).
  */
 @Injectable()
 export class RatingModerationService {
@@ -103,111 +138,157 @@ export class RatingModerationService {
     private readonly prisma: PrismaService,
     private readonly ratingService: RatingService,
     private readonly cache: CacheService,
-    private readonly search: SearchService,
+    private readonly searchIndexing: SearchIndexingService,
+    private readonly outbox: OutboxService,
     private readonly sentry: SentryService,
   ) {}
 
-  async moderateProductRating(
+  moderateProductRating(
     input: RatingModerationInput,
     audit: RatingModerationAuditWriter,
   ): Promise<RatingModerationResult> {
-    const reason = normalizeModerationReason(input.status, input.reason);
-    const outcome = await this.prisma.$transaction(async (tx) => {
-      const before = await tx.productRating.findUnique({
-        where: { id: input.ratingId },
-        select: { ...MODERATION_SELECT, productId: true },
-      });
-      if (!before) {
-        throw new NotFoundException(
-          i18nMessage("server.rating.reviewNotFound"),
-        );
-      }
-      if (before.status === input.status) {
-        return { changed: false, row: before };
-      }
-      // Lock order product -> review: a second moderation of the same
-      // product waits here, so its counter recompute sees this one's commit.
-      await tx.$queryRaw`SELECT id FROM "products" WHERE id = ${before.productId} FOR UPDATE`;
-      const data = ratingModerationData(
-        input.status,
-        reason,
-        input.moderatorAdminId,
-        new Date(),
-      );
-      const { count } = await tx.productRating.updateMany({
-        where: { id: before.id, status: before.status },
-        data,
-      });
-      if (count !== 1) {
-        throw new ConflictException(
-          i18nMessage("server.admin.review.statusChanged"),
-        );
-      }
-      await this.ratingService.updateProductRatingStats(before.productId, tx);
-      await audit(tx, changeOf(before, input.status, reason));
-      return { changed: true, row: { ...before, ...data } };
-    });
-
-    this.trace("product", input, outcome.changed);
-    if (outcome.changed) {
-      await this.afterCommit("product", input.ratingId, () =>
-        refreshProductVisibility(
-          {
-            cache: this.cache,
-            searchService: this.search,
-            logger: this.logger,
-          },
-          [outcome.row.productId],
-        ),
-      );
-    }
-    return toResult(outcome.row, outcome.changed);
+    type Row = ModerationRow & { productId: string };
+    return this.moderate<Row>(
+      {
+        kind: "product",
+        notFoundKey: "server.rating.reviewNotFound",
+        find: (tx, id) =>
+          tx.productRating.findUnique({
+            where: { id },
+            select: { ...MODERATION_SELECT, productId: true },
+          }),
+        update: async (tx, row, data) =>
+          (
+            await tx.productRating.updateMany({
+              where: { id: row.id, status: row.status },
+              data,
+            })
+          ).count,
+        // Lock order product -> review: a concurrent recompute of the same
+        // product (another moderation, a new review) waits for this commit.
+        lock: (tx, row) => lockProductRow(tx, row.productId),
+        afterUpdate: async (tx, row, data) => {
+          await this.ratingService.updateProductRatingStats(row.productId, tx);
+          await this.outbox.enqueue(tx, {
+            type: OUTBOX_SEARCH_PRODUCT_REINDEX,
+            payload: { productId: row.productId },
+            dedupeKey: reindexKey(row, data),
+          });
+        },
+        refresh: (row, data) => this.refreshProduct(row, data),
+      },
+      input,
+      audit,
+    );
   }
 
-  async moderateUserRating(
+  moderateUserRating(
+    input: RatingModerationInput,
+    audit: RatingModerationAuditWriter,
+  ): Promise<RatingModerationResult> {
+    type Row = ModerationRow & { receiverId: string };
+    return this.moderate<Row>(
+      {
+        kind: "user",
+        notFoundKey: "server.admin.review.notFound",
+        find: (tx, id) =>
+          tx.rating.findUnique({
+            where: { id },
+            select: { ...MODERATION_SELECT, receiverId: true },
+          }),
+        update: async (tx, row, data) =>
+          (
+            await tx.rating.updateMany({
+              where: { id: row.id, status: row.status },
+              data,
+            })
+          ).count,
+        refresh: (row) => this.refreshRatedUser(row.receiverId),
+      },
+      input,
+      audit,
+    );
+  }
+
+  private async moderate<R extends ModerationRow>(
+    target: ModerationTarget<R>,
     input: RatingModerationInput,
     audit: RatingModerationAuditWriter,
   ): Promise<RatingModerationResult> {
     const reason = normalizeModerationReason(input.status, input.reason);
     const outcome = await this.prisma.$transaction(async (tx) => {
-      const before = await tx.rating.findUnique({
-        where: { id: input.ratingId },
-        select: { ...MODERATION_SELECT, receiverId: true },
-      });
+      const before = await target.find(tx, input.ratingId);
       if (!before) {
-        throw new NotFoundException(
-          i18nMessage("server.admin.review.notFound"),
-        );
+        throw new NotFoundException(i18nMessage(target.notFoundKey));
       }
-      if (before.status === input.status) {
-        return { changed: false, row: before };
+      const visibilityChanges = before.status !== input.status;
+      const reasonCorrected =
+        input.status === RatingStatus.hidden &&
+        reason !== before.moderationReason;
+      if (!visibilityChanges && !reasonCorrected) {
+        return { changed: false, visibilityChanges, row: before, data: null };
       }
+      if (visibilityChanges) await target.lock?.(tx, before);
       const data = ratingModerationData(
         input.status,
         reason,
         input.moderatorAdminId,
         new Date(),
       );
-      const { count } = await tx.rating.updateMany({
-        where: { id: before.id, status: before.status },
-        data,
-      });
-      if (count !== 1) {
+      if ((await target.update(tx, before, data)) !== 1) {
         throw new ConflictException(
           i18nMessage("server.admin.review.statusChanged"),
         );
       }
-      await audit(tx, changeOf(before, input.status, reason));
-      return { changed: true, row: { ...before, ...data } };
+      if (visibilityChanges) await target.afterUpdate?.(tx, before, data);
+      await audit(tx, {
+        before: {
+          status: before.status,
+          moderationReason: before.moderationReason,
+        },
+        after: { status: input.status, reason },
+      });
+      return {
+        changed: true,
+        visibilityChanges,
+        row: { ...before, ...data },
+        data,
+      };
     });
 
-    this.trace("user", input, outcome.changed);
-    if (outcome.changed) {
-      await this.afterCommit("user", input.ratingId, () =>
-        this.refreshRatedUser(outcome.row.receiverId),
+    this.trace(target.kind, input, outcome.changed);
+    if (outcome.visibilityChanges && outcome.data) {
+      const { row, data } = outcome;
+      await this.afterCommit(target.kind, input.ratingId, () =>
+        target.refresh(row, data),
       );
     }
-    return toResult(outcome.row, outcome.changed);
+    return {
+      success: true,
+      id: outcome.row.id,
+      status: outcome.row.status,
+      moderationReason: outcome.row.moderationReason,
+      moderatedAt: outcome.row.moderatedAt,
+      changed: outcome.changed,
+    };
+  }
+
+  /**
+   * A product review shows on the product page and its counters on every
+   * card and list. The API caches go first, so the web, asked to revalidate
+   * next, fetches fresh data. The search re-index queued in the transaction
+   * runs now; if it fails, the outbox drainer retries it.
+   */
+  private async refreshProduct(
+    row: { id: string; productId: string },
+    data: RatingModerationData,
+  ): Promise<void> {
+    await this.cache.del(`products:detail:${row.productId}`);
+    await this.cache.delPattern("products:list:*");
+    await this.outbox.runInline(this.prisma, reindexKey(row, data), () =>
+      this.searchIndexing.queueIndexProduct(row.productId),
+    );
+    void notifyWebRevalidate(productListTags([row.productId]));
   }
 
   /**
@@ -230,7 +311,8 @@ export class RatingModerationService {
 
   /**
    * Post-commit refresh. The change is committed, so a failure here must not
-   * turn the response into an error: caches expire on their own (TTL, ISR).
+   * turn the response into an error: the caches expire on their own (TTL,
+   * ISR) and the search re-index stays queued in the outbox.
    */
   private async afterCommit(
     kind: RatingModerationKind,
@@ -270,30 +352,12 @@ export class RatingModerationService {
   }
 }
 
-function changeOf(
-  before: Pick<ModerationRow, "status" | "moderationReason">,
-  status: ReviewModerationStatus,
-  reason: string | null,
-): RatingModerationChange {
-  return {
-    before: {
-      status: before.status,
-      moderationReason: before.moderationReason,
-    },
-    after: { status, reason },
-  };
-}
-
-function toResult(
-  row: ModerationRow,
-  changed: boolean,
-): RatingModerationResult {
-  return {
-    success: true,
-    id: row.id,
-    status: row.status,
-    moderationReason: row.moderationReason,
-    moderatedAt: row.moderatedAt,
-    changed,
-  };
-}
+/** One outbox row per visibility change of one review. */
+const reindexKey = (
+  row: { id: string; productId: string },
+  data: RatingModerationData,
+): string =>
+  searchProductReindexDedupeKey(
+    row.productId,
+    `review:${row.id}:${data.moderatedAt.toISOString()}`,
+  );
