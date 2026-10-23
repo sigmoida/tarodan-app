@@ -136,23 +136,43 @@ describe("PayTRTransferService.createPlatformTransfer", () => {
     });
   });
 
-  it("refuses a hyphenated trans_id before touching the network", async () => {
-    let thrown: BadRequestException | undefined;
+  it("refuses a hyphenated trans_id before touching the network, as not sent", async () => {
+    let thrown: PlatformTransferRequestError | undefined;
     try {
       await service.createPlatformTransfer({
         ...params,
         transId: "PYT-K7X9M2QF3N",
       });
     } catch (e) {
-      thrown = e as BadRequestException;
+      thrown = e as PlatformTransferRequestError;
     }
-    expect(thrown).toBeInstanceOf(BadRequestException);
-    // Hata gövdesi i18n payload'ıdır; sebep parametresinde alan adı geçer.
-    expect(thrown!.getResponse()).toEqual({
-      i18nKey: "server.payment.paytrPlatformTransferFailed",
-      i18nParams: { reason: expect.stringContaining("trans_id") },
-    });
+    expect(thrown).toBeInstanceOf(PlatformTransferRequestError);
+    expect(thrown!.phase).toBe("not_sent");
+    expect(thrown!.causeCode).toBe("INVALID_TRANS_ID");
+    expect(thrown!.message).toContain("trans_id");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("reports a failure while building the request (credentials) as not sent", async () => {
+    const credentials = jest
+      .spyOn(PayTRCredentials.prototype, "forMerchant")
+      .mockImplementation(() => {
+        throw new Error("marketplace credentials missing");
+      });
+    try {
+      let thrown: PlatformTransferRequestError | undefined;
+      try {
+        await service.createPlatformTransfer(params);
+      } catch (e) {
+        thrown = e as PlatformTransferRequestError;
+      }
+      expect(thrown).toBeInstanceOf(PlatformTransferRequestError);
+      expect(thrown!.phase).toBe("not_sent");
+      expect(thrown!.causeCode).toBe("PRE_SEND");
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      credentials.mockRestore();
+    }
   });
 
   /**
@@ -230,6 +250,32 @@ describe("PayTRTransferService.createPlatformTransfer", () => {
         expect(error.causeCode).toBe("INVALID_BODY");
       },
     );
+
+    it.each([403, 404, 429])(
+      "reports an HTTP %s without a PayTR answer as not sent (refused before processing)",
+      async (status) => {
+        fetchSpy.mockResolvedValue({
+          status,
+          text: async () => "<html>blocked</html>",
+        });
+        const error = await rejection();
+        expect(error.phase).toBe("not_sent");
+        expect(error.causeCode).toBe(`HTTP_${status}`);
+      },
+    );
+
+    it("returns a PayTR answer even when it comes with a 4xx status", async () => {
+      fetchSpy.mockResolvedValue({
+        status: 400,
+        text: async () =>
+          JSON.stringify({ status: "error", err_no: "005", err_msg: "x" }),
+      });
+      await expect(service.createPlatformTransfer(params)).resolves.toEqual({
+        status: "error",
+        err_no: "005",
+        err_msg: "x",
+      });
+    });
 
     it("reports a failure while reading the body as unknown", async () => {
       fetchSpy.mockResolvedValue({

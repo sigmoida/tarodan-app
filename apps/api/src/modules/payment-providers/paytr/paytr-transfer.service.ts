@@ -94,8 +94,10 @@ export class PayTRTransferService {
    * Returns PayTR's parsed answer, accepted (`status: "success"`) or rejected
    * (`status: "error"` with `err_no`/`err_msg`). Throws
    * `PlatformTransferRequestError` when no usable answer came back, with
-   * `phase: "not_sent"` only if the connection was never established. Never
-   * retried here: this call moves money, the caller decides.
+   * `phase: "not_sent"` only when PayTR provably did not process it (failure
+   * before the request left the host, connect-phase error, or a 4xx refusal
+   * without a PayTR answer). Never retried here: this call moves money, the
+   * caller decides.
    */
   async createPlatformTransfer(params: {
     merchantOid: string;
@@ -105,43 +107,30 @@ export class PayTRTransferService {
     transferName: string;
     transferIban: string;
   }): Promise<PaytrPlatformTransferResult> {
-    // PayTR: trans_id yalnız harf/rakam. Tire SİLİNMEZ — sonuç callback'i ve dönen
-    // transfer listesi numarayı aldığı biçimde döndürür, DB ile eşleşmezdi.
-    // Biçimi çağıran (payout.service) garanti eder; burası son savunma.
+    // PayTR: trans_id is letters and digits only. The hyphen is NOT stripped
+    // here: the result callback and the returned-transfer list echo the id as
+    // sent, so it would no longer match the database. The caller
+    // (payout.service) guarantees the format; this is the last line.
     if (!isValidPayoutTransId(params.transId)) {
-      throw new BadRequestException(
-        i18nMessage("server.payment.paytrPlatformTransferFailed", {
-          reason: `trans_id alfanümerik olmalı (aldı: ${params.transId})`,
-        }),
+      throw this.noAnswer(
+        params.transId,
+        "not_sent",
+        "INVALID_TRANS_ID",
+        `trans_id must be alphanumeric (got ${params.transId})`,
       );
     }
-    const submerchantAmountKurus = Math.round(
-      params.submerchantAmount * 100,
-    ).toString();
-    const totalAmountKurus = Math.round(params.totalAmount * 100).toString();
-    const oid = params.merchantOid.replace(/-/g, "");
-
-    const hashStr =
-      this.merchantId +
-      oid +
-      params.transId +
-      submerchantAmountKurus +
-      totalAmountKurus +
-      params.transferName +
-      params.transferIban;
-
-    const paytrToken = this.creds.signWithSalt(hashStr);
-
-    const postData = new URLSearchParams({
-      merchant_id: this.merchantId,
-      merchant_oid: oid,
-      trans_id: params.transId,
-      submerchant_amount: submerchantAmountKurus,
-      total_amount: totalAmountKurus,
-      transfer_name: params.transferName,
-      transfer_iban: params.transferIban,
-      paytr_token: paytrToken,
-    }).toString();
+    // Anything failing before fetch (credentials, signing) never reached PayTR.
+    let postData: string;
+    try {
+      postData = this.platformTransferBody(params);
+    } catch (error) {
+      throw this.noAnswer(
+        params.transId,
+        "not_sent",
+        "PRE_SEND",
+        errorMessage(error),
+      );
+    }
 
     let response: Response;
     try {
@@ -183,6 +172,16 @@ export class PayTRTransferService {
     }
     const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(rawText);
     if (!parsed || typeof parsed.status !== "string") {
+      // A 4xx without a PayTR answer is a refusal before processing (WAF,
+      // rate limit, wrong URL): nothing was transferred.
+      if (response.status >= 400 && response.status < 500) {
+        throw this.noAnswer(
+          params.transId,
+          "not_sent",
+          `HTTP_${response.status}`,
+          `PayTR refused the request with HTTP ${response.status} and no answer`,
+        );
+      }
       throw this.noAnswer(
         params.transId,
         "unknown",
@@ -194,6 +193,42 @@ export class PayTRTransferService {
       `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_no ? ` err_no=${parsed.err_no}` : ""}${parsed.err_msg ? ` err=${parsed.err_msg}` : ""}`,
     );
     return parsed;
+  }
+
+  /** The signed form body of a platform transfer instruction (amounts in kurus). */
+  private platformTransferBody(params: {
+    merchantOid: string;
+    transId: string;
+    submerchantAmount: number;
+    totalAmount: number;
+    transferName: string;
+    transferIban: string;
+  }): string {
+    const submerchantAmountKurus = Math.round(
+      params.submerchantAmount * 100,
+    ).toString();
+    const totalAmountKurus = Math.round(params.totalAmount * 100).toString();
+    const oid = params.merchantOid.replace(/-/g, "");
+
+    const hashStr =
+      this.merchantId +
+      oid +
+      params.transId +
+      submerchantAmountKurus +
+      totalAmountKurus +
+      params.transferName +
+      params.transferIban;
+
+    return new URLSearchParams({
+      merchant_id: this.merchantId,
+      merchant_oid: oid,
+      trans_id: params.transId,
+      submerchant_amount: submerchantAmountKurus,
+      total_amount: totalAmountKurus,
+      transfer_name: params.transferName,
+      transfer_iban: params.transferIban,
+      paytr_token: this.creds.signWithSalt(hashStr),
+    }).toString();
   }
 
   /**

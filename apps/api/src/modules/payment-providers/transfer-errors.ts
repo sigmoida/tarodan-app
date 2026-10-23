@@ -1,7 +1,8 @@
 /**
  * Whether a platform transfer request could have reached the provider:
- * - `not_sent`: the connection was never established, so nothing was
- *   transferred and the same `trans_id` may be sent again.
+ * - `not_sent`: PayTR provably did not process it (it failed before leaving
+ *   the host, the connection was never established, or PayTR refused it
+ *   with a 4xx and no answer), so the same `trans_id` may be sent again.
  * - `unknown`: the request may have been processed (reset or timeout after
  *   sending, HTTP 5xx, unreadable answer). Resending could pay twice.
  */
@@ -18,7 +19,11 @@ export class PlatformTransferRequestError extends Error {
 
   constructor(
     readonly phase: PlatformTransferRequestPhase,
-    /** Network cause (`error.cause.code`), `TimeoutError`, `HTTP_<status>` or `INVALID_BODY`. */
+    /**
+     * Network cause (`error.cause.code`), `TimeoutError`, `HTTP_<status>`,
+     * `INVALID_BODY`, `PRE_SEND` (building the request failed) or
+     * `INVALID_TRANS_ID`.
+     */
     readonly causeCode: string | undefined,
     message: string,
   ) {
