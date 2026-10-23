@@ -3,6 +3,19 @@ import { EMAIL_PATTERN, URL_QUERY_PATTERN } from "./error-fingerprint";
 import { extractIdentifiers, maskIdentifiers } from "./error-identifiers";
 
 /**
+ * How long an unchanged error stays reported: about once a day. A cron that
+ * fails the same way every 30 minutes reaches Sentry ~once a day instead of
+ * 48 times. Deliberately shorter than 24h: a DAILY alarm (ledger
+ * reconciliation) runs a few seconds earlier or later each day, and with an
+ * exact 24h window today's run could land just inside yesterday's window and
+ * the alarm would reach the e-mail rule only every other day.
+ *
+ * Read by the Sentry throttle (`SentryReportThrottle`) and by the cron
+ * tracker, which re-raises a failure that lasts once per window.
+ */
+export const SENTRY_REPEAT_WINDOW_SECONDS = 20 * 60 * 60;
+
+/**
  * Repeat-report key for an error log line: "the same failure of the same
  * entity". Sentry receives one event per key per window
  * (`SentryReportThrottle`); the console still logs every occurrence.

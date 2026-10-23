@@ -1,8 +1,6 @@
 import type { CacheService } from "../cache/cache.service";
-import {
-  SENTRY_REPEAT_WINDOW_SECONDS,
-  SentryReportThrottle,
-} from "./sentry-report-throttle";
+import { SENTRY_REPEAT_WINDOW_SECONDS } from "../../common/logging/error-report-key";
+import { SentryReportThrottle } from "./sentry-report-throttle";
 
 const HOUR = 60 * 60 * 1000;
 const WINDOW_MS = SENTRY_REPEAT_WINDOW_SECONDS * 1000;

@@ -1,5 +1,6 @@
 import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
+import { SENTRY_REPEAT_WINDOW_SECONDS } from "../common/logging/error-report-key";
 import { CronStepFailuresError } from "./cron-step-runner";
 import { CronTrackerService } from "./cron-tracker.service";
 
@@ -184,6 +185,47 @@ describe("CronTrackerService.track alarms on a state change only", () => {
     await fail("refund-crons", REFUND_A);
 
     expect(error).toHaveBeenCalledTimes(2);
+  });
+
+  it("raises a failure that lasts again once the repeat window has passed", async () => {
+    const now = jest.spyOn(Date, "now");
+    const start = Date.parse("2026-10-23T00:00:00.000Z");
+    const at = (ms: number) => now.mockReturnValue(start + ms);
+
+    at(0);
+    await fail("payment-expired", REFUND_A);
+    at(SENTRY_REPEAT_WINDOW_SECONDS * 1000 - 60_000);
+    await fail("payment-expired", REFUND_A);
+    expect(error).toHaveBeenCalledTimes(1);
+
+    at(SENTRY_REPEAT_WINDOW_SECONDS * 1000);
+    await fail("payment-expired", REFUND_A);
+    expect(error).toHaveBeenCalledTimes(2);
+
+    // The window restarts from the re-raise.
+    at(SENTRY_REPEAT_WINDOW_SECONDS * 1000 + 5 * 60_000);
+    await fail("payment-expired", REFUND_A);
+    expect(error).toHaveBeenCalledTimes(2);
+  });
+
+  it("raises a summary its steps did not report, after the same text that they did", async () => {
+    const details = ["barcode-retry-records: 1 kayıt tamamlanamadı"];
+    const throwing = (reported: boolean) =>
+      expect(
+        tracker.track("sync-surat-tracking", "*/5 * * * *", () => {
+          throw new CronStepFailuresError(
+            ["barcode-retry-records"],
+            details,
+            reported,
+          );
+        }),
+      ).rejects.toBeInstanceOf(CronStepFailuresError);
+
+    await throwing(true);
+    expect(error).not.toHaveBeenCalled();
+
+    await throwing(false);
+    expect(error).toHaveBeenCalledTimes(1);
   });
 
   it("does not log a recovery for a job that never failed", async () => {

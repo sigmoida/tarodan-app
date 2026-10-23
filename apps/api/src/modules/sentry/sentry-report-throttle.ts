@@ -1,15 +1,6 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { CacheService } from "../cache/cache.service";
-
-/**
- * How long an unchanged error stays reported: about once a day. A cron that
- * fails the same way every 30 minutes reaches Sentry ~once a day instead of
- * 48 times. Deliberately shorter than 24h: a DAILY alarm (ledger
- * reconciliation) runs a few seconds earlier or later each day, and with an
- * exact 24h window today's run could land just inside yesterday's window and
- * the alarm would reach the e-mail rule only every other day.
- */
-export const SENTRY_REPEAT_WINDOW_SECONDS = 20 * 60 * 60;
+import { SENTRY_REPEAT_WINDOW_SECONDS } from "../../common/logging/error-report-key";
 
 /**
  * After another instance claimed a key, this instance trusts that for a short

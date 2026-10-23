@@ -3,7 +3,10 @@ import * as Sentry from "@sentry/node";
 import { setCronTracker } from "./cron-tracker.holder";
 import { errorMessage, errorStack } from "../common/helpers/error-message";
 import { isAlreadyReportedCronFailure } from "./cron-step-runner";
-import { buildErrorReportKey } from "../common/logging/error-report-key";
+import {
+  SENTRY_REPEAT_WINDOW_SECONDS,
+  buildErrorReportKey,
+} from "../common/logging/error-report-key";
 
 export type CronStatus = "idle" | "running" | "success" | "failed";
 
@@ -27,24 +30,30 @@ export interface CronRunRecord {
  *   gerektirdiği için bilinçli olarak şimdilik yok).
  * - Sentry check-in çağrıları DSN yokken güvenle no-op'tur; production'da DSN +
  *   Sentry Cron Monitoring açılınca otomatik "job çalışmadı/patladı" alarmı verir.
- * - A failed run is an `error` (an alarm) only on a state change: the first
+ * - A failed run is an `error` (an alarm) on a state change: the first
  *   failure, or a failure that differs from the previous run's (another
  *   reason, another entity; compared by the repeat-report key). The same
- *   failure on the next runs is a `warn`, and the first success after it is
- *   logged as a recovery. Every run still fails (Bull retry) and still sends
- *   its "error" check-in, so the Sentry Crons view shows a failure that lasts.
- *   The state is in memory: after a restart the first failure is an `error`
- *   again, and the Redis repeat throttle keeps that from becoming a second
- *   event inside its window (`SentryReportThrottle`).
+ *   failure on the next runs is a `warn` until the repeat window has passed
+ *   since it was last raised; then it is raised again, so a failure that
+ *   lasts still reaches Sentry about once a day, as the throttle intends.
+ *   The first success after a failure is logged as a recovery. Every run
+ *   still fails (Bull retry) and sends its "error" check-in. The state is in
+ *   memory: after a restart the first failure is an `error` again, and the
+ *   Redis repeat throttle keeps that from becoming a second event inside its
+ *   window (`SentryReportThrottle`).
  */
 @Injectable()
 export class CronTrackerService implements OnModuleInit {
   private readonly logger = new Logger("CronTracker");
   private readonly records = new Map<string, CronRunRecord>();
-  /** Per job, the failure its last run ended with; absent after a success. */
+  /**
+   * Per job, the failure its last run ended with; absent after a success.
+   * `raisedAt` is when it was last logged at error (null: never, because
+   * its steps had already reported it).
+   */
   private readonly openFailures = new Map<
     string,
-    { key: string; runs: number }
+    { key: string; runs: number; raisedAt: number | null }
   >();
 
   constructor() {
@@ -148,27 +157,38 @@ export class CronTrackerService implements OnModuleInit {
 
   private reportFailure(job: string, rec: CronRunRecord, error: unknown) {
     const line = `Cron '${job}' FAILED (${rec.lastDurationMs}ms): ${rec.lastError}`;
+    const alreadyReported = isAlreadyReportedCronFailure(error);
     const key = buildErrorReportKey({
-      context: job,
+      // An already-reported summary and the same text that is NOT reported
+      // yet are different states: the second one's alarm must not be lost.
+      context: alreadyReported ? `${job}:steps-reported` : job,
       errorName: error instanceof Error ? error.name : undefined,
       message: rec.lastError ?? "",
     });
+    const now = Date.now();
     const open = this.openFailures.get(job);
     const unchanged = open?.key === key;
     const runs = unchanged ? open.runs + 1 : 1;
-    this.openFailures.set(job, { key, runs });
+    const raisedRecently =
+      unchanged &&
+      open.raisedAt !== null &&
+      now - open.raisedAt < SENTRY_REPEAT_WINDOW_SECONDS * 1000;
 
-    if (isAlreadyReportedCronFailure(error)) {
+    if (alreadyReported) {
       // Each failed step already logged its own error (id + stack); a second
       // error here made every failure two Sentry events. The run still fails
       // (Bull retry, check-in "error"), this line only stops the duplicate.
       this.logger.warn(line);
-    } else if (unchanged) {
-      // Same failure as the last run: the first one was the alarm.
+      this.openFailures.set(job, { key, runs, raisedAt: null });
+    } else if (raisedRecently) {
+      // Same failure as the last run, raised within the window.
       this.logger.warn(`${line} (unchanged, ${runs} failed runs in a row)`);
+      this.openFailures.set(job, { key, runs, raisedAt: open.raisedAt });
     } else {
-      // A new failure is this run's alarm; the stack says where.
+      // A new failure, or one that has lasted a whole window: this run's
+      // alarm. The stack says where.
       this.logger.error(line, errorStack(error));
+      this.openFailures.set(job, { key, runs, raisedAt: now });
     }
   }
 
