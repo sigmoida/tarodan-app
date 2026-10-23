@@ -1,36 +1,54 @@
-import { Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
-import { RatingService } from "../../rating/rating.service";
+import {
+  RatingModerationService,
+  type RatingModerationResult,
+} from "../../rating/moderation/rating-moderation.service";
 import { AdminAuditService } from "./admin-audit.service";
 import {
   fulltextProductRatingSearch,
   fulltextUserSearch,
 } from "../../../common/helpers/fulltext-search";
 import { fulltextProductSearch } from "../../product/helpers/fulltext-search";
-import { AdminUserRatingQueryDto, RatingQueryDto, RatingStatus } from "../dto";
-import { Prisma } from "@prisma/client";
+import {
+  AdminUserRatingQueryDto,
+  RatingQueryDto,
+  UpdateRatingStatusDto,
+} from "../dto";
+import { Prisma, RatingStatus } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../../common/list";
-import { i18nMessage } from "../../i18n";
+
+/** The moderator as the admin lists show it. */
+const MODERATED_BY_SELECT = {
+  select: { id: true, user: { select: { displayName: true } } },
+} as const;
+
+type ModeratedByRow = {
+  id: string;
+  user: { displayName: string };
+} | null;
+
+const moderatedByView = (row: ModeratedByRow) =>
+  row ? { id: row.id, displayName: row.user.displayName } : null;
 
 /**
- * Ürün yorumu ve satıcı puanı admin operasyonları — AdminService'in
- * REVIEWS & RATINGS bölümünden birebir taşındı. AdminService aynı
- * imzalarla buraya delege eder.
+ * Admin operations on product reviews and user (seller) ratings: the two
+ * lists and the moderation (hide / show again). AdminService delegates here
+ * with the same signatures. The moderation write itself lives in the rating
+ * domain (`RatingModerationService`); this service adds the admin, the
+ * required audit entry and the entity type.
  */
 @Injectable()
 export class AdminReviewService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ratingService: RatingService,
+    private readonly ratingModeration: RatingModerationService,
     private readonly audit: AdminAuditService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
 
-  // AdminService'teki leaf yardımcı ile birebir aynıydı (bilinçli kopya,
-  // emsal: admin-user.service.ts); facade'daki son kullanıcı bu bölüm
-  // olduğundan oradaki kopya silindi.
   private resolveProductImageUrl(
     imageKeyOrUrl: string | null | undefined,
   ): string | null {
@@ -65,12 +83,17 @@ export class AdminReviewService {
   // ==================== REVIEWS & RATINGS ====================
 
   /**
-   * Get product reviews
+   * Product reviews for the admin list. `id` opens one review (deep link from
+   * a review report); `status` filters by any stored status, legacy ones too.
    */
   async getReviews(query: RatingQueryDto) {
-    const { page = 1, limit = 20, status, productId, search } = query;
+    const { page = 1, limit = 20, status, productId, search, id } = query;
 
-    const where: any = {};
+    const where: Prisma.ProductRatingWhereInput = {};
+
+    if (id) {
+      where.id = id;
+    }
 
     if (status) {
       where.status = status;
@@ -86,7 +109,7 @@ export class AdminReviewService {
         fulltextUserSearch(this.prisma, search),
         fulltextProductSearch(this.prisma, search),
       ]);
-      const conditions: any[] = [];
+      const conditions: Prisma.ProductRatingWhereInput[] = [];
       if (ratingIds.length > 0) conditions.push({ id: { in: ratingIds } });
       if (userIds.length > 0) conditions.push({ userId: { in: userIds } });
       if (productIds.length > 0)
@@ -95,14 +118,14 @@ export class AdminReviewService {
       const numericScore = Number(search);
       if (Number.isInteger(numericScore))
         conditions.push({ score: numericScore });
-      if (Object.values(RatingStatus).includes(normalized as RatingStatus))
-        conditions.push({ status: normalized as RatingStatus });
+      if (isRatingStatus(normalized)) conditions.push({ status: normalized });
       if (["true", "verified", "doğrulanmış", "onaylı"].includes(normalized))
         conditions.push({ isVerifiedPurchase: true });
       if (["false", "unverified", "doğrulanmamış"].includes(normalized))
         conditions.push({ isVerifiedPurchase: false });
       if (conditions.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
+        // The standard list envelope, like every other answer of this list.
+        return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
       }
       where.OR = conditions;
     }
@@ -148,33 +171,34 @@ export class AdminReviewService {
               images: { take: 1 },
             },
           },
+          moderatedBy: MODERATED_BY_SELECT,
         },
       },
       { page, limit },
     );
 
-    // Detay çekmecesi yeni uç istemeden çizilsin: tam yorum metni (`review`,
-    // `title`), admin yanıtı (`adminReply`), yorum görselleri (çözülmüş URL),
-    // ve sipariş / ürün / satıcı bağlantı kimlikleri satırda.
+    // The detail drawer draws without another endpoint: full text (`review`,
+    // `title`), admin reply (`adminReply`), review images (resolved URLs), the
+    // order / product / seller link ids and the last moderation are on the row.
     const orderNumbers = await this.orderNumbersOf(
-      result.data.map((review: { orderId: string }) => review.orderId),
+      result.data.map((review) => review.orderId),
     );
-    const resolvedReviews = result.data.map((review: any) => ({
+    const resolvedReviews = result.data.map(({ moderatedBy, ...review }) => ({
       ...review,
+      moderatedBy: moderatedByView(moderatedBy),
       images: (review.images ?? []).map(
-        (image: string) => this.resolveProductImageUrl(image) ?? image,
+        (image) => this.resolveProductImageUrl(image) ?? image,
       ),
       orderNumber: orderNumbers.get(review.orderId) ?? null,
       sellerId: review.product?.sellerId ?? null,
       product: review.product
         ? {
             ...review.product,
-            images: (review.product.images || []).map((img: any) => ({
+            // A product image has only storage keys (no `url` column);
+            // the card variant is the thumbnail.
+            images: (review.product.images || []).map((img) => ({
               ...img,
-              url:
-                this.resolveProductImageUrl(img.cardKey) ||
-                this.resolveProductImageUrl(img.url) ||
-                img.url,
+              url: this.resolveProductImageUrl(img.cardKey),
             })),
           }
         : review.product,
@@ -183,7 +207,7 @@ export class AdminReviewService {
     return { ...result, data: resolvedReviews };
   }
 
-  /** Sayfadaki siparişlerin numaraları — tek sorgu (N+1 yok). */
+  /** The order numbers of the page's reviews: one query (no N+1). */
   private async orderNumbersOf(
     orderIds: ReadonlyArray<string | null>,
   ): Promise<Map<string, string>> {
@@ -197,48 +221,77 @@ export class AdminReviewService {
   }
 
   /**
-   * Update review status
+   * Hide (`hidden`, reason required) or show again (`approved`) a product
+   * review. Audited fail-closed in the same transaction as entity
+   * `ProductRating`; the counters, caches and web pages follow.
    */
   async updateReviewStatus(
-    adminId: string,
+    adminUserId: string,
     reviewId: string,
-    status: RatingStatus,
-  ) {
-    const review = await this.prisma.productRating.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!review) {
-      throw new NotFoundException(i18nMessage("server.rating.reviewNotFound"));
-    }
-
-    // Cast to any to avoid TS error if prisma client is not generated
-    const updated = await this.prisma.productRating.update({
-      where: { id: reviewId },
-      data: { status } as any,
-    });
-
-    await this.audit.createAuditLog(
-      adminId,
-      "review_status_update",
-      "Rating",
-      reviewId,
-      review,
-      updated,
+    dto: UpdateRatingStatusDto,
+  ): Promise<RatingModerationResult> {
+    const moderatorAdminId = await this.audit.resolveActiveAdminId(adminUserId);
+    return this.ratingModeration.moderateProductRating(
+      {
+        ratingId: reviewId,
+        status: dto.status,
+        reason: dto.reason,
+        moderatorAdminId,
+      },
+      (tx, change) =>
+        this.audit.createRequiredAuditLog(
+          adminUserId,
+          "review_status_update",
+          "ProductRating",
+          reviewId,
+          change.before,
+          change.after,
+          tx,
+        ),
     );
-
-    await this.ratingService.updateProductRatingStats(review.productId);
-
-    return updated;
   }
 
   /**
-   * Get seller (user) ratings for admin panel
+   * Hide or show again a user (seller) rating; same rules as a product
+   * review, audited as entity `Rating`.
+   */
+  async updateUserRatingStatus(
+    adminUserId: string,
+    ratingId: string,
+    dto: UpdateRatingStatusDto,
+  ): Promise<RatingModerationResult> {
+    const moderatorAdminId = await this.audit.resolveActiveAdminId(adminUserId);
+    return this.ratingModeration.moderateUserRating(
+      {
+        ratingId,
+        status: dto.status,
+        reason: dto.reason,
+        moderatorAdminId,
+      },
+      (tx, change) =>
+        this.audit.createRequiredAuditLog(
+          adminUserId,
+          "user_rating_status_update",
+          "Rating",
+          ratingId,
+          change.before,
+          change.after,
+          tx,
+        ),
+    );
+  }
+
+  /**
+   * User (seller) ratings for the admin list; `id` and `status` filter like
+   * the product review list.
    */
   async getUserRatings(query: AdminUserRatingQueryDto) {
-    const search = query.search;
-    const status = query.status;
+    const { search, status, id } = query;
     const where: Prisma.RatingWhereInput = {};
+
+    if (id) {
+      where.id = id;
+    }
 
     if (search) {
       const normalized = search.trim().toLowerCase();
@@ -256,10 +309,9 @@ export class AdminReviewService {
       ];
       if (Number.isInteger(numericScore))
         where.OR.push({ score: numericScore });
-      if (Object.values(RatingStatus).includes(normalized as RatingStatus))
-        where.OR.push({ status: normalized as RatingStatus });
+      if (isRatingStatus(normalized)) where.OR.push({ status: normalized });
     }
-    if (status && ["pending", "approved", "rejected"].includes(status)) {
+    if (status) {
       where.status = status;
     }
 
@@ -293,21 +345,23 @@ export class AdminReviewService {
               avatarUrl: true,
             },
           },
+          moderatedBy: MODERATED_BY_SELECT,
         },
       },
       query,
     );
 
-    // Satıcı puanının görseli ve admin yanıtı yoktur; tam yorum (`comment`)
-    // satırda. Detay çekmecesi siparişe / takasa numarasıyla bağlanabilsin.
+    // A user rating has no images or admin reply; the full `comment` is on
+    // the row. The drawer links the order / trade by its number.
     const [orderNumbers, tradeNumbers] = await Promise.all([
       this.orderNumbersOf(result.data.map((rating) => rating.orderId)),
       this.tradeNumbersOf(result.data.map((rating) => rating.tradeId)),
     ]);
     return {
       ...result,
-      data: result.data.map((rating) => ({
+      data: result.data.map(({ moderatedBy, ...rating }) => ({
         ...rating,
+        moderatedBy: moderatedByView(moderatedBy),
         orderNumber: rating.orderId
           ? (orderNumbers.get(rating.orderId) ?? null)
           : null,
@@ -318,7 +372,7 @@ export class AdminReviewService {
     };
   }
 
-  /** Sayfadaki takasların numaraları — tek sorgu (N+1 yok). */
+  /** The trade numbers of the page's ratings: one query (no N+1). */
   private async tradeNumbersOf(
     tradeIds: ReadonlyArray<string | null>,
   ): Promise<Map<string, string>> {
@@ -330,4 +384,9 @@ export class AdminReviewService {
     });
     return new Map(trades.map((trade) => [trade.id, trade.tradeNumber]));
   }
+}
+
+/** A search term that names a stored status (`hidden`, `approved`, ...). */
+function isRatingStatus(value: string): value is RatingStatus {
+  return (Object.values(RatingStatus) as string[]).includes(value);
 }

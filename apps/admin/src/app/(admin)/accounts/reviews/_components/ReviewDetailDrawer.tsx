@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { ReviewModerationStatus } from "@tarodan/types";
 import { Badge, Button, Drawer } from "@tarodan/ui";
 import { DataList, Field } from "@/components/detail/DataList";
 import { Panel } from "@/components/detail/Panel";
@@ -9,21 +10,23 @@ import { TextLink } from "@/components/TextLink";
 import { useResourceList } from "@/components/list";
 import { fmtDateTime } from "@/lib/format";
 import type { ReviewDetail } from "../_lib/detail";
-import { REVIEW_TRANSITION_LABEL_KEY, reviewTransitions } from "../_lib/transitions";
-import { reviewStatusConfig, type ReviewStatus } from "../_lib/types";
+import {
+  REVIEW_TRANSITION_LABEL_KEY,
+  reviewTransitions,
+} from "@/components/reviews/transitions";
+import { reviewStatusConfig } from "@/components/reviews/reviewStatus";
 import { Stars } from "./Stars";
 
 const DETAIL_BUTTON_VARIANT = {
   approved: "primary",
-  pending: "secondary",
-  rejected: "danger",
-} as const satisfies Record<ReviewStatus, string>;
+  hidden: "danger",
+} as const satisfies Record<ReviewModerationStatus, string>;
 
 /**
- * Yorum detay çekmecesi — ürün ve satıcı yorumları AYNI görünümü (`ReviewDetail`)
- * çizer. Liste bağlamı içinde durur: seçili satır `rows`'tan her render'da
- * okunur, böylece bir moderasyon geçişinden sonra liste tazelenince çekmece de
- * yeni durumu gösterir (satır süzgeçten düştüyse kapanır).
+ * Review detail drawer: product and seller reviews draw the SAME view
+ * (`ReviewDetail`). It lives inside the list context: the selected row is read
+ * from `rows` on every render, so after a moderation the refreshed list also
+ * updates the drawer (it closes if the row drops out of the filter).
  */
 export function ReviewDetailDrawer<Row extends { id: string }>({
   selectedId,
@@ -34,20 +37,25 @@ export function ReviewDetailDrawer<Row extends { id: string }>({
 }: {
   selectedId: string | null;
   toDetail: (row: Row) => ReviewDetail;
-  /** Satır menüsüyle AYNI mutasyon (onay penceresi dahil) — çoğaltılmaz. */
-  onAct: (id: string, status: ReviewStatus) => void;
+  /** The SAME action as the row menu (opens the reason modal); not duplicated. */
+  onAct: (id: string, status: ReviewModerationStatus) => void;
   busyId?: string;
   onClose: () => void;
 }) {
   const t = useTranslations();
-  const { rows } = useResourceList<Row>();
+  const { rows, filters, setFilter } = useResourceList<Row>();
   const row = selectedId ? rows.find((r) => r.id === selectedId) : undefined;
   const detail = row ? toDetail(row) : null;
 
   return (
     <Drawer
       isOpen={!!detail}
-      onClose={onClose}
+      onClose={() => {
+        onClose();
+        // A report deep link narrows the list to one review (`?id=`); closing
+        // the drawer returns to the full list.
+        if (filters.id) setFilter("id", "");
+      }}
       side="right"
       title={t("admin.accounts.reviews.detail.title")}
       closeLabel={t("common.close")}
@@ -137,6 +145,27 @@ function ReviewDetailBody({ detail }: { detail: ReviewDetail }) {
               {fmtDateTime(detail.adminReplyAt)}
             </p>
           )}
+        </Panel>
+      )}
+
+      {detail.moderation && (
+        <Panel tone="muted" padding="sm">
+          <Eyebrow className="mb-1">
+            {t("admin.accounts.reviews.detail.moderation")}
+          </Eyebrow>
+          {detail.moderation.reason && (
+            <p className="whitespace-pre-wrap break-words text-sm text-body">
+              {detail.moderation.reason}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-muted">
+            {detail.moderation.by
+              ? t("admin.accounts.reviews.moderatedBy", {
+                  name: detail.moderation.by,
+                  date: fmtDateTime(detail.moderation.at),
+                })
+              : fmtDateTime(detail.moderation.at)}
+          </p>
         </Panel>
       )}
 

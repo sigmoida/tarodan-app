@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { ModuleRef } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
@@ -390,9 +391,10 @@ export class OrderTrackingSyncService {
             failed++;
           }
         }
-      } catch (error: any) {
-        this.logger.error(`Failed to sync parcel ${ref}: ${error.message}`);
-        failures.push(`${ref} (${error?.message ?? "bilinmeyen hata"})`);
+      } catch (error: unknown) {
+        // Into the run summary like every other parcel failure (its alarm);
+        // an error here as well made the same failure two Sentry events.
+        recordFailure(ref, errorMessage(error));
         failed += siblings.length;
       }
     }

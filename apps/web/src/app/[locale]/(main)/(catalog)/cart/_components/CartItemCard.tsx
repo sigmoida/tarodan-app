@@ -9,6 +9,7 @@ import { Badge, Checkbox, IconButton, QuantityStepper } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { CartLineItem } from "../_lib/types";
+import { listingPath } from "@tarodan/types";
 
 const PLACEHOLDER = "https://via.placeholder.com/96";
 
@@ -20,7 +21,7 @@ const fmtTL = (n: number) =>
 
 export default function CartItemCard({ item }: { item: CartLineItem }) {
   const t = useTranslations();
-  const href = `/listings/${item.productId}`;
+  const href = listingPath({ id: item.productId, title: item.title });
   const hasDiscount =
     item.isAvailable &&
     item.originalPrice != null &&

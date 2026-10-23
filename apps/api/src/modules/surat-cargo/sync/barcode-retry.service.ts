@@ -145,7 +145,8 @@ export class BarcodeRetryService {
     }
 
     if (failedSteps.length > 0) {
-      throw new CronStepFailuresError(failedSteps, failureDetails);
+      // Each step above logged its own failure at error.
+      throw new CronStepFailuresError(failedSteps, failureDetails, true);
     }
     return { order, trade };
   }

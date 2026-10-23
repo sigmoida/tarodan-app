@@ -68,6 +68,26 @@ export class AdminAuditService {
     }
   }
 
+  /**
+   * The `admin_users.id` of an active admin, from the signed-in user id
+   * (`@CurrentUser("id")`). Rows that record "which admin" (audit logs,
+   * review moderation) reference this id. Throws when the user is not an
+   * active admin, which the admin guards already rule out.
+   */
+  async resolveActiveAdminId(
+    userId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
+    const adminUser = await db.adminUser.findFirst({
+      where: { userId, isActive: true },
+      select: { id: true },
+    });
+    if (!adminUser) {
+      throw new Error(`Active admin user not found for userId ${userId}`);
+    }
+    return adminUser.id;
+  }
+
   private async writeAuditLog(
     adminUserId: string,
     action: string,
@@ -77,13 +97,7 @@ export class AdminAuditService {
     newValue: any,
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    const adminUser = await db.adminUser.findFirst({
-      where: { userId: adminUserId, isActive: true },
-      select: { id: true },
-    });
-    if (!adminUser) {
-      throw new Error(`Active admin user not found for userId ${adminUserId}`);
-    }
+    const adminId = await this.resolveActiveAdminId(adminUserId, db);
 
     const sensitiveKeys = new Set([
       // Yasal kimlik (ad, soyad, TCKN) ve banka TCKN'si denetim kaydına değer
@@ -157,7 +171,7 @@ export class AdminAuditService {
 
     return db.auditLog.create({
       data: {
-        adminUserId: adminUser.id,
+        adminUserId: adminId,
         action,
         entityType,
         entityId,

@@ -63,11 +63,11 @@ export function targetHref(report: ReportDetail): string | null {
     case "user":
       return `/accounts/users/${report.targetId}`;
     case "review":
-      // Tekil yorum sayfası yok: ilgili sekmedeki yorum listesine gider
-      // (reddetme/geri alma orada).
+      // No single review page: opens the review's drawer on its tab
+      // (hide / show again happen there).
       return `/accounts/reviews?tab=${
         report.target.reviewKind === "seller" ? "seller" : "product"
-      }`;
+      }&id=${report.targetId}`;
     default:
       // Koleksiyon ve mesajın admin panelinde tekil sayfası yok.
       return null;

@@ -1,7 +1,12 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 import { PrismaService } from "../../../prisma";
 import { SearchIndexingService } from "./search-indexing.service";
+import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
+import {
+  OUTBOX_SEARCH_PRODUCT_REINDEX,
+  type SearchProductReindexPayload,
+} from "../../outbox/outbox.types";
 
 interface EntityEvent {
   entityId: string;
@@ -12,13 +17,26 @@ interface CarModelEvent extends EntityEvent {
 }
 
 @Injectable()
-export class SearchSyncListener {
+export class SearchSyncListener implements OnModuleInit {
   private readonly logger = new Logger(SearchSyncListener.name);
 
   constructor(
     private readonly searchIndexing: SearchIndexingService,
     private readonly prisma: PrismaService,
+    private readonly outboxHandlers: OutboxHandlerRegistry,
   ) {}
+
+  /** The lossless after-commit re-index (`OUTBOX_SEARCH_PRODUCT_REINDEX`). */
+  onModuleInit(): void {
+    this.outboxHandlers.register(OUTBOX_SEARCH_PRODUCT_REINDEX, (payload) =>
+      this.reindexProduct(payload as SearchProductReindexPayload),
+    );
+  }
+
+  /** Queues the index job; the job reads the committed row. Idempotent. */
+  reindexProduct({ productId }: SearchProductReindexPayload): Promise<void> {
+    return this.searchIndexing.queueIndexProduct(productId);
+  }
 
   @OnEvent("product.changed", { async: true })
   async handleProductChanged(payload: EntityEvent): Promise<void> {

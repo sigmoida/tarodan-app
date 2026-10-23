@@ -7,6 +7,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import * as Sentry from "@sentry/node";
 import { SentryService } from "./sentry.service";
 import { SentryInterceptor } from "./sentry.interceptor";
+import { SentryReportThrottle } from "./sentry-report-throttle";
 import { initAppLogger } from "../../common/logging/logger";
 import {
   applySentryBreadcrumbPolicy,
@@ -20,7 +21,7 @@ import {
 @Global()
 @Module({
   imports: [ConfigModule],
-  providers: [SentryService, SentryInterceptor],
+  providers: [SentryService, SentryInterceptor, SentryReportThrottle],
   exports: [SentryService, SentryInterceptor],
 })
 export class SentryModule implements OnModuleInit {

@@ -1,6 +1,7 @@
 import { TradeTrackingSyncService } from "./sync/trade-tracking-sync.service";
 import { buildSimulatedSuratReading } from "./helpers/surat-simulated-reading";
 import { ShipmentStatus, TradeStatus } from "@prisma/client";
+import { Logger } from "@nestjs/common";
 
 /**
  * #2 (takip donması) + #3 (at_warehouse geri-sarma) regresyon testleri.
@@ -183,6 +184,56 @@ describe("TradeTrackingSyncService", () => {
       expect(where.status.notIn).not.toContain(ShipmentStatus.failed);
       // Eski beyaz-liste artık yok — at_delivery_branch/out_for_delivery pollanır.
       expect(where.status.in).toBeUndefined();
+    });
+  });
+
+  describe("syncAllActiveTradeShipments failure reporting", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("logs a leg the carrier rejects at warn and hands its id to the run summary", async () => {
+      // Staging, wrong carrier credentials: every leg failed every 30 minutes
+      // and each one was its own Sentry error (TARODAN-API-10).
+      const error = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      const warn = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      jest.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
+      const leg = {
+        id: "leg-1",
+        carrier: "surat",
+        trackingNumber: "TKS-K7X9M2QF3N-1",
+        status: ShipmentStatus.in_transit,
+      };
+      const prisma = {
+        tradeShipment: {
+          findMany: jest.fn().mockResolvedValue([leg]),
+          findUnique: jest.fn().mockResolvedValue(leg),
+        },
+      };
+      const client = {
+        lookupTracking: jest.fn().mockResolvedValue({
+          kind: "failure",
+          category: "provider",
+          message: "Kullanıcı kodu veya şifreniz hatalı",
+        }),
+      };
+      type Deps = ConstructorParameters<typeof TradeTrackingSyncService>;
+      const svc = new TradeTrackingSyncService(
+        prisma as unknown as Deps[0],
+        {} as Deps[1],
+        client as unknown as Deps[2],
+      );
+
+      const result = await svc.syncAllActiveTradeShipments();
+
+      expect(result).toMatchObject({ failed: 1 });
+      expect(result.failures).toEqual([
+        "leg-1 (Sürat takip provider hatası: Kullanıcı kodu veya şifreniz hatalı)",
+      ]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("leg-1"));
+      expect(error).not.toHaveBeenCalled();
     });
   });
 

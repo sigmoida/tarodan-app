@@ -1,6 +1,8 @@
 import type { LoggerService } from "@nestjs/common";
 import { getRequestId } from "../context/request-context";
+import { errorMessage } from "../helpers/error-message";
 import { attachFingerprint, buildErrorFingerprint } from "./error-fingerprint";
+import { attachReportKey, buildErrorReportKey } from "./error-report-key";
 import { getAppLogger } from "./logger";
 
 const QUIET_CONTEXTS = new Set(["RouterExplorer", "RoutesResolver"]);
@@ -74,13 +76,28 @@ export class AppNestLogger implements LoggerService {
       // Sentry gruplamasını (§ error-fingerprint.ts) context+mesaja göre
       // sabitle: aksi halde stack her zaman burada bittiği için ilgisiz
       // hatalar tek issue'da eriyor.
-      attachFingerprint(
+      const identity = {
+        context,
+        errorName: suppliedError?.name,
+        message: text,
+      };
+      attachFingerprint(error, buildErrorFingerprint(identity));
+      // A cron or retry loop logs the same failure of the same entity every
+      // run; Sentry gets it once per window (§ error-report-key.ts), the
+      // console line below still records every occurrence. In
+      // `logger.error("PayTR refund error:", err)` the reason and the entity
+      // are in the error, not in the text: without it every new reason would
+      // hide behind the first one for the whole window. `errorMessage`
+      // renders a localized exception's catalog key, whose `.message` is only
+      // "Bad Request Exception" for every reason.
+      const keyedText = !suppliedError
+        ? text
+        : suppliedError === message
+          ? errorMessage(suppliedError)
+          : `${text} ${errorMessage(suppliedError)}`;
+      attachReportKey(
         error,
-        buildErrorFingerprint({
-          context,
-          errorName: suppliedError?.name,
-          message: text,
-        }),
+        buildErrorReportKey({ ...identity, message: keyedText }),
       );
       logger.error(text, { error, details, ...(requestId && { requestId }) });
       return;

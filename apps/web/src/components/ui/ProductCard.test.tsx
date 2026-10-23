@@ -130,7 +130,9 @@ describe.each(["grid", "list"] as const)("ProductCard (%s)", (layout) => {
 
     // Kartın kendisi hâlâ ilana gider (ve tıklamayı sayar).
     act(() => link.click());
-    expect(h.linkClick).toHaveBeenCalledWith("/listings/p1");
+    expect(h.linkClick).toHaveBeenCalledWith(
+      "/listings/hot-wheels-67-camaro-p1",
+    );
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 

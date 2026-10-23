@@ -206,7 +206,7 @@ const DELIVERED_SECTIONS = {
   refund: "order.requestRefundTitle",
   shippingRow: "checkout.shipping",
   sellerInvoice: "order.sellerInvoice",
-  productLink: 'href="/listings/p1"',
+  productLink: 'href="/listings/model-car-p1"',
 } as const;
 const PAID_SECTIONS = {
   preparingDeadline: "order.preparingDeadlineTitle",

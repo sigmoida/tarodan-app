@@ -14,6 +14,15 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
+import { isPublicRatingStatus } from "../../common/helpers/public-rating";
+import type { OrderOwnReview } from "@tarodan/types";
+
+/** `OrderOwnReview` before serialisation: `createdAt` is still a Date. */
+type Dated<T> = Omit<T, "createdAt"> & { createdAt: Date };
+export type OrderOwnReviewView = {
+  product: Dated<NonNullable<OrderOwnReview["product"]>> | null;
+  seller: Dated<NonNullable<OrderOwnReview["seller"]>> | null;
+};
 
 /**
  * Sipariş sorguları (liste, detay, grup görünümleri, misafir takibi, satıcı
@@ -47,8 +56,16 @@ export class OrderQueryService {
    * The buyer's own submitted review for an order — product rating + seller
    * rating content. Powers the read-only "Değerlendirmeni Gör" view so a
    * reviewed order shows what was submitted instead of re-opening the form.
+   *
+   * The author always sees their own review, whatever its status. `hidden`
+   * says it is not shown publicly (an admin hid it, or a legacy unpublished
+   * row), so the client can say so. Contract: `OrderOwnReview` in
+   * `@tarodan/types`.
    */
-  async getOrderReview(orderId: string, userId: string) {
+  async getOrderReview(
+    orderId: string,
+    userId: string,
+  ): Promise<OrderOwnReviewView> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: { id: true, buyerId: true, sellerId: true },
@@ -69,12 +86,18 @@ export class OrderQueryService {
           review: true,
           images: true,
           createdAt: true,
+          status: true,
         },
       }),
       order.sellerId
         ? this.prisma.rating.findFirst({
             where: { orderId, giverId: userId, receiverId: order.sellerId },
-            select: { score: true, comment: true, createdAt: true },
+            select: {
+              score: true,
+              comment: true,
+              createdAt: true,
+              status: true,
+            },
           })
         : Promise.resolve(null),
     ]);
@@ -89,6 +112,7 @@ export class OrderQueryService {
               .map((img) => this.orderCommon.resolveProductImageUrl(img) ?? img)
               .filter(Boolean),
             createdAt: productRating.createdAt,
+            hidden: !isPublicRatingStatus(productRating.status),
           }
         : null,
       seller: sellerRating
@@ -96,6 +120,7 @@ export class OrderQueryService {
             score: sellerRating.score,
             comment: sellerRating.comment,
             createdAt: sellerRating.createdAt,
+            hidden: !isPublicRatingStatus(sellerRating.status),
           }
         : null,
     };

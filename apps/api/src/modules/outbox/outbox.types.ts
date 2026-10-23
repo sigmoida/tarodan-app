@@ -232,3 +232,24 @@ export interface BoostNoticePayload {
 
 export const boostNoticeDedupeKey = (p: BoostNoticePayload): string =>
   `${OUTBOX_BOOST_NOTICE}:${p.kind}:${p.boostId}${p.at ? `:${p.at}` : ""}`;
+
+/**
+ * Re-index one product's search document after a change it must reflect,
+ * written in the change's transaction. The Prisma middleware's
+ * `product.changed` fires inside an interactive transaction, before commit,
+ * so its index job can read the old row; this event runs after commit and
+ * has no TTL to wait out, unlike the caches. Used by review moderation (the
+ * document carries `ratingAverage` / `ratingCount`). The handler
+ * (`SearchSyncListener`) queues an index job, which reads the row when it
+ * runs: idempotent. One row per change (the dedupe key carries its time).
+ */
+export const OUTBOX_SEARCH_PRODUCT_REINDEX = "search.product_reindex";
+
+export interface SearchProductReindexPayload {
+  productId: string;
+}
+
+export const searchProductReindexDedupeKey = (
+  productId: string,
+  cause: string,
+): string => `${OUTBOX_SEARCH_PRODUCT_REINDEX}:${productId}:${cause}`;
