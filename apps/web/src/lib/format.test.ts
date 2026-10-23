@@ -9,15 +9,6 @@ import {
   formatTL,
 } from "./format";
 
-describe("formatRating", () => {
-  it("has exactly one decimal with the UI locale's separator", () => {
-    expect(formatRating(4.25, "tr")).toBe("4,3");
-    expect(formatRating(4.25, "en")).toBe("4.3");
-    expect(formatRating(4, "tr")).toBe("4,0");
-    expect(formatRating(3.74, "en")).toBe("3.7");
-  });
-});
-
 describe("formatDayMonth", () => {
   it("is the day and short month in the UI locale, without the year", () => {
     expect(formatDayMonth("2026-11-12T10:00:00.000Z", "tr")).toBe("12 Kas");
@@ -75,5 +66,14 @@ describe("para biçimi", () => {
     expect(formatPriceNumber(468)).toBe("468,00");
     expect(formatPriceNumber(1234.5)).toBe("1.234,50");
     expect(formatPriceNumber(null)).toBe("0,00");
+  });
+});
+
+describe("formatRating", () => {
+  it("has exactly one decimal with the UI locale's separator", () => {
+    expect(formatRating(4.25, "tr")).toBe("4,3");
+    expect(formatRating(4.25, "en")).toBe("4.3");
+    expect(formatRating(4, "tr")).toBe("4,0");
+    expect(formatRating(3.74, "en")).toBe("3.7");
   });
 });
