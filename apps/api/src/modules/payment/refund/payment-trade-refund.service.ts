@@ -237,7 +237,9 @@ export class PaymentTradeRefundService {
 
   /** Tek bir takas ödemesinin PayTR iadesi (tutar çağırandan gelir). */
   private async refundOneTradeCashPayment(
-    payment: any,
+    payment: Prisma.PaymentGetPayload<{
+      include: { tradeCashPayment: true };
+    }>,
     tradeId: string,
     amount: number,
     opts?: { shippingRefunded?: boolean },
@@ -440,9 +442,9 @@ export class PaymentTradeRefundService {
             },
           });
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.error(
-          `Trade refund provider event could not be recorded attempt=${refundAttempt.attempt.id}: ${e?.message}`,
+          `Trade refund provider event could not be recorded attempt=${refundAttempt.attempt.id}: ${errorMessage(e)}`,
         );
       }
     }
@@ -526,9 +528,9 @@ export class PaymentTradeRefundService {
           });
         });
         persisted = true;
-      } catch (persistErr: any) {
+      } catch (persistErr: unknown) {
         this.logger.error(
-          `refundTradeCash persist denemesi ${attempt}/3 başarısız (tradeId=${tradeId}): ${persistErr?.message}`,
+          `refundTradeCash persist denemesi ${attempt}/3 başarısız (tradeId=${tradeId}): ${errorMessage(persistErr)}`,
         );
       }
     }
@@ -568,9 +570,9 @@ export class PaymentTradeRefundService {
           // bedeli artık hiç iade edilmediği için hiçbir zaman tutmazdı.
           shippingReversal: opts?.shippingRefunded ? shippingAmount : 0,
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.warn(
-          `Ledger takas iade kaydı başarısız (tcp ${payment.tradeCashPaymentId}): ${e?.message}`,
+          `Ledger takas iade kaydı başarısız (tcp ${payment.tradeCashPaymentId}): ${errorMessage(e)}`,
         );
       }
     }
@@ -685,9 +687,9 @@ export class PaymentTradeRefundService {
             refundFailureAt: new Date(),
           },
         })
-        .catch((persistErr: any) =>
+        .catch((persistErr: unknown) =>
           this.logger.error(
-            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
+            `Failed to persist refund failure for trade ${tradeId}: ${errorMessage(persistErr)}`,
           ),
         );
       try {

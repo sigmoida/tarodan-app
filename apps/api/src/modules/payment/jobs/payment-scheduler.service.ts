@@ -7,6 +7,10 @@ import {
   type CronStepRunner,
 } from "../../../monitoring/cron-step-runner";
 import { QUEUE_NAMES } from "../../../workers/constants";
+import {
+  errorMessage,
+  errorStack,
+} from "../../../common/helpers/error-message";
 import { PaymentService } from "../payment.service";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { EventService } from "../../events/event.service";
@@ -354,9 +358,9 @@ export class PaymentSchedulerService implements OnModuleInit {
               receiverId: trade.receiverId,
               reason: cancelReason,
             });
-          } catch (err: any) {
+          } catch (err: unknown) {
             this.logger.error(
-              `Failed to notify trade ${trade.tradeId}: ${err.message}`,
+              `Failed to notify trade ${trade.tradeId}: ${errorMessage(err)}`,
             );
           }
         }
@@ -455,12 +459,12 @@ export class PaymentSchedulerService implements OnModuleInit {
           cancelled: result.cancelled,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Error in expired preparing orders job: ${error.message}`,
-        error.stack,
+        `Error in expired preparing orders job: ${errorMessage(error)}`,
+        errorStack(error),
       );
-      log(`HATA: ${error.message}`);
+      log(`HATA: ${errorMessage(error)}`);
       // Yut MA: Bull job'ı "failed" olsun ki retry + Sentry Cron alarmı çalışsın.
       throw error;
     }
