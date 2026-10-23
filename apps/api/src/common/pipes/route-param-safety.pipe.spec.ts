@@ -58,4 +58,13 @@ describe("uuidParamPipe (UuidParam)", () => {
       response: { i18nKey: "server.common.invalidId" },
     });
   });
+
+  it("a route can pass its own catalog key", async () => {
+    await expect(
+      uuidParamPipe("server.product.invalidIdFormat").transform("x", meta),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { i18nKey: "server.product.invalidIdFormat" },
+    });
+  });
 });
