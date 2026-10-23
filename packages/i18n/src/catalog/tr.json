@@ -1306,7 +1306,10 @@
     "preparingDeadlineSeller": "Siparişi bu tarihe kadar kargoya vermeniz gerekiyor.",
     "preparingDeadlineBuyer": "Satıcının siparişi en geç bu tarihe kadar kargoya vermesi gerekiyor.",
     "preparingExtendedSeller": "Kargo süreniz doldu ve bir kez uzatıldı. Bu son süredir; sipariş bu tarihe kadar kargoya verilmezse otomatik iptal edilir ve alıcıya tam iade yapılır.",
-    "preparingExtendedBuyer": "Satıcı siparişi süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı. Bu tarihe kadar kargoya verilmezse sipariş otomatik iptal edilir ve ödemenizin tamamı iade edilir. Kargoya verilene kadar siparişi iptal edebilirsiniz."
+    "preparingExtendedBuyer": "Satıcı siparişi süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı. Bu tarihe kadar kargoya verilmezse sipariş otomatik iptal edilir ve ödemenizin tamamı iade edilir. Kargoya verilene kadar siparişi iptal edebilirsiniz.",
+    "review": {
+      "hiddenNote": "Bu değerlendirme herkese gösterilmiyor."
+    }
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -4635,8 +4638,9 @@
         "allStatuses": "Tüm Durumlar",
         "filters": {
           "pending": "Bekleyenler",
-          "approved": "Onaylananlar",
-          "rejected": "Reddedilenler"
+          "approved": "Yayında",
+          "rejected": "Reddedilenler",
+          "hidden": "Gizli"
         },
         "product": "Ürün",
         "review": "Yorum",
@@ -4655,20 +4659,9 @@
         "productEmpty": "Yorum bulunamadı",
         "sellerEmpty": "Satıcı yorumu bulunamadı",
         "updateFailed": "Yorum durumu güncellenemedi",
-        "reject": "Reddet",
-        "revert": "Geri Al",
         "actionResult": {
-          "approved": "onaylandı",
-          "pending": "beklemeye alındı",
-          "rejected": "reddedildi"
-        },
-        "confirm": {
-          "approveTitle": "Yorumu Onayla",
-          "approveDescription": "Bu yorumu yayınlamak istediğinize emin misiniz?",
-          "rejectTitle": "Yorumu Reddet",
-          "rejectDescription": "Bu yorumu reddetmek istediğinize emin misiniz?",
-          "revertTitle": "Yorumu Beklemeye Al",
-          "revertDescription": "Bu yorumu yeniden inceleme kuyruğuna almak istediğinize emin misiniz?"
+          "approved": "yeniden gösterildi",
+          "hidden": "gizlendi"
         },
         "detail": {
           "open": "Detay",
@@ -4683,8 +4676,36 @@
             "order": "Sipariş",
             "trade": "Takas",
             "seller": "Satıcı"
-          }
-        }
+          },
+          "moderation": "Moderasyon"
+        },
+        "hide": "Gizle",
+        "unhide": "Yeniden göster",
+        "status": {
+          "visible": "Yayında",
+          "hidden": "Gizli",
+          "pending": "Bekliyor",
+          "rejected": "Reddedildi",
+          "spam": "Spam",
+          "deleted": "Silindi"
+        },
+        "moderation": {
+          "hideTitle": "Yorumu gizle",
+          "hideDescription": "Gizlenen yorum site ve uygulamada herkese kapanır; puan ortalamasına ve sayaçlara da girmez. Yazar kendi yorumunu görmeye devam eder.",
+          "unhideTitle": "Yorumu yeniden göster",
+          "unhideDescription": "Yorum yeniden herkese açık yayınlanır ve puan hesaplarına girer.",
+          "hideReason": "Gizleme nedeni",
+          "hideReasonPlaceholder": "Yorumun neden gizlendiğini yazın (en az {min} karakter)",
+          "unhideNote": "Not (isteğe bağlı)",
+          "unhideNotePlaceholder": "Denetim kaydına eklenecek kısa not",
+          "counter": "{count}/{max}",
+          "hideSubmit": "Gizle",
+          "unhideSubmit": "Yeniden göster"
+        },
+        "reasonColumn": "Gizleme nedeni",
+        "moderatedAtColumn": "Moderasyon tarihi",
+        "moderatedByColumn": "Moderatör",
+        "moderatedBy": "{name}, {date}"
       },
       "sellerApplications": {
         "title": "Kurumsal Satıcı Başvuruları",
@@ -5523,9 +5544,6 @@
         "rejectionReasonLabel": "Red Nedeni:",
         "aiImageCheck": "AI Görsel Denetimi",
         "aiScores": "İlgililik (araç/model): %{relevance} · Uygunsuzluk: %{nsfw}",
-        "reviewStatusUpdated": "Yorum durumu güncellendi",
-        "reviewApproved": "Onaylı",
-        "reviewPending": "Bekliyor",
         "reviewsTitle": "Ürün Yorumları",
         "noReviews": "Bu ürün için henüz yorum yok.",
         "verifiedBuyer": "Onaylı Alıcı",

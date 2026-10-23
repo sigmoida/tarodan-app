@@ -1306,7 +1306,10 @@
     "preparingDeadlineSeller": "You need to ship this order by this date.",
     "preparingDeadlineBuyer": "The seller has to ship this order by this date at the latest.",
     "preparingExtendedSeller": "Your shipping deadline passed and was extended once. This is the final deadline; if the order is not shipped by then, it is cancelled automatically and the buyer refunded in full.",
-    "preparingExtendedBuyer": "The seller could not ship on time and was given one extension. If the order is not shipped by this date, it is cancelled automatically and your payment refunded in full. You can cancel the order any time before it ships."
+    "preparingExtendedBuyer": "The seller could not ship on time and was given one extension. If the order is not shipped by this date, it is cancelled automatically and your payment refunded in full. You can cancel the order any time before it ships.",
+    "review": {
+      "hiddenNote": "This review is not shown publicly."
+    }
   },
   "trade": {
     "myTrades": "My Trades",
@@ -4635,8 +4638,9 @@
         "allStatuses": "All Statuses",
         "filters": {
           "pending": "Pending",
-          "approved": "Approved",
-          "rejected": "Rejected"
+          "approved": "Visible",
+          "rejected": "Rejected",
+          "hidden": "Hidden"
         },
         "product": "Product",
         "review": "Review",
@@ -4655,20 +4659,9 @@
         "productEmpty": "No reviews found",
         "sellerEmpty": "No seller reviews found",
         "updateFailed": "Review status could not be updated",
-        "reject": "Reject",
-        "revert": "Revert",
         "actionResult": {
-          "approved": "approved",
-          "pending": "moved to pending",
-          "rejected": "rejected"
-        },
-        "confirm": {
-          "approveTitle": "Approve Review",
-          "approveDescription": "Are you sure you want to publish this review?",
-          "rejectTitle": "Reject Review",
-          "rejectDescription": "Are you sure you want to reject this review?",
-          "revertTitle": "Move Review to Pending",
-          "revertDescription": "Are you sure you want to return this review to the review queue?"
+          "approved": "shown again",
+          "hidden": "hidden"
         },
         "detail": {
           "open": "Details",
@@ -4683,8 +4676,36 @@
             "order": "Order",
             "trade": "Trade",
             "seller": "Seller"
-          }
-        }
+          },
+          "moderation": "Moderation"
+        },
+        "hide": "Hide",
+        "unhide": "Show again",
+        "status": {
+          "visible": "Visible",
+          "hidden": "Hidden",
+          "pending": "Pending",
+          "rejected": "Rejected",
+          "spam": "Spam",
+          "deleted": "Deleted"
+        },
+        "moderation": {
+          "hideTitle": "Hide review",
+          "hideDescription": "A hidden review is removed from the site and the app and no longer counts toward ratings or counters. The author can still see their own review.",
+          "unhideTitle": "Show review again",
+          "unhideDescription": "The review is public again and counts toward ratings.",
+          "hideReason": "Reason for hiding",
+          "hideReasonPlaceholder": "Say why the review is hidden (at least {min} characters)",
+          "unhideNote": "Note (optional)",
+          "unhideNotePlaceholder": "A short note for the audit log",
+          "counter": "{count}/{max}",
+          "hideSubmit": "Hide",
+          "unhideSubmit": "Show again"
+        },
+        "reasonColumn": "Reason for hiding",
+        "moderatedAtColumn": "Moderated on",
+        "moderatedByColumn": "Moderator",
+        "moderatedBy": "{name}, {date}"
       },
       "sellerApplications": {
         "title": "Corporate Seller Applications",
@@ -5523,9 +5544,6 @@
         "rejectionReasonLabel": "Rejection Reason:",
         "aiImageCheck": "AI Image Check",
         "aiScores": "Relevance (vehicle/model): {relevance}% · Inappropriateness: {nsfw}%",
-        "reviewStatusUpdated": "Review status updated",
-        "reviewApproved": "Approved",
-        "reviewPending": "Pending",
         "reviewsTitle": "Product Reviews",
         "noReviews": "No reviews for this product yet.",
         "verifiedBuyer": "Verified Buyer",
