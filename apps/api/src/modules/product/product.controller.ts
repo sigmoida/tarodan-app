@@ -172,7 +172,11 @@ export class ProductController {
     status: 404,
     description: "No such listing, or not the caller's listing",
   })
-  @ApiResponse({ status: 400, description: "The listing is not active" })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Malformed listing id (server.product.invalidIdFormat), or the listing is not active",
+  })
   @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async getBoostOptions(
     @ListingIdParam("id", "server.product.invalidIdFormat") id: string,

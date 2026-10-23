@@ -15,7 +15,11 @@ import {
   WishlistItemResponseDto,
 } from "./dto";
 import { errorMessage } from "../../common/helpers/error-message";
-import { ListingIdParam } from "../../common/pipes/listing-id.pipe";
+import {
+  LISTING_ID_PARAM_DESCRIPTION,
+  ListingIdParam,
+} from "../../common/pipes/listing-id.pipe";
+import { ApiOperation, ApiParam, ApiResponse } from "@nestjs/swagger";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 
 @Controller("wishlist")
@@ -38,7 +42,7 @@ export class WishlistController {
       this.logger.warn(`getWishlist failed: ${errorMessage(err)}`);
       return {
         id: "",
-        userId: userId,
+        userId,
         items: [],
         totalItems: 0,
         createdAt: new Date(),
@@ -64,6 +68,13 @@ export class WishlistController {
    */
   @Delete(":productId")
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Remove a product from the caller's wishlist" })
+  @ApiParam({ name: "productId", description: LISTING_ID_PARAM_DESCRIPTION })
+  @ApiResponse({ status: 204, description: "Removed" })
+  @ApiResponse({
+    status: 400,
+    description: "Malformed product id (server.common.invalidId)",
+  })
   async removeFromWishlist(
     @CurrentUser("id") userId: string,
     @ListingIdParam("productId") productId: string,
@@ -76,6 +87,13 @@ export class WishlistController {
    * GET /wishlist/check/:productId (bare UUID or listing URL segment)
    */
   @Get("check/:productId")
+  @ApiOperation({ summary: "Is the product in the caller's wishlist" })
+  @ApiParam({ name: "productId", description: LISTING_ID_PARAM_DESCRIPTION })
+  @ApiResponse({ status: 200, description: "{ inWishlist: boolean }" })
+  @ApiResponse({
+    status: 400,
+    description: "Malformed product id (server.common.invalidId)",
+  })
   async isInWishlist(
     @CurrentUser("id") userId: string,
     @ListingIdParam("productId") productId: string,
