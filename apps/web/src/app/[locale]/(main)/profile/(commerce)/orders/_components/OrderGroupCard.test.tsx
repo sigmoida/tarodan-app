@@ -147,3 +147,109 @@ describe.each<[string, Signals]>([
     expect(card(order(signals, "paid"))).not.toContain("order.cancelShort");
   });
 });
+
+/** The seller's tab: the same order seen by its seller. */
+const sellerCard = (o: Order) =>
+  renderToStaticMarkup(
+    createElement(OrderGroupCard, {
+      group: { ...group(o), viewerRole: "seller" },
+      onCancelGroup: vi.fn(),
+      actions: {
+        role: "seller",
+        downloadingId: null,
+        onInvoice: vi.fn(),
+        onReorder: vi.fn(),
+        onReview: vi.fn(),
+      },
+    }),
+  );
+
+const asSeller = (o: Order): Order => ({
+  ...o,
+  isBuyer: false,
+  isSeller: true,
+});
+
+describe("orders list card in the seller's tab", () => {
+  it("offers the listing seller the invoice upload and the cargo code", () => {
+    const preparing = asSeller(order({ kind: "listing" }, "preparing"));
+    const html = sellerCard({ ...preparing, shipment: undefined });
+    expect(html).toContain("order.invoice");
+    expect(html).toContain("order.viewCargoCode");
+    expect(html).toContain("order.netToYou");
+  });
+
+  it.each<[string, Signals]>([
+    ["boost", { kind: "boost" }],
+    ["membership", { kind: "membership" }],
+    ["no kind, origin platform_service", { origin: "platform_service" }],
+    ["no kind, deprecated isMembership", { isMembership: true }],
+  ])(
+    "offers the platform account neither for a digital order (%s)",
+    (_, signals) => {
+      const preparing = asSeller(order(signals, "preparing"));
+      const html = sellerCard({ ...preparing, shipment: undefined });
+      expect(html).not.toContain("order.invoice");
+      expect(html).not.toContain("order.viewCargoCode");
+    },
+  );
+});
+
+describe("orders list card for a cart mixing a listing and a digital order", () => {
+  // Not produced by checkout today (services have their own checkout); the
+  // card must still gate per order, never per group.
+  const mixed = (): ServerOrderGroup => {
+    const physical = order({ kind: "listing" }, "delivered");
+    const digital: Order = {
+      ...order({ kind: "boost" }, "delivered"),
+      id: "o2",
+      orderNumber: "ORD-2",
+      product: { id: "p2", title: "Boost" },
+      shipment: undefined,
+    };
+    const base = group(physical);
+    return {
+      ...base,
+      orders: [physical, digital],
+      packages: [
+        base.packages[0],
+        {
+          ...base.packages[0],
+          id: "pkg2",
+          packageNumber: "PKG-2",
+          cargo: null,
+          orders: [digital],
+        },
+      ],
+    };
+  };
+
+  const render = () =>
+    renderToStaticMarkup(
+      createElement(OrderGroupCard, {
+        group: mixed(),
+        onCancelGroup: vi.fn(),
+        actions: {
+          role: "buyer",
+          downloadingId: null,
+          onInvoice: vi.fn(),
+          onReorder: vi.fn(),
+          onReview: vi.fn(),
+        },
+      }),
+    );
+
+  it("keeps every goods action and the parcel of the listing order", () => {
+    const html = render();
+    for (const [what, marker] of Object.entries(DELIVERED_MARKERS)) {
+      expect(html, what).toContain(marker);
+    }
+  });
+
+  it("gives the digital order no link and no parcel", () => {
+    const html = render();
+    expect(html).toContain("Boost");
+    expect(html).not.toContain('href="/listings/p2"');
+    expect(html).not.toContain("PKG-2");
+  });
+});
