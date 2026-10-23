@@ -4,6 +4,7 @@ import {
   Injectable,
   NestInterceptor,
   Type,
+  mixin,
 } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { Observable } from "rxjs";
@@ -34,5 +35,5 @@ export function scopedSentryTag(tag: {
       return next.handle();
     }
   }
-  return ScopedSentryTagInterceptor;
+  return mixin(ScopedSentryTagInterceptor);
 }

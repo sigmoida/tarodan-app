@@ -5,8 +5,12 @@ import {
   ExceptionFilter,
   Get,
   INestApplication,
+  Post,
+  UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { json } from "express";
 import { Test } from "@nestjs/testing";
 import * as Sentry from "@sentry/node";
 import * as request from "supertest";
@@ -31,24 +35,39 @@ describe("scopedSentryTag with the per-request Sentry scope", () => {
     }
   }
 
+  const failAfterATick = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    seen.handler = featureTag();
+    throw new Error("boom");
+  };
+
   @UseInterceptors(scopedSentryTag({ key: "feature", value: "demo" }))
   @Controller("tagged")
   class TaggedController {
     @Get()
-    async fail() {
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      seen.handler = featureTag();
-      throw new Error("boom");
+    fail() {
+      return failAfterATick();
+    }
+
+    // The body parsers resume the chain from stream callbacks: the scope
+    // must survive them as well.
+    @Post("json")
+    failJson() {
+      return failAfterATick();
+    }
+
+    @Post("file")
+    @UseInterceptors(FileInterceptor("file"))
+    failUpload(@UploadedFile() _file: unknown) {
+      return failAfterATick();
     }
   }
 
   @Controller("untagged")
   class UntaggedController {
     @Get()
-    async fail() {
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      seen.handler = featureTag();
-      throw new Error("boom");
+    fail() {
+      return failAfterATick();
     }
   }
 
@@ -61,8 +80,13 @@ describe("scopedSentryTag with the per-request Sentry scope", () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [TaggedController, UntaggedController],
     }).compile();
-    app = moduleRef.createNestApplication({ logger: false });
+    // The order of main.ts: the scope first, then the body parser.
+    app = moduleRef.createNestApplication({
+      bodyParser: false,
+      logger: false,
+    });
     app.use(sentryRequestScopeMiddleware);
+    app.use(json());
     app.useGlobalFilters(new RecordingFilter());
     await app.init();
   });
@@ -79,6 +103,26 @@ describe("scopedSentryTag with the per-request Sentry scope", () => {
 
   it("puts the tag on the scope the 5xx is reported from", async () => {
     await request(app.getHttpServer()).get("/tagged").expect(500);
+
+    expect(seen.handler).toBe("demo");
+    expect(seen.filter).toBe("demo");
+  });
+
+  it("keeps the tag through a JSON body", async () => {
+    await request(app.getHttpServer())
+      .post("/tagged/json")
+      .send({ name: "x" })
+      .expect(500);
+
+    expect(seen.handler).toBe("demo");
+    expect(seen.filter).toBe("demo");
+  });
+
+  it("keeps the tag through a multipart upload", async () => {
+    await request(app.getHttpServer())
+      .post("/tagged/file")
+      .attach("file", Buffer.from("hello"), "a.txt")
+      .expect(500);
 
     expect(seen.handler).toBe("demo");
     expect(seen.filter).toBe("demo");
