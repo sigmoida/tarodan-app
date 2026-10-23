@@ -31,6 +31,28 @@ const dayMonthFmt = (locale: string): Intl.DateTimeFormat => {
   }
   return fmt;
 };
+// A star rating reads with the UI locale's decimal separator ("4,5" / "4.5").
+const ratingFmts = new Map<string, Intl.NumberFormat>();
+const ratingFmt = (locale: string): Intl.NumberFormat => {
+  let fmt = ratingFmts.get(locale);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+    ratingFmts.set(locale, fmt);
+  }
+  return fmt;
+};
+
+/**
+ * A 0 to 5 review average with exactly one decimal in the UI locale: "4,5"
+ * (tr), "4.5" (en). The seller trust score has its own two-decimal
+ * `formatTrustRating` in `@tarodan/types`.
+ */
+export function formatRating(value: number, locale: string): string {
+  return ratingFmt(locale).format(value);
+}
 
 type DateLike = string | number | Date | null | undefined;
 

@@ -14,10 +14,11 @@ import UserAvatar from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useListingDetail } from "../_context/ListingDetailContext";
+import { formatRating } from "@/lib/format";
 import { publicNameOf } from "@/lib/public-name";
 
 export default function SellerCard() {
-  const { t, listing, isAuthenticated, isOwner, requireAuth } =
+  const { t, locale, listing, isAuthenticated, isOwner, requireAuth } =
     useListingDetail();
 
   const seller = listing?.seller;
@@ -65,7 +66,7 @@ export default function SellerCard() {
               <span className="flex items-center gap-1">
                 <StarIconSolid className="w-4 h-4 text-warning-400" />
                 <span className="font-medium text-heading">
-                  {rating.toFixed(1)}
+                  {formatRating(rating, locale)}
                 </span>
                 {totalRatings != null && totalRatings > 0 && (
                   <span className="text-subtle">({totalRatings})</span>

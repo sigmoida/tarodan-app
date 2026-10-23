@@ -16,14 +16,9 @@ import { useLocale, useTranslations } from "next-intl";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
+import { formatRating } from "@/lib/format";
 import { publicNameOf } from "@/lib/public-name";
 import SellerTrustBadge from "./SellerTrustBadge";
-
-const formatRating = (value: number, locale: string) =>
-  new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
 
 interface SellerHeaderProps {
   seller: Seller;
@@ -155,7 +150,7 @@ export default function SellerHeader({
         <MetricCard
           icon={StarIcon}
           label={t("profile.rating")}
-          value={hasRatings ? averageRating.toFixed(1) : "—"}
+          value={hasRatings ? formatRating(averageRating, locale) : "—"}
           accent="text-warning-600"
         />
       </div>

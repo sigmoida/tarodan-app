@@ -5,8 +5,18 @@ import {
   formatDayMonth,
   formatPrice,
   formatPriceNumber,
+  formatRating,
   formatTL,
 } from "./format";
+
+describe("formatRating", () => {
+  it("has exactly one decimal with the UI locale's separator", () => {
+    expect(formatRating(4.25, "tr")).toBe("4,3");
+    expect(formatRating(4.25, "en")).toBe("4.3");
+    expect(formatRating(4, "tr")).toBe("4,0");
+    expect(formatRating(3.74, "en")).toBe("3.7");
+  });
+});
 
 describe("formatDayMonth", () => {
   it("is the day and short month in the UI locale, without the year", () => {
