@@ -11913,7 +11913,10 @@
         "documentsNotApproved": "Tüm güncel belgeler onaylanmadan hesap aktifleştirilemez"
       },
       "review": {
-        "notFound": "Kullanıcı yorumu bulunamadı"
+        "notFound": "Kullanıcı yorumu bulunamadı",
+        "reasonRequired": "Gizleme nedeni girin (en az {min} karakter).",
+        "reasonTooLong": "Neden en fazla {max} karakter olabilir.",
+        "statusChanged": "Yorumun durumu az önce değişti; sayfayı yenileyip tekrar deneyin."
       },
       "tax": {
         "regionNotFound": "Vergi bölgesi bulunamadı",
