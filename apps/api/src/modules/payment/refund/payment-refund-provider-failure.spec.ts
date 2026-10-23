@@ -295,6 +295,37 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
       expect(refundErrorLine(failureLines().error)).toHaveLength(1);
     });
 
+    it("a caller that alarms itself: PayTR refunded, then the commit failed, is still an error", async () => {
+      const { service, prisma, paytr, failureLines, payoutRestored } =
+        make(undefined);
+      paytr.createRefund.mockResolvedValue({
+        status: "success",
+        return_amount: PAID,
+      });
+      // The claim runs in the first transaction; the money commit (order,
+      // payment, hold, ledger) is the second and fails after PayTR refunded.
+      const runInTx = prisma.$transaction.getMockImplementation()!;
+      prisma.$transaction
+        .mockImplementationOnce(runInTx)
+        .mockImplementationOnce(() =>
+          Promise.reject(new Error("database connection lost")),
+        );
+
+      await expect(
+        service.processRefund(ORDER_ID, undefined, {
+          cancelledBy: CancellationActor.system,
+          callerAlarms: true,
+        }),
+      ).rejects.toBeInstanceOf(RefundPendingReconciliationException);
+
+      expect(paytr.createRefund).toHaveBeenCalledTimes(1);
+      // The buyer's money went back: a loud alarm whoever the caller is, and
+      // the seller's voided payout stays voided.
+      expect(refundErrorLine(failureLines().error)).toHaveLength(1);
+      expect(refundErrorLine(failureLines().warn)).toEqual([]);
+      expect(payoutRestored()).toBe(false);
+    });
+
     it("any other caller keeps the error line (pin)", async () => {
       const { service, failureLines } = make(
         new ProviderRefundRejectedException("iade limiti asildi"),
