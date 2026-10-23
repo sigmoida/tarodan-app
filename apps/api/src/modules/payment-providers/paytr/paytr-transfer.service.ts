@@ -6,9 +6,12 @@ import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { parsePaytrMoneyString } from "./paytr-money.util";
 import { normalizeTrIban } from "../../../common/validators/tr-iban";
 import {
+  classifyPaytrFetchError,
+  fetchErrorCode,
   networkErrorReason,
   withPaytrFetchRetry,
 } from "./paytr-fetch-retry.util";
+import { PlatformTransferRequestError } from "../transfer-errors";
 
 /** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
  *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
@@ -86,6 +89,12 @@ export class PayTRTransferService {
   /**
    * Transfer funds to seller's IBAN via PayTR Platform Transfer API.
    * Requires a previously completed payment (merchant_oid must match).
+   *
+   * Returns PayTR's parsed answer, accepted (`status: "success"`) or rejected
+   * (`status: "error"` with `err_no`/`err_msg`). Throws
+   * `PlatformTransferRequestError` when no usable answer came back, with
+   * `phase: "not_sent"` only if the connection was never established. Never
+   * retried here: this call moves money, the caller decides.
    */
   async createPlatformTransfer(params: {
     merchantOid: string;
@@ -133,34 +142,74 @@ export class PayTRTransferService {
       paytr_token: paytrToken,
     }).toString();
 
+    let response: Response;
     try {
-      const response = await fetch(`${this.baseUrl}/platform/transfer`, {
+      response = await fetch(`${this.baseUrl}/platform/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: postData,
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
-      const rawText = await response.text();
-      const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(
-        rawText,
-      ) ?? {
-        status: "failed",
-        err_msg: "PayTR geçersiz/boş yanıt",
-      };
-      this.logger.log(
-        `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_msg ? ` err=${parsed.err_msg}` : ""}`,
-      );
-      return parsed;
-    } catch (error: any) {
-      this.logger.error(
-        `Platform transfer failed for ${params.transId}: ${error.message}`,
-      );
-      throw new BadRequestException(
-        i18nMessage("server.payment.paytrPlatformTransferFailed", {
-          reason: error.message,
-        }),
+    } catch (error) {
+      throw this.noAnswer(
+        params.transId,
+        classifyPaytrFetchError(error),
+        fetchErrorCode(error),
+        networkErrorReason(error),
       );
     }
+
+    // From here on PayTR received the request: anything but a parsed answer
+    // leaves the outcome unknown.
+    if (response.status >= 500) {
+      throw this.noAnswer(
+        params.transId,
+        "unknown",
+        `HTTP_${response.status}`,
+        `PayTR answered HTTP ${response.status}`,
+      );
+    }
+    let rawText: string;
+    try {
+      rawText = await response.text();
+    } catch (error) {
+      throw this.noAnswer(
+        params.transId,
+        "unknown",
+        fetchErrorCode(error),
+        networkErrorReason(error),
+      );
+    }
+    const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(rawText);
+    if (!parsed || typeof parsed.status !== "string") {
+      throw this.noAnswer(
+        params.transId,
+        "unknown",
+        "INVALID_BODY",
+        "PayTR answer is empty or not a transfer result",
+      );
+    }
+    this.logger.log(
+      `Platform transfer ${params.transId}: status=${parsed.status}${parsed.err_no ? ` err_no=${parsed.err_no}` : ""}${parsed.err_msg ? ` err=${parsed.err_msg}` : ""}`,
+    );
+    return parsed;
+  }
+
+  /**
+   * One `warn` line with the cause code, then the typed error. The payout
+   * flow logs the decision (retry or final) at the right level, so logging
+   * `error` here too would raise the same incident twice.
+   */
+  private noAnswer(
+    transId: string,
+    phase: PlatformTransferRequestError["phase"],
+    causeCode: string | undefined,
+    message: string,
+  ): PlatformTransferRequestError {
+    this.logger.warn(
+      `Platform transfer ${transId}: no answer from PayTR (phase=${phase}, cause=${causeCode ?? "none"}): ${message}`,
+    );
+    return new PlatformTransferRequestError(phase, causeCode, message);
   }
 
   /**
