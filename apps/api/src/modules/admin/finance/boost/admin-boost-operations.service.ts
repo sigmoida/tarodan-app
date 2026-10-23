@@ -25,6 +25,9 @@ import {
 } from "../../../payment-providers/refund-errors";
 import { BoostTimelineService } from "../../../product/boost-timeline/boost-timeline.service";
 import { BoostNoticeService } from "../../../product/ranking/boost-notice.service";
+import { refreshProductVisibility } from "../../../product/helpers/product-visibility";
+import { CacheService } from "../../../cache/cache.service";
+import { SearchService } from "../../../search/search.service";
 import { errorMessage } from "../../../../common/helpers/error-message";
 import { AdminAuditService } from "../../ops/admin-audit.service";
 import { AdminAdPackageService } from "../admin-ad-package.service";
@@ -67,7 +70,10 @@ export function boostRefundFailureOutcome(
  * and refund and stop of a paid boost. Every timeline change goes through
  * `BoostTimelineService` under the listing lock; every action has a required
  * audit row; the seller notice is queued with the change (outbox) and sent
- * right after it. Sentry: tag `flow=boost`, boost id and order number only.
+ * right after it. After the commit the listing's caches, search entry and
+ * the web lists are refreshed (`refreshProductVisibility`), so the change
+ * shows on the home rails without waiting for the cache windows. Sentry: tag
+ * `flow=boost`, boost id and order number only.
  */
 @Injectable()
 export class AdminBoostOperationsService {
@@ -80,8 +86,31 @@ export class AdminBoostOperationsService {
     private readonly audit: AdminAuditService,
     private readonly purchases: AdminAdPackageService,
     private readonly notices: BoostNoticeService,
+    private readonly cache: CacheService,
+    private readonly searchService: SearchService,
     @Optional() private readonly sentry?: SentryService,
   ) {}
+
+  /**
+   * Post-commit only, never inside the transaction: clears the API caches
+   * first, then asks the web to revalidate. Never throws: the action is
+   * committed (a refund is already back with the buyer), so a refresh
+   * failure is logged and the cache windows are the fallback.
+   */
+  private async refreshListing(productId: string): Promise<void> {
+    await refreshProductVisibility(
+      {
+        cache: this.cache,
+        searchService: this.searchService,
+        logger: this.logger,
+      },
+      [productId],
+    ).catch((error: unknown) =>
+      this.logger.warn(
+        `boost listing refresh failed product=${productId}: ${errorMessage(error)}`,
+      ),
+    );
+  }
 
   private trace(action: string, data: Record<string, string | null>): void {
     this.sentry?.setTag("flow", "boost");
@@ -151,6 +180,7 @@ export class AdminBoostOperationsService {
       return result;
     });
     this.trace("grant", { boostId: granted.boostId, orderNumber: null });
+    await this.refreshListing(granted.productId);
     await this.notices.flush({ boostId: granted.boostId, kind: "granted" });
     return this.purchases.getPurchase(granted.boostId);
   }
@@ -204,6 +234,7 @@ export class AdminBoostOperationsService {
       );
     }
     this.trace("revoke", { boostId, orderNumber: null });
+    await this.refreshListing(stopped.productId);
     await this.notices.flush({ boostId, kind: "cancelled" });
     return this.purchases.getPurchase(boostId);
   }
@@ -239,6 +270,7 @@ export class AdminBoostOperationsService {
         price: true,
         refundedAmount: true,
         orderId: true,
+        productId: true,
       },
     });
     if (!boost) {
@@ -361,7 +393,9 @@ export class AdminBoostOperationsService {
       where: { id: boostId },
       select: { status: true },
     });
-    if (after?.status !== BoostStatus.cancelled) {
+    if (after?.status === BoostStatus.cancelled) {
+      await this.refreshListing(boost.productId);
+    } else {
       this.logger.error(
         `BOOST_REFUND_NOT_STOPPED: boost ${boostId} (order ${order.orderNumber}) refunded but ${after?.status ?? "missing"}`,
       );
