@@ -15,9 +15,13 @@ describe("reviewTransitions", () => {
   });
 
   it("lets a legacy unpublished review be shown or hidden", () => {
-    for (const status of ["pending", "rejected", "spam", "deleted"] as const) {
+    for (const status of ["pending", "rejected", "spam"] as const) {
       expect(reviewTransitions(status)).toEqual(["approved", "hidden"]);
     }
+  });
+
+  it("offers nothing for a review its author deleted", () => {
+    expect(reviewTransitions("deleted")).toEqual([]);
   });
 
   it("never offers a way back to pending", () => {

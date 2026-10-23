@@ -7,12 +7,15 @@ import type { RatingStatusCode, ReviewModerationStatus } from "@tarodan/types";
  * only hides a review or shows it again.
  *  - `approved` (show again): any review that is not public
  *  - `hidden` (hide): any review that is not already hidden
- * A row without a status (old seller rating) counts as approved.
+ * A review its author deleted gets neither: showing it again would publish
+ * content the author withdrew. A row without a status (old seller rating)
+ * counts as approved.
  */
 export function reviewTransitions(
   status: RatingStatusCode | undefined,
 ): ReviewModerationStatus[] {
   const s = status ?? "approved";
+  if (s === "deleted") return [];
   const targets: ReviewModerationStatus[] = [];
   if (s !== "approved") targets.push("approved");
   if (s !== "hidden") targets.push("hidden");
