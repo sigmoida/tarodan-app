@@ -328,6 +328,59 @@ describe("payout transfer retry policy", () => {
       expect(ledger.record).not.toHaveBeenCalled();
     });
 
+    it("a PayTR callback for a payout settled outside PayTR raises a possible double payment", async () => {
+      const world = world349();
+      Object.assign(world.payout("p1"), {
+        status: PayoutStatus.completed,
+        failureReason: null,
+        submittedTotalAmount: 0,
+        submittedAt: null,
+        submittedAmount: null,
+        providerResponse: {
+          manualSettlement: {
+            method: "external_bank",
+            reference: "EFT-1",
+            adminId: "admin-1",
+            settledAt: "2026-10-23T10:00:00.000Z",
+            netAmount: 300,
+            platformFundedAmount: 300,
+          },
+        },
+      });
+      const before = { ...world.payout("p1") };
+      const { service, ledger, notification } = buildPayoutProcessor(world);
+
+      await service.handleTransferResultCallback('["PYTRETRY1"]', "hash");
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /p1.*PYTRETRY1.*settled outside PayTR.*possible double payment/,
+        ),
+      );
+      // Ids only: no IBAN, name or amount in the alarm.
+      expect(errorSpy.mock.calls[0][0]).not.toMatch(/TR\d{2}|300/);
+      expect(world.payout("p1")).toEqual(before);
+      expect(ledger.record).not.toHaveBeenCalled();
+      expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
+    });
+
+    it("a repeated PayTR callback for a payout PayTR completed stays quiet", async () => {
+      const world = world349();
+      Object.assign(world.payout("p1"), {
+        status: PayoutStatus.completed,
+        submittedAt: new Date(),
+        submittedAmount: 300,
+        providerResponse: { status: "success", reference: "REF1" },
+      });
+      const { service, ledger } = buildPayoutProcessor(world);
+
+      await service.handleTransferResultCallback('["PYTRETRY1"]', "hash");
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(ledger.record).not.toHaveBeenCalled();
+    });
+
     it("the unknown-outcome total keeps counting against siblings on the same oid", async () => {
       const world = world349();
       world.payments.get("pay-1")!.amount = 449;

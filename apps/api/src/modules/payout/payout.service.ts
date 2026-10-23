@@ -48,6 +48,7 @@ import {
   type TransferTotalSnapshot,
 } from "./helpers/transfer-total";
 import { payoutCompletedLedgerInput } from "./helpers/payout-ledger";
+import { manualSettlementOf } from "./helpers/payout-resolution-policy";
 import type {
   PaytrPlatformTransferResult,
   PaytrReturnedTransfer,
@@ -1425,6 +1426,16 @@ export class PayoutService {
           // (rejected, returned): never pay it again before checking.
           this.logger.error(
             `PayTR transfer callback confirms payout ${payout.id} (${payout.transId}) in state ${payout.status}/${payout.failureReason ?? "-"}: not changed; check the PayTR panel before any further payment of it`,
+          );
+        } else if (
+          manualSettlementOf(payout.providerResponse)?.method ===
+          "external_bank"
+        ) {
+          // The platform already paid this one from its bank account and
+          // PayTR now says it transferred it too: the seller may have been
+          // paid twice. Ids only; the row stays as it is for a person.
+          this.logger.error(
+            `PayTR transfer callback confirms payout ${payout.id} (${payout.transId}), which was settled outside PayTR (external_bank): possible double payment; check the PayTR panel and the bank transfer, recover the duplicate from the seller`,
           );
         }
         continue;
