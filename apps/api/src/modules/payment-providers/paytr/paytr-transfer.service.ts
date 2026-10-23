@@ -12,6 +12,7 @@ import {
   withPaytrFetchRetry,
 } from "./paytr-fetch-retry.util";
 import { PlatformTransferRequestError } from "../transfer-errors";
+import { errorMessage } from "../../../common/helpers/error-message";
 
 /** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
  *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
@@ -78,7 +79,7 @@ export class PayTRTransferService {
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
   }
-  private parsePaytrJson<T = any>(raw: string) {
+  private parsePaytrJson<T = unknown>(raw: string) {
     return this.paytr.parsePaytrJson<T>(raw);
   }
 
@@ -296,7 +297,7 @@ export class PayTRTransferService {
           raw: r,
         };
       });
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof BadRequestException) throw error;
       // İzin verilen deneme sayısı tükendikten sonra buraya düşer; rethrow eden
       // exception filter zaten alarm üretecek — burada `warn` yeterli, tekrar
@@ -307,7 +308,7 @@ export class PayTRTransferService {
       );
       throw new BadRequestException(
         i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
-          reason: error.message,
+          reason: errorMessage(error),
         }),
       );
     }
@@ -319,7 +320,7 @@ export class PayTRTransferService {
   async resendReturnedTransfers(params: {
     transId: string;
     transfers: Array<{ amount: number; receiver: string; iban: string }>;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const paytrToken = this.creds.signWithSalt(
       this.merchantId + params.transId,
     );
@@ -349,11 +350,13 @@ export class PayTRTransferService {
       );
       const rawText = await response.text();
       return this.parsePaytrJson(rawText) ?? { status: "failed" };
-    } catch (error: any) {
-      this.logger.error(`Resend returned transfers failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error(
+        `Resend returned transfers failed: ${networkErrorReason(error)}`,
+      );
       throw new BadRequestException(
         i18nMessage("server.payment.paytrSendFromAccountFailed", {
-          reason: error.message,
+          reason: errorMessage(error),
         }),
       );
     }
