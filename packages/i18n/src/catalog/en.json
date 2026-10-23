@@ -7012,7 +7012,50 @@
         },
         "filterDue": "Due date",
         "filterAllDue": "All",
-        "filterOverdueOnly": "Overdue"
+        "filterOverdueOnly": "Overdue",
+        "resolution": {
+          "transId": "Transaction ID (PayTR)",
+          "failureReason": "Reason",
+          "paytrMessage": "PayTR message",
+          "submittedTotal": "Total sent to PayTR",
+          "breakdownTitle": "Transfer total breakdown",
+          "breakdownNet": "Net to the seller",
+          "breakdownOwnAllowed": "Order or trade share (after refunds)",
+          "breakdownOidRemaining": "Left on the payment (PayTR)",
+          "breakdownAllowedTotal": "Highest total that can be sent",
+          "breakdownMissingInput": "No {input, select, payment {payment} other {order or trade}} record was found to cap the total. This is a data problem: fix the link and retry the transfer; do not pay it outside PayTR.",
+          "noDetails": "No further details for this transfer.",
+          "manualSettlementTitle": "Marked as paid manually",
+          "manualSettlementShort": "Manual: {method}",
+          "settledAt": "Marked on",
+          "reference": "Reference",
+          "platformFunded": "Escrow added by the platform",
+          "method": {
+            "paytr_confirmed": "Confirmed in the PayTR panel",
+            "external_bank": "Paid from the company bank account"
+          },
+          "retryTitle": "Retry the transfer",
+          "retryUnknownWarning": "The PayTR outcome of this transfer is unknown: PayTR may have paid the seller already. Before retrying, check in the PayTR panel that no transfer with this transaction ID exists. If it is there, do not retry; record it with \"Mark as paid\".",
+          "retryRecomputeNote": "The transfer is queued again; the net and the total are recomputed before it is sent.",
+          "confirmProviderChecked": "I checked the PayTR panel",
+          "confirmProviderCheckedRequired": "Confirm that you checked the PayTR panel to retry.",
+          "reasonPlaceholder": "Write why you take this action",
+          "markPaid": "Mark as paid",
+          "markPaidMethod": "Method",
+          "markPaidHelp": {
+            "paytr_confirmed": "You saw the transfer with this transaction ID in the PayTR panel: the money reached the seller through PayTR. The record is marked completed; nothing else is paid.",
+            "external_bank": "This amount cannot be sent through PayTR: too little is left on the payment. The platform pays the net itself from the company bank account to the seller's IBAN. Marking it does not send any money: make the bank transfer first, then enter the bank's transaction reference. The platform covers what the order's escrow no longer holds, and the ledger records it."
+          },
+          "markPaidNet": "Net paid to the seller",
+          "markPaidReference": {
+            "paytr_confirmed": "Reference in the PayTR panel",
+            "external_bank": "Bank transaction reference (receipt no)"
+          },
+          "markPaidTypedConfirm": "Type the net amount to confirm ({amount})",
+          "markPaidTypedMismatch": "The amount you typed does not match the net.",
+          "markedPaid": "Transfer marked as paid",
+          "alreadyMarkedPaid": "The transfer was already marked as paid; nothing changed."
+        }
       },
       "tax": {
         "title": "Tax Settings",
@@ -12478,6 +12521,21 @@
       "failed": "Failed",
       "returned": "Returned",
       "retry_pending": "Will Retry"
+    },
+    "payoutFailureReason": {
+      "no_bank_account": "No bank account",
+      "invalid_iban_format": "Invalid IBAN format",
+      "bank_details_rejected": "Bank details rejected",
+      "provider_rejected": "Rejected by PayTR",
+      "transfer_total_exceeds_remaining": "Too little left on the payment",
+      "transfer_needs_manual_decision": "Needs a manual decision",
+      "provider_unreachable": "PayTR unreachable",
+      "transfer_outcome_unknown": "PayTR outcome unknown",
+      "order_not_payout_eligible": "Order not eligible for payout",
+      "refund_pending": "Refund in progress",
+      "order_refunded": "Order refunded",
+      "trade_refund_pending": "Trade refund in progress",
+      "fully_refunded": "Fully refunded"
     },
     "subscription": {
       "active": "Active",
