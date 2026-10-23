@@ -338,12 +338,12 @@ on the payment − totals the other transfers on the oid took)`.
    network cause goes to `providerResponse` and the log, never to the
    seller.
 
-   | Outcome                                                                                                                                                                                                                        | Action                                                                                                                   |
-   | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-   | PayTR `err_no 010`                                                                                                                                                                                                             | `retry_pending` (60 min, then 4 h) with a recomputed total, 3 attempts, then `transfer_total_exceeds_remaining`          |
-   | Other PayTR rejection                                                                                                                                                                                                          | `failed` at once: `bank_details_rejected` when `err_msg` says the IBAN or holder name is wrong, else `provider_rejected` |
-   | Request not sent (failed before leaving the host; connect phase: `UND_ERR_CONNECT_TIMEOUT`, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, a connect syscall error; HTTP 4xx without a PayTR answer) | `retry_pending`, same `trans_id`, 3 attempts, then `provider_unreachable`                                                |
-   | Outcome unknown (reset or timeout after sending, our 20 s timeout, HTTP 5xx, unreadable answer)                                                                                                                                | `failed / transfer_outcome_unknown` at once, never resent by a cron; total and net stay on the row                       |
+   | Outcome                                                                                                                                                                                                           | Action                                                                                                                                                         |
+   | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | PayTR `err_no 010`                                                                                                                                                                                                | `retry_pending` (60 min, then 4 h) with a recomputed total, 3 attempts, then `transfer_total_exceeds_remaining`                                                |
+   | Other PayTR rejection                                                                                                                                                                                             | `failed` at once: `bank_details_rejected` when `err_msg` says the IBAN or holder name is wrong (a detail word next to a defect word), else `provider_rejected` |
+   | Request not sent (connect phase: `UND_ERR_CONNECT_TIMEOUT`, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, a connect syscall error; HTTP 4xx other than 408/409 without a PayTR answer) | `retry_pending`, same `trans_id`, 3 attempts, then `provider_unreachable`                                                                                      |
+   | Outcome unknown (reset or timeout after sending, our 20 s timeout, HTTP 5xx, 408 or 409, unreadable answer)                                                                                                       | `failed / transfer_outcome_unknown` at once, never resent by a cron; total and net stay on the row                                                             |
 
    Final failures log at `error` with the payout id, `trans_id` and cause
    code (Sentry). The classifier is `classifyPaytrFetchError`
@@ -351,9 +351,13 @@ on the payment − totals the other transfers on the oid took)`.
    in that file is not for money writes. Only the PayTR call itself is
    treated as the transfer: an error in the bookkeeping after PayTR
    accepted is logged at `error`, leaves the row `processing` (zombie
-   alarm) and is never retried; the run goes on with the next payout.
-   Saving the bank account puts the seller's `failed` rows with a
-   seller-fixable code back to `pending`. Admin retry puts a `failed` row back to
+   alarm) and is never retried; the run goes on with the next payout. A
+   failure while building the request (credentials, signing, endpoint)
+   is a configuration problem: the claim is released and the run stops,
+   so no payout burns its retries. Saving the bank account puts the
+   seller's `failed / no_bank_account` rows back to `pending`, and also
+   `invalid_iban_format` and `bank_details_rejected` when the IBAN or
+   holder name changed. Admin retry puts a `failed` row back to
    `pending` (same `trans_id`; `returned` gets a new one) and the processor
    recomputes net and total; before retrying `transfer_outcome_unknown`,
    check in the PayTR panel that no transfer with that `trans_id` exists.
@@ -367,9 +371,10 @@ on the payment − totals the other transfers on the oid took)`.
 7. **Callback**: `POST /payouts/callback/paytr-transfer` (public, hash
    verified, must answer a plain `"OK"`). It completes `processing` rows and
    also `failed / transfer_outcome_unknown` rows (PayTR confirms a transfer
-   we did not hear back about; the send time goes to `submittedAt` so a
-   later bank return still matches), each once by CAS; other failed rows
-   are never revived. A callback later than 3 days raises an alarm. Daily
+   we did not hear back about), each once by CAS; other failed rows are
+   never revived. A row without a send snapshot (unknown outcome, or
+   bookkeeping failed after acceptance) gets the send time and net
+   stamped, so a later bank return still matches. A callback later than 3 days raises an alarm. Daily
    returned-transfer scan plus a 30-minute stuck-`processing` check.
    **Returned transfer matching**: PayTR's list carries its own `ref_no`,
    not our `trans_id`; the instruction answer's `reference` is stored in
