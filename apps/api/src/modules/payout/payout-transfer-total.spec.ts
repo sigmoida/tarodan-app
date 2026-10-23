@@ -313,6 +313,12 @@ describe("payout transfer total_amount", () => {
     expect(world.payout("orphan")).toMatchObject({
       status: PayoutStatus.failed,
       failureReason: "transfer_needs_manual_decision",
+      providerResponse: {
+        transferTotal: expect.objectContaining({
+          missingInput: "payment",
+          allowedTotal: 0,
+        }),
+      },
     });
   });
 

@@ -65,7 +65,21 @@ export interface TransferTotalSnapshot {
   paymentAmount: number;
   paymentRefunded: number;
   otherTransfersTotal: number;
+  /** Set when the payout has no payment or source to cap against. */
+  missingInput?: "payment" | "source";
 }
+
+const EMPTY_SNAPSHOT: TransferTotalSnapshot = {
+  net: 0,
+  allowedTotal: 0,
+  ownAllowed: 0,
+  oidRemaining: 0,
+  sourceTotal: 0,
+  sourceRefunded: 0,
+  paymentAmount: 0,
+  paymentRefunded: 0,
+  otherTransfersTotal: 0,
+};
 
 export type TransferTotalDecision =
   | { kind: "send"; totalAmount: number; snapshot: TransferTotalSnapshot }
@@ -199,16 +213,15 @@ export async function resolveTransferTotal(
 ): Promise<TransferTotalDecision> {
   const { payout, payment, source } = params;
   if (!payment || !source) {
-    return decideTransferTotal({
-      payoutId: payout.id,
-      net: params.net,
-      sourceKey: source?.key ?? "",
-      sourceTotal: source?.total ?? Number.NaN,
-      paymentAmount: Number.NaN,
-      refundedOrders: undefined,
-      refundAttempts: [],
-      oidTransfers: [],
-    });
+    // Nothing to cap against: never send blind.
+    return {
+      kind: "manual_decision",
+      snapshot: {
+        ...EMPTY_SNAPSHOT,
+        net: toTl(toKurus(params.net)),
+        missingInput: payment ? "source" : "payment",
+      },
+    };
   }
   const [refundAttempts, oidTransfers] = await Promise.all([
     db.refundAttempt.findMany({
