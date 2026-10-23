@@ -8,7 +8,7 @@ import { TagIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/ui";
 import { formatTL } from "@/lib/format";
 import { useTranslations } from "next-intl";
-import { isDigitalOrder } from "@tarodan/types";
+import { isDigitalOrder, listingPath } from "@tarodan/types";
 import { getProductInfo, type OrderDetail } from "../_lib/types";
 
 export default function ProductInfoCard({ order }: { order: OrderDetail }) {
@@ -51,7 +51,7 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
             <p className="text-lg font-medium text-heading">{title}</p>
           ) : (
             <Link
-              href={`/listings/${productInfo?.id}`}
+              href={productInfo ? listingPath(productInfo) : "/listings"}
               className="text-lg font-medium text-heading hover:text-primary-600 transition-colors"
             >
               {title}

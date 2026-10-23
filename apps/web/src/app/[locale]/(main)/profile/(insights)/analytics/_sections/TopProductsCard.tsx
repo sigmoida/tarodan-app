@@ -11,6 +11,7 @@ import { formatTL } from "@/lib/format";
 import type { TopProduct } from "../_lib/types";
 import { useTranslations } from "next-intl";
 import type { Translate } from "@/types/i18n";
+import { listingPath } from "@tarodan/types";
 
 const RANK_CLASS = [
   "bg-warning-400 text-inverted",
@@ -49,7 +50,7 @@ export default function TopProductsCard({
           return (
             <Link
               key={product.id}
-              href={`/listings/${product.id}`}
+              href={listingPath(product)}
               className="group flex items-center gap-4 rounded-lg p-3 transition-colors hover:bg-surface"
             >
               <div

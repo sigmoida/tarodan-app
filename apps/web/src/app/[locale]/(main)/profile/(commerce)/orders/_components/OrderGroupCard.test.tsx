@@ -105,7 +105,7 @@ const card = (o: Order) =>
   );
 
 const DELIVERED_MARKERS = {
-  productLink: 'href="/listings/p1"',
+  productLink: 'href="/listings/model-car-p1"',
   reorder: "order.reorder",
   review: "review.writeReview",
   refund: "order.requestRefund",

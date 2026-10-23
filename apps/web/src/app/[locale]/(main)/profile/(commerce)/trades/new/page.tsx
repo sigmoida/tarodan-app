@@ -29,6 +29,7 @@ import TradeSummary from "./_components/TradeSummary";
 import TradeCostPreview from "@/components/trade/TradeCostPreview";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
 import { usePagedPicks } from "@/hooks/usePagedPicks";
+import { listingPath } from "@tarodan/types";
 
 function NewTradeContent() {
   const router = useRouter();
@@ -153,7 +154,7 @@ function NewTradeContent() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        backHref={`/listings/${listingId}`}
+        backHref={listingPath(target)}
         backLabel={t("common.back")}
         title={t("trade.createTrade")}
         description={t("page.new.page.takasEtmekIstediginizUrunleriSecin")}

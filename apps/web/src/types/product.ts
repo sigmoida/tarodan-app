@@ -28,7 +28,7 @@ export interface ProductAttributeEntry {
 }
 
 export interface Product {
-  id: string | number;
+  id: string;
   title: string;
   description?: string;
   price: number;

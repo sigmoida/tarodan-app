@@ -6,6 +6,7 @@ import { ProductCard, SectionCard } from "@/components/ui";
 import { listingsApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import type { Product } from "@/types/product";
+import { listingPath } from "@tarodan/types";
 
 export default function CartSimilarProducts({
   productIds,
@@ -44,7 +45,7 @@ export default function CartSimilarProducts({
               key={product.id}
               product={product}
               index={index}
-              href={`/listings/${product.id}`}
+              href={listingPath(product)}
             />
           ))}
         </div>

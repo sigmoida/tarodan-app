@@ -65,7 +65,7 @@ export default function ProductActionIcons() {
       </IconButton>
 
       <ShareMenu
-        path={listingSharePath(id)}
+        path={listingSharePath({ id, title: listing?.title })}
         title={listing?.title ?? ""}
         text={
           listing ? `${listing.title} - ${formatTL(effectivePrice)}` : undefined

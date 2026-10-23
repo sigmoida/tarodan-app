@@ -36,6 +36,7 @@ import type { Product, ProductImage } from "@/types/product";
 import { formatTL } from "@/lib/format";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { PRODUCT_PLACEHOLDER } from "@/lib/productPlaceholder";
+import { listingPath } from "@tarodan/types";
 
 /**
  * The single product/listing card for the whole marketplace (grid + list). It is
@@ -135,7 +136,7 @@ export default function ProductCard({
   const t = useTranslations();
   const badgeLabels = productBadgeLabels(t);
 
-  const linkHref = href === undefined ? `/listings/${product.id}` : href;
+  const linkHref = href === undefined ? listingPath(product) : href;
   const trackClick =
     href === undefined
       ? () => {

@@ -9,7 +9,7 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
 import { formatDate } from "@/lib/format";
 import { Button } from "@tarodan/ui";
-import { isDigitalOrder } from "@tarodan/types";
+import { isDigitalOrder, listingPath } from "@tarodan/types";
 import {
   formatTL,
   getOrderPrimary,
@@ -73,7 +73,7 @@ function OrderLine({
             <p className="font-medium text-heading">{title}</p>
           ) : product ? (
             <Link
-              href={`/listings/${product.id}`}
+              href={listingPath(product)}
               className="font-medium text-heading transition-colors hover:text-primary-600"
             >
               {title}

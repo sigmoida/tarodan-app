@@ -11,6 +11,7 @@ import { formatTL } from "@/lib/format";
 import { isListingViewable } from "../_lib/boosts";
 import BoostPurchase from "./BoostPurchase";
 import BoostThumb from "./BoostThumb";
+import { listingPath } from "@tarodan/types";
 
 /** "Geçmiş": one ended or cancelled boost. No actions beyond the invoice. */
 export default function BoostHistoryRow({
@@ -40,7 +41,7 @@ export default function BoostHistoryRow({
           <div className="space-y-1">
             {isListingViewable(product.status) ? (
               <Link
-                href={`/listings/${product.id}`}
+                href={listingPath(product)}
                 className="line-clamp-2 font-semibold text-heading hover:text-primary-600"
               >
                 {product.title}

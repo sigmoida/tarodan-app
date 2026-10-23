@@ -13,6 +13,7 @@ import { isValidImageSrc } from "@/components/OptimizedImage";
 import type { RichAutocompleteResults } from "@/lib/api/products";
 import { useNavCatalog } from "./_hooks/useNavCatalog";
 import { formatTL } from "@/lib/format";
+import { listingPath } from "@tarodan/types";
 
 /** Kaç popüler arama çipi gösterilir (üreticiler + bir ölçek). */
 const POPULAR_MANUFACTURER_COUNT = 5;
@@ -168,7 +169,7 @@ export default function HeaderSearchDropdown({
                     return (
                       <Link
                         key={product.id}
-                        href={`/listings/${product.id}`}
+                        href={listingPath(product)}
                         className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIndex === itemIdx ? "bg-primary-50" : "hover:bg-surface"}`}
                         onClick={() => onClose()}
                       >

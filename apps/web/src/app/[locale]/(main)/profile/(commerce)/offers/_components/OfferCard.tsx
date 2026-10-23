@@ -46,6 +46,7 @@ import {
 import { publicNameOf } from "@/lib/public-name";
 import { statusConfig, statusLabel } from "@/lib/statusLabels";
 import { imagePlaceholder } from "@/lib/placeholder";
+import { listingPath } from "@tarodan/types";
 
 interface OfferCardProps {
   offer: Offer;
@@ -190,7 +191,7 @@ export default function OfferCard({
       <div className="flex flex-col md:flex-row">
         {/* Media */}
         <Link
-          href={`/listings/${offer.product.id}`}
+          href={listingPath(offer.product)}
           className="group relative h-48 w-full flex-shrink-0 md:h-auto md:w-48"
         >
           {src ? (
@@ -226,7 +227,7 @@ export default function OfferCard({
           <div className="mb-4 flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <Link
-                href={`/listings/${offer.product.id}`}
+                href={listingPath(offer.product)}
                 className="line-clamp-1 text-lg font-semibold text-heading transition-colors group-hover:text-primary-600"
               >
                 {offer.product.title}
