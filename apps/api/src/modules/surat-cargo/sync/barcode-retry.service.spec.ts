@@ -31,13 +31,24 @@ describe("BarcodeRetryService carrier registration semantics", () => {
         labelZpl: null,
       }),
     };
+    const tradeShipments = { retryInboundBarcode: jest.fn() };
+    const tradeWarehouse = { retryReturnBarcode: jest.fn() };
+    const moduleRef = {
+      get: jest.fn((token: { name?: string }) =>
+        token?.name === "TradeShipmentService"
+          ? tradeShipments
+          : token?.name === "AdminTradeWarehouseService"
+            ? tradeWarehouse
+            : undefined,
+      ),
+    };
     const service = new BarcodeRetryService(
       prisma as any,
-      {} as any,
+      moduleRef as any,
       cache as any,
       orderShipments as any,
     );
-    return { service, prisma, orderShipments };
+    return { service, prisma, orderShipments, tradeShipments, tradeWarehouse };
   };
 
   it("retries only pending registrations, not label_created acceptance waits", async () => {
@@ -155,6 +166,45 @@ describe("BarcodeRetryService carrier registration semantics", () => {
       expect(warn).toHaveBeenCalledWith(
         "Barcode retry failed: order shipment-2 (carrier timeout)",
       );
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
+  it("names failed trade legs by id and reason, at warn only", async () => {
+    const { service, prisma, tradeShipments, tradeWarehouse } = makeService();
+    prisma.tradeShipment.findMany
+      .mockResolvedValueOnce([{ id: "ts-in-1" }, { id: "ts-in-2" }])
+      .mockResolvedValueOnce([{ id: "ts-ret-1" }]);
+    tradeShipments.retryInboundBarcode
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(new Error("carrier timeout"));
+    tradeWarehouse.retryReturnBarcode.mockRejectedValueOnce(
+      new Error("address rejected"),
+    );
+    const warn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    try {
+      const result = await (service as any).retryPendingTradeBarcodes(
+        new Date(0),
+        new Date(),
+      );
+
+      expect(result).toEqual({
+        retried: 0,
+        failed: 3,
+        failures: [
+          "trade-inbound ts-in-1 (retry reported not completed)",
+          "trade-inbound ts-in-2 (carrier timeout)",
+          "trade-return ts-ret-1 (address rejected)",
+        ],
+      });
+      expect(error).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(3);
     } finally {
       warn.mockRestore();
       error.mockRestore();
