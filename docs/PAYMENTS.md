@@ -715,11 +715,15 @@ The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
 `payment-expired`, every 5 minutes) and the attempt recovery
 (`RefundReconciliationService`) follow `payment/helpers/refund-sweep-policy.ts`:
 
-- An order whose refund attempt failed waits as long as the attempt has been
-  failing (`updatedAt - createdAt`, read from the attempt itself), at least 10
-  minutes and at most 6 hours: about 10, 10, 20, 40, 80, 160, 320 minutes, then
-  every 6 hours. It is not queried while it waits. The ledger is the only
-  source: nothing to lose on a cache flush, no lock between runs.
+- An order whose refund attempt failed waits 10 minutes after the last
+  failure, doubled for every further definite failure of that attempt
+  (`RefundAttempt.failureCount`), at most 6 hours: 10, 20, 40, 80, 160, 320
+  minutes, then every 6 hours. It is not queried while it waits. The ledger is
+  the only source: nothing to lose on a cache flush, no lock between runs. An
+  attempt requeued without a new failure (status inquiry) waits 10 minutes.
+- A failure that never reached an attempt (a data problem before the claim,
+  e.g. the group refund cap or a missing merchant_oid) has nothing in the
+  ledger to wait on: the order cools down for an hour in the cache.
 - An order whose refund has an unresolved attempt (`prepared`, `submitting`,
   `succeeded`, `manual_review`) is not swept: the attempt recovery, the
   quarantine, the status inquiry or a person owns it. In the cancelled and
@@ -732,7 +736,7 @@ The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
   day each (an atomic claim per key in the cache; if the cache is unavailable
   the alarm goes out), warn in between. A submission quarantined to
   `manual_review` gets its own error line at once. The review alarm reads the
-  newest 500 attempts in review first.
+  newest 500 attempts in review; past that, one daily line gives the count.
 - `processRefund` logs "Refund error for payment" at warn instead of error
   when its caller alarms itself (`callerAlarms`, the order sweep) and no money
   moved; when money may have moved it stays an error.
