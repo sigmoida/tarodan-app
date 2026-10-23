@@ -73,6 +73,10 @@ import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { testLaneRefundResult } from "../helpers/test-lane-refund";
+import {
+  isPaymentNotYetSyncedRejection,
+  providerRefundFailure,
+} from "../helpers/refund-provider-failure";
 import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
 import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-notices";
 import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
@@ -851,22 +855,25 @@ export class PaymentRefundService {
                   )),
               };
             } catch (err) {
-              const reason = (err as Error).message || "refund request failed";
-              if (err instanceof ProviderRefundRejectedException) {
+              // One outcome table for every refund path
+              // (helpers/refund-provider-failure): retryable `failed` only
+              // when no money moved; otherwise the attempt waits for a person
+              // or the status inquiry and the voided payout stays voided.
+              const failure = providerRefundFailure(err);
+              if (!failure.needsReconciliation) {
                 await this.prisma.refundAttempt.updateMany({
                   where: {
                     id: refundAttempt.attempt.id,
                     status: RefundAttemptStatus.submitting,
                   },
                   data: {
-                    status: RefundAttemptStatus.failed,
-                    failureReason: reason,
+                    status: failure.status,
+                    failureReason: failure.failureReason,
                   },
                 });
                 if (
-                  /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-                    reason,
-                  )
+                  err instanceof ProviderRefundRejectedException &&
+                  isPaymentNotYetSyncedRejection(failure.failureReason)
                 ) {
                   throw new BadRequestException(
                     i18nMessage("server.payment.paymentNotYetSynced"),
@@ -883,14 +890,16 @@ export class PaymentRefundService {
                     status: RefundAttemptStatus.submitting,
                   },
                   data: {
-                    status: RefundAttemptStatus.manual_review,
-                    failureReason: reason,
+                    status: failure.status,
+                    failureReason: failure.failureReason,
                   },
                 })
                 .catch(() => undefined);
               throw err instanceof ProviderRefundOutcomeUnknownException
                 ? err
-                : new RefundPendingReconciliationException(reason);
+                : new RefundPendingReconciliationException(
+                    localizedPayloadOf(err) ?? errorMessage(err),
+                  );
             }
           }
         }

@@ -28,6 +28,11 @@ import { tradeHandedToCargo } from "../../trade/helpers/trade-handed-to-cargo";
 import { isProduction } from "../../../config/environment";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { testLaneRefundResult } from "../helpers/test-lane-refund";
+import { errorMessage } from "../../../common/helpers/error-message";
+import {
+  isPaymentNotYetSyncedRejection,
+  providerRefundFailure,
+} from "../helpers/refund-provider-failure";
 import { OutboxService } from "../../outbox/outbox.service";
 import {
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
@@ -345,17 +350,19 @@ export class PaymentTradeRefundService {
               amount,
               refundAttempt.attempt.id,
             )) as unknown as Record<string, unknown>;
-        } catch (e: any) {
-          const reason = e?.message || "trade refund request failed";
-          if (e instanceof ProviderRefundRejectedException) {
+        } catch (e: unknown) {
+          // Same outcome table as the order refund
+          // (helpers/refund-provider-failure).
+          const failure = providerRefundFailure(e);
+          if (!failure.needsReconciliation) {
             await this.prisma.refundAttempt.updateMany({
               where: {
                 id: refundAttempt.attempt.id,
                 status: RefundAttemptStatus.submitting,
               },
               data: {
-                status: RefundAttemptStatus.failed,
-                failureReason: reason,
+                status: failure.status,
+                failureReason: failure.failureReason,
               },
             });
             await this.prisma.payoutTransfer.updateMany({
@@ -369,9 +376,8 @@ export class PaymentTradeRefundService {
               data: { status: "pending", failureReason: null },
             });
             if (
-              /odeme henuz siteye bildirilmemis|henuz siteye bildirilmemi/i.test(
-                reason,
-              )
+              e instanceof ProviderRefundRejectedException &&
+              isPaymentNotYetSyncedRejection(failure.failureReason)
             ) {
               throw new BadRequestException(
                 i18nMessage("server.payment.paymentNotYetSynced"),
@@ -386,12 +392,14 @@ export class PaymentTradeRefundService {
                 status: RefundAttemptStatus.submitting,
               },
               data: {
-                status: RefundAttemptStatus.manual_review,
-                failureReason: reason,
+                status: failure.status,
+                failureReason: failure.failureReason,
               },
             })
             .catch(() => undefined);
-          throw new RefundPendingReconciliationException(reason);
+          throw new RefundPendingReconciliationException(
+            localizedPayloadOf(e) ?? errorMessage(e),
+          );
         }
       }
 
@@ -648,8 +656,12 @@ export class PaymentTradeRefundService {
         failed: false,
         skippedReason: result.skippedReason,
       };
-    } catch (err: any) {
-      const reason = err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
+    } catch (err: unknown) {
+      // The rendered catalog text, not Nest's class name ("Service
+      // Unavailable Exception") for a localized refusal such as a refund
+      // PayTR never received: it is the marker admins and the retry read.
+      const reason =
+        errorMessage(err) || "Bilinmeyen hata (PayTR iade başarısız)";
       if (
         opts?.deferIfNotYetSynced &&
         localizedPayloadOf(err)?.i18nKey ===
