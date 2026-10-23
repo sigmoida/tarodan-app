@@ -3,7 +3,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button, Checkbox } from "@tarodan/ui";
+import { CubeIcon } from "@heroicons/react/24/outline";
+import { Button, Checkbox, EmptyState } from "@tarodan/ui";
 import {
   FormInput,
   FormDatePicker,
@@ -200,9 +201,11 @@ export default function DiscountFormModal({
             )}
           </div>
           {products.length === 0 ? (
-            <p className="rounded-lg bg-surface p-4 text-sm text-muted">
-              {t("seller.discounts.noActiveProducts")}
-            </p>
+            <EmptyState
+              size="compact"
+              icon={<CubeIcon className="h-6 w-6" />}
+              title={t("seller.discounts.noActiveProducts")}
+            />
           ) : (
             <div className="max-h-48 divide-y divide-border-subtle overflow-y-auto rounded-lg border border-border">
               {products.map((product) => (

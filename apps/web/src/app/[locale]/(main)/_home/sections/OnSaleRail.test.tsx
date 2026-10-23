@@ -25,9 +25,6 @@ vi.mock("./HomeSection", () => ({
   ),
 }));
 vi.mock("./ProductRail", () => ({ default: () => <i data-rail /> }));
-vi.mock("@/i18n/navigation", () => ({
-  Link: ({ children }: { children?: React.ReactNode }) => <a>{children}</a>,
-}));
 
 import OnSaleRail from "./OnSaleRail";
 

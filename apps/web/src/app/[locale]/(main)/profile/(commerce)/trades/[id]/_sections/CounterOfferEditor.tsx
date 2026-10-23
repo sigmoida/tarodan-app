@@ -1,11 +1,20 @@
 /** @format */
 
-import { Link } from "@/i18n/navigation";
 import {
   ArrowsRightLeftIcon,
   ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-import { Button, Checkbox, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  Input,
+  Radio,
+  Spinner,
+  Textarea,
+} from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import OptimizedImage from "@/components/OptimizedImage";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { formatTL } from "@/lib/format";
@@ -89,11 +98,11 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                   {t("trade.productsYouWant")}
                 </h2>
                 {counterTargetProducts.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted">
-                      {t("trade.noProductsFromSeller")}
-                    </p>
-                  </div>
+                  <EmptyState
+                    size="compact"
+                    icon={<ArrowsRightLeftIcon className="h-6 w-6" />}
+                    title={t("trade.noProductsFromSeller")}
+                  />
                 ) : (
                   <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
@@ -171,17 +180,21 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                   {t("trade.productsYouOffer")}
                 </h2>
                 {counterProducts.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted mb-4">
-                      {t("trade.noProductsAvailable")}
-                    </p>
-                    <Link
-                      href="/profile/listings"
-                      className="text-primary-500 hover:text-primary-600 font-medium"
-                    >
-                      {t("trade.goToMyListings")}
-                    </Link>
-                  </div>
+                  <EmptyState
+                    size="compact"
+                    icon={<ArrowsRightLeftIcon className="h-6 w-6" />}
+                    title={t("trade.noProductsAvailable")}
+                    action={
+                      <ButtonLink
+                        variant="secondary"
+                        href="/profile/listings"
+                        className="gap-2"
+                      >
+                        {t("trade.goToMyListings")}
+                        <ChevronRightIcon className="h-5 w-5" />
+                      </ButtonLink>
+                    }
+                  />
                 ) : (
                   <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
