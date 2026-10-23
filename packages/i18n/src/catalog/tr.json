@@ -11466,7 +11466,7 @@
     "commission": {
       "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",
       "sellerSalesSuspended": "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.",
-      "categoryRequired": "Komisyon önizlemesi için kategori seçilmelidir.",
+      "categoryRequired": "Komisyon önizlemesi için kategori seçin.",
       "pricingChanged": "Komisyon koşulları güncellendi. Lütfen sepeti yenileyip yeni tutarı onaylayın."
     },
     "admin": {
