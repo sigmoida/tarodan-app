@@ -12271,7 +12271,7 @@
     "rating": {
       "rateSelf": "You cannot rate yourself",
       "orderOrTradeRequired": "An order or trade ID is required",
-      "membershipOrder": "Membership orders cannot be reviewed",
+      "membershipOrder": "Digital service orders cannot be rated",
       "deliveredOnly": "Only delivered orders can be rated",
       "orderForbidden": "You are not allowed to rate this order",
       "invalidRecipient": "Invalid recipient",

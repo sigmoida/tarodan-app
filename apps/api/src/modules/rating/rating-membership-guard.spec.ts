@@ -1,83 +1,136 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { findUniqueShaping } from "../../prisma/prisma-row-shape.testing";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
+import type { CreateProductRatingDto, CreateUserRatingDto } from "./dto";
 import { RatingService } from "./rating.service";
 
 /**
- * Üyelik/dijital siparişler sipariş sistemi içinde sanal ürün + platform satıcısı
- * olarak modellenir ("MEM-" sipariş no). Bu siparişlere ürün/satıcı değerlendirmesi
- * yapılamaz — guard, ürün-tipine özgü diğer kontrollerden ÖNCE devreye girer.
+ * Platform-service orders (membership `MEM-`, boost `BST-`) are orders on a
+ * virtual product (`membership-<tierId>`, `boost-<boostId>`) sold by the
+ * platform account. Neither the product nor the seller of such an order can
+ * be rated. The guard reads the virtual product id and runs before the
+ * product-specific checks. A completed boost order used to pass because only
+ * the `MEM-` order number was checked. The order lookup is shaped by its
+ * query arguments, so the guard fails here if the query stops selecting
+ * `productId` (a missing id would read as a listing and let the rating in).
  */
-describe("RatingService — üyelik siparişi guard", () => {
-  const moderationAi = { isEnabled: false } as any;
-
-  const makeService = (order: any, user: any = { id: "r1" }) => {
+describe("RatingService platform-service order guard", () => {
+  const makeService = (order: object) => {
     const prisma = {
-      order: { findUnique: jest.fn().mockResolvedValue(order) },
-      user: { findUnique: jest.fn().mockResolvedValue(user) },
+      order: { findUnique: findUniqueShaping(order) },
+      user: { findUnique: jest.fn().mockResolvedValue({ id: "r1" }) },
     };
     return new RatingService(
-      prisma as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      moderationAi,
-      userBlockServiceStub() as any,
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { isEnabled: false } as never,
+      userBlockServiceStub() as never,
     );
   };
 
+  const membershipOrder = {
+    id: "o1",
+    orderNumber: "MEM-1781257318265-BENIPST9F",
+    buyerId: "b1",
+    sellerId: "r1",
+    productId: "membership-tier-premium",
+    status: "completed",
+  };
+  const boostOrder = {
+    id: "o2",
+    orderNumber: "BST-DBN4NPYYTZ",
+    buyerId: "b1",
+    sellerId: "r1",
+    productId: "boost-boost-1",
+    status: "completed",
+  };
+  const listingOrder = {
+    id: "o3",
+    orderNumber: "ORD-NGGCF4J4V4",
+    buyerId: "b1",
+    sellerId: "r1",
+    productId: "p1",
+    status: "completed",
+  };
+
+  const expectRefused = async (promise: Promise<unknown>) => {
+    const error = await promise.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect(error).toMatchObject({
+      response: { i18nKey: "server.rating.membershipOrder" },
+    });
+  };
+
   describe("createProductRating", () => {
-    it('"MEM-" siparişinde ürün değerlendirmesini reddeder', async () => {
-      const service = makeService({
-        id: "o1",
-        orderNumber: "MEM-1781257318265-BENIPST9F",
-        buyerId: "b1",
-        productId: "p1",
-        status: "completed",
-      });
-      await expect(
+    it.each([
+      ["membership", membershipOrder],
+      ["boost", boostOrder],
+    ])("refuses a completed %s order", async (_kind, order) => {
+      const service = makeService(order);
+      await expectRefused(
         service.createProductRating("b1", {
-          orderId: "o1",
-          productId: "p1",
+          orderId: order.id,
+          productId: order.productId,
           score: 5,
-        } as any),
-      ).rejects.toBeInstanceOf(BadRequestException);
+        } as CreateProductRatingDto),
+      );
     });
 
-    it("normal siparişte guard tetiklenmez → sahiplik doğrulamasına ilerler", async () => {
-      const service = makeService({
-        id: "o1",
-        orderNumber: "TRD-1001",
-        buyerId: "b1",
-        productId: "p1",
-        status: "completed",
-      });
-      // Farklı kullanıcı → membership değil; buyer kontrolü Forbidden atmalı
+    it("lets a listing order through to the ownership check", async () => {
+      const service = makeService(listingOrder);
+      // Another user: not a platform-service order, so the buyer check refuses.
       await expect(
         service.createProductRating("other", {
-          orderId: "o1",
+          orderId: "o3",
           productId: "p1",
           score: 5,
-        } as any),
+        } as CreateProductRatingDto),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 
-  describe("createUserRating (satıcı değerlendirmesi)", () => {
-    it('"MEM-" siparişinde satıcı değerlendirmesini reddeder', async () => {
-      const service = makeService({
-        id: "o1",
-        orderNumber: "MEM-1781257318265-BENIPST9F",
-        buyerId: "giver1",
-        sellerId: "r1",
-        status: "completed",
-      });
-      await expect(
-        service.createUserRating("giver1", {
+  describe("createUserRating (seller rating)", () => {
+    it.each([
+      ["membership", membershipOrder],
+      ["boost", boostOrder],
+    ])("refuses a completed %s order", async (_kind, order) => {
+      const service = makeService(order);
+      await expectRefused(
+        service.createUserRating("b1", {
           receiverId: "r1",
-          orderId: "o1",
+          orderId: order.id,
           score: 5,
-        } as any),
-      ).rejects.toBeInstanceOf(BadRequestException);
+        } as CreateUserRatingDto),
+      );
+    });
+
+    it("refuses a boost order that is not delivered yet with the digital-order reason", async () => {
+      // The guard runs before the delivered-only check: the buyer is told the
+      // order can never be rated, not to wait for delivery.
+      const service = makeService({ ...boostOrder, status: "paid" });
+      await expectRefused(
+        service.createUserRating("b1", {
+          receiverId: "r1",
+          orderId: boostOrder.id,
+          score: 5,
+        } as CreateUserRatingDto),
+      );
+    });
+
+    it("lets a listing order through to the party check", async () => {
+      const service = makeService(listingOrder);
+      await expect(
+        service.createUserRating("other", {
+          receiverId: "r1",
+          orderId: "o3",
+          score: 5,
+        } as CreateUserRatingDto),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });
