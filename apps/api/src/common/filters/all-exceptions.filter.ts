@@ -18,6 +18,7 @@ import { getRequestId } from "../context/request-context";
 import { I18nService } from "../../modules/i18n/i18n.service";
 import { isLocalizedMessage } from "../../modules/i18n/localized-message";
 import { resolveRequestLocale } from "../../modules/i18n/locale.util";
+import { isClientAbort } from "../helpers/client-abort";
 import { errorStack } from "../helpers/error-message";
 
 /**
@@ -34,6 +35,8 @@ import { errorStack } from "../helpers/error-message";
  *  - Anything else becomes a sanitized 500: the client sees a generic localized
  *    message, never an internal `error.message`, stack, SQL, or file path. Full
  *    detail is logged server-side (and persisted by ErrorLogInterceptor).
+ *  - A client abort (`isClientAbort`) is only a debug line: no 5xx, no Sentry
+ *    event, and no body for a client that is gone.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -90,7 +93,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
-    // 2+3) Prisma / unknown — resolve to a sanitized status + catalog message.
+    // 2) The client went away mid-request (aborted upload, dropped connection).
+    // Nothing is wrong on our side and nobody is left to read an answer.
+    if (isClientAbort(exception, request)) {
+      this.logger.debug(
+        `${request?.method} ${String(request?.url ?? "").split("?")[0]} -> client aborted the request`,
+      );
+      if (
+        !response.headersSent &&
+        !response.writableEnded &&
+        !response.socket?.destroyed
+      ) {
+        response.status(HttpStatus.BAD_REQUEST).end();
+      }
+      return;
+    }
+
+    // 3) Prisma / unknown — resolve to a sanitized status + catalog message.
     const { status, key, params } = this.resolve(exception);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -182,7 +201,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
-    // 3) Anything else — sanitized 500, no internal detail in the response.
+    // 4) Anything else — sanitized 500, no internal detail in the response.
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       key: "server.common.internalError",

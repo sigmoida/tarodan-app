@@ -207,9 +207,8 @@ export class OrderTrackingSyncService {
     /** Başarısız kolilerin kimliği + sebebi; cron alarmı bunu metne basar. */
     failures: string[];
   }> {
-    // Only sync shipments that have a tracking reference. Auto-created
-    // pending shipments without a Sürat tracking number would just spam
-    // the API with "not found" responses.
+    // Only shipments with a tracking reference are polled (see
+    // syncShipmentsWhere). Without one there is nothing to ask Surat about.
     return this.syncShipmentsWhere({
       status: {
         notIn: [
@@ -287,6 +286,11 @@ export class OrderTrackingSyncService {
         // Test şeridi kolileri taşıyıcıya gitmedi; sorgulamak yalnız gürültü/alarm üretir.
         order: { isTest: false },
         ...where,
+        // A parcel without Surat's code is still polled when it has our
+        // reference: a `label_created` parcel waiting for branch acceptance
+        // gets its KargoTakipNo, `shippedAt` and every later status (delivery
+        // and the escrow release included) only from this poll. Barcode retry
+        // touches `pending` rows only.
         OR: [
           { providerTrackingId: { not: null } },
           { trackingNumber: { not: null } },
@@ -697,9 +701,9 @@ export class OrderTrackingSyncService {
             gonderi.KargoTakipNo,
           );
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.warn(
-          `notify order-shipped failed (poll) for ${shipment.orderId}: ${e?.message}`,
+          `notify order-shipped failed (poll) for ${shipment.orderId}: ${errorMessage(e)}`,
         );
       }
     }
@@ -722,9 +726,9 @@ export class OrderTrackingSyncService {
           strict: false,
         });
         await paymentService?.announceOrderDelivered?.(shipment.orderId);
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.warn(
-          `announce delivered failed (poll) for ${shipment.orderId}: ${e?.message}`,
+          `announce delivered failed (poll) for ${shipment.orderId}: ${errorMessage(e)}`,
         );
       }
     }
@@ -747,9 +751,9 @@ export class OrderTrackingSyncService {
           shipment.orderId,
           dr.confirmationDeadline,
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.logger.warn(
-          `notify delivered-confirm failed (poll) for ${shipment.orderId}: ${e?.message}`,
+          `notify delivered-confirm failed (poll) for ${shipment.orderId}: ${errorMessage(e)}`,
         );
       }
     }
@@ -825,9 +829,9 @@ export class OrderTrackingSyncService {
               `Auto-refunded order ${shipment.orderId} after Sürat return completion (suratCode=${gonderi.KargonunDurumuSayi})`,
             );
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.logger.error(
-            `Failed to auto-refund order ${shipment.orderId} after return: ${error.message}. ` +
+            `Failed to auto-refund order ${shipment.orderId} after return: ${errorMessage(error)}. ` +
               `processRefundedOrders sweep (returned-arm) will retry.`,
           );
         }

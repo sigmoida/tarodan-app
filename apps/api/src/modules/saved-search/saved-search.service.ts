@@ -18,7 +18,6 @@ import { PrismaService } from "../../prisma";
 import { paginate } from "../../common/list";
 import { i18nMessage } from "../i18n";
 import { MembershipService } from "../membership/membership.service";
-import { SentryService } from "../sentry/sentry.service";
 import { lockActiveUserForQuota } from "../user/helpers/user-row-lock";
 import {
   CreateSavedSearchDto,
@@ -27,12 +26,6 @@ import {
   SavedSearchResponseDto,
 } from "./dto";
 import { savedSearchQueryHash } from "./helpers/saved-search-hash";
-
-/** Sentry tag on every saved-search request, so its 5xx errors group by feature. */
-export const SAVED_SEARCH_SENTRY_TAG = {
-  key: "feature",
-  value: "saved_search",
-};
 
 const SAVED_SEARCH_SELECT = {
   id: true,
@@ -61,7 +54,6 @@ export class SavedSearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly membership: MembershipService,
-    private readonly sentry: SentryService,
   ) {}
 
   /** The caller's searches, newest first. */
@@ -69,7 +61,6 @@ export class SavedSearchService {
     userId: string,
     query: SavedSearchListQueryDto,
   ): Promise<SavedSearchListResponseDto> {
-    this.tagSentry();
     const page = await paginate(
       this.prisma.savedSearch,
       {
@@ -91,7 +82,6 @@ export class SavedSearchService {
     userId: string,
     dto: CreateSavedSearchDto,
   ): Promise<SavedSearchResponseDto> {
-    this.tagSentry();
     const query = canonicalizeSavedSearchQuery(dto.query);
     if (isEmptySavedSearchQuery(query)) {
       throw new BadRequestException(
@@ -147,20 +137,12 @@ export class SavedSearchService {
 
   /** Deletes one of the caller's searches; another user's id is a 404 too. */
   async remove(userId: string, id: string): Promise<void> {
-    this.tagSentry();
     const { count } = await this.prisma.savedSearch.deleteMany({
       where: { id, userId },
     });
     if (count === 0) {
       throw new NotFoundException(i18nMessage("server.savedSearch.notFound"));
     }
-  }
-
-  private tagSentry(): void {
-    this.sentry.setTag(
-      SAVED_SEARCH_SENTRY_TAG.key,
-      SAVED_SEARCH_SENTRY_TAG.value,
-    );
   }
 }
 

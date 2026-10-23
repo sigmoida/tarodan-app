@@ -9,6 +9,7 @@ import { Observable, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
 import { PrismaService } from "../../prisma/prisma.service";
 import { getRequestId } from "../context/request-context";
+import { isClientAbort } from "../helpers/client-abort";
 import { errorMessage } from "../helpers/error-message";
 import { redactRequestBody } from "../security/redact-sensitive";
 
@@ -30,6 +31,10 @@ export class ErrorLogInterceptor implements NestInterceptor {
   private async logError(context: ExecutionContext, error: any) {
     const request = context.switchToHttp().getRequest();
     if (!request) return; // Not an HTTP request
+
+    // The client dropped the upload: no server fault, nothing to keep (the
+    // exception filter answers it with a debug line only).
+    if (isClientAbort(error, request)) return;
 
     const { method, url, body, user, headers } = request;
     const status = error.status || 500;

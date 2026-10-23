@@ -103,3 +103,45 @@ describe("ErrorLogInterceptor body redaction", () => {
     expect(metadata.body).toBeUndefined();
   });
 });
+
+describe("ErrorLogInterceptor client aborts", () => {
+  const persist = async (error: Error, request: Record<string, unknown>) => {
+    const create = jest.fn().mockResolvedValue({});
+    const interceptor = new ErrorLogInterceptor({
+      errorLog: { create },
+    } as never);
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => ({
+          method: "POST",
+          url: "/api/media/upload/product",
+          headers: {},
+          ...request,
+        }),
+      }),
+    } as unknown as ExecutionContext;
+    const next: CallHandler = { handle: () => throwError(() => error) };
+
+    await expect(
+      lastValueFrom(interceptor.intercept(context, next)),
+    ).rejects.toBe(error);
+    await new Promise((resolve) => setImmediate(resolve));
+    return create;
+  };
+
+  it("does not store an upload the client aborted", async () => {
+    const create = await persist(new Error("Request aborted"), {
+      readableAborted: true,
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("still stores an upstream reset while the client is connected", async () => {
+    const reset = Object.assign(new Error("socket hang up"), {
+      code: "ECONNRESET",
+    });
+    const create = await persist(reset, { readableAborted: false });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0].data.severity).toBe("error");
+  });
+});

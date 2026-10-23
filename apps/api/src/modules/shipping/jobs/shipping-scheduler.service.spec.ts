@@ -16,8 +16,8 @@ describe("ShippingSchedulerService", () => {
     };
     const tracking = {
       retryPendingBarcodes: jest.fn().mockResolvedValue({
-        order: { retried: 0, failed: 0 },
-        trade: { retried: 0, failed: 0 },
+        order: { retried: 0, failed: 0, failures: [] },
+        trade: { retried: 0, failed: 0, failures: [] },
       }),
       syncAllActiveShipments: jest
         .fn()
@@ -114,11 +114,35 @@ describe("ShippingSchedulerService", () => {
     );
   });
 
+  it("names the failed barcode-retry records and reasons in the alarm", async () => {
+    const { service, tracking } = makeService();
+    tracking.retryPendingBarcodes.mockResolvedValue({
+      order: {
+        retried: 0,
+        failed: 1,
+        failures: ["order shipment-9 (carrier returned no barcode)"],
+      },
+      trade: {
+        retried: 0,
+        failed: 1,
+        failures: ["trade-return ts-4 (carrier timeout)"],
+      },
+    });
+
+    const error = await service.runSyncSuratTracking().catch((e) => e);
+
+    expect(error).toBeInstanceOf(CronStepFailuresError);
+    expect(error.message).toContain(
+      "order shipment-9 (carrier returned no barcode)",
+    );
+    expect(error.message).toContain("trade-return ts-4 (carrier timeout)");
+  });
+
   it("kayıt bazlı başarısızlığı Bull retry için job hatasına çevirir", async () => {
     const { service, tracking } = makeService();
     tracking.retryPendingBarcodes.mockResolvedValue({
-      order: { retried: 0, failed: 1 },
-      trade: { retried: 0, failed: 0 },
+      order: { retried: 0, failed: 1, failures: ["order shipment-1 (x)"] },
+      trade: { retried: 0, failed: 0, failures: [] },
     });
     tracking.syncAllActiveShipments.mockResolvedValue({
       synced: 2,
@@ -221,6 +245,41 @@ describe("ShippingSchedulerService", () => {
       const e = await failure(service.runSyncSuratTracking());
 
       expect(e.alreadyReported).toBe(false);
+    });
+
+    // The records were only warn lines: the summary is their one alarm, so it
+    // must not be marked reported (that would send no alarm at all).
+    it("makes the summary the one alarm for failed barcode records", async () => {
+      const { service, tracking } = makeService();
+      tracking.retryPendingBarcodes.mockResolvedValue({
+        order: {
+          retried: 1,
+          failed: 4,
+          failures: [
+            "order shipment-1 (carrier returned no barcode)",
+            "order shipment-2 (carrier timeout)",
+            "order-orphan order-3 (ensure-shipment skipped)",
+            "order shipment-4 (carrier timeout)",
+          ],
+        },
+        trade: {
+          retried: 0,
+          failed: 1,
+          failures: ["trade-inbound ts-5 (retry reported not completed)"],
+        },
+      });
+
+      const e = await failure(service.runSyncSuratTracking());
+
+      expect(e.alreadyReported).toBe(false);
+      expect(e.failedSteps).toEqual(["barcode-retry-records"]);
+      expect(e.details).toEqual([
+        "barcode-retry-records: 5 records could not be completed: " +
+          "order shipment-1 (carrier returned no barcode), " +
+          "order shipment-2 (carrier timeout), " +
+          "order-orphan order-3 (ensure-shipment skipped) (+2 more)",
+      ]);
+      expect(error).not.toHaveBeenCalled();
     });
 
     it("does not log the barcode retry again when it reported its own steps", async () => {
