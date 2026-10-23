@@ -19,6 +19,7 @@ export interface PayoutResolutionRow {
   providerResponse: unknown;
   netAmount: unknown;
   submittedAmount: unknown;
+  submittedAt: Date | null;
   retryCount: number;
 }
 
@@ -50,20 +51,37 @@ const EXTERNAL_BANK_REASONS: readonly string[] = [
  * clear answer. Such a row is never resent or paid elsewhere before someone
  * checks the PayTR panel (the admin retry asks for that confirmation):
  * - `transfer_outcome_unknown`;
- * - a row written before the reason codes (2026-10-23) whose free-text
- *   reason came from a thrown error during a send attempt, e.g. "Bad Request
- *   Exception" for a network failure: the old failure handler counted the
- *   attempt (`retryCount > 0`) and stored PayTR's answer when there was one
- *   (`status: "error"` = a rejection). A free-text row without an attempt
- *   failed before anything was sent.
+ * - a row written before the reason codes (2026-10-23) with a free-text
+ *   reason after send attempts. The old failure handler counted each
+ *   attempt (`retryCount`) but kept only the LAST attempt's reason and
+ *   answer, and resent the same trans_id: after more than one attempt an
+ *   earlier one may have been a network error ("fetch failed") that reached
+ *   PayTR, whatever the last answer says. After a single attempt, a stored
+ *   PayTR answer (`status: "error"`) is a rejection and anything else (e.g.
+ *   "Bad Request Exception") came from a thrown error. A free-text row
+ *   without an attempt failed before anything was sent.
  */
 export function transferOutcomeMayBeUnknown(row: PayoutResolutionRow): boolean {
   if (row.status !== PayoutStatus.failed) return false;
   if (row.failureReason === PAYOUT_FAILURE.transferOutcomeUnknown) return true;
   if (isPayoutFailureReason(row.failureReason)) return false;
+  if (row.retryCount <= 0) return false;
   return (
-    row.retryCount > 0 && asRecord(row.providerResponse)?.status !== "error"
+    row.retryCount > 1 || asRecord(row.providerResponse)?.status !== "error"
   );
+}
+
+/**
+ * An earlier request of this row may have reached PayTR without PayTR ever
+ * confirming it: a net is recorded for a send (`submittedAmount`) but no
+ * send time (`submittedAt`, stamped only when PayTR accepted or confirmed).
+ * Written on an unknown outcome and kept through the admin's retry (which
+ * also records it for a legacy row) until PayTR accepts a later attempt.
+ * Before such a row is paid from the bank, the PayTR panel is checked again
+ * for its trans_id.
+ */
+export function earlierSendUnconfirmed(row: PayoutResolutionRow): boolean {
+  return row.submittedAmount != null && row.submittedAt == null;
 }
 
 /** The transfer-total snapshot the processor stored when it parked or
@@ -196,6 +214,21 @@ export function withoutManualSettlement(providerResponse: unknown): unknown {
   return rest;
 }
 
+/**
+ * Whether marking this row as paid needs the admin's confirmation that the
+ * PayTR panel shows no transfer with its trans_id (`confirmProviderChecked`):
+ * an `external_bank` payment of a row whose earlier send PayTR never
+ * confirmed. (`paytr_confirmed` is itself the panel's answer.)
+ */
+export function markPaidRequiresProviderCheck(
+  row: PayoutResolutionRow,
+): boolean {
+  return (
+    manualSettlementMethodFor(row) === "external_bank" &&
+    earlierSendUnconfirmed(row)
+  );
+}
+
 /** The admin list's view of what may be done with a transfer. */
 export interface PayoutResolutionFlags {
   /** A retry must confirm the PayTR panel check and give a reason. */
@@ -203,6 +236,8 @@ export interface PayoutResolutionFlags {
   markPaidMethod: PayoutManualSettlementMethod | null;
   /** The net the mark-paid request must confirm (`expectedNetAmount`). */
   markPaidNetAmount: number | null;
+  /** Mark as paid must confirm the PayTR panel check (`confirmProviderChecked`). */
+  markPaidRequiresProviderCheck: boolean;
 }
 
 export function payoutResolutionFlags(
@@ -213,5 +248,6 @@ export function payoutResolutionFlags(
     retryRequiresProviderCheck: transferOutcomeMayBeUnknown(row),
     markPaidMethod: method,
     markPaidNetAmount: method ? manualSettlementNet(row, method) : null,
+    markPaidRequiresProviderCheck: markPaidRequiresProviderCheck(row),
   };
 }

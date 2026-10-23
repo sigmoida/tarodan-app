@@ -22,6 +22,12 @@ import {
  * Each shape is driven as the runbook does after the deploy: an admin retry,
  * then the next payout cron run. The expected end state is the runbook's
  * classification (send the recomputed total, or park for `external_bank`).
+ *
+ * The old handler resent the same trans_id up to 3 times and kept only the
+ * LAST attempt's reason and answer, so an earlier attempt may have been a
+ * network error that reached PayTR whatever the last answer says. Every
+ * legacy row with more than one attempt therefore needs the PayTR panel
+ * check before its retry, and again before it is paid from the bank.
  */
 
 const PAYTR_010_TEXT = "toplam transfer tutarı kalan tutardan fazla olamaz";
@@ -51,6 +57,13 @@ const legacyCompleted = (): Partial<FixturePayout> => ({
   status: PayoutStatus.completed,
   submittedTotalAmount: null,
 });
+
+/** The admin retry after the PayTR panel showed no transfer for the trans_id. */
+const CHECKED = {
+  actor: "admin-1",
+  confirmProviderChecked: true,
+  reason: "PayTR panel: no transfer with this trans_id",
+};
 
 function wire(world: PayoutProcessorWorld) {
   const built = buildPayoutProcessor(world);
@@ -82,18 +95,37 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
   afterEach(() => jest.restoreAllMocks());
 
   it("legacy PayTR rejections and network failures are recognised as such by the admin list", () => {
-    // A rejection: PayTR answered, nothing was taken, a plain retry is safe.
+    // A rejection after 3 attempts: only the last answer is known, an
+    // earlier attempt may have reached PayTR. Panel check first.
     expect(
       payoutResolutionFlags({
         status: PayoutStatus.failed,
         netAmount: 300,
         submittedAmount: null,
+        submittedAt: null,
         ...legacyRejection(),
+      } as never),
+    ).toEqual({
+      retryRequiresProviderCheck: true,
+      markPaidMethod: "paytr_confirmed",
+      markPaidNetAmount: 300,
+      markPaidRequiresProviderCheck: false,
+    });
+    // A rejection on the only attempt: PayTR answered, nothing was taken.
+    expect(
+      payoutResolutionFlags({
+        status: PayoutStatus.failed,
+        netAmount: 300,
+        submittedAmount: null,
+        submittedAt: null,
+        ...legacyRejection(),
+        retryCount: 1,
       } as never),
     ).toEqual({
       retryRequiresProviderCheck: false,
       markPaidMethod: null,
       markPaidNetAmount: null,
+      markPaidRequiresProviderCheck: false,
     });
     // A thrown error during a send attempt: PayTR may have it.
     expect(
@@ -101,12 +133,14 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
         status: PayoutStatus.failed,
         netAmount: 300,
         submittedAmount: null,
+        submittedAt: null,
         ...legacyNetworkFailure(),
       } as never),
     ).toEqual({
       retryRequiresProviderCheck: true,
       markPaidMethod: "paytr_confirmed",
       markPaidNetAmount: 300,
+      markPaidRequiresProviderCheck: false,
     });
   });
 
@@ -147,7 +181,10 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
     const { resolution, service, createPlatformTransfer, notification } =
       wire(world);
 
-    await resolution.retry("pA", { actor: "admin-1" });
+    await expect(
+      resolution.retry("pA", { actor: "admin-1" }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await resolution.retry("pA", CHECKED);
     await service.processPendingPayouts();
 
     expect(createPlatformTransfer).toHaveBeenCalledTimes(1);
@@ -218,7 +255,7 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
       const { resolution, service, createPlatformTransfer, notification } =
         wire(world);
 
-      await resolution.retry("pA", { actor: "admin-1" });
+      await resolution.retry("pA", CHECKED);
       await service.processPendingPayouts();
 
       if (sends) {
@@ -247,11 +284,13 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
             }),
           },
         });
-        // Runbook step 6: the row now offers external_bank for the net.
+        // Runbook step 6: the row now offers external_bank for the net,
+        // after another PayTR panel check (an earlier send is unconfirmed).
         expect(payoutResolutionFlags(row as never)).toEqual({
           retryRequiresProviderCheck: false,
           markPaidMethod: "external_bank",
           markPaidNetAmount: net,
+          markPaidRequiresProviderCheck: true,
         });
       }
       expect(failedSellerMails(notification)).toHaveLength(0);
@@ -283,7 +322,7 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
     const { resolution, service, createPlatformTransfer, notification } =
       wire(world);
 
-    await resolution.retry("pA", { actor: "admin-1" });
+    await resolution.retry("pA", CHECKED);
     await service.processPendingPayouts();
 
     expect(createPlatformTransfer).not.toHaveBeenCalled();
@@ -304,6 +343,7 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
       retryRequiresProviderCheck: false,
       markPaidMethod: "external_bank",
       markPaidNetAmount: 40,
+      markPaidRequiresProviderCheck: true,
     });
     expect(failedSellerMails(notification)).toHaveLength(0);
     // A second retry (e.g. a double click in the runbook) parks it again
@@ -344,7 +384,7 @@ describe("recovery of the payouts that failed before the 2026-10-23 hotfix", () 
     });
     const { resolution, service, createPlatformTransfer } = wire(world);
 
-    await resolution.retry("pA", { actor: "admin-1" });
+    await resolution.retry("pA", CHECKED);
     await service.processPendingPayouts();
 
     expect(createPlatformTransfer.mock.calls[0][0]).toMatchObject({

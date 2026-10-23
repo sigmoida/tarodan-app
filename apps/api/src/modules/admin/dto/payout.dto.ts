@@ -207,4 +207,12 @@ export class MarkPayoutTransferPaidDto {
   @IsNumber({ maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false })
   @Min(0.01)
   expectedNetAmount: number;
+
+  @ApiPropertyOptional({
+    description:
+      "The admin checked the PayTR panel: no transfer with this trans_id exists. Required (true) when the list row says resolution.markPaidRequiresProviderCheck.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirmProviderChecked?: boolean;
 }

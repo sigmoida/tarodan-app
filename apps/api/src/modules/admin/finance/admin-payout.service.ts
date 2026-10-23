@@ -981,9 +981,11 @@ export class AdminPayoutService {
    * "Mark as paid" (payout domain: `PayoutResolutionService.markPaid`):
    * `paytr_confirmed` when the PayTR panel shows the transfer arrived,
    * `external_bank` when the platform paid the net from its own bank account.
-   * Reason and reference are required; the audit record is written in the
-   * same transaction as the settlement and its ledger entries. A repeated
-   * request returns the first result (`alreadySettled: true`).
+   * Reason and reference are required; a row with an earlier send PayTR
+   * never confirmed also needs `confirmProviderChecked` (the list row's
+   * `resolution.markPaidRequiresProviderCheck`). The audit record is written
+   * in the same transaction as the settlement and its ledger entries. A
+   * repeated request returns the first result (`alreadySettled: true`).
    */
   async markPayoutTransferPaid(
     adminId: string,
@@ -993,6 +995,7 @@ export class AdminPayoutService {
       reference: string;
       reason: string;
       expectedNetAmount: number;
+      confirmProviderChecked?: boolean;
     },
   ) {
     const reason = input.reason?.trim();
@@ -1006,6 +1009,7 @@ export class AdminPayoutService {
       method: input.method,
       reference: input.reference ?? "",
       expectedNetAmount: input.expectedNetAmount,
+      confirmProviderChecked: input.confirmProviderChecked,
       afterWrite: (tx, settled, previous) =>
         this.audit.createRequiredAuditLog(
           adminId,
@@ -1028,6 +1032,7 @@ export class AdminPayoutService {
             reason,
             netAmount: settled.netAmount,
             platformFundedAmount: settled.platformFundedAmount,
+            providerCheckConfirmed: settled.providerCheckConfirmed,
             orderId: settled.orderId,
             tradeId: settled.tradeId,
           },

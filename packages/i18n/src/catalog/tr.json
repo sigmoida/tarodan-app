@@ -11746,7 +11746,8 @@
         "markPaidNotAllowed": "Bu transfer bu yöntemle ödendi olarak işaretlenemez (durum: {status}, neden: {reason}).",
         "markPaidMissingInput": "Bu transferin ödeme ya da sipariş bağlantısı eksik. Bu bir veri sorunu: bağlantıyı düzeltip transferi tekrar deneyin, PayTR dışında ödemeyin.",
         "markPaidAmountChanged": "Ödenecek net tutar değişti, güncel tutar {current} TL. Listeyi yenileyip tutarı kontrol edin.",
-        "markPaidPayoutBlocked": "Bu ödeme şu an yapılamaz ({reason}). Transferi tekrar deneyin; tutar ve koşullar yeniden hesaplanır."
+        "markPaidPayoutBlocked": "Bu ödeme şu an yapılamaz ({reason}). Transferi tekrar deneyin; tutar ve koşullar yeniden hesaplanır.",
+        "markPaidProviderCheckRequired": "Bu transferin daha önceki bir gönderiminin PayTR sonucu doğrulanmadı. Bankadan ödemeden önce PayTR panelinde bu işlem numarasıyla bir transfer olmadığını doğrulayın."
       },
       "product": {
         "approvePendingOnly": "Sadece bekleyen ürünler onaylanabilir",

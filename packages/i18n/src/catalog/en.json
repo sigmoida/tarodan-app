@@ -11746,7 +11746,8 @@
         "markPaidNotAllowed": "This transfer cannot be marked as paid with this method (status: {status}, reason: {reason}).",
         "markPaidMissingInput": "This transfer is missing its payment or order link. This is a data problem: fix the link and retry the transfer; do not pay it outside PayTR.",
         "markPaidAmountChanged": "The net to pay has changed; the current amount is {current} TL. Reload the list and check the amount.",
-        "markPaidPayoutBlocked": "This payout cannot be made right now ({reason}). Retry the transfer so the amount and conditions are recomputed."
+        "markPaidPayoutBlocked": "This payout cannot be made right now ({reason}). Retry the transfer so the amount and conditions are recomputed.",
+        "markPaidProviderCheckRequired": "An earlier send of this transfer was never confirmed by PayTR. Before paying it from the bank, confirm in the PayTR panel that no transfer with this transaction ID exists."
       },
       "product": {
         "approvePendingOnly": "Only pending products can be approved",

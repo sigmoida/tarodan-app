@@ -174,6 +174,21 @@ describe("request bodies", () => {
     ).resolves.toEqual(fields);
   });
 
+  it("mark-paid takes the PayTR panel confirmation as a boolean", async () => {
+    await expect(
+      invalidFields(MarkPayoutTransferPaidDto, {
+        ...valid,
+        confirmProviderChecked: true,
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      invalidFields(MarkPayoutTransferPaidDto, {
+        ...valid,
+        confirmProviderChecked: "yes",
+      }),
+    ).resolves.toEqual(["confirmProviderChecked"]);
+  });
+
   it("retry accepts an empty body (old admin panel) and the confirmation", async () => {
     await expect(invalidFields(RetryPayoutTransferDto, {})).resolves.toEqual(
       [],
@@ -287,6 +302,7 @@ describe("AdminPayoutService — delegation and audit", () => {
       method: "external_bank",
       reference: "EFT-1",
       expectedNetAmount: 40,
+      confirmProviderChecked: undefined,
       afterWrite: expect.any(Function),
     });
     expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
@@ -547,6 +563,7 @@ describe("AdminPayoutService.toTransferRows — resolution flags", () => {
       retryRequiresProviderCheck: false,
       markPaidMethod: null,
       markPaidNetAmount: null,
+      markPaidRequiresProviderCheck: false,
     });
     expect(row.manualSettlement).toEqual({
       method: "external_bank",

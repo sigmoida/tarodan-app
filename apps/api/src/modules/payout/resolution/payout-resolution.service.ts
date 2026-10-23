@@ -30,6 +30,7 @@ import { PAYOUT_FAILURE } from "../helpers/payout-failure-reasons";
 import {
   asRecord,
   manualSettlementMethodFor,
+  markPaidRequiresProviderCheck,
   manualSettlementNet,
   manualSettlementOf,
   platformFundingAmount,
@@ -59,6 +60,7 @@ const RESOLUTION_ROW_SELECT = {
   netAmount: true,
   submittedAmount: true,
   submittedTotalAmount: true,
+  submittedAt: true,
   retryCount: true,
   transferIban: true,
   updatedAt: true,
@@ -120,6 +122,9 @@ export interface ManualSettlementResult {
   netAmount: number;
   /** What the platform added to the escrow before paying (external_bank). */
   platformFundedAmount: number;
+  /** The admin confirmed the PayTR panel shows no transfer for this
+   *  trans_id (asked before paying a row with an unconfirmed earlier send). */
+  providerCheckConfirmed: boolean;
   settledAt: string;
   /** A repeated request found the row already settled; nothing was written. */
   alreadySettled: boolean;
@@ -252,7 +257,13 @@ export class PayoutResolutionService {
           // submittedTotalAmount and submittedAmount stay: a pending row is
           // not counted against the oid and the next claim overwrites them,
           // but a late PayTR callback for the earlier send settles the row
-          // with them (handleTransferResultCallback).
+          // with them (handleTransferResultCallback). A legacy row that may
+          // have been taken never recorded the net it sent: record it now,
+          // so the row keeps saying an earlier send is unconfirmed until
+          // PayTR accepts a later one (earlierSendUnconfirmed).
+          ...(providerCheck && row.submittedAmount === null
+            ? { submittedAmount: row.netAmount }
+            : {}),
           ...(newTransId ? { transId: newTransId } : {}),
         },
       });
@@ -286,6 +297,7 @@ export class PayoutResolutionService {
       method: PayoutManualSettlementMethod;
       reference: string;
       expectedNetAmount: number;
+      confirmProviderChecked?: boolean;
       afterWrite?: PayoutResolutionAfterWrite<ManualSettlementResult>;
     },
   ): Promise<ManualSettlementResult> {
@@ -339,6 +351,15 @@ export class PayoutResolutionService {
       // on the row read again after the locks, so a refund cannot start
       // between the check and the commit. PayTR-confirmed money already
       // moved; that row only records it.
+      // An earlier send of this row may have reached PayTR (unknown outcome,
+      // then retried): paying it from the bank without looking at the PayTR
+      // panel again could pay the seller twice.
+      const providerCheck = markPaidRequiresProviderCheck(row);
+      if (providerCheck && opts.confirmProviderChecked !== true) {
+        throw new ConflictException(
+          i18nMessage("server.admin.payout.markPaidProviderCheckRequired"),
+        );
+      }
       if (method === "external_bank") {
         const locked = await this.lockSource(tx, row);
         if (
@@ -463,6 +484,7 @@ export class PayoutResolutionService {
         reference,
         netAmount: net,
         platformFundedAmount: record.platformFundedAmount,
+        providerCheckConfirmed: providerCheck,
         settledAt: record.settledAt,
         alreadySettled: false,
       };
@@ -516,6 +538,7 @@ export class PayoutResolutionService {
       reference: record.reference,
       netAmount: record.netAmount,
       platformFundedAmount: record.platformFundedAmount,
+      providerCheckConfirmed: false,
       settledAt: record.settledAt,
       alreadySettled: true,
     };

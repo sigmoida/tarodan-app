@@ -1,7 +1,9 @@
 import { PayoutStatus } from "@prisma/client";
 import { PAYOUT_FAILURE_REASONS } from "@tarodan/types";
 import {
+  earlierSendUnconfirmed,
   manualSettlementMethodFor,
+  markPaidRequiresProviderCheck,
   manualSettlementNet,
   manualSettlementOf,
   payoutResolutionFlags,
@@ -19,6 +21,7 @@ const row = (over: Partial<PayoutResolutionRow> = {}): PayoutResolutionRow => ({
   providerResponse: null,
   netAmount: 40,
   submittedAmount: null,
+  submittedAt: null,
   // The processor's failure handler counted the attempts.
   retryCount: 3,
   ...over,
@@ -74,19 +77,30 @@ describe("payout resolution policy", () => {
       ).toBeNull();
     });
 
-    it("a legacy free-text reason with PayTR's error answer did not (a rejection)", () => {
-      expect(
-        transferOutcomeMayBeUnknown(
-          row({
-            failureReason: "toplam transfer tutarı kalan tutardan fazla olamaz",
-            providerResponse: {
-              status: "error",
-              err_no: "010",
-              err_msg: "toplam transfer tutarı kalan tutardan fazla olamaz",
-            },
-          }),
-        ),
-      ).toBe(false);
+    const legacyRejection = (retryCount: number) =>
+      row({
+        failureReason: "toplam transfer tutarı kalan tutardan fazla olamaz",
+        providerResponse: {
+          status: "error",
+          err_no: "010",
+          err_msg: "toplam transfer tutarı kalan tutardan fazla olamaz",
+        },
+        retryCount,
+      });
+
+    it("a legacy free-text reason with PayTR's error answer on the only attempt did not (a rejection)", () => {
+      expect(transferOutcomeMayBeUnknown(legacyRejection(1))).toBe(false);
+      expect(manualSettlementMethodFor(legacyRejection(1))).toBeNull();
+    });
+
+    it("a legacy PayTR rejection after several attempts may have: only the last answer was kept", () => {
+      // The old handler resent the same trans_id; attempt 1 may have been a
+      // "fetch failed" that reached PayTR before attempt 3 got 010.
+      expect(transferOutcomeMayBeUnknown(legacyRejection(2))).toBe(true);
+      expect(transferOutcomeMayBeUnknown(legacyRejection(3))).toBe(true);
+      expect(manualSettlementMethodFor(legacyRejection(3))).toBe(
+        "paytr_confirmed",
+      );
     });
 
     it.each([
@@ -196,6 +210,7 @@ describe("payout resolution policy", () => {
         retryRequiresProviderCheck: false,
         markPaidMethod: "external_bank",
         markPaidNetAmount: 40,
+        markPaidRequiresProviderCheck: false,
       });
       expect(
         payoutResolutionFlags(
@@ -209,6 +224,7 @@ describe("payout resolution policy", () => {
         retryRequiresProviderCheck: true,
         markPaidMethod: "paytr_confirmed",
         markPaidNetAmount: 300,
+        markPaidRequiresProviderCheck: false,
       });
       expect(
         payoutResolutionFlags(row({ status: PayoutStatus.completed })),
@@ -216,6 +232,54 @@ describe("payout resolution policy", () => {
         retryRequiresProviderCheck: false,
         markPaidMethod: null,
         markPaidNetAmount: null,
+        markPaidRequiresProviderCheck: false,
+      });
+    });
+
+    describe("an earlier send PayTR never confirmed", () => {
+      it("is a net recorded for a send without a send time", () => {
+        expect(earlierSendUnconfirmed(row({ submittedAmount: 40 }))).toBe(true);
+        expect(
+          earlierSendUnconfirmed(
+            row({ submittedAmount: 40, submittedAt: new Date() }),
+          ),
+        ).toBe(false);
+        expect(earlierSendUnconfirmed(row())).toBe(false);
+      });
+
+      it.each([
+        "transfer_needs_manual_decision",
+        "transfer_total_exceeds_remaining",
+      ])(
+        "%s after an unconfirmed send: external_bank only after the panel check",
+        (reason) => {
+          const parked = row({ failureReason: reason, submittedAmount: 40 });
+          expect(manualSettlementMethodFor(parked)).toBe("external_bank");
+          expect(markPaidRequiresProviderCheck(parked)).toBe(true);
+          expect(payoutResolutionFlags(parked)).toMatchObject({
+            markPaidMethod: "external_bank",
+            markPaidRequiresProviderCheck: true,
+          });
+        },
+      );
+
+      it("a returned transfer that was sent and confirmed needs no extra check", () => {
+        expect(
+          markPaidRequiresProviderCheck(
+            row({ submittedAmount: 40, submittedAt: new Date() }),
+          ),
+        ).toBe(false);
+      });
+
+      it("the PayTR-confirmed method is itself the panel's answer", () => {
+        expect(
+          markPaidRequiresProviderCheck(
+            row({
+              failureReason: "transfer_outcome_unknown",
+              submittedAmount: 40,
+            }),
+          ),
+        ).toBe(false);
       });
     });
   });

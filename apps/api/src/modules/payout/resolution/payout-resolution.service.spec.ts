@@ -967,6 +967,63 @@ describe("PayoutResolutionService.markPaid", () => {
     });
   });
 
+  describe("an earlier send PayTR never confirmed (retried unknown outcome)", () => {
+    /** Parked after a checked retry of an unknown outcome: the net of the
+     *  earlier send is recorded, PayTR never confirmed it. */
+    const parkedAfterUnknown = () => {
+      const world = residualWorld();
+      Object.assign(world.row("p1"), {
+        submittedAmount: 40,
+        submittedAt: null,
+      });
+      return world;
+    };
+
+    it("external_bank without the PayTR panel check -> 409, nothing written", async () => {
+      const world = parkedAfterUnknown();
+      const before = clone(world.row("p1"));
+      const { service, payouts } = build(world);
+
+      await expect(markPaid(service, "p1")).rejects.toMatchObject({
+        response: expect.objectContaining({
+          i18nKey: "server.admin.payout.markPaidProviderCheckRequired",
+        }),
+      });
+      await expect(
+        markPaid(service, "p1", { confirmProviderChecked: false }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(world.row("p1")).toEqual(before);
+      expect(world.ledger.some((e) => e.payoutId === "p1")).toBe(false);
+      expect(payouts.sendPayoutReleasedEmail).not.toHaveBeenCalled();
+    });
+
+    it("external_bank after the check is paid and says so", async () => {
+      const world = parkedAfterUnknown();
+      const { service, afterWrite } = build(world);
+
+      const result = await markPaid(service, "p1", {
+        confirmProviderChecked: true,
+        afterWrite,
+      });
+
+      expect(result).toMatchObject({
+        method: "external_bank",
+        providerCheckConfirmed: true,
+        netAmount: 40,
+      });
+      expect(world.row("p1").status).toBe(PayoutStatus.completed);
+    });
+
+    it("a row without an earlier send needs no check (and reports none)", async () => {
+      const world = residualWorld();
+      const { service } = build(world);
+
+      await expect(markPaid(service, "p1")).resolves.toMatchObject({
+        providerCheckConfirmed: false,
+      });
+    });
+  });
+
   describe("refusals (nothing written)", () => {
     const expectUntouched = (world: World, id: string, before: Row) => {
       expect(world.row(id)).toEqual(before);
@@ -1286,6 +1343,29 @@ describe("PayoutResolutionService.retry", () => {
         // late PayTR callback for the earlier send settles with them.
         submittedTotalAmount: 303,
         submittedAmount: 300,
+      });
+    });
+
+    it("a checked retry of a legacy row records the net it may have sent", async () => {
+      const world = unknownWorld("Bad Request Exception", null);
+      Object.assign(world.row("p4"), {
+        submittedAmount: null,
+        submittedTotalAmount: null,
+        retryCount: 3,
+      });
+      const { service } = build(world);
+
+      await retry(service, "p4", {
+        confirmProviderChecked: true,
+        reason: "PayTR panel: no transfer with PYTP4",
+      });
+
+      // Kept until PayTR accepts a later attempt: if this one parks, paying
+      // it from the bank asks for the panel check again.
+      expect(world.row("p4")).toMatchObject({
+        status: PayoutStatus.pending,
+        submittedAmount: 300,
+        submittedAt: null,
       });
     });
 
