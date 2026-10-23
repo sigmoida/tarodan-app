@@ -14,6 +14,7 @@ import { errorMessage } from "../../../common/helpers/error-message";
 import { RefundPendingReconciliationException } from "../../payment-providers/refund-errors";
 import { PaymentRefundService } from "./payment-refund.service";
 import {
+  REFUND_SWEEP_COOLDOWN_SECONDS,
   REFUND_SWEEP_MAX_DELAY_MS,
   claimRefundAlarm,
   sweepablePaymentWhere,
@@ -28,8 +29,15 @@ const REFUND_SWEEP_CANDIDATE_SELECT = {
   id: true,
   payment: { select: { metadata: true } },
   checkoutGroup: { select: { payment: { select: { metadata: true } } } },
-  // A carried-out refund (also a zero-cash settlement, which records 0 on
-  // the payment). Branches 1-2 filter these out in SQL already.
+} as const;
+
+/**
+ * Branch 3 also reads whether a refund was carried out as an attempt (also
+ * a zero-cash settlement, which records 0 on the payment). Branches 1-2 leave
+ * those orders out in SQL.
+ */
+const RETURNED_CANDIDATE_SELECT = {
+  ...REFUND_SWEEP_CANDIDATE_SELECT,
   refundAttempts: {
     where: { status: RefundAttemptStatus.finalized },
     select: { id: true },
@@ -43,6 +51,9 @@ interface RefundSweepCandidate {
   checkoutGroup?: { payment?: { metadata: unknown } | null } | null;
   refundAttempts?: { id: string }[];
 }
+
+/** Cache key of the cooldown after a failure that left no attempt. */
+const cooldownKey = (orderId: string) => `refund-sweep:cooldown:${orderId}`;
 
 /** Candidates per branch and run (bounded, ordered: oldest change first). */
 const REFUND_SWEEP_BATCH = 50;
@@ -151,7 +162,7 @@ export class RefundOrderSweepService {
             gt: new Date(now.getTime() - REFUND_SWEEP_MAX_DELAY_MS),
           },
         },
-        select: { orderId: true, createdAt: true, updatedAt: true },
+        select: { orderId: true, failureCount: true, updatedAt: true },
       }),
       this.productionCopy.copiedBefore(now),
     ]);
@@ -160,19 +171,26 @@ export class RefundOrderSweepService {
 
     // Common to the three branches: not while the order waits after a
     // failure, not while (or once) another refund owns it.
+    const candidateWhere = (
+      where: Prisma.OrderWhereInput,
+      ownedStatuses: RefundAttemptStatus[],
+    ): Prisma.OrderWhereInput => ({
+      ...where,
+      ...(waiting.length > 0 ? { id: { notIn: waiting } } : {}),
+      refundAttempts: { none: { status: { in: ownedStatuses } } },
+    });
+    const batch = {
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: REFUND_SWEEP_BATCH,
+    } satisfies Prisma.OrderFindManyArgs;
     const findCandidates = (
       where: Prisma.OrderWhereInput,
       ownedStatuses: RefundAttemptStatus[],
     ) =>
       this.prisma.order.findMany({
-        where: {
-          ...where,
-          ...(waiting.length > 0 ? { id: { notIn: waiting } } : {}),
-          refundAttempts: { none: { status: { in: ownedStatuses } } },
-        },
+        where: candidateWhere(where, ownedStatuses),
         select: REFUND_SWEEP_CANDIDATE_SELECT,
-        orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-        take: REFUND_SWEEP_BATCH,
+        ...batch,
       });
     // Branches 1-2 also leave out orders with a finalized refund in SQL, not
     // only in app code: a closed order with a carried-out refund (partial,
@@ -222,37 +240,43 @@ export class RefundOrderSweepService {
     // the RefundRequest). Orders with a carried-out refund stay in this
     // query: closed money on a still open order is the stuck case alarmed
     // below, never a second (full) refund.
-    const returnedStuckOrders = await findCandidates(
-      {
-        status: OrderStatus.refund_requested,
-        shipment: { is: { status: ShipmentStatus.returned } },
-        ...(copiedBefore
-          ? {
-              OR: [
-                { payment: { is: sweepable } },
-                { checkoutGroup: { is: { payment: { is: sweepable } } } },
-              ],
-            }
-          : {}),
-      },
-      UNRESOLVED_REFUND_ATTEMPT_STATUSES,
-    );
+    const returnedStuckOrders = await this.prisma.order.findMany({
+      where: candidateWhere(
+        {
+          status: OrderStatus.refund_requested,
+          shipment: { is: { status: ShipmentStatus.returned } },
+          ...(copiedBefore
+            ? {
+                OR: [
+                  { payment: { is: sweepable } },
+                  { checkoutGroup: { is: { payment: { is: sweepable } } } },
+                ],
+              }
+            : {}),
+        },
+        UNRESOLVED_REFUND_ATTEMPT_STATUSES,
+      ),
+      select: RETURNED_CANDIDATE_SELECT,
+      ...batch,
+    });
 
     // Skips in branches 1-2 are terminal (cancelled/refunded: the refund was
     // carried out) and silent. In branch 3 the order is not terminal: a
     // refund is recorded but the order is still open, and nothing but this
     // sweep would move it, so it is reported once a day per order.
     const returnedCandidates = partitionRefundCandidates(returnedStuckOrders);
-    for (const orderId of returnedCandidates.skipped) {
-      if (
-        await claimRefundAlarm(this.cache, `refund-sweep:returned:${orderId}`)
-      ) {
-        this.logger.warn(
-          `REFUND_MANUAL_REVIEW: order ${orderId} has a recorded refund but is still refund_requested; ` +
-            `the refund sweep cannot close it, manual review needed`,
-        );
-      }
-    }
+    const returnedDue = await Promise.all(
+      returnedCandidates.skipped.map((orderId) =>
+        claimRefundAlarm(this.cache, `refund-sweep:returned:${orderId}`),
+      ),
+    );
+    returnedCandidates.skipped.forEach((orderId, index) => {
+      if (!returnedDue[index]) return;
+      this.logger.warn(
+        `REFUND_MANUAL_REVIEW: order ${orderId} has a recorded refund but is still refund_requested; ` +
+          `the refund sweep cannot close it, manual review needed`,
+      );
+    });
 
     const allOrderIds = [
       ...partitionRefundCandidates(orders).pending,
@@ -263,6 +287,9 @@ export class RefundOrderSweepService {
     let refunded = 0;
     let failed = 0;
     for (const orderId of allOrderIds) {
+      // A failure that left no attempt to wait on cools down in the cache.
+      if (await this.cache.exists(cooldownKey(orderId))) continue;
+      const triedAt = new Date();
       try {
         // Branches 1-2: the order is already cancelled (its actor is kept).
         // Branch 3: the parcel came back; nobody asked to cancel, the system
@@ -282,6 +309,23 @@ export class RefundOrderSweepService {
             `Auto-refund of order ${orderId} handed to refund attempt reconciliation: ${errorMessage(error)}`,
           );
           continue;
+        }
+        // No failed attempt from this try (a data problem before the
+        // claim, e.g. the group cap or a missing oid): nothing in the ledger
+        // to wait on, so the order cools down in the cache for an hour.
+        const leftAttempt = await this.prisma.refundAttempt.findFirst({
+          where: {
+            orderId,
+            status: RefundAttemptStatus.failed,
+            updatedAt: { gte: triedAt },
+          },
+          select: { id: true },
+        });
+        if (!leftAttempt) {
+          await this.cache.setIfAbsent(
+            cooldownKey(orderId),
+            REFUND_SWEEP_COOLDOWN_SECONDS,
+          );
         }
         // One line per order (the Sentry repeat throttle keys it by the
         // order id). Stock is restored at cancel time, so a stuck refund only

@@ -176,6 +176,7 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
         data: {
           status: RefundAttemptStatus.failed,
           failureReason: `${REFUND_FAILURE_PROVIDER_NOT_SENT}: fetch failed (UND_ERR_CONNECT_TIMEOUT)`,
+          failureCount: { increment: 1 },
         },
       },
     ]);
@@ -221,6 +222,7 @@ describe("PaymentRefundService.processRefund when the PayTR refund fails", () =>
         data: {
           status: RefundAttemptStatus.failed,
           failureReason: "iade limiti asildi",
+          failureCount: { increment: 1 },
         },
       },
     ]);

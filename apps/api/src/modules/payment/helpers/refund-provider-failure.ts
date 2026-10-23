@@ -1,4 +1,4 @@
-import { RefundAttemptStatus } from "@prisma/client";
+import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import {
   ProviderRefundNotSentException,
   ProviderRefundRejectedException,
@@ -67,6 +67,23 @@ export function providerRefundFailure(error: unknown): ProviderRefundFailure {
     status: RefundAttemptStatus.manual_review,
     failureReason: reason,
     needsReconciliation: true,
+  };
+}
+
+/**
+ * The attempt write for a failed provider call (CAS on `submitting` is the
+ * caller's). A definite failure counts towards the sweep backoff
+ * (`failureCount`, helpers/refund-sweep-policy); a parked one does not.
+ */
+export function refundAttemptFailureData(
+  failure: ProviderRefundFailure,
+): Prisma.RefundAttemptUpdateManyMutationInput {
+  return {
+    status: failure.status,
+    failureReason: failure.failureReason,
+    ...(failure.status === RefundAttemptStatus.failed
+      ? { failureCount: { increment: 1 } }
+      : {}),
   };
 }
 

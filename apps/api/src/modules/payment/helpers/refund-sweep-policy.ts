@@ -8,10 +8,13 @@ import type { CacheService } from "../../cache/cache.service";
  * days for one order).
  *
  * - The wait is read from the durable RefundAttempt ledger, not kept
- *   elsewhere: a `failed` attempt records when it was first tried
- *   (`createdAt`) and when it last failed (`updatedAt`); the longer it has
- *   been failing, the longer the sweep waits (`refundRetryAt`). No second
- *   source of truth, no lock, nothing lost on a cache flush.
+ *   elsewhere: a `failed` attempt counts its consecutive definite provider
+ *   failures (`failureCount`) and records the last one (`updatedAt`); the
+ *   wait doubles with each failure (`refundRetryAt`). No second source of
+ *   truth, no lock, nothing lost on a cache flush.
+ * - A failure that never reached an attempt (a data problem before the
+ *   claim: group cap, missing oid) cools down for an hour in the cache
+ *   (`REFUND_SWEEP_COOLDOWN_SECONDS`): there is no attempt to read.
  * - An alarm about one order or attempt goes out at most once a day: an
  *   atomic claim per key in the cache (`claimRefundAlarm`). If the cache is
  *   unavailable the alarm goes out (an outage must not hide money alarms).
@@ -26,25 +29,27 @@ export const REFUND_SWEEP_FIRST_DELAY_MS = 10 * MINUTE_MS;
 export const REFUND_SWEEP_MAX_DELAY_MS = 6 * HOUR_MS;
 /** At most one alarm per order or attempt in this window. */
 export const REFUND_ALARM_INTERVAL_SECONDS = 24 * 60 * 60;
+/** Wait after a failure that left no attempt behind (cache cooldown). */
+export const REFUND_SWEEP_COOLDOWN_SECONDS = 60 * 60;
 
 /** What the backoff reads from a failed `RefundAttempt`. */
 export interface FailedRefundAttempt {
   orderId: string | null;
-  createdAt: Date;
+  /** Consecutive definite provider failures; 0 for a requeued attempt. */
+  failureCount: number;
   updatedAt: Date;
 }
 
 /**
  * When the sweep may try an order again after its attempt failed: the last
- * failure plus as long as the attempt has been failing, between 10 minutes
- * and 6 hours. With the 5-minute cron that is about 10, 10, 20, 40, 80, 160,
- * 320 minutes, then every 6 hours.
+ * failure plus 10 minutes doubled per further failure, at most 6 hours
+ * (10, 20, 40, 80, 160, 320, then 360 minutes). An attempt requeued without
+ * a new failure (status inquiry, admin "retry") waits the first step only.
  */
 export function refundRetryAt(attempt: FailedRefundAttempt): Date {
-  const failingForMs =
-    attempt.updatedAt.getTime() - attempt.createdAt.getTime();
+  const doublings = Math.min(Math.max(attempt.failureCount - 1, 0), 30);
   const waitMs = Math.min(
-    Math.max(failingForMs, REFUND_SWEEP_FIRST_DELAY_MS),
+    REFUND_SWEEP_FIRST_DELAY_MS * 2 ** doublings,
     REFUND_SWEEP_MAX_DELAY_MS,
   );
   return new Date(attempt.updatedAt.getTime() + waitMs);

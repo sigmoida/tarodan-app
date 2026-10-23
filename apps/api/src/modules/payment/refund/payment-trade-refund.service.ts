@@ -32,6 +32,7 @@ import { errorMessage } from "../../../common/helpers/error-message";
 import {
   isPaymentNotYetSyncedRejection,
   providerRefundFailure,
+  refundAttemptFailureData,
 } from "../helpers/refund-provider-failure";
 import { OutboxService } from "../../outbox/outbox.service";
 import {
@@ -362,10 +363,7 @@ export class PaymentTradeRefundService {
                 id: refundAttempt.attempt.id,
                 status: RefundAttemptStatus.submitting,
               },
-              data: {
-                status: failure.status,
-                failureReason: failure.failureReason,
-              },
+              data: refundAttemptFailureData(failure),
             });
             await this.prisma.payoutTransfer.updateMany({
               where: {
@@ -393,10 +391,7 @@ export class PaymentTradeRefundService {
                 id: refundAttempt.attempt.id,
                 status: RefundAttemptStatus.submitting,
               },
-              data: {
-                status: failure.status,
-                failureReason: failure.failureReason,
-              },
+              data: refundAttemptFailureData(failure),
             })
             .catch(() => undefined);
           throw new RefundPendingReconciliationException(

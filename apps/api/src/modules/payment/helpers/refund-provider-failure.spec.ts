@@ -10,6 +10,7 @@ import {
   REFUND_FAILURE_PROVIDER_NOT_SENT,
   isPaymentNotYetSyncedRejection,
   providerRefundFailure,
+  refundAttemptFailureData,
 } from "./refund-provider-failure";
 
 /**
@@ -95,5 +96,34 @@ describe("isPaymentNotYetSyncedRejection", () => {
 
   it("does not match other rejections", () => {
     expect(isPaymentNotYetSyncedRejection("iade limiti asildi")).toBe(false);
+  });
+});
+
+describe("refundAttemptFailureData", () => {
+  it("a retryable failure counts towards the sweep backoff", () => {
+    expect(
+      refundAttemptFailureData({
+        status: RefundAttemptStatus.failed,
+        failureReason: "iade limiti asildi",
+        needsReconciliation: false,
+      }),
+    ).toEqual({
+      status: RefundAttemptStatus.failed,
+      failureReason: "iade limiti asildi",
+      failureCount: { increment: 1 },
+    });
+  });
+
+  it("a parked attempt does not count (it is not resent by the sweep)", () => {
+    expect(
+      refundAttemptFailureData({
+        status: RefundAttemptStatus.manual_review,
+        failureReason: "provider_nothing_left: ...",
+        needsReconciliation: true,
+      }),
+    ).toEqual({
+      status: RefundAttemptStatus.manual_review,
+      failureReason: "provider_nothing_left: ...",
+    });
   });
 });

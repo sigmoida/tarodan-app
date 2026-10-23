@@ -76,6 +76,7 @@ import { testLaneRefundResult } from "../helpers/test-lane-refund";
 import {
   isPaymentNotYetSyncedRejection,
   providerRefundFailure,
+  refundAttemptFailureData,
 } from "../helpers/refund-provider-failure";
 import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
 import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-notices";
@@ -873,10 +874,7 @@ export class PaymentRefundService {
                     id: refundAttempt.attempt.id,
                     status: RefundAttemptStatus.submitting,
                   },
-                  data: {
-                    status: failure.status,
-                    failureReason: failure.failureReason,
-                  },
+                  data: refundAttemptFailureData(failure),
                 });
                 if (
                   err instanceof ProviderRefundRejectedException &&
@@ -896,10 +894,7 @@ export class PaymentRefundService {
                     id: refundAttempt.attempt.id,
                     status: RefundAttemptStatus.submitting,
                   },
-                  data: {
-                    status: failure.status,
-                    failureReason: failure.failureReason,
-                  },
+                  data: refundAttemptFailureData(failure),
                 })
                 .catch(() => undefined);
               throw err instanceof ProviderRefundOutcomeUnknownException
@@ -1516,11 +1511,13 @@ export class PaymentRefundService {
       } else {
         this.logger.error(failureLine);
       }
-      // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
-      // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
-      // başardıysa (paytrRefunded=true) void kalır — para iade edildi, satıcı ödenmemeli.
-      // Finding 3: yalnız BU çağrının void'lediği ID'leri restore et — önceki bir başarılı
-      // iadenin void'lediği bayat payout'u diriltip satıcıyı çift ödemeyelim.
+      // MONEY-M3: if it failed before PayTR refunded anything, RESTORE the
+      // payouts voided before the PayTR call (order_refunded -> pending) so the
+      // seller can be paid. If PayTR refunded (paytrRefunded) or may have
+      // (providerOutcomeUncertain), they stay voided: the buyer's money went
+      // or may have gone back, the seller must not be paid.
+      // Finding 3: restore only the ids THIS call voided, never a stale
+      // payout an earlier successful refund voided (double payment).
       if (
         !paytrRefunded &&
         !providerOutcomeUncertain &&
@@ -1550,9 +1547,9 @@ export class PaymentRefundService {
           .catch(() => undefined);
       }
       if (paytrRefunded || providerOutcomeUncertain) {
-        // Sarmalarken katalog payload'unu KORU: `error.message` yerelleştirilmiş
-        // istisnalarda "Bad Request Exception"a düşer, yani istemci de log da
-        // gerçek sebebi kaybederdi.
+        // KEEP the catalog payload when wrapping: on a localized exception
+        // `error.message` degrades to "Bad Request Exception", so the client
+        // and the log would lose the real reason.
         throw error instanceof RefundPendingReconciliationException
           ? error
           : new RefundPendingReconciliationException(

@@ -367,6 +367,18 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       expect(reviewQuery?.take).toBe(500);
     });
 
+    it("more attempts in review than one run lists: one count line a day", async () => {
+      const { runAt, error } = makeService({ manualReviewCount: 650 });
+
+      await runAt(NOW);
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(String(error.mock.calls[0][0])).toContain("650");
+
+      error.mockClear();
+      await runAt(later(HOUR));
+      expect(error).not.toHaveBeenCalled();
+    });
+
     it("without the cache every run alarms (fail loud)", async () => {
       const { runAt, error, cache } = makeService({
         reviewAttempts: [review("attempt-a", "payout_completed")],

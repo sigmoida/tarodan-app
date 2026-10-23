@@ -31,8 +31,8 @@ const STALE_SUBMISSION_MINUTES = 10;
 const RECOVERY_BATCH = 50;
 /**
  * Attempts the review alarm looks at per run, newest first: a newly parked
- * attempt always alarms; past this many, the oldest ones (alarmed before)
- * skip their daily repeat.
+ * attempt always alarms; past this many, the oldest ones are covered by one
+ * daily count line instead of their own.
  */
 const REVIEW_ALARM_BATCH = 500;
 /** Cache key of an attempt's once-a-day manual review alarm. */
@@ -405,7 +405,7 @@ export class RefundReconciliationService {
     const manualReview = await this.prisma.refundAttempt.count({
       where: { status: RefundAttemptStatus.manual_review, ...paymentFilter },
     });
-    await this.alarmManualReview(paymentFilter, quarantined);
+    await this.alarmManualReview(paymentFilter, quarantined, manualReview);
 
     if (recovered > 0) {
       this.logger.warn(
@@ -466,12 +466,14 @@ export class RefundReconciliationService {
    * One error line per attempt still in manual review, at most once a day
    * each (an atomic claim per attempt, helpers/refund-sweep-policy; without
    * the cache every run alarms, fail loud). Newest first, so a newly parked
-   * attempt always alarms. An attempt quarantined in this run already had
-   * its line.
+   * attempt always alarms; when more are in review than one run reads, one
+   * extra line a day says how many, so the oldest are not forgotten. An
+   * attempt quarantined in this run already had its line.
    */
   private async alarmManualReview(
     paymentFilter: { payment?: ReturnType<typeof sweepablePaymentWhere> },
     quarantined: Set<string>,
+    total: number,
   ): Promise<void> {
     const inReview = await this.prisma.refundAttempt.findMany({
       where: { status: RefundAttemptStatus.manual_review, ...paymentFilter },
@@ -479,13 +481,26 @@ export class RefundReconciliationService {
       orderBy: { updatedAt: "desc" },
       take: REVIEW_ALARM_BATCH,
     });
-    for (const attempt of inReview) {
-      if (quarantined.has(attempt.id)) continue;
-      if (!(await claimRefundAlarm(this.cache, reviewAlarmKey(attempt.id)))) {
-        continue;
-      }
+    const candidates = inReview.filter(
+      (attempt) => !quarantined.has(attempt.id),
+    );
+    const due = await Promise.all(
+      candidates.map((attempt) =>
+        claimRefundAlarm(this.cache, reviewAlarmKey(attempt.id)),
+      ),
+    );
+    candidates.forEach((attempt, index) => {
+      if (!due[index]) return;
       this.logger.error(
         `REFUND_MANUAL_REVIEW: ${attemptSubject(attempt)} needs a manual provider check: ${attempt.failureReason ?? "no reason recorded"}`,
+      );
+    });
+    if (
+      total > REVIEW_ALARM_BATCH &&
+      (await claimRefundAlarm(this.cache, "refund-alarm:review:overflow"))
+    ) {
+      this.logger.error(
+        `REFUND_MANUAL_REVIEW: ${total} refund attempts are in manual review; only the newest ${REVIEW_ALARM_BATCH} are listed one by one, check the admin reconciliation list for the oldest`,
       );
     }
   }

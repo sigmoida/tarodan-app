@@ -13,41 +13,36 @@ const HOUR = 60 * MINUTE;
 const NOW = new Date("2026-10-23T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
 
-/** A failed attempt first tried `firstMs` ago and last failed `lastMs` ago. */
-const failed = (orderId: string, firstMs: number, lastMs: number) => ({
+/** A failed attempt after `failures` definite failures, the last `lastMs` ago. */
+const failed = (orderId: string, failures: number, lastMs: number) => ({
   orderId,
-  createdAt: at(-firstMs),
+  failureCount: failures,
   updatedAt: at(-lastMs),
 });
 
 describe("refundRetryAt (wait read from the RefundAttempt ledger)", () => {
   it("waits 10 minutes after a first failure", () => {
     expect(REFUND_SWEEP_FIRST_DELAY_MS).toBe(10 * MINUTE);
-    expect(refundRetryAt(failed("o", 0, 0))).toEqual(at(10 * MINUTE));
+    expect(refundRetryAt(failed("o", 1, 0))).toEqual(at(10 * MINUTE));
   });
 
-  it("waits as long as the attempt has been failing", () => {
-    // First tried 40 minutes before its last failure: next try 40 min later.
-    expect(refundRetryAt(failed("o", 40 * MINUTE, 0))).toEqual(at(40 * MINUTE));
-  });
-
-  it("never waits more than 6 hours", () => {
+  it("doubles the wait with every further failure, at most 6 hours", () => {
     expect(REFUND_SWEEP_MAX_DELAY_MS).toBe(6 * HOUR);
-    expect(refundRetryAt(failed("o", 3 * 24 * HOUR, 0))).toEqual(at(6 * HOUR));
+    expect(
+      [1, 2, 3, 4, 5, 6, 7, 50].map(
+        (n) =>
+          (refundRetryAt(failed("o", n, 0)).getTime() - NOW.getTime()) / MINUTE,
+      ),
+    ).toEqual([10, 20, 40, 80, 160, 320, 360, 360]);
   });
 
-  it("with the 5-minute cron the tries spread out: 10, 10, 20, 40, 80 ... 360 minutes", () => {
-    const createdAt = NOW;
-    let updatedAt = NOW;
-    const gaps: number[] = [];
-    for (let i = 0; i < 9; i++) {
-      const retry = refundRetryAt({ orderId: "o", createdAt, updatedAt });
-      // The next cron tick at or after the retry instant.
-      const tick = Math.ceil(retry.getTime() / (5 * MINUTE)) * 5 * MINUTE;
-      gaps.push((tick - updatedAt.getTime()) / MINUTE);
-      updatedAt = new Date(tick);
-    }
-    expect(gaps).toEqual([10, 10, 20, 40, 80, 160, 320, 360, 360]);
+  /**
+   * Review finding: measured from the attempt's age, an attempt the status
+   * inquiry just requeued (two days in manual review) waited 6 hours before
+   * the refund was resent. Time in review is not failing.
+   */
+  it("an attempt requeued without a new failure waits only the first step", () => {
+    expect(refundRetryAt(failed("o", 0, 0))).toEqual(at(10 * MINUTE));
   });
 });
 
@@ -56,10 +51,10 @@ describe("waitingOrderIds", () => {
     expect(
       waitingOrderIds(
         [
-          failed("waiting", 0, 5 * MINUTE),
-          failed("waiting", 0, 9 * MINUTE),
-          failed("due", 0, 11 * MINUTE),
-          { orderId: null, createdAt: NOW, updatedAt: NOW },
+          failed("waiting", 1, 5 * MINUTE),
+          failed("waiting", 3, 30 * MINUTE),
+          failed("due", 1, 11 * MINUTE),
+          { orderId: null, failureCount: 1, updatedAt: NOW },
         ],
         NOW,
       ),

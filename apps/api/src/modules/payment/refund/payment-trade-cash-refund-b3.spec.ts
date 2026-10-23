@@ -433,6 +433,7 @@ describe("PaymentService trade cash refund idempotency", () => {
       data: {
         status: RefundAttemptStatus.failed,
         failureReason: "odeme henuz siteye bildirilmemis",
+        failureCount: { increment: 1 },
       },
     });
   });
@@ -479,6 +480,7 @@ describe("PaymentService trade cash refund idempotency", () => {
       data: {
         status: RefundAttemptStatus.failed,
         failureReason: "insufficient balance",
+        failureCount: { increment: 1 },
       },
     });
   });
@@ -501,6 +503,7 @@ describe("PaymentService trade cash refund idempotency", () => {
       data: {
         status: RefundAttemptStatus.failed,
         failureReason: `${REFUND_FAILURE_PROVIDER_NOT_SENT}: fetch failed (ECONNREFUSED)`,
+        failureCount: { increment: 1 },
       },
     });
   });

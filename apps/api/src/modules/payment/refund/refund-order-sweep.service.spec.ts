@@ -28,7 +28,11 @@ type Candidate = {
   payment?: { metadata: unknown } | null;
   refundAttempts?: { id: string }[];
 };
-type FailedAttempt = { orderId: string; createdAt: Date; updatedAt: Date };
+type FailedAttempt = {
+  orderId: string;
+  failureCount: number;
+  updatedAt: Date;
+};
 type OrderWhere = Prisma.OrderWhereInput & {
   id?: unknown;
   OR?: unknown;
@@ -36,7 +40,12 @@ type OrderWhere = Prisma.OrderWhereInput & {
 };
 
 function makeHarness(
-  opts: { copiedBefore?: Date | null; cacheDown?: boolean } = {},
+  opts: {
+    copiedBefore?: Date | null;
+    cacheDown?: boolean;
+    /** Whether a failed processRefund left a failed attempt behind. */
+    failureLeavesAttempt?: boolean;
+  } = {},
 ) {
   // The alarm claims behave like Redis `SET NX EX` against a test clock.
   let clock = NOW;
@@ -51,13 +60,30 @@ function makeHarness(
       claims.set(key, clock.getTime() + ttlSeconds * 1000);
       return "claimed" as const;
     }),
+    exists: jest.fn(async (key: string) => {
+      if (opts.cacheDown) return false;
+      const expiresAt = claims.get(key);
+      return expiresAt !== undefined && expiresAt > clock.getTime();
+    }),
+    setIfAbsent: jest.fn(async (key: string, ttlSeconds: number) => {
+      if (opts.cacheDown) return false;
+      const expiresAt = claims.get(key);
+      if (expiresAt !== undefined && expiresAt > clock.getTime()) return false;
+      claims.set(key, clock.getTime() + ttlSeconds * 1000);
+      return true;
+    }),
   };
   /** Candidates per branch for the next run: [single, group, returned]. */
   let branches: Candidate[][] = [[], [], []];
   let failedAttempts: FailedAttempt[] = [];
   const prisma = {
     order: { findMany: jest.fn(async () => branches.shift() ?? []) },
-    refundAttempt: { findMany: jest.fn(async () => failedAttempts) },
+    refundAttempt: {
+      findMany: jest.fn(async () => failedAttempts),
+      findFirst: jest.fn(async () =>
+        opts.failureLeavesAttempt === false ? null : { id: "attempt-failed" },
+      ),
+    },
   };
   const paymentRefund = {
     processRefund: jest.fn().mockResolvedValue({ success: true }),
@@ -100,19 +126,24 @@ function makeHarness(
     (
       prisma.order.findMany.mock.calls as unknown as [{ where: OrderWhere }][]
     ).map(([args]) => args.where);
-  return { service, prisma, paymentRefund, error, warn, nextRun, wheres };
+  return {
+    service,
+    prisma,
+    paymentRefund,
+    cache,
+    error,
+    warn,
+    nextRun,
+    wheres,
+  };
 }
 
 const single = (id: string): Candidate => ({ id, payment: { metadata: {} } });
 const failedAttempt = (
   orderId: string,
-  firstFailedAt: Date,
+  failureCount: number,
   lastFailedAt: Date,
-): FailedAttempt => ({
-  orderId,
-  createdAt: firstFailedAt,
-  updatedAt: lastFailedAt,
-});
+): FailedAttempt => ({ orderId, failureCount, updatedAt: lastFailedAt });
 
 describe("RefundOrderSweepService.processRefundedOrders backoff (from the attempt ledger)", () => {
   it("reads only the failed attempts that can still be waiting", async () => {
@@ -127,17 +158,13 @@ describe("RefundOrderSweepService.processRefundedOrders backoff (from the attemp
         orderId: { not: null },
         updatedAt: { gt: at(-6 * HOUR) },
       },
-      select: { orderId: true, createdAt: true, updatedAt: true },
+      select: { orderId: true, failureCount: true, updatedAt: true },
     });
   });
 
   it("an order whose attempt just failed is kept out of every candidate query", async () => {
     const h = makeHarness();
-    h.nextRun(
-      at(5 * MINUTE),
-      [[], [], []],
-      [failedAttempt("order-1", NOW, NOW)],
-    );
+    h.nextRun(at(5 * MINUTE), [[], [], []], [failedAttempt("order-1", 1, NOW)]);
 
     await h.service.processRefundedOrders(at(5 * MINUTE));
 
@@ -154,7 +181,7 @@ describe("RefundOrderSweepService.processRefundedOrders backoff (from the attemp
     h.nextRun(
       at(10 * MINUTE),
       [[single("order-1")], [], []],
-      [failedAttempt("order-1", NOW, NOW)],
+      [failedAttempt("order-1", 1, NOW)],
     );
 
     await h.service.processRefundedOrders(at(10 * MINUTE));
@@ -163,14 +190,10 @@ describe("RefundOrderSweepService.processRefundedOrders backoff (from the attemp
     expect(h.paymentRefund.processRefund).toHaveBeenCalledTimes(1);
   });
 
-  it("waits longer the longer the attempt has been failing", async () => {
+  it("waits longer after every further failure (from the attempt's failure count)", async () => {
     const h = makeHarness();
-    // Failing since 40 minutes before its last failure: waits 40 more.
-    const failing = failedAttempt(
-      "order-1",
-      at(-70 * MINUTE),
-      at(-30 * MINUTE),
-    );
+    // Third failure 30 minutes ago: waits 40 minutes.
+    const failing = failedAttempt("order-1", 3, at(-30 * MINUTE));
 
     h.nextRun(NOW, [[], [], []], [failing]);
     await h.service.processRefundedOrders(NOW);
@@ -179,6 +202,49 @@ describe("RefundOrderSweepService.processRefundedOrders backoff (from the attemp
     h.nextRun(at(10 * MINUTE), [[], [], []], [failing]);
     await h.service.processRefundedOrders(at(10 * MINUTE));
     expect(h.wheres()[0].id).toBeUndefined();
+  });
+
+  /**
+   * Review finding: a failure before the attempt claim (group cap, missing
+   * oid) leaves no attempt to wait on and was retried every 5 minutes.
+   */
+  it("a failure that left no attempt cools down for an hour", async () => {
+    const h = makeHarness({ failureLeavesAttempt: false });
+    h.paymentRefund.processRefund.mockRejectedValue(
+      new Error("refund amount exceeds the limit"),
+    );
+    h.nextRun(NOW, [[single("order-1")], [], []]);
+    await h.service.processRefundedOrders(NOW);
+    expect(h.cache.setIfAbsent).toHaveBeenCalledWith(
+      "refund-sweep:cooldown:order-1",
+      60 * 60,
+    );
+
+    h.nextRun(at(30 * MINUTE), [[single("order-1")], [], []]);
+    await h.service.processRefundedOrders(at(30 * MINUTE));
+    expect(h.paymentRefund.processRefund).not.toHaveBeenCalled();
+
+    h.nextRun(at(61 * MINUTE), [[single("order-1")], [], []]);
+    await h.service.processRefundedOrders(at(61 * MINUTE));
+    expect(h.paymentRefund.processRefund).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failure that left a failed attempt waits on the attempt, no cooldown", async () => {
+    const h = makeHarness({ failureLeavesAttempt: true });
+    h.paymentRefund.processRefund.mockRejectedValue(new Error("refused"));
+    h.nextRun(NOW, [[single("order-1")], [], []]);
+
+    await h.service.processRefundedOrders(NOW);
+
+    expect(h.cache.setIfAbsent).not.toHaveBeenCalled();
+    expect(h.prisma.refundAttempt.findFirst).toHaveBeenCalledWith({
+      where: {
+        orderId: "order-1",
+        status: RefundAttemptStatus.failed,
+        updatedAt: { gte: expect.any(Date) },
+      },
+      select: { id: true },
+    });
   });
 });
 
@@ -350,6 +416,25 @@ describe("RefundOrderSweepService.processRefundedOrders candidates", () => {
     expect(h.warn).toHaveBeenCalledWith(
       expect.stringContaining("returned-zero-cash"),
     );
+  });
+
+  it("only branch 3 reads the finalized attempt (branches 1-2 exclude it in SQL)", async () => {
+    const h = makeHarness();
+
+    await h.service.processRefundedOrders(NOW);
+
+    const selects = (
+      h.prisma.order.findMany.mock.calls as unknown as [
+        { select: Record<string, unknown> },
+      ][]
+    ).map(([args]) => args.select);
+    expect(selects[0].refundAttempts).toBeUndefined();
+    expect(selects[1].refundAttempts).toBeUndefined();
+    expect(selects[2].refundAttempts).toEqual({
+      where: { status: RefundAttemptStatus.finalized },
+      select: { id: true },
+      take: 1,
+    });
   });
 
   it("candidate queries are bounded and ordered", async () => {

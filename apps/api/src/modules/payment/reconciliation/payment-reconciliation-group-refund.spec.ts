@@ -14,8 +14,11 @@ describe("RefundOrderSweepService.processRefundedOrders — MONEY-H5 group + SEA
   const makeService = () => {
     const prisma = {
       order: { findMany: jest.fn() },
-      // D1: no recent failed attempt, nothing waits.
-      refundAttempt: { findMany: jest.fn().mockResolvedValue([]) },
+      // D1: no recent failed attempt, nothing waits; a failure leaves one.
+      refundAttempt: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue({ id: "attempt-failed" }),
+      },
     };
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),
@@ -24,7 +27,11 @@ describe("RefundOrderSweepService.processRefundedOrders — MONEY-H5 group + SEA
       prisma as any, // prisma
       paymentRefund as any, // paymentRefund
       // Alarm claims (D1): every alarm is the first of the day.
-      { claimKey: jest.fn().mockResolvedValue("claimed") } as any,
+      {
+        claimKey: jest.fn().mockResolvedValue("claimed"),
+        exists: jest.fn().mockResolvedValue(false),
+        setIfAbsent: jest.fn().mockResolvedValue(true),
+      } as any,
       // Staging guard (D1): no production copy here.
       { copiedBefore: jest.fn().mockResolvedValue(null) } as any,
     );
