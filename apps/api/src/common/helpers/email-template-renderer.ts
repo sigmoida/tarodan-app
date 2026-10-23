@@ -1719,13 +1719,14 @@ export function renderEmailTemplate(
 
     "payout-failed-seller": wrapEmail(
       `
-      ${titleBlock("Ödemeniz Aktarılamadı", "⚠️")}
+      ${titleBlock("Ödemeniz Aktarılamadı")}
       ${greeting(data?.sellerName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bir satışınıza ait ödeme, banka hesabınıza aktarılamadı. Tutar güvende — banka bilgileriniz doğrulandıktan sonra yeniden aktarılacak.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("Tutar", formatEmailPrice(data?.payoutAmount || 0) + " TL", true)}
           ${data?.bankAccountLast4 ? detailRow("Hesap", "•••• " + data.bankAccountLast4) : ""}
+          ${data?.failureReason ? detailRow("Neden", String(data.failureReason)) : ""}
         </table>
       `)}
       ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Lütfen profilinizden IBAN ve hesap sahibi bilgilerinizin doğru olduğundan emin olun. Sorun devam ederse destek ekibimizle iletişime geçin.</p>`)}

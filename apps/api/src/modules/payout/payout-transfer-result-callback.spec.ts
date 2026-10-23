@@ -26,7 +26,13 @@ function makePayout(overrides: Record<string, unknown> = {}) {
     transferName: "Seller",
     status: PayoutStatus.pending,
     paymentHold: null,
-    tradeCashPayment: null,
+    // A paid source: the transfer total is capped against its payment.
+    tradeCashPayment: {
+      tradeId: "trade-1",
+      paidAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      totalAmount: 100,
+      payment: { id: "pay-1", amount: 100, metadata: null },
+    },
     submittedAt: null,
     submittedAmount: null,
     ...overrides,
@@ -80,6 +86,10 @@ function makePrisma(payout: any, account: any) {
         apply(data);
         return Promise.resolve({});
       }),
+    },
+    refundAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     sellerBankAccount: {
       findUnique: jest.fn().mockResolvedValue(account),
