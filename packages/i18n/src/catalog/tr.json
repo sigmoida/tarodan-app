@@ -12273,7 +12273,7 @@
     "rating": {
       "rateSelf": "Kendinizi puanlayamazsınız",
       "orderOrTradeRequired": "Sipariş veya takas ID gerekli",
-      "membershipOrder": "Üyelik siparişleri için değerlendirme yapılamaz",
+      "membershipOrder": "Dijital hizmet siparişleri değerlendirilemez",
       "deliveredOnly": "Sadece teslim edilmiş siparişler puanlanabilir",
       "orderForbidden": "Bu siparişi puanlama yetkiniz yok",
       "invalidRecipient": "Geçersiz alıcı",

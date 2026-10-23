@@ -33,6 +33,7 @@ import {
 import { i18nMessage } from "../i18n";
 import { UserBlockService } from "../user-block/user-block.service";
 import { excludeIds } from "../user-block/user-block.helpers";
+import { virtualOrderKind } from "../payment/helpers/virtual-order-kind";
 
 @Injectable()
 export class RatingService {
@@ -124,8 +125,10 @@ export class RatingService {
         throw new NotFoundException(i18nMessage("server.order.notFound"));
       }
 
-      // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
-      if (order.orderNumber?.startsWith("MEM-")) {
+      // Platform-service orders (membership, boost: a virtual product sold
+      // by the platform account) cannot be rated. A completed boost order
+      // used to pass, as only the membership order number was checked.
+      if (virtualOrderKind(order)) {
         throw new BadRequestException(
           i18nMessage("server.rating.membershipOrder"),
         );
@@ -300,8 +303,8 @@ export class RatingService {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
-    // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
-    if (order.orderNumber?.startsWith("MEM-")) {
+    // Platform-service orders (membership, boost) cannot be rated.
+    if (virtualOrderKind(order)) {
       throw new BadRequestException(
         i18nMessage("server.rating.membershipOrder"),
       );
