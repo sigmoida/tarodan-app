@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Product } from "@/types/product";
 import {
   HOME_RAIL_RETRY_DELAY_MS,
+  HOME_RAIL_RETRY_HEADER,
   PRODUCTS_LIST_TAG,
   RailHttpError,
   fetchProductRail,
@@ -69,6 +70,11 @@ describe("fetchProductRail", () => {
 
     await expect(settle(result)).resolves.toEqual([product("a")]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The retry is a distinct fetch for Next's dedupe and data cache.
+    expect(fetchMock.mock.calls[0][1]?.headers).toBeUndefined();
+    expect(fetchMock.mock.calls[1][1]?.headers).toEqual({
+      [HOME_RAIL_RETRY_HEADER]: "1",
+    });
   });
 
   it("retries once on a timeout", async () => {

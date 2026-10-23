@@ -34,13 +34,16 @@ import type {
 export const HOME_REVALIDATE_SECONDS = 60;
 /** Per-attempt budget of a product rail fetch (two attempts at most). */
 export const HOME_RAIL_TIMEOUT_MS = 4000;
-/**
- * Pause before the single retry. While Next revalidates a stale fetch entry it
- * shares the in-flight origin request with any identical fetch until that
- * response body is read, so an immediate retry would get the same failure
- * back instead of asking the API again.
- */
+/** Pause before the single retry. */
 export const HOME_RAIL_RETRY_DELAY_MS = 300;
+/**
+ * Marks the retry so it is a different fetch for Next (headers are part of the
+ * fetch cache key). While Next revalidates a stale fetch entry, an identical
+ * fetch in the same render gets the first attempt's failed response back
+ * instead of reaching the API (seen on 15.5 even after the pause). A
+ * successful retry is cached under its own key and refreshed the same way.
+ */
+export const HOME_RAIL_RETRY_HEADER = "x-tarodan-retry";
 /**
  * Tag the API revalidates (`POST /api/revalidate`) when listing visibility or
  * order changes: price, discount, boost, expiry.
@@ -69,8 +72,13 @@ function isRetryable(error: unknown): boolean {
   return error instanceof TypeError || error instanceof DOMException;
 }
 
-async function fetchRailOnce(path: string, url: string): Promise<Product[]> {
+async function fetchRailOnce(
+  path: string,
+  url: string,
+  isRetry = false,
+): Promise<Product[]> {
   const res = await fetch(url, {
+    headers: isRetry ? { [HOME_RAIL_RETRY_HEADER]: "1" } : undefined,
     next: { revalidate: HOME_REVALIDATE_SECONDS, tags: [PRODUCTS_LIST_TAG] },
     // Next drops the signal while it revalidates a stale entry in the
     // background; that render does not block a visitor.
@@ -101,7 +109,7 @@ export async function fetchProductRail(
     await new Promise((resolve) =>
       setTimeout(resolve, HOME_RAIL_RETRY_DELAY_MS),
     );
-    return fetchRailOnce(path, url);
+    return fetchRailOnce(path, url, true);
   }
 }
 
