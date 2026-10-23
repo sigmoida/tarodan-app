@@ -35,7 +35,7 @@ export function TransferDetails({ row }: { row: PayoutTransferRow }) {
               {row.providerMessage}
             </Field>
           )}
-          {row.submittedTotalAmount != null && (
+          {row.submittedTotalAmount != null && row.status !== "pending" && (
             <Field label={t("admin.finance.payouts.resolution.submittedTotal")}>
               {fmtTry(row.submittedTotalAmount)}
             </Field>

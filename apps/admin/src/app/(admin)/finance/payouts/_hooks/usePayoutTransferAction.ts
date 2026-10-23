@@ -4,8 +4,10 @@ import { useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
-import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { adminKeys } from "@/lib/query/keys";
+import {
+  invalidateAdminResources,
+  useAdminMutation,
+} from "@/hooks/useAdminMutation";
 import {
   PAYOUT_TRANSFER_RESOURCES,
   payoutActionError,
@@ -40,15 +42,6 @@ export function usePayoutTransferAction<TVars, TData>(
     onSuccess: (data) => opts.onSuccess(data),
   });
 
-  const refresh = () => {
-    for (const resource of PAYOUT_TRANSFER_RESOURCES) {
-      void queryClient.invalidateQueries({ queryKey: adminKeys.all(resource) });
-      void queryClient.invalidateQueries({
-        queryKey: adminKeys.countAll(resource),
-      });
-    }
-  };
-
   const submit = (vars: TVars) => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -59,7 +52,7 @@ export function usePayoutTransferAction<TVars, TData>(
       onError: (raw) => {
         const error = payoutActionError(raw, t("common.operationFailed"));
         if (error.refresh) {
-          refresh();
+          invalidateAdminResources(queryClient, PAYOUT_TRANSFER_RESOURCES);
           toast.error(error.message);
           opts.onStale?.();
         } else if (opts.onError) {

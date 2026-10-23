@@ -7024,7 +7024,6 @@
           "breakdownOidRemaining": "Ödemede kalan (PayTR)",
           "breakdownAllowedTotal": "Gönderilebilecek en yüksek toplam",
           "breakdownMissingInput": "Toplamı sınırlayacak {input, select, payment {ödeme} other {sipariş ya da takas}} kaydı bulunamadı. Bu bir veri sorunu: bağlantıyı düzeltip transferi tekrar deneyin, PayTR dışında ödemeyin.",
-          "noDetails": "Bu transfer için ek ayrıntı yok.",
           "manualSettlementTitle": "Elle ödendi olarak işaretlendi",
           "manualSettlementShort": "Elle: {method}",
           "settledAt": "İşaretlenme tarihi",

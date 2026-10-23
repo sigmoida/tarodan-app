@@ -7024,7 +7024,6 @@
           "breakdownOidRemaining": "Left on the payment (PayTR)",
           "breakdownAllowedTotal": "Highest total that can be sent",
           "breakdownMissingInput": "No {input, select, payment {payment} other {order or trade}} record was found to cap the total. This is a data problem: fix the link and retry the transfer; do not pay it outside PayTR.",
-          "noDetails": "No further details for this transfer.",
           "manualSettlementTitle": "Marked as paid manually",
           "manualSettlementShort": "Manual: {method}",
           "settledAt": "Marked on",

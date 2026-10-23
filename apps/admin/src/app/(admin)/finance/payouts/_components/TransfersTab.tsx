@@ -20,8 +20,8 @@ import { TransferDetails } from "./TransferDetails";
 type Dialog = { kind: "retry" | "markPaid"; row: PayoutTransferRow } | null;
 
 /**
- * Gerçek banka transferleri (PayoutTransfer). Escrow hold listesinden AYRI:
- * burada paranın satıcının hesabına gerçekten geçip geçmediği görünür. A row
+ * Real bank transfers (PayoutTransfer), separate from the escrow hold list:
+ * whether the money actually reached the seller's account. A row
  * opens to the details an admin resolves it with (PayTR transaction ID,
  * reason, PayTR's message, the transfer-total breakdown, a manual
  * settlement). Super admins and admins may retry a failed or returned

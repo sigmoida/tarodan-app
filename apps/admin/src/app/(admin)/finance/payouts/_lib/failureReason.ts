@@ -1,5 +1,6 @@
+import { isPayoutFailureReason } from "@tarodan/types";
 import { payoutFailureReasonConfig } from "@tarodan/ui";
-import { statusLabel, type Translate } from "@/lib/statusLabels";
+import type { Translate } from "@/lib/statusLabels";
 
 /**
  * The text for a payout transfer's `failureReason`: the label of a
@@ -14,5 +15,8 @@ export function failureReasonText(
 ): string | null {
   const value = reason?.trim();
   if (!value) return null;
-  return statusLabel(payoutFailureReasonConfig, value, t, value);
+  // The same guard as the API export: only a shared code is a label.
+  return isPayoutFailureReason(value)
+    ? t(payoutFailureReasonConfig[value].labelKey)
+    : value;
 }
