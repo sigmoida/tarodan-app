@@ -8,6 +8,8 @@
  * `sentry.build.js` (explicit value, else Coolify's `SOURCE_COMMIT`).
  */
 
+import { resolveSentryEnvironment } from "./src/lib/sentryEnvironment";
+
 /**
  * DSN for the server and edge runtimes. A runtime `SENTRY_DSN` wins over the
  * build-time public one, so the server side can be repointed without a
@@ -27,14 +29,14 @@ export const sentryRelease =
   process.env.NEXT_PUBLIC_SENTRY_RELEASE?.trim() || undefined;
 
 /**
- * The environment tag (`production`, `staging`). Never derived from
- * `NODE_ENV`: the Dockerfile sets it to `production` on staging too, so
- * staging test errors would mix into production alerts
- * (tarodan-ops: docs/observability.md). Unset reads as "unknown" on purpose,
- * so a misconfigured build is visible in Sentry instead of posing as one.
+ * The environment tag (`production`, `staging`): the explicit build variable,
+ * else derived from the app URL host (see `resolveSentryEnvironment`). Never
+ * from `NODE_ENV` (tarodan-ops: docs/observability.md).
  */
-export const sentryEnvironment =
-  process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT?.trim() || "unknown";
+export const sentryEnvironment = resolveSentryEnvironment(
+  process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+  process.env.NEXT_PUBLIC_APP_URL,
+);
 
 /**
  * The sample rate follows the real build mode, not the tag: staging is a
