@@ -5,7 +5,6 @@ import {
   Body,
   Param,
   Query,
-  Request,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import { RatingService } from "./rating.service";
@@ -31,10 +30,10 @@ export class RatingController {
    */
   @Post("users")
   async createUserRating(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @Body() dto: CreateUserRatingDto,
   ): Promise<UserRatingResponseDto> {
-    return this.ratingService.createUserRating(req.user.id, dto);
+    return this.ratingService.createUserRating(userId, dto);
   }
 
   /**
@@ -43,10 +42,10 @@ export class RatingController {
    */
   @Post("products")
   async createProductRating(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @Body() dto: CreateProductRatingDto,
   ): Promise<ProductRatingResponseDto> {
-    return this.ratingService.createProductRating(req.user.id, dto);
+    return this.ratingService.createProductRating(userId, dto);
   }
 
   /**
