@@ -31,7 +31,7 @@ const describeFailures = (failures: string[] = []): string => {
   if (failures.length === 0) return "";
   const listed = failures.slice(0, MAX_LISTED_FAILURES).join(", ");
   const rest = failures.length - MAX_LISTED_FAILURES;
-  return `: ${listed}${rest > 0 ? ` (+${rest} kayıt daha)` : ""}`;
+  return `: ${listed}${rest > 0 ? ` (+${rest} more)` : ""}`;
 };
 
 @Injectable()
@@ -172,9 +172,15 @@ export class ShippingSchedulerService implements OnModuleInit {
       stats.barcodeRetried = retry.order.retried + retry.trade.retried;
       stats.barcodeRetryFailed = retry.order.failed + retry.trade.failed;
       if (stats.barcodeRetryFailed > 0) {
+        // Name the records and the reason in the alarm text: "N records could
+        // not be completed" alone cannot be diagnosed.
         recordStepFailure(
           "barcode-retry-records",
-          new Error(`${stats.barcodeRetryFailed} kayıt tamamlanamadı`),
+          new Error(
+            `${stats.barcodeRetryFailed} records could not be completed${describeFailures(
+              [...retry.order.failures, ...retry.trade.failures],
+            )}`,
+          ),
           false,
         );
       }

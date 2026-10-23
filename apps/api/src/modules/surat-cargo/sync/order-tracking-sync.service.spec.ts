@@ -580,6 +580,18 @@ describe("OrderTrackingSyncService", () => {
     });
   });
 
+  it("polls only shipments that already have a carrier tracking code", async () => {
+    const { service, prisma } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([]);
+    await service.syncAllActiveShipments();
+    await service.syncPostDeliveryShipments(0, 48);
+    for (const [args] of prisma.shipment.findMany.mock.calls) {
+      expect(args.where).toMatchObject({ providerTrackingId: { not: null } });
+      expect(args.where.OR).toBeUndefined();
+    }
+    expect(prisma.shipment.findMany).toHaveBeenCalledTimes(2);
+  });
+
   // Sahte taşıyıcı (staging UAT): poller koliyi Sürat'a sormaz, "henüz haber
   // yok" alır — hata/alarm sayılmaz ve koliye hiçbir şey yazılmaz.
   it("with the stub tracking client the cron reports pending, never failed, and writes nothing", async () => {

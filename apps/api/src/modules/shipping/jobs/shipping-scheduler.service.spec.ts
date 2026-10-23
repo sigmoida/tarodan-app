@@ -16,8 +16,8 @@ describe("ShippingSchedulerService", () => {
     };
     const tracking = {
       retryPendingBarcodes: jest.fn().mockResolvedValue({
-        order: { retried: 0, failed: 0 },
-        trade: { retried: 0, failed: 0 },
+        order: { retried: 0, failed: 0, failures: [] },
+        trade: { retried: 0, failed: 0, failures: [] },
       }),
       syncAllActiveShipments: jest
         .fn()
@@ -114,11 +114,35 @@ describe("ShippingSchedulerService", () => {
     );
   });
 
+  it("names the failed barcode-retry records and reasons in the alarm", async () => {
+    const { service, tracking } = makeService();
+    tracking.retryPendingBarcodes.mockResolvedValue({
+      order: {
+        retried: 0,
+        failed: 1,
+        failures: ["order shipment-9 (carrier returned no barcode)"],
+      },
+      trade: {
+        retried: 0,
+        failed: 1,
+        failures: ["trade-return ts-4 (carrier timeout)"],
+      },
+    });
+
+    const error = await service.runSyncSuratTracking().catch((e) => e);
+
+    expect(error).toBeInstanceOf(CronStepFailuresError);
+    expect(error.message).toContain(
+      "order shipment-9 (carrier returned no barcode)",
+    );
+    expect(error.message).toContain("trade-return ts-4 (carrier timeout)");
+  });
+
   it("kayıt bazlı başarısızlığı Bull retry için job hatasına çevirir", async () => {
     const { service, tracking } = makeService();
     tracking.retryPendingBarcodes.mockResolvedValue({
-      order: { retried: 0, failed: 1 },
-      trade: { retried: 0, failed: 0 },
+      order: { retried: 0, failed: 1, failures: ["order shipment-1 (x)"] },
+      trade: { retried: 0, failed: 0, failures: [] },
     });
     tracking.syncAllActiveShipments.mockResolvedValue({
       synced: 2,

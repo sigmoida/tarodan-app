@@ -69,7 +69,7 @@ describe("BarcodeRetryService carrier registration semantics", () => {
 
     await expect(
       (service as any).retryPendingOrderBarcodes(new Date(0), new Date()),
-    ).resolves.toEqual({ retried: 1, failed: 0 });
+    ).resolves.toEqual({ retried: 1, failed: 0, failures: [] });
 
     expect(orderShipments.createBarcode).toHaveBeenCalledWith(
       "order-1",
@@ -83,5 +83,37 @@ describe("BarcodeRetryService carrier registration semantics", () => {
         status: ShipmentStatus.label_created,
       },
     });
+  });
+  it("reports the failed shipment id and the reason, not just a count", async () => {
+    const { service, prisma, orderShipments } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      {
+        id: "shipment-1",
+        orderId: "order-1",
+        trackingNumber: "PKG-1",
+        order: { orderNumber: "ORD-1", sellerId: "seller-1" },
+      },
+      {
+        id: "shipment-2",
+        orderId: "order-2",
+        trackingNumber: "PKG-2",
+        order: { orderNumber: "ORD-2", sellerId: "seller-2" },
+      },
+    ]);
+    orderShipments.createBarcode
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("carrier timeout"));
+
+    const result = await (service as any).retryPendingOrderBarcodes(
+      new Date(0),
+      new Date(),
+    );
+
+    expect(result.retried).toBe(0);
+    expect(result.failed).toBe(2);
+    expect(result.failures).toEqual([
+      "order shipment-1 (carrier returned no barcode)",
+      "order shipment-2 (carrier timeout)",
+    ]);
   });
 });
