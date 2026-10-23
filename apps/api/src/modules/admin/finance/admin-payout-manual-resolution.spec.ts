@@ -471,6 +471,45 @@ describe("AdminPayoutService.toTransferRows — resolution flags", () => {
     });
   });
 
+  it("a PayTR rejection shows PayTR's message and the trans id", async () => {
+    const [row] = await service.toTransferRows([
+      transfer({
+        transId: "PYT123",
+        failureReason: "provider_rejected",
+        providerResponse: {
+          status: "error",
+          err_no: "005",
+          err_msg: "IBAN hatali",
+          transferTotal: { net: 40, allowedTotal: 303 },
+        },
+      }),
+    ]);
+
+    expect(row).toMatchObject({
+      transId: "PYT123",
+      providerMessage: "IBAN hatali",
+      transferTotal: { net: 40, allowedTotal: 303 },
+    });
+  });
+
+  it("a retried row waiting to be resent no longer shows the old answer", async () => {
+    const [row] = await service.toTransferRows([
+      transfer({
+        status: PayoutStatus.pending,
+        failureReason: null,
+        retryCount: 0,
+        providerResponse: {
+          status: "error",
+          err_msg: "IBAN hatali",
+          transferTotal: { net: 40, allowedTotal: 303 },
+        },
+      }),
+    ]);
+
+    expect(row.providerMessage).toBeNull();
+    expect(row.transferTotal).toBeNull();
+  });
+
   it("a resent row does not show an earlier settlement", async () => {
     const [row] = await service.toTransferRows([
       transfer({

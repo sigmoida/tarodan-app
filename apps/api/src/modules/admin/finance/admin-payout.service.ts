@@ -98,6 +98,13 @@ function istanbulDateRange(filter: {
   };
 }
 
+/** Rows whose stored PayTR answer and transfer-total snapshot are the
+ *  current story (a failed or waiting-to-retry attempt). */
+const FAILED_ATTEMPT_STATUSES: readonly PayoutStatus[] = [
+  PayoutStatus.failed,
+  PayoutStatus.retry_pending,
+];
+
 /** A manual settlement as the admin list shows it (no admin id); only on a
  *  completed row (a returned and resent one is no longer settled by it). */
 function manualSettlementView(t: {
@@ -429,8 +436,14 @@ export class AdminPayoutService {
       // nothing in flight or a row sent before 2026-10-23).
       submittedTotalAmount:
         t.submittedTotalAmount === null ? null : Number(t.submittedTotalAmount),
-      transferTotal: transferTotalOf(t.providerResponse),
-      providerMessage: providerMessageOf(t.providerResponse),
+      // The last attempt's answer, only while it explains the row: a retry
+      // keeps providerResponse until the next send (pending row).
+      ...(FAILED_ATTEMPT_STATUSES.includes(t.status)
+        ? {
+            transferTotal: transferTotalOf(t.providerResponse),
+            providerMessage: providerMessageOf(t.providerResponse),
+          }
+        : { transferTotal: null, providerMessage: null }),
       resolution: payoutResolutionFlags(t),
       manualSettlement: manualSettlementView(t),
     }));

@@ -296,7 +296,7 @@ describe("transferExportRecord", () => {
     });
   });
 
-  it("bir sebep kodunu etiketiyle yazar", () => {
+  it("writes a reason code as its label", () => {
     expect(
       transferExportRecord(
         {
