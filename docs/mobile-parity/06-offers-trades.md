@@ -72,8 +72,17 @@ Durumlar: `pending, accepted, rejected, expired, cancelled, payment_expired`.
 
 "Ödendi" türetimi: `status === 'accepted' && orderStatus ∈ {paid, preparing, shipped, delivered, completed}`.
 
-Karşı teklif sınırları (istemci): alıcı karşı teklifi mevcut tutardan **küçük**, satıcı
-karşı teklifi **büyük** olmalı. Sunucu %50/fiyat-altı kuralını yeniden doğrular.
+Counter bounds (client): a buyer counter is **below** the current amount, a seller counter
+**above** it. The server rechecks every amount against the listing's **current** sale price
+(`product.price` in the offer payload, the sale window applied), never the price the offer
+was made at:
+
+- Offer and buyer counter: strictly below the price (`server.offer.offerMustBeBelowPrice`),
+  plus the 50% minimum and the platform floor.
+- Seller counter: up to and including the price (`server.offer.counterCannotExceedPrice`).
+- Accept: the same bound for whoever proposed the amount. If the price dropped since, the
+  accept is a **409** `server.offer.priceChangedSinceOffer` (`{price}` = current price) and
+  the offer stays pending; no order is created.
 
 ### Süre gösterimi
 

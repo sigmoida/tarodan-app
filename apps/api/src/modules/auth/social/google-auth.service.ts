@@ -1,7 +1,7 @@
 // apps/api/src/modules/auth/google-auth.service.ts
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { OAuth2Client } from "google-auth-library";
+import { OAuth2Client, type TokenPayload } from "google-auth-library";
 import { i18nMessage } from "../../i18n";
 
 export interface GoogleProfile {
@@ -9,6 +9,11 @@ export interface GoogleProfile {
   email: string;
   name?: string;
   picture?: string;
+  /**
+   * When Google issued the id_token (`iat`, seconds since the epoch). The
+   * step-up uses it to accept only a fresh sign-in, not a cached token.
+   */
+  issuedAt?: number;
 }
 
 @Injectable()
@@ -65,8 +70,28 @@ export class GoogleAuthService {
     }
   }
 
+  /**
+   * One verified profile from either client shape: web sends the popup
+   * `code` (exchanged here), native sends the `idToken`. Neither is a 401
+   * `googleSessionInvalid`, like every other verification failure here.
+   */
+  async verifyProof(proof: {
+    code?: string;
+    idToken?: string;
+  }): Promise<GoogleProfile> {
+    const idToken = proof.code
+      ? await this.exchangeCodeForIdToken(proof.code)
+      : proof.idToken;
+    if (!idToken) {
+      throw new UnauthorizedException(
+        i18nMessage("server.auth.googleSessionInvalid"),
+      );
+    }
+    return this.verifyIdToken(idToken);
+  }
+
   async verifyIdToken(idToken: string): Promise<GoogleProfile> {
-    let payload: any;
+    let payload: TokenPayload | undefined;
     try {
       const ticket = await this.client.verifyIdToken({
         idToken,
@@ -96,6 +121,7 @@ export class GoogleAuthService {
       email: payload.email,
       name: payload.name,
       picture: payload.picture,
+      issuedAt: payload.iat,
     };
   }
 }

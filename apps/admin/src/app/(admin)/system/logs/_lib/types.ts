@@ -1,4 +1,5 @@
 import type { BadgeVariant } from "@tarodan/ui";
+import { signInMethodEventLabels } from "@/lib/sign-in-methods";
 import {
   ExclamationTriangleIcon,
   ShieldExclamationIcon,
@@ -132,6 +133,7 @@ export const eventTypeLabels = (t: T): Record<string, string> => ({
   password_reset: t("admin.system.logs.events.passwordReset"),
   "2fa_enabled": t("admin.system.logs.events.twoFactorEnabled"),
   account_locked: t("admin.system.logs.events.accountLocked"),
+  ...signInMethodEventLabels(t),
 });
 
 export const actionLabels = (t: T): Record<string, string> => ({

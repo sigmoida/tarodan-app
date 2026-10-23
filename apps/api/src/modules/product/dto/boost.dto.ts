@@ -1,41 +1,67 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsEnum,
+  IsIn,
   IsOptional,
   IsInt,
   IsBoolean,
+  IsNotEmpty,
   IsString,
+  IsUUID,
+  Max,
   Min,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  BOOST_OFFER_MAX,
+  MY_BOOST_STATES,
+  MY_BOOSTS_DEFAULT_LIMIT,
+  MY_BOOSTS_MAX_LIMIT,
+  type MyBoostState,
+} from "@tarodan/types";
 import { PaymentProvider } from "../../payment/dto";
-
-/** Eski (paket öncesi) düz-fiyat boost süreleri — geçiş dönemi geriye-dönük uyum. */
-export const BOOST_DURATIONS = [3, 7, 30] as const;
+import { JsonBoolean, JsonNumber } from "../../../common/transforms";
+import { IsTlAmount } from "../../../common/validators/tl-amount";
 
 export class InitiateBoostDto {
-  @ApiPropertyOptional({
+  @ApiProperty({
     description:
-      "Reklam paketi id (yeni model). Verilmezse eski düz-fiyat akışı kullanılır.",
+      "Ad package id. Required: the price comes from the package tier for the listing's price (the legacy flat 3/7/30-day price is retired).",
   })
-  @IsOptional()
   @IsString()
-  packageId?: string;
+  @IsNotEmpty()
+  packageId: string;
 
   @ApiProperty({
     example: 7,
-    description:
-      "Boost süresi (gün). Paket seçildiyse pakette tanımlı bir süre olmalı.",
+    description: "Boost duration in days; must be a duration of the package.",
   })
   @Type(() => Number)
   @IsInt({ message: "Süre tam sayı olmalıdır" })
   @Min(1, { message: "Geçerli bir süre seçiniz" })
   durationDays: number;
 
+  // The price the seller consented to. Required: every client that could
+  // lack it also lacks the consents, which are required already. Only a JSON
+  // number passes (`JsonNumber`): implicit conversion would accept the text
+  // "59.9". The service compares it in whole kuruş with what it would charge
+  // (`boostPriceMatches`) before anything is written.
+  @ApiProperty({
+    example: 59.9,
+    description:
+      "The price the pre-information showed for this package and duration (TL, VAT included: `price` of the chosen `BoostDurationOption`). A JSON number of at least 0 with at most two decimals. When it is not what the server charges now (whole kuruş), the answer is 409 `server.product.boostPriceChanged` and nothing is written.",
+  })
+  @JsonNumber()
+  @IsTlAmount()
+  expectedPrice: number;
+
   @ApiPropertyOptional({
     enum: PaymentProvider,
     example: "paytr",
-    description: "Ödeme sağlayıcı (varsayılan: paytr)",
+    description: "Payment provider (default: paytr)",
   })
   @IsOptional()
   @IsEnum(PaymentProvider, { message: "Geçerli bir ödeme sağlayıcı seçiniz" })
@@ -44,15 +70,95 @@ export class InitiateBoostDto {
   @ApiPropertyOptional({
     example: false,
     description:
-      "Süre bitince otomatik yenileme hatırlatması (sadece premium üyeler)",
+      "Remind 24 hours before the boost ends (premium members only; no automatic charge)",
   })
   @IsOptional()
   @IsBoolean()
   autoRenew?: boolean;
+
+  // The two consents are declared here (the global pipe drops undeclared
+  // fields) but decided by the service: anything but `true` gets 400
+  // `server.product.boostConsentRequired`, a catalog key the dialog can show,
+  // before any row is written. Only a JSON boolean passes (`JsonBoolean`):
+  // implicit conversion would read the text "false" as `true`.
+  @ApiProperty({
+    example: true,
+    description:
+      "Must be true: the seller accepted the pre-contract information form and the distance service contract (consent document `platform_service_sales`).",
+  })
+  @IsOptional()
+  @JsonBoolean()
+  @IsBoolean()
+  preInformationAccepted?: boolean;
+
+  @ApiProperty({
+    example: true,
+    description:
+      "Must be true: the seller accepted that the service starts at once, so the right of withdrawal does not apply (consent document `withdrawal_waiver`).",
+  })
+  @IsOptional()
+  @JsonBoolean()
+  @IsBoolean()
+  withdrawalWaiverAccepted?: boolean;
 }
 
-export interface BoostPricingOption {
-  durationDays: number;
-  price: number;
-  label: string;
+/** `GET /products/boost/my` query: the section and its page. */
+export class MyBoostsQueryDto {
+  @ApiPropertyOptional({
+    enum: MY_BOOST_STATES,
+    default: "current",
+    description:
+      "current: active and paused boosts; history: expired and cancelled. Pending and failed (abandoned checkouts) are never returned.",
+  })
+  @IsOptional()
+  @IsIn(MY_BOOST_STATES)
+  state?: MyBoostState;
+
+  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: MY_BOOSTS_MAX_LIMIT,
+    description: `Default ${MY_BOOSTS_DEFAULT_LIMIT.current} for current, ${MY_BOOSTS_DEFAULT_LIMIT.history} for history`,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MY_BOOSTS_MAX_LIMIT)
+  limit?: number;
+}
+
+/** `PATCH /products/:id/boost/reminder` body. */
+export class BoostReminderDto {
+  @ApiProperty({
+    example: true,
+    description:
+      "The ending-soon reminder for the listing's running and paused boosts (premium to turn on; no automatic charge)",
+  })
+  // A JSON boolean only: implicit conversion would read "false" as true.
+  @JsonBoolean()
+  @IsBoolean()
+  enabled: boolean;
+}
+
+/** `POST /products/boost/offers/dismiss` body. */
+export class DismissBoostOffersDto {
+  @ApiProperty({
+    type: [String],
+    description:
+      "Listing ids of the offers shown; only the caller's own listings are recorded",
+    minItems: 1,
+    maxItems: BOOST_OFFER_MAX,
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(BOOST_OFFER_MAX)
+  @IsUUID("all", { each: true })
+  productIds: string[];
 }

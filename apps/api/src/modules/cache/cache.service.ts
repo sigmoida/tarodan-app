@@ -61,7 +61,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Set value in cache
    */
-  async set(key: string, value: any, options?: CacheOptions): Promise<void> {
+  async set(
+    key: string,
+    value: unknown,
+    options?: CacheOptions,
+  ): Promise<void> {
     try {
       const ttl = options?.ttl ?? this.DEFAULT_TTL;
       const serialized = JSON.stringify(value);
@@ -145,17 +149,26 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Atomik "yoksa yaz" (`SET key 1 EX ttl NX`): anahtarı BU çağrı
-   * oluşturduysa true, zaten varsa false. Bir olayı pencere başına bir kez
-   * saymak (tekilleştirme) için — `exists` + `set` ikilisi eşzamanlı iki
-   * istekte ikisine de "ilk" derdi.
+   * Atomic "write if absent" (`SET key <value> EX ttl NX`): true when THIS
+   * call created the key, false when it already existed. Used to count an
+   * event once per window (deduplication); `exists` + `set` would call both of
+   * two concurrent requests "first".
    *
-   * Redis hatasında false döner (kapalı başarısızlık): bu bir kilit/sayım
-   * kapısıdır; Redis yokken her isteği "ilk" saymak tekilleştirmeyi tamamen
-   * kaldırırdı.
+   * Answers false on a Redis error (fails closed): this is a lock or counting
+   * gate, and treating every request as "first" while Redis is down would
+   * remove the deduplication entirely.
+   *
+   * `value` (stored as JSON, default `1`) lets a caller store a record that
+   * must not be reported as written when Redis is down, which `set` cannot
+   * tell (it swallows the error). The step-up token is stored this way; `get`
+   * reads it back.
    */
-  async setIfAbsent(key: string, ttlSeconds: number): Promise<boolean> {
-    return (await this.claimKey(key, ttlSeconds)) === "claimed";
+  async setIfAbsent(
+    key: string,
+    ttlSeconds: number,
+    value: unknown = 1,
+  ): Promise<boolean> {
+    return (await this.claimKey(key, ttlSeconds, value)) === "claimed";
   }
 
   /**
@@ -169,9 +182,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   async claimKey(
     key: string,
     ttlSeconds: number,
+    value: unknown = 1,
   ): Promise<"claimed" | "held" | "unavailable"> {
     try {
-      const result = await this.client.set(key, "1", "EX", ttlSeconds, "NX");
+      const serialized = JSON.stringify(value);
+      const result = await this.client.set(
+        key,
+        serialized,
+        "EX",
+        ttlSeconds,
+        "NX",
+      );
       return result === "OK" ? "claimed" : "held";
     } catch {
       this.logger.warn("Cache claimKey error");
@@ -232,7 +253,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   async setSession(
     sessionId: string,
-    data: any,
+    data: unknown,
     ttlSeconds = 3600,
   ): Promise<void> {
     const key = `session:${sessionId}`;
@@ -270,7 +291,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Push to queue
    */
-  async pushToQueue(queueName: string, data: any): Promise<void> {
+  async pushToQueue(queueName: string, data: unknown): Promise<void> {
     try {
       await this.client.rpush(queueName, JSON.stringify(data));
     } catch (error) {
@@ -311,7 +332,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Publish message
    */
-  async publish(channel: string, message: any): Promise<void> {
+  async publish(channel: string, message: unknown): Promise<void> {
     try {
       await this.client.publish(channel, JSON.stringify(message));
     } catch (error) {
@@ -324,7 +345,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   async subscribe(
     channel: string,
-    callback: (message: any) => void,
+    callback: (message: unknown) => void,
   ): Promise<void> {
     await this.subscriber.subscribe(channel);
     this.subscriber.on("message", (ch: string, message: string) => {
@@ -388,11 +409,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get Redis info
    */
-  async getInfo(): Promise<Record<string, any>> {
+  async getInfo(): Promise<Record<string, string>> {
     try {
       const info = await this.client.info();
       const lines = info.split("\n");
-      const result: Record<string, any> = {};
+      const result: Record<string, string> = {};
 
       for (const line of lines) {
         if (line.includes(":")) {

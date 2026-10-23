@@ -72,14 +72,16 @@ export default function PricingCard({
   return (
     <SectionCard title={t("product.pricing")}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Text, not type="number": a number field hands over "1.000" (one
+            thousand to a Turkish seller) as 1. The schema reads the text with
+            the shared `parseTlAmount` and refuses grouping. */}
         <FormInput
           name="price"
-          type="number"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           label={t("product.priceLabel")}
-          placeholder="0.00"
-          min={1}
-          max={9999999}
-          step="0.01"
+          placeholder="0,00"
           helperText={priceHint}
         />
         <FormInput

@@ -17,7 +17,7 @@ export default function PaymentFilters({ filters, onChange, onClear }: Props) {
 
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-body">
             {t("common.status")}
@@ -32,19 +32,6 @@ export default function PaymentFilters({ filters, onChange, onClear }: Props) {
             <option value="completed">{t("order.statusCompleted")}</option>
             <option value="failed">{t("trade.shipmentStatus.failed")}</option>
             <option value="refunded">{t("order.statusRefunded")}</option>
-          </Select>
-        </label>
-
-        <label className="block">
-          <span className="mb-2 block text-sm font-medium text-body">
-            {t("payment.provider")}
-          </span>
-          <Select
-            value={filters.provider}
-            onChange={(e) => onChange("provider", e.target.value)}
-          >
-            <option value="">{t("common.all")}</option>
-            <option value="paytr">PayTR</option>
           </Select>
         </label>
 

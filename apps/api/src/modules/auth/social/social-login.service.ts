@@ -4,9 +4,9 @@ import { AuthResponseDto } from "../dto";
 import { AuthTokenService } from "../auth-token.service";
 import { StorageService } from "../../storage/storage.service";
 import { GoogleAuthService } from "./google-auth.service";
-import { AppleAuthService, type AppleProfile } from "./apple-auth.service";
+import { AppleAuthService } from "./apple-auth.service";
 import { AppleTokenService } from "./apple-token.service";
-import { allocateUsernameFromEmail } from "../utils/username.util";
+import { SocialIdentityService } from "./social-identity.service";
 import { resolveAvatarUrl } from "../utils/avatar-url.util";
 import { i18nMessage } from "../../i18n";
 import {
@@ -16,13 +16,14 @@ import {
 import { stampUserLogin } from "../utils/login-stamp";
 
 /**
- * Google ve Apple ile giriş. AuthService'ten birebir taşındı.
+ * Google and Apple sign-in.
  *
- * İki sağlayıcı aynı üç adımı yürütüyor — sağlayıcı kimliğini doğrula, var
- * olan bir hesaba bağla ya da yenisini aç, sonra normal giriş yanıtını üret.
- * Son adım (`buildUserAuthResponse`) buraya ait: sağlayıcı girişinin şifreyle
- * girişten farklı bir yanıt üretmesi ya da ikinci faktörü atlaması, tam olarak
- * bu gövdenin kopyalanmasıyla olur.
+ * Both providers run the same three steps: verify the provider identity,
+ * resolve it to an account (`SocialIdentityService`: existing link, link,
+ * take-over or new account), then build the normal login response. The last
+ * step (`buildUserAuthResponse`) lives here once: a provider login that
+ * answered differently from password login, or skipped the second factor,
+ * is exactly what copying this body would cause.
  */
 @Injectable()
 export class SocialLoginService {
@@ -35,11 +36,10 @@ export class SocialLoginService {
     private readonly googleAuthService: GoogleAuthService,
     private readonly appleAuthService: AppleAuthService,
     private readonly appleTokens: AppleTokenService,
+    private readonly socialIdentity: SocialIdentityService,
   ) {}
 
-  /**
-   * Verilen userId için AuthResponseDto üretir (login response ile aynı şekil).
-   */
+  /** The AuthResponseDto for a user id (same shape as the login response). */
   private async buildUserAuthResponse(
     userId: string,
   ): Promise<AuthResponseDto> {
@@ -54,10 +54,11 @@ export class SocialLoginService {
     if (!user) {
       throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
     }
-    // Personel hesabı sosyal girişle de web/mobil oturumu açamaz (bkz. login).
+    // A staff account cannot open a web/mobile session via a provider either
+    // (see login).
     assertNotStaffAccount(user);
-    // Silinmiş/banlı satıra token verme: aksi halde login "başarılı" olur ama
-    // ilk korumalı istekte guard reddeder → kafa karıştırıcı "askıya alındı" ekranı.
+    // No tokens for a deleted or banned row: the login would "succeed" and the
+    // guard would refuse the first protected request (a confusing screen).
     if (user.deletedAt) {
       throw new UnauthorizedException(
         i18nMessage("server.auth.accountDeleted"),
@@ -70,14 +71,13 @@ export class SocialLoginService {
     }
     if (user.twoFactorSecret?.isEnabled) {
       throw new UnauthorizedException({
-        message:
-          "İki faktörlü doğrulama etkin hesaplar sağlayıcı girişi yerine şifre ile giriş yapmalıdır",
+        ...i18nMessage("server.auth.socialTwoFactorPasswordRequired"),
         errorCode: "TWO_FACTOR_PASSWORD_REQUIRED",
       });
     }
 
-    // Sosyal giriş de giriş damgası basar; aksi halde yalnız Google/Apple ile
-    // giren hesap "hiç giriş yapmamış" sayılır (admin silme uygunluğu buna bakar).
+    // Social sign-in stamps the login too; otherwise a Google/Apple-only account
+    // counts as "never signed in" (admin deletion eligibility reads it).
     await stampUserLogin(this.prisma, this.logger, user.id);
 
     const tokens = await this.tokens.generateTokens(
@@ -126,14 +126,14 @@ export class SocialLoginService {
   }
 
   /**
-   * Google id_token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
-   * → yoksa yeni kullanıcı. Mevcut JWT akışını kullanır.
+   * Google sign-in: verify the id_token, resolve the identity to an account
+   * (`SocialIdentityService`), then build the normal login response.
    */
   async loginWithGoogle(
     input: string | { idToken?: string; code?: string },
   ): Promise<AuthResponseDto> {
-    // Geriye uyumlu: mobil/native doğrudan id_token string'i gönderir; web
-    // { code } gönderir (backend Google ile takas eder → id_token).
+    // Backward compatible: mobile/native sends the id_token string; web sends
+    // { code }, which the backend exchanges with Google for an id_token.
     const opts = typeof input === "string" ? { idToken: input } : input;
     const idToken = opts.code
       ? await this.googleAuthService.exchangeCodeForIdToken(opts.code)
@@ -144,83 +144,18 @@ export class SocialLoginService {
       );
     }
     const profile = await this.googleAuthService.verifyIdToken(idToken);
-
-    // 1) Mevcut OAuthAccount?
-    const existing = await this.prisma.oAuthAccount.findUnique({
-      where: {
-        provider_providerUserId: {
-          provider: "google",
-          providerUserId: profile.sub,
-        },
-      },
-    });
-    if (existing) {
-      return this.buildUserAuthResponse(existing.userId);
-    }
-
-    // 2) Aynı e-postalı kullanıcı? → oto-bağla
-    //    Silinmiş (anonimleştirilmiş) satıra ASLA bağlanma; o satırın email'i zaten
-    //    deleted_<id>@deleted.local'a çevrildiği için normalde eşleşmez, ama eski
-    //    bozuk silme kalıntılarına karşı deletedAt:null ile savunma yapıyoruz.
-    const byEmail = await this.prisma.user.findFirst({
-      where: { email: profile.email, deletedAt: null },
-    });
-    if (byEmail) {
-      await this.prisma.oAuthAccount.create({
-        data: {
-          provider: "google",
-          providerUserId: profile.sub,
-          email: profile.email,
-          userId: byEmail.id,
-        },
-      });
-      // Google e-postayı zaten doğruladı (email_verified === true zorunlu). Hesap
-      // henüz doğrulanmamışsa artık doğrulanmış say — böylece normal parola girişi
-      // de açılır ve Google-login'in bypass ettiği e-posta doğrulama kapısıyla
-      // tutarlı hale gelir.
-      if (!byEmail.isEmailVerified) {
-        await this.prisma.user.update({
-          where: { id: byEmail.id },
-          data: { isEmailVerified: true },
-        });
-      }
-      return this.buildUserAuthResponse(byEmail.id);
-    }
-
-    // 3) Yeni kullanıcı. Sosyal girişte kullanıcı adı SORULMAZ; e-postadan
-    //    türetilir (bkz. allocateUsernameFromEmail). `usernameClaimedAt` boş
-    //    kalır: adı kullanıcı seçmediği için bir kereliğine değiştirebilir.
-    const displayName = profile.name?.trim() || profile.email.split("@")[0];
-    const username = await allocateUsernameFromEmail(
-      this.prisma,
-      profile.email,
+    const { userId } = await this.socialIdentity.resolveUser(
+      { provider: "google", providerUserId: profile.sub, email: profile.email },
+      { displayName: profile.name, avatarUrl: profile.picture },
     );
-    const created = await this.prisma.user.create({
-      data: {
-        email: profile.email,
-        passwordHash: null,
-        username,
-        displayName,
-        avatarUrl: profile.picture ?? null,
-        isEmailVerified: true,
-        isSeller: false,
-      },
-    });
-    await this.prisma.oAuthAccount.create({
-      data: {
-        provider: "google",
-        providerUserId: profile.sub,
-        email: profile.email,
-        userId: created.id,
-      },
-    });
-    return this.buildUserAuthResponse(created.id);
+    return this.buildUserAuthResponse(userId);
   }
 
   /**
-   * Apple identity token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
-   * → yoksa yeni kullanıcı. Relay email olduğu gibi kaydedilir; kimlik anahtarı sub.
-   * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
+   * Apple sign-in: verify the identity token, resolve the identity to an
+   * account, then build the normal login response. A relay e-mail is stored
+   * as it is; the identity key is `sub`. `fullName` only arrives on the first
+   * authorization (a new account).
    *
    * When `authorizationCode` (mobile 1.1.0+) is present, it is exchanged for a
    * refresh token IN THE BACKGROUND after the login response is built and
@@ -235,16 +170,19 @@ export class SocialLoginService {
   ): Promise<AuthResponseDto> {
     const profile =
       await this.appleAuthService.verifyIdentityToken(identityToken);
-    const userId = await this.resolveAppleUserId(profile, fullName);
+    const { userId } = await this.socialIdentity.resolveUser(
+      { provider: "apple", providerUserId: profile.sub, email: profile.email },
+      { displayName: fullName },
+    );
     const response = await this.buildUserAuthResponse(userId);
     if (authorizationCode) {
-      // Beklenmez: yavaş Apple girişleri tutmasın. Servis fırlatmaz; yine de
-      // reddedilen bir söz işlenmemiş kalmasın.
+      // Not awaited: a slow Apple exchange must not hold the login. The
+      // service does not throw; the catch keeps a rejection from going unhandled.
       void this.appleTokens
         .storeFromAuthorizationCode({
           userId,
           appleUserId: profile.sub,
-          // Kod, girişin yapıldığı uygulamanın client id'siyle çevrilir.
+          // The code is exchanged with the client id the sign-in used.
           clientId: profile.audience,
           authorizationCode,
         })
@@ -255,66 +193,5 @@ export class SocialLoginService {
         );
     }
     return response;
-  }
-
-  /** Apple kimliğini bir kullanıcıya bağlar: var olan, e-postayla eşleşen ya da yeni. */
-  private async resolveAppleUserId(
-    profile: AppleProfile,
-    fullName?: string,
-  ): Promise<string> {
-    // 1) Mevcut OAuthAccount?
-    const existing = await this.prisma.oAuthAccount.findUnique({
-      where: {
-        provider_providerUserId: {
-          provider: "apple",
-          providerUserId: profile.sub,
-        },
-      },
-    });
-    if (existing) {
-      return existing.userId;
-    }
-
-    // 2) Aynı e-postalı (silinmemiş) kullanıcı? → oto-bağla.
-    const byEmail = await this.prisma.user.findFirst({
-      where: { email: profile.email, deletedAt: null },
-    });
-    if (byEmail) {
-      await this.prisma.oAuthAccount.create({
-        data: {
-          provider: "apple",
-          providerUserId: profile.sub,
-          email: profile.email,
-          userId: byEmail.id,
-        },
-      });
-      return byEmail.id;
-    }
-
-    // 3) Yeni kullanıcı (Google ile aynı kural: kullanıcı adı e-postadan türer)
-    const displayName = fullName?.trim() || profile.email.split("@")[0];
-    const username = await allocateUsernameFromEmail(
-      this.prisma,
-      profile.email,
-    );
-    const created = await this.prisma.user.create({
-      data: {
-        email: profile.email,
-        passwordHash: null,
-        username,
-        displayName,
-        isEmailVerified: true,
-        isSeller: false,
-      },
-    });
-    await this.prisma.oAuthAccount.create({
-      data: {
-        provider: "apple",
-        providerUserId: profile.sub,
-        email: profile.email,
-        userId: created.id,
-      },
-    });
-    return created.id;
   }
 }

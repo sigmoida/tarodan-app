@@ -101,14 +101,28 @@ response envelopes with `lib/unwrapList.ts`.
 - Favourite = the card's built-in heart (`ProductCardFavorite`), state from
   `hooks/useWishlist` over the one `GET /wishlist` query. Never add a second
   favourite query; pass `showFavorite={false}` where the card has its own control.
+- Card action = the card's built-in price-row button (`ProductCardPriceRow`):
+  the cart toggle, or "Öne Çıkar" / "Süre Ekle" on the viewer's own listing,
+  always from `productCardAction` (`@tarodan/types`). The title is the card's
+  one stretched link, so buttons sit beside it, never inside an `<a>`. Do not
+  add a second card button; a card with its own control passes `footer`.
 - Loading = `SkeletonCard` matching the card footprint (never a bare spinner in
-  a grid); empty = `EmptyStateCard` / `EmptyState` with the action that resolves
-  it; paging = `Pagination` or an infinite rail, one per surface.
+  a grid); empty = `EmptyState` (`@tarodan/ui`) with an icon, a description and
+  the action that resolves it (`size="compact"` inside a card or popover; the
+  same heroicon as the mobile screen); a failed load =
+  `components/feedback/ErrorState` with `inline` and `reset` (the full block is
+  for `error.tsx` boundaries); never a hand-built block. Paging = `Pagination`
+  or an infinite rail, one per surface. Pickers inside forms, modals and
+  editors use a "Show more" button (`common.loadMore`) instead: page numbers
+  would split the user's picks and an infinite rail would
+  push the submit out of reach (`hooks/useWebInfiniteList`, `lib/pagedList.ts`,
+  `hooks/usePagedPicks.ts`; the trade pickers).
 - **Filter and sort state lives in the URL**, parsed by the route's
   `_lib/params.ts`, so it is shareable and readable by the server prefetch.
 
 ## Components and forms
 
+- No emoji or pictographs in copy; use design-system icons.
 - Marketplace composites built from `@tarodan/ui` (`ProductCard`, `BrandCard`,
   `SectionHeader`, ...) live in `src/components/ui/`, which also re-exports the
   `@tarodan/ui` surface the app uses. Feature composites go in
@@ -122,8 +136,9 @@ response envelopes with `lib/unwrapList.ts`.
 
 ## Layout and folders
 
-Route groups separate the storefront shell, the auth pages (minimal frame,
-"already logged in" redirect) and the private area (providers, `noindex`). A
+Route groups separate the storefront shell, the auth pages (minimal frame;
+login and register redirect a signed-in visitor at the edge, the mail-link
+pages do not) and the private area (providers, `noindex`). A
 page that swaps two flows by a mode flag becomes two routes.
 
 ```

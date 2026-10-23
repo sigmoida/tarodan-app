@@ -1,11 +1,13 @@
-import { readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { ConsentAction, ConsentSource } from "@prisma/client";
 import {
+  ACCOUNT_REQUIRED_CONSENTS,
   CONSENT_ACTIONS,
   CONSENT_DOCUMENT_KEYS,
   CONSENT_DOCUMENTS,
   CONSENT_SOURCES,
+  isDraftConsentVersion,
 } from "@tarodan/types";
 import { apiAppRoot } from "../../common/helpers/app-root";
 import { clientIpThrottleTracker } from "../../common/helpers/client-ip";
@@ -32,10 +34,37 @@ describe("consent catalog contract", () => {
     );
   });
 
-  it("her belgenin YYYY-MM-DD biçiminde bir sürümü var", () => {
+  it("every document has a YYYY-MM-DD version, optionally marked -draft", () => {
     for (const key of CONSENT_DOCUMENT_KEYS) {
-      expect(CONSENT_DOCUMENTS[key].version).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(CONSENT_DOCUMENTS[key].version).toMatch(
+        /^\d{4}-\d{2}-\d{2}(-draft)?$/,
+      );
     }
+  });
+
+  it("a document required for every account is never a draft", () => {
+    // A draft there would send every member to the re-consent gate for a
+    // text legal has not signed off.
+    for (const key of ACCOUNT_REQUIRED_CONSENTS) {
+      expect(isDraftConsentVersion(CONSENT_DOCUMENTS[key].version)).toBe(false);
+    }
+  });
+
+  it("the platform service documents are per order, not an account gate", () => {
+    expect(CONSENT_DOCUMENTS.platform_service_sales).toMatchObject({
+      requiredForAccount: false,
+      path: "/platform-service-sales",
+    });
+    expect(CONSENT_DOCUMENTS.withdrawal_waiver).toMatchObject({
+      requiredForAccount: false,
+      path: null,
+    });
+  });
+
+  it("isDraftConsentVersion reads the -draft suffix only", () => {
+    expect(isDraftConsentVersion("2026-10-21-draft")).toBe(true);
+    expect(isDraftConsentVersion("2026-10-21")).toBe(false);
+    expect(isDraftConsentVersion("draft-2026-10-21")).toBe(false);
   });
 
   it("çerez ucu tarayıcı başına (istemci IP) sıkı hız sınırı taşır", () => {
@@ -70,9 +99,18 @@ describe("consent catalog contract", () => {
       );
     });
 
-    it("ConsentSource enum değerleri şemayla aynı", () => {
+    it("every ConsentSource value is created by a migration", () => {
+      // The enum is created here; later values arrive as `ADD VALUE` in their
+      // own migrations, so all migrations touching the type are read.
+      const migrationsDir = join(apiAppRoot(), "prisma/migrations");
+      const enumSql = readdirSync(migrationsDir)
+        .map((folder) => join(migrationsDir, folder, "migration.sql"))
+        .filter((file) => existsSync(file))
+        .map((file) => readFileSync(file, "utf8").replace(/--.*$/gm, ""))
+        .filter((text) => text.includes('"ConsentSource"'))
+        .join("\n");
       for (const source of CONSENT_SOURCES) {
-        expect(sql).toContain(`'${source}'`);
+        expect(enumSql).toContain(`'${source}'`);
       }
     });
   });

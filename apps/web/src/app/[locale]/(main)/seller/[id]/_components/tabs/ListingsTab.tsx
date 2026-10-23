@@ -2,8 +2,9 @@
 
 "use client";
 
+import { TagIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { EmptyStateCard, ProductCard } from "@/components/ui";
+import { EmptyState, ProductCard } from "@/components/ui";
 import type { Product } from "@/types/product";
 
 export default function ListingsTab({
@@ -16,7 +17,8 @@ export default function ListingsTab({
   const t = useTranslations();
   if (products.length === 0) {
     return (
-      <EmptyStateCard
+      <EmptyState
+        icon={<TagIcon className="h-7 w-7" />}
         title={t("product.noListings")}
         description={noActiveMessage}
       />

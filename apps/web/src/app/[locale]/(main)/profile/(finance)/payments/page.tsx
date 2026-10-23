@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCardIcon } from "@heroicons/react/24/outline";
+import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
 import { Button, Spinner, ConfirmDialog } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
@@ -64,10 +65,10 @@ export default function PaymentHistoryPage() {
           <Spinner size="xl" />
         </div>
       ) : payments.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface-elevated p-12 text-center">
-          <CreditCardIcon className="mx-auto mb-4 h-16 w-16 text-subtle" />
-          <p className="text-lg text-muted">{t("payment.noHistory")}</p>
-        </div>
+        <EmptyState
+          icon={<ReceiptPercentIcon className="h-7 w-7" />}
+          title={t("payment.noHistory")}
+        />
       ) : (
         <>
           <div className="space-y-3">

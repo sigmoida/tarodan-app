@@ -4,21 +4,25 @@
 
 import { ShoppingCartIcon } from "@heroicons/react/24/outline";
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { EmptyState } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
-import { useLocale, useTranslations } from "next-intl";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { useTranslations } from "next-intl";
 
+/** Same structure as empty Favorites and the mobile cart: page title, then the empty state. */
 export default function EmptyCart() {
   const t = useTranslations();
   return (
-    <PageShell className="flex items-center justify-center">
-      <div className="text-center">
-        <ShoppingCartIcon className="w-24 h-24 text-border-strong mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-heading mb-2">
-          {t("cart.empty")}
-        </h2>
-        <p className="text-muted mb-6">{t("cart.emptyDesc")}</p>
-        <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
-      </div>
+    <PageShell>
+      <PageHeader title={t("cart.myCart")} />
+      <EmptyState
+        icon={<ShoppingCartIcon className="h-7 w-7" />}
+        title={t("cart.empty")}
+        description={t("cart.emptyDesc")}
+        action={
+          <ButtonLink href="/listings">{t("cart.browseListings")}</ButtonLink>
+        }
+      />
     </PageShell>
   );
 }

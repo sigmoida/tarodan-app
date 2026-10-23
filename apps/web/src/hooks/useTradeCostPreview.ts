@@ -6,8 +6,9 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { tradesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { cashAmountValue } from "@/lib/cashAmount";
 
-/** Bir tarafın önizleme dökümü (kullanıcı kimliği yok — teklif henüz yok). */
+/** One party's preview breakdown (no user ids: the offer does not exist yet). */
 export interface TradeQuotePreviewParty {
   serviceFee: number;
   shipping: number;
@@ -15,32 +16,35 @@ export interface TradeQuotePreviewParty {
   total: number;
 }
 
-/** `POST /trades/payment-quote/preview` yanıtı. */
+/** The `POST /trades/payment-quote/preview` response. */
 export interface TradeQuotePreview {
   initiator: TradeQuotePreviewParty;
   receiver: TradeQuotePreviewParty;
 }
 
 interface UseTradeCostPreviewArgs {
-  /** Teklifi kuran tarafın (yani kullanıcının) verdiği ürünler. */
+  /** The products offered by the side building the offer (the user). */
   myProductIds: string[];
-  /** Karşı taraftan istenen ürünler. */
+  /** The products asked from the other side. */
   theirProductIds: string[];
-  /** Ham input değeri — boş/geçersizken fark yok sayılır. */
+  /**
+   * The raw field text, read with `cashAmountValue`: empty or refused text
+   * and an amount above the API's ceiling count as no cash difference.
+   */
   cashAmount: string;
   cashPayer: "me" | "them";
   enabled: boolean;
 }
 
-/** Seçim tıklaması başına istek atmamak için gecikme. */
+/** Delay so that each selection click does not send a request. */
 const PREVIEW_DEBOUNCE_MS = 400;
 
 /**
- * Karşı teklif kurulurken "bu teklif bana kaça mal olur" önizlemesi.
+ * The "what will this offer cost me" preview while an offer is being built.
  *
- * Kabul edilmiş takasın dökümüyle AYNI motordan (backend `previewQuote`) gelir;
- * ekran kendi başına ücret/kargo hesaplamaz — aksi halde önizleme ile tahsilat
- * ayrışırdı.
+ * It comes from the SAME engine as the accepted trade's breakdown (backend
+ * `previewQuote`); the screen never computes fees or shipping itself, or the
+ * preview and the charge could drift apart.
  */
 export function useTradeCostPreview({
   myProductIds,
@@ -49,7 +53,7 @@ export function useTradeCostPreview({
   cashPayer,
   enabled,
 }: UseTradeCostPreviewArgs) {
-  const parsedCash = Math.abs(parseFloat(cashAmount) || 0);
+  const parsedCash = cashAmountValue(cashAmount);
   const signature = JSON.stringify([
     [...myProductIds].sort(),
     [...theirProductIds].sort(),
@@ -78,8 +82,8 @@ export function useTradeCostPreview({
         "me" | "them",
       ];
       const response = await tradesApi.previewPaymentQuote({
-        // Karşı teklifte "initiator" tarafı teklifi KURAN taraftır (counter
-        // gövdesiyle aynı eşleme) — panel etiketleri buna dayanır.
+        // In a counter offer the "initiator" side is the side BUILDING the
+        // offer (same mapping as the counter body); the panel labels rely on it.
         initiatorItems: mine.map((productId) => ({ productId, quantity: 1 })),
         receiverItems: theirs.map((productId) => ({ productId, quantity: 1 })),
         cashAmount: cash > 0 ? cash : undefined,

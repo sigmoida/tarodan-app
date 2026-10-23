@@ -22,6 +22,7 @@ describe("admin system and user list sorting", () => {
     const service = new AdminUserService(
       { user } as any,
       {} as any,
+      {} as never, // sellerTrust
       undefined as any,
     );
 
@@ -61,6 +62,7 @@ describe("admin system and user list sorting", () => {
     const service = new AdminUserService(
       { user, order } as any,
       {} as any,
+      {} as never, // sellerTrust
       undefined as any,
     );
 
@@ -97,6 +99,7 @@ describe("admin system and user list sorting", () => {
     const service = new AdminUserService(
       { user } as any,
       {} as any,
+      {} as never, // sellerTrust
       undefined as any,
     );
 
@@ -118,6 +121,7 @@ describe("admin system and user list sorting", () => {
     const service = new AdminUserService(
       { user } as any,
       {} as any,
+      {} as never, // sellerTrust
       undefined as any,
     );
 

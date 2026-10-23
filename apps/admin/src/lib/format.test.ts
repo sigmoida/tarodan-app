@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   fmtDate,
+  fmtDecimal,
   fmtDateTime,
   fmtFileSize,
   fmtPercent,
@@ -76,5 +77,19 @@ describe("fmtFileSize", () => {
     expect(fmtFileSize(undefined)).toBeUndefined();
     expect(fmtFileSize(-1)).toBeUndefined();
     expect(fmtFileSize(Number.NaN)).toBeUndefined();
+  });
+});
+
+describe("fmtDecimal", () => {
+  it("always prints the given decimals in Turkish notation", () => {
+    expect(fmtDecimal(3.7)).toBe("3,70");
+    expect(fmtDecimal(1234.5)).toBe("1.234,50");
+    expect(fmtDecimal(4.456, 1)).toBe("4,5");
+  });
+
+  it("is null-safe", () => {
+    expect(fmtDecimal(null)).toBeUndefined();
+    expect(fmtDecimal("")).toBeUndefined();
+    expect(fmtDecimal("abc")).toBeUndefined();
   });
 });

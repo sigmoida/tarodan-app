@@ -61,8 +61,22 @@ export function toFormValues(
 }
 
 /**
- * Yalnız DEĞİŞEN kayıtlar — her biri kendi denetim satırını yazar, değişmeyen
- * bir kayıt gönderilip "değişti" diye kaydedilmez.
+ * The row's edited action, or `undefined` when it did not change. A locked
+ * (single-action) row cannot change: its select is disabled, so whatever its
+ * field holds (e.g. a spurious "" from the select) is never validated or sent.
+ */
+function changedAction(
+  values: TimingRulesFormValues,
+  state: AdminTimingRuleState,
+): string | undefined {
+  if (isActionLocked(state.id)) return undefined;
+  const action = values[actionField(state.id)];
+  return action !== undefined && action !== state.action ? action : undefined;
+}
+
+/**
+ * Only the rules that CHANGED: each writes its own audit row, so an unchanged
+ * rule is never sent and recorded as "changed".
  */
 export function changedRules(
   values: TimingRulesFormValues,
@@ -75,10 +89,8 @@ export function changedRules(
     if (rawValue !== undefined && Number(rawValue) !== state.value) {
       change.value = Number(rawValue);
     }
-    const action = values[actionField(state.id)];
-    if (action !== undefined && action !== state.action) {
-      change.action = action as TimingExpiryAction;
-    }
+    const action = changedAction(values, state);
+    if (action !== undefined) change.action = action as TimingExpiryAction;
     if (change.value !== undefined || change.action !== undefined) {
       changes.push(change);
     }
@@ -93,12 +105,13 @@ function violationMessage(t: T, violation: TimingRuleViolation): string {
 }
 
 /**
- * Formun zod şeması — sunucuyla AYNI kural: yalnız DEĞİŞEN satırlar
- * doğrulanır (tam sayı + kayıt sınırları + açık eylem), alanlar arası kurallar
- * değişenleri içeren aday küme üzerinde denetlenir. Dokunulmamış bir satırın
- * etkin değeri sınır dışıysa (ör. eski env değeri) bu bir KİLİT değil, satırdaki
- * uyarıdır (`state.outOfBounds`): admin başka bir satırı kaydedebilir, o satırı
- * düzelttiğinde de sınırlar uygulanır.
+ * The form's zod schema, the SAME rules as the server: only CHANGED rows are
+ * validated (integer + registry bounds + an available action; a locked row's
+ * action never changes), and the cross-field rules run on the candidate set
+ * that includes the changes. An untouched row whose effective value is out of
+ * bounds (e.g. an old env value) does not LOCK the form; it is a row warning
+ * (`state.outOfBounds`): the admin can save another row, and the bounds apply
+ * once that row is edited.
  */
 export function timingRulesSchema(
   t: T,
@@ -130,8 +143,8 @@ export function timingRulesSchema(
         }
       }
 
-      const action = values[actionField(state.id)];
-      if (action !== undefined && action !== state.action) {
+      const action = changedAction(values, state);
+      if (action !== undefined) {
         const actionViolation = validateTimingAction(state.id, action);
         if (actionViolation) {
           fail(actionField(state.id), violationMessage(t, actionViolation));

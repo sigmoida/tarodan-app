@@ -100,7 +100,7 @@ describe("preparingDeadlineNoticeOf", () => {
     ).toBeNull();
   });
 
-  it("is hidden for closed orders, without a deadline, for memberships and outsiders", () => {
+  it("is hidden for closed orders, without a deadline, for digital orders and outsiders", () => {
     expect(
       preparingDeadlineNoticeOf(order({ status: "shipped" }), NOW),
     ).toBeNull();
@@ -110,9 +110,12 @@ describe("preparingDeadlineNoticeOf", () => {
     expect(
       preparingDeadlineNoticeOf(order({ preparingDeadline: null }), NOW),
     ).toBeNull();
+    // Digital = the order's `kind` (via `isDigitalOrder`), never the order
+    // number prefix.
     expect(
-      preparingDeadlineNoticeOf(order({ orderNumber: "MEM-1" }), NOW),
+      preparingDeadlineNoticeOf(order({ kind: "membership" }), NOW),
     ).toBeNull();
+    expect(preparingDeadlineNoticeOf(order({ kind: "boost" }), NOW)).toBeNull();
     expect(
       preparingDeadlineNoticeOf(
         order({ isBuyer: false, isSeller: false }),

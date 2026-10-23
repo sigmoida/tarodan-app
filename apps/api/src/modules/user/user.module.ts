@@ -11,6 +11,7 @@ import { UserAnalyticsService } from "./stats/user-analytics.service";
 import { UserDiscoveryService } from "./social/user-discovery.service";
 import { UserBankService } from "./seller/user-bank.service";
 import { UserEngagementService } from "./stats/user-engagement.service";
+import { UserSellerTrustStatsService } from "./stats/user-seller-trust-stats.service";
 import { UserController } from "./user.controller";
 import { SellerDocumentController } from "./seller/seller-document.controller";
 import { SellerDocumentService } from "./seller/seller-document.service";
@@ -26,8 +27,10 @@ import { ConsentModule } from "../consent/consent.module";
 import { MarketingModule } from "../marketing/marketing.module";
 import { SearchModule } from "../search/search.module";
 import { AppleTokenModule } from "../auth/social/apple-token.module";
+import { AuthModule } from "../auth/auth.module";
 import { WebSocketModule } from "../websocket/websocket.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
+import { SellerTrustModule } from "../seller-trust";
 
 @Module({
   imports: [
@@ -49,6 +52,12 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     // Hesap silmede açık soketler kapatılır (commit sonrası). WebSocketModule
     // User'a bağlı değil, döngü yok.
     WebSocketModule,
+    // Account deletion takes the step-up (`@RequireReauth`): the guard and
+    // its service are exported by AuthModule. AuthModule does not import
+    // UserModule, so there is no cycle.
+    AuthModule,
+    // Profiles read the stored trust score. A leaf (Prisma only), no cycle.
+    SellerTrustModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],
@@ -66,8 +75,10 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     UserEngagementService,
     FeaturedSchedulerService,
     UserBlockAdminListener,
+    UserSellerTrustStatsService,
     ...scheduledProcessors(FeaturedScheduledProcessor),
   ],
-  exports: [UserService],
+  // UserSellerTrustStatsService: account input of the seller trust batch.
+  exports: [UserService, UserSellerTrustStatsService],
 })
 export class UserModule {}

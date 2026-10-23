@@ -1,9 +1,16 @@
 import { ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { PERMISSION_MAP, RolesGuard } from "./roles.guard";
-import { ROLES_KEY } from "../decorators/roles.decorator";
-import { PERMISSION_KEY } from "../decorators/require-permission.decorator";
-import { BYPASS_PERMISSION_MATRIX_KEY } from "../decorators/bypass-permission-matrix.decorator";
+import { PERMISSION_MAP, RolesGuard, declaredPermissions } from "./roles.guard";
+import { Roles, ROLES_KEY } from "../decorators/roles.decorator";
+import {
+  PERMISSION_KEY,
+  RequireAllPermissions,
+  RequirePermission,
+} from "../decorators/require-permission.decorator";
+import {
+  BYPASS_PERMISSION_MATRIX_KEY,
+  BypassPermissionMatrix,
+} from "../decorators/bypass-permission-matrix.decorator";
 
 /**
  * retry-refund gibi gerçek-para iadesi tetikleyen endpoint @RequirePermission('refund_requests')
@@ -495,5 +502,188 @@ describe("RolesGuard — bildirim görseli yükleme izni", () => {
     await expect(
       makeGuard(["ads"]).canActivate(ctx("/api/admin/notifications/upload")),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+/**
+ * `@RequireAllPermissions`: every listed key is needed (the boost refund
+ * needs `ads` and `payments`), where the URL map and `@RequirePermission`
+ * accept any one. Real decorators and a real Reflector.
+ */
+describe("RolesGuard — @RequireAllPermissions (all-of)", () => {
+  @RequirePermission("trades")
+  class ClassScoped {
+    @Roles("super_admin", "admin", "moderator")
+    @RequireAllPermissions("ads", "payments")
+    both() {}
+
+    @Roles("super_admin", "admin", "moderator")
+    one() {}
+
+    @Roles("super_admin", "admin", "moderator")
+    @BypassPermissionMatrix()
+    @RequireAllPermissions("ads", "payments")
+    bypassed() {}
+  }
+
+  class Bare {
+    // No @Roles: the all-of rule alone still closes the route.
+    @RequireAllPermissions("ads", "payments")
+    noRoles() {}
+  }
+
+  const guard = (perms: Record<string, string[]>) =>
+    new RolesGuard(new Reflector(), {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ settingValue: JSON.stringify(perms) }),
+      },
+    } as never);
+
+  const ctx = (
+    cls: { prototype: object },
+    handler: string,
+    role: string,
+    user: Record<string, unknown> = { isAdmin: true, role },
+  ): ExecutionContext =>
+    ({
+      getHandler: () => (cls.prototype as Record<string, unknown>)[handler],
+      getClass: () => cls,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user,
+          method: "POST",
+          originalUrl: "/api/admin/ad-packages/purchases/b1/refund",
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
+  it("joins a class-level @RequirePermission into the all-of set", () => {
+    expect(
+      declaredPermissions({ one: "trades", all: ["ads", "payments"] }),
+    ).toEqual({ keys: ["ads", "payments", "trades"], match: "all" });
+    expect(declaredPermissions({ one: "trades" })).toEqual({
+      keys: ["trades"],
+      match: "any",
+    });
+    expect(declaredPermissions({})).toBeNull();
+    expect(declaredPermissions({ all: [] })).toBeNull();
+  });
+
+  it("passes only when the role has every key", async () => {
+    await expect(
+      guard({ admin: ["ads", "payments", "trades"] }).canActivate(
+        ctx(ClassScoped, "both", "admin"),
+      ),
+    ).resolves.toBe(true);
+    for (const perms of [
+      ["ads", "payments"],
+      ["ads", "trades"],
+      ["payments", "trades"],
+    ]) {
+      await expect(
+        guard({ admin: perms }).canActivate(ctx(ClassScoped, "both", "admin")),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    }
+  });
+
+  it("leaves the any-of handlers of the same class as they were", async () => {
+    await expect(
+      guard({ moderator: ["trades"] }).canActivate(
+        ctx(ClassScoped, "one", "moderator"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("is not skipped by @BypassPermissionMatrix", async () => {
+    await expect(
+      guard({ admin: ["ads", "trades"] }).canActivate(
+        ctx(ClassScoped, "bypassed", "admin"),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("closes a route without @Roles to non-admins and to admins lacking a key", async () => {
+    await expect(
+      guard({ admin: ["ads", "payments"] }).canActivate(
+        ctx(Bare, "noRoles", "admin", { isAdmin: false }),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      guard({ admin: ["ads"] }).canActivate(ctx(Bare, "noRoles", "admin")),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      guard({ admin: ["ads", "payments"] }).canActivate(
+        ctx(Bare, "noRoles", "admin"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("lets super_admin through, as for every other permission", async () => {
+    await expect(
+      guard({ super_admin: [] }).canActivate(
+        ctx(ClassScoped, "both", "super_admin"),
+      ),
+    ).resolves.toBe(true);
+  });
+});
+
+/**
+ * The URL map stays any-of next to the new all-of rule: a segment that lists
+ * two keys (`users`: `users` or `seller_performance`) opens to a role that
+ * has either one, and stays closed to a role with neither.
+ */
+describe("RolesGuard — URL map entries stay any-of", () => {
+  class Users {
+    @Roles("super_admin", "admin", "moderator")
+    list() {}
+  }
+
+  const guard = (perms: Record<string, string[]>) =>
+    new RolesGuard(new Reflector(), {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ settingValue: JSON.stringify(perms) }),
+      },
+    } as never);
+
+  const ctx = (role: string): ExecutionContext =>
+    ({
+      getHandler: () => Users.prototype.list,
+      getClass: () => Users,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { isAdmin: true, role },
+          method: "GET",
+          originalUrl: "/api/admin/users",
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
+  it("maps the users segment to two keys", () => {
+    expect(PERMISSION_MAP.users).toEqual(["users", "seller_performance"]);
+  });
+
+  it.each([["users"], ["seller_performance"]])(
+    "a role with only %s passes",
+    async (key) => {
+      await expect(
+        guard({ moderator: [key] }).canActivate(ctx("moderator")),
+      ).resolves.toBe(true);
+    },
+  );
+
+  it("a role with neither key gets 403 naming both", async () => {
+    await expect(
+      guard({ moderator: ["orders"] }).canActivate(ctx("moderator")),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: {
+        i18nKey: "server.auth.permissionRequired",
+        i18nParams: { perms: "users, seller_performance" },
+      },
+    });
   });
 });

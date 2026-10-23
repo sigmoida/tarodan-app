@@ -6,6 +6,7 @@ import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { CellMoney, COL_WIDTH, col, Empty } from "@/components/table";
+import { amountBandLabel } from "@/lib/amount-band";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import {
@@ -18,7 +19,7 @@ const rangeKey = (t: AdPackageTier) => `${t.minAmount}|${t.maxAmount ?? "∞"}`;
 
 type PriceRange = { key: string; min: number; max: number | null };
 
-/** Unique product-price ranges across a package's tiers, sorted by lower bound. */
+/** Unique product-price bands across a package's tiers, sorted by lower bound. */
 function priceRanges(pkg: AdPackage) {
   const map = new Map<string, { min: number; max: number | null }>();
   for (const tier of pkg.tiers) {
@@ -28,15 +29,6 @@ function priceRanges(pkg: AdPackage) {
   return Array.from(map.entries())
     .map(([key, r]) => ({ key, ...r }))
     .sort((a, b) => a.min - b.min);
-}
-
-function rangeLabel(
-  r: { min: number; max: number | null },
-  unlimited: string,
-): string {
-  return r.max == null
-    ? `${fmtTry(r.min)}+`
-    : `${fmtTry(r.min)} – ${fmtTry(r.max)}`;
 }
 
 /** One package = header (name/badges/actions) + a pricing matrix (ranges × durations). */
@@ -57,12 +49,13 @@ export function PackageCard({
     byCell.set(`${rangeKey(tier)}#${tier.durationDays}`, tier);
   }
 
-  // Fiyat aralığı sütunu + süre başına bir fiyat sütunu.
+  // The price band column (the last cent inside the half-open band, as the
+  // commission table shows it) + one price column per duration.
   const columns = useMemo(
     () => [
       col.text<PriceRange>(
         t("admin.marketing.adPackages.priceRange"),
-        (r) => rangeLabel(r, t("admin.marketing.adPackages.unlimited")),
+        (r) => amountBandLabel(r.min, r.max),
         { minWidth: COL_WIDTH.amountRange },
       ),
       ...durations.map((d) =>
@@ -71,7 +64,7 @@ export function PackageCard({
           (r) => {
             const tier = byCell.get(`${r.key}#${d}`);
             if (!tier) return <Empty />;
-            // Kampanyalı fiyat: eski fiyat üstü çizili, kampanya fiyatı vurgulu.
+            // Campaign price: the old price struck through, the campaign price highlighted.
             return tier.campaignPrice != null ? (
               <span className="flex items-center justify-end gap-1.5 whitespace-nowrap tabular-nums">
                 <span className="text-xs text-subtle line-through">
@@ -83,7 +76,7 @@ export function PackageCard({
               <CellMoney value={tier.price} />
             );
           },
-          // Üstü çizili eski fiyat + kampanya fiyatı yan yana sığsın.
+          // Room for the struck-through old price next to the campaign price.
           {
             id: `duration-${d}`,
             align: "right",

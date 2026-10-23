@@ -19,6 +19,10 @@ import {
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
+import type {
+  AccountSecurityNoticeDetails,
+  AccountSecurityNoticeEvent,
+} from "../../common/helpers/account-security-notice-mail";
 import type { NotificationAudience } from "./helpers/notification-link";
 import type { OrderCancelNoticeParty } from "./helpers/order-cancel-notice";
 import type { TradePlatformCancelNotice } from "./helpers/trade-platform-cancel-notice";
@@ -409,6 +413,14 @@ export class NotificationService {
 
   async sendEmailVerification(userId: string, verificationToken: string) {
     return this.account.sendEmailVerification(userId, verificationToken);
+  }
+
+  async sendAccountSecurityNotice(
+    userId: string,
+    event: AccountSecurityNoticeEvent,
+    details?: AccountSecurityNoticeDetails,
+  ) {
+    return this.account.sendAccountSecurityNotice(userId, event, details);
   }
 
   async sendEmailChangeCode(email: string, code: string, ttlSeconds: number) {

@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { i18nMessage } from "../../i18n";
 
@@ -45,4 +45,29 @@ export async function lockUserForDeletion(
   userId: string,
 ): Promise<void> {
   await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+}
+
+/**
+ * Serialises one user's quota-checked inserts (count, then insert), such as
+ * saved searches: two parallel saves cannot both pass the tier limit.
+ *
+ * `FOR NO KEY UPDATE` conflicts with itself, with the deletion lock
+ * (`FOR UPDATE`) and with the buyer and trade lock (`FOR SHARE`), but not with
+ * the `FOR KEY SHARE` that any insert referencing the user takes, so unrelated
+ * writes are not held up. A deleted account is refused: a save queued behind
+ * the deletion must not write after it. Like the others, it must be the
+ * transaction's first lock.
+ */
+export async function lockActiveUserForQuota(
+  tx: UserRowLockDb,
+  userId: string,
+): Promise<void> {
+  const rows = await tx.$queryRaw<Array<{ deleted_at: Date | null }>>`
+    SELECT deleted_at FROM users WHERE id = ${userId} FOR NO KEY UPDATE`;
+  if (rows.length === 0) {
+    throw new NotFoundException(i18nMessage("server.user.notFound"));
+  }
+  if (rows[0].deleted_at) {
+    throw new ForbiddenException(i18nMessage("server.auth.accountDeleted"));
+  }
 }

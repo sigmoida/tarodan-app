@@ -67,6 +67,12 @@ describe("normalizeErrorMessage", () => {
     );
   });
 
+  it("strips the query string from a relative request path too", () => {
+    expect(
+      normalizeErrorMessage("GET /api/products?search=ali&page=2 -> 500"),
+    ).toBe("GET /api/products?<query> -> 500");
+  });
+
   it("masks emails", () => {
     expect(normalizeErrorMessage("failed to notify user@example.com")).toBe(
       "failed to notify <email>",

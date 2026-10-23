@@ -30,7 +30,6 @@ export function usePayments(enabled: boolean) {
     queryFn: async (): Promise<PaymentListResponse> => {
       const params: Record<string, string | number> = { page, limit: 20 };
       if (filters.status) params.status = filters.status;
-      if (filters.provider) params.provider = filters.provider;
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
       const res = await paymentsApi.getMyPayments(params);

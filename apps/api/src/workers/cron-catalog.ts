@@ -196,6 +196,15 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
 
+  // Triggerable so a staging run can calibrate the formula (ADR 0014). It only
+  // rewrites its own table; a manual production run still needs the user's go.
+  {
+    key: "seller-trust-refresh",
+    label: "Satıcı güven skorları",
+    description: "Satıcı güven skorlarını gece toplu hesaplar",
+    triggerable: true,
+  },
+
   // ── Elle tetiklenmez: zaten dakikada bir koşuyor — butonun kazancı yok ─────
   {
     key: "outbox-drain",
@@ -216,7 +225,7 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     key: "search-periodic-sync",
     label: "ES periyodik senkron",
     description:
-      "DB↔Elasticsearch sayı farkını kontrol eder, gerekirse delta senkron",
+      "DB ile Elasticsearch arasındaki sayı farkını kontrol eder, gerekirse delta senkron",
     triggerable: false,
   },
   {

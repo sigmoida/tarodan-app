@@ -22,6 +22,7 @@ import {
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
+import { SAVED_SEARCH_TIER_LIMITS } from "../src/modules/saved-search/helpers/saved-search-tier-limits";
 import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/helpers/shipping-package-tier";
 import { PRODUCTION_REFERENCE_IDS } from "./seed-ids";
 import { seedHeroContent } from "./seed-hero-content";
@@ -38,6 +39,7 @@ const membershipTiers = [
     maxFreeListings: 5,
     maxTotalListings: 10,
     maxImagesPerListing: 3,
+    maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.free,
     canCreateCollections: false,
     canTrade: false,
     isAdFree: false,
@@ -54,6 +56,7 @@ const membershipTiers = [
     maxFreeListings: 15,
     maxTotalListings: 50,
     maxImagesPerListing: 6,
+    maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.basic,
     canCreateCollections: true,
     canTrade: true,
     isAdFree: false,
@@ -70,6 +73,7 @@ const membershipTiers = [
     maxFreeListings: 50,
     maxTotalListings: 200,
     maxImagesPerListing: 10,
+    maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.premium,
     canCreateCollections: true,
     canTrade: true,
     isAdFree: true,
@@ -86,6 +90,7 @@ const membershipTiers = [
     maxFreeListings: 200,
     maxTotalListings: 1000,
     maxImagesPerListing: 15,
+    maxSavedSearches: SAVED_SEARCH_TIER_LIMITS.business,
     canCreateCollections: true,
     canTrade: true,
     isAdFree: true,

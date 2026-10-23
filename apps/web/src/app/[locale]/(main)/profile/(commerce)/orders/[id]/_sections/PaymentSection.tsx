@@ -23,6 +23,7 @@ import {
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { formatTL } from "@/lib/format";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import {
   useSavedAddresses,
   useSetAddressAndPay,
@@ -30,9 +31,15 @@ import {
 import { orderAmountOf, type OrderDetail } from "../_lib/types";
 
 /**
- * Ödeme bekleyen alıcı: adres seç/ekle + güvenli ödeme akışı. Grup üyesi
- * siparişte tahsilat SEPETİN TAMAMI için yapılır (backend tekil isteği gruba
- * yönlendirir) — groupTotal verildiğinde buton grup toplamını gösterir.
+ * A buyer awaiting payment: pick or add an address, then the secure payment
+ * flow. For a group member the charge covers the WHOLE cart (the backend
+ * routes a single request to the group); with `groupTotal` the button shows
+ * the group total.
+ *
+ * Not for a digital order (membership, boost): it has no delivery address
+ * (its address field holds the purchase snapshot, which an address would
+ * overwrite) and its payment belongs to its own checkout (membership or
+ * boost), so the order detail stays read-only, as on mobile.
  */
 export default function PaymentSection({
   order,
@@ -43,7 +50,9 @@ export default function PaymentSection({
 }) {
   const t = useTranslations();
   const isPendingPaymentBuyer =
-    order.isBuyer && order.status === "pending_payment";
+    order.isBuyer &&
+    order.status === "pending_payment" &&
+    !isDigitalOrder(order);
 
   const addressesQuery = useSavedAddresses(isPendingPaymentBuyer);
   const setAddressAndPay = useSetAddressAndPay(order.id);

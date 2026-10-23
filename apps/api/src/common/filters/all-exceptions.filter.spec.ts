@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
   ArgumentsHost,
+  Logger,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { AllExceptionsFilter } from "./all-exceptions.filter";
@@ -172,5 +173,38 @@ describe("AllExceptionsFilter", () => {
       run(new ForbiddenException("nope")),
     );
     expect(body).not.toHaveProperty("requestId");
+  });
+
+  /**
+   * The 5xx log line becomes the Sentry event message and fingerprint. The
+   * query string carries user input (search text, possibly an e-mail), so it
+   * never reaches the log: only the method, the path and the status do, and
+   * every query of one endpoint groups into one issue.
+   */
+  it("logs a 5xx with the request path only, never the query string", () => {
+    const error = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const json = jest.fn();
+    const host = {
+      switchToHttp: () => ({
+        getResponse: () => ({ status: jest.fn(() => ({ json })) }),
+        getRequest: () => ({
+          method: "GET",
+          url: "/api/products?search=ali%40mail.com&page=2",
+          headers: {},
+        }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    try {
+      filter.catch(new Error("boom"), host);
+
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error.mock.calls[0][0]).toBe("GET /api/products -> 500");
+      expect(JSON.stringify(error.mock.calls)).not.toContain("ali");
+    } finally {
+      error.mockRestore();
+    }
   });
 });

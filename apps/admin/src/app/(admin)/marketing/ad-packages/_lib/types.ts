@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
+import {
+  amountField,
+  amountInputValue,
+  amountOrNull,
+  amountOrZero,
+} from "@/lib/schemas/amount";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -48,22 +54,41 @@ export function packageDurations(pkg: AdPackage): number[] {
 }
 
 // ── Form schema (validation-only; strings→numbers/ISO shaped in toPayload) ──
+// The TL fields are text read by the shared TL amount parser
+// (`@/lib/schemas/amount`): "1.000" is refused, never 1 TL. 0 is a real value.
+// A tier's price band is half-open (`@/lib/amount-band`): the form takes the
+// exclusive upper bound as stored, as the commission form does.
 
 const tierRowSchema = (t: T) =>
-  z.object({
-    durationDays: z
-      .string()
-      .min(1, t("admin.marketing.adPackages.validation.durationMin")),
-    minAmount: z.string().default("0"),
-    maxAmount: z.string().default(""),
-    price: z
-      .string()
-      .min(1, t("admin.marketing.adPackages.validation.priceMin")),
-    campaignPrice: z.string().default(""),
-    campaignStartsAt: z.string().default(""),
-    campaignEndsAt: z.string().default(""),
-    isActive: z.boolean().default(true),
-  });
+  z
+    .object({
+      durationDays: z
+        .string()
+        .min(1, t("admin.marketing.adPackages.validation.durationMin")),
+      minAmount: amountField(t).default("0"),
+      maxAmount: amountField(t).default(""),
+      price: amountField(t, {
+        required: t("admin.marketing.adPackages.validation.priceMin"),
+      }),
+      campaignPrice: amountField(t).default(""),
+      campaignStartsAt: z.string().default(""),
+      campaignEndsAt: z.string().default(""),
+      isActive: z.boolean().default(true),
+    })
+    .superRefine((row, context) => {
+      // The API refuses an empty band on any row (active or not). Refused
+      // text has its own field error, and null skips the comparison; a blank
+      // lower bound is sent as 0 (`packageFormToPayload`).
+      const max = amountOrNull(row.maxAmount);
+      const min = row.minAmount.trim() === "" ? 0 : amountOrNull(row.minAmount);
+      if (max != null && min != null && max <= min) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["maxAmount"],
+          message: t("admin.finance.commission.validation.strictRange"),
+        });
+      }
+    });
 
 export const packageSchema = (t: T) =>
   z
@@ -145,6 +170,27 @@ export const emptyTierRow: TierRowValues = {
   isActive: true,
 };
 
+/**
+ * The row "Add row" appends below the last row. After a band with an upper
+ * bound it is the next band of the same duration, starting at that bound:
+ * the upper bound is exclusive, so the two bands touch with no gap
+ * (1000-5000, then 5000-...). After an open-ended band that duration is
+ * covered up to any price, so the row starts a new duration at 0 and leaves
+ * the duration for the admin to pick (copying it would overlap). The first
+ * row is the default row.
+ */
+export function nextTierRow(rows: readonly TierRowValues[]): TierRowValues {
+  const last = rows.at(-1);
+  if (!last) return { ...emptyTierRow };
+  const end = amountOrNull(last.maxAmount);
+  if (end == null) return { ...emptyTierRow, durationDays: "" };
+  return {
+    ...emptyTierRow,
+    durationDays: last.durationDays,
+    minAmount: amountInputValue(end),
+  };
+}
+
 const dateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
 
 export function packageToForm(pkg?: AdPackage): PackageFormValues {
@@ -172,11 +218,10 @@ export function packageToForm(pkg?: AdPackage): PackageFormValues {
     targetUserIds: pkg.targetUsers?.map((user) => user.id) ?? [],
     tiers: pkg.tiers.map((tier) => ({
       durationDays: String(tier.durationDays),
-      minAmount: String(tier.minAmount),
-      maxAmount: tier.maxAmount == null ? "" : String(tier.maxAmount),
-      price: String(tier.price),
-      campaignPrice:
-        tier.campaignPrice == null ? "" : String(tier.campaignPrice),
+      minAmount: amountInputValue(tier.minAmount),
+      maxAmount: amountInputValue(tier.maxAmount),
+      price: amountInputValue(tier.price),
+      campaignPrice: amountInputValue(tier.campaignPrice),
       campaignStartsAt: dateInput(tier.campaignStartsAt),
       campaignEndsAt: dateInput(tier.campaignEndsAt),
       isActive: tier.isActive,
@@ -204,12 +249,10 @@ export function packageFormToPayload(v: PackageFormValues) {
         : [],
     tiers: v.tiers.map((row) => ({
       durationDays: parseInt(row.durationDays, 10) || 1,
-      minAmount: parseFloat(row.minAmount) || 0,
-      maxAmount: row.maxAmount.trim() ? parseFloat(row.maxAmount) : null,
-      price: parseFloat(row.price) || 0,
-      campaignPrice: row.campaignPrice.trim()
-        ? parseFloat(row.campaignPrice)
-        : null,
+      minAmount: amountOrZero(row.minAmount),
+      maxAmount: amountOrNull(row.maxAmount),
+      price: amountOrZero(row.price),
+      campaignPrice: amountOrNull(row.campaignPrice),
       campaignStartsAt: row.campaignStartsAt
         ? new Date(row.campaignStartsAt).toISOString()
         : null,

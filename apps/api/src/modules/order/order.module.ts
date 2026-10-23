@@ -34,6 +34,7 @@ import { RefundModule } from "../refund/refund.module";
 import { UserBlockModule } from "../user-block/user-block.module";
 import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { OrderSellerTrustStatsService } from "./stats/order-seller-trust-stats.service";
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     OrderSchedulerService,
     ...scheduledProcessors(OrderScheduledProcessor),
     SellerInvoiceService,
+    OrderSellerTrustStatsService,
   ],
   // OrderCheckoutCommonService: teklif/sipariş bedel primitifleri (OfferService
   // teklif kabulünde aynı hesabı kullanır — tek kaynak).
@@ -82,6 +84,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     OrderCheckoutCommonService,
     OrderTaxPolicyService,
     OrderFeeDiscountService,
+    // Seller trust batch: order-side aggregates (seller-trust/jobs).
+    OrderSellerTrustStatsService,
   ],
 })
 export class OrderModule {}

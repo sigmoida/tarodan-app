@@ -33,6 +33,16 @@ interface ReportableError {
   config?: { url?: unknown; method?: unknown };
 }
 
+/**
+ * A cancelled request or a step the user backed out of (an `AbortError`, as
+ * the step-up's `ReauthCancelledError` is, or axios `ERR_CANCELED`). It is not
+ * a failure: no Sentry report here, no error toast in `useWebMutation`.
+ */
+export function isCancellation(error: unknown): boolean {
+  const err = error as { name?: unknown; code?: unknown } | null;
+  return err?.name === "AbortError" || err?.code === "ERR_CANCELED";
+}
+
 /** HTTP status of an axios-style error; `undefined` for network/runtime errors. */
 function httpStatusOf(error: unknown): number | undefined {
   const status = (error as ReportableError)?.response?.status;
@@ -55,8 +65,7 @@ export function shouldReportMutationError(
   meta?: Record<string, unknown>,
 ): boolean {
   if (meta?.reportError === false) return false;
-  const err = error as ReportableError;
-  if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return false;
+  if (isCancellation(error)) return false;
   const status = httpStatusOf(error);
   if (status !== undefined && status < 500 && status !== 429) return false;
   return true;

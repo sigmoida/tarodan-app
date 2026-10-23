@@ -4,17 +4,19 @@
 
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
-import { isMembershipOrder, type OrderDetail } from "../_lib/types";
+import { isDigitalOrder } from "@tarodan/types";
+import type { OrderDetail } from "../_lib/types";
 
 /**
- * Teslimat adresi — sadece ödeme bekleyen alıcı değilse göster (alıcı için adres
- * ödeme kartının içinde). Üyelik/dijital siparişlerde teslimat adresi yoktur.
+ * Delivery address, except for a buyer awaiting payment (the payment card
+ * holds the address then). A digital order (membership, boost) has no
+ * delivery address.
  */
 export default function ShippingAddressCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
   if (
     !order.shippingAddress ||
-    isMembershipOrder(order) ||
+    isDigitalOrder(order) ||
     (order.isBuyer && order.status === "pending_payment")
   ) {
     return null;

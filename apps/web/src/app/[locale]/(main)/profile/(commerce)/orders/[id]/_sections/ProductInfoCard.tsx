@@ -8,18 +8,20 @@ import { TagIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/ui";
 import { formatTL } from "@/lib/format";
 import { useTranslations } from "next-intl";
-import { getProductInfo, orderAmountOf, type OrderDetail } from "../_lib/types";
+import { isDigitalOrder } from "@tarodan/types";
+import { getProductInfo, type OrderDetail } from "../_lib/types";
 
 export default function ProductInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
   const productInfo = getProductInfo(order);
+  const title = productInfo?.title || t("order.product");
   const productImage =
     productInfo?.imageUrl || order.items?.[0]?.product?.imageUrl;
-  // Ürün bedelinin TEK kaynağı `pricing.subtotal`. `items[].price` yedek
-  // DEĞİLDİR: API onu `order.totalAmount`tan doldurur, yani alıcının ödediği
-  // toplamdır — yedek olarak kullanmak satıcıya o toplamı gösterirdi.
+  // The ONE source of the product amount is `pricing.subtotal`. `items[].price`
+  // is NOT a fallback: the API fills it from `order.totalAmount`, the buyer's
+  // total, so using it would show that total to the seller.
   const productAmount = order.pricing?.subtotal ?? null;
-  // Çok adetli sipariş: gerçek adedi ve birim fiyatı göster (satır tutarı / adet).
+  // Multi-quantity order: show the real quantity and unit price (line amount / quantity).
   const quantity = order.items?.[0]?.quantity ?? 1;
   const unitPrice =
     productAmount != null && quantity > 0 ? productAmount / quantity : null;
@@ -31,7 +33,7 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
           {productImage ? (
             <OptimizedImage
               src={productImage}
-              alt={productInfo?.title || t("order.product")}
+              alt={title}
               fill
               sizes="96px"
               className="object-cover"
@@ -43,12 +45,18 @@ export default function ProductInfoCard({ order }: { order: OrderDetail }) {
           )}
         </div>
         <div className="flex-1">
-          <Link
-            href={`/listings/${productInfo?.id}`}
-            className="text-lg font-medium text-heading hover:text-primary-600 transition-colors"
-          >
-            {productInfo?.title || t("order.product")}
-          </Link>
+          {/* A digital order sells a virtual product (membership, boost) with
+              no listing page, so its title is plain text (D4). */}
+          {isDigitalOrder(order) ? (
+            <p className="text-lg font-medium text-heading">{title}</p>
+          ) : (
+            <Link
+              href={`/listings/${productInfo?.id}`}
+              className="text-lg font-medium text-heading hover:text-primary-600 transition-colors"
+            >
+              {title}
+            </Link>
+          )}
           <p className="text-sm text-muted mt-1">
             {unitPrice != null
               ? `${quantity} ${t("order.unitTimes")} ${formatTL(unitPrice)}`

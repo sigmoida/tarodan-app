@@ -3,6 +3,7 @@ import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { ANONYMIZED_DISPLAY_NAME } from "../../../common/helpers/deleted-user-identity";
 
 jest.mock("../../../common/helpers/revalidate", () => ({
+  ...jest.requireActual("../../../common/helpers/revalidate"),
   notifyWebRevalidate: jest.fn(),
 }));
 
@@ -155,6 +156,7 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       twoFactorSecret: { deleteMany: jest.fn() },
       savedCard: { deleteMany: jest.fn() },
       notificationLog: { deleteMany: jest.fn() },
+      savedSearch: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       newsletterSubscriber: { updateMany: jest.fn() },
     };
 
@@ -204,6 +206,7 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       search as never,
       cache as never,
       notifications as never,
+      {} as never, // sellerTrust
       undefined, // appleTokens
       outbox as never,
       realtime as never,
@@ -639,6 +642,20 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       });
       expect(search.removeCollection).toHaveBeenCalledWith("c1");
       expect(search.removeCollection).toHaveBeenCalledWith("c2");
+    });
+
+    it("deletes the saved searches in the deletion transaction", async () => {
+      const { service, tx } = makeService();
+
+      await service.deleteAccount("user-1");
+
+      expect(tx.savedSearch.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+      });
+      // Before the anonymising write, inside the same transaction.
+      expect(
+        tx.savedSearch.deleteMany.mock.invocationCallOrder[0],
+      ).toBeLessThan(tx.user.update.mock.invocationCallOrder[0]);
     });
 
     it("dizin hatası silmeyi başarısız göstermez", async () => {

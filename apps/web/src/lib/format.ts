@@ -20,6 +20,39 @@ const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+// The month is a word here, so this formatter follows the UI locale (the
+// numeric ones above read the same in every language).
+const dayMonthFmts = new Map<string, Intl.DateTimeFormat>();
+const dayMonthFmt = (locale: string): Intl.DateTimeFormat => {
+  let fmt = dayMonthFmts.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+    dayMonthFmts.set(locale, fmt);
+  }
+  return fmt;
+};
+// A star rating reads with the UI locale's decimal separator ("4,5" / "4.5").
+const ratingFmts = new Map<string, Intl.NumberFormat>();
+const ratingFmt = (locale: string): Intl.NumberFormat => {
+  let fmt = ratingFmts.get(locale);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+    ratingFmts.set(locale, fmt);
+  }
+  return fmt;
+};
+
+/**
+ * A 0 to 5 review average with exactly one decimal in the UI locale: "4,5"
+ * (tr), "4.5" (en). The seller trust score has its own two-decimal
+ * `formatTrustRating` in `@tarodan/types`.
+ */
+export function formatRating(value: number, locale: string): string {
+  return ratingFmt(locale).format(value);
+}
 
 type DateLike = string | number | Date | null | undefined;
 
@@ -42,6 +75,43 @@ export function formatDateTime(value: DateLike): string {
   if (value === null || value === undefined || value === "") return "";
   const d = value instanceof Date ? value : new Date(value);
   return isNaN(d.getTime()) ? "" : dateTimeFmt.format(d);
+}
+
+/**
+ * Day and short month without the year, in the UI locale ("12 Kas",
+ * "12 Nov"): for dates that are close and must fit a narrow card (a boost's
+ * end, at most a few months ahead).
+ */
+export function formatDayMonth(value: DateLike, locale: string): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? "" : dayMonthFmt(locale).format(d);
+}
+
+const dateTimeMonthFmts = new Map<string, Intl.DateTimeFormat>();
+const dateTimeMonthFmt = (locale: string): Intl.DateTimeFormat => {
+  let fmt = dateTimeMonthFmts.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    dateTimeMonthFmts.set(locale, fmt);
+  }
+  return fmt;
+};
+
+/**
+ * Date and time with a short month word in the UI locale ("12 Kas 2026
+ * 14:30", "Nov 12, 2026, 2:30 PM"): for cards that show a full timestamp.
+ */
+export function formatDateTimeLong(value: DateLike, locale: string): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? "" : dateTimeMonthFmt(locale).format(d);
 }
 
 /**

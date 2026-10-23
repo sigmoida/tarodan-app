@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Spinner } from "@tarodan/ui";
+import { ChatBubbleLeftEllipsisIcon } from "@heroicons/react/24/outline";
+import { Button, EmptyState, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import type { MessageThread } from "../_lib/messages";
 import ThreadListItem from "./ThreadListItem";
@@ -44,8 +45,12 @@ export default function ThreadList({
           <Spinner size="lg" />
         </div>
       ) : threads.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-muted p-6 text-center text-sm">
-          {t("message.noMessages")}
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            size="compact"
+            icon={<ChatBubbleLeftEllipsisIcon className="h-6 w-6" />}
+            title={t("message.noMessages")}
+          />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto flex flex-col">

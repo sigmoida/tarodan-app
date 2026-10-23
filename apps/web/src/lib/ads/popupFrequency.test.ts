@@ -100,6 +100,7 @@ describe("isPopupBlockedByOverlay", () => {
     requiredStepsOutstanding: false,
     cookieBannerOpen: false,
     tourRunning: false,
+    boostOpen: false,
   };
 
   it("hiçbir katman açık değilse engellemez", async () => {
@@ -111,6 +112,7 @@ describe("isPopupBlockedByOverlay", () => {
     "requiredStepsOutstanding",
     "cookieBannerOpen",
     "tourRunning",
+    "boostOpen",
   ] as const)("%s engeller", async (key) => {
     const { isPopupBlockedByOverlay } = await load();
     expect(isPopupBlockedByOverlay({ ...clear, [key]: true })).toBe(true);

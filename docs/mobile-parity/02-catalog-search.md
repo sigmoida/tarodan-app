@@ -267,7 +267,8 @@ Koleksiyon oluşturma **üyelik hakkına bağlı** (`canCreateCollections`) — 
 | `GET`    | `/wishlist/check/:productId` | bearer | Durum                                                    |
 | `DELETE` | `/wishlist`                  | bearer | Tümünü temizle (web'de kullanılmıyor, mobilde işe yarar) |
 
-Satır: `{ id, productId, productTitle, productImage, productPrice, productOriginalPrice, productCondition, productStatus, sellerId, sellerName, addedAt }`.
+Row: `{ id, productId, productTitle, productImage, productPrice, productOriginalPrice, productCondition, productStatus, availableQuantity?, sellerId, sellerName, addedAt }`
+(`availableQuantity` = quantity - reserved; missing = unlimited stock).
 **`productId` veya `productTitle` boş olan satırları at.**
 
 > Web'in "favorileri paylaş" bağlantısı hatalı bir yola (`/favorites?ids=`) gidiyor. Mobilde

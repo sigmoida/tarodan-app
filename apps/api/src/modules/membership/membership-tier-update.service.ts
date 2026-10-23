@@ -26,6 +26,7 @@ export interface MembershipTierUpdateInput {
   canCreateCollections?: boolean;
   canTrade?: boolean;
   isAdFree?: boolean;
+  maxSavedSearches?: number;
   isActive?: boolean;
   sortOrder?: number;
 }
@@ -87,6 +88,7 @@ export class MembershipTierUpdateService {
           canCreateCollections: dto.canCreateCollections,
           canTrade: dto.canTrade,
           isAdFree: dto.isAdFree,
+          maxSavedSearches: dto.maxSavedSearches,
           // featuredListingSlots + commissionDiscount admin tarafından
           // DÜZENLENEMEZ (ölü entitlement / motor hiç okumaz); DB kolonları
           // duruyor ama burada dokunulmaz.

@@ -97,6 +97,13 @@ function isForbiddenCrossOrigin(request: NextRequest): boolean {
  * kimliği değil): misafir kart ödemesi (`/payments/direct-form`) ve ödeme
  * durum / doğrulama / başarısız-onay / fatura uçları onu okur. Taşınmadığında
  * web misafir kart ödemesi 403 alıyordu.
+ *
+ * `x-reauth-token` is the step-up token of sensitive writes (account
+ * deletion, e-mail change, sign-in method changes), sent as a header where a
+ * request has no body (`REAUTH_TOKEN_HEADER` in `@tarodan/types`; this
+ * package does not depend on types, so the API and this list each pin the
+ * literal). It is short-lived and bound to the session's user, not a session
+ * credential.
  */
 export const FORWARDED_REQUEST_HEADERS = [
   "content-type",
@@ -106,6 +113,7 @@ export const FORWARDED_REQUEST_HEADERS = [
   "idempotency-key",
   "user-agent",
   "x-payment-capability",
+  "x-reauth-token",
 ] as const;
 
 /**

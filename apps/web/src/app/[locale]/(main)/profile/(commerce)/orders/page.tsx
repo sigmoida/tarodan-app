@@ -1,21 +1,21 @@
 "use client";
 
+import {
+  ReceiptPercentIcon,
+  ShoppingCartIcon,
+} from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Pagination, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useTranslations } from "next-intl";
-import {
-  useOrderGroups,
-  useOrderCounts,
-  useInvoiceDownload,
-  useReorder,
-} from "./_hooks/useOrders";
+import { useOrderGroups, useOrderCounts, useReorder } from "./_hooks/useOrders";
+import { useInvoiceDownload } from "../_hooks/useInvoiceDownload";
 import {
   type Order,
   type OrderRole,
@@ -138,7 +138,14 @@ export default function OrdersPage() {
           <Spinner size="xl" />
         </div>
       ) : groups.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={
+            role === "seller" ? (
+              <ShoppingCartIcon className="h-7 w-7" />
+            ) : (
+              <ReceiptPercentIcon className="h-7 w-7" />
+            )
+          }
           title={emptyTitle}
           action={
             role === "buyer" && statusFilter === "active" ? (

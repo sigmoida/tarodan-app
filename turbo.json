@@ -84,7 +84,8 @@
         "e2e/**",
         "plugins/**",
         "prisma/**",
-        "*.{js,cjs,mjs,ts,json}"
+        "*.{js,cjs,mjs,ts,json}",
+        "Dockerfile"
       ]
     },
     "dev": {

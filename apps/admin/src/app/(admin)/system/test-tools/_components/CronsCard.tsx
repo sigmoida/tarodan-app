@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Spinner } from "@tarodan/ui";
+import { Alert, Button, Spinner } from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
@@ -105,9 +105,9 @@ export function CronsCard({ isProd }: { isProd: boolean }) {
             })}
           </p>
           {isProd && (
-            <p className="text-xs text-danger-700">
+            <Alert variant="danger">
               {t("admin.system.testTools.cronProdWarning")}
-            </p>
+            </Alert>
           )}
         </div>
       ),

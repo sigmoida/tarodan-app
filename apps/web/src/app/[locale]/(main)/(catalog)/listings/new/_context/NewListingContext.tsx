@@ -14,13 +14,16 @@ import {
 import { useRouter } from "@/i18n/navigation";
 import type { UseFormReturn } from "react-hook-form";
 import { useZodForm } from "@tarodan/ui/form";
+import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { listingsApi } from "@/lib/api";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
 import { usePriceLimits } from "@/hooks/usePublicSettings";
+import { invalidateListingQueries } from "@/lib/query/invalidateListing";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
+import { tlAmountValue } from "@tarodan/shared";
 import {
   newListingSchema,
   emptyListingValues,
@@ -42,13 +45,14 @@ import {
   createEmptySaleData,
   priceLimitMessages,
   saleDataToPayload,
-  salePriceLimitMessage,
+  saleDataError,
   type ListingPriceRules,
   type SaleData,
 } from "@tarodan/listing-form";
 
 function useNewListingValue() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const {
     isAuthenticated,
     isLoading: authLoading,
@@ -112,7 +116,9 @@ function useNewListingValue() {
   // kullanır; API kapısı ayrıca normal ve indirimli fiyatın ikisini de denetler.
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData);
   const [showDiscountSection, setShowDiscountSection] = useState(false);
-  const formPrice = Number(price);
+  // The price field text, read by the shared parser: refused or empty text
+  // is 0 here and the schema blocks the submit.
+  const formPrice = tlAmountValue(price);
   const salePayload = saleDataToPayload(saleData, formPrice);
   const now = Date.now();
   const saleStartsAt = salePayload.saleStartDate
@@ -125,11 +131,13 @@ function useNewListingValue() {
     salePayload.salePrice != null &&
     (saleStartsAt == null || now >= saleStartsAt) &&
     (saleEndsAt == null || now <= saleEndsAt);
-  const commissionPreviewPrice = saleIsActive ? salePayload.salePrice! : price;
-  // İndirimli fiyat da alt sınırın altına inemez (form alanı olmadığı için
-  // şemada değil burada denetlenir; ekran satır içi gösterir, gönderim durur).
+  const commissionPreviewPrice = saleIsActive
+    ? salePayload.salePrice!
+    : formPrice;
+  // Refused discount text and a sale price below the floor block the submit
+  // (not form fields, so checked here; the card shows them inline).
   const priceMessages = useMemo(() => priceLimitMessages(locale), [locale]);
-  const salePriceError = salePriceLimitMessage(
+  const salePriceError = saleDataError(
     saleData,
     formPrice,
     { limits: priceLimits },
@@ -254,6 +262,8 @@ function useNewListingValue() {
     }
 
     try {
+      // The schema has already refused text that is not a price.
+      const submitPrice = tlAmountValue(values.price);
       const customAttributeSlugs = Object.values(values.customAttributes)
         .flat()
         .filter(Boolean);
@@ -261,7 +271,7 @@ function useNewListingValue() {
       const payload = {
         title: values.title,
         description: values.description || undefined,
-        price: Number(values.price),
+        price: submitPrice,
         categoryId: values.categoryId,
         condition: values.condition,
         brandId: values.brandId || undefined,
@@ -284,7 +294,7 @@ function useNewListingValue() {
             ? Number(values.bundleSize)
             : undefined,
         quantity: values.quantity !== "" ? Number(values.quantity) : 1,
-        ...saleDataToPayload(saleData, Number(values.price)),
+        ...saleDataToPayload(saleData, submitPrice),
         shippingPackageTier: values.shippingPackageTier,
         images: values.images.length > 0 ? values.images : undefined,
         attributes:
@@ -292,6 +302,7 @@ function useNewListingValue() {
       };
 
       await listingsApi.create(payload as any);
+      void invalidateListingQueries(queryClient);
       toast.success(t("product.listingCreated"));
       await refreshUser();
       await refetchLimits();

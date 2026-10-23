@@ -100,7 +100,7 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
           data: { status: "processing" },
         });
         if (claim.count !== 1) {
-          log(`bildirim ${notification.id} → başka süreç aldı, atlandı`);
+          log(`bildirim ${notification.id}: başka süreç aldı, atlandı`);
           continue;
         }
 
@@ -143,7 +143,7 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
           });
 
           queued++;
-          log(`bildirim ${notification.id} → dağıtım kuyruğa alındı`);
+          log(`bildirim ${notification.id}: dağıtım kuyruğa alındı`);
           this.logger.log(
             `Scheduled notification ${notification.id} queued (${targetType})`,
           );
@@ -153,7 +153,7 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             error,
           );
           failed++;
-          log(`bildirim ${notification.id} → HATA (gönderilemedi)`);
+          log(`bildirim ${notification.id}: HATA (gönderilemedi)`);
 
           await this.prisma.scheduledNotification.update({
             where: { id: notification.id },

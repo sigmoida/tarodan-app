@@ -1,8 +1,11 @@
 /**
- * `backfill:prod:test-account-consents` betiğinin saf parçaları: koşu kipi ve
- * hedef veritabanının (şifresiz) tanımı. Betik ekleme-yalnız bir tabloya yazar,
- * bu yüzden VARSAYILAN yazmaz; yazmak, hedef veritabanının ADINI açıkça
- * yazmayı gerektirir (yanlış ortamda `--apply` tek başına yetmez).
+ * The pure parts of the consent maintenance scripts
+ * (`backfill:prod:test-account-consents`,
+ * `backfill:prod:consent-trade-cash-payments`): the run mode and the target
+ * database description (no credentials). Both write to the append-only
+ * `consent_records`, so neither writes by default; writing requires naming
+ * the target database explicitly (`--apply` alone is not enough on the wrong
+ * environment).
  */
 
 export type BackfillMode =

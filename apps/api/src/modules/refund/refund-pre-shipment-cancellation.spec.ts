@@ -43,6 +43,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
     orderNumber: "ORD-1001",
     buyerId: "buyer-1",
     sellerId: "seller-1",
+    productId: "product-1",
     status: OrderStatus.paid as OrderStatus,
     totalAmount: 1180,
     subtotal: 1000,
@@ -382,9 +383,72 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(payment.processRefund).not.toHaveBeenCalled();
     });
+
+    // Ownership comes first: someone else's boost order is a 403, so the
+    // service-order answer never tells a stranger what the order is.
+    it("refuses someone else's boost order as not theirs, before the service-order answer", async () => {
+      const { creation, payment } = makeService({
+        productId: "boost-b1",
+        status: OrderStatus.completed,
+      });
+
+      await expect(
+        creation.createCancellationRefund(
+          "order-1",
+          "someone-else",
+          OrderCancellationReason.changed_mind,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(payment.processRefund).not.toHaveBeenCalled();
+    });
+
+    // A platform service order has no pre-shipment phase; even in a paid
+    // status (a boost order whose boost row is missing stays `preparing`)
+    // the buyer gets the completed-order answer and no money moves (D16).
+    it.each([
+      ["boost", "boost-b1", OrderStatus.preparing],
+      ["boost", "boost-b1", OrderStatus.completed],
+      ["membership", "membership-tier-1", OrderStatus.paid],
+    ])(
+      "refuses a %s order (%s, %s) before any money moves",
+      async (_kind, productId, status) => {
+        const { creation, payment, prisma } = makeService({
+          productId,
+          status,
+        });
+
+        await expect(
+          creation.createCancellationRefund(
+            "order-1",
+            "buyer-1",
+            OrderCancellationReason.changed_mind,
+          ),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: { i18nKey: "server.refund.cancelPaidPreShipmentOnly" },
+        });
+        expect(payment.processRefund).not.toHaveBeenCalled();
+        expect(prisma.refundRequest.create).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("platform (admin) iptali — aynı çekirdek", () => {
+    it("settles a paid boost order without its boost row (the admin guard lets it through)", async () => {
+      const { creation, payment } = makeService({
+        productId: "boost-b1",
+        status: OrderStatus.preparing,
+      });
+
+      await creation.createPlatformCancellationRefund(
+        "order-1",
+        "admin-1",
+        "stock_error",
+      );
+
+      expect(payment.processRefund).toHaveBeenCalledTimes(1);
+    });
+
     it("alıcıya ödediği her kalemi iade eder; talep alıcı adına, karar admin'in", async () => {
       const { creation, payment, createdRows, prisma } = makeService();
 

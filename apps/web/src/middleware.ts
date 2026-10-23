@@ -53,12 +53,7 @@ import {
 
 const authMiddleware = createAuthMiddleware(webAuthConfig, {
   publicPaths: [],
-  guestOnlyPaths: [
-    "/login",
-    "/register",
-    "/forgot-password",
-    "/reset-password",
-  ],
+  guestOnlyPaths: ["/login", "/register"],
 });
 
 /** Split a leading locale prefix off the path. Prefix-free ⇒ the default locale. */
@@ -76,19 +71,23 @@ function splitLocale(pathname: string): { locale: string; rest: string } {
  * `/seller`, `/products`, `/support` trees; the owner-only edit flows; the
  * standalone authed pages; and the guest-only auth pages.
  *
- * `/verify-email` is deliberately NOT here: the link carries its own token, so
- * it must work whatever session the browser holds. As a guest-only path it
- * bounced any signed-in visitor to the home page before the page could post
- * the token, so the address was silently never verified.
+ * `/verify-email` and `/reset-password` are deliberately NOT here: each mail
+ * link carries its own token, so it must work whatever session the browser
+ * holds. As guest-only paths they bounced any signed-in visitor to the home
+ * page before the page could post the token, so the address was silently never
+ * verified and the password never reset. (A successful reset revokes every
+ * refresh token; the reset page then clears the local session itself.)
+ * `/forgot-password` is open too: it is where a signed-in visitor with a
+ * broken or expired reset link asks for a new one (the reset page's "request a
+ * new link" button leads there); bouncing them home left no way forward.
  */
 function isAuthRelevant(path: string): boolean {
   if (/^\/(profile|seller|products)(\/|$)/.test(path)) return true;
-  // `/support` yardım içeriğini de barındırdığı için (eski /help ile birleşti)
-  // kök sayfa herkese açıktır; giriş gerektiren kısmı sayfa içinde kendi
-  // kartıyla anlatır. Talep DETAYI (`/support/<id>`) korumalı kalır.
+  // `/support` also hosts the help content (merged with the old /help), so the
+  // root page is public; it explains the signed-in part in its own card. A
+  // ticket DETAIL (`/support/<id>`) stays protected.
   if (/^\/support\/.+/.test(path)) return true;
-  if (/^\/(login|register|forgot-password|reset-password)(\/|$)/.test(path))
-    return true;
+  if (/^\/(login|register)(\/|$)/.test(path)) return true;
   if (
     path === "/wishlist" ||
     path === "/collections/liked" ||

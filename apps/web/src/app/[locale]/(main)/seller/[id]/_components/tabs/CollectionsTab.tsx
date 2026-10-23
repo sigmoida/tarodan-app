@@ -2,9 +2,10 @@
 
 "use client";
 
+import { RectangleStackIcon } from "@heroicons/react/24/outline";
 import { Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import CollectionCard from "../../../../(catalog)/collections/_components/CollectionCard";
 import type { Seller, SellerCollection } from "../../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
@@ -31,7 +32,8 @@ export default function CollectionsTab({
   }
   if (collections.length === 0) {
     return (
-      <EmptyStateCard
+      <EmptyState
+        icon={<RectangleStackIcon className="h-7 w-7" />}
         title={t("seller.noCollections")}
         description={t("seller.noCollectionsDesc")}
       />

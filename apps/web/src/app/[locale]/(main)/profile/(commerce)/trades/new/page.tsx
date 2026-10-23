@@ -1,5 +1,7 @@
 "use client";
 
+import { cashAmountValue, signedCashAmount } from "@/lib/cashAmount";
+import { negotiatedAmountError } from "@/lib/negotiatedAmount";
 import { useState, useEffect, Suspense } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -11,7 +13,7 @@ import TradeAddressPicker from "../_components/TradeAddressPicker";
 import SectionCard from "@/components/ui/SectionCard";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/productPrice";
@@ -26,6 +28,7 @@ import TradeProductPicker from "./_components/TradeProductPicker";
 import TradeSummary from "./_components/TradeSummary";
 import TradeCostPreview from "@/components/trade/TradeCostPreview";
 import { useTradeCostPreview } from "@/hooks/useTradeCostPreview";
+import { usePagedPicks } from "@/hooks/usePagedPicks";
 
 function NewTradeContent() {
   const router = useRouter();
@@ -41,7 +44,6 @@ function NewTradeContent() {
 
   const canTrade = Boolean(limits?.canTrade);
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [cashAmount, setCashAmount] = useState("");
   const [cashPayer, setCashPayer] = useState<"me" | "them">("me");
   const [message, setMessage] = useState("");
@@ -62,45 +64,60 @@ function NewTradeContent() {
     listingId,
     enabled,
   );
-  const { products } = useTradeableProducts(listingId, enabled);
+  const {
+    products,
+    isLoading: productsLoading,
+    hasMore,
+    isLoadingMore,
+    loadMore,
+  } = useTradeableProducts(listingId, enabled);
   const createTrade = useCreateTrade();
 
-  const selectedProducts = products.filter((p) => selectedIds.includes(p.id));
-  const cash = parseFloat(cashAmount) || 0;
+  // The picker refetches on open and on tab focus: a pick that is no longer
+  // eligible (deactivated, sold, offered elsewhere) drops out of the offer
+  // instead of being sent and rejected by the API, and is pruned from the
+  // selection so it does not come back checked if the listing returns later.
+  // A pick that only moved onto a page not loaded yet stays (`usePagedPicks`).
+  const picks = usePagedPicks({
+    loaded: products,
+    complete: !hasMore,
+    ready: !productsLoading,
+  });
+  const selectedProducts = picks.picked;
+  const offeredIds = picks.pickedIds;
+  const cash = cashAmountValue(cashAmount);
+  // Text that is not an amount, or an amount above the API's ceiling.
+  const cashError = negotiatedAmountError(cashAmount, t);
 
   const {
     preview: costPreview,
     previewLoading: costPreviewLoading,
     previewFailed: costPreviewFailed,
   } = useTradeCostPreview({
-    myProductIds: selectedIds,
+    myProductIds: offeredIds,
     theirProductIds: target ? [target.id] : [],
     cashAmount,
     cashPayer,
     enabled,
   });
 
-  const toggle = (id: string) =>
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-
   const submit = () => {
-    // API en az 1 teklif edilen ürün ister (CreateTradeDto initiatorItems ArrayMinSize(1));
-    // yalnız nakitle teklif sunucuda reddedilirdi.
-    if (selectedIds.length === 0)
+    // The API wants at least one offered item (CreateTradeDto initiatorItems
+    // ArrayMinSize(1)); a cash-only offer would be refused on the server.
+    if (offeredIds.length === 0)
       return toast.error(t("trade.selectAtLeastOneOffer"));
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
       return toast.error(t("page.new.page.lutfenBirTeslimatAdresiSecinVeya"));
+    if (cashError) return toast.error(cashError);
     const sellerId = getSellerId(target);
     if (!sellerId) return toast.error(t("trade.sellerNotFound"));
 
     createTrade.mutate({
       receiverId: sellerId,
-      initiatorItems: selectedIds.map((id) => ({ productId: id, quantity: 1 })),
+      initiatorItems: offeredIds.map((id) => ({ productId: id, quantity: 1 })),
       receiverItems: [{ productId: target.id, quantity: 1 }],
-      cashAmount: cash > 0 ? (cashPayer === "me" ? cash : -cash) : undefined,
+      cashAmount: signedCashAmount(cashAmount, cashPayer),
       message: message || undefined,
       shippingAddressId: addressId || undefined,
     });
@@ -118,7 +135,8 @@ function NewTradeContent() {
     return (
       <PageShell className="pb-16">
         <div className="mx-auto w-full max-w-2xl px-4 pt-4">
-          <EmptyStateCard
+          <EmptyState
+            icon={<ArrowsRightLeftIcon className="h-7 w-7" />}
             title={t("trade.targetNotFound")}
             description={t("trade.targetNotFoundDesc")}
             action={
@@ -179,9 +197,13 @@ function NewTradeContent() {
           className="flex-1"
         >
           <TradeProductPicker
-            products={products}
-            selectedIds={selectedIds}
-            onToggle={toggle}
+            products={picks.rows}
+            isLoading={productsLoading}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMore}
+            selectedIds={offeredIds}
+            onToggle={picks.toggle}
           />
         </SectionCard>
       </div>
@@ -193,18 +215,16 @@ function NewTradeContent() {
           {t("page.new.page.takasDegeriniDengelemekIcinNakitFark")}
         </p>
         <div className="space-y-4">
-          <div className="relative max-w-xs">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">
-              ₺
-            </span>
+          <div className="max-w-xs">
             <Input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              leftAdornment="₺"
               value={cashAmount}
               onChange={(e) => setCashAmount(e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="pl-10"
+              placeholder="0,00"
+              helperText={t("trade.cashHelper")}
+              error={cashError}
             />
           </div>
           {cash > 0 && (
@@ -282,7 +302,7 @@ function NewTradeContent() {
         <Button
           className="flex-1 gap-2"
           onClick={submit}
-          disabled={selectedIds.length === 0}
+          disabled={offeredIds.length === 0}
           isLoading={createTrade.isPending}
         >
           <ArrowsRightLeftIcon className="h-5 w-5" />

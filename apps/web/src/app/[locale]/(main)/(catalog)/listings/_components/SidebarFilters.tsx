@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, useId } from "react";
 import {
   Accordion,
   AccordionItem,
@@ -10,9 +11,17 @@ import {
   Checkbox,
   Input,
 } from "@tarodan/ui";
+import type { Translate } from "@/types/i18n";
 import { useSidebarFilters } from "../_hooks/useSidebarFilters";
 import FilterOptionList, { type FilterOption } from "./FilterOptionList";
-import type { Filters } from "../_lib/params";
+import {
+  priceFilterIssue,
+  priceFilterIssueMessage,
+  priceFilterParam,
+  priceRangeIssues,
+  type Filters,
+  type PriceFilterIssue,
+} from "../_lib/params";
 
 interface SidebarFiltersProps {
   filters: Filters;
@@ -20,6 +29,29 @@ interface SidebarFiltersProps {
   activeFilterCount: number;
   onClearFilters: () => void;
 }
+
+// Quick price ranges as [min, max] bounds ("" = open); the mobile filter
+// sheet offers the same four.
+const PRICE_RANGES = [
+  ["0", "100"],
+  ["100", "500"],
+  ["500", "1000"],
+  ["1000", ""],
+].map(([min, max]) => ({
+  min,
+  max,
+  // The bounds the range sets, compared with the fields' bounds.
+  bounds: `${priceFilterParam(min)}-${priceFilterParam(max)}`,
+}));
+
+// Boolean catalog flags shown after trade-only in the "options" group, in the
+// mobile filter sheet's order; the keys are the Filters / URL / API param names.
+const FLAG_OPTIONS = [
+  { key: "preOrder", labelKey: "product.preOrder" },
+  { key: "limited", labelKey: "product.limitedEdition" },
+  { key: "set", labelKey: "product.sets" },
+  { key: "discountOnly", labelKey: "product.onSale" },
+] as const;
 
 export default function SidebarFilters({
   filters,
@@ -49,6 +81,7 @@ export default function SidebarFilters({
     toggleCustomAttribute,
     handleConditionChange,
   } = useSidebarFilters({ filters, onFilterChange });
+  const priceErrorId = useId();
 
   // Her bölüm aynı gövdeyi (arama + sınırlı yükseklik + boş durum) kullanır;
   // burada yalnız katalog kaydını seçenek biçimine çeviriyoruz.
@@ -303,71 +336,16 @@ export default function SidebarFilters({
         <AccordionItem value="price">
           <AccordionTrigger>{t("product.price")}</AccordionTrigger>
           <AccordionContent>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  placeholder="Min ₺"
-                  value={filters.minPrice}
-                  onChange={(e) =>
-                    onFilterChange({ ...filters, minPrice: e.target.value })
-                  }
-                  inputSize="sm"
-                  className="min-w-0 flex-1 rounded border-border px-2 focus:border-primary-400"
-                />
-                <span className="flex-shrink-0 text-subtle">-</span>
-                <Input
-                  type="number"
-                  placeholder="Max ₺"
-                  value={filters.maxPrice}
-                  onChange={(e) =>
-                    onFilterChange({ ...filters, maxPrice: e.target.value })
-                  }
-                  inputSize="sm"
-                  className="min-w-0 flex-1 rounded border-border px-2 focus:border-primary-400"
-                />
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {["0-100", "100-500", "500-1000", "1000+"].map((range) => {
-                  const [min, max] = range.split("-");
-                  const isActive =
-                    filters.minPrice === (min || "") &&
-                    filters.maxPrice === (max || "");
-                  return (
-                    <Button
-                      variant="secondary"
-                      key={range}
-                      onClick={() => {
-                        if (isActive) {
-                          onFilterChange({
-                            ...filters,
-                            minPrice: "",
-                            maxPrice: "",
-                          });
-                        } else {
-                          onFilterChange({
-                            ...filters,
-                            minPrice: min === "1000+" ? "1000" : min,
-                            maxPrice: max === undefined ? "" : max,
-                          });
-                        }
-                      }}
-                      className={`rounded px-2 py-1 text-xs transition-colors ${
-                        isActive
-                          ? "bg-primary-500 text-inverted"
-                          : "bg-surface-alt text-muted hover:bg-border-subtle"
-                      }`}
-                    >
-                      {range === "1000+" ? "₺1000+" : `₺${range}`}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
+            <PriceRange
+              filters={filters}
+              onFilterChange={onFilterChange}
+              errorId={priceErrorId}
+              t={t}
+            />
           </AccordionContent>
         </AccordionItem>
 
-        {/* Diğer Seçenekler */}
+        {/* Other options */}
         <AccordionItem value="options">
           <AccordionTrigger>{t("product.options")}</AccordionTrigger>
           <AccordionContent>
@@ -388,9 +366,131 @@ export default function SidebarFilters({
                 </p>
               </div>
             </label>
+            {FLAG_OPTIONS.map(({ key, labelKey }) => (
+              <label
+                key={key}
+                className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-surface"
+              >
+                <Checkbox
+                  checked={filters[key]}
+                  onChange={(e) =>
+                    onFilterChange({ ...filters, [key]: e.target.checked })
+                  }
+                  className="h-5 w-5"
+                />
+                <span className="text-sm font-medium text-body">
+                  {t(labelKey)}
+                </span>
+              </label>
+            ))}
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+    </div>
+  );
+}
+
+/**
+ * Min/max price fields and the quick ranges. The fields keep the typed text in
+ * `filters` (see `priceFilterBound`): the search, the URL and the chip read
+ * only the parsed bound, so refused text ("1.000") or a bound above the search
+ * maximum filters nothing and shows its message (`priceFilterIssueMessage`,
+ * one per issue, each field described by its own) instead of searching for
+ * 1 TL or failing the search.
+ */
+function PriceRange({
+  filters,
+  onFilterChange,
+  errorId,
+  t,
+}: {
+  filters: Filters;
+  onFilterChange: (filters: Filters) => void;
+  errorId: string;
+  t: Translate;
+}) {
+  const fields = [
+    { key: "minPrice", placeholder: "Min ₺", label: t("product.minPrice") },
+    { key: "maxPrice", placeholder: "Max ₺", label: t("product.maxPrice") },
+  ] as const;
+  const issues = priceRangeIssues(filters);
+  const messageId = (issue: PriceFilterIssue) => `${errorId}-${issue}`;
+  // No range is active while a field has an issue: its "" would match an open
+  // range bound ("1.000" next to max 100 is not "0-100").
+  const bounds = issues.length
+    ? null
+    : `${priceFilterParam(filters.minPrice)}-${priceFilterParam(filters.maxPrice)}`;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {fields.map(({ key, placeholder, label }, i) => {
+          const fieldIssue = priceFilterIssue(filters[key]);
+          return (
+            <Fragment key={key}>
+              {i > 0 && <span className="flex-shrink-0 text-subtle">-</span>}
+              <Input
+                bare
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                aria-label={label}
+                placeholder={placeholder}
+                value={filters[key]}
+                onChange={(e) =>
+                  onFilterChange({ ...filters, [key]: e.target.value })
+                }
+                error={
+                  fieldIssue
+                    ? priceFilterIssueMessage(fieldIssue, t)
+                    : undefined
+                }
+                aria-invalid={fieldIssue ? true : undefined}
+                aria-describedby={
+                  fieldIssue ? messageId(fieldIssue) : undefined
+                }
+                inputSize="sm"
+                className="min-w-0 flex-1 rounded px-2"
+              />
+            </Fragment>
+          );
+        })}
+      </div>
+      {issues.map((issue) => (
+        <p
+          key={issue}
+          id={messageId(issue)}
+          role="alert"
+          className="text-xs text-danger-600"
+        >
+          {priceFilterIssueMessage(issue, t)}
+        </p>
+      ))}
+      <div className="flex flex-wrap gap-1">
+        {PRICE_RANGES.map(({ min, max, bounds: rangeBounds }) => {
+          // Compared as bounds, so "100,00" typed by hand lights "100".
+          const isActive = bounds === rangeBounds;
+          return (
+            <Button
+              variant="secondary"
+              key={`${min}-${max}`}
+              onClick={() =>
+                onFilterChange({
+                  ...filters,
+                  minPrice: isActive ? "" : min,
+                  maxPrice: isActive ? "" : max,
+                })
+              }
+              className={`rounded px-2 py-1 text-xs transition-colors ${
+                isActive
+                  ? "bg-primary-500 text-inverted"
+                  : "bg-surface-alt text-muted hover:bg-border-subtle"
+              }`}
+            >
+              {max ? `₺${min}-${max}` : `₺${min}+`}
+            </Button>
+          );
+        })}
+      </div>
     </div>
   );
 }

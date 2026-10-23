@@ -1,6 +1,7 @@
 import type { Breadcrumb, Event } from "@sentry/node";
 import { getRequestId } from "../../common/context/request-context";
 import {
+  redactRequestBody,
   redactSensitive,
   redactUrlQuery,
 } from "../../common/security/redact-sensitive";
@@ -21,6 +22,12 @@ export function applySentryEventPolicy<T extends Event>(event: T): T | null {
     event.tags = { ...event.tags, requestId };
   }
 
+  // The SDK stores the request body as a JSON string, out of reach of the
+  // key-based pass (a failed login would carry its password). It is redacted
+  // first, on the raw text: the generic pass below could break the JSON.
+  if (event.request?.data !== undefined) {
+    event.request.data = redactRequestBody(event.request.data);
+  }
   return redactSensitive(event) as T;
 }
 

@@ -8,6 +8,7 @@ import { discountsApi, userApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Discount, DiscountFormData, SellerProduct } from "../_lib/types";
+import { buildPayload } from "../_lib/payload";
 
 const RESOURCE = "profile-discounts";
 const PRODUCTS_RESOURCE = "profile-discounts-products";
@@ -45,45 +46,6 @@ export function useSellerProducts(enabled: boolean) {
     query: { meta: { page: "profile-discounts-products" } },
   });
   return query.data ?? [];
-}
-
-function buildPayload(form: DiscountFormData) {
-  const isQuantityType = form.type === "bogo" || form.type === "bulk_quantity";
-  return {
-    // Adet koşullu kampanya KODSUZ-otomatiktir: sepette kendiliğinden uygulanır.
-    code: isQuantityType ? undefined : form.code.trim() || undefined,
-    name: form.name,
-    description: form.description || undefined,
-    type: form.type,
-    // bogo'da değer kullanılmaz; bedava adet buy/get'ten gelir.
-    value: form.type === "bogo" ? 0 : form.value,
-    buyQuantity:
-      form.type === "bogo"
-        ? parseInt(form.buyQuantity) || undefined
-        : undefined,
-    getQuantity:
-      form.type === "bogo"
-        ? parseInt(form.getQuantity) || undefined
-        : undefined,
-    minQuantity:
-      form.type === "bulk_quantity"
-        ? parseInt(form.minQuantity) || undefined
-        : undefined,
-    scope: form.scope,
-    targetProductIds: form.scope === "product" ? form.targetProductIds : [],
-    minCartValue: form.minCartValue ? parseFloat(form.minCartValue) : undefined,
-    maxDiscountAmount: form.maxDiscountAmount
-      ? parseFloat(form.maxDiscountAmount)
-      : undefined,
-    usageLimitTotal: form.usageLimitTotal
-      ? parseInt(form.usageLimitTotal)
-      : undefined,
-    usageLimitPerUser: parseInt(form.usageLimitPerUser) || 1,
-    isStackable: form.isStackable,
-    isActive: form.isActive,
-    startDate: new Date(form.startDate).toISOString(),
-    endDate: new Date(form.endDate + "T23:59:59").toISOString(),
-  };
 }
 
 /** Create or update a discount (update when `id` is passed). */

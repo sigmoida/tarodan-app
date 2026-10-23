@@ -37,6 +37,10 @@ import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper"
 import { isPaymentExpiryCancellation } from "../../trade/helpers/trade-cancellation";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
 import { resolveTimingValue } from "../../../common/timing-rules";
+import {
+  notifyWebRevalidate,
+  productListTags,
+} from "../../../common/helpers/revalidate";
 import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import {
@@ -529,13 +533,20 @@ export class PaymentFulfillmentService {
     const isMembershipOrder = resultOrder.productId.startsWith("membership-");
     const isBoostOrder = resultOrder.productId.startsWith("boost-");
 
-    // Ürün listesi cache'ini temizle:
-    // - Boost: öne çıkarma sıralamayı etkiler.
-    // - Normal ürün siparişi: stok düşer, tükenince status=inactive olur → ürün
-    //   listelerde "stokta yok" olarak sona kayar; sıralama/görünürlük değişir.
-    // Membership siparişleri ürün listelerini etkilemez.
+    // Clear the API product list cache:
+    // - Boost: a promotion changes the list order.
+    // - Regular order: stock goes down; at zero the listing turns inactive
+    //   and moves to the end of the lists as "out of stock".
+    // Membership orders do not change the product lists.
     if (!isMembershipOrder) {
       await this.cache.delPattern("products:list:*").catch(() => {});
+    }
+    // A paid boost also refreshes the web's ISR copy of the lists (home
+    // rails) and of the listing page. Only after the API list cache above is
+    // cleared, or the web would fetch the stale API list again. Best-effort,
+    // never throws; the web's revalidate window is the fallback.
+    if (isBoostOrder && result.productIdsToInvalidate.length > 0) {
+      void notifyWebRevalidate(productListTags(result.productIdsToInvalidate));
     }
 
     // Faz 8.1: fiziksel siparişin POST-COMMIT sonlandırması (ledger capture + order.paid

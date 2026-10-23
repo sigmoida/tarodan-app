@@ -9,6 +9,7 @@ import RequiredStepsGate from "@/components/required-steps/RequiredStepsGate";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Container } from "@/components/layout/Container";
+import BoostOfferMount from "@/components/boost/BoostOfferMount";
 import PreferredLanguageSync from "@/components/PreferredLanguageSync";
 
 /**
@@ -31,6 +32,7 @@ export default function MainLayout({
             tek montaj noktası, aynı anda tek pencere. Üyelik kapısından
             bağımsız, her storefront sayfasında. */}
         <RequiredStepsGate />
+        <BoostOfferMount />
         <BusinessMembershipGuard>
           <SellerAddressPrompt />
           <Header />

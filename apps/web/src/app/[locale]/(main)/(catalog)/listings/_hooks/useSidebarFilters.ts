@@ -10,7 +10,7 @@ import type { Filters } from "../_lib/params";
 import {
   useListingFiltersQuery,
   type CustomAttributeGroup,
-} from "./useListingFiltersQuery";
+} from "@/hooks/useListingFiltersQuery";
 
 interface Category {
   id: string;

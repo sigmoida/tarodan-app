@@ -25,6 +25,7 @@ import {
 import { type Locale } from "@tarodan/i18n";
 import { UserService } from "./user.service";
 import { JwtAuthGuard, CurrentUser, Public } from "../auth";
+import { RequireReauth } from "../auth/reauth/require-reauth.decorator";
 import { I18nService, ReqLocale } from "../i18n";
 import {
   UpdateProfileDto,
@@ -37,6 +38,7 @@ import {
 } from "./dto";
 import { errorMessage } from "../../common/helpers/error-message";
 import { Throttle } from "@nestjs/throttler";
+import { clientIpThrottle } from "../../common/helpers/client-ip";
 import { BlockUserDto } from "./dto/block-user.dto";
 import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 
@@ -134,19 +136,26 @@ export class UserController {
 
   /**
    * DELETE /users/me
-   * Delete current user account
+   * Deletes the signed-in account. Step-up: a token sent in the
+   * `X-Reauth-Token` header (or a `reauthToken` body field) is checked;
+   * without one the request passes while the setting
+   * `auth_require_reauth_for_sensitive_actions` is off (mobile versions
+   * without the step-up send none).
    */
   @Delete("me")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  // Per client IP: web deletions arrive from the gateway's one address.
+  @Throttle(clientIpThrottle(5))
+  @RequireReauth({ required: "setting", flow: "account_delete" })
   @ApiOperation({
-    summary: "Hesabı sil",
+    summary: "Delete the account",
     description:
-      "Hesabı silmek için tüm ilanlar kaldırılmış, aktif takas teklifi ve bekleyen sipariş olmamalıdır.",
+      "Every listing must be removed, with no active trade offer and no pending order.",
   })
   @ApiResponse({
     status: 200,
-    description: "Hesap silindi",
+    description: "Account deleted",
     schema: {
       type: "object",
       properties: {
@@ -156,7 +165,8 @@ export class UserController {
   })
   @ApiResponse({
     status: 400,
-    description: "Hesap silinemez - aktif ilan, takas veya sipariş var",
+    description:
+      "The account cannot be deleted: active listings, trades or orders",
     schema: {
       type: "object",
       properties: {

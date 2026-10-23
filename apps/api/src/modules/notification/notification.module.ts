@@ -34,6 +34,8 @@ import { MailModule } from "../mail/mail.module";
     // ExpoPushProvider makbuz (receipt) kontrolünü gecikmeli `push` işi olarak
     // planlar; kök bağlantı BullRootModule'dedir (her rolde yüklenir).
     BullModule.registerQueue({ name: QUEUE_NAMES.PUSH }),
+    // Account security notices are queued, never sent inside the caller.
+    BullModule.registerQueue({ name: QUEUE_NAMES.EMAIL }),
   ],
   controllers: [NotificationController],
   providers: [

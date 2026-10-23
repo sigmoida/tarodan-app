@@ -13,6 +13,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { MembershipTierType, SubscriptionStatus } from "@prisma/client";
+import { SAVED_SEARCH_TIER_LIMIT_MAX } from "@tarodan/types";
 import { MAX_PRODUCT_IMAGES } from "../../product/helpers/product-image-keys";
 import { PAYMENT_PURPOSES, type PaymentPurpose } from "../../../config/paytr";
 
@@ -112,6 +113,14 @@ export class UpdateMembershipTierDto {
   @IsBoolean()
   isAdFree?: boolean;
 
+  // 0 is valid: a tier without saved searches.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(SAVED_SEARCH_TIER_LIMIT_MAX)
+  maxSavedSearches?: number;
+
   // featuredListingSlots + commissionDiscount BİLEREK düzenlenemez: ilki ücretli
   // öne çıkarma paketlerine devredildi, ikincisi komisyon motoru tarafından hiç
   // okunmadı. DB kolonları (deprecated) duruyor ama admin yanıltıcı değer yazamaz.
@@ -172,6 +181,14 @@ export class CreateMembershipTierDto {
   @IsBoolean()
   canTrade: boolean;
 
+  // Same bounds as UpdateMembershipTierDto; missing means the column default.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(SAVED_SEARCH_TIER_LIMIT_MAX)
+  maxSavedSearches?: number;
+
   /**
    * Yükseltme/düşürme yönü katmanların sortOrder karşılaştırmasından çıkar —
    * alan yük taşır. Ayarlanamadığında yeni katman 0'a (free ile aynı sıraya)
@@ -216,6 +233,8 @@ export class MembershipTierResponseDto {
   isAdFree: boolean;
   /** DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı; yeni yanıtlarda doldurulmaz, hiçbir yerde okunmaz. */
   featuredListingSlots?: number;
+  /** Most saved searches a member of the tier may keep. */
+  maxSavedSearches: number;
   isActive: boolean;
 }
 
@@ -273,6 +292,11 @@ export class MembershipLimitsDto {
   remainingFeaturedSlots?: number;
   tierName: string;
   tierType: MembershipTierType;
+  /**
+   * Most saved searches the effective tier allows; `POST /saved-searches`
+   * refuses the next one. Existing searches above it (after a downgrade) stay.
+   */
+  maxSavedSearches: number;
 }
 
 // Re-export payment DTOs

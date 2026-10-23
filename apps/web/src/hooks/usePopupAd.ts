@@ -11,6 +11,7 @@ import {
   isPopupBlockedByOverlay,
   markPopupAdDismissed,
 } from "@/lib/ads/popupFrequency";
+import { useBoostDialogStore } from "@/stores/boostDialogStore";
 import { useOnboardingTourStore } from "@/stores/onboardingTourStore";
 import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 
@@ -18,16 +19,21 @@ import { useRequiredStepsStore } from "@/stores/requiredStepsStore";
 export const POPUP_AD_DELAY_MS = 3000;
 
 /**
- * Popup afişi — yalnız ana sayfada bağlanır (`PopupAd`), her girişte yeniden
- * değerlendirilir. Sıklık reklamın kendisinde (`popupFrequency`): kapatılmış
- * `until_dismissed` reklamlar seçimden ÖNCE elenir (`canShowPopupAd`).
- * Yalnız başka hiçbir katman (zorunlu adım, çerez bandı, tanıtım turu) açık
- * değilken, ~3 sn sonra açılır; bir katman gecikmede açılırsa sayaç iptal
- * olur, kapanınca yeniden başlar. Kapatma kaydı yalnız kapatınca yazılır.
+ * The popup ad: mounted on the home page only (`PopupAd`) and evaluated on
+ * every visit. The frequency lives on the ad itself (`popupFrequency`):
+ * dismissed `until_dismissed` ads are dropped BEFORE the pick
+ * (`canShowPopupAd`). It opens ~3 s later, and only while no other layer is
+ * on screen (a required step, the cookie banner, the onboarding tour, the
+ * boost offer or a boost dialog); a layer that opens during the delay
+ * cancels the timer, which restarts once it closes. The dismissal is
+ * recorded only on close.
  */
 export function usePopupAd(): { ad: Advertisement | null; close: () => void } {
   const outstanding = useRequiredStepsStore((s) => s.outstanding);
   const tourRunning = useOnboardingTourStore((s) => s.running);
+  const boostOpen = useBoostDialogStore(
+    (s) => s.offerOpen || s.openDialogs > 0,
+  );
   const { needsConsent: cookieBannerOpen } = useCookieConsent();
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
@@ -41,6 +47,7 @@ export function usePopupAd(): { ad: Advertisement | null; close: () => void } {
     requiredStepsOutstanding: outstanding,
     cookieBannerOpen,
     tourRunning,
+    boostOpen,
   });
 
   useEffect(() => {

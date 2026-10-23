@@ -11,8 +11,8 @@ import { queryKeys } from "@/lib/query/keys";
  * unread counts, thread-list freshness) — mirrors mobile's _layout.tsx behaviour.
  *
  * Registers ONLY the global socket events:
- *   - notification:new → bildirim sayacı + listesi
- *   - thread:updated    → mesaj listesi + okunmamış sayacı
+ *   - notification:new → notification badge + list
+ *   - thread:updated    → thread list + unread message count
  *
  * Thread-scoped events (message:new / message:read / typing) stay in
  * useMessagingSocket so they only fire on the messages page.
@@ -23,6 +23,16 @@ import { queryKeys } from "@/lib/query/keys";
  * import would ship socket.io in that bundle even though only signed-in users
  * ever open a connection. An anonymous visitor (token === null) never triggers
  * the import, so the chunk stays out of the critical path.
+ *
+ * Dormant today: since tokens moved to httpOnly cookies, `authStore.token` is
+ * always null and the API socket only accepts a bearer token in the handshake,
+ * so neither effect below connects. Restoring it needs a socket credential the
+ * cookie session can hand out (tracked in the tarodan-ops backlog).
+ *
+ * The query cache is NOT cleared here: that is keyed on the session owner in
+ * the auth store (`lib/query/sessionCache`). It sees what the store learns:
+ * its own sign-in and sign-out actions, `checkAuth`, an ended session the API
+ * client reports, and another tab's change picked up by `reconcileSession`.
  */
 export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -54,8 +64,8 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.trades.pendingCount(),
         });
-        // Sipariş bildirimleri (kargoya verildi / teslim edildi / kargo kodu
-        // hazır) açık grup listesini ve grup ekranını da tazelesin.
+        // Order notifications (shipped / delivered / shipping code ready)
+        // also refresh the open order list and order screen.
         queryClient.invalidateQueries({ queryKey: queryKeys.orders.all() });
         queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail() });
       };
@@ -83,18 +93,13 @@ export function RealtimeProvider({ children }: { children?: React.ReactNode }) {
     };
   }, [token, queryClient]);
 
-  // Logout: socket'i kapat + React Query cache'ini temizle. Aksi halde aynı
-  // QueryClient bir sonraki hesaba taşınır ve önceki kullanıcının bildirim/
-  // sayaç verisi görünür. Tüm logout yolları için çalışır (buton, 401, token).
+  // Logout: close the socket. Only reach for the socket module if we actually
+  // opened one, which keeps the socket.io chunk out of a guest's bundle.
   useEffect(() => {
-    if (token) return;
-    queryClient.clear();
-    // Only reach for the socket module if we actually opened one — keeps the
-    // socket.io chunk out of an anonymous visitor's bundle.
-    if (!connectedRef.current) return;
+    if (token || !connectedRef.current) return;
     connectedRef.current = false;
     import("@/lib/socket").then(({ disconnectSocket }) => disconnectSocket());
-  }, [token, queryClient]);
+  }, [token]);
 
   return <>{children ?? null}</>;
 }

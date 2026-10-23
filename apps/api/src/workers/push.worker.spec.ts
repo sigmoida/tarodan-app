@@ -75,6 +75,21 @@ describe("PushWorker — teklif bildirimi mükerrer filtresi", () => {
     expect(prisma.notificationLog.create).not.toHaveBeenCalled();
   });
 
+  it("stores the in-app row without an emoji icon", async () => {
+    const { worker, prisma } = makeWorker(null);
+
+    await (worker as any).saveInAppNotification(
+      "buyer-1",
+      "Teklif Kabul Edildi!",
+      "gövde",
+      queueData,
+    );
+
+    const { data } = prisma.notificationLog.create.mock.calls[0][0];
+    expect(data.data).not.toHaveProperty("icon");
+    expect(data.data).toMatchObject({ offerId: queueData.offerId });
+  });
+
   it("dispatch emisyonu kuyruk payload'ıyla AYNI offerId anahtarını taşır", async () => {
     // İki ucun sözleşmesi: notifyOfferAccepted'ın data'sı offerId içermezse
     // yukarıdaki filtre sorgusu (path: ["offerId"]) dispatch satırını asla

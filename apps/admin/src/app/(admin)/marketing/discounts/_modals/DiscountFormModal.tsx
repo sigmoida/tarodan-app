@@ -14,10 +14,11 @@ import {
 import { adminApi } from "@/lib/api";
 import { Panel } from "@/components/detail/Panel";
 import { SectionTitle } from "@/components/detail/SectionTitle";
-import { useUserOptions, userOptionLabel } from "../_hooks/useUserOptions";
+import { useUserOptions } from "../_hooks/useUserOptions";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { discountSchema, type DiscountFormValues } from "../_lib/schema";
+import { discountFormToPayload, discountToForm } from "../_lib/form";
 import {
   audienceFormOptions,
   discountTypeOptions,
@@ -27,136 +28,6 @@ import {
   type Discount,
 } from "../_lib/types";
 import { useTranslations } from "next-intl";
-
-const isoDate = (offsetDays = 0) =>
-  new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
-
-/** Discount → form defaults (numerics converted to strings). */
-function toDefaults(d?: Discount): DiscountFormValues {
-  if (!d) {
-    return {
-      code: "",
-      name: "",
-      description: "",
-      type: "percentage",
-      value: "10",
-      scope: "global",
-      categoryId: "",
-      target: "buyer_commission",
-      audience: "everyone",
-      targetTierTypes: [],
-      targetUserIds: [],
-      budgetLimit: "",
-      minCartValue: "",
-      minQuantity: "",
-      buyQuantity: "",
-      getQuantity: "",
-      maxDiscountAmount: "",
-      usageLimitTotal: "",
-      usageLimitPerUser: "1",
-      isStackable: false,
-      isActive: true,
-      isFlashSale: false,
-      startDate: isoDate(),
-      endDate: isoDate(30),
-    };
-  }
-  return {
-    code: d.code ?? "",
-    name: d.name,
-    description: d.description ?? "",
-    type: d.type,
-    value: String(d.value),
-    scope: d.scope === "category" ? "category" : "global",
-    categoryId: d.categoryId ?? "",
-    // Ürün fiyatı kampanyaları satıcıya aittir ve bu formdan düzenlenmez;
-    // eski bir kayıt açılırsa varsayılan bedel kalemine düşer.
-    target:
-      d.target && d.target !== "product_price" ? d.target : "buyer_commission",
-    audience: d.audience ?? "everyone",
-    targetTierTypes: (d.targetTierTypes ?? []).map((value) => ({
-      value,
-      label: value,
-    })),
-    // Sunucu hedeflenen kişileri adlarıyla döndürür; yalnız kimlik geldiğinde
-    // (eski yanıt) çip kimliği gösterir — seçim yine de KAYBOLMAZ, ki düzenleme
-    // kaydı kitleyi sıfırlamasın.
-    targetUserIds: (d.targetUsers?.length
-      ? d.targetUsers.map((u) => ({
-          value: u.id,
-          label: userOptionLabel(u),
-        }))
-      : (d.targetUserIds ?? []).map((id) => ({
-          value: id,
-          label: id,
-        }))) as Array<{
-      value: string;
-      label: string;
-    }>,
-    budgetLimit: d.budgetLimit?.toString() ?? "",
-    minCartValue: d.minCartValue?.toString() ?? "",
-    minQuantity: d.minQuantity?.toString() ?? "",
-    buyQuantity: d.buyQuantity?.toString() ?? "",
-    getQuantity: d.getQuantity?.toString() ?? "",
-    maxDiscountAmount: d.maxDiscountAmount?.toString() ?? "",
-    usageLimitTotal: d.usageLimitTotal?.toString() ?? "",
-    // null = limitsiz; formda 0 olarak temsil edilir (API sözleşmesi: 0 = limitsiz).
-    usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
-    isStackable: d.isStackable,
-    isActive: d.isActive,
-    isFlashSale: d.isFlashSale,
-    startDate: d.startDate.split("T")[0],
-    endDate: d.endDate.split("T")[0],
-  };
-}
-
-/** Convert form values into the backend payload (string→number/ISO). */
-function toPayload(v: DiscountFormValues) {
-  return {
-    code: v.code.trim() ? v.code.trim().toUpperCase() : null,
-    name: v.name,
-    description: v.description || undefined,
-    type: v.type,
-    value: parseFloat(v.value) || 0,
-    scope: v.scope,
-    categoryId: v.scope === "category" ? v.categoryId : undefined,
-    minCartValue: v.minCartValue ? parseFloat(v.minCartValue) : undefined,
-    minQuantity: v.minQuantity ? parseInt(v.minQuantity) : undefined,
-    buyQuantity: v.buyQuantity ? parseInt(v.buyQuantity) : undefined,
-    getQuantity: v.getQuantity ? parseInt(v.getQuantity) : undefined,
-    maxDiscountAmount: v.maxDiscountAmount
-      ? parseFloat(v.maxDiscountAmount)
-      : undefined,
-    usageLimitTotal: v.usageLimitTotal
-      ? parseInt(v.usageLimitTotal)
-      : undefined,
-    // 0 = kişi-başı limitsiz (yalnız 'herkes' kitlesinde; misafirler ancak
-    // limitsiz kodu kullanabilir). Boş bırakılırsa varsayılan 1.
-    usageLimitPerUser:
-      v.usageLimitPerUser.trim() === ""
-        ? 1
-        : parseInt(v.usageLimitPerUser) || 0,
-    isStackable: v.isStackable,
-    priority: 0,
-    isActive: v.isActive,
-    isFlashSale: v.isFlashSale,
-    startDate: new Date(v.startDate).toISOString(),
-    endDate: new Date(v.endDate + "T23:59:59").toISOString(),
-    target: v.target,
-    audience: v.audience,
-    targetTierTypes:
-      v.audience === "membership_tiers"
-        ? v.targetTierTypes.map((option) => option.value)
-        : [],
-    targetUserIds:
-      v.audience === "specific_buyers" || v.audience === "specific_sellers"
-        ? v.targetUserIds.map((option) => option.value)
-        : [],
-    budgetLimit: v.budgetLimit ? parseFloat(v.budgetLimit) : undefined,
-  };
-}
 
 /** Create/edit discount. Mount with `key={discount?.id ?? 'new'}` so defaults seed fresh. */
 export function DiscountFormModal({
@@ -171,7 +42,7 @@ export function DiscountFormModal({
   const t = useTranslations();
   const isEdit = Boolean(discount);
   const form = useZodForm(discountSchema(t), {
-    defaultValues: toDefaults(discount),
+    defaultValues: discountToForm(discount),
   });
   const { data: categories = [] } = useCategories();
 
@@ -208,8 +79,11 @@ export function DiscountFormModal({
   const save = useAdminMutation(
     (v: DiscountFormValues) =>
       isEdit
-        ? adminApi.patch(`/admin/discounts/${discount!.id}`, toPayload(v))
-        : adminApi.post("/admin/discounts", toPayload(v)),
+        ? adminApi.patch(
+            `/admin/discounts/${discount!.id}`,
+            discountFormToPayload(v),
+          )
+        : adminApi.post("/admin/discounts", discountFormToPayload(v)),
     {
       invalidates: ["discounts"],
       successMessage: isEdit
@@ -264,11 +138,12 @@ export function DiscountFormModal({
           options={targetFormOptions(t)}
           helperText={t("admin.marketing.discounts.targetHelper")}
         />
+        {/* Amounts are text, not type="number" (see `@/lib/schemas/amount`). */}
         <FormInput
           name="budgetLimit"
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           label={t("admin.marketing.discounts.budgetLimit")}
           helperText={t("admin.marketing.discounts.budgetHelper")}
         />
@@ -322,10 +197,9 @@ export function DiscountFormModal({
         />
         <FormInput
           name="value"
-          type="number"
-          min="0"
-          max={type === "percentage" || type === "bogo" ? 100 : 10000}
-          step={type === "percentage" || type === "bogo" ? 1 : 0.01}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           label={
             type === "bogo"
               ? t("admin.marketing.discounts.bogoRate")
@@ -401,17 +275,17 @@ export function DiscountFormModal({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormInput
           name="minCartValue"
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           label={t("admin.marketing.discounts.minCartValue")}
           placeholder={t("admin.marketing.discounts.hundredExample")}
         />
         <FormInput
           name="maxDiscountAmount"
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           label={t("admin.marketing.discounts.maxDiscountAmount")}
           placeholder={t("admin.marketing.discounts.fiveHundredExample")}
         />

@@ -26,6 +26,32 @@ describe("toConsentRow", () => {
     });
   });
 
+  it("binds a trade consent to its cash payment, and nothing else to one", () => {
+    const trade = toConsentRow(
+      {
+        document: "distance_sales",
+        source: ConsentSource.payment,
+        subject: { userId: "u1" },
+        tradeCashPaymentId: "tcp-1",
+      },
+      null,
+      null,
+    );
+    const cart = toConsentRow(
+      {
+        document: "distance_sales",
+        source: ConsentSource.checkout,
+        subject: { userId: "u1" },
+        checkoutGroupId: "group-1",
+      },
+      null,
+      null,
+    );
+
+    expect(trade.tradeCashPaymentId).toBe("tcp-1");
+    expect(cart.tradeCashPaymentId).toBeNull();
+  });
+
   it("lower-cases and trims the guest email", () => {
     const row = toConsentRow(
       {

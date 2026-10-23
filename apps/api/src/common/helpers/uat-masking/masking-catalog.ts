@@ -421,6 +421,17 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
     columns: { [column]: JSON_SCRUB },
   })),
   {
+    table: "saved_searches",
+    action: "mask",
+    reason:
+      "Saved search: the search text in the query and the labels are typed by the user and may carry contact data; the filters stay. The query hash is the SHA-256 of the original, unscrubbed query, so a short search text (a phone number) could be confirmed or brute-forced from it: it becomes a fake derived from the row id, unique per row and so per (user_id, query_hash).",
+    columns: {
+      query: JSON_SCRUB,
+      labels: JSON_SCRUB,
+      query_hash: fake("token", { unique: true }),
+    },
+  },
+  {
     table: "orders",
     action: "mask",
     reason:
@@ -517,10 +528,13 @@ export const UAT_MASKING_CATALOG: readonly MaskRule[] = [
       ["ratings", ["comment"]],
       ["product_ratings", ["title", "review", "admin_reply"]],
       ["collections", ["name", "description"]],
+      ["saved_searches", ["name"]],
       ["collection_items", ["custom_title", "custom_description"]],
       ["addresses", ["title"]],
       ["messages", ["flagged_reason"]],
       ["moderation_events", ["reason"]],
+      // Staff-written boost grant and stop reasons (admin boost screen).
+      ["product_boosts", ["grant_reason", "cancel_reason"]],
       ["product_removal_events", ["detail"]],
       ["commission_ledger", ["waived_reason"]],
       ["discount_usages", ["revoke_reason"]],
@@ -1026,7 +1040,7 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
   },
   {
     reason:
-      "Kişisel veri taşımayan JSON: ayar, kural, tarife, tutar ve politika görüntüleri, etiketler, toplu sayılar.",
+      "JSON without personal data: settings, rules, tariffs, amount and policy snapshots, labels, aggregate counts.",
     columns: [
       "users.notification_settings",
       "admin_users.permissions",
@@ -1043,6 +1057,10 @@ export const UAT_MASK_ALLOW_GROUPS: readonly AllowListGroup[] = [
       "search_indexes.settings",
       "mail_area_settings.events",
       "elogo_invoices.line_items",
+      // `SellerTrustComponentsV1`: counts and sub-scores of the trust formula
+      // only, built field by field in `computeSellerTrust`; no ids, names,
+      // e-mails or hashes.
+      "seller_trust_scores.components",
     ],
   },
 ];

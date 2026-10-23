@@ -30,6 +30,8 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
   ) => {
     const prisma = {
       payment: { findUnique: jest.fn().mockResolvedValue(payment) },
+      // Not a boost order (the boost guard has its own spec).
+      productBoost: { findUnique: jest.fn().mockResolvedValue(null) },
       tradeCashPayment: {
         findMany: jest.fn().mockResolvedValue(tradeFixture?.cashPayments ?? []),
       },

@@ -1,6 +1,13 @@
 "use client";
 
-import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  type InfiniteData,
+  useQuery,
+  type UseInfiniteQueryOptions,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
+import { nextPageParam, type PagedResult } from "@/lib/pagedList";
 import { webKeys } from "@/lib/query/keys";
 
 /**
@@ -64,5 +71,48 @@ export function useWebItem<T>({
     queryKey: webKeys.detail(resource, id),
     queryFn: () => fetcher(id),
     enabled: enabled ?? !!id,
+  });
+}
+
+export interface UseWebInfiniteListOptions<T> {
+  /** Resource name; the key is `webKeys.infinite(resource, params)`. */
+  resource: string;
+  /** Key discriminators (user, filters). The page is NOT part of the key: one entry holds every loaded page. */
+  params?: unknown;
+  /** Fetches one page (1-based) and returns it as a `PagedResult`. */
+  fetchPage: (page: number) => Promise<PagedResult<T>>;
+  enabled?: boolean;
+  query?: Omit<
+    UseInfiniteQueryOptions<
+      PagedResult<T>,
+      Error,
+      InfiniteData<PagedResult<T>, number>,
+      readonly unknown[],
+      number
+    >,
+    | "queryKey"
+    | "queryFn"
+    | "enabled"
+    | "initialPageParam"
+    | "getNextPageParam"
+    | "select"
+  >;
+}
+
+/** Paged "Show more" list over `useInfiniteQuery`, under a web resource key. */
+export function useWebInfiniteList<T>({
+  resource,
+  params,
+  fetchPage,
+  enabled = true,
+  query,
+}: UseWebInfiniteListOptions<T>) {
+  return useInfiniteQuery({
+    ...query,
+    queryKey: webKeys.infinite(resource, params),
+    queryFn: ({ pageParam }) => fetchPage(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: nextPageParam,
+    enabled,
   });
 }

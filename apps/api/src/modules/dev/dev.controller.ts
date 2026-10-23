@@ -293,6 +293,7 @@ export class DevController {
       "cart_items",
       "wishlists",
       "wishlist_items",
+      "saved_searches",
       "support_tickets",
       "ticket_messages",
       "notification_logs",
@@ -303,6 +304,8 @@ export class DevController {
       "ratings",
       "product_likes",
       "product_boosts",
+      // Dismissed new-listing boost offers belong to the listings' boosts.
+      "boost_offer_dismissals",
       "seller_bank_accounts",
       "user_follows",
       "two_factor_secrets",

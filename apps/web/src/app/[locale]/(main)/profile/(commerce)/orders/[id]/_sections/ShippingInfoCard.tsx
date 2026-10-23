@@ -6,6 +6,7 @@ import { TruckIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { Alert, Button } from "@tarodan/ui";
 import { SectionCard, CopyButton } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { isDigitalOrder } from "@tarodan/types";
 import type { OrderDetail } from "../_lib/types";
 
 const SHIPPED_ORDER_STATUSES = [
@@ -16,8 +17,9 @@ const SHIPPED_ORDER_STATUSES = [
 ];
 
 /**
- * Kargo bilgileri — SADECE gerçek gönderi varken: shipment + taşıyıcı takip kodu +
- * sipariş durumu kargolanmış/teslim. İptal ya da teslim öncesi durumlarda gizli.
+ * Shipping details, ONLY for a real shipment: a shipment, a carrier tracking
+ * code and a shipped or delivered order status. Hidden for a cancelled or
+ * not yet shipped order, and always for a digital order (membership, boost).
  */
 export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
   const t = useTranslations();
@@ -49,6 +51,7 @@ export default function ShippingInfoCard({ order }: { order: OrderDetail }) {
         order.shipment.status,
       ));
   if (
+    isDigitalOrder(order) ||
     !order.shipment ||
     !displayTrackingCode ||
     isIptalOrder ||

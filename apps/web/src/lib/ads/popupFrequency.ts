@@ -58,18 +58,21 @@ export function markPopupAdDismissed(ad: PopupAdIdentity): void {
   }
 }
 
-/** Popup'ın önünü kesen başka katmanlar (üst üste binmesin). */
+/** Other layers that hold the popup back (so they never stack). */
 export interface PopupOverlayState {
-  /** Zorunlu adım penceresi (onay / yasal kimlik) bekliyor. */
+  /** A required step (consents / legal identity) is pending. */
   requiredStepsOutstanding: boolean;
   cookieBannerOpen: boolean;
   tourRunning: boolean;
+  /** The boost offer or a boost dialog is open (`useBoostDialogStore`). */
+  boostOpen: boolean;
 }
 
 export function isPopupBlockedByOverlay(state: PopupOverlayState): boolean {
   return (
     state.requiredStepsOutstanding ||
     state.cookieBannerOpen ||
-    state.tourRunning
+    state.tourRunning ||
+    state.boostOpen
   );
 }

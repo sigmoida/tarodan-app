@@ -20,7 +20,7 @@ import {
   ThumbnailStack,
 } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
-import { formatTL } from "@/lib/format";
+import { formatDateTimeLong, formatTL } from "@/lib/format";
 import {
   groupOrdersOf,
   type GroupOrder,
@@ -185,17 +185,10 @@ export default function PaymentCard({
                 · {counterparty.role}: {counterparty.name}
               </span>
             )}
-            <span className="uppercase">· {payment.provider}</span>
           </div>
           <div className="mt-1 flex items-center gap-1 text-xs text-subtle">
             <CalendarIcon className="h-3.5 w-3.5" />
-            {new Date(payment.createdAt).toLocaleDateString("tr-TR", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatDateTimeLong(payment.createdAt, locale)}
           </div>
         </div>
 

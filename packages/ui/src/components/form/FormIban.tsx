@@ -21,8 +21,8 @@ export interface FormIbanProps extends Omit<
  * `@tarodan/ui`) in the zod schema.
  */
 export function FormIban({ name, ...props }: FormIbanProps) {
-  const { control, formState } = useFormContext();
-  const error = formState.errors[name]?.message as string | undefined;
+  const { control, formState, getFieldState } = useFormContext();
+  const error = getFieldState(name, formState).error?.message;
 
   return (
     <Controller

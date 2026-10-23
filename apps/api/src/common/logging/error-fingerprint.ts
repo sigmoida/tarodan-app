@@ -25,8 +25,9 @@ const UUID_PATTERN =
 // that every parcel opened its own Sentry issue.
 const ENTITY_CODE_PATTERN = /\b(PKG|ORD|GRP|RFD|TKS|TRD)-?\d+\b/gi;
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-// Sadece query string'i maskele; yol (path) tanısal değer taşıdığı için kalsın.
-const URL_QUERY_PATTERN = /(\bhttps?:\/\/[^\s?]+)\?[^\s]*/gi;
+// Mask only the query string; the path stays for its diagnostic value. Both
+// absolute URLs and relative request paths ("GET /api/products?search=...").
+const URL_QUERY_PATTERN = /((?:\bhttps?:\/\/|(?<![\w/])\/)[^\s?]*)\?[^\s]*/gi;
 // Tırnak içindeki değer bir rakam barındırıyorsa değişkendir (id, sayı, kod);
 // yalnızca harflerden oluşan tırnaklı değerler (cron job adları gibi) sabit
 // kalır ki "Cron 'refund-crons' FAILED" ile "Cron 'sync-surat-tracking'

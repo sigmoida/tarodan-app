@@ -41,6 +41,8 @@ export interface ResourceListProps<T> {
   /** Fixed request scope (e.g. a tab) — keys the cache; see `useAdminResource`. */
   scope?: Record<string, string>;
   selectable?: boolean;
+  /** Title of the load error, when the generic one would not say which list failed. */
+  errorTitle?: ReactNode;
   children: ReactNode;
 }
 
@@ -59,10 +61,11 @@ export interface ResourceListProps<T> {
  */
 export function ResourceListRoot<T>({
   children,
+  errorTitle,
   ...config
 }: ResourceListProps<T>) {
   return (
-    <SuspenseBoundary>
+    <SuspenseBoundary errorTitle={errorTitle}>
       <HydratedResourceList {...config}>{children}</HydratedResourceList>
     </SuspenseBoundary>
   );

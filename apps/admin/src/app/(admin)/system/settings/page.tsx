@@ -12,6 +12,8 @@ import { useSettingsPage } from "./_lib/useSettingsPage";
 import { SearchReindexButton } from "./_components/SearchReindexButton";
 import { WarehouseAddressCard } from "./_components/WarehouseAddressCard";
 import { LegalSettingsCard } from "./_components/LegalSettingsCard";
+import { StepUpSettingsCard } from "./_components/StepUpSettingsCard";
+import { BoostSettingsCard } from "./_components/BoostSettingsCard";
 
 export default function SettingsPage() {
   const {
@@ -21,6 +23,7 @@ export default function SettingsPage() {
     activeTab,
     isWarehouseTab,
     isLegalTab,
+    isSecurityTab,
     tabs,
     title,
     fields,
@@ -70,7 +73,10 @@ export default function SettingsPage() {
                   <FormInput
                     key={f.key}
                     name={f.key}
-                    type="number"
+                    // TL amounts are text, not number fields (see
+                    // `@/lib/schemas/amount`).
+                    type={f.money ? "text" : "number"}
+                    inputMode={f.money ? "decimal" : undefined}
                     label={f.label}
                     helperText={f.helper}
                     min={f.min}
@@ -87,6 +93,9 @@ export default function SettingsPage() {
               </Button>
             </div>
           </Form>
+          {/* On/off settings save on their own, outside the numeric form. */}
+          {isSecurityTab && <StepUpSettingsCard />}
+          {activeTab === "listing" && <BoostSettingsCard />}
         </>
       )}
     </AdminPage>

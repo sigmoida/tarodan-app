@@ -4,6 +4,7 @@ import {
   type AdminCancelReasonCode,
 } from "@tarodan/types";
 import { refundRequestIdOf } from "../../invoicing/helpers/refund-request-key";
+import { isBoostRefundKey } from "./boost-refund-key";
 
 /**
  * Bir iade talebini (RefundRequest) başlatabilen taraflar: alıcı (kendi iptal /
@@ -65,6 +66,8 @@ export function refundRequestAdminReasonCode(
  *
  * - `refund-request:<id>` → iade talebinden doğdu; aktör talebin
  *   metadata'sından (`refundRequestCancelActor`): alıcı ya da platform.
+ * - `boost-refund:<boostId>:<n>` → a boost refund, only ever started by staff
+ *   from the boost screen: the platform.
  * - Diğer her şey (`full-refund:*`, `stock-shortage-refund:*`, yönetici manuel
  *   iadesinin serbest anahtarı) → `system`. Stok ve cron anahtarlarında
  *   sipariş zaten iptaldir ve processRefund önceki aktörü korur; yalnız
@@ -77,6 +80,7 @@ export function refundAttemptCancelActor(
   idempotencyKey: string | null | undefined,
   requestMetadata?: unknown,
 ): CancellationActor {
+  if (isBoostRefundKey(idempotencyKey)) return CancellationActor.platform;
   return refundRequestIdOf(idempotencyKey)
     ? refundRequestCancelActor(requestMetadata)
     : CancellationActor.system;

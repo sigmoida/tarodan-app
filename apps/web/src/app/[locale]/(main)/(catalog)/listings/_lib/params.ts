@@ -9,6 +9,13 @@
  * pure functions. Do NOT branch behavior by environment; keep this free of
  * `'use client'` and React so it runs identically on both.
  */
+import {
+  formatPrice,
+  parseTlAmount,
+  tlAmountInputValue,
+} from "@tarodan/shared";
+import { SEARCH_PRICE_MAX } from "@tarodan/types";
+import type { Translate } from "@/types/i18n";
 
 /** Search terms that are really brands; when the search box matches one, we
  *  treat it as a brand filter instead of a free-text search. */
@@ -40,6 +47,11 @@ export interface Filters {
   /** Seçili renk slug'ları — URL'de `?color=red,black` olarak taşınır. */
   colors: string[];
   condition: string;
+  /**
+   * Price bounds as text: what the user typed, or the URL value. Every reader
+   * goes through {@link priceFilterBound}; the URL and the API get
+   * {@link priceFilterParam} / the bound, never this text.
+   */
   minPrice: string;
   maxPrice: string;
   tradeOnly: boolean;
@@ -53,6 +65,110 @@ export interface Filters {
   manufacturer: string;
   manufacturerId: string;
   customAttributes: Record<string, string[]>;
+}
+
+/**
+ * Why a non-empty price text sets no bound: it is not an amount ("refused",
+ * `validation.amountFormatRefused`), or it is above `SEARCH_PRICE_MAX`, the
+ * highest bound `GET /products` accepts ("aboveMax", `validation.maxValue`).
+ */
+export type PriceFilterIssue = "refused" | "aboveMax";
+
+/**
+ * The bound a price filter text sets, read with the shared TL parser
+ * (`parseTlAmount`, the one reader of typed TL amounts): `undefined` when the
+ * text is empty, zero, refused or above `SEARCH_PRICE_MAX`, so such text never
+ * filters and never reaches `GET /products` (which answers a larger bound with
+ * a 400). "1.000" is refused (a Turkish user means one thousand), never read
+ * as 1 TL; that also holds for a legacy URL or saved-search value, whose bound
+ * is then ignored, as is one above the max. Plain numbers ("1000", "1250.5",
+ * the canonical URL form) and a decimal comma ("1250,5") read as written. A
+ * min above the max is kept as it is (the API then finds nothing), the same as
+ * before.
+ */
+export function priceFilterBound(text: string): number | undefined {
+  return readPriceFilter(text).bound;
+}
+
+/** Why the price text sets no bound, or `undefined` when it sets one or is empty or zero. */
+export function priceFilterIssue(text: string): PriceFilterIssue | undefined {
+  return readPriceFilter(text).issue;
+}
+
+/** The one reading of a price text: its bound, or why it sets none (empty and zero: neither). */
+function readPriceFilter(text: string): {
+  bound?: number;
+  issue?: PriceFilterIssue;
+} {
+  const parsed = parseTlAmount(text);
+  if (parsed.status === "refused") return { issue: "refused" };
+  if (parsed.status !== "ok") return {};
+  return parsed.amount > SEARCH_PRICE_MAX
+    ? { issue: "aboveMax" }
+    : { bound: parsed.amount };
+}
+
+/** A refusal first: the more basic error, and the first one a save shows. */
+const PRICE_FILTER_ISSUE_ORDER: readonly PriceFilterIssue[] = [
+  "refused",
+  "aboveMax",
+];
+
+/**
+ * The distinct issues of the two price fields, a refusal first: the fields
+ * show one message per issue, each field pointing at its own.
+ */
+export function priceRangeIssues(
+  filters: Pick<Filters, "minPrice" | "maxPrice">,
+): PriceFilterIssue[] {
+  const found = [
+    priceFilterIssue(filters.minPrice),
+    priceFilterIssue(filters.maxPrice),
+  ];
+  return PRICE_FILTER_ISSUE_ORDER.filter((issue) => found.includes(issue));
+}
+
+/** The message of a price issue; the max reads as money ("9.999.999,00 TL"). */
+export function priceFilterIssueMessage(
+  issue: PriceFilterIssue,
+  t: Translate,
+): string {
+  return issue === "refused"
+    ? t("validation.amountFormatRefused")
+    : t("validation.maxValue", { max: formatPrice(SEARCH_PRICE_MAX) });
+}
+
+/**
+ * The field text for a URL price value (a shared link, a saved-search run):
+ * the amount prefilled with a decimal comma (`tlAmountInputValue`, "1250,50"),
+ * or the value as it is when it is refused, so the field shows the issue
+ * instead of hiding why the bound is ignored. An amount above
+ * `SEARCH_PRICE_MAX` is prefilled too, and shows its issue. Empty or zero is "".
+ */
+export function priceFilterText(value: string): string {
+  const parsed = parseTlAmount(value);
+  if (parsed.status === "ok") return tlAmountInputValue(parsed.amount);
+  return parsed.status === "refused" ? value.trim() : "";
+}
+
+/**
+ * The canonical URL value of a price bound: a plain number with a dot
+ * ("1000", "1250.5"), or "" when the text sets no bound. The URL and saved
+ * searches never carry the typed text.
+ */
+export function priceFilterParam(text: string): string {
+  const bound = priceFilterBound(text);
+  return bound === undefined ? "" : String(bound);
+}
+
+/** True when either price text sets a bound (the chip and the filter count). */
+export function hasPriceFilter(
+  filters: Pick<Filters, "minPrice" | "maxPrice">,
+): boolean {
+  return (
+    priceFilterBound(filters.minPrice) !== undefined ||
+    priceFilterBound(filters.maxPrice) !== undefined
+  );
 }
 
 /**
@@ -107,8 +223,8 @@ export function parseListingsFilters(sp: URLSearchParams): Filters {
       .map((slug) => slug.trim())
       .filter(Boolean),
     condition: sp.get("condition") || "",
-    minPrice: sp.get("minPrice") || "",
-    maxPrice: sp.get("maxPrice") || "",
+    minPrice: priceFilterText(sp.get("minPrice") || ""),
+    maxPrice: priceFilterText(sp.get("maxPrice") || ""),
     tradeOnly: sp.get("tradeOnly") === "true",
     discountOnly: sp.get("discountOnly") === "true",
     preOrder: sp.get("preOrder") === "true",
@@ -121,6 +237,51 @@ export function parseListingsFilters(sp: URLSearchParams): Filters {
     manufacturerId: sp.get("manufacturerId") || "",
     customAttributes: parseCustomAttrs(sp),
   };
+}
+
+/**
+ * The `/listings` URL query of a filter state: the writing side of
+ * {@link parseListingsFilters}, so a written URL parses back into the same
+ * search. Price bounds are written canonical ({@link priceFilterParam}).
+ */
+export function buildListingsUrlParams(
+  f: Filters,
+  page: number,
+): URLSearchParams {
+  const params = new URLSearchParams();
+  if (f.search) params.set("search", f.search);
+  if (f.brand) params.set("brand", f.brand);
+  if (f.brandId) params.set("brandId", f.brandId);
+  if (f.carModel) params.set("carModel", f.carModel);
+  if (f.carModelId) params.set("carModelId", f.carModelId);
+  if (f.scale) params.set("scale", f.scale);
+  if (f.material) params.set("material", f.material);
+  if (f.colors?.length) params.set("color", f.colors.join(","));
+  if (f.condition) params.set("condition", f.condition);
+  // The canonical bound ("1000", "1250.5"), never the typed text.
+  const minPrice = priceFilterParam(f.minPrice);
+  if (minPrice) params.set("minPrice", minPrice);
+  const maxPrice = priceFilterParam(f.maxPrice);
+  if (maxPrice) params.set("maxPrice", maxPrice);
+  if (f.tradeOnly) params.set("tradeOnly", "true");
+  if (f.discountOnly) params.set("discountOnly", "true");
+  if (f.preOrder) params.set("preOrder", "true");
+  if (f.limited) params.set("limited", "true");
+  if (f.set) params.set("set", "true");
+  if (f.sortBy && f.sortBy !== "relevance") params.set("sortBy", f.sortBy);
+  if (f.category) params.set("category", f.category);
+  if (f.categoryId) params.set("categoryId", f.categoryId);
+  if (f.manufacturer) params.set("manufacturer", f.manufacturer);
+  if (f.manufacturerId) params.set("manufacturerId", f.manufacturerId);
+  // Encode manufacturer-scoped attribute selections as attr.<groupSlug>=a,b,c
+  if (f.customAttributes) {
+    for (const [groupSlug, slugs] of Object.entries(f.customAttributes)) {
+      if (slugs && slugs.length > 0)
+        params.set(`attr.${groupSlug}`, slugs.join(","));
+    }
+  }
+  if (page > 1) params.set("page", page.toString());
+  return params;
 }
 
 /** Boş grupları atarak, anahtar sırasından bağımsız karşılaştırılabilir biçim —
@@ -193,8 +354,10 @@ export function buildListApiParams(
   if (filters.search) p.search = filters.search;
   if (resolvedCategoryId) p.categoryId = resolvedCategoryId;
   if (mappedCondition) p.condition = mappedCondition;
-  if (filters.minPrice) p.minPrice = Number(filters.minPrice);
-  if (filters.maxPrice) p.maxPrice = Number(filters.maxPrice);
+  const minPrice = priceFilterBound(filters.minPrice);
+  if (minPrice !== undefined) p.minPrice = minPrice;
+  const maxPrice = priceFilterBound(filters.maxPrice);
+  if (maxPrice !== undefined) p.maxPrice = maxPrice;
   if (filters.brandId) p.brandId = filters.brandId;
   else if (filters.brand) p.brand = filters.brand;
   if (filters.carModelId) p.carModelId = filters.carModelId;

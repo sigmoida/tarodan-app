@@ -9,24 +9,141 @@ const amountIssue = (
   return result.success ? null : result.error.issues[0]?.message;
 };
 
-describe("offerSchema — platform alt sınırı", () => {
-  // İlan 1000 TL: yüzde kuralı 500 TL; platform tabanı 600 TL.
+describe("offerSchema, platform floor", () => {
+  // Listing 1000 TL: the percentage rule gives 500 TL; the platform floor is 600 TL.
   const withFloor = offerSchema(500, 1000, "tr", 600);
 
-  it("tabanın altındaki teklifi i18n iletisiyle reddeder", () => {
+  it("refuses an offer below the floor with the i18n message", () => {
     expect(amountIssue(withFloor, "550")).toBe(
       "Teklif en az 600,00 TL olmalıdır.",
     );
   });
 
-  it("tabana eşit ve üstü teklif geçer", () => {
+  it("accepts an offer at or above the floor", () => {
     expect(amountIssue(withFloor, "600")).toBeNull();
     expect(amountIssue(withFloor, "900")).toBeNull();
   });
 
-  it("taban yoksa yalnız eski kurallar işler", () => {
+  it("applies only the percentage rule without a floor", () => {
     const noFloor = offerSchema(500, 1000, "tr", null);
     expect(amountIssue(noFloor, "500")).toBeNull();
-    expect(amountIssue(noFloor, "499")).toContain("Min:");
+    expect(amountIssue(noFloor, "499")).toBe(
+      "Teklif en az 500,00 TL olmalıdır.",
+    );
+  });
+});
+
+describe("offerSchema, amount text", () => {
+  // Listing 2000 TL: offers from 1000 TL up to (not including) 2000 TL.
+  const schema = offerSchema(1000, 2000, "tr", null);
+
+  it.each(["1000", "1250,50", "1250.50", "1999,99"])("accepts %j", (raw) => {
+    expect(amountIssue(schema, raw)).toBeNull();
+  });
+
+  it.each(["1.000", "1.250,50", "1,250.50", "12,345", "abc", "-1500"])(
+    "refuses %j with the shared format copy",
+    (raw) => {
+      // parseFloat read "1.000" as 1 TL and "1.250,50" as 1.25 TL.
+      expect(amountIssue(schema, raw)).toBe(
+        "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
+      );
+    },
+  );
+
+  it("asks for an amount when empty and for a valid one when zero", () => {
+    expect(amountIssue(schema, "")).toBe("Bir tutar girin");
+    expect(amountIssue(schema, "0")).toBe("Geçerli bir tutar girin");
+  });
+
+  it("refuses an amount at the listing price", () => {
+    expect(amountIssue(schema, "2000")).toBe("Teklif fiyattan düşük olmalı");
+  });
+
+  it("holds each bound to the kurus", () => {
+    // The 50% minimum is inclusive, the price is exclusive.
+    expect(amountIssue(schema, "999,99")).toBe(
+      "Teklif en az 1.000,00 TL olmalıdır.",
+    );
+    expect(amountIssue(schema, "1000,00")).toBeNull();
+    expect(amountIssue(schema, "1999,99")).toBeNull();
+    expect(amountIssue(schema, "2000,00")).toBe("Teklif fiyattan düşük olmalı");
+    expect(amountIssue(schema, "2500")).toBe("Teklif fiyattan düşük olmalı");
+  });
+
+  it("reads separator-only text as no amount", () => {
+    expect(amountIssue(schema, ",")).toBe("Geçerli bir tutar girin");
+    expect(amountIssue(schema, "0,00")).toBe("Geçerli bir tutar girin");
+  });
+});
+
+describe("offerSchema, the API's ceiling of an agreed amount", () => {
+  // A listing above the ceiling: offers from 6,000,000 TL up to 20,000,000 TL.
+  const schema = offerSchema(6_000_000, 20_000_000, "tr", null);
+
+  it("accepts the ceiling itself", () => {
+    expect(amountIssue(schema, "9999999")).toBeNull();
+    expect(amountIssue(schema, "9999999,00")).toBeNull();
+  });
+
+  it.each(["10000000", "9999999,01", "19999999"])(
+    "refuses %j with the ceiling in the message",
+    (raw) => {
+      expect(amountIssue(schema, raw)).toBe("Tutar 9.999.999 TL'yi aşamaz.");
+    },
+  );
+
+  it("says it in English with the English number format", () => {
+    const en = offerSchema(6_000_000, 20_000_000, "en", null);
+    expect(amountIssue(en, "10000000")).toBe(
+      "The amount cannot exceed 9,999,999 TL.",
+    );
+  });
+
+  it("refuses the format before the ceiling", () => {
+    expect(amountIssue(schema, "10.000.000")).toBe(
+      "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
+    );
+  });
+
+  // The ceiling comes before every price bound: an amount the API refuses
+  // says so, whatever the listing's bounds would say about it.
+  it.each([
+    ["at or above the listing price", offerSchema(1000, 2000, "tr", null)],
+    ["below the 50% minimum", offerSchema(15_000_000, 30_000_000, "tr", null)],
+    [
+      "below the platform floor",
+      offerSchema(1000, 30_000_000, "tr", 12_000_000),
+    ],
+  ])("refuses the ceiling before a bound (%s)", (_case, bounded) => {
+    expect(amountIssue(bounded, "10000000")).toBe(
+      "Tutar 9.999.999 TL'yi aşamaz.",
+    );
+  });
+});
+
+describe("offerSchema, rule order", () => {
+  // One issue per field, in order: refused, empty, 50%, floor, below price.
+  const schema = offerSchema(500, 1000, "tr", 600);
+  const issues = (amount: string) => {
+    const result = schema.safeParse({ amount });
+    return result.success
+      ? []
+      : result.error.issues.map((issue) => issue.message);
+  };
+
+  it("names the 50% minimum before a higher platform floor", () => {
+    expect(issues("400")).toEqual(["Teklif en az 500,00 TL olmalıdır."]);
+  });
+
+  it("refuses the format before any bound", () => {
+    // "1.000" read by parseFloat was 1 TL: below every bound.
+    expect(issues("1.000")).toEqual([
+      "Tutar kabul edilmedi. Binlik ayracı kullanmayın; kuruş için virgül kullanın, örn. 1250,50",
+    ]);
+  });
+
+  it("refuses at the price even when the floor passes", () => {
+    expect(issues("1000")).toEqual(["Teklif fiyattan düşük olmalı"]);
   });
 });

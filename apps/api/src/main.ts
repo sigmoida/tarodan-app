@@ -91,6 +91,8 @@ async function bootstrap() {
         "X-Requested-With",
         "X-Payment-Capability",
         "X-CSRF-Token",
+        // Step-up token on sensitive writes (`@RequireReauth`).
+        "X-Reauth-Token",
       ],
     });
 

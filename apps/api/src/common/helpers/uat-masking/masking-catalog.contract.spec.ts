@@ -8,6 +8,7 @@ import {
   UAT_MASK_ALLOW_LIST,
   isCoveredByCatalog,
 } from "./masking-catalog";
+import { computeMaskedCell } from "./masking-sql";
 
 /**
  * Maskeleme kataloğu ↔ schema.prisma sözleşmesi.
@@ -146,11 +147,42 @@ describe("UAT masking catalogue ↔ schema.prisma", () => {
       ["products", "description"],
       ["seller_uploaded_invoices", "file_name"],
       ["media_files", "filename"],
+      // Saved searches: the user's own name and search words, and the
+      // display labels typed with them.
+      ["saved_searches", "name"],
+      ["saved_searches", "query"],
+      ["saved_searches", "labels"],
+      // The hash of the unscrubbed query: kept, it would let a short search
+      // text be confirmed offline.
+      ["saved_searches", "query_hash"],
     ]) {
       expect([`${table}.${column}`, isCoveredByCatalog(table, column)]).toEqual(
         [`${table}.${column}`, true],
       );
     }
+  });
+
+  it("replaces the saved-search hash with a unique fake from the row id only", () => {
+    const rule = UAT_MASKING_CATALOG.find(
+      (r) => r.table === "saved_searches" && r.action === "mask",
+    );
+    const hashRule =
+      rule?.action === "mask" ? rule.columns.query_hash : undefined;
+    expect(hashRule).toEqual({ strategy: "fake", fake: "token", unique: true });
+    if (hashRule?.strategy !== "fake") throw new Error("unreachable");
+
+    const real = "a".repeat(64);
+    const cellA = computeMaskedCell("query_hash", hashRule, "row-1", real);
+    // The original never feeds the fake: another original, the same value.
+    expect(
+      computeMaskedCell("query_hash", hashRule, "row-1", "b".repeat(64)).value,
+    ).toBe(cellA.value);
+    expect(cellA.value).not.toBe(real);
+    expect(cellA.value).toMatch(/^[0-9a-f]{64}$/);
+    // Distinct per row, so (user_id, query_hash) stays unique.
+    expect(
+      computeMaskedCell("query_hash", hashRule, "row-2", real).value,
+    ).not.toBe(cellA.value);
   });
 
   it("computed rules never target list (array) columns", () => {

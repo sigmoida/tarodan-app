@@ -38,8 +38,9 @@
  *  - PATCH /api/admin/ads/:id → 200; PATCH /api/admin/ads/reorder @HttpCode(200); DELETE @HttpCode(204).
  *  - POST /api/newsletter/subscribe @HttpCode(200) → mesajlar; e-posta lowercase+trim; idempotent güncelle;
  *    reaktivasyon. GET /unsubscribe?token= (yok→404); POST /unsubscribe (bulunmayan→200 nötr, idempotent).
- *  - GET /api/products/boost/pricing @Public → { enabled, options:[{durationDays,price,label}] }; 3→29,7→59,30→149.
- *  - POST /api/products/:id/boost/initiate (@UseGuards) → durationDays @IsIn([3,7,30]); 15→400;
+ *  - GET /api/products/boost/pricing is retired (404); prices come from the package tiers.
+ *  - POST /api/products/:id/boost/initiate (@UseGuards) → packageId and expectedPrice (the tier
+ *    price shown) required; a duration the package has no tier for (15) → 400;
  *    başkası→403; pasif→400; UUID değil→400 "Geçersiz ürün ID formatı". Platform seller (platform@tarodan.com,
  *    sellerType=platform) + aktif kategori gerekir → INLINE seed edilir.
  *  - Boost ödemesi PayTR callback (PAYMENT_BYPASS=false) ile tamamlanır → ProductBoost.status=active,
@@ -71,6 +72,19 @@ import {
   getLastEmailTo,
   extractCode,
 } from "../../test-utils/mail";
+
+/** Both purchase consents; the boost initiate refuses a body without them. */
+const BOOST_CONSENTS = {
+  preInformationAccepted: true,
+  withdrawalWaiverAccepted: true,
+} as const;
+
+/**
+ * The tier price per duration that `ensureBoostPackage` writes (TL, any
+ * listing price): what the dialog shows, so what an initiate body sends as
+ * `expectedPrice`.
+ */
+const BOOST_TIER_PRICES: Record<number, number> = { 3: 29, 7: 59, 30: 149 };
 
 describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   let ctx: E2ETestApp;
@@ -238,6 +252,40 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
           totalAmount: Math.round(Number(payment.amount) * 100),
         }),
       );
+  }
+
+  /**
+   * A boost package for everyone with 3, 7 and 30-day tiers at 29, 59 and 149
+   * TL for any listing price. ad_packages is not truncated between tests, so
+   * it is upserted by slug and its tiers are rewritten.
+   */
+  async function ensureBoostPackage(): Promise<string> {
+    const prisma = getPrisma();
+    const pkg = await prisma.adPackage.upsert({
+      where: { slug: "e2e-dsc-boost" },
+      update: {
+        isActive: true,
+        audienceMode: "everyone",
+        showcaseOnHome: false,
+      },
+      create: {
+        name: "E2E Boost",
+        slug: "e2e-dsc-boost",
+        audienceMode: "everyone",
+        showcaseOnHome: false,
+      },
+    });
+    await prisma.adPackageTier.deleteMany({ where: { packageId: pkg.id } });
+    await prisma.adPackageTier.createMany({
+      data: Object.entries(BOOST_TIER_PRICES).map(([durationDays, price]) => ({
+        packageId: pkg.id,
+        durationDays: Number(durationDays),
+        minAmount: new Prisma.Decimal(0),
+        maxAmount: null,
+        price: new Prisma.Decimal(price),
+      })),
+    });
+    return pkg.id;
   }
 
   const iabAd = (over: Record<string, unknown> = {}) => ({
@@ -2134,23 +2182,14 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   // ════════════════════════════ Boost (öne çıkarma) ════════════════════════════
 
   scenario("DSC-082", async () => {
-    // Boost fiyat/süre listesi → 200, { enabled, options:[...] }; varsayılan 3→29, 7→59, 30→149.
-    const res = await request(server())
-      .get("/api/products/boost/pricing")
-      .expect(200);
-    expect(res.body).toHaveProperty("enabled");
-    expect(Array.isArray(res.body.options)).toBe(true);
-    const byDuration = new Map(
-      res.body.options.map((o: any) => [o.durationDays, o.price]),
-    );
-    expect(byDuration.get(3)).toBe(29);
-    expect(byDuration.get(7)).toBe(59);
-    expect(byDuration.get(30)).toBe(149);
+    // The legacy flat-price list is retired: 404.
+    await request(server()).get("/api/products/boost/pricing").expect(404);
   });
 
   scenario("DSC-083", async () => {
     // Geçerli ilan için boost başlatma → 201 + alanlar; DB'de ProductBoost(pending) + boost order.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2159,7 +2198,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(201);
     expect(res.body.boostId).toBeTruthy();
     expect(res.body.productId).toBe(product.id);
@@ -2185,8 +2229,9 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   });
 
   scenario("DSC-084", async () => {
-    // Geçersiz süre (15) → 400.
+    // A duration the package has no tier for (15) → 400.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2195,20 +2240,31 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 15 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 15,
+        expectedPrice: 59,
+      })
       .expect(400);
   });
 
   scenario("DSC-085", async () => {
     // Başkasının ilanını boost → 403.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const owner = await createUser(ctx.module, { isSeller: true });
     const other = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({ sellerId: owner.id, status: "active" });
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(other))
-      .send({ durationDays: 3 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 3,
+        expectedPrice: 29,
+      })
       .expect(403);
     expect(String(res.body.message)).toContain(
       "Sadece kendi ilanınızı öne çıkarabilirsiniz",
@@ -2218,6 +2274,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-086", async () => {
     // Pasif (yayında olmayan) ilanı boost → 400.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2226,7 +2283,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(400);
     expect(String(res.body.message)).toContain(
       "Sadece aktif (yayında) ilanlar öne çıkarılabilir",
@@ -2242,7 +2304,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     });
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId: "pkg-any",
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(401);
   });
 
@@ -2252,7 +2319,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const res = await request(server())
       .post("/api/products/abc/boost/initiate")
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId: "pkg-any",
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(400);
     expect(String(res.body.message)).toContain("Geçersiz ürün ID formatı");
   });
@@ -2260,6 +2332,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-089", async () => {
     // Boost ödemesi tamamlanınca → ProductBoost.active, ürün rankTier=2, boostedUntil dolu, order completed.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2268,7 +2341,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(201);
 
     const prisma = getPrisma();
@@ -2299,6 +2377,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-090", async () => {
     // Aktif boost üstüne ikinci boost süreyi yığar (stacking): endsAt = mevcut boostedUntil + yeni süre.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2310,7 +2389,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init1 = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(201);
     const boost1 = await prisma.productBoost.findUnique({
       where: { id: init1.body.boostId },
@@ -2325,7 +2409,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init2 = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 30 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 30,
+        expectedPrice: 149,
+      })
       .expect(201);
     const boost2 = await prisma.productBoost.findUnique({
       where: { id: init2.body.boostId },
@@ -2346,6 +2435,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-091", async () => {
     // Oto-yenileme premium olmayan kullanıcıda zorla false.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2354,7 +2444,13 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7, autoRenew: true })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 7,
+        expectedPrice: 59,
+        autoRenew: true,
+      })
       .expect(201);
     const prisma = getPrisma();
     const boost = await prisma.productBoost.findUnique({
@@ -2366,6 +2462,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-092", async () => {
     // Premium satıcıda oto-yenileme etkin.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, {
       isSeller: true,
       premium: true,
@@ -2377,7 +2474,13 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     const init = await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 30, autoRenew: true })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 30,
+        expectedPrice: 149,
+        autoRenew: true,
+      })
       .expect(201);
     const prisma = getPrisma();
     const boost = await prisma.productBoost.findUnique({
@@ -2389,6 +2492,7 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
   scenario("DSC-093", async () => {
     // Boost geçmişim listesi → 200, dizi, alanlar; en yeni önce.
     await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await makeProduct({
       sellerId: seller.id,
@@ -2397,7 +2501,12 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     await request(server())
       .post(`/api/products/${product.id}/boost/initiate`)
       .set(authHeader(seller))
-      .send({ durationDays: 7 })
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: 7,
+        expectedPrice: 59,
+      })
       .expect(201);
     const res = await request(server())
       .get("/api/products/boost/my")
@@ -2415,6 +2524,389 @@ describe("17 — İndirim, Kupon, Reklam, Bülten & Boost (DSC)", () => {
     expect(item).toHaveProperty("isActive");
     expect(item).toHaveProperty("remainingMs");
     expect(item).toHaveProperty("createdAt");
+  });
+
+  scenario("DSC-113", async () => {
+    // Two boost payments for one listing fulfilled at the same time (7 and 3
+    // days): the listing row lock serialises the activations, so the second
+    // stacks on the first and no duration is lost.
+    await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await makeProduct({
+      sellerId: seller.id,
+      status: "active",
+    });
+    const prisma = getPrisma();
+
+    const initiate = async (durationDays: number) => {
+      const res = await request(server())
+        .post(`/api/products/${product.id}/boost/initiate`)
+        .set(authHeader(seller))
+        .send({
+          ...BOOST_CONSENTS,
+          packageId,
+          durationDays,
+          expectedPrice: BOOST_TIER_PRICES[durationDays],
+        })
+        .expect(201);
+      const boost = await prisma.productBoost.findUnique({
+        where: { id: res.body.boostId },
+      });
+      return boost!;
+    };
+    const seven = await initiate(7);
+    const three = await initiate(3);
+
+    const startedAt = Date.now();
+    await Promise.all([
+      completeBoostPayment(seven.orderId!),
+      completeBoostPayment(three.orderId!),
+    ]);
+
+    const [b7, b3, listing] = await Promise.all([
+      prisma.productBoost.findUnique({ where: { id: seven.id } }),
+      prisma.productBoost.findUnique({ where: { id: three.id } }),
+      prisma.product.findUnique({ where: { id: product.id } }),
+    ]);
+    expect(b7?.status).toBe("active");
+    expect(b3?.status).toBe("active");
+    const until = listing!.boostedUntil!.getTime();
+    // 10 days from the callbacks (a few seconds of tolerance).
+    expect(
+      Math.abs(until - (startedAt + 10 * 24 * 60 * 60 * 1000)),
+    ).toBeLessThan(60_000);
+    // The later of the two boosts ends with the listing.
+    expect(Math.max(b7!.endsAt!.getTime(), b3!.endsAt!.getTime())).toBe(until);
+  });
+
+  // ═══════════════ Admin boost operations (LB4): timeline, grant, refund ═══════════════
+
+  /** Within a minute of `expected` (the requests take a few seconds). */
+  const expectAbout = (actual: Date | null | undefined, expected: number) =>
+    expect(Math.abs((actual?.getTime() ?? 0) - expected)).toBeLessThan(60_000);
+
+  /** A paid, active boost of `days` on the listing (initiate + PayTR callback). */
+  async function buyBoost(
+    seller: { accessToken: string },
+    productId: string,
+    packageId: string,
+    days: number,
+  ) {
+    const res = await request(server())
+      .post(`/api/products/${productId}/boost/initiate`)
+      .set(authHeader(seller))
+      .send({
+        ...BOOST_CONSENTS,
+        packageId,
+        durationDays: days,
+        expectedPrice: BOOST_TIER_PRICES[days],
+      })
+      .expect(201);
+    const prisma = getPrisma();
+    const pending = await prisma.productBoost.findUnique({
+      where: { id: res.body.boostId },
+    });
+    await completeBoostPayment(pending!.orderId!);
+    const boost = await prisma.productBoost.findUnique({
+      where: { id: res.body.boostId },
+    });
+    expect(boost?.status).toBe("active");
+    return boost!;
+  }
+
+  async function boostSetup() {
+    await ensurePlatformSeller();
+    const packageId = await ensureBoostPackage();
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const product = await makeProduct({ sellerId: seller.id });
+    const admin = await createAdminUser(ctx.module, {
+      email: `admin-boost-${uuid()}@test.com`,
+      role: AdminRole.admin,
+    });
+    return { packageId, seller, product, admin };
+  }
+
+  scenario("DSC-120", async () => {
+    // 7 days, then 3 days stacked (10 paid days). Staff pause and resume the
+    // stacked one: it keeps its own 3 days, so the listing still ends at +10
+    // days (it used to keep 10 days and end at +17).
+    const { packageId, seller, product, admin } = await boostSetup();
+    const startedAt = Date.now();
+    await buyBoost(seller, product.id, packageId, 7);
+    const three = await buyBoost(seller, product.id, packageId, 3);
+    const prisma = getPrisma();
+
+    await request(server())
+      .post(`/api/admin/ad-packages/purchases/${three.id}/pause`)
+      .set(authHeader(admin))
+      .expect(201);
+    const paused = await prisma.productBoost.findUnique({
+      where: { id: three.id },
+    });
+    expect(paused?.status).toBe("paused");
+    expect(paused?.pausedRemainingSeconds).toBe(3 * 86400);
+
+    await request(server())
+      .post(`/api/admin/ad-packages/purchases/${three.id}/resume`)
+      .set(authHeader(admin))
+      .expect(201);
+
+    const [resumed, listing] = await Promise.all([
+      prisma.productBoost.findUnique({ where: { id: three.id } }),
+      prisma.product.findUnique({ where: { id: product.id } }),
+    ]);
+    expectAbout(listing?.boostedUntil, startedAt + 10 * DAY_MS);
+    expect(resumed?.endsAt?.getTime()).toBe(listing?.boostedUntil?.getTime());
+  });
+
+  scenario("DSC-121", async () => {
+    const { packageId, seller, product, admin } = await boostSetup();
+    const prisma = getPrisma();
+    const { productCode } = await prisma.product.findUniqueOrThrow({
+      where: { id: product.id },
+      select: { productCode: true },
+    });
+    await buyBoost(seller, product.id, packageId, 3);
+    const ordersBefore = await prisma.order.count();
+
+    const res = await request(server())
+      .post("/api/admin/ad-packages/purchases/grant")
+      .set(authHeader(admin))
+      .send({
+        productId: productCode,
+        packageId,
+        durationDays: 7,
+        reason: "Compensation for a listing outage",
+      })
+      .expect(201);
+
+    expect(res.body).toMatchObject({
+      source: "admin_grant",
+      price: 0,
+      status: "active",
+      grantReason: "Compensation for a listing outage",
+      grantedBy: { id: admin.id },
+      orderNumber: null,
+      paymentId: null,
+      refundableAmount: 0,
+    });
+    const grant = await prisma.productBoost.findUniqueOrThrow({
+      where: { id: res.body.id },
+    });
+    expect(grant.orderId).toBeNull();
+    expect(grant.grantedById).toBe(admin.id);
+    // Stacked on the running 3-day boost: no order, payment or invoice.
+    const listing = await prisma.product.findUnique({
+      where: { id: product.id },
+    });
+    expect(listing?.boostedUntil?.getTime()).toBe(grant.endsAt?.getTime());
+    expect(await prisma.order.count()).toBe(ordersBefore);
+    expect(
+      await prisma.fiscalInvoice.count({
+        where: { type: "boost", sourceId: grant.id },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "boost_grant", entityId: grant.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.outboxEvent.count({
+        where: { dedupeKey: `boost.notice:granted:${grant.id}` },
+      }),
+    ).toBe(1);
+
+    // An inactive listing gets 400; a moderator gets 403.
+    const inactive = await makeProduct({
+      sellerId: seller.id,
+      status: "inactive",
+    });
+    const refused = await request(server())
+      .post("/api/admin/ad-packages/purchases/grant")
+      .set(authHeader(admin))
+      .send({
+        productId: inactive.id,
+        durationDays: 7,
+        reason: "Compensation for a listing outage",
+      })
+      .expect(400);
+    expect(refused.body.i18nKey).toBe(
+      "server.admin.boost.grantListingNotActive",
+    );
+    const moderator = await createAdminUser(ctx.module, {
+      email: `mod-boost-${uuid()}@test.com`,
+      role: AdminRole.moderator,
+    });
+    await request(server())
+      .post("/api/admin/ad-packages/purchases/grant")
+      .set(authHeader(moderator))
+      .send({
+        productId: product.id,
+        durationDays: 7,
+        reason: "Compensation for a listing outage",
+      })
+      .expect(403);
+  });
+
+  scenario("DSC-122", async () => {
+    // A paid 7-day boost (59 TL) with a 3-day boost stacked behind it. Refund
+    // and stop the 7-day one in full.
+    const { packageId, seller, product, admin } = await boostSetup();
+    const seven = await buyBoost(seller, product.id, packageId, 7);
+    const three = await buyBoost(seller, product.id, packageId, 3);
+    const prisma = getPrisma();
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: seven.orderId! },
+      include: { payment: true },
+    });
+
+    const refund = () =>
+      request(server())
+        .post(`/api/admin/ad-packages/purchases/${seven.id}/refund`)
+        .set(authHeader(admin))
+        .send({ reason: "Seller asked for a refund" });
+    const res = await refund().expect(200);
+    const refundedAt = Date.now();
+
+    expect(res.body).toMatchObject({
+      status: "cancelled",
+      refundedAmount: 59,
+      refundableAmount: 0,
+      cancelReason: "Seller asked for a refund",
+      cancelledBy: { id: admin.id },
+      orderNumber: order.orderNumber,
+    });
+    // PayTR once, on the marketplace store, for 59 TL.
+    expect(ctx.paytr.refundCalls).toEqual([
+      expect.objectContaining({
+        merchantOid: order.payment!.providerConversationId,
+        refundAmount: 59,
+        merchant: "marketplace",
+      }),
+    ]);
+    // The stacked boost moved up by the 7 unused days.
+    const [stacked, listing, closed] = await Promise.all([
+      prisma.productBoost.findUnique({ where: { id: three.id } }),
+      prisma.product.findUnique({ where: { id: product.id } }),
+      prisma.order.findUnique({
+        where: { id: order.id },
+        include: { payment: true },
+      }),
+    ]);
+    expectAbout(stacked?.endsAt, refundedAt + 3 * DAY_MS);
+    expect(listing?.boostedUntil?.getTime()).toBe(stacked?.endsAt?.getTime());
+    expect(closed?.status).toBe("cancelled");
+    expect(closed?.payment?.status).toBe("refunded");
+    // No ledger lines for the platform seller; the e-Arşiv reversal is queued.
+    expect(
+      await prisma.ledgerEntry.count({ where: { orderId: order.id } }),
+    ).toBe(0);
+    expect(
+      await prisma.outboxEvent.count({
+        where: {
+          type: "invoice.refund_reverse",
+          payload: { path: ["orderId"], equals: order.id },
+        },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "boost_refund", entityId: seven.id },
+      }),
+    ).toBe(1);
+
+    // A retry of the same refund answers with the stopped boost and refunds nothing.
+    await refund().expect(200);
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+  });
+
+  scenario("DSC-123", async () => {
+    // A partial refund of 20 of 59 TL: the boost stops, the order and the
+    // payment stay open, the invoice reversal is 20/59.
+    const { packageId, seller, product, admin } = await boostSetup();
+    const seven = await buyBoost(seller, product.id, packageId, 7);
+    const prisma = getPrisma();
+
+    await request(server())
+      .post(`/api/admin/ad-packages/purchases/${seven.id}/refund`)
+      .set(authHeader(admin))
+      .send({ amount: 20, reason: "Partial goodwill refund" })
+      .expect(200);
+
+    const [boost, order] = await Promise.all([
+      prisma.productBoost.findUnique({ where: { id: seven.id } }),
+      prisma.order.findUnique({
+        where: { id: seven.orderId! },
+        include: { payment: true },
+      }),
+    ]);
+    expect(ctx.paytr.refundCalls.map((c) => c.refundAmount)).toEqual([20]);
+    expect(boost?.status).toBe("cancelled");
+    expect(Number(boost?.refundedAmount)).toBe(20);
+    expect(order?.status).toBe("completed");
+    expect(order?.payment?.status).toBe("completed");
+    const reversal = await prisma.outboxEvent.findFirst({
+      where: { type: "invoice.refund_reverse" },
+    });
+    expect(
+      (reversal?.payload as { refundRatio: number }).refundRatio,
+    ).toBeCloseTo(20 / 59, 6);
+
+    // Above the refundable amount: 400 before PayTR.
+    const other = await buyBoost(seller, product.id, packageId, 3);
+    const tooMuch = await request(server())
+      .post(`/api/admin/ad-packages/purchases/${other.id}/refund`)
+      .set(authHeader(admin))
+      .send({ amount: 30, reason: "Partial goodwill refund" })
+      .expect(400);
+    expect(tooMuch.body.i18nKey).toBe("server.admin.boost.refundAmountInvalid");
+    expect(ctx.paytr.refundCalls).toHaveLength(1);
+  });
+
+  scenario("DSC-124", async () => {
+    // The generic manual refund refuses a boost payment (D16).
+    const { packageId, seller, product, admin } = await boostSetup();
+    const seven = await buyBoost(seller, product.id, packageId, 7);
+    const payment = await getPrisma().payment.findFirstOrThrow({
+      where: { orderId: seven.orderId! },
+    });
+
+    const res = await request(server())
+      .post(`/api/admin/payments/${payment.id}/manual-refund`)
+      .set(authHeader(admin))
+      .send({ idempotencyKey: uuid(), reason: "Manual refund attempt" })
+      .expect(400);
+
+    expect(res.body.i18nKey).toBe(
+      "server.admin.payment.boostRefundUseBoostScreen",
+    );
+    expect(ctx.paytr.refundCalls).toHaveLength(0);
+  });
+
+  scenario("DSC-125", async () => {
+    // PayTR fails: the boost keeps running, nothing is recorded on it.
+    const { packageId, seller, product, admin } = await boostSetup();
+    const seven = await buyBoost(seller, product.id, packageId, 7);
+    ctx.paytr.nextRefundFails = true;
+
+    const res = await request(server())
+      .post(`/api/admin/ad-packages/purchases/${seven.id}/refund`)
+      .set(authHeader(admin))
+      .send({ reason: "Seller asked for a refund" });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    const boost = await getPrisma().productBoost.findUnique({
+      where: { id: seven.id },
+    });
+    expect(boost?.status).toBe("active");
+    expect(boost?.refundedAmount).toBeNull();
+    expect(
+      await getPrisma().auditLog.count({
+        where: { action: "boost_refund", entityId: seven.id },
+      }),
+    ).toBe(1);
   });
 
   // ════════════════════════════ Sınır / para / güvenlik ════════════════════════════

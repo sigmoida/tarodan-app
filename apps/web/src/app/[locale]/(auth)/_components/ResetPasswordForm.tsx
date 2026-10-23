@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { AuthCard } from "./AuthCard";
 import { resetPasswordSchema, type ResetPasswordValues } from "../_lib/auth";
 import { useResetPassword } from "../_hooks/useResetPassword";
-import { PasswordChecklist } from "./PasswordChecklist";
+import { PasswordChecklist } from "@/components/auth/PasswordChecklist";
 
 export function ResetPasswordForm() {
   const t = useTranslations();

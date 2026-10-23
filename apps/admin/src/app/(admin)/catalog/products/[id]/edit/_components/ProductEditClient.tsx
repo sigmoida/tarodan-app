@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { Form, useZodForm } from "@tarodan/ui/form";
+import { tlAmountValue } from "@tarodan/shared";
 import {
   DiscountCard,
   GlobalAttributesCard,
@@ -23,6 +24,9 @@ import {
   emptyEditValues,
   getConditions,
   getYearOptions,
+  NO_PRICE_LIMITS,
+  priceLimitMessages,
+  saleDataError,
   useCarModels,
   useListingCategories,
   useListingFilters,
@@ -38,6 +42,9 @@ import { useQuery } from "@tanstack/react-query";
 import { adminKeys } from "@/lib/query/keys";
 import { PageLoading } from "@/components/PageLoading";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+
+/** Admin edits run in Turkish (see `editListingSchema`). */
+const PRICE_MESSAGES = priceLimitMessages("tr");
 
 /**
  * Yönetici ilan düzenleme formu — satıcı formuyla AYNI kartlar.
@@ -90,6 +97,15 @@ export default function ProductEditClient({ id }: { id: string }) {
     ((images: any[], sessionId?: string) => void) | null
   >(null);
   const populatedForRef = useRef<string | null>(null);
+
+  // Refused discount text blocks the save (the discount fields are not form
+  // fields); admin edits are exempt from the price limits.
+  const salePriceError = saleDataError(
+    saleData,
+    tlAmountValue(form.watch("price")),
+    { limits: NO_PRICE_LIMITS },
+    PRICE_MESSAGES,
+  );
 
   const record = item?.edit ?? null;
   const maxImages = item?.maxImagesPerListing || 3;
@@ -220,6 +236,10 @@ export default function ProductEditClient({ id }: { id: string }) {
         form={form}
         onSubmit={(values: EditListingValues) => {
           if (submitBlocker) return;
+          if (salePriceError) {
+            setShowDiscountSection(true);
+            return;
+          }
           save.mutate(values);
         }}
         className="space-y-4"
@@ -270,6 +290,7 @@ export default function ProductEditClient({ id }: { id: string }) {
           setSaleData={setSaleData}
           showDiscountSection={showDiscountSection}
           setShowDiscountSection={setShowDiscountSection}
+          salePriceError={salePriceError}
         />
         <ImagesCard
           maxImages={maxImages}

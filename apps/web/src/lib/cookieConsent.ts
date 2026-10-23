@@ -165,12 +165,6 @@ export function cookieCategories(t: Translate): CookieCategoryInfo[] {
           active: true,
         },
         {
-          name: "diecast_saved_searches",
-          purpose: t("legal.cookies.purpose.savedSearches"),
-          duration: t("legal.cookies.duration.persistentLocal"),
-          active: true,
-        },
-        {
           name: "platform-fee-banner-dismissed",
           purpose: t("legal.cookies.purpose.dismissedBanners"),
           duration: t("legal.cookies.duration.persistentLocal"),

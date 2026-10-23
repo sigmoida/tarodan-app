@@ -49,14 +49,12 @@ export interface PaymentListResponse {
 
 export interface PaymentFilterState {
   status: string;
-  provider: string;
   startDate: string;
   endDate: string;
 }
 
 export const EMPTY_FILTERS: PaymentFilterState = {
   status: "",
-  provider: "",
   startDate: "",
   endDate: "",
 };

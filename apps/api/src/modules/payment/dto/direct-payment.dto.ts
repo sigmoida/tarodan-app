@@ -46,11 +46,12 @@ export class DirectPaymentDto {
 
   @ApiPropertyOptional({
     description:
-      "Alıcı bu ödeme ekranında mesafeli satış sözleşmesini onayladı mı. " +
-      "Sepet/sipariş için henüz onay kaydı yoksa (teklif siparişi, checkout'ta " +
-      "onay göndermeyen istemci) onay burada kaydedilir. " +
-      "`distance_sales_consent_required` ayarı açıkken kayıtsız ve onaysız " +
-      "satın alma 400 server.consent.distanceSalesRequired ile reddedilir.",
+      "Whether the payer accepted the distance sales contract on this payment " +
+      "screen. When the cart, order or trade cash payment has no consent " +
+      "record yet (offer order, trade, a client that sent none at checkout), " +
+      "it is recorded here. While `distance_sales_consent_required` is on, a " +
+      "payment without a record and without this consent is refused with " +
+      "400 server.consent.distanceSalesRequired.",
   })
   @IsOptional()
   @IsBoolean()

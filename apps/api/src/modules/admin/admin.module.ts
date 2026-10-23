@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { BoostTimelineModule } from "../product/boost-timeline/boost-timeline.module";
 import { BullModule } from "@nestjs/bull";
 import { AdminCommissionController } from "./finance/admin-commission.controller";
 import { AdminUserController } from "./users/admin-user.controller";
@@ -44,12 +45,15 @@ import { AdminSiteAccessController } from "./users/admin-site-access.controller"
 import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./users/admin-user.service";
 import { UserModule } from "../user/user.module";
+import { SellerTrustModule } from "../seller-trust";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
 import { AdminConsentService } from "./users/admin-consent.service";
 import { AdminConsentController } from "./users/admin-consent.controller";
 import { AdminLegalIdentityService } from "./users/admin-legal-identity.service";
 import { AdminLegalIdentityController } from "./users/admin-legal-identity.controller";
+import { AdminUserSignInMethodsService } from "./users/sign-in-methods/admin-user-sign-in-methods.service";
+import { AdminUserSignInMethodsController } from "./users/sign-in-methods/admin-user-sign-in-methods.controller";
 import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
 import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
 import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
@@ -119,6 +123,7 @@ import { AdminShippingTariffService } from "./orders/admin-shipping-tariff.servi
 import { AdminReviewService } from "./ops/admin-review.service";
 import { AdminSellerApplicationService } from "./users/admin-seller-application.service";
 import { AdminAdPackageService } from "./finance/admin-ad-package.service";
+import { AdminBoostOperationsService } from "./finance/boost/admin-boost-operations.service";
 import { ScheduledNotificationScheduler } from "./jobs/scheduled-notification.scheduler";
 import { LogRetentionService } from "./jobs/log-retention.service";
 import {
@@ -190,6 +195,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     // extend_once kuralı (teklifin görünen durumu) — OfferExtensionPolicy.
     OfferModule,
     UserModule,
+    // User detail: the stored trust score and its breakdown. A leaf, no cycle.
+    SellerTrustModule,
     ModerationModule,
     InvoicingModule,
     ShippingTariffModule,
@@ -199,6 +206,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     CommissionModule,
     MembershipModule,
     ProductModule,
+    // Boost pause, resume and extend go through the listing timeline owner.
+    BoostTimelineModule,
     SiteAccessModule,
     // Onay Kayıtları ekranı: üye durumu domain servisinden okunur.
     ConsentModule,
@@ -217,6 +226,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDeletedIdentityController,
     AdminConsentController,
     AdminLegalIdentityController,
+    AdminUserSignInMethodsController,
     AdminGibReportController,
     AdminProductController,
     AdminOrderController,
@@ -268,6 +278,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDeletedIdentityService,
     AdminConsentService,
     AdminLegalIdentityService,
+    AdminUserSignInMethodsService,
     AdminGibReportService,
     AdminStaffService,
     AdminProductService,
@@ -326,6 +337,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminReviewService,
     AdminSellerApplicationService,
     AdminAdPackageService,
+    AdminBoostOperationsService,
     AdminHeroService,
     ScheduledNotificationScheduler,
     ...scheduledProcessors(ScheduledNotificationProcessor),

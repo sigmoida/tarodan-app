@@ -88,6 +88,88 @@ ile sipariş oluşturma anında e-posta doğrulamasıdır (Redis'te tek kullanı
 idempotency kontrolünden **sonra** tüketilir, replay kodu yakmaz). Misafir
 ödemesi `userId = null` ile sıradan `initiate`/`direct-form`'dur.
 
+### Return URLs and virtual orders
+
+Membership and boost are **virtual orders**: an ordinary Order on a virtual
+product (`membership-<tierId>`, `boost-<boostId>`, origin
+`platform_service`). `virtualOrderKind` (`payment/helpers/virtual-order-kind.ts`)
+is the one reader of those prefixes (`VIRTUAL_ORDER_KINDS` in
+`@tarodan/types`); the older prefix checks in fulfilment, refunds and
+invoicing are a backlog item.
+
+- **Return URLs.** `createDirectPaymentForm` builds
+  `merchant_ok_url = <FRONTEND_URL>/payment/success?<query>` and
+  `merchant_fail_url = <FRONTEND_URL>/payment/fail?<query>` with the same
+  query (`paymentReturnQuery`): `paymentId` always, `type=membership|boost`
+  for a virtual order, `guest=true` for a guest order or cart. A trade cash
+  payment carries `paymentId` only. Mobile matches only the path of these
+  URLs, so the query is safe for every app version.
+- **Fail page.** With the `paymentId` the web fail page calls
+  `POST /payments/:id/confirm-failed` while the payment is still `pending`.
+  It is a no-op while the 3DS charge may be live
+  (`metadata.lastChargeStartedAt` within `paymentFailTimeoutMinutes`); after
+  that it runs `processFailedPayment`, the same path as the PayTR failure
+  callback and the expiry cron (CAS to `failed`, order cancelled,
+  reservation released). A 3DS failure therefore needs a new checkout, as
+  before.
+- **Payment status.** `GET /payments/:id/status`, `/status-guest` and
+  `GET /payments/:id` add `isMembershipOrder: true` for a membership payment
+  and `isBoostOrder: true` with `boost: { id, productId, productTitle,
+endsAt }` for a boost payment (`endsAt` null until activation;
+  `VirtualOrderPaymentFields` in `@tarodan/types`). Orders of goods get
+  neither.
+- **Boost purchase consents.** `POST /products/:id/boost/initiate` needs the
+  pre-contract information and withdrawal waiver consents and writes the
+  boost, its virtual product, its order and both consents in one
+  transaction; `direct-form` refuses a boost order without them
+  (`400 server.product.boostConsentRequired`). Details and the legal release
+  blocker: `CONSENTS.md`, "Platform services (boost)".
+- **Boost price at consent.** The initiate body carries `expectedPrice`, the
+  price the dialog showed for the chosen package and duration (TL, VAT
+  included; required, a JSON number with at most two decimals, text is a
+  400). The server resolves the price itself (package tier for the listing's
+  price band and the seller's audience, campaign price inside its window: the
+  same rule `GET /products/:id/boost/options` shows) and compares the two in
+  whole kuruş (`boostPriceMatches` in `@tarodan/types`, the only comparison
+  rule). A mismatch (the package and duration are still offered, at another
+  price) is `409 server.product.boostPriceChanged` before any order lookup,
+  reference or write, so no boost, order, consent or payment row exists for
+  terms the seller did not see. The refusals that come before it win:
+  consents, boost off, listing, owner, status, package, tier, a zero price; so
+  a package or duration that is no longer offered at all is the 400
+  `boostPackageNotFound` or `boostPriceUndefined`, not the 409. On a match the
+  resolved price is what the boost, the order and the payment carry; the
+  client's number is never written. On the 409 the dialog reloads the prices
+  and asks for both consents again; it also refuses to open the pay page for
+  a started order whose price is not the one shown (same rule), which covers
+  an API that does not check the price yet while a release rolls out.
+- **Boost tier band.** A package tier prices one duration for a band of
+  listing prices (`boostTierBasePrice`). The band is half-open:
+  `minAmount <= price < maxAmount`, a null `maxAmount` has no upper bound,
+  the same rule as the commission bands. So 1000-5000 and 5000-(none) touch
+  without overlapping, and a listing priced exactly 5000 is in the second
+  band only. The rule lives in one file,
+  `product/helpers/boost-tier-band.ts`, read by the options, the purchase
+  start and the one-time offer. The admin save (create, and an update that
+  sends `tiers`) refuses, before any write, a band whose upper bound is not
+  above its lower bound (`400 server.admin.commission.maxAboveMin`) and two
+  active tiers of one duration whose bands share a price
+  (`400 server.admin.adPackage.tierOverlap`, with both ranges in the
+  message); both name the rows in `tierIndexes` (positions in `tiers`).
+  Inactive rows and other durations may overlap. For rows saved before the
+  check, the options and the purchase start read the covering tiers with the
+  same filter and the same order (`BOOST_TIER_PRECEDENCE`: highest lower
+  bound, then the narrower band, then the older row, then the id) and take
+  the first one per duration, so the options show one price per duration and
+  initiate resolves that same tier. `maintenance/check-ad-package-tiers.ts`
+  lists such rows (`OPERATIONS.md`, "Check: ad package tier bands").
+- **Tracing.** The boost purchase start tags its request `flow=boost`;
+  the purchase and the activation leave `boost.*` breadcrumbs with ids only
+  (boost, order, order number, listing; `boost.price_mismatch` carries the
+  listing, package and duration, no amount). Activation sets no tag because it
+  also runs in worker jobs, which share the process scope. A paid boost
+  order without its boost row is a Sentry error event.
+
 ---
 
 ## 2. Sipariş para formülü
@@ -474,6 +556,130 @@ ayrıdır; belirsizler `manual_review`'a park eder ve
 `refund-reconciliation.service.ts` PayTR **durum sorgusu**ndaki `returns[]`
 listesini `referenceNo` ile eşleyip CAS ile `succeeded`'a çevirir; referanssız
 ama tutarı tutan dönüş **belirsiz** bırakılır (insan kararı).
+
+### Boost refund and stop (admin)
+
+A boost (`BST-` order, `origin = platform_service`, the platform seller sells
+the virtual `boost-<id>` product) is refunded only from the admin Boost
+purchases screen: `POST /admin/ad-packages/purchases/:id/refund
+{ amount?, reason }` (`super_admin`, `admin`; the `ads` **and** `payments`
+permissions, `@RequireAllPermissions`). Every other refund path refuses an
+order that carries a boost, before any money moves (decision D16):
+
+- admin, `400 server.admin.payment.boostRefundUseBoostScreen`: the manual
+  refund (`POST /admin/payments/:id/manual-refund`), the order cancel and its
+  preview (`POST /admin/orders/:id/cancel`, `GET .../cancel-preview`; an
+  unpaid boost order still cancels, no money moves, and a closed one keeps
+  `cancelAlreadyClosed`), and approving or force-finalizing a refund request
+  (`POST /admin/refund-requests/:id/approve`, `.../force-finalize`). One
+  gate, `assertNotBoostOrderRefund`: a boost order (`virtualOrderKind`, so an
+  ordinary order costs no query) that still has its boost row
+  (`ProductBoost.orderId`). A boost order paid without its boost row has
+  nothing to stop and the boost screen cannot see it, so these paths still
+  settle it.
+- buyer: a refund request on any platform service order (`virtualOrderKind`)
+  answers `400 server.refund.orderStatusNotEligible` for a boost
+  (`membershipOrderNotEligible` for a membership). An order cancel is refused
+  as for any completed order (`server.order.cannotCancelShipped`), and one
+  still in a paid status (a boost order without its boost row) with
+  `400 server.refund.cancelPaidPreShipmentOnly`.
+- system paths still refund a boost order and stop its boost in the same
+  transaction: the auto-refund of a late payment on a cancelled order and the
+  stuck-refund recovery cron.
+
+- **Refundable**: a paid (`source = purchase`) boost that is `active` or
+  `paused` with a `completed` payment; not an ended boost (decision D2). The
+  maximum is `boostRefundableAmount` (`admin/finance/boost/`): the price minus
+  `refundedAmount`, never above what the payment still holds. The admin may
+  enter less (D1); empty means the maximum.
+- **Order of operations**: `processRefund` runs as for any order (the attempt
+  is written before PayTR, the refund goes to the store the boost was paid on,
+  the payment and the order record it, a full refund cancels the order with
+  `cancelledBy = platform`). Its finalize transaction also stops the boost
+  (`BoostTimelineService.stopForRefund`): status `cancelled`, the amount added
+  to `refundedAmount`, the admin and reason written, the boost's unused time
+  taken off the listing and the boosts queued behind it moved up. If PayTR
+  refuses or the outcome is uncertain, the boost is unchanged. Whichever path
+  finalizes the attempt (the admin call, a retry, the stuck-refund recovery
+  cron) stops the boost with the money.
+- **No ledger lines**: a virtual order never had a capture group, so the
+  refund writes no `refund_issued` group, no hold change, no seller debt and no
+  stock on the virtual product (this holds for membership orders too).
+- **Invoice**: the boost e-Arşiv is reversed through the outbox like any order
+  refund (`OUTBOX_INVOICE_REFUND_REVERSE`): cancelled within 8 days for a full,
+  unadjusted refund, otherwise a RETURN invoice per attempt in the refund's
+  ratio.
+- **Never twice**: every try gets a fresh attempt key
+  (`boost-refund:<boostId>:<n>`, `n` = the boost's earlier attempts), so a try
+  PayTR refused can be repeated with another amount. The attempt claim refuses
+  a new attempt while an earlier one is unresolved, and the claim guard
+  (`claimGuard`, under the payment lock) refuses a boost that a finished
+  refund stopped meanwhile. A retry after a finished refund answers with the
+  stopped boost.
+- **Notices**: `processRefund` itself sends no order refund or cancel notice,
+  no staff "order cancelled" mail and no shipment cancel for a boost order,
+  whichever path finalizes it (the platform's own services never ship).
+- **Audit and notice**: one `boost_refund` audit row with the real outcome
+  (`refunded`, `failed`, `pending_reconciliation` when this call's own
+  attempt, its key, may be moving money, also when the stuck-refund recovery
+  took it over; `in_flight_elsewhere` when the attempt claim turned it away
+  before anything was sent because another attempt of the order, another
+  key, is unresolved: `RefundAttemptInFlightException`, still a 503
+  `RefundPendingReconciliationException` for the admin); `refunded` is
+  written only when that call refunded; a failed audit write after the
+  money went back is reported
+  (`BOOST_REFUND_AUDIT_MISSING`, Sentry) and not turned into an error. The
+  seller gets `BOOST_REFUNDED` through the outbox. Sentry: tag `flow=boost`,
+  boost id and order number.
+- **One refund per boost**: the refund stops the boost, and a stopped boost
+  is not refundable again, so a partial refund leaves the rest of the payment
+  with no admin path (open product decision).
+
+A free grant (`source = admin_grant`, `POST /admin/ad-packages/purchases/grant`)
+has no order, payment or invoice and is not revenue (D3); it is stopped
+without money by `POST /admin/ad-packages/purchases/:id/revoke`. Boost
+revenue, counts and uplift in analytics read bought boosts only
+(`admin/analytics/sold-boost.predicate.ts`).
+
+### Boost end, reminder and the seller's view
+
+No money moves here; these rules only read and announce the boost timeline
+(`BoostTimelineService`, product domain).
+
+- **End of a boost** (`expire-boosts` cron, every 15 minutes, one
+  transaction per listing under its lock, `BoostExpiryService`): the ended
+  `active` boosts become `expired` with the listing's final counters, the
+  listing's promotion is rebuilt, and `BOOST_EXPIRED` goes out **once per
+  listing**, when no running boost of it ends later and none waits paused
+  (stacked boosts used to send one per boost). The notice is an outbox row
+  (`boost.notice`, kind `expired`, keyed by the boost that ended last)
+  written with the change.
+- **Ending-soon reminder** (premium only, decision D7; a reminder, never an
+  automatic charge): the switch is the listing's (on while any running or
+  paused boost of it has `autoRenew`). When the listing's last running boost
+  (its "tail") ends within `BOOST_REMINDER_LEAD_HOURS` (24), the
+  cron claims it with a compare-and-set on `reminderSentAt` and queues
+  `BOOST_ENDING_SOON` (outbox kind `ending_soon`, keyed by the stamp). It is
+  due again only when that end moves past the window the reminder announced
+  (a stacked purchase is a new tail; a staff extension or a resume moves the
+  end). A seller who is no longer premium gets none; the handler drops a
+  late reminder that no longer holds (the boost stopped, is no longer the
+  tail, or its end moved past the lead time).
+- **My boosts** (`GET /products/boost/my?state=current|history`, web only,
+  ADR 0015): the caller's `active` and `paused` boosts, or the `expired` and
+  `cancelled` ones, in the `{ data, meta }` envelope, with the order number,
+  source, refunded amount and the listing's real end (`boostedUntil`).
+  `pending` and `failed` rows (abandoned checkouts) are never shown. There is
+  no seller cancel. `PATCH /products/:id/boost/reminder` sets `autoRenew` on
+  the owner's running and paused boosts of the listing; turning it on needs
+  premium (`server.product.boostReminderPremiumOnly`).
+- **New-listing offer** (`GET /products/boost/offers`,
+  `POST /products/boost/offers/dismiss`): computed, never stored, for the
+  seller's live listings created after `boost_offer_since` and in the last 30
+  days, never boosted (`pending`/`failed` do not count), not dismissed, with a
+  package tier for the price (`boostTierBasePrice`) and the seller's
+  audience; at most 20, newest first. Only dismissals are stored
+  (`boost_offer_dismissals`, own listings only, idempotent).
 
 ---
 

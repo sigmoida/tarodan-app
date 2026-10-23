@@ -70,6 +70,8 @@ describe("AppleTokenService", () => {
       user?: { deleted_at: Date | null } | null;
       /** Kullanıcının canlı (iptali istenmemiş) token satırı. */
       liveRow?: { id: string } | null;
+      /** Owner of the Apple identity's link; null = not linked (an unlink). */
+      appleLinkOwner?: string | null;
     } = {},
   ) => {
     const configService = { get: (key: string) => config[key] };
@@ -79,6 +81,15 @@ describe("AppleTokenService", () => {
       // Saklama başarısız olduktan sonra hesabın durumu (kilitsiz okuma).
       user: { findUnique: jest.fn().mockResolvedValue({ deletedAt: null }) },
       $queryRaw: jest.fn().mockResolvedValue(user ? [user] : []),
+      oAuthAccount: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            opts.appleLinkOwner === null
+              ? null
+              : { userId: opts.appleLinkOwner ?? "u1" },
+          ),
+      },
       appleSignInToken: {
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
@@ -242,6 +253,52 @@ describe("AppleTokenService", () => {
         }),
       );
     });
+
+    // An unlink committed while the exchange ran: the token must not stay
+    // live for an Apple identity the account no longer has.
+    it.each([
+      ["unlinked", null],
+      ["linked to another account", "someone-else"],
+    ])(
+      "Apple identity %s: token written as revoke-requested and revoke queued",
+      async (_label, appleLinkOwner) => {
+        exchangeOk();
+        const { service, prisma, outbox } = makeService(fullConfig, {
+          liveRow: { id: "live-1" },
+          appleLinkOwner,
+        });
+
+        await service.storeFromAuthorizationCode(input);
+
+        expect(prisma.oAuthAccount.findUnique).toHaveBeenCalledWith({
+          where: {
+            provider_providerUserId: {
+              provider: "apple",
+              providerUserId: "apple-sub-1",
+            },
+          },
+          select: { userId: true },
+        });
+        // Checked on the locked row, after the user lock.
+        expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+          prisma.oAuthAccount.findUnique.mock.invocationCallOrder[0],
+        );
+        expect(prisma.appleSignInToken.update).not.toHaveBeenCalled();
+        expect(prisma.appleSignInToken.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            userId: "u1",
+            revokeRequestedAt: expect.any(Date),
+          }),
+          select: { id: true },
+        });
+        expect(outbox.enqueue).toHaveBeenCalledWith(
+          prisma,
+          expect.objectContaining({
+            payload: { appleSignInTokenId: "new-row" },
+          }),
+        );
+      },
+    );
 
     // Kullanıcı satırı hiç yoksa satır açmak FK ihlali olurdu: yazma yok,
     // token Apple'a doğrudan iptal edilir.

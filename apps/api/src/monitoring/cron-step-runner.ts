@@ -63,7 +63,7 @@ export function createCronStepRunner(params: {
     async step<T>(name: string, fn: () => Promise<T>): Promise<T | undefined> {
       try {
         const result = await fn();
-        log?.(`✓ ${name}`);
+        log?.(`OK ${name}`);
         return result;
       } catch (error: unknown) {
         const message = errorMessage(error);
@@ -71,7 +71,7 @@ export function createCronStepRunner(params: {
           `Step "${name}" failed: ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
-        log?.(`✗ ${name}: ${message}`);
+        log?.(`HATA ${name}: ${message}`);
         failedSteps.push(name);
         details.push(`${name}: ${message}`);
         return undefined;

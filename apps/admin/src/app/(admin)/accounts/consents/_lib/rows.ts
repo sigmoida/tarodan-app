@@ -31,9 +31,9 @@ export function consentSubject(t: TranslateFn, row: AdminConsentRecordRow) {
 }
 
 /**
- * Mesafeli satış onayının ait olduğu satın alma. Tekil (teklif) siparişin
- * dosyası var; sepetin ayrı bir dosyası yok — Siparişler ekranı sepet
- * numarasıyla aranır.
+ * The purchase a distance sales consent belongs to. A single (offer) order
+ * and a trade have their own detail page; a cart has none, so the Orders
+ * screen is searched by the cart number.
  */
 export function consentReference(
   row: AdminConsentRecordRow,
@@ -42,6 +42,12 @@ export function consentReference(
     return {
       href: `/operations/orders/${row.order.id}`,
       label: row.order.orderNumber,
+    };
+  }
+  if (row.trade) {
+    return {
+      href: `/operations/trades/${row.trade.id}`,
+      label: row.trade.tradeNumber,
     };
   }
   if (row.checkoutGroup) {

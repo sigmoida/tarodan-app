@@ -281,4 +281,104 @@ describe("OfferService — teklif alt sınırı", () => {
       expect(tx.offer.update).toHaveBeenCalled();
     });
   });
+
+  /**
+   * The upper bound mirrors web (`offerSchema`) and mobile (`MakeOfferModal`):
+   * an offer is strictly below the price they show, which is the API's
+   * `price` (`resolveSalePrice`). The seller counter may reach the price.
+   */
+  describe("listing price ceiling", () => {
+    const i18nKeyOf = (error: unknown) =>
+      (error as { response?: { i18nKey?: string } } | undefined)?.response
+        ?.i18nKey;
+
+    it.each([1000, 1000.01, 5000])(
+      "create refuses an offer of %p on a 1000 TL listing",
+      async (amount) => {
+        const { service, tx } = build({ min: undefined, listingPrice: 1000 });
+
+        const error = await service
+          .create("b1", { productId: "p1", amount })
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect(i18nKeyOf(error)).toBe("server.offer.offerMustBeBelowPrice");
+        expect(tx.offer.findFirst).not.toHaveBeenCalled();
+      },
+    );
+
+    it("create accepts 999.99 on a 1000 TL listing", async () => {
+      const { service } = build({ min: undefined, listingPrice: 1000 });
+
+      const error = await service
+        .create("b1", { productId: "p1", amount: 999.99 })
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.alreadyPendingOffer");
+    });
+
+    it("create bounds by the sale price after the discount window closed", async () => {
+      // price 800 with oldPrice 1000 and a window that ended: the listing
+      // sells (and shows) at 1000, so 900 is a valid offer.
+      const { service, tx } = build({ min: undefined, listingPrice: 800 });
+      tx.product.findUnique.mockResolvedValue({
+        ...product(800),
+        oldPrice: 1000,
+        saleEndDate: new Date(Date.now() - 3_600_000),
+      });
+
+      const error = await service
+        .create("b1", { productId: "p1", amount: 900 })
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.alreadyPendingOffer");
+    });
+
+    it("create bounds by the discounted price inside an open sale window", async () => {
+      // price 800 with oldPrice 1000 and a window still open: the listing
+      // sells (and shows) at 800, so 900 is at or above the price.
+      const { service, tx } = build({ min: undefined, listingPrice: 800 });
+      tx.product.findUnique.mockResolvedValue({
+        ...product(800),
+        oldPrice: 1000,
+        saleEndDate: new Date(Date.now() + 3_600_000),
+      });
+
+      const error = await service
+        .create("b1", { productId: "p1", amount: 900 })
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.offerMustBeBelowPrice");
+      expect(tx.offer.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("the seller counter may equal the listing price", async () => {
+      const { service, tx } = build({
+        min: undefined,
+        listingPrice: 1000,
+        offer: { amount: 600 },
+      });
+
+      const error = await service
+        .counter("o1", "s1", { amount: 1000 })
+        .catch((e: unknown) => e);
+
+      expect(error).toBe(STOP);
+      expect(tx.offer.update).toHaveBeenCalled();
+    });
+
+    it("the seller counter above the listing price is refused", async () => {
+      const { service } = build({
+        min: undefined,
+        listingPrice: 1000,
+        offer: { amount: 600 },
+      });
+
+      const error = await service
+        .counter("o1", "s1", { amount: 1000.01 })
+        .catch((e: unknown) => e);
+
+      expect(i18nKeyOf(error)).toBe("server.offer.counterCannotExceedPrice");
+    });
+  });
 });

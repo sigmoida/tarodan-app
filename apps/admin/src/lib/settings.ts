@@ -1,6 +1,9 @@
 import {
-  DISTANCE_SALES_CONSENT_REQUIRED_SETTING,
-  parseDistanceSalesConsentRequired,
+  BOOST_ENABLED_SETTING,
+  BOOST_OFFER_SINCE_SETTING,
+  boostOfferSince,
+  isBoostEnabled,
+  isPlatformSettingOn,
 } from "@tarodan/types";
 
 /**
@@ -41,12 +44,28 @@ export function readPspFeeRate(raw: unknown): number {
 }
 
 /**
- * Mesafeli satış onayı ödemede zorunlu mu (`distance_sales_consent_required`).
- * Anahtar ve "yalnız `true` açık" kuralı API ile aynı kaynaktan
- * (`@tarodan/types`) gelir; ayar yoksa kapalıdır.
+ * Whether an on/off setting is on (`distance_sales_consent_required`,
+ * `auth_require_reauth_for_sensitive_actions`, ...). The "only `true` is on"
+ * rule comes from `@tarodan/types`, the same one the API applies; a missing
+ * setting is off.
  */
-export function readDistanceSalesConsentRequired(raw: unknown): boolean {
-  return parseDistanceSalesConsentRequired(
-    readSetting(raw, DISTANCE_SALES_CONSENT_REQUIRED_SETTING),
-  );
+export function readSettingOn(raw: unknown, key: string): boolean {
+  return isPlatformSettingOn(readSetting(raw, key));
+}
+
+/**
+ * Whether boost sales are on. Unlike `readSettingOn`, a missing or empty
+ * `boost_enabled` is on (`isBoostEnabled`, the rule the API applies); only
+ * "false" turns it off.
+ */
+export function readBoostEnabled(raw: unknown): boolean {
+  return isBoostEnabled(readSetting(raw, BOOST_ENABLED_SETTING));
+}
+
+/**
+ * The new-listing offer start (`boost_offer_since`) as the API reads it, or
+ * null when offers are off (missing, empty or not a date).
+ */
+export function readBoostOfferSince(raw: unknown): Date | null {
+  return boostOfferSince(readSetting(raw, BOOST_OFFER_SINCE_SETTING));
 }

@@ -2,8 +2,17 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { Prisma, RefundAttemptStatus } from "@prisma/client";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
+import { asPaymentMetadata } from "../helpers/payment-metadata.types";
 import { i18nMessage } from "../../i18n";
-import { RefundPendingReconciliationException } from "../../payment-providers/refund-errors";
+// Two refusals, both before this call sends anything: a different attempt of
+// the order is unresolved (`RefundAttemptInFlight`, this call's intent has no
+// attempt), or this key's own attempt is in flight or uncertain
+// (`RefundPendingReconciliation`: the money of this intent may be moving,
+// for example the stuck-refund recovery submitting it).
+import {
+  RefundAttemptInFlightException,
+  RefundPendingReconciliationException,
+} from "../../payment-providers/refund-errors";
 
 /**
  * Dayanıklı iade denemesi defteri — PaymentRefundService'ten birebir taşındı.
@@ -28,6 +37,12 @@ export class PaymentRefundAttemptService {
     idempotencyKey: string,
     provider: string,
     providerReference: string,
+    /**
+     * The caller's own precondition, checked under the payment lock right
+     * before an attempt is (re)prepared to go to the provider; it throws to
+     * refuse. Not run for an attempt that only finishes (already sent).
+     */
+    guard?: (tx: Prisma.TransactionClient) => Promise<void>,
   ): Promise<{
     action: "submit" | "finalize" | "done";
     attempt: {
@@ -43,9 +58,8 @@ export class PaymentRefundAttemptService {
         where: { id: paymentId },
         select: { metadata: true },
       });
-      const meta = (fresh?.metadata as Record<string, any>) || {};
       const refundedOrders =
-        (meta.refundedOrders as Record<string, number>) || {};
+        asPaymentMetadata(fresh?.metadata).refundedOrders ?? {};
 
       if (isGroupPayment && refundedOrders[orderId]) {
         throw new BadRequestException(
@@ -94,6 +108,7 @@ export class PaymentRefundAttemptService {
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
+        await guard?.(tx);
         if (attempt.status === RefundAttemptStatus.failed) {
           attempt = await tx.refundAttempt.update({
             where: { id: attempt.id },
@@ -122,10 +137,11 @@ export class PaymentRefundAttemptService {
         },
       });
       if (unresolved) {
-        throw new RefundPendingReconciliationException(
+        throw new RefundAttemptInFlightException(
           i18nMessage("server.payment.refundInitiationFailed"),
         );
       }
+      await guard?.(tx);
 
       attempt = await tx.refundAttempt.create({
         data: {
@@ -150,6 +166,8 @@ export class PaymentRefundAttemptService {
       },
     });
     if (started.count !== 1) {
+      // This attempt (this key) was started by another call, possibly the
+      // stuck-refund recovery: its money is in flight, so it is pending.
       throw new RefundPendingReconciliationException(
         i18nMessage("server.payment.refundInitiationFailed"),
       );
@@ -229,7 +247,7 @@ export class PaymentRefundAttemptService {
         },
       });
       if (unresolved) {
-        throw new RefundPendingReconciliationException(
+        throw new RefundAttemptInFlightException(
           i18nMessage("server.payment.refundInitiationFailed"),
         );
       }

@@ -2,8 +2,9 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
-import { ArchiveBoxIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { EmptyState } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useLocale, useTranslations } from "next-intl";
 import ProductCard from "@/components/ui/ProductCard";
 import type { Product } from "@/types/product";
@@ -40,24 +41,16 @@ export default function ManufacturerProductsGrid({
           ))}
         </div>
       ) : products.length === 0 ? (
-        <div className="bg-surface-elevated rounded-2xl border border-border-subtle p-24 text-center shadow-sm">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-surface rounded-full mb-6">
-            <ArchiveBoxIcon className="w-10 h-10 text-border-strong" />
-          </div>
-          <h3 className="text-2xl font-bold text-heading mb-3">
-            {t("brands.noProducts") ||
-              t("brands.manufacturerGrid.ilanBulunamadi")}
-          </h3>
-          <p className="text-muted max-w-md mx-auto mb-8">
-            {t("brands.manufacturerGrid.buUreticiyeAitHenuzBirIlan")}
-          </p>
-          <Link
-            href="/listings/new"
-            className="inline-block px-10 py-4 bg-heading text-inverted rounded-full font-bold shadow-sm hover:bg-primary-600 transition-all"
-          >
-            {t("brands.manufacturerGrid.ilanVerenIlkKisiOl")}
-          </Link>
-        </div>
+        <EmptyState
+          icon={<MagnifyingGlassIcon className="h-7 w-7" />}
+          title={t("brands.noProducts")}
+          description={t("brands.manufacturerGrid.buUreticiyeAitHenuzBirIlan")}
+          action={
+            <ButtonLink href="/listings/new">
+              {t("brands.manufacturerGrid.ilanVerenIlkKisiOl")}
+            </ButtonLink>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {products.map((product, index) => (

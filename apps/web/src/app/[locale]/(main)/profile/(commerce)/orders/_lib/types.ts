@@ -1,17 +1,30 @@
 /** @format */
 
+import {
+  isDigitalOrder,
+  type DigitalOrderSignals,
+  type OrderKind,
+} from "@tarodan/types";
+
 export interface Order {
   id: string;
   orderNumber: string;
-  /** Çok ürünlü checkout grubu: aynı gruptaki siparişler tek kart altında gösterilir */
+  /** What the order sells; `isDigitalOrder` reads it (with the fallbacks below). */
+  kind?: OrderKind;
+  /** `platform_service` for a membership or boost order (fallback signal). */
+  origin?: string | null;
+  /** @deprecated True for every platform-service order; read `kind`. */
+  isMembership?: boolean;
+  /** Multi-product checkout group: the orders of one group share one card. */
   checkoutGroupId?: string | null;
-  /** Çatı (checkout group) numarası — GRP-… ; kart başlığında gösterilir. */
+  /** Umbrella (checkout group) number, GRP-…; shown in the card header. */
   groupNumber?: string | null;
-  /** Satıcı paketi (çatı): aynı grupta aynı satıcının order'ları tek paket. Kargo pakete
-   * bir kez yüklenir → kardeş order shippingCost=0 olabilir ("ücretsiz" değil, pakete dahil). */
+  /** Seller package: one seller's orders in one group form one package. Shipping is
+   * charged once per package, so a sibling order may carry shippingCost=0 (included
+   * in the package, not "free"). */
   packageId?: string | null;
   status: string;
-  /** 'iptal' (kargo öncesi) | 'iade' (kargo sonrası). */
+  /** 'iptal' (before shipping) | 'iade' (after shipping). */
   cancellationType?: string | null;
   totalAmount?: number;
   amount?: number;
@@ -36,7 +49,7 @@ export interface Order {
     carrier?: string;
     provider?: string;
     status: string;
-    /** İlk fiziksel devir mührü — iptal hakkının bittiği an (bkz. hasShipped). */
+    /** First physical handover stamp: the moment the cancel right ends (see hasShipped). */
     shippedAt?: string | null;
   };
   isBuyer?: boolean;
@@ -216,26 +229,37 @@ export const visibleCargoCode = (
   cargo: ServerPackageView["cargo"],
 ): string | null => cargo?.cargoCode ?? null;
 
-/** İptal edilebilir sipariş durumları (kargo öncesi). */
+/**
+ * A package of digital orders (membership, boost) ships nothing: no parcel
+ * number, cargo code or tracking is shown for it.
+ */
+export const isDigitalPackage = (pkg: ServerPackageView): boolean =>
+  pkg.orders.length > 0 && pkg.orders.every(isDigitalOrder);
+
+/** Order statuses that can be cancelled (before shipping). */
 const CANCELLABLE_STATUSES = ["pending_payment", "paid", "preparing"];
 
 /**
- * Grup iptali (R4): SEPET bazlı iptal yalnız hiçbir üye kargoya verilmemişken
- * açıktır. Kısmen kargolanmış sepette grup iptali kapalıdır — kargolanmamış
- * kalemler için tek KALEM iptali (isOrderCancellable) devreye girer.
+ * Group cancel (R4): cancelling the whole cart is open only while no member
+ * has been handed to the carrier. A partly shipped cart cannot be cancelled
+ * as a group; its unshipped lines use the single-line cancel
+ * (`isOrderCancellable`). The client offers no cancel for a digital order (an
+ * unpaid one expires on the server), so a group holding one offers no group
+ * cancel.
  */
 export const isGroupCancellable = (group: ServerOrderGroup): boolean =>
   group.viewerRole === "buyer" &&
   group.orders.length > 0 &&
   group.orders.every(
     (o) =>
+      !isDigitalOrder(o) &&
       CANCELLABLE_STATUSES.includes(o.status) &&
       !hasShipped(o) &&
       !o.activeRefundRequest,
   );
 
-/** Tekil iptal önkoşullarının okuduğu asgari sipariş şekli (Order ⊆, OrderDetail ⊆). */
-export interface CancellableOrderLike {
+/** The minimal order shape the single-line cancel reads (Order and OrderDetail fit it). */
+export interface CancellableOrderLike extends DigitalOrderSignals {
   status: string;
   isBuyer?: boolean;
   activeRefundRequest?: { id: string } | null;
@@ -243,12 +267,15 @@ export interface CancellableOrderLike {
 }
 
 /**
- * Tek KALEM iptali: sipariş kargoya devredilmeden (pending_payment/paid/
- * preparing, gönderi en fazla etiket aşamasında) ve aktif iade yokken alıcı
- * tek satırı iptal edebilir. Karışık sepette (bir kalem kargoda, diğeri değil)
- * grup iptali kapanır ama bu yol açık kalır.
+ * Single-line cancel: before the order is handed to the carrier
+ * (pending_payment, paid or preparing, the shipment at most at the label
+ * stage) and with no active refund, the buyer can cancel one line. In a mixed
+ * cart (one line shipped, another not) the group cancel closes but this path
+ * stays open. The client offers no cancel for a digital order (membership,
+ * boost); an unpaid one expires on the server's payment-expiry sweep.
  */
 export const isOrderCancellable = (o: CancellableOrderLike): boolean => {
+  if (isDigitalOrder(o)) return false;
   if (o.isBuyer === false) return false;
   if (!CANCELLABLE_STATUSES.includes(o.status)) return false;
   if (o.activeRefundRequest) return false;

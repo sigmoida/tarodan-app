@@ -28,6 +28,7 @@ import { adminCancelReasonText } from "../../order/helpers/admin-cancel-reason";
 import { orderReservationState } from "../../order/helpers/order-reservation";
 import { i18nMessage } from "../../i18n";
 import { errorMessage } from "../../../common/helpers/error-message";
+import { assertNotBoostOrderRefund } from "../finance/boost/boost-refund-policy";
 
 /**
  * Uygunluk ve kilit altındaki yeniden değerlendirmenin okuduğu sipariş yükü.
@@ -211,6 +212,7 @@ export class AdminOrderCancelService {
 
   async previewCancel(orderId: string): Promise<AdminOrderCancelPreview> {
     const order = await this.loadOrder(orderId);
+    await this.refuseBoostRefund(order);
     const kind = cancellableKind(order);
     const quantity = order.quantity ?? 1;
     if (kind === "unpaid") {
@@ -241,6 +243,7 @@ export class AdminOrderCancelService {
 
     let outcome: CancelOutcome;
     try {
+      await this.refuseBoostRefund(order);
       const kind = cancellableKind(order);
       assertExpectedKind(request.expectedKind, kind);
       outcome =
@@ -417,6 +420,22 @@ export class AdminOrderCancelService {
       // sonlandırdıysa iptali ve duyuruyu o yaptı (çift mesaj olmaz).
       notice: refund.closedWithAdminReason ? { refundAmount } : null,
     };
+  }
+
+  /**
+   * A paid order that carries a boost is refunded (and its boost stopped)
+   * only on the boost screen (D16). Checked before the other blockers so the
+   * admin is sent there. Skipped for an unpaid order, which cancels like any
+   * order (no money moves; a payment landing meanwhile is caught under the
+   * lock), and for a closed one, which keeps its own "already closed" answer.
+   */
+  private async refuseBoostRefund(order: CancelOrderRow): Promise<void> {
+    const eligibility = eligibilityOf(order);
+    const noMoneyPath = eligibility.allowed
+      ? eligibility.kind === "unpaid"
+      : eligibility.blocker === "closed";
+    if (noMoneyPath) return;
+    await assertNotBoostOrderRefund(this.prisma, order);
   }
 
   private auditAfter(

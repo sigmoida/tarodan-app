@@ -29,6 +29,16 @@ describe("yearlyDiscountSchema — 0..YEARLY_DISCOUNT_MAX range", () => {
     expect(schema.safeParse({ discount: "abc" }).success).toBe(false);
   });
 
+  it("accepts a decimal comma or point", () => {
+    expect(schema.safeParse({ discount: "12,5" }).success).toBe(true);
+    expect(schema.safeParse({ discount: "12.5" }).success).toBe(true);
+  });
+
+  it("refuses grouping and a third decimal", () => {
+    expect(schema.safeParse({ discount: "1.000" }).success).toBe(false);
+    expect(schema.safeParse({ discount: "10,125" }).success).toBe(false);
+  });
+
   it("rejects an empty or whitespace-only value as required", () => {
     expect(schema.safeParse({ discount: "" }).success).toBe(false);
     expect(schema.safeParse({ discount: "  " }).success).toBe(false);

@@ -10,6 +10,15 @@ import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentStatus } from "../_hooks/usePaymentStatus";
 import PaymentReady from "./PaymentReady";
 import { useTranslations } from "next-intl";
+import type { MessageKey } from "@tarodan/i18n";
+import type { PaymentKind } from "@/lib/paymentKind";
+
+/** The not-found button: back to the purchase's own list. */
+const BACK_LABEL: Record<PaymentKind, MessageKey> = {
+  checkout: "page.payment.paymentpageclient.siparislerimeDon",
+  membership: "page.payment.paymentpageclient.uyelikSayfasinaDon",
+  boost: "payment.boost.toBoosts",
+};
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -20,9 +29,9 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Yarım kalmış bir ödemeye dönüş ekranı. Yaşam döngüsü (yükleme, bulunamadı,
- * tamamlanmışı yönlendirme) burada; ödemeye hazır görünüm `PaymentReady`'de —
- * checkout ile aynı iskelet, sayfa başlığı yok.
+ * The screen for returning to an unfinished payment. The lifecycle (loading,
+ * not found, routing a finished payment away) lives here; the ready-to-pay
+ * view is `PaymentReady`, the same layout as checkout, without a page title.
  */
 export default function PaymentPageClient() {
   const t = useTranslations();
@@ -36,8 +45,8 @@ export default function PaymentPageClient() {
     retry,
     directTarget,
     hasTarget,
-    isMembershipPayment,
-    purpose,
+    kind,
+    routes,
   } = usePaymentStatus();
 
   if (phase === "auth-loading") return <AuthLoadingScreen />;
@@ -60,14 +69,8 @@ export default function PaymentPageClient() {
         <p className="mb-4 text-muted">
           {t("page.payment.paymentpageclient.odemeBulunamadi")}
         </p>
-        <Button
-          onClick={() =>
-            router.push(isMembershipPayment ? "/membership" : "/profile/orders")
-          }
-        >
-          {isMembershipPayment
-            ? t("page.payment.paymentpageclient.uyelikSayfasinaDon")
-            : t("page.payment.paymentpageclient.siparislerimeDon")}
+        <Button onClick={() => router.push(routes.back)}>
+          {t(BACK_LABEL[kind])}
         </Button>
       </Centered>
     );
@@ -78,12 +81,12 @@ export default function PaymentPageClient() {
       <PaymentReady
         target={directTarget}
         paymentId={payment.id}
+        kind={kind}
         amount={payment.amount}
-        // Kalemler yalnız takas ödemesinde döner (grup/sipariş ödemesinin
-        // kendi özeti sepet ekranındadır).
+        // Only a trade payment returns line items (a cart or order payment
+        // has its own summary on the cart screen).
         pricing={payment.tradeId ? payment.pricing : null}
         cardStorageEnabled={cardStorageEnabled}
-        purpose={purpose}
         hasTarget={hasTarget}
         onCancel={handleCancel}
         cancelling={cancelling}

@@ -4,17 +4,24 @@
  * senders. Delegates delivery to the shared NotificationDispatchService. (The
  * guest contact staff notice moved to Mail Routing: MailInternalNotifier.)
  */
+import { InjectQueue } from "@nestjs/bull";
 import { Injectable, Logger } from "@nestjs/common";
+import { Queue } from "bull";
 import { ConfigService } from "@nestjs/config";
+import { redactString } from "@tarodan/logger";
 import { PrismaService } from "../../prisma";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { NotificationDispatchService } from "./notification-dispatch.service";
+import { QUEUE_NAMES } from "../../workers/constants";
 import {
-  frontendUrl as resolveFrontendUrl,
-  frontendUrlForEnvironment,
-  LOCAL_FRONTEND_URL,
-} from "../../config/app-urls";
+  ACCOUNT_SECURITY_NOTICE_TEMPLATE,
+  buildAccountSecurityNoticeData,
+  type AccountSecurityNoticeDetails,
+  type AccountSecurityNoticeEvent,
+} from "../../common/helpers/account-security-notice-mail";
+import { getEmailTemplateSubject } from "../../common/helpers/email-template-renderer";
+import { frontendUrlForEnvironment } from "../../config/app-urls";
 import {
   buildEmailVerificationTemplateData,
   EMAIL_VERIFICATION_TEMPLATE,
@@ -29,6 +36,7 @@ export class NotificationAccountService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly smtpProvider: SmtpProvider,
+    @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
   ) {}
 
   /**
@@ -40,7 +48,7 @@ export class NotificationAccountService {
       select: { email: true, displayName: true },
     });
     if (!user) return { success: false, error: "User not found" };
-    const frontendUrl = resolveFrontendUrl();
+    const frontendUrl = frontendUrlForEnvironment();
     await this.dispatch.sendTemplateEmailToAddress(user.email, "welcome", {
       name: user.displayName || "",
       verifyUrl: `${frontendUrl}/listings`,
@@ -59,10 +67,10 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    const frontendUrl = resolveFrontendUrl(LOCAL_FRONTEND_URL);
+    const frontendUrl = frontendUrlForEnvironment();
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
     const displayName = user.displayName || "";
-    // displayName: name'in takma adı — legacy admin şablonları {{displayName}} kullanıyor.
+    // displayName: alias of name; legacy admin templates use {{displayName}}.
     const templateData = { name: displayName, displayName, resetUrl };
 
     const dbTemplate = await this.prisma.emailTemplate.findUnique({
@@ -75,18 +83,24 @@ export class NotificationAccountService {
       frontendUrl,
     );
 
+    const smtpConfigured = this.smtpProvider.isConfigured();
     let result;
-    if (this.smtpProvider.isConfigured()) {
+    if (smtpConfigured) {
       result = await this.smtpProvider.sendEmail({
         to: user.email,
         subject: email.subject,
         html: email.html,
-        // EmailLog satırı şablonu bilsin (filtre/denetim için). Bu noktada
-        // yalnız e-posta+ad taşınıyor; kullanıcı kimliği kapsamda değil.
+        // Lets the EmailLog row record the template and the user, so support
+        // can check per user whether a reset mail went out.
         template: "password-reset",
+        userId,
       });
     } else {
-      this.logger.warn("SMTP is not configured for password reset email");
+      // The caller still answers 200 (no account enumeration), so the dropped
+      // reset must surface here: error-level lines are forwarded to Sentry.
+      this.logger.error(
+        `Password reset email dropped, SMTP is not configured (userId=${userId})`,
+      );
       result = { success: false, error: "No email provider configured" };
     }
 
@@ -100,10 +114,12 @@ export class NotificationAccountService {
     );
 
     if (result.success) {
-      this.logger.log(`Password reset email sent to ${user.email}`);
-    } else {
+      this.logger.log(`Password reset email sent (userId=${userId})`);
+    } else if (smtpConfigured) {
       this.logger.error(
-        `Failed to send password reset email to ${user.email}: ${result.error}`,
+        // SMTP rejections often quote the recipient address; this line
+        // reaches Sentry, so the provider text is scrubbed first.
+        `Failed to send password reset email (userId=${userId}): ${redactString(result.error ?? "")}`,
       );
     }
 
@@ -121,8 +137,8 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    // Link ve süre metni kuyruklu yolla ORTAK helper'dan gelir; iki yolun
-    // farklı host'a işaret etmesi mümkün olmasın.
+    // The link and the expiry text come from the SAME helper as the queued
+    // path, so the two can never point at different hosts.
     const frontendUrl = frontendUrlForEnvironment();
     const templateData = buildEmailVerificationTemplateData(
       user.displayName,
@@ -146,6 +162,7 @@ export class NotificationAccountService {
         subject: email.subject,
         html: email.html,
         template: "email-verification",
+        userId,
       });
     } else {
       this.logger.warn("SMTP is not configured for email verification");
@@ -162,14 +179,55 @@ export class NotificationAccountService {
     );
 
     if (result.success) {
-      this.logger.log(`Email verification sent to ${user.email}`);
+      this.logger.log(`Email verification sent (userId=${userId})`);
     } else {
       this.logger.error(
-        `Failed to send email verification to ${user.email}: ${result.error}`,
+        `Failed to send email verification (userId=${userId}): ${redactString(result.error ?? "")}`,
       );
     }
 
     return result;
+  }
+
+  /**
+   * Tells the account owner that a sign-in method changed (provider linked or
+   * unlinked, password set). Queued on the e-mail queue; it never throws and
+   * never waits for delivery, so a mail failure cannot fail or slow the
+   * security action that triggered it. Logs and Sentry get the user id only.
+   * The payload is kept out of `EmailLog.metadata` (`redactTemplateData`).
+   */
+  async sendAccountSecurityNotice(
+    userId: string,
+    event: AccountSecurityNoticeEvent,
+    details: AccountSecurityNoticeDetails = {},
+  ): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, displayName: true },
+      });
+      if (!user) return;
+
+      const templateData = buildAccountSecurityNoticeData({
+        event,
+        name: user.displayName,
+        ...details,
+      });
+      await this.emailQueue.add("send-template", {
+        to: user.email,
+        subject: getEmailTemplateSubject(
+          ACCOUNT_SECURITY_NOTICE_TEMPLATE,
+          templateData,
+        ),
+        template: ACCOUNT_SECURITY_NOTICE_TEMPLATE,
+        templateData: { ...templateData, userId },
+        redactTemplateData: true,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue account security notice (userId=${userId}, event=${event}): ${redactString(error instanceof Error ? error.message : String(error))}`,
+      );
+    }
   }
 
   /**

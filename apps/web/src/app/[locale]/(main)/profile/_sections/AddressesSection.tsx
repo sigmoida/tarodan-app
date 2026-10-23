@@ -9,8 +9,9 @@ import {
   PencilIcon,
   TrashIcon,
   CheckIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, IconButton } from "@tarodan/ui";
+import { Badge, Button, EmptyState, IconButton } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { PROFILE_GATE } from "@/lib/profileGate";
@@ -86,12 +87,16 @@ export default function AddressesSection() {
             ))}
           </div>
         ) : addresses.length === 0 ? (
-          <div className="rounded-lg bg-surface py-10 text-center">
-            <p className="mb-4 text-muted">{t("address.noAddresses")}</p>
-            <Button type="button" onClick={openAdd}>
-              {t("address.addFirstAddress")}
-            </Button>
-          </div>
+          <EmptyState
+            size="compact"
+            icon={<MapPinIcon className="h-6 w-6" />}
+            title={t("address.noAddresses")}
+            action={
+              <Button type="button" onClick={openAdd}>
+                {t("address.addFirstAddress")}
+              </Button>
+            }
+          />
         ) : (
           <div className="space-y-3">
             {addresses.map((address) => (

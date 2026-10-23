@@ -31,8 +31,9 @@ export const NOTIFICATION_INTERNAL_PATHS: readonly RegExp[] = [
   /^\/profile$/,
   // Alt segmenti GERÇEKTEN olan iki bölüm (`[id]` route'u var).
   /^\/profile\/(orders|trades)(\/[^/]+)?$/,
-  // Kalanlar yalnız liste ekranı: `/profile/offers/x` diye bir sayfa yok.
-  /^\/profile\/(offers|messages|listings|favorites|payments|notifications)$/,
+  // The rest are list screens only: there is no `/profile/offers/x` page.
+  // `boosts` is "My boosts" (web only, ADR 0015), the target of boost notices.
+  /^\/profile\/(offers|messages|listings|boosts|favorites|payments|notifications)$/,
 ];
 
 /**

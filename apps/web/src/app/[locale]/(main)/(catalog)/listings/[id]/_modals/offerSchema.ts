@@ -1,19 +1,23 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
-import { formatTL } from "@tarodan/shared";
+import { formatTL, parseTlAmount } from "@tarodan/shared";
+import { exceedsTlNegotiatedAmountMax } from "@tarodan/types";
+import { amountAboveMaxMessage } from "@/lib/negotiatedAmount";
 
 /**
- * Make-offer form. `amount` stays the raw input string (the `<input type=number>`
- * value) and is validated against the listing's price bounds: at least 50% of the
- * current price and strictly below it. Bounds are runtime values, so this is a
- * factory (like the auth / track-order schemas).
+ * Make-offer form. `amount` stays the raw text of a `type="text"` field, read
+ * by the shared TL amount parser (grouping such as "1.000" is refused, never
+ * read as 1 TL), and is validated against the API's ceiling of an agreed
+ * amount (`TL_NEGOTIATED_AMOUNT_MAX`) and the listing's price bounds: at least
+ * 50% of the current price and strictly below it. Bounds are runtime values,
+ * so this is a factory (like the auth / track-order schemas).
  */
 export const offerSchema = (
   min: number,
   max: number,
   locale: string,
-  /** Platform alt sınırı (admin ayarı); null = kural yok. */
+  /** Platform floor (admin setting); null = no rule. */
   floor: number | null = null,
 ) => {
   const t = createTranslator({
@@ -25,16 +29,33 @@ export const offerSchema = (
       .string()
       .trim()
       .min(1, t("validation.enterAmount"))
-      .refine(
-        (v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0,
-        t("validation.enterValidAmount"),
-      )
-      .refine((v) => parseFloat(v) >= min, `Min: ${min.toFixed(2)} TL (50%)`)
-      .refine(
-        (v) => floor == null || parseFloat(v) >= floor,
-        t("offer.minimumOfferFloorError", { amount: formatTL(floor ?? 0) }),
-      )
-      .refine((v) => parseFloat(v) < max, t("validation.offerBelowPrice")),
+      .superRefine((v, ctx) => {
+        // One issue, in rule order: the field shows the first failing rule.
+        const fail = (message: string) =>
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+        const parsed = parseTlAmount(v);
+        if (parsed.status === "refused") {
+          return fail(t("validation.amountFormatRefused"));
+        }
+        if (parsed.status === "empty") {
+          return fail(t("validation.enterValidAmount"));
+        }
+        const amount = parsed.amount;
+        if (exceedsTlNegotiatedAmountMax(amount)) {
+          return fail(amountAboveMaxMessage(t));
+        }
+        if (amount < min) {
+          return fail(
+            t("offer.minimumOfferFloorError", { amount: formatTL(min) }),
+          );
+        }
+        if (floor != null && amount < floor) {
+          return fail(
+            t("offer.minimumOfferFloorError", { amount: formatTL(floor) }),
+          );
+        }
+        if (amount >= max) return fail(t("validation.offerBelowPrice"));
+      }),
     message: z.string().trim().max(500, t("validation.max500Chars")).optional(),
   });
 };

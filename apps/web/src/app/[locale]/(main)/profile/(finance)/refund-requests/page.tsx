@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { Spinner } from "@tarodan/ui";
+import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
+import { EmptyState, Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuthStore } from "@/stores/authStore";
@@ -43,9 +44,10 @@ export default function MyRefundRequestsPage() {
           <Spinner />
         </div>
       ) : requests.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface-elevated p-8 text-center text-muted">
-          {t("refund.listEmpty")}
-        </div>
+        <EmptyState
+          icon={<ReceiptPercentIcon className="h-7 w-7" />}
+          title={t("refund.listEmpty")}
+        />
       ) : (
         <div className="space-y-3">
           {requests.map((rr) => (

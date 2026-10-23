@@ -1,5 +1,6 @@
 /** @format */
 
+import { tlAmountInputValue } from "@tarodan/shared";
 import type { SaleData } from "../form";
 import {
   COLOR_GROUP_SLUG,
@@ -103,7 +104,8 @@ export function buildListingFormData(edit: ListingEditPayload): {
   const newFormData: EditListingFormData = {
     title: text(edit.title),
     description: text(edit.description),
-    price: basePrice != null ? String(basePrice) : "",
+    // Field text with a decimal comma ("1250,50"), as the price field reads it.
+    price: basePrice != null ? tlAmountInputValue(basePrice) : "",
     categoryId: text(edit.categoryId),
     condition: edit.condition || "very_good",
     brandId: text(edit.brandId),
@@ -162,8 +164,8 @@ export function buildSaleDataFromListing(edit: ListingEditPayload): {
 
   return {
     saleData: {
-      originalPrice: original != null ? String(original) : "",
-      salePrice: saleActive ? String(sale) : "",
+      originalPrice: original != null ? tlAmountInputValue(original) : "",
+      salePrice: saleActive ? tlAmountInputValue(sale) : "",
       saleStartDate: dayOf(edit.saleStartDate) ?? today(),
       saleEndDate: dayOf(edit.saleEndDate) ?? inAWeek(),
     },

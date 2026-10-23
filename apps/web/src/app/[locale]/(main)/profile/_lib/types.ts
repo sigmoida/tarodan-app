@@ -43,10 +43,8 @@ export interface UserProfile {
     expiresAt: string | null;
   };
   membershipTier?: string;
-  // Premium trust score (optional, surfaced in the hero)
+  // Premium flag (optional, surfaced in the hero)
   isPremium?: boolean;
-  trustScore?: number;
-  trustLevel?: string;
 }
 
 export interface PendingCounts {

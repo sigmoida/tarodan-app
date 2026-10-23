@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderPlusIcon } from "@heroicons/react/24/outline";
+import {
+  FolderPlusIcon,
+  RectangleStackIcon,
+} from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -11,7 +14,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { queryKeys } from "@/lib/query/keys";
 import { useTranslations } from "next-intl";
 import CreateCollectionModal from "@/components/CreateCollectionModal";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { useMyCollections } from "./_hooks/useMyCollections";
 import CollectionCard from "../../../(catalog)/collections/_components/CollectionCard";
 import CollectionsToolbar from "./_components/CollectionsToolbar";
@@ -97,7 +100,8 @@ export default function MyCollectionsPage() {
           ))}
         </div>
       ) : displayedCollections.length === 0 ? (
-        <EmptyStateCard
+        <EmptyState
+          icon={<RectangleStackIcon className="h-7 w-7" />}
           title={
             searchQuery
               ? `"${searchQuery}" ${t("common.noResults")}`

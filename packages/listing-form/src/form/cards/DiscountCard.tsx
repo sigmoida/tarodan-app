@@ -10,7 +10,7 @@ import {
   ReceiptPercentIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, DatePicker, Input } from "@tarodan/ui";
-import { formatTL } from "@tarodan/shared";
+import { formatTL, isTlAmountRefused, tlAmountValue } from "@tarodan/shared";
 
 /**
  * İlan indirimi — yeni ilan ve düzenleme formlarının ORTAK bölümü.
@@ -37,7 +37,7 @@ interface DiscountCardProps {
    * bu yüzden kart onu üretmez — verilmezse bölüm hiç çıkmaz.
    */
   manageDiscountsLink?: ReactNode;
-  /** İndirimli fiyat alt sınırın altındaysa satır içi hata (`salePriceLimitMessage`). */
+  /** The discount section error that blocks the submit (`saleDataError`). */
   salePriceError?: string | null;
 }
 
@@ -58,6 +58,13 @@ export default function DiscountCard({
   // Alt sınır hatası yazarken değil, alandan çıkınca ya da gönderimde görünür.
   const [saleBlurred, setSaleBlurred] = useState(false);
   const price = (watch("price") as string) || "";
+  // Text that is not an amount is refused at once on its own field, like the
+  // price field; the limit error waits for blur or submit.
+  const refusedCopy = t("validation.amountFormatRefused");
+  const originalRefused = isTlAmountRefused(saleData.originalPrice);
+  const saleRefused = isTlAmountRefused(saleData.salePrice);
+  const originalAmount = tlAmountValue(saleData.originalPrice);
+  const saleAmount = tlAmountValue(saleData.salePrice);
   return (
     <div className="border border-border rounded-xl overflow-hidden">
       <Button
@@ -101,13 +108,17 @@ export default function DiscountCard({
                 <label className="block text-xs font-medium text-body mb-1">
                   {t("product.originalPriceTry")}
                 </label>
+                {/* Text, not type="number": see the price field. */}
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
                   value={saleData.originalPrice || price}
                   onChange={(e) =>
                     setSaleData({ ...saleData, originalPrice: e.target.value })
                   }
-                  placeholder={price || "Orijinal fiyat"}
+                  placeholder={price || t("product.originalPrice")}
+                  error={originalRefused ? refusedCopy : undefined}
                 />
               </div>
               <div>
@@ -115,7 +126,9 @@ export default function DiscountCard({
                   {t("product.discountedPrice")} (₺)
                 </label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
                   value={saleData.salePrice}
                   onChange={(e) =>
                     setSaleData({ ...saleData, salePrice: e.target.value })
@@ -123,9 +136,11 @@ export default function DiscountCard({
                   placeholder={t("product.discountedPricePlaceholder")}
                   onBlur={() => setSaleBlurred(true)}
                   error={
-                    saleBlurred || isSubmitted
-                      ? (salePriceError ?? undefined)
-                      : undefined
+                    saleRefused
+                      ? refusedCopy
+                      : !originalRefused && (saleBlurred || isSubmitted)
+                        ? (salePriceError ?? undefined)
+                        : undefined
                   }
                 />
               </div>
@@ -154,21 +169,13 @@ export default function DiscountCard({
               </div>
             </div>
 
-            {saleData.salePrice && saleData.originalPrice && (
+            {saleAmount > 0 && originalAmount > 0 && (
               <div className="flex items-center gap-2 text-sm text-success-700 bg-success-50 p-2 rounded-lg mb-4">
                 <span>
-                  %
-                  {Math.round(
-                    (1 -
-                      Number(saleData.salePrice) /
-                        Number(saleData.originalPrice)) *
-                      100,
-                  )}{" "}
-                  indirim
+                  %{Math.round((1 - saleAmount / originalAmount) * 100)} indirim
                 </span>
                 <span className="text-muted">
-                  ({formatTL(Number(saleData.originalPrice))} →{" "}
-                  {formatTL(Number(saleData.salePrice))})
+                  ({formatTL(originalAmount)} → {formatTL(saleAmount)})
                 </span>
               </div>
             )}

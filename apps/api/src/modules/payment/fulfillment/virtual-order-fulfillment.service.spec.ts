@@ -1,4 +1,8 @@
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
+import { newBoostTimeline } from "../../product/boost-timeline/boost-timeline.testing";
+
+/** The real timeline facade over its slices (activation runs for real). */
+const newTimeline = () => newBoostTimeline().timeline;
 import {
   CancellationActor,
   SubscriptionStatus,
@@ -28,7 +32,13 @@ describe("VirtualOrderFulfillmentService", () => {
       updateMany: jest.fn(),
     },
     payment: { updateMany: jest.fn() },
-    productBoost: { findUnique: jest.fn(), update: jest.fn() },
+    productBoost: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    // Boost activation locks the listing row first.
+    $queryRaw: jest.fn().mockResolvedValue([]),
   });
 
   const payment = {
@@ -83,7 +93,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       // D1: kullanılabilir kayıtlı kart var → autoRenew açılır.
       tx.savedCard.findFirst.mockResolvedValue({ id: "card-1" });
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
 
@@ -127,7 +141,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       // makeTx varsayılanı: savedCard.findFirst → null (kart yok)
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
 
@@ -151,7 +169,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.userMembership.findUnique.mockResolvedValue(membership("free"));
       tx.membershipPayment.findUnique.mockResolvedValue(intent("free"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       await svc.applyMembershipInTx(tx, {
         ...payment,
@@ -166,7 +188,11 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
       tx.order.findMany.mockResolvedValue([{ id: "sib-1" }, { id: "sib-2" }]);
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       await svc.applyMembershipInTx(tx, payment);
 
@@ -192,7 +218,11 @@ describe("VirtualOrderFulfillmentService", () => {
       const tx = makeTx() as any;
       tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       await expect(
         svc.applyMembershipInTx(tx, {
@@ -211,27 +241,37 @@ describe("VirtualOrderFulfillmentService", () => {
   });
 
   describe("applyBoostInTx", () => {
-    it("boost'u aktive eder (stacking), ürünü rankTier=2 yapar, productId döner", async () => {
+    const boostRow = {
+      id: "boost-1",
+      productId: "prod-1",
+      orderId: "ord-1",
+      durationDays: 30,
+      showcaseOnHome: false,
+      status: "pending",
+    };
+
+    it("activates the boost through the timeline, completes the order and returns the listing", async () => {
       const tx = makeTx() as any;
-      tx.productBoost.findUnique.mockResolvedValue({
-        id: "boost-1",
-        productId: "prod-1",
-        orderId: "ord-1",
-        durationDays: 30,
-      });
+      tx.productBoost.findUnique.mockResolvedValue(boostRow);
       tx.product.findUnique.mockResolvedValue({
         boostedUntil: null,
         qualityScore: 10,
         popularityScore: 5,
       });
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       const productId = await svc.applyBoostInTx(tx, payment);
 
       expect(productId).toBe("prod-1");
-      expect(tx.productBoost.update).toHaveBeenCalledWith(
+      // the listing row is locked before the timeline is read
+      expect(tx.$queryRaw).toHaveBeenCalled();
+      expect(tx.productBoost.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "boost-1" },
+          where: { id: "boost-1", status: { in: ["pending", "failed"] } },
           data: expect.objectContaining({ status: "active" }),
         }),
       );
@@ -247,14 +287,42 @@ describe("VirtualOrderFulfillmentService", () => {
       });
     });
 
-    it("eşleşen boost yoksa null döner, hiçbir mutasyon yapmaz", async () => {
+    it("keeps the order terminal but does not stack an already active boost again", async () => {
+      const tx = makeTx() as any;
+      tx.productBoost.findUnique.mockResolvedValue({
+        ...boostRow,
+        status: "active",
+      });
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
+
+      const productId = await svc.applyBoostInTx(tx, payment);
+
+      expect(productId).toBeNull();
+      expect(tx.productBoost.updateMany).not.toHaveBeenCalled();
+      expect(tx.product.update).not.toHaveBeenCalled();
+      expect(tx.order.update).toHaveBeenCalledWith({
+        where: { id: "ord-1" },
+        data: { status: OrderStatus.completed, preparingDeadline: null },
+      });
+    });
+
+    it("returns null and changes nothing without a matching boost", async () => {
       const tx = makeTx() as any;
       tx.productBoost.findUnique.mockResolvedValue(null);
-      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+      const svc = new VirtualOrderFulfillmentService(
+        {} as any,
+        {} as any,
+        newTimeline(),
+      );
 
       const productId = await svc.applyBoostInTx(tx, payment);
       expect(productId).toBeNull();
       expect(tx.product.update).not.toHaveBeenCalled();
+      expect(tx.order.update).not.toHaveBeenCalled();
     });
   });
 });

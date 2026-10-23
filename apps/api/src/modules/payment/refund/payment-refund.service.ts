@@ -14,6 +14,7 @@ import {
   PaymentStatus,
   PaymentHoldStatus,
   OfferStatus,
+  OrderOrigin,
   OrderStatus,
   RefundAttemptStatus,
   RefundRequestStatus,
@@ -74,6 +75,7 @@ import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { testLaneRefundResult } from "../helpers/test-lane-refund";
 import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
 import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-notices";
+import { BoostTimelineService } from "../../product/boost-timeline/boost-timeline.service";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -175,6 +177,21 @@ export interface ProcessRefundOptions {
   refundQuantity?: number;
   idempotencyKey?: string;
   settlement?: RefundSettlementOptions;
+  /**
+   * Who asked for the refund of a boost order and why: written on the boost
+   * it stops (`cancelledById`, `cancelReason`). A refund of a boost order
+   * always stops its boost in the finalize transaction; without this (the
+   * stuck-refund recovery cron) the stop carries no staff user and no reason.
+   */
+  boostStop?: { actorId: string; reason: string };
+  /**
+   * The caller's precondition for sending a new refund to the provider,
+   * checked under the payment lock in the attempt claim (see
+   * `PaymentRefundAttemptService.claimRefundAttempt`). It throws to refuse;
+   * nothing is written then. The boost refund uses it to refuse a boost that
+   * a concurrent refund has just stopped.
+   */
+  claimGuard?: (tx: Prisma.TransactionClient) => Promise<void>;
 }
 
 /**
@@ -210,6 +227,10 @@ export class PaymentRefundService {
     private readonly holdRelease: PaymentHoldReleaseService,
     private readonly attempts: PaymentRefundAttemptService,
     private readonly tradeRefunds: PaymentTradeRefundService,
+    // A refunded boost order stops its boost in the finalize transaction.
+    // Required: without it a boost refund would send the money back and
+    // leave the boost running (PaymentModule imports BoostTimelineModule).
+    private readonly boostTimeline: BoostTimelineService,
     // Faz 5: iade tx'iyle AYNI anda "Sürat iptali" outbox satırı yaz → çökmeye dayanıklı
     // backstop (post-commit anlık iptal hızlı-yol kalır; handler idempotent). @Optional:
     // prod'da global OutboxModule daima enjekte eder; birim testleri (mock tx) sağlamak
@@ -697,6 +718,7 @@ export class PaymentRefundService {
       idempotencyKey,
       payment.provider,
       paytrOid,
+      opts.claimGuard,
     );
     if (refundAttempt.action === "done") {
       return {
@@ -921,6 +943,11 @@ export class PaymentRefundService {
       // Update payment status after successful refund
       let invoiceAdjustment: InvoiceRefundReversePayload | null = null;
       let shipmentCancellationRequired = false;
+      // The refund closed the order (full refund): the staff notice follows.
+      let orderClosed = false;
+      // A boost order's refund: its boost is stopped here and the seller hears
+      // it from the boost notice, never from the order refund notices.
+      let boostRefund = false;
       // Bu iadeyle kesinleşen yönetici iptalinin neden kodu (siparişe yazıldıysa).
       let completedAdminReason: AdminCancelReasonCode | null = null;
       // Teslim SONRASI iadede stok karantinaya girer (ilan pasif kalır) — tx
@@ -1130,9 +1157,16 @@ export class PaymentRefundService {
               buyerId: true,
               commissionAmount: true,
               withholdingTaxAmount: true,
+              origin: true,
             },
           });
-          if (ledgerOrder) {
+          // The platform's own service orders (membership, boost) never had a
+          // capture group (fulfilment skips the ledger for virtual orders):
+          // reversing one would credit the platform seller's escrow with money
+          // that never entered it.
+          const isPlatformService =
+            ledgerOrder?.origin === OrderOrigin.platform_service;
+          if (ledgerOrder && !isPlatformService) {
             await this.ledger?.recordRefund(tx, {
               orderId,
               paymentId: payment.id,
@@ -1205,7 +1239,9 @@ export class PaymentRefundService {
             // artık "tam iade" sanılmaz; art arda kısmi iadeler tamı bulunca kapanır.
             const isFullRefund =
               isOrderFullyRefunded || Boolean(opts?.settlement?.closeOrder);
-            shipmentCancellationRequired = isFullRefund;
+            orderClosed = isFullRefund;
+            // The platform's own services (membership, boost) never ship.
+            shipmentCancellationRequired = isFullRefund && !isPlatformService;
             // Stok: adet-bazlı iadede o kadar adet; TAM iadede tüm adet; tutar-bazlı
             // KISMİ iadede (admin jest/telafi) stok geri YÜKLENMEZ — alıcı malı elinde
             // tutar. Aksi halde 50 TL jest 1000 TL siparişin TÜM stoğunu geri yükler +
@@ -1330,6 +1366,19 @@ export class PaymentRefundService {
             }
           }
 
+          // A refunded boost order stops its boost here, with the money: the
+          // boost tool, a retry of it and the stuck-refund recovery cron all
+          // finalize through this transaction, so money never goes back while
+          // the boost keeps running. A membership order has no boost (no-op).
+          if (isPlatformService) {
+            const stop = await this.boostTimeline.stopForRefund(tx, orderId, {
+              actorId: opts.boostStop?.actorId ?? null,
+              reason: opts.boostStop?.reason ?? null,
+              refundedAmount: amountToRefund,
+            });
+            boostRefund = stop != null;
+          }
+
           this.logger.log(
             `Refund processed for payment ${payment.id}: ${amountToRefund} TRY`,
           );
@@ -1404,14 +1453,17 @@ export class PaymentRefundService {
             amountToRefund,
             payment,
             response.providerRefundId,
-            opts?.skipRefundEvent,
+            opts?.skipRefundEvent || boostRefund,
             completedAdminReason,
           );
-          if (shipmentCancellationRequired) {
-            // Personel bildirimi: sipariş bu iadeyle kapandı (tam iade).
-            // Kargo öncesi iptal, stok kaskadı, kargolamama ve yönetici iptali
-            // hepsi buradan geçer; teslim sonrası iade (`iade`) iptal sayılmaz.
+          // Staff notice: the order was closed by this refund (full refund).
+          // Pre-shipment cancellations, stock cascades, missed shipping and
+          // admin cancellations all pass here; a post-delivery return (`iade`)
+          // is not a cancellation. A boost refund is the staff's own action.
+          if (orderClosed && !boostRefund) {
             void this.notifyStaffOrderCancelled(orderId, amountToRefund);
+          }
+          if (shipmentCancellationRequired) {
             // Para commit'inden sonra hızlı yol; aynı iş outbox'ta kalıcıdır.
             try {
               await this.paymentCommon.cancelSuratShipmentIfExists(

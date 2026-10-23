@@ -6,7 +6,6 @@ import {
   CONSENT_DOCUMENTS,
   OPTIONAL_COOKIE_CATEGORIES,
   isConsentDocumentKey,
-  type ConsentDocumentKey,
   type ConsentDocumentStatus,
   type OptionalCookieCategory,
   type PendingConsent,
@@ -14,7 +13,10 @@ import {
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import { getRequestClientInfo } from "../../common/context/request-context";
-import { findPendingAccountConsents } from "./helpers/account-consents";
+import {
+  findGrantedAccountConsents,
+  findPendingAccountConsents,
+} from "./helpers/account-consents";
 import { toConsentRow, type ConsentEntry } from "./helpers/consent-row";
 import {
   computePendingConsents,
@@ -29,6 +31,15 @@ export type { ConsentEntry, ConsentSubject } from "./helpers/consent-row";
 export type ConsentWriter = Pick<Prisma.TransactionClient, "consentRecord">;
 
 export type CookiePreferenceInput = Record<OptionalCookieCategory, boolean>;
+
+/** The latest row of one document, as `getStatus` reads it. */
+interface ConsentStatusRow {
+  document: string;
+  version: string;
+  action: ConsentAction;
+  source: ConsentSource;
+  createdAt: Date;
+}
 
 /**
  * Hukuki onay kayıtlarının TEK yazım ve okuma noktası.
@@ -72,6 +83,32 @@ export class ConsentService {
     );
     return this.record(
       accepted.map((document) => ({ document, source, subject: { userId } })),
+      db,
+    );
+  }
+
+  /**
+   * Withdraws every required account consent that is currently granted, as
+   * new `withdrawn` rows (the table is append-only; the earlier grants stay as
+   * the record of what was accepted and by whom). The re-consent gate then
+   * asks the member again. Used when the person who gave the consents is not
+   * the account's owner (social take-over of an unverified registration).
+   *
+   * @returns the number of rows written.
+   */
+  async withdrawAccountConsents(
+    userId: string,
+    source: ConsentSource,
+    db: ConsentWriter = this.prisma,
+  ): Promise<number> {
+    const granted = await findGrantedAccountConsents(db, userId);
+    return this.record(
+      granted.map((document) => ({
+        document,
+        source,
+        action: ConsentAction.withdrawn,
+        subject: { userId },
+      })),
       db,
     );
   }
@@ -165,20 +202,21 @@ export class ConsentService {
     );
   }
 
-  /** Admin kullanıcı detayı: belge başına en son kayıt + güncel mi. */
+  /**
+   * Admin user detail: the latest record per document and whether it is
+   * current. One query reads the latest row of each document
+   * (`DISTINCT ON`, on the `user_id, document, created_at` index): per-order
+   * documents (distance sales, platform services) add rows with every
+   * purchase, so a "newest N rows" window could push an older account
+   * consent out and show it as missing.
+   */
   async getStatus(userId: string): Promise<ConsentDocumentStatus[]> {
-    const rows = await this.prisma.consentRecord.findMany({
-      where: { userId },
-      select: {
-        document: true,
-        version: true,
-        action: true,
-        source: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 500,
-    });
+    const rows = await this.prisma.$queryRaw<ConsentStatusRow[]>`
+      SELECT DISTINCT ON (document)
+        document, version, action, source, created_at AS "createdAt"
+      FROM consent_records
+      WHERE user_id = ${userId}
+      ORDER BY document, created_at DESC`;
     const latest = latestByDocument(rows);
     const pending = new Set(
       computePendingConsents(rows).map((p) => p.document),

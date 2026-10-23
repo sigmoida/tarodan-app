@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import appleSignin from "apple-signin-auth";
+import appleSignin, { type AppleIdTokenType } from "apple-signin-auth";
 import { i18nMessage } from "../../i18n";
 
 export interface AppleProfile {
@@ -14,6 +14,11 @@ export interface AppleProfile {
    * ve iptal edilir.
    */
   audience: string;
+  /**
+   * When Apple issued the identity token (`iat`, seconds since the epoch). The
+   * step-up uses it to accept only a fresh sign-in.
+   */
+  issuedAt?: number;
 }
 
 @Injectable()
@@ -31,7 +36,7 @@ export class AppleAuthService {
   }
 
   async verifyIdentityToken(identityToken: string): Promise<AppleProfile> {
-    let payload: any;
+    let payload: AppleIdTokenType;
     try {
       payload = await appleSignin.verifyIdToken(identityToken, {
         audience: this.audience(),
@@ -65,6 +70,13 @@ export class AppleAuthService {
       email: String(payload.email),
       isPrivateEmail: isPrivate,
       audience: String(audience ?? ""),
+      issuedAt: issuedAtSeconds(payload.iat),
     };
   }
+}
+
+/** The decoded JWT carries `iat` as a number; the library types it as a string. */
+function issuedAtSeconds(iat: unknown): number | undefined {
+  const value = Number(iat);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
 }

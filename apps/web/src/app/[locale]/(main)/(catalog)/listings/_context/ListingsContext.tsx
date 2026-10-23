@@ -18,6 +18,8 @@ import {
   mergeUrlFilters,
   parseListingsFilters,
   getListingsPage,
+  buildListingsUrlParams,
+  hasPriceFilter,
   type Filters,
 } from "../_lib/params";
 import { fetchListingsClient } from "../_lib/data";
@@ -124,40 +126,6 @@ function useListingsValue(): ListingsContextValue {
 
   const searchString = searchParams.toString();
 
-  const buildParamsFromFilters = (f: typeof filters, page: number) => {
-    const params = new URLSearchParams();
-    if (f.search) params.set("search", f.search);
-    if (f.brand) params.set("brand", f.brand);
-    if (f.brandId) params.set("brandId", f.brandId);
-    if (f.carModel) params.set("carModel", f.carModel);
-    if (f.carModelId) params.set("carModelId", f.carModelId);
-    if (f.scale) params.set("scale", f.scale);
-    if (f.material) params.set("material", f.material);
-    if (f.colors?.length) params.set("color", f.colors.join(","));
-    if (f.condition) params.set("condition", f.condition);
-    if (f.minPrice) params.set("minPrice", f.minPrice);
-    if (f.maxPrice) params.set("maxPrice", f.maxPrice);
-    if (f.tradeOnly) params.set("tradeOnly", "true");
-    if (f.discountOnly) params.set("discountOnly", "true");
-    if (f.preOrder) params.set("preOrder", "true");
-    if (f.limited) params.set("limited", "true");
-    if (f.set) params.set("set", "true");
-    if (f.sortBy && f.sortBy !== "relevance") params.set("sortBy", f.sortBy);
-    if (f.category) params.set("category", f.category);
-    if (f.categoryId) params.set("categoryId", f.categoryId);
-    if (f.manufacturer) params.set("manufacturer", f.manufacturer);
-    if (f.manufacturerId) params.set("manufacturerId", f.manufacturerId);
-    // Encode manufacturer-scoped attribute selections as attr.<groupSlug>=a,b,c
-    if (f.customAttributes) {
-      for (const [groupSlug, slugs] of Object.entries(f.customAttributes)) {
-        if (slugs && slugs.length > 0)
-          params.set(`attr.${groupSlug}`, slugs.join(","));
-      }
-    }
-    if (page > 1) params.set("page", page.toString());
-    return params;
-  };
-
   const lastScrollY = useRef(0);
   useEffect(() => {
     const onScroll = () => {
@@ -178,7 +146,7 @@ function useListingsValue(): ListingsContextValue {
       hasSyncedToUrl.current = true;
       return;
     }
-    const nextParams = buildParamsFromFilters(filters, currentPage);
+    const nextParams = buildListingsUrlParams(filters, currentPage);
     const currentParams = new URLSearchParams(searchString);
     if (normalizeParams(nextParams) !== normalizeParams(currentParams)) {
       urlWrites.current.recordWrite(nextParams);
@@ -197,7 +165,15 @@ function useListingsValue(): ListingsContextValue {
     setFilters((prev) => mergeUrlFilters(prev, sp));
   }, [searchString]);
 
-  const categorySlug = filters.category || searchParams.get("category") || "";
+  // The slug lookup is only for a category that arrives as a name/slug (nav
+  // link). With an id in hand (sidebar pick, saved-search run) `category` is
+  // just the display name, and looking it up as a slug would 404 every time.
+  const hasCategoryId = !!(
+    filters.categoryId || searchParams.get("categoryId")
+  );
+  const categorySlug = hasCategoryId
+    ? ""
+    : filters.category || searchParams.get("category") || "";
   const { data: categoryBySlug } = useQuery({
     queryKey: queryKeys.category.bySlug(categorySlug),
     queryFn: async () => {
@@ -300,7 +276,8 @@ function useListingsValue(): ListingsContextValue {
         }
       } else if (!pair) {
         if (k === "minPrice" || k === "maxPrice") {
-          if (!counted.has("price") && (filters.minPrice || filters.maxPrice)) {
+          // Refused or zero text sets no bound, so it is not a filter.
+          if (!counted.has("price") && hasPriceFilter(filters)) {
             count += 1;
             counted.add("price");
           }

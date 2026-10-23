@@ -38,8 +38,11 @@ export function useSettingsPage() {
 
   // Reactively reseed from the query (including after invalidation) without an
   // effect-backed state mirror. All tabs remain valid on whole-form submit.
+  // A reseed keeps fields the admin is still editing: an on/off toggle on the
+  // same tab saves on its own and invalidates the same query.
   const form = useZodForm(settingsSchema(t), {
     values: query.data ? toFormValues(query.data) : undefined,
+    resetOptions: { keepDirtyValues: true },
   });
 
   const save = useAdminMutation(
@@ -65,6 +68,7 @@ export function useSettingsPage() {
     activeTab,
     isWarehouseTab,
     isLegalTab,
+    isSecurityTab: activeTab === "security",
     tabs: settingsTabs(t),
     title: tabTitle(t)[activeTab],
     fields: fieldsByTab[activeTab],

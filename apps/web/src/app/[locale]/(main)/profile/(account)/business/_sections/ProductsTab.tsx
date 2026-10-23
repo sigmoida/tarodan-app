@@ -2,6 +2,8 @@
 
 "use client";
 
+import { ChartBarIcon } from "@heroicons/react/24/outline";
+import { EmptyState } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import ProductRow from "../_components/ProductRow";
 import type { ProductStats } from "../_lib/types";
@@ -17,9 +19,11 @@ function ProductList({
   const t = useTranslations();
   if (products.length === 0) {
     return (
-      <p className="py-4 text-center text-muted">
-        {t("page.business.productstab.henuzUrunIstatistigiYok")}
-      </p>
+      <EmptyState
+        size="compact"
+        icon={<ChartBarIcon className="h-6 w-6" />}
+        title={t("page.business.productstab.henuzUrunIstatistigiYok")}
+      />
     );
   }
   return (

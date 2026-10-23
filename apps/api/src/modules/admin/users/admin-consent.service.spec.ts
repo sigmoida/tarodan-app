@@ -1,7 +1,10 @@
 import * as ExcelJS from "exceljs";
 import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import { ExportListService } from "../../../common/export";
-import { AdminConsentService, buildConsentWhere } from "./admin-consent.service";
+import {
+  AdminConsentService,
+  buildConsentWhere,
+} from "./admin-consent.service";
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: "c1",
@@ -24,12 +27,14 @@ const row = (over: Record<string, unknown> = {}) => ({
   },
   checkoutGroup: null,
   order: null,
+  tradeCashPayment: null,
   ...over,
 });
 
 interface FindManyArgs {
   where: Record<string, unknown>;
   orderBy: unknown;
+  select?: Record<string, unknown>;
   skip?: number;
   take?: number;
 }
@@ -117,6 +122,34 @@ describe("buildConsentWhere", () => {
   });
 });
 
+describe("buildConsentWhere: trade number", () => {
+  it("searches a trade consent by its trade number through the cash payment", () => {
+    const where = buildConsentWhere({ search: "TKS-10001" });
+    const or = (where.AND as Array<{ OR: unknown[] }>)[0].OR;
+    expect(or).toContainEqual({
+      tradeCashPayment: {
+        trade: {
+          tradeNumber: { contains: "TKS-10001", mode: "insensitive" },
+        },
+      },
+    });
+  });
+
+  it("selects the linked trade for every listed row", async () => {
+    const { service, prisma } = makeService();
+
+    await service.list({ search: "TKS-10001" });
+
+    expect(prisma.consentRecord.findMany.mock.calls[0][0].select).toMatchObject(
+      {
+        tradeCashPayment: {
+          select: { trade: { select: { id: true, tradeNumber: true } } },
+        },
+      },
+    );
+  });
+});
+
 describe("AdminConsentService.list", () => {
   it("varsayılan sıra en yeni kayıt önce", async () => {
     const { service, prisma } = makeService();
@@ -155,6 +188,83 @@ describe("AdminConsentService.list", () => {
       details: { analytics: true },
     });
     expect(result.meta.total).toBe(2);
+  });
+
+  it("maps a trade cash payment consent to its trade (from details)", async () => {
+    const tradeDetails = {
+      tradeId: "trade-1",
+      tradeNumber: "TKS-10001",
+      tradeCashPaymentId: "tcp-1",
+    };
+    const { service } = makeService([
+      row({
+        document: "distance_sales",
+        version: CONSENT_DOCUMENTS.distance_sales.version,
+        source: "payment",
+        details: tradeDetails,
+      }),
+      row({ id: "c2" }),
+      // Only a distance sales row is read as a trade reference.
+      row({ id: "c3", document: "cookies", details: tradeDetails }),
+    ]);
+
+    const result = await service.list({});
+
+    expect(result.data[0]).toMatchObject({
+      trade: { id: "trade-1", tradeNumber: "TKS-10001" },
+      order: null,
+      checkoutGroup: null,
+    });
+    expect(result.data[1].trade).toBeNull();
+    expect(result.data[2].trade).toBeNull();
+  });
+
+  it("maps a trade consent to its trade through the linked cash payment", async () => {
+    const { service } = makeService([
+      row({
+        document: "distance_sales",
+        version: CONSENT_DOCUMENTS.distance_sales.version,
+        source: "payment",
+        details: {
+          tradeId: "trade-1",
+          tradeNumber: "TKS-10001",
+          tradeCashPaymentId: "tcp-1",
+        },
+        tradeCashPayment: {
+          trade: { id: "trade-1", tradeNumber: "TKS-10001" },
+        },
+      }),
+    ]);
+
+    const result = await service.list({});
+
+    expect(result.data[0].trade).toEqual({
+      id: "trade-1",
+      tradeNumber: "TKS-10001",
+    });
+  });
+
+  it("exports the trade number of a linked trade consent (no details)", async () => {
+    const { service } = makeService([
+      row({
+        document: "distance_sales",
+        version: CONSENT_DOCUMENTS.distance_sales.version,
+        source: "payment",
+        details: null,
+        tradeCashPayment: {
+          trade: { id: "trade-1", tradeNumber: "TKS-10001" },
+        },
+      }),
+    ]);
+
+    const file = await service.export({}, "admin-1", "tr");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.body as never);
+    const sheet = workbook.worksheets[1];
+    const header = (sheet.getRow(1).values as unknown[]).map(String);
+    const values = sheet.getRow(2).values as unknown[];
+
+    expect(values[header.indexOf("Takas no")]).toBe("TKS-10001");
   });
 });
 
@@ -220,6 +330,32 @@ describe("AdminConsentService.export", () => {
     expect(sheet.getRow(2).getCell(1).value).toEqual(
       new Date("2026-10-01T12:00:00.000Z"),
     );
+  });
+
+  it("exports the trade number of a trade cash payment consent", async () => {
+    const { service } = makeService([
+      row({
+        document: "distance_sales",
+        version: CONSENT_DOCUMENTS.distance_sales.version,
+        source: "payment",
+        details: {
+          tradeId: "trade-1",
+          tradeNumber: "TKS-10001",
+          tradeCashPaymentId: "tcp-1",
+        },
+      }),
+    ]);
+
+    const file = await service.export({}, "admin-1", "tr");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.body as never);
+    const sheet = workbook.worksheets[1];
+    const header = (sheet.getRow(1).values as unknown[]).map(String);
+    const values = sheet.getRow(2).values as unknown[];
+
+    expect(values[header.indexOf("Takas no")]).toBe("TKS-10001");
+    // The trade reference is not read as cookie categories.
+    expect(values[header.indexOf("Çerez kategorileri")] ?? "").toBe("");
   });
 });
 

@@ -3,7 +3,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button, Checkbox, Input } from "@tarodan/ui";
+import { CubeIcon } from "@heroicons/react/24/outline";
+import { Button, Checkbox, EmptyState } from "@tarodan/ui";
 import {
   FormInput,
   FormDatePicker,
@@ -23,6 +24,7 @@ import {
   type SellerProduct,
 } from "../_lib/types";
 import { discountSchema } from "../_lib/schema";
+import { fromDiscount } from "../_lib/payload";
 
 interface DiscountFormModalProps {
   open: boolean;
@@ -31,31 +33,8 @@ interface DiscountFormModalProps {
   products: SellerProduct[];
 }
 
-function fromDiscount(d: Discount): DiscountFormData {
-  return {
-    code: d.code || "",
-    name: d.name,
-    description: d.description || "",
-    type: d.type,
-    value: d.value,
-    buyQuantity: d.buyQuantity?.toString() || "",
-    getQuantity: d.getQuantity?.toString() || "",
-    minQuantity: d.minQuantity?.toString() || "",
-    scope: d.scope === "product" ? "product" : "seller",
-    targetProductIds: d.targetProductIds || [],
-    minCartValue: d.minCartValue?.toString() || "",
-    maxDiscountAmount: d.maxDiscountAmount?.toString() || "",
-    usageLimitTotal: d.usageLimitTotal?.toString() || "",
-    usageLimitPerUser: d.usageLimitPerUser.toString(),
-    isStackable: d.isStackable,
-    isActive: d.isActive,
-    startDate: d.startDate.split("T")[0],
-    endDate: d.endDate.split("T")[0],
-  };
-}
-
 /** Create/edit discount — its own RHF+zod form + save mutation, framed by the
- *  shared `FormModal`. `value` and `targetProductIds` are custom-controlled. */
+ *  shared `FormModal`. `targetProductIds` is custom-controlled. */
 export default function DiscountFormModal({
   open,
   onClose,
@@ -71,11 +50,9 @@ export default function DiscountFormModal({
   const { register, setValue, watch, formState } = form;
 
   // Custom-driven fields still need to live in the form state.
-  register("value");
   register("targetProductIds");
   const type = watch("type");
   const scope = watch("scope");
-  const value = watch("value");
   const targetProductIds = watch("targetProductIds") ?? [];
 
   const toggleProduct = (id: string) =>
@@ -136,24 +113,16 @@ export default function DiscountFormModal({
           </option>
         </FormSelect>
         {type !== "bogo" && (
-          <Input
+          <FormInput
+            name="value"
             label={
               type === "bulk_quantity"
                 ? t("seller.discounts.percentLabel")
                 : t("seller.discounts.valueLabel")
             }
-            type="number"
-            min="0"
-            max={type === "fixed_amount" ? 10000 : 100}
-            step={type === "fixed_amount" ? 0.01 : 1}
+            type="text"
+            inputMode="decimal"
             placeholder="10"
-            value={value}
-            onChange={(e) =>
-              setValue("value", parseFloat(e.target.value) || 0, {
-                shouldValidate: true,
-              })
-            }
-            error={formState.errors.value?.message as string | undefined}
           />
         )}
       </div>
@@ -232,9 +201,11 @@ export default function DiscountFormModal({
             )}
           </div>
           {products.length === 0 ? (
-            <p className="rounded-lg bg-surface p-4 text-sm text-muted">
-              {t("seller.discounts.noActiveProducts")}
-            </p>
+            <EmptyState
+              size="compact"
+              icon={<CubeIcon className="h-6 w-6" />}
+              title={t("seller.discounts.noActiveProducts")}
+            />
           ) : (
             <div className="max-h-48 divide-y divide-border-subtle overflow-y-auto rounded-lg border border-border">
               {products.map((product) => (
@@ -281,17 +252,15 @@ export default function DiscountFormModal({
         <FormInput
           name="minCartValue"
           label={t("seller.discounts.minCartLabel")}
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           placeholder={t("seller.discounts.minCartPlaceholder")}
         />
         <FormInput
           name="maxDiscountAmount"
           label={t("seller.discounts.maxDiscountLabel")}
-          type="number"
-          min="0"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           placeholder={t("seller.discounts.maxDiscountPlaceholder")}
         />
       </div>

@@ -1,25 +1,25 @@
 /**
- * Sentry Edge Configuration
- * This file configures Sentry for edge runtime (middleware)
+ * Sentry for the edge runtime (middleware). Loaded by `register()` in
+ * `src/instrumentation.ts`.
  */
 import * as Sentry from "@sentry/nextjs";
+import { scrubSentryEvent, scrubSentryTransaction } from "@tarodan/logger";
 
 import {
   sentryEnvironment,
   sentryRelease,
+  sentryServerDsn,
   sentryTracesSampleRate,
 } from "./sentry.release";
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
-
-  // Performance monitoring
-  tracesSampleRate: sentryTracesSampleRate,
-
-  // Environment
+  dsn: sentryServerDsn,
+  enabled: !!sentryServerDsn,
   environment: sentryEnvironment,
   release: sentryRelease,
-
-  // Only enable in production or when DSN is set
-  enabled: !!(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN),
+  initialScope: { tags: { app: "web" } },
+  tracesSampleRate: sentryTracesSampleRate,
+  sendDefaultPii: false,
+  beforeSend: scrubSentryEvent,
+  beforeSendTransaction: scrubSentryTransaction,
 });

@@ -1,9 +1,11 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { Request } from "express";
 import { PrismaService } from "../../../prisma";
@@ -13,84 +15,81 @@ import {
   ProductStatus,
   OrderOrigin,
   OrderStatus,
-  MembershipTierType,
-  Prisma,
 } from "@prisma/client";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../../common/helpers/generate-reference";
 import { boostTierBasePrice } from "../helpers/product-sale-window";
 import {
-  effectiveMembershipTierType,
-  isPremiumEntitled,
-} from "../../membership/helpers/membership.util";
+  BOOST_TIER_PRECEDENCE,
+  boostTierCoversPriceWhere,
+  firstTierPerDuration,
+} from "../helpers/boost-tier-band";
+import {
+  BoostAudienceService,
+  eligibleAudienceWhere,
+} from "../boost-seller/boost-audience.service";
 import { PaymentService } from "../../payment/payment.service";
 import { PaymentProvider } from "../../payment/dto";
-import { BOOST_DURATIONS, BoostPricingOption } from "../dto/boost.dto";
+import { boostVirtualProductId } from "../../payment/helpers/virtual-order-kind";
+import {
+  PlatformServiceConsentService,
+  platformServiceConsentsAccepted,
+  type PlatformServiceConsentInput,
+} from "../../consent/platform-service-consent.service";
+import { SentryService } from "../../sentry/sentry.service";
+import {
+  boostBreadcrumb,
+  tagBoostRequest,
+} from "../helpers/boost-observability";
+import {
+  BOOST_ENABLED_SETTING,
+  type BoostOptionsResponse,
+  boostPriceMatches,
+  isBoostEnabled as isBoostSettingOn,
+} from "@tarodan/types";
+
+/** What the seller chose and accepted in the boost dialog. */
+export interface InitiateBoostInput extends PlatformServiceConsentInput {
+  packageId: string;
+  durationDays: number;
+  /** The price the dialog showed (TL); must match what is charged now. */
+  expectedPrice: number;
+  provider: PaymentProvider;
+  /** Asks for the ending-soon reminder; kept only for premium members. */
+  autoRenew: boolean;
+}
 
 /**
- * Boost (öne çıkarma) satın alma akışı.
+ * Boost purchase flow.
  *
- * Üyelik satın alma akışını birebir taklit eder: `boost-<boostId>` ön ekli sanal ürün +
- * normal Order + PaymentService.initiatePayment. Ödeme başarıyla tamamlanınca
- * PaymentService callback'i (boost- dalı) ProductBoost'u aktive eder ve ürünü
- * sponsorlu kademesine (rankTier=2) alır.
+ * It mirrors the membership purchase: a virtual product `boost-<boostId>`, a
+ * normal Order and PaymentService.initiatePayment. When the payment succeeds,
+ * the payment callback (boost branch) activates the ProductBoost through
+ * `BoostTimelineService`. The price always comes from the ad package tier for
+ * the listing's price; the legacy flat 3/7/30-day prices are retired.
  */
 @Injectable()
 export class ProductBoostService {
   private readonly logger = new Logger(ProductBoostService.name);
 
-  // PlatformSetting bulunmazsa kullanılacak varsayılan fiyatlar (TL)
-  private readonly DEFAULT_PRICES: Record<number, number> = {
-    3: 29,
-    7: 59,
-    30: 149,
-  };
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentService: PaymentService,
+    private readonly platformServiceConsents: PlatformServiceConsentService,
+    private readonly audience: BoostAudienceService,
+    @Optional() private readonly sentry?: SentryService,
   ) {}
 
-  private settingKeyFor(durationDays: number): string {
-    return `boost_price_${durationDays}d`;
-  }
-
-  /** Boost özelliği admin tarafından kapatılmış mı? */
+  /** Whether boost sales are on (`isBoostEnabled`: a missing row means on). */
   async isBoostEnabled(): Promise<boolean> {
     const setting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "boost_enabled" },
+      where: { settingKey: BOOST_ENABLED_SETTING },
+      select: { settingValue: true },
     });
-    if (!setting) return true; // varsayılan: açık
-    return setting.settingValue !== "false";
+    return isBoostSettingOn(setting?.settingValue);
   }
 
-  /** Belirli bir süre için fiyatı döndürür (PlatformSetting → varsayılan). */
-  async getPriceForDuration(durationDays: number): Promise<number> {
-    const setting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: this.settingKeyFor(durationDays) },
-    });
-    const parsed = setting?.settingValue
-      ? parseFloat(setting.settingValue)
-      : NaN;
-    if (!isNaN(parsed) && parsed >= 0) return parsed;
-    return this.DEFAULT_PRICES[durationDays] ?? 0;
-  }
-
-  /** Tüm boost süreleri + fiyatları (admin'den ayarlanabilir). */
-  async getPricing(): Promise<{
-    enabled: boolean;
-    options: BoostPricingOption[];
-  }> {
-    const enabled = await this.isBoostEnabled();
-    const options: BoostPricingOption[] = [];
-    for (const durationDays of BOOST_DURATIONS) {
-      const price = await this.getPriceForDuration(durationDays);
-      options.push({ durationDays, price, label: `${durationDays} gün` });
-    }
-    return { enabled, options };
-  }
-
-  /** Kampanya fiyatı geçerli mi (opsiyonel tarih penceresi açık)? → efektif fiyat. */
+  /** The campaign price while its (optional) window is open, else the list price. */
   private effectiveTierPrice(tier: {
     price: unknown;
     campaignPrice: unknown;
@@ -106,72 +105,22 @@ export class ProductBoostService {
   }
 
   /**
-   * Alıcının EFEKTİF üyelik katmanı — paket hedeflemesi GEÇERLİ üyelik ister.
-   * Tek doğruluk kaynağı `effectiveMembershipTierType`: durum + dönem sonu +
-   * tier.isActive + business için KYC şartı; hak yoksa "free". (Eskiden burada
-   * yalnız status+dönem türetiliyordu: KYC'si iptal edilmiş business üye veya
-   * pasifleştirilmiş tier hâlâ hedefli paketleri açabiliyordu.)
+   * The active tier of (package, duration) for the listing price, and its
+   * price now. The same band rule and precedence as the options call
+   * (`boost-tier-band.ts`), so both pick the same tier for the same price.
    */
-  private async resolveAudienceTierType(
-    userId: string,
-  ): Promise<MembershipTierType> {
-    const membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-      select: {
-        status: true,
-        currentPeriodEnd: true,
-        tier: { select: { type: true, isActive: true } },
-        user: {
-          select: {
-            businessStatus: true,
-            companyName: true,
-            taxId: true,
-          },
-        },
-      },
-    });
-    return effectiveMembershipTierType(membership, membership?.user);
-  }
-
-  private eligibleAudienceWhere(
-    userId: string,
-    tierType: MembershipTierType,
-  ): Prisma.AdPackageWhereInput {
-    return {
-      OR: [
-        { audienceMode: "everyone" },
-        {
-          audienceMode: "membership_tiers",
-          targetTiers: { some: { tierType } },
-        },
-        {
-          audienceMode: "specific_users",
-          targetUsers: { some: { userId } },
-        },
-        {
-          audienceMode: "tiers_or_users",
-          OR: [
-            { targetTiers: { some: { tierType } } },
-            { targetUsers: { some: { userId } } },
-          ],
-        },
-      ],
-    };
-  }
-
-  /** Ürün fiyatına göre (paket, süre) için aktif kademeyi çöz → efektif fiyat. */
   private async resolvePackagePrice(
     packageId: string,
     durationDays: number,
     productPrice: number,
     userId: string,
   ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
-    const tierType = await this.resolveAudienceTierType(userId);
+    const tierType = await this.audience.audienceTierType(userId);
     const pkg = await this.prisma.adPackage.findFirst({
       where: {
         id: packageId,
         isActive: true,
-        ...this.eligibleAudienceWhere(userId, tierType),
+        ...eligibleAudienceWhere(userId, tierType),
       },
       select: { id: true, name: true, showcaseOnHome: true },
     });
@@ -185,9 +134,9 @@ export class ProductBoostService {
         packageId,
         durationDays,
         isActive: true,
-        minAmount: { lte: productPrice },
-        OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+        ...boostTierCoversPriceWhere(productPrice),
       },
+      orderBy: BOOST_TIER_PRECEDENCE,
     });
     if (!tier) {
       throw new BadRequestException(
@@ -202,35 +151,52 @@ export class ProductBoostService {
   }
 
   /**
-   * Bir ürün için satın alınabilir paket seçenekleri: ürünün fiyatına uyan
-   * kademeleri paket + süre bazında döndürür (modal bunu render eder).
+   * The packages the seller can buy for a listing: the tiers matching the
+   * listing's price, per package and duration (the boost dialog renders them).
+   *
+   * Only the owner of an active listing: anyone else gets the same 404 as for
+   * a missing listing (no existence leak, and no prices of packages targeted
+   * at specific users); the owner of an inactive listing gets 400.
    */
-  async getBoostOptions(productId: string, userId: string) {
+  async getBoostOptions(
+    productId: string,
+    userId: string,
+  ): Promise<BoostOptionsResponse> {
     const product = await this.prisma.product.findFirst({
       where: { id: productId, kind: ProductKind.listing },
-      select: { id: true, price: true, oldPrice: true },
+      select: {
+        id: true,
+        sellerId: true,
+        status: true,
+        price: true,
+        oldPrice: true,
+      },
     });
-    if (!product) {
+    if (!product || product.sellerId !== userId) {
       throw new NotFoundException(i18nMessage("server.product.notFound"));
+    }
+    if (product.status !== ProductStatus.active) {
+      throw new BadRequestException(
+        i18nMessage("server.product.boostActiveOnly"),
+      );
     }
     const productPrice = boostTierBasePrice(product);
     const enabled = await this.isBoostEnabled();
-    const tierType = await this.resolveAudienceTierType(userId);
+    const tierType = await this.audience.audienceTierType(userId);
 
     const packages = await this.prisma.adPackage.findMany({
       where: {
         isActive: true,
-        ...this.eligibleAudienceWhere(userId, tierType),
+        ...eligibleAudienceWhere(userId, tierType),
       },
       orderBy: { sortOrder: "asc" },
       include: {
         tiers: {
           where: {
             isActive: true,
-            minAmount: { lte: productPrice },
-            OR: [{ maxAmount: null }, { maxAmount: { gte: productPrice } }],
+            ...boostTierCoversPriceWhere(productPrice),
           },
-          orderBy: { durationDays: "asc" },
+          orderBy: [{ durationDays: "asc" }, ...BOOST_TIER_PRECEDENCE],
         },
       },
     });
@@ -244,7 +210,8 @@ export class ProductBoostService {
           name: p.name,
           slug: p.slug,
           showcaseOnHome: p.showcaseOnHome,
-          options: p.tiers.map((t) => ({
+          // One option per duration: the tier the purchase start resolves.
+          options: firstTierPerDuration(p.tiers).map((t) => ({
             durationDays: t.durationDays,
             price: this.effectiveTierPrice(t),
             listPrice: Number(t.price),
@@ -252,40 +219,60 @@ export class ProductBoostService {
             label: `${t.durationDays} gün`,
           })),
         }))
-        // paketin bu fiyat için hiç kademesi yoksa listeleme
+        // a package without a tier for this price is not offered
         .filter((p) => p.options.length > 0),
     };
   }
 
   /**
-   * Boost satın almayı başlatır: doğrula → ProductBoost(pending) + sanal ürün + Order →
-   * ödeme başlat. Ödeme URL'sini döndürür.
+   * Starts a boost purchase: validate, then one transaction writes the
+   * ProductBoost (pending), the virtual product `boost-<boostId>`, the Order
+   * and the two purchase consents (pre-contract information and distance
+   * service contract, withdrawal waiver), and only after it commits the
+   * payment intent is created. An order of a boost therefore never exists
+   * without its consents, and a failed write leaves nothing behind.
    *
-   * `packageId` verilirse yeni paket/kademe fiyatlandırması (ürün fiyatına göre);
-   * verilmezse eski düz `boost_price_*` fiyatı (geçiş dönemi geriye-dönük uyumu).
+   * The consents are checked first: anything but `true` for both is a 400
+   * `server.product.boostConsentRequired` before any read or write. No
+   * setting relaxes it: mobile never buys a boost (ADR 0003, 0015) and the
+   * web dialog that sends them ships in the same release.
+   *
+   * The price is resolved on the server from the package tier for the
+   * listing's price (never trusted from the client), with the same rule the
+   * options call shows. When it is not the price the seller consented to
+   * (`expectedPrice`, `boostPriceMatches`: whole kuruş), the answer is 409
+   * `server.product.boostPriceChanged` before any order lookup, reference or
+   * write: a campaign started or ended, or the tier, the listing's price band
+   * or the seller's audience changed since the options were read, and the
+   * package and duration are still offered at another price. When they are
+   * no longer offered at all, the earlier 400 (`boostPackageNotFound`,
+   * `boostPriceUndefined`) answers instead. Every earlier refusal (consents,
+   * boost off, listing, owner, status, package, tier, a zero price) wins over
+   * it. The checked price is the one written, so the boost, the order, the
+   * payment and the consents carry the consented price.
    */
   async initiateBoost(
     userId: string,
     productId: string,
-    durationDays: number,
-    provider: PaymentProvider = PaymentProvider.paytr,
-    autoRenew = false,
+    input: InitiateBoostInput,
     req?: Request,
-    packageId?: string,
   ) {
-    if (!packageId && !BOOST_DURATIONS.includes(durationDays as any)) {
+    const { packageId, durationDays, expectedPrice, provider, autoRenew } =
+      input;
+    tagBoostRequest(this.sentry);
+    boostBreadcrumb(this.sentry, "initiate", { productId });
+    if (!platformServiceConsentsAccepted(input)) {
       throw new BadRequestException(
-        i18nMessage("server.product.invalidBoostDuration"),
+        i18nMessage("server.product.boostConsentRequired"),
       );
     }
-
     if (!(await this.isBoostEnabled())) {
       throw new BadRequestException(
         i18nMessage("server.product.boostUnavailable"),
       );
     }
 
-    // Ürün + sahiplik + durum doğrula
+    // Listing, ownership and status
     const product = await this.prisma.product.findFirst({
       where: { id: productId, kind: ProductKind.listing },
       select: {
@@ -310,30 +297,30 @@ export class ProductBoostService {
       );
     }
 
-    // Fiyat + paket bilgisi HER ZAMAN serverda çözülür (istemciye güvenilmez).
-    let price: number;
-    let packageName: string | null = null;
-    let showcaseOnHome = false;
-    if (packageId) {
-      const resolved = await this.resolvePackagePrice(
+    const { price, packageName, showcaseOnHome } =
+      await this.resolvePackagePrice(
         packageId,
         durationDays,
         boostTierBasePrice(product),
         userId,
       );
-      price = resolved.price;
-      packageName = resolved.packageName;
-      showcaseOnHome = resolved.showcaseOnHome;
-    } else {
-      price = await this.getPriceForDuration(durationDays);
-    }
     if (price <= 0) {
       throw new BadRequestException(
         i18nMessage("server.product.boostPriceUndefined"),
       );
     }
+    if (!boostPriceMatches(expectedPrice, price)) {
+      boostBreadcrumb(this.sentry, "price_mismatch", {
+        productId,
+        packageId,
+        durationDays,
+      });
+      throw new ConflictException(
+        i18nMessage("server.product.boostPriceChanged"),
+      );
+    }
 
-    // Platform satıcısı + varsayılan kategori (sanal ürün için)
+    // The platform seller and a default category (for the virtual product)
     const platformSeller = await this.prisma.user.findFirst({
       where: { email: "platform@tarodan.com", sellerType: "platform" },
     });
@@ -351,70 +338,51 @@ export class ProductBoostService {
       );
     }
 
-    // Otomatik yenileme yalnızca premium (ücretli, aktif) üyelere
-    let effectiveAutoRenew = false;
-    if (autoRenew) {
-      const membership = await this.prisma.userMembership.findUnique({
-        where: { userId },
-        select: {
-          status: true,
-          currentPeriodEnd: true,
-          tier: { select: { type: true, isActive: true } },
-          user: {
-            select: {
-              businessStatus: true,
-              companyName: true,
-              taxId: true,
-            },
-          },
+    // The reminder flag (`autoRenew`) is kept only for premium members
+    const effectiveAutoRenew = autoRenew
+      ? await this.audience.isPremium(userId)
+      : false;
+
+    // Reads stay outside the transaction; `order_number` is unique, so a
+    // code taken in between fails the write instead of being shared.
+    const orderNumber = await generateUniqueReference(
+      REFERENCE_PREFIX.boostOrder,
+      async (code) =>
+        (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
+    );
+
+    // One business event, one transaction: inserts only, no lock on an
+    // existing row and nothing slow (the payment intent comes after).
+    const { boost, order } = await this.prisma.$transaction(async (tx) => {
+      const boost = await tx.productBoost.create({
+        data: {
+          productId: product.id,
+          userId,
+          packageId,
+          packageName,
+          showcaseOnHome,
+          durationDays,
+          price,
+          status: "pending",
+          autoRenew: effectiveAutoRenew,
         },
       });
-      effectiveAutoRenew = isPremiumEntitled(membership, membership?.user);
-    }
-
-    // ProductBoost kaydı (pending)
-    const boost = await this.prisma.productBoost.create({
-      data: {
-        productId: product.id,
-        userId,
-        packageId: packageId ?? null,
-        packageName,
-        showcaseOnHome,
-        durationDays,
-        price,
-        status: "pending",
-        autoRenew: effectiveAutoRenew,
-      },
-    });
-
-    try {
-      // Sanal ürün: boost-<boostId>
-      const virtualProductId = `boost-${boost.id}`;
-      await this.prisma.product.create({
+      const virtualProductId = boostVirtualProductId(boost.id);
+      await tx.product.create({
         data: {
           id: virtualProductId,
           sellerId: platformSeller.id,
           categoryId: defaultCategory.id,
-          title: packageName
-            ? `${packageName} — İlan Öne Çıkarma (${durationDays} gün)`
-            : `İlan Öne Çıkarma (${durationDays} gün)`,
-          description: `"${product.title}" ilanı için ${
-            packageName ? `${packageName} ` : ""
-          }${durationDays} günlük öne çıkarma`,
+          // Stored text of the virtual product (order and admin screens).
+          title: `${packageName} — İlan Öne Çıkarma (${durationDays} gün)`,
+          description: `"${product.title}" ilanı için ${packageName} ${durationDays} günlük öne çıkarma`,
           price,
           condition: "new",
           kind: ProductKind.boost,
           status: ProductStatus.active,
         },
       });
-
-      const orderNumber = await generateUniqueReference(
-        REFERENCE_PREFIX.boostOrder,
-        async (code) =>
-          (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
-      );
-
-      const order = await this.prisma.order.create({
+      const order = await tx.order.create({
         data: {
           orderNumber,
           buyerId: userId,
@@ -426,23 +394,36 @@ export class ProductBoostService {
           shippingCost: 0,
           status: OrderStatus.pending_payment,
           paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          shippingAddress: { type: "boost", boostId: boost.id } as any,
+          // A virtual order ships nothing; the marker links it to its boost.
+          shippingAddress: { type: "boost", boostId: boost.id },
         },
       });
-
-      // Order'ı boost'a bağla (callback orderId ile bulacak)
-      await this.prisma.productBoost.update({
+      // Link the order to the boost (the payment callback finds it by orderId)
+      await tx.productBoost.update({
         where: { id: boost.id },
         data: { orderId: order.id },
       });
+      await this.platformServiceConsents.recordForOrder(tx, {
+        orderId: order.id,
+        userId,
+      });
+      return { boost, order };
+    });
+    boostBreadcrumb(this.sentry, "order_created", {
+      boostId: boost.id,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      productId: product.id,
+    });
 
+    try {
       const paymentResult = await this.paymentService.initiatePayment(
         userId,
         { orderId: order.id, provider },
         req,
       );
 
-      // Ödeme niyeti (intent): kart bilgisi /payments/direct-form ile alınır (iframe yok).
+      // Payment intent: the card is entered through /payments/direct-form (no iframe).
       return {
         boostId: boost.id,
         productId: product.id,
@@ -455,101 +436,14 @@ export class ProductBoostService {
           (paymentResult as { useBypass?: boolean }).useBypass === true,
       };
     } catch (error) {
-      // Ödeme başlatılamazsa pending boost'u temizle
+      // If the payment cannot start, mark the pending boost failed. A failure
+      // here must not hide the original error, and the expiry sweep marks a
+      // stale pending boost failed anyway. The unpaid order expires with its
+      // payment window; its consents stay as the record of what was accepted.
       await this.prisma.productBoost
         .update({ where: { id: boost.id }, data: { status: "failed" } })
-        .catch(() => {});
+        .catch(() => undefined);
       throw error;
     }
-  }
-
-  /** Kullanıcının boost'ları (en yeni önce) + ürün özeti. */
-  async getMyBoosts(userId: string) {
-    const boosts = await this.prisma.productBoost.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        product: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            viewCount: true,
-            likeCount: true,
-            clickCount: true,
-            images: { orderBy: { sortOrder: "asc" }, take: 1 },
-          },
-        },
-      },
-    });
-
-    const now = new Date();
-    const rows = boosts.map((b) => {
-      const current = {
-        views: b.finalViewCount ?? b.product?.viewCount ?? 0,
-        likes: b.finalLikeCount ?? b.product?.likeCount ?? 0,
-        clicks: b.finalClickCount ?? b.product?.clickCount ?? 0,
-      };
-      const before =
-        b.baselineViewCount == null
-          ? null
-          : {
-              views: b.baselineViewCount,
-              likes: b.baselineLikeCount ?? 0,
-              clicks: b.baselineClickCount ?? 0,
-            };
-      const gain = before
-        ? {
-            views: current.views - before.views,
-            likes: current.likes - before.likes,
-            clicks: current.clicks - before.clicks,
-          }
-        : null;
-      const performanceScore = gain
-        ? Math.max(0, gain.views) +
-          Math.max(0, gain.likes) * 5 +
-          Math.max(0, gain.clicks) * 3
-        : null;
-
-      return {
-        id: b.id,
-        productId: b.productId,
-        product: b.product
-          ? {
-              id: b.product.id,
-              title: b.product.title,
-              status: b.product.status,
-              image: b.product.images[0]?.cardKey ?? null,
-            }
-          : null,
-        packageName: b.packageName,
-        durationDays: b.durationDays,
-        extendedDays: b.extendedDays,
-        price: Number(b.price),
-        status: b.status,
-        autoRenew: b.autoRenew,
-        startsAt: b.startsAt?.toISOString() ?? null,
-        endsAt: b.endsAt?.toISOString() ?? null,
-        isActive: b.status === "active" && b.endsAt != null && b.endsAt > now,
-        remainingMs:
-          b.status === "active" && b.endsAt != null && b.endsAt > now
-            ? b.endsAt.getTime() - now.getTime()
-            : b.status === "paused"
-              ? (b.pausedRemainingSeconds ?? 0) * 1000
-              : 0,
-        metrics: { before, current, gain, performanceScore },
-        createdAt: b.createdAt.toISOString(),
-      };
-    });
-    const bestScore = rows.reduce(
-      (best, row) => Math.max(best, row.metrics.performanceScore ?? -1),
-      -1,
-    );
-    return rows.map((row) => ({
-      ...row,
-      isBest:
-        row.metrics.performanceScore != null &&
-        row.metrics.performanceScore === bestScore,
-    }));
   }
 }

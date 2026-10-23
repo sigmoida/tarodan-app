@@ -3,7 +3,7 @@
 "use client";
 
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { Button } from "@tarodan/ui";
+import { Button, EmptyState } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { Fragment } from "react";
 import InlineAdSlot from "@/components/marketing/InlineAdSlot";
@@ -55,29 +55,24 @@ export default function ListingsGrid() {
 
   if (listings.length === 0) {
     return (
-      <div className="text-center py-20 bg-surface-elevated rounded border border-border">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-surface rounded mb-4">
-          <MagnifyingGlassIcon className="w-7 h-7 text-subtle" />
-        </div>
-        <p className="text-muted text-lg font-medium mb-1">
-          {t("product.noListings")}
-        </p>
-        {/*
-          "Filtrelerinizi değiştirmeyi deneyin" hiç filtre uygulanmamışken de
-          yazıyordu — katalog boşken ziyaretçiye var olmayan bir filtreyi
-          suçluyordu. Filtre yokken ilan vermeye davet ediyoruz.
-        */}
-        <p className="text-subtle text-sm mb-4">
-          {activeFilterCount > 0
+      <EmptyState
+        icon={<MagnifyingGlassIcon className="h-7 w-7" />}
+        title={t("product.noListings")}
+        // With no filter applied the catalog is simply empty: invite a
+        // listing instead of blaming a filter that does not exist.
+        description={
+          activeFilterCount > 0
             ? t("product.tryAdjustingFilters")
-            : t("home.beTheFirst")}
-        </p>
-        {activeFilterCount > 0 && (
-          <Button variant="primary" size="md" onClick={clearFilters}>
-            {t("product.clearFilters")}
-          </Button>
-        )}
-      </div>
+            : t("home.beTheFirst")
+        }
+        action={
+          activeFilterCount > 0 ? (
+            <Button variant="primary" size="md" onClick={clearFilters}>
+              {t("product.clearFilters")}
+            </Button>
+          ) : undefined
+        }
+      />
     );
   }
 
