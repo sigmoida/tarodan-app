@@ -338,7 +338,7 @@ describe("OrderPricingService listing commission preview", () => {
       ]);
 
       // small: pay %100 alıcı → kesinti yok; medium: 180×%60=108; large: 260×%50=130.
-      expect(results.map((r) => r.sellerNetAmount)).toEqual([900, 792, 770]);
+      expect(results.map((r) => r?.sellerNetAmount)).toEqual([900, 792, 770]);
     });
 
     it("paket boyutu verilmeyen kalem küçük paket varsayılır (geriye uyum)", async () => {
@@ -347,7 +347,7 @@ describe("OrderPricingService listing commission preview", () => {
       ]);
 
       // Küçük paket 100 TL × %60 satıcı payı = 60 → 1000 − 100 − 60.
-      expect(results[0].sellerNetAmount).toBe(840);
+      expect(results[0]?.sellerNetAmount).toBe(840);
     });
   });
 });

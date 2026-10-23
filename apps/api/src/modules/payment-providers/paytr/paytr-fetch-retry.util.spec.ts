@@ -1,4 +1,6 @@
 import {
+  classifyPaytrFetchError,
+  fetchErrorCode,
   isRetryableNetworkError,
   networkErrorReason,
   withPaytrFetchRetry,
@@ -147,5 +149,107 @@ describe("networkErrorReason", () => {
     expect(networkErrorReason(new Error("gecersiz token"))).toBe(
       "gecersiz token",
     );
+  });
+});
+
+/**
+ * Money writes (platform transfer) may only be resent when the request
+ * provably never left the host. Sentry TARODAN-API-30: "fetch failed" about
+ * 10 s after the cron tick is undici's connect timeout, which is safe to
+ * resend; a reset or timeout after the request was written is not.
+ */
+describe("classifyPaytrFetchError", () => {
+  const fetchFailed = (cause: unknown) =>
+    Object.assign(new TypeError("fetch failed"), { cause });
+
+  it.each([
+    "UND_ERR_CONNECT_TIMEOUT",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ENETUNREACH",
+    "EHOSTUNREACH",
+  ])("classifies the connect-phase cause %s as not_sent", (code) => {
+    expect(classifyPaytrFetchError(fetchFailed({ code }))).toBe("not_sent");
+  });
+
+  it("classifies any failure of the TCP connect syscall as not_sent", () => {
+    expect(
+      classifyPaytrFetchError(
+        fetchFailed({ code: "ETIMEDOUT", syscall: "connect" }),
+      ),
+    ).toBe("not_sent");
+  });
+
+  it("classifies a Happy Eyeballs AggregateError of connect failures as not_sent", () => {
+    const aggregate = Object.assign(new AggregateError([], ""), {
+      code: "ETIMEDOUT",
+      errors: [
+        { code: "ETIMEDOUT", syscall: "connect" },
+        { code: "ENETUNREACH", syscall: "connect" },
+      ],
+    });
+    expect(classifyPaytrFetchError(fetchFailed(aggregate))).toBe("not_sent");
+  });
+
+  it.each([
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "EPIPE",
+    "UND_ERR_SOCKET",
+    "UND_ERR_HEADERS_TIMEOUT",
+    "UND_ERR_BODY_TIMEOUT",
+  ])("classifies the post-send cause %s as unknown", (code) => {
+    expect(classifyPaytrFetchError(fetchFailed({ code }))).toBe("unknown");
+  });
+
+  it("classifies a read-side ETIMEDOUT as unknown", () => {
+    expect(
+      classifyPaytrFetchError(
+        fetchFailed({ code: "ETIMEDOUT", syscall: "read" }),
+      ),
+    ).toBe("unknown");
+  });
+
+  it("classifies an aggregate with one post-send failure as unknown", () => {
+    const aggregate = Object.assign(new AggregateError([], ""), {
+      errors: [
+        { code: "ECONNREFUSED", syscall: "connect" },
+        { code: "ECONNRESET", syscall: "read" },
+      ],
+    });
+    expect(classifyPaytrFetchError(fetchFailed(aggregate))).toBe("unknown");
+  });
+
+  it.each(["AbortError", "TimeoutError"])(
+    "classifies our own %s timeout as unknown",
+    (name) => {
+      const error = new Error("The operation was aborted");
+      error.name = name;
+      expect(classifyPaytrFetchError(error)).toBe("unknown");
+    },
+  );
+
+  it("classifies 'fetch failed' without a known cause as unknown", () => {
+    expect(classifyPaytrFetchError(new TypeError("fetch failed"))).toBe(
+      "unknown",
+    );
+    expect(classifyPaytrFetchError("boom")).toBe("unknown");
+  });
+});
+
+describe("fetchErrorCode", () => {
+  it("returns the cause code, the timeout name, or undefined", () => {
+    expect(
+      fetchErrorCode(
+        Object.assign(new TypeError("fetch failed"), {
+          cause: { code: "UND_ERR_CONNECT_TIMEOUT" },
+        }),
+      ),
+    ).toBe("UND_ERR_CONNECT_TIMEOUT");
+    const timeout = new Error("aborted");
+    timeout.name = "TimeoutError";
+    expect(fetchErrorCode(timeout)).toBe("TimeoutError");
+    expect(fetchErrorCode(new TypeError("fetch failed"))).toBeUndefined();
   });
 });

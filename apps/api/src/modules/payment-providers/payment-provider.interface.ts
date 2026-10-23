@@ -127,6 +127,13 @@ export interface IPaymentProvider {
     ctoken: string,
   ): Promise<{ status: string; reason?: string }>;
 
+  /**
+   * Platform transfer instruction (seller payout). Resolves with the
+   * provider's parsed answer, accepted or rejected; rejects with
+   * `PlatformTransferRequestError` (`./transfer-errors`) when no usable answer
+   * came back, telling whether the request could have been processed.
+   * `totalAmount` is the slice of the payment this transfer settles.
+   */
   createPlatformTransfer(params: {
     merchantOid: string;
     transId: string;

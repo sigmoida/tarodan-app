@@ -5,10 +5,8 @@ import {
   Patch,
   Delete,
   Body,
-  Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
   BadRequestException,
   NotFoundException,
   ForbiddenException,
@@ -57,6 +55,10 @@ import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import { errorStack } from "../../common/helpers/error-message";
+import {
+  LISTING_ID_PARAM_DESCRIPTION,
+  ListingIdParam,
+} from "../../common/pipes/listing-id.pipe";
 
 @ApiTags("products")
 @Controller("products")
@@ -170,9 +172,14 @@ export class ProductController {
     status: 404,
     description: "No such listing, or not the caller's listing",
   })
-  @ApiResponse({ status: 400, description: "The listing is not active" })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Malformed listing id (server.product.invalidIdFormat), or the listing is not active",
+  })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async getBoostOptions(
-    @Param("id") id: string,
+    @ListingIdParam("id", "server.product.invalidIdFormat") id: string,
     @CurrentUser("id") userId: string,
   ) {
     return this.productBoostService.getBoostOptions(id, userId);
@@ -248,7 +255,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Turn the boost ending-soon reminder on or off" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "{ enabled } (false when no boost of the listing runs)",
@@ -263,16 +270,7 @@ export class ProductController {
     description: "No such listing, or not the caller's listing",
   })
   async setBoostReminder(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: BoostReminderDto,
@@ -405,12 +403,12 @@ export class ProductController {
   @Header("Cache-Control", "no-store, no-cache, must-revalidate")
   @Header("Pragma", "no-cache")
   @ApiOperation({ summary: "Kendi ürünüm (düzenleme için)" })
-  @ApiParam({ name: "id", description: "Product UUID" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({ status: 200, description: "Ürün detayı" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   @ApiResponse({ status: 403, description: "Bu ürün size ait değil" })
   async findMyProductById(
-    @Param("id", ParseUUIDPipe) id: string,
+    @ListingIdParam("id") id: string,
     @CurrentUser("id") userId: string,
   ) {
     return this.productService.findMyProductById(id, userId);
@@ -423,7 +421,7 @@ export class ProductController {
   @Get(":id")
   @Public()
   @ApiOperation({ summary: "Ürün detayı" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Ürün detayı",
@@ -432,16 +430,7 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async findOne(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormatDetailed"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormatDetailed")
     id: string,
     @CurrentUser("id") viewerId?: string,
   ) {
@@ -456,18 +445,9 @@ export class ProductController {
   @Get(":id/similar")
   @Public()
   @ApiOperation({ summary: "Benzer ürünler (aynı kategori, aktif)" })
-  @ApiParam({ name: "id", description: "Product ID (UUID)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async getSimilar(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @Query("limit") limit?: string,
     @CurrentUser("id") viewerId?: string,
@@ -527,7 +507,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Süresi dolan ilanı yenile" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description: "Yenilendi (active) ya da onaya düştü (pending)",
@@ -539,16 +519,7 @@ export class ProductController {
   @ApiResponse({ status: 403, description: "Yetkiniz yok / ilan limiti" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async renew(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
   ) {
@@ -563,7 +534,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Ürün güncelle" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Ürün güncellendi",
@@ -574,16 +545,7 @@ export class ProductController {
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   @ApiResponse({ status: 409, description: "Concurrent update conflict" })
   async update(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
     @Body() dto: UpdateProductDto,
@@ -601,7 +563,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Boost a listing (buy a boost)" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description:
@@ -622,16 +584,7 @@ export class ProductController {
       "expectedPrice is not the price charged now (server.product.boostPriceChanged); nothing is written",
   })
   async initiateBoost(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: InitiateBoostDto,
@@ -667,7 +620,7 @@ export class ProductController {
     description:
       "Optional JSON body with the removal reason (DeleteProductDto). Omitted reason is recorded as not_given.",
   })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({ status: 200, description: "Ürün silindi" })
   @ApiResponse({
     status: 400,
@@ -676,16 +629,7 @@ export class ProductController {
   @ApiResponse({ status: 403, description: "Yetkiniz yok" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async remove(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
     @ReqLocale() locale: Locale,
@@ -707,7 +651,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Ürünü beğen" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description: "Ürün beğenildi",
@@ -722,16 +666,7 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Zaten beğenilmiş" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async likeProduct(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
   ) {
@@ -746,7 +681,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Beğeniyi kaldır" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Beğeni kaldırıldı",
@@ -761,16 +696,7 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Beğenilmemiş" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async unlikeProduct(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
   ) {
@@ -784,7 +710,7 @@ export class ProductController {
   @Post(":id/view")
   @Public()
   @ApiOperation({ summary: "Görüntülenme sayısını artır" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description: "Görüntülenme sayısı artırıldı",
@@ -797,16 +723,7 @@ export class ProductController {
   })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async incrementViewCount(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
@@ -828,18 +745,9 @@ export class ProductController {
   @Post(":id/click")
   @Public()
   @ApiOperation({ summary: "İlan kartı tıklama sayısını artır" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async incrementClickCount(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
@@ -862,7 +770,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Ürün istatistikleri (satıcı için)" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Ürün istatistikleri",
@@ -881,16 +789,7 @@ export class ProductController {
   @ApiResponse({ status: 403, description: "Yetkiniz yok" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async getProductStats(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
   ) {
@@ -905,7 +804,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Kullanıcı bu ürünü beğenmiş mi?" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Beğeni durumu",
@@ -917,16 +816,7 @@ export class ProductController {
     },
   })
   async isProductLiked(
-    @Param(
-      "id",
-      new ParseUUIDPipe({
-        errorHttpStatusCode: 400,
-        exceptionFactory: () =>
-          new BadRequestException(
-            i18nMessage("server.product.invalidIdFormat"),
-          ),
-      }),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
   ) {

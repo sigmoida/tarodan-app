@@ -18,6 +18,8 @@ import {
 } from "./types";
 import type { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
+import { ArrowPathIcon, BanknotesIcon } from "@heroicons/react/24/outline";
+import { failureReasonText } from "./failureReason";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -163,12 +165,18 @@ export function transactionColumns(
   ];
 }
 
+/** Row actions of the transfer list (only for roles that may resolve). */
+export interface TransferRowActions {
+  /** Retry: right away, or through the panel-check dialog when the row
+   *  requires it (`resolution.retryRequiresProviderCheck`). */
+  onRetry: (transfer: PayoutTransferRow) => void;
+  onMarkPaid: (transfer: PayoutTransferRow) => void;
+  /** The row whose retry is in flight (menu spinner). */
+  retryingId?: string;
+}
+
 /** Gerçek banka transferleri (PayoutTransfer) — hold listesinden ayrı yüzey. */
-export function transferColumns(
-  onRetry: ((transfer: PayoutTransferRow) => void) | undefined,
-  retryingId: string | undefined,
-  t: T,
-) {
+export function transferColumns(actions: TransferRowActions | undefined, t: T) {
   return [
     col.link<PayoutTransferRow>(
       t("admin.finance.common.order"),
@@ -197,44 +205,64 @@ export function transferColumns(
       "adjustmentDeduction",
       { sortKey: "adjustmentDeduction", sortType: "number" },
     ),
-    col.code<PayoutTransferRow>(t("admin.finance.payouts.ibanLast4"), (r) =>
+    col.text<PayoutTransferRow>(t("admin.finance.payouts.ibanLast4"), (r) =>
       r.ibanLast4 ? `••${r.ibanLast4}` : "—",
     ),
     col.custom<PayoutTransferRow>(
       t("common.status"),
-      (r) => (
-        <div className="min-w-0">
-          <Badge
-            status={r.status}
-            config={statusConfig(payoutStatusConfig, t)}
-          />
-          {r.failureReason && (
-            <p className="mt-1 truncate text-xs text-danger-600">
-              {r.failureReason}
-            </p>
-          )}
-        </div>
-      ),
+      (r) => {
+        const reason = failureReasonText(r.failureReason, t);
+        return (
+          <div className="min-w-0">
+            <Badge
+              status={r.status}
+              config={statusConfig(payoutStatusConfig, t)}
+            />
+            {r.manualSettlement ? (
+              <p className="mt-1 truncate text-xs text-muted">
+                {t("admin.finance.payouts.resolution.manualSettlementShort", {
+                  method: t(
+                    `admin.finance.payouts.resolution.method.${r.manualSettlement.method}`,
+                  ),
+                })}
+              </p>
+            ) : (
+              reason && (
+                <p
+                  className="mt-1 truncate text-xs text-danger-600"
+                  title={reason}
+                >
+                  {reason}
+                </p>
+              )
+            )}
+          </div>
+        );
+      },
       { grow: 2, minWidth: 180, sortKey: "status", sortType: "text" },
     ),
     col.date<PayoutTransferRow>(t("common.date"), "createdAt", {
       sortKey: "createdAt",
       sortType: "date",
     }),
-    ...(onRetry
+    ...(actions
       ? [
-          col.actions<PayoutTransferRow>(
-            (r) =>
-              r.status === "failed" || r.status === "returned" ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  isLoading={retryingId === r.id}
-                  onClick={() => onRetry(r)}
-                >
-                  {t("admin.finance.payouts.retryTransfer")}
-                </Button>
-              ) : null,
+          col.rowMenu<PayoutTransferRow>(
+            (r) => [
+              (r.status === "failed" || r.status === "returned") && {
+                label: t("admin.finance.payouts.retryTransfer"),
+                icon: ArrowPathIcon,
+                onClick: () => actions.onRetry(r),
+                isLoading: actions.retryingId === r.id,
+                // One retry at a time: another row's waits for this one.
+                disabled: actions.retryingId != null,
+              },
+              r.resolution?.markPaidMethod && {
+                label: t("admin.finance.payouts.resolution.markPaid"),
+                icon: BanknotesIcon,
+                onClick: () => actions.onMarkPaid(r),
+              },
+            ],
             { header: t("common.actions") },
           ),
         ]

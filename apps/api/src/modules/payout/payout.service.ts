@@ -1,17 +1,14 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  Optional,
-} from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import {
   PayoutStatus,
   PayoutTransfer,
+  PaymentHold,
   PaymentHoldStatus,
   PaymentStatus,
+  Order,
   OrderStatus,
   Prisma,
   RefundRequestStatus,
@@ -40,8 +37,28 @@ import {
   PAYOUT_MIN_NET,
 } from "./helpers/payout-entitlement";
 import { purgeSettledBankAccountsOfDeletedSellers } from "./helpers/unsettled-payout";
-import type { PaytrReturnedTransfer } from "../payment-providers/paytr/paytr-transfer.service";
-import type { HoldReleaseBlockedReason } from "@tarodan/types";
+import {
+  PAYOUT_FAILURE,
+  classifyTransferRejection,
+  isSellerActionableFailure,
+  sellerFailureText,
+} from "./helpers/payout-failure-reasons";
+import {
+  resolveTransferTotal,
+  type TransferTotalSnapshot,
+} from "./helpers/transfer-total";
+import { payoutCompletedLedgerInput } from "./helpers/payout-ledger";
+import { manualSettlementOf } from "./helpers/payout-resolution-policy";
+import type {
+  PaytrPlatformTransferResult,
+  PaytrReturnedTransfer,
+} from "../payment-providers/paytr/paytr-transfer.service";
+import { PlatformTransferRequestError } from "../payment-providers/transfer-errors";
+import { errorMessage } from "../../common/helpers/error-message";
+import type {
+  HoldReleaseBlockedReason,
+  PayoutFailureReason,
+} from "@tarodan/types";
 import {
   OPEN_REFUND_STATUSES,
   RESIDUAL_ORDER_STATUSES,
@@ -110,10 +127,11 @@ export class PayoutService {
   ) {}
 
   /**
-   * "Ödemeniz aktarıldı" e-postası — payout transferi PayTR'de başarıyla
-   * tamamlandığında satıcıya markalı bilgilendirme. Asla throw etmez.
+   * The seller's "payout released" e-mail, sent when a transfer completes at
+   * PayTR or an admin marks it as paid (`resolution/payout-resolution.service.ts`).
+   * Never throws.
    */
-  private async sendPayoutReleasedEmail(
+  async sendPayoutReleasedEmail(
     sellerId: string,
     netAmount: number,
     iban: string,
@@ -133,9 +151,9 @@ export class PayoutService {
           bankAccountLast4: last4 || undefined,
         },
       );
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `payout-released email failed for seller ${sellerId}: ${err?.message}`,
+        `payout-released email failed for seller ${sellerId}: ${errorMessage(err)}`,
       );
     }
   }
@@ -177,26 +195,31 @@ export class PayoutService {
           failureReason: params.reason,
         },
       );
-    } catch (err: any) {
+    } catch (err) {
       this.logger.warn(
-        `${params.template} email failed for seller ${params.sellerId}: ${err?.message}`,
+        `${params.template} email failed for seller ${params.sellerId}: ${errorMessage(err)}`,
       );
     }
   }
 
   /**
-   * Siparişin durumu hold parasının satıcıya gitmesine izin veriyor mu — hold
-   * bırakma yollarıyla AYNI yüklem (`holdPayoutOrderBlock`). Teslim edilmiş
-   * sipariş doğrudan geçer; iade/iptalle kapanmış siparişin KALINTISI yalnız
-   * kusur satıcıda değilse geçer (kusur, sonuçlanmış iade taleplerinden okunur
-   * — bu sorgu yalnız kapanmış siparişte koşar).
+   * Whether the order's state lets the hold money go to the seller: the same
+   * predicate as the hold release paths (`holdPayoutOrderBlock`). A delivered
+   * order passes; the residual of an order closed by a refund or cancellation
+   * passes only when the seller is not at fault (read from the finalized
+   * refund requests; queried only for a closed order). The processor and the
+   * admin's manual settlement (`resolution/`, inside its transaction: `db`)
+   * both check it.
    */
-  private async orderPayoutBlock(order: {
-    id: string;
-    status: OrderStatus;
-  }): Promise<HoldReleaseBlockedReason | null> {
+  async orderPayoutBlock(
+    order: {
+      id: string;
+      status: OrderStatus;
+    },
+    db: Pick<Prisma.TransactionClient, "refundRequest"> = this.prisma,
+  ): Promise<HoldReleaseBlockedReason | null> {
     const finalizedRefunds = RESIDUAL_ORDER_STATUSES.includes(order.status)
-      ? await this.prisma.refundRequest.findMany({
+      ? await db.refundRequest.findMany({
           where: { orderId: order.id, status: RefundRequestStatus.refunded },
           select: { faultParty: true, policyCode: true },
         })
@@ -205,28 +228,33 @@ export class PayoutService {
   }
 
   /**
-   * Bu ödeme/sipariş için parayı bağlayan bir iade var mı? Payout OLUŞTURMA,
-   * transfer ETME ve iade-void'lu payout'u yeniden kuyruğa alma yollarının
-   * tamamı aynı guard'ı kullanır (tek kaynak).
+   * Whether a refund still ties up the money of this payment and order (or
+   * trade): an open refund request or an unresolved refund attempt. Creating
+   * a payout, sending it, requeueing a refund-voided one and the admin's
+   * manual settlement (inside its transaction: `db`) all use this one guard.
    *
-   * @returns engel nedeni (`refund_pending`) veya engel yoksa `null`
+   * @returns the block reason (`refund_pending`) or `null`
    */
-  private async findBlockingRefund(target: {
-    orderId: string | null;
-    paymentId: string;
-    tradeId?: string | null;
-  }): Promise<"refund_pending" | null> {
+  async findBlockingRefund(
+    target: {
+      orderId: string | null;
+      paymentId: string;
+      tradeId?: string | null;
+    },
+    db: Pick<Prisma.TransactionClient, "refundRequest" | "refundAttempt"> = this
+      .prisma,
+  ): Promise<typeof PAYOUT_FAILURE.refundPending | null> {
     if (target.orderId) {
-      const openRefund = await this.prisma.refundRequest.findFirst({
+      const openRefund = await db.refundRequest.findFirst({
         where: {
           orderId: target.orderId,
           status: { in: [...OPEN_REFUND_STATUSES] },
         },
         select: { id: true },
       });
-      if (openRefund) return "refund_pending";
+      if (openRefund) return PAYOUT_FAILURE.refundPending;
     }
-    const activeAttempt = await this.prisma.refundAttempt.findFirst({
+    const activeAttempt = await db.refundAttempt.findFirst({
       where: {
         paymentId: target.paymentId,
         orderId: target.orderId,
@@ -235,7 +263,7 @@ export class PayoutService {
       },
       select: { id: true },
     });
-    return activeAttempt ? "refund_pending" : null;
+    return activeAttempt ? PAYOUT_FAILURE.refundPending : null;
   }
 
   /**
@@ -385,7 +413,7 @@ export class PayoutService {
             transferIban: bankAccount?.iban || "",
             transferName: bankAccount?.accountHolder || "",
             status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
-            failureReason: bankAccount ? null : "no_bank_account",
+            failureReason: bankAccount ? null : PAYOUT_FAILURE.noBankAccount,
           },
         });
         created++;
@@ -477,7 +505,7 @@ export class PayoutService {
             transferIban: bankAccount?.iban || "",
             transferName: bankAccount?.accountHolder || "",
             status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
-            failureReason: bankAccount ? null : "no_bank_account",
+            failureReason: bankAccount ? null : PAYOUT_FAILURE.noBankAccount,
           },
         });
         created++;
@@ -496,8 +524,11 @@ export class PayoutService {
   }
 
   private async createAdjustedOrderPayout(input: {
-    hold: any;
-    order: any;
+    hold: Pick<PaymentHold, "id" | "sellerId">;
+    order: Pick<
+      Order,
+      "id" | "totalAmount" | "commissionAmount" | "withholdingTaxAmount"
+    >;
     merchantOid: string;
     transId: string;
     bankAccount: { iban: string; accountHolder: string } | null;
@@ -576,7 +607,7 @@ export class PayoutService {
               : PayoutStatus.failed,
           processedAt: fullyConsumed ? new Date() : null,
           failureReason:
-            fullyConsumed || bankAccount ? null : "no_bank_account",
+            fullyConsumed || bankAccount ? null : PAYOUT_FAILURE.noBankAccount,
         },
       });
 
@@ -674,15 +705,24 @@ export class PayoutService {
             // Transfer öncesi bayat-net doğrulaması için gerekli (aşağıya bkz).
             amount: true,
             refundedAmount: true,
-            // Aynı-gün koruması: PayTR ödeme gününde transfer talimatı kabul etmez.
-            payment: { select: { paidAt: true, createdAt: true } },
+            // Same-day guard (paidAt) and the transfer total cap (amount,
+            // refundedOrders in metadata).
+            payment: {
+              select: {
+                paidAt: true,
+                createdAt: true,
+                amount: true,
+                metadata: true,
+              },
+            },
           },
         },
         tradeCashPayment: {
           select: {
             tradeId: true,
             paidAt: true,
-            payment: { select: { id: true } },
+            totalAmount: true,
+            payment: { select: { id: true, amount: true, metadata: true } },
           },
         },
       },
@@ -694,6 +734,9 @@ export class PayoutService {
     let failed = 0;
 
     for (const payout of pending) {
+      // The transfer total is capped by the source's own total (order or
+      // trade cash), read fresh here, never from the row.
+      let orderTotal: unknown = undefined;
       const refundTarget = payout.paymentHold
         ? {
             paymentId: payout.paymentHold.paymentId,
@@ -712,8 +755,9 @@ export class PayoutService {
           const orderId = refundTarget.orderId;
           const order = await this.prisma.order.findUnique({
             where: { id: orderId },
-            select: { status: true },
+            select: { status: true, totalAmount: true },
           });
+          orderTotal = order?.totalAmount;
           if (
             !order ||
             (await this.orderPayoutBlock({ id: orderId, status: order.status }))
@@ -722,7 +766,7 @@ export class PayoutService {
               where: { id: payout.id, status: PayoutStatus.pending },
               data: {
                 status: PayoutStatus.failed,
-                failureReason: "order_not_payout_eligible",
+                failureReason: PAYOUT_FAILURE.orderNotPayoutEligible,
               },
             });
             continue;
@@ -798,7 +842,7 @@ export class PayoutService {
           where: { id: payout.id, status: PayoutStatus.pending },
           data: {
             status: PayoutStatus.failed,
-            failureReason: "no_bank_account",
+            failureReason: PAYOUT_FAILURE.noBankAccount,
           },
         });
         if (failedClaim.count > 0) {
@@ -808,7 +852,7 @@ export class PayoutService {
             template: "payout-failed-seller",
             netAmount: netToTransfer,
             iban: transferIban,
-            reason: "no_bank_account",
+            reason: sellerFailureText(PAYOUT_FAILURE.noBankAccount),
           });
         }
         continue;
@@ -822,7 +866,7 @@ export class PayoutService {
           where: { id: payout.id, status: PayoutStatus.pending },
           data: {
             status: PayoutStatus.failed,
-            failureReason: "invalid_iban_format",
+            failureReason: PAYOUT_FAILURE.invalidIbanFormat,
           },
         });
         this.logger.warn(
@@ -835,7 +879,7 @@ export class PayoutService {
             template: "payout-failed-seller",
             netAmount: netToTransfer,
             iban: transferIban,
-            reason: "invalid_iban_format",
+            reason: sellerFailureText(PAYOUT_FAILURE.invalidIbanFormat),
           });
         }
         continue;
@@ -896,11 +940,73 @@ export class PayoutService {
         continue;
       }
 
-      // Atomik claim (K2): yalnızca hâlâ pending ise processing'e al. Cooldown
-      // kontrolü claim'den önce yapıldığı için bekleyen payout processing'te takılmaz.
+      // PayTR total_amount: what this payout may take from the payment
+      // (helpers/transfer-total). A net that does not fit is never sent: PayTR
+      // would reject it on every attempt (err_no 010) and the residual can
+      // only be paid outside the order transfer (docs/PAYMENTS.md §6).
+      const holdPayment = payout.paymentHold?.payment;
+      const tradeCash = payout.tradeCashPayment;
+      const totalDecision = await resolveTransferTotal(this.prisma, {
+        payout: { id: payout.id, merchantOid: payout.merchantOid },
+        net: netToTransfer,
+        source: payout.paymentHold
+          ? { key: payout.paymentHold.orderId, total: orderTotal }
+          : tradeCash
+            ? { key: tradeCash.tradeId, total: tradeCash.totalAmount }
+            : null,
+        payment:
+          payout.paymentHold && holdPayment
+            ? {
+                id: payout.paymentHold.paymentId,
+                amount: holdPayment.amount,
+                metadata: holdPayment.metadata,
+              }
+            : (tradeCash?.payment ?? null),
+      });
+      const transferTotal = totalDecision.snapshot;
+      if (totalDecision.kind === "manual_decision") {
+        const parked = await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.pending },
+          data: {
+            status: PayoutStatus.failed,
+            failureReason: PAYOUT_FAILURE.transferNeedsManualDecision,
+            submittedTotalAmount: null,
+            providerResponse: {
+              transferTotal,
+            } as unknown as Prisma.InputJsonValue,
+          },
+        });
+        if (parked.count > 0) {
+          failed++;
+          this.logger.error(
+            transferTotal.missingInput
+              ? `Payout ${payout.id} (${payout.transId}) ${PAYOUT_FAILURE.transferNeedsManualDecision}: ` +
+                  `no ${transferTotal.missingInput} to cap the transfer total against (a data problem, ` +
+                  `not a residual: fix the link and retry, do not pay it outside PayTR); PayTR not called`
+              : `Payout ${payout.id} (${payout.transId}) ${PAYOUT_FAILURE.transferNeedsManualDecision}: ` +
+                  `net ${transferTotal.net} TL does not fit the allowed total ${transferTotal.allowedTotal} TL ` +
+                  `(order/trade ${transferTotal.ownAllowed}, payment remaining ${transferTotal.oidRemaining}); PayTR not called`,
+          );
+        }
+        continue;
+      }
+
+      // Resolved before the claim: a provider that cannot be resolved fails
+      // the run while the row is still pending, never as a transfer outcome.
+      const provider = this.paymentProviders.resolve();
+
+      // Atomic claim (K2): pending -> processing only. The total about to be
+      // sent is stamped in the same write, so a sibling on the same oid that
+      // is decided after this write subtracts it. The cron runs payouts one
+      // by one; two overlapping runs could still decide siblings from the
+      // same balance, and PayTR's err_no 010 (retried with a recomputed
+      // total) is the backstop for that window.
       const claim = await this.prisma.payoutTransfer.updateMany({
         where: { id: payout.id, status: PayoutStatus.pending },
-        data: { status: PayoutStatus.processing },
+        data: {
+          status: PayoutStatus.processing,
+          submittedTotalAmount: totalDecision.totalAmount,
+        },
       });
       if (claim.count === 0) {
         continue;
@@ -925,6 +1031,7 @@ export class PayoutService {
             status: PayoutStatus.pending,
             transferIban: confirmedIban,
             transferName: confirmedName,
+            submittedTotalAmount: null,
           },
         });
         this.logger.warn(
@@ -935,75 +1042,99 @@ export class PayoutService {
       transferIban = confirmedIban;
       transferName = confirmedName;
 
+      // Only the provider call is guarded: a thrown error here means PayTR
+      // gave no answer. Errors in the bookkeeping after an accepted transfer
+      // must not be mistaken for a failed transfer (that used to retry it).
+      let result: PaytrPlatformTransferResult;
       try {
-        const result = await this.paymentProviders
-          .resolve()
-          .createPlatformTransfer({
-            merchantOid: payout.merchantOid,
-            transId: payout.transId,
-            submerchantAmount: netToTransfer,
-            totalAmount: Number(payout.amount),
-            transferName,
-            transferIban,
+        result = await provider.createPlatformTransfer({
+          merchantOid: payout.merchantOid,
+          transId: payout.transId,
+          submerchantAmount: netToTransfer,
+          totalAmount: totalDecision.totalAmount,
+          transferName,
+          transferIban,
+        });
+      } catch (error) {
+        // Building the request failed (credentials, signing, endpoint): a
+        // configuration problem every payout of the run would hit. Release
+        // the claim and stop the run (the cron alarm reports it); burning
+        // each payout's retries would only hide the cause.
+        if (
+          error instanceof PlatformTransferRequestError &&
+          error.causeCode === "PRE_SEND"
+        ) {
+          await this.prisma.payoutTransfer.updateMany({
+            where: { id: payout.id, status: PayoutStatus.processing },
+            data: { status: PayoutStatus.pending, submittedTotalAmount: null },
           });
+          throw error;
+        }
+        const notSent =
+          error instanceof PlatformTransferRequestError &&
+          error.phase === "not_sent";
+        const causeCode =
+          error instanceof PlatformTransferRequestError
+            ? error.causeCode
+            : undefined;
+        const message = errorMessage(error);
+        await this.recordTransferFailure(payout, {
+          reason: notSent
+            ? PAYOUT_FAILURE.providerUnreachable
+            : PAYOUT_FAILURE.transferOutcomeUnknown,
+          // Resending is safe only when the request never left the host.
+          retryable: notSent,
+          providerResponse: {
+            error: {
+              phase: notSent ? "not_sent" : "unknown",
+              causeCode: causeCode ?? null,
+              message,
+            },
+            transferTotal,
+          },
+          detail: `cause=${causeCode ?? "none"} ${message}`,
+          net: netToTransfer,
+          totalAmount: totalDecision.totalAmount,
+        });
+        failed++;
+        continue;
+      }
 
-        if (result.status === "success") {
-          // Aşama-1 kabul anının snapshot'ı: callback (2. aşama) saatler/günler
-          // sonra geldiğinde mail + ledger'ın kullanacağı GERÇEK gönderilen
-          // tutar — adjustment/iade sonrası netAmount değişebilir.
-          const submittedAt = new Date();
-          if (this.transferCallbackEnabled()) {
-            // 2. aşama akışı: PayTR yalnız TALİMATI kabul etti; para henüz
-            // satıcıya ulaşmadı. Payout processing'te bekler; completed + yan
-            // etkiler transfer sonucu callback'inde (handleTransferResultCallback).
-            await this.prisma.payoutTransfer.update({
-              where: { id: payout.id },
-              data: {
-                providerResponse: result as any,
-                // Geri dönen transfer listesi yalnız bu referansla eşlenir.
-                providerReference: result.reference ?? null,
-                submittedAt,
-                submittedAmount: netToTransfer,
-              },
-            });
-            submitted++;
-            this.logger.log(
-              `Payout ${payout.transId} submitted (transfer sonucu callback'i bekleniyor): ${netToTransfer} TL → ${maskIban(transferIban)}`,
-            );
-          } else {
-            // Eski akış (bayrak kapalı): senkron kabul = tamamlandı. PayTR
-            // panelinde "Platform Transfer Sonucu Bildirim URL" tanımlanana
-            // kadar güvenli varsayılan — aksi halde hiçbir payout tamamlanamaz.
-            await this.prisma.payoutTransfer.update({
-              where: { id: payout.id },
-              data: {
-                status: PayoutStatus.completed,
-                providerResponse: result as any,
-                providerReference: result.reference ?? null,
-                processedAt: submittedAt,
-                submittedAt,
-                submittedAmount: netToTransfer,
-              },
-            });
-            await this.applyPayoutCompletionEffects({
-              payoutId: payout.id,
-              sellerId: payout.sellerId,
-              transId: payout.transId,
+      if (result.status === "success") {
+        // PayTR has the instruction: from here on nothing may treat this
+        // payout as a failed transfer. A bookkeeping error is logged and the
+        // row stays processing with submittedAt null, which the zombie check
+        // raises for a person; the batch goes on with the next payout.
+        try {
+          if (
+            await this.recordAcceptedTransfer(payout, result, {
+              net: netToTransfer,
+              totalAmount: totalDecision.totalAmount,
               transferIban,
-              netAmount: netToTransfer,
-            });
+            })
+          ) {
+            submitted++;
+          } else {
             processed++;
           }
-        } else {
-          await this.handlePayoutFailure(
-            payout.id,
-            result.err_msg || "PayTR error",
-            result,
+        } catch (error) {
+          this.logger.error(
+            `Payout ${payout.id} (${payout.transId}) was accepted by PayTR but recording it failed: ${errorMessage(error)}; check the row (a processing row is raised by the zombie check), do not resend`,
           );
-          failed++;
         }
-      } catch (error: any) {
-        await this.handlePayoutFailure(payout.id, error.message, null);
+      } else {
+        // PayTR answered and did not take the instruction.
+        const reason = classifyTransferRejection(result);
+        await this.recordTransferFailure(payout, {
+          reason,
+          // Only err_no 010 can pass later: refunds and sibling transfers
+          // change the total, which the next attempt recomputes.
+          retryable: reason === PAYOUT_FAILURE.transferTotalExceedsRemaining,
+          providerResponse: { ...result, transferTotal },
+          detail: `PayTR status=${result.status} err_no=${result.err_no ?? "none"}`,
+          net: netToTransfer,
+          totalAmount: totalDecision.totalAmount,
+        });
         failed++;
       }
     }
@@ -1014,6 +1145,64 @@ export class PayoutService {
       );
     }
     return { processed, submitted, failed };
+  }
+
+  /**
+   * Records a transfer PayTR accepted (stage 1). The submitted snapshot (time
+   * and net) is what the stage-2 callback's e-mail and ledger use hours or
+   * days later; netAmount can change meanwhile (adjustments, refunds).
+   *
+   * @returns true when the payout now waits for the transfer-result callback
+   *   (submitted), false when it completed right away.
+   */
+  private async recordAcceptedTransfer(
+    payout: { id: string; transId: string; sellerId: string },
+    result: PaytrPlatformTransferResult,
+    sent: { net: number; totalAmount: number; transferIban: string },
+  ): Promise<boolean> {
+    const submittedAt = new Date();
+    const accepted = {
+      providerResponse: result as unknown as Prisma.InputJsonValue,
+      // The returned-transfer list is matched by this reference only.
+      providerReference: result.reference ?? null,
+      submittedAt,
+      submittedAmount: sent.net,
+    };
+    if (this.transferCallbackEnabled()) {
+      // Stage-2 flow: PayTR only accepted the INSTRUCTION; the money has not
+      // reached the seller. The payout waits in processing; completion and
+      // its effects happen in the result callback.
+      await this.prisma.payoutTransfer.update({
+        where: { id: payout.id },
+        data: accepted,
+      });
+      this.logger.log(
+        `Payout ${payout.transId} submitted (awaiting the transfer-result callback): net ${sent.net} TL → ${maskIban(sent.transferIban)}, total ${sent.totalAmount}`,
+      );
+      return true;
+    }
+    // Flag off (default): the synchronous acceptance counts as completed.
+    // Safe until the PayTR panel has the "Platform Transfer Sonucu Bildirim
+    // URL"; without it no payout could ever complete.
+    await this.prisma.payoutTransfer.update({
+      where: { id: payout.id },
+      data: {
+        ...accepted,
+        status: PayoutStatus.completed,
+        processedAt: submittedAt,
+      },
+    });
+    this.logger.log(
+      `Payout ${payout.transId} accepted by PayTR: net ${sent.net}, total ${sent.totalAmount}`,
+    );
+    await this.applyPayoutCompletionEffects({
+      payoutId: payout.id,
+      sellerId: payout.sellerId,
+      transId: payout.transId,
+      transferIban: sent.transferIban,
+      netAmount: sent.net,
+    });
+    return false;
   }
 
   /**
@@ -1049,17 +1238,18 @@ export class PayoutService {
     this.logger.log(
       `Payout ${params.transId} completed: ${params.netAmount} TL → ${maskIban(params.transferIban)}`,
     );
-    // Faz 6.2 (ledger): escrow → satıcıya ödendi. seller_escrow (borç) kapanır,
-    // payout (dış çıkış) borçlanır. capture'daki seller_escrow debit'ini dengeler
-    // → sipariş bazında escrow net 0'a iner.
+    // Ledger: the escrow is paid to the seller. seller_escrow (the debt held
+    // since capture) is credited and payout (money out) debited, which
+    // balances the capture's escrow debit for the order (or trade).
     //
-    // POST-COMMIT: payout zaten `completed` yazıldı; burada fırlatmak hiçbir şeyi
-    // geri almaz → best-effort KALIR (tx-içi yollardan farklı olarak). Reconciliation
-    // escrow kalıntısı olarak yakalar.
+    // POST-COMMIT: the payout is already `completed`; throwing here would
+    // undo nothing, so this stays best-effort (unlike the in-transaction
+    // paths). The reconciliation reports a missing entry as escrow residue.
     //
-    // `orderId`/`holdId` referansları escrow kalıntı invaryantının ön koşuludur:
-    // sipariş bazlı escrow bakiyesi ancak settle kaydı siparişe bağlıysa kapanır.
-    // Hold ↔ payout 1:1 (PayoutTransfer.paymentHoldId UNIQUE) → payout satırından türer.
+    // The order/hold (or trade) refs are what lets the per-order escrow
+    // balance close; hold and payout are 1:1, so they come from the row.
+    // One group per payout (`payout-completed:<id>`): PayTR repeats the
+    // callback until it sees "OK".
     try {
       const net = params.netAmount;
       if (net > 0) {
@@ -1068,35 +1258,26 @@ export class PayoutService {
           select: {
             paymentHoldId: true,
             paymentHold: { select: { orderId: true } },
+            tradeCashPayment: { select: { tradeId: true } },
           },
         });
-        await this.ledger?.record(this.prisma, {
-          eventType: LedgerEventType.payout_completed,
-          // Payout başına TEK settle kaydı: PayTR "OK" görene dek bildirimi yineler.
-          idempotencyKey: `payout-completed:${params.payoutId}`,
-          entries: [
+        await this.ledger?.record(
+          this.prisma,
+          payoutCompletedLedgerInput(
             {
-              account: LedgerAccount.seller_escrow,
-              direction: LedgerDirection.credit,
-              amount: net,
+              payoutId: params.payoutId,
+              sellerId: params.sellerId,
+              orderId: payoutRow?.paymentHold?.orderId ?? null,
+              holdId: payoutRow?.paymentHoldId ?? null,
+              tradeId: payoutRow?.tradeCashPayment?.tradeId ?? null,
             },
-            {
-              account: LedgerAccount.payout,
-              direction: LedgerDirection.debit,
-              amount: net,
-            },
-          ],
-          refs: {
-            payoutId: params.payoutId,
-            sellerId: params.sellerId,
-            orderId: payoutRow?.paymentHold?.orderId ?? null,
-            holdId: payoutRow?.paymentHoldId ?? null,
-          },
-        });
+            net,
+          ),
+        );
       }
-    } catch (e: any) {
+    } catch (e) {
       this.logger.warn(
-        `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${e?.message}`,
+        `Ledger payout kaydı başarısız (payout ${params.payoutId}): ${errorMessage(e)}`,
       );
     }
   }
@@ -1160,16 +1341,101 @@ export class PayoutService {
         continue;
       }
 
-      // Atomik claim + idempotens: yalnız processing → completed. Tekrarlanan
-      // callback'te count=0 döner, mail/ledger ikinci kez tetiklenmez.
-      const claim = await this.prisma.payoutTransfer.updateMany({
+      // Atomic claim + idempotency: processing -> completed only. A repeated
+      // callback gets count=0, so e-mail and ledger never run twice.
+      // A row whose bookkeeping failed after PayTR accepted it has no send
+      // snapshot: stamp the claim time and the net it carried, so a later
+      // bank return can still be matched (no PayTR reference was stored).
+      let claim = await this.prisma.payoutTransfer.updateMany({
         where: { id: payout.id, status: PayoutStatus.processing },
-        data: { status: PayoutStatus.completed, processedAt: new Date() },
+        data: {
+          status: PayoutStatus.completed,
+          processedAt: new Date(),
+          ...(payout.submittedAt
+            ? {}
+            : {
+                submittedAt: payout.updatedAt,
+                submittedAmount: payout.submittedAmount ?? payout.netAmount,
+              }),
+        },
       });
+      // We never heard back from PayTR for this one (failed /
+      // transfer_outcome_unknown) and PayTR now confirms it: settle it once.
+      // No other failed row is revived: PayTR rejected those.
+      if (
+        claim.count === 0 &&
+        payout.status === PayoutStatus.failed &&
+        payout.failureReason === PAYOUT_FAILURE.transferOutcomeUnknown
+      ) {
+        claim = await this.prisma.payoutTransfer.updateMany({
+          where: {
+            id: payout.id,
+            status: PayoutStatus.failed,
+            failureReason: PAYOUT_FAILURE.transferOutcomeUnknown,
+          },
+          data: {
+            status: PayoutStatus.completed,
+            processedAt: new Date(),
+            failureReason: null,
+            // When we sent it: the failure was recorded right after the send
+            // and nothing else writes a failed row. The returned-transfer
+            // match by IBAN + amount + date needs it (no PayTR reference
+            // came back).
+            submittedAt: payout.updatedAt,
+          },
+        });
+        if (claim.count > 0) {
+          this.logger.warn(
+            `Payout ${payout.id} (${payout.transId}) with an unknown outcome was confirmed by the PayTR callback: completed`,
+          );
+        }
+      }
+      // PayTR confirms a transfer that waits to be sent again: an admin
+      // retried an unknown outcome (same trans_id) before this late result
+      // arrived. The money moved, so settle it instead of sending it twice.
+      // Nothing else puts an executed trans_id back in the queue.
+      if (
+        claim.count === 0 &&
+        (payout.status === PayoutStatus.pending ||
+          payout.status === PayoutStatus.retry_pending)
+      ) {
+        claim = await this.prisma.payoutTransfer.updateMany({
+          where: {
+            id: payout.id,
+            status: payout.status,
+            transId: payout.transId,
+          },
+          data: {
+            status: PayoutStatus.completed,
+            processedAt: new Date(),
+            failureReason: null,
+            nextRetryAt: null,
+            submittedAt: payout.submittedAt ?? payout.updatedAt,
+            submittedAmount: payout.submittedAmount ?? payout.netAmount,
+          },
+        });
+        if (claim.count > 0) {
+          this.logger.error(
+            `Payout ${payout.id} (${payout.transId}) was waiting to be sent again (${payout.status}) when the PayTR callback confirmed it: completed, not resent; check the retry that requeued it`,
+          );
+        }
+      }
       if (claim.count === 0) {
         if (payout.status !== PayoutStatus.completed) {
-          this.logger.warn(
-            `PayTR transfer callback: payout ${payout.id} beklenmeyen statüde (${payout.status}) — dokunulmadı`,
+          // PayTR says this transfer was paid while we hold it as not paid
+          // (rejected, returned): never pay it again before checking.
+          this.logger.error(
+            `PayTR transfer callback confirms payout ${payout.id} (${payout.transId}) in state ${payout.status}/${payout.failureReason ?? "-"}: not changed; check the PayTR panel before any further payment of it`,
+          );
+        } else if (
+          manualSettlementOf(payout.providerResponse)?.method ===
+          "external_bank"
+        ) {
+          // The platform already paid this one from its bank account and
+          // PayTR now says it transferred it too: the seller may have been
+          // paid twice. Ids only; the row stays as it is for a person.
+          this.logger.error(
+            `PayTR transfer callback confirms payout ${payout.id} (${payout.transId}), which was settled outside PayTR (external_bank): possible double payment; check the PayTR panel and the bank transfer, recover the duplicate from the seller`,
           );
         }
         continue;
@@ -1202,7 +1468,7 @@ export class PayoutService {
     const voided = await this.prisma.payoutTransfer.findMany({
       where: {
         status: PayoutStatus.failed,
-        failureReason: "order_refunded",
+        failureReason: PAYOUT_FAILURE.orderRefunded,
         paymentHoldId: { not: null },
       },
       include: {
@@ -1253,7 +1519,7 @@ export class PayoutService {
         where: {
           id: payout.id,
           status: PayoutStatus.failed,
-          failureReason: "order_refunded",
+          failureReason: PAYOUT_FAILURE.orderRefunded,
         },
         data: {
           status: PayoutStatus.pending,
@@ -1493,13 +1759,13 @@ export class PayoutService {
           { submittedAmount: amount },
           { submittedAmount: null, netAmount: amount },
         ],
-        ...(Number.isNaN(transferDate.getTime())
-          ? {}
-          : {
-              submittedAt: {
-                lte: new Date(transferDate.getTime() + DAY_MS),
-              },
-            }),
+        // Only a row PayTR carried can come back: a payout settled outside
+        // PayTR (admin "Mark as paid" / external_bank) has no send time and
+        // must never be taken for this bank return, even when PayTR's date
+        // cannot be read.
+        submittedAt: Number.isNaN(transferDate.getTime())
+          ? { not: null }
+          : { lte: new Date(transferDate.getTime() + DAY_MS) },
       },
     });
     if (candidates.length === 1) {
@@ -1513,58 +1779,89 @@ export class PayoutService {
     return { kind: "unmatched" };
   }
 
-  private async handlePayoutFailure(
-    payoutId: string,
-    reason: string,
-    providerResponse: any,
-  ) {
-    const payout = await this.prisma.payoutTransfer.findUnique({
-      where: { id: payoutId },
+  /**
+   * Records a transfer attempt that did not go through (the row is
+   * `processing`, claimed by this run). The reason is a code
+   * (`PAYOUT_FAILURE`); PayTR's raw answer or the network cause goes to
+   * `providerResponse` and the log, never to the seller.
+   *
+   * - `retryable` (PayTR err_no 010, connect-phase error): `retry_pending`
+   *   with backoff (60 min, 4 h) until `maxRetries`, then `failed`.
+   * - otherwise `failed` at once. An unknown outcome keeps the total and the
+   *   net it may have moved: siblings keep counting it and a late PayTR
+   *   callback completes it (`handleTransferResultCallback`).
+   * - The seller is e-mailed only for a final, seller-fixable reason.
+   */
+  private async recordTransferFailure(
+    payout: { id: string; transId: string; sellerId: string },
+    failure: {
+      reason: PayoutFailureReason;
+      retryable: boolean;
+      providerResponse: {
+        transferTotal: TransferTotalSnapshot;
+        [key: string]: unknown;
+      };
+      /** Log-only: PayTR status/err_no or the network cause. */
+      detail: string;
+      net: number;
+      totalAmount: number;
+    },
+  ): Promise<void> {
+    const row = await this.prisma.payoutTransfer.findUnique({
+      where: { id: payout.id },
+      select: { retryCount: true, maxRetries: true, transferIban: true },
     });
-    if (!payout) return;
+    if (!row) return;
 
-    const newRetryCount = payout.retryCount + 1;
+    const attempt = row.retryCount + 1;
+    const final = !failure.retryable || attempt >= row.maxRetries;
+    const outcomeUnknown =
+      failure.reason === PAYOUT_FAILURE.transferOutcomeUnknown;
+    // Exponential backoff: 60 min, then 4 h.
+    const nextRetryAt = final
+      ? null
+      : new Date(Date.now() + Math.pow(4, attempt) * 15 * 60 * 1000);
 
-    if (newRetryCount >= payout.maxRetries) {
-      await this.prisma.payoutTransfer.update({
-        where: { id: payoutId },
-        data: {
-          status: PayoutStatus.failed,
-          failureReason: reason,
-          retryCount: newRetryCount,
-          providerResponse: providerResponse as any,
-        },
-      });
-      this.logger.error(
-        `Payout ${payout.transId} permanently failed after ${newRetryCount} attempts: ${reason}`,
+    const written = await this.prisma.payoutTransfer.updateMany({
+      where: { id: payout.id, status: PayoutStatus.processing },
+      data: {
+        status: final ? PayoutStatus.failed : PayoutStatus.retry_pending,
+        failureReason: failure.reason,
+        retryCount: attempt,
+        nextRetryAt,
+        providerResponse:
+          failure.providerResponse as unknown as Prisma.InputJsonValue,
+        submittedTotalAmount: outcomeUnknown ? failure.totalAmount : null,
+        ...(outcomeUnknown ? { submittedAmount: failure.net } : {}),
+      },
+    });
+    if (written.count === 0) {
+      this.logger.warn(
+        `Payout ${payout.id} (${payout.transId}) left its processing state before the failure (${failure.reason}) was recorded; not touched`,
       );
-      // Yalnız KALICI başarısızlıkta mail — geçici retry'lar sessiz.
+      return;
+    }
+
+    if (!final) {
+      this.logger.warn(
+        `Payout ${payout.id} (${payout.transId}) attempt ${attempt}/${row.maxRetries} failed: ${failure.reason}; ${failure.detail}; retry at ${nextRetryAt?.toISOString()}`,
+      );
+      return;
+    }
+    this.logger.error(
+      `Payout ${payout.id} (${payout.transId}) failed after ${attempt} attempt(s): ${failure.reason}; ${failure.detail}` +
+        (outcomeUnknown
+          ? `; PayTR may have taken it (total ${failure.totalAmount}, net ${failure.net}): check the PayTR panel before any retry`
+          : ""),
+    );
+    if (isSellerActionableFailure(failure.reason)) {
       await this.sendPayoutProblemEmail({
         sellerId: payout.sellerId,
         template: "payout-failed-seller",
-        netAmount: Number(payout.netAmount),
-        iban: payout.transferIban,
-        reason,
+        netAmount: failure.net,
+        iban: row.transferIban,
+        reason: sellerFailureText(failure.reason),
       });
-    } else {
-      // Exponential backoff: 15min, 1hr, 4hr
-      const backoffMinutes = Math.pow(4, newRetryCount) * 15;
-      const nextRetryAt = new Date();
-      nextRetryAt.setMinutes(nextRetryAt.getMinutes() + backoffMinutes);
-
-      await this.prisma.payoutTransfer.update({
-        where: { id: payoutId },
-        data: {
-          status: PayoutStatus.retry_pending,
-          failureReason: reason,
-          retryCount: newRetryCount,
-          nextRetryAt,
-          providerResponse: providerResponse as any,
-        },
-      });
-      this.logger.warn(
-        `Payout ${payout.transId} failed (attempt ${newRetryCount}/${payout.maxRetries}), retry at ${nextRetryAt.toISOString()}`,
-      );
     }
   }
 }

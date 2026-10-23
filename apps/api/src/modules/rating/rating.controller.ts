@@ -5,7 +5,6 @@ import {
   Body,
   Param,
   Query,
-  Request,
   ParseUUIDPipe,
 } from "@nestjs/common";
 import { RatingService } from "./rating.service";
@@ -19,6 +18,7 @@ import {
 } from "./dto";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ListingIdParam } from "../../common/pipes/listing-id.pipe";
 
 @Controller("ratings")
 export class RatingController {
@@ -30,10 +30,10 @@ export class RatingController {
    */
   @Post("users")
   async createUserRating(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @Body() dto: CreateUserRatingDto,
   ): Promise<UserRatingResponseDto> {
-    return this.ratingService.createUserRating(req.user.id, dto);
+    return this.ratingService.createUserRating(userId, dto);
   }
 
   /**
@@ -42,10 +42,10 @@ export class RatingController {
    */
   @Post("products")
   async createProductRating(
-    @Request() req: any,
+    @CurrentUser("id") userId: string,
     @Body() dto: CreateProductRatingDto,
   ): Promise<ProductRatingResponseDto> {
-    return this.ratingService.createProductRating(req.user.id, dto);
+    return this.ratingService.createProductRating(userId, dto);
   }
 
   /**
@@ -78,12 +78,12 @@ export class RatingController {
 
   /**
    * Get product ratings (public)
-   * GET /ratings/products/:productId
+   * GET /ratings/products/:productId (bare UUID or listing URL segment)
    */
   @Public()
   @Get("products/:productId")
   async getProductRatings(
-    @Param("productId", ParseUUIDPipe) productId: string,
+    @ListingIdParam("productId") productId: string,
     @Query("page") page?: number,
     @Query("pageSize") pageSize?: number,
     @Query("sortBy") sortBy?: string,
@@ -102,12 +102,12 @@ export class RatingController {
 
   /**
    * Get product rating stats (public)
-   * GET /ratings/products/:productId/stats
+   * GET /ratings/products/:productId/stats (bare UUID or listing URL segment)
    */
   @Public()
   @Get("products/:productId/stats")
   async getProductRatingStats(
-    @Param("productId", ParseUUIDPipe) productId: string,
+    @ListingIdParam("productId") productId: string,
   ): Promise<ProductRatingStatsDto> {
     return this.ratingService.getProductRatingStats(productId);
   }

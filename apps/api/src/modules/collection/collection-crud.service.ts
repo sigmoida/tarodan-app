@@ -12,7 +12,7 @@ import {
   fulltextCollectionSearch,
   fulltextUserDisplayNameSearch,
 } from "../../common/helpers/fulltext-search";
-import { generateSlug } from "../../common/helpers/slug";
+import { generateSlug } from "@tarodan/types";
 import {
   CreateCollectionDto,
   UpdateCollectionDto,

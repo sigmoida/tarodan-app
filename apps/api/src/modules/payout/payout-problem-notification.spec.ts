@@ -2,14 +2,16 @@ import { PayoutStatus } from "@prisma/client";
 import { PayoutService } from "./payout.service";
 
 /**
- * Satıcı, payout'u aktarılamadığında HABER ALMALI. Eskiden yalnız başarıda
- * ("ödemeniz aktarıldı") mail vardı; returned/failed sadece log + admin
- * ekranında kalıyordu — satıcı parasının gelmediğini kendisi keşfediyordu.
+ * The seller must hear about a payout that did not reach them. There used to
+ * be an e-mail only on success; returned/failed stayed in logs and the admin
+ * screen, and sellers found out on their own.
  *
- *  - Banka transferi geri döndüğünde (kullanım dışı IBAN): payout-returned-seller.
- *  - Kalıcı başarısızlıkta (maxRetries doldu / geçersiz IBAN / hesap yok):
- *    payout-failed-seller.
- *  - Geçici hata (retry_pending) mail ATMAZ — her denemede spam olmasın.
+ *  - Transfer bounced by the bank (closed IBAN): payout-returned-seller.
+ *  - Final failure the seller can fix (PayTR rejected the bank details,
+ *    invalid IBAN, no bank account): payout-failed-seller.
+ *  - A failure that will be retried (PayTR err_no 010) sends nothing, so the
+ *    seller is not spammed on every attempt. Platform-side failures are the
+ *    team's (payout-transfer-retry-policy.spec.ts).
  */
 
 const VALID_IBAN = "TR330006100519786457841326";
@@ -26,7 +28,13 @@ function makePayout(overrides: Record<string, unknown> = {}) {
     transferName: "Seller",
     status: PayoutStatus.pending,
     paymentHold: null,
-    tradeCashPayment: null,
+    // A paid source: the transfer total is capped against its payment.
+    tradeCashPayment: {
+      tradeId: "trade-1",
+      paidAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      totalAmount: 100,
+      payment: { id: "pay-1", amount: 100, metadata: null },
+    },
     submittedAt: null,
     submittedAmount: null,
     retryCount: 0,
@@ -82,6 +90,10 @@ function makePrisma(payout: any, account: any) {
         return Promise.resolve({});
       }),
     },
+    refundAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     sellerBankAccount: {
       findUnique: jest.fn().mockResolvedValue(account),
       update: jest.fn().mockResolvedValue({}),
@@ -94,7 +106,7 @@ function makePrisma(payout: any, account: any) {
 
 function makeService(opts: {
   prisma: any;
-  transferResult?: { status: string; err_msg?: string };
+  transferResult?: { status: string; err_no?: string; err_msg?: string };
   returnedTransfers?: any[];
 }) {
   const createPlatformTransfer = jest
@@ -159,8 +171,8 @@ describe("payout problem notifications", () => {
     );
   });
 
-  it("emails the seller on PERMANENT provider failure (maxRetries doldu)", async () => {
-    const payout = makePayout({ retryCount: 0, maxRetries: 1 });
+  it("emails the seller when PayTR rejects the bank details (final at once)", async () => {
+    const payout = makePayout({ retryCount: 0, maxRetries: 3 });
     const prisma = makePrisma(payout, activeAccount);
     const { service, notification } = makeService({
       prisma,
@@ -177,12 +189,16 @@ describe("payout problem notifications", () => {
     );
   });
 
-  it("does NOT email on a transient failure that will be retried", async () => {
+  it("does NOT email on a failure that will be retried (PayTR err_no 010)", async () => {
     const payout = makePayout({ retryCount: 0, maxRetries: 3 });
     const prisma = makePrisma(payout, activeAccount);
     const { service, notification } = makeService({
       prisma,
-      transferResult: { status: "failed", err_msg: "timeout" },
+      transferResult: {
+        status: "error",
+        err_no: "010",
+        err_msg: "toplam transfer tutarı kalan tutardan fazla olamaz",
+      },
     });
 
     await service.processPendingPayouts();

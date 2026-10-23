@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Injectable,
   Logger,
-  NotFoundException,
   Optional,
 } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
@@ -31,13 +30,20 @@ import {
 import { PaymentService } from "../../payment/payment.service";
 import { PaymentHoldResidualService } from "../../payment/refund/payment-hold-residual.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
-import { generatePayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { istanbulRangeEdge } from "../../../common/helpers/tr-calendar";
 import { i18nMessage } from "../../i18n";
 import {
   HOLD_RELEASE_ORDER_SELECT,
   holdReleasabilityOf,
 } from "../../payout/helpers/hold-release-eligibility";
+import { PayoutResolutionService } from "../../payout/resolution/payout-resolution.service";
+import {
+  manualSettlementOf,
+  payoutResolutionFlags,
+  providerMessageOf,
+  transferTotalOf,
+} from "../../payout/helpers/payout-resolution-policy";
+import type { PayoutManualSettlementMethod } from "@tarodan/types";
 
 /** Hold satırının ilişkileri — liste ve döküm aynı şekli okur. */
 export const HOLD_ROW_INCLUDE = {
@@ -92,6 +98,34 @@ function istanbulDateRange(filter: {
   };
 }
 
+/** Rows whose stored PayTR answer and transfer-total snapshot are the
+ *  current story (a failed or waiting-to-retry attempt). */
+const FAILED_ATTEMPT_STATUSES: readonly PayoutStatus[] = [
+  PayoutStatus.failed,
+  PayoutStatus.retry_pending,
+];
+
+/** A manual settlement as the admin list shows it (no admin id); only on a
+ *  completed row (a returned and resent one is no longer settled by it). */
+function manualSettlementView(t: {
+  status: PayoutStatus;
+  providerResponse: unknown;
+}) {
+  const record =
+    t.status === PayoutStatus.completed
+      ? manualSettlementOf(t.providerResponse)
+      : null;
+  return record
+    ? {
+        method: record.method,
+        reference: record.reference,
+        settledAt: record.settledAt,
+        netAmount: record.netAmount,
+        platformFundedAmount: record.platformFundedAmount,
+      }
+    : null;
+}
+
 /**
  * Satıcı ödemeleri (escrow özet/işlem/plan, manuel release, transfer retry) —
  * AdminService'in SELLER PAYOUTS bölümünden birebir taşındı.
@@ -109,7 +143,17 @@ export class AdminPayoutService {
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     // Sondaki opsiyonel bağımlılık: mevcut dar spec kurulumları 5 argümanla kurar.
     @Optional() private readonly holdResidual?: PaymentHoldResidualService,
+    @Optional() private readonly resolution?: PayoutResolutionService,
   ) {}
+
+  private payoutResolution(): PayoutResolutionService {
+    if (!this.resolution) {
+      throw new Error(
+        "PayoutResolutionService is not wired into AdminPayoutService",
+      );
+    }
+    return this.resolution;
+  }
 
   /**
    * Satıcı kusurlu kalıntıyı platforma kapatır (PSP'ye gidilmez). Kalan tutar
@@ -374,6 +418,9 @@ export class AdminPayoutService {
         ? (orderNumberById.get(t.paymentHold.orderId) ?? null)
         : null,
       tradeCashPaymentId: t.tradeCashPaymentId,
+      // PayTR's transfer reference: the key to look the transfer up in the
+      // PayTR panel before a retry or a "mark as paid".
+      transId: t.transId,
       seller: t.seller,
       amount: Number(t.amount),
       netAmount: Number(t.netAmount),
@@ -385,6 +432,20 @@ export class AdminPayoutService {
       retryCount: t.retryCount,
       processedAt: t.processedAt,
       createdAt: t.createdAt,
+      // What PayTR took from the payment (0 = settled outside PayTR, null =
+      // nothing in flight or a row sent before 2026-10-23).
+      submittedTotalAmount:
+        t.submittedTotalAmount === null ? null : Number(t.submittedTotalAmount),
+      // The last attempt's answer, only while it explains the row: a retry
+      // keeps providerResponse until the next send (pending row).
+      ...(FAILED_ATTEMPT_STATUSES.includes(t.status)
+        ? {
+            transferTotal: transferTotalOf(t.providerResponse),
+            providerMessage: providerMessageOf(t.providerResponse),
+          }
+        : { transferTotal: null, providerMessage: null }),
+      resolution: payoutResolutionFlags(t),
+      manualSettlement: manualSettlementView(t),
     }));
   }
 
@@ -868,75 +929,117 @@ export class AdminPayoutService {
   }
 
   /**
-   * Retry a failed payout transfer
+   * Retry a failed or returned payout transfer (payout domain:
+   * `PayoutResolutionService.retry`). A transfer PayTR may have taken needs
+   * `confirmProviderChecked` and a reason (409 otherwise). The audit record
+   * is written in the same transaction and keeps the previous PayTR
+   * reference and answer, which the next send overwrites.
    */
-  async retryPayoutTransfer(adminId: string, transferId: string) {
-    const transfer = await this.prisma.payoutTransfer.findUnique({
-      where: { id: transferId },
+  async retryPayoutTransfer(
+    adminId: string,
+    transferId: string,
+    input: { confirmProviderChecked?: boolean; reason?: string } = {},
+  ) {
+    const reason = input.reason?.trim() || undefined;
+    await this.payoutResolution().retry(transferId, {
+      actor: adminId,
+      confirmProviderChecked: input.confirmProviderChecked,
+      reason,
+      afterWrite: (tx, result, previous) =>
+        this.audit.createRequiredAuditLog(
+          adminId,
+          "payout_retry",
+          "PayoutTransfer",
+          transferId,
+          {
+            action: "admin_retry",
+            wasReturned: previous.status === "returned",
+            status: previous.status,
+            transId: previous.transId,
+            providerReference: previous.providerReference,
+            providerResponse: previous.providerResponse,
+            failureReason: previous.failureReason,
+            submittedTotalAmount: previous.submittedTotalAmount,
+            providerCheckConfirmed: result.providerCheckConfirmed,
+            ...(reason ? { reason } : {}),
+          },
+          {
+            status: "pending",
+            ...(result.renewedTransId ? { transId: result.transId } : {}),
+          },
+          tx,
+        ),
     });
-    if (!transfer)
-      throw new NotFoundException(
-        i18nMessage("server.admin.payout.transferNotFound"),
-      );
-    if (!["failed", "returned"].includes(transfer.status)) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.payout.retryStateInvalid", {
-          status: transfer.status,
-        }),
-      );
-    }
-
-    // Y10: 'returned' transfer ZATEN PayTR'de işlenip geri döndü → aynı transId ile yeniden
-    // göndermek PayTR idempotency'sine takılabilir. Bu yüzden returned retry'da YENİ transId
-    // üret (taze transfer). 'failed' (hiç işlenmedi) ise mevcut transId korunur. Geri dönüş
-    // çoğunlukla IBAN sorunundandır; satıcı IBAN'ı düzeltince cron işleme anında GÜNCEL
-    // IBAN'ı okur (Y5) ve doğru hesaba gönderir.
-    const isReturned = transfer.status === "returned";
-    // PayTR iade edilen bir transId'yi tekrar kabul etmez; yeni referans üret.
-    const newTransId = isReturned
-      ? await generatePayoutTransId(
-          async (code) =>
-            (await this.prisma.payoutTransfer.count({
-              where: { transId: code },
-            })) > 0,
-        )
-      : undefined;
-    await this.prisma.payoutTransfer.update({
-      where: { id: transferId },
-      data: {
-        status: "pending",
-        failureReason: null,
-        retryCount: 0,
-        nextRetryAt: null,
-        // Yeni gönderim yeni PayTR referansı üretir; eskisi kalırsa geri dönen
-        // transfer taraması aynı ref_no ile bu satırı tekrar returned yapardı.
-        // providerResponse (talimat + dönüş satırı) yeni gönderime dek kalır;
-        // hiçbir okuyucu pending satırda ona bakmaz, iz kaybolmasın.
-        providerReference: null,
-        ...(newTransId ? { transId: newTransId } : {}),
-      },
-    });
-    // Yeniden gönderim providerResponse'u ezer; PayTR ref/dönüş kaydı yalnız burada kalır.
-    await this.audit.createRequiredAuditLog(
-      adminId,
-      "payout_retry",
-      "PayoutTransfer",
-      transferId,
-      {
-        action: "admin_retry",
-        wasReturned: isReturned,
-        transId: transfer.transId,
-        providerReference: transfer.providerReference,
-        providerResponse: transfer.providerResponse,
-        failureReason: transfer.failureReason,
-      },
-      { status: "pending", ...(newTransId ? { transId: newTransId } : {}) },
-    );
     return {
       success: true,
       transferId,
       message: "Transfer tekrar denenmek üzere sıraya alındı",
     };
+  }
+
+  /**
+   * "Mark as paid" (payout domain: `PayoutResolutionService.markPaid`):
+   * `paytr_confirmed` when the PayTR panel shows the transfer arrived,
+   * `external_bank` when the platform paid the net from its own bank account.
+   * Reason and reference are required; a row with an earlier send PayTR
+   * never confirmed also needs `confirmProviderChecked` (the list row's
+   * `resolution.markPaidRequiresProviderCheck`). The audit record is written
+   * in the same transaction as the settlement and its ledger entries. A
+   * repeated request returns the first result (`alreadySettled: true`).
+   */
+  async markPayoutTransferPaid(
+    adminId: string,
+    transferId: string,
+    input: {
+      method: PayoutManualSettlementMethod;
+      reference: string;
+      reason: string;
+      expectedNetAmount: number;
+      confirmProviderChecked?: boolean;
+    },
+  ) {
+    const reason = input.reason?.trim();
+    if (!reason) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.payout.reasonRequired"),
+      );
+    }
+    const result = await this.payoutResolution().markPaid(transferId, {
+      actor: adminId,
+      method: input.method,
+      reference: input.reference ?? "",
+      expectedNetAmount: input.expectedNetAmount,
+      confirmProviderChecked: input.confirmProviderChecked,
+      afterWrite: (tx, settled, previous) =>
+        this.audit.createRequiredAuditLog(
+          adminId,
+          "payout_mark_paid",
+          "PayoutTransfer",
+          transferId,
+          {
+            status: previous.status,
+            failureReason: previous.failureReason,
+            transId: previous.transId,
+            netAmount: previous.netAmount,
+            submittedAmount: previous.submittedAmount,
+            submittedTotalAmount: previous.submittedTotalAmount,
+            providerReference: previous.providerReference,
+          },
+          {
+            status: "completed",
+            method: settled.method,
+            reference: settled.reference,
+            reason,
+            netAmount: settled.netAmount,
+            platformFundedAmount: settled.platformFundedAmount,
+            providerCheckConfirmed: settled.providerCheckConfirmed,
+            orderId: settled.orderId,
+            tradeId: settled.tradeId,
+          },
+          tx,
+        ),
+    });
+    return { success: true, ...result };
   }
 
   /**

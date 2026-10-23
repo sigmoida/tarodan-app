@@ -1,5 +1,5 @@
-import { transliterateTurkish } from "./turkish-text";
 import {
+  transliterateTurkish,
   SCALE_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
   COLOR_GROUP_SLUG,

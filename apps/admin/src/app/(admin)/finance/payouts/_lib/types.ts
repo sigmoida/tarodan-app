@@ -1,4 +1,5 @@
 import { payoutStatusConfig } from "@tarodan/ui";
+import type { PayoutManualSettlementMethod } from "@tarodan/types";
 import type { useTranslations } from "next-intl";
 import type { HoldReleaseFlags } from "./holdReason";
 
@@ -25,22 +26,70 @@ export interface PayoutSummary {
   }>;
 }
 
+/**
+ * The transfer-total snapshot the processor stored when it parked or failed
+ * the row (TL): the net does not fit `allowedTotal = min(ownAllowed,
+ * oidRemaining)`. `missingInput` = no payment or source to cap against.
+ */
+export interface PayoutTransferTotal {
+  net: number;
+  allowedTotal: number;
+  ownAllowed: number;
+  oidRemaining: number;
+  missingInput: "payment" | "source" | null;
+}
+
+/**
+ * What an admin may do with the row; decided by the API (one policy for the
+ * guards and these flags), never recomputed here.
+ */
+export interface PayoutTransferResolution {
+  /** A retry must confirm the PayTR panel check and give a reason. */
+  retryRequiresProviderCheck: boolean;
+  /** The one way the row may be marked as paid, or null. */
+  markPaidMethod: PayoutManualSettlementMethod | null;
+  /** The net (TL) the mark-paid request confirms (`expectedNetAmount`). */
+  markPaidNetAmount: number | null;
+  /** Mark as paid must confirm the PayTR panel check: an earlier send of
+   *  this row may have reached PayTR unconfirmed (`confirmProviderChecked`). */
+  markPaidRequiresProviderCheck: boolean;
+}
+
+/** A completed row an admin marked as paid. */
+export interface PayoutManualSettlement {
+  method: PayoutManualSettlementMethod;
+  reference: string;
+  settledAt: string;
+  netAmount: number;
+  platformFundedAmount: number;
+}
+
 /** Gerçek banka transferi satırı (PayoutTransfer). */
 export interface PayoutTransferRow {
   id: string;
   orderId: string | null;
   orderNumber: string | null;
   tradeCashPaymentId: string | null;
+  /** PayTR's transfer reference: what to search the PayTR panel for. */
+  transId: string;
   seller: { id: string; displayName: string | null; email: string | null };
   amount: number;
   netAmount: number;
   adjustmentDeduction: number;
   ibanLast4: string;
   status: string;
+  /** A `PAYOUT_FAILURE_REASONS` code, or free text (legacy and returned rows). */
   failureReason: string | null;
   retryCount: number;
   processedAt: string | null;
   createdAt: string;
+  /** What PayTR took from the payment (0 = settled outside PayTR). */
+  submittedTotalAmount: number | null;
+  transferTotal: PayoutTransferTotal | null;
+  /** PayTR's own message on a rejection. */
+  providerMessage: string | null;
+  resolution: PayoutTransferResolution;
+  manualSettlement: PayoutManualSettlement | null;
 }
 
 /** Satıcı borç mahsubu satırı (SellerAccountAdjustment). */

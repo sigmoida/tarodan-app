@@ -1,6 +1,7 @@
 import { BRANDS_CACHE_PATTERN } from "../../../brand/brand-cache";
 import { resolveRef } from "../../../../common/helpers/excel-import";
-import { carModelSlug, generateSlug } from "../../../../common/helpers/slug";
+import { generateSlug } from "@tarodan/types";
+import { carModelSlug } from "../../../../common/helpers/slug";
 import type {
   CatalogImportColumn,
   CatalogImportResource,

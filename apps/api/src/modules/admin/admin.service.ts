@@ -67,6 +67,7 @@ import {
   SellerUploadedInvoiceQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
+  MarkPayoutTransferPaidDto,
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
@@ -755,8 +756,24 @@ export class AdminService {
     );
   }
 
-  async retryPayoutTransfer(adminId: string, transferId: string) {
-    return this.payoutService.retryPayoutTransfer(adminId, transferId);
+  async retryPayoutTransfer(
+    adminId: string,
+    transferId: string,
+    input: { confirmProviderChecked?: boolean; reason?: string } = {},
+  ) {
+    return this.payoutService.retryPayoutTransfer(adminId, transferId, input);
+  }
+
+  async markPayoutTransferPaid(
+    adminId: string,
+    transferId: string,
+    input: MarkPayoutTransferPaidDto,
+  ) {
+    return this.payoutService.markPayoutTransferPaid(
+      adminId,
+      transferId,
+      input,
+    );
   }
 
   async getFailedPayouts(page = 1, limit = 20) {
@@ -1043,7 +1060,7 @@ export class AdminService {
   // ==================== EMAIL TEMPLATES ====================
   // Taşındı: admin-content.service.ts — imzalar aynen korunuyor (facade delege).
 
-  substituteVariables(text: string, data: Record<string, any>): string {
+  substituteVariables(text: string, data: Record<string, unknown>): string {
     return this.contentService.substituteVariables(text, data);
   }
 
@@ -1069,7 +1086,7 @@ export class AdminService {
 
   async previewEmailTemplate(
     key: string,
-    templateData?: Record<string, any>,
+    templateData?: Record<string, unknown>,
     overrideHtml?: string,
     overrideSubject?: string,
   ) {
@@ -1083,7 +1100,7 @@ export class AdminService {
 
   async sendTestEmail(
     key: string,
-    dto: { to: string; templateData?: Record<string, any> },
+    dto: { to: string; templateData?: Record<string, unknown> },
   ) {
     return this.contentService.sendTestEmail(key, dto);
   }
