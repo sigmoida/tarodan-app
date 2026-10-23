@@ -1,5 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
+import { TagIcon } from "@heroicons/react/24/outline";
+import { EmptyState } from "@tarodan/ui";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import type { Product } from "@/types/product";
 import HomeSection from "./HomeSection";
 import ProductRail from "./ProductRail";
@@ -24,20 +26,17 @@ export default async function OnSaleRail({ items }: { items: Product[] }) {
         items={items}
         isLoading={false}
         emptyState={
-          <div className="py-10 text-center">
-            <h3 className="font-semibold text-heading">
-              {t("home.noProductsOnSale")}
-            </h3>
-            <p className="mt-1 text-sm text-muted">
-              {t("home.checkBackLater")}
-            </p>
-            <Link
-              href="/listings"
-              className="mt-4 inline-flex rounded-md border border-border px-3 py-1.5 text-sm font-medium text-body"
-            >
-              {viewAllLabel}
-            </Link>
-          </div>
+          <EmptyState
+            size="compact"
+            icon={<TagIcon className="h-6 w-6" />}
+            title={t("home.noProductsOnSale")}
+            description={t("home.checkBackLater")}
+            action={
+              <ButtonLink href="/listings" variant="outline">
+                {viewAllLabel}
+              </ButtonLink>
+            }
+          />
         }
       />
     </HomeSection>

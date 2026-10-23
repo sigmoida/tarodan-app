@@ -2,8 +2,11 @@
 
 "use client";
 
-import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Button, Checkbox, Spinner } from "@tarodan/ui";
+import {
+  ArrowsRightLeftIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/outline";
+import { Button, Checkbox, EmptyState, Spinner } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui";
 import OptimizedImage from "@/components/OptimizedImage";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
@@ -43,19 +46,21 @@ export default function TradeProductPicker({
   }
   if (products.length === 0) {
     return (
-      <div className="py-8 text-center">
-        <p className="mb-4 text-muted">
-          {t("page.new.tradeproductpicker.takasEdilebilirAktifIlaninizYok")}
-        </p>
-        <ButtonLink
-          variant="secondary"
-          href="/profile/listings"
-          className="gap-2"
-        >
-          {t("trade.goToMyListings")}
-          <ChevronRightIcon className="h-5 w-5" />
-        </ButtonLink>
-      </div>
+      <EmptyState
+        size="compact"
+        icon={<ArrowsRightLeftIcon className="h-6 w-6" />}
+        title={t("page.new.tradeproductpicker.takasEdilebilirAktifIlaninizYok")}
+        action={
+          <ButtonLink
+            variant="secondary"
+            href="/profile/listings"
+            className="gap-2"
+          >
+            {t("trade.goToMyListings")}
+            <ChevronRightIcon className="h-5 w-5" />
+          </ButtonLink>
+        }
+      />
     );
   }
 

@@ -2,7 +2,8 @@
 
 "use client";
 
-import { Button, Modal, Spinner } from "@tarodan/ui";
+import { RectangleStackIcon } from "@heroicons/react/24/outline";
+import { Button, EmptyState, Modal, Spinner } from "@tarodan/ui";
 import { useListingDetail } from "../_context/ListingDetailContext";
 
 export default function CollectionPickerModal() {
@@ -63,9 +64,11 @@ export default function CollectionPickerModal() {
               </Button>
             ))
           ) : (
-            <p className="py-8 text-center text-muted">
-              {t("collection.noCollections")}
-            </p>
+            <EmptyState
+              size="compact"
+              icon={<RectangleStackIcon className="h-6 w-6" />}
+              title={t("collection.noCollections")}
+            />
           )}
 
           <Button

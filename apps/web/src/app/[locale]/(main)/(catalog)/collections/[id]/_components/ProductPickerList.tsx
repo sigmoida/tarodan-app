@@ -3,8 +3,8 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Button, Spinner } from "@tarodan/ui";
+import { ChevronRightIcon, CubeIcon } from "@heroicons/react/24/outline";
+import { Button, EmptyState, Spinner } from "@tarodan/ui";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { PRODUCT_PLACEHOLDER } from "../_lib/add-item";
 import type { UseAddItem } from "../_hooks/useAddItem";
@@ -26,19 +26,21 @@ export default function ProductPickerList({ s }: { s: UseAddItem }) {
       <Spinner size="lg" color="border-primary-500 border-t-transparent" />
     </div>
   ) : products.length === 0 ? (
-    <div className="py-8 text-center">
-      <p className="mb-3 text-sm text-muted">
-        {t("collection.noProductsToAdd")}
-      </p>
-      <Link
-        href="/listings/new"
-        className="inline-flex items-center text-sm font-medium text-primary-500 hover:text-primary-600"
-        onClick={close}
-      >
-        {t("collection.createNewListing")}
-        <ChevronRightIcon className="ml-1 h-4 w-4" />
-      </Link>
-    </div>
+    <EmptyState
+      size="compact"
+      icon={<CubeIcon className="h-6 w-6" />}
+      title={t("collection.noProductsToAdd")}
+      action={
+        <Link
+          href="/listings/new"
+          className="inline-flex items-center text-sm font-medium text-primary-500 hover:text-primary-600"
+          onClick={close}
+        >
+          {t("collection.createNewListing")}
+          <ChevronRightIcon className="ml-1 h-4 w-4" />
+        </Link>
+      }
+    />
   ) : (
     <>
       <div className="mb-3 flex items-center justify-between">
