@@ -1,6 +1,6 @@
 import { AppNestLogger } from "./nest-logger";
 import { readFingerprint } from "./error-fingerprint";
-import { readReportKey } from "./error-report-key";
+import { takeReportKey } from "./error-report-key";
 import { getAppLogger } from "./logger";
 
 jest.mock("./logger", () => ({ getAppLogger: jest.fn() }));
@@ -109,11 +109,41 @@ describe("AppNestLogger", () => {
     );
 
     const [first, repeat, otherRefund] = child.error.mock.calls.map(([, ctx]) =>
-      readReportKey(ctx.error),
+      takeReportKey(ctx.error),
     );
     expect(first).toEqual(expect.any(String));
     expect(repeat).toBe(first);
     expect(otherRefund).not.toBe(first);
+  });
+
+  it("keys a supplied error by its own reason, not only by the log text", () => {
+    const logger = new AppNestLogger();
+    const insufficient = () =>
+      new Error(
+        "insufficient balance payment 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      );
+    logger.error("PayTR refund error:", insufficient(), "PaytrService");
+    logger.error("PayTR refund error:", insufficient(), "PaytrService");
+    logger.error(
+      "PayTR refund error:",
+      new Error(
+        "merchant blocked payment 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      ),
+      "PaytrService",
+    );
+    logger.error(
+      "PayTR refund error:",
+      new Error(
+        "insufficient balance payment 9c858901-8a57-4791-81fe-4c455b099bc9",
+      ),
+      "PaytrService",
+    );
+
+    const [first, repeat, otherReason, otherPayment] =
+      child.error.mock.calls.map(([, ctx]) => takeReportKey(ctx.error));
+    expect(repeat).toBe(first);
+    expect(otherReason).not.toBe(first);
+    expect(otherPayment).not.toBe(first);
   });
 
   it("does not key warn lines (they never reach Sentry)", () => {

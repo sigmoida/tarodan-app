@@ -83,8 +83,18 @@ export class AppNestLogger implements LoggerService {
       attachFingerprint(error, buildErrorFingerprint(identity));
       // A cron or retry loop logs the same failure of the same entity every
       // run; Sentry gets it once per window (§ error-report-key.ts), the
-      // console line below still records every occurrence.
-      attachReportKey(error, buildErrorReportKey(identity));
+      // console line below still records every occurrence. In
+      // `logger.error("PayTR refund error:", err)` the reason and the entity
+      // are in `err.message`, not in the text: without it every new reason
+      // would hide behind the first one for the whole window.
+      const reason =
+        suppliedError && suppliedError !== message
+          ? ` ${suppliedError.message}`
+          : "";
+      attachReportKey(
+        error,
+        buildErrorReportKey({ ...identity, message: `${text}${reason}` }),
+      );
       logger.error(text, { error, details, ...(requestId && { requestId }) });
       return;
     }

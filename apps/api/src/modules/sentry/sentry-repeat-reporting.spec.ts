@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/node";
 import { AppNestLogger } from "../../common/logging/nest-logger";
-import { initAppLogger } from "../../common/logging/logger";
+import { getAppLogger, initAppLogger } from "../../common/logging/logger";
 import type { CacheService } from "../cache/cache.service";
 import { SentryReportThrottle } from "./sentry-report-throttle";
 import { SentryService } from "./sentry.service";
@@ -141,6 +141,65 @@ describe("repeat reporting of logged errors", () => {
     }
 
     expect(captured()).toHaveLength(2);
+  });
+
+  describe("in production", () => {
+    const env = { ...process.env };
+    beforeEach(() => {
+      process.env.NODE_ENV = "production";
+      process.env.APP_ENV = "production";
+    });
+    afterEach(() => {
+      process.env = { ...env };
+    });
+
+    it("reports the first occurrence of every new failure, with no delay", async () => {
+      const alarm =
+        "ALARM: PayTR reconcile tutar uyuşmazlığı — payment=3fa85f64-5717-4562-b3fc-2c963f66afa6";
+
+      await logError(alarm, "PspReconciliationService");
+
+      expect(captured()).toEqual([alarm]);
+    });
+
+    it("reports the first occurrence even when Redis is down", async () => {
+      const down = {
+        claimKey: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+      } as unknown as CacheService;
+      initAppLogger(new SentryService(new SentryReportThrottle(down)));
+
+      await logError(
+        "PAYOUT_FAILED PYTTEST000001: transfer rejected",
+        "PayoutService",
+      );
+
+      expect(captured()).toHaveLength(1);
+    });
+  });
+
+  it("always sends the 5xx capture of an error a service already logged", async () => {
+    // A request fails the same way twice. The service logs the error it
+    // throws (keyed, throttled); the SentryInterceptor captures that same
+    // object as a 5xx, which must reach Sentry every time (the 5xx alert).
+    const interceptorCaptures: Error[] = [];
+    for (let request = 0; request < 2; request++) {
+      const failure = new Error(
+        "refund outcome unknown payment 3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      );
+      logger.error("PayTR refund error:", failure, "PaytrService");
+      getAppLogger().captureException(failure, { url: "/api/refunds" });
+      interceptorCaptures.push(failure);
+      await jest.advanceTimersByTimeAsync(1);
+    }
+
+    const sent = (Sentry.captureException as jest.Mock).mock.calls.map(
+      ([error]: [Error]) => error,
+    );
+    // Request 1: the log line and the 5xx. Request 2: the 5xx only.
+    expect(sent).toHaveLength(3);
+    for (const failure of interceptorCaptures) {
+      expect(sent).toContain(failure);
+    }
   });
 
   it("never throttles a warn (it does not go to Sentry at all)", async () => {

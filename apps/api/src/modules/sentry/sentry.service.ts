@@ -5,7 +5,7 @@
 import { Injectable, Optional } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { readFingerprint } from "../../common/logging/error-fingerprint";
-import { readReportKey } from "../../common/logging/error-report-key";
+import { takeReportKey } from "../../common/logging/error-report-key";
 import { SentryReportThrottle } from "./sentry-report-throttle";
 
 @Injectable()
@@ -22,7 +22,7 @@ export class SentryService {
    * what the 5xx-spike alert counts.
    */
   captureException(exception: Error, context?: Record<string, unknown>) {
-    const reportKey = readReportKey(exception);
+    const reportKey = takeReportKey(exception);
     if (!reportKey || !this.throttle) {
       this.send(exception, context);
       return;

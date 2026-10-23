@@ -67,8 +67,20 @@ export function attachReportKey(error: Error, key: string): void {
   (error as ErrorWithReportKey)[REPORT_KEY] = key;
 }
 
-/** The key set by `attachReportKey`; `undefined` means "always report". */
-export function readReportKey(error: unknown): string | undefined {
+/**
+ * The key set by `attachReportKey`, removed from the error as it is read;
+ * `undefined` means "always report".
+ *
+ * Read once because the key belongs to ONE log line, not to the error object:
+ * a service may log the error it then throws, and the `SentryInterceptor`
+ * captures that same object as an HTTP 5xx, which must never be throttled.
+ * `SentryService` takes the key synchronously in the capture the log line
+ * triggers, so the later capture finds none.
+ */
+export function takeReportKey(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
-  return (error as ErrorWithReportKey)[REPORT_KEY];
+  const carrier = error as ErrorWithReportKey;
+  const key = carrier[REPORT_KEY];
+  delete carrier[REPORT_KEY];
+  return key;
 }

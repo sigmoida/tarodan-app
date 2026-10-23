@@ -3,7 +3,7 @@ import {
   attachReportKey,
   buildErrorReportKey,
   errorMessageShape,
-  readReportKey,
+  takeReportKey,
 } from "./error-report-key";
 
 /**
@@ -153,15 +153,22 @@ describe("extractIdentifiers", () => {
   });
 });
 
-describe("attachReportKey / readReportKey", () => {
+describe("attachReportKey / takeReportKey", () => {
   it("round-trips the key on an Error", () => {
     const error = new Error("boom");
     attachReportKey(error, "abc");
-    expect(readReportKey(error)).toBe("abc");
+    expect(takeReportKey(error)).toBe("abc");
+  });
+
+  it("hands the key out once: a later capture of the same error is unkeyed", () => {
+    const error = new Error("boom");
+    attachReportKey(error, "abc");
+    takeReportKey(error);
+    expect(takeReportKey(error)).toBeUndefined();
   });
 
   it("returns undefined for unkeyed errors and non-errors", () => {
-    expect(readReportKey(new Error("boom"))).toBeUndefined();
-    expect(readReportKey("boom")).toBeUndefined();
+    expect(takeReportKey(new Error("boom"))).toBeUndefined();
+    expect(takeReportKey("boom")).toBeUndefined();
   });
 });
