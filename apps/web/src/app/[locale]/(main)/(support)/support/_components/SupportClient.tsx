@@ -14,6 +14,7 @@ import { Form, FormInput, FormTextarea } from "@tarodan/ui/form";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
+import { EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import {
   ticketCategories,
@@ -108,22 +109,23 @@ export default function SupportClient() {
 
       {/* Ticketing */}
       {!authLoading && !isAuthenticated && (
-        <SectionCard className="text-center">
-          <LifebuoyIcon className="mx-auto mb-3 h-10 w-10 text-subtle" />
-          <h2 className="mb-2 text-lg font-semibold text-heading">
-            {t("support.loginToCreateTicket")}
-          </h2>
-          <p className="mb-5 text-sm text-muted">
-            {t("support.loginToCreateTicketDesc")}
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <ButtonLink href="/login?redirect=/support">
-              {t("common.login")}
-            </ButtonLink>
-            <ButtonLink variant="secondary" href="/contact">
-              {t("support.contactForm")}
-            </ButtonLink>
-          </div>
+        <SectionCard>
+          <EmptyState
+            size="compact"
+            icon={<LifebuoyIcon className="h-6 w-6" />}
+            title={t("support.loginToCreateTicket")}
+            description={t("support.loginToCreateTicketDesc")}
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <ButtonLink href="/login?redirect=/support">
+                  {t("common.login")}
+                </ButtonLink>
+                <ButtonLink variant="secondary" href="/contact">
+                  {t("support.contactForm")}
+                </ButtonLink>
+              </div>
+            }
+          />
         </SectionCard>
       )}
 
@@ -222,10 +224,11 @@ export default function SupportClient() {
                 ))}
               </div>
             ) : tickets.length === 0 ? (
-              <div className="py-8 text-center">
-                <ClockIcon className="mx-auto mb-3 h-10 w-10 text-subtle" />
-                <p className="text-muted">{t("support.noTickets")}</p>
-              </div>
+              <EmptyState
+                size="compact"
+                icon={<ClockIcon className="h-6 w-6" />}
+                title={t("support.noTickets")}
+              />
             ) : (
               <ul className="divide-y divide-border">
                 {tickets.map((ticket) => {

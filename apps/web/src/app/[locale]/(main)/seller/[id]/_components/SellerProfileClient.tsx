@@ -8,10 +8,11 @@ import {
   CubeIcon,
   StarIcon,
   RectangleStackIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
-import { EmptyStateCard, ButtonLink } from "@/components/ui";
+import { EmptyState, ButtonLink } from "@/components/ui";
 import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
 import { useSellerProfile } from "../_hooks/useSellerProfile";
 import type { SellerTab } from "../_lib/types";
@@ -68,7 +69,8 @@ export default function SellerProfileClient() {
     return (
       <PageShell>
         <div className="mx-auto w-full max-w-6xl">
-          <EmptyStateCard
+          <EmptyState
+            icon={<UserCircleIcon className="h-7 w-7" />}
             title={t("seller.notFound")}
             description={t("seller.notFoundDesc")}
             action={

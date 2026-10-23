@@ -32,7 +32,7 @@ import {
 } from "./_lib/types";
 import DiscountCard from "./_components/DiscountCard";
 import DiscountFormModal from "./_modals/DiscountFormModal";
-import { MetricCard } from "@/components/ui";
+import { EmptyState, MetricCard } from "@/components/ui";
 
 export default function ProfileDiscountsPage() {
   const t = useTranslations();
@@ -163,20 +163,20 @@ export default function ProfileDiscountsPage() {
           <Spinner size="xl" color="border-primary-500 border-t-transparent" />
         </div>
       ) : visible.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface-elevated p-12 text-center">
-          <TagIcon className="mx-auto mb-4 h-16 w-16 text-border-strong" />
-          <h3 className="mb-2 text-xl font-semibold text-heading">
-            {filter !== "all"
+        <EmptyState
+          icon={<TagIcon className="h-7 w-7" />}
+          title={
+            filter !== "all"
               ? t("seller.discounts.emptyFiltered")
-              : t("seller.discounts.emptyTitle")}
-          </h3>
-          <p className="mb-6 text-muted">
-            {t("seller.discounts.emptyDescription")}
-          </p>
-          <Button onClick={openCreate}>
-            {t("seller.discounts.createFirst")}
-          </Button>
-        </div>
+              : t("seller.discounts.emptyTitle")
+          }
+          description={t("seller.discounts.emptyDescription")}
+          action={
+            <Button onClick={openCreate}>
+              {t("seller.discounts.createFirst")}
+            </Button>
+          }
+        />
       ) : (
         <div className="space-y-4">
           {visible.map((discount) => (

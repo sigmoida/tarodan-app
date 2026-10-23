@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { CreditCardIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
-import { Button, Spinner, ConfirmDialog } from "@tarodan/ui";
+import { Spinner, ConfirmDialog } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
+import ErrorState from "@/components/feedback/ErrorState";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import type { SavedCard } from "@/lib/api";
@@ -43,31 +44,19 @@ export default function PaymentMethodsPage() {
           <Spinner />
         </div>
       ) : isError ? (
-        <EmptyStateCard
+        <ErrorState
           title={t("payment.savedCardsLoadFailed")}
           description={t("payment.savedCardsLoadFailedDesc")}
-          action={
-            <Button
-              onClick={() => void refetch()}
-              isLoading={isFetching}
-              disabled={isFetching}
-            >
-              {t("common.tryAgain")}
-            </Button>
-          }
+          reset={() => void refetch()}
         />
       ) : cards.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface-elevated p-8 text-center">
-          <CreditCardIcon className="mx-auto mb-3 h-12 w-12 text-muted" />
-          <p className="text-muted">
-            {t("profile.paymentMethods.kayitliKartinYok")}
-          </p>
-          <p className="mt-1 text-sm text-muted">
-            {t(
-              "profile.paymentMethods.birOdemeYaparkenKartimiKaydetSecenegini",
-            )}
-          </p>
-        </div>
+        <EmptyState
+          icon={<CreditCardIcon className="h-7 w-7" />}
+          title={t("profile.paymentMethods.kayitliKartinYok")}
+          description={t(
+            "profile.paymentMethods.birOdemeYaparkenKartimiKaydetSecenegini",
+          )}
+        />
       ) : (
         <div className="space-y-3">
           {cards.map((c) => (

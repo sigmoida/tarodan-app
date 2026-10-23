@@ -107,9 +107,10 @@ response envelopes with `lib/unwrapList.ts`.
   one stretched link, so buttons sit beside it, never inside an `<a>`. Do not
   add a second card button; a card with its own control passes `footer`.
 - Loading = `SkeletonCard` matching the card footprint (never a bare spinner in
-  a grid); empty = `EmptyStateCard` / `EmptyState` with the action that resolves
-  it; paging = `Pagination` or an infinite rail, one per surface. Pickers inside
-  forms, modals and editors use a "Show more" button (`common.loadMore`)
+  a grid); empty = `EmptyState` (`@tarodan/ui`) with an icon, a description and
+  the action that resolves it (`size="compact"` inside a card or popover),
+  errors = `components/feedback/ErrorState`, never a hand-built block; paging =
+  `Pagination` or an infinite rail, one per surface. Pickers inside forms, modals and editors use a "Show more" button (`common.loadMore`)
   instead: page numbers would split the user's picks and an infinite rail would
   push the submit out of reach (`hooks/useWebInfiniteList`, `lib/pagedList.ts`,
   `hooks/usePagedPicks.ts`; the trade pickers).

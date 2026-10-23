@@ -2,11 +2,12 @@
 
 "use client";
 
+import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { EmptyStateCard, SectionCard } from "@/components/ui";
+import { EmptyState, SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { RatingStats, UserRating } from "../../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
@@ -60,7 +61,8 @@ export default function ReviewsTab({
   }
   if (reviews.length === 0) {
     return (
-      <EmptyStateCard
+      <EmptyState
+        icon={<ChatBubbleLeftRightIcon className="h-7 w-7" />}
         title={t("review.noReviews")}
         description={t("seller.noReviewsDesc")}
       />

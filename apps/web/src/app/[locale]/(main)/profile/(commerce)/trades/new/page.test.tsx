@@ -49,7 +49,7 @@ vi.mock("react-hot-toast", () => ({
 }));
 // The `@/components/ui` barrel pulls the `server-only` chain.
 vi.mock("@/components/ui", () => ({
-  EmptyStateCard: ({ title }: { title: string }) => <div>{title}</div>,
+  EmptyState: ({ title }: { title: string }) => <div>{title}</div>,
   ButtonLink: ({ children }: { children?: ReactNode }) => <a>{children}</a>,
 }));
 vi.mock("@/components/ui/SectionCard", () => ({

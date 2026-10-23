@@ -2,10 +2,10 @@
 
 "use client";
 
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { EmptyStateCard } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { ProductCard } from "@/components/ui";
 import ProductCardCartButton from "@/components/ui/ProductCardCartButton";
 import { useProductCardAction } from "@/components/ui/ProductCardAction";
@@ -53,7 +53,8 @@ export default function FavoritesGrid({
 
   if (items.length === 0 && pendingCount === 0) {
     return (
-      <EmptyStateCard
+      <EmptyState
+        icon={<HeartIcon className="h-7 w-7" />}
         title={t("favorites.empty")}
         description={t("favorites.emptyDesc")}
         action={
