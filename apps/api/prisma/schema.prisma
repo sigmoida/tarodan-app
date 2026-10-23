@@ -640,6 +640,9 @@ model AdminUser {
   adminSessions    AdminSession[]
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs        AuditLog[]
+  /// Reviews and ratings this admin last hid or showed again.
+  moderatedRatings        Rating[]        @relation("RatingModerator")
+  moderatedProductRatings ProductRating[] @relation("ProductRatingModerator")
 
   @@map("admin_users")
 }
@@ -1617,18 +1620,28 @@ model ContentFilter {
 }
 
 model Rating {
-  id         String       @id @default(uuid())
-  giverId    String       @map("giver_id")
-  receiverId String       @map("receiver_id")
-  orderId    String?      @map("order_id")
-  tradeId    String?      @map("trade_id")
-  score      Int
-  comment    String?
-  status     RatingStatus @default(pending)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  giver      User         @relation("RatingGiver", fields: [giverId], references: [id])
-  receiver   User         @relation("RatingReceiver", fields: [receiverId], references: [id])
+  id                 String       @id @default(uuid())
+  giverId            String       @map("giver_id")
+  receiverId         String       @map("receiver_id")
+  orderId            String?      @map("order_id")
+  tradeId            String?      @map("trade_id")
+  score              Int
+  comment            String?
+  status             RatingStatus @default(pending)
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  /// Why an admin last hid this rating (free text, 5-500 characters, shown
+  /// only to admins). Kept when the rating is shown again; every change and
+  /// its reason is in `audit_logs`.
+  moderationReason   String?      @map("moderation_reason")
+  /// When an admin last changed the visibility (hide or unhide).
+  moderatedAt        DateTime?    @map("moderated_at")
+  /// The admin who last changed the visibility. SET NULL keeps the rating
+  /// if the admin row goes; the audit log keeps the actor.
+  moderatedByAdminId String?      @map("moderated_by_admin_id")
+  giver              User         @relation("RatingGiver", fields: [giverId], references: [id])
+  receiver           User         @relation("RatingReceiver", fields: [receiverId], references: [id])
+  moderatedBy        AdminUser?   @relation("RatingModerator", fields: [moderatedByAdminId], references: [id], onDelete: SetNull)
 
   @@unique([giverId, orderId])
   @@unique([giverId, tradeId])
@@ -1653,8 +1666,18 @@ model ProductRating {
   adminReply         String?      @map("admin_reply")
   adminReplyAt       DateTime?    @map("admin_reply_at")
   status             RatingStatus @default(pending)
+  /// Why an admin last hid this review (free text, 5-500 characters, shown
+  /// only to admins). Kept when the review is shown again; every change and
+  /// its reason is in `audit_logs`.
+  moderationReason   String?      @map("moderation_reason")
+  /// When an admin last changed the visibility (hide or unhide).
+  moderatedAt        DateTime?    @map("moderated_at")
+  /// The admin who last changed the visibility. SET NULL keeps the review
+  /// if the admin row goes; the audit log keeps the actor.
+  moderatedByAdminId String?      @map("moderated_by_admin_id")
   product            Product      @relation(fields: [productId], references: [id])
   user               User         @relation(fields: [userId], references: [id])
+  moderatedBy        AdminUser?   @relation("ProductRatingModerator", fields: [moderatedByAdminId], references: [id], onDelete: SetNull)
 
   @@unique([productId, userId, orderId])
   @@index([productId])
@@ -4620,12 +4643,20 @@ enum CouponReservationStatus {
   released
 }
 
+/// Moderation state of a product review (`ProductRating`) and a user rating
+/// (`Rating`). Only `approved` is public (`common/helpers/public-rating.ts`).
+/// New reviews are written `approved` (post-moderation); admins move them
+/// between `approved` and `hidden`. `pending` and `rejected` exist only in
+/// legacy and fixture rows; `spam` and `deleted` are never written.
 enum RatingStatus {
   pending
   approved
   rejected
   spam
   deleted
+  /// Taken off every public surface by an admin, with a reason
+  /// (`moderation_reason`). The author still sees it, flagged.
+  hidden
 }
 
 enum TaxRuleScope {
