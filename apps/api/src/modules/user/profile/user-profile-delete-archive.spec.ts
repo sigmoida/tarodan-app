@@ -3,6 +3,7 @@ import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { ANONYMIZED_DISPLAY_NAME } from "../../../common/helpers/deleted-user-identity";
 
 jest.mock("../../../common/helpers/revalidate", () => ({
+  ...jest.requireActual("../../../common/helpers/revalidate"),
   notifyWebRevalidate: jest.fn(),
 }));
 
