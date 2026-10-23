@@ -715,19 +715,27 @@ The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
 `payment-expired`, every 5 minutes) and the attempt recovery
 (`RefundReconciliationService`) follow `payment/helpers/refund-sweep-policy.ts`:
 
-- An order whose refund fails waits 10 minutes, then twice as long after each
-  further failure, at most 6 hours; it is not queried while it waits. A
-  success clears it.
+- An order whose refund attempt failed waits as long as the attempt has been
+  failing (`updatedAt - createdAt`, read from the attempt itself), at least 10
+  minutes and at most 6 hours: about 10, 10, 20, 40, 80, 160, 320 minutes, then
+  every 6 hours. It is not queried while it waits. The ledger is the only
+  source: nothing to lose on a cache flush, no lock between runs.
 - An order whose refund has an unresolved attempt (`prepared`, `submitting`,
   `succeeded`, `manual_review`) is not swept: the attempt recovery, the
-  quarantine, the status inquiry or a person owns it.
+  quarantine, the status inquiry or a person owns it. In the cancelled and
+  refunded branches an order with a `finalized` attempt is left out in SQL as
+  well: its refund was carried out (partial, or a zero-cash settlement that
+  records 0 on the payment) and is never repeated as a full refund. In the
+  returned-shipment branch such an order is reported as stuck instead.
 - Alarms are one line per order or attempt (`REFUND_MANUAL_REVIEW`, with its
   ids, so the Sentry repeat throttle keys each one), at error at most once a
-  day each, warn in between. A submission quarantined to `manual_review`
-  gets its own error line at once.
-- The backoff and alarm state lives in the cache. Lost (flush, outage), the
-  sweeps behave as before: retry and alarm every run. Whether money may move
-  is decided by the `RefundAttempt` ledger only.
+  day each (an atomic claim per key in the cache; if the cache is unavailable
+  the alarm goes out), warn in between. A submission quarantined to
+  `manual_review` gets its own error line at once. The review alarm reads the
+  newest 500 attempts in review first.
+- `processRefund` logs "Refund error for payment" at warn instead of error
+  when its caller alarms itself (`callerAlarms`, the order sweep) and no money
+  moved; when money may have moved it stays an error.
 - `createRefund` logs one warn line per failure; the caller logs the decision.
 
 **Staging.** The staging database is a masked production copy
@@ -737,7 +745,9 @@ production (`isLiveProduction()`, fail closed), the refund sweeps (order sweep,
 attempt recovery and quarantine, status inquiry, review alarm) leave out
 payments created up to the last production copy
 (`UatProductionCopyService.copiedBefore`: the refresh's `sourceSnapshotAt`; an
-unfinished refresh counts up to now, capped at its timeout). Test-lane payments
+unfinished refresh counts up to now, capped at its timeout; a refresh that
+never reported back therefore also hides the staging payments of the hours
+before its timeout, the safe direction). Test-lane payments
 stay in (they never reach PayTR). On live production nothing is filtered.
 Payouts need no such filter: staging cannot boot without
 `PAYOUTS_DISABLED=true`, and with it the payout run sends nothing.
