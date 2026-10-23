@@ -24,10 +24,13 @@ const UUID_PATTERN =
 // alphanumeric (`PKG-WQMTZDB5TT`) and are masked by `maskIdentifiers`; without
 // that every parcel opened its own Sentry issue.
 const ENTITY_CODE_PATTERN = /\b(PKG|ORD|GRP|RFD|TKS|TRD)-?\d+\b/gi;
-const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
+// Shared with the repeat-report key (`error-report-key.ts`): one rule for
+// what is volatile text, so both read a message the same way.
+export const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 // Mask only the query string; the path stays for its diagnostic value. Both
 // absolute URLs and relative request paths ("GET /api/products?search=...").
-const URL_QUERY_PATTERN = /((?:\bhttps?:\/\/|(?<![\w/])\/)[^\s?]*)\?[^\s]*/gi;
+export const URL_QUERY_PATTERN =
+  /((?:\bhttps?:\/\/|(?<![\w/])\/)[^\s?]*)\?[^\s]*/gi;
 // Tırnak içindeki değer bir rakam barındırıyorsa değişkendir (id, sayı, kod);
 // yalnızca harflerden oluşan tırnaklı değerler (cron job adları gibi) sabit
 // kalır ki "Cron 'refund-crons' FAILED" ile "Cron 'sync-surat-tracking'

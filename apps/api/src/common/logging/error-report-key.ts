@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { EMAIL_PATTERN, URL_QUERY_PATTERN } from "./error-fingerprint";
 import { extractIdentifiers, maskIdentifiers } from "./error-identifiers";
 
 /**
@@ -25,8 +26,6 @@ export interface ErrorReportKeyInput {
   message: string;
 }
 
-const URL_QUERY_PATTERN = /(\bhttps?:\/\/[^\s?]+)\?[^\s]*/gi;
-const EMAIL_PATTERN = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const DIGIT_RUN_PATTERN = /\d+/g;
 
 /**

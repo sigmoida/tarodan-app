@@ -121,6 +121,12 @@ describe("errorMessageShape", () => {
       ),
     ).toBe("mail to <email> failed at https://api.example.com/track?<query>");
   });
+
+  it("masks the query of a relative request path too (same rule as the fingerprint)", () => {
+    expect(errorMessageShape("GET /api/products?search=tamiya -> 500")).toBe(
+      "GET /api/products?<query> -> #",
+    );
+  });
 });
 
 describe("extractIdentifiers", () => {
