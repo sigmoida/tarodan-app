@@ -349,6 +349,18 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       expect(error).not.toHaveBeenCalled();
     });
 
+    it("a submission that finished while being quarantined is not alarmed as quarantined", async () => {
+      const { runAt, error, prisma } = makeService({
+        staleAttempts: [{ id: "stale-1", orderId: "order-1", tradeId: null }],
+      });
+      // The CAS on `submitting` lost: the submission got its answer meanwhile.
+      prisma.refundAttempt.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await runAt(NOW);
+
+      expect(error).not.toHaveBeenCalled();
+    });
+
     it("reads the attempts in review newest first, so a newly parked one always alarms", async () => {
       const { runAt, prisma } = makeService();
 
