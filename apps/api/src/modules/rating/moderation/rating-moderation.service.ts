@@ -221,6 +221,13 @@ export class RatingModerationService {
       if (!before) {
         throw new NotFoundException(i18nMessage(target.notFoundKey));
       }
+      // A review its author deleted stays deleted: showing it would publish
+      // it again (and count it), hiding it would lose the deleted marker.
+      if (before.status === RatingStatus.deleted) {
+        throw new ConflictException(
+          i18nMessage("server.admin.review.deletedNotModeratable"),
+        );
+      }
       const visibilityChanges = before.status !== input.status;
       const reasonCorrected =
         input.status === RatingStatus.hidden &&
@@ -294,12 +301,16 @@ export class RatingModerationService {
   /**
    * A user rating feeds the seller block of every product response (average
    * and count, `ProductCommonService`), so the product caches go, like on a
-   * new rating. The seller page is client-rendered (no ISR); the web product
+   * new rating, and so do the featured seller cards. The seller page is
+   * client-rendered (no ISR); the web product
    * pages of the rated user's active listings are revalidated, up to a cap.
    */
   private async refreshRatedUser(receiverId: string): Promise<void> {
     await this.cache.delPattern("products:detail:*");
     await this.cache.delPattern("products:list:*");
+    // The featured seller cards (home) carry the rating average and count.
+    await this.cache.del("featured:business");
+    await this.cache.del("featured:collector");
     const listings = await this.prisma.product.findMany({
       where: { sellerId: receiverId, status: ProductStatus.active },
       select: { id: true },

@@ -23194,8 +23194,8 @@
       "title": "Show again: hidden or legacy rejected → approved; no way back to pending",
       "tur": "Happy path / Moderasyon",
       "pri": "P2",
-      "steps": "1. PATCH .../status { status: \"pending\" } → 400. 2. { status: \"rejected\" } → 400. 3. { status: \"approved\" } → 200. 4. { status: \"hidden\", reason } → 200. 5. { status: \"approved\" } → 200.",
-      "exp": "Only approved and hidden are accepted; the review is public again and keeps its last hide reason; the stats are recomputed on every change.",
+      "steps": "1. PATCH .../status { status: \"pending\" } → 400. 2. { status: \"rejected\" } → 400. 3. { status: \"approved\" } → 200. 4. { status: \"hidden\", reason } → 200. 5. { status: \"approved\" } → 200. 6. On a review its author deleted: { status: \"approved\" } and { status: \"hidden\", reason } → 409.",
+      "exp": "Only approved and hidden are accepted; the review is public again and keeps its last hide reason; the stats are recomputed on every change. A deleted review gets 409 server.admin.review.deletedNotModeratable, stays deleted and has no audit row.",
       "gap": false,
       "gapRefs": []
     },

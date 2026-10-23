@@ -1120,6 +1120,37 @@ describe("19 — Puanlama & Yorum (RAT)", () => {
         status: RatingStatus.approved,
         moderationReason: "Spam link",
       });
+
+      // A review its author deleted is out of moderation: neither shown again
+      // (it would count again) nor hidden (the deleted marker would be lost).
+      const other = await setupDeliveredOrder();
+      const deleted = await seedApprovedProductRating({
+        productId: other.productId,
+        userId: other.buyer.id,
+        orderId: other.orderId,
+        status: RatingStatus.deleted,
+      });
+      for (const [status, reason] of [
+        ["approved", undefined],
+        ["hidden", "Spam link"],
+      ] as const) {
+        const res = await patchReview(admin, deleted.id, status, reason).expect(
+          409,
+        );
+        expect(res.body.i18nKey).toBe(
+          "server.admin.review.deletedNotModeratable",
+        );
+      }
+      const stillDeleted = await getPrisma().productRating.findUnique({
+        where: { id: deleted.id },
+      });
+      expect(stillDeleted).toMatchObject({
+        status: RatingStatus.deleted,
+        moderatedAt: null,
+      });
+      expect(
+        await getPrisma().auditLog.count({ where: { entityId: deleted.id } }),
+      ).toBe(0);
     });
 
     scenario("RAT-078", async () => {

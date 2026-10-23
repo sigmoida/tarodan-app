@@ -496,6 +496,8 @@ describe("RatingModerationService.moderateUserRating", () => {
       "commit",
       "cache.delPattern products:detail:*",
       "cache.delPattern products:list:*",
+      "cache.del featured:business",
+      "cache.del featured:collector",
       "web products:list,product:p-7,product:p-8",
     ]);
     expect(ctx.prisma.product.findMany).toHaveBeenCalledWith({

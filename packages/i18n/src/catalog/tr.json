@@ -11934,7 +11934,8 @@
         "notFound": "Kullanıcı yorumu bulunamadı",
         "reasonRequired": "Gizleme nedeni girin (en az {min} karakter).",
         "reasonTooLong": "Neden en fazla {max} karakter olabilir.",
-        "statusChanged": "Yorumun durumu az önce değişti; sayfayı yenileyip tekrar deneyin."
+        "statusChanged": "Yorumun durumu az önce değişti; sayfayı yenileyip tekrar deneyin.",
+        "deletedNotModeratable": "Yazarının sildiği bir yorum yeniden yayınlanamaz veya gizlenemez."
       },
       "tax": {
         "regionNotFound": "Vergi bölgesi bulunamadı",

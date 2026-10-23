@@ -11934,7 +11934,8 @@
         "notFound": "User review not found",
         "reasonRequired": "Enter a reason for hiding (at least {min} characters).",
         "reasonTooLong": "The reason can be at most {max} characters.",
-        "statusChanged": "The review's status just changed; refresh the page and try again."
+        "statusChanged": "The review's status just changed; refresh the page and try again.",
+        "deletedNotModeratable": "A review its author deleted cannot be shown again or hidden."
       },
       "tax": {
         "regionNotFound": "Tax region not found",
