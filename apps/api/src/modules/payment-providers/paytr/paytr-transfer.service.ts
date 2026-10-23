@@ -14,6 +14,9 @@ import {
 import { PlatformTransferRequestError } from "../transfer-errors";
 import { errorMessage } from "../../../common/helpers/error-message";
 
+/** 4xx statuses that do not prove the request went unprocessed. */
+const UNCERTAIN_CLIENT_ERROR_STATUSES = new Set([408, 409]);
+
 /** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
  *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
 export interface PaytrPlatformTransferResult {
@@ -119,10 +122,15 @@ export class PayTRTransferService {
         `trans_id must be alphanumeric (got ${params.transId})`,
       );
     }
-    // Anything failing before fetch (credentials, signing) never reached PayTR.
-    let postData: string;
+    // Anything failing before fetch (endpoint, credentials, signing, timeout
+    // setting) never reached PayTR. PRE_SEND is a configuration problem.
+    let request: { url: string; body: string; signal: AbortSignal };
     try {
-      postData = this.platformTransferBody(params);
+      request = {
+        url: new URL(`${this.baseUrl}/platform/transfer`).href,
+        body: this.platformTransferBody(params),
+        signal: AbortSignal.timeout(this.httpTimeoutMs),
+      };
     } catch (error) {
       throw this.noAnswer(
         params.transId,
@@ -134,11 +142,11 @@ export class PayTRTransferService {
 
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}/platform/transfer`, {
+      response = await fetch(request.url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: postData,
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
+        body: request.body,
+        signal: request.signal,
       });
     } catch (error) {
       throw this.noAnswer(
@@ -173,8 +181,13 @@ export class PayTRTransferService {
     const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(rawText);
     if (!parsed || typeof parsed.status !== "string") {
       // A 4xx without a PayTR answer is a refusal before processing (WAF,
-      // rate limit, wrong URL): nothing was transferred.
-      if (response.status >= 400 && response.status < 500) {
+      // rate limit, wrong path): nothing was transferred. 408 and 409 are
+      // the exceptions: a timeout or a conflict can follow processing.
+      const clientError = response.status >= 400 && response.status < 500;
+      if (
+        clientError &&
+        !UNCERTAIN_CLIENT_ERROR_STATUSES.has(response.status)
+      ) {
         throw this.noAnswer(
           params.transId,
           "not_sent",
@@ -185,7 +198,7 @@ export class PayTRTransferService {
       throw this.noAnswer(
         params.transId,
         "unknown",
-        "INVALID_BODY",
+        clientError ? `HTTP_${response.status}` : "INVALID_BODY",
         "PayTR answer is empty or not a transfer result",
       );
     }

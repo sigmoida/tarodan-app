@@ -2,7 +2,8 @@
  * Whether a platform transfer request could have reached the provider:
  * - `not_sent`: PayTR provably did not process it (it failed before leaving
  *   the host, the connection was never established, or PayTR refused it
- *   with a 4xx and no answer), so the same `trans_id` may be sent again.
+ *   with a 4xx other than 408/409 and no answer), so the same `trans_id`
+ *   may be sent again.
  * - `unknown`: the request may have been processed (reset or timeout after
  *   sending, HTTP 5xx, unreadable answer). Resending could pay twice.
  */
