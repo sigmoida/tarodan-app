@@ -13,6 +13,12 @@ const iconButtonVariants = cva(
           "bg-surface-alt text-heading hover:bg-border-subtle focus-visible:ring-subtle",
         outline:
           "border border-border bg-transparent text-body hover:bg-surface focus-visible:ring-subtle",
+        // The outline twin of `primary`: an action that is offered but not
+        // taken (the card's cart toggle before the listing is in the cart).
+        // The label is primary-700, not 600: 600 on a light surface is under
+        // the 4.5:1 text contrast of WCAG AA; the border keeps 600 (3:1).
+        "outline-primary":
+          "border border-primary-600 bg-transparent text-primary-700 hover:border-primary-700 hover:bg-primary-50 active:bg-primary-100 focus-visible:ring-primary-600",
         ghost: "text-muted hover:bg-surface-alt hover:text-heading",
         danger:
           "text-danger-600 hover:bg-danger-50 focus-visible:ring-danger-600",
