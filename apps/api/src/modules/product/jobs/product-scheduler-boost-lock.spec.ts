@@ -223,6 +223,39 @@ describe("ProductSchedulerService expire-boosts under the listing lock", () => {
       ]);
     });
 
+    it("refreshes only after every listing transaction has closed", async () => {
+      const { service, prisma, tx, cache, notices } = make();
+      prisma.productBoost.findMany.mockResolvedValueOnce([
+        { productId: "p1" },
+        { productId: "p2" },
+      ]);
+      let open = 0;
+      prisma.$transaction.mockImplementation(
+        async (fn: (t: typeof tx) => Promise<unknown>) => {
+          open += 1;
+          try {
+            return await fn(tx);
+          } finally {
+            open -= 1;
+          }
+        },
+      );
+      const openAtRefresh: number[] = [];
+      cache.del.mockImplementation(async () => {
+        openAtRefresh.push(open);
+      });
+      cache.delPattern.mockImplementation(async () => {
+        openAtRefresh.push(open);
+        return 0;
+      });
+
+      await service.runExpireBoosts();
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(openAtRefresh).toEqual([0, 0, 0]);
+      expect(notices.flush).not.toHaveBeenCalled();
+    });
+
     it("refreshes nothing when no promotion ended", async () => {
       const { service, cache } = make();
 
