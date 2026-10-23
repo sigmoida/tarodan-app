@@ -73,10 +73,11 @@ const LISTING_PAGE_SIZE = 100;
  */
 const MAX_LISTING_PAGES = 50;
 
+/** A listing as the list endpoint sends it; untrusted, checked per field. */
 interface SitemapListing {
-  id: string;
-  title?: string | null;
-  updatedAt?: string | null;
+  id?: unknown;
+  title?: unknown;
+  updatedAt?: unknown;
 }
 
 interface ListingPage {
@@ -102,9 +103,10 @@ async function fetchListingPage(page: number): Promise<ListingPage | null> {
     });
     if (!res.ok) return null;
     const raw = await res.json();
-    const items: SitemapListing[] = Array.isArray(raw)
+    const list: unknown = Array.isArray(raw)
       ? raw
-      : (raw?.data ?? raw?.products ?? []);
+      : (raw?.data ?? raw?.products);
+    const items: SitemapListing[] = Array.isArray(list) ? list : [];
     const totalPages = Number(raw?.meta?.totalPages);
     return {
       items,
@@ -134,15 +136,22 @@ async function fetchListingUrls(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
   for (const page of [first, ...rest]) {
     for (const listing of page?.items ?? []) {
+      const id = listing?.id;
       // A listing created mid-build shifts the pages by one: skip the repeat.
-      if (typeof listing?.id !== "string" || seen.has(listing.id)) continue;
-      seen.add(listing.id);
-      const path = listingPath(listing);
+      if (typeof id !== "string" || seen.has(id)) continue;
+      seen.add(id);
+      const title = typeof listing.title === "string" ? listing.title : null;
+      const path = listingPath({ id, title });
+      const updatedAt =
+        typeof listing.updatedAt === "string"
+          ? new Date(listing.updatedAt)
+          : null;
       entries.push({
         url: `${SITE_URL}${path}`,
-        lastModified: listing.updatedAt
-          ? new Date(listing.updatedAt)
-          : undefined,
+        lastModified:
+          updatedAt && !Number.isNaN(updatedAt.getTime())
+            ? updatedAt
+            : undefined,
         changeFrequency: "daily",
         priority: 0.7,
         alternates: localeAlternates(path),

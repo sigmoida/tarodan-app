@@ -135,6 +135,38 @@ describe("sitemap: listings", () => {
   });
 });
 
+describe("sitemap: unexpected API shapes never break it", () => {
+  it("a non-list body leaves the static sitemap", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { not: "a list" }, products: null }),
+    });
+    const entries = await sitemap();
+    expect(listingUrls(entries)).toEqual([]);
+    expect(entries.map((e) => e.url)).toContain(`${SITE_URL}/listings`);
+  });
+
+  it("a non-string title or a bad date still yields the listing URL", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: uuid(1), title: 42, updatedAt: "not a date" },
+          { id: 7, title: "no string id" },
+        ],
+        meta: { totalPages: 1 },
+      }),
+    });
+    const entries = (await sitemap()).filter((e) =>
+      e.url.includes("/listings/"),
+    );
+    expect(entries.map((e) => e.url)).toEqual([
+      `${SITE_URL}/listings/${uuid(1)}`,
+    ]);
+    expect(entries[0].lastModified).toBeUndefined();
+  });
+});
+
 describe("sitemap: static pages", () => {
   it("keep their hreflang alternates (root included)", async () => {
     catalogue(1, 0);
