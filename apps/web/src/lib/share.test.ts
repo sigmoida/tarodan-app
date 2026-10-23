@@ -10,7 +10,6 @@ import {
   collectionSharePath,
   copyText,
   favoritesSharePath,
-  listingSharePath,
   openShareWindow,
   resolveShareUrl,
   shouldFallbackToMenu,
@@ -61,23 +60,6 @@ describe("buildShareTargets", () => {
 });
 
 describe("kanonik paylaşım yolları", () => {
-  const LISTING_ID = "0b1e2f3a-4b5c-4d6e-8f70-8192a3b4c5d6";
-
-  it("listing: canonical /listings/<slug>-<uuid>, no locale prefix or query", () => {
-    expect(
-      listingSharePath({
-        id: LISTING_ID,
-        title: "Ferrari F40 1:18 Bburago Kırmızı",
-      }),
-    ).toBe(`/listings/ferrari-f40-1-18-bburago-kirmizi-${LISTING_ID}`);
-  });
-
-  it("listing: bare UUID while the title is unknown (the page redirects)", () => {
-    expect(listingSharePath({ id: LISTING_ID })).toBe(
-      `/listings/${LISTING_ID}`,
-    );
-  });
-
   it("koleksiyon: id ya da slug", () => {
     expect(collectionSharePath("my-slug")).toBe("/collections/my-slug");
   });

@@ -1,7 +1,5 @@
 /** @format */
 
-import { listingPath, type ListingUrlSource } from "@tarodan/types";
-
 /**
  * Paylaşım için tek kaynak: sosyal ağ linkleri, kanonik paylaşım URL'leri,
  * panoya kopyalama ve pencere açma. `ShareMenu` ve çağıranlar buradan okur;
@@ -42,11 +40,7 @@ export function buildShareTargets({
 // utm), so the recipient opens them in their own language. The origin is not a
 // build-time constant; it is added at share time from `window.location.origin`,
 // so staging and preview links show the right host (see `resolveShareUrl`).
-
-/** A listing's canonical path, `/listings/<slug>-<uuid>` (ADR 0017). */
-export function listingSharePath(listing: ListingUrlSource): string {
-  return listingPath(listing);
-}
+// A listing is shared at `listingPath()` from @tarodan/types (ADR 0017).
 
 export function collectionSharePath(idOrSlug: string): string {
   return `/collections/${idOrSlug}`;

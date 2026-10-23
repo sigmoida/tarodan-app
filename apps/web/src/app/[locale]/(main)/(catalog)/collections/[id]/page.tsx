@@ -3,6 +3,7 @@ import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
+import { collectionSharePath } from "@/lib/share";
 import CollectionDetailClient from "./CollectionDetailClient";
 
 import { getServerApiOrigin } from "@/lib/api/origin";
@@ -49,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // The `[id]` segment may be the id or a slug, and a slug is unique per owner
   // only, so the canonical URL is the id form. A readable collection URL is a
   // later phase (ADR 0017 covers listings only).
-  const path = `/collections/${collection.id ?? id}`;
+  const path = collectionSharePath(collection.id ?? id);
 
   return {
     title,
