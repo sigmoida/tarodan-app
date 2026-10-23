@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { isClientAbort } from "./client-abort";
 
 describe("isClientAbort", () => {
@@ -35,5 +36,48 @@ describe("isClientAbort", () => {
     expect(isClientAbort(err({ code: "ECONNABORTED" }), aborted)).toBe(false);
     expect(isClientAbort("Request aborted", aborted)).toBe(false);
     expect(isClientAbort(null, aborted)).toBe(false);
+  });
+  // The shapes our upstream clients really raise, on a request whose client
+  // has already gone: each is an outage of ours and must stay reported.
+  it.each([
+    [
+      "Prisma lost connection",
+      new Prisma.PrismaClientKnownRequestError(
+        "Server has closed the connection.",
+        { code: "P1017", clientVersion: "test" },
+      ),
+    ],
+    [
+      "S3 (smithy) timeout",
+      Object.assign(new Error("Connection timed out after 5000 ms"), {
+        name: "TimeoutError",
+        code: "ETIMEDOUT",
+      }),
+    ],
+    [
+      "Redis (ioredis) reset",
+      Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        errno: -54,
+        syscall: "read",
+      }),
+    ],
+    ["Redis (ioredis) closed", new Error("Connection is closed.")],
+    [
+      "SMTP (nodemailer) drop",
+      Object.assign(new Error("Connection closed unexpectedly"), {
+        code: "ECONNECTION",
+        command: "CONN",
+      }),
+    ],
+    [
+      "http client (axios) timeout",
+      Object.assign(new Error("timeout of 10000ms exceeded"), {
+        code: "ECONNABORTED",
+      }),
+    ],
+  ])("%s on an aborted request stays a server error", (_name, e) => {
+    expect(isClientAbort(e, aborted)).toBe(false);
+    expect(isClientAbort(e, legacyAborted)).toBe(false);
   });
 });
