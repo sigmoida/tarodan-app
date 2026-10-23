@@ -966,9 +966,13 @@ export class PayoutService {
         if (parked.count > 0) {
           failed++;
           this.logger.error(
-            `Payout ${payout.id} (${payout.transId}) ${PAYOUT_FAILURE.transferNeedsManualDecision}: ` +
-              `net ${transferTotal.net} TL does not fit the allowed total ${transferTotal.allowedTotal} TL ` +
-              `(order/trade ${transferTotal.ownAllowed}, payment remaining ${transferTotal.oidRemaining}); PayTR not called`,
+            transferTotal.missingInput
+              ? `Payout ${payout.id} (${payout.transId}) ${PAYOUT_FAILURE.transferNeedsManualDecision}: ` +
+                  `no ${transferTotal.missingInput} to cap the transfer total against (a data problem, ` +
+                  `not a residual: fix the link and retry, do not pay it outside PayTR); PayTR not called`
+              : `Payout ${payout.id} (${payout.transId}) ${PAYOUT_FAILURE.transferNeedsManualDecision}: ` +
+                  `net ${transferTotal.net} TL does not fit the allowed total ${transferTotal.allowedTotal} TL ` +
+                  `(order/trade ${transferTotal.ownAllowed}, payment remaining ${transferTotal.oidRemaining}); PayTR not called`,
           );
         }
         continue;
@@ -1039,6 +1043,20 @@ export class PayoutService {
           transferIban,
         });
       } catch (error) {
+        // Building the request failed (credentials, signing, endpoint): a
+        // configuration problem every payout of the run would hit. Release
+        // the claim and stop the run (the cron alarm reports it); burning
+        // each payout's retries would only hide the cause.
+        if (
+          error instanceof PlatformTransferRequestError &&
+          error.causeCode === "PRE_SEND"
+        ) {
+          await this.prisma.payoutTransfer.updateMany({
+            where: { id: payout.id, status: PayoutStatus.processing },
+            data: { status: PayoutStatus.pending, submittedTotalAmount: null },
+          });
+          throw error;
+        }
         const notSent =
           error instanceof PlatformTransferRequestError &&
           error.phase === "not_sent";
@@ -1088,7 +1106,7 @@ export class PayoutService {
           }
         } catch (error) {
           this.logger.error(
-            `Payout ${payout.id} (${payout.transId}) was accepted by PayTR but recording it failed: ${errorMessage(error)}; left processing, do not resend`,
+            `Payout ${payout.id} (${payout.transId}) was accepted by PayTR but recording it failed: ${errorMessage(error)}; check the row (a processing row is raised by the zombie check), do not resend`,
           );
         }
       } else {
@@ -1320,9 +1338,21 @@ export class PayoutService {
 
       // Atomic claim + idempotency: processing -> completed only. A repeated
       // callback gets count=0, so e-mail and ledger never run twice.
+      // A row whose bookkeeping failed after PayTR accepted it has no send
+      // snapshot: stamp the claim time and the net it carried, so a later
+      // bank return can still be matched (no PayTR reference was stored).
       let claim = await this.prisma.payoutTransfer.updateMany({
         where: { id: payout.id, status: PayoutStatus.processing },
-        data: { status: PayoutStatus.completed, processedAt: new Date() },
+        data: {
+          status: PayoutStatus.completed,
+          processedAt: new Date(),
+          ...(payout.submittedAt
+            ? {}
+            : {
+                submittedAt: payout.updatedAt,
+                submittedAmount: payout.submittedAmount ?? payout.netAmount,
+              }),
+        },
       });
       // We never heard back from PayTR for this one (failed /
       // transfer_outcome_unknown) and PayTR now confirms it: settle it once.

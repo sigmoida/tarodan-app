@@ -309,6 +309,11 @@ describe("payout transfer total_amount", () => {
 
     await service.processPendingPayouts();
 
+    // A data problem, not a residual to pay outside PayTR: the log says so.
+    const logged = errorSpy.mock.calls.map(([m]) => String(m)).join("\n");
+    expect(logged).toMatch(/orphan.*no payment/);
+    expect(logged).not.toContain("does not fit");
+
     expect(createPlatformTransfer).not.toHaveBeenCalled();
     expect(world.payout("orphan")).toMatchObject({
       status: PayoutStatus.failed,

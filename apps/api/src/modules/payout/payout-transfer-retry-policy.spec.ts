@@ -380,6 +380,44 @@ describe("payout transfer retry policy", () => {
       });
     });
 
+    it("a configuration error before sending (PRE_SEND) stops the run and leaves the payout pending", async () => {
+      const world = world349();
+      world.addOrderPayout({
+        payoutId: "p2",
+        paymentId: "pay-1",
+        orderId: "o2",
+        orderTotal: 100,
+        holdAmount: 90,
+        merchantOid: "OTHER1",
+        transId: "PYTSECOND2",
+      });
+      const createPlatformTransfer: TransferMock = jest.fn(async () => {
+        throw new PlatformTransferRequestError(
+          "not_sent",
+          "PRE_SEND",
+          "marketplace credentials missing",
+        );
+      });
+      const { service, notification } = buildPayoutProcessor(world, {
+        createPlatformTransfer,
+      });
+
+      await expect(service.processPendingPayouts()).rejects.toThrow(
+        "marketplace credentials missing",
+      );
+
+      expect(createPlatformTransfer).toHaveBeenCalledTimes(1);
+      for (const id of ["p1", "p2"]) {
+        expect(world.payout(id)).toMatchObject({
+          status: PayoutStatus.pending,
+          failureReason: null,
+          retryCount: 0,
+          submittedTotalAmount: null,
+        });
+      }
+      expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
+    });
+
     it("a bookkeeping error after PayTR accepted leaves the row processing and the batch goes on", async () => {
       const world = world349();
       world.payments.get("pay-1")!.amount = 449;
@@ -417,6 +455,37 @@ describe("payout transfer retry policy", () => {
         ),
       );
       // Only p2 completed: one release e-mail.
+      expect(notification.sendTemplateEmailToUser).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("callback for a payout whose bookkeeping failed", () => {
+    it("completes it once and stamps the send time and net so a bank return can be matched", async () => {
+      const world = world349();
+      const { service, prisma, notification, ledger } = buildPayoutProcessor(
+        world,
+        { callbackFlag: true },
+      );
+      prisma.payoutTransfer.update.mockRejectedValueOnce(
+        new Error("connection terminated"),
+      );
+      await service.processPendingPayouts();
+      const claimedAt = world.payout("p1").updatedAt;
+      expect(world.payout("p1")).toMatchObject({
+        status: PayoutStatus.processing,
+        submittedAt: null,
+        submittedAmount: null,
+      });
+
+      await service.handleTransferResultCallback('["PYTRETRY1"]', "hash");
+      await service.handleTransferResultCallback('["PYTRETRY1"]', "hash");
+
+      expect(world.payout("p1")).toMatchObject({
+        status: PayoutStatus.completed,
+        submittedAt: claimedAt,
+        submittedAmount: 300,
+      });
+      expect(ledger.record).toHaveBeenCalledTimes(1);
       expect(notification.sendTemplateEmailToUser).toHaveBeenCalledTimes(1);
     });
   });
