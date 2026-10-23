@@ -45,7 +45,7 @@ export function transliterateTurkish(value: string): string {
   return value
     .replace(/[ıİşŞğĞüÜöÖçÇâÂîÎûÛ]/g, (char) => TR_CHAR_MAP[char] ?? char)
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 /**
@@ -132,16 +132,19 @@ const UUID_LENGTH = 36;
  * The listing id inside a URL segment: a bare UUID, or the trailing UUID of
  * `<anything>-<uuid>` (the prefix is ignored, so an old or edited slug still
  * resolves). Returns null for anything else; callers answer that as an
- * invalid id. The UUID is returned as written.
+ * invalid id.
+ *
+ * The UUID comes back lower-cased: ids are generated lower case and compared
+ * case-sensitively (text column), so an upper-cased link still resolves.
  */
 export function parseListingParam(
   param: string | null | undefined,
 ): string | null {
   if (typeof param !== "string") return null;
-  if (UUID_RE.test(param)) return param;
+  if (UUID_RE.test(param)) return param.toLowerCase();
   // `<prefix>-<uuid>`: at least one prefix character, then the separator.
   const separator = param.length - UUID_LENGTH - 1;
   if (separator < 1 || param.charAt(separator) !== "-") return null;
   const id = param.slice(separator + 1);
-  return UUID_RE.test(id) ? id : null;
+  return UUID_RE.test(id) ? id.toLowerCase() : null;
 }

@@ -169,9 +169,11 @@ describe("listingPathSegment / listingPath", () => {
 });
 
 describe("parseListingParam", () => {
-  it("accepts a bare uuid of any version and case, unchanged", () => {
+  it("accepts a bare uuid of any version and case, lower-cased", () => {
     expect(parseListingParam(ID)).toBe(ID);
-    expect(parseListingParam(ID.toUpperCase())).toBe(ID.toUpperCase());
+    // Ids are stored lower case and compared case-sensitively.
+    expect(parseListingParam(ID.toUpperCase())).toBe(ID);
+    expect(parseListingParam(`Ferrari-${ID.toUpperCase()}`)).toBe(ID);
     // Seeded ids are not always v4.
     expect(parseListingParam("6f1e2d3c-4b5a-1c6d-0e7f-0a1b2c3d4e01")).toBe(
       "6f1e2d3c-4b5a-1c6d-0e7f-0a1b2c3d4e01",

@@ -8,6 +8,7 @@ import { APP_FILTER } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import * as request from "supertest";
 import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter";
+import { RouteParamSafetyPipe } from "../../common/pipes/route-param-safety.pipe";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../common/validators/global-validation-pipe-options";
 import { JwtAuthGuard } from "../auth";
 import { I18nService } from "../i18n/i18n.service";
@@ -22,12 +23,13 @@ import { RatingService } from "../rating/rating.service";
 
 /**
  * Listing URL segments on the listing read routes, over HTTP with the real
- * exception filter (contract delta 2026-10-23-listing-slug-param, ADR 0017).
+ * exception filter and global pipes (contract delta
+ * 2026-10-23-listing-slug-param, ADR 0017).
  *
  * Live apps send the whole `/listings/<slug>-<uuid>` segment of a deep link
  * to the API. The read routes a product screen calls resolve it to the UUID,
- * so the service only ever sees the UUID; a bare UUID is unchanged, and
- * anything else keeps exactly the 400 the route answered before.
+ * so the service only ever sees the lower-case UUID; anything else is a 400
+ * with the route's catalog key.
  */
 describe("listing id params over HTTP", () => {
   const ID = "0b1e7a52-3c4d-4e5f-8a9b-1c2d3e4f5ac9";
@@ -72,7 +74,11 @@ describe("listing id params over HTTP", () => {
       .useValue(signedIn)
       .compile();
     app = moduleRef.createNestApplication({ logger: false });
-    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
+    // The same global pipes, in the same order, as main.ts.
+    app.useGlobalPipes(
+      new RouteParamSafetyPipe(),
+      new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS),
+    );
     await app.init();
   });
 
@@ -95,6 +101,9 @@ describe("listing id params over HTTP", () => {
       ["a stale slug", `old-title-${ID}`],
       // Express decodes the path: a raw Turkish prefix still resolves.
       ["a percent-encoded prefix", `k%C4%B1rm%C4%B1z%C4%B1-${ID}`],
+      // Ids are stored lower case: an upper-cased link still resolves.
+      ["an upper-case uuid", ID.toUpperCase()],
+      ["an upper-case segment", `FERRARI-${ID.toUpperCase()}`],
     ])("resolves %s to the uuid", async (_label, param) => {
       const res = await http().get(`/products/${param}`);
 
@@ -104,10 +113,11 @@ describe("listing id params over HTTP", () => {
 
     it.each([
       ["garbage", "123"],
+      ["an empty prefix", `-${ID}`],
       ["a slug without a uuid", "ferrari-f40"],
       ["a uuid followed by a slug", `${ID}-ferrari`],
       ["a truncated uuid", `ferrari-${ID.slice(0, 35)}`],
-    ])("rejects %s with the route's existing 400", async (_label, param) => {
+    ])("rejects %s with the route's 400", async (_label, param) => {
       const res = await http()
         .get(`/products/${param}`)
         .set("accept-language", "en");
@@ -152,10 +162,22 @@ describe("listing id params over HTTP", () => {
     expect(view.status).toBe(400);
     expect(view.body.i18nKey).toBe("server.product.invalidIdFormat");
 
-    // Nest's default ParseUUIDPipe message, as before.
+    // Was Nest's untranslated "Validation failed (uuid is expected)".
     const mine = await http().get("/products/my/ferrari-f40");
     expect(mine.status).toBe(400);
-    expect(mine.body.message).toBe("Validation failed (uuid is expected)");
+    expect(mine.body.i18nKey).toBe("server.common.invalidId");
+  });
+
+  it("keeps the global route-param guard in front of the slug parse", async () => {
+    // Over-long or control-character segments stop before the listing pipe.
+    const long = await http().get(`/products/${"a".repeat(1000)}-${ID}`);
+    expect(long.status).toBe(400);
+    expect(long.body.i18nKey).toBe("server.common.invalidRouteParam");
+
+    const nul = await http().get(`/products/ferrari%00-${ID}`);
+    expect(nul.status).toBe(400);
+    expect(nul.body.i18nKey).toBe("server.common.invalidRouteParam");
+    expect(product.findOne).not.toHaveBeenCalled();
   });
 
   describe("GET /ratings/products/:productId", () => {
@@ -169,11 +191,11 @@ describe("listing id params over HTTP", () => {
       expect(rating.getProductRatingStats).toHaveBeenCalledWith(ID);
     });
 
-    it("rejects garbage with the default uuid 400, as before", async () => {
+    it("rejects garbage with the common invalid-id 400", async () => {
       const res = await http().get("/ratings/products/ferrari-f40/stats");
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toBe("Validation failed (uuid is expected)");
+      expect(res.body.i18nKey).toBe("server.common.invalidId");
       expect(rating.getProductRatingStats).not.toHaveBeenCalled();
     });
   });

@@ -56,10 +56,7 @@ import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import { errorStack } from "../../common/helpers/error-message";
-import {
-  UuidParam,
-  uuidParamPipe,
-} from "../../common/pipes/uuid-param.decorator";
+import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 import {
   LISTING_ID_PARAM_DESCRIPTION,
   ListingIdParam,
@@ -430,10 +427,7 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async findOne(
-    @ListingIdParam(
-      "id",
-      uuidParamPipe("server.product.invalidIdFormatDetailed"),
-    )
+    @ListingIdParam("id", "server.product.invalidIdFormatDetailed")
     id: string,
     @CurrentUser("id") viewerId?: string,
   ) {
@@ -450,7 +444,7 @@ export class ProductController {
   @ApiOperation({ summary: "Benzer ürünler (aynı kategori, aktif)" })
   @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async getSimilar(
-    @ListingIdParam("id", uuidParamPipe("server.product.invalidIdFormat"))
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @Query("limit") limit?: string,
     @CurrentUser("id") viewerId?: string,
@@ -726,7 +720,7 @@ export class ProductController {
   })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async incrementViewCount(
-    @ListingIdParam("id", uuidParamPipe("server.product.invalidIdFormat"))
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,

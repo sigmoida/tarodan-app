@@ -4,7 +4,9 @@ import {
   ParseUUIDPipe,
   PipeTransform,
 } from "@nestjs/common";
+import { type MessageKey } from "@tarodan/i18n";
 import { parseListingParam } from "@tarodan/types";
+import { uuidParamPipe } from "./uuid-param.decorator";
 
 /**
  * Listing id route param that also takes the listing URL segment
@@ -15,12 +17,13 @@ import { parseListingParam } from "@tarodan/types";
  * reviews, similar, view). Taking the trailing UUID here keeps those links
  * opening on app versions that do not parse the segment themselves.
  *
- * Anything else goes to `uuidPipe` unchanged, so a bare UUID behaves as before
- * and garbage fails with the route's existing 400 (same status, message and
- * catalog key). Read routes only: write routes keep a bare-UUID contract.
+ * Anything else goes to `uuidPipe` unchanged, so garbage fails with the
+ * route's UUID 400 (`UuidParam` semantics: status 400 with a catalog key).
+ * A UUID is lower-cased (ids are stored lower case). Read routes only: write
+ * routes keep a bare-UUID contract.
  */
 export class ListingIdPipe implements PipeTransform<unknown, Promise<string>> {
-  constructor(private readonly uuidPipe: ParseUUIDPipe = new ParseUUIDPipe()) {}
+  constructor(private readonly uuidPipe: ParseUUIDPipe = uuidParamPipe()) {}
 
   transform(value: unknown, metadata: ArgumentMetadata): Promise<string> {
     const id =
@@ -35,12 +38,12 @@ export const LISTING_ID_PARAM_DESCRIPTION =
 
 /**
  * `@ListingIdParam("id")`: a listing id route param that accepts a bare UUID
- * or `<slug>-<uuid>`. Pass the route's existing UUID pipe (for example
- * `uuidParamPipe("server.product.invalidIdFormat")`) to keep its 400.
+ * or `<slug>-<uuid>`, the listing counterpart of `UuidParam`. A malformed id
+ * is a 400 with `i18nKey` (default `server.common.invalidId`).
  */
 export function ListingIdParam(
   name: string,
-  uuidPipe?: ParseUUIDPipe,
+  i18nKey?: MessageKey,
 ): ParameterDecorator {
-  return Param(name, new ListingIdPipe(uuidPipe));
+  return Param(name, new ListingIdPipe(uuidParamPipe(i18nKey)));
 }
