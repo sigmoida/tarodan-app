@@ -7012,7 +7012,49 @@
         },
         "filterDue": "Vade",
         "filterAllDue": "Tümü",
-        "filterOverdueOnly": "Vadesi geçmiş"
+        "filterOverdueOnly": "Vadesi geçmiş",
+        "resolution": {
+          "transId": "İşlem numarası (PayTR)",
+          "failureReason": "Neden",
+          "paytrMessage": "PayTR mesajı",
+          "submittedTotal": "PayTR'ye gönderilen toplam",
+          "breakdownTitle": "Transfer tutarı hesabı",
+          "breakdownNet": "Satıcıya net",
+          "breakdownOwnAllowed": "Sipariş/takas payı (iadeler düşülmüş)",
+          "breakdownOidRemaining": "Ödemede kalan (PayTR)",
+          "breakdownAllowedTotal": "Gönderilebilecek en yüksek toplam",
+          "breakdownMissingInput": "Toplamı sınırlayacak {input, select, payment {ödeme} other {sipariş ya da takas}} kaydı bulunamadı. Bu bir veri sorunu: bağlantıyı düzeltip transferi tekrar deneyin, PayTR dışında ödemeyin.",
+          "manualSettlementTitle": "Elle ödendi olarak işaretlendi",
+          "manualSettlementShort": "Elle: {method}",
+          "settledAt": "İşaretlenme tarihi",
+          "reference": "Referans",
+          "platformFunded": "Platformun eklediği emanet tutarı",
+          "method": {
+            "paytr_confirmed": "PayTR panelinde doğrulandı",
+            "external_bank": "Şirket banka hesabından ödendi"
+          },
+          "retryTitle": "Transferi yeniden dene",
+          "retryUnknownWarning": "Bu transferin PayTR sonucu bilinmiyor: PayTR parayı satıcıya göndermiş olabilir. Yeniden denemeden önce PayTR panelinde bu işlem numarasıyla bir transfer olmadığını kontrol edin. Transfer oradaysa yeniden denemeyin; \"Ödendi olarak işaretle\" ile kaydedin.",
+          "retryRecomputeNote": "Transfer yeniden kuyruğa alınır; net ve toplam tutar gönderimden önce yeniden hesaplanır.",
+          "confirmProviderChecked": "PayTR panelinde kontrol ettim",
+          "confirmProviderCheckedRequired": "Yeniden denemek için PayTR panelini kontrol ettiğinizi onaylayın.",
+          "reasonPlaceholder": "Bu işlemi neden yaptığınızı yazın",
+          "markPaid": "Ödendi olarak işaretle",
+          "markPaidMethod": "Yöntem",
+          "markPaidHelp": {
+            "paytr_confirmed": "PayTR panelinde bu işlem numarasıyla yapılmış transferi gördünüz: para satıcıya PayTR üzerinden ulaştı. Kayıt tamamlandı olarak işaretlenir; başka bir ödeme yapılmaz.",
+            "external_bank": "Bu tutar PayTR üzerinden gönderilemez: ödemede yeterli tutar kalmadı. Platform net tutarı şirketin banka hesabından satıcının IBAN'ına kendisi öder. Bu işaretleme parayı göndermez: önce havaleyi bankadan yapın, sonra banka işlem referansını girin. Siparişin emanetinde eksik kalan kısmı platform karşılar ve muhasebe kaydı oluşur."
+          },
+          "markPaidNet": "Satıcıya ödenen net tutar",
+          "markPaidReference": {
+            "paytr_confirmed": "PayTR panelindeki referans",
+            "external_bank": "Banka işlem referansı (dekont no)"
+          },
+          "markPaidTypedConfirm": "Onaylamak için net tutarı yazın ({amount})",
+          "markPaidTypedMismatch": "Yazdığınız tutar net tutarla aynı değil.",
+          "markedPaid": "Transfer ödendi olarak işaretlendi",
+          "alreadyMarkedPaid": "Transfer zaten ödendi olarak işaretlenmişti; değişiklik yapılmadı."
+        }
       },
       "tax": {
         "title": "Vergi Ayarları",
@@ -11697,7 +11739,16 @@
       },
       "payout": {
         "transferNotFound": "Payout transfer bulunamadı",
-        "retryStateInvalid": "Transfer durumu '{status}' tekrar denenebilir değil"
+        "retryStateInvalid": "Durumu {status} olan transfer tekrar denenemez.",
+        "providerCheckRequired": "Bu transferin PayTR sonucu bilinmiyor. Tekrar denemeden önce PayTR panelinde bu işlem numarasıyla bir transfer olmadığını doğrulayın ve bir sebep yazın.",
+        "transferStateChanged": "Transfer bu arada değişti. Listeyi yenileyip tekrar kontrol edin.",
+        "referenceRequired": "Ödeme referansı zorunludur.",
+        "reasonRequired": "Bu işlem için sebep zorunludur.",
+        "markPaidNotAllowed": "Bu transfer bu yöntemle ödendi olarak işaretlenemez (durum: {status}, neden: {reason}).",
+        "markPaidMissingInput": "Bu transferin ödeme ya da sipariş bağlantısı eksik. Bu bir veri sorunu: bağlantıyı düzeltip transferi tekrar deneyin, PayTR dışında ödemeyin.",
+        "markPaidAmountChanged": "Ödenecek net tutar değişti, güncel tutar {current} TL. Listeyi yenileyip tutarı kontrol edin.",
+        "markPaidPayoutBlocked": "Bu ödeme şu an yapılamaz ({reason}). Transferi tekrar deneyin; tutar ve koşullar yeniden hesaplanır.",
+        "markPaidProviderCheckRequired": "Bu transferin daha önceki bir gönderiminin PayTR sonucu doğrulanmadı. Bankadan ödemeden önce PayTR panelinde bu işlem numarasıyla bir transfer olmadığını doğrulayın."
       },
       "product": {
         "approvePendingOnly": "Sadece bekleyen ürünler onaylanabilir",
@@ -12471,6 +12522,21 @@
       "failed": "Başarısız",
       "returned": "Geri Döndü",
       "retry_pending": "Yeniden Denenecek"
+    },
+    "payoutFailureReason": {
+      "no_bank_account": "Banka hesabı yok",
+      "invalid_iban_format": "IBAN biçimi geçersiz",
+      "bank_details_rejected": "Banka bilgileri reddedildi",
+      "provider_rejected": "PayTR reddetti",
+      "transfer_total_exceeds_remaining": "Ödemede yeterli tutar kalmadı",
+      "transfer_needs_manual_decision": "Manuel karar gerekiyor",
+      "provider_unreachable": "PayTR'ye ulaşılamadı",
+      "transfer_outcome_unknown": "PayTR sonucu bilinmiyor",
+      "order_not_payout_eligible": "Sipariş ödemeye uygun değil",
+      "refund_pending": "İade sürüyor",
+      "order_refunded": "Sipariş iade edildi",
+      "trade_refund_pending": "Takas iadesi sürüyor",
+      "fully_refunded": "Tamamı iade edildi"
     },
     "subscription": {
       "active": "Aktif",

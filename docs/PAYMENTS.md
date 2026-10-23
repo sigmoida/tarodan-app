@@ -292,43 +292,176 @@ paradır.
 
 ## 6. Payout
 
-`modules/payout/payout.service.ts`; scheduler: `payout-process` 15 dk'da bir,
-`payout-check-returned` her gün 06:00. Kill-switch: `PAYOUTS_DISABLED=true`.
+`modules/payout/payout.service.ts`; scheduler: `payout-process` every 15 min,
+`payout-check-returned` daily at 06:00. Kill switch: `PAYOUTS_DISABLED=true`.
 
-1. **Oluşturma** — `released` ve dondurulmamış her hold için (bloklayan iade
-   yoksa) `PYT…` referanslı transfer (tiresiz — PayTR `trans_id` şartı, bkz.
-   docs/CODE_SCHEME.md); `netPayout = hold − iade edilen`.
-2. **Satıcı borcu mahsubu** — açık `sellerAccountAdjustment` varsa FIFO tahsis
-   (`FOR UPDATE`), `netAmount = max(0, net − Σtahsis)`; dengeli ledger grubu
-   `seller_debt_recovery / seller_escrow`.
-3. **İşleme kontrolleri** — uygunluk + iade yeniden doğrulanır; **bayat-net
-   koruması** (yalnız aşağı düzeltme; `fully_refunded` → failed); IBAN her
-   seferinde güncel `SellerBankAccount`'tan okunur (snapshot'a güvenilmez);
-   `isValidTrIban` (mod-97) geçemeyen → failed; **3 günlük IBAN değişiklik
-   soğuması** → pending bekler; **aynı-gün koruması** (PayTR ödeme gününde
-   talimat kabul etmez; `paidAt` Türkiye takviminde bugünse pending bekler,
-   retry sayacı yanmaz); eski tireli `PYT-…` transId tiresiz yeniden üretilir;
-   atomik `pending → processing` claim + claim sonrası TOCTOU yeniden okuma.
-4. **Submitted / processed ayrımı** — PayTR `success` yalnız _talimat kabulü_
-   demektir. `PAYTR_TRANSFER_CALLBACK_ENABLED=true` iken payout `processing` +
-   `submittedAt` olarak kalır (**submitted**); tamamlanma yalnız callback'te.
-   Bayrak kapalıyken (varsayılan) senkron kabul `completed` sayılır. İki yol da
-   `applyPayoutCompletionEffects()`'te birleşir (IBAN oto-doğrulama, satıcıya
-   e-posta, ledger settle).
-5. **Callback** — `POST /payouts/callback/paytr-transfer` (public, hash
-   doğrulamalı, düz `"OK"` dönmek zorunda). 3 günü aşan callback gecikmesi alarm
-   üretir. `payout-failed-seller` / `payout-returned-seller` e-postaları maskeli
-   IBAN son-4 ve (varsa) sebep taşır; günlük returned taraması + 30 dk stuck-processing
-   tespiti vardır. **Geri dönen transfer eşlemesi**: PayTR'nin listesi bizim
-   `trans_id`'mizi değil kendi `ref_no`'sunu verir; talimat yanıtındaki `reference`
-   `PayoutTransfer.providerReference`'a yazılır ve eşleme onunla yapılır (migration
-   eski satırları `provider_response->>'reference'`'tan doldurur; referanssız kalan
-   eski satırlar için IBAN + tutar + tarih; belirsizlikte dokunulmaz, loglanır).
-   PayTR aynı satırı pencere boyunca her gün yeniden verir: referansı taşıyan
-   payout artık completed/processing değilse satır "işlendi" sayılır, sezgiye
-   düşülmez. Yeniden gönderim (admin retry, requeue) referansı sıfırlar;
-   `providerResponse` yeni gönderime dek kalır, admin retry'ın audit kaydı
-   önceki referans/yanıtı taşır.
+1. **Creation**: for every `released`, unfrozen hold without a blocking
+   refund, a transfer with a `PYT…` reference (no hyphen: PayTR `trans_id`
+   rule, see docs/CODE_SCHEME.md); `netPayout = hold − refunded`.
+2. **Seller debt offset**: open `sellerAccountAdjustment` rows are
+   allocated FIFO (`FOR UPDATE`), `netAmount = max(0, net − Σallocations)`;
+   balanced ledger group `seller_debt_recovery / seller_escrow`.
+3. **Processing checks**: eligibility and refunds are checked again;
+   **stale-net guard** (only lowers; `fully_refunded` → failed); the IBAN is
+   read from the current `SellerBankAccount` every time (never the
+   snapshot); `isValidTrIban` (mod-97) failures → failed; **3-day IBAN change
+   cooldown** → stays pending; **same-day guard** (PayTR refuses an
+   instruction on the payment day; `paidAt` today in the Turkish calendar →
+   stays pending, the retry counter does not move); legacy hyphenated
+   `PYT-…` trans ids are regenerated without the hyphen; atomic
+   `pending → processing` claim plus a TOCTOU re-read after the claim.
+4. **Transfer total (`total_amount`)**: the slice of the payment
+   (`merchant_oid`) this transfer settles. PayTR rejects a total above what
+   the oid has left (`err_no 010`); a cart payment pays several sellers from
+   one oid and refunds lower its balance. Computed on every attempt in
+   `payout/helpers/transfer-total.ts`, one formula for order and trade-cash
+   payouts, in kuruş:
+   `allowed = min(source total − cash refunded on it, payment − all refunds
+on the payment − totals the other transfers on the oid took)`.
+   - Refunds: `RefundAttempt`s that are not `failed` (one in flight reserves
+     its room), or `Payment.metadata.refundedOrders` when larger (refunds
+     before 2026-07-28 exist only there).
+   - Other transfers count when `processing`, `completed`, `returned` (PayTR
+     returns a bounced transfer to the merchant balance, not to the oid) or
+     `failed / transfer_outcome_unknown`, by `submittedTotalAmount`; rows
+     sent before 2026-10-23 count `amount` (what they sent), a zero net
+     counts 0. The total is stamped on `submittedTotalAmount` in the claim.
+   - The net (`submerchant_amount`) is never changed by this. If it does
+     not fit (including nothing left, e.g. a residual after a full refund)
+     PayTR is not called: `failed / transfer_needs_manual_decision`, inputs
+     in `providerResponse.transferTotal`, error log, no seller e-mail. The
+     platform pays such a payout from its own bank account and records it
+     in admin (decision of 2026-10-23); a non-faulty seller is paid as §5
+     says. A payout without a payment fails closed the same way.
+5. **Outcomes and retries**: `failureReason` is a code
+   (`PAYOUT_FAILURE_REASONS` in `@tarodan/types`); PayTR's answer or the
+   network cause goes to `providerResponse` and the log, never to the
+   seller.
+
+   | Outcome                                                                                                                                                                                                           | Action                                                                                                                                                         |
+   | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | PayTR `err_no 010`                                                                                                                                                                                                | `retry_pending` (60 min, then 4 h) with a recomputed total, 3 attempts, then `transfer_total_exceeds_remaining`                                                |
+   | Other PayTR rejection                                                                                                                                                                                             | `failed` at once: `bank_details_rejected` when `err_msg` says the IBAN or holder name is wrong (a detail word next to a defect word), else `provider_rejected` |
+   | Request not sent (connect phase: `UND_ERR_CONNECT_TIMEOUT`, `ECONNREFUSED`, `ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, a connect syscall error; HTTP 4xx other than 408/409 without a PayTR answer) | `retry_pending`, same `trans_id`, 3 attempts, then `provider_unreachable`                                                                                      |
+   | Outcome unknown (reset or timeout after sending, our 20 s timeout, HTTP 5xx, 408 or 409, unreadable answer)                                                                                                       | `failed / transfer_outcome_unknown` at once, never resent by a cron; total and net stay on the row                                                             |
+
+   Final failures log at `error` with the payout id, `trans_id` and cause
+   code (Sentry). The classifier is `classifyPaytrFetchError`
+   (`payment-providers/paytr/paytr-fetch-retry.util.ts`); the read-path retry
+   in that file is not for money writes. Only the PayTR call itself is
+   treated as the transfer: an error in the bookkeeping after PayTR
+   accepted is logged at `error`, leaves the row `processing` (zombie
+   alarm) and is never retried; the run goes on with the next payout. A
+   failure while building the request (credentials, signing, endpoint)
+   is a configuration problem: the claim is released and the run stops,
+   so no payout burns its retries. Saving the bank account puts the
+   seller's `failed / no_bank_account` rows back to `pending`, and also
+   `invalid_iban_format` and `bank_details_rejected` when the IBAN or
+   holder name changed. Admin retry puts a `failed` row back to
+   `pending` (same `trans_id`; `returned` gets a new one) and the processor
+   recomputes net and total (see 9).
+
+6. **Submitted / processed**: PayTR `success` only means the _instruction
+   was accepted_. With `PAYTR_TRANSFER_CALLBACK_ENABLED=true` the payout stays
+   `processing` with `submittedAt` (**submitted**); it completes only in the
+   callback. With the flag off (default) the synchronous acceptance counts
+   as `completed`. Both paths meet in `applyPayoutCompletionEffects()`
+   (seller e-mail, ledger settle).
+7. **Callback**: `POST /payouts/callback/paytr-transfer` (public, hash
+   verified, must answer a plain `"OK"`). It completes `processing` rows and
+   also `failed / transfer_outcome_unknown` rows (PayTR confirms a transfer
+   we did not hear back about), and `pending` / `retry_pending` rows (an
+   admin retried an unknown outcome before this late result came; the
+   money moved, so it is settled instead of sent again, error log), each
+   once by CAS. Other rows are never revived; a callback for one logs an
+   error (check the PayTR panel before paying it any other way), and so does
+   a callback for a row an admin paid from the bank (`external_bank`):
+   possible double payment. A row without a send snapshot (unknown outcome, or
+   bookkeeping failed after acceptance) gets the send time and net
+   stamped, so a later bank return still matches. A callback later than 3 days raises an alarm. Daily
+   returned-transfer scan plus a 30-minute stuck-`processing` check.
+   **Returned transfer matching**: PayTR's list carries its own `ref_no`,
+   not our `trans_id`; the instruction answer's `reference` is stored in
+   `PayoutTransfer.providerReference` and matching uses it (the migration
+   filled old rows from `provider_response->>'reference'`; old rows without
+   a reference fall back to IBAN + amount + date; ambiguous rows are left
+   alone and logged). PayTR repeats the same row every day of the window: a
+   row whose payout is no longer completed/processing counts as handled and
+   never falls back to the heuristic. A resend (admin retry, requeue) clears
+   the reference; `providerResponse` stays until the next send and the admin
+   retry's audit record keeps the previous reference and answer.
+8. **Seller e-mails**: `payout-failed-seller` only for the seller-fixable
+   codes `no_bank_account`, `invalid_iban_format` and `bank_details_rejected`,
+   with the mapped text of `payout/helpers/payout-failure-reasons.ts`
+   (masked IBAN last 4); never PayTR's text or an oid. Platform-side reasons
+   send nothing; the team resolves them. `payout-returned-seller` goes out
+   when the bank returns a transfer.
+9. **Manual resolution (admin → Finance → Payouts → Transfers)**, in the
+   payout domain (`payout/resolution/payout-resolution.service.ts`); one
+   policy (`payout/helpers/payout-resolution-policy.ts`) drives the API
+   guards and the list row's `resolution` flags. Every write is a CAS on the
+   row as read (status, reason, `updatedAt`), with the required audit record
+   in the same transaction (`payout_retry`, `payout_mark_paid`).
+   - **Retry** (`POST /admin/payouts/:transferId/retry`, super_admin/admin
+     with the `payouts` permission): `failed` or `returned` → `pending`,
+     retry counter and reference cleared (an earlier manual settlement too);
+     net and total are never set here. `submittedTotalAmount` and
+     `submittedAmount` stay: a pending row is not counted against the oid,
+     the next claim overwrites them, and a late callback settles with them.
+     A row PayTR may have taken needs `confirmProviderChecked: true` and a
+     reason (the PayTR panel shows no transfer with that `trans_id`), else
+     409: `transfer_outcome_unknown`, and rows from before the reason codes
+     with a free-text reason after more than one attempt (the old handler
+     resent the same `trans_id` and kept only the last attempt's reason and
+     answer, so an earlier attempt may have reached PayTR) or after one
+     attempt without a stored PayTR answer (a thrown error, e.g. "Bad
+     Request Exception"). One attempt answered by PayTR (`status: "error"`)
+     is a rejection, and a free-text row without an attempt failed before
+     sending; neither needs the check. A checked retry of a legacy row
+     records the net it may have sent (`submittedAmount`), so the row keeps
+     saying an earlier send is unconfirmed (a net without `submittedAt`)
+     until PayTR accepts a later attempt.
+   - **Mark as paid** (`POST /admin/payouts/transfers/:id/mark-paid`,
+     super_admin/admin with the `payouts` permission; body `method`,
+     `reference`, `reason`, `expectedNetAmount`). One method fits a row:
+     - `paytr_confirmed` for a row PayTR may have taken (as above) when the
+       panel shows it arrived. Net = `submittedAmount ?? netAmount`. Stamps
+       like the callback: `submittedAt` = the failure time, total kept.
+     - `external_bank` for `transfer_needs_manual_decision` (not a missing
+       payment or source: that is a data problem, fix and retry) and
+       `transfer_total_exceeds_remaining`, after finance paid the net from the
+       company account (decision of 2026-10-23). The processor's guards run
+       again inside the transaction, under the payment and then the order
+       row lock (refund attempts and refund requests take them) on the row
+       read after the locks: order payable, no refund in flight, the hold
+       still entitles the seller to the net; for trade cash, the cash payment
+       completed, released, not refunded and not below the net. Else 409 and
+       a retry recomputes. `submittedTotalAmount
+= 0` (siblings on the oid do not count it), `submittedAt` and
+       `submittedAmount` null (no PayTR transfer for the PSP comparison or
+       the returned-transfer scan, which never matches a row without a send
+       time).
+     - `expectedNetAmount` must equal the net to the kuruş (409 otherwise),
+       so a stale screen never books a different amount.
+     - `external_bank` on a row whose earlier send PayTR never confirmed
+       (`resolution.markPaidRequiresProviderCheck`) also needs
+       `confirmProviderChecked: true`: the panel shows no transfer with its
+       `trans_id` (409 `markPaidProviderCheckRequired` otherwise).
+     - Ledger, in the same transaction: `external_bank` first funds what the
+       escrow no longer holds, `F = max(0, net − max(0, seller_escrow))` per
+       order (per trade and recipient for trade cash): `adjustment`
+       `seller_escrow` debit / `platform_commission` credit, key
+       `payout-platform-funding:<payoutId>`. Then both methods book
+       `payout_completed` (`seller_escrow` credit / `payout` debit, net, key
+       `payout-completed:<payoutId>`, metadata method and reference). If
+       that key already exists (a transfer the bank returned, then retried)
+       nothing is booked again. The order's escrow ends at 0.
+     - The row keeps `providerResponse.manualSettlement` (method, reference,
+       admin, time, net, funded amount). The seller gets the normal "payout
+       released" e-mail after commit. A repeated request returns the first
+       result (`alreadySettled: true`) and writes nothing; a row a callback
+       or retry moved first gives 409.
+   - Runbook: OPERATIONS.md, "Payout transfers needing a decision".
 
 ---
 

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { PayoutService } from "./payout.service";
+import { PayoutResolutionService } from "./resolution/payout-resolution.service";
 import { PayoutCallbackController } from "./payout-callback.controller";
 import { PayoutSchedulerService } from "./jobs/payout-scheduler.service";
 import { PayoutScheduledProcessor } from "./jobs/payout-scheduled.processor";
@@ -20,9 +21,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   controllers: [PayoutCallbackController],
   providers: [
     PayoutService,
+    PayoutResolutionService,
     PayoutSchedulerService,
     ...scheduledProcessors(PayoutScheduledProcessor),
   ],
-  exports: [PayoutService],
+  exports: [PayoutService, PayoutResolutionService],
 })
 export class PayoutModule {}

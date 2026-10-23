@@ -61,9 +61,7 @@ const pager = (rows: unknown[]) =>
     rows.slice(args.skip ?? 0, (args.skip ?? 0) + (args.take ?? rows.length)),
   );
 
-function makeService(
-  data: { holds?: unknown[]; transfers?: unknown[] } = {},
-) {
+function makeService(data: { holds?: unknown[]; transfers?: unknown[] } = {}) {
   const prisma = {
     paymentHold: {
       findMany: pager(data.holds ?? [hold()]),
@@ -73,7 +71,12 @@ function makeService(
     order: {
       findMany: jest.fn().mockResolvedValue([
         // Liste satırı bırakılabilirlik bayrağını da türetir (HOLD_RELEASE_ORDER_SELECT).
-        { id: "o1", orderNumber: "ORD-1", status: "completed", refundRequests: [] },
+        {
+          id: "o1",
+          orderNumber: "ORD-1",
+          status: "completed",
+          refundRequests: [],
+        },
       ]),
     },
   };
@@ -288,6 +291,32 @@ describe("transferExportRecord", () => {
       netAmount: 90,
       ibanLast4: "••7890",
       status: "Başarısız",
+      // Legacy free text stays as is.
+      failureReason: "IBAN hatalı",
     });
+  });
+
+  it("writes a reason code as its label", () => {
+    expect(
+      transferExportRecord(
+        {
+          id: "t1",
+          orderId: "o1",
+          orderNumber: "ORD-1",
+          tradeCashPaymentId: null,
+          seller: { id: "s1", displayName: "Satıcı", email: "s@x.com" },
+          amount: 100,
+          netAmount: 90,
+          adjustmentDeduction: 0,
+          ibanLast4: "7890",
+          status: "failed",
+          failureReason: "transfer_needs_manual_decision",
+          retryCount: 0,
+          processedAt: null,
+          createdAt: new Date("2026-10-01T09:00:00.000Z"),
+        } as never,
+        t,
+      ).failureReason,
+    ).toBe("Manuel karar gerekiyor");
   });
 });

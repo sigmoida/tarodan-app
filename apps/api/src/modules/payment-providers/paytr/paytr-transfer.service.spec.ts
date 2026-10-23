@@ -4,6 +4,7 @@ import { BadRequestException, Logger } from "@nestjs/common";
 import * as crypto from "crypto";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRTransferService } from "./paytr-transfer.service";
+import { PlatformTransferRequestError } from "../transfer-errors";
 
 /**
  * Aşama-1: Platform Transfer talimatı (dev.paytr.com/platform-transfer-talebi/
@@ -135,23 +136,187 @@ describe("PayTRTransferService.createPlatformTransfer", () => {
     });
   });
 
-  it("refuses a hyphenated trans_id before touching the network", async () => {
-    let thrown: BadRequestException | undefined;
+  it("refuses a hyphenated trans_id before touching the network, as not sent", async () => {
+    let thrown: PlatformTransferRequestError | undefined;
     try {
       await service.createPlatformTransfer({
         ...params,
         transId: "PYT-K7X9M2QF3N",
       });
     } catch (e) {
-      thrown = e as BadRequestException;
+      thrown = e as PlatformTransferRequestError;
     }
-    expect(thrown).toBeInstanceOf(BadRequestException);
-    // Hata gövdesi i18n payload'ıdır; sebep parametresinde alan adı geçer.
-    expect(thrown!.getResponse()).toEqual({
-      i18nKey: "server.payment.paytrPlatformTransferFailed",
-      i18nParams: { reason: expect.stringContaining("trans_id") },
-    });
+    expect(thrown).toBeInstanceOf(PlatformTransferRequestError);
+    expect(thrown!.phase).toBe("not_sent");
+    expect(thrown!.causeCode).toBe("INVALID_TRANS_ID");
+    expect(thrown!.message).toContain("trans_id");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("reports an unusable endpoint URL as a pre-send failure", async () => {
+    const credentials = (service as unknown as { paytr: { baseUrl: string } })
+      .paytr;
+    Object.defineProperty(credentials, "baseUrl", { value: "not a url" });
+    let thrown: PlatformTransferRequestError | undefined;
+    try {
+      await service.createPlatformTransfer(params);
+    } catch (e) {
+      thrown = e as PlatformTransferRequestError;
+    }
+    expect(thrown).toBeInstanceOf(PlatformTransferRequestError);
+    expect(thrown!.phase).toBe("not_sent");
+    expect(thrown!.causeCode).toBe("PRE_SEND");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("reports a failure while building the request (credentials) as not sent", async () => {
+    const credentials = jest
+      .spyOn(PayTRCredentials.prototype, "forMerchant")
+      .mockImplementation(() => {
+        throw new Error("marketplace credentials missing");
+      });
+    try {
+      let thrown: PlatformTransferRequestError | undefined;
+      try {
+        await service.createPlatformTransfer(params);
+      } catch (e) {
+        thrown = e as PlatformTransferRequestError;
+      }
+      expect(thrown).toBeInstanceOf(PlatformTransferRequestError);
+      expect(thrown!.phase).toBe("not_sent");
+      expect(thrown!.causeCode).toBe("PRE_SEND");
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      credentials.mockRestore();
+    }
+  });
+
+  /**
+   * Sentry TARODAN-API-30: a network failure was rethrown as
+   * BadRequestException(i18n payload), whose message is Nest's default
+   * "Bad Request Exception" -- that string became the payout's failureReason
+   * and the cause code was lost. Without an answer from PayTR the caller
+   * must know whether the request could have reached PayTR at all.
+   */
+  describe("when PayTR gives no usable answer", () => {
+    const rejection = async (): Promise<PlatformTransferRequestError> => {
+      try {
+        await service.createPlatformTransfer(params);
+      } catch (e) {
+        return e as PlatformTransferRequestError;
+      }
+      throw new Error("expected createPlatformTransfer to throw");
+    };
+    const networkError = (code: string) =>
+      Object.assign(new TypeError("fetch failed"), { cause: { code } });
+
+    it("reports a connect-phase failure as not_sent with its cause code, without retrying", async () => {
+      const warnSpy = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      fetchSpy.mockRejectedValue(networkError("UND_ERR_CONNECT_TIMEOUT"));
+
+      const error = await rejection();
+
+      expect(error).toBeInstanceOf(PlatformTransferRequestError);
+      expect(error).not.toBeInstanceOf(BadRequestException);
+      expect(error.phase).toBe("not_sent");
+      expect(error.causeCode).toBe("UND_ERR_CONNECT_TIMEOUT");
+      expect(error.message).toContain("UND_ERR_CONNECT_TIMEOUT");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("UND_ERR_CONNECT_TIMEOUT"),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it("reports a reset after the request was written as unknown", async () => {
+      fetchSpy.mockRejectedValue(networkError("ECONNRESET"));
+      const error = await rejection();
+      expect(error.phase).toBe("unknown");
+      expect(error.causeCode).toBe("ECONNRESET");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports our own request timeout as unknown", async () => {
+      const timeout = new Error("The operation was aborted due to timeout");
+      timeout.name = "TimeoutError";
+      fetchSpy.mockRejectedValue(timeout);
+      const error = await rejection();
+      expect(error.phase).toBe("unknown");
+      expect(error.causeCode).toBe("TimeoutError");
+    });
+
+    it("reports an HTTP 5xx as unknown even when the body parses", async () => {
+      fetchSpy.mockResolvedValue({
+        status: 502,
+        text: async () => JSON.stringify({ status: "error", err_msg: "x" }),
+      });
+      const error = await rejection();
+      expect(error.phase).toBe("unknown");
+      expect(error.causeCode).toBe("HTTP_502");
+    });
+
+    it.each(["<html>gateway</html>", "", "null", JSON.stringify({ foo: 1 })])(
+      "reports an unusable body as unknown: %s",
+      async (body) => {
+        fetchSpy.mockResolvedValue({ status: 200, text: async () => body });
+        const error = await rejection();
+        expect(error.phase).toBe("unknown");
+        expect(error.causeCode).toBe("INVALID_BODY");
+      },
+    );
+
+    it.each([400, 403, 404, 429])(
+      "reports an HTTP %s without a PayTR answer as not sent (refused before processing)",
+      async (status) => {
+        fetchSpy.mockResolvedValue({
+          status,
+          text: async () => "<html>blocked</html>",
+        });
+        const error = await rejection();
+        expect(error.phase).toBe("not_sent");
+        expect(error.causeCode).toBe(`HTTP_${status}`);
+      },
+    );
+
+    it.each([408, 409])(
+      "keeps an HTTP %s without a PayTR answer unknown (it can follow processing)",
+      async (status) => {
+        fetchSpy.mockResolvedValue({
+          status,
+          text: async () => "<html>timeout</html>",
+        });
+        const error = await rejection();
+        expect(error.phase).toBe("unknown");
+        expect(error.causeCode).toBe(`HTTP_${status}`);
+      },
+    );
+
+    it("returns a PayTR answer even when it comes with a 4xx status", async () => {
+      fetchSpy.mockResolvedValue({
+        status: 400,
+        text: async () =>
+          JSON.stringify({ status: "error", err_no: "005", err_msg: "x" }),
+      });
+      await expect(service.createPlatformTransfer(params)).resolves.toEqual({
+        status: "error",
+        err_no: "005",
+        err_msg: "x",
+      });
+    });
+
+    it("reports a failure while reading the body as unknown", async () => {
+      fetchSpy.mockResolvedValue({
+        status: 200,
+        text: async () => {
+          throw networkError("UND_ERR_SOCKET");
+        },
+      });
+      const error = await rejection();
+      expect(error.phase).toBe("unknown");
+      expect(error.causeCode).toBe("UND_ERR_SOCKET");
+    });
   });
 
   describe("getReturnedTransfers", () => {

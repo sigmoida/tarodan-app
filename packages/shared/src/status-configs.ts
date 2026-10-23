@@ -729,6 +729,68 @@ export const payoutStatusConfig: StatusConfigDefMap = {
   },
 };
 
+/**
+ * Why a payout transfer is not paid (`PayoutTransfer.failureReason`): one
+ * entry per code of `PAYOUT_FAILURE_REASONS` (@tarodan/types). Rows written
+ * before 2026-10-23 and returned rows carry free text instead of a code;
+ * readers show that text as is. Variant: warning = the seller can fix it,
+ * danger = the team resolves it, outline = a refund or order guard.
+ */
+export const payoutFailureReasonConfig: StatusConfigDefMap = {
+  no_bank_account: {
+    labelKey: "status.payoutFailureReason.no_bank_account",
+    variant: "warning",
+  },
+  invalid_iban_format: {
+    labelKey: "status.payoutFailureReason.invalid_iban_format",
+    variant: "warning",
+  },
+  bank_details_rejected: {
+    labelKey: "status.payoutFailureReason.bank_details_rejected",
+    variant: "warning",
+  },
+  provider_rejected: {
+    labelKey: "status.payoutFailureReason.provider_rejected",
+    variant: "danger",
+  },
+  transfer_total_exceeds_remaining: {
+    labelKey: "status.payoutFailureReason.transfer_total_exceeds_remaining",
+    variant: "danger",
+  },
+  transfer_needs_manual_decision: {
+    labelKey: "status.payoutFailureReason.transfer_needs_manual_decision",
+    variant: "danger",
+  },
+  provider_unreachable: {
+    labelKey: "status.payoutFailureReason.provider_unreachable",
+    variant: "danger",
+  },
+  transfer_outcome_unknown: {
+    labelKey: "status.payoutFailureReason.transfer_outcome_unknown",
+    variant: "danger",
+  },
+  order_not_payout_eligible: {
+    labelKey: "status.payoutFailureReason.order_not_payout_eligible",
+    variant: "outline",
+  },
+  refund_pending: {
+    labelKey: "status.payoutFailureReason.refund_pending",
+    variant: "outline",
+  },
+  order_refunded: {
+    labelKey: "status.payoutFailureReason.order_refunded",
+    variant: "outline",
+  },
+  trade_refund_pending: {
+    labelKey: "status.payoutFailureReason.trade_refund_pending",
+    variant: "outline",
+  },
+  fully_refunded: {
+    labelKey: "status.payoutFailureReason.fully_refunded",
+    variant: "outline",
+  },
+};
+
 /** Üyelik abonelik durumu (SubscriptionStatus). */
 export const subscriptionStatusConfig: StatusConfigDefMap = {
   active: {

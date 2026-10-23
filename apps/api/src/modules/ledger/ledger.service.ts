@@ -433,12 +433,18 @@ export class LedgerService {
     });
   }
 
-  /** Bir hesabın signed (debit +, credit −) bakiyesi. Test/teşhis/gelecekteki türetim. */
+  /**
+   * Signed balance of an account (debit +, credit -), for tests and
+   * diagnostics and for the escrow check of a manual payout settlement,
+   * which passes its transaction as `db` so it reads inside the transaction
+   * that settles the payout.
+   */
   async accountBalance(
     account: LedgerAccount,
-    where?: { sellerId?: string; orderId?: string },
+    where?: { sellerId?: string; orderId?: string; tradeId?: string },
+    db: Pick<Prisma.TransactionClient, "ledgerEntry"> = this.prisma,
   ): Promise<number> {
-    const rows = await this.prisma.ledgerEntry.groupBy({
+    const rows = await db.ledgerEntry.groupBy({
       by: ["direction"],
       where: { account, ...(where ?? {}) },
       _sum: { amount: true },

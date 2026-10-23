@@ -32,7 +32,10 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
         update: jest.fn().mockResolvedValue({}),
       },
       refundRequest: { findFirst: jest.fn().mockResolvedValue(null) },
-      refundAttempt: { findFirst: jest.fn().mockResolvedValue(null) },
+      refundAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       sellerBankAccount: {
         findUnique: jest.fn().mockResolvedValue({
           userId: "s1",
@@ -63,6 +66,7 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
     id: "o1",
     status: OrderStatus.completed,
     orderNumber: "ORD-1",
+    totalAmount: 100,
   };
 
   it("kısmi iade sonrası retry: bayat netAmount değil, güncel hak edilen tutar transfer edilir", async () => {
@@ -83,6 +87,7 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
         orderId: "o1",
         amount: 85,
         refundedAmount: 30,
+        payment: { amount: 100, metadata: null },
       },
       tradeCashPayment: null,
     };
@@ -112,6 +117,7 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
         orderId: "o1",
         amount: 85,
         refundedAmount: 85,
+        payment: { amount: 100, metadata: null },
       },
       tradeCashPayment: null,
     };
@@ -143,6 +149,7 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
         orderId: "o1",
         amount: 88,
         refundedAmount: 0,
+        payment: { amount: 100, metadata: null },
       },
       tradeCashPayment: null,
     };
@@ -173,6 +180,7 @@ describe("PayoutService — stale netAmount recheck before transfer", () => {
         orderId: "o1",
         amount: 88,
         refundedAmount: 0,
+        payment: { amount: 100, metadata: null },
       },
       tradeCashPayment: null,
     };

@@ -4,7 +4,12 @@ import {
   NotFoundException,
   Logger,
 } from "@nestjs/common";
-import { isValidTckn, normalizeTckn } from "@tarodan/types";
+import {
+  SELLER_ACTIONABLE_PAYOUT_FAILURES,
+  isValidTckn,
+  normalizeTckn,
+  type PayoutFailureReason,
+} from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 
@@ -55,9 +60,15 @@ export class UserBankService {
     // ödeme takılmaz; ödemeler zaten teslimden ~14 gün sonra yapılır (F2.1).
     const existing = await this.prisma.sellerBankAccount.findUnique({
       where: { userId },
-      select: { iban: true, tcKimlikNo: true },
+      select: { iban: true, accountHolder: true, tcKimlikNo: true },
     });
     const ibanChanged = !!existing && existing.iban !== normalizedIban;
+    // PayTR rejected (or the checksum refused) the details on record: only a
+    // change of IBAN or holder name makes a resend worth trying.
+    const payeeChanged =
+      !existing ||
+      ibanChanged ||
+      existing.accountHolder !== data.accountHolder.trim();
     const tcKimlikNo = await this.resolveBankTckn(
       userId,
       data.tcKimlikNo,
@@ -91,18 +102,26 @@ export class UserBankService {
       );
     }
 
-    // IBAN yokken üretilen transferler failed(no_bank_account) düşer ve kendi
-    // kendine canlanmazdı — satıcı IBAN girse bile para admin'in elle retry'ına
-    // kadar bekliyordu. Artık hesap kaydedilince bu transferler pending'e
-    // çekilir; 15 dk'lık payout cron'u işleme anında GÜNCEL IBAN'ı okur.
-    // IBAN DEĞİŞİKLİĞİNDE cooldown yine devrededir (cron pending satırı
-    // bekletir); yalnız kuyruğa geri koyarız, cooldown'ı atlatmayız. failed
-    // hiç PayTR'ye gitmediği için transId korunur (admin retry ile aynı kural).
+    // Transfers that failed for a reason the seller fixes (no bank account,
+    // invalid IBAN, PayTR rejected the IBAN or holder name) never revived on
+    // their own: the money waited for an admin retry although the "payout
+    // failed" e-mail promises a resend. Saving the account puts them back to
+    // pending; the 15-minute payout cron reads the CURRENT details at send
+    // time. A save that keeps the IBAN and holder name revives only
+    // no_bank_account rows: resending details PayTR already refused would
+    // fail and e-mail the seller again. On an IBAN CHANGE the cooldown still
+    // applies (the cron holds the pending row); we only requeue, we never
+    // skip the cooldown. None of these took anything from the PayTR oid, so
+    // the transId is kept (same rule as the admin retry of a failed row).
     const requeued = await this.prisma.payoutTransfer.updateMany({
       where: {
         sellerId: userId,
         status: "failed",
-        failureReason: "no_bank_account",
+        failureReason: {
+          in: payeeChanged
+            ? [...SELLER_ACTIONABLE_PAYOUT_FAILURES]
+            : ["no_bank_account" satisfies PayoutFailureReason],
+        },
       },
       data: {
         status: "pending",
@@ -114,7 +133,7 @@ export class UserBankService {
     });
     if (requeued.count > 0) {
       this.logger.log(
-        `Seller ${userId}: ${requeued.count} adet no_bank_account payout, IBAN kaydıyla yeniden kuyruğa alındı.`,
+        `Seller ${userId}: ${requeued.count} seller-fixable failed payout(s) requeued after the bank account was saved`,
       );
     }
 

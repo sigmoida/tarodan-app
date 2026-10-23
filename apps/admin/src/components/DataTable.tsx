@@ -292,7 +292,10 @@ export function DataTable<T>({
                           ? (e) => {
                               // Clicking interactive elements inside the row does
                               // not trigger the row click — their own behavior runs.
+                              // A click in a portal (a row menu's items) bubbles
+                              // through React but is not in the row's DOM.
                               if (
+                                !e.currentTarget.contains(e.target as Node) ||
                                 (e.target as HTMLElement).closest(
                                   "a, button, input, select, textarea, label, [role='button']",
                                 )

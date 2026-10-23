@@ -244,6 +244,7 @@ export {
   sellerTypeConfig,
   paymentHoldStatusConfig,
   payoutStatusConfig,
+  payoutFailureReasonConfig,
   subscriptionStatusConfig,
   accountStatusConfig,
   discountTypeConfig,
