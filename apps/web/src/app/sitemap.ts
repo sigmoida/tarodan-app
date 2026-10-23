@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
-import { SITE_URL } from "@/lib/seo";
+import { listingPath } from "@tarodan/types";
+import { SITE_URL, localeLanguages } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
 
 /**
@@ -8,16 +9,15 @@ import { getServerApiOrigin } from "@/lib/api/origin";
  * and English lives under `/en`. `x-default` points at the tr URL. Emitting
  * these as `<xhtml:link rel="alternate">` per entry tells crawlers the two
  * language variants are the same page (complements the `Link` hreflang headers
- * the next-intl middleware already sets on every response).
+ * the next-intl middleware already sets on every response). The set comes from
+ * `localeLanguages`, the same one the page heads use, made absolute here.
  */
 function localeAlternates(path: string) {
-  return {
-    languages: {
-      tr: `${SITE_URL}${path}`,
-      en: `${SITE_URL}/en${path}`,
-      "x-default": `${SITE_URL}${path}`,
-    },
-  };
+  const languages: Record<string, string> = {};
+  for (const [lang, href] of Object.entries(localeLanguages(path))) {
+    languages[lang] = `${SITE_URL}${href}`;
+  }
+  return { languages };
 }
 
 // Server-side API origin (same resolution the listings route uses).
@@ -59,31 +59,97 @@ const STATIC_PATHS = [
   "/account-deletion",
 ];
 
-/** Best-effort: append active listing detail URLs. Never throws — a failed or
- *  slow API just yields the static sitemap so the route always resolves. */
-async function fetchListingUrls(): Promise<MetadataRoute.Sitemap> {
+/**
+ * Page size for the listing pages: the API's cap on `GET /products`
+ * (`ProductQueryDto.limit` is `@Max(100)`). Asking for more is a 400, which
+ * once left the sitemap with no listings at all.
+ */
+const LISTING_PAGE_SIZE = 100;
+
+/**
+ * Most listing pages one sitemap build reads (50 x 100 = 5,000 listings, well
+ * under the 50,000 URLs a sitemap file may hold). Keeps the hourly build
+ * bounded if the catalogue grows; past it, a sitemap index is the next step.
+ */
+const MAX_LISTING_PAGES = 50;
+
+interface SitemapListing {
+  id: string;
+  title?: string | null;
+  updatedAt?: string | null;
+}
+
+interface ListingPage {
+  items: SitemapListing[];
+  totalPages: number;
+}
+
+/**
+ * One page of active listings, newest first: a fixed order, so the pages do
+ * not shift under the build the way the default relevance order would (it
+ * moves with views and boosts). Null when the page could not be read.
+ */
+async function fetchListingPage(page: number): Promise<ListingPage | null> {
   try {
-    const res = await fetch(
-      `${API_BASE}/api/products?limit=1000&status=active`,
-      { next: { revalidate: 3600 } },
-    );
-    if (!res.ok) return [];
+    const query = new URLSearchParams({
+      status: "active",
+      sortBy: "created_desc",
+      limit: String(LISTING_PAGE_SIZE),
+      page: String(page),
+    });
+    const res = await fetch(`${API_BASE}/api/products?${query}`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
     const raw = await res.json();
-    const items: any[] = Array.isArray(raw)
+    const items: SitemapListing[] = Array.isArray(raw)
       ? raw
       : (raw?.data ?? raw?.products ?? []);
-    return items
-      .filter((p) => p?.id)
-      .map((p) => ({
-        url: `${SITE_URL}/listings/${p.id}`,
-        lastModified: p.updatedAt ? new Date(p.updatedAt) : undefined,
-        changeFrequency: "daily" as const,
-        priority: 0.7,
-        alternates: localeAlternates(`/listings/${p.id}`),
-      }));
+    const totalPages = Number(raw?.meta?.totalPages);
+    return {
+      items,
+      totalPages:
+        Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1,
+    };
   } catch {
-    return [];
+    return null;
   }
+}
+
+/**
+ * Best-effort: the active listings' canonical URLs (`/listings/<slug>-<uuid>`,
+ * ADR 0017). Never throws: a failed or slow API yields fewer (or no) listing
+ * entries, so the route always resolves. Page 1 tells how many pages there
+ * are; the rest are read in parallel, and a page that fails is skipped.
+ */
+async function fetchListingUrls(): Promise<MetadataRoute.Sitemap> {
+  const first = await fetchListingPage(1);
+  if (!first) return [];
+  const pageCount = Math.min(first.totalPages, MAX_LISTING_PAGES);
+  const rest = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, i) => fetchListingPage(i + 2)),
+  );
+
+  const seen = new Set<string>();
+  const entries: MetadataRoute.Sitemap = [];
+  for (const page of [first, ...rest]) {
+    for (const listing of page?.items ?? []) {
+      // A listing created mid-build shifts the pages by one: skip the repeat.
+      if (typeof listing?.id !== "string" || seen.has(listing.id)) continue;
+      seen.add(listing.id);
+      const path = listingPath(listing);
+      entries.push({
+        url: `${SITE_URL}${path}`,
+        lastModified: listing.updatedAt
+          ? new Date(listing.updatedAt)
+          : undefined,
+        changeFrequency: "daily",
+        priority: 0.7,
+        alternates: localeAlternates(path),
+      });
+    }
+  }
+  return entries;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
