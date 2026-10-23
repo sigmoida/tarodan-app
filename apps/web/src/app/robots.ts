@@ -13,6 +13,8 @@ const DISALLOW = [
   "/membership/checkout",
   "/track-order",
   "/listings/new",
+  // Owner-only editor; the page is noindex as well.
+  "/listings/*/edit",
   "/login",
   "/register",
   "/forgot-password",

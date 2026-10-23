@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
@@ -30,13 +29,13 @@ import { useAuthGate } from "@/hooks/useAuthGate";
 import { useProductFavorite } from "@/hooks/useWishlist";
 import { getCardImageUrl } from "../_lib/images";
 import { useListingData } from "../_hooks/useListingData";
+import { useListingIdParam } from "../_hooks/useListingIdParam";
 import { useProductGallery } from "../_hooks/useProductGallery";
 import { publicNameOf } from "@/lib/public-name";
 
 function useListingDetailValue() {
-  const params = useParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = useListingIdParam();
   const t = useTranslations();
   const locale = useLocale();
 

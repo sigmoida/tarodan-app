@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
 import { tlAmountValue } from "@tarodan/shared";
+import { listingPath } from "@tarodan/types";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { invalidateListingQueries } from "@/lib/query/invalidateListing";
@@ -222,10 +223,13 @@ export function useEditListingForm({
     mutationFn: (payload: Record<string, unknown>) =>
       listingsApi.update(id, payload as any),
     onMutate: () => setIsLoading(true),
-    onSuccess: () => {
+    onSuccess: (_response, payload) => {
       toast.success(t("product.listingUpdated"));
       void invalidateListingQueries(queryClient, id);
-      router.push(`/listings/${id}`);
+      // The saved title: an edited title moves the canonical URL, and landing
+      // on it directly skips the redirect from the old slug.
+      const title = typeof payload.title === "string" ? payload.title : null;
+      router.push(listingPath({ id, title }));
     },
     onError: (error: any) =>
       toast.error(error.response?.data?.message || t("product.updateFailed")),

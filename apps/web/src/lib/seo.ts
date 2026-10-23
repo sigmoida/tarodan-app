@@ -35,3 +35,29 @@ export function localizedPath(locale: string, path: string): string {
 export function localizedCanonical(locale: string, path: string) {
   return { canonical: localizedPath(locale, path) };
 }
+
+/**
+ * hreflang targets of one page: every locale's URL plus `x-default` (the
+ * default-locale URL). Relative paths: `generateMetadata` resolves them
+ * against `metadataBase`; the sitemap prefixes {@link SITE_URL} itself.
+ */
+export function localeLanguages(path: string): Record<string, string> {
+  const languages: Record<string, string> = {};
+  for (const locale of routing.locales) {
+    languages[locale] = localizedPath(locale, path);
+  }
+  languages["x-default"] = localizedPath(routing.defaultLocale, path);
+  return languages;
+}
+
+/**
+ * `alternates` for a page that has a language variant per locale: the
+ * per-locale canonical plus the hreflang set, so the page head and the
+ * sitemap name the same URLs.
+ */
+export function localizedAlternates(locale: string, path: string) {
+  return {
+    ...localizedCanonical(locale, path),
+    languages: localeLanguages(path),
+  };
+}
