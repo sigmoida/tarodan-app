@@ -8,6 +8,7 @@ import {
   isPaymentPath,
   safeOrigin,
   sentryIngestOrigin,
+  reportUriForEnvironment,
   sentryReportUri,
 } from "../src/lib/cspPolicy.mjs";
 
@@ -259,6 +260,33 @@ test("attaches the report endpoint when one is configured", () => {
     ),
   );
   assert.ok(!without.includes("report-uri"));
+});
+
+test("emits the report endpoint only in production", () => {
+  const dsn = "https://public0key@o4507.ingest.sentry.io/1234567";
+
+  assert.equal(
+    reportUriForEnvironment("production", dsn),
+    sentryReportUri(dsn),
+  );
+  for (const env of ["staging", "development", "unknown", "", undefined]) {
+    assert.equal(reportUriForEnvironment(env, dsn), null);
+  }
+  assert.equal(reportUriForEnvironment("production", undefined), null);
+
+  // Only the report-uri directive differs between the two environments.
+  const base = { nonce: "n", isPayment: false, isProduction: true };
+  const prod = buildContentSecurityPolicy({
+    ...base,
+    reportUri: reportUriForEnvironment("production", dsn),
+  });
+  const staging = buildContentSecurityPolicy({
+    ...base,
+    reportUri: reportUriForEnvironment("staging", dsn),
+  });
+  assert.ok(prod.includes("report-uri"));
+  assert.ok(!staging.includes("report-uri"));
+  assert.equal(prod.replace(/; report-uri .*$/, ""), staging);
 });
 
 test("reduces configured URLs to bare origins", () => {

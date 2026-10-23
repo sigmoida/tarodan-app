@@ -96,6 +96,14 @@ export function sentryReportUri(dsn) {
   return `${url.origin}/api/${projectId}/security/?sentry_key=${publicKey}`;
 }
 
+/**
+ * Rapor uç noktası yalnız canlıda açıktır: staging/yerel trafik gerçek ihlal
+ * sinyali değil gürültüdür. Ortam, Sentry `environment` etiketiyle aynı kural.
+ */
+export function reportUriForEnvironment(environment, dsn) {
+  return environment === "production" ? sentryReportUri(dsn) : null;
+}
+
 /** Yapılandırılmış bir URL'yi çıplak origin'e indirger; geçersizse null. */
 export function safeOrigin(value) {
   if (typeof value !== "string" || value.trim() === "") return null;
