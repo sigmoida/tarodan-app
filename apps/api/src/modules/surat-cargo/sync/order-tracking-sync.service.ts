@@ -207,9 +207,8 @@ export class OrderTrackingSyncService {
     /** Başarısız kolilerin kimliği + sebebi; cron alarmı bunu metne basar. */
     failures: string[];
   }> {
-    // Only shipments that already have a carrier tracking code are polled.
-    // Auto-created pending shipments without one would just spam the API with
-    // "not found" responses.
+    // Only shipments with a tracking reference are polled (see
+    // syncShipmentsWhere). Without one there is nothing to ask Surat about.
     return this.syncShipmentsWhere({
       status: {
         notIn: [
@@ -287,9 +286,15 @@ export class OrderTrackingSyncService {
         // Test şeridi kolileri taşıyıcıya gitmedi; sorgulamak yalnız gürültü/alarm üretir.
         order: { isTest: false },
         ...where,
-        // No carrier code yet: nothing to track. Polling such a parcel only
-        // gets "not found" back every run; barcode retry owns getting the code.
-        providerTrackingId: { not: null },
+        // A parcel without Surat's code is still polled when it has our
+        // reference: a `label_created` parcel waiting for branch acceptance
+        // gets its KargoTakipNo, `shippedAt` and every later status (delivery
+        // and the escrow release included) only from this poll. Barcode retry
+        // touches `pending` rows only.
+        OR: [
+          { providerTrackingId: { not: null } },
+          { trackingNumber: { not: null } },
+        ],
       },
       include: { order: true },
     });

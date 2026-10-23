@@ -580,16 +580,47 @@ describe("OrderTrackingSyncService", () => {
     });
   });
 
-  it("polls only shipments that already have a carrier tracking code", async () => {
+  // A registered parcel waits for branch acceptance with our reference only:
+  // Surat's code, the hand-off and the delivery reach it through this poll.
+  it("keeps polling parcels that have our reference but no Surat code yet", async () => {
     const { service, prisma } = makeService();
     prisma.shipment.findMany.mockResolvedValue([]);
     await service.syncAllActiveShipments();
     await service.syncPostDeliveryShipments(0, 48);
     for (const [args] of prisma.shipment.findMany.mock.calls) {
-      expect(args.where).toMatchObject({ providerTrackingId: { not: null } });
-      expect(args.where.OR).toBeUndefined();
+      expect(args.where.OR).toEqual([
+        { providerTrackingId: { not: null } },
+        { trackingNumber: { not: null } },
+      ]);
+      expect(args.where.providerTrackingId).toBeUndefined();
     }
     expect(prisma.shipment.findMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("fills Surat's code on a label_created parcel found by our reference", async () => {
+    const { service, prisma, client, tx } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({
+        status: ShipmentStatus.label_created,
+        providerTrackingId: null,
+        shippedAt: null,
+      }),
+    ]);
+    client.lookupTracking.mockResolvedValue({
+      kind: "found",
+      data: { Gonderiler: [tracking(2)] },
+    });
+
+    await service.syncAllActiveShipments();
+
+    expect(client.lookupTracking).toHaveBeenCalledWith("PACKAGE-REF-1");
+    const writes = [
+      ...prisma.shipment.updateMany.mock.calls,
+      ...tx.shipment.updateMany.mock.calls,
+    ].map(([args]) => args.data);
+    expect(writes).toContainEqual(
+      expect.objectContaining({ providerTrackingId: "SURAT-CODE-1" }),
+    );
   });
 
   // Sahte taşıyıcı (staging UAT): poller koliyi Sürat'a sormaz, "henüz haber
