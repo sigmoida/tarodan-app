@@ -354,4 +354,89 @@ describe("payout transfer total_amount", () => {
       submittedTotalAmount: null,
     });
   });
+
+  describe("a refund voids the payout while its total is computed", () => {
+    /** Simulates the refund flow voiding the pending payout (K1) between the
+     *  processor's read of the row and its write, as a concurrent request
+     *  would: the row leaves `pending` while the refunds are being read. */
+    function voidDuringTotal(
+      world: PayoutProcessorWorld,
+      prisma: ReturnType<typeof buildPayoutProcessor>["prisma"],
+      payoutId: string,
+    ) {
+      prisma.refundAttempt.findMany.mockImplementationOnce(
+        async ({ where }: { where: { paymentId?: string } }) => {
+          Object.assign(world.payout(payoutId), {
+            status: PayoutStatus.failed,
+            failureReason: "order_refunded",
+          });
+          return world.refundAttempts.filter(
+            (a) => a.paymentId === where.paymentId,
+          );
+        },
+      );
+    }
+
+    it("a residual that does not fit is not parked over the voided row", async () => {
+      const world = new PayoutProcessorWorld();
+      world.addPayment("pay-1", 322, { refundedOrders: { o1: 322 } });
+      world.refundAttempts.push({
+        paymentId: "pay-1",
+        orderId: "o1",
+        tradeId: null,
+        amount: 322,
+        status: RefundAttemptStatus.finalized,
+      });
+      world.addOrderPayout({
+        payoutId: "p1",
+        paymentId: "pay-1",
+        orderId: "o1",
+        orderTotal: 322,
+        holdAmount: 362,
+        holdRefunded: 322,
+        merchantOid: "ORDRACE1",
+        transId: "PYTRACEPARK1",
+      });
+      const { service, prisma, createPlatformTransfer } =
+        buildPayoutProcessor(world);
+      voidDuringTotal(world, prisma, "p1");
+
+      const result = await service.processPendingPayouts();
+
+      expect(createPlatformTransfer).not.toHaveBeenCalled();
+      expect(world.payout("p1")).toMatchObject({
+        status: PayoutStatus.failed,
+        failureReason: "order_refunded",
+        providerResponse: null,
+      });
+      expect(result.failed).toBe(0);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it("a total that fits is not claimed or sent for the voided row", async () => {
+      const world = new PayoutProcessorWorld();
+      world.addPayment("pay-1", 349);
+      world.addOrderPayout({
+        payoutId: "p1",
+        paymentId: "pay-1",
+        orderId: "o1",
+        orderTotal: 349,
+        holdAmount: 300,
+        merchantOid: "ORDRACE2",
+        transId: "PYTRACESEND1",
+      });
+      const { service, prisma, createPlatformTransfer } =
+        buildPayoutProcessor(world);
+      voidDuringTotal(world, prisma, "p1");
+
+      await service.processPendingPayouts();
+
+      expect(createPlatformTransfer).not.toHaveBeenCalled();
+      expect(world.payout("p1")).toMatchObject({
+        status: PayoutStatus.failed,
+        failureReason: "order_refunded",
+        submittedTotalAmount: null,
+      });
+    });
+  });
 });
