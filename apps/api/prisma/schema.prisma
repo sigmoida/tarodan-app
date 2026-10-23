@@ -2504,12 +2504,24 @@ model PayoutTransfer {
   retryCount             Int                           @default(0) @map("retry_count")
   maxRetries             Int                           @default(3) @map("max_retries")
   nextRetryAt            DateTime?                     @map("next_retry_at")
-  // PayTR aşama-1 (talimat kabulü) anı ve o an GERÇEKTEN gönderilen net tutar.
-  // Aşama-2 callback'i saatler/günler sonra gelir; mail + ledger o anki
-  // netAmount'a değil bu snapshot'a bakar (adjustment/iade netAmount'ı değiştirebilir).
-  // submittedAt doluysa payout PayTR'ye iletilmiştir → zombi tespiti bunu takılı saymaz.
+  /// When PayTR accepted the instruction (stage 1) and the net it carried.
+  /// The stage-2 callback comes hours or days later; e-mail and ledger read
+  /// this snapshot, not the current netAmount (adjustments and refunds can
+  /// change it). A set submittedAt means PayTR has the instruction, so the
+  /// zombie check skips the row. On an unknown outcome (`failed` /
+  /// `transfer_outcome_unknown`) submittedAmount holds the net of the request
+  /// that may have gone through while submittedAt stays null.
   submittedAt            DateTime?                     @map("submitted_at")
   submittedAmount        Decimal?                      @map("submitted_amount") @db.Decimal(10, 2)
+  /// PayTR `total_amount` of the transfer instruction this row sent or is
+  /// sending: the slice of the payment (merchant_oid) it settles, computed per
+  /// attempt (order total minus cash refunded, capped by what the payment has
+  /// left). Written at claim time, cleared when the request provably took
+  /// nothing from the oid (rejection, connect failure), kept on success and
+  /// on an unknown outcome. Sibling transfers on the same oid subtract it.
+  /// Null on rows sent before 2026-10-23, which sent `amount`; 0 means
+  /// nothing was taken from the oid (e.g. settled outside PayTR).
+  submittedTotalAmount   Decimal?                      @map("submitted_total_amount") @db.Decimal(10, 2)
   processedAt            DateTime?                     @map("processed_at")
   createdAt              DateTime                      @default(now()) @map("created_at")
   updatedAt              DateTime                      @updatedAt @map("updated_at")
