@@ -720,7 +720,11 @@ export class PaymentTradeRefundService {
       // The payer hears it once per failure episode: when this call set the
       // marker. A retry while it is set (the sweep, every few minutes) used
       // to push "refund failed" again each time. Success clears the marker.
-      if (!startedFailure) {
+      // A scoped call (`payerId`) always tells its own party: it is a
+      // one-shot of a flow (one outbox event per payer on a cancel, a dispute
+      // compensation), never the sweep, and on a two-payer trade the marker
+      // may already carry the other party's failure.
+      if (!startedFailure && !opts?.payerId) {
         return { refunded: false, failed: true, reason };
       }
       try {

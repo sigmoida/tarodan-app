@@ -188,6 +188,25 @@ describe("RefundTradeSweepService.retryFailedTradeRefunds candidates", () => {
     );
   });
 
+  /**
+   * `refundTradeCashTracked` stays quiet on a repeat failure only for an
+   * unscoped call; a scoped one (payerId) always notifies its party. The
+   * sweep must therefore never scope its call, or every retry would push
+   * "refund failed" again.
+   */
+  it("never scopes its call to a payer, so a retry cannot notify", async () => {
+    const h = makeHarness();
+    h.nextRun(NOW, ["trade-1", "trade-2"]);
+
+    await h.service.retryFailedTradeRefunds(NOW);
+
+    for (const call of h.paymentRefund.refundTradeCashTracked.mock.calls) {
+      expect(call).toEqual([expect.any(String), { callerAlarms: true }]);
+      expect(call[1]).not.toHaveProperty("payerId");
+    }
+    expect(h.paymentRefund.refundTradeCashTracked).toHaveBeenCalledTimes(2);
+  });
+
   it("staging: trades paid before the production copy are left out", async () => {
     const cutoff = new Date("2026-10-20T03:00:00.000Z");
     const h = makeHarness({ copiedBefore: cutoff });
