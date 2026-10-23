@@ -31,8 +31,9 @@ export function boostVirtualProductId(boostId: string): string {
  * Which platform service an order sells, read from its virtual product id
  * (`membership-<tierId>`, `boost-<boostId>`); null for a listing order. The
  * one place that knows the prefixes: payment status, return URLs and the
- * PayTR merchant choice, the order response and rating call it (the
- * remaining prefix checks in fulfilment and invoicing are a backlog item).
+ * PayTR merchant choice, refund creation, the boost refund policy, the order
+ * response and rating call it (the remaining prefix checks in fulfilment and
+ * invoicing are a backlog item).
  */
 export function virtualOrderKind(
   order: { productId?: string | null } | null | undefined,

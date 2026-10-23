@@ -44,7 +44,7 @@ export interface DigitalOrderSignals {
  * delivery confirmation, cancellation or rating. The one client rule for
  * gating physical-goods UI; web imports it and mobile vendors it.
  *
- * `kind` decides when present (any value other than `listing` is a platform
+ * A non-empty `kind` decides (any value other than `listing` is a platform
  * service, so a kind added later is never shown as goods). Without it the
  * order is digital when `origin` is `platform_service` or `isMembership` is
  * true.
@@ -53,7 +53,9 @@ export function isDigitalOrder(
   order: DigitalOrderSignals | null | undefined,
 ): boolean {
   if (!order) return false;
-  if (typeof order.kind === "string") return order.kind !== "listing";
+  if (typeof order.kind === "string" && order.kind !== "") {
+    return order.kind !== "listing";
+  }
   return order.origin === "platform_service" || order.isMembership === true;
 }
 

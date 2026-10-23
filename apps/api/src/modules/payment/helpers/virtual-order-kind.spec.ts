@@ -113,6 +113,11 @@ describe("isDigitalOrder (the client gating rule, @tarodan/types)", () => {
     expect(isDigitalOrder({ isMembership: false })).toBe(false);
   });
 
+  it("treats an empty `kind` as absent and falls back", () => {
+    expect(isDigitalOrder({ kind: "", origin: "direct_sale" })).toBe(false);
+    expect(isDigitalOrder({ kind: "", origin: "platform_service" })).toBe(true);
+  });
+
   it("is false when nothing tells the order apart", () => {
     expect(isDigitalOrder({})).toBe(false);
     expect(isDigitalOrder(null)).toBe(false);
