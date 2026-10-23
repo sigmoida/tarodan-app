@@ -76,7 +76,19 @@ vi.mock("./_hooks/useOrderDetail", () => {
     useUploadSellerInvoice: mutation,
     useSetAddressAndPay: mutation,
     useElogoInvoices: () => ({ data: [] }),
-    useSellerInvoice: () => ({ data: null }),
+    // The API answers the buyer of any order; the section must not ask (or
+    // show) it for a digital order, which passes no order here.
+    useSellerInvoice: (_id: string, order: unknown) => ({
+      data: order
+        ? {
+            invoice: null,
+            canUpload: false,
+            isSeller: false,
+            isBuyer: true,
+            sellerIssuesInvoice: false,
+          }
+        : undefined,
+    }),
     useSavedAddresses: (enabled: boolean) => {
       hooks.savedAddressesEnabled.push(enabled);
       return { data: [], isSuccess: false, isError: false };
@@ -193,6 +205,7 @@ const DELIVERED_SECTIONS = {
   review: "review.writeReview",
   refund: "order.requestRefundTitle",
   shippingRow: "checkout.shipping",
+  sellerInvoice: "order.sellerInvoice",
   productLink: 'href="/listings/p1"',
 } as const;
 const PAID_SECTIONS = {
