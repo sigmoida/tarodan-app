@@ -719,8 +719,11 @@ The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
   failure, doubled for every further definite failure of that attempt
   (`RefundAttempt.failureCount`), at most 6 hours: 10, 20, 40, 80, 160, 320
   minutes, then every 6 hours. It is not queried while it waits. The ledger is
-  the only source: nothing to lose on a cache flush, no lock between runs. An
-  attempt requeued without a new failure (status inquiry) waits 10 minutes.
+  the only source: nothing to lose on a cache flush, no lock between runs. A
+  requeue by the status inquiry (PayTR has no record of the refund) keeps the
+  count on purpose: the attempt was refused before and the requeue is no
+  evidence that a resend now goes through, so it keeps its longer wait. An
+  attempt that only ever went to review has 0 and waits 10 minutes.
 - A failure that never reached an attempt (a data problem before the claim,
   e.g. the group refund cap or a missing merchant_oid) has nothing in the
   ledger to wait on: the order cools down for an hour in the cache.
@@ -741,6 +744,17 @@ The order retry sweep (`RefundOrderSweepService.processRefundedOrders`, cron
   when its caller alarms itself (`callerAlarms`, the order sweep) and no money
   moved; when money may have moved it stays an error.
 - `createRefund` logs one warn line per failure; the caller logs the decision.
+
+**Trade cash refunds** follow the same rules in their retry sweep
+(`RefundTradeSweepService.retryFailedTradeRefunds`, cron `trade-expired`,
+every 5 minutes), for trades marked with `refundFailureReason`: the wait on
+the trade attempt's failure count, no retry while the refund has an
+unresolved attempt (a "nothing left" refusal parks it in review), the
+one-hour cooldown, one alarm line per trade once a day. The cash payer is
+told "refund failed" once per failure episode: `refundTradeCashTracked` sets
+the marker with a CAS on "no marker yet" and only that call notifies; a retry
+refreshes the marker without a notification, and success clears it. The
+admin "retry trade refund" action still notifies on its own failure.
 
 **Staging.** The staging database is a masked production copy
 ([UAT_REFRESH.md](./UAT_REFRESH.md)), and the PayTR test store refuses the
