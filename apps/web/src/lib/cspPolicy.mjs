@@ -97,11 +97,15 @@ export function sentryReportUri(dsn) {
 }
 
 /**
- * Rapor uç noktası yalnız canlıda açıktır: staging/yerel trafik gerçek ihlal
- * sinyali değil gürültüdür. Ortam, Sentry `environment` etiketiyle aynı kural.
+ * The report endpoint is on only in production: staging and local violations
+ * are test noise, not a detection signal. `environment` is the Sentry tag
+ * (`sentry.release.ts`), and it is passed on as `sentry_environment` so the
+ * reports match the production alert rules like every other event.
  */
 export function reportUriForEnvironment(environment, dsn) {
-  return environment === "production" ? sentryReportUri(dsn) : null;
+  if (environment !== "production") return null;
+  const uri = sentryReportUri(dsn);
+  return uri && `${uri}&sentry_environment=${environment}`;
 }
 
 /** Yapılandırılmış bir URL'yi çıplak origin'e indirger; geçersizse null. */

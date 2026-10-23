@@ -267,7 +267,7 @@ test("emits the report endpoint only in production", () => {
 
   assert.equal(
     reportUriForEnvironment("production", dsn),
-    sentryReportUri(dsn),
+    `${sentryReportUri(dsn)}&sentry_environment=production`,
   );
   for (const env of ["staging", "development", "unknown", "", undefined]) {
     assert.equal(reportUriForEnvironment(env, dsn), null);
