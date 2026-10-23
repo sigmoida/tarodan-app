@@ -1,9 +1,12 @@
 /**
  * Why a payout transfer (`PayoutTransfer.failureReason`) is not paid: the
- * shared vocabulary of the API and the admin panel. The API stores one of
- * these codes, never PayTR's raw text (that goes to `providerResponse`);
- * the admin panel labels each code. Rows written before 2026-10-23 may still
- * carry free text, so readers treat an unknown value as a legacy reason.
+ * shared vocabulary of the API and the admin panel. A `failed` or
+ * `retry_pending` transfer stores one of these codes, never PayTR's raw text
+ * (that goes to `providerResponse`); the admin panel labels each code. Two
+ * kinds of free text remain, so readers treat an unknown value as text to
+ * show as is: rows written before 2026-10-23, and `returned` rows, whose
+ * reason carries PayTR's reference and detection date (the status already
+ * says the bank returned it).
  *
  * Seller-fixable (the seller gets the "payout failed" e-mail):
  * - no_bank_account: no bank account at transfer time.
