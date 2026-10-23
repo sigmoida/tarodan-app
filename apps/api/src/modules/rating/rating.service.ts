@@ -7,7 +7,14 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { OrderStatus, RatingStatus, TradeStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  RatingStatus,
+  TradeStatus,
+  Prisma,
+  type ProductRating,
+  type Rating,
+} from "@prisma/client";
 import {
   CreateUserRatingDto,
   CreateProductRatingDto,
@@ -43,35 +50,39 @@ type RatingAuthor = PublicIdentityInput & {
 };
 
 /** The `Rating` columns and relations `mapUserRatingToDto` reads. */
-interface UserRatingRow {
-  id: string;
-  giverId: string;
-  receiverId: string;
-  orderId: string | null;
-  tradeId: string | null;
-  score: number;
-  comment: string | null;
-  createdAt: Date;
+type UserRatingRow = Pick<
+  Rating,
+  | "id"
+  | "giverId"
+  | "receiverId"
+  | "orderId"
+  | "tradeId"
+  | "score"
+  | "comment"
+  | "createdAt"
+> & {
   giver?: RatingAuthor | null;
   receiver?: PublicIdentityInput | null;
-}
+};
 
 /** The `ProductRating` columns and relations `mapProductRatingToDto` reads. */
-interface ProductRatingRow {
-  id: string;
-  productId: string;
-  userId: string;
-  orderId: string;
-  score: number;
-  title: string | null;
-  review: string | null;
-  images: string[];
-  isVerifiedPurchase: boolean;
-  helpfulCount: number;
-  createdAt: Date;
+type ProductRatingRow = Pick<
+  ProductRating,
+  | "id"
+  | "productId"
+  | "userId"
+  | "orderId"
+  | "score"
+  | "title"
+  | "review"
+  | "images"
+  | "isVerifiedPurchase"
+  | "helpfulCount"
+  | "createdAt"
+> & {
   product?: { title: string } | null;
   user?: RatingAuthor | null;
-}
+};
 
 @Injectable()
 export class RatingService {
