@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { findUniqueShaping } from "../../prisma/prisma-row-shape.testing";
 import { userBlockServiceStub } from "../user-block/user-block.testing";
 import type { CreateProductRatingDto, CreateUserRatingDto } from "./dto";
 import { RatingService } from "./rating.service";
@@ -9,12 +10,14 @@ import { RatingService } from "./rating.service";
  * platform account. Neither the product nor the seller of such an order can
  * be rated. The guard reads the virtual product id and runs before the
  * product-specific checks. A completed boost order used to pass because only
- * the `MEM-` order number was checked.
+ * the `MEM-` order number was checked. The order lookup is shaped by its
+ * query arguments, so the guard fails here if the query stops selecting
+ * `productId` (a missing id would read as a listing and let the rating in).
  */
 describe("RatingService platform-service order guard", () => {
   const makeService = (order: object) => {
     const prisma = {
-      order: { findUnique: jest.fn().mockResolvedValue(order) },
+      order: { findUnique: findUniqueShaping(order) },
       user: { findUnique: jest.fn().mockResolvedValue({ id: "r1" }) },
     };
     return new RatingService(
@@ -101,6 +104,19 @@ describe("RatingService platform-service order guard", () => {
         service.createUserRating("b1", {
           receiverId: "r1",
           orderId: order.id,
+          score: 5,
+        } as CreateUserRatingDto),
+      );
+    });
+
+    it("refuses a boost order that is not delivered yet with the digital-order reason", async () => {
+      // The guard runs before the delivered-only check: the buyer is told the
+      // order can never be rated, not to wait for delivery.
+      const service = makeService({ ...boostOrder, status: "paid" });
+      await expectRefused(
+        service.createUserRating("b1", {
+          receiverId: "r1",
+          orderId: boostOrder.id,
           score: 5,
         } as CreateUserRatingDto),
       );
