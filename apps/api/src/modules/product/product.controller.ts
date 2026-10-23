@@ -5,7 +5,6 @@ import {
   Patch,
   Delete,
   Body,
-  Param,
   Query,
   UseGuards,
   BadRequestException,
@@ -56,7 +55,6 @@ import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
 import { errorStack } from "../../common/helpers/error-message";
-import { UuidParam } from "../../common/pipes/uuid-param.decorator";
 import {
   LISTING_ID_PARAM_DESCRIPTION,
   ListingIdParam,
@@ -175,8 +173,9 @@ export class ProductController {
     description: "No such listing, or not the caller's listing",
   })
   @ApiResponse({ status: 400, description: "The listing is not active" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async getBoostOptions(
-    @Param("id") id: string,
+    @ListingIdParam("id", "server.product.invalidIdFormat") id: string,
     @CurrentUser("id") userId: string,
   ) {
     return this.productBoostService.getBoostOptions(id, userId);
@@ -252,7 +251,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Turn the boost ending-soon reminder on or off" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "{ enabled } (false when no boost of the listing runs)",
@@ -267,7 +266,7 @@ export class ProductController {
     description: "No such listing, or not the caller's listing",
   })
   async setBoostReminder(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: BoostReminderDto,
@@ -504,7 +503,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Süresi dolan ilanı yenile" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description: "Yenilendi (active) ya da onaya düştü (pending)",
@@ -516,7 +515,7 @@ export class ProductController {
   @ApiResponse({ status: 403, description: "Yetkiniz yok / ilan limiti" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async renew(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
   ) {
@@ -531,7 +530,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Ürün güncelle" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Ürün güncellendi",
@@ -542,7 +541,7 @@ export class ProductController {
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   @ApiResponse({ status: 409, description: "Concurrent update conflict" })
   async update(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
     @Body() dto: UpdateProductDto,
@@ -560,7 +559,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Boost a listing (buy a boost)" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description:
@@ -581,7 +580,7 @@ export class ProductController {
       "expectedPrice is not the price charged now (server.product.boostPriceChanged); nothing is written",
   })
   async initiateBoost(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
     @Body() dto: InitiateBoostDto,
@@ -617,7 +616,7 @@ export class ProductController {
     description:
       "Optional JSON body with the removal reason (DeleteProductDto). Omitted reason is recorded as not_given.",
   })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({ status: 200, description: "Ürün silindi" })
   @ApiResponse({
     status: 400,
@@ -626,7 +625,7 @@ export class ProductController {
   @ApiResponse({ status: 403, description: "Yetkiniz yok" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async remove(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
     @ReqLocale() locale: Locale,
@@ -648,7 +647,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Ürünü beğen" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 201,
     description: "Ürün beğenildi",
@@ -663,7 +662,7 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Zaten beğenilmiş" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async likeProduct(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
   ) {
@@ -678,7 +677,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Beğeniyi kaldır" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Beğeni kaldırıldı",
@@ -693,7 +692,7 @@ export class ProductController {
   @ApiResponse({ status: 400, description: "Beğenilmemiş" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async unlikeProduct(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
   ) {
@@ -742,9 +741,9 @@ export class ProductController {
   @Post(":id/click")
   @Public()
   @ApiOperation({ summary: "İlan kartı tıklama sayısını artır" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   async incrementClickCount(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId?: string,
     @Ip() ip?: string,
@@ -767,7 +766,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Ürün istatistikleri (satıcı için)" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Ürün istatistikleri",
@@ -786,7 +785,7 @@ export class ProductController {
   @ApiResponse({ status: 403, description: "Yetkiniz yok" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async getProductStats(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") sellerId: string,
   ) {
@@ -801,7 +800,7 @@ export class ProductController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Kullanıcı bu ürünü beğenmiş mi?" })
-  @ApiParam({ name: "id", description: "Product ID (UUID format)" })
+  @ApiParam({ name: "id", description: LISTING_ID_PARAM_DESCRIPTION })
   @ApiResponse({
     status: 200,
     description: "Beğeni durumu",
@@ -813,7 +812,7 @@ export class ProductController {
     },
   })
   async isProductLiked(
-    @UuidParam("id", "server.product.invalidIdFormat")
+    @ListingIdParam("id", "server.product.invalidIdFormat")
     id: string,
     @CurrentUser("id") userId: string,
   ) {

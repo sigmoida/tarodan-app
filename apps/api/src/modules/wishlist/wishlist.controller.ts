@@ -4,9 +4,7 @@ import {
   Post,
   Delete,
   Body,
-  Param,
   Request,
-  ParseUUIDPipe,
   HttpCode,
   HttpStatus,
   Logger,
@@ -18,6 +16,7 @@ import {
   WishlistItemResponseDto,
 } from "./dto";
 import { errorMessage } from "../../common/helpers/error-message";
+import { ListingIdParam } from "../../common/pipes/listing-id.pipe";
 
 @Controller("wishlist")
 export class WishlistController {
@@ -59,25 +58,25 @@ export class WishlistController {
 
   /**
    * Remove product from wishlist
-   * DELETE /wishlist/:productId
+   * DELETE /wishlist/:productId (bare UUID or listing URL segment)
    */
   @Delete(":productId")
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeFromWishlist(
     @Request() req: any,
-    @Param("productId", ParseUUIDPipe) productId: string,
+    @ListingIdParam("productId") productId: string,
   ): Promise<void> {
     return this.wishlistService.removeFromWishlist(req.user.id, productId);
   }
 
   /**
    * Check if product is in wishlist
-   * GET /wishlist/check/:productId
+   * GET /wishlist/check/:productId (bare UUID or listing URL segment)
    */
   @Get("check/:productId")
   async isInWishlist(
     @Request() req: any,
-    @Param("productId", ParseUUIDPipe) productId: string,
+    @ListingIdParam("productId") productId: string,
   ): Promise<{ inWishlist: boolean }> {
     const inWishlist = await this.wishlistService.isInWishlist(
       req.user.id,

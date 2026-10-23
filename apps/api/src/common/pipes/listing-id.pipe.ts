@@ -5,30 +5,29 @@ import {
   PipeTransform,
 } from "@nestjs/common";
 import { type MessageKey } from "@tarodan/i18n";
-import { parseListingParam } from "@tarodan/types";
+import { toListingId } from "../transforms/listing-id";
 import { uuidParamPipe } from "./uuid-param.decorator";
 
 /**
- * Listing id route param that also takes the listing URL segment
- * `<slug>-<uuid>` (ADR 0017) and resolves it to the UUID; the slug is ignored.
+ * Product id route param that also takes the listing URL segment
+ * `<slug>-<uuid>` (ADR 0017) and resolves it to the lower-case UUID; the slug
+ * is ignored (`toListingId`, shared with the body-field `ListingIdField`).
  *
  * Why: the live apps route `/listings/<segment>` deep links to their product
- * screen and send the whole segment to the API (`GET /products/<segment>`,
- * reviews, similar, view). Taking the trailing UUID here keeps those links
- * opening on app versions that do not parse the segment themselves.
+ * screen and send the whole segment wherever that screen (and the edit screen
+ * a `/listings/<segment>/edit` link opens) uses the product id. Taking the
+ * trailing UUID here keeps those screens working on app versions that do not
+ * parse the segment themselves.
  *
  * Anything else goes to `uuidPipe` unchanged, so garbage fails with the
  * route's UUID 400 (`UuidParam` semantics: status 400 with a catalog key).
- * A UUID is lower-cased (ids are stored lower case). Read routes only: write
- * routes keep a bare-UUID contract.
+ * Only for params that are always a product id; other ids stay `UuidParam`.
  */
 export class ListingIdPipe implements PipeTransform<unknown, Promise<string>> {
   constructor(private readonly uuidPipe: ParseUUIDPipe = uuidParamPipe()) {}
 
   transform(value: unknown, metadata: ArgumentMetadata): Promise<string> {
-    const id =
-      typeof value === "string" ? (parseListingParam(value) ?? value) : value;
-    return this.uuidPipe.transform(id as string, metadata);
+    return this.uuidPipe.transform(toListingId(value) as string, metadata);
   }
 }
 
@@ -37,7 +36,7 @@ export const LISTING_ID_PARAM_DESCRIPTION =
   "Product UUID or listing URL segment `<slug>-<uuid>`";
 
 /**
- * `@ListingIdParam("id")`: a listing id route param that accepts a bare UUID
+ * `@ListingIdParam("id")`: a product id route param that accepts a bare UUID
  * or `<slug>-<uuid>`, the listing counterpart of `UuidParam`. A malformed id
  * is a 400 with `i18nKey` (default `server.common.invalidId`).
  */

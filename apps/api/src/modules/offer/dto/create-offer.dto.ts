@@ -11,12 +11,15 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { TL_NEGOTIATED_AMOUNT_MAX } from "@tarodan/types";
 import { IsTlAmount } from "../../../common/validators/tl-amount";
+import { ListingIdField } from "../../../common/transforms";
 
 export class CreateOfferDto {
   @ApiProperty({
     example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-    description: "Product ID (UUID format) to make offer on",
+    description:
+      "Product ID (UUID) to make offer on; a listing URL segment `<slug>-<uuid>` is also accepted",
   })
+  @ListingIdField()
   @IsNotEmpty({ message: "Ürün ID gereklidir" })
   @IsUUID("4", {
     message: "Geçerli bir ürün ID giriniz (UUID formatında olmalıdır)",

@@ -8,6 +8,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
+import { ListingIdField } from "../../../common/transforms";
 
 export enum ReportType {
   PRODUCT = "product",
@@ -69,8 +70,10 @@ export class CreateReportDto {
 
   @ApiProperty({
     description:
-      "ID of the content being reported (product, user, collection, message, or review — a product review or a seller rating id)",
+      "ID of the content being reported (product, user, collection, message, or review — a product review or a seller rating id). For `product` a listing URL segment `<slug>-<uuid>` is also accepted",
   })
+  // Only a product target: every other target id stays a strict UUID.
+  @ListingIdField((body) => body.type === ReportType.PRODUCT)
   @IsUUID()
   targetId: string;
 
