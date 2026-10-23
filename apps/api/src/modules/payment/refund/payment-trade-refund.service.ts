@@ -579,6 +579,37 @@ export class PaymentTradeRefundService {
   }
 
   /**
+   * Writes the trade's refund failure marker. True when this call started
+   * the failure episode (no marker before: a CAS on the trade row, so two
+   * concurrent failures notify once), false when it only refreshed an
+   * existing marker. If the write fails, true: the payer is told rather than
+   * left without a word (the retry sweep cannot see an unmarked trade).
+   */
+  private async markRefundFailure(
+    tradeId: string,
+    reason: string,
+  ): Promise<boolean> {
+    const data = {
+      refundFailureReason: reason.slice(0, 500),
+      refundFailureAt: new Date(),
+    };
+    try {
+      const started = await this.prisma.trade.updateMany({
+        where: { id: tradeId, refundFailureReason: null },
+        data,
+      });
+      if (started.count === 1) return true;
+      await this.prisma.trade.update({ where: { id: tradeId }, data });
+      return false;
+    } catch (persistErr: unknown) {
+      this.logger.error(
+        `Failed to persist refund failure for trade ${tradeId}: ${errorMessage(persistErr)}`,
+      );
+      return true;
+    }
+  }
+
+  /**
    * MONEY-H2: Takas nakit iadesini FAILURE-TRACKING ile yapar. `cancelTrade` /
    * `resolveDispute` gibi kullanıcı/admin akışlarında iade PayTR'da patlarsa
    * `trade.refundFailureReason` marker'ı yazılır → admin `retryTradeRefund` ve
@@ -597,7 +628,15 @@ export class PaymentTradeRefundService {
    */
   async refundTradeCashTracked(
     tradeId: string,
-    opts?: { payerId?: string; deferIfNotYetSynced?: boolean },
+    opts?: {
+      payerId?: string;
+      deferIfNotYetSynced?: boolean;
+      /**
+       * The caller raises its own, rate-limited alarm (the retry sweep: once
+       * a day per trade): the failure is logged here at warn, not error.
+       */
+      callerAlarms?: boolean;
+    },
   ): Promise<{
     refunded: boolean;
     failed: boolean;
@@ -669,29 +708,26 @@ export class PaymentTradeRefundService {
         );
         return { refunded: false, failed: false, deferred: true, reason };
       }
-      this.logger.error(
-        `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`,
-      );
-      // Marker'ı yaz ki admin retryTradeRefund + retryFailedTradeRefunds cron'u
-      // bu takası bulup yeniden denesin (yoksa para alıcıda sessizce kalır).
-      await this.prisma.trade
-        .update({
-          where: { id: tradeId },
-          data: {
-            refundFailureReason: reason.slice(0, 500),
-            refundFailureAt: new Date(),
-          },
-        })
-        .catch((persistErr: unknown) =>
-          this.logger.error(
-            `Failed to persist refund failure for trade ${tradeId}: ${errorMessage(persistErr)}`,
-          ),
-        );
+      const failureLine = `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`;
+      if (opts?.callerAlarms) {
+        this.logger.warn(failureLine);
+      } else {
+        this.logger.error(failureLine);
+      }
+      // Write the marker so the admin retry and the retry sweep find the
+      // trade (otherwise the refund silently never happens).
+      const startedFailure = await this.markRefundFailure(tradeId, reason);
+      // The payer hears it once per failure episode: when this call set the
+      // marker. A retry while it is set (the sweep, every few minutes) used
+      // to push "refund failed" again each time. Success clears the marker.
+      if (!startedFailure) {
+        return { refunded: false, failed: true, reason };
+      }
       try {
-        // Kapsamlı iadede hata bildirimi o tarafa; kapsamsızda tek ödeme
-        // satırı varsa (v1) sahibi bellidir, iki satırlı v2'de taraf
-        // belirsizdir → null (yanlış tarafa "iade başarısız" bildirmektense
-        // kimseye kişisel bildirim atmamak doğrudur; admin marker'ı görür).
+        // A scoped refund notifies that party. Unscoped, a single payment
+        // row (v1) names its payer; with two rows (v2) the party is unclear,
+        // so nobody gets a personal notice (better than telling the wrong
+        // party "refund failed"; admins see the marker).
         let cashPayerId: string | null = opts?.payerId ?? null;
         if (!cashPayerId) {
           const rows = await this.prisma.tradeCashPayment.findMany({
