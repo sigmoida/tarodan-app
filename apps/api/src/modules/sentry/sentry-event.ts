@@ -145,13 +145,16 @@ export function resolveSentryRelease(
  * Dockerfile sets that to `production`, so staging and production would look
  * the same and staging test errors would mix into production alerts. The tag
  * has its own key; without it the old behaviour (`NODE_ENV`) is kept.
+ *
+ * Lower-cased, as web and admin do: Sentry environments are case-sensitive,
+ * so a `Production` tag would miss every `environment:production` alert rule
+ * and filter while still being sampled as production.
  */
 export function resolveSentryEnvironment(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  return (
-    env.SENTRY_ENVIRONMENT?.trim() || env.NODE_ENV?.trim() || "development"
-  );
+  const tag = env.SENTRY_ENVIRONMENT?.trim() || env.NODE_ENV?.trim();
+  return tag ? tag.toLowerCase() : "development";
 }
 
 /**

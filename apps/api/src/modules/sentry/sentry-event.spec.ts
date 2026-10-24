@@ -268,6 +268,12 @@ describe("resolveSentryEnvironment", () => {
   it("hiçbiri yoksa development varsayar", () => {
     expect(resolveSentryEnvironment({})).toBe("development");
   });
+
+  it("lower-cases the tag so alert rules on environment:production match", () => {
+    expect(
+      resolveSentryEnvironment({ SENTRY_ENVIRONMENT: " Production " }),
+    ).toBe("production");
+  });
 });
 
 /**
