@@ -41,23 +41,13 @@ const CHECK_IN_APP_ENV = "production";
 export interface TrackedRunContext {
   /** Time zone of the Bull repeatable (`job.opts.repeat.tz`). */
   timezone?: string;
-  /** Bull job id: the automatic retries of one scheduled slot share it. */
-  jobId?: string;
-  /**
-   * False while Bull will retry a failure of this attempt by itself
-   * (default true). One slot is one Sentry check-in across its attempts.
-   */
-  finalAttempt?: boolean;
 }
 
-/** An open Sentry check-in of one scheduled slot. */
+/** An open Sentry check-in of one run. */
 interface OpenCheckIn {
   checkInId: string;
   monitorSlug: string;
   config: SentryMonitorConfig | undefined;
-  jobId: string | undefined;
-  /** When the slot's first attempt started, for the reported duration. */
-  startedAt: number;
 }
 
 /**
@@ -68,22 +58,25 @@ interface OpenCheckIn {
  * - Sentry cron check-ins only for a job with a `monitor` in the cron catalog,
  *   only on the production deployment and only with a Sentry client. The
  *   monitor config (schedule, time zone, thresholds) goes with every
- *   check-in, so Sentry creates and updates the monitor itself. One scheduled
- *   slot is one check-in: a failed attempt that Bull retries keeps it open
- *   and the retry closes it, so the monitor's thresholds count slots, not
- *   attempts (a retry landing on another worker process opens its own, and
- *   the first one times out in Sentry). Check-ins are fire and forget:
- *   nothing is awaited or flushed and every Sentry call is guarded, so Sentry
- *   can never fail, delay or change a run.
+ *   check-in, so Sentry creates and updates the monitor itself. Every
+ *   attempt is its own check-in pair, a Bull retry included: nothing is held
+ *   open across attempts, so a restart, a deploy or another worker cannot
+ *   leave a check-in dangling, and the monitor's thresholds count attempts.
+ *   Check-ins are fire and forget: nothing is awaited or flushed and every
+ *   Sentry call is guarded, so Sentry can never fail, delay or change a run.
+ * - The bookkeeping around a run (record, check-in, failure alarm, recovery
+ *   line) never decides its outcome: a throw in it is swallowed, so a run
+ *   that succeeded is never failed and retried (payout-process moves money),
+ *   and a failed run rethrows its own error.
  * - A failed run is an `error` (an alarm) on a state change: the first
  *   failure, or a failure that differs from the previous run's (another
  *   reason, another entity; compared by the repeat-report key). The same
  *   failure on the next runs is a `warn` until the repeat window has passed
  *   since it was last raised; then it is raised again, so a failure that
  *   lasts still reaches Sentry about once a day, as the throttle intends.
- *   The first success after a failure is logged as a recovery. Every run
- *   still fails (Bull retry) and, on a monitored job, sends its "error"
- *   check-in. The state is in memory: after a restart the first failure is
+ *   The first success after a failure is logged as a recovery. Every failed
+ *   attempt still fails (Bull retry) and, on a monitored job, sends its
+ *   "error" check-in. The state is in memory: after a restart the first failure is
  *   an `error` again, and the Redis repeat throttle keeps that from becoming
  *   a second event inside its window (`SentryReportThrottle`).
  */
@@ -102,8 +95,6 @@ export class CronTrackerService implements OnModuleInit {
   >();
   /** `job|schedule` pairs already warned about having no crontab form. */
   private readonly warnedSchedules = new Set<string>();
-  /** Per monitored job, the check-in of a failed slot that Bull will retry. */
-  private readonly retryingCheckIns = new Map<string, OpenCheckIn>();
 
   constructor() {
     // Let the run helpers reach the tracker before any cron fires.
@@ -176,30 +167,42 @@ export class CronTrackerService implements OnModuleInit {
         rec.lastError = null;
       }
       this.closeCheckIn(
-        job,
         checkIn,
         status === "success" ? "ok" : "error",
-        run.finalAttempt ?? true,
+        rec.lastDurationMs,
       );
     };
 
+    let result: T;
     try {
-      const result = await fn();
+      result = await fn();
+    } catch (e) {
+      this.safely(() => {
+        finalize("failed", e);
+        this.reportFailure(job, rec, e);
+      });
+      throw e; // unchanged: the error goes up as is
+    }
+    this.safely(() => {
       finalize("success");
       this.closeFailure(job);
-      return result;
-    } catch (e) {
-      finalize("failed", e);
-      this.reportFailure(job, rec, e);
-      throw e; // unchanged: the error goes up as is
+    });
+    return result;
+  }
+
+  /** Runs bookkeeping that must never change a run's outcome. */
+  private safely(bookkeeping: () => void): void {
+    try {
+      bookkeeping();
+    } catch {
+      /* the record or the alarm is lost, the run's outcome is not */
     }
   }
 
   /**
-   * The check-in of this run: the one its slot's failed attempt left open
-   * (a Bull retry), or a new "in_progress" one. Only for a monitored job on
-   * the production deployment with a Sentry client. Never throws: a Sentry
-   * problem only costs the check-in.
+   * Sends the "in_progress" check-in of this run: only for a monitored job
+   * on the production deployment with a Sentry client. Never throws: a
+   * Sentry problem only costs the check-in.
    */
   private openCheckIn(
     job: string,
@@ -212,13 +215,6 @@ export class CronTrackerService implements OnModuleInit {
       if (appEnv() !== CHECK_IN_APP_ENV || !Sentry.getClient()) {
         return undefined;
       }
-      const retrying = this.retryingCheckIns.get(job);
-      this.retryingCheckIns.delete(job);
-      if (retrying && run.jobId !== undefined && retrying.jobId === run.jobId) {
-        return retrying;
-      }
-      // A left-over check-in of another slot is dropped here: its retry never
-      // ran, and Sentry times it out after the max runtime (a failure).
       const config = buildSentryMonitorConfig(schedule, run.timezone, monitor);
       if (!config) this.warnUnsupportedSchedule(job, schedule);
       const monitorSlug = this.slug(job);
@@ -226,40 +222,26 @@ export class CronTrackerService implements OnModuleInit {
         { monitorSlug, status: "in_progress" },
         config,
       );
-      return {
-        checkInId,
-        monitorSlug,
-        config,
-        jobId: run.jobId,
-        startedAt: Date.now(),
-      };
+      return { checkInId, monitorSlug, config };
     } catch {
       return undefined;
     }
   }
 
-  /**
-   * Closes the slot's check-in with the same id and config, or keeps it open
-   * when this attempt failed and Bull retries it. Never throws.
-   */
+  /** Sends the closing check-in with the same id and config. Never throws. */
   private closeCheckIn(
-    job: string,
     checkIn: OpenCheckIn | undefined,
     status: "ok" | "error",
-    finalAttempt: boolean,
+    durationMs: number,
   ): void {
     if (!checkIn) return;
     try {
-      if (status === "error" && !finalAttempt && checkIn.jobId !== undefined) {
-        this.retryingCheckIns.set(job, checkIn);
-        return;
-      }
       Sentry.captureCheckIn(
         {
           checkInId: checkIn.checkInId,
           monitorSlug: checkIn.monitorSlug,
           status,
-          duration: (Date.now() - checkIn.startedAt) / 1000,
+          duration: durationMs / 1000,
         },
         checkIn.config,
       );

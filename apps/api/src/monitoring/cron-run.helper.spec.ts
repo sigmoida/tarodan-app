@@ -51,13 +51,13 @@ describe("runTrackedJob", () => {
       "payout-process",
       "*/15 * * * *",
       expect.any(Function),
-      { timezone: undefined, jobId: undefined, finalAttempt: true },
+      { timezone: undefined },
     );
     expect(res.ok).toBe(true);
     expect(res.summary).toBe("2 işlendi");
   });
 
-  it("passes the repeatable's time zone, the job id and the attempt to the tracker", async () => {
+  it("tracks an automatic retry and passes the repeatable's time zone", async () => {
     const tracker = makeTracker();
     const job = {
       ...makeJob({
@@ -74,29 +74,7 @@ describe("runTrackedJob", () => {
       "payout-process",
       "*/15 * * * *",
       expect.any(Function),
-      {
-        timezone: "Europe/Istanbul",
-        jobId: "repeat:abc:1761300000000",
-        finalAttempt: false,
-      },
-    );
-  });
-
-  it("marks the last automatic attempt as final", async () => {
-    const tracker = makeTracker();
-    const job = {
-      ...makeJob({ repeat: { cron: "*/15 * * * *" }, attempts: 3 }),
-      id: 42,
-      attemptsMade: 2,
-    } as unknown as Job;
-
-    await runTrackedJob(job, "payout-process", () => undefined);
-
-    expect(tracker.track).toHaveBeenCalledWith(
-      "payout-process",
-      "*/15 * * * *",
-      expect.any(Function),
-      expect.objectContaining({ jobId: "42", finalAttempt: true }),
+      { timezone: "Europe/Istanbul" },
     );
   });
 

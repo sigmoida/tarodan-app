@@ -1155,17 +1155,18 @@ Addresses" and the server-side data scrubber; the client SDK does not send IPs
 ### Sentry cron monitor (API)
 
 The Sentry plan includes one cron monitor and it watches `payout-process`
-(every 15 minutes, Europe/Istanbul): a payout slot that is missed (10 minutes
-late), fails after its Bull retries, or is still running after 30 minutes
-counts as failed; two failed slots in a row open an issue and the first good
-slot resolves it. A slot is one check-in: an attempt that Bull retries keeps
-it open. The settings are the `monitor` of its entry in
-`apps/api/src/workers/cron-catalog.ts`.
+(every 15 minutes, Europe/Istanbul): a payout run that is missed (10 minutes
+late), fails, or is still running after 30 minutes counts as failed. Every
+attempt checks in, Bull's automatic retries included, so two failed check-ins
+in a row (a run and its retry 30 seconds later, or two slots) open an issue
+and the first good one resolves it. The settings are the `monitor` of its
+entry in `apps/api/src/workers/cron-catalog.ts`.
 
-- **Production only.** Only a worker whose Sentry environment is `production`
-  sends check-ins, and only for catalog entries with a `monitor`; staging and
-  development send none (`APP_ENV`). Manual runs (the admin release fast
-  path, a Bull Board retry of a failed job) are not check-ins.
+- **Production only.** Only a worker with `APP_ENV=production` and a Sentry
+  DSN sends check-ins, and only for catalog entries with a `monitor`; staging
+  and development send none, whatever their `SENTRY_ENVIRONMENT`. Manual runs
+  (the admin release fast path, a Bull Board retry of a failed job) are not
+  check-ins.
 - **No manual setup.** Every check-in carries the monitor config (schedule,
   time zone, margin, runtime, thresholds), so the first production run creates
   the monitor and a deploy that changes the settings updates it. Check after

@@ -78,9 +78,5 @@ export async function runTrackedJob(
   const attempts = opts?.attempts ?? 1;
   const retriedByHand = Boolean((job as { retriedOn?: number }).retriedOn);
   if (retriedByHand || attemptsMade >= attempts) return exec();
-  return tracker.track(jobName, cron, exec, {
-    timezone: opts?.repeat?.tz,
-    jobId: job.id === undefined ? undefined : String(job.id),
-    finalAttempt: attemptsMade + 1 >= attempts,
-  });
+  return tracker.track(jobName, cron, exec, { timezone: opts?.repeat?.tz });
 }

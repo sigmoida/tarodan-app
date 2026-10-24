@@ -241,9 +241,9 @@ describe("CronTrackerService.track alarms on a state change only", () => {
 
 /**
  * Sentry cron check-ins: only a job with a `monitor` in the cron catalog
- * (payout-process), only on the production deployment (APP_ENV), one check-in
- * per scheduled slot across its Bull retries, with the monitor config on both
- * check-ins so Sentry upserts the monitor. Staging used to send a check-in for
+ * (payout-process), only on the production deployment (APP_ENV), one pair per
+ * attempt, with the monitor config on both check-ins so Sentry upserts the
+ * monitor. Staging used to send a check-in for
  * every cron every minute with no config, and Sentry dropped them all. The run
  * itself never depends on Sentry.
  */
@@ -314,16 +314,13 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     );
   });
 
-  it("closes a failed final attempt with an error check-in and rethrows the same error", async () => {
+  it("closes a failed run with an error check-in and rethrows the same error", async () => {
     const boom = new Error("paytr down");
 
     await expect(
-      payout(
-        () => {
-          throw boom;
-        },
-        { timezone: "Europe/Istanbul", jobId: "slot-1", finalAttempt: true },
-      ),
+      payout(() => {
+        throw boom;
+      }),
     ).rejects.toBe(boom);
 
     expect(captureCheckIn).toHaveBeenNthCalledWith(
@@ -338,70 +335,22 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     expect(tracker.list()[0]).toMatchObject({ status: "failed", failures: 1 });
   });
 
-  it("keeps the slot's check-in open over a Bull retry and closes it once", async () => {
-    const slot = { timezone: "Europe/Istanbul", jobId: "slot-1" };
+  it("closes every attempt on its own, a Bull retry included (nothing left open)", async () => {
+    captureCheckIn
+      .mockReturnValueOnce("attempt-1")
+      .mockReturnValueOnce("attempt-1")
+      .mockReturnValueOnce("attempt-2");
 
-    await expect(
-      payout(failing(), { ...slot, finalAttempt: false }),
-    ).rejects.toThrow("paytr down");
-    expect(statuses()).toEqual(["in_progress"]);
+    await expect(payout(failing())).rejects.toThrow("paytr down");
+    await expect(payout(() => "paid")).resolves.toBe("paid");
 
-    await expect(
-      payout(() => "paid", { ...slot, finalAttempt: true }),
-    ).resolves.toBe("paid");
-
-    expect(statuses()).toEqual(["in_progress", "ok"]);
+    expect(statuses()).toEqual(["in_progress", "error", "in_progress", "ok"]);
     expect(captureCheckIn.mock.calls[1][0]).toMatchObject({
-      checkInId: "check-in-id",
+      checkInId: "attempt-1",
     });
-    // Both attempts are still runs on the admin jobs page.
-    expect(tracker.list()[0]).toMatchObject({ runs: 2, failures: 1 });
-  });
-
-  it("reports a slot whose every attempt failed as one error check-in", async () => {
-    const slot = { timezone: "Europe/Istanbul", jobId: "slot-1" };
-
-    await expect(
-      payout(failing(), { ...slot, finalAttempt: false }),
-    ).rejects.toThrow();
-    await expect(
-      payout(failing(), { ...slot, finalAttempt: false }),
-    ).rejects.toThrow();
-    await expect(
-      payout(failing(), { ...slot, finalAttempt: true }),
-    ).rejects.toThrow();
-
-    expect(statuses()).toEqual(["in_progress", "error"]);
-  });
-
-  it("opens a new check-in for the next slot when a retry never came", async () => {
-    await expect(
-      payout(failing(), {
-        timezone: "Europe/Istanbul",
-        jobId: "slot-1",
-        finalAttempt: false,
-      }),
-    ).rejects.toThrow();
-    captureCheckIn.mockReturnValue("check-in-id-2");
-
-    await payout(() => "paid", {
-      timezone: "Europe/Istanbul",
-      jobId: "slot-2",
-      finalAttempt: true,
+    expect(captureCheckIn.mock.calls[3][0]).toMatchObject({
+      checkInId: "attempt-2",
     });
-
-    expect(statuses()).toEqual(["in_progress", "in_progress", "ok"]);
-    expect(captureCheckIn.mock.calls[2][0]).toMatchObject({
-      checkInId: "check-in-id-2",
-    });
-  });
-
-  it("closes a failure without a job id at once", async () => {
-    await expect(
-      payout(failing(), { timezone: "Europe/Istanbul", finalAttempt: false }),
-    ).rejects.toThrow();
-
-    expect(statuses()).toEqual(["in_progress", "error"]);
   });
 
   it("keeps the failure alarm unchanged on a monitored job", async () => {
@@ -535,5 +484,48 @@ describe("CronTrackerService.track Sentry check-ins", () => {
         "'*/30 */15 * * * *' has no 5-field crontab form",
       ),
     );
+  });
+});
+
+/**
+ * The tracker's bookkeeping never decides a run's outcome: a run that
+ * succeeded (payout-process has already moved money) must not be failed and
+ * retried by Bull because a log line threw, and a failed run rethrows its own
+ * error, not the bookkeeping's.
+ */
+describe("CronTrackerService.track bookkeeping cannot change the outcome", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("returns the result when the recovery line throws", async () => {
+    jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const tracker = new CronTrackerService();
+    await expect(
+      tracker.track("payout-process", "*/15 * * * *", () => {
+        throw new Error("paytr down");
+      }),
+    ).rejects.toThrow("paytr down");
+    jest.spyOn(Logger.prototype, "log").mockImplementation(() => {
+      throw new Error("log transport broken");
+    });
+    const fn = jest.fn(() => "paid");
+
+    await expect(
+      tracker.track("payout-process", "*/15 * * * *", fn),
+    ).resolves.toBe("paid");
+
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("rethrows the run's own error when the failure alarm throws", async () => {
+    jest.spyOn(Logger.prototype, "error").mockImplementation(() => {
+      throw new Error("log transport broken");
+    });
+    const boom = new Error("paytr down");
+
+    await expect(
+      new CronTrackerService().track("payout-process", "*/15 * * * *", () => {
+        throw boom;
+      }),
+    ).rejects.toBe(boom);
   });
 });

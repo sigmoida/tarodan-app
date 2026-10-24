@@ -303,8 +303,9 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     // payout/jobs/payout-scheduler.service.ts (the contract spec pins it, so
     // a schedule change revisits these): a slot not started 10 minutes late
     // is missed, one still running after 30 minutes (two slots) timed out.
-    // A slot is one check-in across its Bull retries; two failed slots in a
-    // row open the issue and the first good slot resolves it.
+    // Every attempt checks in, a Bull retry included: two failed check-ins in
+    // a row (a run and its retry, or two slots) open the issue and the first
+    // good one resolves it.
     monitor: {
       checkinMarginMinutes: 10,
       maxRuntimeMinutes: 30,

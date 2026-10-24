@@ -160,9 +160,10 @@ shares a process with HTTP.
   double-process. Cron keys are bound to Bull and Sentry: renaming one is an ops step.
 - **Sentry cron monitors** come from a catalog entry's `monitor` (today only
   `payout-process`; the plan includes one). Only those jobs check in, only
-  on `APP_ENV=production`, one check-in per scheduled slot (Bull retries
-  included), with the schedule and time zone of the Bull repeatable.
-  Check-ins never await or throw into the job.
+  on `APP_ENV=production`, one check-in pair per attempt (Bull retries
+  included, Bull Board retries not), with the schedule and time zone of the
+  Bull repeatable. Check-ins and the tracker's bookkeeping never await, throw
+  into or change the job.
 
 ## Logging and Sentry
 
