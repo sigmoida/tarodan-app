@@ -1,4 +1,5 @@
-import type { Breadcrumb, Event } from "@sentry/node";
+import type { Breadcrumb, Event, NodeOptions } from "@sentry/node";
+import { sentrySampling } from "@tarodan/logger";
 import { getRequestId } from "../../common/context/request-context";
 import {
   redactRequestBody,
@@ -124,10 +125,10 @@ export function applySentryTransactionPolicy<T extends Event>(
 }
 
 /**
- * Dağıtım sürümü. Sırayla: açıkça verilen `SENTRY_RELEASE`, Coolify'ın
- * `SOURCE_COMMIT`'i, genel `GIT_COMMIT_SHA`. Hiçbiri yoksa undefined döner ve
- * Sentry kendi tahminine düşer (Docker imajında .git bulunmadığı için
- * genellikle tahmin edemez — o durumda sürüm etiketsiz kalır, akış bozulmaz).
+ * The deploy release: an explicit `SENTRY_RELEASE`, else Coolify's
+ * `SOURCE_COMMIT`, else the generic `GIT_COMMIT_SHA`. With none of them it is
+ * undefined and the SDK guesses; the Docker image has no `.git`, so the
+ * release then stays untagged (nothing breaks).
  */
 export function resolveSentryRelease(
   env: NodeJS.ProcessEnv = process.env,
@@ -140,10 +141,10 @@ export function resolveSentryRelease(
 }
 
 /**
- * Sentry ortam etiketi. `NODE_ENV`'e bağlanamaz: üç Dockerfile da onu sabit
- * `production` yazar, dolayısıyla staging ile gerçek prod Sentry'de ayırt
- * edilemez ve staging test hataları prod alarmlarına karışırdı. Etiket kendi
- * anahtarından gelir; verilmezse eski davranış (NODE_ENV) korunur.
+ * The Sentry environment tag. It cannot come from `NODE_ENV`: every
+ * Dockerfile sets that to `production`, so staging and production would look
+ * the same and staging test errors would mix into production alerts. The tag
+ * has its own key; without it the old behaviour (`NODE_ENV`) is kept.
  */
 export function resolveSentryEnvironment(
   env: NodeJS.ProcessEnv = process.env,
@@ -154,12 +155,30 @@ export function resolveSentryEnvironment(
 }
 
 /**
- * Örnekleme oranı için: ETİKETE değil gerçek çalışma kipine bakar. Staging de
- * bir production build'idir; etiketi "staging" diye tam örneklemeye geçilirse
- * iz/profil kotası hızla tükenir.
+ * The one `Sentry.init` configuration for the API process, used by both
+ * entry points: `worker.ts` (before Nest boots) and `SentryModule` (web and
+ * `all` roles). The sample rates come from the shared table by environment
+ * tag (`@tarodan/logger` `sentrySampling`), never from `NODE_ENV`, which is
+ * `production` on staging too. The privacy gates are not optional: the
+ * default fetch instrumentation records every outbound URL, and the Sürat
+ * tracking contract carries credentials in the query string.
  */
-export function isProductionRuntime(
+export function buildSentryNodeOptions(
+  dsn: string,
   env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return env.NODE_ENV === "production";
+): NodeOptions {
+  const environment = resolveSentryEnvironment(env);
+  const { sampleRate, tracesSampleRate } = sentrySampling(environment);
+  return {
+    dsn,
+    environment,
+    // Answers "which deploy brought this error" and drives Sentry's
+    // regression tracking (a resolved issue reopening in a new release).
+    release: resolveSentryRelease(env),
+    sampleRate,
+    tracesSampleRate,
+    beforeSend: applySentryEventPolicy,
+    beforeBreadcrumb: applySentryBreadcrumbPolicy,
+    beforeSendTransaction: applySentryTransactionPolicy,
+  };
 }

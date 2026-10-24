@@ -7,25 +7,16 @@ import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
-import {
-  applySentryBreadcrumbPolicy,
-  applySentryEventPolicy,
-  applySentryTransactionPolicy,
-  isProductionRuntime,
-  resolveSentryEnvironment,
-  resolveSentryRelease,
-} from "./modules/sentry/sentry-event";
+import { buildSentryNodeOptions } from "./modules/sentry/sentry-event";
 import { errorStack } from "./common/helpers/error-message";
 
 /**
- * Initialize Sentry for the worker process (#71). The worker runs as a separate
- * process and does NOT import the API's SentryModule, so without this every
- * background-job error — and any uncaught exception in the worker — went
- * unreported. Mirrors the API's Sentry config. The breadcrumb policy is NOT
- * optional here: Sentry's default fetch instrumentation records every outbound
- * call (Sürat tracking polls run in this process) and the Sürat contract carries
- * credentials in the query string — without the policy the password landed in
- * Sentry breadcrumbs verbatim.
+ * Initializes Sentry for the worker process (#71) before Nest boots, so a
+ * crash while the headless AppModule loads is reported too. The options are
+ * the API's (`buildSentryNodeOptions`): same environment tag, sample rates
+ * and privacy gates (the Sürat tracking polls run in this process and carry
+ * credentials in their query string). `SentryModule`, loaded later with
+ * AppModule, sees the client and does not initialize Sentry a second time.
  */
 function initWorkerSentry(logger: Logger): boolean {
   const dsn = process.env.SENTRY_DSN;
@@ -33,17 +24,7 @@ function initWorkerSentry(logger: Logger): boolean {
     logger.warn("Sentry DSN not configured — worker error tracking disabled");
     return false;
   }
-  Sentry.init({
-    dsn,
-    // API ile aynı çözümleme: etiket SENTRY_ENVIRONMENT'tan (staging ile prod
-    // ayrılsın), örnekleme gerçek çalışma kipinden, sürüm commit sha'sından.
-    environment: resolveSentryEnvironment(),
-    release: resolveSentryRelease(),
-    tracesSampleRate: isProductionRuntime() ? 0.2 : 1.0,
-    beforeSend: applySentryEventPolicy,
-    beforeBreadcrumb: applySentryBreadcrumbPolicy,
-    beforeSendTransaction: applySentryTransactionPolicy,
-  });
+  Sentry.init(buildSentryNodeOptions(dsn));
   logger.log("Sentry initialized (worker)");
   return true;
 }

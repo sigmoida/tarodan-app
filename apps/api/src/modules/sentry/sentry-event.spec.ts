@@ -2,7 +2,7 @@ import {
   applySentryBreadcrumbPolicy,
   applySentryEventPolicy,
   applySentryTransactionPolicy,
-  isProductionRuntime,
+  buildSentryNodeOptions,
   resolveSentryEnvironment,
   resolveSentryRelease,
 } from "./sentry-event";
@@ -271,21 +271,54 @@ describe("resolveSentryEnvironment", () => {
 });
 
 /**
- * Örnekleme oranı ETİKETE değil gerçek çalışma kipine (NODE_ENV) bakar:
- * staging de production build'idir ve etiketi "staging" olduğu için tam
- * örneklemeye düşerse ücretsiz kota hızla tükenirdi.
+ * One `Sentry.init` configuration for both entry points (worker.ts and
+ * SentryModule). The sample rates follow the environment TAG through the
+ * shared table, not `NODE_ENV`: every Dockerfile sets `NODE_ENV=production`,
+ * so staging used to sample at production rates.
  */
-describe("isProductionRuntime", () => {
-  it("staging etiketi tam örneklemeyi AÇMAZ", () => {
-    expect(
-      isProductionRuntime({
-        SENTRY_ENVIRONMENT: "staging",
-        NODE_ENV: "production",
-      }),
-    ).toBe(true);
+describe("buildSentryNodeOptions", () => {
+  const DSN = "https://public@example.ingest.sentry.io/1";
+
+  it("production: errors 1, traces 0.2, no dead profiling option", () => {
+    const options = buildSentryNodeOptions(DSN, {
+      SENTRY_ENVIRONMENT: "production",
+      NODE_ENV: "production",
+      SOURCE_COMMIT: "abcdef1234567890",
+    });
+    expect(options).toMatchObject({
+      dsn: DSN,
+      environment: "production",
+      release: "abcdef1",
+      sampleRate: 1,
+      tracesSampleRate: 0.2,
+    });
+    expect(options).not.toHaveProperty("profilesSampleRate");
   });
 
-  it("yerel geliştirmede false", () => {
-    expect(isProductionRuntime({ NODE_ENV: "development" })).toBe(false);
+  it("staging samples 0.02 of traces although NODE_ENV is production", () => {
+    const options = buildSentryNodeOptions(DSN, {
+      SENTRY_ENVIRONMENT: "staging",
+      NODE_ENV: "production",
+    });
+    expect(options.environment).toBe("staging");
+    expect(options.sampleRate).toBe(1);
+    expect(options.tracesSampleRate).toBe(0.02);
+  });
+
+  it.each([
+    ["development", { NODE_ENV: "development" }],
+    ["unset", {}],
+    ["unknown tag", { SENTRY_ENVIRONMENT: "preview", NODE_ENV: "production" }],
+  ])("%s: errors only, no traces", (_label, env) => {
+    const options = buildSentryNodeOptions(DSN, env);
+    expect(options.sampleRate).toBe(1);
+    expect(options.tracesSampleRate).toBe(0);
+  });
+
+  it("keeps every privacy gate (the worker runs the Sürat polls)", () => {
+    const options = buildSentryNodeOptions(DSN, {});
+    expect(options.beforeSend).toBe(applySentryEventPolicy);
+    expect(options.beforeBreadcrumb).toBe(applySentryBreadcrumbPolicy);
+    expect(options.beforeSendTransaction).toBe(applySentryTransactionPolicy);
   });
 });
