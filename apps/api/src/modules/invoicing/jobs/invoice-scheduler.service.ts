@@ -42,10 +42,10 @@ export class InvoiceSchedulerService implements OnModuleInit {
       // retry endpoint recovers them.
       const exhausted = await this.invoicing.reportExhaustedInvoices();
       log(
-        `eLogo retry çalıştı${exhausted > 0 ? ` · ${exhausted} fatura deneme bütçesi tükenmiş` : ""}`,
+        `eLogo retry ran${exhausted > 0 ? ` · ${exhausted} invoice(s) with an exhausted attempt budget` : ""}`,
       );
       return {
-        summary: `eLogo retry tamam${exhausted > 0 ? ` · ${exhausted} tükenmiş` : ""}`,
+        summary: `eLogo retry done${exhausted > 0 ? ` · ${exhausted} exhausted` : ""}`,
         stats: { exhausted } as Record<string, number>,
       };
     } catch (err) {

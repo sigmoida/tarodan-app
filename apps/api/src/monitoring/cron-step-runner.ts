@@ -32,11 +32,11 @@ export function isAlreadyReportedCronFailure(error: unknown): boolean {
 
 export interface CronStepRunner {
   /**
-   * Bir adımı izole çalıştırır: hata diğer adımları BLOKLAMAZ, kaydedilir.
-   * Adımın dönüş değeri geri verilir; hata durumunda `undefined`.
+   * Runs one step in isolation: its error does NOT block the other steps and
+   * is recorded. Returns the step's value; `undefined` on an error.
    */
   step<T>(name: string, fn: () => Promise<T>): Promise<T | undefined>;
-  /** Başarısız adım varsa fırlatır — tur sonunda çağrılmalı. */
+  /** Throws when a step failed; call it at the end of the run. */
   assertAllStepsSucceeded(): void;
   readonly failedSteps: string[];
 }
@@ -71,7 +71,7 @@ export function createCronStepRunner(params: {
           `Step "${name}" failed: ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
-        log?.(`HATA ${name}: ${message}`);
+        log?.(`FAILED ${name}: ${message}`);
         failedSteps.push(name);
         details.push(`${name}: ${message}`);
         return undefined;
