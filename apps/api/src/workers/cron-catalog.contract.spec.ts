@@ -1,6 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import "reflect-metadata";
+import type { Job } from "bull";
+import { setCronTracker } from "../monitoring/cron-tracker.holder";
+import type { CronTrackerService } from "../monitoring/cron-tracker.service";
 import { toSentryCrontab } from "../monitoring/cron-monitor-config";
 import { CRON_CATALOG, cronMonitorFor } from "./cron-catalog";
 
@@ -43,9 +46,15 @@ function findProcessorFiles(dir: string): string[] {
   return out;
 }
 
-/** `scheduled` kuyruğuna kayıtlı tüm @Process job adlarını topla. */
-function collectScheduledJobNames(): Set<string> {
-  const names = new Set<string>();
+/** A `@Process(name)` handler on the `scheduled` queue. */
+interface ScheduledHandler {
+  name: string;
+  handler: (job: Job) => unknown;
+}
+
+/** Every `@Process` handler registered on the `scheduled` queue. */
+function collectScheduledHandlers(): ScheduledHandler[] {
+  const handlers: ScheduledHandler[] = [];
   const files = findProcessorFiles(path.join(__dirname, ".."));
   for (const file of files) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -60,11 +69,21 @@ function collectScheduledJobNames(): Set<string> {
         if (typeof handler !== "function") continue;
         const processMeta = Reflect.getMetadata(BULL_PROCESS_META, handler) as
           { name?: string } | undefined;
-        if (processMeta?.name) names.add(processMeta.name);
+        if (processMeta?.name) {
+          handlers.push({
+            name: processMeta.name,
+            handler: handler as ScheduledHandler["handler"],
+          });
+        }
       }
     }
   }
-  return names;
+  return handlers;
+}
+
+/** The job names of every `@Process` handler on the `scheduled` queue. */
+function collectScheduledJobNames(): Set<string> {
+  return new Set(collectScheduledHandlers().map((h) => h.name));
 }
 
 describe("cron-catalog sözleşmesi", () => {
@@ -167,4 +186,39 @@ describe("cron-catalog Sentry monitors", () => {
     expect(cronMonitorFor("payment-expired")).toBeUndefined();
     expect(cronMonitorFor("no-such-job")).toBeUndefined();
   });
+});
+
+/**
+ * CONTRACT: every scheduled handler is tracked under its own `@Process` key.
+ * The tracker finds a job's Sentry monitor (and the /admin/jobs row) by the
+ * name the handler passes to `runTrackedJob`, not by the Bull job name: a
+ * handler that passed another name would make payout-process check in under
+ * no monitor, and Sentry would never raise a missed or failed payout run.
+ * Each handler is called with a scheduled job and a tracker that records the
+ * name without running the job, so no business code runs here.
+ */
+describe("cron-catalog tracked names", () => {
+  afterEach(() => setCronTracker(null as unknown as CronTrackerService));
+
+  it.each(collectScheduledHandlers().map((h) => [h.name, h] as const))(
+    "%s is tracked under its own key",
+    async (name, { handler }) => {
+      const track = jest.fn().mockResolvedValue(undefined);
+      setCronTracker({ track } as unknown as CronTrackerService);
+      const job = {
+        name,
+        opts: {
+          repeat: { cron: "*/15 * * * *", tz: "Europe/Istanbul" },
+          attempts: 3,
+        },
+        attemptsMade: 0,
+        log: jest.fn().mockResolvedValue(undefined),
+      } as unknown as Job;
+
+      await handler.call({}, job);
+
+      expect(track).toHaveBeenCalledTimes(1);
+      expect(track.mock.calls[0][0]).toBe(name);
+    },
+  );
 });
