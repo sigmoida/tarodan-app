@@ -2,7 +2,10 @@ import { Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { SENTRY_REPEAT_WINDOW_SECONDS } from "../common/logging/error-report-key";
 import { CronStepFailuresError } from "./cron-step-runner";
-import { CronTrackerService } from "./cron-tracker.service";
+import {
+  CronTrackerService,
+  type TrackedRunContext,
+} from "./cron-tracker.service";
 
 jest.mock("@sentry/node", () => ({
   captureCheckIn: jest.fn(() => "check-in-id"),
@@ -11,12 +14,10 @@ jest.mock("@sentry/node", () => ({
 
 const captureCheckIn = Sentry.captureCheckIn as jest.Mock;
 const getClient = Sentry.getClient as jest.Mock;
-/** A Sentry client tagged with `environment` (undefined: no client). */
-const sentryIn = (environment: string | undefined) =>
+/** Sentry client present or not (no DSN), tagged with `environment`. */
+const sentryClient = (present: boolean, environment = "production") =>
   getClient.mockReturnValue(
-    environment === undefined
-      ? undefined
-      : { getOptions: () => ({ environment }) },
+    present ? { getOptions: () => ({ environment }) } : undefined,
   );
 
 /**
@@ -240,7 +241,8 @@ describe("CronTrackerService.track alarms on a state change only", () => {
 
 /**
  * Sentry cron check-ins: only a job with a `monitor` in the cron catalog
- * (payout-process), only from production, with the monitor config on both
+ * (payout-process), only on the production deployment (APP_ENV), one check-in
+ * per scheduled slot across its Bull retries, with the monitor config on both
  * check-ins so Sentry upserts the monitor. Staging used to send a check-in for
  * every cron every minute with no config, and Sentry dropped them all. The run
  * itself never depends on Sentry.
@@ -254,6 +256,7 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     failureIssueThreshold: 2,
     recoveryThreshold: 1,
   };
+  const originalAppEnv = process.env.APP_ENV;
   let warn: jest.SpyInstance;
   let tracker: CronTrackerService;
 
@@ -265,16 +268,28 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     warn = jest
       .spyOn(Logger.prototype, "warn")
       .mockImplementation(() => undefined);
-    sentryIn("production");
+    process.env.APP_ENV = "production";
+    sentryClient(true);
     tracker = new CronTrackerService();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalAppEnv === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = originalAppEnv;
+  });
 
   const payout = <T>(
     fn: () => T | Promise<T>,
+    run: TrackedRunContext = { timezone: "Europe/Istanbul" },
     schedule = "*/15 * * * *",
-    timezone: string | undefined = "Europe/Istanbul",
-  ) => tracker.track("payout-process", schedule, fn, timezone);
+  ) => tracker.track("payout-process", schedule, fn, run);
+  const failing =
+    (message = "paytr down") =>
+    () => {
+      throw new Error(message);
+    };
+  const statuses = () =>
+    captureCheckIn.mock.calls.map(([checkIn]) => checkIn.status);
 
   it("opens and closes an ok check-in with the same id and the monitor config", async () => {
     const result = { summary: "2 processed" };
@@ -299,13 +314,16 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     );
   });
 
-  it("closes a failed run with an error check-in and rethrows the same error", async () => {
+  it("closes a failed final attempt with an error check-in and rethrows the same error", async () => {
     const boom = new Error("paytr down");
 
     await expect(
-      payout(() => {
-        throw boom;
-      }),
+      payout(
+        () => {
+          throw boom;
+        },
+        { timezone: "Europe/Istanbul", jobId: "slot-1", finalAttempt: true },
+      ),
     ).rejects.toBe(boom);
 
     expect(captureCheckIn).toHaveBeenNthCalledWith(
@@ -318,6 +336,72 @@ describe("CronTrackerService.track Sentry check-ins", () => {
       PAYOUT_CONFIG,
     );
     expect(tracker.list()[0]).toMatchObject({ status: "failed", failures: 1 });
+  });
+
+  it("keeps the slot's check-in open over a Bull retry and closes it once", async () => {
+    const slot = { timezone: "Europe/Istanbul", jobId: "slot-1" };
+
+    await expect(
+      payout(failing(), { ...slot, finalAttempt: false }),
+    ).rejects.toThrow("paytr down");
+    expect(statuses()).toEqual(["in_progress"]);
+
+    await expect(
+      payout(() => "paid", { ...slot, finalAttempt: true }),
+    ).resolves.toBe("paid");
+
+    expect(statuses()).toEqual(["in_progress", "ok"]);
+    expect(captureCheckIn.mock.calls[1][0]).toMatchObject({
+      checkInId: "check-in-id",
+    });
+    // Both attempts are still runs on the admin jobs page.
+    expect(tracker.list()[0]).toMatchObject({ runs: 2, failures: 1 });
+  });
+
+  it("reports a slot whose every attempt failed as one error check-in", async () => {
+    const slot = { timezone: "Europe/Istanbul", jobId: "slot-1" };
+
+    await expect(
+      payout(failing(), { ...slot, finalAttempt: false }),
+    ).rejects.toThrow();
+    await expect(
+      payout(failing(), { ...slot, finalAttempt: false }),
+    ).rejects.toThrow();
+    await expect(
+      payout(failing(), { ...slot, finalAttempt: true }),
+    ).rejects.toThrow();
+
+    expect(statuses()).toEqual(["in_progress", "error"]);
+  });
+
+  it("opens a new check-in for the next slot when a retry never came", async () => {
+    await expect(
+      payout(failing(), {
+        timezone: "Europe/Istanbul",
+        jobId: "slot-1",
+        finalAttempt: false,
+      }),
+    ).rejects.toThrow();
+    captureCheckIn.mockReturnValue("check-in-id-2");
+
+    await payout(() => "paid", {
+      timezone: "Europe/Istanbul",
+      jobId: "slot-2",
+      finalAttempt: true,
+    });
+
+    expect(statuses()).toEqual(["in_progress", "in_progress", "ok"]);
+    expect(captureCheckIn.mock.calls[2][0]).toMatchObject({
+      checkInId: "check-in-id-2",
+    });
+  });
+
+  it("closes a failure without a job id at once", async () => {
+    await expect(
+      payout(failing(), { timezone: "Europe/Istanbul", finalAttempt: false }),
+    ).rejects.toThrow();
+
+    expect(statuses()).toEqual(["in_progress", "error"]);
   });
 
   it("keeps the failure alarm unchanged on a monitored job", async () => {
@@ -347,10 +431,11 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     expect(captureCheckIn).not.toHaveBeenCalled();
   });
 
-  it.each([["staging"], ["development"], [""]])(
-    "sends nothing from the %p environment",
-    async (environment) => {
-      sentryIn(environment);
+  it.each([["staging"], ["development"], [""], [undefined]])(
+    "sends nothing on APP_ENV %p",
+    async (appEnv) => {
+      if (appEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = appEnv;
 
       await payout(() => "ok");
 
@@ -358,8 +443,17 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     },
   );
 
+  it("sends nothing from staging whose Sentry label fell back to production", async () => {
+    process.env.APP_ENV = "staging";
+    sentryClient(true, "production");
+
+    await payout(() => "ok");
+
+    expect(captureCheckIn).not.toHaveBeenCalled();
+  });
+
   it("sends nothing without a Sentry client (no DSN)", async () => {
-    sentryIn(undefined);
+    sentryClient(false);
 
     await expect(payout(() => "ok")).resolves.toBe("ok");
 
@@ -409,7 +503,7 @@ describe("CronTrackerService.track Sentry check-ins", () => {
   });
 
   it("drops a zero seconds field from a 6-field schedule", async () => {
-    await payout(() => "ok", "0 */15 * * * *");
+    await payout(() => "ok", undefined, "0 */15 * * * *");
 
     expect(captureCheckIn).toHaveBeenNthCalledWith(
       1,
@@ -426,15 +520,16 @@ describe("CronTrackerService.track Sentry check-ins", () => {
     expect(captureCheckIn.mock.calls[0][1]).not.toHaveProperty("timezone");
   });
 
-  it("sends a schedule without a crontab form without config and warns once", async () => {
-    await payout(() => "ok", "*/30 */15 * * * *");
-    await payout(() => "ok", "*/30 */15 * * * *");
+  it("sends a schedule without a crontab form without config and warns once per schedule", async () => {
+    await payout(() => "ok", undefined, "*/30 */15 * * * *");
+    await payout(() => "ok", undefined, "*/30 */15 * * * *");
+    await payout(() => "ok", undefined, "0 3 L * *");
 
-    expect(captureCheckIn).toHaveBeenCalledTimes(4);
+    expect(captureCheckIn).toHaveBeenCalledTimes(6);
     for (const [, config] of captureCheckIn.mock.calls) {
       expect(config).toBeUndefined();
     }
-    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining(
         "'*/30 */15 * * * *' has no 5-field crontab form",

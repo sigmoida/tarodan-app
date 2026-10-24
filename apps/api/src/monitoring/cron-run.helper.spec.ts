@@ -26,7 +26,7 @@ describe("runTrackedJob", () => {
           _job: string,
           _schedule: string,
           fn: () => Promise<T> | T,
-          _timezone?: string,
+          _run?: unknown,
         ) => Promise.resolve(fn()),
       ),
     } as unknown as CronTrackerService;
@@ -51,17 +51,22 @@ describe("runTrackedJob", () => {
       "payout-process",
       "*/15 * * * *",
       expect.any(Function),
-      undefined,
+      { timezone: undefined, jobId: undefined, finalAttempt: true },
     );
     expect(res.ok).toBe(true);
     expect(res.summary).toBe("2 işlendi");
   });
 
-  it("passes the repeatable's time zone to the tracker (Sentry monitor config)", async () => {
+  it("passes the repeatable's time zone, the job id and the attempt to the tracker", async () => {
     const tracker = makeTracker();
-    const job = makeJob({
-      repeat: { cron: "*/15 * * * *", tz: "Europe/Istanbul" },
-    });
+    const job = {
+      ...makeJob({
+        repeat: { cron: "*/15 * * * *", tz: "Europe/Istanbul" },
+        attempts: 3,
+      }),
+      id: "repeat:abc:1761300000000",
+      attemptsMade: 1,
+    } as unknown as Job;
 
     await runTrackedJob(job, "payout-process", () => undefined);
 
@@ -69,9 +74,52 @@ describe("runTrackedJob", () => {
       "payout-process",
       "*/15 * * * *",
       expect.any(Function),
-      "Europe/Istanbul",
+      {
+        timezone: "Europe/Istanbul",
+        jobId: "repeat:abc:1761300000000",
+        finalAttempt: false,
+      },
     );
   });
+
+  it("marks the last automatic attempt as final", async () => {
+    const tracker = makeTracker();
+    const job = {
+      ...makeJob({ repeat: { cron: "*/15 * * * *" }, attempts: 3 }),
+      id: 42,
+      attemptsMade: 2,
+    } as unknown as Job;
+
+    await runTrackedJob(job, "payout-process", () => undefined);
+
+    expect(tracker.track).toHaveBeenCalledWith(
+      "payout-process",
+      "*/15 * * * *",
+      expect.any(Function),
+      expect.objectContaining({ jobId: "42", finalAttempt: true }),
+    );
+  });
+
+  it.each([
+    ["retried from Bull Board", { attemptsMade: 1, retriedOn: 1761300000000 }],
+    ["run again after its attempts were used up", { attemptsMade: 3 }],
+  ])(
+    "does not track a scheduled job %s, but still runs it",
+    async (_case, state) => {
+      const tracker = makeTracker();
+      const fn = jest.fn().mockResolvedValue({ summary: "retried" });
+      const job = {
+        ...makeJob({ repeat: { cron: "*/15 * * * *" }, attempts: 3 }),
+        ...state,
+      } as unknown as Job;
+
+      const res = await runTrackedJob(job, "payout-process", fn);
+
+      expect(tracker.track).not.toHaveBeenCalled();
+      expect(fn).toHaveBeenCalled();
+      expect(res).toMatchObject({ ok: true, summary: "retried" });
+    },
+  );
 
   it("does not track a manual run even when it carries a time zone", async () => {
     const tracker = makeTracker();

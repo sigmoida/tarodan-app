@@ -299,10 +299,12 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     label: "Payout işleme",
     description: "Bekleyen satıcı ödemelerini (havale) işler",
     triggerable: false,
-    // Every 15 minutes. A run that has not started 10 minutes late, or is
-    // still running after 30 (two slots), counts as failed; two in a row open
-    // the issue (one Bull retry or a slow PayTR minute is not an alarm), and
-    // the first good run resolves it.
+    // Tuned to the "*/15 * * * *" schedule registered in
+    // payout/jobs/payout-scheduler.service.ts (the contract spec pins it, so
+    // a schedule change revisits these): a slot not started 10 minutes late
+    // is missed, one still running after 30 minutes (two slots) timed out.
+    // A slot is one check-in across its Bull retries; two failed slots in a
+    // row open the issue and the first good slot resolves it.
     monitor: {
       checkinMarginMinutes: 10,
       maxRuntimeMinutes: 30,

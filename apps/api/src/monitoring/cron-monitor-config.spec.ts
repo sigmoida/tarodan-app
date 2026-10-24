@@ -18,12 +18,18 @@ describe("toSentryCrontab", () => {
     expect(toSentryCrontab(cron)).toBe(crontab);
   });
 
-  it.each([["*/10 * * * * *"], ["30 */5 * * * *"], ["* * * *"], [""]])(
-    "has no crontab form for %p",
-    (cron) => {
-      expect(toSentryCrontab(cron)).toBeNull();
-    },
-  );
+  it.each([
+    ["*/10 * * * * *"],
+    ["30 */5 * * * *"],
+    ["* * * *"],
+    [""],
+    ["0 3 L * *"],
+    ["0 3 * * MON"],
+    ["0 3 ? * 1"],
+    ["@daily"],
+  ])("has no crontab form for %p", (cron) => {
+    expect(toSentryCrontab(cron)).toBeUndefined();
+  });
 });
 
 describe("buildSentryMonitorConfig", () => {
@@ -53,9 +59,9 @@ describe("buildSentryMonitorConfig", () => {
     ).not.toHaveProperty("timezone");
   });
 
-  it("is null for a schedule with no crontab form", () => {
+  it("is undefined for a schedule with no crontab form", () => {
     expect(
       buildSentryMonitorConfig("*/10 * * * * *", "Europe/Istanbul", monitor),
-    ).toBeNull();
+    ).toBeUndefined();
   });
 });

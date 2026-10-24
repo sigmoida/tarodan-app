@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import "reflect-metadata";
+import { toSentryCrontab } from "../monitoring/cron-monitor-config";
 import { CRON_CATALOG, cronMonitorFor } from "./cron-catalog";
 
 /**
@@ -89,24 +90,47 @@ describe("cron-catalog sözleşmesi", () => {
   });
 });
 
+/** Every `registerRepeatableCron(queue, "<key>", "<cron>", ...)` in src. */
+function collectRegisteredSchedules(): Map<string, string> {
+  const schedules = new Map<string, string>();
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".spec.ts")) {
+        const source = fs.readFileSync(full, "utf8");
+        for (const m of source.matchAll(
+          /registerRepeatableCron\(\s*[^,]+,\s*"([^"]+)",\s*"([^"]+)"/g,
+        )) {
+          schedules.set(m[1], m[2]);
+        }
+      }
+    }
+  };
+  walk(path.join(__dirname, ".."));
+  return schedules;
+}
+
 /**
  * CONTRACT: the Sentry cron monitors. The plan includes one monitor and it is
  * spent on payout-process (a silent stop leaves sellers unpaid). A new monitor
  * is a plan and alert decision: change this list on purpose. Sentry rejects a
- * monitor config with a non-positive margin, runtime or threshold, and then
- * every check-in of that job is dropped.
+ * monitor config with a non-positive margin, runtime or threshold, or a
+ * schedule outside plain crontab, and then drops every check-in of the job.
+ * The thresholds are tuned to the registered schedule, so it is pinned here.
  */
 describe("cron-catalog Sentry monitors", () => {
   const monitored = CRON_CATALOG.flatMap((c) =>
     c.monitor ? [{ key: c.key, monitor: c.monitor }] : [],
   );
+  const schedules = collectRegisteredSchedules();
 
   it("monitors payout-process only", () => {
     expect(monitored.map((c) => c.key)).toEqual(["payout-process"]);
   });
 
   it.each(monitored.map((c) => [c.key, c.monitor] as const))(
-    "%s has positive whole-minute settings",
+    "%s has positive whole-number settings",
     (_key, monitor) => {
       for (const value of [
         monitor.checkinMarginMinutes,
@@ -120,7 +144,17 @@ describe("cron-catalog Sentry monitors", () => {
     },
   );
 
-  it("pins the payout-process thresholds", () => {
+  it.each(monitored.map((c) => [c.key] as const))(
+    "%s is registered with a schedule Sentry accepts",
+    (key) => {
+      const schedule = schedules.get(key);
+      expect(schedule).toBeDefined();
+      expect(toSentryCrontab(schedule ?? "")).toBeDefined();
+    },
+  );
+
+  it("pins the payout-process schedule and the thresholds tuned to it", () => {
+    expect(schedules.get("payout-process")).toBe("*/15 * * * *");
     expect(cronMonitorFor("payout-process")).toEqual({
       checkinMarginMinutes: 10,
       maxRuntimeMinutes: 30,

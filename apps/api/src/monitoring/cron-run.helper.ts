@@ -59,17 +59,28 @@ export async function runTrackedJob(
   // CronTracker feeds /admin/jobs and the Sentry check-ins. track() returns the
   // result and rethrows the error AS IS, so Bull still marks the job failed.
   //
-  // ONLY scheduled runs are tracked: every job born of a repeatable has
-  // `opts.repeat.cron`; manual or one-off jobs (test tools, the admin-release
-  // fast path, a Bull Board retry) do not. A manual job in the tracker would
+  // ONLY scheduled runs are tracked, with their automatic retries: every job
+  // born of a repeatable has `opts.repeat.cron`; manual or one-off jobs (test
+  // tools, the admin-release fast path) do not. A Bull Board retry re-runs the
+  // failed scheduled job with its opts, so it is told apart by Bull's own
+  // marks: `retriedOn` is set by `job.retry()`, and a job that has used up its
+  // attempts is only run again by hand. A manual run in the tracker would
   // overwrite the schedule on /admin/jobs, skew the run and failure counters,
-  // and make the Sentry cron monitor raise a false alarm or mask the "missed"
-  // alarm of a scheduled run that really did not happen. Manual runs stay
-  // visible in Bull Board (Logs / Data / Error tabs).
+  // and send an off-schedule check-in that could resolve an open Sentry
+  // monitor issue or mask a "missed" one. Manual runs stay visible in Bull
+  // Board (Logs / Data / Error tabs).
   const tracker = getCronTracker();
-  const repeat = (job?.opts as { repeat?: { cron?: string; tz?: string } })
-    ?.repeat;
-  const cron = repeat?.cron;
+  const opts = job?.opts as
+    { repeat?: { cron?: string; tz?: string }; attempts?: number } | undefined;
+  const cron = opts?.repeat?.cron;
   if (!tracker || !cron) return exec();
-  return tracker.track(jobName, cron, exec, repeat?.tz);
+  const attemptsMade = job.attemptsMade ?? 0;
+  const attempts = opts?.attempts ?? 1;
+  const retriedByHand = Boolean((job as { retriedOn?: number }).retriedOn);
+  if (retriedByHand || attemptsMade >= attempts) return exec();
+  return tracker.track(jobName, cron, exec, {
+    timezone: opts?.repeat?.tz,
+    jobId: job.id === undefined ? undefined : String(job.id),
+    finalAttempt: attemptsMade + 1 >= attempts,
+  });
 }
