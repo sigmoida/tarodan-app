@@ -47,10 +47,10 @@ export async function registerRepeatableCron(
         removeOnFail: 50,
       },
     );
-    logger.log(`Bull repeatable kayıtlı: '${jobName}' (${cron}).`);
+    logger.log(`Bull repeatable registered: '${jobName}' (${cron}).`);
   } catch (e) {
     logger.error(
-      `Bull repeatable sync başarısız ('${jobName}'): ${errorMessage(e)}`,
+      `Bull repeatable sync failed ('${jobName}'): ${errorMessage(e)}`,
     );
     throw e;
   }

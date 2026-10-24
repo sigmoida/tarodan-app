@@ -48,10 +48,10 @@ export async function runTrackedJob(
     try {
       const res = (await fn(log)) || {};
       const durationMs = Date.now() - started;
-      log(`bitti (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
+      log(`done (${durationMs}ms)${res.summary ? " — " + res.summary : ""}`);
       return { ok: true, durationMs, summary: res.summary, stats: res.stats };
     } catch (e) {
-      log(`HATA (${Date.now() - started}ms): ${errorMessage(e)}`);
+      log(`FAILED (${Date.now() - started}ms): ${errorMessage(e)}`);
       throw e; // Bull marks the job failed and the Error tab shows the stack.
     }
   };

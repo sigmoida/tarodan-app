@@ -33,12 +33,13 @@ export class InvoiceSchedulerService implements OnModuleInit {
     );
   }
 
-  /** Gerçek iş — Bull processor 'elogo-retry-pending' buradan çağırır. */
+  /** The actual work: the Bull processor 'elogo-retry-pending' calls this. */
   async runRetryPending(log: (msg: string) => void = () => undefined) {
     try {
       await this.invoicing.retryPendingInvoices();
-      // Deneme bütçesi tükenmiş faturalar otomatik kurtarılmaz; görünür olmaları
-      // gerekir (yasal süre işliyor). Admin retry endpoint'i ile kurtarılabilirler.
+      // Invoices with an exhausted attempt budget are not recovered by
+      // themselves and must be visible (the legal deadline runs). The admin
+      // retry endpoint recovers them.
       const exhausted = await this.invoicing.reportExhaustedInvoices();
       log(
         `eLogo retry çalıştı${exhausted > 0 ? ` · ${exhausted} fatura deneme bütçesi tükenmiş` : ""}`,
@@ -48,8 +49,8 @@ export class InvoiceSchedulerService implements OnModuleInit {
         stats: { exhausted } as Record<string, number>,
       };
     } catch (err) {
-      this.logger.warn(`eLogo retry cron hatası: ${errorMessage(err)}`);
-      log(`HATA: ${errorMessage(err)}`);
+      this.logger.warn(`eLogo retry cron failed: ${errorMessage(err)}`);
+      log(`FAILED: ${errorMessage(err)}`);
       // Rethrow, do not swallow: the Bull job must fail so attempts/backoff and
       // the cron tracker's failure alarm really apply (otherwise even a failed
       // run looks successful and the error stays in a log line).
