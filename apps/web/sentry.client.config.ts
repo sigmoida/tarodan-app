@@ -27,6 +27,7 @@ Sentry.init({
   // running recording. See docs/PCI_PAYMENT_PAGE.md.
   ...replaySampleRates(
     typeof window === "undefined" ? undefined : window.location.pathname,
+    sentryEnvironment,
   ),
 
   ignoreErrors: [

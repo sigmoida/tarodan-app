@@ -8,6 +8,8 @@
  * `sentry.build.js` (explicit value, else Coolify's `SOURCE_COMMIT`).
  */
 
+import { sentrySampling } from "@tarodan/logger";
+
 import { resolveSentryEnvironment } from "./src/lib/sentryEnvironment";
 
 /**
@@ -39,8 +41,9 @@ export const sentryEnvironment = resolveSentryEnvironment(
 );
 
 /**
- * The sample rate follows the real build mode, not the tag: staging is a
- * production build too, and full sampling there would burn the trace quota.
+ * Trace sample rate by Sentry environment (production 0.2, staging 0.02,
+ * development 0), from the shared table in `@tarodan/logger`. Keyed on the
+ * resolved tag, never `NODE_ENV`: staging is a production build too.
  */
 export const sentryTracesSampleRate =
-  process.env.NODE_ENV === "production" ? 0.2 : 1.0;
+  sentrySampling(sentryEnvironment).tracesSampleRate;
