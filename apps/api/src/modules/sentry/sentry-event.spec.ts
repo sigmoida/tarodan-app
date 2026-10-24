@@ -10,9 +10,10 @@ import type { Breadcrumb, Event } from "@sentry/node";
 import { runWithRequestId } from "../../common/context/request-context";
 
 /**
- * Breadcrumb kapısı: Sentry'nin fetch entegrasyonu her dış çağrının URL'ini
- * kaydeder; Sürat sözleşmesi kimliği query'de taşır. Canlıda şifre Sentry
- * olaylarında düz metin göründü — bu testler o sızıntıyı kapalı tutar.
+ * Breadcrumb gate: Sentry's fetch integration records the URL of every
+ * outbound call, and the Sürat contract carries its credentials in the query.
+ * In production the password showed up in Sentry events as plain text; these
+ * tests keep that leak closed.
  */
 describe("applySentryBreadcrumbPolicy", () => {
   const suratUrl =
@@ -65,9 +66,9 @@ describe("applySentryBreadcrumbPolicy", () => {
 });
 
 /**
- * Performans izleri: fetch entegrasyonu her dış çağrı için `http.client` span'ı
- * üretir ve tam URL'yi span verisine yazar. Breadcrumb temizlense de span
- * üzerinden sızardı — bu kapı onu kapatır.
+ * Performance traces: the fetch integration creates an `http.client` span for
+ * every outbound call and writes the full URL into the span data. With the
+ * breadcrumb clean it would still leak through the span; this gate closes it.
  */
 describe("applySentryTransactionPolicy", () => {
   const suratUrl =
@@ -129,38 +130,38 @@ describe("applySentryTransactionPolicy", () => {
 });
 
 /**
- * Sentry'ye giden her olayın geçtiği TEK kapı. Üç sözleşme:
- *  - sağlık kontrolleri hiç gitmez (dakikada bir koşan gürültü),
- *  - hassas alanlar redakte edilir (gövde/başlık sızıntısı olmaz),
- *  - korelasyon kimliği TAG olur — `extra` aranabilir değildir, oysa asıl
- *    senaryo kullanıcının verdiği kodu Sentry aramasına yazmaktır.
+ * The ONE gate every event passes on its way to Sentry. Three contracts:
+ *  - health checks never go out (noise that runs every minute),
+ *  - sensitive fields are redacted (no body or header leaks),
+ *  - the correlation id becomes a TAG: `extra` cannot be searched, and the
+ *    main use is typing the code a user gave into the Sentry search.
  */
 describe("applySentryEventPolicy", () => {
-  it("sağlık kontrolü olaylarını düşürür", () => {
+  it("drops health-check events", () => {
     const event: Event = { request: { url: "https://api/x/health" } };
     expect(applySentryEventPolicy(event)).toBeNull();
   });
 
-  it("korelasyon kimliğini ARANABİLİR tag olarak ekler", () => {
+  it("adds the correlation id as a SEARCHABLE tag", () => {
     const event = runWithRequestId("req-abc", () =>
       applySentryEventPolicy<Event>({ message: "boom" }),
     );
     expect(event?.tags).toMatchObject({ requestId: "req-abc" });
   });
 
-  it("istek bağlamı dışında (cron/worker) tag eklemez", () => {
+  it("adds no tag outside a request context (cron, worker)", () => {
     const event = applySentryEventPolicy<Event>({ message: "cron" });
     expect(event?.tags?.requestId).toBeUndefined();
   });
 
-  it("mevcut tag'leri korur", () => {
+  it("keeps the existing tags", () => {
     const event = runWithRequestId("req-1", () =>
       applySentryEventPolicy({ tags: { area: "payment" } } satisfies Event),
     );
     expect(event?.tags).toMatchObject({ area: "payment", requestId: "req-1" });
   });
 
-  it("hassas alanları redakte eder", () => {
+  it("redacts sensitive fields", () => {
     const event = applySentryEventPolicy({
       request: { url: "https://api/login", data: { password: "hunter2" } },
     } satisfies Event);
@@ -212,12 +213,12 @@ describe("applySentryEventPolicy", () => {
 });
 
 /**
- * Sürüm etiketi olmadan "bu hata hangi deploy'la geldi" sorusu cevapsız kalır;
- * Sentry'nin regresyon takibi (çözülen bir issue yeni sürümde tekrar açılırsa
- * uyarma) da sürüme dayanır.
+ * Without a release tag "which deploy brought this error" has no answer, and
+ * Sentry's regression tracking (alerting when a resolved issue reopens in a
+ * new release) depends on the release too.
  */
 describe("resolveSentryRelease", () => {
-  it("açık SENTRY_RELEASE her şeyin önündedir", () => {
+  it("an explicit SENTRY_RELEASE wins over everything", () => {
     expect(
       resolveSentryRelease({
         SENTRY_RELEASE: "v1.2.3",
@@ -226,7 +227,7 @@ describe("resolveSentryRelease", () => {
     ).toBe("v1.2.3");
   });
 
-  it("Coolify'ın SOURCE_COMMIT'ini kısa sha'ya indirger", () => {
+  it("shortens Coolify's SOURCE_COMMIT to a short sha", () => {
     expect(resolveSentryRelease({ SOURCE_COMMIT: "abcdef1234567890" })).toBe(
       "abcdef1",
     );
@@ -238,19 +239,19 @@ describe("resolveSentryRelease", () => {
     );
   });
 
-  it("hiçbiri yoksa undefined döner (Sentry kendi tahminine düşer)", () => {
+  it("returns undefined when none is set (the SDK guesses)", () => {
     expect(resolveSentryRelease({})).toBeUndefined();
   });
 });
 
 /**
- * Ortam etiketi `NODE_ENV`'e bağlanamaz: her üç Dockerfile da onu sabit
- * `production` yazar, yani staging ve gerçek prod Sentry'de AYNI görünürdü —
- * staging'deki test hataları prod alarmlarının arasına karışırdı. Etiket
- * kendi anahtarından (SENTRY_ENVIRONMENT) gelir.
+ * The environment tag cannot come from `NODE_ENV`: all three Dockerfiles set
+ * it to `production`, so staging and production would look the SAME in
+ * Sentry and staging test errors would mix into production alerts. The tag
+ * has its own key (SENTRY_ENVIRONMENT).
  */
 describe("resolveSentryEnvironment", () => {
-  it("SENTRY_ENVIRONMENT ortamı belirler (NODE_ENV production olsa bile)", () => {
+  it("SENTRY_ENVIRONMENT sets the environment (even with NODE_ENV production)", () => {
     expect(
       resolveSentryEnvironment({
         SENTRY_ENVIRONMENT: "staging",
@@ -259,13 +260,13 @@ describe("resolveSentryEnvironment", () => {
     ).toBe("staging");
   });
 
-  it("verilmezse NODE_ENV'e düşer (tek ortamlı kurulum bozulmaz)", () => {
+  it("falls back to NODE_ENV when unset (a single-environment setup keeps working)", () => {
     expect(resolveSentryEnvironment({ NODE_ENV: "production" })).toBe(
       "production",
     );
   });
 
-  it("hiçbiri yoksa development varsayar", () => {
+  it("defaults to development when neither is set", () => {
     expect(resolveSentryEnvironment({})).toBe("development");
   });
 

@@ -8,14 +8,15 @@ import {
 } from "../../common/security/redact-sensitive";
 
 /**
- * Sentry'ye giden her olayın geçtiği tek kapı (Sentry.init → beforeSend).
+ * The one gate every event passes on its way to Sentry (Sentry.init ->
+ * beforeSend).
  *
- * Korelasyon kimliği `extra` değil TAG olarak eklenir: extra alanları
- * aranamaz, oysa asıl senaryo kullanıcının destek talebinde verdiği kodu
- * Sentry arama çubuğuna `requestId:...` diye yazmaktır.
+ * The correlation id is added as a TAG, not `extra`: extra fields cannot be
+ * searched, and the main use is typing the code a user gave in a support
+ * request into the Sentry search bar as `requestId:...`.
  */
 export function applySentryEventPolicy<T extends Event>(event: T): T | null {
-  // Sağlık kontrolleri dakikada bir koşar; issue listesini boğar.
+  // Health checks run every minute; they would flood the issue list.
   if (event.request?.url?.includes("/health")) return null;
 
   const requestId = getRequestId();
@@ -33,21 +34,21 @@ export function applySentryEventPolicy<T extends Event>(event: T): T | null {
 }
 
 /**
- * Sentry breadcrumb'larının geçtiği tek kapı (Sentry.init → beforeBreadcrumb);
- * API ve worker süreçleri AYNI fonksiyonu kullanmalı.
+ * The one gate every Sentry breadcrumb passes (Sentry.init ->
+ * beforeBreadcrumb); the API and worker processes must use the SAME function.
  *
- * Neden ayrı bir kapı: Sentry'nin varsayılan fetch/undici entegrasyonu her dış
- * çağrıyı `http` breadcrumb'ı olarak URL'iyle birlikte kaydeder. Sürat takip
- * sözleşmesi kimliği (`CariKodu`/`Sifre`) query parametresinde taşıdığı için
- * canlıda şifre Sentry olaylarında düz metin göründü. `redactSensitive` anahtar
- * adına bakar, URL'yi ayrıştırmaz; o yüzden `url` ve `http.query` alanları ayrıca
- * `redactUrlQuery`'den geçirilir.
+ * Why a separate gate: Sentry's default fetch/undici integration records every
+ * outbound call as an `http` breadcrumb with its URL. The Sürat tracking
+ * contract carries its credentials (`CariKodu`/`Sifre`) in the query string,
+ * so in production the password showed up in Sentry events as plain text.
+ * `redactSensitive` looks at key names and does not parse URLs, so the `url`
+ * and `http.query` fields also go through `redactUrlQuery`.
  */
 export function applySentryBreadcrumbPolicy<T extends Breadcrumb>(
   breadcrumb: T,
 ): T | null {
   const url = breadcrumb.data?.url;
-  // Sağlık kontrolleri dakikada bir koşar; breadcrumb listesini boğar.
+  // Health checks run every minute; they would flood the breadcrumb list.
   if (
     breadcrumb.category === "http" &&
     typeof url === "string" &&
@@ -71,7 +72,7 @@ export function applySentryBreadcrumbPolicy<T extends Breadcrumb>(
   return redacted;
 }
 
-/** Bir span/trace veri sözlüğündeki her metin değerinde URL query'sini maskeler. */
+/** Masks the URL query in every string value of a span or trace data map. */
 function redactSpanData(
   data: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
@@ -85,15 +86,16 @@ function redactSpanData(
 }
 
 /**
- * Performans izlerinin (transaction) geçtiği tek kapı (Sentry.init →
- * beforeSendTransaction); API ve worker AYNI fonksiyonu kullanmalı.
+ * The one gate every performance trace (transaction) passes (Sentry.init ->
+ * beforeSendTransaction); the API and worker must use the SAME function.
  *
- * Breadcrumb kapısı yetmiyor: aynı fetch entegrasyonu her dış çağrı için bir
- * `http.client` span'ı da üretir ve tam URL'yi span verisine (`url.full`,
- * `http.url`, `http.target`) ve açıklamasına yazar. `tracesSampleRate` sıfır
- * olmadığı sürece bu izler Sentry'ye gider — yani Sürat şifresi breadcrumb'dan
- * silinse bile span üzerinden sızmaya devam ederdi. Anahtar adına güvenmek
- * yerine span'daki HER metin değeri query redaksiyonundan geçirilir.
+ * The breadcrumb gate is not enough: the same fetch integration also creates
+ * an `http.client` span for every outbound call and writes the full URL into
+ * the span data (`url.full`, `http.url`, `http.target`) and its description.
+ * Whenever `tracesSampleRate` is above zero these traces reach Sentry, so the
+ * Sürat password would keep leaking through spans even with the breadcrumb
+ * clean. Instead of trusting key names, EVERY string value in a span goes
+ * through the query redaction.
  */
 export function applySentryTransactionPolicy<T extends Event>(
   event: T,
