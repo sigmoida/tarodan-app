@@ -3,7 +3,7 @@
  * Standalone worker process for background job processing
  */
 import { NestFactory } from "@nestjs/core";
-import { Logger } from "@nestjs/common";
+import { INestApplicationContext, Logger } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
@@ -46,14 +46,29 @@ async function bootstrap() {
 
   logger.log("Starting Tarodan Worker...");
 
-  // Faz 7.2: worker, AppModule'ü BAŞSIZ (HTTP yok) application-context olarak yükler.
-  // Böylece hem klasik kuyruk worker'ları (WorkerModule) hem de feature modüllerine
-  // gömülü `scheduled` kuyruğu processor'ları (outbox-drain, ledger-reconcile, payout,
-  // membership, boost, ...) ayrı worker process'inde koşar. Rol env'den okunur; worker
-  // servisine `PROCESS_ROLE=worker` verilir (WorkerModule yine yüklenir — `web` değil).
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: new AppNestLogger(),
-  });
+  // The worker loads AppModule as a HEADLESS application context (no HTTP), so
+  // both the classic queue workers (WorkerModule) and the `scheduled` queue
+  // processors embedded in feature modules (outbox-drain, ledger-reconcile,
+  // payout, membership, boost, ...) run in this separate process. The role
+  // comes from the env: the worker service gets `PROCESS_ROLE=worker`
+  // (WorkerModule still loads; it is not `web`).
+  let app: INestApplicationContext;
+  try {
+    app = await NestFactory.createApplicationContext(AppModule, {
+      logger: new AppNestLogger(),
+    });
+  } catch (err) {
+    // Exit like main.ts does: a worker that failed to boot must not stay up
+    // with no queues running, looking healthy to the orchestrator. Flush the
+    // event first; the unhandledRejection listener would keep the process
+    // alive and never flush it.
+    logger.error("Worker failed to start", errorStack(err));
+    if (sentryEnabled) {
+      Sentry.captureException(err);
+      await Sentry.close(2000);
+    }
+    process.exit(1);
+  }
 
   logger.log(
     "Worker started successfully (headless AppModule application-context)",
