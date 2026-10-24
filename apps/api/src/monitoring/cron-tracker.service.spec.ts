@@ -485,6 +485,58 @@ describe("CronTrackerService.track Sentry check-ins", () => {
       ),
     );
   });
+
+  it("reports the run's duration in seconds, as Sentry reads it", async () => {
+    const now = jest.spyOn(Date, "now");
+    now.mockReturnValueOnce(1_000_000).mockReturnValue(1_000_000 + 95_500);
+
+    await payout(() => "ok");
+
+    expect(captureCheckIn.mock.calls[1][0]).toMatchObject({
+      status: "ok",
+      duration: 95.5,
+    });
+  });
+
+  it("closes overlapping runs (two workers, a slow slot) each with its own check-in id", async () => {
+    captureCheckIn
+      .mockReturnValueOnce("slot-1")
+      .mockReturnValueOnce("slot-2")
+      .mockReturnValue("ignored");
+    let finishFirst!: (value: string) => void;
+    let failSecond!: (error: Error) => void;
+    const first = payout(
+      () => new Promise<string>((resolve) => (finishFirst = resolve)),
+    );
+    const second = payout(
+      () => new Promise<string>((_, reject) => (failSecond = reject)),
+    );
+
+    failSecond(new Error("paytr down"));
+    await expect(second).rejects.toThrow("paytr down");
+    finishFirst("paid");
+    await expect(first).resolves.toBe("paid");
+
+    const closes = captureCheckIn.mock.calls
+      .slice(2)
+      .map(([checkIn]) => [checkIn.checkInId, checkIn.status]);
+    expect(closes).toEqual([
+      ["slot-2", "error"],
+      ["slot-1", "ok"],
+    ]);
+  });
+
+  it("closes an async rejection with an error check-in and rethrows it as is", async () => {
+    const thrown = "not an Error";
+
+    await expect(payout(() => Promise.reject(thrown))).rejects.toBe(thrown);
+
+    expect(statuses()).toEqual(["in_progress", "error"]);
+    expect(tracker.list()[0]).toMatchObject({
+      status: "failed",
+      lastError: thrown,
+    });
+  });
 });
 
 /**
@@ -514,6 +566,23 @@ describe("CronTrackerService.track bookkeeping cannot change the outcome", () =>
     ).resolves.toBe("paid");
 
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("rethrows the run's own error when the repeat warn throws", async () => {
+    jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const tracker = new CronTrackerService();
+    const run = (error: Error) =>
+      tracker.track("payout-process", "*/15 * * * *", () => {
+        throw error;
+      });
+    const first = new Error("paytr down");
+    await expect(run(first)).rejects.toBe(first);
+    jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {
+      throw new Error("log transport broken");
+    });
+    const second = new Error("paytr down");
+
+    await expect(run(second)).rejects.toBe(second);
   });
 
   it("rethrows the run's own error when the failure alarm throws", async () => {
