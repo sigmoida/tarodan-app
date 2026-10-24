@@ -1,5 +1,5 @@
 /**
- * Window width classes (px / pt) and content widths for large screens: iPad,
+ * Window width classes (px / pt) for large screens: iPad,
  * the foldable iPhone, Android tablets and foldables. The classes match the
  * Material window size classes; a class starts at its value here:
  *
@@ -21,11 +21,3 @@ export const breakpoints = {
 } as const;
 
 export type Breakpoints = typeof breakpoints;
-
-/** Content widths (px / pt) that large screens centre content at. */
-export const contentWidths = {
-  /** Forms, settings and detail pages (web `max-w-2xl`, 42rem). */
-  readable: 672,
-} as const;
-
-export type ContentWidths = typeof contentWidths;

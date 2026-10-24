@@ -16,7 +16,7 @@ import { typography } from "./typography";
 import { motion } from "./motion";
 import { zIndex } from "./z-index";
 import { containers } from "./containers";
-import { breakpoints, contentWidths } from "./breakpoints";
+import { breakpoints } from "./breakpoints";
 
 export const tokens = {
   colors,
@@ -28,7 +28,6 @@ export const tokens = {
   zIndex,
   containers,
   breakpoints,
-  contentWidths,
 } as const;
 
 export type Tokens = typeof tokens;
